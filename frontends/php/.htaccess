@@ -1,0 +1,17 @@
+<FilesMatch "\.sql$">
+        Deny from all
+</FilesMatch>
+
+<FilesMatch "\.svn$">
+        Deny from all
+</FilesMatch>
+
+<FilesMatch "\.css$">
+        Allow from all
+</FilesMatch>
+
+AuthType Basic
+AuthName  "Zabbix Monitoring Tool (Graphs)"
+AuthBasicProvider pam
+AuthnPAMService httpd
+Require valid-user
