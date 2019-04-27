@@ -628,10 +628,11 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 				",tls_issuer,tls_subject,tls_psk_identity,tls_psk,proxy_address,auto_compress,"
 				"maintenanceid"
 			" from hosts"
-			" where status in (%d,%d,%d,%d)"
+			" where status in (%d,%d,%d,%d,%d,%d)"
 				" and flags<>%d",
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
+			HOST_STATUS_DOMAIN, HOST_STATUS_SERVER,
 			ZBX_FLAG_DISCOVERY_PROTOTYPE)))
 	{
 		return FAIL;
@@ -648,10 +649,11 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 				"status,name,lastaccess,error,snmp_error,ipmi_error,jmx_error,tls_connect,tls_accept,"
 				"proxy_address,auto_compress,maintenanceid"
 			" from hosts"
-			" where status in (%d,%d,%d,%d)"
+			" where status in (%d,%d,%d,%d,%d,%d)"
 				" and flags<>%d",
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
+			HOST_STATUS_DOMAIN,HOST_STATUS_SERVER,
 			ZBX_FLAG_DISCOVERY_PROTOTYPE)))
 	{
 		return FAIL;
@@ -1809,8 +1811,9 @@ static int	dbsync_compare_trigger(const ZBX_DC_TRIGGER *trigger, const DB_ROW db
 	if (FAIL == dbsync_compare_uchar(dbrow[5], trigger->type))
 		return FAIL;
 
-	if (FAIL == dbsync_compare_uchar(dbrow[9], trigger->status))
-		return FAIL;
+	//we don't care about saved trigger status in cluster edition
+	//if (FAIL == dbsync_compare_uchar(dbrow[9], trigger->status))
+	//	return FAIL;
 
 	if (FAIL == dbsync_compare_uchar(dbrow[10], trigger->recovery_mode))
 		return FAIL;
@@ -1915,6 +1918,7 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
 
 	if (NULL == (result = DBselect(
 			"select distinct t.triggerid,t.description,t.expression,t.error,t.priority,t.type,t.value,"
+//			"select distinct t.triggerid,t.description,t.expression,t.error,t.priority,t.type,0,"
 				"t.state,t.lastchange,t.status,t.recovery_mode,t.recovery_expression,"
 				"t.correlation_mode,t.correlation_tag"
 			" from hosts h,items i,functions f,triggers t"

@@ -242,7 +242,7 @@ int	CONFIG_LOG_SLOW_QUERIES		= 0;	/* ms; 0 - disable */
 
 int	CONFIG_SERVER_STARTUP_TIME	= 0;	/* zabbix server startup time */
 
-int	CONFIG_PROXYPOLLER_FORKS	= 1;	/* parameters for passive proxies */
+int	CONFIG_PROXYPOLLER_FORKS	= 3;	/* parameters for passive proxies */
 
 /* how often Zabbix server sends configuration data to proxy, in seconds */
 int	CONFIG_PROXYCONFIG_FREQUENCY	= SEC_PER_HOUR;
@@ -282,6 +282,10 @@ static char	*CONFIG_SOCKET_PATH	= NULL;
 char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
 char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
 int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
+char	CONFIG_HOSTNAME[MAX_ZBX_HOSTNAME_LEN];
+//char	CONFIG_CLUSTER_DOMAINS[MAX_ZBX_HOSTNAME_LEN];
+int 	CONFIG_CLUSTER_SERVER_ID =0;
+int CONFIG_CLUSTER_REROUTE_DATA	= 1;
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -496,7 +500,10 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_SOCKET_PATH)
 		CONFIG_SOCKET_PATH = zbx_strdup(CONFIG_SOCKET_PATH, "/tmp");
-
+	
+	if (NULL == CONFIG_HOSTNAME)
+	 	gethostname(CONFIG_HOSTNAME, MAX_ZBX_HOSTNAME_LEN);
+		
 	if (0 != CONFIG_IPMIPOLLER_FORKS)
 		CONFIG_IPMIMANAGER_FORKS = 1;
 }
@@ -706,7 +713,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"LogSlowQueries",		&CONFIG_LOG_SLOW_QUERIES,		TYPE_INT,
 			PARM_OPT,	0,			3600000},
 		{"StartProxyPollers",		&CONFIG_PROXYPOLLER_FORKS,		TYPE_INT,
-			PARM_OPT,	0,			250},
+			PARM_MAND,	2,			250},
 		{"ProxyConfigFrequency",	&CONFIG_PROXYCONFIG_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	1,			SEC_PER_WEEK},
 		{"ProxyDataFrequency",		&CONFIG_PROXYDATA_FREQUENCY,		TYPE_INT,
@@ -763,6 +770,12 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			0},
 		{"HistoryStorageTableName",		&CONFIG_HISTORY_STORAGE_TABLE_NAME,		TYPE_STRING,
 			PARM_OPT,	1,			0},
+		{"Hostname",			&CONFIG_HOSTNAME,			TYPE_STRING,
+			PARM_MAND,	0,			0},
+		{"ServerID",		&CONFIG_CLUSTER_SERVER_ID,			TYPE_INT,
+			PARM_MAND,	0,			ZBX_CLUSTER_MAX_SERVERS-1},
+		{"RerouteItems",		&CONFIG_CLUSTER_REROUTE_DATA,			TYPE_INT,
+			PARM_OPT,	0,			1},
 		{NULL}
 	};
 

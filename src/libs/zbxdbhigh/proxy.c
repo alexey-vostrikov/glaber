@@ -32,7 +32,7 @@
 #include "../zbxcrypto/tls_tcp_active.h"
 
 extern char	*CONFIG_SERVER;
-
+extern int CONFIG_CLUSTER_REROUTE_DATA;
 /* the space reserved in json buffer to hold at least one record plus service data */
 #define ZBX_DATA_JSON_RESERVED		(HISTORY_TEXT_VALUE_LEN * 4 + ZBX_KIBIBYTE * 4)
 
@@ -43,6 +43,7 @@ extern char	*CONFIG_SERVER;
 #define ZBX_HISTORY_VALUES_MAX		256
 
 extern unsigned int	configured_tls_accept_modes;
+int zbx_dc_forward_item_to_server(DC_ITEM *item, zbx_agent_value_t *value) ;
 
 typedef struct
 {
@@ -590,6 +591,17 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 	size_t		sql_alloc = 512, sql_offset;
 
 	sql = (char *)zbx_malloc(sql, sql_alloc * sizeof(char));
+	//todo: fix this to cluster in following ways:
+	
+	//1-this will not work at all as hosts are not really assigned to proxies
+	//2-instead of loading hostid from the database, we need to go through
+	//all the hosts that has been loaded and assigned to this server
+	//and select thouse, which  are assigned to the proxy 
+	//we also need to calculate host to proxy mathcing according to domains 
+	//and number of proxies and we need to recalc it on some events 
+	//	- a new proxy has appeared/disappeared
+	//	- a new list of the hosts belonging to the server has been loaded
+	//	- a config reload has happend
 
 	result = DBselect(
 			"select hostid"
@@ -2475,13 +2487,23 @@ int	process_history_data(DC_ITEM *items, zbx_agent_value_t *values, int *errcode
 	size_t		i;
 	int		processed_num = 0;
 
+
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
 	for (i = 0; i < values_num; i++)
 	{
+		
 		if (SUCCEED != errcodes[i])
 			continue;
-
+		/* reroute items which hosts processed on other cluster nodes to that nodes */
+		if ( ZBX_CLUSTER_HOST_STATE_ACTIVE != items[i].host.cluster_state && 
+			0 != CONFIG_CLUSTER_REROUTE_DATA &&
+			0 != items[i].host.cluster_server_host_id && //may be not set during cluster rebult or startup
+			SUCCEED == zbx_dc_forward_item_to_server(&items[i],&values[i]) ) {
+				processed_num++;
+				continue;
+		} 
+		
 		if (SUCCEED != process_history_data_value(&items[i], &values[i]))
 		{
 			/* clean failed items to avoid updating their runtime data */
@@ -2954,8 +2976,8 @@ static int	agent_item_validator(DC_ITEM *item, zbx_socket_t *sock, void *args, c
 {
 	zbx_host_rights_t	*rights = (zbx_host_rights_t *)args;
 
-	if (0 != item->host.proxy_hostid)
-		return FAIL;
+	//if (0 != item->host.proxy_hostid)
+	//	return FAIL;
 
 	if (ITEM_TYPE_ZABBIX_ACTIVE != item->type)
 		return FAIL;
@@ -2988,8 +3010,8 @@ static int	sender_item_validator(DC_ITEM *item, zbx_socket_t *sock, void *args, 
 {
 	zbx_host_rights_t	*rights;
 
-	if (0 != item->host.proxy_hostid)
-		return FAIL;
+	//if (0 != item->host.proxy_hostid)
+	//	return FAIL;
 
 	switch(item->type)
 	{
@@ -3035,7 +3057,6 @@ static int	sender_item_validator(DC_ITEM *item, zbx_socket_t *sock, void *args, 
 		rights->hostid = item->host.hostid;
 		rights->value = zbx_host_check_permissions(&item->host, sock, error);
 	}
-
 	return rights->value;
 }
 
@@ -3139,7 +3160,7 @@ static int	process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse
 					zabbix_log(LOG_LEVEL_WARNING, "%s", error);
 					zbx_free(error);
 				}
-
+				
 				DCconfig_clean_items(&items[i], &errcodes[i], 1);
 				errcodes[i] = FAIL;
 			}

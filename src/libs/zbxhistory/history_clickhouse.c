@@ -572,6 +572,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
     //for checks with small intervalls it's better to wait item
     //collection then to request SLOOW history cache, so 
     if (time(NULL)- ZBX_VALUECACHE_FILL_TIME < first_run) {
+			zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
             ret = SUCCEED;
             goto out;
 
@@ -640,7 +641,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 	if (CURLE_OK != (err = curl_easy_perform(data->handle)))
 	{
 		clickhouse_log_error(data->handle, err, errbuf,page_r);
-        zabbix_log(LOG_LEVEL_INFORMATION, "Failed query");
+        zabbix_log(LOG_LEVEL_WARNING, "Failed clickhosue query %s",sql_buffer);
 		goto out;
 	}
 
@@ -821,6 +822,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 	if (num > 0)
 	{ 
         zbx_snprintf_alloc(&data->buf, &buf_alloc, &buf_offset, "%s\n", tmp_buffer);
+        zabbix_log(LOG_LEVEL_DEBUG, "will insert to clickhouse: %s",data->buf);
 
 		clickhouse_writer_add_iface(hist);
 	}

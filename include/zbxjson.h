@@ -100,6 +100,14 @@
 #define ZBX_PROTO_TAG_SESSION		"session"
 #define ZBX_PROTO_TAG_ID		"id"
 
+#define ZBX_PROTO_VALUE_CLUSTER_HELLO "cluster_hello"
+#define ZBX_PROTO_SERVER_ID	"server_id"
+#define ZBX_PROTO_SERVER_HOST_ID	"server_hostid"
+#define ZBX_PROTO_CLUSTER_TOPOLOGY_VERSION "cluster_topology_version"
+#define	ZBX_PROTO_CLUSTER_PROXYLIST	"proxy_list"
+#define	ZBX_PROTO_CLUSTER_TOPOLOGY	"topology"
+#define ZBX_PROTO_CLUSTER_REROUTED_DATA "rerouted_data"
+
 #define ZBX_PROTO_VALUE_FAILED		"failed"
 #define ZBX_PROTO_VALUE_SUCCESS		"success"
 
@@ -120,6 +128,7 @@
 #define ZBX_PROTO_VALUE_GET_PROBLEMS	"problems.get"
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"
+#define ZBX_PROTO_VALUE_CLUSTER_TOPOLGY		"cluster_topology"
 
 #define ZBX_PROTO_VALUE_GET_QUEUE_OVERVIEW	"overview"
 #define ZBX_PROTO_VALUE_GET_QUEUE_PROXY		"overview by proxy"

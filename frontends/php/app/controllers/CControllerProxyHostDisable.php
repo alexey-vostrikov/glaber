@@ -43,7 +43,8 @@ class CControllerProxyHostDisable extends CController {
 		$proxies = API::Proxy()->get([
 			'proxyids' => $this->getInput('proxyids'),
 			'countOutput' => true,
-			'editable' => true
+			'editable' => true,
+			'all_objects' => true,
 		]);
 
 		return ($proxies == count($this->getInput('proxyids')));

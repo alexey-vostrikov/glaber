@@ -35,13 +35,13 @@ extern char	*CONFIG_TLS_SERVER_CERT_SUBJECT;
 extern char	*CONFIG_TLS_PSK_IDENTITY;
 #endif
 
-int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval)
+int	connect_to_a_server(zbx_socket_t *sock, char *SERVER_NAME, int timeout, int retry_interval)
 {
 	int	res, lastlogtime, now;
 	char	*tls_arg1, *tls_arg2;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In connect_to_server() [%s]:%d [timeout:%d]",
-			CONFIG_SERVER, CONFIG_SERVER_PORT, timeout);
+			SERVER_NAME, CONFIG_SERVER_PORT, timeout);
 
 	switch (configured_tls_connect_mode)
 	{
@@ -64,23 +64,23 @@ int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval)
 			return FAIL;
 	}
 
-	if (FAIL == (res = zbx_tcp_connect(sock, CONFIG_SOURCE_IP, CONFIG_SERVER, CONFIG_SERVER_PORT, timeout,
+	if (FAIL == (res = zbx_tcp_connect(sock, CONFIG_SOURCE_IP, SERVER_NAME, CONFIG_SERVER_PORT, timeout,
 			configured_tls_connect_mode, tls_arg1, tls_arg2)))
 	{
 		if (0 == retry_interval)
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "Unable to connect to the server [%s]:%d [%s]",
-					CONFIG_SERVER, CONFIG_SERVER_PORT, zbx_socket_strerror());
+					SERVER_NAME, CONFIG_SERVER_PORT, zbx_socket_strerror());
 		}
 		else
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "Unable to connect to the server [%s]:%d [%s]. Will retry every"
-					" %d second(s)", CONFIG_SERVER, CONFIG_SERVER_PORT, zbx_socket_strerror(),
+					" %d second(s)", SERVER_NAME, CONFIG_SERVER_PORT, zbx_socket_strerror(),
 					retry_interval);
 
 			lastlogtime = (int)time(NULL);
 
-			while (FAIL == (res = zbx_tcp_connect(sock, CONFIG_SOURCE_IP, CONFIG_SERVER, CONFIG_SERVER_PORT,
+			while (FAIL == (res = zbx_tcp_connect(sock, CONFIG_SOURCE_IP, SERVER_NAME, CONFIG_SERVER_PORT,
 					timeout, configured_tls_connect_mode, tls_arg1, tls_arg2)))
 			{
 				now = (int)time(NULL);
@@ -101,6 +101,9 @@ int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval)
 	return res;
 }
 
+int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval) {
+	return connect_to_a_server(sock,CONFIG_SERVER,timeout,retry_interval);
+}
 void	disconnect_server(zbx_socket_t *sock)
 {
 	zbx_tcp_close(sock);

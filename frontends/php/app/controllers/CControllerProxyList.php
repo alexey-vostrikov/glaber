@@ -33,7 +33,7 @@ class CControllerProxyList extends CController {
 			'filter_set' =>		'in 1',
 			'filter_rst' =>		'in 1',
 			'filter_name' =>	'string',
-			'filter_status' =>	'in -1,'.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE
+			'filter_status' =>	'in -1,'.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE.','.HOST_STATUS_SERVER.','.HOST_STATUS_DOMAIN
 		];
 
 		$ret = $this->validateInput($fields);
@@ -96,7 +96,8 @@ class CControllerProxyList extends CController {
 			'sortfield' => $sortField,
 			'limit' => $config['search_limit'] + 1,
 			'editable' => true,
-			'preservekeys' => true
+			'preservekeys' => true,
+			'all_objects' => true,
 		]);
 		// sorting & paging
 		order_result($data['proxies'], $sortField, $sortOrder);
@@ -107,11 +108,13 @@ class CControllerProxyList extends CController {
 		$data['paging'] = getPagingLine($data['proxies'], $sortOrder, $url);
 
 		$data['proxies'] = API::Proxy()->get([
-			'output' => ['proxyid', 'host', 'status', 'lastaccess', 'tls_connect', 'tls_accept', 'auto_compress'],
+			'output' => ['proxyid', 'host', 'status', 'lastaccess', 'tls_connect', 'tls_accept',
+				 'auto_compress','domains','error'],
 			'selectHosts' => ['hostid', 'name', 'status'],
 			'proxyids' => array_keys($data['proxies']),
 			'editable' => true,
-			'preservekeys' => true
+			'preservekeys' => true,
+			'all_objects' => true,
 		]);
 		order_result($data['proxies'], $sortField, $sortOrder);
 
@@ -156,7 +159,7 @@ class CControllerProxyList extends CController {
 							$data['proxies'][$stats['attributes']['proxyid']]['item_count'] += $stats['count'];
 						}
 					}
-				}
+				} 
 
 				// performance
 				if (array_key_exists('required performance', $server_status)) {

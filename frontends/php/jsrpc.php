@@ -185,19 +185,55 @@ switch ($data['method']) {
 		break;
 
 	case 'zabbix.status':
+		
 		CSession::start();
 		if (!CSession::keyExists('serverCheckResult')
 				|| (CSession::getValue('serverCheckTime') + SERVER_CHECK_INTERVAL) <= time()) {
-			$zabbixServer = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, 0);
-			CSession::setValue('serverCheckResult', $zabbixServer->isRunning(CWebUser::getSessionCookie()));
+		
+			$server_list='';
+			//getting list of all the servers we have now
+			$servers = API::Proxy()->get([
+				'output' => ['proxyid', 'host', 'status', 'lastaccess', 'tls_connect', 'tls_accept',
+					 'auto_compress','domains','error','useip'],
+				'selectInterface' => ['interfaceid', 'dns', 'ip', 'useip', 'port'],
+				'editable' => true,
+				'preservekeys' => true,
+				'all_objects' => true,
+			]);
+			
+
+			$running_servers=0;
+			$total_servers=0;
+			foreach ($servers as $server) {
+			
+				if (HOST_STATUS_SERVER == $server['status']) {
+					//	echo "Got true server ".$server['host'];
+					$server_list=$server_list.$server['host'];
+					//we need to fetch interface data as well
+					if ($server['interface']['useip'])  $host= $server['interface']['ip']; else $host = $server['interface']['dns'];
+				
+					$zabbixServer = new CZabbixServer($host, $server['interface']['port'], ZBX_SOCKET_TIMEOUT, 0);
+				
+					if (  $zabbixServer->isRunning(CWebUser::getSessionCookie())) {
+					
+						$running_servers++;
+					}
+					
+					$total_servers++;
+				}
+			}
+				
+			CSession::setValue('serverCheckResult', "$running_servers servers are running out of $total_servers");
+			//echo CSession::getValue('serverCheckResult');
 			CSession::setValue('serverCheckTime', time());
+
 		}
 
 		$result = [
-			'result' => (bool) CSession::getValue('serverCheckResult'),
+			'result' => 0, //(bool) CSession::getValue('serverCheckResult'),
 			'message' => CSession::getValue('serverCheckResult')
-				? ''
-				: _('Zabbix server is not running: the information displayed may not be current.')
+			//	? ''
+			//	: _('Zabbix server is not running: the information displayed may not be current.')
 		];
 		break;
 

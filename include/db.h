@@ -753,15 +753,26 @@ typedef struct
 	unsigned char	compress;
 	int		version;
 	int		lastaccess;
+	char *domains;
 
+	int 		cluster_failed_hello_count;
+	zbx_uint64_t cluster_topology_version;
+	int 		cluster_lastheard ;
+	int 		cluster_state;
+	int 		cluster_rtt;
+	int 		cluster_id;
+
+	
 #define ZBX_FLAGS_PROXY_DIFF_UNSET				__UINT64_C(0x0000)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_COMPRESS			__UINT64_C(0x0001)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_VERSION			__UINT64_C(0x0002)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_LASTACCESS			__UINT64_C(0x0004)
+#define ZBX_FLAGS_PROXY_DIFF_UPDATE_CLUSTER			__UINT64_C(0x0008)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE (			\
 		ZBX_FLAGS_PROXY_DIFF_UPDATE_COMPRESS |	\
 		ZBX_FLAGS_PROXY_DIFF_UPDATE_VERSION | 	\
-		ZBX_FLAGS_PROXY_DIFF_UPDATE_LASTACCESS)
+		ZBX_FLAGS_PROXY_DIFF_UPDATE_LASTACCESS  | \
+		ZBX_FLAGS_PROXY_DIFF_UPDATE_CLUSTER )
 	zbx_uint64_t	flags;
 }
 zbx_proxy_diff_t;

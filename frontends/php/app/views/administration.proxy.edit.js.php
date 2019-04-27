@@ -2,11 +2,14 @@
 	jQuery(function($) {
 		// proxy mode: active or passive
 		$('#status').change(function() {
-			$('#ip').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>);
+			$('#ip').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?>);
+			$('#groupids_').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?>
+			|| $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>
+			);
 			$('#proxy_address')
 				.closest('li')
 				.toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>);
-
+			
 			toggleEncryptionFields();
 		});
 
@@ -73,7 +76,8 @@
 		 *  if proxy is active, "Connections to proxy" field is disabled and "Connections from proxy" is enabled.
 		 */
 		function toggleEncryptionFields() {
-			if ($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>) {
+			if ($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?> ||
+					$('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?>) {
 				$('input[name=tls_connect]').prop('disabled', true);
 				$('#tls_in_none, #tls_in_psk, #tls_in_cert').prop('disabled', false);
 			}

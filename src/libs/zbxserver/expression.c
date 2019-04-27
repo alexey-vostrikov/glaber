@@ -4714,6 +4714,14 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, zbx_vector_ptr_t *
 			continue;
 		}
 
+		if (ZBX_CLUSTER_HOST_STATE_ACTIVE != items[i].host.cluster_state)
+		{
+			func->error = zbx_dsprintf(func->error, "Cannot evaluate function \"%s:%s.%s(%s)\":"
+					" item belongs to a host processed on other cluster node.",
+					items[i].host.host, items[i].key_orig, func->function, func->parameter);
+			continue;
+		}
+
 		/* If the item is NOTSUPPORTED then evaluation is allowed for:   */
 		/*   - time-based functions and nodata(). Their values can be    */
 		/*     evaluated to regular numbers even for NOTSUPPORTED items. */

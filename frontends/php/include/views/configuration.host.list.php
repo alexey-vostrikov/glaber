@@ -51,6 +51,8 @@ $widget = (new CWidget())
 // filter
 $filter = new CFilter();
 
+var_dump( $data['proxies_ms']);
+
 $filter
 	->setProfile($data['profileIdx'])
 	->setActiveTab($data['active_tab'])
@@ -81,12 +83,11 @@ $filter
 			->addRow(_('Monitored by'),
 				(new CRadioButtonList('filter_monitored_by', (int) $data['filter']['monitored_by']))
 					->addValue(_('Any'), ZBX_MONITORED_BY_ANY)
-					->addValue(_('Server'), ZBX_MONITORED_BY_SERVER)
-					->addValue(_('Proxy'), ZBX_MONITORED_BY_PROXY)
+					->addValue(_('Domain'), ZBX_MONITORED_BY_PROXY)
 					->setModern(true)
 			)
 			->addRow(
-				(new CLabel(_('Proxy'), 'filter_proxyids__ms')),
+				(new CLabel(_('Domain'), 'filter_proxyids__ms')),
 				(new CMultiSelect([
 					'name' => 'filter_proxyids[]',
 					'object_name' => 'proxies',

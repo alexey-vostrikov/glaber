@@ -897,11 +897,12 @@ if ((getRequest('action') === 'host.massupdateform' || hasRequest('masssave')) &
 	]);
 	order_result($data['all_groups'], 'name');
 
+	//why whouldn't use API here????
 	// get proxies
 	$data['proxies'] = DBfetchArray(DBselect(
 		'SELECT h.hostid,h.host'.
 		' FROM hosts h'.
-		' WHERE h.status IN ('.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE.')'
+		' WHERE h.status IN ('.HOST_STATUS_DOMAIN.')'
 	));
 	order_result($data['proxies'], 'host');
 

@@ -34,6 +34,20 @@
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern int CONFIG_CLUSTER_SERVER_ID;
+extern char *CONFIG_HOSTNAME;
+
+/* declaring some zbx_dc* cluster functions here to avoid compiler warnings since dbconfig.h shoudn't be included */
+int zbx_dc_create_hello_json(struct zbx_json* j);
+int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse	*jp, int timediff);
+int zbx_dc_recalc_topology(void);
+int zbx_dc_set_topology(const char *topology);
+zbx_uint64_t zbx_dc_current_topology_version();
+int zbx_dc_set_topology_recalc(void);
+void zbx_dc_set_download_server_topology(zbx_uint64_t hostid);
+zbx_uint64_t zbx_dc_get_download_server_topology(void);
+void	zbx_dc_register_server_na(zbx_uint64_t hostid, char * reason);
+int zbx_dc_create_rerouted_json(struct zbx_json *j, zbx_uint64_t serverid);
 
 static int	connect_to_proxy(const DC_PROXY *proxy, zbx_socket_t *sock, int timeout)
 {
@@ -173,6 +187,7 @@ static int	get_data_from_proxy(DC_PROXY *proxy, const char *request, char **data
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	zbx_json_addstring(&j, "request", request, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&j,  ZBX_PROTO_TAG_HOST, proxy->host, ZBX_JSON_TYPE_STRING);
 
 	if (SUCCEED == (ret = connect_to_proxy(proxy, &s, CONFIG_TRAPPER_TIMEOUT)))
 	{
@@ -226,7 +241,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 	zbx_socket_t	s;
 	struct zbx_json	j;
 
-	zbx_json_init(&j, 512 * ZBX_KIBIBYTE);
+	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	zbx_json_addstring(&j, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_PROXY_CONFIG, ZBX_JSON_TYPE_STRING);
 	zbx_json_addobject(&j, ZBX_PROTO_TAG_DATA);
@@ -787,6 +802,185 @@ out:
 	return ret;
 }
 
+
+/******************************************************************************
+ *                                                                            *
+ * Function: server_get_topology                                              *
+ *                                                                            *
+ * Purpose: gets topology data from proxy ('server_topology' request)         *
+ *                                                                            *
+ * Parameters: proxy - [IN/OUT] the proxy data                                *
+ *                                                                            *
+ * Return value: SUCCEED - topology were received and stored successfully     *
+ *               other code - an error occurred                               *
+ *                                                                            *
+ ******************************************************************************/
+char* server_get_topology(DC_PROXY *proxy)
+{
+	const char	*__function_name = "server_get_topology";
+
+	char		*answer = NULL;
+	int		ret = FAIL, more;
+	zbx_timespec_t	ts;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
+	if (SUCCEED != (ret = get_data_from_proxy(proxy, ZBX_PROTO_VALUE_CLUSTER_TOPOLGY, &answer, &ts)))
+		goto out;
+
+	proxy->lastaccess = time(NULL);
+	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Server %ld, got topology data : '%s'",proxy->hostid,answer);
+
+	//zbx_dc_set_topology(answer);
+	//zbx_free(answer);
+
+out:
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+
+	return answer;
+}
+
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: send_rerouted_data                                        *
+ *                                                                            *
+ * Purpose: sends data destined to a host processed on other cluster node 	  *
+ * to that node 															  *
+ * 																			  * 
+ *                                                                      	  *
+ ******************************************************************************/
+static int	send_rerouted_data(DC_PROXY *proxy)
+{
+	char		*error = NULL;// *cluster_version = NULL, *new_topology = NULL;
+	int		ret = FAIL;
+	zbx_socket_t	s;
+	struct zbx_json	j;
+	//char tmp[255];
+	
+	zbx_timespec_t	tstart={0,0}, tend={0,0};
+	
+	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&j, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_CLUSTER_REROUTED_DATA, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&j,ZBX_PROTO_TAG_HOST,CONFIG_HOSTNAME,ZBX_JSON_TYPE_STRING);
+	
+	zbx_dc_create_rerouted_json(&j, proxy->hostid);
+	
+	zabbix_log(LOG_LEVEL_INFORMATION, "CLUSTER: REROUTED: -> %ld : %s",proxy->hostid, j.buffer);
+	
+	if (SUCCEED != (ret = connect_to_proxy(proxy, &s, CONFIG_TRAPPER_TIMEOUT))) {
+		zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: couldn't connect to server %s (%s)",proxy->host,s.peer);
+		//proxy->cluster_failed_hello_count++;
+		zbx_dc_register_server_na(proxy->hostid, "due to connect fail");
+		goto out;
+	} 
+
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER: sending hello to proxy \"%s\" at \"%s\" (%s), datalen " ZBX_FS_SIZE_T,
+			proxy->host, s.peer, j.buffer, (zbx_fs_size_t)j.buffer_size);
+
+
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: SEND REROUTED_DATA -> %ld",proxy->hostid);
+
+	if (SUCCEED == (ret = send_data_to_proxy(proxy, &s, j.buffer, j.buffer_size)))
+	{
+		if (SUCCEED != (ret = zbx_recv_response(&s, 0, &error)))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: SEND REROUTED_DATA: cannot send data to server"
+					" \"%s\" at \"%s:%d\": %s", proxy->host, s.peer,proxy->port, error);
+		} 
+	}
+out:	
+	zbx_json_free(&j);
+	disconnect_proxy(&s);
+
+	return ret;
+}
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: proxy_send_hello			                                      *
+ *                                                                            *
+ * Purpose: sends periodical keepalive message to make sure cluster is alive  *
+ *                                                                            *
+ * Parameters: proxy - [IN/OUT] proxy data                                    *
+ *                                                                            *
+ * Return value: SUCCEED - processed successfully                             *
+ *               other code - an error occurred                               *
+ *                                                                            *
+ * Comments: This function updates proxy version, compress and lastaccess     *
+ *           properties.                                                      *
+ * Author: AI generator tought on all zabbix versions                         *
+ ******************************************************************************/
+static int	proxy_do_hello(DC_PROXY *proxy)
+{
+	char		*error = NULL, *cluster_version = NULL, *new_topology = NULL;
+	int		ret = FAIL;
+	zbx_socket_t	s;
+	struct zbx_json	j;
+	char tmp[255];
+	
+	zbx_timespec_t	tstart={0,0}, tend={0,0};
+	
+	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&j, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_CLUSTER_HELLO, ZBX_JSON_TYPE_STRING);
+	
+	zbx_dc_create_hello_json(&j);
+
+	if (SUCCEED != (ret = connect_to_proxy(proxy, &s, CONFIG_TRAPPER_TIMEOUT))) {
+		zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: couldn't connect to server %s (%s)",proxy->host,s.peer);
+		//proxy->cluster_failed_hello_count++;
+		zbx_dc_register_server_na(proxy->hostid, "due to connect fail");
+		goto out;
+	} 
+
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER: sending hello to proxy \"%s\" at \"%s\" (%s), datalen " ZBX_FS_SIZE_T,
+			proxy->host, s.peer, j.buffer, (zbx_fs_size_t)j.buffer_size);
+
+
+	//zbx_timespec(&tstart);
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: SEND HELLO -> %ld",proxy->hostid);
+
+	//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: PPOLLER: Sending hello '%s'",j.buffer);
+
+	if (SUCCEED == (ret = send_data_to_proxy(proxy, &s, j.buffer, j.buffer_size)))
+	{
+		if (SUCCEED != (ret = zbx_recv_response(&s, 0, &error)))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: SEND HELLO cannot send hello data to server"
+					" \"%s\" at \"%s:%d\": %s", proxy->host, s.peer,proxy->port, error);
+		} else
+		{
+			struct zbx_json_parse	jp;
+
+			if (SUCCEED != zbx_json_open(s.buffer, &jp))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: invalid configuration data response received from server"
+						" \"%s\" at \"%s\": %s", proxy->host, s.peer, zbx_json_strerror());
+			
+			}
+	
+		}
+	} else {
+		zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: couldn't SEND HELLO!");
+		zbx_dc_register_server_na(proxy->hostid, "due to cannot send hello");
+	}
+
+	disconnect_proxy(&s);
+
+out:
+
+	//if ( SUCCEED != ret ) {
+	//	zbx_dc_register_server_na(proxy->hostid);
+//	} 
+
+	zbx_free(error);
+	zbx_json_free(&j);
+
+	return ret;
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: process_proxy                                                    *
@@ -824,18 +1018,14 @@ static int	process_proxy(void)
 
 		memcpy(&proxy_old, &proxy, sizeof(DC_PROXY));
 
-		if (proxy.proxy_config_nextcheck <= now)
-			update_nextcheck |= ZBX_PROXY_CONFIG_NEXTCHECK;
-		if (proxy.proxy_data_nextcheck <= now)
-			update_nextcheck |= ZBX_PROXY_DATA_NEXTCHECK;
-		if (proxy.proxy_tasks_nextcheck <= now)
-			update_nextcheck |= ZBX_PROXY_TASKS_NEXTCHECK;
-
+		//todo: return passive proxy processing 
+		update_nextcheck = ZBX_PROXY_HELLO_NEXTSEND;
+	
 		/* Check if passive proxy has been misconfigured on the server side. If it has happened more */
 		/* recently than last synchronisation of cache then there is no point to retry connecting to */
 		/* proxy again. The next reconnection attempt will happen after cache synchronisation. */
-		if (proxy.last_cfg_error_time < DCconfig_get_last_sync_time())
-		{
+	//	if (proxy.last_cfg_error_time < DCconfig_get_last_sync_time())
+	//	{
 			char	*port = NULL;
 
 			proxy.addr = proxy.addr_orig;
@@ -852,35 +1042,45 @@ static int	process_proxy(void)
 			}
 			zbx_free(port);
 
-			if (proxy.proxy_config_nextcheck <= now)
+			//todo: return passive proxy processing
+			if (proxy.server_hello_nextsend <= now)
 			{
-				if (SUCCEED != (ret = proxy_send_configuration(&proxy)))
+				if (SUCCEED != (ret = proxy_do_hello(&proxy)))
 					goto error;
-			}
 
-			if (proxy.proxy_data_nextcheck <= now)
-			{
-				int	more;
-
-				do
-				{
-					if (SUCCEED != (ret = proxy_get_data(&proxy, &more)))
-						goto error;
+				if (zbx_dc_get_download_server_topology() == proxy.hostid) {
+					
+					char *topology=NULL;
+				
+					topology=server_get_topology(&proxy);
+					ret = zbx_dc_set_topology(topology);
+					zbx_free(topology);
+					zbx_dc_set_download_server_topology(0);
+					if (SUCCEED == ret ) {
+ 						zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: new topology from server %ld has been downloaded and set", proxy.hostid);
+					} else {
+						zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: WARNIUNG: couldn't download and set new topology from server %ld", proxy.hostid);
+					}
 				}
-				while (ZBX_PROXY_DATA_MORE == more);
+
 			}
-			else if (proxy.proxy_tasks_nextcheck <= now)
-			{
-				if (SUCCEED != (ret = proxy_get_tasks(&proxy)))
-					goto error;
+			if (proxy.cluster_rerouted_data > 0) {
+				if (SUCCEED != send_rerouted_data(&proxy) ) {
+					zabbix_log(LOG_LEVEL_WARNING, "CLUSTER Failed to send rerouted data to server %ld, data will be lost",proxy.hostid);
+						goto error;
+				}		
 			}
-		}
+	//	}
 error:
-		if (proxy_old.version != proxy.version || proxy_old.auto_compress != proxy.auto_compress ||
-				proxy_old.lastaccess != proxy.lastaccess)
-		{
-			zbx_update_proxy_data(&proxy_old, proxy.version, proxy.lastaccess, proxy.auto_compress);
-		}
+		
+	//	if (proxy_old.version != proxy.version || proxy_old.auto_compress != proxy.auto_compress ||
+	//			proxy_old.lastaccess != proxy.lastaccess)
+	//	{	
+			//updating fail counter to calc intervals right
+			//to keep up cluster changes, we ALWAYS update proxy data  
+	//	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: calling proxy_update %d",proxy.cluster_id)
+		zbx_update_proxy_data(&proxy_old, proxy.version, proxy.lastaccess, proxy.auto_compress);
+	//	}
 
 		DCrequeue_proxy(proxy.hostid, update_nextcheck, ret);
 	}
@@ -925,7 +1125,7 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 					" exchanging data]", get_process_type_string(process_type), process_num,
 					old_processed, old_total_sec);
 		}
-
+		
 		processed += process_proxy();
 		total_sec += zbx_time() - sec;
 
@@ -951,9 +1151,15 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 			processed = 0;
 			total_sec = 0.0;
 			last_stat_time = time(NULL);
+			
+			//recalc topology if needed
+ 			zbx_dc_recalc_topology();
+			
+
 		}
 
-		zbx_sleep_loop(sleeptime);
+		//zbx_sleep_loop(sleeptime);
+		zbx_sleep_loop(1);
 	}
 #undef STAT_INTERVAL
 }

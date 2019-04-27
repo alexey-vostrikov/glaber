@@ -24,10 +24,10 @@ if ($data['uncheck']) {
 }
 
 $widget = (new CWidget())
-	->setTitle(_('Proxies'))
+	->setTitle(_('Cluster management'))
 	->setControls((new CTag('nav', true,
 		(new CList())
-			->addItem(new CRedirectButton(_('Create proxy'), 'zabbix.php?action=proxy.edit'))
+			->addItem(new CRedirectButton(_('Add server/proxy/domain'), 'zabbix.php?action=proxy.edit'))
 		))
 			->setAttribute('aria-label', _('Content controls'))
 	)
@@ -40,11 +40,12 @@ $widget = (new CWidget())
 					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 					->setAttribute('autofocus', 'autofocus')
 			),
-			(new CFormList())->addRow(_('Mode'),
+			(new CFormList())->addRow(_('Server type'),
 				(new CRadioButtonList('filter_status', (int) $data['filter']['status']))
 					->addValue(_('Any'), -1)
-					->addValue(_('Active'), HOST_STATUS_PROXY_ACTIVE)
-					->addValue(_('Passive'), HOST_STATUS_PROXY_PASSIVE)
+					->addValue(_('Proxy'), HOST_STATUS_PROXY_ACTIVE)
+					->addValue(_('Monitoring domain'), HOST_STATUS_DOMAIN)
+					->addValue(_('Server'), HOST_STATUS_SERVER)
 					->setModern(true)
 			)
 		])
@@ -62,7 +63,7 @@ $proxyTable = (new CTableInfo())
 				->onClick("checkAll('".$proxyForm->getName()."', 'all_hosts', 'proxyids');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
 		make_sorting_header(_('Name'), 'host', $data['sort'], $data['sortorder']),
-		_('Mode'),
+		_('Type'),
 		_('Encryption'),
 		_('Compression'),
 		_('Last seen (age)'),
@@ -75,30 +76,58 @@ $proxyTable = (new CTableInfo())
 foreach ($data['proxies'] as $proxy) {
 	$hosts = [];
 	$i = 0;
+	//only show list of related hosts for domains
+	if (HOST_STATUS_DOMAIN == $proxy['status']  ) {
+		foreach ($proxy['hosts'] as $host) {
+			if (++$i > $data['config']['max_in_table']) {
+				$hosts[] = ' &hellip;';
 
-	foreach ($proxy['hosts'] as $host) {
-		if (++$i > $data['config']['max_in_table']) {
-			$hosts[] = ' &hellip;';
-
-			break;
-		}
-
-		switch ($host['status']) {
-			case HOST_STATUS_MONITORED:
-				$style = null;
 				break;
-			case HOST_STATUS_TEMPLATE:
-				$style = ZBX_STYLE_GREY;
-				break;
-			default:
-				$style = ZBX_STYLE_RED;
-		}
+			}
 
-		if ($hosts) {
-			$hosts[] = ', ';
-		}
+			switch ($host['status']) {
+				case HOST_STATUS_DOMAIN:
+					$style = ZBX_STYLE_GREY;
+					break;
+				case HOST_STATUS_MONITORED:
+					$style = null;
+					break;
+				case HOST_STATUS_TEMPLATE:
+					$style = ZBX_STYLE_GREY;
+					break;
+				default:
+					$style = ZBX_STYLE_RED;
+			}
 
-		$hosts[] = (new CLink($host['name'], 'hosts.php?form=update&hostid='.$host['hostid']))->addClass($style);
+			if ($hosts) {
+				$hosts[] = ', ';
+			}
+
+			$hosts[] = (new CLink($host['name'], 'hosts.php?form=update&hostid='.$host['hostid']))->addClass($style);
+		}
+	} else {
+		//todo: fetch domains in the CProxy instead of here, just use the options
+		//show list of related domains
+		if ($proxy['error']) {
+			//fetching list of domains
+			$domain_ids=explode(',',$proxy['error']);
+
+			$tdomains=API::Proxy()->get([
+				'proxyids' => $domain_ids,
+				'countOutput' => false,
+				'editable' => true,
+			]);
+		
+			
+			foreach($tdomains as $domain) {		
+			
+				if ($hosts) {
+					$hosts[] = ', ';
+				}
+				$hosts[] = ($domain['host']);
+			}
+		}
+			
 	}
 
 	$name = new CLink($proxy['host'], 'zabbix.php?action=proxy.edit&proxyid='.$proxy['proxyid']);
@@ -135,17 +164,26 @@ foreach ($data['proxies'] as $proxy) {
 		$out_encryption = (new CDiv($out_encryption_array))->addClass(ZBX_STYLE_STATUS_CONTAINER);
 	}
 
+	$proxy_statuses= [
+		HOST_STATUS_PROXY_ACTIVE => _('Proxy'),
+		HOST_STATUS_DOMAIN =>  _('Monitoring Domain'),
+		HOST_STATUS_SERVER =>  _('Server')
+	];
+
 	$proxyTable->addRow([
 		new CCheckBox('proxyids['.$proxy['proxyid'].']', $proxy['proxyid']),
 		(new CCol($name))->addClass(ZBX_STYLE_NOWRAP),
-		$proxy['status'] == HOST_STATUS_PROXY_ACTIVE ? _('Active') : _('Passive'),
+		//todo: fix to real names, as for now just an index will be shown
+		$proxy_statuses[$proxy['status']],
 		$proxy['status'] == HOST_STATUS_PROXY_ACTIVE ? $out_encryption : $in_encryption,
+		($proxy['status'] ==HOST_STATUS_PROXY_ACTIVE) ? (
 		($proxy['auto_compress'] == HOST_COMPRESSION_ON)
 			? (new CSpan(_('On')))->addClass(ZBX_STYLE_STATUS_GREEN)
-			: (new CSpan(_('Off')))->addClass(ZBX_STYLE_STATUS_GREY),
+			: (new CSpan(_('Off')))->addClass(ZBX_STYLE_STATUS_GREY)) : '',
+		($proxy['status'] !=HOST_STATUS_DOMAIN) ? 
 		($proxy['lastaccess'] == 0)
 			? (new CSpan(_('Never')))->addClass(ZBX_STYLE_RED)
-			: zbx_date2age($proxy['lastaccess']),
+			: zbx_date2age($proxy['lastaccess']) : '',
 		array_key_exists('host_count', $proxy) ? $proxy['host_count'] : '',
 		array_key_exists('item_count', $proxy) ? $proxy['item_count'] : '',
 		array_key_exists('vps_total', $proxy) ? $proxy['vps_total'] : '',
@@ -158,13 +196,7 @@ $proxyForm->addItem([
 	$proxyTable,
 	$data['paging'],
 	new CActionButtonList('action', 'proxyids', [
-		'proxy.hostenable' => ['name' => _('Enable hosts'),
-			'confirm' => _('Enable hosts monitored by selected proxies?')
-		],
-		'proxy.hostdisable' => ['name' => _('Disable hosts'),
-			'confirm' => _('Disable hosts monitored by selected proxies?')
-		],
-		'proxy.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected proxies?')]
+		'proxy.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected servers or domains?')]
 	], 'proxy')
 ]);
 
