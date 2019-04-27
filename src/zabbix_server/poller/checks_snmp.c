@@ -2550,6 +2550,7 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 		else
 			snmp_timeout();
 		zabbix_log(LOG_LEVEL_DEBUG, "In %s() : waiting for %d pollers to finish", __function_name, conf->active_hosts);
+		netsnmp_large_fd_set_cleanup(&fdset);
 	}
 
 	/* sessions cleanup */

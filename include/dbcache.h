@@ -43,7 +43,7 @@
 #define MAX_POLLER_ITEMS	128	/* MAX(MAX_JAVA_ITEMS, MAX_SNMP_ITEMS) */
 #define MAX_PINGER_ITEMS	4096
 #define MAX_UNREACH_ITEMS		64 //we don't want this to be too big, but it's better for efficiency if thats more then one item 
-#define MAX_ASYNC_SNMP_ITEMS		512
+#define MAX_ASYNC_SNMP_ITEMS		4096
 #define MAX_ASYNC_AGENT_ITEMS		4096
 
 #define ZBX_TRIGGER_DEPENDENCY_LEVELS_MAX	32
