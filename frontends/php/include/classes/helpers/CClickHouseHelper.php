@@ -20,7 +20,7 @@ class CClickHouseHelper {
 //		error("CClikHouseHelper.query($request) ");
 		$ch = curl_init();
 
-		curl_setopt($ch, CURLOPT_URL,$HISTORY['url']['uint']);
+		curl_setopt($ch, CURLOPT_URL,$HISTORY['url']);
 		curl_setopt($ch, CURLOPT_POST, 1);
 		curl_setopt($ch, CURLOPT_POSTFIELDS,$request);
 
