@@ -203,9 +203,7 @@ void handle_socket_operation(zbx_socket_t *socket, DC_ITEM * item, int *errcode,
 				*errcode = CONFIG_ERROR;
 				SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot  connect to the host"));
 				break;	
-			}
-
-			*conn_status=CONNECT_SENT;
+			} else  *conn_status=CONNECT_SENT;
 			break;
 
 		case CONNECT_SENT:
@@ -217,9 +215,7 @@ void handle_socket_operation(zbx_socket_t *socket, DC_ITEM * item, int *errcode,
 				*conn_status = FAIL;
 				SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot send request to the agent"));
 				zabbix_log(LOG_LEVEL_DEBUG,"Data send fail, aborting session");
-			}
-			
-			*conn_status=REQ_SENT;
+			} else  *conn_status=REQ_SENT;
 			break;
 
 		case REQ_SENT:
@@ -306,6 +302,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 	{
 		conn_status[i]=INIT;
 		s[i].buf_type = ZBX_BUF_TYPE_STAT;
+		s[i].buffer=s[i].buf_stat;
 
 		//cheick if the item is agent type
 		if (  ITEM_TYPE_ZABBIX != items[i].type )	
@@ -401,7 +398,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 				}
 				if ( 0!= result ) {
 					zabbix_log(LOG_LEVEL_DEBUG, "Connection %d has failed", i);
-					SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Connection to the host failed: check firewall rules and agent is running"));
+					if ( NULL != &results[i] )SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Connection to the host failed: check firewall rules and agent is running"));
 					conn_status[i]==CLOSED;
 					errcodes[i]=NETWORK_ERROR;
 					continue;
@@ -434,8 +431,8 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 		if (s[i].socket) zbx_tcp_close(&s[i]);
 
 		if (REQ_SENT == conn_status[i] || CONNECT_SENT ==conn_status[i]) {
-			zabbix_log(LOG_LEVEL_DEBUG, "Connection %d has timed out while waiting for responce", num);
-			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
+			zabbix_log(LOG_LEVEL_INFORMATION, "Connection %d has timed out while waiting for responce", num);
+//			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
 			errcodes[i]=TIMEOUT_ERROR;
 			continue;
 		}
