@@ -247,7 +247,7 @@ class CHistory extends CApiService {
 	 * @see CHistory::get
 	 */
 	private function getFromClickHouse($options) {
-		global $HISTORY;
+i		global $HISTORY, $ClickHouseDisableNanoseconds;
 		$result = [];
 		$sql_parts = [
 			'select'	=> ['history' => 'h.itemid'],
@@ -350,12 +350,12 @@ class CHistory extends CApiService {
 		}
 
 		$sql_limit = $sql_parts['limit'];
-		$sql = "SELECT itemid, toInt32(clock), ns, $value_col".
+		$sql = "SELECT itemid, toInt32(clock),". ($ClickHouseDisableNanoseconds == 1 ? "0 AS ns," : "ns",) ."$value_col".
 				' FROM '.$sql_from.
 				$sql_where.
 				$sql_order;
 
-		var_dump($sql);
+//		var_dump($sql);
 		$values = CClickHouseHelper::query($sql,1,array('itemid','clock','ns', 'value'));
 
 
