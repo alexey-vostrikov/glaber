@@ -350,7 +350,7 @@ i		global $HISTORY, $ClickHouseDisableNanoseconds;
 		}
 
 		$sql_limit = $sql_parts['limit'];
-		$sql = "SELECT itemid, toInt32(clock),". ($ClickHouseDisableNanoseconds == 1 ? "0 AS ns," : "ns",) ."$value_col".
+		$sql = "SELECT itemid, toInt32(clock),". ($ClickHouseDisableNanoseconds == 1 ? "0 AS ns," : "ns,") ."$value_col".
 				' FROM '.$sql_from.
 				$sql_where.
 				$sql_order;
