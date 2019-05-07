@@ -325,7 +325,7 @@ static void	clickhouse_writer_add_iface(zbx_history_iface_t *hist)
 
 	zabbix_log(LOG_LEVEL_DEBUG,"CLICKHOUSE: Will send data to %s",data->base_url);
 	zabbix_log(LOG_LEVEL_DEBUG,"CLICKHOUSE: Will do query %s",data->buf);
-	
+
 	curl_easy_setopt(data->handle, CURLOPT_URL, data->base_url);
 	curl_easy_setopt(data->handle, CURLOPT_POST, 1L);
 	curl_easy_setopt(data->handle, CURLOPT_POSTFIELDS, data->buf);
@@ -620,7 +620,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 	    zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, "LIMIT %d", count);
 	}
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "sending query to clickhouse: %s", sql_buffer);
+	zabbix_log(LOG_LEVEL_DEBUG, "sending query to clickhouse: %s", sql_buffer);
 
 
     
