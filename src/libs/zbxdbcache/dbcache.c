@@ -2546,6 +2546,10 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 			h->flags |= ZBX_DC_FLAG_NOTRENDS;
 		}
 
+		h->host_name = item->host.host;
+		//todo: need to see if the item key actually needs macro processing first
+		h->item_key = item->key_orig;
+
 		normalize_item_value(item, h);
 
 		diff = calculate_item_update(item, h);

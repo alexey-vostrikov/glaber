@@ -43,6 +43,10 @@
 extern char	*CONFIG_HISTORY_STORAGE_URL;
 extern int	CONFIG_HISTORY_STORAGE_PIPELINES;
 extern char *CONFIG_HISTORY_STORAGE_TABLE_NAME;
+extern int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME;
+extern int CONFIG_CLICKHOUSE_SAVE_NS_VALUE;
+extern char *CONFIG_CLICKHOUSE_USERNAME;
+extern char *CONFIG_CLICKHOUSE_PASSWORD;
 
 typedef struct
 {
@@ -319,6 +323,9 @@ static void	clickhouse_writer_add_iface(zbx_history_iface_t *hist)
 		return;
 	}
 
+	zabbix_log(LOG_LEVEL_DEBUG,"CLICKHOUSE: Will send data to %s",data->base_url);
+	zabbix_log(LOG_LEVEL_DEBUG,"CLICKHOUSE: Will do query %s",data->buf);
+	
 	curl_easy_setopt(data->handle, CURLOPT_URL, data->base_url);
 	curl_easy_setopt(data->handle, CURLOPT_POST, 1L);
 	curl_easy_setopt(data->handle, CURLOPT_POSTFIELDS, data->buf);
@@ -613,7 +620,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 	    zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, "LIMIT %d", count);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "sending query to clickhouse: %s", sql_buffer);
+	zabbix_log(LOG_LEVEL_INFORMATION, "sending query to clickhouse: %s", sql_buffer);
 
 
     
@@ -774,46 +781,60 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
     
-	zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"INSERT INTO %s VALUES ", CONFIG_HISTORY_STORAGE_TABLE_NAME );
-    
+	zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"INSERT INTO %s (day,itemid,clock,value", CONFIG_HISTORY_STORAGE_TABLE_NAME);
+
+	if (1 == CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME) {
+		zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",hostname,itemname");
+	}
+	if (1 == CONFIG_CLICKHOUSE_SAVE_NS_VALUE) {
+		zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",ns");
+	}
+	zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,") VALUES");
+
 	for (i = 0; i < history->values_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)history->values[i];
-
+			
 		if (hist->value_type != h->value_type)
 			continue;
-
 		
-		if (ITEM_VALUE_TYPE_UINT64 == h->value_type) {
-	           zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"(CAST(%d as date) ,%ld,%d,%d,%ld,0,''),",
-				h->ts.sec,h->itemid,h->ts.sec,h->ts.ns,h->value.ui64);
-    	}
+		//common part
+		zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"(CAST(%d as date) ,%ld,%d",
+				h->ts.sec,h->itemid,h->ts.sec);
+    	
+		//type-dependent part
+		if (ITEM_VALUE_TYPE_UINT64 == h->value_type) 
+	           zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",'%ld'",h->value.ui64);
+    	
+		if (ITEM_VALUE_TYPE_FLOAT == h->value_type) 
+           zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",'%f'",h->value.dbl);
+        
 
-		if (ITEM_VALUE_TYPE_FLOAT == h->value_type) {
-           zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"(CAST(%d as date) ,%ld,%d,%d,0,%f,''),",
-					h->ts.sec,h->itemid,h->ts.sec,h->ts.ns,h->value.dbl);
-        }
-
-		if (ITEM_VALUE_TYPE_STR == h->value_type || 
-		 	        ITEM_VALUE_TYPE_TEXT == h->value_type ) {
-		    zabbix_log(LOG_LEVEL_DEBUG, "Parsing value as string or text type");
-			
-                //todo: make more sensible string quotation
+		if (ITEM_VALUE_TYPE_STR == h->value_type || ITEM_VALUE_TYPE_TEXT == h->value_type ) {
+		    		
+            //todo: make more sensible string quotation
             for (j = 0; j < strlen(h->value.str); j++) {
 		        if ('\'' == h->value.str[j]) { 
 				    h->value.str[j]=' ';
 			    }
 			}
-
-		    zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"(CAST(%d as date) ,%ld,%d,%d,0,0,'%s'),",
-					h->ts.sec,h->itemid,h->ts.sec,h->ts.ns,h->value.str);
+		    zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",'%s'",h->value.str);
 		}
-
-		if (ITEM_VALUE_TYPE_LOG == h->value_type)
-		{
+		//todo: log writing support
+		//if (ITEM_VALUE_TYPE_LOG == h->value_type)
+		//{
 		//    const zbx_log_value_t	*log;
 		//    log = h->value.log;
+		//}
+		if (1 == CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME) {
+			zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",'%s','%s'",h->host_name,h->item_key);
 		}
+		
+		if (1 == CONFIG_CLICKHOUSE_SAVE_NS_VALUE) {
+			zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,",%d", h->ts.ns);
+		}
+		
+		zbx_snprintf_alloc(&tmp_buffer,&tmp_alloc,&tmp_offset,"),");
 
 		num++;
 	}
@@ -826,6 +847,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 	}
 
 	zbx_free(tmp_buffer);
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
 
 	return num;
@@ -867,7 +889,7 @@ static int	clickhouse_flush(zbx_history_iface_t *hist)
 int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_type, char **error)
 {
 	zbx_clickhouse_data_t	*data;
-
+	size_t alloc = 0, offset = 0;
 	if (0 != curl_global_init(CURL_GLOBAL_ALL))
 	{
 		*error = zbx_strdup(*error, "Cannot initialize cURL library");
@@ -875,8 +897,18 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 	}
 
 	data = (zbx_clickhouse_data_t *)zbx_malloc(NULL, sizeof(zbx_clickhouse_data_t));
+	
 	memset(data, 0, sizeof(zbx_clickhouse_data_t));
-	data->base_url = zbx_strdup(NULL, CONFIG_HISTORY_STORAGE_URL);
+	
+	if (NULL != CONFIG_CLICKHOUSE_USERNAME) {
+		//https://clickhouse.yandex/docs/en/interfaces/http/
+		//echo 'SELECT 1' | curl 'http://localhost:8123/?user=user&password=password' -d @-
+		zbx_snprintf_alloc(&data->base_url,&alloc,&offset,"%s/?user=%s&password=%s",
+			CONFIG_HISTORY_STORAGE_URL, CONFIG_CLICKHOUSE_USERNAME, CONFIG_CLICKHOUSE_PASSWORD);
+	} else {
+		data->base_url = zbx_strdup(NULL, CONFIG_HISTORY_STORAGE_URL);
+	}
+
 	zbx_rtrim(data->base_url, "/");
 	data->buf = NULL;
 	data->post_url = NULL;
