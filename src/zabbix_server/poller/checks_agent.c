@@ -94,7 +94,7 @@ int	get_value_agent(DC_ITEM *item, AGENT_RESULT *result)
 			goto out;
 	}
 
-	if (SUCCEED == (ret = zbx_tcp_connect(&s, CONFIG_SOURCE_IP, item->interface.addr, item->interface.port, 0,
+	if (SUCCEED == (ret = zbx_tcp_connect(&s, CONFIG_SOURCE_IP, item->interface.addr, item->interface.port, CONFIG_TIMEOUT,
 			item->host.tls_connect, tls_arg1, tls_arg2)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]", item->key);
@@ -174,38 +174,7 @@ void handle_socket_operation(zbx_socket_t *socket, DC_ITEM * item, int *errcode,
 	int status;
 
 	switch (*conn_status) {
-		case SOCKET_CREATED:
-			zabbix_log(LOG_LEVEL_DEBUG,"Starting connect to item");
-
-			if (NULL == (hp = gethostbyname(item->interface.addr)))
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot get hostname for the ip."));
-				*conn_status=FAIL;
-				*errcode=CONFIG_ERROR;
-				break;	
-			}
-#if !defined(_WINDOWS) && !SOCK_CLOEXEC
-			fcntl(socket->socket, F_SETFD, FD_CLOEXEC);
-#endif
-			servaddr_in.sin_family = AF_INET;
-			servaddr_in.sin_addr.s_addr = ((struct in_addr *)(hp->h_addr))->s_addr;
-			servaddr_in.sin_port = htons(item->interface.port);
-			
-			zabbix_log(LOG_LEVEL_DEBUG,"Doing connect to host %s",item->interface.addr);
-
-			status = connect(socket->socket, (const struct sockaddr *)&servaddr_in, sizeof(servaddr_in));
-			
-			//async connects will return immediately with the error status and EINPROGRESS as errno
-			if (ZBX_PROTO_ERROR == status && EINPROGRESS != errno )
-			{	
-				zabbix_log(LOG_LEVEL_DEBUG,"Connect fail");
-				*conn_status = FAIL;
-				*errcode = CONFIG_ERROR;
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot  connect to the host"));
-				break;	
-			} else  *conn_status=CONNECT_SENT;
-			break;
-
+		
 		case CONNECT_SENT:
 			zabbix_log(LOG_LEVEL_DEBUG,"Sending data to the socket");
 
@@ -296,7 +265,8 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 		zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for sockets");
 		return FAIL;
 	};
-
+	
+	
 	//starting connections
 	for ( i = 0; i < num; i++ ) 
 	{
@@ -346,17 +316,19 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 				conn_status[i]=SKIPPED;
 				errcodes[i]=CONFIG_ERROR;
 				continue;
+	
 		}
 
-				
-		if (ZBX_SOCKET_ERROR == (s[i].socket = socket(AF_INET,  SOCK_STREAM | SOCK_NONBLOCK |  SOCK_CLOEXEC, 0)))
-		{
+		if (SUCCEED != (ret = zbx_tcp_connect(&s[i], CONFIG_SOURCE_IP, items[i].interface.addr, items[i].interface.port, 0,
+			items[i].host.tls_connect, tls_arg1, tls_arg2))) {
+
 			conn_status[i]=SKIPPED;
-			errcodes[i]=CONFIG_ERROR;
+			errcodes[i]=NETWORK_ERROR;
 			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Couldn't create socket"));
 			continue;
 		}
-		conn_status[i]=SOCKET_CREATED;
+
+		conn_status[i]=CONNECT_SENT;
 		max_socket=s[i].socket;
 		active_agents++;
 		

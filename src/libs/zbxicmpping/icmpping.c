@@ -103,7 +103,14 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 	assert(hosts);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hosts_count:%d", __function_name, hosts_count);
-
+	
+	if (NULL != CONFIG_NMAP_LOCATION && 
+		(-1 == access(CONFIG_NMAP_LOCATION, X_OK) ) ) {
+		//todo: add check of root owner and setuid bit
+		zbx_snprintf(error, max_error_len, "%s: %s", CONFIG_NMAP_LOCATION, zbx_strerror(errno));
+		return ret;
+	}
+	
 	if (-1 == access(CONFIG_FPING_LOCATION, X_OK))
 	{
 #if !defined(HAVE_IPV6)
@@ -251,16 +258,19 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 	//since it's turned out that doing one packet check via vping is also a good idea, 
 	// timeout =1 (not realistic value ) used to indicate we want nmap to be invoked
 	// this also allows to runtime modification of the utility
-	if ( 1 == count ) 
+	if ( 1 == count && NULL != CONFIG_NMAP_LOCATION) 
 	{
 		//for 1-packet probes use nmap as accesibility utility
 		//ipv6 ??? i guess it won't work, but who knows: todo: check and fix ipv6 as soon as we have it
 
 		if (-1 == size ) size=32;
 		
-		zbx_snprintf(tmp, sizeof(tmp), "%s --data-length=%d %s -iL %s 2>&1",
+		offset = zbx_snprintf(tmp, sizeof(tmp), "%s -4 --data-length=%d %s -iL %s 2>&1;",
 								CONFIG_NMAP_LOCATION,size,CONFIG_NMAP_PARAMS,filename);
-
+#ifdef HAVE_IPV6
+		offset = zbx_snprintf(tmp, sizeof(tmp), "%s -6 --data-length=%d %s -iL %s 2>&1",
+								CONFIG_NMAP_LOCATION,size,CONFIG_NMAP_PARAMS,filename);
+#endif
 
 		zabbix_log(LOG_LEVEL_DEBUG, "Will run %s", tmp);
 

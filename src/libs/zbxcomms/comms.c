@@ -405,7 +405,10 @@ static int	zbx_socket_connect(zbx_socket_t *s, const struct sockaddr *addr, sock
 		return FAIL;
 	}
 #else
-	if (ZBX_PROTO_ERROR == connect(s->socket, addr, addrlen))
+	//on non-block socket it's ok to get an error, but the socket 
+	//should be in the connect progress state
+	if (ZBX_PROTO_ERROR == connect(s->socket, addr, addrlen) && 
+			( 0 != timeout | EINPROGRESS != errno ) )
 	{
 		*error = zbx_strdup(*error, strerror_from_system(zbx_socket_last_error()));
 		return FAIL;
@@ -439,6 +442,11 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 	struct addrinfo	*ai_bind = NULL;
 	char		service[8], *error = NULL;
 	void		(*func_socket_close)(zbx_socket_t *s);
+	
+	if ( 0 == timeout ) {
+		//assuming async operations when no timeout is set
+		type = type | SOCK_NONBLOCK;
+	}
 
 	if (SOCK_DGRAM == type && (ZBX_TCP_SEC_TLS_CERT == tls_connect || ZBX_TCP_SEC_TLS_PSK == tls_connect))
 	{
@@ -549,6 +557,11 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 	struct hostent	*hp;
 	char		*error = NULL;
 	void		(*func_socket_close)(zbx_socket_t *s);
+
+	if ( 0 == timeout ) {
+		//assuming async operations when no timeout is set
+		type = type | SOCK_NONBLOCK;
+	}
 
 	if (SOCK_DGRAM == type && (ZBX_TCP_SEC_TLS_CERT == tls_connect || ZBX_TCP_SEC_TLS_PSK == tls_connect))
 	{
