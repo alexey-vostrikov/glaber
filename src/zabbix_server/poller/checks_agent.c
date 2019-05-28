@@ -332,9 +332,6 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 		max_socket=s[i].socket;
 		active_agents++;
 		
-		//todo: binding to the source ip code
-				
-		handle_socket_operation(&s[i],&items[i],&errcodes[i],&conn_status[i],&results[i],&active_agents);
 		
 	}
 			
