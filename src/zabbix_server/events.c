@@ -1713,13 +1713,11 @@ void	zbx_export_events(void)
 			zbx_json_close(&json);
 		}
 
-		zbx_hashset_clear(&hosts);
+			zbx_hashset_clear(&hosts);
 		zbx_vector_uint64_clear(&hostids);
 
 		if (SUCCEED == zbx_is_export_enabled())
 			zbx_problems_export_write(json.buffer, json.buffer_size);
-
-		zbx_register_problem(events[i].eventid, json.buffer);
 
 	}
 
@@ -1741,7 +1739,7 @@ void	zbx_export_events(void)
 		
 		if (SUCCEED == zbx_is_export_enabled())
 			zbx_problems_export_write(json.buffer, json.buffer_size);
-		zbx_register_problem_recovery(recovery->eventid);
+	
 	}
 
 	zbx_problems_export_flush();

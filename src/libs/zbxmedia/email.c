@@ -32,6 +32,7 @@
 
 /* multiple 'encoded-word's should be separated by <CR><LF><SPACE> */
 #define ZBX_EMAIL_ENCODED_WORD_SEPARATOR	"\r\n "
+extern int CONFIG_TIMEOUT; 
 
 /******************************************************************************
  *                                                                            *
@@ -425,7 +426,7 @@ static int	send_email_plain(const char *smtp_server, unsigned short smtp_port, c
 
 	/* connect to and receive an initial greeting from SMTP server */
 
-	if (FAIL == zbx_tcp_connect(&s, CONFIG_SOURCE_IP, smtp_server, smtp_port, 0, ZBX_TCP_SEC_UNENCRYPTED, NULL,
+	if (FAIL == zbx_tcp_connect(&s, CONFIG_SOURCE_IP, smtp_server, smtp_port, CONFIG_TIMEOUT, ZBX_TCP_SEC_UNENCRYPTED, NULL,
 			NULL))
 	{
 		zbx_snprintf(error, max_error_len, "cannot connect to SMTP server \"%s\": %s",

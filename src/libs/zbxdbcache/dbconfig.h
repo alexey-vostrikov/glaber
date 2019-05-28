@@ -842,11 +842,6 @@ void	DCsync_maintenance_periods(zbx_dbsync_t *sync);
 void	DCsync_maintenance_groups(zbx_dbsync_t *sync);
 void	DCsync_maintenance_hosts(zbx_dbsync_t *sync);
 
-/* trapper problems reporting */
-void zbx_dump_problems_to_json(struct zbx_json *json);
-void zbx_register_problem(zbx_uint64_t id, char *problem_text);
-void zbx_register_problem_recovery(zbx_uint64_t id);
-
 /* maintenance support */
 
 /* number of slots to store maintenance update flags */
