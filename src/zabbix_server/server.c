@@ -283,6 +283,13 @@ char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
 char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
 int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 
+//clickhouse specific
+int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME =0;
+int CONFIG_CLICKHOUSE_SAVE_NS_VALUE = 0;
+int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME = 60;
+char *CONFIG_CLICKHOUSE_USERNAME = NULL;
+char *CONFIG_CLICKHOUSE_PASSWORD = NULL;
+
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num)
@@ -763,6 +770,17 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			0},
 		{"HistoryStorageTableName",		&CONFIG_HISTORY_STORAGE_TABLE_NAME,		TYPE_STRING,
 			PARM_OPT,	1,			0},
+		{"ClickhouseSaveNames",		&CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME,		TYPE_INT,
+			PARM_OPT,	0,			1},
+		{"CLickhouseSaveNS",		&CONFIG_CLICKHOUSE_SAVE_NS_VALUE,		TYPE_INT,
+			PARM_OPT,	0,			1},
+		{"ClickhouseUsername",		&CONFIG_CLICKHOUSE_USERNAME,		TYPE_STRING,
+			PARM_OPT,	1,			0},
+		{"ClickhousePassword",		&CONFIG_CLICKHOUSE_PASSWORD,		TYPE_STRING,
+			PARM_OPT,	1,			0},
+		{"ClickhouseCacheFillTime",		&CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME,		TYPE_STRING,
+			PARM_OPT,	0,			365*3600*24},
+		
 		{NULL}
 	};
 
