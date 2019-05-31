@@ -153,13 +153,13 @@ out:
 	return ret;
 }
 
-#define INIT			10
+
 #define SKIPPED			11
 #define SOCKET_CREATED	12
 #define CONNECT_SENT	13
 #define REQ_SENT		14
 #define	CLOSED			15
-#define ZBX_AGENT_MAX_RESPONSE_TIME 2
+//#define ZBX_AGENT_MAX_RESPONSE_TIME 2
 
 //this function follows the socket status and 
 //handles operations according to the socket state
@@ -226,9 +226,8 @@ void handle_socket_operation(zbx_socket_t *socket, DC_ITEM * item, int *errcode,
 			}					
 		
 			zbx_tcp_close(socket);				
-			
 			socket->socket=0;
-			*conn_status=FAIL;
+			*conn_status=CLOSED;
 			
 			*active_agents=*active_agents-1;
 			
@@ -244,7 +243,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 	const char	*__function_name = "get_value_agent_async";
 	zbx_socket_t	*s;	
 	char		*tls_arg1, *tls_arg2;
-	int			i,	ret=SUCCEED,	max_socket;
+	int			i,	ret=SUCCEED,	max_socket, processed_vals=1;
 	// connects=0;
 	int 		*conn_status;
 	unsigned int active_agents=0;
@@ -270,7 +269,6 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 	//starting connections
 	for ( i = 0; i < num; i++ ) 
 	{
-		conn_status[i]=INIT;
 		s[i].buf_type = ZBX_BUF_TYPE_STAT;
 		s[i].buffer=s[i].buf_stat;
 
@@ -338,7 +336,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 	starttime=time(NULL);
 	zabbix_log(LOG_LEVEL_DEBUG,"Starting waiting for %d sockets to connect",active_agents);
 
-	while (active_agents>0 && (time(NULL)-starttime)< ZBX_AGENT_MAX_RESPONSE_TIME *2) 
+	while (active_agents>0 && (time(NULL)-starttime)< CONFIG_TIMEOUT && processed_vals>0)
 	{
 		
 		//this was the simplest and compact way to implement async io
@@ -351,7 +349,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 		
 		for ( i=0; i<num; i++) 
 		{
-			if (SKIPPED == conn_status[i] || FAIL == conn_status[i] || CLOSED == conn_status[i]) 
+			if (CONNECT_SENT != conn_status[i] && REQ_SENT != conn_status[i] )
 				continue;
 
 			//the socket is in connection phase, checking that it's ready to be written to
@@ -367,12 +365,13 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 				}
 				if ( 0!= result ) {
 					zabbix_log(LOG_LEVEL_DEBUG, "Connection %d has failed", i);
-					if ( NULL != &results[i] )SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Connection to the host failed: check firewall rules and agent is running"));
+					if (NULL == &results[i]) SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Connection to the host failed: check firewall rules and agent is running"));
 					conn_status[i]==CLOSED;
 					errcodes[i]=NETWORK_ERROR;
 					continue;
 				}
-				
+				processed_vals++;
+
 			} else 	if (REQ_SENT == conn_status[i] ) 
 			{ 
 				//checking if there are some data waiting for us in the socket
@@ -380,13 +379,8 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 				ioctl(s[i].socket, FIONREAD, &count);
 			
 				if ( 0 == count) continue;  
-				
-			} else {
-				//self-check zabbix team syle: this should never happen :)
-				THIS_SHOULD_NEVER_HAPPEN;
-				continue;
-			}
-
+				processed_vals++;
+			} 
 			handle_socket_operation(&s[i],&items[i],&errcodes[i],&conn_status[i],&results[i],&active_agents);
 		}
 		
@@ -400,7 +394,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 		if (s[i].socket) zbx_tcp_close(&s[i]);
 
 		if (REQ_SENT == conn_status[i] || CONNECT_SENT ==conn_status[i]) {
-			zabbix_log(LOG_LEVEL_INFORMATION, "Connection %d has timed out while waiting for responce", num);
+			zabbix_log(LOG_LEVEL_DEBUG, "Connection %d has timed out while waiting for responce", num);
 //			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
 			errcodes[i]=TIMEOUT_ERROR;
 			continue;

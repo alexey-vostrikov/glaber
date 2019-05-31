@@ -172,6 +172,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 		zbx_vector_history_record_t *values)
 {
 	const char		*__function_name = "clickhouse_get_values";
+	int valuecount=0;
 
 	zbx_clickhouse_data_t	*data = (zbx_clickhouse_data_t *)hist->data;
 	size_t			url_alloc = 0, url_offset = 0;
@@ -194,11 +195,11 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
     bzero(&page_r,sizeof(zbx_httppage_t));
 
 	
-    if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
-		
-		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
-        goto out;
-	}
+//    if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
+//		
+//		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
+//      goto out;
+//	}
 
 	if (NULL == (handle = curl_easy_init()))
 	{
@@ -287,7 +288,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 				} else hr.timestamp.ns = 0;
 
                	hr.timestamp.sec = atoi(clck);
-				zabbix_log(LOG_LEVEL_DEBUG,"CLICKHOSUE: Clock: %s, ns: %s, value: %s, value_dbl: %s, value_str:%s ",clck,ns,value,value_dbl,value_str);
+				zabbix_log(LOG_LEVEL_DEBUG,"CLICKHOSUE read: Clock: %s, ns: %s, value: %s, value_dbl: %s, value_str:%s ",clck,ns,value,value_dbl,value_str);
 
                 switch (hist->value_type)
 				{
@@ -315,12 +316,14 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
                         break;
 				}				
 				
+				valuecount++;
 			} 
             
         } else {
             zabbix_log(LOG_LEVEL_DEBUG,"CLICCKHOUSE: Couldn't parse JSON row: %s",p);
         };
 
+		if ( !valuecount) zabbix_log(LOG_LEVEL_DEBUG,"No data returned form request");
         zbx_free(clck);
         zbx_free(ns);
         zbx_free(value);
@@ -379,7 +382,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 	{
 		h = (ZBX_DC_HISTORY *)history->values[i];
 			
-		if (hist->value_type != h->value_type)
+		if (hist->value_type != h->value_type)	
 			continue;
 		
 		//common part
@@ -449,7 +452,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
         		zabbix_log(LOG_LEVEL_WARNING, "Failed query '%s'", sql_buffer);
 	
 			} else {
-				zabbix_log(LOG_LEVEL_INFORMATION, "CLICKHOUSE: succeeded query: %s",sql_buffer);
+				zabbix_log(LOG_LEVEL_DEBUG, "CLICKHOUSE: succeeded query: %s",sql_buffer);
 			}
 		}
 		
