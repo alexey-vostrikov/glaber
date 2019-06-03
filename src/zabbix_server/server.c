@@ -1211,12 +1211,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_ASYNC_SNMP:
 				poller_type = ZBX_POLLER_TYPE_ASYNC_SNMP;
 				thread_args.args = &poller_type;
-				threads[i] = zbx_thread_start(poller_thread, &thread_args);
+				zbx_thread_start(poller_thread, &thread_args,&threads[i] );
 				break;
 			case ZBX_PROCESS_TYPE_ASYNC_AGENT:
 				poller_type = ZBX_POLLER_TYPE_ASYNC_AGENT;
 				thread_args.args = &poller_type;
-				threads[i] = zbx_thread_start(poller_thread, &thread_args);
+				zbx_thread_start(poller_thread, &thread_args,&threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_TRAPPER:
 				thread_args.args = &listen_sock;
