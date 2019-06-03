@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -68,7 +68,7 @@ static void	__binary_heap_ensure_free_space(zbx_binary_heap_t *heap)
 	else if (heap->elems_num == heap->elems_alloc)
 		tmp_elems_alloc = MAX(heap->elems_alloc + 1, heap->elems_alloc * ARRAY_GROWTH_FACTOR);
 
-	if (heap->elems_num != tmp_elems_alloc)
+	if (heap->elems_alloc != tmp_elems_alloc)
 	{
 		heap->elems = (zbx_binary_heap_elem_t *)heap->mem_realloc_func(heap->elems, tmp_elems_alloc * sizeof(zbx_binary_heap_elem_t));
 
@@ -322,13 +322,7 @@ void	zbx_binary_heap_remove_direct(zbx_binary_heap_t *heap, zbx_uint64_t key)
 
 void	zbx_binary_heap_clear(zbx_binary_heap_t *heap)
 {
-	if (NULL != heap->elems)
-	{
-		heap->mem_free_func(heap->elems);
-		heap->elems = NULL;
-		heap->elems_num = 0;
-		heap->elems_alloc = 0;
-	}
+	heap->elems_num = 0;
 
 	if (HAS_DIRECT_OPTION(heap))
 		zbx_hashmap_clear(heap->key_index);

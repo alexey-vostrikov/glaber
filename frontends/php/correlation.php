@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -96,13 +96,13 @@ if ($correlationid !== null) {
 
 if (hasRequest('action')) {
 	$correlations = API::Correlation()->get([
-		'countOutput' => true,
+		'output' => [],
 		'correlationids' => getRequest('g_correlationid'),
 		'editable' => true
 	]);
 
-	if ($correlations != count(getRequest('g_correlationid'))) {
-		access_deny();
+	if (count($correlations) != count(getRequest('g_correlationid'))) {
+		uncheckTableRows(null, zbx_objectValues($correlations, 'correlationid'));
 	}
 }
 

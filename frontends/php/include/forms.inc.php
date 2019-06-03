@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -179,7 +179,7 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 	$output = [new CTag('h3', true, $label)];
 
 	foreach ($data as $id => $element) {
-		$element['name'] = nbsp(CHtml::encode($element['name']));
+		$element['name'] = CHtml::encode($element['name']);
 
 		// is activated
 		if (str_in_array($id, $subfilter)) {
@@ -192,6 +192,7 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 				' ',
 				new CSup($element['count'])
 			]))
+				->addClass(ZBX_STYLE_NOWRAP)
 				->addClass(ZBX_STYLE_SUBFILTER)
 				->addClass(ZBX_STYLE_SUBFILTER_ENABLED);
 		}
@@ -220,7 +221,9 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 					$link,
 					' ',
 					new CSup(($subfilter ? '+' : '').$element['count'])
-				]))->addClass(ZBX_STYLE_SUBFILTER);
+				]))
+					->addClass(ZBX_STYLE_NOWRAP)
+					->addClass(ZBX_STYLE_SUBFILTER);
 			}
 		}
 	}
@@ -261,7 +264,7 @@ function getItemFilterForm(&$items) {
 	$subfilter_trends			= $_REQUEST['subfilter_trends'];
 	$subfilter_interval			= $_REQUEST['subfilter_interval'];
 
-	$filter = (new CFilter())
+	$filter = (new CFilter(new CUrl('items.php')))
 		->setProfile('web.items.filter')
 		->setActiveTab(CProfile::get('web.items.filter.active', 1))
 		->addVar('subfilter_hosts', $subfilter_hosts)
@@ -351,7 +354,7 @@ function getItemFilterForm(&$items) {
 			ITEM_VALUE_TYPE_LOG => _('Log'),
 			ITEM_VALUE_TYPE_TEXT => _('Text')
 		])
-	);;
+	);
 	$filterColumn4->addRow(_('State'),
 		new CComboBox('filter_state', $filter_state, null, [
 			-1 => _('all'),
@@ -962,7 +965,7 @@ function getItemFormData(array $item = [], array $options = []) {
 		'status' => getRequest('status', isset($_REQUEST['form_refresh']) ? 1 : 0),
 		'type' => getRequest('type', 0),
 		'snmp_community' => getRequest('snmp_community', 'public'),
-		'snmp_oid' => getRequest('snmp_oid', 'interfaces.ifTable.ifEntry.ifInOctets.1'),
+		'snmp_oid' => getRequest('snmp_oid', ''),
 		'port' => getRequest('port', ''),
 		'value_type' => getRequest('value_type', ITEM_VALUE_TYPE_UINT64),
 		'trapper_hosts' => getRequest('trapper_hosts', ''),
@@ -998,7 +1001,9 @@ function getItemFormData(array $item = [], array $options = []) {
 		'query_fields' => getRequest('query_fields', []),
 		'posts' => getRequest('posts'),
 		'status_codes' => getRequest('status_codes', DB::getDefault('items', 'status_codes')),
-		'follow_redirects' => (int) getRequest('follow_redirects'),
+		'follow_redirects' => hasRequest('form_refresh')
+			? (int) getRequest('follow_redirects')
+			: getRequest('follow_redirects', DB::getDefault('items', 'follow_redirects')),
 		'post_type' => getRequest('post_type', DB::getDefault('items', 'post_type')),
 		'http_proxy' => getRequest('http_proxy'),
 		'headers' => getRequest('headers', []),
@@ -1131,7 +1136,9 @@ function getItemFormData(array $item = [], array $options = []) {
 		$data['key'] = $data['item']['key_'];
 		$data['interfaceid'] = $data['item']['interfaceid'];
 		$data['type'] = $data['item']['type'];
-		$data['snmp_community'] = $data['item']['snmp_community'];
+		if ($data['item']['snmp_community'] !== '') {
+			$data['snmp_community'] = $data['item']['snmp_community'];
+		}
 		$data['snmp_oid'] = $data['item']['snmp_oid'];
 		$data['port'] = $data['item']['port'];
 		$data['value_type'] = $data['item']['value_type'];
@@ -1220,10 +1227,9 @@ function getItemFormData(array $item = [], array $options = []) {
 
 				foreach ($update_interval_parser->getIntervals() as $interval) {
 					if ($interval['type'] == ITEM_DELAY_FLEXIBLE) {
-						$interval_parts = explode('/', $interval['interval']);
 						$data['delay_flex'][] = [
-							'delay' => $interval_parts[0],
-							'period' => $interval_parts[1],
+							'delay' => $interval['update_interval'],
+							'period' => $interval['time_period'],
 							'type' => ITEM_DELAY_FLEXIBLE
 						];
 					}
@@ -1362,67 +1368,54 @@ function getItemFormData(array $item = [], array $options = []) {
 	return $data;
 }
 
-function getCopyElementsFormData($elementsField, $title = null) {
+/**
+ * Prepares data to copy items/triggers/graphs.
+ *
+ * @param string      $elements_field
+ * @param null|string $title
+ *
+ * @return array
+ */
+function getCopyElementsFormData($elements_field, $title = null) {
 	$data = [
 		'title' => $title,
-		'elements_field' => $elementsField,
-		'elements' => getRequest($elementsField, []),
+		'elements_field' => $elements_field,
+		'elements' => getRequest($elements_field, []),
 		'copy_type' => getRequest('copy_type', COPY_TYPE_TO_HOST_GROUP),
-		'copy_groupid' => getRequest('copy_groupid', 0),
-		'copy_targetid' => getRequest('copy_targetid', []),
-		'hostid' => getRequest('hostid', 0),
-		'groups' => [],
-		'hosts' => [],
-		'templates' => []
+		'copy_targetids' => getRequest('copy_targetids', []),
+		'hostid' => getRequest('hostid', 0)
 	];
 
-	// validate elements
-	if (empty($data['elements']) || !is_array($data['elements'])) {
-		error(_('Incorrect list of items.'));
+	if (!$data['elements'] || !is_array($data['elements'])) {
+		show_error_message(_('Incorrect list of items.'));
 
-		return null;
+		return $data;
 	}
 
-	if ($data['copy_type'] == COPY_TYPE_TO_HOST_GROUP) {
-		// get groups
-		$data['groups'] = API::HostGroup()->get([
-			'output' => ['groupid', 'name']
-		]);
-		order_result($data['groups'], 'name');
-	}
-	else {
-		// hosts or templates
-		$params = ['output' => ['name', 'groupid']];
+	if ($data['copy_targetids']) {
+		switch ($data['copy_type']) {
+			case COPY_TYPE_TO_HOST_GROUP:
+				$data['copy_targetids'] = CArrayHelper::renameObjectsKeys(API::HostGroup()->get([
+					'output' => ['groupid', 'name'],
+					'groupids' => $data['copy_targetids'],
+					'editable' => true
+				]), ['groupid' => 'id']);
+				break;
 
-		if ($data['copy_type'] == COPY_TYPE_TO_HOST) {
-			$params['real_hosts'] = true;
-		}
-		else {
-			$params['templated_hosts'] = true;
-		}
+			case COPY_TYPE_TO_HOST:
+				$data['copy_targetids'] = CArrayHelper::renameObjectsKeys(API::Host()->get([
+					'output' => ['hostid', 'name'],
+					'hostids' => $data['copy_targetids'],
+					'editable' => true
+				]), ['hostid' => 'id']);
+				break;
 
-		$data['groups'] = API::HostGroup()->get($params);
-		order_result($data['groups'], 'name');
-
-		$groupIds = zbx_objectValues($data['groups'], 'groupid');
-
-		if (!in_array($data['copy_groupid'], $groupIds) || $data['copy_groupid'] == 0) {
-			$data['copy_groupid'] = reset($groupIds);
-		}
-
-		if ($data['copy_type'] == COPY_TYPE_TO_TEMPLATE) {
-			$data['templates'] = API::Template()->get([
-				'output' => ['name', 'templateid'],
-				'groupids' => $data['copy_groupid']
-			]);
-			order_result($data['templates'], 'name');
-		}
-		elseif ($data['copy_type'] == COPY_TYPE_TO_HOST) {
-			$data['hosts'] = API::Host()->get([
-				'output' => ['name', 'hostid'],
-				'groupids' => $data['copy_groupid']
-			]);
-			order_result($data['hosts'], 'name');
+			case COPY_TYPE_TO_TEMPLATE:
+				$data['copy_targetids'] = CArrayHelper::renameObjectsKeys(API::Template()->get([
+					'output' => ['templateid', 'name'],
+					'templateids' => $data['copy_targetids'],
+					'editable' => true
+				]), ['templateid' => 'id']);
 		}
 	}
 
@@ -1619,27 +1612,33 @@ function getTriggerFormData(array $data) {
 	// Trigger expression constructor.
 	if ($data['expression_constructor'] == IM_TREE) {
 		$analyze = analyzeExpression($data['expression'], TRIGGER_EXPRESSION);
+
 		if ($analyze !== false) {
 			list($data['expression_formula'], $data['expression_tree']) = $analyze;
+
 			if ($data['expression_action'] !== '' && $data['expression_tree'] !== null) {
 				$new_expr = remakeExpression($data['expression'], $_REQUEST['expr_target_single'],
 					$data['expression_action'], $data['expr_temp']
 				);
+
 				if ($new_expr !== false) {
 					$data['expression'] = $new_expr;
 					$analyze = analyzeExpression($data['expression'], TRIGGER_EXPRESSION);
+
 					if ($analyze !== false) {
 						list($data['expression_formula'], $data['expression_tree']) = $analyze;
 					}
 					else {
 						show_messages(false, '', _('Expression syntax error.'));
 					}
+
 					$data['expr_temp'] = '';
 				}
 				else {
 					show_messages(false, '', _('Expression syntax error.'));
 				}
 			}
+
 			$data['expression_field_name'] = 'expr_temp';
 			$data['expression_field_value'] = $data['expr_temp'];
 			$data['expression_field_readonly'] = true;
@@ -1661,8 +1660,10 @@ function getTriggerFormData(array $data) {
 	// Trigger recovery expression constructor.
 	if ($data['recovery_expression_constructor'] == IM_TREE) {
 		$analyze = analyzeExpression($data['recovery_expression'], TRIGGER_RECOVERY_EXPRESSION);
+
 		if ($analyze !== false) {
 			list($data['recovery_expression_formula'], $data['recovery_expression_tree']) = $analyze;
+
 			if ($data['recovery_expression_action'] !== '' && $data['recovery_expression_tree'] !== null) {
 				$new_expr = remakeExpression($data['recovery_expression'], $_REQUEST['recovery_expr_target_single'],
 					$data['recovery_expression_action'], $data['recovery_expr_temp']
@@ -1671,18 +1672,21 @@ function getTriggerFormData(array $data) {
 				if ($new_expr !== false) {
 					$data['recovery_expression'] = $new_expr;
 					$analyze = analyzeExpression($data['recovery_expression'], TRIGGER_RECOVERY_EXPRESSION);
+
 					if ($analyze !== false) {
 						list($data['recovery_expression_formula'], $data['recovery_expression_tree']) = $analyze;
 					}
 					else {
 						show_messages(false, '', _('Recovery expression syntax error.'));
 					}
+
 					$data['recovery_expr_temp'] = '';
 				}
 				else {
 					show_messages(false, '', _('Recovery expression syntax error.'));
 				}
 			}
+
 			$data['recovery_expression_field_name'] = 'recovery_expr_temp';
 			$data['recovery_expression_field_value'] = $data['recovery_expr_temp'];
 			$data['recovery_expression_field_readonly'] = true;

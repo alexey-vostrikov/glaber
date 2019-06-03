@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -441,43 +441,54 @@ function zbx_num2bitstr($num, $rev = false) {
 }
 
 /**
- * Converts strings like 2M or 5k to bytes
+ * Converts strings like 2M or 5k to bytes.
  *
  * @param string $val
  *
- * @return int
+ * @return string
  */
 function str2mem($val) {
-	$val = trim($val);
-	$last = strtolower(substr($val, -1));
-	$val = (int) $val;
+	$unit = strtolower(substr($val, -1));
 
-	switch ($last) {
+	switch ($unit) {
 		case 'g':
-			$val *= 1024;
-			// break; is not missing here
+			$val = bcmul(substr($val, 0, -1), ZBX_GIBIBYTE, 0);
+			break;
 		case 'm':
-			$val *= 1024;
-			// break; is not missing here
+			$val = bcmul(substr($val, 0, -1), ZBX_MEBIBYTE, 0);
+			break;
 		case 'k':
-			$val *= 1024;
+			$val = bcmul(substr($val, 0, -1), ZBX_KIBIBYTE, 0);
+			break;
 	}
 
 	return $val;
 }
 
+/**
+ * Converts bytes into human-readable form.
+ *
+ * @param string|int $size
+ *
+ * @return string
+ */
 function mem2str($size) {
 	$prefix = 'B';
-	if ($size > 1048576) {
-		$size = $size / 1048576;
+	if (bccomp($size, ZBX_MEBIBYTE) == 1) {
+		$size = bcdiv($size, ZBX_MEBIBYTE, ZBX_UNITS_ROUNDOFF_LOWER_LIMIT);
 		$prefix = 'M';
 	}
-	elseif ($size > 1024) {
-		$size = $size / 1024;
+	elseif (bccomp($size, ZBX_KIBIBYTE) == 1) {
+		$size = bcdiv($size, ZBX_KIBIBYTE, ZBX_UNITS_ROUNDOFF_LOWER_LIMIT);
 		$prefix = 'K';
 	}
 
-	return round($size, 6).$prefix;
+	if (strpos($size, '.') !== false) {
+		$size = rtrim($size, '0');
+		$size = rtrim($size, '.');
+	}
+
+	return $size.$prefix;
 }
 
 function convertUnitsUptime($value) {
@@ -695,13 +706,13 @@ function convert_units($options = []) {
 
 	// if one or more items is B or Bps, then Y-scale use base 8 and calculated in bytes
 	if ($options['byteStep']) {
-		$step = 1024;
+		$step = ZBX_KIBIBYTE;
 	}
 	else {
 		switch ($options['units']) {
 			case 'Bps':
 			case 'B':
-				$step = 1024;
+				$step = ZBX_KIBIBYTE;
 				$options['convert'] = $options['convert'] ? $options['convert'] : ITEM_CONVERT_NO_UNITS;
 				break;
 			case 'b':
@@ -811,7 +822,7 @@ function convert_units($options = []) {
  *
  * @param string $time
  *
- * @return int
+ * @return null|string
  */
 function timeUnitToSeconds($time) {
 	preg_match('/^(?<sign>[\-+])?(?<number>(\d)+)(?<suffix>['.ZBX_TIME_SUFFIXES.'])?$/', $time, $matches);
@@ -821,7 +832,8 @@ function timeUnitToSeconds($time) {
 	if (!array_key_exists('number', $matches)) {
 		return null;
 	}
-	elseif (array_key_exists('suffix', $matches)) {
+
+	if (array_key_exists('suffix', $matches)) {
 		$time = $matches['number'];
 
 		switch ($matches['suffix']) {
@@ -882,13 +894,13 @@ function convertFunctionValue($value, $scale = 0) {
 			return bcmul($value, '604800', $scale);
 
 		case 'K':
-			return bcmul($value, '1024', $scale);
+			return bcmul($value, ZBX_KIBIBYTE, $scale);
 
 		case 'M':
-			return bcmul($value, '1048576', $scale);
+			return bcmul($value, ZBX_MEBIBYTE, $scale);
 
 		case 'G':
-			return bcmul($value, '1073741824', $scale);
+			return bcmul($value, ZBX_GIBIBYTE, $scale);
 
 		case 'T':
 			return bcmul($value, '1099511627776', $scale);
@@ -923,7 +935,13 @@ function zbx_avg($values) {
 	return bcdiv($sum, count($values));
 }
 
-// accepts parameter as integer either
+/**
+ * Check if every character in given string value is a decimal digit.
+ *
+ * @param string | int   $x Value to check.
+ *
+ * @return boolean
+ */
 function zbx_ctype_digit($x) {
 	return ctype_digit(strval($x));
 }
@@ -1907,6 +1925,10 @@ function makeMessageBox($good, array $messages, $title = null, $show_close_box =
 		$msg_details = (new CDiv())->addClass(ZBX_STYLE_MSG_DETAILS)->addItem($list);
 	}
 
+	if ($title !== null) {
+		$title = new CSpan($title);
+	}
+
 	// Details link should be in front of title.
 	$msg_box = (new CTag('output', true, [$link_details, $title, $msg_details]))
 		->addClass($class)
@@ -2401,12 +2423,21 @@ function hasErrorMesssages() {
 /**
  * Clears table rows selection's cookies.
  *
- * @param string $cookieId		parent ID, is used as cookie suffix
+ * @param string $parentid  parent ID, is used as sessionStorage suffix
+ * @param array  $keepids   checked rows ids
  */
-function uncheckTableRows($cookieId = null) {
-	insert_js('cookie.eraseArray("cb_'.basename($_SERVER['SCRIPT_NAME'], '.php').
-		($cookieId === null ? '' : '_'.$cookieId).'")'
-	);
+function uncheckTableRows($parentid = null, $keepids = []) {
+	$key = implode('_', array_filter(['cb', basename($_SERVER['SCRIPT_NAME'], '.php'), $parentid]));
+
+	if ($keepids) {
+		// If $keepids will not have same key as value, it will create mess, when new checkbox will be checked.
+		$keepids = array_combine($keepids, $keepids);
+
+		insert_js('sessionStorage.setItem("'.$key.'", JSON.stringify('.CJs::encodeJson($keepids).'))');
+	}
+	else {
+		insert_js('sessionStorage.removeItem("'.$key.'")');
+	}
 }
 
 /**

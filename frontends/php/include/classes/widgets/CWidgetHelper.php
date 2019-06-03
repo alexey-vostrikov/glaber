@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -139,19 +139,20 @@ class CWidgetHelper {
 	}
 
 	/**
-	 * @param CWidgetFieldTextArea $field
+	 * @param CWidgetFieldTextArea $field      Widget field object.
+	 * @param string               $form_name  HTML form element name.
 	 *
-	 * @return Array
+	 * @return CDiv
 	 */
 	public static function getHostsPatternTextBox($field, $form_name) {
-		return [
+		return (new CDiv([
 			(new CTextArea($field->getName(), self::makeStringFromChunks($field->getValue()), ['rows' => 1]))
 				->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 				->setAriaRequired(self::isAriaRequired($field))
 				->setEnabled(!($field->getFlags() & CWidgetField::FLAG_DISABLED))
 				->setAttribute('placeholder', $field->getPlaceholder())
+				->addClass(ZBX_STYLE_FORM_INPUT_MARGIN)
 				->addClass(ZBX_STYLE_PATTERNSELECT),
-			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 			(new CButton($field->getName().'_select', _('Select')))
 				->setEnabled(!($field->getFlags() & CWidgetField::FLAG_DISABLED))
 				->addClass(ZBX_STYLE_BTN_GREY)
@@ -165,7 +166,7 @@ class CWidgetHelper {
 						'dstfld1' => $field->getName()
 					]).', null, this);'
 				)
-		];
+		]))->addClass(CMultiSelect::ZBX_STYLE_CLASS);
 	}
 
 	/**
@@ -202,6 +203,8 @@ class CWidgetHelper {
 					'srcfld1' => 'groupid',
 					'dstfrm' => $form_name,
 					'dstfld1' => zbx_formatDomId($field_name),
+					'real_hosts' => true,
+					'enrich_parent_groups' => true
 				]
 			],
 			'add_post_js' => false
@@ -350,11 +353,11 @@ class CWidgetHelper {
 	 * @return CList
 	 */
 	public static function getSeverities($field, $config) {
-		$class = ($field->getOrientation() == CWidgetFieldSeverities::ORIENTATION_VERTICAL)
-			? ZBX_STYLE_LIST_CHECK_RADIO
-			: ZBX_STYLE_LIST_HOR_CHECK_RADIO;
+		$severities = (new CList())->addClass(ZBX_STYLE_LIST_CHECK_RADIO);
 
-		$severities = (new CList())->addClass($class);
+		if ($field->getOrientation() == CWidgetFieldSeverities::ORIENTATION_HORIZONTAL) {
+			$severities->addClass(ZBX_STYLE_HOR_LIST);
+		}
 
 		for ($severity = TRIGGER_SEVERITY_NOT_CLASSIFIED; $severity < TRIGGER_SEVERITY_COUNT; $severity++) {
 			$severities->addItem(
@@ -468,6 +471,26 @@ class CWidgetHelper {
 	}
 
 	/**
+	 * @param CWidgetFieldApplication $field
+	 *
+	 * @return array
+	 */
+	public static function getApplicationSelector($field) {
+		return [
+			(new CTextBox($field->getName(), $field->getValue()))
+				->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+				->setAriaRequired(self::isAriaRequired($field))
+				->addClass('simple-textbox'),
+			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+			(new CButton($field->getName().'_select', _('Select')))
+				->addClass(ZBX_STYLE_BTN_GREY)
+				->onClick(
+					'return PopUp("popup.generic", '.CJs::encodeJson($field->getFilterParameters()).', null, this);'
+				)
+		];
+	}
+
+	/**
 	 * Function returns array containing HTML objects filled with given values. Used to generate HTML in widget
 	 * overrides field.
 	 *
@@ -505,8 +528,8 @@ class CWidgetHelper {
 							))
 							->setAttribute('placeholder', _('host pattern'))
 							->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+							->addClass(ZBX_STYLE_FORM_INPUT_MARGIN)
 							->addClass(ZBX_STYLE_PATTERNSELECT),
-						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 						(new CButton(null, _('Select')))
 							->addClass(ZBX_STYLE_BTN_GREY)
 							->onClick('return PopUp("popup.generic", jQuery.extend('.
@@ -519,6 +542,7 @@ class CWidgetHelper {
 								]).', {dstfld1: jQuery(this).siblings("textarea").attr("name")}), null, this);'
 							)
 					]))
+						->addClass(CMultiSelect::ZBX_STYLE_CLASS)
 						->addClass(ZBX_STYLE_COLUMN_50),
 					(new CDiv([
 						(new CTextArea($field_name.'['.$row_num.'][items]', self::makeStringFromChunks($value['items']),
@@ -526,8 +550,8 @@ class CWidgetHelper {
 							))
 							->setAttribute('placeholder', _('item pattern'))
 							->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+							->addClass(ZBX_STYLE_FORM_INPUT_MARGIN)
 							->addClass(ZBX_STYLE_PATTERNSELECT),
-						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 						(new CButton(null, _('Select')))
 							->addClass(ZBX_STYLE_BTN_GREY)
 							->onClick('return PopUp("popup.generic", jQuery.extend('.
@@ -538,11 +562,13 @@ class CWidgetHelper {
 									'multiselect' => 1,
 									'real_hosts' => 1,
 									'numeric' => 1,
+									'with_webitems' => 1,
 									'orig_names' => 1,
 									'dstfrm' => $form_name
 								]).', {dstfld1: jQuery(this).siblings("textarea").attr("name")}), null, this);'
 							)
 					]))
+						->addClass(CMultiSelect::ZBX_STYLE_CLASS)
 						->addClass(ZBX_STYLE_COLUMN_50)
 				]))
 					->addClass(ZBX_STYLE_COLUMN_95)
@@ -820,7 +846,7 @@ class CWidgetHelper {
 				'handle: ".drag-icon",'.
 				'tolerance: "pointer",'.
 				'scroll: false,'.
-				'cursor: "move",'.
+				'cursor: IE ? "move" : "grabbing",'.
 				'opacity: 0.6,'.
 				'axis: "y",'.
 				'disabled: function() {'.
@@ -865,38 +891,41 @@ class CWidgetHelper {
 							->addClass(ZBX_STYLE_COLOR_PREVIEW_BOX)
 							->addStyle('background-color: #'.$value['color'].';')
 							->setAttribute('title', $is_opened ? _('Collapse') : _('Expand')),
-						(new CTextArea($field_name.'['.$row_num.'][hosts]', self::makeStringFromChunks($value['hosts']),
-								['rows' => 1]))
-							->setAttribute('placeholder', _('host pattern'))
-							->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
-							->addClass(ZBX_STYLE_PATTERNSELECT),
-						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-						(new CButton(null, _('Select')))
-							->addClass(ZBX_STYLE_BTN_GREY)
-							->onClick('return PopUp("popup.generic", jQuery.extend('.
-								CJs::encodeJson([
-									'srctbl' => 'hosts',
-									'srcfld1' => 'host',
-									'reference' => 'name',
-									'multiselect' => 1,
-									'dstfrm' => $form_name
-								]) . ', {dstfld1: jQuery(this).siblings("textarea").attr("name")}), null, this);'
+						(new CDiv([
+							(new CTextArea($field_name.'['.$row_num.'][hosts]',
+								self::makeStringFromChunks($value['hosts']), ['rows' => 1])
 							)
+								->setAttribute('placeholder', _('host pattern'))
+								->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+								->addClass(ZBX_STYLE_FORM_INPUT_MARGIN)
+								->addClass(ZBX_STYLE_PATTERNSELECT),
+							(new CButton(null, _('Select')))
+								->addClass(ZBX_STYLE_BTN_GREY)
+								->onClick('return PopUp("popup.generic", jQuery.extend('.
+									CJs::encodeJson([
+										'srctbl' => 'hosts',
+										'srcfld1' => 'host',
+										'reference' => 'name',
+										'multiselect' => 1,
+										'dstfrm' => $form_name
+									]).', {dstfld1: jQuery(this).siblings("textarea").attr("name")}), null, this);'
+								)
+						]))->addClass(CMultiSelect::ZBX_STYLE_CLASS)
 					]))->addClass(ZBX_STYLE_COLUMN_50),
 					(new CDiv([
-						(new CTextArea($field_name.'['.$row_num.'][items]', self::makeStringFromChunks($value['items']),
-								['rows' => 1]))
+						(new CTextArea($field_name.'['.$row_num.'][items]',
+							self::makeStringFromChunks($value['items']), ['rows' => 1])
+						)
 							->setAttribute('placeholder', _('item pattern'))
 							->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+							->addClass(ZBX_STYLE_FORM_INPUT_MARGIN)
 							->addClass(ZBX_STYLE_PATTERNSELECT),
-						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 						(new CButton(null, _('Select')))
 							->addClass(ZBX_STYLE_BTN_GREY)
 							->onClick('return PopUp("popup.generic", jQuery.extend('.
 								CJs::encodeJson([
 									'srctbl' => 'items',
 									'srcfld1' => 'itemid',
-									'srcfld2' => 'name',
 									'reference' => 'name_expanded',
 									'multiselect' => 1,
 									'real_hosts' => 1,
@@ -904,9 +933,11 @@ class CWidgetHelper {
 									'with_webitems' => 1,
 									'orig_names' => 1,
 									'dstfrm' => $form_name
-								]) . ', {dstfld1: jQuery(this).siblings("textarea").attr("name")}), null, this);'
+								]).', {dstfld1: jQuery(this).siblings("textarea").attr("name")}), null, this);'
 							)
-					]))->addClass(ZBX_STYLE_COLUMN_50),
+					]))
+						->addClass(CMultiSelect::ZBX_STYLE_CLASS)
+						->addClass(ZBX_STYLE_COLUMN_50),
 				]))
 					->addClass(ZBX_STYLE_COLUMN_95)
 					->addClass(ZBX_STYLE_COLUMNS),
@@ -914,8 +945,7 @@ class CWidgetHelper {
 					(new CButton())
 						->setAttribute('title', _('Delete'))
 						->addClass(ZBX_STYLE_REMOVE_BTN)
-				]))
-					->addClass(ZBX_STYLE_COLUMN_5)
+				]))->addClass(ZBX_STYLE_COLUMN_5)
 			]))
 				->addClass(ZBX_STYLE_LIST_ACCORDION_ITEM_HEAD)
 				->addClass(ZBX_STYLE_COLUMNS),
@@ -1083,17 +1113,17 @@ class CWidgetHelper {
 					'jQuery("#ds_" + row_num + "_width").rangeControl("disable");'.
 					'jQuery("#ds_" + row_num + "_fill").rangeControl("disable");'.
 					'jQuery("#ds_" + row_num + "_pointsize").rangeControl("enable");'.
-					'jQuery("#ds_" + row_num + "_missingdatafunc_0").attr("disabled", "disabled");'.
-					'jQuery("#ds_" + row_num + "_missingdatafunc_1").attr("disabled", "disabled");'.
-					'jQuery("#ds_" + row_num + "_missingdatafunc_2").attr("disabled", "disabled");'.
+					'jQuery("#ds_" + row_num + "_missingdatafunc_0").prop("disabled", true);'.
+					'jQuery("#ds_" + row_num + "_missingdatafunc_1").prop("disabled", true);'.
+					'jQuery("#ds_" + row_num + "_missingdatafunc_2").prop("disabled", true);'.
 				'}'.
 				'else {'.
 					'jQuery("#ds_" + row_num + "_width").rangeControl("enable");'.
 					'jQuery("#ds_" + row_num + "_fill").rangeControl("enable");'.
 					'jQuery("#ds_" + row_num + "_pointsize").rangeControl("disable");'.
-					'jQuery("#ds_" + row_num + "_missingdatafunc_0").removeAttr("disabled");'.
-					'jQuery("#ds_" + row_num + "_missingdatafunc_1").removeAttr("disabled");'.
-					'jQuery("#ds_" + row_num + "_missingdatafunc_2").removeAttr("disabled");'.
+					'jQuery("#ds_" + row_num + "_missingdatafunc_0").prop("disabled", false);'.
+					'jQuery("#ds_" + row_num + "_missingdatafunc_1").prop("disabled", false);'.
+					'jQuery("#ds_" + row_num + "_missingdatafunc_2").prop("disabled", false);'.
 				'}'.
 			'};',
 
@@ -1140,7 +1170,7 @@ class CWidgetHelper {
 				'})'.
 				'.bind("tableupdate.dynamicRows", function(event, options) {'.
 					'updateVariableOrder(jQuery("#data_sets"), ".'.ZBX_STYLE_LIST_ACCORDION_ITEM.'", "ds");'.
-					'jQuery(".'.ZBX_STYLE_RANGE_CONTROL.'[data-options]").rangeControl();'.
+					'jQuery(".'.CRangeControl::ZBX_STYLE_CLASS.'[data-options]").rangeControl();'.
 					'if (jQuery("#data_sets .'.ZBX_STYLE_LIST_ACCORDION_ITEM.'").length > 1) {'.
 						'jQuery("#data_sets .drag-icon").removeClass("disabled");'.
 						'jQuery("#data_sets").sortable("enable");'.
@@ -1157,7 +1187,7 @@ class CWidgetHelper {
 			'});',
 
 			// Initialize rangeControl UI elements.
-			'jQuery(".'.ZBX_STYLE_RANGE_CONTROL.'", jQuery("#data_sets")).rangeControl();',
+			'jQuery(".'.CRangeControl::ZBX_STYLE_CLASS.'", jQuery("#data_sets")).rangeControl();',
 
 			// Expand dataset when click in pattern fields.
 			'jQuery("#data_sets").on("click", "'.implode(', ', [
@@ -1194,7 +1224,7 @@ class CWidgetHelper {
 				'handle: ".drag-icon",'.
 				'tolerance: "pointer",'.
 				'scroll: false,'.
-				'cursor: "move",'.
+				'cursor: IE ? "move" : "grabbing",'.
 				'opacity: 0.6,'.
 				'axis: "y",'.
 				'disabled: function() {'.
@@ -1230,6 +1260,7 @@ class CWidgetHelper {
 	 * @return string
 	 */
 	public static function makeStringFromChunks(array $chunks) {
+		ksort($chunks);
 		return implode('', $chunks);
 	}
 
@@ -1241,7 +1272,7 @@ class CWidgetHelper {
 	 * @return array  Returns array of unique patterns.
 	 */
 	public static function splitPatternIntoParts($patterns) {
-		$patterns = is_array($patterns) ? $patterns : str_split(str_replace("\r", '', $patterns), 255);
+		$patterns = is_array($patterns) ? $patterns : str_split(str_replace("\r", '', trim($patterns)), 255);
 		return array_filter($patterns, 'strlen');
 	}
 }

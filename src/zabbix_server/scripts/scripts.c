@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -143,7 +143,7 @@ static int	zbx_execute_script_on_terminal(const DC_HOST *host, const zbx_script_
 			item.authtype = script->authtype;
 			item.publickey = script->publickey;
 			item.privatekey = script->privatekey;
-			/* break; is not missing here */
+			ZBX_FALLTHROUGH;
 		case ZBX_SCRIPT_TYPE_TELNET:
 			item.username = script->username;
 			item.password = script->password;
@@ -360,7 +360,7 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 					&script->publickey, MACRO_TYPE_COMMON, NULL, 0);
 			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
 					&script->privatekey, MACRO_TYPE_COMMON, NULL, 0);
-			/* break; is not missing here */
+			ZBX_FALLTHROUGH;
 		case ZBX_SCRIPT_TYPE_TELNET:
 			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
 					&script->port, MACRO_TYPE_COMMON, NULL, 0);
@@ -396,8 +396,11 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 				goto out;
 			}
 
-			substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, host, NULL, NULL, NULL, &script->command,
-					MACRO_TYPE_SCRIPT, NULL, 0);
+			if (SUCCEED != substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, host, NULL, NULL,
+					NULL, &script->command, MACRO_TYPE_SCRIPT, error, max_error_len))
+			{
+				goto out;
+			}
 
 			/* DBget_script_by_scriptid() may overwrite script type with anything but global script... */
 			if (ZBX_SCRIPT_TYPE_GLOBAL_SCRIPT == script->type)
@@ -421,7 +424,6 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 	ret = SUCCEED;
 out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
-
 	return ret;
 }
 

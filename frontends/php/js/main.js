@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -130,52 +130,6 @@ var MMenu = {
 				});
 			}
 		});
-
-		if (SF) {
-			var nav_elems = jQuery('.top-subnav a, .search, .btn-search, .top-nav-zbbshare, .top-nav-help, .top-nav-profile, .top-nav-signout')
-					.on('keydown', function(event) {
-				if (event.which == 9) {
-					var visible_subnav_elems = nav_elems.filter(function() {
-						return jQuery(this).is(':visible');
-					});
-					var current = visible_subnav_elems.toArray().indexOf(this);
-
-					if (event.shiftKey && current > 0) {
-						visible_subnav_elems.get(current - 1).focus();
-					}
-					else if (!event.shiftKey && visible_subnav_elems.length > current + 1) {
-						visible_subnav_elems.get(current + 1).focus();
-					}
-					else if (event.shiftKey && current == 0) {
-						// Find the previous :focusable element to focus.
-						var active_element_index = jQuery('*', 'body').toArray().indexOf(document.activeElement),
-							prev_element = null;
-
-						jQuery('*', 'body').each(function(i) {
-							if (active_element_index > i && jQuery(this).is(':focusable')) {
-								prev_element = this;
-							};
-						});
-
-						if (prev_element) {
-							prev_element.focus();
-						}
-					}
-					else if (current + 1 == visible_subnav_elems.length) {
-						// If this is the last item in the sub-menu list, focus next :focusable element.
-						var active_element_index = jQuery('*', 'body').toArray().indexOf(document.activeElement);
-
-						jQuery('*', 'body').filter(function(i) {
-							return (i > active_element_index && jQuery(this).is(':focusable'));
-						}).get(0).focus();
-					}
-
-					event.preventDefault();
-
-					return false;
-				}
-			});
-		}
 	},
 
 	mouseOver: function(show_label) {
@@ -432,31 +386,28 @@ var hintBox = {
 	/**
 	 * Initialize hint box event handlers.
 	 *
-	 * Event 'remove' is triggered on:
-	 * - content update using flickerfreeScreen.refreshHtml()
-	 * - widget update by updateWidgetContent()
-	 * - widget remove by deleteWidget().
-	 *
 	 * Triggered events:
 	 * - onDeleteHint.hintBox 	- when removing a hintbox.
 	 */
 	bindEvents: function () {
-		jQuery(document).on('keydown click mouseenter mouseleave remove', '[data-hintbox=1]', function (e) {
-			var target = jQuery(this);
+		jQuery(document).on('keydown click mouseenter mouseleave', '[data-hintbox=1]', function (e) {
+
+			if (jQuery(this).hasClass('hint-item')) {
+				var target = jQuery(this).siblings('.main-hint');
+			}
+			else {
+				var target = jQuery(this);
+			}
 
 			switch (e.type) {
 				case 'mouseenter':
-					hintBox.showHint(e, this, target.next('.hint-box').html(), target.data('hintbox-class'), false,
+					hintBox.showHint(e, target[0], target.next('.hint-box').html(), target.data('hintbox-class'), false,
 						target.data('hintbox-style')
 					);
 					break;
 
 				case 'mouseleave':
-					hintBox.hideHint(e, this);
-					break;
-
-				case 'remove':
-					hintBox.deleteHint(this);
+					hintBox.hideHint(target[0], false);
 					break;
 
 				case 'keydown':
@@ -468,7 +419,7 @@ var hintBox = {
 						e.clientY = offset.top - w.scrollTop() + (target.height() / 2);
 						e.preventDefault();
 
-						hintBox.showStaticHint(e, this, target.data('hintbox-class'), false,
+						hintBox.showStaticHint(e, target[0], target.data('hintbox-class'), false,
 							target.data('hintbox-style')
 						);
 					}
@@ -476,7 +427,7 @@ var hintBox = {
 
 				case 'click':
 					if (target.data('hintbox-static') == 1) {
-						hintBox.showStaticHint(e, this, target.data('hintbox-class'), false,
+						hintBox.showStaticHint(e, target[0], target.data('hintbox-class'), false,
 							target.data('hintbox-style')
 						);
 					}
@@ -517,27 +468,36 @@ var hintBox = {
 
 		if (isStatic) {
 			target.hintboxid = hintboxid;
+			jQuery(target).attr('data-expanded', 'true');
 			addToOverlaysStack(hintboxid, target, 'hintbox');
 
 			var close_link = jQuery('<button>', {
 					'class': 'overlay-close-btn',
-					'title': t('Close')
+					'title': t('S_CLOSE')
 				}
 			)
 				.click(function() {
-					hintBox.hideHint(e, target, true);
+					hintBox.hideHint(target, true);
 				});
 			box.prepend(close_link);
 		}
 
 		jQuery(appendTo).append(box);
 
+		var removeHandler = function() {
+			hintBox.deleteHint(target);
+		};
+
+		jQuery(target)
+			.off('remove', removeHandler)
+			.on('remove', removeHandler);
+
 		return box;
 	},
 
 	showStaticHint: function(e, target, className, resizeAfterLoad, styles, hintText) {
 		var isStatic = target.isStatic;
-		hintBox.hideHint(e, target, true);
+		hintBox.hideHint(target, true);
 
 		if (!isStatic) {
 			if (typeof hintText === 'undefined') {
@@ -546,6 +506,7 @@ var hintBox = {
 
 			target.isStatic = true;
 			hintBox.showHint(e, target, hintText, className, true, styles);
+			jQuery(target).data('return-control', jQuery(e.target));
 
 			if (resizeAfterLoad) {
 				hintText.one('load', function(e) {
@@ -640,7 +601,7 @@ var hintBox = {
 		});
 	},
 
-	hideHint: function(e, target, hideStatic) {
+	hideHint: function(target, hideStatic) {
 		if (target.isStatic && !hideStatic) {
 			return;
 		}
@@ -650,6 +611,7 @@ var hintBox = {
 
 	deleteHint: function(target) {
 		if (typeof target.hintboxid !== 'undefined') {
+			jQuery(target).removeAttr('data-expanded');
 			removeFromOverlaysStack(target.hintboxid);
 		}
 
@@ -659,6 +621,9 @@ var hintBox = {
 			delete target.hintBoxItem;
 
 			if (target.isStatic) {
+				if (jQuery(target).data('return-control') !== 'undefined') {
+					jQuery(target).data('return-control').focus();
+				}
 				delete target.isStatic;
 			}
 		}
@@ -731,7 +696,7 @@ function changeWidgetState(obj, widgetId, url) {
 		state = 1;
 	}
 
-	obj.title = (state == 1) ? locale['S_COLLAPSE'] : locale['S_EXPAND'];
+	obj.title = (state == 1) ? t('S_COLLAPSE') : t('S_EXPAND');
 
 	sendAjaxData(url, {
 		data: {

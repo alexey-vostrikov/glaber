@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -257,6 +257,15 @@ elseif (hasRequest('action') && getRequest('action') == 'hostprototype.massdelet
 		uncheckTableRows($discoveryRule['itemid']);
 	}
 	show_messages($result, _('Host prototypes deleted'), _('Cannot delete host prototypes'));
+}
+
+if (hasRequest('action') && hasRequest('group_hostid') && !$result) {
+	$host_prototypes = API::HostPrototype()->get([
+		'output' => [],
+		'hostids' => getRequest('group_hostid'),
+		'editable' => true
+	]);
+	uncheckTableRows($discoveryRule['itemid'], zbx_objectValues($host_prototypes, 'hostid'));
 }
 
 $config = select_config();

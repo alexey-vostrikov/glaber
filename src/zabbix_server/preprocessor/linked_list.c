@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -124,7 +124,7 @@ void	zbx_list_insert_after(zbx_list_t *list, zbx_list_item_t *after, void *value
  ******************************************************************************/
 void	zbx_list_append(zbx_list_t *list, void *value, zbx_list_item_t **inserted)
 {
-	return zbx_list_insert_after(list, NULL, value, inserted);
+	zbx_list_insert_after(list, NULL, value, inserted);
 }
 
 /******************************************************************************

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -164,8 +164,8 @@ $tab_data_set = (new CFormList())
 $scripts[] = CWidgetHelper::getGraphDataSetJavascript();
 $jq_templates['dataset-row'] = CWidgetHelper::getGraphDataSetTemplate($fields['ds'], $form_name);
 
-// Create 'Display options' tab.
-$tab_display_opt = (new CFormList())
+// Create 'Displaying options' tab.
+$tab_displaying_opt = (new CFormList())
 	->addRow(CWidgetHelper::getLabel($fields['source']),
 		CWidgetHelper::getRadioButtonList($fields['source'], $form_name)
 	);
@@ -184,8 +184,7 @@ $tab_axes = (new CFormList())->addRow('',
 			->addRow(CWidgetHelper::getLabel($fields['lefty_min']), CWidgetHelper::getNumericBox($fields['lefty_min']))
 			->addRow(CWidgetHelper::getLabel($fields['lefty_max']), CWidgetHelper::getNumericBox($fields['lefty_max']))
 			->addRow(CWidgetHelper::getLabel($fields['lefty_units']), [
-				CWidgetHelper::getComboBox($fields['lefty_units']),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+				CWidgetHelper::getComboBox($fields['lefty_units'])->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 				CWidgetHelper::getTextBox($fields['lefty_static_units'])
 			])
 			->addClass(ZBX_STYLE_COLUMN_33),
@@ -199,8 +198,7 @@ $tab_axes = (new CFormList())->addRow('',
 				CWidgetHelper::getNumericBox($fields['righty_max'])
 			)
 			->addRow(CWidgetHelper::getLabel($fields['righty_units']), [
-				CWidgetHelper::getComboBox($fields['righty_units']),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+				CWidgetHelper::getComboBox($fields['righty_units'])->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 				CWidgetHelper::getTextBox($fields['righty_static_units'])
 			])
 			->addClass(ZBX_STYLE_COLUMN_33),
@@ -249,7 +247,7 @@ $jq_templates['overrides-row'] = CWidgetHelper::getGraphOverrideTemplate($fields
 // Create CTabView.
 $form_tabs = (new CTabView())
 	->addTab('data_set',  _('Data set'), $tab_data_set)
-	->addTab('display_options',  _('Display options'), $tab_display_opt)
+	->addTab('displaying_options',  _('Displaying options'), $tab_displaying_opt)
 	->addTab('time_period',  _('Time period'), $tab_time_period)
 	->addTab('axes',  _('Axes'), $tab_axes)
 	->addTab('legendtab',  _('Legend'), $tab_legend)

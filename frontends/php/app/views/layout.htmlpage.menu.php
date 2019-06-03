@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ $user_navigation = (new CList())
 		(new CForm('get', 'search.php'))
 			->cleanItems()
 			->addItem([
-				(new CTextBox('search', '', false, 255))
+				(new CTextBox('search', getRequest('search', ''), false, 255))
 					->setAttribute('autocomplete', 'off')
 					->addClass(ZBX_STYLE_SEARCH)
 					->setAttribute('aria-label', _('type here to search')),

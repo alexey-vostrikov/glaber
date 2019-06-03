@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -132,6 +132,7 @@ class CGraphItem extends CApiService {
 		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
+
 		return $result;
 	}
 
@@ -149,7 +150,7 @@ class CGraphItem extends CApiService {
 		$result = parent::addRelatedObjects($options, $result);
 
 		// adding graphs
-		if ($options['selectGraphs'] !== null) {
+		if ($options['selectGraphs'] !== null && $options['selectGraphs'] != API_OUTPUT_COUNT) {
 			$relationMap = $this->createRelationMap($result, 'gitemid', 'graphid');
 			$graphs = API::Graph()->get([
 				'output' => $options['selectGraphs'],

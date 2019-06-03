@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -49,13 +49,13 @@ class CCorrelation extends CApiService {
 	 *
 	 * @param array $options
 	 *
-	 * @return array
+	 * @return array|string
 	 */
 	public function get($options = []) {
 		$options = zbx_array_merge($this->getOptions, $options);
 
 		if ($options['editable'] && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			return ($options['countOutput'] && !$options['groupCount']) ? 0 : [];
+			return ($options['countOutput'] && !$options['groupCount']) ? '0' : [];
 		}
 
 		$res = DBselect($this->createSelectQuery($this->tableName(), $options), $options['limit']);

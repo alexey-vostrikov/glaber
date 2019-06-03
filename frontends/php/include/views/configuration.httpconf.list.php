@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 **/
 
 
-$filter = (new CFilter())
+$filter = (new CFilter(new CUrl('httpconf.php')))
 	->setProfile($data['profileIdx'])
 	->setActiveTab($data['active_tab'])
 	->addFilterTab(_('Filter'), [
@@ -155,8 +155,6 @@ foreach ($httpTests as $httpTestId => $httpTest) {
 		$this->data['showInfoColumn'] ? makeInformationList($info_icons) : null
 	]);
 }
-
-zbx_add_post_js('cookie.prefix = "'.$this->data['hostid'].'";');
 
 // append table to form
 $httpForm->addItem([

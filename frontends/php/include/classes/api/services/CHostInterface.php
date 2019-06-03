@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -228,6 +228,7 @@ class CHostInterface extends CApiService {
 			'preservekeys' => true
 		]);
 
+		$check_have_items = [];
 		foreach ($interfaces as &$interface) {
 			if (!check_db_fields($interfaceDBfields, $interface)) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect arguments passed to function.'));
@@ -241,6 +242,10 @@ class CHostInterface extends CApiService {
 				$dbInterface = $dbInterfaces[$interface['interfaceid']];
 				if (isset($interface['hostid']) && bccomp($dbInterface['hostid'], $interface['hostid']) != 0) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Cannot switch host for interface.'));
+				}
+
+				if (array_key_exists('type', $interface) && $interface['type'] != $dbInterface['type']) {
+					$check_have_items[] = $interface['interfaceid'];
 				}
 
 				$interface['hostid'] = $dbInterface['hostid'];
@@ -311,6 +316,10 @@ class CHostInterface extends CApiService {
 		// check if any of the affected hosts are discovered
 		if ($update) {
 			$interfaces = $this->extendObjects('interface', $interfaces, ['hostid']);
+
+			if ($check_have_items) {
+				$this->checkIfInterfaceHasItems($check_have_items);
+			}
 		}
 		$this->checkValidator(zbx_objectValues($interfaces, 'hostid'), new CHostNormalValidator([
 			'message' => _('Cannot update interface for discovered host "%1$s".')
@@ -711,32 +720,20 @@ class CHostInterface extends CApiService {
 		$this->checkMainInterfaces($interfaces);
 	}
 
+	/**
+	 * Prepares data to validate main interface for every interface type. Executes main interface validation.
+	 *
+	 * @param array $interfaces                     Array of interfaces to validate.
+	 * @param int   $interfaces[]['hostid']         Updated interface's hostid.
+	 * @param int   $interfaces[]['interfaceid']    Updated interface's interfaceid.
+	 *
+	 * @throws APIException
+	 */
 	private function checkMainInterfacesOnUpdate(array $interfaces) {
-		$interfaceidsWithoutHostIds = [];
-
-		// gather all hostids where interfaces should be checked
-		foreach ($interfaces as $interface) {
-			if (isset($interface ['type']) || isset($interface['main'])) {
-				if (isset($interface['hostid'])) {
-					$hostids[$interface['hostid']] = $interface['hostid'];
-				}
-				else {
-					$interfaceidsWithoutHostIds[] = $interface['interfaceid'];
-				}
-			}
-		}
-
-		// gather missing host ids
-		$hostIds = [];
-		if ($interfaceidsWithoutHostIds) {
-			$dbResult = DBselect('SELECT DISTINCT i.hostid FROM interface i WHERE '.dbConditionInt('i.interfaceid', $interfaceidsWithoutHostIds));
-			while ($hostData = DBfetch($dbResult)) {
-				$hostIds[$hostData['hostid']] = $hostData['hostid'];
-			}
-		}
+		$hostids = array_keys(array_flip(zbx_objectValues($interfaces, 'hostid')));
 
 		$dbInterfaces = API::HostInterface()->get([
-			'hostids' => $hostIds,
+			'hostids' => $hostids,
 			'output' => ['hostid', 'main', 'type'],
 			'preservekeys' => true,
 			'nopermissions' => true
@@ -747,7 +744,7 @@ class CHostInterface extends CApiService {
 			if (isset($dbInterfaces[$interface['interfaceid']])) {
 				$dbInterfaces[$interface['interfaceid']] = array_merge(
 					$dbInterfaces[$interface['interfaceid']],
-					$interfaces[$interface['interfaceid']]
+					$interface
 				);
 			}
 		}
@@ -893,8 +890,10 @@ class CHostInterface extends CApiService {
 					'groupCount' => true
 				]);
 				$items = zbx_toHash($items, 'interfaceid');
-				foreach ($result as $interfaceId => $interface) {
-					$result[$interfaceId]['items'] = isset($items[$interfaceId]) ? $items[$interfaceId]['rowscount'] : 0;
+				foreach ($result as $interfaceid => $interface) {
+					$result[$interfaceid]['items'] = array_key_exists($interfaceid, $items)
+						? $items[$interfaceid]['rowscount']
+						: '0';
 				}
 			}
 		}

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -179,7 +179,7 @@ void	DCsync_maintenance_tags(zbx_dbsync_t *sync)
 				sizeof(zbx_dc_maintenance_tag_t), &found);
 
 		maintenance_tag->maintenanceid = maintenanceid;
-		ZBX_STR2UCHAR(maintenance_tag->operator, row[2]);
+		ZBX_STR2UCHAR(maintenance_tag->op, row[2]);
 		DCstrpool_replace(found, &maintenance_tag->tag, row[3]);
 		DCstrpool_replace(found, &maintenance_tag->value, row[4]);
 
@@ -1027,15 +1027,26 @@ void	zbx_dc_flush_host_maintenance_updates(const zbx_vector_ptr_t *updates)
 	int					i;
 	const zbx_host_maintenance_diff_t	*diff;
 	ZBX_DC_HOST				*host;
+	int					now;
+
+	now = time(NULL);
 
 	WRLOCK_CACHE;
 
 	for (i = 0; i < updates->values_num; i++)
 	{
+		int	maintenance_without_data = 0;
+
 		diff = (zbx_host_maintenance_diff_t *)updates->values[i];
 
 		if (NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &diff->hostid)))
 			continue;
+
+		if (HOST_MAINTENANCE_STATUS_ON == host->maintenance_status &&
+				MAINTENANCE_TYPE_NODATA == host->maintenance_type)
+		{
+			maintenance_without_data = 1;
+		}
 
 		if (0 != (diff->flags & ZBX_FLAG_HOST_MAINTENANCE_UPDATE_MAINTENANCEID))
 			host->maintenanceid = diff->maintenanceid;
@@ -1048,6 +1059,15 @@ void	zbx_dc_flush_host_maintenance_updates(const zbx_vector_ptr_t *updates)
 
 		if (0 != (diff->flags & ZBX_FLAG_HOST_MAINTENANCE_UPDATE_MAINTENANCE_FROM))
 			host->maintenance_from = diff->maintenance_from;
+
+		if (1 == maintenance_without_data && (HOST_MAINTENANCE_STATUS_ON != host->maintenance_status ||
+				MAINTENANCE_TYPE_NODATA != host->maintenance_type))
+		{
+			/* Store time at which no-data maintenance ended for the host (either */
+			/* because no-data maintenance ended or because maintenance type was  */
+			/* changed to normal), this is needed for nodata() trigger function.  */
+			host->data_expected_from = now;
+		}
 	}
 
 	UNLOCK_CACHE;
@@ -1105,7 +1125,7 @@ void	zbx_dc_get_host_maintenance_updates(const zbx_vector_uint64_t *maintenancei
  ******************************************************************************/
 static int	dc_maintenance_tag_value_match(const zbx_dc_maintenance_tag_t *mt, const zbx_tag_t *tag)
 {
-	switch (mt->operator)
+	switch (mt->op)
 	{
 		case ZBX_MAINTENANCE_TAG_OPERATOR_LIKE:
 			return (NULL != strstr(tag->value, mt->value) ? SUCCEED : FAIL);

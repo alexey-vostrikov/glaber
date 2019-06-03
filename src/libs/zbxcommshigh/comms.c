@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_send_response                                                *
+ * Function: zbx_send_response_ext                                            *
  *                                                                            *
  * Purpose: send json SUCCEED or FAIL to socket along with an info message    *
  *                                                                            *
@@ -40,13 +40,11 @@
  *                                                                            *
  * Author: Alexander Vladishev, Alexei Vladishev                              *
  *                                                                            *
- * Comments:                                                                  *
- *                                                                            *
  ******************************************************************************/
 int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, const char *version, int protocol,
 		int timeout)
 {
-	const char	*__function_name = "zbx_send_response";
+	const char	*__function_name = "zbx_send_response_ext";
 
 	struct zbx_json	json;
 	const char	*resp;

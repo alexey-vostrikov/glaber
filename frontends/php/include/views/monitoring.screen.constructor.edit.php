@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -502,7 +502,8 @@ elseif (in_array($resourceType, [SCREEN_RESOURCE_HOSTGROUP_TRIGGERS, SCREEN_RESO
 						'srctbl' => 'host_groups',
 						'srcfld1' => 'groupid',
 						'dstfrm' => $form->getName(),
-						'dstfld1' => 'resourceid'
+						'dstfld1' => 'resourceid',
+						'real_hosts' => true
 					]
 				]
 			]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
@@ -635,16 +636,31 @@ elseif (in_array($resourceType, [SCREEN_RESOURCE_TRIGGER_OVERVIEW, SCREEN_RESOUR
 					'srctbl' => 'host_groups',
 					'srcfld1' => 'groupid',
 					'dstfrm' => $form->getName(),
-					'dstfld1' => 'resourceid'
+					'dstfld1' => 'resourceid',
+					'real_hosts' => true
 				]
 			]
 		]))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 			->setAriaRequired()
-	);
-	$screenFormList->addRow(_('Application'),
-		(new CTextBox('application', $application, false, 255))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-	);
+	)
+	->addRow(_('Application'), [
+		(new CTextBox('application', $application))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
+		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+		(new CButton('application_select', _('Select')))
+			->addClass(ZBX_STYLE_BTN_GREY)
+			->onClick('return PopUp("popup.generic", '.
+				CJs::encodeJson([
+					'srctbl' => 'applications',
+					'srcfld1' => 'name',
+					'dstfrm' => $form->getName(),
+					'dstfld1' => 'application',
+					'real_hosts' => '1',
+					'with_applications' => '1'
+				]).', null, this);'
+			)
+	]);
 }
 
 /*
@@ -732,7 +748,8 @@ elseif ($resourceType == SCREEN_RESOURCE_HOST_INFO || $resourceType == SCREEN_RE
 					'srctbl' => 'host_groups',
 					'srcfld1' => 'groupid',
 					'dstfrm' => $form->getName(),
-					'dstfld1' => 'resourceid'
+					'dstfld1' => 'resourceid',
+					'real_hosts' => true
 				]
 			]
 		]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
@@ -866,7 +883,7 @@ if (in_array($resourceType, $resourcesWithHAlign)) {
 	$screenFormList->addRow(_('Horizontal align'),
 		(new CRadioButtonList('halign', (int) $halign))
 			->addValue(_('Left'), HALIGN_LEFT)
-			->addValue(_('Center'), HALIGN_CENTER)
+			->addValue(_('Centre'), HALIGN_CENTER)
 			->addValue(_('Right'), HALIGN_RIGHT)
 			->setModern(true)
 	);

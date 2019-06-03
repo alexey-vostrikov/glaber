@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -80,7 +80,10 @@ if (!empty($_REQUEST['serviceid'])) {
 
 	$service = API::Service()->get($options);
 	$service = reset($service);
-	if (!$service) {
+	if (!$service && hasRequest('delete')) {
+		show_error_message(_('No permissions to referred object or it does not exist!'));
+	}
+	elseif (!$service) {
 		access_deny();
 	}
 }
@@ -90,7 +93,7 @@ if (!empty($_REQUEST['serviceid'])) {
  */
 
 // delete
-if (isset($_REQUEST['delete']) && isset($_REQUEST['serviceid'])) {
+if (hasRequest('delete') && $service) {
 	DBstart();
 
 	$result = API::Service()->delete([$service['serviceid']]);

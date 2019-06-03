@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -35,7 +35,8 @@ else {
 		$table->addRow([
 			new CLink($drule['name'], (new CUrl('zabbix.php'))
 				->setArgument('action', 'discovery.view')
-				->setArgument('druleid', $drule['druleid'])
+				->setArgument('filter_set', 1)
+				->setArgument('filter_druleids', [$drule['druleid']])
 			),
 			($drule['up'] != 0) ? (new CSpan($drule['up']))->addClass(ZBX_STYLE_GREEN) : '',
 			($drule['down'] != 0) ? (new CSpan($drule['down']))->addClass(ZBX_STYLE_RED) : ''

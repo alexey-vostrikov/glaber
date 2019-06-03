@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -226,6 +226,15 @@ elseif (hasRequest('action') && getRequest('action') == 'drule.massdelete' && ha
 		uncheckTableRows();
 	}
 	show_messages($result, _('Discovery rules deleted'), _('Cannot delete discovery rules'));
+}
+
+if (hasRequest('action') && hasRequest('g_druleid') && !$result) {
+	$drules = API::DRule()->get([
+		'output' => [],
+		'druleids' => getRequest('g_druleid'),
+		'editable' => true
+	]);
+	uncheckTableRows(null, zbx_objectValues($drules, 'druleid'));
 }
 
 /*

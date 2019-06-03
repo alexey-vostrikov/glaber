@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -610,7 +610,7 @@ static int	get_latest_data(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: main_snmptrapper_loop                                            *
+ * Function: snmptrapper_thread                                               *
  *                                                                            *
  * Purpose: SNMP trap reader's entry point                                    *
  *                                                                            *
@@ -619,7 +619,7 @@ static int	get_latest_data(void)
  ******************************************************************************/
 ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 {
-	const char	*__function_name = "main_snmptrapper_loop";
+	const char	*__function_name = "snmptrapper_thread";
 	double		sec;
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;

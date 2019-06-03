@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,6 +23,11 @@
  * Class to create a date textbox and calendar button.
  */
 class CDateSelector extends CTag {
+	/**
+	 * Default CSS class name for HTML root element.
+	 */
+	const ZBX_STYLE_CLASS = 'calendar-control';
+
 	/**
 	 * Default date format.
 	 *
@@ -71,6 +76,7 @@ class CDateSelector extends CTag {
 
 		$this->name = $name;
 		$this->value = $value;
+		$this->addClass(static::ZBX_STYLE_CLASS);
 	}
 
 	/**

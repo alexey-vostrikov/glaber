@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -131,24 +131,6 @@ switch ($page['type']) {
 
 			header('X-Frame-Options: '.$x_frame_options);
 		}
-
-		if ((array_key_exists('https', $_SERVER) && ($_SERVER['https'] == 1 || $_SERVER['https'] === 'on'))
-				|| (array_key_exists('SERVER_PORT', $_SERVER) && $_SERVER['SERVER_PORT'] == 443)) {
-			header('strict-transport-security: max-age=31557600');
-		}
-
-		global $ZBX_SERVER_NAME;
-
-		// page title
-		$pageTitle = '';
-		if (isset($ZBX_SERVER_NAME) && $ZBX_SERVER_NAME !== '') {
-			$pageTitle = $ZBX_SERVER_NAME.NAME_DELIMITER;
-		}
-		$pageTitle .= isset($page['title']) ? $page['title'] : _('Zabbix');
-
-		if ((defined('ZBX_PAGE_DO_REFRESH') || defined('ZBX_PAGE_DO_JS_REFRESH')) && CWebUser::getRefresh() != 0) {
-			$pageTitle .= ' ['._s('refreshed every %1$s sec.', CWebUser::getRefresh()).']';
-		}
 		break;
 }
 
@@ -164,6 +146,19 @@ if ($denied_page_requested) {
 }
 
 if ($page['type'] == PAGE_TYPE_HTML) {
+	global $ZBX_SERVER_NAME;
+
+	// page title
+	$pageTitle = '';
+	if (isset($ZBX_SERVER_NAME) && $ZBX_SERVER_NAME !== '') {
+		$pageTitle = $ZBX_SERVER_NAME.NAME_DELIMITER;
+	}
+	$pageTitle .= isset($page['title']) ? $page['title'] : _('Zabbix');
+
+	if ((defined('ZBX_PAGE_DO_REFRESH') || defined('ZBX_PAGE_DO_JS_REFRESH')) && CWebUser::getRefresh() != 0) {
+		$pageTitle .= ' ['._s('refreshed every %1$s sec.', CWebUser::getRefresh()).']';
+	}
+
 	$pageHeader = new CPageHeader($pageTitle);
 	$is_standard_page = (!defined('ZBX_PAGE_NO_MENU')
 		|| in_array($page['web_layout_mode'], [ZBX_LAYOUT_FULLSCREEN, ZBX_LAYOUT_KIOSKMODE]));
@@ -190,24 +185,33 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 	if ($page['file'] == 'sysmap.php') {
 		$pageHeader->addCssFile('imgstore.php?css=1&output=css');
 	}
+
 	$pageHeader
-		->addJsFile('js/browsers.js')
+		->addJsFile((new CUrl('js/browsers.js'))->getUrl())
 		->addJsBeforeScripts(
 			'var PHP_TZ_OFFSET = '.date('Z').','.
 				'PHP_ZBX_FULL_DATE_TIME = "'.ZBX_FULL_DATE_TIME.'";'
-	);
+		);
 
-	// show GUI messages in pages with menus and in fullscreen mode
-	$path = 'jsLoader.php?ver='.ZABBIX_VERSION.'&amp;lang='.CWebUser::$data['lang'].'&amp;showGuiMessaging='
-		.($is_standard_page ? '1' : '0');
-	$pageHeader->addJsFile($path);
+	// Show GUI messages in pages with menus and in fullscreen mode.
+	if (CView::$js_loader_disabled !== true) {
+		$pageHeader->addJsFile((new CUrl('jsLoader.php'))
+			->setArgument('ver', ZABBIX_VERSION)
+			->setArgument('lang', CWebUser::$data['lang'])
+			->setArgument('showGuiMessaging', $is_standard_page ? 1 : null)
+			->getUrl()
+		);
 
-	if (!empty($page['scripts']) && is_array($page['scripts'])) {
-		foreach ($page['scripts'] as $script) {
-			$path .= '&amp;files[]='.$script;
+		if ($page['scripts']) {
+			$pageHeader->addJsFile((new CUrl('jsLoader.php'))
+				->setArgument('ver', ZABBIX_VERSION)
+				->setArgument('lang', CWebUser::$data['lang'])
+				->setArgument('files', $page['scripts'])
+				->getUrl()
+			);
 		}
-		$pageHeader->addJsFile($path);
 	}
+
 	$pageHeader->display();
 ?>
 <body lang="<?= CWebUser::getLang() ?>">
@@ -273,7 +277,7 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 unset($table, $top_page_row, $menu_table, $main_menu_row, $sub_menu_table, $sub_menu_rows);
 
 if ($page['type'] == PAGE_TYPE_HTML && $is_standard_page) {
-	zbx_add_post_js('initMessages({});');
+	zbx_add_post_js('initMessages();');
 }
 
 // if a user logs in after several unsuccessful attempts, display a warning

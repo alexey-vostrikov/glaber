@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -56,12 +56,8 @@ int	get_value_agent(DC_ITEM *item, AGENT_RESULT *result)
 	int		ret = SUCCEED;
 	ssize_t		received_len;
 
-	if (SUCCEED == zabbix_check_log_level(LOG_LEVEL_DEBUG))
-	{
-		zabbix_log(LOG_LEVEL_DEBUG, "In %s() host:'%s' addr:'%s' key:'%s' conn:'%s'", __function_name,
-				item->host.host, item->interface.addr, item->key,
-				zbx_tcp_connection_type_name(item->host.tls_connect));
-	}
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() host:'%s' addr:'%s' key:'%s' conn:'%s'", __function_name, item->host.host,
+			item->interface.addr, item->key, zbx_tcp_connection_type_name(item->host.tls_connect));
 
 	switch (item->host.tls_connect)
 	{
