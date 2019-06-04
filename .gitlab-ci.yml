@@ -1,0 +1,1 @@
+test: cat Readme | grep -i "zabbix"
