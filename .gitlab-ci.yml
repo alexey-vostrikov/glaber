@@ -1,2 +1,2 @@
 test: 
-    script: cat Readme | grep -i "zabbix"
+    script: cat README | grep -i "zabbix"
