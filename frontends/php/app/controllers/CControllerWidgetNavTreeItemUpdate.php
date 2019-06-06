@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ class CControllerWidgetNavTreeItemUpdate extends CController {
 		$ret = $this->validateInput($fields);
 
 		if ($ret && trim(getRequest('map_name', '')) === '') {
-			error(_('Please specify element name.'));
+			error(_s('Incorrect value for field "%1$s": cannot be empty.', _('Name')));
 			$ret = false;
 		}
 
@@ -79,7 +79,7 @@ class CControllerWidgetNavTreeItemUpdate extends CController {
 
 		$maps_relations = [];
 
-		if ($map_mapid && $add_submaps == 1) {
+		if ($map_mapid != 0 && $add_submaps == 1) {
 			// Recursively select submaps.
 			$maps_found = [$map_mapid];
 			$maps_resolved = [];

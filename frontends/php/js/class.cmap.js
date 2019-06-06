@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -198,13 +198,21 @@ ZABBIX.apps.map = (function($) {
 			}
 
 			// create container for forms
-			this.formContainer = $('<div></div>', {
+			this.formContainer = $('<div>', {
 					id: 'map-window',
 					class: 'overlay-dialogue',
-					style: 'display:none; top: 50px; left: 500px'})
+					style: 'display: none; top: 0; left: 0;'
+				})
 				.appendTo('body')
 				.draggable({
-					containment: [0, 0, 3200, 3200]
+					containment: [0, 0, 3200, 3200],
+					start: function(){
+						$(this).data("scroll", {top: window.pageYOffset, left: window.pageXOffset});
+					},
+					drag: function(event, ui){
+						ui.position.top -= parseInt($(this).data("scroll").top);
+						ui.position.left -= parseInt($(this).data("scroll").left);
+					}
 				});
 
 			this.updateImage();
@@ -258,7 +266,7 @@ ZABBIX.apps.map = (function($) {
 			expand_sources: [],
 
 			save: function() {
-				var url = new Curl(location.href);
+				var url = new Curl();
 
 				$.ajax({
 					url: url.getPath() + '?output=ajax&sid=' + url.getArgument('sid'),
@@ -288,12 +296,12 @@ ZABBIX.apps.map = (function($) {
 				this.updateImage();
 
 				if (labels === null) {
-					alert(locale['S_MACRO_EXPAND_ERROR']);
+					alert(t('S_MACRO_EXPAND_ERROR'));
 				}
 			},
 
 			expandMacros: function(source) {
-				var url = new Curl(location.href);
+				var url = new Curl();
 
 				if (source !== null) {
 					if (/\{.+\}/.test(source.getLabel(false))) {
@@ -423,7 +431,7 @@ ZABBIX.apps.map = (function($) {
 			deleteSelectedElements: function() {
 				var selementid;
 
-				if (this.selection.count.selements && confirm(locale['S_DELETE_SELECTED_ELEMENTS_Q'])) {
+				if (this.selection.count.selements && confirm(t('S_DELETE_SELECTED_ELEMENTS_Q'))) {
 					for (selementid in this.selection.selements) {
 						this.selements[selementid].remove();
 						this.removeLinksBySelementId(selementid);
@@ -438,7 +446,7 @@ ZABBIX.apps.map = (function($) {
 			deleteSelectedShapes: function() {
 				var shapeid;
 
-				if (this.selection.count.shapes && confirm(locale['S_DELETE_SELECTED_SHAPES_Q'])) {
+				if (this.selection.count.shapes && confirm(t('S_DELETE_SELECTED_SHAPES_Q'))) {
 					for (shapeid in this.selection.shapes) {
 						this.shapes[shapeid].remove();
 					}
@@ -495,7 +503,7 @@ ZABBIX.apps.map = (function($) {
 				// toggle expand macros
 				$('#expand_macros').click(function() {
 					that.data.expand_macros = (that.data.expand_macros === '1') ? '0' : '1';
-					$(this).html((that.data.expand_macros === '1') ? locale['S_ON'] : locale['S_OFF']);
+					$(this).html((that.data.expand_macros === '1') ? t('S_ON') : t('S_OFF'));
 					that.updateImage();
 				});
 
@@ -512,13 +520,13 @@ ZABBIX.apps.map = (function($) {
 				// toggle autoalign
 				$('#gridautoalign').click(function() {
 					that.data.grid_align = (that.data.grid_align === '1') ? '0' : '1';
-					$(this).html((that.data.grid_align === '1') ? locale['S_ON'] : locale['S_OFF']);
+					$(this).html((that.data.grid_align === '1') ? t('S_ON') : t('S_OFF'));
 				});
 
 				// toggle grid visibility
 				$('#gridshow').click(function() {
 					that.data.grid_show = (that.data.grid_show === '1') ? '0' : '1';
-					$(this).html((that.data.grid_show === '1') ? locale['S_SHOWN'] : locale['S_HIDDEN']);
+					$(this).html((that.data.grid_show === '1') ? t('S_SHOWN') : t('S_HIDDEN'));
 					that.updateImage();
 				});
 
@@ -541,7 +549,7 @@ ZABBIX.apps.map = (function($) {
 				// add element
 				$('#selementAdd').click(function() {
 					if (typeof(that.iconList[0]) === 'undefined') {
-						alert(locale['S_NO_IMAGES']);
+						alert(t('S_NO_IMAGES'));
 
 						return;
 					}
@@ -571,7 +579,7 @@ ZABBIX.apps.map = (function($) {
 					var link;
 
 					if (that.selection.count.selements !== 2) {
-						alert(locale['S_TWO_MAP_ELEMENTS_SHOULD_BE_SELECTED']);
+						alert(t('S_TWO_MAP_ELEMENTS_SHOULD_BE_SELECTED'));
 
 						return false;
 					}
@@ -587,14 +595,14 @@ ZABBIX.apps.map = (function($) {
 					var linkids;
 
 					if (that.selection.count.selements !== 2) {
-						alert(locale['S_PLEASE_SELECT_TWO_ELEMENTS']);
+						alert(t('S_PLEASE_SELECT_TWO_ELEMENTS'));
 
 						return false;
 					}
 
 					linkids = that.getLinksBySelementIds(that.selection.selements);
 
-					if (linkids.length && confirm(locale['S_DELETE_LINKS_BETWEEN_SELECTED_ELEMENTS_Q'])) {
+					if (linkids.length && confirm(t('S_DELETE_LINKS_BETWEEN_SELECTED_ELEMENTS_Q'))) {
 						for (var i = 0, ln = linkids.length; i < ln; i++) {
 							that.links[linkids[i]].remove();
 						}
@@ -648,7 +656,7 @@ ZABBIX.apps.map = (function($) {
 						{
 							'items': [
 								{
-									label: locale['S_BRING_TO_FRONT'],
+									label: t('S_BRING_TO_FRONT'),
 									disabled: !can_reorder,
 									clickCallback: function() {
 										that.reorderShapes(that.selection.shapes, 'last');
@@ -656,7 +664,7 @@ ZABBIX.apps.map = (function($) {
 									}
 								},
 								{
-									label: locale['S_BRING_FORWARD'],
+									label: t('S_BRING_FORWARD'),
 									disabled: !can_reorder,
 									clickCallback: function() {
 										that.reorderShapes(that.selection.shapes, 'next');
@@ -664,7 +672,7 @@ ZABBIX.apps.map = (function($) {
 									}
 								},
 								{
-									label: locale['S_SEND_BACKWARD'],
+									label: t('S_SEND_BACKWARD'),
 									disabled: !can_reorder,
 									clickCallback: function() {
 										that.reorderShapes(that.selection.shapes, 'previous');
@@ -672,7 +680,7 @@ ZABBIX.apps.map = (function($) {
 									}
 								},
 								{
-									label: locale['S_SEND_TO_BACK'],
+									label: t('S_SEND_TO_BACK'),
 									disabled: !can_reorder,
 									clickCallback: function() {
 										that.reorderShapes(that.selection.shapes, 'first');
@@ -684,7 +692,7 @@ ZABBIX.apps.map = (function($) {
 						{
 							'items': [
 								{
-									label: locale['S_COPY'],
+									label: t('S_COPY'),
 									disabled: !can_copy,
 									clickCallback: function() {
 										that.copypaste_buffer = that.getSelectionBuffer(that);
@@ -692,7 +700,7 @@ ZABBIX.apps.map = (function($) {
 									}
 								},
 								{
-									label: locale['S_PASTE'],
+									label: t('S_PASTE'),
 									disabled: !can_paste,
 									clickCallback: function() {
 										var offset = $(that.container).offset(),
@@ -714,7 +722,7 @@ ZABBIX.apps.map = (function($) {
 									}
 								},
 								{
-									label: locale['S_PASTE_SIMPLE'],
+									label: t('S_PASTE_SIMPLE'),
 									disabled: !can_paste,
 									clickCallback: function() {
 										var offset = $(that.container).offset(),
@@ -736,7 +744,7 @@ ZABBIX.apps.map = (function($) {
 									}
 								},
 								{
-									label: locale['S_REMOVE'],
+									label: t('S_REMOVE'),
 									disabled: !can_remove,
 									clickCallback: function() {
 										if (that.selection.count.selements || that.selection.count.shapes) {
@@ -1755,7 +1763,7 @@ ZABBIX.apps.map = (function($) {
 						background: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7") 0 0 repeat',
 				})
 				.appendTo(this.sysmap.container)
-				.addClass('pointer sysmap_shape')
+				.addClass('cursor-pointer sysmap_shape')
 				.attr('data-id', this.id)
 				.attr('data-type', 'shapes');
 
@@ -1949,12 +1957,18 @@ ZABBIX.apps.map = (function($) {
 								return this.sysmap.dragGroupPlaceholder();
 							}, this),
 							start: $.proxy(function() {
+								this.domNode
+									.addClass(IE ? 'cursor-move' : 'cursor-dragging')
+									.removeClass('cursor-pointer');
 								this.sysmap.dragGroupInit(this);
 							}, this),
 							drag: $.proxy(function(event, data) {
 								this.sysmap.dragGroupDrag(data, this);
 							}, this),
 							stop: $.proxy(function() {
+								this.domNode
+									.addClass('cursor-pointer')
+									.removeClass(IE ? 'cursor-move' : 'cursor-dragging');
 								this.sysmap.dragGroupStop(this);
 							}, this)
 						});
@@ -2222,7 +2236,7 @@ ZABBIX.apps.map = (function($) {
 					elementtype: '4', // image
 					elements: {},
 					iconid_off: this.sysmap.defaultIconId, // first imageid
-					label: locale['S_NEW_ELEMENT'],
+					label: t('S_NEW_ELEMENT'),
 					label_location: -1, // set default map label location
 					x: 0,
 					y: 0,
@@ -2251,7 +2265,7 @@ ZABBIX.apps.map = (function($) {
 			// create dom
 			this.domNode = $('<div></div>', {style: 'position: absolute; z-index: 100'})
 				.appendTo(this.sysmap.container)
-				.addClass('pointer sysmap_element')
+				.addClass('cursor-pointer sysmap_element')
 				.attr('data-id', this.id)
 				.attr('data-type', 'selements');
 
@@ -2340,7 +2354,7 @@ ZABBIX.apps.map = (function($) {
 						this.data.inherited_label = this.data.elements[0].elementName;
 					}
 					else {
-						this.data.inherited_label = locale['S_IMAGE'];
+						this.data.inherited_label = t('S_IMAGE');
 					}
 				}
 
@@ -2716,7 +2730,7 @@ ZABBIX.apps.map = (function($) {
 					.append('<option value="' + icon.imageid + '">' + icon.name + '</option>');
 			}
 			$('#iconid_on, #iconid_maintenance, #iconid_disabled')
-				.prepend('<option value="0">' + locale['S_DEFAULT'] + '</option>');
+				.prepend('<option value="0">' + t('S_DEFAULT') + '</option>');
 			$('#iconid_on, #iconid_maintenance, #iconid_disabled').val(0);
 
 			// hosts
@@ -2785,6 +2799,8 @@ ZABBIX.apps.map = (function($) {
 				this.formContainer.draggable('option', 'handle', '#formDragHandler');
 				this.formContainer.show();
 				this.domNode.show();
+				// Element must first be visible so that outerWidth() and outerHeight() are correct.
+				this.formContainer.positionOverlayDialogue();
 				this.active = true;
 			},
 
@@ -3050,13 +3066,13 @@ ZABBIX.apps.map = (function($) {
 					}
 
 					if (data.urls[i].name === '' || data.urls[i].url === '') {
-						alert(locale['S_INCORRECT_ELEMENT_MAP_LINK']);
+						alert(t('S_INCORRECT_ELEMENT_MAP_LINK'));
 
 						return false;
 					}
 
 					if (typeof urlNames[data.urls[i].name] !== 'undefined') {
-						alert(locale['S_EACH_URL_SHOULD_HAVE_UNIQUE'] + " '" + data.urls[i].name + "'.");
+						alert(t('S_EACH_URL_SHOULD_HAVE_UNIQUE') + " '" + data.urls[i].name + "'.");
 
 						return false;
 					}
@@ -3091,7 +3107,8 @@ ZABBIX.apps.map = (function($) {
 					disabled: (triggerContainer.find('tr.sortable').length < 2),
 					items: 'tbody tr.sortable',
 					axis: 'y',
-					cursor: 'move',
+					containment: 'parent',
+					cursor: IE ? 'move' : 'grabbing',
 					handle: 'div.drag-icon',
 					tolerance: 'pointer',
 					opacity: 0.6,
@@ -3209,7 +3226,7 @@ ZABBIX.apps.map = (function($) {
 					.append('<option value="' + icon.imageid + '">' + icon.name + '</option>');
 			}
 			$('#massIconidOn, #massIconidMaintenance, #massIconidDisabled')
-				.prepend('<option value="0">' + locale['S_DEFAULT'] + '</option>');
+				.prepend('<option value="0">' + t('S_DEFAULT') + '</option>');
 
 			this.actionProcessor = new ActionProcessor(formActions);
 			this.actionProcessor.process();
@@ -3223,6 +3240,8 @@ ZABBIX.apps.map = (function($) {
 				this.formContainer.draggable('option', 'handle', '#massDragHandler');
 				this.formContainer.show();
 				this.domNode.show();
+				// Element must first be visible so that outerWidth() and outerHeight() are correct.
+				this.formContainer.positionOverlayDialogue();
 				this.updateList();
 			},
 
@@ -3285,11 +3304,11 @@ ZABBIX.apps.map = (function($) {
 					element = this.sysmap.selements[id];
 
 					switch (element.data.elementtype) {
-						case '0': elementTypeText = locale['S_HOST']; break;
-						case '1': elementTypeText = locale['S_MAP']; break;
-						case '2': elementTypeText = locale['S_TRIGGER']; break;
-						case '3': elementTypeText = locale['S_HOST_GROUP']; break;
-						case '4': elementTypeText = locale['S_IMAGE']; break;
+						case '0': elementTypeText = t('S_HOST'); break;
+						case '1': elementTypeText = t('S_MAP'); break;
+						case '2': elementTypeText = t('S_TRIGGER'); break;
+						case '3': elementTypeText = t('S_HOST_GROUP'); break;
+						case '4': elementTypeText = t('S_IMAGE'); break;
 					}
 
 					list.push({
@@ -3354,6 +3373,8 @@ ZABBIX.apps.map = (function($) {
 				this.formContainer.draggable('option', 'handle', '#shapeDragHandler');
 				this.formContainer.show();
 				this.domNode.show();
+				// Element must first be visible so that outerWidth() and outerHeight() are correct.
+				this.formContainer.positionOverlayDialogue();
 				this.active = true;
 			},
 
@@ -3482,6 +3503,8 @@ ZABBIX.apps.map = (function($) {
 				this.formContainer.draggable('option', 'handle', '#massShapeDragHandler');
 				this.formContainer.show();
 				this.domNode.show();
+				// Element must first be visible so that outerWidth() and outerHeight() are correct.
+				this.formContainer.positionOverlayDialogue();
 				this.active = true;
 			},
 
@@ -3543,7 +3566,7 @@ ZABBIX.apps.map = (function($) {
 			 */
 			show: function() {
 				this.domNode.show();
-				$('.element-edit-control').attr('disabled', true);
+				$('.element-edit-control').prop('disabled', true);
 			},
 
 			/**
@@ -3551,7 +3574,7 @@ ZABBIX.apps.map = (function($) {
 			 */
 			hide: function() {
 				$('#linkForm').hide();
-				$('.element-edit-control').attr('disabled', false);
+				$('.element-edit-control').prop('disabled', false);
 			},
 
 			/**
@@ -3573,10 +3596,7 @@ ZABBIX.apps.map = (function($) {
 
 					if (linkTrigger !== null) {
 						if (linkTrigger[2] == 'color' && !colorPattern.match(values[i].value.toString())) {
-							throw sprintf(
-								t('Colour "%1$s" is not correct: expecting hexadecimal colour code (6 symbols).'),
-								values[i].value
-							);
+							throw sprintf(t('S_COLOR_IS_NOT_CORRECT'), values[i].value);
 						}
 
 						if (typeof data.linktriggers[linkTrigger[1]] === 'undefined') {
@@ -3587,10 +3607,7 @@ ZABBIX.apps.map = (function($) {
 					}
 					else {
 						if (values[i].name == 'color' && !colorPattern.match(values[i].value.toString())) {
-							throw sprintf(
-								t('Colour "%1$s" is not correct: expecting hexadecimal colour code (6 symbols).'),
-								values[i].value
-							);
+							throw sprintf(t('S_COLOR_IS_NOT_CORRECT'), values[i].value);
 						}
 
 						data[values[i].name] = values[i].value.toString();
@@ -3656,23 +3673,23 @@ ZABBIX.apps.map = (function($) {
 				for (optgroupType in optgroups) {
 					switch (optgroupType) {
 						case '0':
-							optgroupLabel = locale['S_HOST'];
+							optgroupLabel = t('S_HOST');
 							break;
 
 						case '1':
-							optgroupLabel = locale['S_MAP'];
+							optgroupLabel = t('S_MAP');
 							break;
 
 						case '2':
-							optgroupLabel = locale['S_TRIGGER'];
+							optgroupLabel = t('S_TRIGGER');
 							break;
 
 						case '3':
-							optgroupLabel = locale['S_HOST_GROUP'];
+							optgroupLabel = t('S_HOST_GROUP');
 							break;
 
 						case '4':
-							optgroupLabel = locale['S_IMAGE'];
+							optgroupLabel = t('S_IMAGE');
 							break;
 					}
 
@@ -3937,3 +3954,31 @@ ZABBIX.apps.map = (function($) {
 		}
 	};
 }(jQuery));
+
+jQuery(function ($) {
+	/*
+	 * Reposition the overlay dialogue window. The previous position is remembered using offset(). Each time overlay
+	 * dialogue is opened, it could have different content (shape form, element form etc) and different size, so the
+	 * new top and left position must be calculated. If the overlay dialogue is opened for the first time, position is
+	 * set depending on map size and canvas top position. This makes map more visible at first. In case popup window is
+	 * dragged outside visible view port or window is resized, popup will again be repositioned so it doesn't go outside
+	 * the viewport. In case the popup is too large, position it with a small margin depenging on whether is too long
+	 * or too wide.
+	 */
+	$.fn.positionOverlayDialogue = function () {
+		var $map = $('#map-area'),
+			map_margin = 10,
+			obj_pos = this.offset(),
+			obj_size = {width: this.outerWidth(), height: this.outerHeight()},
+			scroll_pos = {left: $(window).scrollLeft(), top: $(window).scrollTop()};
+
+		if (obj_pos.left == 0 && obj_pos.top == 0) {
+			obj_pos = {left: $map.offset().left + $map.width(), top: $map.offset().top - map_margin};
+		}
+
+		return this.css({
+			left: Math.max(0, Math.min(obj_pos.left, $(window).width() - obj_size.width)) + scroll_pos.left,
+			top: Math.max(scroll_pos.top, Math.min(obj_pos.top, $(window).height() - obj_size.height + scroll_pos.top))
+		});
+	};
+});

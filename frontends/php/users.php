@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -116,14 +116,13 @@ if (hasRequest('action')) {
 		access_deny();
 	}
 	else {
-		$usersChk = API::User()->get([
-			'output' => ['userid'],
+		$users = API::User()->get([
+			'output' => [],
 			'userids' => getRequest('group_userid'),
-			'countOutput' => true,
 			'editable' => true
 		]);
-		if ($usersChk != count(getRequest('group_userid'))) {
-			access_deny();
+		if (count($users) != count(getRequest('group_userid'))) {
+			uncheckTableRows(null, zbx_objectValues($users, 'userid'));
 		}
 	}
 }

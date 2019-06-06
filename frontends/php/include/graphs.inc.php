@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -106,7 +106,7 @@ function getGraphDims($graphid = null) {
 		return $graphDims;
 	}
 
-	// zoom featers
+	// Select graph's type and height as well as which Y axes are used by graph items.
 	$dbGraphs = DBselect(
 		'SELECT MAX(g.graphtype) AS graphtype,MIN(gi.yaxisside) AS yaxissidel,MAX(gi.yaxisside) AS yaxissider,MAX(g.height) AS height'.
 		' FROM graphs g,graphs_items gi'.
@@ -847,18 +847,14 @@ function find_period_end($periods, $time, $max_time) {
 /**
  * Converts Base1000 values to Base1024 and calculate pow
  * Example:
- * 	204800 (200 KBytes) with '1024' step convert to 209715,2 (0.2MB (204.8 KBytes))
+ *  204800 (200 KBytes) with '1024' step convert to 209715,2 (0.2MB (204.8 KBytes))
  *
- * @param string   $value
- * @param bool|int $step
+ * @param string|int $value
+ * @param string $step
  *
  * @return array
  */
-function convertToBase1024($value, $step = false) {
-	if (!$step) {
-		$step = 1000;
-	}
-
+function convertToBase1024($value, $step = '1000') {
 	if ($value < 0) {
 		$abs = bcmul($value, '-1');
 	}
@@ -887,7 +883,7 @@ function convertToBase1024($value, $step = false) {
 			$valData['value'] = bcdiv(sprintf('%.10f',$value), sprintf('%.10f', $valData['value']),
 				ZBX_PRECISION_10);
 
-			$valData['value'] = sprintf('%.10f', round(bcmul($valData['value'], bcpow(1024, $valData['pow'])),
+			$valData['value'] = sprintf('%.10f', round(bcmul($valData['value'], bcpow(ZBX_KIBIBYTE, $valData['pow'])),
 				ZBX_PRECISION_10));
 		}
 	}

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -159,6 +159,7 @@ switch ($data['popup_type']) {
 	case 'host_templates':
 	case 'templates':
 	case 'applications':
+	case 'drules':
 		foreach ($data['table_records'] as $item) {
 			$check_box = $data['multiselect']
 				? new CCheckBox('item['.$item['id'].']', $item['id'])
@@ -357,19 +358,6 @@ switch ($data['popup_type']) {
 
 			$name = (new CLink($item['key'], 'javascript:void(0);'))->onClick($action.$js_action_onclick);
 			$table->addRow([$name, $item['description']]);
-		}
-		unset($data['table_records']);
-		break;
-
-	case 'drules':
-		foreach ($data['table_records'] as $item) {
-			$action = get_window_opener($options['dstfrm'], $options['dstfld1'], $item[$options['srcfld1']]);
-			$action .= $options['srcfld2']
-				? get_window_opener($options['dstfrm'], $options['dstfld2'], $item[$options['srcfld2']])
-				: '';
-
-			$name = (new CLink($item['name'], 'javascript:void(0);'))->onClick($action.$js_action_onclick);
-			$table->addRow($name);
 		}
 		unset($data['table_records']);
 		break;
@@ -641,6 +629,7 @@ if ($data['multiselect'] && $form !== null) {
 		[
 			'title' => _('Select'),
 			'class' => '',
+			'isSubmit' => true,
 			'action' => 'return addSelectedValues('.zbx_jsvalue($form->getId()).', '.
 						zbx_jsvalue($options['reference']).', '.$options['parentid'].'); '.
 						'overlayDialogueDestroy(jQuery(this).closest("[data-dialogueid]").attr("data-dialogueid"));'
@@ -660,7 +649,10 @@ jQuery(document).ready(function() {
 });';
 
 if ($form) {
-	$form->addItem($table);
+	$form->addItem([
+		$table,
+		(new CInput('submit', 'submit'))->addStyle('display: none;')
+	]);
 	$output['body'] = (new CDiv([$data['messages'], $form]))->toString();
 }
 else {

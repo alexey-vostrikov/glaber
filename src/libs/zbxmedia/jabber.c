@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -284,7 +284,7 @@ static void	lookup_jabber(const char *server, int port, char *real_server, size_
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-static int	disconnect_jabber()
+static int	disconnect_jabber(void)
 {
 	const char	*__function_name = "disconnect_jabber";
 

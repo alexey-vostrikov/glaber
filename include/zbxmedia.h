@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 #define ZABBIX_ZBXMEDIA_H
 
 #include "sysinc.h" /* using "config.h" would be better, but it causes warnings when compiled with Net-SNMP */
-#include "zbxalgo.h"
 
 extern char	*CONFIG_SOURCE_IP;
 

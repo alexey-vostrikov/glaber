@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -261,6 +261,7 @@ class CUser extends CApiService {
 		}
 
 		$valid_themes = THEME_DEFAULT.','.implode(',', array_keys(Z::getThemes()));
+		$supported_locales = array_keys(getLocales());
 
 		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['alias']], 'fields' => [
 			'alias' =>			['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('users', 'alias')],
@@ -270,7 +271,7 @@ class CUser extends CApiService {
 			'url' =>			['type' => API_URL, 'length' => DB::getFieldLength('users', 'url')],
 			'autologin' =>		['type' => API_INT32, 'in' => '0,1'],
 			'autologout' =>		['type' => API_TIME_UNIT, 'flags' => API_NOT_EMPTY, 'in' => '0,90:'.SEC_PER_DAY],
-			'lang' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('users', 'lang')],
+			'lang' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'in' => implode(',', $supported_locales)],
 			'theme' =>			['type' => API_STRING_UTF8, 'in' => $valid_themes, 'length' => DB::getFieldLength('users', 'theme')],
 			'type' =>			['type' => API_INT32, 'in' => implode(',', [USER_TYPE_ZABBIX_USER, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN])],
 			'refresh' =>		['type' => API_TIME_UNIT, 'flags' => API_NOT_EMPTY, 'in' => '0:'.SEC_PER_HOUR],
@@ -302,6 +303,7 @@ class CUser extends CApiService {
 		unset($user);
 
 		$this->checkDuplicates(zbx_objectValues($users, 'alias'));
+		$this->checkLanguages(zbx_objectValues($users, 'lang'));
 		$this->checkUserGroups($users, []);
 		$db_mediatypes = $this->checkMediaTypes($users);
 		$this->validateMediaRecipients($users, $db_mediatypes);
@@ -365,6 +367,7 @@ class CUser extends CApiService {
 	 */
 	private function validateUpdate(array &$users, array &$db_users = null) {
 		$valid_themes = THEME_DEFAULT.','.implode(',', array_keys(Z::getThemes()));
+		$supported_locales = array_keys(getLocales());
 
 		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['userid'], ['alias']], 'fields' => [
 			'userid' =>			['type' => API_ID, 'flags' => API_REQUIRED],
@@ -375,7 +378,7 @@ class CUser extends CApiService {
 			'url' =>			['type' => API_URL, 'length' => DB::getFieldLength('users', 'url')],
 			'autologin' =>		['type' => API_INT32, 'in' => '0,1'],
 			'autologout' =>		['type' => API_TIME_UNIT, 'flags' => API_NOT_EMPTY, 'in' => '0,90:'.SEC_PER_DAY],
-			'lang' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('users', 'lang')],
+			'lang' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'in' => implode(',', $supported_locales)],
 			'theme' =>			['type' => API_STRING_UTF8, 'in' => $valid_themes, 'length' => DB::getFieldLength('users', 'theme')],
 			'type' =>			['type' => API_INT32, 'in' => implode(',', [USER_TYPE_ZABBIX_USER, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN])],
 			'refresh' =>		['type' => API_TIME_UNIT, 'flags' => API_NOT_EMPTY, 'in' => '0:'.SEC_PER_HOUR],
@@ -445,6 +448,7 @@ class CUser extends CApiService {
 		if ($aliases) {
 			$this->checkDuplicates($aliases);
 		}
+		$this->checkLanguages(zbx_objectValues($users, 'lang'));
 		$this->checkUserGroups($users, $db_users);
 		$db_mediatypes = $this->checkMediaTypes($users);
 		$this->validateMediaRecipients($users, $db_mediatypes);
@@ -532,6 +536,21 @@ class CUser extends CApiService {
 						_s('Incorrect value for field "%1$s": %2$s.', 'passwd', _('cannot be empty'))
 					);
 				}
+			}
+		}
+	}
+
+	/**
+	 * Check if specified language has dependent locale installed.
+	 *
+	 * @param array $languages
+	 *
+	 * @throws APIException if language locale is not installed.
+	 */
+	private function checkLanguages(array $languages) {
+		foreach ($languages as $lang) {
+			if ($lang !== 'en_GB' && !setlocale(LC_MONETARY , zbx_locale_variants($lang))) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Language "%1$s" is not supported.', $lang));
 			}
 		}
 	}
@@ -1089,7 +1108,11 @@ class CUser extends CApiService {
 			return true;
 		}
 		else {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Login name or password is incorrect.'));
+			self::exception($ldapValidator->isConnectionError()
+					? ZBX_API_ERROR_PARAMETERS
+					: ZBX_API_ERROR_PERMISSIONS,
+				$ldapValidator->getError()
+			);
 		}
 	}
 
@@ -1150,27 +1173,21 @@ class CUser extends CApiService {
 			GROUP_GUI_ACCESS_SYSTEM => $config['authentication_type'],
 			GROUP_GUI_ACCESS_INTERNAL => ZBX_AUTH_INTERNAL,
 			GROUP_GUI_ACCESS_LDAP => ZBX_AUTH_LDAP,
-			GROUP_GUI_ACCESS_DISABLED => null
+			GROUP_GUI_ACCESS_DISABLED => $config['authentication_type']
 		];
 
 		$db_user = $this->findByAlias($user['user'], ($config['ldap_case_sensitive'] == ZBX_AUTH_CASE_SENSITIVE),
 			$config['authentication_type'], true
 		);
 
-		// Check if user is blocked.
 		if ($db_user['attempt_failed'] >= ZBX_LOGIN_ATTEMPTS) {
-			$time_left = ZBX_LOGIN_BLOCK - (time() - $db_user['attempt_clock']);
+			$sec_left = ZBX_LOGIN_BLOCK - (time() - $db_user['attempt_clock']);
 
-			if ($time_left > 0) {
-				self::exception(ZBX_API_ERROR_PARAMETERS,
-					_n('Account is blocked for %1$s second.', 'Account is blocked for %1$s seconds.', $time_left)
+			if ($sec_left > 0) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_n('Account is blocked for %1$s second.', 'Account is blocked for %1$s seconds.', $sec_left)
 				);
 			}
-
-			DB::update('users', [
-				'values' => ['attempt_clock' => time()],
-				'where' => ['userid' => $db_user['userid']]
-			]);
 		}
 
 		try {
@@ -1181,21 +1198,25 @@ class CUser extends CApiService {
 
 				case ZBX_AUTH_INTERNAL:
 					if (md5($user['password']) !== $db_user['passwd']) {
-						self::exception(ZBX_API_ERROR_PARAMETERS, _('Login name or password is incorrect.'));
+						self::exception(ZBX_API_ERROR_PERMISSIONS, _('Login name or password is incorrect.'));
 					}
 					break;
 
 				default:
-					self::exception(ZBX_API_ERROR_PARAMETERS, _('No permissions for system access.'));
+					self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions for system access.'));
 					break;
 			}
 		}
 		catch (APIException $e) {
+			if ($e->getCode() == ZBX_API_ERROR_PERMISSIONS) {
+				++$db_user['attempt_failed'];
+			}
+
 			DB::update('users', [
 				'values' => [
-					'attempt_failed' => ++$db_user['attempt_failed'],
+					'attempt_failed' => $db_user['attempt_failed'],
 					'attempt_clock' => time(),
-					'attempt_ip' => $db_user['userip']
+					'attempt_ip' => substr($db_user['userip'], 0, 39)
 				],
 				'where' => ['userid' => $db_user['userid']]
 			]);
@@ -1204,7 +1225,13 @@ class CUser extends CApiService {
 				$db_user['userip']
 			);
 
-			self::exception(ZBX_API_ERROR_PARAMETERS, $e->getMessage());
+			if ($e->getCode() == ZBX_API_ERROR_PERMISSIONS && $db_user['attempt_failed'] >= ZBX_LOGIN_ATTEMPTS) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_n('Account is blocked for %1$s second.', 'Account is blocked for %1$s seconds.', ZBX_LOGIN_BLOCK)
+				);
+			}
+
+			self::exception(ZBX_API_ERROR_PERMISSIONS, $e->getMessage());
 		}
 
 		// Start session.
@@ -1483,7 +1510,7 @@ class CUser extends CApiService {
 			GROUP_GUI_ACCESS_SYSTEM => $default_auth,
 			GROUP_GUI_ACCESS_INTERNAL => ZBX_AUTH_INTERNAL,
 			GROUP_GUI_ACCESS_LDAP => ZBX_AUTH_LDAP,
-			GROUP_GUI_ACCESS_DISABLED => null
+			GROUP_GUI_ACCESS_DISABLED => $default_auth
 		];
 		$fields = ['userid', 'alias', 'name', 'surname', 'url', 'autologin', 'autologout', 'lang', 'refresh',
 			'type', 'theme', 'attempt_failed', 'attempt_ip', 'attempt_clock', 'rows_per_page', 'passwd'

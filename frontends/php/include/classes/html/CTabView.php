@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -122,7 +122,7 @@ class CTabView extends CDiv {
 
 	public function makeJavascript() {
 		if ($this->selectedTab === null) {
-			$active_tab = get_cookie('tab', 0);
+			$active_tab = (int) get_cookie('tab', 0);
 			$create_event = '';
 		}
 		else {

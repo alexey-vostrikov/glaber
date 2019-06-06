@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ $widget->setControls((new CTag('nav', true, $form))
 // filter
 if (!$data['templateid']) {
 	$widget->addItem(
-		(new CFilter())
+		(new CFilter(new CUrl('screenconf.php')))
 			->setProfile($data['profileIdx'])
 			->setActiveTab($data['active_tab'])
 			->addFilterTab(_('Filter'), [
@@ -119,7 +119,11 @@ if (!$data['templateid']) {
 $buttons['screen.massdelete'] = ['name' => _('Delete'), 'confirm' => _('Delete selected screens?')];
 
 // append table to form
-$screenForm->addItem([$screenTable, $data['paging'], new CActionButtonList('action', 'screens', $buttons)]);
+$screenForm->addItem([
+	$screenTable,
+	$data['paging'],
+	new CActionButtonList('action', 'screens', $buttons, $data['templateid'] ? $data['templateid'] : null)
+]);
 
 // append form to widget
 $widget->addItem($screenForm);

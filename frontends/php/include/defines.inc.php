@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,18 +19,22 @@
 **/
 
 
-define('ZABBIX_VERSION',		'4.0.1');
-define('ZABBIX_API_VERSION',	'4.0.1');
+define('ZABBIX_VERSION',		'4.0.8rc1');
+define('ZABBIX_API_VERSION',	'4.0.8');
 define('ZABBIX_EXPORT_VERSION',	'4.0');
 define('ZABBIX_DB_VERSION',		4000000);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
-define('ZABBIX_COPYRIGHT_TO',	'2018');
+define('ZABBIX_COPYRIGHT_TO',	'2019');
 
 define('ZBX_LOGIN_ATTEMPTS',	5);
 define('ZBX_LOGIN_BLOCK',		30); // sec
 
 define('ZBX_SESSION_NAME', 'zbx_sessionid'); // Session cookie name for Zabbix front-end.
+
+define('ZBX_KIBIBYTE',	'1024');
+define('ZBX_MEBIBYTE',	'1048576');
+define('ZBX_GIBIBYTE',	'1073741824');
 
 define('ZBX_MIN_PERIOD',		60); // 1 minute
 define('ZBX_MAX_PERIOD',		63158400); // the maximum period for the time bar control, ~2 years (2 * 365 * 86400) + 86400
@@ -63,7 +67,7 @@ define('ELASTICSEARCH_RESPONSE_DOCUMENTS',		2);
 
 define('ZBX_WIDGET_ROWS', 2000);
 
-define('ZBX_FONTPATH',				realpath('fonts')); // where to search for font (GD > 2.0.18)
+define('ZBX_FONTPATH',				realpath('assets/fonts')); // where to search for font (GD > 2.0.18)
 define('ZBX_GRAPH_FONT_NAME',		'DejaVuSans'); // font file name
 define('ZBX_GRAPH_LEGEND_HEIGHT',	120); // when graph height is less then this value, some legend will not show up
 
@@ -71,7 +75,7 @@ define('ZBX_SCRIPT_TIMEOUT',		60); // in seconds
 
 define('GRAPH_YAXIS_SIDE_DEFAULT', 0); // 0 - LEFT SIDE, 1 - RIGHT SIDE
 
-define('ZBX_MAX_IMAGE_SIZE', 1048576); // 1024 * 1024
+define('ZBX_MAX_IMAGE_SIZE', ZBX_MEBIBYTE);
 
 define('ZBX_UNITS_ROUNDOFF_THRESHOLD',		0.01);
 define('ZBX_UNITS_ROUNDOFF_UPPER_LIMIT',	2);
@@ -212,37 +216,39 @@ define('AUDIT_ACTION_LOGOUT',	4);
 define('AUDIT_ACTION_ENABLE',	5);
 define('AUDIT_ACTION_DISABLE',	6);
 
-define('AUDIT_RESOURCE_USER',			0);
-define('AUDIT_RESOURCE_ZABBIX_CONFIG',	2);
-define('AUDIT_RESOURCE_MEDIA_TYPE',		3);
-define('AUDIT_RESOURCE_HOST',			4);
-define('AUDIT_RESOURCE_ACTION',			5);
-define('AUDIT_RESOURCE_GRAPH',			6);
-define('AUDIT_RESOURCE_GRAPH_ELEMENT',	7);
-define('AUDIT_RESOURCE_USER_GROUP',		11);
-define('AUDIT_RESOURCE_APPLICATION',	12);
-define('AUDIT_RESOURCE_TRIGGER',		13);
-define('AUDIT_RESOURCE_HOST_GROUP',		14);
-define('AUDIT_RESOURCE_ITEM',			15);
-define('AUDIT_RESOURCE_IMAGE',			16);
-define('AUDIT_RESOURCE_VALUE_MAP',		17);
-define('AUDIT_RESOURCE_IT_SERVICE',		18);
-define('AUDIT_RESOURCE_MAP',			19);
-define('AUDIT_RESOURCE_SCREEN',			20);
-define('AUDIT_RESOURCE_SCENARIO',		22);
-define('AUDIT_RESOURCE_DISCOVERY_RULE',	23);
-define('AUDIT_RESOURCE_SLIDESHOW',		24);
-define('AUDIT_RESOURCE_SCRIPT',			25);
-define('AUDIT_RESOURCE_PROXY',			26);
-define('AUDIT_RESOURCE_MAINTENANCE',	27);
-define('AUDIT_RESOURCE_REGEXP',			28);
-define('AUDIT_RESOURCE_MACRO',			29);
-define('AUDIT_RESOURCE_TEMPLATE',		30);
-define('AUDIT_RESOURCE_TRIGGER_PROTOTYPE', 31);
-define('AUDIT_RESOURCE_ICON_MAP',		32);
-define('AUDIT_RESOURCE_DASHBOARD',		33);
-define('AUDIT_RESOURCE_CORRELATION',	34);
-define('AUDIT_RESOURCE_HOST_PROTOTYPE', 35);
+define('AUDIT_RESOURCE_USER',				0);
+define('AUDIT_RESOURCE_ZABBIX_CONFIG',		2);
+define('AUDIT_RESOURCE_MEDIA_TYPE',			3);
+define('AUDIT_RESOURCE_HOST',				4);
+define('AUDIT_RESOURCE_ACTION',				5);
+define('AUDIT_RESOURCE_GRAPH',				6);
+define('AUDIT_RESOURCE_GRAPH_ELEMENT',		7);
+define('AUDIT_RESOURCE_USER_GROUP',			11);
+define('AUDIT_RESOURCE_APPLICATION',		12);
+define('AUDIT_RESOURCE_TRIGGER',			13);
+define('AUDIT_RESOURCE_HOST_GROUP',			14);
+define('AUDIT_RESOURCE_ITEM',				15);
+define('AUDIT_RESOURCE_IMAGE',				16);
+define('AUDIT_RESOURCE_VALUE_MAP',			17);
+define('AUDIT_RESOURCE_IT_SERVICE',			18);
+define('AUDIT_RESOURCE_MAP',				19);
+define('AUDIT_RESOURCE_SCREEN',				20);
+define('AUDIT_RESOURCE_SCENARIO',			22);
+define('AUDIT_RESOURCE_DISCOVERY_RULE',		23);
+define('AUDIT_RESOURCE_SLIDESHOW',			24);
+define('AUDIT_RESOURCE_SCRIPT',				25);
+define('AUDIT_RESOURCE_PROXY',				26);
+define('AUDIT_RESOURCE_MAINTENANCE',		27);
+define('AUDIT_RESOURCE_REGEXP',				28);
+define('AUDIT_RESOURCE_MACRO',				29);
+define('AUDIT_RESOURCE_TEMPLATE',			30);
+define('AUDIT_RESOURCE_TRIGGER_PROTOTYPE',	31);
+define('AUDIT_RESOURCE_ICON_MAP',			32);
+define('AUDIT_RESOURCE_DASHBOARD',			33);
+define('AUDIT_RESOURCE_CORRELATION',		34);
+define('AUDIT_RESOURCE_GRAPH_PROTOTYPE',	35);
+define('AUDIT_RESOURCE_ITEM_PROTOTYPE',		36);
+define('AUDIT_RESOURCE_HOST_PROTOTYPE',		37);
 
 define('CONDITION_TYPE_HOST_GROUP',			0);
 define('CONDITION_TYPE_HOST',				1);
@@ -480,8 +486,8 @@ define('ITEM_DATA_TYPE_OCTAL',			1);
 define('ITEM_DATA_TYPE_HEXADECIMAL',	2);
 define('ITEM_DATA_TYPE_BOOLEAN',		3);
 
-define('ZBX_DEFAULT_KEY_DB_MONITOR',			'db.odbc.select[<unique short description>,<dsn>]');
-define('ZBX_DEFAULT_KEY_DB_MONITOR_DISCOVERY',	'db.odbc.discovery[<unique short description>,<dsn>]');
+define('ZBX_DEFAULT_KEY_DB_MONITOR',			'db.odbc.select[<unique short description>,dsn]');
+define('ZBX_DEFAULT_KEY_DB_MONITOR_DISCOVERY',	'db.odbc.discovery[<unique short description>,dsn]');
 define('ZBX_DEFAULT_KEY_SSH',					'ssh.run[<unique short description>,<ip>,<port>,<encoding>]');
 define('ZBX_DEFAULT_KEY_TELNET',				'telnet.run[<unique short description>,<ip>,<port>,<encoding>]');
 
@@ -754,8 +760,9 @@ define('ZBX_MIN_WIDGET_LINES', 1);
 define('ZBX_MAX_WIDGET_LINES', 100);
 
 // dashboards
-define('DASHBOARD_MAX_ROWS', 64);
-define('DASHBOARD_MAX_COLUMNS', 12);
+define('DASHBOARD_MAX_COLUMNS',		12);
+define('DASHBOARD_MAX_ROWS',		64);
+define('DASHBOARD_WIDGET_MAX_ROWS',	32);
 
 // alignments
 define('HALIGN_DEFAULT',	0);
@@ -1148,8 +1155,8 @@ define('IPMI_PRIVILEGE_OEM',		5);
 define('ZBX_HAVE_IPV6', true);
 define('ZBX_DISCOVERER_IPRANGE_LIMIT', 65536);
 
-define('ZBX_SOCKET_TIMEOUT',        3);         // socket timeout limit
-define('ZBX_SOCKET_BYTES_LIMIT',    1048576);   // socket response size limit, 1048576 is 1MB in bytes
+define('ZBX_SOCKET_TIMEOUT',        3);            // socket timeout limit
+define('ZBX_SOCKET_BYTES_LIMIT',    ZBX_MEBIBYTE); // socket response size limit
 
 // value is also used in servercheck.js file
 define('SERVER_CHECK_INTERVAL', 10);
@@ -1329,9 +1336,7 @@ define('WIDGET_NAVIGATION_TREE_MAX_DEPTH', 10);
 // event details widgets
 define('WIDGET_HAT_TRIGGERDETAILS',		'hat_triggerdetails');
 define('WIDGET_HAT_EVENTDETAILS',		'hat_eventdetails');
-define('WIDGET_HAT_EVENTACK',			'hat_eventack');
-define('WIDGET_HAT_EVENTACTIONMSGS',	'hat_eventactionmsgs');
-define('WIDGET_HAT_EVENTACTIONMCMDS',	'hat_eventactionmcmds');
+define('WIDGET_HAT_EVENTACTIONS',		'hat_eventactions');
 define('WIDGET_HAT_EVENTLIST',			'hat_eventlist');
 // search widget
 define('WIDGET_SEARCH_HOSTS',			'search_hosts');
@@ -1395,10 +1400,10 @@ define('QUEUE_DETAILS', 2);
 // item count to display in the details queue
 define('QUEUE_DETAIL_ITEM_COUNT', 500);
 
-// constants for element "copy to..." target types
-define('COPY_TYPE_TO_HOST', 0);
-define('COPY_TYPE_TO_TEMPLATE', 2);
-define('COPY_TYPE_TO_HOST_GROUP', 1);
+// target types to copy items/triggers/graphs
+define('COPY_TYPE_TO_HOST_GROUP',	0);
+define('COPY_TYPE_TO_HOST',			1);
+define('COPY_TYPE_TO_TEMPLATE',		2);
 
 define('HISTORY_GRAPH', 'showgraph');
 define('HISTORY_BATCH_GRAPH', 'batchgraph');
@@ -1471,9 +1476,10 @@ define('ZBX_STYLE_COLUMN_TAGS_1', 'column-tags-1');
 define('ZBX_STYLE_COLUMN_TAGS_2', 'column-tags-2');
 define('ZBX_STYLE_COLUMN_TAGS_3', 'column-tags-3');
 define('ZBX_STYLE_COMPACT_VIEW', 'compact-view');
-define('ZBX_STYLE_CURSOR_MOVE', 'cursor-move');
 define('ZBX_STYLE_CURSOR_POINTER', 'cursor-pointer');
-define('ZBX_STYLE_DASHBRD_GRID_WIDGET_CONTAINER', 'dashbrd-grid-widget-container');
+define('ZBX_STYLE_DASHBRD_GRID_CONTAINER', 'dashbrd-grid-container');
+define('ZBX_STYLE_DASHBRD_WIDGET', 'dashbrd-widget');
+define('ZBX_STYLE_DASHBRD_WIDGET_FLUID', 'dashbrd-widget-fluid');
 define('ZBX_STYLE_DASHBRD_WIDGET_HEAD', 'dashbrd-widget-head');
 define('ZBX_STYLE_DASHBRD_WIDGET_FOOT', 'dashbrd-widget-foot');
 define('ZBX_STYLE_DASHBRD_EDIT', 'dashbrd-edit');
@@ -1514,13 +1520,13 @@ define('ZBX_STYLE_FLH_WARNING_BG', 'flh-warning-bg');
 define('ZBX_STYLE_FLOAT_LEFT', 'float-left');
 define('ZBX_STYLE_FORM_INPUT_MARGIN', 'form-input-margin');
 define('ZBX_STYLE_FORM_NEW_GROUP', 'form-new-group');
+define('ZBX_STYLE_GRAPH_WRAPPER', 'graph-wrapper');
 define('ZBX_STYLE_GREEN', 'green');
 define('ZBX_STYLE_GREEN_BG', 'green-bg');
 define('ZBX_STYLE_GREY', 'grey');
 define('ZBX_STYLE_TEAL', 'teal');
 define('ZBX_STYLE_HEADER_LOGO', 'header-logo');
 define('ZBX_STYLE_HEADER_TITLE', 'header-title');
-define('ZBX_STYLE_HIDDEN', 'hidden');
 define('ZBX_STYLE_HIGH_BG', 'high-bg');
 define('ZBX_STYLE_HOR_LIST', 'hor-list');
 define('ZBX_STYLE_HOVER_NOBG', 'hover-nobg');
@@ -1552,7 +1558,6 @@ define('ZBX_STYLE_INPUT_COLOR_PICKER', 'input-color-picker');
 define('ZBX_STYLE_LEFT', 'left');
 define('ZBX_STYLE_LINK_ACTION', 'link-action');
 define('ZBX_STYLE_LINK_ALT', 'link-alt');
-define('ZBX_STYLE_LIST_HOR_CHECK_RADIO', 'list-hor-check-radio');
 define('ZBX_STYLE_LIST_CHECK_RADIO', 'list-check-radio');
 define('ZBX_STYLE_LIST_TABLE', 'list-table');
 define('ZBX_STYLE_LIST_TABLE_FOOTER', 'list-table-footer');
@@ -1584,6 +1589,7 @@ define('ZBX_STYLE_NOTIF_INDIC', 'notif-indic');
 define('ZBX_STYLE_NOTIF_INDIC_CONTAINER', 'notif-indic-container');
 define('ZBX_STYLE_NOTHING_TO_SHOW', 'nothing-to-show');
 define('ZBX_STYLE_NOWRAP', 'nowrap');
+define('ZBX_STYLE_WORDWRAP', 'wordwrap');
 define('ZBX_STYLE_ORANGE', 'orange');
 define('ZBX_STYLE_OVERLAY_CLOSE_BTN', 'overlay-close-btn');
 define('ZBX_STYLE_OVERLAY_DESCR', 'overlay-descr');
@@ -1597,8 +1603,6 @@ define('ZBX_STYLE_PAGE_TITLE', 'page-title-general');
 define('ZBX_STYLE_PROGRESS_BAR_BG', 'progress-bar-bg');
 define('ZBX_STYLE_PROGRESS_BAR_CONTAINER', 'progress-bar-container');
 define('ZBX_STYLE_PROGRESS_BAR_LABEL', 'progress-bar-label');
-define('ZBX_STYLE_RADIO_SEGMENTED', 'radio-segmented');
-define('ZBX_STYLE_RANGE_CONTROL', 'range-control');
 define('ZBX_STYLE_RED', 'red');
 define('ZBX_STYLE_RED_BG', 'red-bg');
 define('ZBX_STYLE_REL_CONTAINER', 'rel-container');
@@ -1636,6 +1640,7 @@ define('ZBX_STYLE_STATUS_NA_BG', 'status-na-bg');
 define('ZBX_STYLE_STATUS_RED', 'status-red');
 define('ZBX_STYLE_STATUS_WARNING_BG', 'status-warning-bg');
 define('ZBX_STYLE_STATUS_YELLOW', 'status-yellow');
+define('ZBX_STYLE_SVG_GRAPH', 'svg-graph');
 define('ZBX_STYLE_SVG_GRAPH_PREVIEW', 'svg-graph-preview');
 define('ZBX_STYLE_SUBFILTER', 'subfilter');
 define('ZBX_STYLE_SUBFILTER_ENABLED', 'subfilter-enabled');

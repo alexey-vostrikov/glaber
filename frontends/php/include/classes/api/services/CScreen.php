@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -388,9 +388,8 @@ class CScreen extends CApiService {
 			if ($options['groupCount']) {
 				return [['rowscount' => count($result)]];
 			}
-			else {
-				return count($result);
-			}
+
+			return (string) count($result);
 		}
 
 		if ($result) {
@@ -1051,6 +1050,7 @@ class CScreen extends CApiService {
 	 */
 	protected function updateReal(array $screens, array $db_screens) {
 		$update_screens = [];
+		CArrayHelper::sort($screens, ['screenid']);
 
 		foreach ($screens as $screen) {
 			$screenid = $screen['screenid'];

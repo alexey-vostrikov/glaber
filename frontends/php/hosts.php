@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -807,6 +807,14 @@ elseif (hasRequest('action') && getRequest('action') == 'host.massdelete' && has
 
 	if ($result) {
 		uncheckTableRows();
+	}
+	else {
+		$hostids = API::Host()->get([
+			'output' => [],
+			'hostids' => getRequest('hosts'),
+			'editable' => true
+		]);
+		uncheckTableRows(getRequest('hostid'), zbx_objectValues($hostids, 'hostid'));
 	}
 	show_messages($result, _('Host deleted'), _('Cannot delete host'));
 }

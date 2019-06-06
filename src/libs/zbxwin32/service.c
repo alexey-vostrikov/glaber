@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ static	SERVICE_STATUS_HANDLE	serviceHandle;
 int	application_status = ZBX_APP_RUNNING;
 
 /* free resources allocated by MAIN_ZABBIX_ENTRY() */
-void	zbx_free_service_resources();
+void	zbx_free_service_resources(void);
 
 static void	parent_signal_handler(int sig)
 {

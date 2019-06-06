@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -76,7 +76,7 @@ $discoveryFormList->addRow(
 			)
 	))
 		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
-		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
+		->setAttribute('style', 'width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
 		->setId('dcheckList')
 );
 
@@ -87,7 +87,7 @@ $discoveryFormList->addRow(_('Device uniqueness criteria'),
 			->makeVertical()
 			->addValue(_('IP address'), -1, zbx_formatDomId('uniqueness_criteria_ip'))
 	))
-		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
+		->setAttribute('style', 'width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
 		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 );
 

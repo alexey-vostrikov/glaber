@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -280,12 +280,19 @@ function makeProblemHostsHintBox(array $hosts, array $data, CUrl $url) {
 		$url->setArgument('filter_hostids', [$hostid]);
 		$host_name = new CLink($host_data['host'], $url->getUrl());
 
-		if ($host_data['maintenance_status'] == HOST_MAINTENANCE_STATUS_ON
-				&& array_key_exists($host_data['maintenanceid'], $db_maintenances)) {
-			$maintenance = $db_maintenances[$host_data['maintenanceid']];
-			$maintenance_icon = makeMaintenanceIcon($host_data['maintenance_type'], $maintenance['name'],
-				$maintenance['description']
-			);
+		if ($host_data['maintenance_status'] == HOST_MAINTENANCE_STATUS_ON) {
+			if (array_key_exists($host_data['maintenanceid'], $db_maintenances)) {
+				$maintenance = $db_maintenances[$host_data['maintenanceid']];
+				$maintenance_icon = makeMaintenanceIcon($host_data['maintenance_type'], $maintenance['name'],
+					$maintenance['description']
+				);
+			}
+			else {
+				$maintenance_icon = makeMaintenanceIcon($host_data['maintenance_type'], _('Inaccessible maintenance'),
+					''
+				);
+			}
+
 			$host_name = [$host_name, $maintenance_icon];
 		}
 

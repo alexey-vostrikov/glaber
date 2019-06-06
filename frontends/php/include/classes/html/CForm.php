@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -63,6 +63,19 @@ class CForm extends CTag {
 		if (!is_null($value)) {
 			$this->addItem(new CVar($name, $value, $id));
 		}
+		return $this;
+	}
+
+	/**
+	 * Prevent browser from auto fill inputs with type password.
+	 *
+	 * @return CForm
+	 */
+	public function disablePasswordAutofill() {
+		$this->addItem((new CDiv([
+			(new CInput('password', null, null))->setAttribute('tabindex', '-1')->removeId()
+		]))->addStyle('display: none;'));
+
 		return $this;
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -278,42 +278,40 @@ elseif ((hasRequest('delete') && hasRequest('screenid'))
 
 	DBstart();
 
-	$screens = API::Screen()->get([
-		'screenids' => $screenids,
-		'output' => API_OUTPUT_EXTEND,
-		'editable' => true
-	]);
+	if (hasRequest('templateid')) {
+		$parent_id = getRequest('templateid');
 
-	if ($screens) {
-		$result = API::Screen()->delete($screenids);
+		$screens = API::TemplateScreen()->get([
+			'screenids' => $screenids,
+			'output' => API_OUTPUT_EXTEND,
+			'editable' => true
+		]);
 
-		if ($result) {
-			foreach ($screens as $screen) {
-				add_audit_details(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_SCREEN, $screen['screenid'], $screen['name']);
-			}
-		}
+		$result = API::TemplateScreen()->delete($screenids);
 	}
 	else {
-		$result = API::TemplateScreen()->delete($screenids);
+		$parent_id = null;
 
-		if ($result) {
-			$templatedScreens = API::TemplateScreen()->get([
-				'screenids' => $screenids,
-				'output' => API_OUTPUT_EXTEND,
-				'editable' => true
-			]);
+		$screens = API::Screen()->get([
+			'screenids' => $screenids,
+			'output' => API_OUTPUT_EXTEND,
+			'editable' => true
+		]);
 
-			foreach ($templatedScreens as $screen) {
-				add_audit_details(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_SCREEN, $screen['screenid'], $screen['name']);
-			}
-		}
+		$result = API::Screen()->delete($screenids);
 	}
 
 	$result = DBend($result);
 
 	if ($result) {
+		foreach ($screens as $screen) {
+			add_audit_details(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_SCREEN, $screen['screenid'], $screen['name']);
+		}
 		unset($_REQUEST['screenid'], $_REQUEST['form']);
-		uncheckTableRows();
+		uncheckTableRows($parent_id);
+	}
+	else {
+		uncheckTableRows($parent_id, zbx_objectValues($screens, 'screenid'));
 	}
 	show_messages($result, _('Screen deleted'), _('Cannot delete screen'));
 }

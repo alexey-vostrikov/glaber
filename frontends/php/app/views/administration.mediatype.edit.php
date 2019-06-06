@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,6 +34,8 @@ $mediaTypeForm = (new CForm())
 	->setId('media_type_form')
 	->addVar('form', 1)
 	->addVar('mediatypeid', $data['mediatypeid'])
+	->addItem((new CVar('status', MEDIA_TYPE_STATUS_DISABLED))->removeId())
+	->disablePasswordAutofill()
 	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
 
 // Create form list.
@@ -131,11 +133,11 @@ $mediatype_formlist->addRow((new CLabel(_('GSM modem'), 'gsm_modem'))->setAsteri
 );
 
 // Create password field.
-if ($data['passwd'] !== '') {
+if ($data['passwd'] !== '' && !$data['change_passwd']) {
 	// Disabling 'passwd' field prevents stored passwords autofill by browser.
 	$passwd_field = [
 		(new CButton('chPass_btn', _('Change password'))),
-		(new CPassBox('passwd', $data['passwd']))
+		(new CPassBox('passwd', ''))
 			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
 			->setAriaRequired()
 			->addStyle('display: none;')
@@ -143,7 +145,7 @@ if ($data['passwd'] !== '') {
 	];
 }
 else {
-	$passwd_field = (new CPassBox('passwd'))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
+	$passwd_field = (new CPassBox('passwd', $data['passwd']))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
 }
 
 // append password field to form list
@@ -167,7 +169,7 @@ $mediatype_formlist
 		EZ_TEXTING_LIMIT_CANADA => _('Canada (136 characters)')
 	]))
 	->addRow(_('Enabled'),
-		(new CCheckBox('status', MEDIA_TYPE_STATUS_ACTIVE))->setChecked(MEDIA_TYPE_STATUS_ACTIVE == $data['status'])
+		(new CCheckBox('status', MEDIA_TYPE_STATUS_ACTIVE))->setChecked($data['status'] == MEDIA_TYPE_STATUS_ACTIVE)
 	);
 $tabs->addTab('mediaTab', _('Media type'), $mediatype_formlist);
 

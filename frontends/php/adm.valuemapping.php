@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -122,6 +122,13 @@ elseif (getRequest('action') === 'valuemap.delete' && hasRequest('valuemapids'))
 	if ($result) {
 		unset($_REQUEST['form']);
 		uncheckTableRows();
+	}
+	else {
+		$valuemaps = API::ValueMap()->get([
+			'valuemapids' => getRequest('valuemapids'),
+			'output' => []
+		]);
+		uncheckTableRows(null, zbx_objectValues($valuemaps, 'valuemapid'));
 	}
 
 	$deleted = count($valuemapids);

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -246,23 +246,19 @@ switch ($data['new_condition']['conditiontype']) {
 		break;
 
 	case CONDITION_TYPE_DRULE:
-		$action_tab->addItem(new CVar('new_condition[value]', '0'));
-		$condition = [
-			(new CTextBox('drule', '', true))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH),
-			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			(new CButton('btn1', _('Select')))
-				->addClass(ZBX_STYLE_BTN_GREY)
-				->onClick('return PopUp("popup.generic",'.
-					CJs::encodeJson([
-						'srctbl' => 'drules',
-						'srcfld1' => 'druleid',
-						'srcfld2' => 'name',
-						'dstfrm' => $actionForm->getName(),
-						'dstfld1' => 'new_condition_value',
-						'dstfld2' => 'drule'
-					]).', null, this);'
-				)
-		];
+		$condition = (new CMultiSelect([
+			'name' => 'new_condition[value][]',
+			'object_name' => 'drules',
+			'default_value' => 0,
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'drules',
+					'srcfld1' => 'druleid',
+					'dstfrm' => $actionForm->getName(),
+					'dstfld1' => 'new_condition_value_'
+				]
+			]
+		]))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
 		break;
 
 	case CONDITION_TYPE_DCHECK:

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -212,6 +212,14 @@ elseif (hasRequest('delete') || (hasRequest('action') && getRequest('action') ==
 	if ($result) {
 		unset($_REQUEST['form'], $_REQUEST['maintenanceid']);
 		uncheckTableRows();
+	}
+	else {
+		$maintenances = API::Maintenance()->get([
+			'maintenanceids' => getRequest('maintenanceids'),
+			'output' => [],
+			'editable' => true
+		]);
+		uncheckTableRows(null, zbx_objectValues($maintenances, 'maintenanceid'));
 	}
 
 	show_messages($result, _('Maintenance deleted'), _('Cannot delete maintenance'));

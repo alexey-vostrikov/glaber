@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -237,7 +237,8 @@ class CWebUser {
 			'filter' => ['alias' => ZBX_GUEST_USER]
 		]);
 
-		return getUserGuiAccess($guest[0]['userid']) != GROUP_GUI_ACCESS_DISABLED;
+		return check_perm2system($guest[0]['userid'])
+			&& getUserGuiAccess($guest[0]['userid']) != GROUP_GUI_ACCESS_DISABLED;
 	}
 
 	/**

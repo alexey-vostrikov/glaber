@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,24 +38,29 @@ class CCollapsibleUiWidget extends CUiWidget {
 	/**
 	 * Sets the header and adds a default expand-collapse icon.
 	 *
-	 * @param string	$caption
-	 * @param array		$controls
+	 * @param string $caption
+	 * @param array  $controls
+	 * @param string $url
+	 *
+	 * @return $this
 	 */
-	public function setHeader($caption, array $controls = [], $cursor_move = false, $url = '') {
+	public function setHeader($caption, array $controls = [], $url = '') {
 		$icon = (new CRedirectButton(null, null))
 			->setId($this->id.'_icon')
 			->onClick('changeWidgetState(this, "'.$this->id.'", "'.$url.'");');
 		if ($this->expanded) {
-			$icon->addClass(ZBX_STYLE_BTN_WIDGET_COLLAPSE)
+			$icon
+				->addClass(ZBX_STYLE_BTN_WIDGET_COLLAPSE)
 				->setTitle(_('Collapse'));
 		}
 		else {
-			$icon->addClass(ZBX_STYLE_BTN_WIDGET_EXPAND)
+			$icon
+				->addClass(ZBX_STYLE_BTN_WIDGET_EXPAND)
 				->setTitle(_('Expand'));
 		}
 		$controls[] = $icon;
 
-		parent::setHeader($caption, $controls, $cursor_move);
+		parent::setHeader($caption, $controls);
 
 		return $this;
 	}

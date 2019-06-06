@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -187,16 +187,6 @@ zbx_procstat_query_data_t;
 static zbx_procstat_util_t	*procstat_snapshot;
 /* the number of processes in process cpu utilization snapshot */
 static int			procstat_snapshot_num;
-
-/* external functions used by procstat collector */
-int	zbx_proc_get_processes(zbx_vector_ptr_t *processes, unsigned int flags);
-
-void	zbx_proc_get_matching_pids(const zbx_vector_ptr_t *processes, const char *procname, const char *username,
-		const char *cmdline, zbx_uint64_t flags, zbx_vector_uint64_t *pids);
-
-void	zbx_proc_get_process_stats(zbx_procstat_util_t *procs, int procs_num);
-
-void	zbx_proc_free_processes(zbx_vector_ptr_t *processes);
 
 /******************************************************************************
  *                                                                            *
@@ -1101,7 +1091,11 @@ int	zbx_procstat_get_util(const char *procname, const char *username, const char
 
 	/* 1e9 (nanoseconds) * 1e2 (percent) * 1e1 (one digit decimal place) */
 	ticks_diff *= __UINT64_C(1000000000000);
+#ifdef HAVE_ROUND
 	*value = round((double)ticks_diff / (time_diff * sysconf(_SC_CLK_TCK))) / 10;
+#else
+	*value = (int)((double)ticks_diff / (time_diff * sysconf(_SC_CLK_TCK)) + 0.5) / 10.0;
+#endif
 
 	ret = SUCCEED;
 out:

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -240,7 +240,7 @@ $itemFormList->addRow(
 					->setAttribute('placeholder', _('name'))
 					->setWidth(ZBX_TEXTAREA_TAG_WIDTH),
 				'&rArr;',
-				(new CTextBox('headers[value][#{index}]', '#{value}', $readonly))
+				(new CTextBox('headers[value][#{index}]', '#{value}', $readonly, 1000))
 					->setAttribute('placeholder', _('value'))
 					->setWidth(ZBX_TEXTAREA_TAG_WIDTH),
 				(new CButton(null, _('Remove')))
@@ -300,7 +300,7 @@ $itemFormList->addRow(
 	new CLabel(_('HTTP proxy'), 'http_proxy'),
 	(new CTextBox('http_proxy', $data['http_proxy'], $readonly, DB::getFieldLength('items', 'http_proxy')))
 		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-		->setAttribute('placeholder', 'http://[user[:password]@]proxy.example.com[:port]'),
+		->setAttribute('placeholder', '[protocol://][user[:password]@]proxy.example.com[:port]'),
 	'http_proxy_row'
 );
 
@@ -320,18 +320,16 @@ $itemFormList->addRow(
 
 // ITEM_TYPE_HTTPAGENT User name.
 $itemFormList->addRow(
-	(new CLabel(_('User name'), 'http_username'))->setAsteriskMark(),
+	new CLabel(_('User name'), 'http_username'),
 	(new CTextBox('http_username', $data['http_username'], $readonly, DB::getFieldLength('items', 'username')))
-		->setAriaRequired()
 		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
 	'http_username_row'
 );
 
 // ITEM_TYPE_HTTPAGENT Password.
 $itemFormList->addRow(
-	(new CLabel(_('Password'), 'http_password'))->setAsteriskMark(),
+	new CLabel(_('Password'), 'http_password'),
 	(new CTextBox('http_password', $data['http_password'], $readonly, DB::getFieldLength('items', 'password')))
-		->setAriaRequired()
 		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
 	'http_password_row'
 );
@@ -471,6 +469,7 @@ if (!empty($this->data['interfaces'])) {
 $itemFormList->addRow(
 	(new CLabel(_('SNMP OID'), 'snmp_oid'))->setAsteriskMark(),
 	(new CTextBox('snmp_oid', $this->data['snmp_oid'], $readonly, 512))
+		->setAttribute('placeholder', '[IF-MIB::]ifInOctets.1')
 		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 		->setAriaRequired(),
 	'row_snmp_oid'

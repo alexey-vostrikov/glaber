@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -565,25 +565,25 @@ class CTemplate extends CHostGeneral {
 		API::Template()->unlink($templateids, null, true);
 
 		// delete the discovery rules first
-		$delRules = API::DiscoveryRule()->get([
-			'output' => ['itemid'],
+		$del_rules = API::DiscoveryRule()->get([
+			'output' => [],
 			'hostids' => $templateids,
 			'nopermissions' => true,
 			'preservekeys' => true
 		]);
-		if ($delRules) {
-			API::DiscoveryRule()->delete(array_keys($delRules), true);
+		if ($del_rules) {
+			API::DiscoveryRule()->delete(array_keys($del_rules), true);
 		}
 
 		// delete the items
-		$delItems = API::Item()->get([
+		$del_items = API::Item()->get([
+			'output' => [],
 			'templateids' => $templateids,
-			'output' => ['itemid'],
 			'nopermissions' => true,
 			'preservekeys' => true
 		]);
-		if ($delItems) {
-			API::Item()->delete(array_keys($delItems), true);
+		if ($del_items) {
+			CItemManager::delete(array_keys($del_items));
 		}
 
 		// delete host from maps
@@ -753,8 +753,6 @@ class CTemplate extends CHostGeneral {
 			$this->checkValidator($hostIds, new CHostNormalValidator([
 				'message' => _('Cannot update templates on discovered host "%1$s".')
 			]));
-
-			$this->validateDependentItemsLinkage($hostIds, $templateIds);
 
 			$this->link($templateIds, $hostIds);
 		}
@@ -1149,10 +1147,9 @@ class CTemplate extends CHostGeneral {
 				]);
 				$templates = zbx_toHash($templates, 'templateid');
 				foreach ($result as $templateid => $template) {
-					if (isset($templates[$templateid]))
-						$result[$templateid]['templates'] = $templates[$templateid]['rowscount'];
-					else
-						$result[$templateid]['templates'] = 0;
+					$result[$templateid]['templates'] = array_key_exists($templateid, $templates)
+						? $templates[$templateid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1179,10 +1176,9 @@ class CTemplate extends CHostGeneral {
 				]);
 				$hosts = zbx_toHash($hosts, 'templateid');
 				foreach ($result as $templateid => $template) {
-					if (isset($hosts[$templateid]))
-						$result[$templateid]['hosts'] = $hosts[$templateid]['rowscount'];
-					else
-						$result[$templateid]['hosts'] = 0;
+					$result[$templateid]['hosts'] = array_key_exists($templateid, $hosts)
+						? $hosts[$templateid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1217,10 +1213,9 @@ class CTemplate extends CHostGeneral {
 				]);
 				$screens = zbx_toHash($screens, 'templateid');
 				foreach ($result as $templateid => $template) {
-					if (isset($screens[$templateid]))
-						$result[$templateid]['screens'] = $screens[$templateid]['rowscount'];
-					else
-						$result[$templateid]['screens'] = 0;
+					$result[$templateid]['screens'] = array_key_exists($templateid, $screens)
+						? $screens[$templateid]['rowscount']
+						: '0';
 				}
 			}
 		}

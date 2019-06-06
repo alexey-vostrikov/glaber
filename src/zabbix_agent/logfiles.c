@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -1203,11 +1203,8 @@ static char	*create_old2new_and_copy_of(int rotation_type, struct st_logfile *ol
 					return NULL;
 			}
 
-			if (SUCCEED == zabbix_check_log_level(LOG_LEVEL_DEBUG))
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "%s(): is_same_file(%s, %s) = %c", __function_name,
-						old_files[i].filename, new_files[j].filename, p[j]);
-			}
+			zabbix_log(LOG_LEVEL_DEBUG, "%s(): is_same_file(%s, %s) = %c", __function_name,
+					old_files[i].filename, new_files[j].filename, p[j]);
 		}
 
 		p += (size_t)num_new;
@@ -1533,8 +1530,8 @@ clean:
  *                                                                            *
  * Parameters:                                                                *
  *     filename_regexp - [IN] regexp to be compiled                           *
- *     re              - [OUT] compiled regexp                             *
- *     err_msg         - [OUT] error message why regexp could not be       *
+ *     re              - [OUT] compiled regexp                                *
+ *     err_msg         - [OUT] error message why regexp could not be          *
  *                       compiled                                             *
  *                                                                            *
  * Return value: SUCCEED or FAIL                                              *
@@ -1546,10 +1543,8 @@ static int	compile_filename_regexp(const char *filename_regexp, zbx_regexp_t **r
 
 	if (SUCCEED != zbx_regexp_compile(filename_regexp, re, &regexp_err))
 	{
-		char	err_buf[MAX_STRING_LEN];
-
 		*err_msg = zbx_dsprintf(*err_msg, "Cannot compile a regular expression describing filename pattern: %s",
-				err_buf);
+				regexp_err);
 		return FAIL;
 	}
 
@@ -1685,8 +1680,8 @@ static int	make_logfile_list(unsigned char flags, const char *filename, int mtim
 			/* do not make logrt[] and logrt.count[] items NOTSUPPORTED if there are no matching log */
 			/* files or they are not accessible (can happen during a rotation), just log the problem */
 #ifdef _WINDOWS
-			zabbix_log(LOG_LEVEL_WARNING, "there are no files matching \"%s\" in \"%s\"", filename_regexp,
-					directory);
+			zabbix_log(LOG_LEVEL_WARNING, "there are no recently modified files matching \"%s\" in \"%s\"",
+					filename_regexp, directory);
 
 			ret = ZBX_NO_FILE_ERROR;
 #else
@@ -1697,8 +1692,8 @@ static int	make_logfile_list(unsigned char flags, const char *filename, int mtim
 			}
 			else
 			{
-				zabbix_log(LOG_LEVEL_WARNING, "there are no files matching \"%s\" in \"%s\"",
-						filename_regexp, directory);
+				zabbix_log(LOG_LEVEL_WARNING, "there are no recently modified files matching \"%s\" in"
+						" \"%s\"", filename_regexp, directory);
 				ret = ZBX_NO_FILE_ERROR;
 			}
 #endif
@@ -2154,13 +2149,10 @@ static int	process_log(unsigned char flags, const char *filename, zbx_uint64_t *
 	if (SUCCEED != close_file_helper(f, filename, err_msg))
 		ret = FAIL;
 out:
-	if (SUCCEED == zabbix_check_log_level(LOG_LEVEL_DEBUG))
-	{
-		zabbix_log(LOG_LEVEL_DEBUG, "End of %s() filename:'%s' lastlogsize:" ZBX_FS_UI64 " mtime:%d ret:%s"
-				" processed_bytes:" ZBX_FS_UI64, __function_name, filename, *lastlogsize,
-				NULL != mtime ? *mtime : 0, zbx_result_string(ret),
-				SUCCEED == ret ? *processed_bytes : (zbx_uint64_t)0);
-	}
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() filename:'%s' lastlogsize:" ZBX_FS_UI64 " mtime:%d ret:%s"
+			" processed_bytes:" ZBX_FS_UI64, __function_name, filename, *lastlogsize,
+			NULL != mtime ? *mtime : 0, zbx_result_string(ret),
+			SUCCEED == ret ? *processed_bytes : (zbx_uint64_t)0);
 
 	return ret;
 }
@@ -2453,14 +2445,10 @@ static double	calculate_delay(zbx_uint64_t processed_bytes, zbx_uint64_t remaini
 	{
 		delay = (double)remaining_bytes * t_proc / (double)processed_bytes;
 
-		if (SUCCEED == zabbix_check_log_level(LOG_LEVEL_DEBUG))
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "calculate_delay(): processed bytes:" ZBX_FS_UI64
-					" remaining bytes:" ZBX_FS_UI64 " t_proc:%e s speed:%e B/s"
-					" remaining full checks:" ZBX_FS_UI64 " delay:%e s", processed_bytes,
-					remaining_bytes, t_proc, (double)processed_bytes / t_proc,
-					remaining_bytes / processed_bytes, delay);
-		}
+		zabbix_log(LOG_LEVEL_DEBUG, "calculate_delay(): processed bytes:" ZBX_FS_UI64
+				" remaining bytes:" ZBX_FS_UI64 " t_proc:%e s speed:%e B/s remaining full checks:"
+				ZBX_FS_UI64 " delay:%e s", processed_bytes, remaining_bytes, t_proc,
+				(double)processed_bytes / t_proc, remaining_bytes / processed_bytes, delay);
 	}
 
 	return delay;
@@ -2664,7 +2652,7 @@ out:
 	if (SUCCEED != close_file_helper(fd, logfile->filename, err_msg))
 		ret = FAIL;
 
-	if (SUCCEED == zabbix_check_log_level(LOG_LEVEL_DEBUG))
+	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
 	{
 		const char	*dbg_msg;
 
@@ -3024,7 +3012,7 @@ int	process_logrt(unsigned char flags, const char *filename, zbx_uint64_t *lastl
 	if (ZBX_LOG_ROTATION_LOGCPT == rotation_type && 1 < logfiles_num)
 		ensure_order_if_mtimes_equal(*logfiles_old, logfiles, logfiles_num, *use_ino, &start_idx);
 
-	if (SUCCEED == zabbix_check_log_level(LOG_LEVEL_DEBUG))
+	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() old file list:", __function_name);
 		if (NULL != *logfiles_old)
@@ -3125,13 +3113,11 @@ int	process_logrt(unsigned char flags, const char *filename, zbx_uint64_t *lastl
 
 			if (0 != process_this_file)
 			{
-				ret = process_log(flags, logfiles[i].filename, lastlogsize,
-						(0 != (ZBX_METRIC_FLAG_LOG_LOGRT & flags) ? mtime : NULL),
-						lastlogsize_sent,
-						(0 != (ZBX_METRIC_FLAG_LOG_LOGRT & flags) ? mtime_sent : NULL),
-						skip_old_data, big_rec, &logfiles[i].incomplete, err_msg, encoding,
-						regexps, pattern, output_template, p_count, s_count, process_value,
-						server, port, hostname, key, &processed_bytes_tmp, seek_offset);
+				ret = process_log(flags, logfiles[i].filename, lastlogsize, mtime, lastlogsize_sent,
+						mtime_sent, skip_old_data, big_rec, &logfiles[i].incomplete, err_msg,
+						encoding, regexps, pattern, output_template, p_count, s_count,
+						process_value, server, port, hostname, key, &processed_bytes_tmp,
+						seek_offset);
 
 				/* process_log() advances 'lastlogsize' only on success therefore */
 				/* we do not check for errors here */
