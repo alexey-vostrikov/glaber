@@ -212,7 +212,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 	} 
 	
 	 zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, 
-			"SELECT  toUInt32(clock) clock,ns,value,value_dbl,value_str");
+			"SELECT  toUInt32(clock) clock,value,value_dbl,value_str");
 
 	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE) {
 		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",ns");
