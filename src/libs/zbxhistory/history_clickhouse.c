@@ -380,6 +380,11 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 		zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",ns");
 	}
 	
+	if ( 1 == CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME ) {
+		zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",hostname, itemname");
+	}
+	
+
 	zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,") VALUES");
 
 	for (i = 0; i < history->values_num; i++)
@@ -420,6 +425,10 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 
 		if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE) {
 			zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",%d", h->ts.ns);
+		}
+		
+		if ( 1 == CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME ) {
+			zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",'%s','%s'", h->host_name, h->item_key);
 		}
 		
 		zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,"),");
