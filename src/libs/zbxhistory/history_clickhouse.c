@@ -672,7 +672,15 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
                         }	
 						
 						if (FAIL == zbx_vc_simple_add(itemid,&hr)) {
-							zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't add value to vc");
+							zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't add value to vc after %ld items", valuecount);
+							if ( 0 == CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME ) {
+								//in case if any prefetching has failed, then 
+								//and user set zerp fill time, them we assume 
+								//system will suffer from clickhouse hammering, 
+								//so we set ip up to avoid reading clickhouse for the 
+								//next 24 hors
+								CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME = 24 * 3600;
+							} 
 						} else {
 							valuecount++;
 						}
