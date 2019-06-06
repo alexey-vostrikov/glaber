@@ -292,10 +292,11 @@ char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 
 //clickhouse specific
 int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME =0;
-int CONFIG_CLICKHOUSE_SAVE_NS_VALUE = 0;
-int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME = 60;
+int CONFIG_CLICKHOUSE_DISABLE_NS_VALUE = 0;
+int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME = 0;
 char *CONFIG_CLICKHOUSE_USERNAME = NULL;
 char *CONFIG_CLICKHOUSE_PASSWORD = NULL;
+int CONFIG_CLICKHOUSE_PRELOAD_VALUES = 5;
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -619,14 +620,17 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
-
+		{"ClickhousePreloadValues",		&CONFIG_CLICKHOUSE_PRELOAD_VALUES,		TYPE_INT,
+			PARM_OPT,	0,			1000},
+		{"ClickhouseSaveNames",		&CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME,		TYPE_INT,
+			PARM_OPT,	0,			1},
+		{"ClickHouseDisableNanoseconds",		&CONFIG_CLICKHOUSE_DISABLE_NS_VALUE,		TYPE_INT,
+			PARM_OPT,	0,			1},
 		{"HistoryStorageType",		&CONFIG_HISTORY_STORAGE_TYPE,		TYPE_STRING,
 			PARM_OPT,	1,			0},
 		{"HistoryStorageTableName",		&CONFIG_HISTORY_STORAGE_TABLE_NAME,		TYPE_STRING,
 			PARM_OPT,	1,			0},
-		{"ClickhouseSaveNames",		&CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME,		TYPE_INT,
-			PARM_OPT,	0,			1},
-		{"CLickhouseSaveNS",		&CONFIG_CLICKHOUSE_SAVE_NS_VALUE,		TYPE_INT,
+		{"ClickHouseDisableNanoseconds",		&CONFIG_CLICKHOUSE_DISABLE_NS_VALUE,		TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"ClickhouseUsername",		&CONFIG_CLICKHOUSE_USERNAME,		TYPE_STRING,
 			PARM_OPT,	1,			0},
@@ -1140,6 +1144,18 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	/* make initial configuration sync before worker processes are forked */
 	DCsync_configuration(ZBX_DBSYNC_INIT);
 
+
+	zbx_vc_enable();
+
+	if (SUCCEED != zbx_history_init(&error))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history storage: %s", error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
+
+
+
 	if (SUCCEED != zbx_check_postinit_tasks(&error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot complete post initialization tasks: %s", error);
@@ -1151,8 +1167,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zbx_dc_update_maintenances();
 
 	DBclose();
-
-	zbx_vc_enable();
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
 			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_ASYNC_SNMP_POLLER_FORKS 

@@ -37,7 +37,7 @@ extern char	*CONFIG_HISTORY_STORAGE_URL;
 extern int	CONFIG_HISTORY_STORAGE_PIPELINES;
 extern char *CONFIG_HISTORY_STORAGE_TABLE_NAME;
 extern int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME;
-extern int CONFIG_CLICKHOUSE_SAVE_NS_VALUE;
+extern int CONFIG_CLICKHOUSE_DISABLE_NS_VALUE;
 extern char *CONFIG_CLICKHOUSE_USERNAME;
 extern char *CONFIG_CLICKHOUSE_PASSWORD;
 extern int CONFIG_SERVER_STARTUP_TIME;
@@ -96,7 +96,7 @@ static history_value_t	history_str2value(char *str, unsigned char value_type)
 }
 
 static void	clickhouse_log_error(CURL *handle, CURLcode error, const char *errbuf,zbx_httppage_t *page_r)
-{curl_easy_cleanup(handle);
+{
 	long	http_code;
 
 	if (CURLE_HTTP_RETURNED_ERROR == error)
@@ -108,7 +108,7 @@ static void	clickhouse_log_error(CURL *handle, CURLcode error, const char *errbu
 					http_code, page_r->data);
 		}
 		else
-			zabbix_log(LOG_LEVEL_ERR, "cannot get values from clickhousesearch, HTTP error: %ld", http_code);
+			zabbix_log(LOG_LEVEL_ERR, "cannot get values from clickhouse, HTTP error: %ld", http_code);
 	}
 	else
 	{
@@ -200,11 +200,10 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
     bzero(&page_r,sizeof(zbx_httppage_t));
 
 	
-//    if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
-//		
-//		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
-//      goto out;
-//	}
+    if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
+		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
+      goto out;
+	}
 
 	if (NULL == (handle = curl_easy_init()))
 	{
@@ -215,7 +214,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 	 zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, 
 			"SELECT  toUInt32(clock) clock,ns,value,value_dbl,value_str");
 
-	if (CONFIG_CLICKHOUSE_SAVE_NS_VALUE) {
+	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE) {
 		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",ns");
 	}
 	
@@ -264,7 +263,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 		goto out;
 	}
 
-    zabbix_log(LOG_LEVEL_DEBUG, "recieved from clickhouse: %s", page_r.data);
+    zabbix_log(LOG_LEVEL_DEBUG, "Recieved from clickhouse: %s", page_r.data);
 		
     struct zbx_json_parse	jp, jp_row, jp_data;
 	const char		*p = NULL;
@@ -287,7 +286,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
                 SUCCEED == zbx_json_value_by_name_dyn(&jp_row, "value_str", &value_str, &value_str_alloc)) 
             {
                
-			   	if ( CONFIG_CLICKHOUSE_SAVE_NS_VALUE &&
+			   	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE &&
 					 SUCCEED == zbx_json_value_by_name_dyn(&jp_row, "ns", &ns, &ns_alloc) ) {
 							hr.timestamp.ns = atoi(ns); 
 				} else hr.timestamp.ns = 0;
@@ -344,9 +343,9 @@ out:
 
 	zbx_vector_history_record_sort(values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
-	//retrun succeed ander any circumstances 
+
+	//retrun succeeds ander any circumstances 
 	//since otherwise history sincers will try to repeate the query 
-	//and will cause additional memory consumption (i suspect in the curl libriary code)
 	return SUCCEED;
 }
 
@@ -377,7 +376,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
     
 	zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,"INSERT INTO %s (day,itemid,clock,value,value_dbl,value_str", CONFIG_HISTORY_STORAGE_TABLE_NAME);
 
-	if ( CONFIG_CLICKHOUSE_SAVE_NS_VALUE ) {
+	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE ) {
 		zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",ns");
 	}
 	
@@ -419,7 +418,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 		//    log = h->value.log;
 		//}
 
-		if ( CONFIG_CLICKHOUSE_SAVE_NS_VALUE) {
+		if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE) {
 			zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",%d", h->ts.ns);
 		}
 		
@@ -461,14 +460,12 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 			}
 		}
 		
-		
 	 	zbx_free(page_r.data);
 		curl_slist_free_all(curl_headers);
 		curl_easy_cleanup(handle);
 	}
 
 	zbx_free(sql_buffer);
-	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
 
 	return num;
@@ -556,7 +553,7 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 		zbx_vector_uint64_create(&vector_itemids);
 		
 
-		zabbix_log(LOG_LEVEL_DEBUG,"Fetching list of items of type %d",value_type);
+		zabbix_log(LOG_LEVEL_INFORMATION,"Prefetching items of type %d to value cache",value_type);
 		size_t items=DCconfig_get_itemids_by_valuetype( value_type, &vector_itemids);
 		zabbix_log(LOG_LEVEL_DEBUG,"Got %ld items for the type",items);
 
@@ -611,7 +608,6 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 		{
 			clickhouse_log_error(handle, err, errbuf,&page_r);
         	zabbix_log(LOG_LEVEL_WARNING, "Failed query %s",query);
-			//goto out;
 		}	
 
 		if (NULL != page_r.data) {
