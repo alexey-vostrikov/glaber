@@ -1,0 +1,5 @@
+debian/tmp.build-MYSQL/src/zabbix_java/bin usr/share/zabbix-java-gateway
+debian/tmp.build-MYSQL/src/zabbix_java/lib usr/share/zabbix-java-gateway
+debian/zabbix_java_gateway usr/sbin
+debian/conf/zabbix_java_gateway.conf etc/zabbix
+debian/conf/zabbix_java_gateway_logback.xml etc/zabbix

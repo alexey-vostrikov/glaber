@@ -1,2 +1,30 @@
-test: 
-    script: cat README | grep -i "zabbix"
+image: debian:stretch
+
+stages:
+  - build
+
+debian:
+  stage: build
+  script:
+    - apt-get update
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
+    #- git config --global http.sslverify "false"
+    - autoreconf -fvi
+    - dpkg-buildpackage -b
+    - mv ../*.deb releases/debian/
+    - git add -A
+    - git commit -m "committing debian packages"
+    - echo $CI_COMMIT_REF_NAME
+    - git push origin HEAD:$CI_COMMIT_REF_NAME
+
+  only:
+    - tags
+    - master
+
+  artifacts:
+    paths:
+      - releases/debian/*
+    expire_in: 1m
