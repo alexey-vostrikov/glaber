@@ -1,0 +1,7 @@
+zabbix-agent
+zabbix-get
+zabbix-sender
+zabbix-server-mysql
+zabbix-server-pgsql
+zabbix-frontend-php
+zabbix-java-gateway

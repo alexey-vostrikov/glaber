@@ -1,0 +1,17 @@
+Package: zabbix-java-gateway
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Architecture: all
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 905
+Depends: adduser, lsb-base, default-jre-headless
+Section: net
+Priority: optional
+Homepage: http://www.zabbix.com
+Description: Zabbix network monitoring solution - java-gateway
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to monitor a Java application
+ using a Zabbix Java gateway. It collects information from JMX agent.

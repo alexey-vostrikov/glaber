@@ -1,0 +1,16 @@
+Package: zabbix-get
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Architecture: amd64
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 441
+Depends: libc6 (>= 2.17), libpcre3, libssl1.1 (>= 1.1.0), zlib1g (>= 1:1.2.0)
+Section: net
+Priority: optional
+Homepage: http://www.zabbix.com
+Description: Zabbix network monitoring solution - get
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the command line utility needed to get data from agent.
