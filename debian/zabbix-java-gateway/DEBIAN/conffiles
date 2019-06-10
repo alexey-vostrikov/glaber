@@ -1,4 +1,0 @@
-/etc/init.d/zabbix-java-gateway
-/etc/logrotate.d/zabbix-java-gateway
-/etc/zabbix/zabbix_java_gateway.conf
-/etc/zabbix/zabbix_java_gateway_logback.xml

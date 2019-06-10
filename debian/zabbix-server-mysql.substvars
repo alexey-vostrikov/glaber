@@ -1,3 +1,0 @@
-shlibs:Depends=libc6 (>= 2.17), libcurl3 (>= 7.28.0), libevent-2.0-5 (>= 2.0.10-stable), libiksemel3 (>= 1.2), libldap-2.4-2 (>= 2.4.7), libmariadbclient18 (>= 10.1.38-0+deb9u1), libodbc1 (>= 2.3.1), libopenipmi0, libpcre3, libsnmp30 (>= 5.7.3+dfsg-1.7+deb9u1~dfsg), libssh2-1 (>= 1.0), libssl1.1 (>= 1.1.0), libxml2 (>= 2.7.4), zlib1g (>= 1:1.2.0)
-misc:Depends=
-misc:Pre-Depends=

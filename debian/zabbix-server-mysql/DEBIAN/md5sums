@@ -1,8 +1,0 @@
-b1556e90e644d17175a48dccbebcff5a  lib/systemd/system/zabbix-server.service
-3eb29a0b65ee93fca6746ee346fa44ed  usr/lib/tmpfiles.d/zabbix-server.conf
-a3e9f9da1813a7ddd1839dad7e7206b4  usr/sbin/zabbix_server
-5957e73b565f8d15dd9b11088ae04879  usr/share/doc/zabbix-server-mysql/changelog.Debian.gz
-dd4a9af6ac9a2c1f2cb7f717aa5083b7  usr/share/doc/zabbix-server-mysql/changelog.gz
-97ef1003e6aa5b17c92630074fca0991  usr/share/doc/zabbix-server-mysql/copyright
-93e6af7dd9a00dd2dcd853ceaa7c1aad  usr/share/doc/zabbix-server-mysql/create.sql.gz
-e5861b949d9f698393937b2972a99b68  usr/share/man/man8/zabbix_server.8.gz
