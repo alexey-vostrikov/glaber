@@ -1,7 +1,0 @@
-#!/bin/sh
-set -e
-# Automatically added by dh_installinit
-if [ -x "/etc/init.d/zabbix-java-gateway" ]; then
-	invoke-rc.d zabbix-java-gateway stop || exit $?
-fi
-# End automatically added section

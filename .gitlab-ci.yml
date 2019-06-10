@@ -14,6 +14,8 @@ debian:
     #- git config --global http.sslverify "false"
     - autoreconf -fvi
     - dpkg-buildpackage -b
+    - rm -rf ./debian/tmp*
+    - git stash -u
     - mv ../*.deb releases/debian/
     - git add -A
     - git commit -m "committing debian packages"
