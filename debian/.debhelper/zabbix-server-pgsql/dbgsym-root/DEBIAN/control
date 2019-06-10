@@ -1,0 +1,13 @@
+Package: zabbix-server-pgsql-dbgsym
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 1896
+Depends: zabbix-server-pgsql (= 1:4.0.8-1+stretch)
+Section: debug
+Priority: extra
+Homepage: http://www.zabbix.com
+Description: Debug symbols for zabbix-server-pgsql
+Build-Ids: b9a2e929b60bc708930fda288fb2c566aa430864

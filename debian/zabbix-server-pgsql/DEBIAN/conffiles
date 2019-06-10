@@ -1,0 +1,3 @@
+/etc/init.d/zabbix-server
+/etc/logrotate.d/zabbix-server-pgsql
+/etc/zabbix/zabbix_server.conf

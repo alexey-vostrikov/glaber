@@ -1,0 +1,13 @@
+Package: zabbix-sender-dbgsym
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 215
+Depends: zabbix-sender (= 1:4.0.8-1+stretch)
+Section: debug
+Priority: extra
+Homepage: http://www.zabbix.com
+Description: Debug symbols for zabbix-sender
+Build-Ids: cad2ae86577e8b4b95f300925671dd510fbc3d87

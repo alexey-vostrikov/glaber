@@ -103,7 +103,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_lib_ibm_db2.m4 \
 	$(top_srcdir)/m4/netsnmp.m4 $(top_srcdir)/m4/openipmi.m4 \
 	$(top_srcdir)/m4/pcre.m4 $(top_srcdir)/m4/pthread.m4 \
 	$(top_srcdir)/m4/resolv.m4 $(top_srcdir)/m4/zlib.m4 \
-	$(top_srcdir)/conf_tests.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -121,7 +121,7 @@ am__v_AR_1 =
 libzbxhistory_a_AR = $(AR) $(ARFLAGS)
 libzbxhistory_a_LIBADD =
 am_libzbxhistory_a_OBJECTS = history.$(OBJEXT) history_sql.$(OBJEXT) \
-	history_elastic.$(OBJEXT) history_clickhouse.$(OBJEXT) 
+	history_elastic.$(OBJEXT) history_clickhouse.$(OBJEXT)
 libzbxhistory_a_OBJECTS = $(am_libzbxhistory_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -382,7 +382,7 @@ libzbxhistory_a_SOURCES = \
 	history.c history.h \
 	history_sql.c \
 	history_elastic.c \
-	history_clickhouse.c 
+	history_clickhouse.c
 
 all: all-am
 
@@ -433,9 +433,9 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_clickhouse.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_elastic.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_sql.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_clickhouse.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\

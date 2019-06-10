@@ -1,0 +1,17 @@
+Package: zabbix-frontend-php
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Architecture: all
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 17985
+Depends: php-mbstring, php-bcmath, php-xml, apache2 | httpd, php5 | libapache2-mod-php | php, php5-mysql | php5-mysqlnd | php-mysql | php5-pgsql | php-pgsql, php5-gd | php-gd, php5-ldap | php-ldap, ttf-dejavu-core | ttf-japanese-gothic
+Section: net
+Priority: optional
+Homepage: http://www.zabbix.com
+Description: Zabbix network monitoring solution - PHP front-end
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides a web-browsable front-end to the Zabbix server, which
+ can display graphs of the data collected from clients.

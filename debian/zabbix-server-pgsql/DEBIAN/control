@@ -1,0 +1,22 @@
+Package: zabbix-server-pgsql
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Architecture: amd64
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 3944
+Pre-Depends: debconf
+Depends: libc6 (>= 2.17), libcurl3 (>= 7.28.0), libevent-2.0-5 (>= 2.0.10-stable), libiksemel3 (>= 1.2), libldap-2.4-2 (>= 2.4.7), libodbc1 (>= 2.3.1), libopenipmi0, libpcre3, libpq5, libsnmp30 (>= 5.7.3+dfsg-1.7+deb9u1~dfsg), libssh2-1 (>= 1.0), libssl1.1 (>= 1.1.0), libxml2 (>= 2.7.4), zlib1g (>= 1:1.2.0), fping, adduser, lsb-base
+Recommends: postgresql (>= 8.1), snmpd
+Suggests: zabbix-frontend-php, logrotate, postgresql-client
+Conflicts: zabbix-server-mysql
+Section: net
+Priority: optional
+Homepage: http://www.zabbix.com
+Description: Zabbix network monitoring solution - server (PostgreSQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ client. It collects information from Zabbix clients and stores it in a
+ PostgreSQL database.

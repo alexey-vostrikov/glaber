@@ -1,0 +1,18 @@
+Package: zabbix-agent
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Architecture: amd64
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 741
+Depends: libc6 (>= 2.17), libcurl3 (>= 7.16.2), libldap-2.4-2 (>= 2.4.7), libpcre3, libssl1.1 (>= 1.1.0), zlib1g (>= 1:1.2.0), adduser, lsb-base
+Suggests: logrotate
+Section: net
+Priority: optional
+Homepage: http://www.zabbix.com
+Description: Zabbix network monitoring solution - agent
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to monitor a host using a
+ Zabbix agent.

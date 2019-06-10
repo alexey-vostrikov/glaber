@@ -1,0 +1,13 @@
+Package: zabbix-get-dbgsym
+Source: zabbix
+Version: 1:4.0.8-1+stretch
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Zabbix Packager <info@zabbix.com>
+Installed-Size: 190
+Depends: zabbix-get (= 1:4.0.8-1+stretch)
+Section: debug
+Priority: extra
+Homepage: http://www.zabbix.com
+Description: Debug symbols for zabbix-get
+Build-Ids: 723386eb79d9c50c20a335357c86136a3832e23d

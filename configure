@@ -12832,37 +12832,7 @@ $as_echo "#define ZBX_PROCSTAT_COLLECTOR 1 " >>confdefs.h
 esac
 
 
-#
-# Zabbix
-# Copyright (C) 2001-2019 Zabbix SIA
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-#
 
-
-
-
-	if test -z "$ZBXCMOCKA_TRUE"; then :
-
-		ac_config_files="$ac_config_files tests/Makefile tests/libs/Makefile tests/libs/zbxcommon/Makefile tests/libs/zbxconf/Makefile tests/libs/zbxdbcache/Makefile tests/libs/zbxdbhigh/Makefile tests/libs/zbxhistory/Makefile tests/libs/zbxjson/Makefile tests/libs/zbxsysinfo/Makefile tests/libs/zbxsysinfo/linux/Makefile tests/libs/zbxsysinfo/common/Makefile tests/libs/zbxcommshigh/Makefile tests/libs/zbxalgo/Makefile tests/zabbix_server/Makefile tests/zabbix_server/preprocessor/Makefile tests/libs/zbxcomms/Makefile"
-
-
-$as_echo "#define HAVE_TESTS 1" >>confdefs.h
-
-
-fi
 
 
 ac_config_files="$ac_config_files Makefile database/Makefile database/ibm_db2/Makefile database/mysql/Makefile database/oracle/Makefile database/postgresql/Makefile database/sqlite3/Makefile misc/Makefile src/Makefile src/libs/Makefile src/libs/zbxlog/Makefile src/libs/zbxalgo/Makefile src/libs/zbxmemory/Makefile src/libs/zbxcrypto/Makefile src/libs/zbxconf/Makefile src/libs/zbxdbcache/Makefile src/libs/zbxdbhigh/Makefile src/libs/zbxmedia/Makefile src/libs/zbxsysinfo/Makefile src/libs/zbxcommon/Makefile src/libs/zbxsysinfo/agent/Makefile src/libs/zbxsysinfo/common/Makefile src/libs/zbxsysinfo/simple/Makefile src/libs/zbxsysinfo/linux/Makefile src/libs/zbxsysinfo/aix/Makefile src/libs/zbxsysinfo/freebsd/Makefile src/libs/zbxsysinfo/hpux/Makefile src/libs/zbxsysinfo/openbsd/Makefile src/libs/zbxsysinfo/osx/Makefile src/libs/zbxsysinfo/solaris/Makefile src/libs/zbxsysinfo/osf/Makefile src/libs/zbxsysinfo/netbsd/Makefile src/libs/zbxsysinfo/unknown/Makefile src/libs/zbxnix/Makefile src/libs/zbxsys/Makefile src/libs/zbxcomms/Makefile src/libs/zbxcommshigh/Makefile src/libs/zbxdb/Makefile src/libs/zbxdbupgrade/Makefile src/libs/zbxjson/Makefile src/libs/zbxhttp/Makefile src/libs/zbxserver/Makefile src/libs/zbxicmpping/Makefile src/libs/zbxexec/Makefile src/libs/zbxself/Makefile src/libs/zbxmodules/Makefile src/libs/zbxregexp/Makefile src/libs/zbxtasks/Makefile src/libs/zbxipcservice/Makefile src/libs/zbxhistory/Makefile src/libs/zbxcompress/Makefile src/zabbix_agent/Makefile src/zabbix_get/Makefile src/zabbix_sender/Makefile src/zabbix_server/Makefile src/zabbix_server/alerter/Makefile src/zabbix_server/dbsyncer/Makefile src/zabbix_server/dbconfig/Makefile src/zabbix_server/discoverer/Makefile src/zabbix_server/housekeeper/Makefile src/zabbix_server/httppoller/Makefile src/zabbix_server/pinger/Makefile src/zabbix_server/poller/Makefile src/zabbix_server/snmptrapper/Makefile src/zabbix_server/timer/Makefile src/zabbix_server/trapper/Makefile src/zabbix_server/escalator/Makefile src/zabbix_server/proxypoller/Makefile src/zabbix_server/selfmon/Makefile src/zabbix_server/vmware/Makefile src/zabbix_server/taskmanager/Makefile src/zabbix_server/ipmi/Makefile src/zabbix_server/odbc/Makefile src/zabbix_server/scripts/Makefile src/zabbix_server/preprocessor/Makefile src/zabbix_proxy/Makefile src/zabbix_proxy/heart/Makefile src/zabbix_proxy/housekeeper/Makefile src/zabbix_proxy/proxyconfig/Makefile src/zabbix_proxy/datasender/Makefile src/zabbix_proxy/taskmanager/Makefile src/zabbix_java/Makefile man/Makefile"
@@ -13633,22 +13603,6 @@ do
   case $ac_config_target in
     "include/config.h") CONFIG_HEADERS="$CONFIG_HEADERS include/config.h" ;;
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
-    "tests/Makefile") CONFIG_FILES="$CONFIG_FILES tests/Makefile" ;;
-    "tests/libs/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/Makefile" ;;
-    "tests/libs/zbxcommon/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxcommon/Makefile" ;;
-    "tests/libs/zbxconf/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxconf/Makefile" ;;
-    "tests/libs/zbxdbcache/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxdbcache/Makefile" ;;
-    "tests/libs/zbxdbhigh/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxdbhigh/Makefile" ;;
-    "tests/libs/zbxhistory/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxhistory/Makefile" ;;
-    "tests/libs/zbxjson/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxjson/Makefile" ;;
-    "tests/libs/zbxsysinfo/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxsysinfo/Makefile" ;;
-    "tests/libs/zbxsysinfo/linux/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxsysinfo/linux/Makefile" ;;
-    "tests/libs/zbxsysinfo/common/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxsysinfo/common/Makefile" ;;
-    "tests/libs/zbxcommshigh/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxcommshigh/Makefile" ;;
-    "tests/libs/zbxalgo/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxalgo/Makefile" ;;
-    "tests/zabbix_server/Makefile") CONFIG_FILES="$CONFIG_FILES tests/zabbix_server/Makefile" ;;
-    "tests/zabbix_server/preprocessor/Makefile") CONFIG_FILES="$CONFIG_FILES tests/zabbix_server/preprocessor/Makefile" ;;
-    "tests/libs/zbxcomms/Makefile") CONFIG_FILES="$CONFIG_FILES tests/libs/zbxcomms/Makefile" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "database/Makefile") CONFIG_FILES="$CONFIG_FILES database/Makefile" ;;
     "database/ibm_db2/Makefile") CONFIG_FILES="$CONFIG_FILES database/ibm_db2/Makefile" ;;

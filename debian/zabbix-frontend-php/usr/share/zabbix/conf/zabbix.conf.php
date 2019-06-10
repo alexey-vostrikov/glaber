@@ -1,0 +1,1 @@
+/etc/zabbix/web/zabbix.conf.php
