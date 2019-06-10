@@ -24,7 +24,6 @@ debian:
 
   only:
     - tags
-    - master
 
   artifacts:
     paths:
