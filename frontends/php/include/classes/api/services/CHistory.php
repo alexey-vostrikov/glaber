@@ -228,7 +228,7 @@ class CHistory extends CApiService {
 	 * @see CHistory::get
 	 */
 	private function getFromClickHouse($options) {
-i		global $HISTORY, $ClickHouseDisableNanoseconds;
+		global $HISTORY, $ClickHouseDisableNanoseconds;
 		$result = [];
 		$sql_parts = [
 			'select'	=> ['history' => 'h.itemid'],
