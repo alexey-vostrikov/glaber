@@ -473,12 +473,13 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 	struct addrinfo	*ai_bind = NULL;
 	char		service[8], *error = NULL;
 	void		(*func_socket_close)(zbx_socket_t *s);
-	
+	int socktype = 0;
+
 	if ( 0 == timeout ) {
 		//assuming async operations when no timeout is set
-		type = type | SOCK_NONBLOCK;
+		socktype = SOCK_NONBLOCK;
 	}
-
+	
 	if (SOCK_DGRAM == type && (ZBX_TCP_SEC_TLS_CERT == tls_connect || ZBX_TCP_SEC_TLS_PSK == tls_connect))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -498,7 +499,6 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 	}
 #endif
 	zbx_socket_clean(s);
-
 	zbx_snprintf(service, sizeof(service), "%hu", port);
 	memset(&hints, 0x00, sizeof(struct addrinfo));
 	hints.ai_family = PF_UNSPEC;
@@ -509,8 +509,8 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 		zbx_set_socket_strerror("cannot resolve [%s]", ip);
 		goto out;
 	}
-
-	if (ZBX_SOCKET_ERROR == (s->socket = socket(ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol)))
+	
+	if (ZBX_SOCKET_ERROR == (s->socket = socket(ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC | type | socktype , ai->ai_protocol)))
 	{
 		zbx_set_socket_strerror("cannot create socket [[%s]:%hu]: %s",
 				ip, port, strerror_from_system(zbx_socket_last_error()));
