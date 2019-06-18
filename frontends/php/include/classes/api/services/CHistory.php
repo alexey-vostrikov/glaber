@@ -251,7 +251,7 @@ class CHistory extends CApiService {
 		}
 
 
-		$table_name = $HISTORY['tablename'];
+		$table_name = $HISTORY['dbname'].'.history';
 
 		$sql_parts['from']['history'] = $table_name.' h';
 
