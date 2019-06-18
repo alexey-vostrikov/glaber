@@ -90,7 +90,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		    .'argMax(value, toInt32(clock)) AS val, 
 		    argMax(value_dbl, toInt32(clock)) AS val_dbl, 
 		    argMax(value_str, toInt32(clock)) AS val_str' .
-	' FROM '.$HISTORY['tablename'].' h'.
+	' FROM '.$HISTORY['dbname'].'.history h'.
 	' WHERE h.itemid in ( '.$itemslist.')'.
 	($period ? ' AND h.clock>'.(time() - $period) : '').
 	' GROUP BY itemid';
@@ -112,109 +112,8 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		    }
 	}
 
-//	foreach ($items as $item) {
-//	    if ( !empty($results[$item['itemid']])) {
-//	    	if ($item['value_type'] ==  ITEM_VALUE_TYPE_FLOAT && !empty($results[$item['itemid']]['value_dbl'])) {
-//		    $results[$item['itemid']]['value']=$results[$item['itemid']]['value_dbl'];
-//	        }
-//		if ($item['value_type'] ==  ITEM_VALUE_TYPE_STR) {
-//		    $results[$item['itemid']]['value']=$results[$item['itemid']]['value_str'];
-//		}
-//	    }
-//	    
-//	}
-
 	return $results;
 
-//	foreach ($items as $item) {
-//	    if ($item['value_type'] ==  ITEM_VALUE_TYPE_FLOAT) {
-//    		if (strlen($float_itemslist)>0) {
-//		        $float_itemslist.=','.$item['itemid'];
-//    		} else {
-//		    $float_itemslist.=$item['itemid'];
-//		}
-//	    } else if ($item['value_type'] ==  ITEM_VALUE_TYPE_UINT64) {
-//		if (strlen($uint_itemslist)>0) {
-//		        $uint_itemslist.=','.$item['itemid'];
-//    		} else {
-//		    $uint_itemslist.=$item['itemid'];
-//		}
-//	    } else {
-//		if (strlen($str_itemslist)>0) {
-//		        $str_itemslist.=','.$item['itemid'];
-//    		} else {
-//		    $str_itemslist.=$item['itemid'];
-//		}
-//	    }
-//	}
-
-//	var_dump($itemslist);
-	
-//	$query_text='SELECT itemid, toInt32(clock) as clk,ns,value,value_dbl,value_str as value'.
-//	' FROM '.$HISTORY['tablename'].' h'.
-//	' WHERE h.itemid in ( '.$itemslist.')'.
-//	($period ? ' AND h.clock>'.(time() - $period) : '').
-//	' ORDER BY clk DESC';
-
-
-//	$query_text.=' UNION ALL SELECT itemid, toInt32(clock) as clk,ns,value as value'.
-//	' FROM '.$HISTORY['tablename'].' h'.
-//	' WHERE h.itemid in ( '.$uint_itemslist.')'.
-//	($period ? ' AND h.clock>'.(time() - $period) : '').
-//	' ORDER BY clk DESC';
-//
-//	$query_text.=' UNION ALL SELECT itemid, toInt32(clock) as clk,ns,value_str as value'.
-//	' FROM '.$HISTORY['tablename'].' h'.
-//	' WHERE h.itemid in ( '.$str_itemslist.')'.
-//	($period ? ' AND h.clock>'.(time() - $period) : '').
-//	' ORDER BY clk DESC';
-
-//	var_dump($query_text);
-    
-//        $values = CClickHouseHelper::query($query_text,1,array('itemid','clock','ns','value','value_dbl','value_str'));
-
-//var_dump($values);
-
-/*
-	foreach ($items as $item) {
-	    if ($item['value_type'] ==  ITEM_VALUE_TYPE_FLOAT) {
-		$query_text=	'SELECT itemid, toInt32(clock),ns,value_dbl'.
-		    ' FROM '.$HISTORY['tablename'].' h'.
-		    ' WHERE h.itemid= '.$item['itemid'].
-		    ($period ? ' AND h.clock>'.(time() - $period) : '').
-		    ' ORDER BY h.clock DESC';
-	    }
-
-	    if ($item['value_type'] ==  ITEM_VALUE_TYPE_UINT64) {
-		$query_text=	'SELECT itemid, toInt32(clock) as clock,ns,value'.
-		    ' FROM '.$HISTORY['tablename'].' h'.
-		    ' WHERE h.itemid= '.$item['itemid']. 
-		    ($period ? ' AND h.clock>'.(time() - $period) : '').
-		    ' ORDER BY h.clock DESC';
-	    }
-
-	    if ($item['value_type'] ==  ITEM_VALUE_TYPE_STR || $item['value_type'] ==  ITEM_VALUE_TYPE_TEXT ) {
-		$query_text=	'SELECT itemid, toInt32(clock) as clock,ns,value_str'.
-		    ' FROM '.$HISTORY['tablename'].' h'.
-		    ' WHERE h.itemid= '.$item['itemid']. 
-		    ($period ? ' AND h.clock>'.(time() - $period) : '').
-		    ' ORDER BY h.clock DESC';
-	    }
-
-	    if ($limit > 0) $query_text.=" LIMIT $limit";
-	    
-	    $values = CClickHouseHelper::query($query_text,1,array('itemid','clock','ns','value'));
-
-//	    var_dump($values);
-	    if ($values) {
-		$results[$item['itemid']] = $values;
-	    } else {
-//			    error("Got empty array, ommiting the result");
-	    }
-	}
-
-	return $results;
-*/
     }
 
 	private function getLastValuesFromElasticsearch($items, $limit, $period) {
@@ -626,7 +525,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 			
 			$query_text = 
 				'SELECT itemid,'.$sql_select.$sql_select_extra.',MAX(toUInt32(clock)) AS clock1'.
-				' FROM '. $HISTORY['tablename'] .
+				' FROM '. $HISTORY['dbname'] . '.history'
 				' WHERE itemid='.$item['itemid'].
 					' AND day >= \''.$daystart. '\''.
 					' AND day <= \''. $dayend. '\''.	 
@@ -889,7 +788,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		global $HISTORY;
 		$query_text =
 			'SELECT '.$aggregation.'(value) AS value'.
-			' FROM '. $HISTORY['tablename'].
+			' FROM '. $HISTORY['dbname']. '.history '
 			' WHERE clock>toDateTime('.$time_from.')'.
 			' AND itemid='.$item['itemid'].
 			' HAVING COUNT(*)>0';

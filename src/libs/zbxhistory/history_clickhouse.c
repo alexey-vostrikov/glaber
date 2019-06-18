@@ -35,7 +35,7 @@ int	zbx_vc_simple_add(zbx_uint64_t itemids, zbx_history_record_t *record);
 
 extern char	*CONFIG_HISTORY_STORAGE_URL;
 extern int	CONFIG_HISTORY_STORAGE_PIPELINES;
-extern char *CONFIG_HISTORY_STORAGE_TABLE_NAME;
+extern char *CONFIG_HISTORY_STORAGE_DB_NAME;
 extern int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME;
 extern int CONFIG_CLICKHOUSE_DISABLE_NS_VALUE;
 extern char *CONFIG_CLICKHOUSE_USERNAME;
@@ -218,8 +218,8 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",ns");
 	}
 	
-	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, " FROM %s WHERE itemid=%ld ",
-		CONFIG_HISTORY_STORAGE_TABLE_NAME,itemid);
+	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, " FROM %s.history WHERE itemid=%ld ",
+		CONFIG_HISTORY_STORAGE_DB_NAME,itemid);
 
 	if (1 == end-start) {
 		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, "AND clock = %d ", end);
@@ -374,7 +374,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
     
-	zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,"INSERT INTO %s (day,itemid,clock,value,value_dbl,value_str", CONFIG_HISTORY_STORAGE_TABLE_NAME);
+	zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,"INSERT INTO %s.history (day,itemid,clock,value,value_dbl,value_str", CONFIG_HISTORY_STORAGE_DB_NAME);
 
 	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE ) {
 		zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",ns");
@@ -567,8 +567,8 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 		zabbix_log(LOG_LEVEL_DEBUG,"Got %ld items for the type",items);
 
 		if ( items > 0 ) {
-			zbx_snprintf_alloc(&query,&q_len,&q_offset,"SELECT itemid, clock, value, value_dbl, value_str FROM %s WHERE (itemid IN  (",
-			CONFIG_HISTORY_STORAGE_TABLE_NAME);
+			zbx_snprintf_alloc(&query,&q_len,&q_offset,"SELECT itemid, clock, value, value_dbl, value_str FROM %s.history WHERE (itemid IN  (",
+			CONFIG_HISTORY_STORAGE_DB_NAME);
 			
 			zbx_snprintf_alloc(&query,&q_len,&q_offset,"%ld",vector_itemids.values[0]);
 			
