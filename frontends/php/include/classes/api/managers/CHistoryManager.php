@@ -102,14 +102,16 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		$itemid=$res['itemid'];
 
 		//i know this is shit code, but it works much better then 
-		//checking for item type for some reason (see it celow)
+		//checking for item type for some reason (see it below)
 		$res['value']=floatval($res['value_dbl'])+intval($res['value']);		
-		if (strlen($res['value_str']>0)) $res['value']=$res['value_str'];
+				
+		$is_str = (strlen($res['value_str'])>0);
+		if ($is_str) $res['value']=$res['value_str'];
 
 		if (empty($results[$itemid])) 
-		    {
+		{
 			$results[$itemid]=[$res];
-		    }
+		}
 	}
 
 	return $results;
