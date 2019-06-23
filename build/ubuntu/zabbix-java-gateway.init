@@ -1,0 +1,67 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          zabbix-java-gateway
+# Required-Start:    $remote_fs $network 
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start zabbix-java-gateway daemon
+### END INIT INFO
+
+set -e
+
+NAME=zabbix_java_gateway
+DAEMON=/usr/sbin/zabbix_java_gateway
+DESC="Zabbix java gateway"
+RETRY=15
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+
+if [ `id -u` -ne 0 ]; then
+        echo "You need root privileges to run this script"
+        exit 1
+fi
+
+# define LSB log_* functions.
+. /lib/lsb/init-functions
+
+# Source Zabbix java gateway configuration file
+. /etc/zabbix/zabbix_java_gateway.conf
+
+if [ -r "/etc/default/zabbix-java-gateway" ]; then
+    . /etc/default/zabbix-java-gateway
+fi
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $DESC" "$NAME"
+
+    start-stop-daemon --start -b -u zabbix -g zabbix -c zabbix  --exec $DAEMON
+
+    case "$?" in
+        0) log_end_msg 0 ;;
+        *) log_end_msg 1; exit 1 ;;
+    esac
+    ;;
+  stop)
+    log_daemon_msg "Stopping $DESC" "$NAME"
+    start-stop-daemon --oknodo --stop --pidfile $PID_FILE --retry $RETRY
+    case "$?" in
+        0) log_end_msg 0 ;;
+        *) log_end_msg 1; exit 1 ;;
+    esac
+    ;;
+  status)
+    status_of_proc -p "$PID_FILE" "$DAEMON" "$NAME" && exit 0 || exit $?
+    ;;
+  restart|force-reload)
+    $0 stop
+    $0 start
+    ;;
+  *)
+    echo "Usage: /etc/init.d/$NAME {start|stop|restart|force-reload}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

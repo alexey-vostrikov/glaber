@@ -1,0 +1,100 @@
+#!/usr/bin/make -f
+
+PACKAGES	= PGSQL MYSQL SQLITE3
+MYSQL_NAME	= mysql
+PGSQL_NAME	= postgresql
+SQLITE3_NAME	= sqlite3
+
+COMMON_CONFIG =	--host=$(DEB_HOST_GNU_TYPE) \
+				--build=$(DEB_BUILD_GNU_TYPE) \
+				--prefix=/usr \
+				--sysconfdir=/etc/zabbix \
+				--libdir=/usr/lib/zabbix \
+				--enable-agent \
+				--enable-ipv6 \
+				--enable-java \
+				--with-jabber \
+				--with-ldap \
+				--with-net-snmp \
+				--with-openipmi \
+				--with-ssh2 \
+				--with-libcurl \
+				--with-unixodbc \
+				--with-libxml2 \
+				--with-openssl \
+				--with-libevent \
+				--with-libpcre
+
+# unless build for sqlite
+PGSQL_CONFIG = $(COMMON_CONFIG) --enable-server
+MYSQL_CONFIG = $(COMMON_CONFIG) --enable-server
+SQLITE3_CONFIG = $(COMMON_CONFIG)
+
+%:
+	dh $@  --with autotools-dev
+
+override_dh_clean:
+	dh_clean
+	rm -f debian/conf/zabbix_agentd.conf
+	rm -f debian/conf/zabbix_server.conf
+	rm -f debian/conf/zabbix_java_gateway.conf
+	rm -f debian/conf/zabbix_java_gateway_logback.xml
+	rm -f database/*/create.sql
+
+override_dh_auto_configure:
+	$(foreach pkg, $(PACKAGES), \
+		mkdir -p $(CURDIR)/debian/tmp.build-$(pkg) ; \
+		tar -cSf - --exclude=./bin --exclude=./build --exclude=./frontends --exclude=./debian . \
+		| tar -xSpf - -C $(CURDIR)/debian/tmp.build-$(pkg) ; \
+		cat $(CURDIR)/database/$($(pkg)_NAME)/schema.sql > $(CURDIR)/database/$($(pkg)_NAME)/create.sql ; \
+		cat $(CURDIR)/database/$($(pkg)_NAME)/images.sql >> $(CURDIR)/database/$($(pkg)_NAME)/create.sql ; \
+		cat $(CURDIR)/database/$($(pkg)_NAME)/data.sql >> $(CURDIR)/database/$($(pkg)_NAME)/create.sql ; \
+		dh_auto_configure --sourcedirectory=$(CURDIR)/debian/tmp.build-$(pkg) -- $($(pkg)_CONFIG) --with-$($(pkg)_NAME) ; \
+	)
+
+override_dh_auto_build:
+	$(foreach pkg, $(PACKAGES), \
+		dh_auto_build --sourcedirectory=$(CURDIR)/debian/tmp.build-$(pkg) ; \
+	)
+	cat conf/zabbix_agentd.conf | sed \
+		-e '/^# PidFile=/a \\nPidFile=/var/run/zabbix/zabbix_agentd.pid' \
+		-e 's|^LogFile=.*|LogFile=/var/log/zabbix/zabbix_agentd.log|g' \
+		-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
+		-e '/^# Include=$$/a \\nInclude=/etc/zabbix/zabbix_agentd.d/*.conf' \
+		> debian/conf/zabbix_agentd.conf
+	cat conf/zabbix_server.conf |sed \
+		-e '/^# PidFile=/a \\nPidFile=/var/run/zabbix/zabbix_server.pid' \
+		-e 's|^LogFile=.*|LogFile=/var/log/zabbix/zabbix_server.log|g' \
+		-e '/^# LogFileSize=/a \\nLogFileSize=0' \
+		-e '/^# AlertScriptsPath=/a \\nAlertScriptsPath=/usr/lib/zabbix/alertscripts' \
+		-e '/^# ExternalScripts=/a \\nExternalScripts=/usr/lib/zabbix/externalscripts' \
+		-e '/^# FpingLocation=/a \\nFpingLocation=/usr/bin/fping' \
+		-e '/^# Fping6Location=/a \\nFping6Location=/usr/bin/fping6' \
+		-e 's|^DBUser=root|DBUser=zabbix|g' \
+		-e '/^# SNMPTrapperFile=.*/a \\nSNMPTrapperFile=/var/log/snmptrap/snmptrap.log' \
+		-e '/^# SocketDir=/a \\nSocketDir=/var/run/zabbix' \
+		> debian/conf/zabbix_server.conf
+	cat src/zabbix_java/settings.sh | sed \
+		-e 's|^PID_FILE=.*|PID_FILE="/var/run/zabbix/zabbix_java_gateway.pid"|g' \
+		> debian/conf/zabbix_java_gateway.conf
+	cat src/zabbix_java/lib/logback.xml | sed \
+		-e 's|/tmp/zabbix_java.log|/var/log/zabbix/zabbix_java_gateway.log|g' \
+		> debian/conf/zabbix_java_gateway_logback.xml
+
+override_dh_install:
+	dh_install
+	rm debian/zabbix-java-gateway/usr/share/zabbix-java-gateway/lib/logback.xml
+	rm debian/zabbix-java-gateway/usr/share/zabbix-java-gateway/lib/logback-console.xml
+	chmod 755 debian/zabbix-java-gateway/usr/sbin/zabbix_java_gateway
+	find debian/zabbix-frontend-php/usr/share/zabbix -name .htaccess | xargs rm -f
+	find debian/zabbix-frontend-php/usr/share/zabbix/locale -name '*.po' | xargs rm -f
+	find debian/zabbix-frontend-php/usr/share/zabbix/locale -name '*.sh' | xargs rm -f
+	rm debian/zabbix-frontend-php/usr/share/zabbix/assets/fonts/DejaVuSans.ttf
+	sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
+		debian/zabbix-frontend-php/usr/share/zabbix/include/defines.inc.php
+
+override_dh_installinit:
+	dh_installinit -p zabbix-agent
+	dh_installinit -p zabbix-java-gateway
+	dh_installinit --no-start -p zabbix-server-mysql --name=zabbix-server
+	dh_installinit --no-start -p zabbix-server-pgsql --name=zabbix-server

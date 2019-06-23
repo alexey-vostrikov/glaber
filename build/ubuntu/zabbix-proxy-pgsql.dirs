@@ -1,0 +1,7 @@
+etc/zabbix
+usr/sbin
+usr/lib/zabbix
+usr/lib/zabbix/externalscripts
+var/log/zabbix
+usr/share/doc/zabbix-proxy-pgsql
+

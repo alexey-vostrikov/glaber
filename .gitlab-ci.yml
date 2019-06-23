@@ -1,31 +1,83 @@
-image: debian:stretch
-
-stages:
-  - build
-
 debian:
   stage: build
+  image: debian:stretch
   script:
     - apt-get update
     - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
     - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
     - git config --global user.email 'dmytro@ovdii.com'
     - git config --global user.name '[BOT] Package Builder'
-    #- git config --global http.sslverify "false"
+    - cp -r build/debian debian
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - rm -rf ./debian/tmp*
+    - rm -rf ./debian/
     - git stash -u
+    - git checkout master
+    - git pull
     - mv ../*.deb releases/debian/
     - git add -A
     - git commit -m "committing debian packages"
-    - echo $CI_COMMIT_REF_NAME
-    - git push origin HEAD:$CI_COMMIT_REF_NAME
+    - git push origin HEAD:master
 
   only:
     - tags
 
-  artifacts:
-    paths:
-      - releases/debian/*
-    expire_in: 1m
+ubuntu:
+  stage: build
+  image: ubuntu:xenial
+  script:
+    - apt-get update
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
+    - cp -r build/ubuntu debian
+    - autoreconf -fvi
+    - dpkg-buildpackage -b
+    - rm -rf ./debian/
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv ../*.deb releases/ubuntu/
+    - git add -A
+    - git commit -m "committing ubuntu packages"
+    - git push origin HEAD:master
+
+  only:
+    - tags
+
+centos:
+  stage: build
+  image: centos:7
+  script:
+    - yum install -y rpm-build yum-utils xz wget git
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
+    - yum groupinstall "Development Tools" -y
+    - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/fping-3.10-1.el7.x86_64.rpm
+    - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/iksemel-1.4-2.el7.centos.x86_64.rpm
+    - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/iksemel-devel-1.4-2.el7.centos.x86_64.rpm
+    - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/iksemel-utils-1.4-2.el7.centos.x86_64.rpm
+    - wget http://springdale.math.ias.edu/data/puias/computational/7/x86_64/automake115-1.15-9.sdl7.noarch.rpm
+    - yum install -y *.rpm
+    - rm -rf *.rpm
+    - cd ..
+    - cp -R glaber zabbix-4.0.8      
+    - tar -czvf zabbix-4.0.8.tar.gz zabbix-4.0.8       
+    - mv zabbix-4.0.8.tar.gz glaber/build/centos/SOURCES/zabbix-4.0.8.tar.gz
+    - cd glaber/build/centos
+    - yum-builddep -y SPECS/zabbix.spec
+    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES"
+    - rm SOURCES/zabbix-4.0.8.tar.gz
+    - cd ../../
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv /root/rpmbuild/RPMS/* releases/centos
+    - git add -A
+    - git commit -m "committing centos packages"
+    - git push origin HEAD:master
+
+  only:
+    - tags
