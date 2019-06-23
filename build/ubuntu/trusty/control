@@ -1,0 +1,120 @@
+Source: zabbix
+Section: net
+Priority: optional
+Maintainer: Zabbix Packager <info@zabbix.com>
+Build-Depends: debhelper (>= 9),
+               autotools-dev,
+               quilt (>= 0.40) | devscripts (>= 2.17.12),
+               pkg-config,
+               libsnmp-dev,
+               libmysqlclient-dev | default-libmysqlclient-dev,
+               libpq-dev,
+               libsqlite3-dev,
+               libcurl4-openssl-dev,
+               libldap2-dev,
+               libiksemel-dev,
+               libopenipmi-dev,
+               libssh2-1-dev (>= 1.0.0),
+               unixodbc-dev,
+               java-sdk,
+               libxml2-dev,
+               libpcre3-dev,
+               libevent-dev,
+               libssl-dev
+Standards-Version: 3.9.5
+Homepage: http://www.zabbix.com
+
+
+Package: zabbix-agent
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, adduser, lsb-base
+Suggests: logrotate
+Description: Zabbix network monitoring solution - agent
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to monitor a host using a
+ Zabbix agent.
+
+
+Package: zabbix-get
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Zabbix network monitoring solution - get
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the command line utility needed to get data from agent.
+
+
+Package: zabbix-sender
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Zabbix network monitoring solution - sender
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the command line utility needed to send data to
+ Zabbix server or Zabix proxy.
+
+
+Package: zabbix-server-mysql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client, fping, adduser, lsb-base
+Pre-Depends: debconf
+Recommends: virtual-mysql-server, snmpd
+Suggests: zabbix-frontend-php, logrotate
+Conflicts: zabbix-server-pgsql
+Description: Zabbix network monitoring solution - server (MySQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ client. It collects information from Zabbix clients and stores it in a
+ MySQL database.
+
+
+Package: zabbix-server-pgsql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
+Pre-Depends: debconf
+Recommends: postgresql (>= 8.1), snmpd
+Suggests: zabbix-frontend-php, logrotate, postgresql-client
+Conflicts: zabbix-server-mysql
+Description: Zabbix network monitoring solution - server (PostgreSQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ client. It collects information from Zabbix clients and stores it in a
+ PostgreSQL database.
+
+
+Package: zabbix-frontend-php
+Architecture: all
+Depends: ${misc:Depends},
+ apache2 | httpd, php5 | libapache2-mod-php | php, php5-mysql | php5-mysqlnd | php-mysql | php5-pgsql | php-pgsql, php5-gd | php-gd, php5-ldap | php-ldap, ttf-dejavu-core | ttf-japanese-gothic
+Description: Zabbix network monitoring solution - PHP front-end
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides a web-browsable front-end to the Zabbix server, which
+ can display graphs of the data collected from clients.
+
+
+Package: zabbix-java-gateway
+Architecture: all
+Depends: ${misc:Depends}, adduser, lsb-base, default-jre-headless
+Description: Zabbix network monitoring solution - java-gateway
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to monitor a Java application
+ using a Zabbix Java gateway. It collects information from JMX agent.
