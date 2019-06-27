@@ -107,7 +107,7 @@ class CBrandHelper {
 		$footer = self::getValue(
 			'BRAND_FOOTER',
 			[
-				$with_version ? 'Zabbix '.ZABBIX_VERSION.'. ' : null,
+				$with_version ? 'Glaber version '.GLABER_VERSION.' based on Zabbix '.ZABBIX_VERSION.'. ' : null,
 				'&copy; '.ZABBIX_COPYRIGHT_FROM.'&ndash;'.ZABBIX_COPYRIGHT_TO.', ',
 				(new CLink('Zabbix SIA', 'http://www.zabbix.com/'))
 					->addClass(ZBX_STYLE_GREY)

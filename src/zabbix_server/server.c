@@ -627,16 +627,16 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"ClickHouseDisableNanoseconds",		&CONFIG_CLICKHOUSE_DISABLE_NS_VALUE,		TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"HistoryStorageType",		&CONFIG_HISTORY_STORAGE_TYPE,		TYPE_STRING,
-			PARM_OPT,	1,			0},
-		{"HistoryStorageTableName",		&CONFIG_HISTORY_STORAGE_DB_NAME,		TYPE_STRING,
-			PARM_OPT,	1,			0},
+			PARM_OPT,	0,			0},
+		{"HistoryStorageDBName",		&CONFIG_HISTORY_STORAGE_DB_NAME,		TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"ClickHouseDisableNanoseconds",		&CONFIG_CLICKHOUSE_DISABLE_NS_VALUE,		TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"ClickHouseUsername",		&CONFIG_CLICKHOUSE_USERNAME,		TYPE_STRING,
-			PARM_OPT,	1,			0},
+			PARM_OPT,	0,			0},
 		{"ClickHousePassword",		&CONFIG_CLICKHOUSE_PASSWORD,		TYPE_STRING,
-			PARM_OPT,	1,			0},
-		{"ClickHouseCacheFillTime",		&CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"ClickHouseCacheFillTime",		&CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME,		TYPE_INT	,
 			PARM_OPT,	0,			365*3600*24},
 		{"StartDBSyncers",		&CONFIG_HISTSYNCER_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			100},
@@ -818,6 +818,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_validate_config();
 #endif
+
 }
 
 /******************************************************************************
@@ -964,7 +965,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	if (0 != (flags & ZBX_TASK_FLAG_FOREGROUND))
 	{
-		printf("Starting Zabbix Server. Zabbix %s (revision %s).\nPress Ctrl+C to exit.\n\n",
+		printf("Starting Glaber Server. Version %s, based on Zabbix %s (revision %s).\nPress Ctrl+C to exit.\n\n", GLABER_VERSION,
 				ZABBIX_VERSION, ZABBIX_REVISION);
 	}
 
@@ -1033,8 +1034,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 #	define TLS_FEATURE_STATUS	" NO"
 #endif
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "Starting Zabbix Server. Zabbix %s (revision %s).",
-			ZABBIX_VERSION, ZABBIX_REVISION);
+	zabbix_log(LOG_LEVEL_INFORMATION, "Starting Glaber Server %s. Based on Zabbix %s (revision %s).",
+			GLABER_VERSION, ZABBIX_VERSION, ZABBIX_REVISION);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "****** Enabled features ******");
 	zabbix_log(LOG_LEVEL_INFORMATION, "SNMP monitoring:           " SNMP_FEATURE_STATUS);
@@ -1043,7 +1044,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zabbix_log(LOG_LEVEL_INFORMATION, "VMware monitoring:         " VMWARE_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "SMTP authentication:       " SMTP_AUTH_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "Jabber notifications:      " JABBER_FEATURE_STATUS);
-	zabbix_log(LOG_LEVEL_INFORMATION, "CURL support:		" LIBCURL_FEATURE_STATUS);
+	zabbix_log(LOG_LEVEL_INFORMATION, "CURL support:			  " LIBCURL_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "ODBC:                      " ODBC_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "SSH2 support:              " SSH2_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "IPv6 support:              " IPV6_FEATURE_STATUS);

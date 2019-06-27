@@ -102,14 +102,16 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		$itemid=$res['itemid'];
 
 		//i know this is shit code, but it works much better then 
-		//checking for item type for some reason (see it celow)
+		//checking for item type for some reason (see it below)
 		$res['value']=floatval($res['value_dbl'])+intval($res['value']);		
-		if (strlen($res['value_str']>0)) $res['value']=$res['value_str'];
+				
+		$is_str = (strlen($res['value_str'])>0);
+		if ($is_str) $res['value']=$res['value_str'];
 
 		if (empty($results[$itemid])) 
-		    {
+		{
 			$results[$itemid]=[$res];
-		    }
+		}
 	}
 
 	return $results;
@@ -458,7 +460,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	 * @return array    history value aggregation for graphs
 	 */
 	public function getGraphAggregation(array $items, $time_from, $time_to, $width = null) {
-//		error("Hello wold");
+
 		if ($width !== null) {
 			$size = $time_to - $time_from;
 			$delta = $size - $time_from % $size;
@@ -514,31 +516,45 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		$results = [];
 
 		foreach ($items as $item) {
-			if ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) {
-				$sql_select = 'COUNT(*) AS count,AVG(value) AS avg,MIN(value) AS min,MAX(value) AS max';
-			} else
-			{
-				$sql_select = 'COUNT(*) AS count,AVG(value_dbl) AS avg,MIN(value_dbl) AS min,MAX(value_dbl) AS max';
+				
+			if ($item['source'] === 'history') {
+			
+				if ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) {
+					$sql_select = 'COUNT(*) AS count,AVG(value) AS avg,MIN(value) AS min,MAX(value) AS max';
+				} else
+				{
+					$sql_select = 'COUNT(*) AS count,AVG(value_dbl) AS avg,MIN(value_dbl) AS min,MAX(value_dbl) AS max';
+				}
+			
+				$sql_from = 'history';
+				
+				$daystart=date('Y-m-d',$time_from);
+				$dayend=date('Y-m-d',$time_to);
+				
+				
+				$sql_day_condition = ' AND day >= \''.$daystart. '\''.
+							  		 ' AND day <= \''. $dayend. '\'';	 
+				
+				$results[$item['itemid']]['source'] = 'history';
 			}
-			$daystart=date('Y-m-d',$time_from);
-			$dayend=date('Y-m-d',$time_to);
+			else {
+				$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
+				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
+				$sql_day_condition='';
+				$results[$item['itemid']]['source'] = 'trends';
+			}
 			
 			$query_text = 
 				'SELECT itemid,'.$sql_select.$sql_select_extra.',MAX(toUInt32(clock)) AS clock1'.
-				' FROM '. $HISTORY['dbname'] . '.history'
+				' FROM '. $HISTORY['dbname'] . '.' . $sql_from .
 				' WHERE itemid='.$item['itemid'].
-					' AND day >= \''.$daystart. '\''.
-					' AND day <= \''. $dayend. '\''.	 
-					' AND toUInt32(clock)>='.$time_from.
-					' AND toUInt32(clock)<='.$time_to.
+					$sql_day_condition .
 				' GROUP BY '.$group_by ;
 
-//			file_put_contents('/var/log/nginx/chartlog.log', "Will do query '$new_query_text' \n",FILE_APPEND);
-
+//			file_put_contents('/var/log/nginx/chartlog.log', "Fetching $query_text from  ".$item['source']."\n",FILE_APPEND);
 
 			$values = CClickHouseHelper::query($query_text,1,array('itemid','count','avg','min','max','i','clock'));
 
-			$results[$item['itemid']]['source'] = 'history';
 			$results[$item['itemid']]['data'] = $values;
 		}
 
@@ -788,7 +804,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		global $HISTORY;
 		$query_text =
 			'SELECT '.$aggregation.'(value) AS value'.
-			' FROM '. $HISTORY['dbname']. '.history '
+			' FROM '. $HISTORY['dbname']. '.history '.
 			' WHERE clock>toDateTime('.$time_from.')'.
 			' AND itemid='.$item['itemid'].
 			' HAVING COUNT(*)>0';

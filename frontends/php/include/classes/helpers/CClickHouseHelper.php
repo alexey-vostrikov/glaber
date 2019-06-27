@@ -17,10 +17,16 @@ class CClickHouseHelper {
 	public static function query($request,$is_table_result,$columns) {
 		
 		global $HISTORY;
-//		error("CClikHouseHelper.query($request) ");
+//		error("$request ");
 		$ch = curl_init();
 
-		curl_setopt($ch, CURLOPT_URL,$HISTORY['url']);
+		if (isset($HISTORY['username']) && isset($HISTORY['password'])) {
+			$url = $HISTORY['url'] . '?user=' . $HISTORY['username'] . '&password=' . $HISTORY['password'];
+		} else {
+			$url=$HISTORY['url'];
+		}
+
+		curl_setopt($ch, CURLOPT_URL,$url);
 		curl_setopt($ch, CURLOPT_POST, 1);
 		curl_setopt($ch, CURLOPT_POSTFIELDS,$request);
 
