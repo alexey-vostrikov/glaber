@@ -259,7 +259,7 @@ class CLineGraphDraw extends CGraphDraw {
 
 			global $HISTORY;
 
-			if ($HISTORY['storagetype'] == 'clickhouse' && isset($HISTORY['disabletrends'])) {
+			if ($HISTORY['storagetype'] == 'clickhouse' && !isset($HISTORY['disabletrends'])) {
 				$item['trends']=1;
 			}
 			
