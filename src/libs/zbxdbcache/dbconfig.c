@@ -12775,6 +12775,7 @@ int zbx_dc_create_rerouted_json(struct zbx_json *j, zbx_uint64_t serverid) {
 
 	UNLOCK_CACHE;
 }
+
 int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp) {
 	const char *p = NULL;
 	int ret=SUCCEED;
