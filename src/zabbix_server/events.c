@@ -1722,11 +1722,8 @@ void	zbx_export_events(void)
 		if (SUCCEED == zbx_is_export_enabled())
 			zbx_problems_export_write(json.buffer, json.buffer_size);
 
-<<<<<<< HEAD
-=======
 		//zbx_register_problem(events[i].eventid, json.buffer);
 
->>>>>>> origin/cluster_mvp1
 	}
 
 	zbx_hashset_iter_reset(&event_recovery, &iter);

@@ -811,8 +811,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"HistoryStorageType",		&CONFIG_HISTORY_STORAGE_TYPE,		TYPE_STRING,
 			PARM_OPT,	1,			0},
-		{"HistoryStorageTableName",		&CONFIG_HISTORY_STORAGE_TABLE_NAME,		TYPE_STRING,
-			PARM_OPT,	1,			0},
 		{"Hostname",			&CONFIG_HOSTNAME,			TYPE_STRING,
 			PARM_MAND,	0,			0},
 		{"ServerID",		&CONFIG_CLUSTER_SERVER_ID,			TYPE_INT,

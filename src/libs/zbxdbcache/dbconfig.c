@@ -1464,11 +1464,8 @@ done:
 				zbx_binary_heap_remove_direct(&config->pqueue, proxy->hostid);
 				proxy->location = ZBX_LOC_NOWHERE;
 			}
-<<<<<<< HEAD
 			proxy->last_version_error_time = time(NULL);
-=======
 		
->>>>>>> origin/cluster_mvp1
 		}
 		else if (NULL != (proxy = (ZBX_DC_PROXY *)zbx_hashset_search(&config->proxies, &hostid)))
 		{

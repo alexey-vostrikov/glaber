@@ -126,7 +126,7 @@
 #define ZBX_PROTO_VALUE_JAVA_GATEWAY_JMX	"java gateway jmx"
 #define ZBX_PROTO_VALUE_GET_QUEUE		"queue.get"
 #define ZBX_PROTO_VALUE_GET_STATUS		"status.get"
-#define ZBX_PROTO_VALUE_GET_PROBLEMS	"problems.get"
+//#define ZBX_PROTO_VALUE_GET_PROBLEMS	"problems.get"
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"
 #define ZBX_PROTO_VALUE_CLUSTER_TOPOLGY		"cluster_topology"
