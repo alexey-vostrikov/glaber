@@ -167,7 +167,18 @@ int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int	CONFIG_PINGER_FORKS		= 1;
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
-int	CONFIG_ASYNC_POLLER_FORKS	= 2;
+
+
+int CONFIG_ASYNC_SNMP_POLLER_FORKS	=2;
+int CONFIG_ASYNC_AGENT_POLLER_FORKS =2;
+char *CONFIG_CLUSTER_DOMAINS=NULL;
+
+
+//to avoid compile time dependancies problem
+int CONFIG_CLUSTER_SERVER_ID	=0;
+int CONFIG_CLUSTERMAN_FORKS	= 1;
+
+
 int	CONFIG_HTTPPOLLER_FORKS		= 1;
 int	CONFIG_IPMIPOLLER_FORKS		= 0;
 int	CONFIG_TRAPPER_FORKS		= 5;
@@ -240,6 +251,7 @@ int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
 int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
 int	CONFIG_UNSAFE_USER_PARAMETERS	= 0;
 
+char	*CONFIG_SERVERS			= NULL;
 char	*CONFIG_SERVER			= NULL;
 int	CONFIG_SERVER_PORT		= ZBX_DEFAULT_SERVER_PORT;
 char	*CONFIG_HOSTNAME		= NULL;
@@ -293,9 +305,12 @@ char	*CONFIG_HISTORY_STORAGE_DB_NAME		= NULL;
 char *CONFIG_NMAP_PARAMS = NULL;
 char *CONFIG_NMAP_LOCATION = NULL;
 
+
 int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
+T_ZBX_SERVER SERVER_LIST[ZBX_CLUSTER_MAX_SERVERS];
+int SERVERS = 0;
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -497,7 +512,60 @@ static void	zbx_set_defaults(void)
 
 	if (0 != CONFIG_IPMIPOLLER_FORKS)
 		CONFIG_IPMIMANAGER_FORKS = 1;
+
+	memset(SERVER_LIST,sizeof(T_ZBX_SERVER)*ZBX_CLUSTER_MAX_SERVERS,0);
 }
+
+/**********************************************************************/
+/* parses list of servers into array with hosts validation			  */
+/* so it can easily be used later in connection procedures			  */
+/* Author: <your name might be here>							      */
+/**********************************************************************/
+static int parse_servers() {
+
+	zabbix_log(LOG_LEVEL_INFORMATION,"Parcing servers configuration");
+
+	const char s[2] = ",";
+   	
+	char *tmp_servers=NULL;
+	char *server=NULL;
+
+	char tmp[MAX_ZBX_DOMAINS_LEN];
+
+	//zbx_validate_hostname(CONFIG_SERVER)
+	//zabbix_log(LOG_LEVEL_CRIT, "invalid entry in \"Server\" configuration parameter: %s", ch_error);
+	//		zbx_free(ch_error); zbx_validate_peer_list(CONFIG_SERVERS, &ch_error))
+
+	strscpy(tmp, CONFIG_SERVERS);
+	server = strtok(tmp,s);
+		
+	while (server && ( SERVERS < ZBX_CLUSTER_MAX_SERVERS) ) {
+		zabbix_log(LOG_LEVEL_INFORMATION,"Processing server domain %s", server);
+
+		if (FAIL == zbx_validate_hostname(server)) {
+			zabbix_log(LOG_LEVEL_CRIT,"Server entry %s is invalid, exiting",server);
+			return FAIL;
+		}
+	
+		strscpy(SERVER_LIST[SERVERS].addr,server);
+		SERVER_LIST[SERVERS].last_activity=0;
+		SERVER_LIST[SERVERS].loss_count=0;
+		SERVER_LIST[SERVERS].status=FAIL;
+		
+		
+		zabbix_log(LOG_LEVEL_INFORMATION,"Added server #%d (%s) to servers list",SERVERS,SERVER_LIST[SERVERS].addr);
+		
+
+		if ( 0 == SERVERS ) {
+			CONFIG_SERVER = SERVER_LIST[SERVERS].addr;
+		}
+		
+		SERVERS++;
+		server=strtok(NULL,s);
+	}
+	return SUCCEED;
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -539,18 +607,10 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
-	if (ZBX_PROXYMODE_ACTIVE == CONFIG_PROXYMODE && FAIL == is_supported_ip(CONFIG_SERVER) &&
-			FAIL == zbx_validate_hostname(CONFIG_SERVER))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "invalid \"Server\" configuration parameter: '%s'", CONFIG_SERVER);
+	if (ZBX_PROXYMODE_ACTIVE != CONFIG_PROXYMODE ) {
+		zabbix_log(LOG_LEVEL_CRIT, "Clustered Zabbix proxy only runs in Active mode");
 		err = 1;
-	}
-	else if (ZBX_PROXYMODE_PASSIVE == CONFIG_PROXYMODE && FAIL == zbx_validate_peer_list(CONFIG_SERVER, &ch_error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "invalid entry in \"Server\" configuration parameter: %s", ch_error);
-		zbx_free(ch_error);
-		err = 1;
-	}
+	} 
 
 	if (NULL != CONFIG_SOURCE_IP && SUCCEED != is_supported_ip(CONFIG_SOURCE_IP))
 	{
@@ -599,9 +659,17 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_IPMIPOLLER_FORKS, "IPMI support"));
 #endif
 
+
+	if ( SUCCEED != parse_servers() ) {
+		err = 1;
+	}
+
 	if (0 != err)
 		exit(EXIT_FAILURE);
+	
 }
+
+
 
 /******************************************************************************
  *                                                                            *
@@ -626,7 +694,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			100},
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,
 			PARM_OPT,	ZBX_PROXYMODE_ACTIVE,	ZBX_PROXYMODE_PASSIVE},
-		{"Server",			&CONFIG_SERVER,				TYPE_STRING,
+		{"Servers",			&CONFIG_SERVERS,				TYPE_STRING,
 			PARM_MAND,	0,			0},
 		{"ServerPort",			&CONFIG_SERVER_PORT,			TYPE_INT,
 			PARM_OPT,	1024,			32767},
@@ -782,6 +850,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"StatsAllowedIP",		&CONFIG_STATS_ALLOWED_IP,		TYPE_STRING_LIST,
 			PARM_OPT,	0,			0},
+		{"ClusterDomains",			&CONFIG_CLUSTER_DOMAINS,			TYPE_STRING,
+			PARM_OPT,	0,			0},	
 		{NULL}
 	};
 
@@ -1000,6 +1070,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zabbix_log(LOG_LEVEL_INFORMATION, "**************************");
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "using configuration file: %s", CONFIG_FILE);
+	
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER domains: %s",CONFIG_CLUSTER_DOMAINS);
 
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	if (SUCCEED != zbx_coredump_disable())

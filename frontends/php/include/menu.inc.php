@@ -254,7 +254,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'url' => 'zabbix.php',
 					'action' => 'proxy.list',
 					'active_if' => ['proxy.edit', 'proxy.list'],
-					'label' => _('Proxies')
+					'label' => _('Cluster management')
 				],
 				[
 					'url' => 'zabbix.php',

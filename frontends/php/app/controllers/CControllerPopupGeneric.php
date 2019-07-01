@@ -109,7 +109,7 @@ class CControllerPopupGeneric extends CController {
 				]
 			],
 			'proxies' => [
-				'title' => _('Proxies'),
+				'title' => _('Domains'),
 				'min_user_type' => USER_TYPE_ZABBIX_ADMIN,
 				'allowed_src_fields' => 'proxyid,host',
 				'form' => [
@@ -117,7 +117,7 @@ class CControllerPopupGeneric extends CController {
 					'id' => 'proxies'
 				],
 				'table_columns' => [
-					_('Name')
+					_('Host')
 				]
 			],
 			'applications' => [
@@ -733,7 +733,7 @@ class CControllerPopupGeneric extends CController {
 				CArrayHelper::sort($records, ['name']);
 				$records = CArrayHelper::renameObjectsKeys($records, ['groupid' => 'id']);
 				break;
-
+		
 			case 'help_items':
 				$records = (new CHelpItems())->getByType($page_options['itemtype']);
 				break;

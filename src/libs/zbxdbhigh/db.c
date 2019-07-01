@@ -43,6 +43,8 @@ zbx_autoreg_host_t;
 extern char	ZBX_PG_ESCAPE_BACKSLASH;
 #endif
 
+extern int CONFIG_CLUSTER_SERVER_ID;
+
 static int	connection_failure;
 
 void	DBclose(void)
@@ -670,7 +672,7 @@ static zbx_uint64_t	DBget_nextid(const char *tablename, int num)
 			if (ZBX_DB_OK > dbres)
 			{
 				/* solving the problem of an invisible record created in a parallel transaction */
-				DBexecute("update ids set nextid=nextid+1 where table_name='%s' and field_name='%s'",
+				DBexecute("update ids set nextid=nextid+%d where table_name='%s' and field_name='%s'",ZBX_CLUSTER_MAX_SERVERS,
 						table->table, table->recid);
 			}
 
@@ -689,7 +691,7 @@ static zbx_uint64_t	DBget_nextid(const char *tablename, int num)
 			}
 
 			DBexecute("update ids set nextid=nextid+%d where table_name='%s' and field_name='%s'",
-					num, table->table, table->recid);
+					(num + 1) * ZBX_CLUSTER_MAX_SERVERS, table->table, table->recid);
 
 			result = DBselect("select nextid from ids where table_name='%s' and field_name='%s'",
 					table->table, table->recid);
@@ -698,7 +700,7 @@ static zbx_uint64_t	DBget_nextid(const char *tablename, int num)
 			{
 				ZBX_STR2UINT64(ret2, row[0]);
 
-				if (ret1 + num == ret2)
+				if (ret1 + (num + 1) * ZBX_CLUSTER_MAX_SERVERS == ret2)
 					found = SUCCEED;
 			}
 			else
@@ -711,7 +713,8 @@ static zbx_uint64_t	DBget_nextid(const char *tablename, int num)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():" ZBX_FS_UI64 " table:'%s' recid:'%s'",
 			__function_name, ret2 - num + 1, table->table, table->recid);
 
-	return ret2 - num + 1;
+	//return ret2 - num + 1;
+	return  ( (int)(ret1/ZBX_CLUSTER_MAX_SERVERS) +1 )*ZBX_CLUSTER_MAX_SERVERS + CONFIG_CLUSTER_SERVER_ID;
 }
 
 zbx_uint64_t	DBget_maxid_num(const char *tablename, int num)

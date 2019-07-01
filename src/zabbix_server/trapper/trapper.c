@@ -46,6 +46,13 @@
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
 extern size_t		(*find_psk_in_cache)(const unsigned char *, unsigned char *, size_t);
+extern int CONFIG_CLUSTER_SERVER_ID;
+
+int zbx_dc_create_hello_json(struct zbx_json* j);
+int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse	*jp, int timediff);
+int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp);
+char *zbx_dc_get_topology();
+
 
 typedef struct
 {
@@ -236,6 +243,7 @@ static void	recv_proxy_heartbeat(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	const char	*__function_name = "recv_proxy_heartbeat";
 
 	char		*error = NULL;
+	char 		domains[MAX_ZBX_DOMAINS_LEN];
 	int		ret, flags = ZBX_TCP_PROTOCOL;
 	DC_PROXY	proxy;
 
@@ -250,14 +258,11 @@ static void	recv_proxy_heartbeat(zbx_socket_t *sock, struct zbx_json_parse *jp)
 
 	if (SUCCEED != (ret = zbx_proxy_check_permissions(&proxy, sock, &error)))
 	{
-		zabbix_log(LOG_LEVEL_WARNING, "cannot accept connection from proxy \"%s\" at \"%s\", allowed address:"
+		zabbix_log(LOG_LEVEL_WARNING, "cannot accept heartbeat connection from proxy \"%s\" at \"%s\", allowed address:"
 				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, error);
 		goto out;
 	}
-
-	zbx_update_proxy_data(&proxy, zbx_get_protocol_version(jp), time(NULL),
-			(0 != (sock->protocol & ZBX_TCP_COMPRESS) ? 1 : 0));
-
+		   
 	if (0 != proxy.auto_compress)
 		flags |= ZBX_TCP_COMPRESS;
 out:
@@ -828,6 +833,200 @@ static void	status_stats_export(struct zbx_json *json, zbx_user_type_t access_le
 
 	zbx_status_counters_free();
 }
+
+/******************************************************************************
+ *                                                                            *
+ * Function: send_topology                        		                        *
+ *                                                                            *
+ * Purpose: sends the cluster topology 						                            *
+ *                                                                            *
+ * Parameters:  sock  - [IN] the request socket                               *
+ *              jp    - [IN] the request data                                 *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ ******************************************************************************/
+static int	send_topology(zbx_socket_t *sock, struct zbx_json_parse *jp)
+{
+
+	const char		*__function_name = "send_topology";
+	
+	int			ret = FAIL;
+	char			tmp[MAX_STRING_LEN];
+	struct zbx_json		json;
+	DC_PROXY proxy;
+	char		*error = NULL, *topology=NULL;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
+	if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot parse heartbeat from active proxy at \"%s\": %s", sock->peer, error);
+		goto out;
+	} 
+	
+	if (SUCCEED != (ret = zbx_proxy_check_permissions(&proxy, sock, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot auth connection from server/proxy \"%s\" at \"%s\", allowed address:"
+				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, tmp);
+		goto out;
+	} 	
+  
+	//todo: replace with dc topology retrieval
+	topology=zbx_dc_get_topology();
+	
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	if (NULL != topology) {
+		zbx_json_addraw(&json, ZBX_PROTO_CLUSTER_TOPOLOGY,topology);
+	}
+	else 
+		zbx_json_addraw(&json, ZBX_PROTO_CLUSTER_TOPOLOGY,"");
+	
+	zbx_free(topology);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER sending topology: %s() json.buffer:'%s'", __function_name, json.buffer);
+	(void)zbx_tcp_send(sock, json.buffer);
+
+	zbx_json_free(&json);
+	ret = SUCCEED;
+
+out:
+	zbx_free(error);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+
+	return ret;
+}
+
+
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: recv_server_hello                                                *
+ *                                                                            *
+ * Purpose: accepts hello from a server, updates server "proxy" record			  *
+ *  if needed, initiates cluster reconfiguration                              *
+ *                                                                            *
+ * Parameters:  sock  - [IN] the request socket                               *
+ *              jp    - [IN] the request data                                 *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ ******************************************************************************/
+static int	recv_server_hello(zbx_socket_t *sock, struct zbx_json_parse *jp)
+{
+
+	const char		*__function_name = "recv_server_hello";
+	
+	int			ret = FAIL;
+	char			tmp[MAX_STRING_LEN];
+	struct zbx_json		json;
+	DC_PROXY proxy;
+	char		*error = NULL;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
+	if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot parse heartbeat from active proxy at \"%s\": %s", sock->peer, error);
+		goto out;
+	} 
+	
+	if (SUCCEED != (ret = zbx_proxy_check_permissions(&proxy, sock, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot auth connection from server/proxy \"%s\" at \"%s\", allowed address:"
+				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, tmp);
+		goto out;
+	} 	
+    zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: RECV HELLO <- %ld",proxy.hostid);
+	ret=zbx_dc_parce_hello_json(&proxy,jp,0);
+ 
+	
+	zbx_json_init(&json, 5 * ZBX_KIBIBYTE);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	
+	//zbx_dc_create_hello_json(&json);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER sending reply: %s() json.buffer:'%s'", __function_name, json.buffer);
+	(void)zbx_tcp_send(sock, json.buffer);
+
+	zbx_json_free(&json);
+
+out:
+	zbx_free(error);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+
+	return 1;
+}
+
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: recv_rerouted_data                                                *
+ *                                                                            *
+ * Purpose: accepts hello from a server, updates server "proxy" record			  *
+ *  if needed, initiates cluster reconfiguration                              *
+ *                                                                            *
+ * Parameters:  sock  - [IN] the request socket                               *
+ *              jp    - [IN] the request data                                 *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ ******************************************************************************/
+static int	recv_server_rerouted_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
+{
+
+	const char		*__function_name = "recv_rerouted_data";
+	
+	int			ret = FAIL;
+	char			tmp[MAX_STRING_LEN];
+	struct zbx_json		json;
+	DC_PROXY proxy;
+	char		*error = NULL;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
+	if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot parse data from active proxy at \"%s\": %s", sock->peer, error);
+		goto out;
+	} 
+	
+	if (SUCCEED != (ret = zbx_proxy_check_permissions(&proxy, sock, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot auth connection from server/proxy \"%s\" at \"%s\", allowed address:"
+				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, tmp);
+		goto out;
+	} 	
+    zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: RECV REROUTED <- %ld",proxy.hostid);
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	
+	if (SUCCEED == (ret=zbx_dc_parce_rerouted_data(&proxy,jp))) {
+ 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	} else {
+		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
+	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER sending reply: %s() json.buffer:'%s'", __function_name, json.buffer);
+	(void)zbx_tcp_send(sock, json.buffer);
+
+	zbx_json_free(&json);
+out:
+
+	zbx_free(error);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+
+	return 1;
+}
+
+
+
 /******************************************************************************
  *                                                                            *
  * Function: recv_getstatus                                                   *
@@ -841,7 +1040,8 @@ static void	status_stats_export(struct zbx_json *json, zbx_user_type_t access_le
  *                FAIL - an error occurred                                    *
  *                                                                            *
  ******************************************************************************/
-static int	recv_getstatus(zbx_socket_t *sock, struct zbx_json_parse *jp)
+/*
+static int	recv_getproblems(zbx_socket_t *sock, struct zbx_json_parse *jp)
 {
 #define ZBX_GET_STATUS_UNKNOWN	-1
 #define ZBX_GET_STATUS_PING	0
@@ -916,6 +1116,7 @@ out:
 #undef ZBX_GET_STATUS_FULL
 }
 
+*/
 /******************************************************************************
  *                                                                            *
  * Function: send_internal_stats_json                                         *
@@ -1141,7 +1342,21 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 			else if (0 == strcmp(value, ZBX_PROTO_VALUE_ZABBIX_STATS))
 			{
 				ret = send_internal_stats_json(sock, &jp);
+		//	} else if (0 == strcmp(value, ZBX_PROTO_VALUE_GET_PROBLEMS))
+		//	{
+		//			ret = recv_getproblems(sock, &jp);
+			} else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_HELLO))
+			{
+					ret = recv_server_hello(sock, &jp);
 			}
+			 else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_TOPOLGY))
+			{
+					ret = send_topology(sock, &jp);
+			} else if (0 == strcmp(value, ZBX_PROTO_CLUSTER_REROUTED_DATA))
+			{
+					ret = recv_server_rerouted_data(sock, &jp);
+			}
+
 			else
 				zabbix_log(LOG_LEVEL_WARNING, "unknown request received [%s]", value);
 		}

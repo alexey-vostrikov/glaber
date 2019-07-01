@@ -56,6 +56,8 @@ static char		*sql = NULL;
 static size_t		sql_alloc = 64 * ZBX_KIBIBYTE;
 
 extern unsigned char	program_type;
+extern int CONFIG_CLUSTER_SERVER_ID;
+
 
 #define ZBX_IDS_SIZE	8
 
@@ -4322,8 +4324,15 @@ zbx_uint64_t	DCget_nextid(const char *table_name, int num)
 
 		if (0 == strcmp(id->table_name, table_name))
 		{
-			nextid = id->lastid + 1;
-			id->lastid += num;
+			//nextid = id->lastid + 1;
+			//id->lastid += num;
+			//lastid = id->lastid;
+
+			//to achive unique cluster id generation we use id interleaving with step of ZBX_CLUSTER_MAX_SERVERS
+			//so the next id is calculated the fillowing way:
+			//looking for closest exceeding id 
+			nextid=( (id->lastid/ZBX_CLUSTER_MAX_SERVERS)+1) * ZBX_CLUSTER_MAX_SERVERS+CONFIG_CLUSTER_SERVER_ID;
+			id->lastid += num*ZBX_CLUSTER_MAX_SERVERS;
 			lastid = id->lastid;
 
 			UNLOCK_CACHE_IDS;
@@ -4355,18 +4364,23 @@ zbx_uint64_t	DCget_nextid(const char *table_name, int num)
 		else
 			ZBX_STR2UINT64(id->lastid, row[0]);
 
-		nextid = id->lastid + 1;
-		id->lastid += num;
+		nextid=( (int)(id->lastid/ZBX_CLUSTER_MAX_SERVERS)+1) * ZBX_CLUSTER_MAX_SERVERS+CONFIG_CLUSTER_SERVER_ID;
+		id->lastid += num*ZBX_CLUSTER_MAX_SERVERS;
 		lastid = id->lastid;
+
+		//nextid = id->lastid + 1;
+		//id->lastid += num;
+		//lastid = id->lastid;
 	}
 	else
-		nextid = lastid = 0;
+		//nextid = lastid = 0;
+		nextid = lastid = CONFIG_CLUSTER_SERVER_ID;
 
 	UNLOCK_CACHE_IDS;
 
 	DBfree_result(result);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() table:'%s' [" ZBX_FS_UI64 ":" ZBX_FS_UI64 "]",
+	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s() table:'%s' [" ZBX_FS_UI64 ":" ZBX_FS_UI64 "]",
 			__function_name, table_name, nextid, lastid);
 
 	return nextid;

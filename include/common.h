@@ -103,6 +103,7 @@ const char	*zbx_result_string(int result);
 #define MAX_STRING_LEN		2048
 #define MAX_BUFFER_LEN		65536
 #define MAX_ZBX_HOSTNAME_LEN	128
+#define	MAX_ZBX_DOMAINS_LEN		4096
 #define MAX_ZBX_DNSNAME_LEN	255	/* maximum host DNS name length from RFC 1035 (without terminating '\0') */
 #define MAX_EXECUTE_OUTPUT_LEN	(512 * ZBX_KIBIBYTE)
 
@@ -538,6 +539,7 @@ const char	*get_program_type_string(unsigned char program_type);
 #define ZBX_PROCESS_TYPE_PREPROCESSOR	27
 #define ZBX_PROCESS_TYPE_ASYNC_SNMP	28
 #define ZBX_PROCESS_TYPE_ASYNC_AGENT	29
+//#define ZBX_PROCESS_TYPE_CLUSTERMAN	30
 #define ZBX_PROCESS_TYPE_COUNT		30	/* number of process types */
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char process_type);
@@ -587,6 +589,8 @@ zbx_maintenance_type_t;
 /*#define HOST_STATUS_DELETED		4*/
 #define HOST_STATUS_PROXY_ACTIVE	5
 #define HOST_STATUS_PROXY_PASSIVE	6
+#define HOST_STATUS_DOMAIN			7
+#define	HOST_STATUS_SERVER			8
 
 /* host maintenance status */
 #define HOST_MAINTENANCE_STATUS_OFF	0
@@ -1508,5 +1512,23 @@ char	*zbx_create_token(zbx_uint64_t seed);
 
 #define ZBX_MIN_OPEN_FILES	16384
 #define ZBX_DESIRED_OPEN_FILES 65536
+
+#define ZBX_CLUSTER_HELLO_FREQUENCY 5
+#define ZBX_CLUSTER_MAX_SERVERS 64 /*maximium numbers of servers per cluster */
+#define ZBX_CLUSTER_NA_HELLO_INERVAL 60 //how long not to try to send hellos to a server if it's not avail
+#define ZBX_CLUSTER_MAX_FAIL_HELLOS 3 //how many hellos to fail to consider server dead
+#define	ZBX_CLUSTER_TOPOLOGY_RECALC_INTERVAL 40 // topology will not be calculated more often then this
+#define	ZBX_CLUSTER_SERVER_HOLD_TIME	10 //hold time for newly appeared servers
+//cluster server states
+#define ZBX_CLUSTER_SERVER_STATE_DOWN 0
+#define ZBX_CLUSTER_SERVER_STATE_ALIVE 1
+#define ZBX_CLUSTER_SERVER_STATE_HOLD 2
+
+
+//host cluster states
+#define	ZBX_CLUSTER_HOST_STATE_DISABLED 0
+#define	ZBX_CLUSTER_HOST_STATE_ACTIVE 1
+
+
 
 #endif

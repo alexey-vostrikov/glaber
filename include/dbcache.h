@@ -127,6 +127,7 @@ typedef struct
 	int		jmx_disable_until;
 	char		inventory_mode;
 	unsigned char	status;
+	unsigned char	cluster_state;
 	unsigned char	tls_connect;
 	unsigned char	tls_accept;
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
@@ -139,6 +140,7 @@ typedef struct
 	char		snmp_error[HOST_ERROR_LEN_MAX];
 	char		ipmi_error[HOST_ERROR_LEN_MAX];
 	char		jmx_error[HOST_ERROR_LEN_MAX];
+	zbx_uint64_t		cluster_server_host_id;
 }
 DC_HOST;
 
@@ -261,9 +263,11 @@ typedef struct
 {
 	zbx_uint64_t	hostid;
 	char		host[HOST_HOST_LEN_MAX];
+	//char		domains[MAX_ZBX_DOMAINS_LEN];
 	int		proxy_config_nextcheck;
 	int		proxy_data_nextcheck;
 	int		proxy_tasks_nextcheck;
+	int		server_hello_nextsend;
 	int		last_cfg_error_time;	/* time when passive proxy misconfiguration error was seen */
 						/* or 0 if no error */
 	int		version;
@@ -285,6 +289,14 @@ typedef struct
 #endif
 	char		proxy_address[HOST_PROXY_ADDRESS_LEN_MAX];
 	int		last_version_error_time;
+
+	int 	cluster_failed_hello_count;
+	zbx_uint64_t		cluster_topology_version;
+	int		cluster_id;
+	int 	cluster_state;
+	int		cluster_rtt; //in microseconds	
+	int 	cluster_lastheard;
+	int 	cluster_rerouted_data; //number of records to reroute
 }
 DC_PROXY;
 
@@ -697,6 +709,9 @@ int	DCconfig_get_proxypoller_nextcheck(void);
 #define ZBX_PROXY_CONFIG_NEXTCHECK	0x01
 #define ZBX_PROXY_DATA_NEXTCHECK	0x02
 #define ZBX_PROXY_TASKS_NEXTCHECK	0x04
+#define ZBX_PROXY_HELLO_NEXTSEND	0x08
+
+
 void	DCrequeue_proxy(zbx_uint64_t hostid, unsigned char update_nextcheck, int proxy_conn_err);
 int	DCcheck_proxy_permissions(const char *host, const zbx_socket_t *sock, zbx_uint64_t *hostid, char **error);
 
@@ -912,4 +927,4 @@ void	zbx_dc_maintenance_reset_update_flag(int timer);
 int	zbx_dc_maintenance_check_update_flag(int timer);
 int	zbx_dc_maintenance_check_update_flags(void);
 
-#endif
+	#endif

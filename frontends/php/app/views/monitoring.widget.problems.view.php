@@ -50,7 +50,7 @@ $table = (new CTableInfo())
 	->setHeader(array_merge($header, [
 		$show_recovery_data ? _('Recovery time') : null,
 		$show_recovery_data ? _('Status') : null,
-//		_('Info'),
+		_('Info'),
 		($data['sortfield'] === 'host') ? [_('Host'), $sort_div] : _('Host'),
 		[
 			($data['sortfield'] === 'name') ? [_('Problem'), $sort_div] : _('Problem'),
@@ -149,18 +149,6 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 		$info_icons[] = makeSuppressedProblemIcon($problem['suppression_data']);
 	}
 
-
-//	$description = (new CCol([$problem['name']
-//		
-//		(new CLinkAction($problem['name']))
-//			->setHint(
-//				make_popup_eventlist($trigger, $eventid, $backurl, $data['fullscreen'], $show_timeline, $sortorder),
-//				'',
-//				true
-//			)
-// 	]));
-
-
 	$description = (new CCol([
 		(new CLinkAction($problem['name']))
 			->setHint(
@@ -224,7 +212,7 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 	$table->addRow(array_merge($row, [
 		$show_recovery_data ? $cell_r_clock : null,
 		$show_recovery_data ? $cell_status : null,
-//		makeInformationList($info_icons),
+		makeInformationList($info_icons),
 		$triggers_hosts[$trigger['triggerid']],
 		$description,
 		$data['fields']['show_latest_values'] ? CScreenProblem::getLatestValues($trigger['items']) : null,

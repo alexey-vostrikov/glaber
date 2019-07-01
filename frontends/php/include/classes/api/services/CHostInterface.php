@@ -225,7 +225,8 @@ class CHostInterface extends CApiService {
 			'output' => ['host'],
 			'proxyids' => zbx_objectValues($interfaces, 'hostid'),
 			'editable' => true,
-			'preservekeys' => true
+			'preservekeys' => true,
+			'all_objects' => true,
 		]);
 
 		$check_have_items = [];

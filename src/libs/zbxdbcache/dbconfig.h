@@ -17,6 +17,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+//#include "../zbxcluster/cluster.h"
+#include "zbxjson.h"
+
+
 #ifndef ZABBIX_DBCONFIG_H
 #define ZABBIX_DBCONFIG_H
 
@@ -314,7 +318,10 @@ typedef struct
 	unsigned char	ipmi_available;
 	unsigned char	jmx_available;
 	unsigned char	status;
-
+	/* cluster state considered in fetching items during poller items queue fetch */
+	unsigned char 	cluster_state;
+	zbx_uint64_t cluster_server_host_id; //hostid of the server responsible for processing the host
+	
 	/* flag to reset host availability to unknown */
 	unsigned char	reset_availability;
 
@@ -336,6 +343,7 @@ typedef struct
 
 	zbx_vector_ptr_t	interfaces_v;	/* for quick finding of all host interfaces in */
 						/* 'config->interfaces' hashset */
+	
 }
 ZBX_DC_HOST;
 
@@ -363,8 +371,18 @@ typedef struct
 	int		proxy_config_nextcheck;
 	int		proxy_data_nextcheck;
 	int		proxy_tasks_nextcheck;
+	int		server_hello_nextsend;
 	int		nextcheck;
 	int		lastaccess;
+
+	int		cluster_lastheard; /* last time when this proxy has been announced by a server */
+	int 	cluster_id;		   /* cluster id for server objects */
+	int		cluster_rtt;	   /* time it took for an answer to arrive - to measure closest servers */
+	int 	cluster_failed_hello_count; //perhaps this may be rplaced by combination of state and lastheard
+	int 	cluster_state;	
+	
+	zbx_uint64_t	cluster_topology_version; /* topology version that the host announces */
+
 	int		last_cfg_error_time;	/* time when passive proxy misconfiguration error was seen */
 						/* or 0 if no error */
 	int		version;
@@ -372,6 +390,13 @@ typedef struct
 	unsigned char	auto_compress;
 	const char	*proxy_address;
 	int		last_version_error_time;
+
+	//todo: it seems that there is no place where i coorectly destroy these 
+	//find and fix 
+	zbx_vector_uint64_t	cluster_domains;
+	//vector for keeping rerouted data ptrs
+	zbx_vector_ptr_t cluster_rerouted_data;
+	
 }
 ZBX_DC_PROXY;
 
@@ -762,6 +787,14 @@ typedef struct
 	ZBX_DC_STATUS		*status;
 	zbx_hashset_t		strpool;
 	zbx_hashset_t		problems;
+
+	/* cluster related fields */
+	zbx_uint64_t cluster_topology_version;
+	int 	cluster_topology_last_update; /* time when local topology was calculated last */
+	char 	*cluster_topology; /* buffer with current active topology */
+	int 	cluster_topology_need_update; /* flag that topology needs to be updated */
+	zbx_uint64_t	cluster_topology_download_host;
+
 }
 ZBX_DC_CONFIG;
 
@@ -787,7 +820,7 @@ ZBX_DC_PROBLEM;
 /* and keep closed problems only for 1 hour */
 #define ZBX_PROBLEM_CLOSED_TIMEOUT	30
 
-
+#define ZBX_PROXY_TIMEOUT	30
 extern int	sync_in_progress;
 extern ZBX_DC_CONFIG	*config;
 extern zbx_rwlock_t	config_lock;
@@ -842,6 +875,18 @@ void	DCsync_maintenance_tags(zbx_dbsync_t *sync);
 void	DCsync_maintenance_periods(zbx_dbsync_t *sync);
 void	DCsync_maintenance_groups(zbx_dbsync_t *sync);
 void	DCsync_maintenance_hosts(zbx_dbsync_t *sync);
+
+/* trapper problems reporting */
+//void zbx_dump_problems_to_json(struct zbx_json *json);
+//void zbx_register_problem(zbx_uint64_t id, char *problem_text);
+/*proxy domains retrieval */
+//char *zbx_dc_get_active_proxy_domains();
+//void zbx_dc_cluster_get_servers_list();
+
+int zbx_dc_create_hello_json(struct zbx_json* j);
+int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse	*jp, int timediff);
+zbx_uint64_t zbx_dc_recalc_topology(void);
+int zbx_dc_set_topology_recalc(void);
 
 /* maintenance support */
 

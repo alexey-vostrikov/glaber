@@ -25,7 +25,7 @@ class CControllerProxyUpdate extends CController {
 		$fields = [
 			'proxyid' =>		'fatal|required|db       hosts.hostid',
 			'host' =>			'db       hosts.host',
-			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE,
+			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE.','.HOST_STATUS_DOMAIN.','.HOST_STATUS_SERVER,
 			'interfaceid' =>    'db       interface.interfaceid',
 			'dns' =>			'db       interface.dns',
 			'ip' =>				'db       interface.ip',
@@ -75,7 +75,8 @@ class CControllerProxyUpdate extends CController {
 		return (bool) API::Proxy()->get([
 			'output' => [],
 			'proxyids' => $this->getInput('proxyid'),
-			'editable' => true
+			'editable' => true,
+			'all_objects' => true,
 		]);
 	}
 
@@ -93,6 +94,14 @@ class CControllerProxyUpdate extends CController {
 		else {
 			$proxy['proxy_address'] = $this->getInput('proxy_address', '');
 		}
+		
+		//echo("WTF?");
+
+		$domains = getRequest('groupids', []);
+		//var_dump($domains);
+
+		$proxy['error']=implode(',',$domains);
+		//var_dump($proxy['domains']);
 
 		DBstart();
 
@@ -118,5 +127,7 @@ class CControllerProxyUpdate extends CController {
 			$response->setMessageError(_('Cannot update proxy'));
 		}
 		$this->setResponse($response);
+		
 	}
+	
 }

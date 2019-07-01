@@ -585,7 +585,7 @@ if ($data['flags'] != ZBX_FLAG_DISCOVERY_CREATED) {
 			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 			->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 	);
-
+	
 	// create new linked template table
 	$new_template_table = (new CTable())
 		->addRow([

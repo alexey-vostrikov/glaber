@@ -18,10 +18,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-
+$this->addJsFile('multiselect.js');
 $this->includeJSfile('app/views/administration.proxy.edit.js.php');
+//require_once dirname(__FILE__).'/js/configuration.maintenance.edit.js.php';
 
-$widget = (new CWidget())->setTitle(_('Proxies'));
+$widget = (new CWidget())->setTitle(_('Cluster objects'));
 
 $tabs = new CTabView();
 
@@ -54,26 +55,80 @@ $interfaceTable = (new CTable())
 			->setAriaRequired()
 	]);
 
+//preparing list of domains
+// Groups with RW permissions.
+
+$data['proxies_ms'] = [];
+
+if ( !empty($data['domains'])) {
+	$domain_ids=explode(',',$data['domains']);
+	//var_dump($data['domains']);
+
+	if (sizeof($domain_ids) > 0  ) {
+		$domains = API::Proxy()->get([
+				'proxyids' => $domain_ids,
+				'editable' => true,
+				'all_objects' => true
+		]);
+
+		//var_dump($domains);
+
+		if (sizeof($domains) >0 ) {
+			foreach ($domains as $domain) {
+				$data['proxies_ms'][] = ([
+					'id' => $domain['proxyid'],
+					'name' => $domain['host'],
+				]);
+			}
+		}	
+	}
+}
+//
+
+// Prepare data for multiselect.
+
 $proxy_form_list = (new CFormList('proxyFormList'))
-	->addRow((new CLabel(_('Proxy name'), 'host'))->setAsteriskMark(),
+	->addRow((new CLabel(_('Cluster object type'), 'status')),
+			(new CRadioButtonList('status', (int) $data['status']))
+			->addValue(_('Monitoring Domain'), HOST_STATUS_DOMAIN)
+			->addValue(_('Server'), HOST_STATUS_SERVER)
+			->addValue(_('Proxy'), HOST_STATUS_PROXY_ACTIVE)
+			->setModern(true)
+	)
+	->addRow((new CLabel(_('Name'), 'host'))->setAsteriskMark(),
 		(new CTextBox('host', $data['host'], false, 128))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 			->setAttribute('autofocus', 'autofocus')
 			->setAriaRequired()
 	)
-	->addRow((new CLabel(_('Proxy mode'), 'status')),
-		(new CRadioButtonList('status', (int) $data['status']))
-			->addValue(_('Active'), HOST_STATUS_PROXY_ACTIVE)
-			->addValue(_('Passive'), HOST_STATUS_PROXY_PASSIVE)
-			->setModern(true)
-	)
+
 	->addRow((new CLabel(_('Interface'), 'proxy_interface'))->setAsteriskMark(),
 		(new CDiv($interfaceTable))
 			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 			->setId('proxy_interface')
 	)
-	->addRow(_('Proxy address'),
-		(new CTextBox('proxy_address', $data['proxy_address'], false, 255))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+	->addRow((new CLabel(_('IP address'), 'ip_address'))->setAsteriskMark(),
+		(new CTextBox('proxy_address', $data['proxy_address'], false, 255))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
+	)
+
+	->addRow(new CLabel(_('Domains'), 'groupids__ms'),
+		(new CMultiSelect([
+			'name' => 'groupids[]',
+			'object_name' => 'proxies',
+			'data' => $data['proxies_ms'],
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'proxies',
+					'srcfld1' => 'proxyid',
+					'srcfld2' => 'host',
+					'dstfrm' => $proxyForm->getName(),
+					'dstfld1' => 'groupids_',
+
+				]
+			]
+		]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	)
 	->addRow(_('Description'),
 		(new CTextArea('description', $data['description']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
@@ -115,7 +170,7 @@ $encryption_form_list = (new CFormList('encryption'))
 		(new CTextBox('tls_subject', $data['tls_subject'], false, 1024))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	);
 
-$tabs->addTab('proxyTab', _('Proxy'), $proxy_form_list);
+$tabs->addTab('proxyTab', _('Monitoring domain/Server/Proxy'), $proxy_form_list);
 $tabs->addTab('encryptionTab', _('Encryption'), $encryption_form_list);
 
 // append buttons to form

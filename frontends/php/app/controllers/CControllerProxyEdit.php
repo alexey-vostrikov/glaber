@@ -29,7 +29,7 @@ class CControllerProxyEdit extends CController {
 		$fields = [
 			'proxyid' =>		'db       hosts.hostid',
 			'host' =>			'db       hosts.host',
-			'status' =>			'db       hosts.status         |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE,
+			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_DOMAIN.','.HOST_STATUS_SERVER,
 			'interfaceid' =>	'db       interface.interfaceid',
 			'dns' =>			'db       interface.dns',
 			'ip' =>				'db       interface.ip',
@@ -70,7 +70,8 @@ class CControllerProxyEdit extends CController {
 			return (bool) API::Proxy()->get([
 				'output' => [],
 				'proxyids' => $this->getInput('proxyid'),
-				'editable' => true
+				'editable' => true,
+				'all_objects' => true,
 			]);
 		}
 
@@ -83,7 +84,7 @@ class CControllerProxyEdit extends CController {
 			'sid' => $this->getUserSID(),
 			'proxyid' => 0,
 			'host' => '',
-			'status' => HOST_STATUS_PROXY_ACTIVE,
+			'status' => HOST_STATUS_SERVER,
 			'dns' => 'localhost',
 			'ip' => '127.0.0.1',
 			'useip' => '1',
@@ -99,16 +100,18 @@ class CControllerProxyEdit extends CController {
 			'form_refresh' => 0
 		];
 
+	
 		// get values from the dabatase
 		if ($this->hasInput('proxyid')) {
 			$data['proxyid'] = $this->getInput('proxyid');
 
 			$proxies = API::Proxy()->get([
 				'output' => ['host', 'status', 'proxy_address', 'description', 'tls_connect', 'tls_accept',
-					'tls_issuer', 'tls_subject', 'tls_psk_identity', 'tls_psk'
+					'tls_issuer', 'tls_subject', 'tls_psk_identity', 'tls_psk', 'error'
 				],
 				'selectInterface' => ['interfaceid', 'dns', 'ip', 'useip', 'port'],
-				'proxyids' => $data['proxyid']
+				'proxyids' => $data['proxyid'],
+				'all_objects' => true,
 			]);
 			$proxy = $proxies[0];
 
@@ -121,7 +124,7 @@ class CControllerProxyEdit extends CController {
 			$data['tls_psk'] = $proxy['tls_psk'];
 			$data['tls_psk_identity'] = $proxy['tls_psk_identity'];
 			$data['tls_subject'] = $proxy['tls_subject'];
-			if ($data['status'] == HOST_STATUS_PROXY_PASSIVE) {
+			if ($data['status'] == HOST_STATUS_SERVER) {
 				$data['interfaceid'] = $proxy['interface']['interfaceid'];
 				$data['dns'] = $proxy['interface']['dns'];
 				$data['ip'] = $proxy['interface']['ip'];
@@ -129,6 +132,8 @@ class CControllerProxyEdit extends CController {
 				$data['port'] = $proxy['interface']['port'];
 			}
 			$data['description'] = $proxy['description'];
+			//$proxy['domains']=implode(',',$domains);
+			$data['domains']=$proxy['error'];
 		}
 
 		// overwrite with input variables
@@ -148,7 +153,7 @@ class CControllerProxyEdit extends CController {
 		$data['tls_subject'] = $this->getInput('tls_subject', $data['tls_subject']);
 		$data['form_refresh'] = $this->getInput('form_refresh', $data['form_refresh']);
 
-		if ($data['status'] == HOST_STATUS_PROXY_PASSIVE && $this->hasInput('interfaceid')) {
+		if ($data['status'] == HOST_STATUS_SERVER && $this->hasInput('interfaceid')) {
 			$data['interfaceid'] = $this->getInput('interfaceid');
 		}
 

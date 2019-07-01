@@ -2158,6 +2158,10 @@ void	zbx_init_snmp(void)
 	sigprocmask(SIG_SETMASK, &orig_mask, NULL);
 }
 
+void	zbx_shutdown_snmp(void)
+{
+	snmp_shutdown(progname);
+}
 
 
 //to do: consider giving up this function, it's pretty useless, could be replaced by one if statement
