@@ -928,6 +928,11 @@ static int	recv_server_hello(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	char		*error = NULL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	
+	if (0 == CONFIG_CLUSTER_SERVER_ID ) {
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: recieved hello, but working in standalone mode, set ServerID and restart server to work in cluster mode");
+		goto out;
+	}
 
 	if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)))
 	{

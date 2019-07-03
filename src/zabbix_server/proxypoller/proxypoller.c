@@ -1068,7 +1068,7 @@ static int	process_proxy(void)
 			zbx_free(port);
 
 			//todo: return passive proxy processing
-			if (proxy.server_hello_nextsend <= now)
+			if (proxy.server_hello_nextsend <= now && CONFIG_CLUSTER_SERVER_ID > 0)
 			{
 				if (SUCCEED != (ret = proxy_do_hello(&proxy)))
 					goto error;

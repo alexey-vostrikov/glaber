@@ -7798,8 +7798,8 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 			continue;
 		}
 
-		if (ZBX_CLUSTER_HOST_STATE_ACTIVE !=dc_host->cluster_state ) {
-			/* placing host back to queue as it'll be probably faster to start polling on cluster recalc */
+		if (ZBX_CLUSTER_HOST_STATE_ACTIVE !=dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0) {
+			/* placing host back to queue if it doesn't belong to this server node and cluster is operational*/
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
 			continue;
 		}
@@ -12230,6 +12230,8 @@ int DC_apply_topology(void) {
 		return FAIL;
 	}
 
+	if (0 == CONFIG_CLUSTER_SERVER_ID) return SUCCEED;
+
 	//just before applying topology params, cleaning all the hosts in case if topology is different from db config
 	zbx_hashset_iter_reset(&config->hosts,&hosts_iter);
 	
@@ -12312,17 +12314,19 @@ int DC_apply_topology(void) {
 /**********************************************************************/
 long int DC_generate_topology() {
 	
-	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Generating new own topology");
+	
 	ZBX_DC_HOST *host;
 	ZBX_DC_PROXY *proxy, *server;
 	zbx_uint64_t default_domain_id = 0, domain_id, server_id;
 	zbx_hashset_iter_t proxy_iter,hosts_iter;
 	struct zbx_json	j;
-
-
 	char *tmp_str, *domain_id_str=NULL;
 	
 	char s[2]=",";
+
+	if (0 == CONFIG_CLUSTER_SERVER_ID) return SUCCEED;
+	
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Generating new own topology");
 	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
 	
 	//step1: prepare: looking for the 'default' domain + cleaning old domains assignements

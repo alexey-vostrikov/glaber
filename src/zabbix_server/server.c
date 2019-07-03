@@ -812,9 +812,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"HistoryStorageType",		&CONFIG_HISTORY_STORAGE_TYPE,		TYPE_STRING,
 			PARM_OPT,	1,			0},
 		{"Hostname",			&CONFIG_HOSTNAME,			TYPE_STRING,
-			PARM_MAND,	0,			0},
+			PARM_OPT,	0,			0},
 		{"ServerID",		&CONFIG_CLUSTER_SERVER_ID,			TYPE_INT,
-			PARM_MAND,	0,			ZBX_CLUSTER_MAX_SERVERS-1},
+			PARM_OPT,	0,			ZBX_CLUSTER_MAX_SERVERS-1},
 		{"RerouteItems",		&CONFIG_CLUSTER_REROUTE_DATA,			TYPE_INT,
 			PARM_OPT,	0,			1},
 		{NULL}
@@ -984,6 +984,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				ZABBIX_VERSION, ZABBIX_REVISION);
 	}
 
+	if ( !CONFIG_CLUSTER_SERVER_ID) 
+		printf("Staring in STANDALONE mode");
+	else
+		printf("Starting in CLUSTER mode");
+
 	if (SUCCEED != zbx_locks_create(&error))
 	{
 		zbx_error("cannot create locks: %s", error);
@@ -1064,6 +1069,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zabbix_log(LOG_LEVEL_INFORMATION, "SSH2 support:              " SSH2_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "IPv6 support:              " IPV6_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "TLS support:               " TLS_FEATURE_STATUS);
+	if (CONFIG_CLUSTER_SERVER_ID)
+		zabbix_log(LOG_LEVEL_INFORMATION, "Cluster mode:                ENABLED");
+	else
+		zabbix_log(LOG_LEVEL_INFORMATION, "Cluster mode:                DISABLED");
+
 	zabbix_log(LOG_LEVEL_INFORMATION, "******************************");
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "using configuration file: %s", CONFIG_FILE);
