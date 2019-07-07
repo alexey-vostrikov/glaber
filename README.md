@@ -1,3 +1,5 @@
+**[PLEASE READ WIKI](https://gitlab.com/mikler/glaber/wikis/home)**
+
 I am finally releasing the changes I did to make zabbix somewhat faster or let me say, better. Here the most important ones:
 
     Before you start please make sure that the right reason to start using this code is your will to get some new experience or achieve an extraordinary results. It’s very likely something will break, won’t work and you will be the only one to deal with it (however I will be glad to answer some questions you might have). If you need strong and reliable production system, get a clean vanilla version of zabbix, buy a support.
@@ -54,7 +56,7 @@ there is some problems you should know:
 
 Zabbix server will use nmap for icmp* checks with packet count set to 1. If you need granular packet loss, say 58%, calculate it in triggers. And setup such an accessibility checks each 10-15 seconds
 
-Now, important note about delays: as items are processed in a bulk way (and also due to my laziness), they are coming back to queue altogether when all items has been polled. That takes 4-7 seconds in our setup. And a few seconds are needed to processing. So, don’t expect delays to be less then 10 seconds.
+Now, important note about delays: as items are processed in a bulk way (and also due to my laziness**, they are coming back to queue altogether when all items has been polled. That takes 4-7 seconds in our setup. And a few seconds are needed to processing. So, don’t expect delays to be less then 10 seconds.
 
 However I would be interested to know if you do have such a requirements, perhaps, i’ll have a motivation to optimize it.
 4. No new widgets
@@ -62,3 +64,24 @@ However I would be interested to know if you do have such a requirements, perhap
 I really don’t want to release widgets yet as they are still in prototype stage and there is a big architecture problem – what they show is the only true since zabbix restart. I have two alternatives to fix that – either force zabbix_server on start to load all active problems from DB to memory or to ignore DB state on zabbix start and consider all triggers in OK state. Which will break problems start time. And there is really simple fix possible, so I will add separate fixed widgets soon.
 5. Proxy compiles, but I haven’t tested it at all.# zabbix
 
+---
+**[ПОЖАЛУЙСТА, ПРОЧТИТЕ WIKI](https://gitlab.com/mikler/glaber/wikis/home)**
+
+Я наконецто готов представить изменения, которые сделают Заббикс быстрей или лучше.
+Вот основные изменения:
+~~~~
+Прежде чем мы продолжим, убедитесь, что основная причина использования этого продукта это новый опыт или попытка достичь экстраординарного результата. Скорей всего какой-то функционал будет недоступен, что-то может сломаться и вы должны быть к этому готовы. Если вам необходима стабильная и надежная система, скачайте Заббикс и покупайте их поддержку.
+~~~~
+Чтож, если вы решили продолжить, вот сам список изменений:
+~~~~
+Использование Clickhouse для хранения истории. Наслаждайтесь хранением данных годам без Postgres/Mysql при 50k NVPS.
+Асинхронные SNMP пуллеры. Внимание! "Обнаружение" итемов работает старым, медленным, синхронным способом.
+Сюрприз... Асинхронные пуллеры агентов. Наслаждайтесь опросом всех пассивных агентов вмиг. Несколько поллеров способны сделать всю работу. Окей, окей, возможно потребуется 3-4 для особенно больших систем (тысячи хостов)
+И Франкенштейн - пулеры недоступности объединяют два мира - сперва происходит попытка асинхронным методом и, в случае неудачи, переходим к старому синхронному.
+Простые проверки с помощью Nmap. Пока только IPv4. Сообщите, если вам потребуется IPv6 и зачем.
+Preproc менеджер с двумя сокетами и контролем очередей.
+Извините, ребята, пока нет "быстрых" виджетов. Они будут, скорей всего.
+Прокси не тестировались. Мы их не используем, поэтому дайте знать, если обнаружите какой-то баг.
+~~~~
+Теперь о том какая версия?
+За основу были взяты исходники zabbix-4.0.8-rc2. Релиз состоится на версии 4.2.
