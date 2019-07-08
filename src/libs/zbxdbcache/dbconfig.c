@@ -12570,7 +12570,6 @@ int zbx_dc_set_topology(const char *topology) {
 	
 	zbx_free(buffer);
 	
-
 	return SUCCEED;
 }
 
