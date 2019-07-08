@@ -12558,9 +12558,9 @@ int zbx_dc_set_topology(const char *topology) {
 
 	
 	WRLOCK_CACHE;
-	/* using strpool with proper mem allocation to store new topology in config cache */
-	DCstrpool_replace(1,(const char **)&config->cluster_topology,buffer);
-	/* strtol stops reading number after first non digit, so this works ok */
+
+	DC_replace_topology(buffer);
+	
 	config->cluster_topology_version = strtol(cluster_topology_version,NULL,10);;	
 	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: set new topology version %ld", config->cluster_topology_version);
 	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: new topology: '%s'", config->cluster_topology);
