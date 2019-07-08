@@ -12563,10 +12563,8 @@ int zbx_dc_set_topology(const char *topology) {
 	
 	config->cluster_topology_version = strtol(cluster_topology_version,NULL,10);;	
 	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: set new topology version %ld", config->cluster_topology_version);
-	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: new topology: '%s'", config->cluster_topology);
-
-
-	 DC_apply_topology();
+	
+	DC_apply_topology();
 
 	UNLOCK_CACHE;
 	
