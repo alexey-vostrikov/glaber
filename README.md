@@ -10,7 +10,7 @@ So, the short list of changes:
     Asynchronous SNMP  processing. Beware! “Discovery” items will work the old slow synchronous way
     Surprise… Asynchronous agent polling. Enjoy polling all your passive agents in a breeze. A couple of async agent polling threads will do all the work. Ok, ok, maybe 3 or 4 for really big installs (thousands of hosts)
     And a Frankenstein – unreachable poller combines two worlds now – it will try async methods first and after failing them, will use old good sync methods.
-    Nmap accessibility checks. IPv4 only. Let me know if you need IPv6, and why.
+    Nmap accessibility checks. 
     Preproc manager with two sockets and queuing control. For those who monitors on really tight hardware.
     Sorry guys, no “fast” widgets yet. They coming. A sort of. I just need to rethink a few points. However for “problems.get” message is working on server. Feel free to use it, and please note that you’ll get only the problems happened since the server start.
     Proxy is not tested yet. We don’t use them anymore. No reason. But sure this is coming also.
@@ -35,7 +35,7 @@ There are also documentation on how to configure certain features
 Асинхронные SNMP пуллеры. Внимание! "Обнаружение" итемов работает старым, медленным, синхронным способом.
 Сюрприз... Асинхронные пуллеры агентов. Наслаждайтесь опросом всех пассивных агентов вмиг. Несколько поллеров способны сделать всю работу. Окей, окей, возможно потребуется 3-4 для особенно больших систем (тысячи хостов)
 И Франкенштейн - пулеры недоступности объединяют два мира - сперва происходит попытка асинхронным методом и, в случае неудачи, переходим к старому синхронному.
-Простые проверки с помощью Nmap. Пока только IPv4. Сообщите, если вам потребуется IPv6 и зачем.
+Простые проверки с помощью Nmap. 
 Preproc менеджер с двумя сокетами и контролем очередей.
 Извините, ребята, пока нет "быстрых" виджетов. Они будут, скорей всего.
 Прокси не тестировались. Мы их не используем, поэтому дайте знать, если обнаружите какой-то баг.
