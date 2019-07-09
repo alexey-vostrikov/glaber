@@ -109,6 +109,53 @@ Description: Zabbix network monitoring solution - PHP front-end
  can display graphs of the data collected from clients.
 
 
+Package: zabbix-proxy-mysql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client, fping, adduser, lsb-base
+Recommends: virtual-mysql-server
+Suggests: logrotate
+Conflicts: zabbix-proxy-pgsql, zabbix-proxy-sqite3
+Description: Zabbix network monitoring solution - proxy (MySQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ proxy. It collects information from Zabbix agents, temporarily stores it
+ in a MySQL database and then passes it to a Zabbix server.
+
+
+Package: zabbix-proxy-pgsql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
+Recommends: postgresql (>= 8.1)
+Suggests: logrotate, postgresql-client
+Conflicts: zabbix-proxy-mysql, zabbix-proxy-sqlite3
+Description: Zabbix network monitoring solution - proxy (PostgreSQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ proxy. It collects information from Zabbix agents, temporarily stores it
+ in a PostgreSQL database and then passes it to a Zabbix server.
+
+
+Package: zabbix-proxy-sqlite3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, sqlite3, fping, adduser, lsb-base
+Suggests: logrotate
+Conflicts: zabbix-proxy-pgsql, zabbix-proxy-mysql
+Description: Zabbix network monitoring solution - proxy (SQLite3)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ proxy. It collects information from Zabbix agents, temporarily stores it
+ in an SQLite3 database and then passes it to a Zabbix server.
+
+
 Package: zabbix-java-gateway
 Architecture: all
 Depends: ${misc:Depends}, adduser, lsb-base, default-jre-headless

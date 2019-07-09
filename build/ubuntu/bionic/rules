@@ -12,6 +12,7 @@ COMMON_CONFIG =	--host=$(DEB_HOST_GNU_TYPE) \
 				--libdir=/usr/lib/zabbix \
 				--enable-agent \
 				--enable-ipv6 \
+				--enable-proxy \
 				--enable-java \
 				--with-jabber \
 				--with-ldap \
@@ -37,6 +38,7 @@ override_dh_clean:
 	dh_clean
 	rm -f debian/conf/zabbix_agentd.conf
 	rm -f debian/conf/zabbix_server.conf
+	rm -f debian/conf/zabbix_proxy.conf
 	rm -f debian/conf/zabbix_java_gateway.conf
 	rm -f debian/conf/zabbix_java_gateway_logback.xml
 	rm -f database/*/create.sql
@@ -74,6 +76,17 @@ override_dh_auto_build:
 		-e '/^# SNMPTrapperFile=.*/a \\nSNMPTrapperFile=/var/log/snmptrap/snmptrap.log' \
 		-e '/^# SocketDir=/a \\nSocketDir=/var/run/zabbix' \
 		> debian/conf/zabbix_server.conf
+	cat conf/zabbix_proxy.conf | sed \
+		-e '/^# PidFile=/a \\nPidFile=/var/run/zabbix/zabbix_proxy.pid' \
+		-e 's|^LogFile=.*|LogFile=/var/log/zabbix/zabbix_proxy.log|g' \
+		-e '/^# LogFileSize=/a \\nLogFileSize=0' \
+		-e '/^# ExternalScripts=/a \\nExternalScripts=/usr/lib/zabbix/externalscripts' \
+		-e '/^# FpingLocation=/a \\nFpingLocation=/usr/bin/fping' \
+		-e '/^# Fping6Location=/a \\nFping6Location=/usr/bin/fping6' \
+		-e 's|^DBUser=root|DBUser=zabbix|g' \
+		-e '/^# SNMPTrapperFile=.*/a \\nSNMPTrapperFile=/var/log/snmptrap/snmptrap.log' \
+		-e '/^# SocketDir=/a \\nSocketDir=/var/run/zabbix' \
+		> debian/conf/zabbix_proxy.conf
 	cat src/zabbix_java/settings.sh | sed \
 		-e 's|^PID_FILE=.*|PID_FILE="/var/run/zabbix/zabbix_java_gateway.pid"|g' \
 		> debian/conf/zabbix_java_gateway.conf
@@ -98,3 +111,6 @@ override_dh_installinit:
 	dh_installinit -p zabbix-java-gateway
 	dh_installinit --no-start -p zabbix-server-mysql --name=zabbix-server
 	dh_installinit --no-start -p zabbix-server-pgsql --name=zabbix-server
+	dh_installinit --no-start -p zabbix-proxy-mysql --name=zabbix-proxy
+	dh_installinit --no-start -p zabbix-proxy-pgsql --name=zabbix-proxy
+	dh_installinit --no-start -p zabbix-proxy-sqlite3 --name=zabbix-proxy
