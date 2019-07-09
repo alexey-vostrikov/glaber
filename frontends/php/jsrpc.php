@@ -210,14 +210,31 @@ switch ($data['method']) {
 			//echo CSession::getValue('serverCheckResult');
 			CSession::setValue('serverCheckTime', time());
 
+			if ($total_servers < 1) {
+				//standalone mode
+				$zabbixServer = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, 0);
+				CSession::setValue('serverCheckResult', $zabbixServer->isRunning(CWebUser::getSessionCookie()));
+				CSession::setValue('serverCheckTime', time());
+			}
+
 		}
 
-		$result = [
-			'result' => 0, //(bool) CSession::getValue('serverCheckResult'),
-			'message' => CSession::getValue('serverCheckResult')
+		if ($total_servers > 0) {
+			$result = [
+				'result' => 0, //(bool) CSession::getValue('serverCheckResult'),
+				'message' => CSession::getValue('serverCheckResult')
 			//	? ''
 			//	: _('Zabbix server is not running: the information displayed may not be current.')
-		];
+			]; 
+		} else {
+			$result = [
+				'result' => (bool) CSession::getValue('serverCheckResult'),
+				'message' => CSession::getValue('serverCheckResult')
+				? ''
+				:_('Zabbix server is not running: the information displayed may not be current.')
+				];
+					
+		}
 		break;
 
 	case 'screen.get':
