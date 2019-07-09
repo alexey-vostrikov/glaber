@@ -16,7 +16,8 @@ So, the short list of changes:
     Proxy is not tested yet. We don’t use them anymore. No reason. But sure this is coming also.
     Worker locks are fixed by zabbix team, thank you, Zabbix guys.
 
-Current release is based on 4.0.8. Release is updates on 2 month cylce basis or of there are real reasons to do so.
+Current release is based on 4.0.8. Release is updateв on 2 month cylce basis or of there are real reasons to do so.
+Howevere there are plans to support latest major version LTS and current release at the same time.
 
 
 Please read WIKI about ways of getting and installing GLaber.
