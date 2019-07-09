@@ -12592,6 +12592,10 @@ zbx_uint64_t zbx_dc_recalc_topology(void) {
 	zbx_hashset_iter_t proxy_iter;
 	
 	
+	if (!CONFIG_CLUSTER_SERVER_ID) {
+		return 0;
+	}
+
 	WRLOCK_CACHE;	
 	max_version=0;//config->cluster_config_version;
 
