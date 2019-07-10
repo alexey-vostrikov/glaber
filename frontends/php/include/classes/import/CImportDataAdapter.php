@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -89,7 +89,7 @@ class CImportDataAdapter {
 				$template = CArrayHelper::renameKeys($template, ['template' => 'host']);
 
 				$templates[] = CArrayHelper::getByKeys($template, [
-					'groups', 'macros', 'templates', 'host', 'status', 'name', 'description'
+					'groups', 'macros', 'templates', 'host', 'status', 'name', 'description', 'tags'
 				]);
 			}
 		}
@@ -133,7 +133,7 @@ class CImportDataAdapter {
 					'inventory', 'proxy', 'groups', 'templates', 'macros', 'interfaces', 'host', 'status',
 					'description', 'ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'name',
 					'inventory_mode', 'tls_connect', 'tls_accept', 'tls_issuer', 'tls_subject', 'tls_psk_identity',
-					'tls_psk'
+					'tls_psk', 'tags'
 				]);
 			}
 		}

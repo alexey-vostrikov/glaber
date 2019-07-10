@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -269,7 +269,7 @@ class DB {
 		$schema = self::getSchema($table_name);
 
 		if ($schema['fields'][$field_name]['type'] == self::FIELD_TYPE_TEXT) {
-			return ($DB['TYPE'] == ZBX_DB_DB2 || $DB['TYPE'] == ZBX_DB_ORACLE) ? 2048 : 65536;
+			return ($DB['TYPE'] == ZBX_DB_DB2 || $DB['TYPE'] == ZBX_DB_ORACLE) ? 2048 : 65535;
 		}
 
 		return $schema['fields'][$field_name]['length'];

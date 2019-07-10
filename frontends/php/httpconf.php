@@ -223,9 +223,6 @@ elseif (hasRequest('add') || hasRequest('update')) {
 			$step['follow_redirects'] = $step['follow_redirects']
 				? HTTPTEST_STEP_FOLLOW_REDIRECTS_ON
 				: HTTPTEST_STEP_FOLLOW_REDIRECTS_OFF;
-			$step['retrieve_mode'] = $step['retrieve_mode']
-				? HTTPTEST_STEP_RETRIEVE_MODE_HEADERS
-				: HTTPTEST_STEP_RETRIEVE_MODE_CONTENT;
 
 			foreach ($field_names as $field_name) {
 				$step[$field_name] = [];
@@ -362,6 +359,10 @@ elseif (hasRequest('add') || hasRequest('update')) {
 			}
 
 			foreach ($httpTest['steps'] as $snum => $step) {
+				if ($step['httpstepid'] < 1) {
+					unset($step['httpstepid']);
+					unset($httpTest['steps'][$snum]['httpstepid']);
+				}
 				if (array_key_exists('httpstepid', $step) && array_key_exists($step['httpstepid'], $dbHttpSteps)) {
 					$db_step = $dbHttpSteps[$step['httpstepid']];
 					$new_step = CArrayHelper::unsetEqualValues($step, $db_step, ['httpstepid']);
@@ -390,8 +391,10 @@ elseif (hasRequest('add') || hasRequest('update')) {
 			}
 
 			$httpTest['httptestid'] = $httpTestId = $_REQUEST['httptestid'];
+
 			$result = API::HttpTest()->update($httpTest);
 			if (!$result) {
+
 				throw new Exception();
 			}
 			else {
@@ -420,6 +423,7 @@ elseif (hasRequest('add') || hasRequest('update')) {
 	}
 	catch (Exception $e) {
 		DBend(false);
+
 
 		$msg = $e->getMessage();
 		if (!empty($msg)) {
@@ -702,6 +706,22 @@ if (isset($_REQUEST['form'])) {
 		);
 		while ($dbApp = DBfetch($dbApps)) {
 			$data['application_list'][$dbApp['applicationid']] = $dbApp['name'];
+		}
+	}
+
+	foreach($data['steps'] as $stepid => $step) {
+		$pairs_grouped = [
+			'query_fields' => [],
+			'post_fields' => [],
+			'variables' => [],
+			'headers' => [],
+		];
+
+		if (array_key_exists('pairs', $step)) {
+			foreach ($step['pairs'] as $field) {
+				$pairs_grouped[$field['type']][] = $field;
+			}
+			$data['steps'][$stepid]['pairs'] = $pairs_grouped;
 		}
 	}
 

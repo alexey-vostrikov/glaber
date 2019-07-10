@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -66,7 +66,7 @@ $data = [
 	'backurl' => getRequest('backurl', '')
 ];
 
-if (!CHtmlUrlValidator::validate($data['backurl'], false, true)) {
+if (!CHtmlUrlValidator::validate($data['backurl'], ['allow_user_macro' => false, 'validate_uri_schemes' => true])) {
 	$data['backurl'] = 'zabbix.php?action=dashboard.view';
 }
 

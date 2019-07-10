@@ -108,7 +108,7 @@ static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_
 		errcodes[i] = FAIL;
 
 		items[i].key = zbx_strdup(items[i].key, items[i].key_orig);
-		if (SUCCEED != substitute_key_macros(&items[i].key, NULL, &items[i], NULL,
+		if (SUCCEED != substitute_key_macros(&items[i].key, NULL, &items[i], NULL, NULL,
 				MACRO_TYPE_ITEM_KEY, error, sizeof(error)))
 		{
 			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, error));
@@ -429,11 +429,10 @@ static void	delay_trap_logs(char *error, int log_level)
  ******************************************************************************/
 static int	read_traps(void)
 {
-	const char	*__function_name = "read_traps";
-	int		nbytes = 0;
-	char		*error = NULL;
+	int	nbytes = 0;
+	char	*error = NULL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() lastsize: %lld", __function_name, (long long int)trap_lastsize);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() lastsize: %lld", __func__, (long long int)trap_lastsize);
 
 	if (-1 == lseek(trap_fd, trap_lastsize, SEEK_SET))
 	{
@@ -461,7 +460,7 @@ static int	read_traps(void)
 out:
 	zbx_free(error);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return nbytes;
 }
@@ -610,7 +609,7 @@ static int	get_latest_data(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: snmptrapper_thread                                               *
+ * Function: main_snmptrapper_loop                                            *
  *                                                                            *
  * Purpose: SNMP trap reader's entry point                                    *
  *                                                                            *
@@ -619,8 +618,7 @@ static int	get_latest_data(void)
  ******************************************************************************/
 ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 {
-	const char	*__function_name = "snmptrapper_thread";
-	double		sec;
+	double	sec;
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
@@ -629,7 +627,7 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trapfile:'%s'", __function_name, CONFIG_SNMPTRAP_FILE);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trapfile:'%s'", __func__, CONFIG_SNMPTRAP_FILE);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 

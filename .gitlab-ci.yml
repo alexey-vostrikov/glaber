@@ -1,17 +1,47 @@
+debian-jessie:
+  stage: build
+  image: debian:jessie
+  script:
+    - apt-get update
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-7-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
+    - cp -r build/debian/jessie debian
+    - autoreconf -fvi
+    - dpkg-buildpackage -b
+    - rm -rf ./debian/
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv ../*.deb releases/debian/jessie/
+    - git add -A
+    - git commit -m "committing debian jessie packages"
+    - git push origin HEAD:master
+
+  only:
+    - tags
+
 debian-stretch:
   stage: build
   image: debian:stretch
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
     - cp -r build/debian/stretch debian
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - rm -rf ./debian/
-    - mkdir -p pkgs/stretch/
-    - mv ../*.deb pkgs/stretch/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 5 --use-pget-n=10 -X .* -X .*/ --reverse --verbose stretch/ debian/stretch/; bye"
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv ../*.deb releases/debian/stretch/
+    - git add -A
+    - git commit -m "committing debian stretch packages"
+    - git push origin HEAD:master
 
   only:
     - tags
@@ -21,16 +51,47 @@ ubuntu-bionic:
   image: ubuntu:bionic
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
     - cp -r build/ubuntu/bionic debian
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - rm -rf ./debian/
-    - mkdir -p pkgs/bionic/
-    - mv ../*.deb pkgs/bionic/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 5 --use-pget-n=10 -X .* -X .*/ --reverse --verbose bionic/ ubuntu/bionic/; bye"
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv ../*.deb releases/ubuntu/bionic
+    - git add -A
+    - git commit -m "committing ubuntu bionic packages"
+    - git push origin HEAD:master
 
+  only:
+    - tags
+
+ubuntu-trusty:
+  stage: build
+  image: ubuntu:trusty
+  script:
+    - apt-get update && apt-get install -y software-properties-common
+    - add-apt-repository ppa:openjdk-r/ppa
+    - apt-get update
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
+    - cp -r build/ubuntu/trusty debian
+    - autoreconf -fvi
+    - dpkg-buildpackage -b
+    - rm -rf ./debian/
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv ../*.deb releases/ubuntu/trusty
+    - git add -A
+    - git commit -m "committing ubuntu trusty packages"
+    - git push origin HEAD:master
 
   only:
     - tags
@@ -40,16 +101,21 @@ ubuntu-xenial:
   image: ubuntu:xenial
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
     - cp -r build/ubuntu/xenial debian
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - rm -rf ./debian/
-    - mkdir -p pkgs/xenial/
-    - mv ../*.deb pkgs/xenial/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 5 --use-pget-n=10 -X .* -X .*/ --reverse --verbose xenial/ ubuntu/xenial/; bye"
-
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv ../*.deb releases/ubuntu/xenial
+    - git add -A
+    - git commit -m "committing ubuntu xenial packages"
+    - git push origin HEAD:master
 
   only:
     - tags
@@ -58,13 +124,16 @@ centos:
   stage: build
   image: centos:7
   script:
-    - yum install -y rpm-build yum-utils xz wget lftp ssh
+    - yum install -y rpm-build yum-utils xz wget git
+    - git remote set-url origin https://ovdii:${CI_PUSH_TOKEN}@gitlab.com/mikler/glaber.git
+    - git config --global user.email 'dmytro@ovdii.com'
+    - git config --global user.name '[BOT] Package Builder'
     - yum groupinstall "Development Tools" -y
     - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/fping-3.10-1.el7.x86_64.rpm
     - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/iksemel-1.4-2.el7.centos.x86_64.rpm
     - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/iksemel-devel-1.4-2.el7.centos.x86_64.rpm
     - wget https://repo.zabbix.com/non-supported/rhel/7/x86_64/iksemel-utils-1.4-2.el7.centos.x86_64.rpm
-    - wget http://www.sns.ias.edu/PU_IAS/puias/computational/7.5/x86_64/automake115-1.15-9.sdl7.noarch.rpm
+    - wget http://springdale.math.ias.edu/data/puias/computational/7/x86_64/automake115-1.15-9.sdl7.noarch.rpm
     - yum install -y *.rpm
     - rm -rf *.rpm
     - cd ..
@@ -73,14 +142,16 @@ centos:
     - mv zabbix-4.0.8.tar.gz glaber/build/centos/7/SOURCES/zabbix-4.0.8.tar.gz
     - cd glaber/build/centos/7/
     - yum-builddep -y SPECS/zabbix.spec
-    - export CFLAGS='-O2 -std=gnu99 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches   -m64 -mtune=generic'
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES"
     - rm SOURCES/zabbix-4.0.8.tar.gz
     - cd ../../../
-    - mkdir -p pkgs/centos7/
-    - mv /root/rpmbuild/RPMS/* pkgs/centos7/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 5 --use-pget-n=10 -X .* -X .*/ --reverse --verbose centos7/ centos/7/; bye"
+    - git stash -u
+    - git checkout master
+    - git pull
+    - mv /root/rpmbuild/RPMS/* releases/centos/7/
+    - git add -A
+    - git commit -m "committing centos packages"
+    - git push origin HEAD:master
 
   only:
     - tags

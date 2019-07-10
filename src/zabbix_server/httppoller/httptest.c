@@ -51,12 +51,9 @@ typedef struct
 }
 zbx_httppage_t;
 
-#define ZBX_RETRIEVE_MODE_CONTENT	0
-#define ZBX_RETRIEVE_MODE_HEADERS	1
-
 static zbx_httppage_t	page;
 
-static size_t	WRITEFUNCTION2(void *ptr, size_t size, size_t nmemb, void *userdata)
+static size_t	curl_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	size_t	r_size = size * nmemb;
 
@@ -75,7 +72,7 @@ static size_t	WRITEFUNCTION2(void *ptr, size_t size, size_t nmemb, void *userdat
 	return r_size;
 }
 
-static size_t	HEADERFUNCTION2(void *ptr, size_t size, size_t nmemb, void *userdata)
+static size_t	curl_ignore_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	ZBX_UNUSED(ptr);
 	ZBX_UNUSED(userdata);
@@ -114,8 +111,6 @@ static void	httptest_remove_macros(zbx_httptest_t *httptest)
 static void	process_test_data(zbx_uint64_t httptestid, int lastfailedstep, double speed_download,
 		const char *err_str, zbx_timespec_t *ts)
 {
-	const char	*__function_name = "process_test_data";
-
 	DB_RESULT	result;
 	DB_ROW		row;
 	unsigned char	types[3];
@@ -125,7 +120,7 @@ static void	process_test_data(zbx_uint64_t httptestid, int lastfailedstep, doubl
 	size_t		i, num = 0;
 	AGENT_RESULT	value;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	result = DBselect("select type,itemid from httptestitem where httptestid=" ZBX_FS_UI64, httptestid);
 
@@ -202,7 +197,7 @@ static void	process_test_data(zbx_uint64_t httptestid, int lastfailedstep, doubl
 		DCconfig_clean_items(items, errcodes, num);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -265,8 +260,6 @@ static void	httppairs_free(zbx_vector_ptr_pair_t *pairs)
 #ifdef HAVE_LIBCURL
 static void	process_step_data(zbx_uint64_t httpstepid, zbx_httpstat_t *stat, zbx_timespec_t *ts)
 {
-	const char	*__function_name = "process_step_data";
-
 	DB_RESULT	result;
 	DB_ROW		row;
 	unsigned char	types[3];
@@ -277,7 +270,7 @@ static void	process_step_data(zbx_uint64_t httpstepid, zbx_httpstat_t *stat, zbx
 	AGENT_RESULT	value;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() rspcode:%ld time:" ZBX_FS_DBL " speed:" ZBX_FS_DBL,
-			__function_name, stat->rspcode, stat->total_time, stat->speed_download);
+			__func__, stat->rspcode, stat->total_time, stat->speed_download);
 
 	result = DBselect("select type,itemid from httpstepitem where httpstepid=" ZBX_FS_UI64, httpstepid);
 
@@ -347,7 +340,7 @@ static void	process_step_data(zbx_uint64_t httpstepid, zbx_httpstat_t *stat, zbx
 		DCconfig_clean_items(items, errcodes, num);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -642,8 +635,6 @@ out:
  ******************************************************************************/
 static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 {
-	const char	*__function_name = "process_httptest";
-
 	DB_RESULT	result;
 	DB_HTTPSTEP	db_httpstep;
 	char		*err_str = NULL, *buffer = NULL;
@@ -662,7 +653,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 #endif
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() httptestid:" ZBX_FS_UI64 " name:'%s'",
-			__function_name, httptest->httptest.httptestid, httptest->httptest.name);
+			__func__, httptest->httptest.httptestid, httptest->httptest.name);
 
 	result = DBselect(
 			"select httpstepid,no,name,url,timeout,posts,required,status_codes,post_type,follow_redirects,"
@@ -697,8 +688,6 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 	if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_PROXY, httptest->httptest.http_proxy)) ||
 			CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_COOKIEFILE, "")) ||
 			CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_USERAGENT, httptest->httptest.agent)) ||
-			CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WRITEFUNCTION2)) ||
-			CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_HEADERFUNCTION, HEADERFUNCTION2)) ||
 			CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_ERRORBUFFER, errbuf)))
 	{
 		err_str = zbx_strdup(err_str, curl_easy_strerror(err));
@@ -719,6 +708,8 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 	{
 		struct curl_slist	*headers_slist = NULL;
 		char			*header_cookie = NULL;
+		size_t			(*curl_header_cb)(void *ptr, size_t size, size_t nmemb, void *userdata);
+		size_t			(*curl_body_cb)(void *ptr, size_t size, size_t nmemb, void *userdata);
 
 		/* NOTE: do not break or return from this block! */
 		/*       process_step_data() call is required! */
@@ -779,8 +770,8 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 
 		memset(&stat, 0, sizeof(stat));
 
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() use step \"%s\"", __function_name, db_httpstep.name);
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() use post \"%s\"", __function_name, ZBX_NULL2EMPTY_STR(httpstep.posts));
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() use step \"%s\"", __func__, db_httpstep.name);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() use post \"%s\"", __func__, ZBX_NULL2EMPTY_STR(httpstep.posts));
 
 		if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_POSTFIELDS, httpstep.posts)))
 		{
@@ -832,6 +823,32 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 			goto httpstep_error;
 		}
 
+		switch (db_httpstep.retrieve_mode)
+		{
+			case ZBX_RETRIEVE_MODE_CONTENT:
+				curl_header_cb = curl_ignore_cb;
+				curl_body_cb = curl_write_cb;
+				break;
+			case ZBX_RETRIEVE_MODE_BOTH:
+				curl_header_cb = curl_body_cb = curl_write_cb;
+				break;
+			case ZBX_RETRIEVE_MODE_HEADERS:
+				curl_header_cb = curl_write_cb;
+				curl_body_cb = curl_ignore_cb;
+				break;
+			default:
+				THIS_SHOULD_NEVER_HAPPEN;
+				err_str = zbx_strdup(err_str, "invalid retrieve mode");
+				goto httpstep_error;
+		}
+
+		if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, curl_body_cb)) ||
+				CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_HEADERFUNCTION, curl_header_cb)))
+		{
+			err_str = zbx_strdup(err_str, curl_easy_strerror(err));
+			goto httpstep_error;
+		}
+
 		/* enable/disable fetching the body */
 		if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_NOBODY,
 				ZBX_RETRIEVE_MODE_HEADERS == db_httpstep.retrieve_mode ? 1L : 0L)))
@@ -846,7 +863,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 			goto httpstep_error;
 		}
 
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() go to URL \"%s\"", __function_name, httpstep.url);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() go to URL \"%s\"", __func__, httpstep.url);
 
 		if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_TIMEOUT, (long)db_httpstep.timeout)) ||
 				CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_URL, httpstep.url)))
@@ -871,8 +888,9 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 
 		if (CURLE_OK == err)
 		{
-			zabbix_log(LOG_LEVEL_TRACE, "%s() page.data from %s:'%s'", __function_name, httpstep.url,
-					page.data);
+			char	*var_err_str = NULL;
+
+			zabbix_log(LOG_LEVEL_TRACE, "%s() page.data from %s:'%s'", __func__, httpstep.url, page.data);
 
 			/* first get the data that is needed even if step fails */
 			if (CURLE_OK != (err = curl_easy_getinfo(easyhandle, CURLINFO_RESPONSE_CODE, &stat.rspcode)))
@@ -904,52 +922,45 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 				speed_download_num++;
 			}
 
-			if (ZBX_RETRIEVE_MODE_CONTENT == db_httpstep.retrieve_mode)
+			/* required pattern */
+			if (NULL == err_str && '\0' != *db_httpstep.required &&
+					NULL == zbx_regexp_match(page.data, db_httpstep.required, NULL))
 			{
-				char	*var_err_str = NULL;
-
-				/* required pattern */
-				if (NULL == err_str && '\0' != *db_httpstep.required &&
-						NULL == zbx_regexp_match(page.data, db_httpstep.required, NULL))
-				{
-					err_str = zbx_dsprintf(err_str, "required pattern \"%s\" was not found on %s",
-							db_httpstep.required, httpstep.url);
-				}
-
-				/* variables defined in scenario */
-				if (NULL == err_str && FAIL == http_process_variables(httptest,
-						&httptest->variables, page.data, &var_err_str))
-				{
-					char	*variables = NULL;
-					size_t	alloc_len = 0, offset;
-
-					httpstep_pairs_join(&variables, &alloc_len, &offset, "=", " ",
-							&httptest->variables);
-
-					err_str = zbx_dsprintf(err_str, "error in scenario variables \"%s\": %s",
-							variables, var_err_str);
-
-					zbx_free(variables);
-				}
-
-				/* variables defined in a step */
-				if (NULL == err_str && FAIL == http_process_variables(httptest, &httpstep.variables,
-						page.data, &var_err_str))
-				{
-					char	*variables = NULL;
-					size_t	alloc_len = 0, offset;
-
-					httpstep_pairs_join(&variables, &alloc_len, &offset, "=", " ",
-							&httpstep.variables);
-
-					err_str = zbx_dsprintf(err_str, "error in step variables \"%s\": %s",
-							variables, var_err_str);
-
-					zbx_free(variables);
-				}
-
-				zbx_free(var_err_str);
+				err_str = zbx_dsprintf(err_str, "required pattern \"%s\" was not found on %s",
+						db_httpstep.required, httpstep.url);
 			}
+
+			/* variables defined in scenario */
+			if (NULL == err_str && FAIL == http_process_variables(httptest, &httptest->variables, page.data,
+					&var_err_str))
+			{
+				char	*variables = NULL;
+				size_t	alloc_len = 0, offset;
+
+				httpstep_pairs_join(&variables, &alloc_len, &offset, "=", " ", &httptest->variables);
+
+				err_str = zbx_dsprintf(err_str, "error in scenario variables \"%s\": %s", variables,
+						var_err_str);
+
+				zbx_free(variables);
+			}
+
+			/* variables defined in a step */
+			if (NULL == err_str && FAIL == http_process_variables(httptest, &httpstep.variables, page.data,
+					&var_err_str))
+			{
+				char	*variables = NULL;
+				size_t	alloc_len = 0, offset;
+
+				httpstep_pairs_join(&variables, &alloc_len, &offset, "=", " ", &httpstep.variables);
+
+				err_str = zbx_dsprintf(err_str, "error in step variables \"%s\": %s", variables,
+						var_err_str);
+
+				zbx_free(variables);
+			}
+
+			zbx_free(var_err_str);
 
 			zbx_timespec(&ts);
 			process_step_data(db_httpstep.httpstepid, &stat, &ts);
@@ -1038,7 +1049,7 @@ httptest_error:
 	zbx_free(err_str);
 	zbx_preprocessor_flush();
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -1058,15 +1069,13 @@ httptest_error:
  ******************************************************************************/
 int	process_httptests(int httppoller_num, int now)
 {
-	const char	*__function_name = "process_httptests";
-
 	DB_RESULT	result;
 	DB_ROW		row;
 	zbx_httptest_t	httptest;
 	DC_HOST		host;
 	int		httptests_count = 0;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	/* create macro cache to use in http tests */
 	zbx_vector_ptr_pair_create(&httptest.macros);
@@ -1178,7 +1187,7 @@ int	process_httptests(int httppoller_num, int now)
 
 	DBfree_result(result);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return httptests_count;
 }

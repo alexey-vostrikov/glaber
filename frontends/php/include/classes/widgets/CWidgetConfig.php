@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -162,6 +162,8 @@ class CWidgetConfig {
 	/**
 	 * Detect if widget uses time selector.
 	 *
+	 * @static
+	 *
 	 * @param array $widget
 	 * @param array $widget[type]
 	 * @param array $widget[fields]
@@ -178,6 +180,26 @@ class CWidgetConfig {
 
 			default:
 				return false;
+		}
+	}
+
+	/**
+	 * Is it allowed for the widget to have scrollable content.
+	 *
+	 * @static
+	 *
+	 * @param string $type  Widget type - 'WIDGET_' constant.
+	 *
+	 * @return bool
+	 */
+	public static function isScrollable($type) {
+		switch ($type) {
+			case WIDGET_GRAPH:
+			case WIDGET_SVG_GRAPH:
+				return false;
+
+			default:
+				return true;
 		}
 	}
 

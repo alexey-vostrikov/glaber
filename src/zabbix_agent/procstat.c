@@ -378,13 +378,11 @@ static void	procstat_reattach(void)
  ******************************************************************************/
 static void	procstat_copy_data(void *dst, size_t size_dst, const void *src)
 {
-	const char		*__function_name = "procstat_copy_data";
-
 	int			offset, *query_offset;
 	zbx_procstat_header_t	*hdst = (zbx_procstat_header_t *)dst;
 	zbx_procstat_query_t	*qsrc, *qdst = NULL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	hdst->size = size_dst;
 	hdst->size_allocated = PROCSTAT_ALIGNED_HEADER_SIZE;
@@ -413,7 +411,7 @@ static void	procstat_copy_data(void *dst, size_t size_dst, const void *src)
 		}
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -489,14 +487,13 @@ static	zbx_procstat_query_t	*procstat_get_query(void *base, const char *procname
  ******************************************************************************/
 static void	procstat_add(const char *procname, const char *username, const char *cmdline, zbx_uint64_t flags)
 {
-	const char		*__function_name = "procstat_add";
 	char			*errmsg = NULL;
 	size_t			size = 0;
 	zbx_procstat_query_t	*query;
 	zbx_procstat_header_t	*header;
 	int			query_offset;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	/* when allocating a new collection reserve space for procstat header */
 	if (0 == collector->procstat.size)
@@ -553,7 +550,7 @@ static void	procstat_add(const char *procname, const char *username, const char 
 	query->next = header->queries;
 	header->queries = query_offset;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************

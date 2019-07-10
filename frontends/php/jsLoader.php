@@ -58,6 +58,7 @@ $availableJScripts = [
 	'dom.js' => '',
 	'servercheck.js' => '',
 	'flickerfreescreen.js' => '',
+	'multilineinput.js' => '',
 	'multiselect.js' => '',
 	'colorpicker.js' => '',
 	'chkbxrange.js' => '',
@@ -212,6 +213,12 @@ $tranStrings = [
 		'S_COLLAPSE' => _('Collapse'),
 		'S_CLOSE' => _('Close')
 	],
+	'multilineinput.js' => [
+		'S_N_SYMBOLS_REMAINING' => _('%1$s symbols remaining'),
+		'S_CLICK_TO_VIEW_OR_EDIT' => _('Click to view or edit'),
+		'S_APPLY' => _('Apply'),
+		'S_CANCEL' => _('Cancel')
+	],
 	'multiselect.js' => [
 		'No matches found' => _('No matches found'),
 		'More matches found...' => _('More matches found...'),
@@ -236,6 +243,7 @@ $tranStrings = [
 		'Create new' => _('Create new'),
 		'Create trigger' => _('Create trigger'),
 		'Create dependent item' => _('Create dependent item'),
+		'Create dependent discovery rule' => _('Create dependent discovery rule'),
 		'Delete' => _('Delete'),
 		'Delete dashboard?' => _('Delete dashboard?'),
 		'Description' => _('Description'),
@@ -296,7 +304,7 @@ $tranStrings = [
 	],
 	'common.js' => [
 		'Cancel' => _('Cancel')
-	]
+	],
 ];
 
 if (empty($_GET['files'])) {

@@ -19,7 +19,7 @@ dnl
 
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([Zabbix],[4.0.8rc1])
+AC_INIT([Zabbix],[4.2.4])
 AC_CONFIG_SRCDIR(src/zabbix_server/server.c)
 AM_INIT_AUTOMAKE([subdir-objects])
 
@@ -1594,6 +1594,10 @@ if test "x$server" = "xyes"; then
 	have_ipcservice="yes"
 fi
 
+if test "x$proxy" = "xyes"; then
+	have_ipcservice="yes"
+fi
+
 AM_CONDITIONAL(PROXY_IPCSERVICE, [test "x$have_ipmi" = "xyes"])
 
 dnl Check for libevent, used by Zabbix IPC services
@@ -1608,10 +1612,8 @@ if test "x$have_ipcservice" = "xyes"; then
 	SERVER_LDFLAGS="$SERVER_LDFLAGS $LIBEVENT_LDFLAGS"
 	SERVER_LIBS="$SERVER_LIBS $LIBEVENT_LIBS"
 
-	if test "x$have_ipmi" = "xyes"; then
-		PROXY_LDFLAGS="$PROXY_LDFLAGS $LIBEVENT_LDFLAGS"
-		PROXY_LIBS="$PROXY_LIBS $LIBEVENT_LIBS"
-	fi
+	PROXY_LDFLAGS="$PROXY_LDFLAGS $LIBEVENT_LDFLAGS"
+	PROXY_LIBS="$PROXY_LIBS $LIBEVENT_LIBS"
 fi
 
 dnl Check for mbed TLS (PolarSSL) libpolarssl [by default - skip]
@@ -1736,6 +1738,8 @@ SERVER_LIBS="$SERVER_LIBS $LIBCURL_LIBS"
 PROXY_LDFLAGS="$PROXY_LDFLAGS $LIBCURL_LDFLAGS"
 PROXY_LIBS="$PROXY_LIBS $LIBCURL_LIBS"
 
+AM_CONDITIONAL(HAVE_LIBCURL, test "x$found_curl" = "xyes")
+
 dnl Starting from 2.0 agent can do web monitoring
 AGENT_LDFLAGS="$AGENT_LDFLAGS $LIBCURL_LDFLAGS"
 AGENT_LIBS="$AGENT_LIBS $LIBCURL_LIBS"
@@ -1840,8 +1844,6 @@ dnl *                 Output configuration results                  *
 dnl *                                                               *
 dnl *****************************************************************
 
-sinclude([conf_tests.m4])
-m4_ifdef([CONF_TESTS],[CONF_TESTS(ZBXCMOCKA)])
 
 AC_OUTPUT([
 	Makefile
@@ -1895,6 +1897,8 @@ AC_OUTPUT([
 	src/libs/zbxipcservice/Makefile
 	src/libs/zbxhistory/Makefile
 	src/libs/zbxcompress/Makefile
+	src/libs/zbxembed/Makefile
+	src/libs/zbxprometheus/Makefile
 	src/zabbix_agent/Makefile
 	src/zabbix_get/Makefile
 	src/zabbix_sender/Makefile
@@ -1919,6 +1923,7 @@ AC_OUTPUT([
 	src/zabbix_server/odbc/Makefile
 	src/zabbix_server/scripts/Makefile
 	src/zabbix_server/preprocessor/Makefile
+	src/zabbix_server/lld/Makefile
 	src/zabbix_proxy/Makefile
 	src/zabbix_proxy/heart/Makefile
 	src/zabbix_proxy/housekeeper/Makefile

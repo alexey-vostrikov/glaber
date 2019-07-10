@@ -774,7 +774,6 @@ static ssize_t	zbx_tcp_write(zbx_socket_t *s, const char *buf, size_t len)
  ******************************************************************************/
 
 #define ZBX_TCP_HEADER_DATA	"ZBXD"
-#define ZBX_TCP_HEADER		ZBX_TCP_HEADER_DATA ZBX_TCP_HEADER_VERSION
 #define ZBX_TCP_HEADER_LEN	ZBX_CONST_STRLEN(ZBX_TCP_HEADER_DATA)
 
 int	zbx_tcp_send_ext(zbx_socket_t *s, const char *data, size_t len, unsigned char flags, int timeout)
@@ -1673,8 +1672,6 @@ ssize_t	zbx_tcp_recv_ext(zbx_socket_t *s, int timeout)
 #define ZBX_TCP_EXPECT_LENGTH		4
 #define ZBX_TCP_EXPECT_SIZE		5
 
-	const char	*__function_name = "zbx_tcp_recv_ext";
-
 	ssize_t		nbytes;
 	size_t		buf_dyn_bytes = 0, buf_stat_bytes = 0, offset = 0;
 	zbx_uint32_t	expected_len = 16 * ZBX_MEBIBYTE, reserved = 0;
@@ -1836,7 +1833,7 @@ ssize_t	zbx_tcp_recv_ext(zbx_socket_t *s, int timeout)
 				s->read_bytes = reserved;
 
 				zabbix_log(LOG_LEVEL_TRACE, "%s(): received " ZBX_FS_SIZE_T " bytes with"
-						" compression ratio %.1f", __function_name,
+						" compression ratio %.1f", __func__,
 						(zbx_fs_size_t)(buf_stat_bytes + buf_dyn_bytes),
 						(double)reserved / (buf_stat_bytes + buf_dyn_bytes));
 			}

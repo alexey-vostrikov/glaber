@@ -102,7 +102,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_lib_ibm_db2.m4 \
 	$(top_srcdir)/m4/netsnmp.m4 $(top_srcdir)/m4/openipmi.m4 \
 	$(top_srcdir)/m4/pcre.m4 $(top_srcdir)/m4/pthread.m4 \
 	$(top_srcdir)/m4/resolv.m4 $(top_srcdir)/m4/zlib.m4 \
-	$(top_srcdir)/conf_tests.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -331,10 +331,12 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 @DBSCHEMA_TRUE@DATABASE = postgresql
+@DBSCHEMA_TRUE@DB_EXTENSION = timescaledb
 EXTRA_DIST = \
 	data.sql \
 	images.sql \
-	schema.sql
+	schema.sql \
+	$(DB_EXTENSION).sql
 
 all: all-am
 
@@ -526,6 +528,9 @@ uninstall-am:
 
 @DBSCHEMA_TRUE@schema.sql: $(top_srcdir)/create/src/schema.tmpl
 @DBSCHEMA_TRUE@	$(top_srcdir)/create/bin/gen_schema.pl $(DATABASE) > schema.sql
+
+@DBSCHEMA_TRUE@$(DB_EXTENSION).sql:
+@DBSCHEMA_TRUE@	$(top_srcdir)/create/bin/gen_schema.pl $(DB_EXTENSION) > $(DB_EXTENSION).sql
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

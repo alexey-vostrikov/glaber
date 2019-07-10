@@ -98,6 +98,7 @@ class ZBase {
 		require_once $this->getRootDir().'/include/draw.inc.php';
 		require_once $this->getRootDir().'/include/events.inc.php';
 		require_once $this->getRootDir().'/include/graphs.inc.php';
+		require_once $this->getRootDir().'/include/hostgroups.inc.php';
 		require_once $this->getRootDir().'/include/hosts.inc.php';
 		require_once $this->getRootDir().'/include/httptest.inc.php';
 		require_once $this->getRootDir().'/include/ident.inc.php';
@@ -152,30 +153,11 @@ class ZBase {
 		if (hasRequest('action')) {
 			$router = new CRouter(getRequest('action'));
 
-			if ($router->getLayout() === 'layout.htmlpage') {
-				$this->checkAssetsCache();
-			}
-
 			if ($router->getController() !== null) {
 				CProfiler::getInstance()->start();
 				$this->processRequest($router);
 				exit;
 			}
-		}
-		elseif ($mode == self::EXEC_MODE_DEFAULT && basename($_SERVER['SCRIPT_NAME']) !== 'cachewarning.php'
-				&& basename($_SERVER['SCRIPT_NAME']) !== 'jsrpc.php') {
-			$this->checkAssetsCache();
-		}
-	}
-
-	/**
-	 * Redirect user to cachewarning.php page if assets cache is not ready.
-	 */
-	public function checkAssetsCache() {
-		if ((new CAssetsFileCache(ZBase::getRootDir()))->build() === false) {
-			redirect('cachewarning.php');
-
-			exit;
 		}
 	}
 
@@ -216,6 +198,7 @@ class ZBase {
 			$this->rootDir.'/include/classes/mvc',
 			$this->rootDir.'/include/classes/api',
 			$this->rootDir.'/include/classes/api/services',
+			$this->rootDir.'/include/classes/api/helpers',
 			$this->rootDir.'/include/classes/api/managers',
 			$this->rootDir.'/include/classes/api/clients',
 			$this->rootDir.'/include/classes/api/wrappers',

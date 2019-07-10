@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@
 #include "sysinfo.h"
 
 ZBX_METRIC	parameters_specific[] =
-/* 	KEY			FLAG		FUNCTION 		TEST PARAMETERS */
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
 {
 	{"kernel.maxfiles",	0,		KERNEL_MAXFILES,	NULL},
-	{"kernel.maxproc",	0,		KERNEL_MAXPROC, 	NULL},
+	{"kernel.maxproc",	0,		KERNEL_MAXPROC,		NULL},
 
-	{"vfs.fs.size",		CF_HAVEPARAMS,	VFS_FS_SIZE, 		"/"},
+	{"vfs.fs.size",		CF_HAVEPARAMS,	VFS_FS_SIZE,		"/"},
 	{"vfs.fs.inode",	CF_HAVEPARAMS,	VFS_FS_INODE,		"/,free"},
 	{"vfs.fs.discovery",	0,		VFS_FS_DISCOVERY,	NULL},
 

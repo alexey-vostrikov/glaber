@@ -19,7 +19,6 @@
 **/
 
 
-require_once dirname(__FILE__).'/../../include/hostgroups.inc.php';
 require_once dirname(__FILE__).'/../../include/hosts.inc.php';
 require_once dirname(__FILE__).'/../../include/triggers.inc.php';
 require_once dirname(__FILE__).'/../../include/items.inc.php';
@@ -127,6 +126,18 @@ class CControllerPopupGeneric extends CController {
 				'form' => [
 					'name' => 'applicationform',
 					'id' => 'applications'
+				],
+				'table_columns' => [
+					_('Name')
+				]
+			],
+			'application_prototypes' => [
+				'title' => _('Application prototypes'),
+				'min_user_type' => USER_TYPE_ZABBIX_ADMIN,
+				'allowed_src_fields' => 'application_prototypeid,name',
+				'form' => [
+					'name' => 'application_prototype_form',
+					'id' => 'application_prototypes'
 				],
 				'table_columns' => [
 					_('Name')
@@ -725,7 +736,7 @@ class CControllerPopupGeneric extends CController {
 
 				$records = API::HostGroup()->get($options);
 				if (array_key_exists('enrich_parent_groups', $page_options)) {
-					$records = CPageFilter::enrichParentGroups($records, [
+					$records = enrichParentGroups($records, [
 						'real_hosts' => null
 					] + $options);
 				}
@@ -733,7 +744,7 @@ class CControllerPopupGeneric extends CController {
 				CArrayHelper::sort($records, ['name']);
 				$records = CArrayHelper::renameObjectsKeys($records, ['groupid' => 'id']);
 				break;
-		
+
 			case 'help_items':
 				$records = (new CHelpItems())->getByType($page_options['itemtype']);
 				break;
@@ -865,6 +876,33 @@ class CControllerPopupGeneric extends CController {
 				$records = API::Application()->get($options);
 				CArrayHelper::sort($records, ['name']);
 				$records = CArrayHelper::renameObjectsKeys($records, ['applicationid' => 'id']);
+				break;
+
+			case 'application_prototypes':
+				$parent_discoveryid = $this->getInput('parent_discoveryid');
+
+				$discovery_rules = API::DiscoveryRule()->get([
+					'output' => [],
+					'selectApplicationPrototypes' => ['application_prototypeid', 'name'],
+					'itemids' => [$parent_discoveryid]
+				]);
+
+				if ($discovery_rules) {
+					$discovery_rule = $discovery_rules[0];
+
+					if ($discovery_rule['applicationPrototypes']) {
+						CArrayHelper::sort($discovery_rule['applicationPrototypes'], [
+							['field' => 'name', 'order' => ZBX_SORT_UP]
+						]);
+
+						foreach ($discovery_rule['applicationPrototypes'] as $application_prototype) {
+							$records[$application_prototype['application_prototypeid']] = [
+								'id' => $application_prototype['application_prototypeid'],
+								'name' => $application_prototype['name']
+							];
+						}
+					}
+				}
 				break;
 
 			case 'graphs':

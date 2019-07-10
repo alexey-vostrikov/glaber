@@ -274,7 +274,7 @@ out:
 }
 
 static char	*smtp_prepare_payload(zbx_vector_ptr_t *from_mails, zbx_vector_ptr_t *to_mails,
-		const char *mailsubject, const char *mailbody)
+		const char *mailsubject, const char *mailbody, unsigned char content_type)
 {
 	char		*tmp = NULL, *base64 = NULL, *base64_lf;
 	char		*localsubject = NULL, *localbody = NULL, *from = NULL, *to = NULL;
@@ -352,12 +352,14 @@ static char	*smtp_prepare_payload(zbx_vector_ptr_t *from_mails, zbx_vector_ptr_t
 			"Date: %s\r\n"
 			"Subject: %s\r\n"
 			"MIME-Version: 1.0\r\n"
-			"Content-Type: text/plain; charset=\"UTF-8\"\r\n"
+			"Content-Type: %s; charset=\"UTF-8\"\r\n"
 			"Content-Transfer-Encoding: base64\r\n"
 			"\r\n"
 			"%s",
 			from, to,
-			str_time, localsubject, localbody);
+			str_time, localsubject,
+			ZBX_MEDIA_CONTENT_TYPE_HTML == content_type ? "text/html" : "text/plain",
+			localbody);
 
 	zbx_free(localsubject);
 	zbx_free(localbody);
@@ -411,7 +413,7 @@ out:
 
 static int	send_email_plain(const char *smtp_server, unsigned short smtp_port, const char *smtp_helo,
 		zbx_vector_ptr_t *from_mails, zbx_vector_ptr_t *to_mails, const char *mailsubject,
-		const char *mailbody, int timeout, char *error, size_t max_error_len)
+		const char *mailbody, unsigned char content_type, int timeout, char *error, size_t max_error_len)
 {
 	zbx_socket_t	s;
 	int		err, ret = FAIL, i;
@@ -548,7 +550,7 @@ static int	send_email_plain(const char *smtp_server, unsigned short smtp_port, c
 		goto close;
 	}
 
-	cmdp = smtp_prepare_payload(from_mails, to_mails, mailsubject, mailbody);
+	cmdp = smtp_prepare_payload(from_mails, to_mails, mailsubject, mailbody, content_type);
 	err = write(s.socket, cmdp, strlen(cmdp));
 	zbx_free(cmdp);
 
@@ -604,11 +606,9 @@ static int	send_email_curl(const char *smtp_server, unsigned short smtp_port, co
 		zbx_vector_ptr_t *from_mails, zbx_vector_ptr_t *to_mails, const char *mailsubject,
 		const char *mailbody, unsigned char smtp_security, unsigned char smtp_verify_peer,
 		unsigned char smtp_verify_host, unsigned char smtp_authentication, const char *username,
-		const char *password, int timeout, char *error, size_t max_error_len)
+		const char *password, unsigned char content_type, int timeout, char *error, size_t max_error_len)
 {
 #ifdef HAVE_SMTP_AUTHENTICATION
-	const char		*__function_name = "send_email_curl";
-
 	int			ret = FAIL, i;
 	CURL			*easyhandle;
 	CURLcode		err;
@@ -681,7 +681,7 @@ static int	send_email_curl(const char *smtp_server, unsigned short smtp_port, co
 
 	if (0 >= from_mails->values_num)
 	{
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() sender's address is not specified", __function_name);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() sender's address is not specified", __func__);
 	}
 	else if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_MAIL_FROM,
 			((zbx_mailaddr_t *)from_mails->values[0])->addr)))
@@ -695,7 +695,7 @@ static int	send_email_curl(const char *smtp_server, unsigned short smtp_port, co
 	if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_MAIL_RCPT, recipients)))
 		goto error;
 
-	payload_status.payload = smtp_prepare_payload(from_mails, to_mails, mailsubject, mailbody);
+	payload_status.payload = smtp_prepare_payload(from_mails, to_mails, mailsubject, mailbody, content_type);
 	payload_status.payload_len = strlen(payload_status.payload);
 
 	if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_UPLOAD, 1L)) ||
@@ -754,6 +754,7 @@ out:
 	ZBX_UNUSED(smtp_authentication);
 	ZBX_UNUSED(username);
 	ZBX_UNUSED(password);
+	ZBX_UNUSED(content_type);
 	ZBX_UNUSED(timeout);
 
 	zbx_strlcpy(error, "Support for SMTP authentication was not compiled in", max_error_len);
@@ -780,16 +781,14 @@ static void	zbx_mailaddr_free(zbx_mailaddr_t *mailaddr)
 int	send_email(const char *smtp_server, unsigned short smtp_port, const char *smtp_helo,
 		const char *smtp_email, const char *mailto, const char *mailsubject, const char *mailbody,
 		unsigned char smtp_security, unsigned char smtp_verify_peer, unsigned char smtp_verify_host,
-		unsigned char smtp_authentication, const char *username, const char *password, int timeout,
-		char *error, size_t max_error_len)
+		unsigned char smtp_authentication, const char *username, const char *password,
+		unsigned char content_type, int timeout, char *error, size_t max_error_len)
 {
-	const char	*__function_name = "send_email";
-
 	int			ret = FAIL;
 	zbx_vector_ptr_t	from_mails, to_mails;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() smtp_server:'%s' smtp_port:%hu smtp_security:%d smtp_authentication:%d",
-			__function_name, smtp_server, smtp_port, (int)smtp_security, (int)smtp_authentication);
+			__func__, smtp_server, smtp_port, (int)smtp_security, (int)smtp_authentication);
 
 	*error = '\0';
 
@@ -807,13 +806,13 @@ int	send_email(const char *smtp_server, unsigned short smtp_port, const char *sm
 	if (SMTP_SECURITY_NONE == smtp_security && SMTP_AUTHENTICATION_NONE == smtp_authentication)
 	{
 		ret = send_email_plain(smtp_server, smtp_port, smtp_helo, &from_mails, &to_mails, mailsubject,
-				mailbody, timeout, error, max_error_len);
+				mailbody, content_type, timeout, error, max_error_len);
 	}
 	else
 	{
 		ret = send_email_curl(smtp_server, smtp_port, smtp_helo, &from_mails, &to_mails, mailsubject,
 				mailbody, smtp_security, smtp_verify_peer, smtp_verify_host, smtp_authentication,
-				username, password, timeout, error, max_error_len);
+				username, password, content_type, timeout, error, max_error_len);
 	}
 
 clean:
@@ -827,7 +826,7 @@ clean:
 	if ('\0' != *error)
 		zabbix_log(LOG_LEVEL_WARNING, "failed to send email: %s", error);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }

@@ -445,20 +445,22 @@ function zbx_num2bitstr($num, $rev = false) {
  *
  * @param string $val
  *
- * @return string
+ * @return int
  */
 function str2mem($val) {
-	$unit = strtolower(substr($val, -1));
+	$val = trim($val);
+	$last = strtolower(substr($val, -1));
+	$val = (int) $val;
 
-	switch ($unit) {
+	switch ($last) {
 		case 'g':
-			$val = bcmul(substr($val, 0, -1), ZBX_GIBIBYTE, 0);
+			$val *= ZBX_GIBIBYTE;
 			break;
 		case 'm':
-			$val = bcmul(substr($val, 0, -1), ZBX_MEBIBYTE, 0);
+			$val *= ZBX_MEBIBYTE;
 			break;
 		case 'k':
-			$val = bcmul(substr($val, 0, -1), ZBX_KIBIBYTE, 0);
+			$val *= ZBX_KIBIBYTE;
 			break;
 	}
 
@@ -474,21 +476,16 @@ function str2mem($val) {
  */
 function mem2str($size) {
 	$prefix = 'B';
-	if (bccomp($size, ZBX_MEBIBYTE) == 1) {
-		$size = bcdiv($size, ZBX_MEBIBYTE, ZBX_UNITS_ROUNDOFF_LOWER_LIMIT);
+	if ($size > ZBX_MEBIBYTE) {
+		$size = $size / ZBX_MEBIBYTE;
 		$prefix = 'M';
 	}
-	elseif (bccomp($size, ZBX_KIBIBYTE) == 1) {
-		$size = bcdiv($size, ZBX_KIBIBYTE, ZBX_UNITS_ROUNDOFF_LOWER_LIMIT);
+	elseif ($size > ZBX_KIBIBYTE) {
+		$size = $size / ZBX_KIBIBYTE;
 		$prefix = 'K';
 	}
 
-	if (strpos($size, '.') !== false) {
-		$size = rtrim($size, '0');
-		$size = rtrim($size, '.');
-	}
-
-	return $size.$prefix;
+	return round($size, ZBX_UNITS_ROUNDOFF_LOWER_LIMIT).$prefix;
 }
 
 function convertUnitsUptime($value) {
@@ -1087,42 +1084,6 @@ function zbx_nl2br($str) {
 
 function zbx_formatDomId($value) {
 	return str_replace(['[', ']'], ['_', ''], $value);
-}
-
-/**
- * Sort an array of objects so that the objects whose $column value matches $pattern are at the top.
- * Return the first $limit objects.
- *
- * @param array 	$table		array of objects to sort
- * @param string 	$column		name of the $column to search
- * @param string 	$pattern	string to match the value of $column against
- * @param int		$limit		number of objects to return
- *
- * @return array
- */
-function selectByPattern(array $table, $column, $pattern, $limit) {
-	$chunk_size = $limit;
-
-	$rsTable = [];
-	foreach ($table as $num => $row) {
-		if (mb_strtolower($row[$column]) === mb_strtolower($pattern)) {
-			$rsTable = [$num => $row] + $rsTable;
-		}
-		elseif ($limit > 0) {
-			$rsTable[$num] = $row;
-		}
-		else {
-			continue;
-		}
-		$limit--;
-	}
-
-	if (!empty($rsTable)) {
-		$rsTable = array_chunk($rsTable, $chunk_size, true);
-		$rsTable = $rsTable[0];
-	}
-
-	return $rsTable;
 }
 
 /************* SORT *************/
@@ -1978,19 +1939,20 @@ function filter_messages(array $messages = []) {
 /**
  * Returns the message box when messages are present; null otherwise
  *
- * @param  boolean	$good			Parameter passed to makeMessageBox to specify message box style.
- * @param  string	$title			Message box title.
- * @global array	$ZBX_MESSAGES
+ * @param  bool    $good            Parameter passed to makeMessageBox to specify message box style.
+ * @param  string  $title           Message box title.
+ * @param  bool    $show_close_box  Show or hide close button in error message box.
+ * @global array   $ZBX_MESSAGES
  *
  * @return CDiv|null
  */
-function getMessages($good = false, $title = null) {
+function getMessages($good = false, $title = null, $show_close_box = true) {
 	global $ZBX_MESSAGES;
 
 	$messages = (isset($ZBX_MESSAGES) && $ZBX_MESSAGES) ? filter_messages($ZBX_MESSAGES) : [];
 
 	$message_box = ($title || $messages)
-		? makeMessageBox($good, $messages, $title)
+		? makeMessageBox($good, $messages, $title, $show_close_box)
 		: null;
 
 	$ZBX_MESSAGES = [];
@@ -2342,12 +2304,21 @@ function get_status() {
 	return $status;
 }
 
-function set_image_header() {
+/**
+ * Set image header.
+ *
+ * @param integer $format    One of IMAGE_FORMAT_* constants. If not set global $IMAGE_FORMAT_DEFAULT will be used.
+ */
+function set_image_header($format = null) {
 	global $IMAGE_FORMAT_DEFAULT;
 
-	switch ($IMAGE_FORMAT_DEFAULT) {
+	switch ($format !== null ? $format : $IMAGE_FORMAT_DEFAULT) {
 		case IMAGE_FORMAT_JPEG:
 			header('Content-type: image/jpeg');
+			break;
+
+		case IMAGE_FORMAT_GIF:
+			header('Content-type: image/gif');
 			break;
 
 		case IMAGE_FORMAT_TEXT:

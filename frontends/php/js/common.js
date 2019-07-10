@@ -466,7 +466,8 @@ function PopUp(action, options, dialogueid, trigger_elmnt) {
 				buttons.push({
 					'title': t('Cancel'),
 					'class': 'btn-alt',
-					'action': function() {}
+					'cancel': true,
+					'action': (typeof resp.cancel_action !== 'undefined') ? resp.cancel_action : function() {}
 				});
 
 				ovelay_properties['title'] = resp.header;
@@ -549,9 +550,14 @@ function closeDialogHandler(event) {
 					hintBox.hideHint(dialog.element, true);
 					break;
 
-				// Close context menu overlays.
-				case 'contextmenu':
-					jQuery('.action-menu.action-menu-top:visible').menuPopup('close', dialog.element);
+				// Close popup menu overlays.
+				case 'menu-popup':
+					jQuery('.menu-popup.menu-popup-top:visible').menuPopup('close', dialog.element);
+					break;
+
+				// Close context menu preloader.
+				case 'preloader':
+					overlayPreloaderDestroy(dialog.dialogueid, dialog.xhr);
 					break;
 
 				// Close overlay time picker.

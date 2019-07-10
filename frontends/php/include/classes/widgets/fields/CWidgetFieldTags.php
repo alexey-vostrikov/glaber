@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@ class CWidgetFieldTags extends CWidgetField {
 	 */
 	public function getJavascript() {
 		return 'var tags_table = jQuery("#tags_table_'.$this->getName().'");'.
-			'tags_table.dynamicRows({template: "#tag-row"});'.
+			'tags_table.dynamicRows({template: "#tag-row-tmpl"});'.
 			'tags_table.parent().addClass("has-before");';
 	}
 

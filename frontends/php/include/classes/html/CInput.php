@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,9 +25,11 @@ class CInput extends CTag {
 		parent::__construct('input');
 		$this->setType($type);
 
-		// if id is not passed, it will be the same as element name
-		$this->setId(zbx_formatDomId($name));
-		$this->setAttribute('name', $name);
+		if ($name !== null) {
+			$this->setId(zbx_formatDomId($name));
+			$this->setAttribute('name', $name);
+		}
+
 		$this->setAttribute('value', $value);
 		return $this;
 	}

@@ -58,8 +58,6 @@ extern int		server_num, process_num;
  ******************************************************************************/
 static int	proxy_data_sender(int *more, int now)
 {
-	const char		*__function_name = "proxy_data_sender";
-
 	static int		data_timestamp = 0, task_timestamp = 0, upload_state = SUCCEED;
 
 	zbx_socket_t		sock;
@@ -72,7 +70,7 @@ static int	proxy_data_sender(int *more, int now)
 	char			*error = NULL;
 	zbx_vector_ptr_t	tasks;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	*more = ZBX_PROXY_DATA_DONE;
 	zbx_json_init(&j, 16 * ZBX_KIBIBYTE);
@@ -86,13 +84,16 @@ static int	proxy_data_sender(int *more, int now)
 		if (SUCCEED == get_host_availability_data(&j, &availability_ts))
 			flags |= ZBX_DATASENDER_AVAILABILITY;
 
-		if  (0 != (history_records = proxy_get_hist_data(&j, &history_lastid, &more_history)))
+		history_records = proxy_get_hist_data(&j, &history_lastid, &more_history);
+		if (0 != history_lastid)
 			flags |= ZBX_DATASENDER_HISTORY;
 
-		if  (0 != (discovery_records = proxy_get_dhis_data(&j, &discovery_lastid, &more_discovery)))
+		discovery_records = proxy_get_dhis_data(&j, &discovery_lastid, &more_discovery);
+		if (0 != discovery_records)
 			flags |= ZBX_DATASENDER_DISCOVERY;
 
-		if  (0 != (areg_records = proxy_get_areg_data(&j, &areg_lastid, &more_areg)))
+		areg_records = proxy_get_areg_data(&j, &areg_lastid, &more_areg);
+		if (0 != areg_records)
 			flags |= ZBX_DATASENDER_AUTOREGISTRATION;
 
 		if (ZBX_PROXY_DATA_MORE != more_history && ZBX_PROXY_DATA_MORE != more_discovery &&
@@ -194,7 +195,7 @@ static int	proxy_data_sender(int *more, int now)
 
 	zbx_json_free(&j);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s more:%d flags:0x" ZBX_FS_UX64, __function_name,
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s more:%d flags:0x" ZBX_FS_UX64, __func__,
 			zbx_result_string(upload_state), *more, flags);
 
 	return history_records + discovery_records + areg_records;

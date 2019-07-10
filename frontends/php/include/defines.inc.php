@@ -18,11 +18,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-define('GLABER_VERSION', '0.9.1');
-define('ZABBIX_VERSION',		'4.0.8rc1');
-define('ZABBIX_API_VERSION',	'4.0.8');
-define('ZABBIX_EXPORT_VERSION',	'4.0');
-define('ZABBIX_DB_VERSION',		4000000);
+
+define('GLABER_VERSION', '0.9.2');
+define('ZABBIX_VERSION',		'4.2.4');
+define('ZABBIX_API_VERSION',	'4.2.4');
+define('ZABBIX_EXPORT_VERSION',	'4.2');
+define('ZABBIX_DB_VERSION',	4020000);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
 define('ZABBIX_COPYRIGHT_TO',	'2019');
@@ -109,10 +110,6 @@ define('TRIGGERS_OPTION_RECENT_PROBLEM',	1);
 define('TRIGGERS_OPTION_ALL',				2);
 define('TRIGGERS_OPTION_IN_PROBLEM',		3);
 
-define('ZBX_ACK_STS_ANY',				1);
-define('ZBX_ACK_STS_WITH_UNACK',		2);
-define('ZBX_ACK_STS_WITH_LAST_UNACK',	3);
-
 define('ZBX_FONT_NAME', 'DejaVuSans');
 
 define('ZBX_AUTH_INTERNAL',	0);
@@ -189,6 +186,7 @@ define('VALIDATE_URI_SCHEMES', true);
 define('IMAGE_FORMAT_PNG',	'PNG');
 define('IMAGE_FORMAT_JPEG',	'JPEG');
 define('IMAGE_FORMAT_TEXT',	'JPEG');
+define('IMAGE_FORMAT_GIF',	'GIF');
 
 define('IMAGE_TYPE_ICON',			1);
 define('IMAGE_TYPE_BACKGROUND',		2);
@@ -537,19 +535,36 @@ define('ITEM_LOGTYPE_VERBOSE',			10);
 define('ITEM_DELAY_FLEXIBLE',	0);
 define('ITEM_DELAY_SCHEDULING',	1);
 
-// item pre-processing
-define('ZBX_PREPROC_MULTIPLIER',	1);
-define('ZBX_PREPROC_RTRIM',			2);
-define('ZBX_PREPROC_LTRIM',			3);
-define('ZBX_PREPROC_TRIM',			4);
-define('ZBX_PREPROC_REGSUB',		5);
-define('ZBX_PREPROC_BOOL2DEC',		6);
-define('ZBX_PREPROC_OCT2DEC',		7);
-define('ZBX_PREPROC_HEX2DEC',		8);
-define('ZBX_PREPROC_DELTA_VALUE',	9);
-define('ZBX_PREPROC_DELTA_SPEED',	10);
-define('ZBX_PREPROC_XPATH',			11);
-define('ZBX_PREPROC_JSONPATH',		12);
+// Item pre-processing types.
+define('ZBX_PREPROC_MULTIPLIER',			1);
+define('ZBX_PREPROC_RTRIM',					2);
+define('ZBX_PREPROC_LTRIM',					3);
+define('ZBX_PREPROC_TRIM',					4);
+define('ZBX_PREPROC_REGSUB',				5);
+define('ZBX_PREPROC_BOOL2DEC',				6);
+define('ZBX_PREPROC_OCT2DEC',				7);
+define('ZBX_PREPROC_HEX2DEC',				8);
+define('ZBX_PREPROC_DELTA_VALUE',			9);
+define('ZBX_PREPROC_DELTA_SPEED',			10);
+define('ZBX_PREPROC_XPATH',					11);
+define('ZBX_PREPROC_JSONPATH',				12);
+define('ZBX_PREPROC_VALIDATE_RANGE',		13);
+define('ZBX_PREPROC_VALIDATE_REGEX',		14);
+define('ZBX_PREPROC_VALIDATE_NOT_REGEX',	15);
+define('ZBX_PREPROC_ERROR_FIELD_JSON',		16);
+define('ZBX_PREPROC_ERROR_FIELD_XML',		17);
+define('ZBX_PREPROC_ERROR_FIELD_REGEX',		18);
+define('ZBX_PREPROC_THROTTLE_VALUE',		19);
+define('ZBX_PREPROC_THROTTLE_TIMED_VALUE',	20);
+define('ZBX_PREPROC_SCRIPT',				21);
+define('ZBX_PREPROC_PROMETHEUS_PATTERN',	22);
+define('ZBX_PREPROC_PROMETHEUS_TO_JSON',	23);
+
+// Item pre-processing error handlers.
+define('ZBX_PREPROC_FAIL_DEFAULT',			0);
+define('ZBX_PREPROC_FAIL_DISCARD_VALUE',	1);
+define('ZBX_PREPROC_FAIL_SET_VALUE',		2);
+define('ZBX_PREPROC_FAIL_SET_ERROR',		3);
 
 define('GRAPH_ITEM_DRAWTYPE_LINE',			0);
 define('GRAPH_ITEM_DRAWTYPE_FILLED_REGION',	1);
@@ -634,6 +649,9 @@ define('SMTP_CONNECTION_SECURITY_SSL_TLS',	2);
 
 define('SMTP_AUTHENTICATION_NONE',		0);
 define('SMTP_AUTHENTICATION_NORMAL',	1);
+
+define('SMTP_MESSAGE_FORMAT_PLAIN_TEXT',	0);
+define('SMTP_MESSAGE_FORMAT_HTML',			1);
 
 define('EZ_TEXTING_LIMIT_USA',		0);
 define('EZ_TEXTING_LIMIT_CANADA',	1);
@@ -812,6 +830,11 @@ define('CALC_FNC_LST', 9);
 define('SERVICE_TIME_TYPE_UPTIME',				0);
 define('SERVICE_TIME_TYPE_DOWNTIME',			1);
 define('SERVICE_TIME_TYPE_ONETIME_DOWNTIME',	2);
+
+define('ZBX_DISCOVERY_UNSPEC',	0);
+define('ZBX_DISCOVERY_DNS',		1);
+define('ZBX_DISCOVERY_IP',		2);
+define('ZBX_DISCOVERY_VALUE',	3);
 
 define('USER_TYPE_ZABBIX_USER',		1);
 define('USER_TYPE_ZABBIX_ADMIN',	2);
@@ -1068,6 +1091,10 @@ define('HOST_INVENTORY_DISABLED',	-1);
 define('HOST_INVENTORY_MANUAL',		0);
 define('HOST_INVENTORY_AUTOMATIC',	1);
 
+define('INVENTORY_URL_MACRO_NONE', -1);
+define('INVENTORY_URL_MACRO_HOST', 0);
+define('INVENTORY_URL_MACRO_TRIGGER', 1);
+
 define('EXPRESSION_HOST_UNKNOWN',			'#ERROR_HOST#');
 define('EXPRESSION_HOST_ITEM_UNKNOWN',		'#ERROR_ITEM#');
 define('EXPRESSION_NOT_A_MACRO_ERROR',		'#ERROR_MACRO#');
@@ -1087,6 +1114,10 @@ define('SPACE',	'&nbsp;');
 define('NAME_DELIMITER', ': ');
 
 define('UNKNOWN_VALUE', '');
+
+// End of line sequence.
+define('ZBX_EOL_LF',	0);
+define('ZBX_EOL_CRLF',	1);
 
 // suffixes
 define('ZBX_BYTE_SUFFIXES', 'KMGT');
@@ -1157,8 +1188,8 @@ define('IPMI_PRIVILEGE_OEM',		5);
 define('ZBX_HAVE_IPV6', true);
 define('ZBX_DISCOVERER_IPRANGE_LIMIT', 65536);
 
-define('ZBX_SOCKET_TIMEOUT',        3);            // socket timeout limit
-define('ZBX_SOCKET_BYTES_LIMIT',    ZBX_MEBIBYTE); // socket response size limit
+define('ZBX_SOCKET_TIMEOUT',        3);                 // socket timeout limit
+define('ZBX_SOCKET_BYTES_LIMIT',    ZBX_MEBIBYTE * 16); // socket response size limit
 
 // value is also used in servercheck.js file
 define('SERVER_CHECK_INTERVAL', 10);
@@ -1221,6 +1252,7 @@ define('API_H_NAME',			21);
 define('API_RANGE_TIME',		22);
 define('API_COLOR',				23);
 define('API_NUMERIC',			24);
+define('API_LLD_MACRO',			25);
 
 // flags
 define('API_REQUIRED',				0x0001);
@@ -1297,6 +1329,11 @@ define('ZBX_HOST_INTERFACE_WIDTH',				750);
 
 // overviews help
 define('ZBX_OVERVIEW_HELP_MIN_WIDTH',			125);
+
+// Helper buttons that allow selected objects to be added, replaced or removed.
+define('ZBX_ACTION_ADD',		0);
+define('ZBX_ACTION_REPLACE',	1);
+define('ZBX_ACTION_REMOVE',		2);
 
 // Maximum width for popups in Actions column for problems.
 define('ZBX_ACTIONS_POPUP_MAX_WIDTH',			800);
@@ -1465,8 +1502,10 @@ define('ZBX_STYLE_CELL_WIDTH', 'cell-width');
 define('ZBX_STYLE_CENTER', 'center');
 define('ZBX_STYLE_CHECKBOX_RADIO', 'checkbox-radio');
 define('ZBX_STYLE_CLOCK', 'clock');
+define('ZBX_STYLE_COLUMNS_3', 'col-3');
 define('ZBX_STYLE_SYSMAP', 'sysmap');
 define('ZBX_STYLE_NAVIGATIONTREE', 'navtree');
+define('ZBX_STYLE_CHECKBOX_LIST', 'checkbox-list');
 define('ZBX_STYLE_CLOCK_SVG', 'clock-svg');
 define('ZBX_STYLE_CLOCK_FACE', 'clock-face');
 define('ZBX_STYLE_CLOCK_HAND', 'clock-hand');
@@ -1540,6 +1579,7 @@ define('ZBX_STYLE_ICON_INFO', 'icon-info');
 define('ZBX_STYLE_ICON_INVISIBLE', 'icon-invisible');
 define('ZBX_STYLE_ICON_MAINT', 'icon-maint');
 define('ZBX_STYLE_ICON_WZRD_ACTION', 'icon-wzrd-action');
+define('ZBX_STYLE_ICON_NONE', 'icon-none');
 define('ZBX_STYLE_ACTION_COMMAND', 'icon-action-command');
 define('ZBX_STYLE_ACTION_ICON_CLOSE', 'icon-action-close');
 define('ZBX_STYLE_ACTION_ICON_MSG', 'icon-action-msg');
@@ -1684,22 +1724,30 @@ define('ZBX_STYLE_BLINK_HIDDEN', 'blink-hidden');
 define('ZBX_STYLE_YELLOW', 'yellow');
 define('ZBX_STYLE_FIELD_LABEL_ASTERISK', 'form-label-asterisk');
 
-// html layout columns
+// HTML column layout.
 define('ZBX_STYLE_COLUMNS', 'columns-wrapper');
-define('ZBX_STYLE_COLUMN_5', 'column-5');	// column occupies 5% width of column wrapper.
-define('ZBX_STYLE_COLUMN_10', 'column-10');	// column occupies 10% width of column wrapper.
+// column occupies x% width of column wrapper
+define('ZBX_STYLE_COLUMN_5', 'column-5');
+define('ZBX_STYLE_COLUMN_10', 'column-10');
+define('ZBX_STYLE_COLUMN_15', 'column-15');
+define('ZBX_STYLE_COLUMN_20', 'column-20');
 define('ZBX_STYLE_COLUMN_33', 'column-33'); // column occupies 1/3 width of column wrapper.
-define('ZBX_STYLE_COLUMN_50', 'column-50'); // column occupies 50% width of column wrapper.
-define('ZBX_STYLE_COLUMN_90', 'column-90'); // column occupies 90% width of column wrapper.
-define('ZBX_STYLE_COLUMN_95', 'column-95'); // column occupies 95% width of column wrapper.
+define('ZBX_STYLE_COLUMN_35', 'column-35');
+define('ZBX_STYLE_COLUMN_40', 'column-40');
+define('ZBX_STYLE_COLUMN_50', 'column-50');
+define('ZBX_STYLE_COLUMN_75', 'column-75');
+define('ZBX_STYLE_COLUMN_90', 'column-90');
+define('ZBX_STYLE_COLUMN_95', 'column-95');
+// column visual options
+define('ZBX_STYLE_COLUMN_CENTER', 'column-center');
+define('ZBX_STYLE_COLUMN_MIDDLE', 'column-middle');
 
 // server variables
-define('HTTPS', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] && $_SERVER['HTTPS'] != 'off');
+define('HTTPS', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] && $_SERVER['HTTPS'] !== 'off');
 
-// configuration -> hosts (macro inheritance)
-define('MACRO_TYPE_INHERITED',	0x01);
-define('MACRO_TYPE_HOSTMACRO',	0x02);
-define('MACRO_TYPE_BOTH',		0x03);	// MACRO_TYPE_INHERITED | MACRO_TYPE_HOSTMACRO
+define('ZBX_PROPERTY_INHERITED',	0x01);
+define('ZBX_PROPERTY_OWN',			0x02);
+define('ZBX_PROPERTY_BOTH',			0x03);	// ZBX_PROPERTY_INHERITED | ZBX_PROPERTY_OWN
 
 // if magic quotes on, then get rid of them
 if (get_magic_quotes_gpc()) {

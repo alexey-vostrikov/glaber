@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -88,6 +88,24 @@ class CComboBox extends CTag {
 
 			parent::addItem($citem);
 		}
+		return $this;
+	}
+
+	/**
+	 * Enable or disable readonly mode for the element.
+	 *
+	 * @param bool $value
+	 *
+	 * @return CComboBox
+	 */
+	public function setReadonly($value) {
+		if ($value) {
+			$this->setAttribute('readonly', 'readonly');
+		}
+		else {
+			$this->removeAttribute('readonly');
+		}
+
 		return $this;
 	}
 

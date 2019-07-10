@@ -228,12 +228,11 @@ static unsigned char	host_availability_agent_by_item_type(unsigned char type)
 
 void	zbx_activate_item_host(DC_ITEM *item, zbx_timespec_t *ts)
 {
-	const char		*__function_name = "zbx_activate_item_host";
 	zbx_host_availability_t	in, out;
 	unsigned char		agent_type;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hostid:" ZBX_FS_UI64 " itemid:" ZBX_FS_UI64 " type:%d",
-			__function_name, item->host.hostid, item->itemid, (int)item->type);
+			__func__, item->host.hostid, item->itemid, (int)item->type);
 
 	zbx_host_availability_init(&in, item->host.hostid);
 	zbx_host_availability_init(&out, item->host.hostid);
@@ -266,17 +265,16 @@ out:
 	zbx_host_availability_clean(&out);
 	zbx_host_availability_clean(&in);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 void	zbx_deactivate_item_host(DC_ITEM *item, zbx_timespec_t *ts, const char *error)
 {
-	const char		*__function_name = "zbx_deactivate_item_host";
 	zbx_host_availability_t	in, out;
 	unsigned char		agent_type;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hostid:" ZBX_FS_UI64 " itemid:" ZBX_FS_UI64 " type:%d",
-			__function_name, item->host.hostid, item->itemid, (int)item->type);
+			__func__, item->host.hostid, item->itemid, (int)item->type);
 
 	zbx_host_availability_init(&in, item->host.hostid);
 	zbx_host_availability_init(&out,item->host.hostid);
@@ -325,13 +323,13 @@ void	zbx_deactivate_item_host(DC_ITEM *item, zbx_timespec_t *ts, const char *err
 		}
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() errors_from:%d available:%d", __function_name,
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() errors_from:%d available:%d", __func__,
 			out.agents[agent_type].errors_from, out.agents[agent_type].available);
 out:
 	zbx_host_availability_clean(&out);
 	zbx_host_availability_clean(&in);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 static void	free_result_ptr(AGENT_RESULT *result)
@@ -342,10 +340,9 @@ static void	free_result_ptr(AGENT_RESULT *result)
 
 static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
 {
-	const char	*__function_name = "get_value";
-	int		res = FAIL;
+	int	res = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s'", __function_name, item->key_orig);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s'", __func__, item->key_orig);
 
 	switch (item->type)
 	{
@@ -416,7 +413,7 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 		zabbix_log(LOG_LEVEL_DEBUG, "Item [%s:%s] error: %s", item->host.host, item->key_orig, result->msg);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(res));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(res));
 
 	return res;
 }
@@ -496,24 +493,20 @@ static int	parse_query_fields(const DC_ITEM *item, char **query_fields)
  * Author: Alexei Vladishev                                                   *
  *                                                                            *
  * Comments: processes single item at a time except for Java, SNMP items,     *
- * 				agent
- * 		    																  *
  *           see DCconfig_get_poller_items()                                  *
  *                                                                            *
  ******************************************************************************/
 static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_num)
 {
-	const char		*__function_name = "get_values";
-	//stack is noet enough for 8k items
-	DC_ITEM			*items;//[MAX_POLLER_ITEMS];
-	AGENT_RESULT		*results;//[MAX_POLLER_ITEMS];
-	int			*errcodes;//[MAX_POLLER_ITEMS];
+	DC_ITEM			*items;
+	AGENT_RESULT		*results;
+	int			*errcodes;
 	zbx_timespec_t		timespec;
 	char			*port = NULL, error[ITEM_ERROR_LEN_MAX];
 	int			i, num_collected=0, num, last_available = HOST_AVAILABLE_UNKNOWN, MAX_ITEMS=1;
 	zbx_vector_ptr_t	add_results;
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	switch (poller_type)
 	{
@@ -550,9 +543,6 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 	num = DCconfig_get_poller_items(poller_type, items);
 	*processed_num=num;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s(), got %d items", __function_name,num);
-
-
 	if (0 == num)
 	{
 		*nextcheck = DCconfig_get_poller_nextcheck(poller_type);
@@ -566,7 +556,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 		errcodes[i] = NOT_PROCESSED;
 
 		ZBX_STRDUP(items[i].key, items[i].key_orig);
-		if (SUCCEED != substitute_key_macros(&items[i].key, NULL, &items[i], NULL,
+		if (SUCCEED != substitute_key_macros(&items[i].key, NULL, &items[i], NULL, NULL,
 				MACRO_TYPE_ITEM_KEY, error, sizeof(error)))
 		{
 			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, error));
@@ -623,7 +613,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 				substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 						NULL, NULL, NULL, &items[i].snmp_community, MACRO_TYPE_COMMON, NULL, 0);
 				if (SUCCEED != substitute_key_macros(&items[i].snmp_oid, &items[i].host.hostid, NULL,
-						NULL, MACRO_TYPE_SNMP_OID, error, sizeof(error)))
+						NULL, NULL, MACRO_TYPE_SNMP_OID, error, sizeof(error)))
 				{
 					SET_MSG_RESULT(&results[i], zbx_strdup(NULL, error));
 					errcodes[i] = CONFIG_ERROR;
@@ -699,7 +689,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 				{
 					case ZBX_POSTTYPE_XML:
 						if (SUCCEED != substitute_macros_xml(&items[i].posts, &items[i], NULL,
-								error, sizeof(error)))
+								NULL, error, sizeof(error)))
 						{
 							SET_MSG_RESULT(&results[i], zbx_dsprintf(NULL, "%s.", error));
 							errcodes[i] = CONFIG_ERROR;
@@ -928,27 +918,25 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 				zbx_free(items[i].jmx_endpoint);
 				break;
 		}
+
 		free_result(&results[i]);
 	}
-	
+
 	zbx_preprocessor_flush();
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)free_result_ptr);
 	zbx_vector_ptr_destroy(&add_results);
 
 	DCconfig_clean_items(items, NULL, num);
-
-exit:	
+exit:
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
 
 	zbx_free(items);
 	zbx_free(results);
 	zbx_free(errcodes);
 
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __function_name, num);
 	return num_collected;
+ 
 }
-
-
 
 ZBX_THREAD_ENTRY(poller_thread, args)
 {

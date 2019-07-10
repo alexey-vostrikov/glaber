@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ ZBX_METRIC	parameters_agent[] =
 /*	KEY			FLAG		FUNCTION	TEST PARAMETERS */
 {
 	{"agent.hostname",	0,		AGENT_HOSTNAME,	NULL},
-	{"agent.ping",		0,		AGENT_PING, 	NULL},
+	{"agent.ping",		0,		AGENT_PING,	NULL},
 	{"agent.version",	0,		AGENT_VERSION,	NULL},
 	{NULL}
 };

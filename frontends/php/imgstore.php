@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -48,10 +48,7 @@ if (isset($_REQUEST['width']) || isset($_REQUEST['height'])) {
 }
 
 if (isset($_REQUEST['css'])) {
-	$css = 'div.sysmap_iconid_0 {'.
-			' height: 50px;'.
-			' width: 50px;'.
-			' background-image: url("images/general/no_icon.png"); }'."\n";
+	$css = '';
 
 	$images = API::Image()->get([
 		'output' => ['imageid'],
@@ -70,8 +67,7 @@ if (isset($_REQUEST['css'])) {
 
 		$css .= 'div.sysmap_iconid_'.$image['imageid'].'{'.
 					' height: '.$h.'px;'.
-					' width: '.$w.'px;'.
-					' background: url("imgstore.php?iconid='.$image['imageid'].'&width='.$w.'&height='.$h.'") no-repeat center center;}'."\n";
+					' width: '.$w.'px;}'."\n";
 	}
 	echo $css;
 }
@@ -83,6 +79,14 @@ elseif (isset($_REQUEST['iconid'])) {
 		$image = get_image_by_imageid($iconid);
 
 		$source = $image['image'] ? imageFromString($image['image']) : get_default_image();
+
+		list(,, $img_type) = getimagesizefromstring($image['image']);
+
+		$img_types = [
+			IMAGETYPE_GIF => IMAGE_FORMAT_GIF,
+			IMAGETYPE_JPEG => IMAGE_FORMAT_JPEG,
+			IMAGETYPE_PNG => IMAGE_FORMAT_PNG
+		];
 	}
 	else {
 		$source = get_default_image();
@@ -97,7 +101,14 @@ elseif (isset($_REQUEST['iconid'])) {
 		imagefilter($source, IMG_FILTER_BRIGHTNESS, 75);
 	}
 
-	imageOut($source);
+	if ($iconid > 0 && !$resize && $unavailable != 1 && array_key_exists($img_type, $img_types)) {
+		set_image_header($img_types[$img_type]);
+
+		echo $image['image'];
+	}
+	else {
+		imageOut($source);
+	}
 }
 elseif (isset($_REQUEST['imageid'])) {
 	$imageid = getRequest('imageid', 0);

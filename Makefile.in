@@ -102,7 +102,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_lib_ibm_db2.m4 \
 	$(top_srcdir)/m4/netsnmp.m4 $(top_srcdir)/m4/openipmi.m4 \
 	$(top_srcdir)/m4/pcre.m4 $(top_srcdir)/m4/pthread.m4 \
 	$(top_srcdir)/m4/resolv.m4 $(top_srcdir)/m4/zlib.m4 \
-	$(top_srcdir)/conf_tests.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
@@ -441,7 +441,8 @@ EXTRA_DIST = \
 @ZBXCMOCKA_TRUE@WRAP_IO_FUNCS = \
 @ZBXCMOCKA_TRUE@	-Wl,--wrap=fopen \
 @ZBXCMOCKA_TRUE@	-Wl,--wrap=fclose \
-@ZBXCMOCKA_TRUE@	-Wl,--wrap=fgets
+@ZBXCMOCKA_TRUE@	-Wl,--wrap=fgets \
+@ZBXCMOCKA_TRUE@	-Wl,--wrap=open
 
 @ZBXCMOCKA_TRUE@WRAP_FS_FUNCS = \
 @ZBXCMOCKA_TRUE@	-Wl,--wrap=opendir \
@@ -455,8 +456,7 @@ EXTRA_DIST = \
 
 @ZBXCMOCKA_TRUE@WRAP_COMM_FUNCS = \
 @ZBXCMOCKA_TRUE@	-Wl,--wrap=read \
-@ZBXCMOCKA_TRUE@	-Wl,--wrap=connect \
-@ZBXCMOCKA_TRUE@	-Wl,--wrap=open
+@ZBXCMOCKA_TRUE@	-Wl,--wrap=connect
 
 @ZBXCMOCKA_TRUE@WRAP_LOG = \
 @ZBXCMOCKA_TRUE@	-Wl,--wrap=__zbx_zabbix_log
@@ -977,6 +977,7 @@ dist-hook:
 
 	rm -rf `find $(top_distdir) -name ".gitignore" -o -name ".gitattributes"`
 	rm -f $(top_distdir)/include/config.h
+	rm -f $(top_distdir)/include/config.h.in~
 	rm -f $(top_distdir)/frontends/php/conf/zabbix.conf.php
 	rm -rf $(top_distdir)/frontends/php/tests
 	rm -f $(top_distdir)/sass/*.html
@@ -1000,7 +1001,8 @@ dist-hook:
 @DBSCHEMA_TRUE@dbschema_postgresql:
 @DBSCHEMA_TRUE@	cd database/postgresql && \
 @DBSCHEMA_TRUE@	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
-@DBSCHEMA_TRUE@	$(MAKE) $(AM_MAKEFLAGS) schema.sql
+@DBSCHEMA_TRUE@	$(MAKE) $(AM_MAKEFLAGS) schema.sql && \
+@DBSCHEMA_TRUE@	$(MAKE) $(AM_MAKEFLAGS) timescaledb.sql
 
 @DBSCHEMA_TRUE@dbschema_sqlite3:
 @DBSCHEMA_TRUE@	cd database/sqlite3 && \

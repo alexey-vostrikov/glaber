@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -201,7 +201,9 @@ foreach ($data['times'] as $service_time) {
 			new CVar('times['.$i.'][note]', $service_time['note'])
 		],
 		$from.' - '.$till,
-		htmlspecialchars($service_time['note']),
+		(new CCol($service_time['note']))
+			->addClass(ZBX_STYLE_WORDWRAP)
+			->addStyle('max-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;'),
 		(new CCol(
 			(new CButton('remove', _('Remove')))
 				->onClick('javascript: removeTime(\''.$i.'\');')

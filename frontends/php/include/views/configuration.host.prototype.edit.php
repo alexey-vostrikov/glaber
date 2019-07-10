@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -176,7 +176,8 @@ $groups = [];
 foreach ($data['groups'] as $group) {
 	$groups[] = [
 		'id' => $group['groupid'],
-		'name' => $group['name']
+		'name' => $group['name'],
+		'inaccessible' => (array_key_exists('inaccessible', $group) && $group['inaccessible'])
 	];
 }
 $groupList->addRow(
@@ -369,7 +370,7 @@ $inventoryFormList = (new CFormList('inventorylist'))
 			->setModern(true)
 	);
 
-$divTabs->addTab('inventoryTab', _('Host inventory'), $inventoryFormList);
+$divTabs->addTab('inventoryTab', _('Inventory'), $inventoryFormList);
 
 // Encryption form list.
 $encryption_form_list = (new CFormList('encryption'))

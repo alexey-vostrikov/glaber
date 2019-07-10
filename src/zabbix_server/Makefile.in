@@ -106,7 +106,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_lib_ibm_db2.m4 \
 	$(top_srcdir)/m4/netsnmp.m4 $(top_srcdir)/m4/openipmi.m4 \
 	$(top_srcdir)/m4/pcre.m4 $(top_srcdir)/m4/pthread.m4 \
 	$(top_srcdir)/m4/resolv.m4 $(top_srcdir)/m4/zlib.m4 \
-	$(top_srcdir)/conf_tests.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -142,6 +142,9 @@ zabbix_server_DEPENDENCIES = alerter/libzbxalerter.a \
 	selfmon/libzbxselfmon.a vmware/libzbxvmware.a \
 	taskmanager/libzbxtaskmanager.a odbc/libzbxodbc.a \
 	scripts/libzbxscripts.a preprocessor/libpreprocessor.a \
+	$(top_srcdir)/src/libs/zbxembed/libzbxembed.a \
+	poller/libzbxpoller_server.a lld/libzbxlld.a libzbxserver.a \
+	$(top_srcdir)/src/libs/zbxprometheus/libzbxprometheus.a \
 	$(top_srcdir)/src/libs/zbxsysinfo/libzbxserversysinfo.a \
 	$(top_srcdir)/src/libs/zbxsysinfo/common/libcommonsysinfo.a \
 	$(top_srcdir)/src/libs/zbxsysinfo/simple/libsimplesysinfo.a \
@@ -172,7 +175,8 @@ zabbix_server_DEPENDENCIES = alerter/libzbxalerter.a \
 	$(top_srcdir)/src/libs/zbxmodules/libzbxmodules.a \
 	$(top_srcdir)/src/libs/zbxtasks/libzbxtasks.a \
 	$(top_srcdir)/src/libs/zbxcompress/libzbxcompress.a \
-	libzbxserver.a $(am__append_1)
+	$(top_srcdir)/src/libs/zbxserver/libzbxserver_server.a \
+	$(am__append_1)
 zabbix_server_LINK = $(CCLD) $(zabbix_server_CFLAGS) $(CFLAGS) \
 	$(zabbix_server_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -495,7 +499,8 @@ SUBDIRS = \
 	ipmi \
 	odbc \
 	scripts \
-	preprocessor
+	preprocessor \
+	lld
 
 noinst_LIBRARIES = libzbxserver.a
 libzbxserver_a_SOURCES = \
@@ -519,6 +524,9 @@ zabbix_server_LDADD = alerter/libzbxalerter.a \
 	selfmon/libzbxselfmon.a vmware/libzbxvmware.a \
 	taskmanager/libzbxtaskmanager.a odbc/libzbxodbc.a \
 	scripts/libzbxscripts.a preprocessor/libpreprocessor.a \
+	$(top_srcdir)/src/libs/zbxembed/libzbxembed.a \
+	poller/libzbxpoller_server.a lld/libzbxlld.a libzbxserver.a \
+	$(top_srcdir)/src/libs/zbxprometheus/libzbxprometheus.a \
 	$(top_srcdir)/src/libs/zbxsysinfo/libzbxserversysinfo.a \
 	$(top_srcdir)/src/libs/zbxsysinfo/common/libcommonsysinfo.a \
 	$(top_srcdir)/src/libs/zbxsysinfo/simple/libsimplesysinfo.a \
@@ -549,7 +557,8 @@ zabbix_server_LDADD = alerter/libzbxalerter.a \
 	$(top_srcdir)/src/libs/zbxmodules/libzbxmodules.a \
 	$(top_srcdir)/src/libs/zbxtasks/libzbxtasks.a \
 	$(top_srcdir)/src/libs/zbxcompress/libzbxcompress.a \
-	libzbxserver.a $(am__append_1) @SERVER_LIBS@
+	$(top_srcdir)/src/libs/zbxserver/libzbxserver_server.a \
+	$(am__append_1) @SERVER_LIBS@
 zabbix_server_LDFLAGS = @SERVER_LDFLAGS@
 zabbix_server_CFLAGS = \
 	-DDEFAULT_SSL_CERT_LOCATION="\"@CURL_SSL_CERT_LOCATION@\"" \

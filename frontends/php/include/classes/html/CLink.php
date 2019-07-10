@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ class CLink extends CTag {
 
 	private	$use_sid = false;
 	private	$confirm_message = '';
-	private $url = null;
+	private $url;
 
 	public function __construct($item = null, $url = null) {
 		parent::__construct('a', true);

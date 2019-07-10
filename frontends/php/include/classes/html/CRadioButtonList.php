@@ -115,7 +115,9 @@ class CRadioButtonList extends CList {
 		}
 
 		if ($this->readonly) {
-			$this->addItem(new CVar($this->name, $this->value, zbx_formatDomId($this->name)));
+			$this->addItem(
+				(new CVar($this->name, $this->value, zbx_formatDomId($this->name)))->setEnabled($this->enabled)
+			);
 		}
 
 		foreach ($this->values as $key => $value) {

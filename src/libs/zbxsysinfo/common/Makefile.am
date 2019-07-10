@@ -13,4 +13,3 @@ libcommonsysinfo_a_SOURCES = \
 	net.c net.h \
 	system.c system.h \
 	zabbix_stats.c zabbix_stats.h
-	

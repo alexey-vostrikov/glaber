@@ -38,16 +38,17 @@ class CCollapsibleUiWidget extends CUiWidget {
 	/**
 	 * Sets the header and adds a default expand-collapse icon.
 	 *
-	 * @param string $caption
-	 * @param array  $controls
-	 * @param string $url
+	 * @param string $caption   Header caption.
+	 * @param array  $controls  (optional)
+	 * @param string $idx       (optional)
 	 *
 	 * @return $this
 	 */
-	public function setHeader($caption, array $controls = [], $url = '') {
+	public function setHeader($caption, array $controls = [], $idx = '') {
 		$icon = (new CRedirectButton(null, null))
 			->setId($this->id.'_icon')
-			->onClick('changeWidgetState(this, "'.$this->id.'", "'.$url.'");');
+			->onClick('changeWidgetState(this, "'.$this->id.'", "'.$idx.'");');
+
 		if ($this->expanded) {
 			$icon
 				->addClass(ZBX_STYLE_BTN_WIDGET_COLLAPSE)
@@ -58,6 +59,7 @@ class CCollapsibleUiWidget extends CUiWidget {
 				->addClass(ZBX_STYLE_BTN_WIDGET_EXPAND)
 				->setTitle(_('Expand'));
 		}
+
 		$controls[] = $icon;
 
 		parent::setHeader($caption, $controls);

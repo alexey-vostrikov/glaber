@@ -27,6 +27,7 @@
 #include "zbxserver.h"
 #include "alerter_protocol.h"
 #include "alert_manager.h"
+#include "zbxmedia.h"
 
 #define ZBX_AM_LOCATION_NOWHERE		0
 #define ZBX_AM_LOCATION_QUEUE		1
@@ -36,6 +37,10 @@
 #define ZBX_WATCHDOG_ALERT_FREQUENCY	(15 * SEC_PER_MIN)
 
 #define ZBX_AM_DB_POLL_DELAY	1
+
+#define ALERT_SOURCE_EXTERNAL	0xffff
+
+#define ZBX_ALERTPOOL_SOURCE(id) (id >> 48)
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
@@ -157,6 +162,7 @@ typedef struct
 	int			maxsessions;
 	int			maxattempts;
 	int			attempt_interval;
+	unsigned char		content_type;
 }
 zbx_am_mediatype_t;
 
@@ -342,7 +348,7 @@ static void	am_update_mediatype(zbx_am_t *manager, zbx_uint64_t mediatypeid, int
 		const char *exec_path, const char *gsm_modem, const char *username, const char *passwd,
 		unsigned short smtp_port, unsigned char smtp_security, unsigned char smtp_verify_peer,
 		unsigned char smtp_verify_host, unsigned char smtp_authentication, const char *exec_params,
-		int maxsessions, int maxattempts, int attempt_interval)
+		int maxsessions, int maxattempts, int attempt_interval, unsigned char content_type)
 {
 	zbx_am_mediatype_t	*mediatype;
 
@@ -381,6 +387,7 @@ static void	am_update_mediatype(zbx_am_t *manager, zbx_uint64_t mediatypeid, int
 	mediatype->maxsessions = maxsessions;
 	mediatype->maxattempts = maxattempts;
 	mediatype->attempt_interval = attempt_interval;
+	mediatype->content_type = content_type;
 }
 
 /******************************************************************************
@@ -494,13 +501,21 @@ static int	am_release_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype
  ******************************************************************************/
 static zbx_uint64_t	am_calc_alertpoolid(int source, int object, zbx_uint64_t objectid)
 {
-	zbx_hash_t	hash;
+	zbx_uint64_t	alertpoolid;
 
-	hash = ZBX_DEFAULT_UINT64_HASH_FUNC(&objectid);
-	hash = ZBX_DEFAULT_UINT64_HASH_ALGO(&source, sizeof(source), hash);
-	hash = ZBX_DEFAULT_UINT64_HASH_ALGO(&object, sizeof(object), hash);
+	if (source < 0 || source > 0xffff)
+		THIS_SHOULD_NEVER_HAPPEN;
 
-	return hash;
+	if (object < 0 || object > 0xffff)
+		THIS_SHOULD_NEVER_HAPPEN;
+
+	alertpoolid = source & 0xffff;
+	alertpoolid <<= 16;
+	alertpoolid |= object & 0xffff;
+	alertpoolid <<= 32;
+	alertpoolid |= ZBX_DEFAULT_UINT64_HASH_FUNC(&objectid);
+
+	return alertpoolid;
 }
 
 /******************************************************************************
@@ -598,7 +613,7 @@ static zbx_am_alertpool_t	*am_pop_alertpool(zbx_am_mediatype_t *mediatype)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_remove_alertpool                                              *
+ * Function: am_release_alertpool                                             *
  *                                                                            *
  * Purpose: removes alert pool                                                *
  *                                                                            *
@@ -772,13 +787,11 @@ static void	am_remove_alert(zbx_am_t *manager, zbx_am_alert_t *alert)
  ******************************************************************************/
 static int	am_retry_alert(zbx_am_t *manager, zbx_am_alert_t *alert)
 {
-	const char		*__function_name = "am_retry_alert";
-
 	zbx_am_alertpool_t	*alertpool;
 	zbx_am_mediatype_t	*mediatype;
 	int			ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() alertid:" ZBX_FS_UI64, __function_name, alert->alertid);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() alertid:" ZBX_FS_UI64, __func__, alert->alertid);
 
 	if (NULL == (mediatype = am_get_mediatype(manager, alert->mediatypeid)))
 		goto out;
@@ -799,7 +812,7 @@ static int	am_retry_alert(zbx_am_t *manager, zbx_am_alert_t *alert)
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return ret;
 }
@@ -831,12 +844,11 @@ static void	am_alerter_free(zbx_am_alerter_t *alerter)
  ******************************************************************************/
 static void	am_register_alerter(zbx_am_t *manager, zbx_ipc_client_t *client, zbx_ipc_message_t *message)
 {
-	const char		*__function_name = "am_register_alerter";
 	zbx_am_alerter_t	*alerter = NULL;	/* if 'alerter' type changes do not forget to change sizeof() */
 							/* (see comment below) */
 	pid_t			ppid;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	memcpy(&ppid, message->data, sizeof(ppid));
 
@@ -862,7 +874,7 @@ static void	am_register_alerter(zbx_am_t *manager, zbx_ipc_client_t *client, zbx
 		zbx_queue_ptr_push(&manager->free_alerters, alerter);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -874,7 +886,7 @@ static void	am_register_alerter(zbx_am_t *manager, zbx_ipc_client_t *client, zbx
  * Parameters: manager - [IN] the manager                                     *
  *             client  - [IN] the connected alerter                           *
  *                                                                            *
- * Return value: The IPMI poller                                              *
+ * Return value: The alerter                                                  *
  *                                                                            *
  ******************************************************************************/
 static zbx_am_alerter_t	*am_get_alerter_by_client(zbx_am_t *manager, zbx_ipc_client_t *client)
@@ -957,8 +969,6 @@ static char	*am_create_db_alert_message(void)
  ******************************************************************************/
 static void	am_queue_watchdog_alerts(zbx_am_t *manager)
 {
-	const char		*__function_name = "am_queue_watchdog_alerts";
-
 	static int		lastsent;
 	int			now;
 	zbx_am_media_t		*media;
@@ -972,7 +982,7 @@ static void	am_queue_watchdog_alerts(zbx_am_t *manager)
 	if ((now = time(NULL)) < lastsent + ZBX_WATCHDOG_ALERT_FREQUENCY)
 		return;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() recipients:%d", __function_name, manager->watchdog.num_data);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() recipients:%d", __func__, manager->watchdog.num_data);
 
 	zbx_hashset_iter_reset(&manager->watchdog, &iter);
 	while (NULL != (media = (zbx_am_media_t *)zbx_hashset_iter_next(&iter)))
@@ -983,6 +993,15 @@ static void	am_queue_watchdog_alerts(zbx_am_t *manager)
 		mediatype->refcount++;
 
 		alert_message = am_create_db_alert_message();
+
+		if (ZBX_MEDIA_CONTENT_TYPE_HTML == mediatype->content_type)
+		{
+			char	*am_esc;
+
+			am_esc = xml_escape_dyn(alert_message);
+			alert_message = zbx_dsprintf(alert_message, "<html><pre>%s</pre></html>", am_esc);
+			zbx_free(am_esc);
+		}
 
 		alert = am_create_alert(0, media->mediatypeid, 0, 0, 0, media->sendto, alert_subject, alert_message, 0,
 				0, 0);
@@ -1011,11 +1030,10 @@ static void	am_queue_watchdog_alerts(zbx_am_t *manager)
  ******************************************************************************/
 static void	am_init(zbx_am_t *manager)
 {
-	const char		*__function_name = "am_init";
 	int			i;
 	zbx_am_alerter_t	*alerter;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() alerters:%d", __function_name, CONFIG_ALERTER_FORKS);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() alerters:%d", __func__, CONFIG_ALERTER_FORKS);
 
 	zbx_vector_ptr_create(&manager->alerters);
 	zbx_queue_ptr_create(&manager->free_alerters);
@@ -1038,7 +1056,7 @@ static void	am_init(zbx_am_t *manager)
 	zbx_hashset_create(&manager->watchdog, 5, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_binary_heap_create(&manager->queue, am_mediatype_queue_compare, ZBX_BINARY_HEAP_OPTION_DIRECT);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -1093,13 +1111,11 @@ static void	am_destroy(zbx_am_t *manager)
  *             error   - [IN] the error message                               *
  *                                                                            *
  ******************************************************************************/
-static void	am_db_update_alert(zbx_am_t *manager, zbx_uint64_t alertid, int status, int retries, char *error)
+static void	am_db_update_alert(zbx_am_t *manager, zbx_uint64_t alertid, int status, int retries, const char *error)
 {
-	const char		*__function_name = "am_db_update_alert";
-
 	zbx_am_alertstatus_t	*update;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() alertid:" ZBX_FS_UI64 " status:%d retries:%d error:%s", __function_name,
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() alertid:" ZBX_FS_UI64 " status:%d retries:%d error:%s", __func__,
 			alertid, status, retries, error);
 
 	/* alerts with 0 alertid are runtime alerts generated by alert manager when database is down */
@@ -1118,7 +1134,36 @@ static void	am_db_update_alert(zbx_am_t *manager, zbx_uint64_t alertid, int stat
 		ZBX_UPDATE_STR(update->error, error);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: am_external_alert_send_response                                  *
+ *                                                                            *
+ * Purpose: send response to external alert request                           *
+ *                                                                            *
+ * Parameters: alerter_service - [IN] the IPC service                         *
+ *             alert           - [IN] the alert                               *
+ *             error           - [IN] the error message                       *
+ *                                                                            *
+ ******************************************************************************/
+static void	am_external_alert_send_response(const zbx_ipc_service_t *alerter_service, const zbx_am_alert_t *alert,
+		int errcode, const char *error)
+{
+	zbx_ipc_client_t	*client;
+
+	if (NULL != (client = zbx_ipc_client_by_id(alerter_service, alert->alertid)))
+	{
+		unsigned char	*data;
+		zbx_uint32_t	data_len;
+
+		data_len = zbx_alerter_serialize_result(&data, errcode, error);
+		zbx_ipc_client_send(client, ZBX_IPC_ALERTER_ALERT, data, data_len);
+		zbx_free(data);
+	}
+	else
+		zabbix_log(LOG_LEVEL_DEBUG, "client has disconnected");
 }
 
 /******************************************************************************
@@ -1139,8 +1184,6 @@ static void	am_db_update_alert(zbx_am_t *manager, zbx_uint64_t alertid, int stat
  ******************************************************************************/
 static int	am_db_get_alerts(zbx_am_t *manager, zbx_vector_ptr_t *alerts, int now)
 {
-	const char		*__function_name = "am_db_get_alerts";
-
 	static int		status_limit = 2;
 	zbx_uint64_t		status_filter[] = {ALERT_STATUS_NEW, ALERT_STATUS_NOT_SENT};
 	DB_RESULT		result;
@@ -1152,7 +1195,7 @@ static int	am_db_get_alerts(zbx_am_t *manager, zbx_vector_ptr_t *alerts, int now
 	zbx_am_alert_t		*alert;
 	zbx_vector_uint64_t	alertids;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_uint64_create(&alertids);
 
@@ -1226,7 +1269,7 @@ static int	am_db_get_alerts(zbx_am_t *manager, zbx_vector_ptr_t *alerts, int now
 out:
 	zbx_free(sql);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() alerts:%d", __function_name, alerts->values_num);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() alerts:%d", __func__, alerts->values_num);
 
 	return ret;
 }
@@ -1250,8 +1293,6 @@ out:
  ******************************************************************************/
 static int	am_db_update_mediatypes(zbx_am_t *manager, const zbx_uint64_t *mediatypeids, int mediatypeids_num)
 {
-	const char	*__function_name = "am_db_update_mediatypes";
-
 	DB_RESULT	result;
 	DB_ROW		row;
 	char		*sql = NULL;
@@ -1259,9 +1300,9 @@ static int	am_db_update_mediatypes(zbx_am_t *manager, const zbx_uint64_t *mediat
 	int		type, maxsessions, maxattempts, attempt_interval, ret = SUCCEED;
 	zbx_uint64_t	mediatypeid;
 	unsigned short	smtp_port;
-	unsigned char	smtp_security, smtp_verify_peer, smtp_verify_host, smtp_authentication;
+	unsigned char	smtp_security, smtp_verify_peer, smtp_verify_host, smtp_authentication, content_type;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	if (0 == mediatypeids_num)
 		goto out;
@@ -1269,7 +1310,7 @@ static int	am_db_update_mediatypes(zbx_am_t *manager, const zbx_uint64_t *mediat
 	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset,
 			"select mediatypeid,type,description,smtp_server,smtp_helo,smtp_email,exec_path,gsm_modem,"
 				"username,passwd,smtp_port,smtp_security,smtp_verify_peer,smtp_verify_host,"
-				"smtp_authentication,exec_params,maxsessions,maxattempts,attempt_interval"
+				"smtp_authentication,exec_params,maxsessions,maxattempts,attempt_interval,content_type"
 			" from media_type"
 			" where");
 
@@ -1300,6 +1341,7 @@ static int	am_db_update_mediatypes(zbx_am_t *manager, const zbx_uint64_t *mediat
 		ZBX_STR2UCHAR(smtp_authentication, row[14]);
 		maxsessions = atoi(row[16]);
 		maxattempts = atoi(row[17]);
+		ZBX_STR2UCHAR(content_type, row[19]);
 
 		if (FAIL == is_time_suffix(row[18], &attempt_interval, ZBX_LENGTH_UNLIMITED))
 		{
@@ -1321,11 +1363,11 @@ static int	am_db_update_mediatypes(zbx_am_t *manager, const zbx_uint64_t *mediat
 
 		am_update_mediatype(manager, mediatypeid, type, row[2], row[3], row[4], row[5], row[6], row[7], row[8],
 				row[9], smtp_port, smtp_security, smtp_verify_peer, smtp_verify_host,
-				smtp_authentication, row[15], maxsessions, maxattempts, attempt_interval);
+				smtp_authentication, row[15], maxsessions, maxattempts, attempt_interval, content_type);
 	}
 	DBfree_result(result);
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() mediatypes:%d", __function_name, mediatypeids_num);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() mediatypes:%d", __func__, mediatypeids_num);
 
 	return ret;
 }
@@ -1336,39 +1378,34 @@ out:
  *                                                                            *
  * Purpose: queues new alerts from database                                   *
  *                                                                            *
- * Parameters: manager - [IN] the alert manager                               *
- *             now     - [IN] the current timestamp                           *
+ * Parameters: manager         - [IN] the alert manager                       *
+ *             alerter_service - [IN] the IPC service                         *
+ *             alerts          - [IN/OUT] alerts to be moved into queue       *
  *                                                                            *
- * Return value: SUCCEED - alerts were queued successfully                    *
- *               FAIL    - database connection error                          *
+ * Return value: SUCCEED - alerts were queued successfully and cleared        *
+ *               FAIL    - database connection error, alerts remain unchanged *
+ *                         and must be queued when database become available  *
  *                                                                            *
  ******************************************************************************/
-static int	am_db_queue_alerts(zbx_am_t *manager, int now)
+static int	am_db_queue_alerts(zbx_am_t *manager, const zbx_ipc_service_t *alerter_service,
+		zbx_vector_ptr_t *alerts)
 {
-	const char		*__function_name = "am_db_queue_alerts";
-
 	zbx_am_alert_t		*alert;
-	zbx_vector_ptr_t	alerts;
-	int			i, ret;
+	int			i, ret = SUCCEED;
 	zbx_am_alertpool_t	*alertpool;
 	zbx_am_mediatype_t	*mediatype;
 	zbx_vector_uint64_t	mediatypeids;
 	zbx_hashset_iter_t	iter;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
-
-	zbx_vector_ptr_create(&alerts);
-
-	if (FAIL == (ret = am_db_get_alerts(manager, &alerts, now)))
-		goto out;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	/* update media types for new and queued alerts */
 
 	zbx_vector_uint64_create(&mediatypeids);
 
-	for (i = 0; i < alerts.values_num; i++)
+	for (i = 0; i < alerts->values_num; i++)
 	{
-		alert = (zbx_am_alert_t *)alerts.values[i];
+		alert = (zbx_am_alert_t *)alerts->values[i];
 		zbx_vector_uint64_append(&mediatypeids, alert->mediatypeid);
 	}
 
@@ -1391,12 +1428,15 @@ static int	am_db_queue_alerts(zbx_am_t *manager, int now)
 
 	/* queue new alerts */
 
-	for (i = 0; i < alerts.values_num; i++)
+	for (i = 0; i < alerts->values_num; i++)
 	{
-		alert = (zbx_am_alert_t *)alerts.values[i];
+		alert = (zbx_am_alert_t *)alerts->values[i];
 
 		if (NULL == (mediatype = am_get_mediatype(manager, alert->mediatypeid)))
 		{
+			if (ALERT_SOURCE_EXTERNAL == ZBX_ALERTPOOL_SOURCE(alert->alertpoolid))
+				am_external_alert_send_response(alerter_service, alert, FAIL, "Media type unavailable");
+
 			am_alert_free(alert);
 			continue;
 		}
@@ -1410,10 +1450,10 @@ static int	am_db_queue_alerts(zbx_am_t *manager, int now)
 		am_push_alertpool(mediatype, alertpool);
 		am_push_mediatype(manager, mediatype);
 	}
-out:
-	zbx_vector_ptr_destroy(&alerts);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zbx_vector_ptr_clear(alerts);
+out:
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -1432,8 +1472,6 @@ out:
  ******************************************************************************/
 static int	am_db_flush_alert_updates(zbx_am_t *manager)
 {
-	const char		*__function_name = "am_db_flush_alert_updates";
-
 	zbx_vector_ptr_t	updates;
 	zbx_hashset_iter_t	iter;
 	zbx_am_alertstatus_t	*update;
@@ -1441,7 +1479,7 @@ static int	am_db_flush_alert_updates(zbx_am_t *manager)
 	size_t			sql_alloc = 0, sql_offset = 0;
 	int			i, j, ret = FAIL, limit;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() updates:%d", __function_name, manager->alertupdates.num_data);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() updates:%d", __func__, manager->alertupdates.num_data);
 
 	if (0 == manager->alertupdates.num_data)
 	{
@@ -1517,7 +1555,7 @@ cleanup:
 	zbx_free(sql);
 	zbx_vector_ptr_destroy(&updates);
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -1537,8 +1575,6 @@ out:
  ******************************************************************************/
 static int	am_db_sync_watchdog(zbx_am_t *manager)
 {
-	const char	*__function_name = "am_db_sync_watchdog";
-
 	DB_RESULT		result;
 	DB_ROW			row;
 	int			i, ret = SUCCEED;
@@ -1551,7 +1587,7 @@ static int	am_db_sync_watchdog(zbx_am_t *manager)
 	zbx_am_mediatype_t	*mediatype;
 	static int		old_count = -1;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	result = DBselect_once(
 			"select m.mediaid,m.mediatypeid,m.sendto"
@@ -1643,7 +1679,7 @@ static int	am_db_sync_watchdog(zbx_am_t *manager)
 
 	old_count = manager->watchdog.num_data;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s recipients:%d", __function_name, zbx_result_string(ret),
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s recipients:%d", __func__, zbx_result_string(ret),
 			manager->watchdog.num_data);
 
 	return ret;
@@ -1704,7 +1740,7 @@ static int	am_prepare_mediatype_exec_command(zbx_am_mediatype_t *mediatype, zbx_
 	}
 	else
 	{
-		*error = zbx_dsprintf(*error, "Cannot exectue command \"%s\": %s", *cmd, zbx_strerror(errno));
+		*error = zbx_dsprintf(*error, "Cannot execute command \"%s\": %s", *cmd, zbx_strerror(errno));
 		zbx_free(*cmd);
 	}
 
@@ -1717,18 +1753,18 @@ static int	am_prepare_mediatype_exec_command(zbx_am_mediatype_t *mediatype, zbx_
  *                                                                            *
  * Purpose: sends alert to the alerter                                        *
  *                                                                            *
- * Parameters: manager - [IN] the alert manager                               *
- *             alerter - [IN] the target alerter                              *
- *             alert   - [IN] the alert to send                               *
+ * Parameters: manager         - [IN] the alert manager                       *
+ *             alerter_service - [IN] the IPC service                         *
+ *             alerter         - [IN] the target alerter                      *
+ *             alert           - [IN] the alert to send                       *
  *                                                                            *
  * Return value: SUCCEED - the alert was successfully sent to alerter         *
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	am_process_alert(zbx_am_t *manager, zbx_am_alerter_t *alerter, zbx_am_alert_t *alert)
+static int	am_process_alert(zbx_am_t *manager, const zbx_ipc_service_t *alerter_service, zbx_am_alerter_t *alerter,
+		zbx_am_alert_t *alert)
 {
-	const char		*__function_name = "am_process_alert";
-
 	zbx_am_mediatype_t	*mediatype;
 	unsigned char		*data = NULL;
 	size_t			data_len;
@@ -1736,8 +1772,8 @@ static int	am_process_alert(zbx_am_t *manager, zbx_am_alerter_t *alerter, zbx_am
 	char			*cmd = NULL, *error = NULL;
 	int			ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() alertid:" ZBX_FS_UI64 " mediatypeid:" ZBX_FS_UI64 " alertpoolid:"
-			ZBX_FS_UI64, __function_name, alert->alertid, alert->mediatypeid, alert->alertpoolid);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() alertid:" ZBX_FS_UI64 " mediatypeid:" ZBX_FS_UI64 " alertpoolid:0x"
+			ZBX_FS_UX64, __func__, alert->alertid, alert->mediatypeid, alert->alertpoolid);
 
 	if (NULL == (mediatype = am_get_mediatype(manager, alert->mediatypeid)))
 	{
@@ -1753,7 +1789,8 @@ static int	am_process_alert(zbx_am_t *manager, zbx_am_alerter_t *alerter, zbx_am
 					alert->message, mediatype->smtp_server, mediatype->smtp_port,
 					mediatype->smtp_helo, mediatype->smtp_email, mediatype->smtp_security,
 					mediatype->smtp_verify_peer, mediatype->smtp_verify_host,
-					mediatype->smtp_authentication, mediatype->username, mediatype->passwd);
+					mediatype->smtp_authentication, mediatype->username, mediatype->passwd,
+					mediatype->content_type);
 			break;
 		case MEDIA_TYPE_JABBER:
 			command = ZBX_IPC_ALERTER_JABBER;
@@ -1774,7 +1811,11 @@ static int	am_process_alert(zbx_am_t *manager, zbx_am_alerter_t *alerter, zbx_am
 			command = ZBX_IPC_ALERTER_EXEC;
 			if (FAIL == am_prepare_mediatype_exec_command(mediatype, alert, &cmd, &error))
 			{
-				am_db_update_alert(manager, alert->alertid, ALERT_STATUS_FAILED, 0, error);
+				if (ALERT_SOURCE_EXTERNAL == ZBX_ALERTPOOL_SOURCE(alert->alertpoolid))
+					am_external_alert_send_response(alerter_service, alert, FAIL, error);
+				else
+					am_db_update_alert(manager, alert->alertid, ALERT_STATUS_FAILED, 0, error);
+
 				am_remove_alert(manager, alert);
 				zbx_free(error);
 				goto out;
@@ -1783,7 +1824,12 @@ static int	am_process_alert(zbx_am_t *manager, zbx_am_alerter_t *alerter, zbx_am
 			zbx_free(cmd);
 			break;
 		default:
-			am_db_update_alert(manager, alert->alertid, ALERT_STATUS_FAILED, 0, (char *)"unsupported media type");
+			error = "unsupported media type";
+			if (ALERT_SOURCE_EXTERNAL == ZBX_ALERTPOOL_SOURCE(alert->alertpoolid))
+				am_external_alert_send_response(alerter_service, alert, FAIL, error);
+			else
+				am_db_update_alert(manager, alert->alertid, ALERT_STATUS_FAILED, 0, error);
+
 			zabbix_log(LOG_LEVEL_ERR, "cannot process alertid:" ZBX_FS_UI64 ": unsupported media type: %d",
 					alert->alertid, mediatype->type);
 			am_remove_alert(manager, alert);
@@ -1796,7 +1842,7 @@ static int	am_process_alert(zbx_am_t *manager, zbx_am_alerter_t *alerter, zbx_am
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return ret;
 }
@@ -1807,23 +1853,23 @@ out:
  *                                                                            *
  * Purpose: process alerter result                                            *
  *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
- *             client  - [IN] the connected alerter                           *
- *             message - [IN] the received message                            *
+ * Parameters: manager         - [IN] the manager                             *
+ *             alerter_service - [IN] the IPC service                         *
+ *             client          - [IN] the connected alerter                   *
+ *             message         - [IN] the received message                    *
  *                                                                            *
  * Return value: SUCCEED - the alert was sent successfully                    *
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	am_process_result(zbx_am_t *manager, zbx_ipc_client_t *client, zbx_ipc_message_t *message)
+static int	am_process_result(zbx_am_t *manager, const zbx_ipc_service_t *alerter_service, zbx_ipc_client_t *client,
+		zbx_ipc_message_t *message)
 {
-	const char		*__function_name = "am_process_result";
-
-	int			ret = FAIL, errcode, status;
-	char			*errmsg;
+	int			ret = FAIL, status;
 	zbx_am_alerter_t	*alerter;
+	char			*errmsg;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	if (NULL == (alerter = am_get_alerter_by_client(manager, client)))
 	{
@@ -1837,37 +1883,44 @@ static int	am_process_result(zbx_am_t *manager, zbx_ipc_client_t *client, zbx_ip
 		goto out;
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() alertid:" ZBX_FS_UI64 " mediatypeid:" ZBX_FS_UI64 " alertpoolid:"
-			ZBX_FS_UI64, __function_name, alerter->alert->alertid, alerter->alert->mediatypeid,
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() alertid:" ZBX_FS_UI64 " mediatypeid:" ZBX_FS_UI64 " alertpoolid:0x"
+			ZBX_FS_UX64, __func__, alerter->alert->alertid, alerter->alert->mediatypeid,
 			alerter->alert->alertpoolid);
 
-	zbx_alerter_deserialize_result(message->data, &errcode, &errmsg);
+	zbx_alerter_deserialize_result(message->data, &ret, &errmsg);
 
-	if (SUCCEED == errcode)
+	if (ALERT_SOURCE_EXTERNAL == ZBX_ALERTPOOL_SOURCE(alerter->alert->alertpoolid))
 	{
-		errmsg = zbx_strdup(errmsg, "");
-		status = ALERT_STATUS_SENT;
-		ret = SUCCEED;
+		am_external_alert_send_response(alerter_service, alerter->alert, ret, errmsg);
+		am_remove_alert(manager, alerter->alert);
 	}
 	else
 	{
-		if (SUCCEED == am_retry_alert(manager, alerter->alert))
-			status = ALERT_STATUS_NOT_SENT;
+		if (SUCCEED == ret)
+		{
+			errmsg = zbx_strdup(errmsg, "");
+			status = ALERT_STATUS_SENT;
+		}
 		else
-			status = ALERT_STATUS_FAILED;
+		{
+			if (SUCCEED == am_retry_alert(manager, alerter->alert))
+				status = ALERT_STATUS_NOT_SENT;
+			else
+				status = ALERT_STATUS_FAILED;
+		}
+
+		am_db_update_alert(manager, alerter->alert->alertid, status, alerter->alert->retries, errmsg);
+
+		if (ALERT_STATUS_NOT_SENT != status)
+			am_remove_alert(manager, alerter->alert);
 	}
 
-	am_db_update_alert(manager, alerter->alert->alertid, status, alerter->alert->retries, errmsg);
-
-	if (ALERT_STATUS_NOT_SENT != status)
-		am_remove_alert(manager, alerter->alert);
-
-	alerter->alert = NULL;
 	zbx_free(errmsg);
+	alerter->alert = NULL;
 
 	zbx_queue_ptr_push(&manager->free_alerters, alerter);
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return ret;
 }
@@ -1916,6 +1969,38 @@ static int	am_check_queue(zbx_am_t *manager, int now)
 	return SUCCEED;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: am_process_external_alert_request                                *
+ *                                                                            *
+ * Purpose: process external alert request                                    *
+ *                                                                            *
+ * Parameters: id     - [IN] client id that sent external alert request       *
+ *             data   - [IN] the received message                             *
+ *             alerts - [OUT] the new alerts                                  *
+ *                                                                            *
+ ******************************************************************************/
+static void	am_process_external_alert_request(zbx_uint64_t id, const unsigned char *data, zbx_vector_ptr_t *alerts)
+{
+	zbx_uint64_t		mediatypeid;
+	char			*sendto, *subject, *message;
+	zbx_am_alert_t		*alert;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_alerter_deserialize_alert_send(data, &mediatypeid, &sendto, &subject, &message);
+
+	alert = am_create_alert(id, mediatypeid, ALERT_SOURCE_EXTERNAL, 0, id, sendto, subject, message, 0, 0, 0);
+
+	zbx_vector_ptr_append(alerts, alert);
+
+	zbx_free(message);
+	zbx_free(subject);
+	zbx_free(sendto);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
 ZBX_THREAD_ENTRY(alert_manager_thread, args)
 {
 #define	STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
@@ -1927,6 +2012,7 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 	zbx_ipc_client_t	*client;
 	zbx_ipc_message_t	*message;
 	zbx_am_alerter_t	*alerter;
+	zbx_vector_ptr_t	alerts;
 	int			ret, sent_num = 0, failed_num = 0, now, time_db = 0, time_watchdog = 0, freq_watchdog;
 	int			time_connect;
 	double			time_stat, time_idle = 0, time_now, sec;
@@ -1961,6 +2047,8 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
+	zbx_vector_ptr_create(&alerts);
 
 	for (;;)
 	{
@@ -2003,7 +2091,22 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 		if (ZBX_DB_OK == manager.dbstatus && now - time_db >= ZBX_AM_DB_POLL_DELAY)
 		{
 			if (SUCCEED == (ret = am_db_flush_alert_updates(&manager)))
-				ret = am_db_queue_alerts(&manager, now);
+			{
+				zbx_vector_ptr_t	alerts_new;
+
+				zbx_vector_ptr_create(&alerts_new);
+
+				if (SUCCEED == (ret = am_db_get_alerts(&manager, &alerts_new, now)) &&
+						0 != alerts_new.values_num)
+				{
+					zbx_vector_ptr_append_array(&alerts, alerts_new.values, alerts_new.values_num);
+				}
+
+				zbx_vector_ptr_destroy(&alerts_new);
+
+				if (SUCCEED == ret)
+					ret = am_db_queue_alerts(&manager, &alerter_service, &alerts);
+			}
 
 			if (FAIL == ret)
 			{
@@ -2032,7 +2135,7 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 			if (NULL == (alerter = (zbx_am_alerter_t *)zbx_queue_ptr_pop(&manager.free_alerters)))
 				break;
 
-			if (FAIL == am_process_alert(&manager, alerter, am_pop_alert(&manager)))
+			if (FAIL == am_process_alert(&manager, &alerter_service, alerter, am_pop_alert(&manager)))
 				zbx_queue_ptr_push(&manager.free_alerters, alerter);
 		}
 
@@ -2054,10 +2157,15 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 					am_register_alerter(&manager, client, message);
 					break;
 				case ZBX_IPC_ALERTER_RESULT:
-					if (SUCCEED == am_process_result(&manager, client, message))
+					if (SUCCEED == am_process_result(&manager, &alerter_service, client, message))
 						sent_num++;
 					else
 						failed_num++;
+					break;
+				case ZBX_IPC_ALERTER_ALERT:
+					am_process_external_alert_request(zbx_ipc_client_id(client), message->data,
+							&alerts);
+					time_db = 0;	/* queue immediately */
 					break;
 			}
 
@@ -2070,6 +2178,7 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 
 	zbx_ipc_service_close(&alerter_service);
 	am_destroy(&manager);
+	zbx_vector_ptr_destroy(&alerts);
 
 	DBclose();
 

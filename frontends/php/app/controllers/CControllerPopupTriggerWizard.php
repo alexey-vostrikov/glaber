@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -100,7 +100,14 @@ class CControllerPopupTriggerWizard extends CController {
 			'item_name' => ''
 		];
 
-		$exprs = $this->getInput('expressions', []);
+		$input = $this->getInput('expressions', []);
+		$exprs = [];
+
+		while ($input) {
+			// Merge array with 'value' and array with 'type' into single array with both attributes.
+			$exprs[] = array_shift($input) + array_shift($input);
+		}
+
 		$constructor = new CTextTriggerConstructor(new CTriggerExpression());
 
 		if ($this->hasInput('triggerid')) {

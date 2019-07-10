@@ -51,6 +51,7 @@ dist-hook:
 
 	rm -rf `find $(top_distdir) -name ".gitignore" -o -name ".gitattributes"`
 	rm -f $(top_distdir)/include/config.h
+	rm -f $(top_distdir)/include/config.h.in~
 	rm -f $(top_distdir)/frontends/php/conf/zabbix.conf.php
 	rm -rf $(top_distdir)/frontends/php/tests
 	rm -f $(top_distdir)/sass/*.html
@@ -75,7 +76,8 @@ dbschema_oracle:
 dbschema_postgresql:
 	cd database/postgresql && \
 	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
-	$(MAKE) $(AM_MAKEFLAGS) schema.sql
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) timescaledb.sql
 
 dbschema_sqlite3:
 	cd database/sqlite3 && \
@@ -136,7 +138,8 @@ WRAP_DB_FUNCS = \
 WRAP_IO_FUNCS = \
 	-Wl,--wrap=fopen \
 	-Wl,--wrap=fclose \
-	-Wl,--wrap=fgets
+	-Wl,--wrap=fgets \
+	-Wl,--wrap=open
 
 WRAP_FS_FUNCS = \
 	-Wl,--wrap=opendir \
@@ -150,8 +153,7 @@ WRAP_EXIT = \
 
 WRAP_COMM_FUNCS = \
 	-Wl,--wrap=read \
-	-Wl,--wrap=connect \
-	-Wl,--wrap=open
+	-Wl,--wrap=connect
 
 WRAP_LOG = \
 	-Wl,--wrap=__zbx_zabbix_log

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,9 +23,12 @@
 #include "common.h"
 #include "dbcache.h"
 #include "sysinfo.h"
+#include "preproc.h"
 
 extern int	CONFIG_SERVER_STARTUP_TIME;
 
 int	get_value_internal(DC_ITEM *item, AGENT_RESULT *result);
+
+int	zbx_get_value_internal_ext(const char *query, const AGENT_REQUEST *request, AGENT_RESULT *result);
 
 #endif

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -47,6 +47,11 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"cluster.status", VMCHECK_FUNC(check_vcenter_cluster_status)},
 	{"version", VMCHECK_FUNC(check_vcenter_version)},
 	{"fullname", VMCHECK_FUNC(check_vcenter_fullname)},
+	{"datastore.discovery", VMCHECK_FUNC(check_vcenter_datastore_discovery)},
+	{"datastore.read", VMCHECK_FUNC(check_vcenter_datastore_read)},
+	{"datastore.size", VMCHECK_FUNC(check_vcenter_datastore_size)},
+	{"datastore.write", VMCHECK_FUNC(check_vcenter_datastore_write)},
+	{"datastore.hv.list", VMCHECK_FUNC(check_vcenter_datastore_hv_list)},
 
 	{"hv.cluster.name", VMCHECK_FUNC(check_vcenter_hv_cluster_name)},
 	{"hv.cpu.usage", VMCHECK_FUNC(check_vcenter_hv_cpu_usage)},
@@ -55,6 +60,7 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"hv.datastore.read", VMCHECK_FUNC(check_vcenter_hv_datastore_read)},
 	{"hv.datastore.size", VMCHECK_FUNC(check_vcenter_hv_datastore_size)},
 	{"hv.datastore.write", VMCHECK_FUNC(check_vcenter_hv_datastore_write)},
+	{"hv.datastore.list", VMCHECK_FUNC(check_vcenter_hv_datastore_list)},
 	{"hv.discovery", VMCHECK_FUNC(check_vcenter_hv_discovery)},
 	{"hv.fullname", VMCHECK_FUNC(check_vcenter_hv_fullname)},
 	{"hv.hw.cpu.num", VMCHECK_FUNC(check_vcenter_hv_hw_cpu_num)},
@@ -143,14 +149,11 @@ static int	get_vmware_function(const char *key, vmfunc_t *vmfunc)
 
 int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
 {
-	const char	*__function_name = "get_value_simple";
-
 	AGENT_REQUEST	request;
 	vmfunc_t	vmfunc;
 	int		ret = NOTSUPPORTED;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key_orig:'%s' addr:'%s'",
-			__function_name, item->key_orig, item->interface.addr);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key_orig:'%s' addr:'%s'", __func__, item->key_orig, item->interface.addr);
 
 	init_request(&request);
 
@@ -211,7 +214,7 @@ int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 out:
 	free_request(&request);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
