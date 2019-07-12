@@ -495,9 +495,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	}
 
 	/**
-	 * Elasticsearch specific implementation of getGraphAggregation.
-	 *
-	 * @see CHistoryManager::getGraphAggregation
+	 * Clickhouse aggregation implementation *
 	 */
 	private function getGraphAggregationFromClickhouse(array $items, $time_from, $time_to, $width, $size, $delta) {
 
