@@ -551,18 +551,10 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 					$sql_day_condition .
 				' GROUP BY '.$group_by ;
 
-			file_put_contents('/var/log/nginx/chartlog.log', "Fetching $query_text from  ".$item['source']."\n",FILE_APPEND);
-
 			$values = CClickHouseHelper::query($query_text,1,array('itemid','count','avg','min','max','i','clock'));
 
 			$results[$item['itemid']]['data'] = $values;
 		}
-
-//	    ob_start();
-//	    var_dump($results);
-//	    $dresult = ob_get_clean();ch
-
-//	    file_put_contents('/var/log/nginx/chartlog.log', "Clickhouse Results structure is $dresult' \n",FILE_APPEND);
 
 		return $results;
 
