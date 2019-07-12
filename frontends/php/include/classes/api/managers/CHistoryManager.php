@@ -548,10 +548,12 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 				'SELECT itemid,'.$sql_select.$sql_select_extra.',MAX(toUInt32(clock)) AS clock1'.
 				' FROM '. $HISTORY['dbname'] . '.' . $sql_from .
 				' WHERE itemid='.$item['itemid'].
+				' AND clock>='.zbx_dbstr($time_from).
+				' AND clock<='.zbx_dbstr($time_to).
 					$sql_day_condition .
 				' GROUP BY '.$group_by ;
 
-//			file_put_contents('/var/log/nginx/chartlog.log', "Fetching $query_text from  ".$item['source']."\n",FILE_APPEND);
+			file_put_contents('/var/log/nginx/chartlog.log', "Fetching $query_text from  ".$item['source']."\n",FILE_APPEND);
 
 			$values = CClickHouseHelper::query($query_text,1,array('itemid','count','avg','min','max','i','clock'));
 
@@ -560,8 +562,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 
 //	    ob_start();
 //	    var_dump($results);
-//	    $dresult = ob_get_clean();
-//	    error("Dump of the result is '$dresult'");
+//	    $dresult = ob_get_clean();ch
 
 //	    file_put_contents('/var/log/nginx/chartlog.log', "Clickhouse Results structure is $dresult' \n",FILE_APPEND);
 
