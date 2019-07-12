@@ -991,13 +991,13 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 		}
 
 #ifdef HAVE_NETSNMP
-		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
-			if (next_snmp_cleanup < processed + ZBX_SNMP_CLEANUP_PERIODICITY) {
-				zbx_shutdown_snmp();
-				zbx_init_snmp();
-				next_snmp_cleanup = processed + ZBX_SNMP_CLEANUP_PERIODICITY;
-			}
-		}
+	//	if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
+	//		if (next_snmp_cleanup < processed + ZBX_SNMP_CLEANUP_PERIODICITY) {
+	//			zbx_shutdown_snmp();
+	//			zbx_init_snmp();
+	//			next_snmp_cleanup = processed + ZBX_SNMP_CLEANUP_PERIODICITY;
+	//		}
+	//	}
 #endif
 		
 
