@@ -940,7 +940,7 @@ exit:
 
 ZBX_THREAD_ENTRY(poller_thread, args)
 {
-	int		nextcheck, sleeptime = -1, processed = 0, old_processed = 0, next_snmp_cleanup=0;
+	int		nextcheck, sleeptime = -1, processed = 0, old_processed = 0;
 	double		sec, total_sec = 0.0, old_total_sec = 0.0;
 	time_t		last_stat_time;
 	unsigned char	poller_type;
@@ -958,12 +958,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			server_num, get_process_type_string(process_type), process_num);
 
 #ifdef HAVE_NETSNMP
-//we want to do complete snmp cleanup after each N items:
-
-#define	ZBX_SNMP_CLEANUP_PERIODICITY 100000
 		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
 			zbx_init_snmp();
-			next_snmp_cleanup=ZBX_SNMP_CLEANUP_PERIODICITY;
 		}
 #endif
 
@@ -989,18 +985,6 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 					get_process_type_string(process_type), process_num, old_processed,
 					old_total_sec);
 		}
-
-#ifdef HAVE_NETSNMP
-	//	if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
-	//		if (next_snmp_cleanup < processed + ZBX_SNMP_CLEANUP_PERIODICITY) {
-	//			zbx_shutdown_snmp();
-	//			zbx_init_snmp();
-	//			next_snmp_cleanup = processed + ZBX_SNMP_CLEANUP_PERIODICITY;
-	//		}
-	//	}
-#endif
-		
-
 
 
 		processed += get_values(poller_type, &nextcheck,&processed);
