@@ -90,7 +90,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		    .'argMax(value, toInt32(clock)) AS val, 
 		    argMax(value_dbl, toInt32(clock)) AS val_dbl, 
 		    argMax(value_str, toInt32(clock)) AS val_str' .
-	' FROM '.$HISTORY['dbname'].'.history h'.
+	' FROM '.$HISTORY['dbname'].'.service_history h'.
 	' WHERE h.itemid in ( '.$itemslist.')'.
 	($period ? ' AND h.clock>'.(time() - $period) : '').
 	' GROUP BY itemid';
@@ -515,7 +515,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 
 		foreach ($items as $item) {
 				
-			if ($item['source'] === 'history') {
+			if ($item['source'] === 'history' || isset($HISTORY['disable_trends'])) {
 			
 				if ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) {
 					$sql_select = 'COUNT(*) AS count,AVG(value) AS avg,MIN(value) AS min,MAX(value) AS max';
@@ -524,7 +524,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 					$sql_select = 'COUNT(*) AS count,AVG(value_dbl) AS avg,MIN(value_dbl) AS min,MAX(value_dbl) AS max';
 				}
 			
-				$sql_from = 'history';
+				$sql_from = 'service_history';
 				
 				$daystart=date('Y-m-d',$time_from);
 				$dayend=date('Y-m-d',$time_to);
@@ -795,7 +795,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		global $HISTORY;
 		$query_text =
 			'SELECT '.$aggregation.'(value) AS value'.
-			' FROM '. $HISTORY['dbname']. '.history '.
+			' FROM '. $HISTORY['dbname']. '.service_history '.
 			' WHERE clock>toDateTime('.$time_from.')'.
 			' AND itemid='.$item['itemid'].
 			' HAVING COUNT(*)>0';
