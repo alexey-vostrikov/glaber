@@ -218,7 +218,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",ns");
 	}
 	
-	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, " FROM %s.history WHERE itemid=%ld ",
+	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, " FROM %s.history_buffer WHERE itemid=%ld ",
 		CONFIG_HISTORY_STORAGE_DB_NAME,itemid);
 
 	if (1 == end-start) {
@@ -374,7 +374,7 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
     
-	zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,"INSERT INTO %s.history (day,itemid,clock,value,value_dbl,value_str", CONFIG_HISTORY_STORAGE_DB_NAME);
+	zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,"INSERT INTO %s.history_buffer (day,itemid,clock,value,value_dbl,value_str", CONFIG_HISTORY_STORAGE_DB_NAME);
 
 	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE ) {
 		zbx_snprintf_alloc(&sql_buffer,&sql_alloc,&sql_offset,",ns");
@@ -567,7 +567,7 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 		zabbix_log(LOG_LEVEL_DEBUG,"Got %ld items for the type",items);
 
 		if ( items > 0 ) {
-			zbx_snprintf_alloc(&query,&q_len,&q_offset,"SELECT itemid, clock, value, value_dbl, value_str FROM %s.history WHERE (itemid IN  (",
+			zbx_snprintf_alloc(&query,&q_len,&q_offset,"SELECT itemid, clock, value, value_dbl, value_str FROM %s.history_buffer WHERE (itemid IN  (",
 			CONFIG_HISTORY_STORAGE_DB_NAME);
 			
 			zbx_snprintf_alloc(&query,&q_len,&q_offset,"%ld",vector_itemids.values[0]);
