@@ -239,5 +239,15 @@ class CWidgetFormProblems extends CWidgetForm {
 		}
 
 		$this->fields[$field_lines->getName()] = $field_lines;
+
+		//disable popups
+		$field_disable_problems_popups = (new CWidgetFieldCheckBox('disable_problems_popups', _('Disable problems popups (WORK FASTER!)')))
+			->setDefault(1);
+
+		if (array_key_exists('disable_problems_popups', $this->data)) {
+			$field_disable_problems_popups->setValue($this->data['disable_problems_popups']);
+		}
+
+		$this->fields[$field_disable_problems_popups->getName()] = $field_disable_problems_popups;
 	}
 }

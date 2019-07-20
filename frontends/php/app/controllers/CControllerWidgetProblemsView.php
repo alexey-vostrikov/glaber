@@ -90,7 +90,8 @@ class CControllerWidgetProblemsView extends CControllerWidget {
 				'tags' => $fields['tags'],
 				'tag_name_format' => $fields['tag_name_format'],
 				'tag_priority' => $fields['tag_priority'],
-				'show_latest_values' => $fields['show_latest_values']
+				'show_latest_values' => $fields['show_latest_values'],
+				'disable_problems_popups' => $fields['disable_problems_popups']
 			],
 			'config' => [
 				'problem_unack_style' => $config['problem_unack_style'],
