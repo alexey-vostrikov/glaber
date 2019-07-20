@@ -31,6 +31,8 @@ $url_details = (new CUrl('tr_events.php'))
 	->setArgument('eventid', '');
 
 $show_timeline = ($data['sortfield'] === 'clock' && $data['fields']['show_timeline']);
+$disable_problems_popups = $data['fields']['disable_problems_popups'];
+
 $show_recovery_data = in_array($data['fields']['show'], [TRIGGERS_OPTION_RECENT_PROBLEM, TRIGGERS_OPTION_ALL]);
 
 $header_time = new CColHeader(($data['sortfield'] === 'clock') ? [_('Time'), $sort_div] : _('Time'));
@@ -149,18 +151,23 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 		$info_icons[] = makeSuppressedProblemIcon($problem['suppression_data']);
 	}
 
-	$description = (new CCol([
-		(new CLinkAction($problem['name']))
-			->setHint(
-				make_popup_eventlist(['comments' => $problem['comments']] + $trigger, $eventid, $backurl,
-					$show_timeline, $data['fields']['show_tags'], $data['fields']['tags'],
-					$data['fields']['tag_name_format'], $data['fields']['tag_priority']
+	if ($disable_problems_popups) {
+		$description = (new CCol([$problem['name']
+		])); 
+	} else {
+		$description = (new CCol([
+			(new CLinkAction($problem['name']))
+				->setHint(
+					make_popup_eventlist(['comments' => $problem['comments']] + $trigger, $eventid, $backurl,
+						$show_timeline, $data['fields']['show_tags'], $data['fields']['tags'],
+						$data['fields']['tag_name_format'], $data['fields']['tag_priority']
+					)
 				)
-			)
-			->setAttribute('aria-label', _xs('%1$s, Severity, %2$s', 'screen reader',
-				$problem['name'], getSeverityName($problem['severity'], $data['config'])
-			))
-	]));
+				->setAttribute('aria-label', _xs('%1$s, Severity, %2$s', 'screen reader',
+					$problem['name'], getSeverityName($problem['severity'], $data['config'])
+				))
+		]));
+	}
 
 	$description_style = getSeverityStyle($problem['severity']);
 
