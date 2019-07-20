@@ -267,6 +267,8 @@ class CLineGraphDraw extends CGraphDraw {
 					&& $this->period / $this->sizeX <= ZBX_MAX_TREND_DIFF / ZBX_GRAPH_MAX_SKIP_CELL))
 					? 'history' : 'trends';
 
+			if (isset($HISTORY['disable_trends']) ) $item['source']='history';
+
 		$items[] = $item;
 		}
 
