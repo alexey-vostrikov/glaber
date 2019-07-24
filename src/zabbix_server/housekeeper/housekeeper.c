@@ -25,12 +25,14 @@
 #include "zbxself.h"
 #include "zbxalgo.h"
 #include "zbxserver.h"
+//#include "../../libs/zbxhistory/history.h"
 
 #include "zbxhistory.h"
 #include "housekeeper.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern char * CONFIG_HISTORY_STORAGE_TYPE;
 
 static int	hk_period;
 
@@ -41,7 +43,7 @@ static int	hk_period;
 
 /* global configuration data containing housekeeping configuration */
 static zbx_config_t	cfg;
-
+int zbx_history_housekeep(char * table, unsigned int age);
 /* Housekeeping rule definition.                                */
 /* A housekeeping rule describes table from which records older */
 /* than history setting must be removed according to optional   */
@@ -633,10 +635,19 @@ static int	housekeeping_history_and_trends(int now)
 	int			deleted = 0, i, rc;
 	zbx_hk_history_rule_t	*rule;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() now:%d", __func__, now);
+	zabbix_log(LOG_LEVEL_INFORMATION, "In %s() housekeeping trends and history now:%d", __func__, now);
 
+	
 	/* prepare delete queues for all history housekeeping rules */
 	hk_history_delete_queue_prepare_all(hk_history_rules, now);
+	
+	
+//	if ( NULL != strstr(CONFIG_HISTORY_STORAGE_TYPE,"clickhouse"))  {
+//				zabbix_log(LOG_LEVEL_INFORMATION, "%s  will do clickhouse data rotation");
+//				zbx_history_housekeep((char *)rule->table,*rule->poption);
+//	};
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "starting housekeeping table looping");
 
 	/* Loop through the history rules. Each rule is a history table (such as history_log, trends_uint, etc) */
 	/* we need to clear records from */
@@ -644,6 +655,17 @@ static int	housekeeping_history_and_trends(int now)
 	{
 		if (ZBX_HK_MODE_DISABLED == *rule->poption_mode)
 			continue;
+	
+		//if ( NULL != strstr(CONFIG_HISTORY_STORAGE_TYPE,"clickhouse") 
+		//&& (!strcmp(rule->table,"history") ||
+		//	!strcmp(rule->table,"trends") ||
+		//	!strcmp(rule->table,"trends_uint") )
+
+		//) {
+		zabbix_log(LOG_LEVEL_INFORMATION, "Will do history interface housekeeping for table %s",rule->table);
+		zbx_history_housekeep((char *)rule->table,*rule->poption);
+		//};
+
 
 		/* If partitioning enabled for history and/or trends then drop partitions with expired history.  */
 		/* ZBX_HK_MODE_PARTITION is set during configuration sync based on the following: */
