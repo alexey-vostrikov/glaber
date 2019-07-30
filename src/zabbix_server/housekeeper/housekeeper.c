@@ -641,14 +641,6 @@ static int	housekeeping_history_and_trends(int now)
 	/* prepare delete queues for all history housekeeping rules */
 	hk_history_delete_queue_prepare_all(hk_history_rules, now);
 	
-	
-//	if ( NULL != strstr(CONFIG_HISTORY_STORAGE_TYPE,"clickhouse"))  {
-//				zabbix_log(LOG_LEVEL_INFORMATION, "%s  will do clickhouse data rotation");
-//				zbx_history_housekeep((char *)rule->table,*rule->poption);
-//	};
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "starting housekeeping table looping");
-
 	/* Loop through the history rules. Each rule is a history table (such as history_log, trends_uint, etc) */
 	/* we need to clear records from */
 	for (rule = hk_history_rules; NULL != rule->table; rule++)
@@ -656,17 +648,11 @@ static int	housekeeping_history_and_trends(int now)
 		if (ZBX_HK_MODE_DISABLED == *rule->poption_mode)
 			continue;
 	
-		//if ( NULL != strstr(CONFIG_HISTORY_STORAGE_TYPE,"clickhouse") 
-		//&& (!strcmp(rule->table,"history") ||
-		//	!strcmp(rule->table,"trends") ||
-		//	!strcmp(rule->table,"trends_uint") )
-
-		//) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Will do history interface housekeeping for table %s",rule->table);
-		zbx_history_housekeep((char *)rule->table,*rule->poption);
-		//};
-
-
+	
+		//if history backend supports data rotation for the table, then doing it
+		if ( SUCCEED == zbx_history_housekeep((char *)rule->table,*rule->poption) ) 
+			continue;
+	
 		/* If partitioning enabled for history and/or trends then drop partitions with expired history.  */
 		/* ZBX_HK_MODE_PARTITION is set during configuration sync based on the following: */
 		/* 1. "Override item history (or trend) period" must be on 2. DB must be PostgreSQL */
