@@ -263,6 +263,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 	{
 		s[i].buf_type = ZBX_BUF_TYPE_STAT;
 		s[i].buffer=s[i].buf_stat;
+		errcodes[i]=NOT_PROCESSED;
 
 		//cheick if the item is agent type
 		if (  ITEM_TYPE_ZABBIX != items[i].type )	
@@ -282,7 +283,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 				tls_arg2 = NULL;
 				break;
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
-			case ZBX_TCP_SEC_TLS_CERT:
+			case ZBX_TCP_SEC_TLS_CERT:		
 				tls_arg1 = items[i].host.tls_issuer;
 				tls_arg2 = items[i].host.tls_subject;
 				break;
@@ -320,7 +321,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 
 		conn_status[i]=CONNECT_SENT;
 		max_socket=s[i].socket;
-		active_agents++;
+		active_agents++;		
 		
 		
 	}
@@ -330,12 +331,6 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 
 	while (active_agents>0 && (time(NULL)-starttime)< CONFIG_TIMEOUT && processed_vals>0)
 	{
-		
-		//this was the simplest and compact way to implement async io
-		//i has tried select() + FD_ISSET, while its seems to work
-		//it requires much more CPU for large batches of hosts
-		//probably it's worth of trying libevent if some problems arise, especially it's already 
-		//used and linked to the daemon, but one usleep hanles all that 
 		
 		usleep(10000);
 		
@@ -387,7 +382,8 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 
 		if (REQ_SENT == conn_status[i] || CONNECT_SENT ==conn_status[i]) {
 			zabbix_log(LOG_LEVEL_DEBUG, "Connection %d has timed out while waiting for responce", num);
-//			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
+			//if (NULL == &results[i]) 
+			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
 			errcodes[i]=TIMEOUT_ERROR;
 			continue;
 		}
