@@ -72,7 +72,8 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	global $HISTORY;
 	$results = [];
 	$itemslist='';
-
+	
+	
 	
 	foreach ($items as $item) {
 	    if (strlen($itemslist)>0) {
@@ -86,7 +87,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	$query_text='
 		SELECT 
 		    itemid, 
-		    max(toInt32(clock)) AS clk,'. ($HISTORY["ClickHouseDisableNanoseconds"] == 1 ? '0 AS ns_,' : 'argMax(ns, toInt32(clock)) AS ns_,')
+		    max(toInt32(clock)) AS clk,'. ( (isset($HISTORY["ClickHouseDisableNanoseconds"]) && $HISTORY["ClickHouseDisableNanoseconds"] == 1 )? '0 AS ns_,' : 'argMax(ns, toInt32(clock)) AS ns_,')
 		    .'argMax(value, toInt32(clock)) AS val, 
 		    argMax(value_dbl, toInt32(clock)) AS val_dbl, 
 		    argMax(value_str, toInt32(clock)) AS val_str' .
