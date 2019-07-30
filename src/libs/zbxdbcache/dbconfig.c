@@ -13130,3 +13130,45 @@ int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp) {
 	}
 	return ret;
 }
+void DC_add_trigger_state(struct zbx_json* j, ZBX_DC_TRIGGER *trigger) {
+	
+	zabbix_log(LOG_LEVEL_TRACE, "NOPROBLEM: adding trigger's %ld state to the responce",trigger->triggerid );
+	
+	zbx_json_addobject(j,NULL);
+	zbx_json_adduint64(j,"triggerid",trigger->triggerid);
+	zbx_json_adduint64(j,"lastchnange",trigger->lastchange);
+	zbx_json_adduint64(j,"current_state",trigger->state);
+	zbx_json_close(j);
+}
+
+void zbx_dc_generate_problems_list(struct zbx_json *j, zbx_vector_uint64_t *triggers ,unsigned int minseverity) {
+	ZBX_DC_TRIGGER *trigger;
+	zbx_uint64_t i;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "NOPROBLEM: %s generating list of triggers with their states", __func__);
+
+	WRLOCK_CACHE;
+	if (triggers->values_num > 0) {
+		//vector is set, will look for triggers which are in the vector
+		for (i=0; i<triggers->values_num ; i++) {
+			
+			trigger=zbx_hashset_search(&config->triggers,&triggers->values[i]);
+			if (trigger && trigger->priority >= minseverity) {
+				//adding trigger value, last change time to the output 
+				DC_add_trigger_state(j,trigger);
+			}
+		}
+	} else 
+	{	zbx_hashset_iter_t iter;
+		zbx_hashset_iter_reset(&config->triggers, &iter);
+		while (trigger=zbx_hashset_iter_next(&iter)){
+			if (trigger->priority >=minseverity) {
+				//adding trigger to the output
+				DC_add_trigger_state(j,trigger);
+			}
+		}
+	
+	}
+	UNLOCK_CACHE;
+
+};
