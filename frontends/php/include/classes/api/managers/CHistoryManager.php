@@ -69,7 +69,7 @@ class CHistoryManager {
 
 private function getLastValuesFromClickhouse($items, $limit, $period) {
 
-	global $HISTORY, $ClickHouseDisableNanoseconds;
+	global $HISTORY;
 	$results = [];
 	$itemslist='';
 
@@ -86,7 +86,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	$query_text='
 		SELECT 
 		    itemid, 
-		    max(toInt32(clock)) AS clk,'. ($ClickHouseDisableNanoseconds == 1 ? '0 AS ns_,' : 'argMax(ns, toInt32(clock)) AS ns_,')
+		    max(toInt32(clock)) AS clk,'. ($HISTORY["ClickHouseDisableNanoseconds"] == 1 ? '0 AS ns_,' : 'argMax(ns, toInt32(clock)) AS ns_,')
 		    .'argMax(value, toInt32(clock)) AS val, 
 		    argMax(value_dbl, toInt32(clock)) AS val_dbl, 
 		    argMax(value_str, toInt32(clock)) AS val_str' .
@@ -95,7 +95,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	($period ? ' AND h.clock>'.(time() - $period) : '').
 	' GROUP BY itemid';
 
-        $values = CClickHouseHelper::query($query_text,1,array('itemid','clock','ns','value','value_dbl','value_str'));
+    $values = CClickHouseHelper::query($query_text,1,array('itemid','clock','ns','value','value_dbl','value_str'));
 
 	foreach ($values as $res) 
 	{
