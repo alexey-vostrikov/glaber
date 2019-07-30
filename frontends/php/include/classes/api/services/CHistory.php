@@ -31,6 +31,7 @@ class CHistory extends CApiService {
 	public function __construct() {
 		// considering the quirky nature of the history API,
 		// the parent::__construct() method should not be called.
+	
 	}
 
 	/**
@@ -229,6 +230,7 @@ class CHistory extends CApiService {
 	 */
 	private function getFromClickHouse($options) {
 		global $HISTORY;
+
 		$result = [];
 		$sql_parts = [
 			'select'	=> ['history' => 'h.itemid'],
@@ -257,7 +259,8 @@ class CHistory extends CApiService {
 
 		// itemids
 		if ($options['itemids'] !== null) {
-			$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
+		//	$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
+			$sql_parts['where']['itemid'] = dbConditionInt('h.itemid', $options['itemids'],false,false,false);
 		}
 
 		// time_from
