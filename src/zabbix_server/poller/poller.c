@@ -799,9 +799,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 				/* for mass problems don't mark host as unreach for async and unreach pollers, because:
 				first, that sometimes causes a "poll" bug in mysql lib (100% thread load on waiting in a poll for mysql, probably solvable by alarm)
 				second, there seems to be no reason for that, async pollers live just fine having even all hosts unreachable */
-				if ( HOST_AVAILABLE_FALSE != last_available && 
-						(ZBX_POLLER_TYPE_NORMAL == poller_type || 
-						 ZBX_POLLER_TYPE_JAVA == poller_type ) )
+				if ( HOST_AVAILABLE_FALSE != last_available )
 				{
 					zbx_deactivate_item_host(&items[i], &timespec, results[i].msg);
 					last_available = HOST_AVAILABLE_FALSE;
