@@ -51,8 +51,6 @@ extern int CONFIG_CLUSTER_SERVER_ID;
 int zbx_dc_create_hello_json(struct zbx_json* j);
 int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse	*jp, int timediff);
 int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp);
-void zbx_dc_generate_problems_list(struct zbx_json *j, zbx_vector_uint64_t *triggers ,unsigned int minseverity);
-
 char *zbx_dc_get_topology();
 
 
@@ -1059,42 +1057,31 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: recv_getproblems                                                   *
+ * Function: recv_getstatus                                                   *
  *                                                                            *
- * Purpose: retruns triggers sates				                        *
+ * Purpose: process status request                                            *
  *                                                                            *
  * Parameters:  sock  - [IN] the request socket                               *
- *              jp    - [IN] the request data   
- * 				triggerslist - on emty all triggers are returned,
- * 							  if the list is filled - only requested triggers
- * 				minseverity - if set, then only triggers with severity
- * 							  equal or exceeding minseverity are returned                              *
+ *              jp    - [IN] the request data                                 *
  *                                                                            *
  * Return value:  SUCCEED - processed successfully                            *
  *                FAIL - an error occurred                                    *
  *                                                                            *
  ******************************************************************************/
-
+/*
 static int	recv_getproblems(zbx_socket_t *sock, struct zbx_json_parse *jp)
 {
+#define ZBX_GET_STATUS_UNKNOWN	-1
+#define ZBX_GET_STATUS_PING	0
+#define ZBX_GET_STATUS_FULL	1
+
+	const char		*__function_name = "recv_getstatus";
 	zbx_user_t		user;
-	int			ret = FAIL;
+	int			ret = FAIL, request_type = ZBX_GET_STATUS_UNKNOWN;
 	char			type[MAX_STRING_LEN], sessionid[MAX_STRING_LEN];
 	struct zbx_json		json;
-	struct zbx_json_parse jp_params, jp_triggers;
-	char *minseverity_str = NULL, *ptr = NULL;
-	const char *triggerid_str;
-	unsigned int minseverity = 0;
-	size_t minseverity_alloc = 0;
-	zbx_uint64_t triggerid;
-	zbx_vector_uint64_t triggers_list;
 
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-	zabbix_log(LOG_LEVEL_INFORMATION,"NOPROBLEM: Got request: %s",jp->start);
-	
-	zbx_vector_uint64_create(&triggers_list);
-	zbx_json_init(&json,1024);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
 	if (SUCCEED != zbx_json_value_by_name(jp, ZBX_PROTO_TAG_SID, sessionid, sizeof(sessionid)) ||
 			SUCCEED != DBget_user_by_active_session(sessionid, &user))
@@ -1103,51 +1090,61 @@ static int	recv_getproblems(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		goto out;
 	}
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"NOPROBLEM: passed auth");
-
-	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_PARAMS, &jp_params))
+	if (SUCCEED == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_TYPE, type, sizeof(type)))
 	{
-		zabbix_log(LOG_LEVEL_INFORMATION,"NOPROBLEM: Found params %s",jp_params.start);
-		//zbx_snprintf(error, sizeof(error), "NOPROBLEM: found params tag: %s", ZBX_PROTO_TAG_PARAMS);
-
-		if (SUCCEED == zbx_json_value_by_name_dyn(&jp_params, ZBX_PROTO_TAG_MINSEVERITY, &minseverity_str, &minseverity_alloc)) {
-				//error = zbx_dsprintf(NULL, "Cannot parse request tag: %s.", ZBX_PROTO_TAG_SENDTO);
-				minseverity = atol(minseverity_str);
-				zbx_free(minseverity_str);
-
-				zabbix_log(LOG_LEVEL_INFORMATION, "NOPROBLEM: parsed severity: %d",minseverity);
+		if (0 == strcmp(type, ZBX_PROTO_VALUE_GET_STATUS_PING))
+		{
+			request_type = ZBX_GET_STATUS_PING;
 		}
-
-		if (SUCCEED == zbx_json_brackets_by_name(&jp_params, ZBX_PROTO_TAG_TRIGGERS, &jp_triggers)) {
-			//parsing triggers array
-			while (NULL!= (triggerid_str = zbx_json_next(&jp_triggers,triggerid_str))) {
-				u_int64_t triggerid=atol(triggerid_str);
-				if (triggerid>0) {
-					zabbix_log(LOG_LEVEL_INFORMATION,"NOPROBLEM: adding triggerid to the array %ld", triggerid);
-					zbx_vector_uint64_append(&triggers_list,triggerid);
-				
-				}
-			}
+		else if (0 == strcmp(type, ZBX_PROTO_VALUE_GET_STATUS_FULL))
+		{
+			request_type = ZBX_GET_STATUS_FULL;
 		}
-		
-	} else {
-			zabbix_log(LOG_LEVEL_DEBUG, "NOPROBLEM: no params found in the request");
-	} 
+	}
 
-	zbx_dc_generate_problems_list(&json,&triggers_list,minseverity);
-	
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s() json.buffer:'%s'", __func__, json.buffer);
+	if (ZBX_GET_STATUS_UNKNOWN == request_type)
+	{
+		zbx_send_response(sock, ret, "Unsupported request type.", CONFIG_TIMEOUT);
+		goto out;
+	}
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+
+	switch (request_type)
+	{
+		case ZBX_GET_STATUS_PING:
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+			zbx_json_addobject(&json, ZBX_PROTO_TAG_DATA);
+			zbx_json_close(&json);
+			break;
+		case ZBX_GET_STATUS_FULL:
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+			zbx_json_addobject(&json, ZBX_PROTO_TAG_DATA);
+			status_stats_export(&json, user.type);
+			zbx_json_close(&json);
+			break;
+		default:
+			THIS_SHOULD_NEVER_HAPPEN;
+	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() json.buffer:'%s'", __function_name, json.buffer);
 
 	(void)zbx_tcp_send(sock, json.buffer);
+
 	zbx_json_free(&json);
 
 	ret = SUCCEED;
 out:
-	zbx_vector_uint64_destroy(&triggers_list);
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
 
 	return ret;
+
+#undef ZBX_GET_STATUS_UNKNOWN
+#undef ZBX_GET_STATUS_PING
+#undef ZBX_GET_STATUS_FULL
 }
+
+*/
 
 
 /******************************************************************************
@@ -1348,7 +1345,6 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 	zbx_rtrim(s, " \r\n");
 
 	zabbix_log(LOG_LEVEL_DEBUG, "trapper got '%s'", s);
-	zabbix_log(LOG_LEVEL_INFORMATION, "trapper got '%s'", s);
 
 	if ('{' == *s)	/* JSON protocol */
 	{
@@ -1446,10 +1442,10 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 				if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 					ret = zbx_trapper_preproc_test(sock, &jp);
 			}
-		   else if (0 == strcmp(value, ZBX_PROTO_VALUE_GET_PROBLEMS))
-			{
-					ret = recv_getproblems(sock, &jp);
-			} 
+		// else if (0 == strcmp(value, ZBX_PROTO_VALUE_GET_PROBLEMS))
+		//	{
+		//			ret = recv_getproblems(sock, &jp);
+		//	} 
 			else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_HELLO))
 			{
 					ret = recv_server_hello(sock, &jp);

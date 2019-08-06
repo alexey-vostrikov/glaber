@@ -199,25 +199,6 @@ class CZabbixServer {
 	}
 
 	/**
-	 * Retrieve current trigger information.
-	 *
-	 * @return bool|array
-	 */
-	public function getTriggers($sid, $triggerlist,$minseverity = 1) {
-		$request = [
-			'request' => 'problems.get',
-			'params' => [
-				'triggers'=> $triggerlist,
-				'minseverity' => "$minseverity"
-			],
-			'sid' => $sid,
-		];
-
-		return $this->request($request);
-	}
-
-
-	/**
 	 * Request server to test media type.
 	 *
 	 * @param array  $data                 Array of media type test data to send.
@@ -316,11 +297,6 @@ class CZabbixServer {
 	 * @return bool
 	 */
 	public function isRunning($sid) {
-		
-		//$triggers=array(1173791, 1299590, 1277847	, 'kolbasa');
-	//	$triggers=array();
-	//	$this->getTriggers($sid,$triggers);
-
 		$response = $this->request([
 			'request' => 'status.get',
 			'type' => 'ping',

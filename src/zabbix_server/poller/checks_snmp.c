@@ -2412,7 +2412,7 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 			if (NULL == (ss[snmp_sessions]=zbx_snmp_open_session(&items[i], error, sizeof(error))))
 			{
 				err = CONFIG_ERROR;
-				errcodes[i]=NOT_PROCESSED;
+				errcodes[i]=NETWORK_ERROR;
 				zabbix_log(LOG_LEVEL_DEBUG, "In %s() Opening snmp sessions: failed to open session for item %d", __function_name,i);
 				SET_MSG_RESULT(&results[i], zbx_dsprintf(NULL, "Couldn't open snmp session"));
 				
@@ -2539,11 +2539,6 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 	/* sessions cleanup */
 	for (i = 0; i < snmp_sessions; i++ ) 
 	{
-		if (NOT_PROCESSED == errcodes[i]) {
-			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "SNMP timeout"));
-			errcodes[i]=TIMEOUT_ERROR;
-		}
-		
 		zabbix_log(LOG_LEVEL_DEBUG, "End of %s() freeing session for  item %d", __function_name,i);
 		zbx_snmp_close_session(ss[i]);
 	}

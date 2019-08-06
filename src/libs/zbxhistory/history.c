@@ -98,28 +98,7 @@ void	zbx_history_destroy(void)
 		writer->destroy(writer);
 	}
 }
-/************************************************************************************
- *                                                                                  *
- * Function: zbx_history_housekeep                                                  *
- *                                                                                  *
- * Purpose: housekeep data in hiostorical stores                                    *
- *                                                                                  *
- ************************************************************************************/
-int	zbx_history_housekeep(char* tablename, unsigned int age)
-{
-	//so far there is no need to distinguish housekeeping
-	//by data type;
 
-	//however if it happens so, then the same code has to be repeated for each data type
-	//and the data type has to be passed inside housekeeping proc
-	zbx_history_iface_t	*writer = &history_ifaces[0];
-
-	if (writer->housekeep ) {
-		writer->housekeep(&history_ifaces[0],tablename,age);
-		return SUCCEED;
-	} 
-	return FAIL;	
-}
 /************************************************************************************
  *                                                                                  *
  * Function: zbx_history_add_values                                                 *
