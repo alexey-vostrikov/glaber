@@ -1498,7 +1498,7 @@ done:
 			zbx_strpool_release(proxy->proxy_address);
 			zbx_vector_uint64_destroy(&proxy->cluster_domains);
 
-			for (i=0; i < proxy->cluster_rerouted_data.values_num; i++) {
+			for ( i=0; i < proxy->cluster_rerouted_data.values_num; i++) {
 				zbx_strpool_release((const char *)&proxy->cluster_rerouted_data.values[i]);
 			}
 			
