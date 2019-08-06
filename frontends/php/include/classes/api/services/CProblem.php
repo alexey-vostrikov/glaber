@@ -87,8 +87,7 @@ class CProblem extends CApiService {
 			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
-			'limit'						=> null,
-			'fromserver'				=> null
+			'limit'						=> null
 		];
 		$options = zbx_array_merge($defOptions, $options);
 

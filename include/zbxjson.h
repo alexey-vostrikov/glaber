@@ -20,8 +20,6 @@
 #ifndef ZABBIX_ZJSON_H
 #define ZABBIX_ZJSON_H
 
-#define ZBX_PROTO_TAG_MINSEVERITY	"minseverity"
-#define ZBX_PROTO_TAG_TRIGGERS		"triggers"
 #define ZBX_PROTO_TAG_CLOCK			"clock"
 #define ZBX_PROTO_TAG_NS			"ns"
 #define ZBX_PROTO_TAG_DATA			"data"
@@ -142,7 +140,7 @@
 #define ZBX_PROTO_VALUE_JAVA_GATEWAY_JMX	"java gateway jmx"
 #define ZBX_PROTO_VALUE_GET_QUEUE		"queue.get"
 #define ZBX_PROTO_VALUE_GET_STATUS		"status.get"
-#define ZBX_PROTO_VALUE_GET_PROBLEMS	"problems.get"
+//#define ZBX_PROTO_VALUE_GET_PROBLEMS	"problems.get"
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"
 #define ZBX_PROTO_VALUE_CLUSTER_TOPOLGY		"cluster_topology"

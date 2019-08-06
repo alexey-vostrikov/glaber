@@ -13,7 +13,7 @@
 ** GNU General Public License for more details.
 **
 ** You should have received a copy of the GNU General Public License
-** along with this rogram; if not, write to the Free Software
+** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
@@ -43,8 +43,6 @@ extern char *CONFIG_CLICKHOUSE_PASSWORD;
 extern int CONFIG_SERVER_STARTUP_TIME;
 extern int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME;
 extern int CONFIG_CLICKHOUSE_PRELOAD_VALUES;
-
-#define ZBX_CLICKHOUSE_SHARDED_SUFFIX "_sharded"
 
 typedef struct
 {
@@ -154,65 +152,7 @@ static void	clickhouse_destroy(zbx_history_iface_t *hist)
 	zbx_free(data->url);
 	zbx_free(data);
 }
-/************************************************************************************
- *                                                                                  *
- * Function: clickhouse_query 														*
- *                                                                                  *
- * Purpose: performs a guery in the clickhouse                                      *
- *                                                                                  *
- * Parameters:  hist - [IN] the history storage interface  
- * 							query 
- * 							page_r - curl page object     		                    *
- *                                                                                  *
- ************************************************************************************/
 
-static int clickhouse_query(zbx_clickhouse_data_t*data, const char *request, zbx_httppage_t *page_r) {
-	
-	CURLcode		err;
-	CURL	*handle = NULL;
-
-	int ret=FAIL;
-	char  errbuf[CURL_ERROR_SIZE];
-	
-	struct curl_slist	*curl_headers = NULL;
-
-	bzero(page_r,sizeof(zbx_httppage_t));
-	if (NULL == (handle = curl_easy_init()))
-	{
-		zabbix_log(LOG_LEVEL_ERR, "cannot initialize cURL session");
-		goto out;
-	} 
-	
-	curl_easy_setopt(handle, CURLOPT_URL, data->url);
-	curl_easy_setopt(handle, CURLOPT_POSTFIELDS, request);
-	curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curl_write_cb);
-	curl_easy_setopt(handle, CURLOPT_WRITEDATA, page_r);
-	curl_easy_setopt(handle, CURLOPT_HTTPHEADER, curl_headers);
-	curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
-	curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errbuf);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "sending query to %s; post data: %s", data->url, request);
-
-	page_r->offset = 0;
-	*errbuf = '\0';
-
-	if (CURLE_OK != (err = curl_easy_perform(handle)))
-	{
-		zabbix_log(LOG_LEVEL_WARNING, "Failed query '%s'", request);
-		clickhouse_log_error(handle, err, errbuf,page_r);
-		goto out;
-	}
-	
-	ret = SUCCEED;
-out:
-	zbx_free(data->buf);
-
-	curl_easy_cleanup(handle);
-	curl_slist_free_all(curl_headers);
-    
-	return ret;
-
-}
 /************************************************************************************
  *                                                                                  *
  * Function: clickhouse_get_values                                                     *
@@ -236,16 +176,27 @@ out:
 static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid, int start, int count, int end,
 		zbx_vector_history_record_t *values)
 {
+	const char		*__function_name = "clickhouse_get_values";
 	int valuecount=0;
 
+	zbx_clickhouse_data_t	*data = (zbx_clickhouse_data_t *)hist->data;
+	size_t			url_alloc = 0, url_offset = 0;
+    
+	CURLcode		err;
+	CURL	*handle = NULL;
+	
+	struct curl_slist	*curl_headers = NULL;
+	
+    char  errbuf[CURL_ERROR_SIZE];
     char	*sql_buffer=NULL;
     size_t			buf_alloc = 0, buf_offset = 0;
- 
     zbx_httppage_t page_r;
- 	zbx_history_record_t	hr;
+ 
+	zbx_history_record_t	hr;
 
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
     bzero(&page_r,sizeof(zbx_httppage_t));
 
 	
@@ -254,7 +205,13 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
       goto out;
 	}
 
-	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, 
+	if (NULL == (handle = curl_easy_init()))
+	{
+		zabbix_log(LOG_LEVEL_ERR, "cannot initialize cURL session");
+		goto out;
+	} 
+	
+	 zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, 
 			"SELECT  toUInt32(clock) clock,value,value_dbl,value_str");
 
 	if ( 0 == CONFIG_CLICKHOUSE_DISABLE_NS_VALUE) {
@@ -284,10 +241,30 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 
     zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, "format JSON ");
 
-	if (SUCCEED != clickhouse_query(hist->data,sql_buffer,&page_r)) 
+	zabbix_log(LOG_LEVEL_DEBUG, "CLICKHOUSE: sending query to clickhouse: %s", sql_buffer);
+
+	curl_easy_setopt(handle, CURLOPT_URL, data->url);
+	curl_easy_setopt(handle, CURLOPT_POSTFIELDS, sql_buffer);
+	curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curl_write_cb);
+	curl_easy_setopt(handle, CURLOPT_WRITEDATA, &page_r);
+	curl_easy_setopt(handle, CURLOPT_HTTPHEADER, curl_headers);
+	curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
+	curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errbuf);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "sending query to %s; post data: %s", data->url, sql_buffer);
+
+	page_r.offset = 0;
+	*errbuf = '\0';
+
+	if (CURLE_OK != (err = curl_easy_perform(handle)))
+	{
+		clickhouse_log_error(handle, err, errbuf,&page_r);
+        zabbix_log(LOG_LEVEL_WARNING, "Failed query '%s'", sql_buffer);
 		goto out;
+	}
 
-
+    zabbix_log(LOG_LEVEL_DEBUG, "Recieved from clickhouse: %s", page_r.data);
+		
     struct zbx_json_parse	jp, jp_row, jp_data;
 	const char		*p = NULL;
     
@@ -359,116 +336,19 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
     } 
 out:
 	clickhouse_close(hist);
-	zbx_free(sql_buffer);
+	curl_easy_cleanup(handle);
+	curl_slist_free_all(curl_headers);
+    zbx_free(sql_buffer);
     zbx_free(page_r.data);
 
 	zbx_vector_history_record_sort(values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
 
+	//retrun succeeds ander any circumstances 
+	//since otherwise history sincers will try to repeate the query 
 	return SUCCEED;
 }
-/************************************************************************************
- *                                                                                  *
- * Function: clickhouse_housekeep                                                   *
- *                                                                                  *
- * Purpose:  removes unnecessary partitions                                     
- *                                                                                  *
- * Parameters:  hist    - [IN] the history storage interface                        *
- * 				table	- [IN] name of table to housekeep                           *
- * 				age		- [IN] age in days of data to keep, 
- * 							   all older partitions will be deleted					* 
- * Comments: This function will iterate query to command clickhouse to drop 
- * 			  12 month of partitions older then age date 
- *                                                                                  *
- ************************************************************************************/
-#define ZBX_CLICKHOUSE_CLEAN_MONTHS 12
 
-static int clickhouse_housekeep(zbx_history_iface_t *hist, char * tablename, unsigned int age) {
-
-	zabbix_log(LOG_LEVEL_DEBUG, "%s: starting housekeeping of table %s age %d", __func__,tablename,age);
-
-	char query[MAX_STRING_LEN];
-	char sharded_table[MAX_STRING_LEN];
-	int exists_table, sharded_exists=0;
-
-	zbx_httppage_t page_r;
-	bzero(&page_r,sizeof(page_r));
-
-	size_t query_alloc, query_offset, i;
-	
-	if ( !( NULL == strstr(tablename,"hisroty") || 
-		NULL == strstr(tablename,"trends") || 
-		NULL == strstr(tablename, "trends_uint"))) {
-		zabbix_log(LOG_LEVEL_DEBUG, "%s: ignoring unsupported table %s", __func__,tablename);
-		return SUCCEED;
-	}
-	
-	//checking if table exists in the system.parts, it's useless to check if 
-	//actual partitions do exists due to in cluster config a server might miss some 
-	zbx_snprintf(query,MAX_STRING_LEN, 
-				"EXISTS TABLE %s.%s",
-				CONFIG_HISTORY_STORAGE_DB_NAME, tablename);
-	
-	clickhouse_query(hist->data,query,&page_r);
-	exists_table=atol(page_r.data);
-	zbx_free(page_r.data);
-	
-	if (! exists_table) {
-		zabbix_log(LOG_LEVEL_DEBUG, "%s: table %s.%s doesn't exists, skipping housekeeping",
-					 __func__,CONFIG_HISTORY_STORAGE_DB_NAME, tablename);	
-		return SUCCEED;
-	}
-	
-	if ( NULL == strstr(tablename, ZBX_CLICKHOUSE_SHARDED_SUFFIX)) {
-		
-		zbx_snprintf(query,MAX_STRING_LEN, "EXISTS TABLE %s.%s%s",
-				CONFIG_HISTORY_STORAGE_DB_NAME,tablename, ZBX_CLICKHOUSE_SHARDED_SUFFIX);
-	
-		clickhouse_query(hist->data,query,&page_r);
-	
-		sharded_exists=atol(page_r.data);
-		zbx_free(page_r.data);
-
-		if (! sharded_exists) 
-		zabbix_log(LOG_LEVEL_DEBUG, "%s: table %s.%s%s doesn't exists, skipping housekeeping",
-					 __func__,CONFIG_HISTORY_STORAGE_DB_NAME, tablename, ZBX_CLICKHOUSE_SHARDED_SUFFIX);	
-	
-	}
-
-	zabbix_log(LOG_LEVEL_DEBUG, "%s: will rotate table %s", __func__,tablename);
-	//i has to start from 1 here to prevent erasing a month too soon
-	//so if an interval of 1 day is set, then the first month which will be deleted will be one month and one day 
-	//there is a chance that in February two months will be kept for several day
-	//i reccomend to run housekeeping once a day
-	//it will NOT be right to check if the partitions are exists in system.part table
-	//due to sometimes in cliuster setup some parts might not exist on a certain table and 
-	
-	///but perhaps it's good idea to check that tables exists at all befor deleting their partitions
-	for (i=1; i<=ZBX_CLICKHOUSE_CLEAN_MONTHS; i++) {
-		//cleaning normal table
-		zbx_snprintf(query,MAX_STRING_LEN, 
-				"ALTER TABLE %s.%s DROP PARTITION toYYYYMM(toDate(%d));",
-				CONFIG_HISTORY_STORAGE_DB_NAME, tablename,(time(NULL)-age-i*31*86400) );
-
-		clickhouse_query(hist->data,query,&page_r);
- 		zbx_free(page_r.data);
-
-		if (sharded_exists) {
-			zbx_snprintf(query,MAX_STRING_LEN, 
-				"ALTER TABLE %s.%s%s DROP PARTITION toYYYYMM(toDate(%d));",
-				CONFIG_HISTORY_STORAGE_DB_NAME, tablename, ZBX_CLICKHOUSE_SHARDED_SUFFIX, (time(NULL)-age-i*31*86400) );
-
-			clickhouse_query(hist->data,query,&page_r);
- 			zbx_free(page_r.data);
-	
-		}
-	}
-
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "%s: finished housekeeping ",__func__);
-
-	return SUCCEED;
-}
 /************************************************************************************
  *                                                                                  *
  * Function: clickhouse_add_values                                                     *
@@ -561,9 +441,37 @@ static int	clickhouse_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr
     
 		zbx_httppage_t	page_r;
 		bzero(&page_r,sizeof(zbx_httppage_t));
-		clickhouse_query(data,sql_buffer,&page_r);
+		struct curl_slist	*curl_headers = NULL;
+		char  errbuf[CURL_ERROR_SIZE];
+		CURLcode		err;
+		CURL	*handle = NULL;
+		
+		if (NULL == (handle = curl_easy_init()))
+		{
+			zabbix_log(LOG_LEVEL_ERR, "cannot initialize cURL session");
+		} else {
+
+			curl_easy_setopt(handle, CURLOPT_URL, data->url);
+			curl_easy_setopt(handle, CURLOPT_POSTFIELDS, sql_buffer);
+			curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curl_write_cb);
+			curl_easy_setopt(handle, CURLOPT_WRITEDATA, page_r);
+			curl_easy_setopt(handle, CURLOPT_HTTPHEADER, curl_headers);
+			curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
+			curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errbuf);
+	
+			if (CURLE_OK != (err = curl_easy_perform(handle)))
+			{
+				clickhouse_log_error(handle, err, errbuf,&page_r);
+        		zabbix_log(LOG_LEVEL_WARNING, "Failed query '%s'", sql_buffer);
+	
+			} else {
+				zabbix_log(LOG_LEVEL_DEBUG, "CLICKHOUSE: succeeded query: %s",sql_buffer);
+			}
+		}
 		
 	 	zbx_free(page_r.data);
+		curl_slist_free_all(curl_headers);
+		curl_easy_cleanup(handle);
 	}
 
 	zbx_free(sql_buffer);
@@ -589,7 +497,6 @@ static int	clickhouse_flush(zbx_history_iface_t *hist)
 	ZBX_UNUSED(hist);
 	return SUCCEED;
 }
-
 
 /************************************************************************************
  *                                                                                  *
@@ -621,6 +528,8 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 	memset(data, 0, sizeof(zbx_clickhouse_data_t));
 	
 	if (NULL != CONFIG_CLICKHOUSE_USERNAME) {
+		//https://clickhouse.yandex/docs/en/interfaces/http/
+		//echo 'SELECT 1' | curl 'http://localhost:8123/?user=user&password=password' -d @-
 		zbx_snprintf_alloc(&data->url,&alloc,&offset,"%s/?user=%s&password=%s",
 			CONFIG_HISTORY_STORAGE_URL, CONFIG_CLICKHOUSE_USERNAME, CONFIG_CLICKHOUSE_PASSWORD);
 	} else {
@@ -635,7 +544,6 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 	hist->add_values = clickhouse_add_values;
 	hist->flush = clickhouse_flush;
 	hist->get_values = clickhouse_get_values;
-	hist->housekeep = clickhouse_housekeep;
 	hist->requires_trends = 0;
 
 	//preloading support
@@ -664,10 +572,10 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 			
 			zbx_snprintf_alloc(&query,&q_len,&q_offset,"%ld",vector_itemids.values[0]);
 			
-			
+			//for ( i = 1; i < vector_itemids.values_num && i< 20; i++ ) {
 			for ( i = 1; i < vector_itemids.values_num ; i++ ) {
 				zbx_snprintf_alloc(&query,&q_len,&q_offset,",%ld",vector_itemids.values[i]);
-			
+				//if (i >  40) break;
 			}
 
 			
@@ -680,13 +588,39 @@ int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_t
 		
 		zbx_vector_uint64_destroy(&vector_itemids);
 
-	//	CURL	*handle = NULL;
+		CURL	*handle = NULL;
 		zbx_httppage_t	page_r;
-	 	bzero(&page_r,sizeof(zbx_httppage_t));
-		clickhouse_query(data,query,&page_r);
-	
+		bzero(&page_r,sizeof(zbx_httppage_t));
+			struct curl_slist	*curl_headers = NULL;
+		char  errbuf[CURL_ERROR_SIZE];
+		CURLcode		err;
+
+		if (NULL == (handle = curl_easy_init()))
+		{
+			zabbix_log(LOG_LEVEL_ERR, "cannot initialize cURL session");
+		} ;
+
+		page_r.offset = 0;
+		*errbuf = '\0';
+
+
+		curl_easy_setopt(handle, CURLOPT_URL, data->url);
+		curl_easy_setopt(handle, CURLOPT_POSTFIELDS, query);
+		curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curl_write_cb);
+		curl_easy_setopt(handle, CURLOPT_WRITEDATA, &page_r);
+		curl_easy_setopt(handle, CURLOPT_HTTPHEADER, curl_headers);
+		curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
+		curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errbuf);
+
+
+		if (CURLE_OK != (err = curl_easy_perform(handle)))
+		{
+			clickhouse_log_error(handle, err, errbuf,&page_r);
+        	zabbix_log(LOG_LEVEL_WARNING, "Failed query %s",query);
+		}	
+
 		if (NULL != page_r.data) {
-    		zabbix_log(LOG_LEVEL_INFORMATION, "Query completed, filling the value cache");
+    		zabbix_log(LOG_LEVEL_INFORMATION, "Query copleted, filling value cache");
 			struct zbx_json_parse	jp, jp_row, jp_data;
 			const char		*p = NULL;
     
@@ -769,6 +703,8 @@ out:
 		}
 
 		zbx_free(page_r.data);
+		curl_slist_free_all(curl_headers);
+		curl_easy_cleanup(handle);
 		zbx_free(query);
    
 	}
