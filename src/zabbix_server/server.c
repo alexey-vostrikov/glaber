@@ -967,22 +967,22 @@ int	main(int argc, char **argv)
 	//to be opened. Checking for that limit
 	getrlimit(RLIMIT_NOFILE,&limits);
 
-        if (ZBX_MIN_OPEN_FILES>limits.rlim_cur ) {
-	    zbx_error("WARNING!!! the system has only %ld open files limit, which is too low for ASYNC version",limits.rlim_cur);
-	    zbx_error("Will try to set the limit to %d:",ZBX_DESIRED_OPEN_FILES);
+    if (ZBX_MIN_OPEN_FILES>limits.rlim_cur ) {
+	   	zbx_error("WARNING!!! the system has only %ld open files limit, which is too low for ASYNC version",limits.rlim_cur);
+	   	zbx_error("Will try to set the limit to %d:",ZBX_DESIRED_OPEN_FILES);
 
-	    limits.rlim_cur=ZBX_DESIRED_OPEN_FILES;
-	    limits.rlim_max=ZBX_DESIRED_OPEN_FILES;
+	   	limits.rlim_cur=ZBX_DESIRED_OPEN_FILES;
+	   	limits.rlim_max=ZBX_DESIRED_OPEN_FILES;
 
-	    setrlimit(RLIMIT_NOFILE,&limits);
-	    getrlimit(RLIMIT_NOFILE,&limits);
+	   	setrlimit(RLIMIT_NOFILE,&limits);
+	   	getrlimit(RLIMIT_NOFILE,&limits);
 
-	    if (ZBX_MIN_OPEN_FILES>limits.rlim_cur ) {
-		zbx_error("Couldn't set max open files to %d. Please set it manualy via ulimit -n. Exisiting now.",ZBX_DESIRED_OPEN_FILES);
-		exit(EXIT_FAILURE);
+	   	if (ZBX_MIN_OPEN_FILES>limits.rlim_cur ) {
+			zbx_error("Couldn't set max open files to %d. Please set it manualy via ulimit -n. Exisiting now.",ZBX_DESIRED_OPEN_FILES);
+			exit(EXIT_FAILURE);
 	    } else {
-		zbx_error("Succesifully set max open files to %d. But it's better to set it manualy via ulimit -n. ",ZBX_DESIRED_OPEN_FILES);
-	    }
+			zbx_error("Succesifully set max open files to %d. But it's better to set it manualy via ulimit -n. ",ZBX_DESIRED_OPEN_FILES);
+		}
 	}
 
 	return daemon_start(CONFIG_ALLOW_ROOT, CONFIG_USER, t.flags);

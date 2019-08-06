@@ -25,12 +25,14 @@
 #include "zbxself.h"
 #include "zbxalgo.h"
 #include "zbxserver.h"
+//#include "../../libs/zbxhistory/history.h"
 
 #include "zbxhistory.h"
 #include "housekeeper.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern char * CONFIG_HISTORY_STORAGE_TYPE;
 
 static int	hk_period;
 
@@ -41,7 +43,7 @@ static int	hk_period;
 
 /* global configuration data containing housekeeping configuration */
 static zbx_config_t	cfg;
-
+int zbx_history_housekeep(char * table, unsigned int age);
 /* Housekeeping rule definition.                                */
 /* A housekeeping rule describes table from which records older */
 /* than history setting must be removed according to optional   */
@@ -633,18 +635,24 @@ static int	housekeeping_history_and_trends(int now)
 	int			deleted = 0, i, rc;
 	zbx_hk_history_rule_t	*rule;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() now:%d", __func__, now);
+	zabbix_log(LOG_LEVEL_INFORMATION, "In %s() housekeeping trends and history now:%d", __func__, now);
 
+	
 	/* prepare delete queues for all history housekeeping rules */
 	hk_history_delete_queue_prepare_all(hk_history_rules, now);
-
+	
 	/* Loop through the history rules. Each rule is a history table (such as history_log, trends_uint, etc) */
 	/* we need to clear records from */
 	for (rule = hk_history_rules; NULL != rule->table; rule++)
 	{
 		if (ZBX_HK_MODE_DISABLED == *rule->poption_mode)
 			continue;
-
+	
+	
+		//if history backend supports data rotation for the table, then doing it
+		if ( SUCCEED == zbx_history_housekeep((char *)rule->table,*rule->poption) ) 
+			continue;
+	
 		/* If partitioning enabled for history and/or trends then drop partitions with expired history.  */
 		/* ZBX_HK_MODE_PARTITION is set during configuration sync based on the following: */
 		/* 1. "Override item history (or trend) period" must be on 2. DB must be PostgreSQL */

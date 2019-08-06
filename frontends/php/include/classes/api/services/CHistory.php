@@ -31,6 +31,7 @@ class CHistory extends CApiService {
 	public function __construct() {
 		// considering the quirky nature of the history API,
 		// the parent::__construct() method should not be called.
+	
 	}
 
 	/**
@@ -228,7 +229,8 @@ class CHistory extends CApiService {
 	 * @see CHistory::get
 	 */
 	private function getFromClickHouse($options) {
-		global $HISTORY, $ClickHouseDisableNanoseconds;
+		global $HISTORY;
+
 		$result = [];
 		$sql_parts = [
 			'select'	=> ['history' => 'h.itemid'],
@@ -257,7 +259,8 @@ class CHistory extends CApiService {
 
 		// itemids
 		if ($options['itemids'] !== null) {
-			$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
+		//	$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
+			$sql_parts['where']['itemid'] = dbConditionInt('h.itemid', $options['itemids'],false,false,false);
 		}
 
 		// time_from
@@ -331,7 +334,7 @@ class CHistory extends CApiService {
 		}
 
 		$sql_limit = $sql_parts['limit'];
-		$sql = "SELECT itemid, toInt32(clock),". ($ClickHouseDisableNanoseconds == 1 ? "0 AS ns," : "ns,") ."$value_col".
+		$sql = "SELECT itemid, toInt32(clock),". ($HISTORY["ClickHouseDisableNanoseconds"] == 1 ? "0 AS ns," : "ns,") ."$value_col".
 				' FROM '.$sql_from.
 				$sql_where.
 				$sql_order;
