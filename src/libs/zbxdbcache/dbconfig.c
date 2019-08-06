@@ -1487,6 +1487,8 @@ done:
 		}
 		else if (NULL != (proxy = (ZBX_DC_PROXY *)zbx_hashset_search(&config->proxies, &hostid)))
 		{
+			int i;
+
 			if (ZBX_LOC_QUEUE == proxy->location)
 			{
 				zbx_binary_heap_remove_direct(&config->pqueue, proxy->hostid);
@@ -1496,7 +1498,7 @@ done:
 			zbx_strpool_release(proxy->proxy_address);
 			zbx_vector_uint64_destroy(&proxy->cluster_domains);
 
-			for (int i=0; i < proxy->cluster_rerouted_data.values_num; i++) {
+			for (i=0; i < proxy->cluster_rerouted_data.values_num; i++) {
 				zbx_strpool_release((const char *)&proxy->cluster_rerouted_data.values[i]);
 			}
 			
@@ -12655,7 +12657,8 @@ long int DC_generate_topology() {
 					HOST_STATUS_DOMAIN == host->status) {
 						
 			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: DOMAIN_DUMP: found domain %ld '%s'",host->hostid, host->host);		
-			for (int i=0; i< proxy->cluster_domains.values_num; i++) {
+			int i;
+			for (i=0; i< proxy->cluster_domains.values_num; i++) {
 				zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER:			  	active server#%d %ld",i, proxy->cluster_domains.values[i]);
 			}
 		
@@ -12705,8 +12708,8 @@ long int DC_generate_topology() {
 			if (domain_id) {
 				//now we can distribute host to the domain's servers
 				if ( NULL != (proxy=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&domain_id))) {
-					
-					for (int i=0; i< proxy->cluster_domains.values_num; i++) {
+					int i;
+					for (i=0; i< proxy->cluster_domains.values_num; i++) {
 						zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: 	Domain %ld has server%d: %ld",domain_id,i,
 						proxy->cluster_domains.values[i]);
 					}
@@ -12749,8 +12752,8 @@ long int DC_generate_topology() {
 				zbx_json_addint64(&j,ZBX_PROTO_SERVER_ID,proxy->cluster_id);
 				zbx_json_addarray(&j,ZBX_PROTO_TAG_HOSTS);
 			
-			
-				for (int i=0; i< proxy->cluster_domains.values_num; i++) {
+				int i;
+				for ( i=0; i< proxy->cluster_domains.values_num; i++) {
 						zbx_json_adduint64(&j,NULL,proxy->cluster_domains.values[i]);
 			
 				}
@@ -13039,8 +13042,8 @@ int zbx_dc_create_rerouted_json(struct zbx_json *j, zbx_uint64_t serverid) {
 	zbx_json_addarray(j,ZBX_PROTO_CLUSTER_REROUTED_DATA);
 	WRLOCK_CACHE;
 	if (NULL != (server = (ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&serverid))) {
-   
-		for (int i=0; i < server->cluster_rerouted_data.values_num; i++) {
+		int i;
+		for (i=0; i < server->cluster_rerouted_data.values_num; i++) {
 			zbx_json_addraw(j, NULL, (const char *)server->cluster_rerouted_data.values[i]);
 			zbx_strpool_release((const char *)&server->cluster_rerouted_data.values[i]);
 		}
