@@ -387,7 +387,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 
 		if (REQ_SENT == conn_status[i] || CONNECT_SENT ==conn_status[i]) {
 			zabbix_log(LOG_LEVEL_DEBUG, "Connection %d has timed out while waiting for responce", num);
-//			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
+			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Waiting for responce timed out"));
 			errcodes[i]=TIMEOUT_ERROR;
 			continue;
 		}

@@ -2393,7 +2393,7 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 		}
 
 		//setting fail code by default to disable for a while items we haven't been able to access
-		errcodes[i]=TIMEOUT_ERROR;
+		errcodes[i]=NOT_PROCESSED;
 
 		if (items[i].host.hostid != last_hostid) 
 		{
@@ -2539,8 +2539,13 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 	/* sessions cleanup */
 	for (i = 0; i < snmp_sessions; i++ ) 
 	{
+		
 		zabbix_log(LOG_LEVEL_DEBUG, "End of %s() freeing session for  item %d", __function_name,i);
 		zbx_snmp_close_session(ss[i]);
+		if (errcodes[i] == NOT_PROCESSED) {
+				SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Couldn't send snmp packet"));
+				errcodes[i]=TIMEOUT_ERROR;
+		}
 	}
 
 	//if something sill left open, it will be closed
