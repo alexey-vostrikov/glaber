@@ -6,7 +6,7 @@ debian-jessie:
     - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-7-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev lftp
     - wget -q https://$CI_DOMAIN/build/debian/jessie/debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "jessie" --distribution "testing" "all latest updates"
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG}" -D "jessie" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/jessie/
@@ -26,7 +26,7 @@ debian-stretch:
     - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils
     - wget -q https://$CI_DOMAIN/build/debian/stretch/debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "stretch" --distribution "testing" "all latest updates"
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG}" -D "stretch" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/stretch/
@@ -45,7 +45,7 @@ debian-buster:
     - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils
     - wget -q https://$CI_DOMAIN/build/debian/buster/debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "buster" --distribution "testing" "all latest updates"
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG}" -D "buster" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/buster/
@@ -64,7 +64,7 @@ ubuntu-disco:
     - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils
     - wget -q https://$CI_DOMAIN/build/ubuntu/disco/debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "disco" --distribution "testing" "all latest updates"
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG}" -D "disco" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/disco/
@@ -83,7 +83,7 @@ ubuntu-bionic:
     - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils
     - wget -q https://$CI_DOMAIN/build/ubuntu/bionic/debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "bionic" --distribution "testing" "all latest updates"
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG}" -D "bionic" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/bionic/
@@ -102,7 +102,7 @@ ubuntu-xenial:
     - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils
     - wget -q https://$CI_DOMAIN/build/ubuntu/xenial/debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "xenial" --distribution "testing" "all latest updates"
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG}" -D "xenial" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/xenial/
@@ -138,7 +138,7 @@ centos:
     - mv ./* ../SOURCES/
     - cd ..
     - yum-builddep -y SPECS/zabbix.spec
-    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG:1}"
+    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG}"
     - cd ../../../
     - mkdir -p pkgs/centos7/
     - mv /root/rpmbuild/RPMS/* pkgs/centos7/
