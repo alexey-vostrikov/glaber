@@ -132,12 +132,13 @@ centos:
     - cd glaber/build/centos/7/temp
     - wget -q https://$CI_DOMAIN/build/centos/7/centos.src.rpm
     - rpm2cpio ./centos.src.rpm | cpio -idmv
+    - sed -i "s/%{?alphatag:0.}1%{?alphatag}/glaber.%{glaber_version}/g" zabbix.spec
     - mv zabbix.spec ../SPECS/zabbix.spec
     - rm zabbix-4.2.4.tar.gz
     - mv ./* ../SOURCES/
     - cd ..
     - yum-builddep -y SPECS/zabbix.spec
-    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES"
+    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG:1}"
     - cd ../../../
     - mkdir -p pkgs/centos7/
     - mv /root/rpmbuild/RPMS/* pkgs/centos7/
