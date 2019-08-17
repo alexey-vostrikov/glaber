@@ -82,8 +82,8 @@ ubuntu-bionic:
     - apt-get update
     - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils
     - wget -q https://$CI_DOMAIN/build/ubuntu/bionic/debian.tar.xz
-    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "bionic" --distribution "testing" "all latest updates"
     - tar -xvf debian.tar.xz
+    - dch -v "1:4.2.1+glaber~${CI_COMMIT_TAG:1}" -D "bionic" --distribution "testing" "all latest updates"
     - autoreconf -fvi
     - dpkg-buildpackage -b
     - mkdir -p pkgs/bionic/
