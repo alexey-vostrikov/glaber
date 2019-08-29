@@ -328,7 +328,7 @@ int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, 
 	starttime=time(NULL);
 	zabbix_log(LOG_LEVEL_DEBUG,"Starting waiting for %d sockets to connect",active_agents);
 
-	while (active_agents>0 && (time(NULL)-starttime)< CONFIG_TIMEOUT && processed_vals>0)
+	while (active_agents>0 && (time(NULL)-starttime)< CONFIG_TIMEOUT)
 	{
 		
 		//this was the simplest and compact way to implement async io
