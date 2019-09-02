@@ -52,6 +52,7 @@ int zbx_dc_create_hello_json(struct zbx_json* j);
 int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse	*jp, int timediff);
 int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp);
 char *zbx_dc_get_topology();
+void zbx_dc_register_proxy_availability(u_int64_t hostid);
 
 
 typedef struct
@@ -168,7 +169,6 @@ static void	recv_proxy_heartbeat(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	DC_PROXY	proxy;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
 	if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "cannot parse heartbeat from active proxy at \"%s\": %s",
@@ -182,7 +182,9 @@ static void	recv_proxy_heartbeat(zbx_socket_t *sock, struct zbx_json_parse *jp)
 				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, error);
 		goto out;
 	}
-		   
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER: got active Proxy %ld (%s) heartbeat",proxy.hostid,proxy.host);
+	zbx_dc_register_proxy_availability(proxy.hostid);
+
 	if (0 != proxy.auto_compress)
 		flags |= ZBX_TCP_COMPRESS;
 out:
@@ -876,25 +878,37 @@ static int	send_topology(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	const char		*__function_name = "send_topology";
 	
 	int			ret = FAIL;
-	char			tmp[MAX_STRING_LEN];
+	char			tmp[MAX_STRING_LEN], sessionid[MAX_STRING_LEN];
 	struct zbx_json		json;
 	DC_PROXY proxy;
 	char		*error = NULL, *topology=NULL;
+	zbx_user_t		user;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
-	if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)))
-	{
-		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot parse heartbeat from active proxy at \"%s\": %s", sock->peer, error);
-		goto out;
-	} 
-	
-	if (SUCCEED != (ret = zbx_proxy_check_permissions(&proxy, sock, &error)))
-	{
-		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot auth connection from server/proxy \"%s\" at \"%s\", allowed address:"
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "Processing request :%s",jp->start);
+
+	if (	SUCCEED != zbx_json_value_by_name(jp, ZBX_PROTO_TAG_SID, sessionid, sizeof(sessionid)) ||
+			SUCCEED != DBget_user_by_active_session(sessionid, &user) ) {
+				
+		//if  couldn't auth by sid and user, will try by proxy			
+		if (SUCCEED != (ret = get_active_proxy_from_request(jp, &proxy, &error)) )
+		{
+			zabbix_log(LOG_LEVEL_INFORMATION, "Permission denied.");
+			goto out;
+		}
+
+		if (SUCCEED != (ret = zbx_proxy_check_permissions(&proxy, sock, &error)))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: <trapper> cannot auth connection from server/proxy \"%s\" at \"%s\", allowed address:"
 				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, tmp);
-		goto out;
-	} 	
+			goto out;
+		} 	
+
+	}
+
+	
   
 	//todo: replace with dc topology retrieval
 	topology=zbx_dc_get_topology();
@@ -902,10 +916,10 @@ static int	send_topology(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
 	if (NULL != topology) {
-		zbx_json_addraw(&json, ZBX_PROTO_CLUSTER_TOPOLOGY,topology);
+		zbx_json_addraw(&json, ZBX_PROTO_TAG_DATA,topology);
 	}
 	else 
-		zbx_json_addraw(&json, ZBX_PROTO_CLUSTER_TOPOLOGY,"");
+		zbx_json_addraw(&json, ZBX_PROTO_TAG_DATA,"");
 	
 	zbx_free(topology);
 
@@ -969,15 +983,12 @@ static int	recv_server_hello(zbx_socket_t *sock, struct zbx_json_parse *jp)
 				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, tmp);
 		goto out;
 	} 	
-    zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: RECV HELLO <- %ld",proxy.hostid);
+    zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: RECV HELLO <- %ld: %s",proxy.hostid,jp->start);
 	ret=zbx_dc_parce_hello_json(&proxy,jp,0);
- 
-	
+ 	
 	zbx_json_init(&json, 5 * ZBX_KIBIBYTE);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
 	
-	//zbx_dc_create_hello_json(&json);
-
 	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER sending reply: %s() json.buffer:'%s'", __function_name, json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
@@ -1406,6 +1417,7 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 			}
 			else if (0 == strcmp(value, ZBX_PROTO_VALUE_PROXY_HEARTBEAT))
 			{
+				//zabbix_log(LOG_LEVEL_INFORMATION,"in the proxy heartbeat code");
 				if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 					recv_proxy_heartbeat(sock, &jp);
 			}
@@ -1451,8 +1463,8 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 					ret = recv_server_hello(sock, &jp);
 			}
 			 else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_TOPOLGY))
-			{
-					ret = send_topology(sock, &jp);
+			{	
+				ret = send_topology(sock, &jp);
 			} else if (0 == strcmp(value, ZBX_PROTO_CLUSTER_REROUTED_DATA))
 			{
 					ret = recv_server_rerouted_data(sock, &jp);

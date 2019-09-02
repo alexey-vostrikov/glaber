@@ -30,6 +30,8 @@ ZBX_VECTOR_IMPL(history_record, zbx_history_record_t);
 extern char	*CONFIG_HISTORY_STORAGE_URL;
 extern char	*CONFIG_HISTORY_STORAGE_OPTS;
 extern char	*CONFIG_HISTORY_STORAGE_TYPE;
+extern int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME;
+extern int CONFIG_SERVER_STARTUP_TIME;
 
 zbx_history_iface_t	history_ifaces[ITEM_VALUE_TYPE_MAX];
 
@@ -165,6 +167,12 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d start:%d count:%d end:%d",
 			__func__, itemid, value_type, start, count, end);
+
+
+	if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
+		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
+      	return SUCCEED;
+	}
 
 	pos = values->values_num;
 	ret = writer->get_values(writer, itemid, start, count, end, values);

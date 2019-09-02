@@ -2,10 +2,14 @@
 	jQuery(function($) {
 		// proxy mode: active or passive
 		$('#status').change(function() {
-			$('#ip').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?>);
+			$('#ip').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?> || 
+				$('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>);
+			
 			$('#groupids_').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?>
-			|| $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>
+			|| $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?> 
+			|| $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>
 			);
+			
 			$('#proxy_address')
 				.closest('li')
 				.toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>);
@@ -77,7 +81,8 @@
 		 */
 		function toggleEncryptionFields() {
 			if ($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?> ||
-					$('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?>) {
+					$('input[name=status]:checked').val() == <?= HOST_STATUS_SERVER ?> ||
+					$('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?> ) {
 				$('input[name=tls_connect]').prop('disabled', true);
 				$('#tls_in_none, #tls_in_psk, #tls_in_cert').prop('disabled', false);
 			}

@@ -1573,6 +1573,7 @@ int	zbx_variant_to_value_type(zbx_variant_t *value, unsigned char value_type, ch
 //host cluster states
 #define	ZBX_CLUSTER_HOST_STATE_DISABLED 0
 #define	ZBX_CLUSTER_HOST_STATE_ACTIVE 1
+#define	ZBX_CLUSTER_HOST_STATE_ACTIVE_PROXY 2
 
 
 

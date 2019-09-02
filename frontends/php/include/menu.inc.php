@@ -105,6 +105,11 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'sub_pages' => ['chart5.php']
 				],
 				[
+					'url' => 'clusterstate.php',
+					'user_type' => USER_TYPE_ZABBIX_ADMIN,
+					'label' => _('Cluster state'),
+				],
+				[
 					'url' => 'chart3.php'
 				],
 				[
@@ -169,6 +174,11 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 				[
 					'url' => 'report4.php',
 					'label' => _('Notifications'),
+					'user_type' => USER_TYPE_ZABBIX_ADMIN
+				],
+				[
+					'url' => 'anomalies.php',
+					'label' => _('Anomalies'),
 					'user_type' => USER_TYPE_ZABBIX_ADMIN
 				]
 			]

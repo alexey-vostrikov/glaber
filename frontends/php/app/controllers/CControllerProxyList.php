@@ -97,7 +97,7 @@ class CControllerProxyList extends CController {
 			'limit' => $config['search_limit'] + 1,
 			'editable' => true,
 			'preservekeys' => true,
-			'all_objects' => true,
+		
 		]);
 		// sorting & paging
 		order_result($data['proxies'], $sortField, $sortOrder);
@@ -114,7 +114,7 @@ class CControllerProxyList extends CController {
 			'proxyids' => array_keys($data['proxies']),
 			'editable' => true,
 			'preservekeys' => true,
-			'all_objects' => true,
+			
 		]);
 		order_result($data['proxies'], $sortField, $sortOrder);
 

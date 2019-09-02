@@ -280,7 +280,7 @@ typedef struct
 {
 	zbx_uint64_t	hostid;
 	char		host[HOST_HOST_LEN_MAX];
-	//char		domains[MAX_ZBX_DOMAINS_LEN];
+	int		proxy_type;
 	int		proxy_config_nextcheck;
 	int		proxy_data_nextcheck;
 	int		proxy_tasks_nextcheck;

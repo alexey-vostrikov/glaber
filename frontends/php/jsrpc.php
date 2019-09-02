@@ -182,15 +182,14 @@ switch ($data['method']) {
 				'selectInterface' => ['interfaceid', 'dns', 'ip', 'useip', 'port'],
 				'editable' => true,
 				'preservekeys' => true,
-				'all_objects' => true,
+				'statusids' => [HOST_STATUS_SERVER],
 			]);
-			
 
 			$running_servers=0;
 			$total_servers=0;
 			foreach ($servers as $server) {
 			
-				if (HOST_STATUS_SERVER == $server['status']) {
+			//	if (HOST_STATUS_SERVER == $server['status']) {
 					//	echo "Got true server ".$server['host'];
 					$server_list=$server_list.$server['host'];
 					//we need to fetch interface data as well
@@ -204,7 +203,7 @@ switch ($data['method']) {
 					}
 					
 					$total_servers++;
-				}
+			//	}
 			}
 				
 			CSession::setValue('serverCheckResult', "$running_servers servers are running out of $total_servers");

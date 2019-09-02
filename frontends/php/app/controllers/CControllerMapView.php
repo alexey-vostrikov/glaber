@@ -38,8 +38,9 @@ class CControllerMapView extends CController {
 
 		if (!$ret) {
 			$this->setResponse(new CControllerResponseFatal());
-		}
+		} 
 
+		
 		return $ret;
 	}
 
@@ -89,7 +90,7 @@ class CControllerMapView extends CController {
 
 	protected function doAction() {
 		CProfile::update('web.maps.sysmapid', $this->sysmapid, PROFILE_TYPE_ID);
-
+		
 		$maps = API::Map()->get([
 			'output' => ['name', 'severity_min'],
 			'sysmapids' => [$this->sysmapid]

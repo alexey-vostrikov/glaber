@@ -34,6 +34,7 @@
 
 extern char	*CONFIG_SERVER;
 extern int CONFIG_CLUSTER_REROUTE_DATA;
+extern int CONFIG_CLUSTER_SERVER_ID;
 /* the space reserved in json buffer to hold at least one record plus service data */
 #define ZBX_DATA_JSON_RESERVED		(HISTORY_TEXT_VALUE_LEN * 4 + ZBX_KIBIBYTE * 4)
 
@@ -42,6 +43,8 @@ extern int CONFIG_CLUSTER_REROUTE_DATA;
 
 /* the maximum number of values processed in one batch */
 #define ZBX_HISTORY_VALUES_MAX		256
+
+int zbx_dc_get_proxy_hosts(u_int64_t proxyid,zbx_vector_uint64_t *hosts);
 
 typedef struct
 {
@@ -490,11 +493,12 @@ static int	get_proxyconfig_table(zbx_uint64_t proxy_hostid, struct zbx_json *j, 
 	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 				",hosts r where t.hostid=r.hostid"
-					" and r.proxy_hostid=" ZBX_FS_UI64
+		//			" and r.proxy_hostid=" ZBX_FS_UI64
 					" and r.status in (%d,%d)"
 					" and t.flags<>%d"
-					" and t.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
-				proxy_hostid,
+					" and t.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)"
+					" and ",
+		//		proxy_hostid,
 				HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 				ZBX_FLAG_DISCOVERY_PROTOTYPE,
 				ITEM_TYPE_ZABBIX, ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_SNMPv1, ITEM_TYPE_SNMPv2c,
@@ -502,6 +506,9 @@ static int	get_proxyconfig_table(zbx_uint64_t proxy_hostid, struct zbx_json *j, 
 				ITEM_TYPE_HTTPTEST, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_SSH,
 				ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_INTERNAL,
 				ITEM_TYPE_HTTPAGENT, ITEM_TYPE_DEPENDENT);
+				DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "t.hostid", hosts->values, hosts->values_num);
+
+				//zabbix_log(LOG_LEVEL_INFORMATION,"Items query is %s",sql);
 	}
 	else if (0 == strcmp(table->table, "item_preproc"))
 	{
@@ -509,11 +516,11 @@ static int	get_proxyconfig_table(zbx_uint64_t proxy_hostid, struct zbx_json *j, 
 				",items i,hosts r"
 				" where t.itemid=i.itemid"
 					" and i.hostid=r.hostid"
-					" and r.proxy_hostid=" ZBX_FS_UI64
+		//			" and r.proxy_hostid=" ZBX_FS_UI64
 					" and r.status in (%d,%d)"
 					" and i.flags<>%d"
-					" and i.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
-				proxy_hostid,
+					" and i.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d) and ",
+		//		proxy_hostid,
 				HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 				ZBX_FLAG_DISCOVERY_PROTOTYPE,
 				ITEM_TYPE_ZABBIX, ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_SNMPv1, ITEM_TYPE_SNMPv2c,
@@ -521,21 +528,30 @@ static int	get_proxyconfig_table(zbx_uint64_t proxy_hostid, struct zbx_json *j, 
 				ITEM_TYPE_HTTPTEST, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_SSH,
 				ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_INTERNAL,
 				ITEM_TYPE_HTTPAGENT, ITEM_TYPE_DEPENDENT);
+				DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "r.hostid", hosts->values, hosts->values_num);
+		
+
 	}
 	else if (0 == strcmp(table->table, "drules"))
 	{
+
+		//todo: fix discovery rules and checks
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-				" where t.proxy_hostid=" ZBX_FS_UI64
-					" and t.status=%d",
-				proxy_hostid, DRULE_STATUS_MONITORED);
+	//			" where t.proxy_hostid=" ZBX_FS_UI64
+	//				" and t.status=%d",
+	//			proxy_hostid, DRULE_STATUS_MONITORED);
+					" where t.status=%d", DRULE_STATUS_MONITORED);
+
 	}
 	else if (0 == strcmp(table->table, "dchecks"))
 	{
+		//todo: fix dchecks
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 				",drules r where t.druleid=r.druleid"
-					" and r.proxy_hostid=" ZBX_FS_UI64
+					//" and r.proxy_hostid=" ZBX_FS_UI64
 					" and r.status=%d",
-				proxy_hostid, DRULE_STATUS_MONITORED);
+//				proxy_hostid, 
+				DRULE_STATUS_MONITORED);
 	}
 	else if (0 == strcmp(table->table, "hstgrp"))
 	{
@@ -628,11 +644,12 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 	DB_RESULT	result;
 	DB_ROW		row;
 	zbx_uint64_t	hostid, *ids = NULL;
-	int		ids_alloc = 0, ids_num = 0;
+	int		ids_alloc = 0, ids_num = 0, i;
 	char		*sql = NULL;
 	size_t		sql_alloc = 512, sql_offset;
 
 	sql = (char *)zbx_malloc(sql, sql_alloc * sizeof(char));
+
 	//todo: fix this to cluster in following ways:
 	
 	//1-this will not work at all as hosts are not really assigned to proxies
@@ -645,6 +662,14 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 	//	- a new list of the hosts belonging to the server has been loaded
 	//	- a config reload has happend
 
+
+	//zabbix guys! you have your config reloading procedure running each N sec
+	//you have all the data you need in the config cache
+	//for what a freaking reason here you go directly to the database?
+
+	//so instead of fixing this, i just make a separate zbx_dc_get_proxy_hosts(proxyid,&vector) call
+	zbx_dc_get_proxy_hosts(proxy_hostid,hosts);
+	/*
 	result = DBselect(
 			"select hostid"
 			" from hosts"
@@ -652,13 +677,15 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 				" and status in (%d,%d)"
 				" and flags<>%d",
 			proxy_hostid, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE);
-
-	while (NULL != (row = DBfetch(result)))
+	*/
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: prefetched %ld hosts for configuration of proxy %ld", hosts->values_num, proxy_hostid);
+	for ( i =0 ; i < hosts->values_num ; i++ )
+	//while (NULL != (row = DBfetch(result)))
 	{
-		ZBX_STR2UINT64(hostid, row[0]);
+		//ZBX_STR2UINT64(hostid, row[0]);
 
-		zbx_vector_uint64_append(hosts, hostid);
-		uint64_array_add(&ids, &ids_alloc, &ids_num, hostid, 64);
+		//zbx_vector_uint64_append(hosts, hostid);
+		uint64_array_add(&ids, &ids_alloc, &ids_num, hosts->values[i], 64);
 	}
 	DBfree_result(result);
 
@@ -761,7 +788,9 @@ int	get_proxyconfig_data(zbx_uint64_t proxy_hostid, struct zbx_json *j, char **e
 	zbx_vector_uint64_create(&hosts);
 	zbx_vector_uint64_create(&httptests);
 
+	//see my comments in the function 
 	get_proxy_monitored_hosts(proxy_hostid, &hosts);
+	zabbix_log(LOG_LEVEL_INFORMATION, "CLUSTER: got %ld hosts total for the proxy %ld",hosts.values_num,proxy_hostid);
 	get_proxy_monitored_httptests(proxy_hostid, &httptests);
 
 	for (i = 0; NULL != proxytable[i]; i++)
@@ -982,7 +1011,7 @@ static int	process_proxyconfig_table(const ZBX_TABLE *table, struct zbx_json_par
 	static const ZBX_TABLE	*table_items, *table_hosts;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() table:'%s'", __func__, table->table);
-
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Got config: %s",jp_obj->start);
 	/************************************************************************************/
 	/* T1. RECEIVED JSON (jp_obj) DATA FORMAT                                           */
 	/************************************************************************************/
@@ -2670,10 +2699,14 @@ int	process_history_data(DC_ITEM *items, zbx_agent_value_t *values, int *errcode
 			continue;
 
 		/* reroute items which hosts processed on other cluster nodes to that nodes */
+		/* reroute only if claster is active */
+		/* and if item isn't processed by a local proxy */
 		if ( ZBX_CLUSTER_HOST_STATE_ACTIVE != items[i].host.cluster_state && 
-			0 != CONFIG_CLUSTER_REROUTE_DATA &&
-			0 != items[i].host.cluster_server_host_id && //may be not set during cluster rebult or startup
-			SUCCEED == zbx_dc_forward_item_to_server(&items[i],&values[i]) ) {
+			 ZBX_CLUSTER_HOST_STATE_ACTIVE_PROXY != items[i].host.cluster_state && 
+			 0 != CONFIG_CLUSTER_REROUTE_DATA &&
+			 0 != CONFIG_CLUSTER_SERVER_ID &&
+			 0 != items[i].host.cluster_server_host_id && //might be not set during cluster rebult or startup
+			 SUCCEED == zbx_dc_forward_item_to_server(&items[i],&values[i]) ) {
 				processed_num++;
 				continue;
 		} 
@@ -3108,8 +3141,9 @@ static int	proxy_item_validator(DC_ITEM *item, zbx_socket_t *sock, void *args, c
 	ZBX_UNUSED(error);
 
 	/* don't process item if its host was assigned to another proxy */
-	if (item->host.proxy_hostid != *proxyid)
-		return FAIL;
+	//thats not the case in cluster - lots of servers may process each other's data
+	//if (item->host.proxy_hostid != *proxyid)
+	//	return FAIL;
 
 	/* don't process aggregate/calculated items coming from proxy */
 	if (ITEM_TYPE_AGGREGATE == item->type || ITEM_TYPE_CALCULATED == item->type)
@@ -4122,6 +4156,7 @@ static int	process_proxy_history_data_33(const DC_PROXY *proxy, struct zbx_json_
 			{
 				DCconfig_clean_items(&items[i], &errcodes[i], 1);
 				errcodes[i] = FAIL;
+				zabbix_log(LOG_LEVEL_INFORMATION, "Item %d doesn't pass duplicate validation",i);
 				continue;
 			}
 
@@ -4135,7 +4170,7 @@ static int	process_proxy_history_data_33(const DC_PROXY *proxy, struct zbx_json_
 
 				DCconfig_clean_items(&items[i], &errcodes[i], 1);
 				errcodes[i] = FAIL;
-			}
+			} 
 		}
 
 		processed_num += process_history_data(items, values, errcodes, values_num);
@@ -4166,7 +4201,6 @@ static int	process_proxy_history_data_33(const DC_PROXY *proxy, struct zbx_json_
 		zbx_free(*info);
 		*info = error;
 	}
-
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;

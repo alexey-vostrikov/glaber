@@ -75,13 +75,19 @@ class CProxy extends CApiService {
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null,
-			'all_objects'				=> false,
+			'statusids'					=> null,
+			
 		];
 		$options = zbx_array_merge($defOptions, $options);
-		if ($options['all_objects']) {
-			$sqlParts['where'] = ['h.status IN ('.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_SERVER.','.HOST_STATUS_DOMAIN.')'];
-		} 
+	
 		
+		if (!$options['statusids'] ) {
+			$sqlParts['where'] = ['h.status IN ('.HOST_STATUS_PROXY_PASSIVE.','.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_SERVER.','.HOST_STATUS_DOMAIN.')'];
+		} else {
+			$sqlParts['where'] = [dbConditionInt('h.status', $options['statusids'])];
+			
+		} ;
+	
 		// editable + PERMISSION CHECK
 		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
@@ -129,6 +135,7 @@ class CProxy extends CApiService {
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
+		
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 				
 		while ($proxy = DBfetch($res)) {
@@ -171,11 +178,10 @@ class CProxy extends CApiService {
 		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
-		
+	
 		$proxies = zbx_toArray($proxies);
-
 		$this->validateCreate($proxies);
-
+		
 		foreach ($proxies as &$proxy) {
 			// Clean encryption fields.
 			if ($proxy['status'] == HOST_STATUS_PROXY_PASSIVE) {
@@ -218,7 +224,8 @@ class CProxy extends CApiService {
 			}
 
 			// Mark the interface as main to pass host interface validation.
-			if ($proxy['status'] == HOST_STATUS_SERVER && array_key_exists('interface', $proxy)) {
+			if (($proxy['status'] == HOST_STATUS_SERVER || $proxy['status'] == HOST_STATUS_PROXY_PASSIVE) 
+					&& array_key_exists('interface', $proxy))  {
 				$proxy['interface']['main'] = INTERFACE_PRIMARY;
 			}
 
@@ -229,7 +236,6 @@ class CProxy extends CApiService {
 		unset($proxy);
 
 		$proxyids = DB::insert('hosts', $proxies);
-
 		$hostUpdate = [];
 		foreach ($proxies as $key => $proxy) {
 			if (!empty($proxy['hosts'])) {
@@ -240,9 +246,9 @@ class CProxy extends CApiService {
 			}
 			
 			// create interface
-			if ($proxy['status'] == HOST_STATUS_SERVER) {
+			if ($proxy['status'] == HOST_STATUS_SERVER || $proxy['status'] == HOST_STATUS_PROXY_PASSIVE ) {
 				$proxy['interface']['hostid'] = $proxyids[$key];
-
+				
 				if (!API::HostInterface()->create($proxy['interface'])) {
 					self::exception(ZBX_API_ERROR_INTERNAL, _('Proxy interface creation failed.'));
 				}
@@ -288,11 +294,10 @@ class CProxy extends CApiService {
 			'proxyids' => $proxyids,
 			'editable' => true,
 			'preservekeys' => true,
-			'all_objects'	=> true,
+			
 		]);
 
 		$this->validateUpdate($proxies, $db_proxies);
-
 		foreach ($proxies as &$proxy) {
 			$status = array_key_exists('status', $proxy) ? $proxy['status'] : $db_proxies[$proxy['proxyid']]['status'];
 
@@ -320,6 +325,10 @@ class CProxy extends CApiService {
 
 			// Mark the interface as main to pass host interface validation.
 			if ($status == HOST_STATUS_PROXY_PASSIVE && array_key_exists('interface', $proxy)) {
+				$proxy['interface']['main'] = INTERFACE_PRIMARY;
+			}
+			// Mark the interface as main to pass host interface validation.
+			if ($status == HOST_STATUS_SERVER && array_key_exists('interface', $proxy)) {
 				$proxy['interface']['main'] = INTERFACE_PRIMARY;
 			}
 
@@ -371,14 +380,15 @@ class CProxy extends CApiService {
 				($proxy['status'] == HOST_STATUS_DOMAIN)
 				
 				) {
-				// If this non server, delete it's interface.
+				// If this non server or passive proxy, delete it's interface.
 
 				$interfaces = API::HostInterface()->get([
 					'hostids' => $proxy['hostid'],
 					'output' => ['interfaceid']
 				]);
-				$interfaceIds = zbx_objectValues($interfaces, 'interfaceid');
 
+				$interfaceIds = zbx_objectValues($interfaces, 'interfaceid');
+			
 				if ($interfaceIds) {
 					API::HostInterface()->delete($interfaceIds);
 				}
@@ -387,20 +397,17 @@ class CProxy extends CApiService {
 				// Update the interface of a server.
 
 				$proxy['interface']['hostid'] = $proxy['hostid'];
-
+			
 				$result = isset($proxy['interface']['interfaceid'])
-					? API::HostInterface()->update($proxy['interface'])
-					: API::HostInterface()->create($proxy['interface']);
-
+				? API::HostInterface()->update($proxy['interface'])
+				: API::HostInterface()->create($proxy['interface']);
+			
 				if (!$result) {
 					self::exception(ZBX_API_ERROR_INTERNAL, _('Proxy interface update failed.'));
 				}
 			}
-			
-		
 		}
-		//var_dump($proxyUpdate);
-
+	
 		DB::update('hosts', $proxyUpdate);
 		DB::update('hosts', $hostUpdate);
 
@@ -440,7 +447,6 @@ class CProxy extends CApiService {
 			'proxyids' => $proxyids,
 			'editable' => true,
 			'preservekeys' => true,
-			'all_objects' => true,
 		]);
 
 		foreach ($proxyids as $proxyid) {
@@ -634,6 +640,9 @@ class CProxy extends CApiService {
 		}
 	}
 
+
+
+	
 	/**
 	 * Validates the input parameters for the create() method.
 	 *
@@ -675,6 +684,7 @@ class CProxy extends CApiService {
 
 		foreach ($proxies as $proxy) {
 			if ($proxy['status'] != HOST_STATUS_PROXY_ACTIVE && 
+				$proxy['status'] != HOST_STATUS_PROXY_PASSIVE &&
 				$proxy['status'] != HOST_STATUS_DOMAIN &&
 				$proxy['status'] != HOST_STATUS_SERVER) {
 				self::exception(ZBX_API_ERROR_PARAMETERS,
@@ -683,15 +693,18 @@ class CProxy extends CApiService {
 			}
 
 			// interface
-			if ($proxy['status'] == HOST_STATUS_SERVER
+			if ( ($proxy['status'] == HOST_STATUS_SERVER || $proxy['status'] == HOST_STATUS_PROXY_PASSIVE)
 					&& (!array_key_exists('interface', $proxy)
 						|| !is_array($proxy['interface']) || !$proxy['interface'])) {
+						
 				self::exception(ZBX_API_ERROR_PARAMETERS, _s('No interface provided for server "%s".', $proxy['host']));
+				
 			}
 
 			if (array_key_exists('proxy_address', $proxy)) {
 				switch ($proxy['status']) {
 					case HOST_STATUS_SERVER:
+					case HOST_STATUS_PROXY_PASSIVE:
 						if ($proxy['proxy_address'] !== '') {
 							self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
 								'proxy_address', _('should be empty')

@@ -50,8 +50,6 @@ static int	send_heartbeat(void)
 	zbx_json_init(&j, 128+4096);
 	zbx_json_addstring(&j, "request", ZBX_PROTO_VALUE_PROXY_HEARTBEAT, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&j, "host", CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
-	//adding domains to announce
-	//zbx_json_addstring(&j, "domains", CONFIG_CLUSTER_DOMAINS, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&j, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
 
 	zabbix_log(LOG_LEVEL_INFORMATION,"Sending trial heartbeat:%s",j.buffer);

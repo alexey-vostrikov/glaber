@@ -36,7 +36,7 @@ $proxyForm = (new CForm())
 	->addVar('tls_accept', $data['tls_accept'])
 	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
 
-if ($data['status'] == HOST_STATUS_PROXY_PASSIVE && array_key_exists('interfaceid', $data)) {
+if (($data['status'] == HOST_STATUS_PROXY_PASSIVE  ||  $data['status'] == HOST_STATUS_SERVER )&& array_key_exists('interfaceid', $data)) {
 	$proxyForm->addVar('interfaceid', $data['interfaceid']);
 }
 
@@ -62,16 +62,13 @@ $data['proxies_ms'] = [];
 
 if ( !empty($data['domains'])) {
 	$domain_ids=explode(',',$data['domains']);
-	//var_dump($data['domains']);
-
+	
 	if (sizeof($domain_ids) > 0  ) {
 		$domains = API::Proxy()->get([
 				'proxyids' => $domain_ids,
 				'editable' => true,
-				'all_objects' => true
+			
 		]);
-
-		//var_dump($domains);
 
 		if (sizeof($domains) >0 ) {
 			foreach ($domains as $domain) {
@@ -92,7 +89,8 @@ $proxy_form_list = (new CFormList('proxyFormList'))
 			(new CRadioButtonList('status', (int) $data['status']))
 			->addValue(_('Monitoring Domain'), HOST_STATUS_DOMAIN)
 			->addValue(_('Server'), HOST_STATUS_SERVER)
-			->addValue(_('Proxy'), HOST_STATUS_PROXY_ACTIVE)
+			->addValue(_('Active Proxy'), HOST_STATUS_PROXY_ACTIVE)
+			->addValue(_('Passive Proxy'), HOST_STATUS_PROXY_PASSIVE)
 			->setModern(true)
 	)
 	->addRow((new CLabel(_('Name'), 'host'))->setAsteriskMark(),

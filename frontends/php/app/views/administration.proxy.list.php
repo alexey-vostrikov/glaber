@@ -165,7 +165,8 @@ foreach ($data['proxies'] as $proxy) {
 	}
 
 	$proxy_statuses= [
-		HOST_STATUS_PROXY_ACTIVE => _('Proxy'),
+		HOST_STATUS_PROXY_ACTIVE => _('Active Proxy'),
+		HOST_STATUS_PROXY_PASSIVE => _('Passive Proxy'),
 		HOST_STATUS_DOMAIN =>  _('Monitoring Domain'),
 		HOST_STATUS_SERVER =>  _('Server')
 	];
@@ -196,7 +197,7 @@ $proxyForm->addItem([
 	$proxyTable,
 	$data['paging'],
 	new CActionButtonList('action', 'proxyids', [
-		'proxy.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected servers or domains?')]
+		'proxy.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected severs/domains?')]
 	], 'proxy')
 ]);
 

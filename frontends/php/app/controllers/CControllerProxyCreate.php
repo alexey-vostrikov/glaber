@@ -24,7 +24,7 @@ class CControllerProxyCreate extends CController {
 	protected function checkInput() {
 		$fields = [
 			'host' =>			'db       hosts.host',
-			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_DOMAIN.','.HOST_STATUS_SERVER,
+			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE.','.HOST_STATUS_DOMAIN.','.HOST_STATUS_SERVER,
 			'dns' =>			'db       interface.dns',
 			'ip' =>				'db       interface.ip',
 			'useip' =>			'db       interface.useip  |in 0,1',
@@ -76,7 +76,8 @@ class CControllerProxyCreate extends CController {
 			'tls_subject', 'tls_psk_identity', 'tls_psk'
 		]);
 
-		if ($this->getInput('status', HOST_STATUS_DOMAIN) == HOST_STATUS_SERVER) {
+		if ($this->getInput('status', HOST_STATUS_DOMAIN) == HOST_STATUS_SERVER || 
+			$this->getInput('status', HOST_STATUS_DOMAIN) == HOST_STATUS_PROXY_PASSIVE) {
 			$proxy['interface'] = [];
 			$this->getInputs($proxy['interface'], ['dns', 'ip', 'useip', 'port']);
 		}
@@ -91,7 +92,6 @@ class CControllerProxyCreate extends CController {
 		$proxy['domains']=implode(',',$domains);
 
 		DBstart();
-		
 		$result = API::Proxy()->create([$proxy]);
 
 		if ($result) {

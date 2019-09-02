@@ -48,6 +48,7 @@ void zbx_dc_set_download_server_topology(zbx_uint64_t hostid);
 zbx_uint64_t zbx_dc_get_download_server_topology(void);
 void	zbx_dc_register_server_na(zbx_uint64_t hostid, char * reason);
 int zbx_dc_create_rerouted_json(struct zbx_json *j, zbx_uint64_t serverid);
+void zbx_dc_register_proxy_availability(u_int64_t hostid);
 
 static int	connect_to_proxy(const DC_PROXY *proxy, zbx_socket_t *sock, int timeout)
 {
@@ -232,6 +233,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 	zbx_socket_t	s;
 	struct zbx_json	j;
 
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: CLUSTER: sending configuration to the proxy %s(%d)", __func__, proxy->host,proxy->hostid);
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	zbx_json_addstring(&j, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_PROXY_CONFIG, ZBX_JSON_TYPE_STRING);
@@ -579,7 +581,7 @@ static int	proxy_do_hello(DC_PROXY *proxy)
 
 
 	//zbx_timespec(&tstart);
-	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: SEND HELLO -> %ld",proxy->hostid);
+	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: SEND HELLO -> %ld",proxy->hostid);
 
 	//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: PPOLLER: Sending hello '%s'",j.buffer);
 
@@ -655,59 +657,101 @@ static int	process_proxy(void)
 
 		memcpy(&proxy_old, &proxy, sizeof(DC_PROXY));
 
-		//todo: return passive proxy processing 
-		update_nextcheck = ZBX_PROXY_HELLO_NEXTSEND;
-	
-		/* Check if passive proxy has been misconfigured on the server side. If it has happened more */
-		/* recently than last synchronisation of cache then there is no point to retry connecting to */
-		/* proxy again. The next reconnection attempt will happen after cache synchronisation. */
-	//	if (proxy.last_cfg_error_time < DCconfig_get_last_sync_time())
-	//	{
-			char	*port = NULL;
+		if (proxy.server_hello_nextsend <= now)
+			update_nextcheck |= ZBX_PROXY_HELLO_NEXTSEND;
+		if (proxy.proxy_config_nextcheck <= now)
+			update_nextcheck |= ZBX_PROXY_CONFIG_NEXTCHECK;
+		if (proxy.proxy_data_nextcheck <= now)
+			update_nextcheck |= ZBX_PROXY_DATA_NEXTCHECK;
+		if (proxy.proxy_tasks_nextcheck <= now)
+			update_nextcheck |= ZBX_PROXY_TASKS_NEXTCHECK;
 
-			proxy.addr = proxy.addr_orig;
+		char	*port = NULL;
+		proxy.addr = proxy.addr_orig;
 
-			port = zbx_strdup(port, proxy.port_orig);
-			substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-					&port, MACRO_TYPE_COMMON, NULL, 0);
-			if (FAIL == is_ushort(port, &proxy.port))
-			{
-				zabbix_log(LOG_LEVEL_ERR, "invalid proxy \"%s\" port: \"%s\"", proxy.host, port);
-				ret = CONFIG_ERROR;
-				zbx_free(port);
-				goto error;
-			}
+		port = zbx_strdup(port, proxy.port_orig);
+		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+				&port, MACRO_TYPE_COMMON, NULL, 0);
+		if (FAIL == is_ushort(port, &proxy.port))
+		{
+			zabbix_log(LOG_LEVEL_ERR, "invalid proxy \"%s\" port: \"%s\"", proxy.host, port);
+			ret = CONFIG_ERROR;
 			zbx_free(port);
+			goto error;
+		}
+		zbx_free(port);
 
-			//todo: return passive proxy processing
-			if (proxy.server_hello_nextsend <= now && CONFIG_CLUSTER_SERVER_ID > 0)
-			{
-				if (SUCCEED != (ret = proxy_do_hello(&proxy)))
+		
+		//sending hellos to the neighbor servers
+		//perhaps it's a good idea to send everyone 
+		//same way
+		if ( proxy.server_hello_nextsend <= now && CONFIG_CLUSTER_SERVER_ID > 0 && HOST_STATUS_SERVER == proxy.proxy_type )  
+		{
+			if (SUCCEED != (ret = proxy_do_hello(&proxy)))
 					goto error;
 
-				if (zbx_dc_get_download_server_topology() == proxy.hostid) {
+			if (zbx_dc_get_download_server_topology() == proxy.hostid) {
 					
-					char *topology=NULL;
-				
-					topology=server_get_topology(&proxy);
-					ret = zbx_dc_set_topology(topology);
-					zbx_free(topology);
-					zbx_dc_set_download_server_topology(0);
-					if (SUCCEED == ret ) {
- 						zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: new topology from server %ld has been downloaded and set", proxy.hostid);
-					} else {
-						zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: WARNIUNG: couldn't download and set new topology from server %ld", proxy.hostid);
-					}
-				}
+				char *topology=NULL;
+			
+				if (NULL == (topology=server_get_topology(&proxy))) {
+					zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: WARNING: couldn't dowload toplogy from server %ld", proxy.hostid);
+					goto error;
+				} 
+				ret = zbx_dc_set_topology(topology);
+				zbx_free(topology);
 
+				zbx_dc_set_download_server_topology(0);
+				if (SUCCEED == ret ) {
+ 					zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: new topology from server %ld has been downloaded and set", proxy.hostid);
+				} else {
+					zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: WARNIUNG: couldn't parse new topology from server %ld", proxy.hostid);
+				}
 			}
+
 			if (proxy.cluster_rerouted_data > 0) {
 				if (SUCCEED != send_rerouted_data(&proxy) ) {
 					zabbix_log(LOG_LEVEL_WARNING, "CLUSTER Failed to send rerouted data to server %ld, data will be lost",proxy.hostid);
 						goto error;
 				}		
 			}
-	//	}
+		}
+			
+		/* Check if passive proxy has been misconfigured on the server side. If it has happened more */
+		/* recently than last synchronisation of cache then there is no point to retry connecting to */
+		/* proxy again. The next reconnection attempt will happen after cache synchronisation. */
+
+		//if (proxy.last_cfg_error_time < DCconfig_get_last_sync_time() && HOST_STATUS_PROXY_PASSIVE == proxy.proxy_type ) {
+		if ( HOST_STATUS_PROXY_PASSIVE == proxy.proxy_type ) {
+		
+			if (proxy.proxy_config_nextcheck <= now) 
+			{
+				if (SUCCEED != (ret = proxy_send_configuration(&proxy)))
+					goto error;
+				
+				zbx_dc_register_proxy_availability(proxy.hostid);
+			}
+
+			if (proxy.proxy_data_nextcheck <= now)
+			{
+				int	more;
+
+				do
+				{
+					if (SUCCEED != (ret = proxy_get_data(&proxy, &more)))
+						goto error;
+				}
+				while (ZBX_PROXY_DATA_MORE == more);
+				zbx_dc_register_proxy_availability(proxy.hostid);
+			}
+			else if (proxy.proxy_tasks_nextcheck <= now)
+			{
+				if (SUCCEED != (ret = proxy_get_tasks(&proxy)))
+					goto error;
+				zbx_dc_register_proxy_availability(proxy.hostid);
+			}
+		}
+
 error:
 		
 	//	if (proxy_old.version != proxy.version || proxy_old.auto_compress != proxy.auto_compress ||
@@ -716,6 +760,7 @@ error:
 			//updating fail counter to calc intervals right
 			//to keep up cluster changes, we ALWAYS update proxy data  
 	//	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: calling proxy_update %d",proxy.cluster_id)
+		//updating proxy anyway, todo: figure if this is redundand and return the condition above
 		zbx_update_proxy_data(&proxy_old, proxy.version, proxy.lastaccess, proxy.auto_compress);
 	//	}
 

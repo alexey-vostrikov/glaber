@@ -85,6 +85,7 @@
 #define ZBX_PROTO_TAG_EVENTID			"eventid"
 #define ZBX_PROTO_TAG_NAME			"name"
 #define ZBX_PROTO_TAG_HOSTS			"hosts"
+#define ZBX_PROTO_TAG_PROXIES			"proxies"
 #define ZBX_PROTO_TAG_GROUPS			"groups"
 #define ZBX_PROTO_TAG_APPLICATIONS		"applications"
 #define ZBX_PROTO_TAG_TAGS			"tags"
@@ -121,10 +122,12 @@
 
 #define ZBX_PROTO_VALUE_CLUSTER_HELLO "cluster_hello"
 #define ZBX_PROTO_SERVER_ID	"server_id"
+#define ZBX_PROTO_PROXY_ID	"proxy_id"
+
 #define ZBX_PROTO_SERVER_HOST_ID	"server_hostid"
 #define ZBX_PROTO_CLUSTER_TOPOLOGY_VERSION "cluster_topology_version"
 #define	ZBX_PROTO_CLUSTER_PROXYLIST	"proxy_list"
-#define	ZBX_PROTO_CLUSTER_TOPOLOGY	"topology"
+//#define	ZBX_PROTO_CLUSTER_TOPOLOGY	"topology"
 #define ZBX_PROTO_CLUSTER_REROUTED_DATA "rerouted_data"
 
 #define ZBX_PROTO_VALUE_FAILED		"failed"

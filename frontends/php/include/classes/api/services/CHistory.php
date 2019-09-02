@@ -241,23 +241,36 @@ class CHistory extends CApiService {
 
 
 		$value_col='value';
-
-		if ($options['history']==ITEM_VALUE_TYPE_FLOAT) {
+		
+		if ($options['history']==ITEM_VALUE_TYPE_STR || 
+			$options['history']==ITEM_VALUE_TYPE_LOG || 
+			$options['history']==ITEM_VALUE_TYPE_TEXT) {
+				$value_col='value_str';
+		   } elseif ($options['history']==ITEM_VALUE_TYPE_FLOAT) {
 		    $value_col='value_dbl';
 		}
 
-		if ($options['history']==ITEM_VALUE_TYPE_STR) {
-		    $value_col='value_str';
-		}
 
-
+		switch ($options['history']) {
+		 	case ITEM_VALUE_TYPE_STR:
+		 	case ITEM_VALUE_TYPE_LOG:
+			case ITEM_VALUE_TYPE_TEXT:
+				 $value_col='value_str';
+				 break;
+			case ITEM_VALUE_TYPE_FLOAT:
+				$value_col='value_dbl';
+				break;
+				 
+		)
+		
 		$table_name = $HISTORY['dbname'].'.history';
 
 		$sql_parts['from']['history'] = $table_name.' h';
 
-		// itemids
 		if ($options['itemids'] !== null) {
-			$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
+			 $key = array_keys($options['itemids'])[0];
+		  	 $sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][$key];
+		  	//$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
 		}
 
 		// time_from
@@ -336,11 +349,7 @@ class CHistory extends CApiService {
 				$sql_where.
 				$sql_order;
 
-//		var_dump($sql);
 		$values = CClickHouseHelper::query($sql,1,array('itemid','clock','ns', 'value'));
-
-
-//		error("Will exec sql $sql");
 
 		return $values;
 	}

@@ -76,7 +76,7 @@ class CControllerProxyUpdate extends CController {
 			'output' => [],
 			'proxyids' => $this->getInput('proxyid'),
 			'editable' => true,
-			'all_objects' => true,
+		
 		]);
 	}
 
@@ -87,21 +87,18 @@ class CControllerProxyUpdate extends CController {
 			'tls_subject', 'tls_psk_identity', 'tls_psk'
 		]);
 
-		if ($this->getInput('status', HOST_STATUS_PROXY_ACTIVE) == HOST_STATUS_PROXY_PASSIVE) {
+		if ($this->getInput('status', HOST_STATUS_PROXY_ACTIVE) == HOST_STATUS_PROXY_PASSIVE || 
+			$this->getInput('status', HOST_STATUS_PROXY_ACTIVE) == HOST_STATUS_SERVER) {
 			$proxy['interface'] = [];
 			$this->getInputs($proxy['interface'], ['interfaceid', 'dns', 'ip', 'useip', 'port']);
 		}
 		else {
 			$proxy['proxy_address'] = $this->getInput('proxy_address', '');
 		}
-		
-		//echo("WTF?");
 
 		$domains = getRequest('groupids', []);
-		//var_dump($domains);
-
 		$proxy['error']=implode(',',$domains);
-		//var_dump($proxy['domains']);
+
 
 		DBstart();
 
@@ -112,7 +109,6 @@ class CControllerProxyUpdate extends CController {
 				'['.$this->getInput('host', '').'] ['.reset($result['proxyids']).']'
 			);
 		}
-
 		$result = DBend($result);
 
 		if ($result) {

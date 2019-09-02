@@ -267,7 +267,7 @@ $hostList->addRow(_('Description'),
 
 // Proxy
 if ($data['flags'] != ZBX_FLAG_DISCOVERY_CREATED) {
-	$proxy = new CComboBox('proxy_hostid', $data['proxy_hostid'], null, [0 => _('(no proxy)')] + $data['proxies']);
+	$proxy = new CComboBox('proxy_hostid', $data['proxy_hostid'], null, [0 => _('(no server)')] + $data['proxies']);
 	$proxy->setEnabled($data['flags'] != ZBX_FLAG_DISCOVERY_CREATED);
 }
 else {
@@ -275,7 +275,7 @@ else {
 		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH);
 	$hostList->addVar('proxy_hostid', $data['proxy_hostid']);
 }
-$hostList->addRow(_('Monitored by proxy'), $proxy);
+$hostList->addRow(_('Monitored by'), $proxy);
 
 $hostList->addRow(_('Enabled'),
 	(new CCheckBox('status', HOST_STATUS_MONITORED))->setChecked($data['status'] == HOST_STATUS_MONITORED)

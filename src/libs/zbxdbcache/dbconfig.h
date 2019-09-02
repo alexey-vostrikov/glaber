@@ -339,6 +339,8 @@ typedef struct
 	/* cluster state considered in fetching items during poller items queue fetch */
 	unsigned char 	cluster_state;
 	zbx_uint64_t cluster_server_host_id; //hostid of the server responsible for processing the host
+										 //we need this for fast rerouting of data
+
 	
 	/* flag to reset host availability to unknown */
 	unsigned char	reset_availability;
@@ -393,11 +395,12 @@ typedef struct
 	int		nextcheck;
 	int		lastaccess;
 
-	int		cluster_lastheard; /* last time when this proxy has been announced by a server */
+	u_int64_t	cluster_lastheard; /* last time when this proxy has been announced by a server */
 	int 	cluster_id;		   /* cluster id for server objects */
-	int		cluster_rtt;	   /* time it took for an answer to arrive - to measure closest servers */
+	//int		cluster_rtt;	   /* time it took for an answer to arrive - to measure closest servers */
 	int 	cluster_failed_hello_count; //perhaps this may be rplaced by combination of state and lastheard
 	int 	cluster_state;	
+	zbx_uint64_t cluster_proxy; //for cluster operations stores real proxy id 
 	
 	zbx_uint64_t	cluster_topology_version; /* topology version that the host announces */
 
@@ -412,6 +415,8 @@ typedef struct
 	//todo: it seems that there is no place where i coorectly destroy these 
 	//find and fix 
 	zbx_vector_uint64_t	cluster_domains;
+	zbx_vector_uint64_t	connected_servers; //list of connected servers for proxies or list of connected proxies for serves
+	zbx_vector_uint64_pair_t proxy_hosts; //storing proxy with hostid pairs for the servers;
 	//vector for keeping rerouted data ptrs
 	zbx_vector_ptr_t cluster_rerouted_data;
 	

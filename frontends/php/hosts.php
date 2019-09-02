@@ -972,7 +972,7 @@ if (hasRequest('hosts') && (getRequest('action') === 'host.massupdateform' || ha
 	$data['proxies'] = DBfetchArray(DBselect(
 		'SELECT h.hostid,h.host'.
 		' FROM hosts h'.
-		' WHERE h.status IN ('.HOST_STATUS_DOMAIN.')'
+		' WHERE h.status IN ('.HOST_STATUS_DOMAIN.",".HOST_STATUS_PROXY_ACTIVE.",".HOST_STATUS_PROXY_PASSIVE.",".HOST_STATUS_SERVER.')'
 	));
 	order_result($data['proxies'], 'host');
 
@@ -1187,6 +1187,7 @@ elseif (hasRequest('form')) {
 			$data['proxies'] = API::Proxy()->get([
 				'output' => ['host'],
 				'proxyids' => [$data['proxy_hostid']],
+				'statusids' => [HOST_STATUS_PROXY_PASSIVE,HOST_STATUS_PROXY_ACTIVE,HOST_STATUS_SERVER,HOST_STATUS_DOMAIN],
 				'preservekeys' => true
 			]);
 		}
@@ -1196,14 +1197,19 @@ elseif (hasRequest('form')) {
 	}
 	else {
 		$data['proxies'] = API::Proxy()->get([
-			'output' => ['host'],
+			'output' => ['host','status'],
 			'preservekeys' => true
 		]);
 		order_result($data['proxies'], 'host');
 	}
+	$statuses=[ HOST_STATUS_PROXY_ACTIVE => 'Active proxy',
+	HOST_STATUS_PROXY_PASSIVE	=> 'Passive proxy', 
+	HOST_STATUS_SERVER => 'Server',
+	HOST_STATUS_DOMAIN => 'Domain'];
 
 	foreach ($data['proxies'] as &$proxy) {
-		$proxy = $proxy['host'];
+		$proxy = $proxy['host']." (".$statuses[$proxy['status']].")";
+
 	}
 	unset($proxy);
 

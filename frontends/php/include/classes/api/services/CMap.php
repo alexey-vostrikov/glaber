@@ -109,7 +109,7 @@ class CMap extends CMapElement {
 		else {
 			$count_output = false;
 		}
-
+		
 		$result = $this->getMaps($options);
 
 		if ($result && self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {

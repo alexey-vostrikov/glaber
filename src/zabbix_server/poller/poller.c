@@ -733,6 +733,8 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 
 #ifdef HAVE_NETSNMP
 	if (ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type  || ZBX_POLLER_TYPE_UNREACHABLE == poller_type) {
+	
+		//todo: this needs to be fixed: in case alarm fires, we will leak items memory allocated inside the async functions
 		zbx_alarm_on(CONFIG_TIMEOUT*2);
 		get_values_snmp_async(items, results, errcodes, num);
 		zbx_alarm_off();

@@ -49,6 +49,7 @@ class CControllerWidgetMapView extends CControllerWidget {
 			$previous_map = array_filter(explode(',', $storage['previous_maps']), 'is_numeric');
 
 			if ($previous_map) {
+			
 				$previous_map = API::Map()->get([
 					'sysmapids' => [array_pop($previous_map)],
 					'output' => ['sysmapid', 'name']
@@ -57,7 +58,7 @@ class CControllerWidgetMapView extends CControllerWidget {
 				$previous_map = reset($previous_map);
 			}
 		}
-
+		
 		$sysmapid = array_key_exists('current_sysmapid', $storage)
 			? $storage['current_sysmapid']
 			: (array_key_exists('sysmapid', $fields) ? $fields['sysmapid'] : null);

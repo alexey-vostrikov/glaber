@@ -146,20 +146,12 @@ unsigned char	process_type		= ZBX_PROCESS_TYPE_UNKNOWN;
 int		process_num		= 0;
 int		server_num		= 0;
 
-
-
-
-
-
-
 int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME=0;
 int CONFIG_CLICKHOUSE_DISABLE_NS_VALUE=0;
 int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME=0;
 char *CONFIG_CLICKHOUSE_USERNAME = NULL;
 char *CONFIG_CLICKHOUSE_PASSWORD = NULL;
 int *CONFIG_CLICKHOUSE_PRELOAD_VALUES=0;
-
-
 
 int CONFIG_ASYNC_SNMP_POLLER_FORKS =2;
 int CONFIG_ASYNC_AGENT_POLLER_FORKS =2;
@@ -426,9 +418,19 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
 		*local_process_num = local_server_num - server_count + CONFIG_PREPROCESSOR_FORKS;
 	}
+	else if (local_server_num <= (server_count += CONFIG_ASYNC_SNMP_POLLER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_ASYNC_SNMP;
+		*local_process_num = local_server_num - server_count + CONFIG_ASYNC_SNMP_POLLER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_ASYNC_AGENT_POLLER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_ASYNC_AGENT;
+		*local_process_num = local_server_num - server_count + CONFIG_ASYNC_AGENT_POLLER_FORKS;
+	}
 	else
 		return FAIL;
-
+ 
 	return SUCCEED;
 }
 
@@ -620,10 +622,11 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
-	if (ZBX_PROXYMODE_ACTIVE != CONFIG_PROXYMODE ) {
-		zabbix_log(LOG_LEVEL_CRIT, "Clustered Zabbix proxy only runs in Active mode");
-		err = 1;
-	} 
+	//in fact, now it does
+	//if (ZBX_PROXYMODE_ACTIVE != CONFIG_PROXYMODE ) {
+	//	zabbix_log(LOG_LEVEL_CRIT, "Clustered Zabbix proxy only runs in Active mode");
+	//	err = 1;
+	//} 
 
 	if (NULL != CONFIG_SOURCE_IP && SUCCEED != is_supported_ip(CONFIG_SOURCE_IP))
 	{
@@ -1062,8 +1065,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 #else
 #	define TLS_FEATURE_STATUS	" NO"
 #endif
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "Starting Zabbix Proxy (%s) [%s]. Zabbix %s (revision %s).",
+	//todo : put glaber's version here
+	zabbix_log(LOG_LEVEL_INFORMATION, "Starting Glaber Proxy (Based in Zabbix) (%s) [%s]. Zabbix %s (revision %s).",
 			ZBX_PROXYMODE_PASSIVE == CONFIG_PROXYMODE ? "passive" : "active",
 			CONFIG_HOSTNAME, ZABBIX_VERSION, ZABBIX_REVISION);
 
@@ -1165,9 +1168,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			+ CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS + CONFIG_IPMIPOLLER_FORKS
 			+ CONFIG_JAVAPOLLER_FORKS + CONFIG_SNMPTRAPPER_FORKS + CONFIG_SELFMON_FORKS
 			+ CONFIG_VMWARE_FORKS + CONFIG_IPMIMANAGER_FORKS + CONFIG_TASKMANAGER_FORKS
-			+ CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS;
+			+ CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS + CONFIG_ASYNC_SNMP_POLLER_FORKS + 
+			CONFIG_ASYNC_AGENT_POLLER_FORKS ;
 
 	threads = (pid_t *)zbx_calloc(threads, threads_num, sizeof(pid_t));
+	zabbix_log(LOG_LEVEL_INFORMATION,"Total %d threads", threads_num);
 
 	if (0 != CONFIG_TRAPPER_FORKS)
 	{
@@ -1196,7 +1201,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 		thread_args.server_num = i + 1;
 		thread_args.args = NULL;
-
+	
 		switch (thread_args.process_type)
 		{
 			case ZBX_PROCESS_TYPE_CONFSYNCER:
@@ -1268,7 +1273,17 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_PREPROCESSOR:
 				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
-		}
+			case ZBX_PROCESS_TYPE_ASYNC_SNMP:
+				poller_type = ZBX_POLLER_TYPE_ASYNC_SNMP;
+				thread_args.args = &poller_type;
+				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
+				break;
+			case ZBX_PROCESS_TYPE_ASYNC_AGENT:
+				poller_type = ZBX_POLLER_TYPE_ASYNC_AGENT;
+				thread_args.args = &poller_type;
+				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
+				break;
+		}	
 	}
 
 	while (-1 == wait(&i))	/* wait for any child to exit */

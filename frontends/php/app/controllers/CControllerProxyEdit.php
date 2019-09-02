@@ -29,7 +29,7 @@ class CControllerProxyEdit extends CController {
 		$fields = [
 			'proxyid' =>		'db       hosts.hostid',
 			'host' =>			'db       hosts.host',
-			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_DOMAIN.','.HOST_STATUS_SERVER,
+			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_PASSIVE.','.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_DOMAIN.','.HOST_STATUS_SERVER,
 			'interfaceid' =>	'db       interface.interfaceid',
 			'dns' =>			'db       interface.dns',
 			'ip' =>				'db       interface.ip',
@@ -71,7 +71,6 @@ class CControllerProxyEdit extends CController {
 				'output' => [],
 				'proxyids' => $this->getInput('proxyid'),
 				'editable' => true,
-				'all_objects' => true,
 			]);
 		}
 
@@ -100,7 +99,6 @@ class CControllerProxyEdit extends CController {
 			'form_refresh' => 0
 		];
 
-	
 		// get values from the dabatase
 		if ($this->hasInput('proxyid')) {
 			$data['proxyid'] = $this->getInput('proxyid');
@@ -111,7 +109,7 @@ class CControllerProxyEdit extends CController {
 				],
 				'selectInterface' => ['interfaceid', 'dns', 'ip', 'useip', 'port'],
 				'proxyids' => $data['proxyid'],
-				'all_objects' => true,
+				
 			]);
 			$proxy = $proxies[0];
 
@@ -124,7 +122,7 @@ class CControllerProxyEdit extends CController {
 			$data['tls_psk'] = $proxy['tls_psk'];
 			$data['tls_psk_identity'] = $proxy['tls_psk_identity'];
 			$data['tls_subject'] = $proxy['tls_subject'];
-			if ($data['status'] == HOST_STATUS_SERVER) {
+			if ($data['status'] == HOST_STATUS_SERVER || $data['status'] == HOST_STATUS_PROXY_PASSIVE) {
 				$data['interfaceid'] = $proxy['interface']['interfaceid'];
 				$data['dns'] = $proxy['interface']['dns'];
 				$data['ip'] = $proxy['interface']['ip'];
@@ -153,7 +151,7 @@ class CControllerProxyEdit extends CController {
 		$data['tls_subject'] = $this->getInput('tls_subject', $data['tls_subject']);
 		$data['form_refresh'] = $this->getInput('form_refresh', $data['form_refresh']);
 
-		if ($data['status'] == HOST_STATUS_SERVER && $this->hasInput('interfaceid')) {
+		if (($data['status'] == HOST_STATUS_SERVER || $data['status'] == HOST_STATUS_PROXY_PASSIVE) && $this->hasInput('interfaceid')) {
 			$data['interfaceid'] = $this->getInput('interfaceid');
 		}
 

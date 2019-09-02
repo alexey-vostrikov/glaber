@@ -202,7 +202,7 @@ static int	clickhouse_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid,
 	
     if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
 		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
-      goto out;
+        goto out;
 	}
 
 	if (NULL == (handle = curl_easy_init()))

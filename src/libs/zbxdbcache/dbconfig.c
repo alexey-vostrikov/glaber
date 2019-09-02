@@ -705,11 +705,11 @@ static void	DCupdate_proxy_queue(ZBX_DC_PROXY *proxy)
 		return;
 
 	proxy->nextcheck = proxy->server_hello_nextsend;
-	//if (proxy->proxy_data_nextcheck < proxy->nextcheck)
-	//	proxy->nextcheck = proxy->proxy_data_nextcheck;
-	//if (proxy->proxy_config_nextcheck < proxy->nextcheck)
-	//	proxy->nextcheck = proxy->proxy_config_nextcheck;
-
+	if (proxy->proxy_data_nextcheck < proxy->nextcheck)
+		proxy->nextcheck = proxy->proxy_data_nextcheck;
+	if (proxy->proxy_config_nextcheck < proxy->nextcheck)
+		proxy->nextcheck = proxy->proxy_config_nextcheck;
+	
 	elem.key = proxy->hostid;
 	elem.data = (const void *)proxy;
 
@@ -1438,9 +1438,7 @@ done:
 		{
 			proxy = (ZBX_DC_PROXY *)DCfind_id(&config->proxies, hostid, sizeof(ZBX_DC_PROXY), &found);
 			//todo: handle cluster object chagges propertly (set the topology change flag here)
-			//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Found server/proxy name %s(%s), type %d, hostid %ld",
-			//		host->host,host->name,status,host->hostid);
-
+			
 			if (0 == found)
 			{
 				proxy->location = ZBX_LOC_NOWHERE;
@@ -1452,24 +1450,27 @@ done:
 				zbx_vector_uint64_create_ext(&proxy->cluster_domains,
 					 __config_mem_malloc_func, __config_mem_realloc_func, __config_mem_free_func);
 		
+				zbx_vector_uint64_create_ext(&proxy->connected_servers,
+					 __config_mem_malloc_func, __config_mem_realloc_func, __config_mem_free_func);
+
+				zbx_vector_uint64_pair_create_ext(&proxy->proxy_hosts,
+					 __config_mem_malloc_func, __config_mem_realloc_func, __config_mem_free_func);
+		
 				zbx_vector_ptr_create_ext(&proxy->cluster_rerouted_data,
 					 __config_mem_malloc_func, __config_mem_realloc_func, __config_mem_free_func);
 					
 				proxy->cluster_id=0;
-				proxy->cluster_rtt=0;
 				proxy->cluster_failed_hello_count=0;
-				proxy->cluster_lastheard=time(NULL);
+				proxy->cluster_lastheard=0;
 				proxy->cluster_state=ZBX_CLUSTER_SERVER_STATE_DOWN;
 				proxy->cluster_topology_version=0;
+
 			}
 
 			proxy->auto_compress = atoi(row[32 + ZBX_HOST_TLS_OFFSET]);
 			DCstrpool_replace(found, &proxy->proxy_address, row[31 + ZBX_HOST_TLS_OFFSET]);
 			
-			//we'll queue servers as passive proxies so that proxypollers would generate
-			//hello traffic
-
-			if (HOST_STATUS_SERVER == status && (0 == found || status != host->status))
+			if ((HOST_STATUS_SERVER == status || HOST_STATUS_PROXY_PASSIVE == status) && (0 == found || status != host->status))
 			{
 				proxy->server_hello_nextsend = (int)calculate_proxy_nextcheck(
 						hostid, ZBX_CLUSTER_HELLO_FREQUENCY , now);
@@ -1497,6 +1498,8 @@ done:
 
 			zbx_strpool_release(proxy->proxy_address);
 			zbx_vector_uint64_destroy(&proxy->cluster_domains);
+			zbx_vector_uint64_destroy(&proxy->connected_servers);
+			zbx_vector_uint64_pair_destroy(&proxy->proxy_hosts);
 
 			for ( i=0; i < proxy->cluster_rerouted_data.values_num; i++) {
 				zbx_strpool_release((const char *)&proxy->cluster_rerouted_data.values[i]);
@@ -9180,6 +9183,7 @@ static void	DCget_proxy(DC_PROXY *dst_proxy, const ZBX_DC_PROXY *src_proxy)
 
 		dst_proxy->tls_connect = host->tls_connect;
 		dst_proxy->tls_accept = host->tls_accept;
+		dst_proxy->proxy_type = host->status;
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		strscpy(dst_proxy->tls_issuer, host->tls_issuer);
 		strscpy(dst_proxy->tls_subject, host->tls_subject);
@@ -9378,11 +9382,7 @@ void	DCrequeue_proxy(zbx_uint64_t hostid, unsigned char update_nextcheck, int pr
 			if (0 != (update_nextcheck & ZBX_PROXY_HELLO_NEXTSEND))
 			{
 				int interval = ZBX_CLUSTER_HELLO_FREQUENCY;
-			
-				//to reduce wait on timeouts throttling N/A proxies hello interval
-				//if  (ZBX_CLUSTER_MAX_FAIL_HELLOS <  dc_proxy->cluster_failed_hello_count ) 
-				//		interval = ZBX_CLUSTER_NA_HELLO_INERVAL;
-
+		
 				dc_proxy->server_hello_nextsend = (int)calculate_proxy_nextcheck(
 						hostid, interval, now);
 
@@ -12321,19 +12321,35 @@ int zbx_dc_create_hello_json(struct zbx_json *j){
 
 	//todo: filter only active proxies here (lastaccess+proxy_timeout>now + only proxy_active hosts)
 	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
+		if (proxy->cluster_lastheard + ZBX_PROXY_TIMEOUT > time(NULL) ) {
+			ZBX_DC_HOST *host;
+			//checking if this is actually a proxy
+			if ( (NULL != (host=zbx_hashset_search(&config->hosts,&proxy->hostid))) &&
+				 ( HOST_STATUS_PROXY_ACTIVE == host->status ||
+				   HOST_STATUS_PROXY_PASSIVE == host->status ) ) {
+				zbx_snprintf_alloc(&proxy_ids,&alloc,&offset,"%ld,",proxy->hostid);
+				
+			}
+			
+		}
 		//	if (ZB proxy->state )
 
 		//todo: proper proxy reg filtering
 		//	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Adding domains from proxy %ld (%s) to the server announcement",proxy->hostid,proxy->domains);
-			zbx_snprintf_alloc(&proxy_ids,&alloc,&offset,"%ld,",proxy->hostid);
+			
 	}
 	
 	UNLOCK_CACHE;
-	
+
+	if (offset>0) {
+		proxy_ids[offset-1]=0;
+	}
 	zbx_json_addstring(j,ZBX_PROTO_CLUSTER_PROXYLIST,proxy_ids,ZBX_JSON_TYPE_STRING);
+	//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Adding list of active proxies to hello: %s",proxy_ids);
+	
+	
 	zbx_free(proxy_ids);
 
-	//zbx_snprintf(tmp,sizeof(tmp),"%d%ld",CONFIG_CLUSTER_SERVER_ID,time(NULL));
 	cluster_topology_version=zbx_dc_current_topology_version();
 	zbx_json_adduint64(j,ZBX_PROTO_CLUSTER_TOPOLOGY_VERSION,cluster_topology_version);
 	
@@ -12366,10 +12382,6 @@ int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse *jp, int timed
 		goto out;
 	}
 	
-	//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: TRAPPER got hello: cluster id: '%s', proxy_list: '%s', cluster_config_version: '%s'",
-	//			cluster_id,proxy_list,cluster_topology_version);
-	//todo: remove change missleading cluster_id naming to server_id
-
 	new_cluster_id=strtol(server_id,NULL,10);	
 	new_cluster_topology_version=strtol(cluster_topology_version,NULL,10);	
 	
@@ -12434,14 +12446,30 @@ int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse *jp, int timed
 	
 	WRLOCK_CACHE;
 	if ( NULL != ( update_proxy = (ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&proxy->hostid))) {
-	
+			char *proxy_list_str=NULL;
 			
 			update_proxy->cluster_id=new_cluster_id;
 			update_proxy->cluster_topology_version=new_cluster_topology_version;
 			update_proxy->cluster_state = proxy->cluster_state;
 			update_proxy->cluster_lastheard = proxy->cluster_lastheard;
 
-			if (timediff) update_proxy->cluster_rtt=timediff;
+	//		if (timediff) update_proxy->cluster_rtt=timediff;
+
+
+			zbx_vector_uint64_clear(&update_proxy->connected_servers);
+			proxy_list_str=strtok(proxy_list,s);
+
+			while (proxy_list_str) {
+				zbx_uint64_t proxy_id=strtol(proxy_list_str,NULL,10);
+				zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: avail proxy id %ld ",proxy_id);
+				zbx_vector_uint64_append(&update_proxy->connected_servers ,proxy_id);
+				proxy_list_str=strtok(NULL,s);
+				
+				
+				
+
+
+			} 
 			
 		
 	}
@@ -12491,8 +12519,9 @@ int DC_apply_topology(void) {
 	const char *p = NULL;
 	zbx_hashset_iter_t hosts_iter;
 	ZBX_DC_HOST *dc_host;
+	u_int32_t local_proxy_hosts=0, remote_server_proxy_hosts=0;
 	
-
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s CLUSTER: starting to process the topology", __func__);
 	
 	topology=zbx_strdup(NULL,config->cluster_topology);
 
@@ -12506,20 +12535,18 @@ int DC_apply_topology(void) {
 	//just before applying topology params, cleaning all the hosts in case if topology is different from db config
 	zbx_hashset_iter_reset(&config->hosts,&hosts_iter);
 	
-	//deactivating all the hosts
 	while (NULL!=(dc_host=(ZBX_DC_HOST*)zbx_hashset_iter_next(&hosts_iter))){
 		dc_host->cluster_state = ZBX_CLUSTER_HOST_STATE_DISABLED;
 		dc_host->cluster_server_host_id = 0;
 	}
 
-
+	zabbix_log(LOG_LEVEL_DEBUG,"Will porcess %s",topology);
 	if (SUCCEED == zbx_json_brackets_by_name(&jp, "servers", &jp_servers))
 	{
 		while (NULL != (p = zbx_json_next(&jp_servers, p))) {
-		
 			char server_id[MAX_ID_LEN], host[MAX_ZBX_HOSTNAME_LEN], host_id[MAX_ID_LEN];
 			char mark_hosts_cluster_state;
-			int processed_hosts=0;
+			u_int32_t processed_hosts;
 
 			if ((SUCCEED != zbx_json_brackets_open(p, &jp_server) ) || 	
 				(SUCCEED != zbx_json_value_by_name(&jp_server,ZBX_PROTO_SERVER_ID, server_id, MAX_ID_LEN)) || 
@@ -12531,8 +12558,7 @@ int DC_apply_topology(void) {
 				continue;	
 			}
 			cluster_server_id = strtol(host_id,0,10);
-			zabbix_log(LOG_LEVEL_INFORMATION, "Processing server id: %ld",cluster_server_id);			
-			
+					
 			//mark hosts belonging to this server as ACTIVE
 			if  ( strtol(server_id,0,10) == CONFIG_CLUSTER_SERVER_ID &&  0 == strcmp(CONFIG_HOSTNAME,host)) 
 				mark_hosts_cluster_state=ZBX_CLUSTER_HOST_STATE_ACTIVE; 
@@ -12558,12 +12584,75 @@ int DC_apply_topology(void) {
 						processed_hosts++;
 				}
 			}			
-			if (ZBX_CLUSTER_HOST_STATE_ACTIVE == mark_hosts_cluster_state) {
-				activated_hosts +=processed_hosts;
+			//if (ZBX_CLUSTER_HOST_STATE_ACTIVE == mark_hosts_cluster_state) {
+			activated_hosts +=processed_hosts;
+			struct zbx_json_parse	jp_proxies;
+
+			//processing proxy assignement topology
+			if (SUCCEED == zbx_json_brackets_by_name (&jp_server,ZBX_PROTO_TAG_PROXIES,&jp_proxies)) {
+				//iterating over proxies
+				const char *pp=NULL;
+				struct zbx_json_parse jp_proxy_entry, jp_proxy_hosts;
+					
+				u_int64_t proxyid_int;
+				//iterating over proxy entries
+				while (NULL != (pp = zbx_json_next(&jp_proxies, pp))) {
+					//parsing proxy id and array of hosts assigned to the proxy
+					char proxy_id[MAX_ID_LEN];
+					zabbix_log(LOG_LEVEL_DEBUG,"Processing proxy entry %s",pp);
+
+					if ( SUCCEED == zbx_json_brackets_open(pp, &jp_proxy_entry) &&
+					     SUCCEED == zbx_json_value_by_name(&jp_proxy_entry,ZBX_PROTO_PROXY_ID, proxy_id, MAX_ID_LEN)) {
+							
+						//parsing proxy id and array of hosts assigned to the proxy
+						proxyid_int=strtol(proxy_id,NULL,10);
+						zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: processing proxy entry for proxy id %ld: %s",proxyid_int,jp_proxy_entry.start);
+
+						//opening the array of hosts assigned to the proxy:			
+						const char *hp = NULL;
+						/* iterating on all the hosts of the server to apply server name for metrics_rerouting and mark this server hosts */
+						if (SUCCEED == zbx_json_brackets_by_name (&jp_proxy_entry,ZBX_PROTO_TAG_HOSTS,&jp_proxy_hosts) ){
+							//&& 	SUCCEED == zbx_json_brackets_open(hp, &jp_proxy_entry)) {
+								
+							char pr_hostid[MAX_ID_LEN];
+							//int is_null = 0;
+							zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: processing hosts proxy entry for proxy id %ld (%s)",proxyid_int, jp_proxy_hosts.start);
+							//iterating over proxy hosts
+							//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: processing proxy's host entry: %s",hp);
+							while  ( NULL != ( hp = zbx_json_next(&jp_proxy_hosts, hp ) )) {
+								zbx_uint64_t hostid_int;
+
+								hostid_int=strtol(hp,NULL,10);
+								zabbix_log(LOG_LEVEL_DEBUG,"Found proxy host %ld",hostid_int);
+								if (NULL != (dc_host = zbx_hashset_search(&config->hosts,&hostid_int))) {
+										
+									//marking the host's server id as proxy id 
+									if (mark_hosts_cluster_state=ZBX_CLUSTER_HOST_STATE_ACTIVE) {
+										//if proxy is under the current sever, remembering the proxy_id in 
+										//the cluster_server_host_id field, to filter proxy's tasks
+										//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: marking host %ld as polled by locally connected proxy %ld",dc_host->hostid, proxyid_int);
+										 dc_host->cluster_server_host_id=proxyid_int;
+										 dc_host->cluster_state=ZBX_CLUSTER_HOST_STATE_ACTIVE_PROXY;
+										// zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: APPLY_TOPOLOGY: Host %ld: assigned to local proxy %ld", dc_host->hostid, proxyid_int);
+										 local_proxy_hosts++;
+									}	else {
+										//if the host assigned to different server / proxy pair, remembering 
+										// server id in the cluster_server_host_id field so we will reroute data 
+										// to the server responsible for the host's operations
+										dc_host->cluster_server_host_id=cluster_server_id;
+										//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: APPLY_TOPOLOGY: Host %ld: assigned to remote server %ld", dc_host->hostid, cluster_server_id);
+										remote_server_proxy_hosts++;
+									}							
+								}
+							}			
+						}
+					} 
+				}
 			}
-			total_hosts +=processed_hosts;
+			total_hosts += processed_hosts;
 		}
-		zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Applied cluster config,  %d hosts activated, total is %d at this server",activated_hosts,total_hosts);
+		zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Applied cluster config,  %d hosts activated, total is %d in config",activated_hosts,total_hosts);
+		zabbix_log(LOG_LEVEL_INFORMATION,"									%d hosts assigned to local proxies, %d to remote",local_proxy_hosts,remote_server_proxy_hosts);
 		
 		//todo : invoke config reloading here, triggers update and  make it intelectual - only load hosts
 		//that has been added to the cluster monitoring lately
@@ -12585,98 +12674,136 @@ int DC_apply_topology(void) {
 /**********************************************************************/
 long int DC_generate_topology() {
 	
-	
-	ZBX_DC_HOST *host;
-	ZBX_DC_PROXY *proxy, *server;
+	ZBX_DC_HOST *server_host, *domain_host, *proxy_host;
+	ZBX_DC_PROXY *server, *domain, *proxy;
 	zbx_uint64_t default_domain_id = 0, domain_id, server_id;
-	zbx_hashset_iter_t proxy_iter,hosts_iter;
+	zbx_hashset_iter_t server_iter,hosts_iter,proxy_iter, domain_iter;
 	struct zbx_json	j;
 	char *tmp_str, *domain_id_str=NULL;
+	u_int64_t hosts_server=0;
 	
 	char s[2]=",";
 
 	if (0 == CONFIG_CLUSTER_SERVER_ID) return SUCCEED;
 	
 	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Generating new own topology");
-	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
+	zbx_hashset_iter_reset(&config->proxies,&server_iter);
 	
-	//step1: prepare: looking for the 'default' domain + cleaning old domains assignements
+	//step1: prepare: looking for the 'default' domain + cleaning 
 
 	//todo: filter only active proxies here (lastaccess+proxy_timeout>now + only proxy_active hosts)
-	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
-		//	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Adding domains from proxy %ld (%s) to the server announcement",proxy->hostid,proxy->domains);
-		//	zbx_snprintf_alloc(&proxy_ids,&alloc,&offset,"%ld,",proxy->hostid);
-		if ( NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&proxy->hostid))) {
-			if (HOST_STATUS_DOMAIN == host->status && !strcmp("default",host->host)) {
-				
-				zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: found 'defaut' domain: %ld", host->hostid);
-				default_domain_id=host->hostid;
-
+	while (NULL!=(server=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&server_iter))){
+		if ( NULL!=(server_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&server->hostid))) {
+			if (HOST_STATUS_DOMAIN == server_host->status && !strcmp("default",server_host->host)) {
+				zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: found 'defaut' domain: %ld", server_host->hostid);
+				default_domain_id=server_host->hostid;
+			}
+			if (HOST_STATUS_PROXY_ACTIVE == server_host->status || 
+			    HOST_STATUS_PROXY_PASSIVE == server_host->status ) {
+				//clearing links from proxies to servers as we fill them from scrath a bit later
+				zbx_vector_uint64_clear(&server->connected_servers);
 			}
 		}
-		zbx_vector_uint64_clear(&proxy->cluster_domains);
+		zbx_vector_uint64_clear(&server->cluster_domains);
+		zbx_vector_uint64_pair_clear(&server->proxy_hosts);
+		
 	}
-
+		//zbx_vector_uint64_pair_append()
 	
 	//step2: going through all the servers and saving their ids to the arrays of the domains they belong
-	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
-
-	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
-		if ( NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&proxy->hostid)) && 
-						HOST_STATUS_SERVER == host->status &&
-						ZBX_CLUSTER_SERVER_STATE_ALIVE == proxy->cluster_state) {
+	zbx_hashset_iter_reset(&config->proxies,&server_iter);
+	//todo: fix ZBX_CLUSTER_SERVER_STATE setting for proxies
+	while (NULL!=(server=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&server_iter))){
+		if ( NULL!=(server_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&server->hostid)) && 
+						(HOST_STATUS_SERVER == server_host->status && ZBX_CLUSTER_SERVER_STATE_ALIVE == server->cluster_state) || 
+						(HOST_STATUS_PROXY_ACTIVE ==server_host->status 
+							|| HOST_STATUS_PROXY_PASSIVE == server_host->status) && server->cluster_lastheard+ZBX_PROXY_TIMEOUT > time(NULL))
+						 {
 					
-			zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: found server %s, with domain ids '%s'", host->host, host->error);
-			tmp_str=zbx_strdup(NULL,host->error);
+			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: found server/proxy %s, with domain ids '%s'", server_host->host, server_host->error);
+			tmp_str=zbx_strdup(NULL,server_host->error);
 
 			domain_id_str=strtok(tmp_str,s);
 
 			while (domain_id_str) {
-				ZBX_DC_PROXY *domain_proxy;
+				ZBX_DC_PROXY *domain;
 				zbx_uint64_t domain_int_id=strtol(domain_id_str,NULL,10);
-				zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Fetched id %ld of the domain, will add %ld server to it",domain_int_id, proxy->hostid);
+				zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Fetched id %ld of the domain, will add %ld server to it",domain_int_id, server->hostid);
 				
-				//todo: 1. consider proxies precedence, on adding first proxy, truncate the existing vector
-				//todo:	2. only use active proxies and servers for filling the domain
-
-				if ( NULL!=(domain_proxy=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&domain_int_id))) {
-
-					zbx_vector_uint64_append(&domain_proxy->cluster_domains,proxy->hostid);
+				if ( NULL!=(domain=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&domain_int_id))) {
+					zbx_vector_uint64_append(&domain->cluster_domains,server->hostid);
 				} 
 				domain_id_str=strtok(NULL,s);
 			} 
 			zbx_free(tmp_str);
+		} else {
+			zabbix_log(LOG_LEVEL_INFORMATION,"Slipping server %ld last seen %ld",server->hostid,server->cluster_lastheard);
 		}
 	}
+	zabbix_log(LOG_LEVEL_INFORMATION,"Dumping domains");
 	//dummping domain->server assignement
 	/* //todo: perhaps must be in LOG_LEVEL_TRACE debug mode */
-	
-	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
-	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
-		if ( NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&proxy->hostid)) && 
-					HOST_STATUS_DOMAIN == host->status) {
+	//dumping domains
+	zbx_hashset_iter_reset(&config->proxies,&domain_iter);
+	while (NULL!=(domain=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&domain_iter))){
+		if ( NULL!=(domain_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&domain->hostid)) && 
+					HOST_STATUS_DOMAIN == domain_host->status) {
 						
-			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: DOMAIN_DUMP: found domain %ld '%s'",host->hostid, host->host);		
+			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: DOMAIN_DUMP: found domain %ld '%s'",domain_host->hostid, domain_host->host);		
+			
 			int i;
-			for (i=0; i< proxy->cluster_domains.values_num; i++) {
-				zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER:			  	active server#%d %ld",i, proxy->cluster_domains.values[i]);
+			for ( i = 0 ; i < domain->cluster_domains.values_num; i++ ) {
+				zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER:			  	active server#%d %ld",i, domain->cluster_domains.values[i]);
 			}
 		
 		}
 	}
 
-
-	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
-	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
-		if ( NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&proxy->hostid)) && 
-					HOST_STATUS_SERVER == host->status) {
+	zabbix_log(LOG_LEVEL_INFORMATION,"Dumping servers");
+	//dumping servers and proxies
+	zbx_hashset_iter_reset(&config->proxies,&server_iter);
+	while (NULL!=(server=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&server_iter))){
+		if ( NULL!=(server_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&server->hostid)) && 
+					HOST_STATUS_SERVER == server_host->status || 
+					HOST_STATUS_PROXY_ACTIVE == server_host->status || 
+					HOST_STATUS_PROXY_PASSIVE == server_host->status) {
 						
-			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: SERVER_DUMP: server %ld '%s' in state %d",host->hostid, host->host, 
-			proxy->cluster_state);		
-					
+			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: (SERVER/PROXY)_DUMP: server %ld '%s' in state %d",server_host->hostid, server_host->host, 
+				server->cluster_state);		
+			
+			int i;
+			for (i=0; i< server->connected_servers.values_num; i++) {
+				zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER:			  	connected proxy#%d %ld",i, server->connected_servers.values[i]);
+				
+
+				hosts_server=server->connected_servers.values[i];
+				//this will fill prox->server hash
+				if( NULL != (proxy = (ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&hosts_server))) {
+					if (FAIL ==  zbx_vector_uint64_search(&proxy->connected_servers, server->hostid,
+									ZBX_DEFAULT_UINT64_COMPARE_FUNC)) {
+						zbx_vector_uint64_append(&proxy->connected_servers,server->hostid);
+					}
+				}
+			}	
 		}
 	}
-	
+	//dumping proxies
+	//todo: fix timing and set cluster state instead if lastheard
+	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
+	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
+		if ( NULL!=(proxy_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&proxy->hostid)) && 
+					(HOST_STATUS_PROXY_ACTIVE == proxy_host->status ||HOST_STATUS_PROXY_PASSIVE == proxy_host->status ) &&
+					proxy->cluster_lastheard + ZBX_PROXY_TIMEOUT > time(NULL))
+					 {
+						
+			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: PROXY_DUMP: proxy %ld '%s' ",proxy_host->hostid, proxy_host->host);		
+			int i;
+			for (i=0; i< proxy->connected_servers.values_num; i++) {
+				zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER:			  	connected server#%d %ld",i, proxy->connected_servers.values[i]);
+			}	
+		}
+	}
+
 
 	//checking if the default domain has any hosts in it 
 	if ( default_domain_id	) {
@@ -12685,104 +12812,261 @@ long int DC_generate_topology() {
 				zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: WARNING: default domain exists but has no servers in it");
 			}
 		} 
-	} else  zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: WARNING: no default domain set, some hosts might be unmonitored");
+	} else  zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: WARNING: no default domain set, some hosts might be unmonitored");
 	
+
+	ZBX_DC_HOST *host;
+	u_int64_t resolve_domain=0;
 	//step3, final: calculating the topology
+	
 	zbx_hashset_iter_reset(&config->hosts,&hosts_iter);
-	while (NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_iter_next(&hosts_iter))){
+	while (NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_iter_next(&hosts_iter))) {
 		if ( HOST_STATUS_MONITORED == host->status || HOST_STATUS_NOT_MONITORED == host->status )  {
+			zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: resolving topology for host %ld",host->hostid);
 			if (host->proxy_hostid)  {
+		
 				domain_id=host->proxy_hostid;
 				zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Host %ld has monitoring domain %ld",host->hostid, domain_id);
+				
 				//host has a domain but 
 				//checking if there are any servers in the host's domain
-				if ( NULL != (proxy=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&domain_id)) 
-						 		&& (0 == proxy->cluster_domains.values_num) ) {
-					zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: host %ld has empty domain, using default for it",host->hostid);
-					domain_id=default_domain_id;
-				} 
-			} else {
-					domain_id=default_domain_id;
-			}
 
-			if (domain_id) {
-				//now we can distribute host to the domain's servers
-				if ( NULL != (proxy=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&domain_id))) {
-					int i;
-					for (i=0; i< proxy->cluster_domains.values_num; i++) {
-						zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: 	Domain %ld has server%d: %ld",domain_id,i,
-						proxy->cluster_domains.values[i]);
+				//todo1: checking what it the host's proxy is
+				//in case it's a server or proxy which has been assigne directly,
+				//then checking if  - server is alive
+				//					- or an announce from a proxy is present on one of the severs in the topology
+				//if not, then assigning default domain id 
+			
+				ZBX_DC_HOST *proxy_host;
+				hosts_server=0;
+				
+				if ( NULL != (server=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&domain_id)) && 
+				 	 NULL != (server_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&server->hostid)) ) {
+				    
+					switch (server_host->status) {
+						case HOST_STATUS_PROXY_PASSIVE:
+						case HOST_STATUS_PROXY_ACTIVE:
+							zabbix_log(LOG_LEVEL_INFORMATION,"Host originally monitored by a proxy");
+							zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: found host %ld with proxy set to %ld",host->hostid,server->hostid);
+							//this host is processed by a proxy, collecting which server's are connected to the proxy
+							//u_int64_t proxy_servers;
+
+							//hosts_proxy = host->proxy_hostid;
+							//todo: check and set by cluster status instead of redundand timeout check
+							
+							//checking if the proxy is still alive
+							if (server->cluster_lastheard + ZBX_PROXY_TIMEOUT> time(NULL)) {
+								u_int64_t server_id = 0;
+								//getting the server from the list
+								if (server->connected_servers.values_num) {
+									server_id=server->connected_servers.values[host->hostid % server->connected_servers.values_num];
+									//getting link to the server 
+									ZBX_DC_PROXY *tmp_server=NULL;
+									if (NULL != (tmp_server=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&server_id))) {
+										//adding pair to the server: proxy, host
+										zbx_uint64_pair_t	pair;
+										pair.first = server->hostid;
+										pair.second = host->hostid;
+										zbx_vector_uint64_pair_append(&tmp_server->proxy_hosts,pair);
+										zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: host %ld will be monitored server->proxy (%ld)->(%ld)",
+												host->hostid,server_id,server->hostid );
+									} else {
+										THIS_SHOULD_NEVER_HAPPEN;
+										resolve_domain=default_domain_id;
+									}
+
+								} else {
+									//there is no servers handling this proxy
+									zabbix_log(LOG_LEVEL_INFORMATION,"Proxy %d seems to be down, last heard of it %ld seconds ago",server->hostid, 
+												time(NULL)- server->cluster_lastheard );
+									//THIS_SHOULD_NEVER_HAPPEN;
+									resolve_domain=default_domain_id;
+								}
+							} else {
+								resolve_domain=default_domain_id;
+							}
+							break;
+						case HOST_STATUS_SERVER:
+							zabbix_log(LOG_LEVEL_INFORMATION,"Host originally monitored by a server");
+							//direct server assignement
+							if (ZBX_CLUSTER_SERVER_STATE_ALIVE == server->cluster_state) {
+								zbx_vector_uint64_append(&server->cluster_domains,host->hostid);
+							} else {
+								resolve_domain=default_domain_id;
+							}; 
+							break;
+						case HOST_STATUS_DOMAIN:
+							resolve_domain = host->proxy_hostid;
+							zabbix_log(LOG_LEVEL_DEBUG,"Host originally monitored by a domain %ld",resolve_domain);
+							
+							break;
+						default:
+							THIS_SHOULD_NEVER_HAPPEN;
+							resolve_domain =  default_domain_id;
+						
 					}
 					
-					if (proxy->cluster_domains.values_num) {
-						server_id=proxy->cluster_domains.values[host->hostid % proxy->cluster_domains.values_num];
+				} else THIS_SHOULD_NEVER_HAPPEN;
+
+			} else {
+				//if host had no server specified, setting default domain
+				resolve_domain=default_domain_id;
+			}
+			
+			zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: finished pre-resolve, selected domain is %ld, default is %ld ",resolve_domain,default_domain_id);
+			//the final step - we'd like to resolve the default domain if it's set for the host
+			//othrewize the host is already calculated to a server/proxy
+			if (resolve_domain ) {
+				zabbix_log(LOG_LEVEL_DEBUG,"Resolving domain %ld",resolve_domain);
+				//now we've got a domain id can distribute host to the domain's servers
+				if ( NULL != (domain=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&resolve_domain))) {
+					int i;
+								
+					if (domain->cluster_domains.values_num) {
+	
+						server_id=domain->cluster_domains.values[host->hostid % domain->cluster_domains.values_num];
 						zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Selected server %ld for host  %ld",server_id, host->hostid);
 
 						//adding the host id to the server's cluster_domains array
-						if ( NULL != (server=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&server_id))) {
-							zbx_vector_uint64_append(&server->cluster_domains,host->hostid);
-						}
+						if ( (NULL != (server=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&server_id))) && 
+							 (NULL != (server_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&server_id)))) {
+							//if we've found a server, adding the host to the server's array of hosts
+							if ( HOST_STATUS_SERVER == server_host->status ) {
+								zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Selected server %ld for host  %ld",server_id, host->hostid);
+								zbx_vector_uint64_append(&server->cluster_domains,host->hostid);
+							} else {
+								//for a proxy we need to select one of the servers
+								//we don't support domains of domains yet, but it might be 
+								//a cool idea .... may be ... too complicated yet
+								zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Selected proxy %ld for host  %ld",server_id, host->hostid);
 
+								if (server->connected_servers.values_num) {
+									server_id=server->connected_servers.values[host->hostid % server->connected_servers.values_num];
+									//getting link to the server 
+									ZBX_DC_PROXY *tmp_server=NULL;
+
+									if (NULL != (tmp_server=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&server_id))) {
+										//adding pair to the server: proxy, host
+										zbx_uint64_pair_t	pair;
+										pair.first = server->hostid;
+										pair.second = host->hostid;
+										zbx_vector_uint64_pair_append(&tmp_server->proxy_hosts,pair);
+										zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: host %ld will be monitored server->proxy (%ld)->(%ld)",
+												host->hostid,server_id,server->hostid );
+									} 
+								}
+							}		
+						}
 					} else {
-						zabbix_log(LOG_LEVEL_DEBUG,"Host %ld will not be actively monitored",host->hostid);
+						zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: No servers in the domain, host %ld will not be actively monitored",host->hostid);
 					}
-				} else THIS_SHOULD_NEVER_HAPPEN;
-			} else 	zabbix_log(LOG_LEVEL_DEBUG,"Host %ld will not be actively monitored",host->hostid);
+				} else {
+					//zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find server id %ld",host_server_id);
+					THIS_SHOULD_NEVER_HAPPEN;
+				}
+			} else {
+				zabbix_log(LOG_LEVEL_DEBUG,"Host %ld will not be actively monitored",host->hostid);
+			}
+		
 		} 
 	}
-	
+	//end of wile hosts iteration;
 	//step4: generating nice and shiny configuration json as well as new config id
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 	
 	zbx_json_addint64(&j,ZBX_PROTO_CLUSTER_TOPOLOGY_VERSION,config->cluster_topology_version);
 	zbx_json_addarray(&j,"servers");
 	
-	zbx_hashset_iter_reset(&config->proxies,&proxy_iter);
+	zbx_hashset_iter_reset(&config->proxies,&server_iter);
 	
-	while (NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&proxy_iter))){
-		
-		if ( NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&proxy->hostid)) && 
-						(HOST_STATUS_SERVER == host->status || HOST_STATUS_PROXY_ACTIVE == host->status) ) {
+	while (NULL!=(server=(ZBX_DC_PROXY*)zbx_hashset_iter_next(&server_iter))){
+		//iterate only on servers due to all proxies will be depended on them
+		if ( NULL!=(server_host=(ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&server->hostid)) && 
+						(HOST_STATUS_SERVER == server_host->status) ) {
 			
+							
+			zbx_json_addobject(&j,NULL);//starting server object
+
+			zbx_json_addstring(&j,ZBX_PROTO_TAG_HOST,server_host->host,ZBX_JSON_TYPE_STRING);
+			zbx_json_addint64(&j,ZBX_PROTO_SERVER_HOST_ID,server->hostid);
+			zbx_json_addint64(&j,ZBX_PROTO_SERVER_ID,server->cluster_id);
+
 		
-			if ( 0 <  proxy->cluster_domains.values_num ) {
-				zbx_json_addobject(&j,NULL);
-				zbx_json_addstring(&j,ZBX_PROTO_TAG_HOST,host->host,ZBX_JSON_TYPE_STRING);
-				zbx_json_addint64(&j,ZBX_PROTO_SERVER_HOST_ID,proxy->hostid);
-				zbx_json_addint64(&j,ZBX_PROTO_SERVER_ID,proxy->cluster_id);
+		
+			//iterating over the server's proxies
+			if ( 0 <  server->cluster_domains.values_num ) {
+									
+				//hosts directly processed by the server
 				zbx_json_addarray(&j,ZBX_PROTO_TAG_HOSTS);
+				
 			
 				int i;
-				for ( i=0; i< proxy->cluster_domains.values_num; i++) {
-						zbx_json_adduint64(&j,NULL,proxy->cluster_domains.values[i]);
+				for ( i=0; i< server->cluster_domains.values_num; i++) {
+						zbx_json_adduint64(&j,NULL,server->cluster_domains.values[i]);
 			
 				}
-			
+				
 				zbx_json_close(&j);//closing hosts array
-				zbx_json_close(&j);//closing server objects
+				
+				
+				//iterating on all the proxies known on the server
+			
 			}
+		
+			//iterating over the server connectedproxies
+			//for server connected_servers holds connected proxy ids
+			zbx_json_addarray(&j,ZBX_PROTO_TAG_PROXIES);
+			
+			int i;
+			for ( i=0; i< server->connected_servers.values_num; i++) {
+					
+				zbx_json_addobject(&j,NULL);
+				zbx_json_addint64(&j,ZBX_PROTO_PROXY_ID, server->connected_servers.values[i]);
+				
+				
+				zbx_json_addarray(&j,ZBX_PROTO_TAG_HOSTS);
+								
+				int k;
+				//zabbix_log(LOG_LEVEL_INFORMATION,"Proxy has %ld hosts",server->proxy_hosts.values_num);
+				for ( k = 0; k < server->proxy_hosts.values_num ; k++ ) {
+						//zabbix_log(LOG_LEVEL_INFORMATION,"Pchecking entry (%ld) -> (%ld)",server->proxy_hosts.values[k].first,
+						//server->proxy_hosts.values[k].second);
+							if ( server->proxy_hosts.values[k].first == server->connected_servers.values[i]) 
+						zbx_json_adduint64(&j,NULL,server->proxy_hosts.values[k].second);
+						
+				}
+				
+				zbx_json_close(&j);//closing proxy hosts array
+				
+				zbx_json_close(&j);//closing the proxy object
+			}
+			
+			
+			
+			
+			
+			zbx_json_close(&j);//closing proxies array	
+			zbx_json_close(&j);//closing server object
 		}
 		
 	}
-	
 	zbx_json_close(&j);//closing servers array
+	zbx_json_close(&j);//closing json
 	
+	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: Topology: %s",
+		j.buffer);
 	DC_replace_topology(j.buffer);
 	DC_apply_topology();
-	//zbx_free(config->cluster_topology);
-	
-	//config->cluster_topology = zbx_strdup(NULL,j.buffer);
 	
 	config->cluster_topology_version = CONFIG_CLUSTER_SERVER_ID * 10000000000 + time(NULL);
 	
 	
 	zbx_json_free(&j);
 	
-
 	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Calculated own topology version %ld",
 		config->cluster_topology_version);
 	
-
+	
 	return SUCCEED;
 
 }
@@ -12809,7 +13093,7 @@ int zbx_dc_set_topology(const char *topology) {
 	/* fetching topology object from the response */
 	//zbx_json_value_by_name_dyn(&jp,ZBX_PROTO_VALUE_CLUSTER_TOPOLGY,&buffer,&alloc);
 		
-	if (SUCCEED != zbx_json_brackets_by_name (&jp,ZBX_PROTO_CLUSTER_TOPOLOGY,&jp_topology) ) {
+	if (SUCCEED != zbx_json_brackets_by_name (&jp,ZBX_PROTO_TAG_DATA,&jp_topology) ) {
 		zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: couldn't parse topology in responce");
 		return FAIL;
 	};
@@ -12819,7 +13103,7 @@ int zbx_dc_set_topology(const char *topology) {
 	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: parced toplogy object is %s",buffer);
 	/* validating and setting jp for topology */
 	if ( SUCCEED != zbx_json_open(buffer,&jp)) {
-		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: couldn't open '%s' object in the responce buffer '%s' : %s",ZBX_PROTO_CLUSTER_TOPOLOGY, buffer, zbx_json_strerror());
+		zabbix_log(LOG_LEVEL_WARNING, "CLUSTER: couldn't open '%s' object in the responce buffer '%s' : %s",ZBX_PROTO_TAG_DATA, buffer, zbx_json_strerror());
 		return FAIL;
 	}
 	/* looking for start of topology version property */
@@ -12848,7 +13132,7 @@ int zbx_dc_set_topology(const char *topology) {
 
 /*************************************************************************/
 /* Purpose: calculates topology tree - finds a server with highest ID    */
-/* if none found (means this server is the mater or no peer servers are  */
+/* if none found (means this server is the msater or no peer servers are */
 /* active), generates own topology 										 */
 /* returns 0 if no servers has been found OR hostid of the master 		 */
 /* if no servres has been found then does own topology calc				 */
@@ -12900,12 +13184,12 @@ zbx_uint64_t zbx_dc_recalc_topology(void) {
 		}
 	
 		if ( 0 == master_server_id ) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Couldn't find a server with higher topology, i am a master, generating new topology");
+			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: I am a MASTER, generating new topology");
 			DC_generate_topology();
 		} else {
 			//char * topology = NULL;
 
-			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: setting topology recalc for server %ld", master_server_id);
+			zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: setting topology download task from server %ld", master_server_id);
 			//downloading new topology from the new server
 		 	server->nextcheck=time(NULL);
 			
@@ -12992,7 +13276,7 @@ int zbx_dc_forward_item_to_server(DC_ITEM *item, zbx_agent_value_t *value) {
 	struct zbx_json j;
 	const char *ptr;
 	ZBX_DC_PROXY *server;
-	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: REROUTE will forward item id %ld to server %ld", item->itemid, item->host.cluster_server_host_id);
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: REROUTE will forward a metric from item id %ld to server %ld", item->itemid, item->host.cluster_server_host_id);
 	
 	zbx_json_init(&j,ZBX_JSON_STAT_BUF_LEN);
 
@@ -13008,21 +13292,23 @@ int zbx_dc_forward_item_to_server(DC_ITEM *item, zbx_agent_value_t *value) {
 	zbx_json_addint64(&j,ZBX_PROTO_TAG_STATE,value->state);
 	zbx_json_addint64(&j,"meta",value->meta);
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: REROUTE: generated JSON : %s",j.buffer);
+	zabbix_log(LOG_LEVEL_DEBUG,"CLUSTER: REROUTE: generated JSON : %s",j.buffer);
 	now=time(NULL);
 
 	WRLOCK_CACHE;
 	//saving to config strpool
 	if (NULL != (server = (ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&item->host.cluster_server_host_id))) {
+	
 		ptr = zbx_strpool_intern(j.buffer);
-    	zbx_vector_ptr_append(&server->cluster_rerouted_data,(void *)ptr);
+    	
+		zbx_vector_ptr_append(&server->cluster_rerouted_data,(void *)ptr);
 		
 		//reducing next server check so that data will be flushed to the server
 		if (server->nextcheck > now + 1 ) {
 				server->nextcheck = now+1;
 		} 
-		zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Added reroute data to buffer, total %d record",
-			server->cluster_rerouted_data.values_num);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: Added reroute data to buffer, total %d record",
+		//	server->cluster_rerouted_data.values_num);
 
 	} else {
 		ret = FAIL; 
@@ -13057,12 +13343,12 @@ int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp) {
 	const char *p = NULL;
 	int ret=SUCCEED;
 	struct zbx_json_parse jp_data,jp_record;
-	zabbix_log(LOG_LEVEL_INFORMATION, "CLUSTER: REROUTED: parsing data");
+	zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER: REROUTED: parsing data from server %ld",server->hostid);
 
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_CLUSTER_REROUTED_DATA, &jp_data))
 	{
 		while (NULL != (p = zbx_json_next(&jp_data, p))) {
-			zabbix_log(LOG_LEVEL_INFORMATION, "CLUSTER: REROUTED: parsing data :%s",p);
+			zabbix_log(LOG_LEVEL_DEBUG, "CLUSTER: REROUTED: parsing data :%s",p);
 
 			char itemid[MAX_ID_LEN],item_value[MAX_STRING_LEN],timestamp[MAX_ID_LEN],
 			source[MAX_STRING_LEN],lastlogsize[MAX_ID_LEN],id[MAX_ID_LEN],mtime[MAX_ID_LEN],
@@ -13110,11 +13396,15 @@ int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp) {
 
 				//looking for the item 
 				WRLOCK_CACHE;
-					if (NULL != (zbx_dc_item = (ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemid_int))) {
-				    	DCget_item(&dc_item, zbx_dc_item);
-						UNLOCK_CACHE;
 				
-						if(  0 == process_history_data(&dc_item,&value,&errcode,1) ) {
+				if (NULL != (zbx_dc_item = (ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemid_int))) {
+				   	DCget_item(&dc_item, zbx_dc_item);
+					zabbix_log(LOG_LEVEL_INFORMATION,"found and parced DC item");
+					UNLOCK_CACHE;
+				
+
+				
+					if(  0 == process_history_data(&dc_item,&value,&errcode,1) ) {
 							zabbix_log(LOG_LEVEL_WARNING,"CLUSTER: REROUTED_DATA: couldn't process item %ld",itemid_int);
 						} else {
 							processed_items++;
@@ -13132,4 +13422,42 @@ int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp) {
 		}
 	}
 	return ret;
+}
+
+//registers proxy's availability
+void zbx_dc_register_proxy_availability(u_int64_t hostid) {
+	ZBX_DC_PROXY *proxy;
+	WRLOCK_CACHE;
+	if ( NULL!=(proxy=(ZBX_DC_PROXY*)zbx_hashset_search(&config->proxies,&hostid)) ) {
+		proxy->cluster_lastheard=time(NULL);
+	} 
+	UNLOCK_CACHE;
+
+};
+
+
+int zbx_dc_get_proxy_hosts(u_int64_t proxyid,zbx_vector_uint64_t *hosts) {
+	ZBX_DC_HOST *host;
+	zbx_hashset_iter_t hosts_iter;
+	u_int32_t cnt = 0;
+
+
+	RDLOCK_CACHE;
+	zbx_hashset_iter_reset(&config->hosts, &hosts_iter);
+	
+	while ( NULL!=(host=(ZBX_DC_HOST*)zbx_hashset_iter_next(&hosts_iter) )) {
+
+		//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: checking host %ld cluster server id is %ld, cluster state is %d", host->hostid,
+		//host->cluster_server_host_id, host->cluster_state );
+
+		if ( (host->proxy_hostid == proxyid && 0 == CONFIG_CLUSTER_SERVER_ID ) || //non cluster mode - all monitored hosts
+			 (host->cluster_server_host_id == proxyid && ZBX_CLUSTER_HOST_STATE_ACTIVE_PROXY ==host->cluster_state && 
+			 			CONFIG_CLUSTER_SERVER_ID > 0) ||  //cluster mode - all monitored hosts active for a proxy on this server
+				HOST_STATUS_NOT_MONITORED == host->status || HOST_STATUS_TEMPLATE == host->status) { //all non-monitored things which are probably templates
+				 zbx_vector_uint64_append(hosts,host->hostid);
+				 cnt++;
+			 } 
+	} 
+	UNLOCK_CACHE;
+	return cnt;
 }

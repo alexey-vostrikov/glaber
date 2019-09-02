@@ -1011,7 +1011,8 @@ class CControllerPopupGeneric extends CController {
 			case 'proxies':
 				$options = [
 					'output' => ['proxyid', 'host'],
-					'preservekeys' => true
+					'preservekeys' => true,
+					'statusids' => [HOST_STATUS_DOMAIN],
 				];
 
 				if (array_key_exists('writeonly', $page_options)) {

@@ -170,6 +170,16 @@ class CZabbixServer {
 		]);
 	}
 
+	public function getTopology($sid) {
+		$request = [
+			'request' => 'cluster_topology',
+			'sid' => $sid,
+		];
+
+	
+		return $this->request($request);
+	}
+
 	/**
 	 * Retrieve item queue information.
 	 *
