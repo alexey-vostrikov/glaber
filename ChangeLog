@@ -1,3 +1,14 @@
+ChangeLog - Glaber 1.0.0
+
+1. Active and passive proxy supported now for both standalone and cluster mode
+2. Fixed clustermanagement panel bugs (IP edit, domain assignement fields didn't worked propertly on edit)
+3. Added cluster topology operations for ZabbixServer class for php
+4. Fixed improper timing introduced with server support for proxy poller operations
+5. Added proxy support to cluster, active and passive ones
+6. ValueCache fill time option is global now and might be used for ANY historical inteface
+7. Tested and fixed support for ASYNC pollers for proxy, wasn't functional before
+
+
 Changes for 4.2.4
 
 4.2.4rc2 was released as 4.2.4 without any changes
