@@ -18,6 +18,7 @@ debian-jessie:
     - cd pkgs
     - ls jessie
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose jessie/ debian/jessie/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for JESSIE were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
@@ -39,6 +40,7 @@ debian-stretch:
     - mv ../*.deb pkgs/stretch/
     - cd pkgs
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose stretch/ debian/stretch/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for STRETCH were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
@@ -60,6 +62,7 @@ debian-buster:
     - mv ../*.deb pkgs/buster/
     - cd pkgs
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose buster/ debian/buster/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for BUSTER were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
@@ -81,6 +84,7 @@ ubuntu-disco:
     - mv ../*.deb pkgs/disco/
     - cd pkgs
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose disco/ ubuntu/disco/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for DISCO were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
@@ -102,6 +106,7 @@ ubuntu-bionic:
     - mv ../*.deb pkgs/bionic/
     - cd pkgs
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose bionic/ ubuntu/bionic/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for BIONIC were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
@@ -123,6 +128,7 @@ ubuntu-xenial:
     - mv ../*.deb pkgs/xenial/
     - cd pkgs
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose xenial/ ubuntu/xenial/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for XENIAL were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
@@ -160,6 +166,7 @@ centos:
     - mv /root/rpmbuild/RPMS/* pkgs/centos7/
     - cd pkgs
     - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose centos7/ centos/7/; bye"
+    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$date Packages for Centos-7 were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
 
   only:
     - tags
