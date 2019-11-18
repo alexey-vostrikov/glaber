@@ -1252,7 +1252,7 @@ static int	zbx_snmp_get_values(struct snmp_session *ss, const DC_ITEM *items, ch
 
 	for (i = 0; i < num; i++)
 	{
-		if (SUCCEED != errcodes[i])
+		if (SUCCEED != errcodes[i] && NOT_PROCESSED != errcodes[i])
 			continue;
 
 		if (NULL != query_and_ignore_type && 0 == query_and_ignore_type[i])
@@ -1529,10 +1529,10 @@ static void	zbx_snmp_translate(char *oid_translated, const char *snmp_oid, size_
 		{LEN_STR("ifHCOutUcastPkts"),".1.3.6.1.2.1.31.1.1.1.11"},
 		{LEN_STR("ifHCInUcastPkts"),".1.3.6.1.2.1.31.1.1.1.7"},
 		{LEN_STR("ifHCInOctets"),	".1.3.6.1.2.1.31.1.1.1.6"},
-		{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
-		{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
+	//	{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
+	//	{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
 		{LEN_STR("rmon.19.2.0"),	".1.3.6.1.2.1.16.19.2.0"},
-		{LEN_STR("ifHighSpeed"),	".1.3.6.1.2.1.31.1.1.1.15"},
+	//	{LEN_STR("ifHighSpeed"),	".1.3.6.1.2.1.31.1.1.1.15"},
  		{LEN_STR("ifAlias"),		".1.3.6.1.2.1.31.1.1.1.18"},
 		{LEN_STR("ifDescr"),		".1.3.6.1.2.1.2.2.1.2"},
 		{LEN_STR("ifInOctets"),		".1.3.6.1.2.1.2.2.1.10"},
@@ -1544,35 +1544,35 @@ static void	zbx_snmp_translate(char *oid_translated, const char *snmp_oid, size_
 		{LEN_STR("ifType"),		    ".1.3.6.1.2.1.2.2.1.3"},
 		{LEN_STR("ifMtu"),	  	    ".1.3.6.1.2.1.2.2.1.4"},
 		{LEN_STR("ifSpeed"),		".1.3.6.1.2.1.2.2.1.5"},
-		{LEN_STR("ifPhysAddress"),	".1.3.6.1.2.1.2.2.1.6"},
-		{LEN_STR("ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
-		{LEN_STR("ifInNUcastPkts"),	".1.3.6.1.2.1.2.2.1.12"},
-		{LEN_STR("ifInDiscards"),	".1.3.6.1.2.1.2.2.1.13"},
-		{LEN_STR("ifInErrors"),		".1.3.6.1.2.1.2.2.1.14"},
-		{LEN_STR("ifInUnknownProtos"),	".1.3.6.1.2.1.2.2.1.15"},
-		{LEN_STR("ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
-		{LEN_STR("ifOutNUcastPkts"),	".1.3.6.1.2.1.2.2.1.18"},
-		{LEN_STR("ifOutDiscards"),	".1.3.6.1.2.1.2.2.1.19"},
-		{LEN_STR("ifOutErrors"),	".1.3.6.1.2.1.2.2.1.20"},
-		{LEN_STR("ifOutQLen"),		".1.3.6.1.2.1.2.2.1.21"},
-		{LEN_STR("IF-MIB::ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
-		{LEN_STR("IF-MIB::ifHCInOctets"),	".1.3.6.1.2.1.31.1.1.1.6"},
-		{LEN_STR("IF-MIB::ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
-		{LEN_STR("IF-MIB::ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
-		{0}
-	};
-#undef LEN_STR
+			{LEN_STR("ifPhysAddress"),	".1.3.6.1.2.1.2.2.1.6"},
+			{LEN_STR("ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
+			{LEN_STR("ifInNUcastPkts"),	".1.3.6.1.2.1.2.2.1.12"},
+			{LEN_STR("ifInDiscards"),	".1.3.6.1.2.1.2.2.1.13"},
+			{LEN_STR("ifInErrors"),		".1.3.6.1.2.1.2.2.1.14"},
+			{LEN_STR("ifInUnknownProtos"),	".1.3.6.1.2.1.2.2.1.15"},
+			{LEN_STR("ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
+			{LEN_STR("ifOutNUcastPkts"),	".1.3.6.1.2.1.2.2.1.18"},
+			{LEN_STR("ifOutDiscards"),	".1.3.6.1.2.1.2.2.1.19"},
+			{LEN_STR("ifOutErrors"),	".1.3.6.1.2.1.2.2.1.20"},
+			{LEN_STR("ifOutQLen"),		".1.3.6.1.2.1.2.2.1.21"},
+			{LEN_STR("IF-MIB::ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
+			{LEN_STR("IF-MIB::ifHCInOctets"),	".1.3.6.1.2.1.31.1.1.1.6"},
+			{LEN_STR("IF-MIB::ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
+			{LEN_STR("IF-MIB::ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
+			{0}
+		};
+	#undef LEN_STR
 
-	int	found = 0, i;
+		int	found = 0, i;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() OID:'%s'", __func__, snmp_oid);
+		zabbix_log(LOG_LEVEL_DEBUG, "In %s() OID:'%s'", __func__, snmp_oid);
 
-	for (i = 0; 0 != mibs[i].sz; i++)
-	{
-		if (0 == strncmp(mibs[i].mib, snmp_oid, mibs[i].sz))
+		for (i = 0; 0 != mibs[i].sz; i++)
 		{
-			found = 1;
-			zbx_snprintf(oid_translated, max_oid_len, "%s%s", mibs[i].replace, snmp_oid + mibs[i].sz);
+			if (0 == strncmp(mibs[i].mib, snmp_oid, mibs[i].sz))
+			{
+				found = 1;
+				zbx_snprintf(oid_translated, max_oid_len, "%s%s", mibs[i].replace, snmp_oid + mibs[i].sz);
 			break;
 		}
 	}
@@ -2030,7 +2030,7 @@ static int	zbx_snmp_process_standard(struct snmp_session *ss, const DC_ITEM *ite
 
 	for (i = 0; i < num; i++)
 	{
-		if (SUCCEED != errcodes[i])
+		if (SUCCEED != errcodes[i] && NOT_PROCESSED != errcodes[i] )
 			continue;
 
 		if (0 != num_key_param(items[i].snmp_oid))
@@ -2079,7 +2079,6 @@ void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 		err = NETWORK_ERROR;
 		goto exit;
 	}
-
 	if (0 != (ZBX_FLAG_DISCOVERY_RULE & items[0].flags) || 0 == strncmp(items[0].snmp_oid, "discovery[", 10))
 	{
 		int	max_vars;
@@ -2105,8 +2104,7 @@ void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 	zbx_snmp_close_session(ss);
 exit:
 	if (SUCCEED != err)
-	{
-		zabbix_log(LOG_LEVEL_DEBUG, "getting SNMP values failed: %s", error);
+	{	
 		SET_MSG_RESULT(&results[0], zbx_strdup(NULL, error));
 		errcodes[0] = err;
 	}
