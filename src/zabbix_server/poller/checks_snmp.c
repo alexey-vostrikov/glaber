@@ -2418,11 +2418,10 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 			} 
 
 #define SNMP_RETRIES	1
-#define SNMP_TIMEOUT	2
 			ss[snmp_sessions]->callback = asynch_response;
 			ss[snmp_sessions]->callback_magic = &hs[snmp_sessions];
 			ss[snmp_sessions]->retries=SNMP_RETRIES;
-			ss[snmp_sessions]->timeout=SNMP_TIMEOUT*1000*1000;
+			ss[snmp_sessions]->timeout=CONFIG_TIMEOUT*1000*1000;
 
 			zabbix_log(LOG_LEVEL_DEBUG, "In %s() session is opened %ld", __function_name,last_hostid);
 
@@ -2499,7 +2498,7 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 	int starttime=time(NULL);
 
 
-#define SNMP_MAX_BATCH_TIME (SNMP_RETRIES+1)*SNMP_TIMEOUT
+#define SNMP_MAX_BATCH_TIME (SNMP_RETRIES+1)*CONFIG_TIMEOUT
 
 	 while (conf->active_hosts > 0  && (time(NULL)-starttime)< SNMP_MAX_BATCH_TIME) {
 
@@ -2507,7 +2506,7 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 		netsnmp_large_fd_set fdset;
 		struct timeval timeout;
 
-		timeout.tv_sec=SNMP_TIMEOUT;
+		timeout.tv_sec=CONFIG_TIMEOUT;
 		timeout.tv_usec=0;
 
 		//FD_ZERO(&fdset);
