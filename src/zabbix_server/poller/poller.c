@@ -503,7 +503,8 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 	int			*errcodes;
 	zbx_timespec_t		timespec;
 	char			*port = NULL, error[ITEM_ERROR_LEN_MAX];
-	int			i, num_collected=0, num, last_available = HOST_AVAILABLE_UNKNOWN, MAX_ITEMS=1;
+	int			i, num_collected=0, num, //last_available = HOST_AVAILABLE_UNKNOWN, 
+									MAX_ITEMS=1;
 	zbx_vector_ptr_t	add_results;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -751,6 +752,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 	/* more then one item to process, but for future  */
 	/* to allow poller to take several tasks, this 	  */
 	/* part is fixed to be ready for it 		  */
+	
 	for (i = 0; i < num; i++) {
 		/* it maybe that some items are already processed by async methods, skipping them */		
 		if ( NOT_PROCESSED == errcodes[i]) {
@@ -759,7 +761,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 			{	
 #ifdef HAVE_NETSNMP
 				/* SNMP checks use their own timeouts */
-				get_values_snmp(items+i, results+i, errcodes+i, 1);
+				get_values_snmp(&items[i], &results[i], &errcodes[i], 1);
 #else
 				SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Support for SNMP checks was not compiled in."));
 				errcodes[i] = CONFIG_ERROR;
@@ -789,10 +791,11 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 			case SUCCEED:
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
-				if (HOST_AVAILABLE_TRUE != last_available)
+				if (//HOST_AVAILABLE_TRUE != last_available || 
+					poller_type == ZBX_POLLER_TYPE_ASYNC_AGENT || poller_type == ZBX_POLLER_TYPE_UNREACHABLE|| poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP)
 				{
 					zbx_activate_item_host(&items[i], &timespec);
-					last_available = HOST_AVAILABLE_TRUE;
+					//last_available = HOST_AVAILABLE_TRUE;
 				}
 				break;
 			case NETWORK_ERROR:
@@ -801,10 +804,13 @@ static int	get_values(unsigned char poller_type, int *nextcheck,int *processed_n
 				/* for mass problems don't mark host as unreach for async and unreach pollers, because:
 				first, that sometimes causes a "poll" bug in mysql lib (100% thread load on waiting in a poll for mysql, probably solvable by alarm)
 				second, there seems to be no reason for that, async pollers live just fine having even all hosts unreachable */
-				if ( HOST_AVAILABLE_FALSE != last_available )
+				if ( //HOST_AVAILABLE_FALSE != last_available &&  
+				   ( poller_type != ZBX_POLLER_TYPE_ASYNC_AGENT && 
+				   	 poller_type != ZBX_POLLER_TYPE_UNREACHABLE && 
+					 poller_type != ZBX_POLLER_TYPE_ASYNC_SNMP))
 				{	
 					zbx_deactivate_item_host(&items[i], &timespec, results[i].msg);
-					last_available = HOST_AVAILABLE_FALSE;
+					//last_available = HOST_AVAILABLE_FALSE;
 				}
 				break;
 			case NOT_PROCESSED:

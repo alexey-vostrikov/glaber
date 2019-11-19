@@ -2500,54 +2500,59 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 
 #define SNMP_MAX_BATCH_TIME (SNMP_RETRIES+1)*CONFIG_TIMEOUT
 
+	struct timeval timeout;
+
+	timeout.tv_sec=CONFIG_TIMEOUT;
+	timeout.tv_usec=0;
+
 	 while (conf->active_hosts > 0  && (time(NULL)-starttime)< SNMP_MAX_BATCH_TIME) {
 
-		int fds = 0, block = 1, sessions;
+		int fds = 0, hosts, block = 0, sessions;
 		netsnmp_large_fd_set fdset;
-		struct timeval timeout;
-
-		timeout.tv_sec=CONFIG_TIMEOUT;
-		timeout.tv_usec=0;
-
+		
 		//FD_ZERO(&fdset);
 		netsnmp_large_fd_set_init(&fdset, MAX_ASYNC_SNMP_ITEMS);
-
-
+		//zabbix_log(LOG_LEVEL_INFORMATION,"%s: starting select", __func__);
 		snmp_select_info2(&fds,&fdset,&timeout,&block);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"%s: finished select", __func__);
+		
+		hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
+		//hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, NULL);
 
-		fds = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
-
-		if (fds < 0) {
+		if (hosts < 0) {
 			zabbix_log(LOG_LEVEL_DEBUG, "End of %s() Something unexpected happened with fds ", __function_name);
 			break;
-		}
-
-		if (fds) {
+		} 
+		if (hosts > 0) {
+//			zabbix_log(LOG_LEVEL_INFORMATION,"in %s: got %d hosts answered",__func__,hosts);
 //			zbx_alarm_on(SNMP_MAX_BATCH_TIME); //to exit out of use netsnm large fdset glitch if it happens
 			snmp_read2(&fdset);
 //			zbx_alarm_off();
-		}
-		else
+		} else {
 			snmp_timeout();
+		//	netsnmp_large_fd_set_cleanup(&fdset);
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"in %s: finished waiting for the hosts",__func__);
+		//	break;
+		}
 		zabbix_log(LOG_LEVEL_DEBUG, "In %s() : waiting for %d pollers to finish", __function_name, conf->active_hosts);
 		netsnmp_large_fd_set_cleanup(&fdset);
+		usleep(100000);
 	}
-
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Finished, doing session cleanup");
 	/* sessions cleanup */
 	for (i = 0; i < snmp_sessions; i++ ) 
 	{
-		
-		zabbix_log(LOG_LEVEL_DEBUG, "End of %s() freeing session for  item %d", __function_name,i);
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s() freeing session for  item %d", __function_name,i);
 		zbx_snmp_close_session(ss[i]);
 		if (errcodes[i] == NOT_PROCESSED) {
 				SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Couldn't send snmp packet"));
 				errcodes[i]=TIMEOUT_ERROR;
 		}
 	}
-
+	
 	//if something sill left open, it will be closed
 	snmp_close_sessions();
-
+	
 	zbx_free(hs);
 	zbx_free(conf);
 
