@@ -7817,7 +7817,6 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, un
 {
 	unsigned char	old_poller_type;
 	int		old_nextcheck;
-
 	old_nextcheck = dc_item->nextcheck;
 	DCitem_nextcheck_update(dc_item, new_state, flags, lastclock, NULL);
 
@@ -7941,7 +7940,7 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
-
+	
 		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			continue;
 
@@ -7959,6 +7958,19 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
 			continue;
 		}
+
+		if ( ( ITEM_TYPE_SNMPv1 == dc_item->type || 
+			   ITEM_TYPE_SNMPv2c == dc_item->type || 
+			   ITEM_TYPE_SNMPv3 == dc_item->type ) && ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
+					ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &dc_item->itemid);
+			
+			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || NULL != strchr(snmpitem->snmp_oid, '[')) ) 
+				/* skipping non async able (yet) items in async snmp poller */
+				break;
+		}
+
+			
+
 		/* don't apply unreachable item/host throttling for prioritized items */
 		/* and for async and unreachable pollers */
 		
@@ -7995,7 +8007,7 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 //				DCincrease_disable_until(dc_item, dc_host, now);
 //			}
 //		}
-
+	
 		dc_item_prev = dc_item;
 		dc_item->location = ZBX_LOC_POLLER;
 		DCget_host(&items[num].host, dc_host);
@@ -13460,4 +13472,19 @@ int zbx_dc_get_proxy_hosts(u_int64_t proxyid,zbx_vector_uint64_t *hosts) {
 	} 
 	UNLOCK_CACHE;
 	return cnt;
+}
+
+int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) {
+	ZBX_DC_ITEM *item;
+	int ret=FAIL;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (item=zbx_hashset_search(&config->items,&itemid))) {
+		*value_type=item->value_type;
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
 }

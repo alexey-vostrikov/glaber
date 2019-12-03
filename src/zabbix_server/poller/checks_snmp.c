@@ -1252,7 +1252,7 @@ static int	zbx_snmp_get_values(struct snmp_session *ss, const DC_ITEM *items, ch
 
 	for (i = 0; i < num; i++)
 	{
-		if (SUCCEED != errcodes[i])
+		if (SUCCEED != errcodes[i] && NOT_PROCESSED != errcodes[i])
 			continue;
 
 		if (NULL != query_and_ignore_type && 0 == query_and_ignore_type[i])
@@ -1529,10 +1529,10 @@ static void	zbx_snmp_translate(char *oid_translated, const char *snmp_oid, size_
 		{LEN_STR("ifHCOutUcastPkts"),".1.3.6.1.2.1.31.1.1.1.11"},
 		{LEN_STR("ifHCInUcastPkts"),".1.3.6.1.2.1.31.1.1.1.7"},
 		{LEN_STR("ifHCInOctets"),	".1.3.6.1.2.1.31.1.1.1.6"},
-		{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
-		{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
+	//	{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
+	//	{LEN_STR("ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
 		{LEN_STR("rmon.19.2.0"),	".1.3.6.1.2.1.16.19.2.0"},
-		{LEN_STR("ifHighSpeed"),	".1.3.6.1.2.1.31.1.1.1.15"},
+	//	{LEN_STR("ifHighSpeed"),	".1.3.6.1.2.1.31.1.1.1.15"},
  		{LEN_STR("ifAlias"),		".1.3.6.1.2.1.31.1.1.1.18"},
 		{LEN_STR("ifDescr"),		".1.3.6.1.2.1.2.2.1.2"},
 		{LEN_STR("ifInOctets"),		".1.3.6.1.2.1.2.2.1.10"},
@@ -1544,35 +1544,35 @@ static void	zbx_snmp_translate(char *oid_translated, const char *snmp_oid, size_
 		{LEN_STR("ifType"),		    ".1.3.6.1.2.1.2.2.1.3"},
 		{LEN_STR("ifMtu"),	  	    ".1.3.6.1.2.1.2.2.1.4"},
 		{LEN_STR("ifSpeed"),		".1.3.6.1.2.1.2.2.1.5"},
-		{LEN_STR("ifPhysAddress"),	".1.3.6.1.2.1.2.2.1.6"},
-		{LEN_STR("ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
-		{LEN_STR("ifInNUcastPkts"),	".1.3.6.1.2.1.2.2.1.12"},
-		{LEN_STR("ifInDiscards"),	".1.3.6.1.2.1.2.2.1.13"},
-		{LEN_STR("ifInErrors"),		".1.3.6.1.2.1.2.2.1.14"},
-		{LEN_STR("ifInUnknownProtos"),	".1.3.6.1.2.1.2.2.1.15"},
-		{LEN_STR("ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
-		{LEN_STR("ifOutNUcastPkts"),	".1.3.6.1.2.1.2.2.1.18"},
-		{LEN_STR("ifOutDiscards"),	".1.3.6.1.2.1.2.2.1.19"},
-		{LEN_STR("ifOutErrors"),	".1.3.6.1.2.1.2.2.1.20"},
-		{LEN_STR("ifOutQLen"),		".1.3.6.1.2.1.2.2.1.21"},
-		{LEN_STR("IF-MIB::ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
-		{LEN_STR("IF-MIB::ifHCInOctets"),	".1.3.6.1.2.1.31.1.1.1.6"},
-		{LEN_STR("IF-MIB::ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
-		{LEN_STR("IF-MIB::ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
-		{0}
-	};
-#undef LEN_STR
+			{LEN_STR("ifPhysAddress"),	".1.3.6.1.2.1.2.2.1.6"},
+			{LEN_STR("ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
+			{LEN_STR("ifInNUcastPkts"),	".1.3.6.1.2.1.2.2.1.12"},
+			{LEN_STR("ifInDiscards"),	".1.3.6.1.2.1.2.2.1.13"},
+			{LEN_STR("ifInErrors"),		".1.3.6.1.2.1.2.2.1.14"},
+			{LEN_STR("ifInUnknownProtos"),	".1.3.6.1.2.1.2.2.1.15"},
+			{LEN_STR("ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
+			{LEN_STR("ifOutNUcastPkts"),	".1.3.6.1.2.1.2.2.1.18"},
+			{LEN_STR("ifOutDiscards"),	".1.3.6.1.2.1.2.2.1.19"},
+			{LEN_STR("ifOutErrors"),	".1.3.6.1.2.1.2.2.1.20"},
+			{LEN_STR("ifOutQLen"),		".1.3.6.1.2.1.2.2.1.21"},
+			{LEN_STR("IF-MIB::ifHCOutOctets"),	".1.3.6.1.2.1.31.1.1.1.10"},
+			{LEN_STR("IF-MIB::ifHCInOctets"),	".1.3.6.1.2.1.31.1.1.1.6"},
+			{LEN_STR("IF-MIB::ifOutUcastPkts"),	".1.3.6.1.2.1.2.2.1.17"},
+			{LEN_STR("IF-MIB::ifInUcastPkts"),	".1.3.6.1.2.1.2.2.1.11"},
+			{0}
+		};
+	#undef LEN_STR
 
-	int	found = 0, i;
+		int	found = 0, i;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() OID:'%s'", __func__, snmp_oid);
+		zabbix_log(LOG_LEVEL_DEBUG, "In %s() OID:'%s'", __func__, snmp_oid);
 
-	for (i = 0; 0 != mibs[i].sz; i++)
-	{
-		if (0 == strncmp(mibs[i].mib, snmp_oid, mibs[i].sz))
+		for (i = 0; 0 != mibs[i].sz; i++)
 		{
-			found = 1;
-			zbx_snprintf(oid_translated, max_oid_len, "%s%s", mibs[i].replace, snmp_oid + mibs[i].sz);
+			if (0 == strncmp(mibs[i].mib, snmp_oid, mibs[i].sz))
+			{
+				found = 1;
+				zbx_snprintf(oid_translated, max_oid_len, "%s%s", mibs[i].replace, snmp_oid + mibs[i].sz);
 			break;
 		}
 	}
@@ -2030,7 +2030,7 @@ static int	zbx_snmp_process_standard(struct snmp_session *ss, const DC_ITEM *ite
 
 	for (i = 0; i < num; i++)
 	{
-		if (SUCCEED != errcodes[i])
+		if (SUCCEED != errcodes[i] && NOT_PROCESSED != errcodes[i] )
 			continue;
 
 		if (0 != num_key_param(items[i].snmp_oid))
@@ -2079,7 +2079,6 @@ void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 		err = NETWORK_ERROR;
 		goto exit;
 	}
-
 	if (0 != (ZBX_FLAG_DISCOVERY_RULE & items[0].flags) || 0 == strncmp(items[0].snmp_oid, "discovery[", 10))
 	{
 		int	max_vars;
@@ -2105,8 +2104,7 @@ void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 	zbx_snmp_close_session(ss);
 exit:
 	if (SUCCEED != err)
-	{
-		zabbix_log(LOG_LEVEL_DEBUG, "getting SNMP values failed: %s", error);
+	{	
 		SET_MSG_RESULT(&results[0], zbx_strdup(NULL, error));
 		errcodes[0] = err;
 	}
@@ -2420,11 +2418,10 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 			} 
 
 #define SNMP_RETRIES	1
-#define SNMP_TIMEOUT	2
 			ss[snmp_sessions]->callback = asynch_response;
 			ss[snmp_sessions]->callback_magic = &hs[snmp_sessions];
 			ss[snmp_sessions]->retries=SNMP_RETRIES;
-			ss[snmp_sessions]->timeout=SNMP_TIMEOUT*1000*1000;
+			ss[snmp_sessions]->timeout=CONFIG_TIMEOUT*1000*1000;
 
 			zabbix_log(LOG_LEVEL_DEBUG, "In %s() session is opened %ld", __function_name,last_hostid);
 
@@ -2501,56 +2498,61 @@ void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *err
 	int starttime=time(NULL);
 
 
-#define SNMP_MAX_BATCH_TIME (SNMP_RETRIES+1)*SNMP_TIMEOUT
+#define SNMP_MAX_BATCH_TIME (SNMP_RETRIES+1)*CONFIG_TIMEOUT
+
+	struct timeval timeout;
+
+	timeout.tv_sec=CONFIG_TIMEOUT;
+	timeout.tv_usec=0;
 
 	 while (conf->active_hosts > 0  && (time(NULL)-starttime)< SNMP_MAX_BATCH_TIME) {
 
-		int fds = 0, block = 1, sessions;
+		int fds = 0, hosts, block = 0, sessions;
 		netsnmp_large_fd_set fdset;
-		struct timeval timeout;
-
-		timeout.tv_sec=SNMP_TIMEOUT;
-		timeout.tv_usec=0;
-
+		
 		//FD_ZERO(&fdset);
 		netsnmp_large_fd_set_init(&fdset, MAX_ASYNC_SNMP_ITEMS);
-
-
+		//zabbix_log(LOG_LEVEL_INFORMATION,"%s: starting select", __func__);
 		snmp_select_info2(&fds,&fdset,&timeout,&block);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"%s: finished select", __func__);
+		
+		hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
+		//hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, NULL);
 
-		fds = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
-
-		if (fds < 0) {
+		if (hosts < 0) {
 			zabbix_log(LOG_LEVEL_DEBUG, "End of %s() Something unexpected happened with fds ", __function_name);
 			break;
-		}
-
-		if (fds) {
+		} 
+		if (hosts > 0) {
+//			zabbix_log(LOG_LEVEL_INFORMATION,"in %s: got %d hosts answered",__func__,hosts);
 //			zbx_alarm_on(SNMP_MAX_BATCH_TIME); //to exit out of use netsnm large fdset glitch if it happens
 			snmp_read2(&fdset);
 //			zbx_alarm_off();
-		}
-		else
+		} else {
 			snmp_timeout();
+		//	netsnmp_large_fd_set_cleanup(&fdset);
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"in %s: finished waiting for the hosts",__func__);
+		//	break;
+		}
 		zabbix_log(LOG_LEVEL_DEBUG, "In %s() : waiting for %d pollers to finish", __function_name, conf->active_hosts);
 		netsnmp_large_fd_set_cleanup(&fdset);
+		usleep(100000);
 	}
-
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Finished, doing session cleanup");
 	/* sessions cleanup */
 	for (i = 0; i < snmp_sessions; i++ ) 
 	{
-		
-		zabbix_log(LOG_LEVEL_DEBUG, "End of %s() freeing session for  item %d", __function_name,i);
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s() freeing session for  item %d", __function_name,i);
 		zbx_snmp_close_session(ss[i]);
 		if (errcodes[i] == NOT_PROCESSED) {
 				SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Couldn't send snmp packet"));
 				errcodes[i]=TIMEOUT_ERROR;
 		}
 	}
-
+	
 	//if something sill left open, it will be closed
 	snmp_close_sessions();
-
+	
 	zbx_free(hs);
 	zbx_free(conf);
 
