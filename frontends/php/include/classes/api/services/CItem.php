@@ -1146,6 +1146,7 @@ class CItem extends CItemGeneral {
 				}
 				if (isset($requestedOutput['lastvalue'])) {
 					$item['lastvalue'] = $lastHistory ? $lastHistory['value'] : $no_value;
+                    $item['lastvalue'] = (string) $item['lastvalue'];
 				}
 				if (isset($requestedOutput['prevvalue'])) {
 					$item['prevvalue'] = $prevHistory ? $prevHistory['value'] : $no_value;

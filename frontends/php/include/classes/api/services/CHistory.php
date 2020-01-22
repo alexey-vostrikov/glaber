@@ -261,15 +261,21 @@ class CHistory extends CApiService {
 				$value_col='value_dbl';
 				break;
 				 
-		)
+		}
 		
 		$table_name = $HISTORY['dbname'].'.history';
 
 		$sql_parts['from']['history'] = $table_name.' h';
 
 		if ($options['itemids'] !== null) {
-			 $key = array_keys($options['itemids'])[0];
-		  	 $sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][$key];
+			// $key = array_keys($options['itemids'])[0];
+			//   $sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][$key];
+			if(!is_array($options['itemids'])) $options['itemids'] = [ $options['itemids'] ];
+			$sql_parts['where']['itemids'] = [];
+			foreach($options['itemids'] as $item){
+				$sql_parts['where']['itemids'][] = "h.itemid =". $item;
+			}   
+
 		  	//$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
 		}
 
@@ -320,6 +326,9 @@ class CHistory extends CApiService {
 			$sql_parts['limit'] = $options['limit'];
 		}
 
+		$sql_itemids = $sql_parts['where']['itemids'] ? ' AND ('.implode(' OR ', $sql_parts['where']['itemids']).' )' : '';
+		unset($sql_parts['where']['itemids']);
+
 		$sql_parts['select'] = array_unique($sql_parts['select']);
 		$sql_parts['from'] = array_unique($sql_parts['from']);
 		$sql_parts['where'] = array_unique($sql_parts['where']);
@@ -337,7 +346,8 @@ class CHistory extends CApiService {
 			$sql_from .= implode(',', $sql_parts['from']);
 		}
 
-		$sql_where = $sql_parts['where'] ? ' WHERE '.implode(' AND ', $sql_parts['where']) : '';
+		$sql_where = $sql_parts['where'] ? ' WHERE '.implode(' AND ', $sql_parts['where']) : ' WHERE 1';
+		$sql_where .=$sql_itemids;
 
 		if ($sql_parts['order']) {
 			$sql_order .= ' ORDER BY '.implode(',', $sql_parts['order']);
@@ -347,7 +357,7 @@ class CHistory extends CApiService {
 		$sql = "SELECT itemid, toInt32(clock),". ($ClickHouseDisableNanoseconds == 1 ? "0 AS ns," : "ns,") ."$value_col".
 				' FROM '.$sql_from.
 				$sql_where.
-				$sql_order;
+				$sql_order.' '.($sql_limit ? ' limit '.$sql_limit : '');
 
 		$values = CClickHouseHelper::query($sql,1,array('itemid','clock','ns', 'value'));
 

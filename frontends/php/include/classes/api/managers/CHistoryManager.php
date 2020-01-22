@@ -536,7 +536,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 				$results[$item['itemid']]['source'] = 'history';
 			}
 			else {
-				$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
+				$sql_select = 'countMerge(num) AS count,avgMerge(value_avg) AS avg,minMerge(value_min) AS min,maxMerge(value_max) AS max';
 				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
 				$sql_day_condition='';
 				$results[$item['itemid']]['source'] = 'trends';
@@ -742,7 +742,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'history_uint' : 'history';
 			}
 			else {
-				$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
+				$sql_select = 'countMerge(num) AS count,avgMerge(value_avg) AS avg,minMerge(value_min) AS min,maxMerge(value_max) AS max';
 				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
 			}
 
