@@ -7968,6 +7968,7 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || 
 				NULL != strchr(snmpitem->snmp_oid, '[')) ) {
 					dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
+					continue;
 			}
 				
 		} 
