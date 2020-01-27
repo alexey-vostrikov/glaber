@@ -113,7 +113,7 @@
 #define HAVE_IPCSERVICE 1
 
 /* Define to 1 if IPv6 should be enabled. */
-#define HAVE_IPV6 1
+/* #undef HAVE_IPV6 */
 
 /* Define to 1 if Jabber should be enabled. */
 /* #undef HAVE_JABBER */
@@ -158,7 +158,7 @@
 #define HAVE_LIBNETSNMP 1
 
 /* Define to 1 if you have the `odbc' library (-lodbc). */
-#define HAVE_LIBODBC 1
+/* #undef HAVE_LIBODBC */
 
 /* Define to 1 if you have the 'libperfstat' library (-lperfstat) */
 /* #undef HAVE_LIBPERFSTAT */
@@ -209,7 +209,7 @@
 #define HAVE_MULTIROW_INSERT 1
 
 /* Define to 1 if MySQL libraries are available */
-/* #undef HAVE_MYSQL */
+#define HAVE_MYSQL 1
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #define HAVE_NETDB_H 1
@@ -233,7 +233,7 @@
 #define HAVE_NLIST_H 1
 
 /* Define to 1 if OPENIPMI should be enabled. */
-#define HAVE_OPENIPMI 1
+/* #undef HAVE_OPENIPMI */
 
 /* Define to 1 if you have 'libssl' and 'libcrypto' libraries (-lssl
    -libcrypto) */
@@ -255,7 +255,7 @@
 /* #undef HAVE_POLARSSL */
 
 /* Define to 1 if PostgreSQL libraries are available */
-#define HAVE_POSTGRESQL 1
+/* #undef HAVE_POSTGRESQL */
 
 /* Define to 1 if '/proc' file system should be used. */
 #define HAVE_PROC 1
@@ -529,7 +529,7 @@
 #define HAVE_UNISTD_SYSCONF 1
 
 /* Define to 1 if unixODBC Driver Manager should be used. */
-#define HAVE_UNIXODBC 1
+/* #undef HAVE_UNIXODBC */
 
 /* Define to 1 if you have the <vm/vm_param.h> header file. */
 /* #undef HAVE_VM_VM_PARAM_H */
@@ -628,7 +628,7 @@
 /* #undef MAC_OS_X */
 
 /* Define to 1 if OPENIPMI depricated functions is used. */
-#define OPENIPMI_DEPRECATED 1
+/* #undef OPENIPMI_DEPRECATED */
 
 /* Name of package */
 #define PACKAGE "zabbix"
