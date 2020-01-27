@@ -7961,13 +7961,17 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 
 		if ( ( ITEM_TYPE_SNMPv1 == dc_item->type || 
 			   ITEM_TYPE_SNMPv2c == dc_item->type || 
-			   ITEM_TYPE_SNMPv3 == dc_item->type ) && ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
+			   ITEM_TYPE_SNMPv3 == dc_item->type ) 
+			   	&& ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
 					ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &dc_item->itemid);
 			
-			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || NULL != strchr(snmpitem->snmp_oid, '[')) ) 
-				/* skipping non async able (yet) items in async snmp poller */
-				break;
-		}
+			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || 
+				NULL != strchr(snmpitem->snmp_oid, '[')) ) {
+					dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
+					continue;
+			}
+				
+		} 
 
 			
 
