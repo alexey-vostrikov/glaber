@@ -144,6 +144,28 @@ class CZabbixServer {
 		]);
 	}
 
+	public function getHistoryData($sid, $itemid, $start, $end, $count, $aggregate) {
+		
+		return $this->request([
+			'request' => 'history.get',
+			'sid' => $sid,
+			'itemid' => $itemid,
+			'start'	=> $start,
+			'end' => $end,
+			'count' => $count,
+			'aggregate' => $aggregate
+		]);
+	}
+
+	public function getLastValues($sid, array $itemids, $limit, $period) {
+		return $this->request([
+			'request' => 'lastvalues.get',
+			'sid' => $sid,
+			'itemids' => $itemids,
+			'limit'	=> $limit,
+			'period' => $period
+		]);
+	}
 	/**
 	 * Request server to test item preprocessing steps.
 	 *
@@ -307,6 +329,7 @@ class CZabbixServer {
 	 * @return bool
 	 */
 	public function isRunning($sid) {
+	
 		$response = $this->request([
 			'request' => 'status.get',
 			'type' => 'ping',
@@ -436,7 +459,7 @@ class CZabbixServer {
 		$response = CJs::decodeJson(substr($response, ZBX_TCP_HEADER_LEN + ZBX_TCP_DATALEN_LEN));
 
 		if (!$response || !$this->normalizeResponse($response)) {
-			$this->error = _s('Incorrect response received from Zabbix server "%1$s".', $this->host);
+			$this->error = _s('Incorrect response received from Zabbix server111 "%1$s".', $this->host);
 
 			return false;
 		}

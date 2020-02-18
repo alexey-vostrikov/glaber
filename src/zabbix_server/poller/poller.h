@@ -22,6 +22,8 @@
 
 #include "threads.h"
 
+#define GLB_ASYNC_POLLING_MAX_ITERATIONS 100000
+
 extern int	CONFIG_TIMEOUT;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 extern int	CONFIG_UNREACHABLE_PERIOD;

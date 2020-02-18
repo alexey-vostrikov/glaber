@@ -421,7 +421,8 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 		return;
 	}
 
-	num = DCconfig_get_poller_items(ZBX_POLLER_TYPE_PINGER, items);
+	
+	num = DCconfig_get_poller_items(ZBX_POLLER_TYPE_PINGER, items , NULL, MAX_PINGER_ITEMS);
 
 	for (i = 0; i < num; i++)
 	{

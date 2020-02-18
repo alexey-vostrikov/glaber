@@ -44,7 +44,7 @@
 #define MAX_POLLER_ITEMS	128	/* MAX(MAX_JAVA_ITEMS, MAX_SNMP_ITEMS) */
 #define MAX_PINGER_ITEMS	4096
 #define MAX_UNREACH_ITEMS		64 //we don't want this to be too big, but it's better for efficiency if thats more then one item 
-#define MAX_ASYNC_SNMP_ITEMS		1024
+#define MAX_ASYNC_SNMP_ITEMS		4096
 #define MAX_ASYNC_AGENT_ITEMS		4096
 
 #define ZBX_TRIGGER_DEPENDENCY_LEVELS_MAX	32
@@ -682,7 +682,7 @@ int	DCconfig_get_suggested_snmp_vars(zbx_uint64_t interfaceid, int *bulk);
 int	DCconfig_get_interface_by_type(DC_INTERFACE *interface, zbx_uint64_t hostid, unsigned char type);
 int	DCconfig_get_interface(DC_INTERFACE *interface, zbx_uint64_t hostid, zbx_uint64_t itemid);
 int	DCconfig_get_poller_nextcheck(unsigned char poller_type);
-int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items);
+int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *errcodes, int max_count);
 int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *nextcheck);
 int	DCconfig_get_snmp_interfaceids_by_addr(const char *addr, zbx_uint64_t **interfaceids);
 size_t	DCconfig_get_snmp_items_by_interfaceid(zbx_uint64_t interfaceid, DC_ITEM **items);
@@ -702,7 +702,7 @@ size_t	DCconfig_get_snmp_items_by_interfaceid(zbx_uint64_t interfaceid, DC_ITEM 
 void	DCrequeue_items(const zbx_uint64_t *itemids, const unsigned char *states, const int *lastclocks,
 		const int *errcodes, size_t num);
 void	DCpoller_requeue_items(const zbx_uint64_t *itemids, const unsigned char *states, const int *lastclocks,
-		const int *errcodes, size_t num, unsigned char poller_type, int *nextcheck);
+		const int *errcodes, size_t num, unsigned char poller_type);
 void	zbx_dc_requeue_unreachable_items(zbx_uint64_t *itemids, size_t itemids_num);
 int	DCconfig_activate_host(DC_ITEM *item);
 int	DCconfig_deactivate_host(DC_ITEM *item, int now);

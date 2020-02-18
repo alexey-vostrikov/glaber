@@ -97,10 +97,39 @@ class CHistory extends CApiService {
 			case ZBX_HISTORY_SOURCE_CLICKHOUSE:
 				return $this->getFromClickHouse($options);
 				break;
+			case ZBX_HISTORY_SOURCE_SERVER:
+				return $this->getFromServer($options);
 			default:
 				return $this->getFromSql($options);
 		}
 	}
+
+/**
+	 * server specific implementation of get.
+	 *
+	 * @see CHistory::get
+	 */
+	private function getFromServer($options) {
+		global $HISTORY, $ClickHouseDisableNanoseconds;
+		$result = [];
+		
+		if ($options['itemids'] !== null) {
+			if(!is_array($options['itemids'])) $options['itemids'] = [ $options['itemids'] ];
+		}
+		$values=[];
+
+		foreach( $options['itemids'] as $itemid) {
+
+			global $ZBX_SERVER, $ZBX_SERVER_PORT;
+			$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT); 
+			
+			$values = $server->getHistoryData(get_cookie(ZBX_SESSION_NAME), $itemid, $options['time_from'], $options['time_till'], $options['limit'], 0); 
+		
+		}
+		
+		return $values;
+	}
+
 
 	/**
 	 * SQL specific implementation of get.
@@ -260,7 +289,6 @@ class CHistory extends CApiService {
 			case ITEM_VALUE_TYPE_FLOAT:
 				$value_col='value_dbl';
 				break;
-				 
 		}
 		
 		$table_name = $HISTORY['dbname'].'.history';
@@ -268,14 +296,8 @@ class CHistory extends CApiService {
 		$sql_parts['from']['history'] = $table_name.' h';
 
 		if ($options['itemids'] !== null) {
-			// $key = array_keys($options['itemids'])[0];
-			//   $sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][$key];
-			if(!is_array($options['itemids'])) $options['itemids'] = [ $options['itemids'] ];
-			$sql_parts['where']['itemids'] = [];
-			foreach($options['itemids'] as $item){
-				$sql_parts['where']['itemids'][] = "h.itemid =". $item;
-			}   
-
+			 $key = array_keys($options['itemids'])[0];
+		  	 $sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][$key];
 		  	//$sql_parts['where']['itemid'] = "h.itemid =". $options['itemids'][0];
 		}
 
@@ -326,9 +348,6 @@ class CHistory extends CApiService {
 			$sql_parts['limit'] = $options['limit'];
 		}
 
-		$sql_itemids = $sql_parts['where']['itemids'] ? ' AND ('.implode(' OR ', $sql_parts['where']['itemids']).' )' : '';
-		unset($sql_parts['where']['itemids']);
-
 		$sql_parts['select'] = array_unique($sql_parts['select']);
 		$sql_parts['from'] = array_unique($sql_parts['from']);
 		$sql_parts['where'] = array_unique($sql_parts['where']);
@@ -346,8 +365,7 @@ class CHistory extends CApiService {
 			$sql_from .= implode(',', $sql_parts['from']);
 		}
 
-		$sql_where = $sql_parts['where'] ? ' WHERE '.implode(' AND ', $sql_parts['where']) : ' WHERE 1';
-		$sql_where .=$sql_itemids;
+		$sql_where = $sql_parts['where'] ? ' WHERE '.implode(' AND ', $sql_parts['where']) : '';
 
 		if ($sql_parts['order']) {
 			$sql_order .= ' ORDER BY '.implode(',', $sql_parts['order']);
@@ -357,10 +375,10 @@ class CHistory extends CApiService {
 		$sql = "SELECT itemid, toInt32(clock),". ($ClickHouseDisableNanoseconds == 1 ? "0 AS ns," : "ns,") ."$value_col".
 				' FROM '.$sql_from.
 				$sql_where.
-				$sql_order.' '.($sql_limit ? ' limit '.$sql_limit : '');
+				$sql_order;
 
 		$values = CClickHouseHelper::query($sql,1,array('itemid','clock','ns', 'value'));
-
+		//var_dump($values);
 		return $values;
 	}
 

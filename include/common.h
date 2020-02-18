@@ -93,7 +93,19 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 #define	AGENT_ERROR	-5
 #define	GATEWAY_ERROR	-6
 #define	CONFIG_ERROR	-7
-#define	NOT_PROCESSED	-8
+
+//for efficient polling in async mode
+#define	POLL_FREE			-8
+#define POLL_CC_FETCHED		-9
+#define POLL_PREPARED		-10
+#define	POLL_POLLING		-11
+#define POLL_SKIPPED		-12
+#define POLL_PREPROCESSED	-13
+#define POLL_FINISHED		-14
+#define	POLL_QUEUED			-15
+#define	POLL_CONNECT_SENT	-16	
+#define	POLL_REQ_SENT		-17
+
 
 #define SUCCEED_OR_FAIL(result) (FAIL != (result) ? SUCCEED : FAIL)
 const char	*zbx_sysinfo_ret_string(int ret);

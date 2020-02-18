@@ -33,7 +33,10 @@ void	zbx_init_snmp(void);
 void	zbx_shutdown_snmp(void);
 int	get_value_snmp(const DC_ITEM *item, AGENT_RESULT *result);
 void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int num);
-void	get_values_snmp_async(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int num);
+
+int init_async_snnmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int max_items, int max_connections);
+int destroy_aync_snmp();
+int	get_values_snmp_async();
 #endif
 
 #endif

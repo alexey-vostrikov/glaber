@@ -1147,6 +1147,12 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: doing history preloading",__func__);
+	zbx_history_preload(ITEM_VALUE_TYPE_FLOAT);
+	zbx_history_preload(ITEM_VALUE_TYPE_UINT64);
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: finished history preloading",__func__);
+
 	if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 	{
 		zbx_setproctitle("%s [waiting for user command]", get_process_type_string(process_type));
@@ -1165,7 +1171,10 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 	for (;;)
 	{
 		sec = zbx_time();
+		
+		//doing history storage data preloading
 
+		
 		if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 			zbx_sleep_forever();
 		else

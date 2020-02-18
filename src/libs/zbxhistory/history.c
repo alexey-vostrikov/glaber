@@ -35,6 +35,30 @@ extern int CONFIG_SERVER_STARTUP_TIME;
 
 zbx_history_iface_t	history_ifaces[ITEM_VALUE_TYPE_MAX];
 
+
+
+/************************************************************************************
+ *                                                                                  *
+ * Function: zbx_history_preload                                                  	*
+ *                                                                                  *
+ * preloads history into the value cache 											*
+ * returns number of values preloaded												*
+  ************************************************************************************/
+int	zbx_history_preload(int value_type)
+{
+	
+	zbx_history_iface_t	*h_writer = &history_ifaces[value_type];
+	
+
+	if (NULL !=  h_writer->preload_values) {
+		return h_writer->preload_values(&history_ifaces[value_type]);
+	}
+
+	return SUCCEED;
+}
+
+
+
 /************************************************************************************
  *                                                                                  *
  * Function: zbx_history_init                                                       *
@@ -135,6 +159,49 @@ int	zbx_history_add_values(const zbx_vector_ptr_t *history)
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+
+	return ret;
+}
+
+/************************************************************************************
+ *                                                                                  *
+ * Function: zbx_history_get_aggregate_values                                             *
+ *                                                                                  *
+ * Purpose: gets buffer of aggregated values from history storage                   *
+ *                                                                                  *
+ * Parameters:  itemid     - [IN] the itemid                                        *
+ *              value_type - [IN] the item value type                               *
+ *              start      - [IN] the period start timestamp                        *
+ *              count      - [IN] the number of values to read                      *
+ *              end        - [IN] the period end timestamp   
+ * 				aggregates - [IN] number of aggregation steps	                    *
+ *              data       - [OUT] buffer of json data values 	                    *
+ *                                                                                  *
+ * Return value: SUCCEED - the history data were read successfully                  *
+ *               FAIL - otherwise                                                   *
+ *                                                                                  *
+ * Comments: This function reads <count> values from ]<start>,<end>] interval or    *
+ *           all values from the specified interval if count is zero.               *
+ *                                                                                  *
+ ************************************************************************************/
+int	zbx_history_get_aggregated_values(zbx_uint64_t itemid, int value_type, int start,  int end, int agggregates,
+		char **buffer)
+{
+	int			ret, pos;
+	zbx_history_iface_t	*writer = &history_ifaces[value_type];
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d start:%d end:%d",
+			__func__, itemid, value_type, start,  end);
+
+	if (NULL != writer->agg_values ) {
+		ret = writer->agg_values(writer, itemid, start, end, agggregates, buffer);
+		if (SUCCEED == ret )
+		{
+			zabbix_log(LOG_LEVEL_TRACE, "Got aggregation data: %s", buffer);
+		}
+	} else {
+		zabbix_log(LOG_LEVEL_WARNING, "WARNING: aggregation requests isn't supported by current server history module");
+	}
 
 	return ret;
 }

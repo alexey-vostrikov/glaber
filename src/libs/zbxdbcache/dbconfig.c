@@ -93,6 +93,8 @@ extern unsigned char	program_type;
 extern int		CONFIG_TIMER_FORKS;
 extern int CONFIG_ASYNC_AGENT_POLLER_FORKS;
 extern int CONFIG_ASYNC_SNMP_POLLER_FORKS;
+extern int CONFIG_ASYNC_SNMP_POLLER_CONNS;
+extern int CONFIG_ASYNC_AGENT_POLLER_CONNS;
 extern int CONFIG_CLUSTER_SERVER_ID;
 extern char * CONFIG_HOSTNAME;
 
@@ -194,7 +196,7 @@ clean:
 	return ret;
 }
 
-static unsigned char	poller_by_item(unsigned char type, const char *key, zbx_uint64_t itemid)
+static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uint64_t itemid)
 {
 	switch (type)
 	{
@@ -229,7 +231,17 @@ static unsigned char	poller_by_item(unsigned char type, const char *key, zbx_uin
 
 				return ZBX_POLLER_TYPE_NORMAL;
 			}
-			return ZBX_POLLER_TYPE_ASYNC_AGENT;
+
+			ZBX_DC_ITEM *dc_item;
+			//for async agent items to achive polling a host by the same poller
+			//we have a queue for each async poller
+			if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemid)))
+					return ZBX_POLLER_TYPE_NORMAL;
+			
+			return  (ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS
+					 + (dc_item->hostid % CONFIG_ASYNC_AGENT_POLLER_FORKS * CONFIG_ASYNC_AGENT_POLLER_CONNS)/CONFIG_ASYNC_AGENT_POLLER_CONNS);
+
+			
 
 		case ITEM_TYPE_SNMPv1:
 		case ITEM_TYPE_SNMPv2c:
@@ -246,16 +258,16 @@ static unsigned char	poller_by_item(unsigned char type, const char *key, zbx_uin
 				snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &itemid);
 				if (NULL == snmpitem ) 
 						return ZBX_POLLER_TYPE_NORMAL;
-
-				
-
-				if ( 0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || 
-						NULL != strchr(snmpitem->snmp_oid, '[') )
-				{
+				if ( 0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || NULL != strchr(snmpitem->snmp_oid, '[') ) {
 					zabbix_log(LOG_LEVEL_DEBUG,"Selecting normal poller for dynamic item snmp  %s",snmpitem->snmp_oid);
 					return ZBX_POLLER_TYPE_NORMAL;
 				} else {
-					return ZBX_POLLER_TYPE_ASYNC_SNMP;
+					ZBX_DC_ITEM *dc_item;
+					//for async items to achive polling a host by the same poller
+					//we have a queue for each async poller
+					if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemid)))
+						return ZBX_POLLER_TYPE_NORMAL;
+					return  (ZBX_POLLER_TYPE_COUNT + (dc_item->hostid % CONFIG_ASYNC_SNMP_POLLER_FORKS * CONFIG_ASYNC_SNMP_POLLER_CONNS)/CONFIG_ASYNC_SNMP_POLLER_CONNS);
 				}
 			}
 
@@ -431,9 +443,9 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 		dc_item->poller_type = ZBX_NO_POLLER;
 		return;
 	}
-
+	zabbix_log(LOG_LEVEL_DEBUG,"#42: in %s",__func__);
 	poller_type = poller_by_item(dc_item->type, dc_item->key, dc_item->itemid);
-
+	
 	if (0 != (flags & ZBX_HOST_UNREACHABLE))
 	{
 		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type)
@@ -2857,9 +2869,8 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		old_nextcheck = item->nextcheck;
 
 		if (ITEM_STATUS_ACTIVE == item->status && HOST_STATUS_MONITORED == host->status)
-		{
+		{	
 			DCitem_poller_type_update(item, host, flags);
-
 			if (SUCCEED == zbx_is_counted_in_item_queue(item->type, item->key))
 			{
 				char	*error = NULL;
@@ -5517,7 +5528,7 @@ void	DCsync_configuration(unsigned char mode)
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() maint time : %d (%d slots)", __func__,
 				config->maintenance_periods.num_data, config->maintenance_periods.num_slots);
 
-		for (i = 0; ZBX_POLLER_TYPE_COUNT > i; i++)
+		for (i = 0; ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS> i; i++)
 		{
 			zabbix_log(LOG_LEVEL_DEBUG, "%s() queue[%d]   : %d (%d allocated)", __func__,
 					i, config->queues[i].elems_num, config->queues[i].elems_alloc);
@@ -5924,6 +5935,8 @@ int	init_configuration_cache(char **error)
 	config = (ZBX_DC_CONFIG *)__config_mem_malloc_func(NULL, sizeof(ZBX_DC_CONFIG) +
 			CONFIG_TIMER_FORKS * sizeof(zbx_vector_ptr_t));
 
+	config->queues = __config_mem_malloc_func(NULL, sizeof(zbx_binary_heap_t)*(ZBX_POLLER_TYPE_COUNT+CONFIG_ASYNC_SNMP_POLLER_FORKS+CONFIG_ASYNC_AGENT_POLLER_FORKS));
+
 #define CREATE_HASHSET(hashset, hashset_size)									\
 														\
 	CREATE_HASHSET_EXT(hashset, hashset_size, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC)
@@ -6000,8 +6013,8 @@ int	init_configuration_cache(char **error)
 	CREATE_HASHSET_EXT(config->psks, 0, __config_psk_hash, __config_psk_compare);
 #endif
 
-	for (i = 0; i < ZBX_POLLER_TYPE_COUNT; i++)
-	{
+	for (i = 0; i < ZBX_POLLER_TYPE_COUNT+CONFIG_ASYNC_SNMP_POLLER_FORKS + CONFIG_ASYNC_AGENT_POLLER_FORKS; i++)
+	{ 	
 		switch (i)
 		{
 			case ZBX_POLLER_TYPE_JAVA:
@@ -7878,9 +7891,9 @@ static void	dc_requeue_item_at(ZBX_DC_ITEM *dc_item, ZBX_DC_HOST *dc_host, int n
  *           function.                                                        *
  *                                                                            *
  ******************************************************************************/
-int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
+int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *errcodes,  int max_items)
 {
-	int			now, num = 0, max_items;
+	int			now, num = 0, cnt=0;
 	zbx_binary_heap_t	*queue;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() poller_type:%d", __func__, (int)poller_type);
@@ -7888,30 +7901,6 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 	now = time(NULL);
 
 	queue = &config->queues[poller_type];
-
-	switch (poller_type)
-	{
-		case ZBX_POLLER_TYPE_JAVA:
-			max_items = MAX_JAVA_ITEMS;
-			break;
-		case ZBX_POLLER_TYPE_PINGER:
-			max_items = MAX_PINGER_ITEMS;
-			break;
-		case ZBX_POLLER_TYPE_NORMAL:
-			max_items = 1;
-			break;
-		case ZBX_POLLER_TYPE_ASYNC_SNMP:
-			max_items = MAX_ASYNC_SNMP_ITEMS;
-			break;
-		case ZBX_POLLER_TYPE_UNREACHABLE:
-			max_items = MAX_UNREACH_ITEMS;
-			break;
-		case ZBX_POLLER_TYPE_ASYNC_AGENT:
-			max_items = MAX_ASYNC_AGENT_ITEMS;
-			break;
-		default:
-			max_items = 1;
-	}
 
 	WRLOCK_CACHE;
 
@@ -7926,27 +7915,45 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
-		if (dc_item->nextcheck > now)
+		//if (ZBX_POLLER_TYPE_NORMAL == poller_type) {
+		//	zabbix_log(LOG_LEVEL_INFORMATION, "Started get poller items for normal poller %d",poller_type);
+		//}
+	
+		if (dc_item->nextcheck > now) 		
 			break;
-		
+
+				//zabbix_log(LOG_LEVEL_INFORMATION, "Started get poller items for normal poller");
+			
 		if ( (0 != num) && 	( ZBX_POLLER_TYPE_NORMAL == poller_type ) && (SUCCEED == is_snmp_type(dc_item_prev->type))
-					 && (0 != __config_snmp_item_compare(dc_item_prev, dc_item)) )
+					 && (0 != __config_snmp_item_compare(dc_item_prev, dc_item)) ) 			
 			break;
-		
-		
+	
+				
 		if ( (0 != num) && 	( ZBX_POLLER_TYPE_JAVA == poller_type )	&& (ITEM_TYPE_JMX == dc_item_prev->type) && 
 				(0 != __config_java_item_compare(dc_item_prev, dc_item)) )
 			break;
+		
+		
+		//if ((ZBX_POLLER_TYPE_ASYNC_SNMP==poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP==poller_type )  && POLL_FREE != errcodes[num]) {
+		//	num++;
+		//	continue;
+		//}
+		//for async pollers queues number is alwayas equal or exceeds ZBX_POLLER_TYPE_COUNT,  skipping non-free items for async calls
+		if (ZBX_POLLER_TYPE_COUNT <= poller_type && POLL_FREE != errcodes[num]) {
+			num++;
+			continue;
+		}
 
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
 	
-		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
+		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid))) 
 			continue;
+		
 
-		if (HOST_STATUS_MONITORED != dc_host->status)
+		if (HOST_STATUS_MONITORED != dc_host->status) 			
 			continue;
-
+		
 		if (SUCCEED == DCin_maintenance_without_data_collection(dc_host, dc_item))
 		{
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
@@ -7958,87 +7965,37 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items)
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
 			continue;
 		}
-
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Fetching item for slot  %d",num);
 		if ( ( ITEM_TYPE_SNMPv1 == dc_item->type || 
 			   ITEM_TYPE_SNMPv2c == dc_item->type || 
-			   ITEM_TYPE_SNMPv3 == dc_item->type ) 
-			   	&& ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
-					ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &dc_item->itemid);
+			   ITEM_TYPE_SNMPv3 == dc_item->type ) && ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
 			
-			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || 
-				NULL != strchr(snmpitem->snmp_oid, '[')) ) {
-					dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
-					continue;
+			ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &dc_item->itemid);
+			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || NULL != strchr(snmpitem->snmp_oid, '[')) ) {
+				/* skipping non async able (yet) items in async snmp poller */
+			//	continue;
+			zabbix_log(LOG_LEVEL_INFORMATION,"THis shouldn't happen yet, dynamic items supprt not implemeneted in ASYNC SNMP");
 			}
-				
-		} 
-
-			
-
-		/* don't apply unreachable item/host throttling for prioritized items */
-		/* and for async and unreachable pollers */
+		}
 		
-		//in async polling model there is NO problems with checking whatever we want
-		//whenever we want, so no prioritization required at all
-		//in fact, there is even no reason to pause quering such an items
-		
-//		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority && ZBX_POLLER_TYPE_ASYNC != poller_type 
-//										&& ZBX_POLLER_TYPE_UNREACHABLE != poller_type)
-//		{
-//			if (0 == (disable_until = DCget_disable_until(dc_item, dc_host)))
-//			{
-//				/* move reachable items on reachable hosts to normal pollers */
-//				if (ZBX_POLLER_TYPE_UNREACHABLE == poller_type &&
-//						ZBX_QUEUE_PRIORITY_LOW != dc_item->queue_priority)
-//				{
-//					dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
-//					continue;
-//				}
-//			}
-//			else
-//			{
-//				/* move items on unreachable hosts to unreachable pollers or    */
-//				/* postpone checks on hosts that have been checked recently and */
-//				/* are still unreachable                                        */
-//				if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type ||
-//						disable_until > now)
-//				{
-//					dc_requeue_item(dc_item, dc_host, dc_item->state,
-//							ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, now);
-//					continue;
-//				}
-//
-//				DCincrease_disable_until(dc_item, dc_host, now);
-//			}
-//		}
-	
 		dc_item_prev = dc_item;
 		dc_item->location = ZBX_LOC_POLLER;
 		DCget_host(&items[num].host, dc_host);
 		DCget_item(&items[num], dc_item);
+		
+		errcodes[num]=POLL_CC_FETCHED;
 		num++;
-
-		//the following code never works anyway as MAX_SNMP_ITEMS is one for regular pollers
-
-//		if (1 == num && ZBX_POLLER_TYPE_NORMAL == poller_type && SUCCEED == is_snmp_type(dc_item->type) &&
-//				0 == (ZBX_FLAG_DISCOVERY_RULE & dc_item->flags))
-//		{
-//			ZBX_DC_SNMPITEM	*snmpitem;
-//
-//			snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &dc_item->itemid);
-//
-//			if (ZBX_SNMP_OID_TYPE_NORMAL == snmpitem->snmp_oid_type ||
-//					ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type)
-//			{
-//				max_items = DCconfig_get_suggested_snmp_vars_nolock(dc_item->interfaceid, NULL);
-//			}
-//		}
+		cnt++;
 	}
+
+	//for(int i=0; i < ZBX_POLLER_TYPE_COUNT+CONFIG_ASYNC_SNMP_POLLER_FORKS; i ++ ) {
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "Poll queue length for type %d is %d", i, config->queues[i].elems_num);
+	//}
 	UNLOCK_CACHE;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
 
-	return num;
+	return cnt;
 }
 
 /******************************************************************************
@@ -8280,7 +8237,8 @@ static void	dc_requeue_items(const zbx_uint64_t *itemids, const unsigned char *s
 				dc_requeue_item(dc_item, dc_host, states[i], ZBX_ITEM_COLLECTED, lastclocks[i]);
 				break;
 			case NETWORK_ERROR:
-			case NOT_PROCESSED:
+			//case PROCESSED:
+			
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
 				dc_item->queue_priority = ZBX_QUEUE_PRIORITY_LOW;
@@ -8341,7 +8299,7 @@ void	DCrequeue_items(const zbx_uint64_t *itemids, const unsigned char *states, c
 }
 
 void	DCpoller_requeue_items(const zbx_uint64_t *itemids, const unsigned char *states, const int *lastclocks,
-		const int *errcodes, size_t num, unsigned char poller_type, int *nextcheck)
+		const int *errcodes, size_t num, unsigned char poller_type)
 {
 	WRLOCK_CACHE;
 	if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type) {
@@ -8349,7 +8307,7 @@ void	DCpoller_requeue_items(const zbx_uint64_t *itemids, const unsigned char *st
 	} else {
 		dc_requeue_items(itemids, states, lastclocks, errcodes, num);
 	}
-	*nextcheck = dc_config_get_queue_nextcheck(&config->queues[poller_type]);
+	//*nextcheck = dc_config_get_queue_nextcheck(&config->queues[poller_type]);
 
 	UNLOCK_CACHE;
 }

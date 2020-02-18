@@ -61,6 +61,7 @@ define('ZBX_HISTORY_PERIOD', 7200);
 define('ZBX_HISTORY_SOURCE_CLICKHOUSE',	'clickhouse');
 define('ZBX_HISTORY_SOURCE_ELASTIC',	'elastic');
 define('ZBX_HISTORY_SOURCE_SQL',		'sql');
+define('ZBX_HISTORY_SOURCE_SERVER',		'server');
 
 define('ELASTICSEARCH_RESPONSE_PLAIN',			0);
 define('ELASTICSEARCH_RESPONSE_AGGREGATION',	1);
@@ -1188,7 +1189,7 @@ define('IPMI_PRIVILEGE_OEM',		5);
 define('ZBX_HAVE_IPV6', true);
 define('ZBX_DISCOVERER_IPRANGE_LIMIT', 65536);
 
-define('ZBX_SOCKET_TIMEOUT',        3);                 // socket timeout limit
+define('ZBX_SOCKET_TIMEOUT',        10);                 // socket timeout limit
 define('ZBX_SOCKET_BYTES_LIMIT',    ZBX_MEBIBYTE * 16); // socket response size limit
 
 // value is also used in servercheck.js file

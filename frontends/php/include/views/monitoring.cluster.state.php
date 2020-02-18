@@ -87,7 +87,7 @@ $gr1="   ";
             $widget->addItem($gr1);
 
      
-//error("Hello world");      
+    
 //need to add 
 //1. graph with servers here
 //2. download and show server topology

@@ -28,7 +28,8 @@ extern char	*CONFIG_SOURCE_IP;
 int	get_value_agent(DC_ITEM *item, AGENT_RESULT *result);
 
 //this is coming soon 
-int	get_value_agent_async(DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int num);
-
+int	get_values_agent_async();
+int destroy_aync_agent();
+int init_async_agent(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int max_items, int max_connections);
 
 #endif

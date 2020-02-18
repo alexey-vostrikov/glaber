@@ -829,7 +829,8 @@ typedef struct
 							/* by PSK identity */
 #endif
 	zbx_hashset_t		data_sessions;
-	zbx_binary_heap_t	queues[ZBX_POLLER_TYPE_COUNT];
+	//todo: fix this problem
+	zbx_binary_heap_t	*queues;
 	zbx_binary_heap_t	pqueue;
 	zbx_binary_heap_t	timer_queue;
 	ZBX_DC_CONFIG_TABLE	*config;

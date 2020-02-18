@@ -38,7 +38,10 @@ class CHistoryManager {
 		$results = [];
 		$grouped_items = self::getItemsGroupedByStorage($items);
 
-		if (array_key_exists(ZBX_HISTORY_SOURCE_CLICKHOUSE, $grouped_items)) {
+		if (array_key_exists(ZBX_HISTORY_SOURCE_SERVER, $grouped_items)) {
+			$results += $this->getLastValuesFromServer($grouped_items[ZBX_HISTORY_SOURCE_SERVER], $limit, $period
+			);
+		} else 	if (array_key_exists(ZBX_HISTORY_SOURCE_CLICKHOUSE, $grouped_items)) {
 			$results += $this->getLastValuesFromClickHouse($grouped_items[ZBX_HISTORY_SOURCE_CLICKHOUSE], $limit,
 					$period
 			);
@@ -46,26 +49,32 @@ class CHistoryManager {
 			$results += $this->getLastValuesFromElasticsearch($grouped_items[ZBX_HISTORY_SOURCE_ELASTIC], $limit,
 					$period
 			);
-		}
-
-		if (array_key_exists(ZBX_HISTORY_SOURCE_SQL, $grouped_items)) {
+		} else if (array_key_exists(ZBX_HISTORY_SOURCE_SQL, $grouped_items)) {
 			$results += $this->getLastValuesFromSql($grouped_items[ZBX_HISTORY_SOURCE_SQL], $limit, $period);
 		}
 
 		return $results;
 	}
 
-	/**
-	 * Elasticsearch specific implementation of getLastValues.
-	 *
-	 * @see CHistoryManager::getLastValues
-	 */
+	/*
+	* server implemetation of lastvalues - uses valuecache as a source for data
+	*/
+private function getLastValuesFromServer($items, $limit, $period) {
+	  global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	 
+	  $server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+	  $result = $server->getLastValues(get_cookie(ZBX_SESSION_NAME),array_column($items,'itemid'),$limit, $period); 
+	  //var_dump($server->getError());
+	  //var_dump($result);
+	  if (!is_array($result)) return [];
+
+	  return $result;
+}
 
 	/**
 	 * Clickhouse implementation of getLastValues.
 	 *
 	 */
-
 
 private function getLastValuesFromClickhouse($items, $limit, $period) {
 
@@ -81,7 +90,6 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	        $itemslist.=$item['itemid'];
 		}
 	} 
-
 
 	$query_text='
 		SELECT 
@@ -114,6 +122,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		}
 	}
 
+	
 	return $results;
 
     }
@@ -301,10 +310,26 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		switch (self::getDataSourceType($item['value_type'])) {
 			case ZBX_HISTORY_SOURCE_ELASTIC:
 				return $this->getValueAtFromElasticsearch($item, $clock, $ns);
-
+			case ZBX_HISTORY_SOURCE_SERVER:
+				return $this->getValueAtFromServer($item, $clock, $ns);
 			default:
 				return $this->getValueAtFromSql($item, $clock, $ns);
 		}
+	}
+	/**
+	 * Sever-trapper db interafce implementation of getValueAt.
+	 *
+	 * @see CHistoryManager::getValueAt
+	 */
+	private function getValueAtFromServer($item, $time_from, $ns) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+		$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+		
+		foreach ($items as $item) {
+			$results[$item['itemid']]['data'] = $server->getHistoryData(get_cookie(ZBX_SESSION_NAME), $item['itemid'], $time_from, $time_from+1,1, 0); 
+		}
+		
+		return $results;
 	}
 
 	/**
@@ -470,12 +495,14 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 			$delta = null;
 		}
 
+		$width=(int)$width;
 		$grouped_items = self::getItemsGroupedByStorage($items);
-
 		$results = [];
 
-
-		if (array_key_exists(ZBX_HISTORY_SOURCE_CLICKHOUSE, $grouped_items)) {
+		if (array_key_exists(ZBX_HISTORY_SOURCE_SERVER, $grouped_items)) {
+			$results += $this->getGraphAggregationFromServer($grouped_items[ZBX_HISTORY_SOURCE_SERVER], $time_from, $time_to, $width);
+		} 
+		else if (array_key_exists(ZBX_HISTORY_SOURCE_CLICKHOUSE, $grouped_items)) {
 			$results += $this->getGraphAggregationFromClickhouse($grouped_items[ZBX_HISTORY_SOURCE_CLICKHOUSE],
 					$time_from, $time_to, $width, $size, $delta
 			);
@@ -492,7 +519,26 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		}
 
 		return $results;
+
 	}
+
+/**
+	 * Sever aggregation implementation *
+	 */
+	private function getGraphAggregationFromServer(array $items, $time_from, $time_to, $aggregates) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+		//$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+		$itemids=array_column($items,'itemid');
+		
+		foreach ($itemids as $itemid) {
+			//for some strange reason same object dosn't do request for the same time, so init once per itemid here
+			$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);  
+			$results[$itemid]['data'] = $server->getHistoryData(get_cookie(ZBX_SESSION_NAME), $itemid, $time_from, $time_to, 0, $aggregates); 
+		}
+	
+		return $results;
+	}
+
 
 	/**
 	 * Clickhouse aggregation implementation *
@@ -536,7 +582,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 				$results[$item['itemid']]['source'] = 'history';
 			}
 			else {
-				$sql_select = 'countMerge(num) AS count,avgMerge(value_avg) AS avg,minMerge(value_min) AS min,maxMerge(value_max) AS max';
+				$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
 				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
 				$sql_day_condition='';
 				$results[$item['itemid']]['source'] = 'trends';
@@ -742,7 +788,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'history_uint' : 'history';
 			}
 			else {
-				$sql_select = 'countMerge(num) AS count,avgMerge(value_avg) AS avg,minMerge(value_min) AS min,maxMerge(value_max) AS max';
+				$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
 				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
 			}
 
@@ -1003,8 +1049,11 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 					if ($HISTORY['storagetype']=='clickhouse') 
 							$cache[$value_type] = in_array(self::getTypeNameByTypeId($value_type), $HISTORY['types'])
 								? ZBX_HISTORY_SOURCE_CLICKHOUSE : ZBX_HISTORY_SOURCE_SQL;
-					else 
+					else if ($HISTORY['storagetype']=='server') 
 							$cache[$value_type] = in_array(self::getTypeNameByTypeId($value_type), $HISTORY['types'])
+						? ZBX_HISTORY_SOURCE_SERVER : ZBX_HISTORY_SOURCE_SQL;
+
+					else $cache[$value_type] = in_array(self::getTypeNameByTypeId($value_type), $HISTORY['types'])
 								? ZBX_HISTORY_SOURCE_ELASTIC : ZBX_HISTORY_SOURCE_SQL;
 			}
 			else {
