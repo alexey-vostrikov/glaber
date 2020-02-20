@@ -181,14 +181,13 @@ static struct	async_agent_session **hs;
 void handle_socket_operation(struct async_agent_session * sess) 
 {
 	
-	ZBX_SOCKADDR	servaddr_in;
-	struct hostent	*hp;
+	//ZBX_SOCKADDR	servaddr_in;
+	//struct hostent	*hp;
 	ssize_t		received_len;
 	
-	int status;
+	//int status;
 
 	uint64_t item_idx=sess->current_item;
-	zabbix_log(LOG_LEVEL_DEBUG,"In handle_socket_operations, connection %ld, item %ld",sess, conf.items[item_idx].itemid);
 	
 	switch (sess->state) {
 		
@@ -297,7 +296,7 @@ int init_async_agent(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 
 int destroy_aync_agent() {
 	int i;
-	struct list_item *litem,*tmp_litem;
+	//struct list_item *litem;
 	zabbix_log(LOG_LEVEL_DEBUG,"%s: doing agent de-init", __func__);
 	for (i = 0; i < conf.max_connections; i++ )  {
 	//	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s() freeing session for  item %d", __function_name,i);
@@ -410,7 +409,7 @@ int get_values_agent_async()
 	const DC_ITEM	*items=conf.items;
 	int *errcodes =conf.errcodes;
 	AGENT_RESULT* results = conf.results;
-	struct list_item* litem;
+	//struct list_item* litem;
 	int result,ret, count;
 	socklen_t result_len = sizeof(result);
 	u_int64_t i;
@@ -436,7 +435,7 @@ int get_values_agent_async()
 	}	
 	//iterating over all items we have to bind them to connections
 	//to do: disable launching of new items if runtime or runcount is exceeded
-	int starttime=time(NULL);
+	//int starttime=time(NULL);
 
 	//stage 2 - looking for ready sockets and if there is any data there
 	//if so, handling the data
