@@ -232,7 +232,7 @@ static int	clickhouse_get_agg_values(zbx_history_iface_t *hist, zbx_uint64_t ite
 				field_name,field_name,field_name,field_name,
 				CONFIG_HISTORY_STORAGE_DB_NAME, start, end, itemid);
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "CLICKHOUSE: sending query to clickhouse: %s", sql_buffer);
+	//zabbix_log(LOG_LEVEL_INFORMATION, "CLICKHOUSE: sending query to clickhouse: %s", sql_buffer);
 
 	curl_easy_setopt(handle, CURLOPT_URL, data->url);
 	curl_easy_setopt(handle, CURLOPT_POSTFIELDS, sql_buffer);
@@ -266,7 +266,7 @@ static int	clickhouse_get_agg_values(zbx_history_iface_t *hist, zbx_uint64_t ite
     if (SUCCEED == zbx_json_brackets_by_name(&jp, "data", &jp_data) ) {
 		//adding one more byte for the trailing zero
 		size_t buf_size=jp_data.end-jp_data.start+1;
-		zabbix_log(LOG_LEVEL_INFORMATION,"HIST: Will need %ld buffer1", buf_size);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"HIST: Will need %ld buffer1", buf_size);
 		zbx_strncpy_alloc(buffer,&allocd,&offset,jp_data.start,buf_size);
 		
 		

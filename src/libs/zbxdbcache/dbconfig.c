@@ -239,7 +239,7 @@ static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uin
 					return ZBX_POLLER_TYPE_NORMAL;
 			
 			return  (ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS
-					 + (dc_item->hostid % CONFIG_ASYNC_AGENT_POLLER_FORKS * CONFIG_ASYNC_AGENT_POLLER_CONNS)/CONFIG_ASYNC_AGENT_POLLER_CONNS);
+					 + ( dc_item->hostid % CONFIG_ASYNC_AGENT_POLLER_FORKS * CONFIG_ASYNC_AGENT_POLLER_CONNS)/CONFIG_ASYNC_AGENT_POLLER_CONNS);
 
 			
 
@@ -443,7 +443,6 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 		dc_item->poller_type = ZBX_NO_POLLER;
 		return;
 	}
-	zabbix_log(LOG_LEVEL_DEBUG,"#42: in %s",__func__);
 	poller_type = poller_by_item(dc_item->type, dc_item->key, dc_item->itemid);
 	
 	if (0 != (flags & ZBX_HOST_UNREACHABLE))
@@ -7915,30 +7914,19 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *er
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
-		//if (ZBX_POLLER_TYPE_NORMAL == poller_type) {
-		//	zabbix_log(LOG_LEVEL_INFORMATION, "Started get poller items for normal poller %d",poller_type);
-		//}
-	
-		if (dc_item->nextcheck > now) 		
+		if (dc_item->nextcheck > now) 
 			break;
-
-				//zabbix_log(LOG_LEVEL_INFORMATION, "Started get poller items for normal poller");
 			
 		if ( (0 != num) && 	( ZBX_POLLER_TYPE_NORMAL == poller_type ) && (SUCCEED == is_snmp_type(dc_item_prev->type))
 					 && (0 != __config_snmp_item_compare(dc_item_prev, dc_item)) ) 			
 			break;
 	
-				
+		
 		if ( (0 != num) && 	( ZBX_POLLER_TYPE_JAVA == poller_type )	&& (ITEM_TYPE_JMX == dc_item_prev->type) && 
 				(0 != __config_java_item_compare(dc_item_prev, dc_item)) )
 			break;
 		
-		
-		//if ((ZBX_POLLER_TYPE_ASYNC_SNMP==poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP==poller_type )  && POLL_FREE != errcodes[num]) {
-		//	num++;
-		//	continue;
-		//}
-		//for async pollers queues number is alwayas equal or exceeds ZBX_POLLER_TYPE_COUNT,  skipping non-free items for async calls
+		///for async pollers queues number is alwayas equal or exceeds ZBX_POLLER_TYPE_COUNT,  skipping non-free items for async calls
 		if (ZBX_POLLER_TYPE_COUNT <= poller_type && POLL_FREE != errcodes[num]) {
 			num++;
 			continue;
@@ -7946,7 +7934,7 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *er
 
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
-	
+
 		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid))) 
 			continue;
 		
@@ -7965,25 +7953,14 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *er
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
 			continue;
 		}
-		//zabbix_log(LOG_LEVEL_INFORMATION, "Fetching item for slot  %d",num);
-		if ( ( ITEM_TYPE_SNMPv1 == dc_item->type || 
-			   ITEM_TYPE_SNMPv2c == dc_item->type || 
-			   ITEM_TYPE_SNMPv3 == dc_item->type ) && ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
-			
-			ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &dc_item->itemid);
-			if (NULL != snmpitem && (0 == strncmp(snmpitem->snmp_oid, "discovery[", 10) || NULL != strchr(snmpitem->snmp_oid, '[')) ) {
-				/* skipping non async able (yet) items in async snmp poller */
-			//	continue;
-			zabbix_log(LOG_LEVEL_INFORMATION,"THis shouldn't happen yet, dynamic items supprt not implemeneted in ASYNC SNMP");
-			}
-		}
-		
+
 		dc_item_prev = dc_item;
 		dc_item->location = ZBX_LOC_POLLER;
 		DCget_host(&items[num].host, dc_host);
 		DCget_item(&items[num], dc_item);
 		
-		errcodes[num]=POLL_CC_FETCHED;
+		//there is no errcodes passed for pingers
+		if (errcodes) errcodes[num]=POLL_CC_FETCHED;
 		num++;
 		cnt++;
 	}

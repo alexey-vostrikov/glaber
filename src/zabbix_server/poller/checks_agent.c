@@ -197,13 +197,11 @@ void handle_socket_operation(struct async_agent_session * sess)
 			if (SUCCEED != zbx_tcp_send(sess->socket, conf.items[item_idx].key))
 			{	//we are using async, so it might be that the socket still not ready, if so, we just have to wait  a bit 
 				//on next call of handle op's (probably) the socket will be ready
-				//if (EAGAIN ==  zbx_socket_last_error() ) {
-				//	zabbix_log(LOG_LEVEL_INFORMATION, "Socket isn't ready yet for item %ld",conf.items[item_idx].itemid );
-				//	return;
-				//} 
+				if (EAGAIN ==  zbx_socket_last_error() ) {
+					zabbix_log(LOG_LEVEL_TRACE, "Socket isn't ready yet for item %ld",conf.items[item_idx].itemid );
+					return;
+				} 
 				
-				//otherwise it's realy an error
-				//zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld sending request failed %d",conf.items[item_idx].itemid, zbx_socket_last_error());
 				conf.errcodes[item_idx] = NETWORK_ERROR;
 				sess->state = POLL_FREE;
 				zbx_tcp_close(sess->socket);		
@@ -249,7 +247,7 @@ void handle_socket_operation(struct async_agent_session * sess)
 				}
 				else {
 					set_result_type(&conf.results[item_idx], ITEM_VALUE_TYPE_TEXT, sess->socket->buffer);
-				//	zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld data parsed, type os set",conf.items[item_idx].itemid);
+					zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld data parsed, type os set",conf.items[item_idx].itemid);
 				}
 			} else 
 			{
@@ -399,7 +397,7 @@ int start_agent_connection( struct async_agent_session *sess) {
 	conf.errcodes[item_idx]=POLL_POLLING;	
 	sess->current_item=item_idx;
 	sess->state=POLL_CONNECT_SENT;
-	sess->stop_time = time(NULL) + CONFIG_TIMEOUT;
+	sess->stop_time = time(NULL) + CONFIG_TIMEOUT+1;
 	
 	return SUCCEED;
 }

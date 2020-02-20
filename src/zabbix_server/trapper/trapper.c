@@ -1102,7 +1102,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		
 
 		if (agg < 1) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Non agg code is running");
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"Non agg code is running");
 			zbx_history_get_values(itemid,value_type,start,count,end,&values);
 			zbx_json_addarray(&json,ZBX_PROTO_TAG_DATA);
 
@@ -1661,7 +1661,7 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 					ret = recv_getstatus(sock, &jp);
 			} else if (0 == strcmp(value, ZBX_PROTO_VALUE_GET_HISTORY))
 			{
-					zabbix_log(LOG_LEVEL_INFORMATION,"HIST: calling history_get_data");
+					//zabbix_log(LOG_LEVEL_INFORMATION,"HIST: calling history_get_data");
 					ret = recv_history_get_data(sock, &jp);
 			}
 			else if (0 == strcmp(value, ZBX_PROTO_VALUE_ZABBIX_STATS))
