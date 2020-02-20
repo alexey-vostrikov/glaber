@@ -766,7 +766,7 @@ out:
 	zbx_free(page_r.data);
 	curl_slist_free_all(curl_headers);
 	curl_easy_cleanup(handle);
-	zabbix_log(LOG_LEVEL_INFORMATION,"History preload: %ld values loadedй to the value cache", valuecount);
+	zabbix_log(LOG_LEVEL_INFORMATION,"History preload: %ld values loaded to the value cache", valuecount);
 	return valuecount;
 }
 
