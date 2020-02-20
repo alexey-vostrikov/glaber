@@ -354,12 +354,12 @@ int start_agent_connection( struct async_agent_session *sess) {
 			break;
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		case ZBX_TCP_SEC_TLS_CERT:
-			tls_arg1 = items[i].host.tls_issuer;
-			tls_arg2 = items[i].host.tls_subject;
+			tls_arg1 = conf.items[item_idx].host.tls_issuer;
+			tls_arg2 = conf.items[item_idx].host.tls_subject;
 			break;
 		case ZBX_TCP_SEC_TLS_PSK:
-			tls_arg1 = items[i].host.tls_psk_identity;
-			tls_arg2 = items[i].host.tls_psk;
+			tls_arg1 = conf.items[item_idx].host.tls_psk_identity;
+			tls_arg2 = conf.items[item_idx].host.tls_psk;
 			break;
 #else
 		case ZBX_TCP_SEC_TLS_CERT:
