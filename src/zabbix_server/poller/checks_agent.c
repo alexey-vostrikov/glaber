@@ -247,7 +247,7 @@ void handle_socket_operation(struct async_agent_session * sess)
 				}
 				else {
 					set_result_type(&conf.results[item_idx], ITEM_VALUE_TYPE_TEXT, sess->socket->buffer);
-					zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld data parsed, type os set",conf.items[item_idx].itemid);
+					zabbix_log(LOG_LEVEL_DEBUG,"Agent item %ld data parsed, type os set",conf.items[item_idx].itemid);
 				}
 			} else 
 			{
