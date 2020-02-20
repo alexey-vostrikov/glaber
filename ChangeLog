@@ -1,3 +1,14 @@
+Changelog - Glaber 1.1.0
+
+1.	All async requests are strictly serialized on per-host basis. This is important for hosts and devices  collecting hundreds of items, both SNMP and AGENT type
+2.	Poller performance greatly increased. It doesn’t depend on timeouts anymore, polling latency is reduced either. One poller is capable of collecting 20kNVPS. However,  for production use calculate number of pollers as  a poller for each 3k NVPS or one poller for 4k unique devices. 
+3.	Unreachable pollers doesn’t use async method of polling anymore
+4.	In async processes titles polling speed is changed to ‘per second’ basis.
+5.	Value Cache preloading is done in housekeeper process now instead of man startup code. 
+6.	New type of history connectivity “server” added to frontend code. This way fronend use server as a proxy and don’t care about history data engine used.
+
+
+
 ChangeLog - Glaber 1.0.0
 
 1. Active and passive proxy supported now for both standalone and cluster mode
