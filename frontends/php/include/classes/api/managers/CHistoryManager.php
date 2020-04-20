@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -64,8 +64,10 @@ private function getLastValuesFromServer($items, $limit, $period) {
 	 
 	  $server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
 	  $result = $server->getLastValues(get_cookie(ZBX_SESSION_NAME),array_column($items,'itemid'),$limit, $period); 
-	  //var_dump($server->getError());
-	  //var_dump($result);
+	  
+	 // var_dump($server->getError());
+	 // var_dump($result);
+	 
 	  if (!is_array($result)) return [];
 
 	  return $result;
@@ -219,27 +221,38 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 
 		if ($limit == 1) {
 			foreach ($items as $item) {
-				$values = DBfetchArray(DBselect(
-					'SELECT *'.
+				// Executing two subsequent queries individually for the sake of performance.
+
+				$clock_max = DBfetch(DBselect(
+					'SELECT MAX(h.clock)'.
 					' FROM '.self::getTableName($item['value_type']).' h'.
 					' WHERE h.itemid='.zbx_dbstr($item['itemid']).
-						' AND h.clock=('.
-							'SELECT MAX(h2.clock)'.
-							' FROM '.self::getTableName($item['value_type']).' h2'.
-							' WHERE h2.itemid='.zbx_dbstr($item['itemid']).
-								($period ? ' AND h2.clock>'.$period : '').
-						')'.
-					' ORDER BY h.ns DESC',
-					$limit
-				));
+						($period ? ' AND h.clock>'.$period : '')
+				), false);
 
-				if ($values) {
-					$results[$item['itemid']] = $values;
+				if ($clock_max) {
+					$clock_max = reset($clock_max);
+
+					if ($clock_max !== null) {
+						$values = DBfetchArray(DBselect(
+							'SELECT *'.
+							' FROM '.self::getTableName($item['value_type']).' h'.
+							' WHERE h.itemid='.zbx_dbstr($item['itemid']).
+								' AND h.clock='.zbx_dbstr($clock_max).
+							' ORDER BY h.ns DESC',
+							$limit
+						));
+
+						if ($values) {
+							$results[$item['itemid']] = $values;
+						}
+					}
 				}
 			}
 		}
 		else {
 			foreach ($items as $item) {
+				// Cannot order by h.ns directly here due to performance issues.
 				$values = DBfetchArray(DBselect(
 					'SELECT *'.
 					' FROM '.self::getTableName($item['value_type']).' h'.
@@ -254,6 +267,11 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 					$clock = $values[$count - 1]['clock'];
 
 					if ($count == $limit + 1 && $values[$count - 2]['clock'] == $clock) {
+						/*
+						 * The last selected entries having the same clock means the selection (not just the order)
+						 * of the last entries is possibly wrong due to unordered by nanoseconds.
+						 */
+
 						do {
 							unset($values[--$count]);
 						} while ($values && $values[$count - 1]['clock'] == $clock);
@@ -293,8 +311,8 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	}
 
 	/**
-	 * Returns the history value of the item at the given time. If no value exists at the given time, the function
-	 * will return the previous value.
+	 * Returns the history data of the item at the given time. If no data exists at the given time, the function will
+	 * return the previous data.
 	 *
 	 * The $item parameter must have the value_type and itemid properties set.
 	 *
@@ -304,7 +322,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	 * @param int    $clock
 	 * @param int    $ns
 	 *
-	 * @return string|null  Value at specified time of first value before specified time. null if value is not found.
+	 * @return array|null  Item data at specified time of first data before specified time. null if data is not found.
 	 */
 	public function getValueAt(array $item, $clock, $ns) {
 		switch (self::getDataSourceType($item['value_type'])) {
@@ -393,7 +411,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 			$result = CElasticsearchHelper::query('POST', reset($endpoints), $query);
 
 			if (count($result) === 1 && is_array($result[0]) && array_key_exists('value', $result[0])) {
-				return $result[0]['value'];
+				return $result[0];
 			}
 		}
 
@@ -406,21 +424,21 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	 * @see CHistoryManager::getValueAt
 	 */
 	private function getValueAtFromSql(array $item, $clock, $ns) {
-		$value = null;
+		$result = null;
 		$table = self::getTableName($item['value_type']);
 
-		$sql = 'SELECT value'.
+		$sql = 'SELECT *'.
 				' FROM '.$table.
 				' WHERE itemid='.zbx_dbstr($item['itemid']).
 					' AND clock='.zbx_dbstr($clock).
 					' AND ns='.zbx_dbstr($ns);
 
 		if (($row = DBfetch(DBselect($sql, 1))) !== false) {
-			$value = $row['value'];
+			$result = $row;
 		}
 
-		if ($value !== null) {
-			return $value;
+		if ($result !== null) {
+			return $result;
 		}
 
 		$max_clock = 0;
@@ -447,18 +465,18 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		}
 
 		if ($max_clock == 0) {
-			return $value;
+			return $result;
 		}
 
 		if ($clock == $max_clock) {
-			$sql = 'SELECT value'.
+			$sql = 'SELECT *'.
 					' FROM '.$table.
 					' WHERE itemid='.zbx_dbstr($item['itemid']).
 						' AND clock='.zbx_dbstr($clock).
 						' AND ns<'.zbx_dbstr($ns);
 		}
 		else {
-			$sql = 'SELECT value'.
+			$sql = 'SELECT *'.
 					' FROM '.$table.
 					' WHERE itemid='.zbx_dbstr($item['itemid']).
 						' AND clock='.zbx_dbstr($max_clock).
@@ -466,10 +484,10 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		}
 
 		if (($row = DBfetch(DBselect($sql, 1))) !== false) {
-			$value = $row['value'];
+			$result = $row;
 		}
 
-		return $value;
+		return $result;
 	}
 
 	/**
@@ -477,136 +495,378 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	 *
 	 * The $item parameter must have the value_type, itemid and source properties set.
 	 *
-	 * @param array  $items        items to get aggregated values for
-	 * @param int    $time_from    minimal timestamp (seconds) to get data from
-	 * @param int    $time_to      maximum timestamp (seconds) to get data from
-	 * @param int    $width        graph width in pixels (is not required for pie charts)
+	 * @param array  $items      items to get aggregated values for
+	 * @param int    $time_from  minimal timestamp (seconds) to get data from
+	 * @param int    $time_to    maximum timestamp (seconds) to get data from
+	 * @param string $function   function for data aggregation
+	 * @param string $interval   aggregation interval in seconds
 	 *
 	 * @return array    history value aggregation for graphs
 	 */
-	public function getGraphAggregation(array $items, $time_from, $time_to, $width = null) {
-
-		if ($width !== null) {
-			$size = $time_to - $time_from;
-			$delta = $size - $time_from % $size;
-		}
-		else {
-			$size = null;
-			$delta = null;
-		}
-
-		$width=(int)$width;
+	public function getGraphAggregationByInterval(array $items, $time_from, $time_to, $function, $interval) {
 		$grouped_items = self::getItemsGroupedByStorage($items);
-		$results = [];
 
-		if (array_key_exists(ZBX_HISTORY_SOURCE_SERVER, $grouped_items)) {
-			$results += $this->getGraphAggregationFromServer($grouped_items[ZBX_HISTORY_SOURCE_SERVER], $time_from, $time_to, $width);
-		} 
-		else if (array_key_exists(ZBX_HISTORY_SOURCE_CLICKHOUSE, $grouped_items)) {
-			$results += $this->getGraphAggregationFromClickhouse($grouped_items[ZBX_HISTORY_SOURCE_CLICKHOUSE],
-					$time_from, $time_to, $width, $size, $delta
-			);
-		} else if (array_key_exists(ZBX_HISTORY_SOURCE_ELASTIC, $grouped_items)) {
-			$results += $this->getGraphAggregationFromElasticsearch($grouped_items[ZBX_HISTORY_SOURCE_ELASTIC],
-					$time_from, $time_to, $width, $size, $delta
+		$results = [];
+		if (array_key_exists(ZBX_HISTORY_SOURCE_ELASTIC, $grouped_items)) {
+			$results = $this->getGraphAggregationByIntervalFromElasticsearch($grouped_items[ZBX_HISTORY_SOURCE_ELASTIC],
+				$time_from, $time_to, $function, $interval
 			);
 		}
 
 		if (array_key_exists(ZBX_HISTORY_SOURCE_SQL, $grouped_items)) {
-			$results += $this->getGraphAggregationFromSql($grouped_items[ZBX_HISTORY_SOURCE_SQL], $time_from, $time_to,
-					$width, $size, $delta
+			$results += $this->getGraphAggregationByIntervalFromSql($grouped_items[ZBX_HISTORY_SOURCE_SQL],
+				$time_from, $time_to, $function, $interval
 			);
 		}
 
-		return $results;
-
-	}
-
-/**
-	 * Sever aggregation implementation *
-	 */
-	private function getGraphAggregationFromServer(array $items, $time_from, $time_to, $aggregates) {
-		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-		//$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
-		$itemids=array_column($items,'itemid');
-		
-		foreach ($itemids as $itemid) {
-			//for some strange reason same object dosn't do request for the same time, so init once per itemid here
-			$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);  
-			$results[$itemid]['data'] = $server->getHistoryData(get_cookie(ZBX_SESSION_NAME), $itemid, $time_from, $time_to, 0, $aggregates); 
+		if (array_key_exists(ZBX_HISTORY_SOURCE_ELASTIC, $grouped_items)) {
+			$results += $this->getGraphAggregationFromElasticsearch($grouped_items[ZBX_HISTORY_SOURCE_ELASTIC],
+					$time_from, $time_to, $width, $size, $delta
+			);
 		}
 	
 		return $results;
 	}
-
-
+	
 	/**
-	 * Clickhouse aggregation implementation *
+	 * Elasticsearch specific implementation of getGraphAggregationByInterval.
+	 *
+	 * @see CHistoryManager::getGraphAggregationByInterval
 	 */
-	private function getGraphAggregationFromClickhouse(array $items, $time_from, $time_to, $width, $size, $delta) {
-
-		global $HISTORY;
-		$group_by = 'itemid';
-		$sql_select_extra = '';
-
-		if ($width !== null && $size !== null && $delta !== null) {
-			// Required for 'group by' support of Oracle.
-			$calc_field = 'round('.$width.'*'.'modulo(toUInt32(clock)'.'+'.$delta.",$size)".'/('.$size.'),0)';
-
-			$sql_select_extra = ','.$calc_field.' AS i';
-			$group_by .= ','.$calc_field;
-		}
-
-		$results = [];
+	private function getGraphAggregationByIntervalFromElasticsearch(array $items, $time_from, $time_to, $function,
+			$interval) {
+		$terms = [];
 
 		foreach ($items as $item) {
-				
-			if ($item['source'] === 'history' || isset($HISTORY['disable_trends'])) {
-			
-				if ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) {
-					$sql_select = 'COUNT(*) AS count,AVG(value) AS avg,MIN(value) AS min,MAX(value) AS max';
-				} else
-				{
-					$sql_select = 'COUNT(*) AS count,AVG(value_dbl) AS avg,MIN(value_dbl) AS min,MAX(value_dbl) AS max';
+			$terms[$item['value_type']][] = $item['itemid'];
+		}
+
+		$aggs = ['clock' => ['max' => ['field' => 'clock']]];
+
+		switch ($function) {
+			case GRAPH_AGGREGATE_MIN:
+				$aggs['value'] = ['min' => ['field' => 'value']];
+				break;
+			case GRAPH_AGGREGATE_MAX:
+				$aggs['value'] = ['max' => ['field' => 'value']];
+				break;
+			case GRAPH_AGGREGATE_AVG:
+				$aggs['value'] = ['avg' => ['field' => 'value']];
+				break;
+			case GRAPH_AGGREGATE_SUM:
+				$aggs['value'] = ['sum' => ['field' => 'value']];
+				break;
+			case GRAPH_AGGREGATE_FIRST:
+				$aggs['value'] = ['top_hits' => ['size' => 1, 'sort' => ['clock' => ['order' => 'asc']]]];
+				$aggs['clock'] = ['min' => ['field' => 'clock']];
+				break;
+			case GRAPH_AGGREGATE_LAST:
+				$aggs['value'] = ['top_hits' => ['size' => 1, 'sort' => ['clock' => ['order' => 'desc']]]];
+				break;
+		}
+
+		$query = [
+			'aggs' => [
+				'group_by_itemid' => [
+					'terms' => [
+						// Assure that aggregations for all terms are returned.
+						'size' => count($items),
+						'field' => 'itemid'
+					]
+				]
+			],
+			'size' => 0
+		];
+
+		// Clock value is divided by 1000 as it is stored as milliseconds.
+		$formula = '((doc[\'clock\'].date.getMillis()/1000) - ((doc[\'clock\'].date.getMillis()/1000)%params.interval))';
+
+		$query['aggs']['group_by_itemid']['aggs'] = [
+			'group_by_script' => [
+				'terms' => [
+					'size' => (($time_to - $time_from) / $interval) + 1,
+					'script' => [
+						'inline' => $formula,
+						'params' => [
+							'interval' => $interval
+						]
+					]
+				],
+				'aggs' => $aggs
+			]
+		];
+
+		$results = [];
+		foreach (self::getElasticsearchEndpoints(array_keys($terms)) as $type => $endpoint) {
+			$query['query']['bool']['must'] = [
+				[
+					'terms' => [
+						'itemid' => $terms[$type]
+					]
+				],
+				[
+					'range' => [
+						'clock' => [
+							'gte' => $time_from,
+							'lte' => $time_to
+						]
+					]
+				]
+			];
+
+			$data = CElasticsearchHelper::query('POST', $endpoint, $query);
+
+			foreach ($data['group_by_itemid']['buckets'] as $item) {
+				if (!is_array($item['group_by_script']) || !array_key_exists('buckets', $item['group_by_script'])
+					|| !is_array($item['group_by_script']['buckets'])) {
+					continue;
 				}
-			
-				$sql_from = 'history_buffer';
-				
-				$daystart=date('Y-m-d',$time_from);
-				$dayend=date('Y-m-d',$time_to);
-				
-				
-				$sql_day_condition = ' AND day >= \''.$daystart. '\''.
-							  		 ' AND day <= \''. $dayend. '\'';	 
-				
-				$results[$item['itemid']]['source'] = 'history';
-			}
-			else {
-				$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
-				$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
-				$sql_day_condition='';
-				$results[$item['itemid']]['source'] = 'trends';
-			}
-			
-			$query_text = 
-				'SELECT itemid,'.$sql_select.$sql_select_extra.',MAX(toUInt32(clock)) AS clock1'.
-				' FROM '. $HISTORY['dbname'] . '.' . $sql_from .
-				' WHERE itemid='.$item['itemid'].
-				' AND clock>='.zbx_dbstr($time_from).
-				' AND clock<='.zbx_dbstr($time_to).
-					$sql_day_condition .
-				' GROUP BY '.$group_by ;
 
-			$values = CClickHouseHelper::query($query_text,1,array('itemid','count','avg','min','max','i','clock'));
+				foreach ($item['group_by_script']['buckets'] as $point) {
+					$row = [
+						'itemid' => $item['key'],
+						'tick' => (int)$point['key'],
+						'count' => $point['doc_count'],
+						'clock' => (int)$point['clock']['value_as_string']
+					];
 
-			$results[$item['itemid']]['data'] = $values;
+					if ($function == GRAPH_AGGREGATE_FIRST || $function == GRAPH_AGGREGATE_LAST) {
+						$row['value'] = $point['value']['hits']['hits'][0]['_source']['value'];
+					}
+					else {
+						$row['value'] = array_key_exists('value', $point) ? $point['value']['value'] : null;
+					}
+
+					$results[$item['key']]['data'][] = $row;
+				}
+
+				if (array_key_exists($item['key'], $results)) {
+					$results[$item['key']]['source'] = 'history';
+				}
+			}
 		}
 
 		return $results;
-
 	}
 
-	private function getGraphAggregationFromElasticsearch(array $items, $time_from, $time_to, $width, $size, $delta) {
+	/**
+	 * SQL specific implementation of getGraphAggregationByWidth.
+	 *
+	 * @see CHistoryManager::getGraphAggregationByInterval
+	 */
+	private function getGraphAggregationByIntervalFromSql(array $items, $time_from, $time_to, $function, $interval) {
+		$items_by_table = [];
+		foreach ($items as $item) {
+			$items_by_table[$item['value_type']][$item['source']][] = $item['itemid'];
+		}
+
+		$result = [];
+
+		foreach ($items_by_table as $value_type => $items_by_source) {
+			foreach ($items_by_source as $source => $itemids) {
+				$sql_select = ['itemid'];
+				$sql_group_by = ['itemid'];
+
+				$calc_field = zbx_dbcast_2bigint('clock').'-'.zbx_sql_mod(zbx_dbcast_2bigint('clock'), $interval);
+				$sql_select[] = $calc_field.' AS tick';
+				$sql_group_by[] = $calc_field;
+
+				if ($source === 'history') {
+					switch ($function) {
+						case GRAPH_AGGREGATE_MIN:
+							$sql_select[] = 'MIN(value) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_MAX:
+							$sql_select[] = 'MAX(value) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_AVG:
+							$sql_select[] = 'AVG(value) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_COUNT:
+							$sql_select[] = 'COUNT(*) AS count, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_SUM:
+							$sql_select[] = 'SUM(value) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_FIRST:
+							$sql_select[] = 'MIN(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_LAST:
+							$sql_select[] = 'MAX(clock) AS clock';
+							break;
+					}
+					$sql_from = ($value_type == ITEM_VALUE_TYPE_UINT64) ? 'history_uint' : 'history';
+				}
+				else {
+					switch ($function) {
+						case GRAPH_AGGREGATE_MIN:
+							$sql_select[] = 'MIN(value_min) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_MAX:
+							$sql_select[] = 'MAX(value_max) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_AVG:
+							$sql_select[] = 'AVG(value_avg) AS value, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_COUNT:
+							$sql_select[] = 'SUM(num) AS count, MAX(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_SUM:
+							$sql_select[] = '(value_avg * num) AS value, MAX(clock) AS clock';
+							$sql_group_by = array_merge($sql_group_by, ['value_avg', 'num']);
+							break;
+						case GRAPH_AGGREGATE_FIRST:
+							$sql_select[] = 'MIN(clock) AS clock';
+							break;
+						case GRAPH_AGGREGATE_LAST:
+							$sql_select[] = 'MAX(clock) AS clock';
+							break;
+					}
+					$sql_from = ($value_type == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
+				}
+
+				$sql = 'SELECT '.implode(', ', $sql_select).
+					' FROM '.$sql_from.
+					' WHERE '.dbConditionInt('itemid', $itemids).
+					' AND clock >= '.zbx_dbstr($time_from).
+					' AND clock <= '.zbx_dbstr($time_to).
+					' GROUP BY '.implode(', ', $sql_group_by);
+
+				if ($function == GRAPH_AGGREGATE_FIRST || $function == GRAPH_AGGREGATE_LAST) {
+					$sql = 'SELECT DISTINCT h.itemid, h.'.($source === 'history' ? 'value' : 'value_avg').' AS value, h.clock, hi.tick'.
+						' FROM '.$sql_from.' h'.
+						' JOIN('.$sql.') hi ON h.itemid = hi.itemid AND h.clock = hi.clock';
+				}
+
+				$sql_result = DBselect($sql);
+
+				while (($row = DBfetch($sql_result)) !== false) {
+					$result[$row['itemid']]['source'] = $source;
+					$result[$row['itemid']]['data'][] = $row;
+				}
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Returns history value aggregation for graphs.
+	 *
+	 * The $item parameter must have the value_type, itemid and source properties set.
+	 *
+	 * @param array $items      items to get aggregated values for
+	 * @param int   $time_from  minimal timestamp (seconds) to get data from
+	 * @param int   $time_to    maximum timestamp (seconds) to get data from
+	 * @param int   $width      graph width in pixels (is not required for pie charts)
+	 *
+	 * @return array    history value aggregation for graphs
+	 */
+	public function getGraphAggregationByWidth(array $items, $time_from, $time_to, $width = null) {
+		$grouped_items = self::getItemsGroupedByStorage($items);
+
+		$results = [];
+		if (array_key_exists(ZBX_HISTORY_SOURCE_ELASTIC, $grouped_items)) {
+			$results += $this->getGraphAggregationByWidthFromElasticsearch($grouped_items[ZBX_HISTORY_SOURCE_ELASTIC],
+					$time_from, $time_to, $width
+			);
+		}
+
+		if (array_key_exists(ZBX_HISTORY_SOURCE_SQL, $grouped_items)) {
+			$results += $this->getGraphAggregationByWidthFromSql($grouped_items[ZBX_HISTORY_SOURCE_SQL],
+				$time_from, $time_to, $width
+			);
+		}
+		
+		if (array_key_exists(ZBX_HISTORY_SOURCE_SERVER, $grouped_items)) {
+			$results += $this->getGraphAggregationByWidthFromServer($grouped_items[ZBX_HISTORY_SOURCE_SERVER],
+				$time_from, $time_to, $width
+			);
+		}
+
+		return $results;
+	}
+	
+	private function getGraphAggregationByWidthFromServer(array $items, $time_from, $time_to, $aggregates) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+		//$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+		$itemids=array_column($items,'itemid');
+			
+		foreach ($itemids as $itemid) {
+			//for some strange reason same object dosn't do request for the same time, so init once per itemid here
+			error_log("$itemid");
+			$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);  
+			$results[$itemid]['data'] = $server->getHistoryData(get_cookie(ZBX_SESSION_NAME), $itemid, $time_from, $time_to, 0, $aggregates); 
+		}
+		return $results;
+	}
+	
+	private function getGraphAggregationFromClickhouse(array $items, $time_from, $time_to, $width, $size, $delta) {
+		global $HISTORY;
+		$group_by = 'itemid';
+		$sql_select_extra = '';
+		
+		if ($width !== null && $size !== null && $delta !== null) {
+			// Required for 'group by' support of Oracle.
+			$calc_field = 'round('.$width.'*'.'modulo(toUInt32(clock)'.'+'.$delta.",$size)".'/('.$size.'),0)';
+		
+			$sql_select_extra = ','.$calc_field.' AS i';
+			$group_by .= ','.$calc_field;
+		}
+		
+		$results = [];
+		
+		foreach ($items as $item) {
+						
+		if ($item['source'] === 'history' || isset($HISTORY['disable_trends'])) {
+		
+		if ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) {
+			$sql_select = 'COUNT(*) AS count,AVG(value) AS avg,MIN(value) AS min,MAX(value) AS max';
+		} else {
+			$sql_select = 'COUNT(*) AS count,AVG(value_dbl) AS avg,MIN(value_dbl) AS min,MAX(value_dbl) AS max';
+		}
+					
+		$sql_from = 'history_buffer';
+						
+		$daystart=date('Y-m-d',$time_from);
+		$dayend=date('Y-m-d',$time_to);
+						
+		$sql_day_condition = ' AND day >= \''.$daystart. '\''.' AND day <= \''. $dayend. '\'';	 
+						
+		$results[$item['itemid']]['source'] = 'history';
+	} else {
+		$sql_select = 'SUM(num) AS count,AVG(value_avg) AS avg,MIN(value_min) AS min,MAX(value_max) AS max';
+		$sql_from = ($item['value_type'] == ITEM_VALUE_TYPE_UINT64) ? 'trends_uint' : 'trends';
+		$sql_day_condition='';
+		$results[$item['itemid']]['source'] = 'trends';
+	}
+					
+	$query_text = 
+		'SELECT itemid,'.$sql_select.$sql_select_extra.',MAX(toUInt32(clock)) AS clock1'.
+		' FROM '. $HISTORY['dbname'] . '.' . $sql_from .
+		' WHERE itemid='.$item['itemid'].
+		' AND clock>='.zbx_dbstr($time_from).
+		' AND clock<='.zbx_dbstr($time_to).
+		$sql_day_condition .
+		' GROUP BY '.$group_by ;
+		
+	$values = CClickHouseHelper::query($query_text,1,array('itemid','count','avg','min','max','i','clock'));
+	
+	$results[$item['itemid']]['data'] = $values;
+	}
+		
+	return $results;
+		
+}
+
+
+
+	/**
+	 * Elasticsearch specific implementation of getGraphAggregationByWidth.
+	 *
+	 * @see CHistoryManager::getGraphAggregationByWidth
+	 */
+	private function getGraphAggregationByWidthFromElasticsearch(array $items, $time_from, $time_to, $width) {
 		$terms = [];
 
 		foreach ($items as $item) {
@@ -668,7 +928,10 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 			'size' => 0
 		];
 
-		if ($width !== null && $size !== null && $delta !== null) {
+		if ($width !== null) {
+			$size = $time_to - $time_from;
+			$delta = $size - $time_from % $size;
+
 			// Additional grouping for line graphs.
 			$aggs['max_clock'] = [
 				'max' => [
@@ -722,7 +985,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 
 			$data = CElasticsearchHelper::query('POST', $endpoint, $query);
 
-			if ($width !== null && $size !== null && $delta !== null) {
+			if ($width !== null) {
 				foreach ($data['group_by_itemid']['buckets'] as $item) {
 					if (!is_array($item['group_by_script']) || !array_key_exists('buckets', $item['group_by_script'])
 							|| !is_array($item['group_by_script']['buckets'])) {
@@ -763,15 +1026,18 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 	}
 
 	/**
-	 * SQL specific implementation of getGraphAggregation.
+	 * SQL specific implementation of getGraphAggregationByWidth.
 	 *
-	 * @see CHistoryManager::getGraphAggregation
+	 * @see CHistoryManager::getGraphAggregationByWidth
 	 */
-	private function getGraphAggregationFromSql(array $items, $time_from, $time_to, $width, $size, $delta) {
+	private function getGraphAggregationByWidthFromSql(array $items, $time_from, $time_to, $width) {
 		$group_by = 'itemid';
 		$sql_select_extra = '';
 
-		if ($width !== null && $size !== null && $delta !== null) {
+		if ($width !== null) {
+			$size = $time_to - $time_from;
+			$delta = $size - $time_from % $size;
+
 			// Required for 'group by' support of Oracle.
 			$calc_field = 'round('.$width.'*'.zbx_sql_mod(zbx_dbcast_2bigint('clock').'+'.$delta, $size)
 					.'/('.$size.'),0)';
@@ -944,7 +1210,7 @@ private function getLastValuesFromClickhouse($items, $limit, $period) {
 		global $HISTORY;
 
 		if (is_array($HISTORY) && array_key_exists('types', $HISTORY) && is_array($HISTORY['types'])
-				&& count($HISTORY['types'] > 0)) {
+				&& count($HISTORY['types']) > 0) {
 
 			$query = [
 				'query' => [

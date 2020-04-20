@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@
 #include "../zabbix_server/selfmon/selfmon.h"
 #include "../zabbix_server/vmware/vmware.h"
 #include "setproctitle.h"
-#include "../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 #include "zbxipcservice.h"
 #include "../zabbix_server/preprocessor/preproc_manager.h"
 #include "../zabbix_server/preprocessor/preproc_worker.h"
@@ -132,26 +132,31 @@ static struct zbx_option	longopts[] =
 	{NULL}
 };
 
+void *API_CALLBACKS;
+
 /* short options */
 static char	shortopts[] = "c:hVR:f";
 
 /* end of COMMAND LINE OPTIONS */
 
-int	threads_num = 0;
-pid_t	*threads = NULL;
+int		threads_num = 0;
+pid_t		*threads = NULL;
+static int	*threads_flags;
 
 unsigned char	program_type		= ZBX_PROGRAM_TYPE_PROXY_ACTIVE;
 
 unsigned char	process_type		= ZBX_PROCESS_TYPE_UNKNOWN;
 int		process_num		= 0;
 int		server_num		= 0;
+u_int64_t CONFIG_DEBUG_ITEM = 0;
+u_int64_t CONFIG_DEBUG_HOST = 0;
 
 int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME=0;
 int CONFIG_CLICKHOUSE_DISABLE_NS_VALUE=0;
-int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME=0;
-char *CONFIG_CLICKHOUSE_USERNAME = NULL;
-char *CONFIG_CLICKHOUSE_PASSWORD = NULL;
-int *CONFIG_CLICKHOUSE_PRELOAD_VALUES=0;
+int CONFIG_VALUECACHE_FILL_TIME=0;
+char *CONFIG_HISTORY_USERNAME = NULL;
+char *CONFIG_HISTORY_PASSWORD = NULL;
+int *CONFIG_HISTORY_PRELOAD_VALUES=0;
 
 int CONFIG_ASYNC_SNMP_POLLER_FORKS =2;
 int CONFIG_ASYNC_AGENT_POLLER_FORKS =2;
@@ -166,6 +171,7 @@ int	CONFIG_PINGER_FORKS		= 1;
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
 int CONFIG_CLUSTER_REROUTE_DATA =0;
+int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 
 char *CONFIG_CLUSTER_DOMAINS=NULL;
 
@@ -195,6 +201,7 @@ int	CONFIG_PREPROCMAN_FORKS		= 1;
 int	CONFIG_PREPROCESSOR_FORKS	= 3;
 int	CONFIG_LLDMANAGER_FORKS		= 0;
 int	CONFIG_LLDWORKER_FORKS		= 0;
+int	CONFIG_ALERTDB_FORKS		= 0;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
 char	*CONFIG_LISTEN_IP		= NULL;
@@ -290,6 +297,14 @@ char	*CONFIG_TLS_CERT_FILE		= NULL;
 char	*CONFIG_TLS_KEY_FILE		= NULL;
 char	*CONFIG_TLS_PSK_IDENTITY	= NULL;
 char	*CONFIG_TLS_PSK_FILE		= NULL;
+char	*CONFIG_TLS_CIPHER_CERT13	= NULL;
+char	*CONFIG_TLS_CIPHER_CERT		= NULL;
+char	*CONFIG_TLS_CIPHER_PSK13	= NULL;
+char	*CONFIG_TLS_CIPHER_PSK		= NULL;
+char	*CONFIG_TLS_CIPHER_ALL13	= NULL;
+char	*CONFIG_TLS_CIPHER_ALL		= NULL;
+char	*CONFIG_TLS_CIPHER_CMD13	= NULL;	/* not used in proxy, defined for linking with tls.c */
+char	*CONFIG_TLS_CIPHER_CMD		= NULL;	/* not used in proxy, defined for linking with tls.c */
 
 static char	*CONFIG_SOCKET_PATH	= NULL;
 
@@ -322,8 +337,15 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	}
 	else if (local_server_num <= (server_count += CONFIG_CONFSYNCER_FORKS))
 	{
+		/* make initial configuration sync before worker processes are forked on active Zabbix proxy */
 		*local_process_type = ZBX_PROCESS_TYPE_CONFSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_CONFSYNCER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_TRAPPER_FORKS))
+	{
+		/* make initial configuration sync before worker processes are forked on passive Zabbix proxy */
+		*local_process_type = ZBX_PROCESS_TYPE_TRAPPER;
+		*local_process_num = local_server_num - server_count + CONFIG_TRAPPER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_HEARTBEAT_FORKS))
 	{
@@ -399,11 +421,6 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_UNREACHABLE;
 		*local_process_num = local_server_num - server_count + CONFIG_UNREACHABLE_POLLER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_TRAPPER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_TRAPPER;
-		*local_process_num = local_server_num - server_count + CONFIG_TRAPPER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_PINGER_FORKS))
 	{
@@ -672,6 +689,16 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_str("TLSPSKIdentity", CONFIG_TLS_PSK_IDENTITY, "TLS support"));
 	err |= (FAIL == check_cfg_feature_str("TLSPSKFile", CONFIG_TLS_PSK_FILE, "TLS support"));
 #endif
+#if !(defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL))
+	err |= (FAIL == check_cfg_feature_str("TLSCipherCert", CONFIG_TLS_CIPHER_CERT, "GnuTLS or OpenSSL"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherPSK", CONFIG_TLS_CIPHER_PSK, "GnuTLS or OpenSSL"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherAll", CONFIG_TLS_CIPHER_ALL, "GnuTLS or OpenSSL"));
+#endif
+#if !defined(HAVE_OPENSSL)
+	err |= (FAIL == check_cfg_feature_str("TLSCipherCert13", CONFIG_TLS_CIPHER_CERT13, "OpenSSL 1.1.1 or newer"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherPSK13", CONFIG_TLS_CIPHER_PSK13, "OpenSSL 1.1.1 or newer"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherAll13", CONFIG_TLS_CIPHER_ALL13, "OpenSSL 1.1.1 or newer"));
+#endif
 
 #if !defined(HAVE_OPENIPMI)
 	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_IPMIPOLLER_FORKS, "IPMI support"));
@@ -706,6 +733,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
+		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
+			PARM_OPT,	0,			0},
+		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
+			PARM_OPT,	0,			0},
 		{"StartPollersAsyncSNMP",	&CONFIG_ASYNC_SNMP_POLLER_FORKS,	TYPE_INT,
 			PARM_OPT,	0,			100},
 		{"StartPollersAsyncAGENT",	&CONFIG_ASYNC_AGENT_POLLER_FORKS,	TYPE_INT,
@@ -863,6 +894,18 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"TLSPSKIdentity",		&CONFIG_TLS_PSK_IDENTITY,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"TLSPSKFile",			&CONFIG_TLS_PSK_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherCert13",		&CONFIG_TLS_CIPHER_CERT13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherCert",		&CONFIG_TLS_CIPHER_CERT,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherPSK13",		&CONFIG_TLS_CIPHER_PSK13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherPSK",		&CONFIG_TLS_CIPHER_PSK,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherAll13",		&CONFIG_TLS_CIPHER_ALL13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherAll",		&CONFIG_TLS_CIPHER_ALL,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"SocketDir",			&CONFIG_SOCKET_PATH,			TYPE_STRING,
 			PARM_OPT,	0,			0},
@@ -1056,10 +1099,10 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 #else
 #	define ODBC_FEATURE_STATUS 	" NO"
 #endif
-#ifdef HAVE_SSH2
-#	define SSH2_FEATURE_STATUS 	"YES"
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
+#	define SSH_FEATURE_STATUS 	"YES"
 #else
-#	define SSH2_FEATURE_STATUS 	" NO"
+#	define SSH_FEATURE_STATUS 	" NO"
 #endif
 #ifdef HAVE_IPV6
 #	define IPV6_FEATURE_STATUS 	"YES"
@@ -1082,7 +1125,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zabbix_log(LOG_LEVEL_INFORMATION, "Web monitoring:        " LIBCURL_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "VMware monitoring:     " VMWARE_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "ODBC:                  " ODBC_FEATURE_STATUS);
-	zabbix_log(LOG_LEVEL_INFORMATION, "SSH2 support:          " SSH2_FEATURE_STATUS);
+	zabbix_log(LOG_LEVEL_INFORMATION, "SSH support:           " SSH_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "IPv6 support:          " IPV6_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "TLS support:           " TLS_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "**************************");
@@ -1163,10 +1206,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	if (SUCCEED != DBcheck_version())
 		exit(EXIT_FAILURE);
-
-	DBconnect(ZBX_DB_CONNECT_NORMAL);
-	DCsync_configuration(ZBX_DBSYNC_INIT);
-	DBclose();
+	DBcheck_character_set();
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_HEARTBEAT_FORKS + CONFIG_DATASENDER_FORKS
 			+ CONFIG_POLLER_FORKS + CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS
@@ -1174,11 +1214,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			+ CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS + CONFIG_IPMIPOLLER_FORKS
 			+ CONFIG_JAVAPOLLER_FORKS + CONFIG_SNMPTRAPPER_FORKS + CONFIG_SELFMON_FORKS
 			+ CONFIG_VMWARE_FORKS + CONFIG_IPMIMANAGER_FORKS + CONFIG_TASKMANAGER_FORKS
-			+ CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS + CONFIG_ASYNC_SNMP_POLLER_FORKS + 
-			CONFIG_ASYNC_AGENT_POLLER_FORKS ;
+			+ CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS 
+			+ CONFIG_ASYNC_SNMP_POLLER_FORKS + CONFIG_ASYNC_AGENT_POLLER_FORKS;
 
 	threads = (pid_t *)zbx_calloc(threads, threads_num, sizeof(pid_t));
-	zabbix_log(LOG_LEVEL_INFORMATION,"Total %d threads", threads_num);
+	threads_flags = (int *)zbx_calloc(threads_flags, threads_num, sizeof(int));
 
 	if (0 != CONFIG_TRAPPER_FORKS)
 	{
@@ -1212,6 +1252,13 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		{
 			case ZBX_PROCESS_TYPE_CONFSYNCER:
 				zbx_thread_start(proxyconfig_thread, &thread_args, &threads[i]);
+				DCconfig_wait_sync();
+				break;
+			case ZBX_PROCESS_TYPE_TRAPPER:
+				thread_args.args = &listen_sock;
+				zbx_thread_start(trapper_thread, &thread_args, &threads[i]);
+				if (0 == CONFIG_CONFSYNCER_FORKS)
+					DCconfig_wait_sync();
 				break;
 			case ZBX_PROCESS_TYPE_HEARTBEAT:
 				zbx_thread_start(heart_thread, &thread_args, &threads[i]);
@@ -1229,10 +1276,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				thread_args.args = &poller_type;
 				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
 				break;
-			case ZBX_PROCESS_TYPE_TRAPPER:
-				thread_args.args = &listen_sock;
-				zbx_thread_start(trapper_thread, &thread_args, &threads[i]);
-				break;
 			case ZBX_PROCESS_TYPE_PINGER:
 				zbx_thread_start(pinger_thread, &thread_args, &threads[i]);
 				break;
@@ -1246,6 +1289,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				zbx_thread_start(discoverer_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_HISTSYNCER:
+				threads_flags[i] = ZBX_THREAD_WAIT_EXIT;
 				zbx_thread_start(dbsyncer_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_JAVAPOLLER:
@@ -1304,19 +1348,20 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	/* all exiting child processes should be caught by signal handlers */
 	THIS_SHOULD_NEVER_HAPPEN;
 
-	zbx_on_exit();
+	zbx_on_exit(FAIL);
 
 	return SUCCEED;
 }
 
-void	zbx_on_exit(void)
+void	zbx_on_exit(int ret)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "zbx_on_exit() called");
 
 	if (NULL != threads)
 	{
-		zbx_threads_wait(threads, threads_num);	/* wait for all child processes to exit */
+		zbx_threads_wait(threads, threads_flags, threads_num, ret);	/* wait for all child processes to exit */
 		zbx_free(threads);
+		zbx_free(threads_flags);
 	}
 #ifdef HAVE_PTHREAD_PROCESS_SHARED
 	zbx_locks_disable();

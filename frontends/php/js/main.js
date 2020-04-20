@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -571,7 +571,7 @@ var hintBox = {
 			top = scrollTop + target.clientY + 10;
 		}
 
-		// fallback if doesn't fit verticaly but could fit if aligned to right or left
+		// fallback if doesn't fit vertically but could fit if aligned to right or left
 		if ((top - scrollTop + hint_height > wHeight)
 				&& (target.clientX - 10 > hint_width || wWidth - target.clientX - 10 > hint_width)) {
 
@@ -837,12 +837,13 @@ function getConditionFormula(conditions, evalType) {
 	 * Creates a table with dynamic add/remove row buttons.
 	 *
 	 * Supported options:
-	 * - template		- row template selector
-	 * - row			- element row selector
-	 * - add			- add row button selector
-	 * - remove			- remove row button selector
-	 * - counter 		- number to start row enumeration from
-	 * - dataCallback	- function to generate the data passed to the template
+	 * - template				- row template selector
+	 * - row					- element row selector
+	 * - add					- add row button selector
+	 * - remove					- remove row button selector
+	 * - counter 				- number to start row enumeration from
+	 * - dataCallback			- function to generate the data passed to the template
+	 * - remove_next_sibling	- remove also next element
 	 *
 	 * Triggered events:
 	 * - tableupdate.dynamicRows 	- after adding or removing a row.
@@ -858,6 +859,7 @@ function getConditionFormula(conditions, evalType) {
 			row: '.form_row',
 			add: '.element-table-add',
 			remove: '.element-table-remove',
+			remove_next_sibling: false,
 			disable: '.element-table-disable',
 			counter: null,
 			beforeRow: null,
@@ -869,6 +871,7 @@ function getConditionFormula(conditions, evalType) {
 		return this.each(function() {
 			var table = $(this);
 
+			// If options.remove_next_sibling is true, counter counts each row making the next index twice as large (bug).
 			table.data('dynamicRows', {
 				counter: (options.counter !== null) ? options.counter : $(options.row, table).length
 			});
@@ -928,6 +931,9 @@ function getConditionFormula(conditions, evalType) {
 	 * @param {object} options
 	 */
 	function removeRow(table, row, options) {
+		if (options.remove_next_sibling) {
+			row.next().remove();
+		}
 		row.remove();
 
 		table.trigger('tableupdate.dynamicRows', options);
@@ -1019,84 +1025,6 @@ jQuery(function ($) {
 
 	if ((IE || ED) && typeof sessionStorage.scrollTop !== 'undefined') {
 		$(window).scrollTop(sessionStorage.scrollTop);
+		sessionStorage.removeItem('scrollTop');
 	}
-});
-
-
-jQuery(function ($) {
-	"use strict";
-
-	function calcRows($obj, options) {
-		var max_height = (options && 'maxHeight' in options) ? options.maxHeight : null,
-			clone = $obj
-				.clone(false)
-				.css({'position': 'absolute', 'z-index': '-1'})
-				.removeClass('patternselect')
-				.insertAfter($obj),
-			padding = parseInt(clone.css('padding-top'), 10) + parseInt(clone.css('padding-bottom'), 10),
-			line_height = parseInt(clone.css('font-size'), 10) * 1.14,
-			rows = 0;
-
-		do {
-			rows++;
-			clone.height(rows * line_height);
-		}
-		while (clone[0].scrollHeight - padding > clone.innerHeight()
-			&& (max_height === null || rows * line_height + padding <= max_height));
-		clone.remove();
-
-		return rows;
-	}
-
-	var methods = {
-		init: function(options) {
-			options = $.extend({}, options);
-
-			this.each(function() {
-				if (typeof $(this).data('autogrow') === 'undefined') {
-					$(this)
-						.css({
-							'resize': 'none',
-							'overflow-x': 'hidden',
-							'white-space': 'pre-line'
-						})
-						.on('paste change keyup', function() {
-							var rows = calcRows($(this), options);
-
-							if (options && 'pair' in options) {
-								var pair_rows = calcRows($(options.pair), options);
-								if (pair_rows > rows) {
-									rows = pair_rows;
-								}
-								$(options.pair).attr('rows', rows);
-							}
-
-							$(this).attr('rows', rows);
-						})
-						.data('autogrow', options)
-						.trigger('keyup');
-				}
-
-				if ($(this).prop('maxlength') !== 'undefined' && !CR && !GK) {
-					$(this).bind('paste contextmenu change keydown keypress keyup', function() {
-						if ($(this).val().length > $(this).attr('maxlength')) {
-							$(this).val($(this).val().substr(0, $(this).attr('maxlength')));
-						}
-					});
-				}
-
-				if (options && 'pair' in options) {
-					$(options.pair).css({'resize': 'none'});
-				}
-			});
-		}
-	};
-
-	$.fn.autoGrowTextarea = function(method, options) {
-		if (methods[method]) {
-			return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
-		}
-
-		return methods.init.apply(this, arguments);
-	};
 });

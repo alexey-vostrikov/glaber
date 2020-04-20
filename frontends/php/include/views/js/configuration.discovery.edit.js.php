@@ -21,8 +21,7 @@
 			(new CInput('radio', 'uniqueness_criteria', '#{dcheckid}'))
 				->addClass(ZBX_STYLE_CHECKBOX_RADIO)
 				->setId('uniqueness_criteria_#{dcheckid}'),
-			(new CLabel([new CSpan(), '#{name}'], 'uniqueness_criteria_#{dcheckid}'))
-				->addClass(ZBX_STYLE_WORDWRAP)
+			(new CLabel([new CSpan(), '#{name}'], 'uniqueness_criteria_#{dcheckid}'))->addClass(ZBX_STYLE_WORDWRAP)
 		]))
 			->setId('uniqueness_criteria_row_#{dcheckid}')
 			->toString()
@@ -34,7 +33,7 @@
 				->addClass(ZBX_STYLE_CHECKBOX_RADIO)
 				->setAttribute('data-id', '#{dcheckid}')
 				->setId('host_source_#{dcheckid}'),
-			new CLabel([new CSpan(), '#{name}'], 'host_source_#{dcheckid}')
+			(new CLabel([new CSpan(), '#{name}'], 'host_source_#{dcheckid}'))->addClass(ZBX_STYLE_WORDWRAP)
 		]))
 			->setId('host_source_row_#{dcheckid}')
 			->toString()
@@ -46,7 +45,7 @@
 				->addClass(ZBX_STYLE_CHECKBOX_RADIO)
 				->setAttribute('data-id', '#{dcheckid}')
 				->setId('name_source_#{dcheckid}'),
-			new CLabel([new CSpan(), '#{name}'], 'name_source_#{dcheckid}')
+			(new CLabel([new CSpan(), '#{name}'], 'name_source_#{dcheckid}'))->addClass(ZBX_STYLE_WORDWRAP)
 		]))
 			->setId('name_source_row_#{dcheckid}')
 			->toString()
@@ -412,7 +411,7 @@
 
 			// button "add"
 			jQuery('#add_new_dcheck').click(function() {
-				saveNewDCheckForm(dcheckId);
+				saveNewDCheckForm(dcheckId, this);
 			});
 
 			// rename button to "update"
@@ -565,7 +564,13 @@
 		toggleInputs('newCheckPrivPassRow', showPrivPass);
 	}
 
-	function saveNewDCheckForm(dcheckId) {
+	/**
+	 * Validates discovery check.
+	 *
+	 * @param {string} dcheckId            Discovery rule check id.
+	 * @param {HTMLElement} trigger_elmnt  Element that triggered this action.
+	 */
+	function saveNewDCheckForm(dcheckId, trigger_elmnt) {
 		var dCheck = jQuery('#new_check_form :input:enabled').serializeJSON();
 		if (typeof dCheck.snmp_oid != 'undefined') {
 			dCheck.key_ = dCheck.snmp_oid;
@@ -611,7 +616,7 @@
 								'action': function() {}
 							}
 						]
-					});
+					}, trigger_elmnt);
 
 					return null;
 				}
@@ -682,7 +687,7 @@
 								'action': function() {}
 							}
 						]
-					});
+					}, trigger_elmnt);
 					jQuery('#add_new_dcheck').prop('disabled', false);
 				}
 			});
@@ -712,7 +717,7 @@
 							'action': function() {}
 						}
 					]
-				});
+				}, trigger_elmnt);
 			}
 			else {
 				dCheck.name = jQuery('#type :selected').text();

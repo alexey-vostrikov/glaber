@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ $options = $data['options'];
 $http_popup_form = (new CForm())
 	->cleanItems()
 	->setId('http_step')
+	->addVar('no', $options['no'])
 	->addVar('httpstepid', $options['httpstepid'])
 	->addItem((new CVar('templated', $options['templated']))->removeId())
 	->addVar('old_name', $options['old_name'])
@@ -163,7 +164,9 @@ $http_popup_form_list
 			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
 	)
 	->addRow(_('Required string'),
-		(new CTextBox('required', $options['required']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+		(new CTextBox('required', $options['required']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAttribute('placeholder', _('pattern'))
 	)
 	->addRow(_('Required status codes'),
 		(new CTextBox('status_codes', $options['status_codes']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
@@ -183,7 +186,7 @@ $http_popup_form->addItem($http_popup_form_list);
 
 // HTTP test step editing form.
 $output['body'] = (new CDiv($http_popup_form))->toString();
-$output['script_inline'] = 'httpconf.steps.onStepOverlayReadyCb('.$options['httpstepid'].');';
+$output['script_inline'] = 'httpconf.steps.onStepOverlayReadyCb('.$options['no'].');';
 
 if ($data['user']['debug_mode'] == GROUP_DEBUG_MODE_ENABLED) {
 	CProfiler::getInstance()->stop();

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -225,9 +225,9 @@ class CHostInterface extends CApiService {
 			'output' => ['host'],
 			'proxyids' => zbx_objectValues($interfaces, 'hostid'),
 			'editable' => true,
-			'preservekeys' => true,
+			'preservekeys' => true
 		]);
-		
+
 		$check_have_items = [];
 		foreach ($interfaces as &$interface) {
 			if (!check_db_fields($interfaceDBfields, $interface)) {
@@ -334,13 +334,13 @@ class CHostInterface extends CApiService {
 	 * @return array
 	 */
 	public function create(array $interfaces) {
-		
 		$interfaces = zbx_toArray($interfaces);
 
 		$this->checkInput($interfaces, __FUNCTION__);
 		$this->checkMainInterfacesOnCreate($interfaces);
 
 		$interfaceIds = DB::insert('interface', $interfaces);
+
 		return ['interfaceids' => $interfaceIds];
 	}
 

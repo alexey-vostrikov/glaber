@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,160 +18,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-
-/**
- * Build user edit form data.
- *
- * @param string $userId			user ID
- * @param array	 $config			array of configuration parameters returned in $data['config'] parameter
- *									to later use when configuring user medias
- * @param bool	 $isProfile			true if current user viewing his own profile
- *
- * @return array
- */
-function getUserFormData($userId, array $config, $isProfile = false) {
-	$data = [
-		'is_profile' => $isProfile,
-		'config' => [
-			'severity_name_0' => $config['severity_name_0'],
-			'severity_name_1' => $config['severity_name_1'],
-			'severity_name_2' => $config['severity_name_2'],
-			'severity_name_3' => $config['severity_name_3'],
-			'severity_name_4' => $config['severity_name_4'],
-			'severity_name_5' => $config['severity_name_5']
-		]
-	];
-
-	if ($userId != 0 && (!hasRequest('form_refresh') || hasRequest('register'))) {
-		$users = API::User()->get([
-			'output' => ['alias', 'name', 'surname', 'url', 'autologin', 'autologout', 'lang', 'theme', 'refresh',
-				'rows_per_page', 'type'
-			],
-			'selectMedias' => ['mediatypeid', 'period', 'sendto', 'severity', 'active'],
-			'userids' => $userId
-		]);
-		$user = reset($users);
-
-		$data['alias']				= $user['alias'];
-		$data['name']				= $user['name'];
-		$data['surname']			= $user['surname'];
-		$data['password1']			= null;
-		$data['password2']			= null;
-		$data['url']				= $user['url'];
-		$data['autologin']			= $user['autologin'];
-		$data['autologout']			= $user['autologout'];
-		$data['autologout_visible']	= (bool) timeUnitToSeconds($data['autologout']);
-		$data['lang']				= $user['lang'];
-		$data['theme']				= $user['theme'];
-		$data['refresh']			= $user['refresh'];
-		$data['rows_per_page']		= $user['rows_per_page'];
-		$data['user_type']			= $user['type'];
-		$data['messages'] 			= getMessageSettings();
-		$data['change_password']	= 0;
-
-		$userGroups = API::UserGroup()->get([
-			'output' => ['usrgrpid'],
-			'userids' => $userId
-		]);
-		$userGroup = zbx_objectValues($userGroups, 'usrgrpid');
-		$data['user_groups']	= zbx_toHash($userGroup);
-
-		$data['user_medias'] = $user['medias'];
-	}
-	else {
-		$data['alias']				= getRequest('alias', '');
-		$data['name']				= getRequest('name', '');
-		$data['surname']			= getRequest('surname', '');
-		$data['password1']			= getRequest('password1', '');
-		$data['password2']			= getRequest('password2', '');
-		$data['url']				= getRequest('url', '');
-		$data['autologin']			= getRequest('autologin', 0);
-		$data['autologout']			= getRequest('autologout', DB::getDefault('users', 'autologout'));
-		$data['autologout_visible']	= hasRequest('autologout_visible');
-		$data['lang']				= getRequest('lang', 'en_gb');
-		$data['theme']				= getRequest('theme', THEME_DEFAULT);
-		$data['refresh']			= getRequest('refresh', DB::getDefault('users', 'refresh'));
-		$data['rows_per_page']		= getRequest('rows_per_page', 50);
-		$data['user_type']			= getRequest('user_type', USER_TYPE_ZABBIX_USER);
-		$data['user_groups']		= getRequest('user_groups', []);
-		$data['change_password']	= getRequest('change_password', 0);
-		$data['user_medias']		= getRequest('user_medias', []);
-
-		// set messages
-		$data['messages'] = getRequest('messages', []);
-		if (!isset($data['messages']['enabled'])) {
-			$data['messages']['enabled'] = 0;
-		}
-		if (!isset($data['messages']['sounds.recovery'])) {
-			$data['messages']['sounds.recovery'] = 'alarm_ok.wav';
-		}
-		if (!isset($data['messages']['triggers.recovery'])) {
-			$data['messages']['triggers.recovery'] = 0;
-		}
-		if (!isset($data['messages']['triggers.severities'])) {
-			$data['messages']['triggers.severities'] = [];
-		}
-		$data['messages'] = array_merge(getMessageSettings(), $data['messages']);
-	}
-
-	// set autologout
-	if ($data['autologin']) {
-		$data['autologout'] = '0';
-	}
-
-	// set media types
-	if (!empty($data['user_medias'])) {
-		$mediaTypeDescriptions = [];
-		$dbMediaTypes = DBselect(
-			'SELECT mt.mediatypeid,mt.type,mt.description FROM media_type mt WHERE '.
-				dbConditionInt('mt.mediatypeid', zbx_objectValues($data['user_medias'], 'mediatypeid'))
-		);
-		while ($dbMediaType = DBfetch($dbMediaTypes)) {
-			$mediaTypeDescriptions[$dbMediaType['mediatypeid']]['description'] = $dbMediaType['description'];
-			$mediaTypeDescriptions[$dbMediaType['mediatypeid']]['mediatype'] = $dbMediaType['type'];
-		}
-
-		foreach ($data['user_medias'] as &$media) {
-			$media['description'] = $mediaTypeDescriptions[$media['mediatypeid']]['description'];
-			$media['mediatype'] = $mediaTypeDescriptions[$media['mediatypeid']]['mediatype'];
-			$media['send_to_sort_field'] = is_array($media['sendto'])
-				? implode(', ', $media['sendto'])
-				: $media['sendto'];
-		}
-		unset($media);
-
-		CArrayHelper::sort($data['user_medias'], ['description', 'send_to_sort_field']);
-
-		foreach ($data['user_medias'] as &$media) {
-			unset($media['send_to_sort_field']);
-		}
-		unset($media);
-	}
-
-	// set user rights
-	if (!$data['is_profile']) {
-		$data['groups'] = API::UserGroup()->get([
-			'output' => ['usrgrpid', 'name'],
-			'usrgrpids' => $data['user_groups']
-		]);
-		order_result($data['groups'], 'name');
-
-		if ($data['user_type'] == USER_TYPE_SUPER_ADMIN) {
-			$data['groups_rights'] = [
-				'0' => [
-					'permission' => PERM_READ_WRITE,
-					'name' => '',
-					'grouped' => '1'
-				]
-			];
-		}
-		else {
-			$data['groups_rights'] = collapseHostGroupRights(getHostGroupsRights($data['user_groups']));
-		}
-	}
-
-	return $data;
-}
 
 function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 	CArrayHelper::sort($data, ['value', 'name']);
@@ -976,7 +822,7 @@ function getItemFormData(array $item = [], array $options = []) {
 		'trends' => getRequest('trends', DB::getDefault('items', 'trends')),
 		'new_application' => getRequest('new_application', ''),
 		'applications' => getRequest('applications', []),
-		'delay_flex' => getRequest('delay_flex', []),
+		'delay_flex' => array_values(getRequest('delay_flex', [])),
 		'snmpv3_contextname' => getRequest('snmpv3_contextname', ''),
 		'snmpv3_securityname' => getRequest('snmpv3_securityname', ''),
 		'snmpv3_securitylevel' => getRequest('snmpv3_securitylevel', 0),
@@ -1331,7 +1177,7 @@ function getItemFormData(array $item = [], array $options = []) {
 	}
 	else {
 		$data['valuemaps'] = API::ValueMap()->get([
-			'output' => ['valemapid', 'name']
+			'output' => ['valuemapid', 'name']
 		]);
 
 		CArrayHelper::sort($data['valuemaps'], ['name']);
@@ -1521,6 +1367,28 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 					_('<metric name>{<label name>="<label value>", ...} == <value>')
 				);
 				break;
+
+			// ZBX-16642
+			case ZBX_PREPROC_CSV_TO_JSON:
+				$step_param_2_value = (array_key_exists('params', $step) && array_key_exists(2, $step['params']))
+					? $step['params'][2]
+					: ZBX_PREPROC_CSV_NO_HEADER;
+
+				$params = [
+					$step_param_0
+						->setAttribute('placeholder', ',')
+						->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH)
+						->setAttribute('maxlength', 1),
+					$step_param_1
+						->setAttribute('placeholder', '"')
+						->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH)
+						->setAttribute('maxlength', 1),
+					(new CCheckBox('preprocessing['.$i.'][params][2]', ZBX_PREPROC_CSV_HEADER))
+						->setLabel(_('With header row'))
+						->setChecked($step_param_2_value == ZBX_PREPROC_CSV_HEADER)
+						->setReadonly($readonly)
+				];
+				break;
 		}
 
 		// Create checkbox "Custom on fail" and enable or disable depending on preprocessing type.
@@ -1530,9 +1398,6 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 			case ZBX_PREPROC_RTRIM:
 			case ZBX_PREPROC_LTRIM:
 			case ZBX_PREPROC_TRIM:
-			case ZBX_PREPROC_ERROR_FIELD_JSON:
-			case ZBX_PREPROC_ERROR_FIELD_XML:
-			case ZBX_PREPROC_ERROR_FIELD_REGEX:
 			case ZBX_PREPROC_THROTTLE_VALUE:
 			case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 			case ZBX_PREPROC_SCRIPT:
@@ -1789,6 +1654,7 @@ function getTriggerFormData(array $data) {
 
 		if ($data['parent_discoveryid'] === null) {
 			$options['selectDiscoveryRule'] = ['itemid', 'name', 'templateid'];
+			$options['selectTriggerDiscovery'] = ['parent_triggerid'];
 			$triggers = API::Trigger()->get($options);
 			$flag = ZBX_FLAG_DISCOVERY_NORMAL;
 		}
@@ -1886,7 +1752,7 @@ function getTriggerFormData(array $data) {
 
 		$data['limited'] = ($trigger['templateid'] != 0);
 
-		// select first host from triggers if gived not match
+		// Select first host from triggers if no matching value is given.
 		$hosts = $trigger['hosts'];
 		if (count($hosts) > 0 && !in_array(['hostid' => $data['hostid']], $hosts)) {
 			$host = reset($hosts);
@@ -1920,6 +1786,7 @@ function getTriggerFormData(array $data) {
 
 		if (!$data['limited'] || !isset($_REQUEST['form_refresh'])) {
 			$data['description'] = $trigger['description'];
+			$data['opdata'] = $trigger['opdata'];
 			$data['type'] = $trigger['type'];
 			$data['recovery_mode'] = $trigger['recovery_mode'];
 			$data['correlation_mode'] = $trigger['correlation_mode'];
@@ -1951,6 +1818,7 @@ function getTriggerFormData(array $data) {
 
 		if ($data['parent_discoveryid'] === null) {
 			$data['discoveryRule'] = $trigger['discoveryRule'];
+			$data['triggerDiscovery'] = $trigger['triggerDiscovery'];
 		}
 
 		if ($trigger['flags'] == ZBX_FLAG_DISCOVERY_CREATED || $data['limited']) {
@@ -2466,26 +2334,30 @@ function getTimeperiodForm(array $data) {
  * Renders tag table row.
  *
  * @param int|string $index
- * @param string     $tag       (optional)
- * @param string     $value     (optional)
- * @param bool       $readonly  (optional)
+ * @param string     $tag      (optional)
+ * @param string     $value    (optional)
+ * @param array      $options  (optional)
  *
  * @return CRow
  */
-function renderTagTableRow($index, $tag = '', $value = '', $readonly = false) {
+function renderTagTableRow($index, $tag = '', $value = '', array $options = []) {
+	$options = array_merge(['readonly' => false], $options);
+
 	return (new CRow([
-		(new CTextBox('tags['.$index.'][tag]', $tag, $readonly))
-			->setWidth(ZBX_TEXTAREA_TAG_WIDTH)
-			->setAttribute('placeholder', _('tag')),
-		(new CTextBox('tags['.$index.'][value]', $value, $readonly))
-			->setWidth(ZBX_TEXTAREA_TAG_WIDTH)
-			->setAttribute('placeholder', _('value')),
-		new CCol(
-			(new CButton('tags['.$index.'][remove]', _('Remove')))
-				->addClass(ZBX_STYLE_BTN_LINK)
-				->addClass('element-table-remove')
-				->setEnabled(!$readonly)
-		)
+		(new CCol(
+			(new CTextAreaFlexible('tags['.$index.'][tag]', $tag, $options))
+				->setWidth(ZBX_TEXTAREA_TAG_WIDTH)
+				->setAttribute('placeholder', _('tag'))
+		))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT),
+		(new CCol(
+			(new CTextAreaFlexible('tags['.$index.'][value]', $value, $options))
+				->setWidth(ZBX_TEXTAREA_TAG_VALUE_WIDTH)
+				->setAttribute('placeholder', _('value'))
+		))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT),
+		(new CButton('tags['.$index.'][remove]', _('Remove')))
+			->addClass(ZBX_STYLE_BTN_LINK)
+			->addClass('element-table-remove')
+			->setEnabled(!$options['readonly'])
 	]))->addClass('form_row');
 }
 
@@ -2500,10 +2372,10 @@ function renderTagTableRow($index, $tag = '', $value = '', $readonly = false) {
  * @return CTable
  */
 function renderTagTable(array $tags, $readonly = false) {
-	$table = new CTable();
+	$table = (new CTable())->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_CONTAINER);
 
 	foreach ($tags as $index => $tag) {
-		$table->addRow(renderTagTableRow($index, $tag['tag'], $tag['value'], $readonly));
+		$table->addRow(renderTagTableRow($index, $tag['tag'], $tag['value'], ['readonly' => $readonly]));
 	}
 
 	return $table->setFooter(new CCol(

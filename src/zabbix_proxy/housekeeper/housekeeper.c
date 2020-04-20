@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -179,6 +179,8 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 	{
 		zbx_setproctitle("%s [waiting for user command]", get_process_type_string(process_type));
@@ -194,7 +196,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 	zbx_set_sigusr_handler(zbx_housekeeper_sigusr_handler);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 
@@ -202,6 +204,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 			zbx_sleep_forever();
 		else
 			zbx_sleep_loop(sleeptime);
+
+		if (!ZBX_IS_RUNNING())
+			break;
 
 		time_now = zbx_time();
 		time_slept = time_now - sec;
@@ -236,4 +241,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		if (0 != CONFIG_HOUSEKEEPING_FREQUENCY)
 			sleeptime = CONFIG_HOUSEKEEPING_FREQUENCY * SEC_PER_HOUR;
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

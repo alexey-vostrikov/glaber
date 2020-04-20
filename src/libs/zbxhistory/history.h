@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,21 +20,16 @@
 #ifndef ZABBIX_HISTORY_H
 #define ZABBIX_HISTORY_H
 
-#define ZBX_HISTORY_IFACE_SQL		0
-#define ZBX_HISTORY_IFACE_ELASTIC	1
+//#define ZBX_HISTORY_IFACE_SQL		0
+//#define ZBX_HISTORY_IFACE_ELASTIC	1
 
-typedef struct zbx_history_iface zbx_history_iface_t;
+typedef void (*zbx_history_destroy_func_t)(void *data);
+typedef int (*zbx_history_add_values_func_t)(void *data, const zbx_vector_ptr_t *history);
+typedef int (*zbx_history_get_values_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, zbx_vector_history_record_t *values);
+typedef int (*zbx_history_get_agg_values_func_t)(void *data, zbx_uint64_t itemid,int value_type, int start, int end, int aggregates, char **buffer);
+typedef int (*zbx_history_preload_values_func_t)(void *data);
 
-typedef void (*zbx_history_destroy_func_t)(struct zbx_history_iface *hist);
-typedef int (*zbx_history_add_values_func_t)(struct zbx_history_iface *hist, const zbx_vector_ptr_t *history);
-typedef int (*zbx_history_get_values_func_t)(struct zbx_history_iface *hist, zbx_uint64_t itemid, int start,
-		int count, int end, zbx_vector_history_record_t *values);
-typedef int(*zbx_history_get_agg_values_func_t)(struct zbx_history_iface *hist, zbx_uint64_t itemid, int start, int end, int aggregates, char **buffer);
-typedef int(*zbx_history_preload_values_func_t)(struct zbx_history_iface *hist);
-
-
-typedef int (*zbx_history_flush_func_t)(struct zbx_history_iface *hist);
-
+/*
 struct zbx_history_iface
 {
 	unsigned char			value_type;
@@ -45,17 +40,28 @@ struct zbx_history_iface
 	zbx_history_add_values_func_t	add_values;
 	zbx_history_get_values_func_t	get_values;
 	zbx_history_get_agg_values_func_t agg_values;
-	zbx_history_flush_func_t	flush;
-	zbx_history_preload_values_func_t	preload_values;
+
 };
+*/
+//the first little two guys really need to be fixed, but not important to glaber yet
+//todo: come back and fix later
 
 /* SQL hist */
-int	zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+//int	zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
 
 /* elastic hist */
-int	zbx_history_elastic_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+//int	zbx_history_elastic_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
 
-/* clickhouse hist */
-int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+/* backend specific init funcs */
+int glb_history_clickhouse_init(char *params);
+int glb_history_vmetrics_init(char *params);
+int glb_history_worker_init(char *params);
+
+
+int glb_set_process_types(u_int8_t *types_array, char *setting);
+int glb_types_array_sum(u_int8_t *types_array);
+history_value_t	history_str2value(char *str, unsigned char value_type);
+/* victoria metrics hist */
+//int glb_history_vmetrics_init(char *params, char **error);
 
 #endif

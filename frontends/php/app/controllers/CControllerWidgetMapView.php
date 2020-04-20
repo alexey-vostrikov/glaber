@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -49,7 +49,6 @@ class CControllerWidgetMapView extends CControllerWidget {
 			$previous_map = array_filter(explode(',', $storage['previous_maps']), 'is_numeric');
 
 			if ($previous_map) {
-			
 				$previous_map = API::Map()->get([
 					'sysmapids' => [array_pop($previous_map)],
 					'output' => ['sysmapid', 'name']
@@ -58,7 +57,7 @@ class CControllerWidgetMapView extends CControllerWidget {
 				$previous_map = reset($previous_map);
 			}
 		}
-		
+
 		$sysmapid = array_key_exists('current_sysmapid', $storage)
 			? $storage['current_sysmapid']
 			: (array_key_exists('sysmapid', $fields) ? $fields['sysmapid'] : null);

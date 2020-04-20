@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -117,8 +117,8 @@ if($pageFilter->groupsSelected && $groupFieldTitle !== ''){
 	$options = [
 		'output' => ['hostid', 'name'],
 		'selectInventory' => [$_REQUEST['groupby']], // only one field is required
-		'withInventory' => true,
-		'groupids' => $pageFilter->groupids
+		'groupids' => $pageFilter->groupids,
+		'filter' => ['inventory_mode' => [HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC]]
 	];
 
 	$hosts = API::Host()->get($options);

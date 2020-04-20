@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,6 +20,13 @@
 
 
 class CInput extends CTag {
+
+	/**
+	 * Enabled or disabled state of input field.
+	 *
+	 * @var bool
+	 */
+	protected $enabled = true;
 
 	public function __construct($type = 'text', $name = 'textbox', $value = '') {
 		parent::__construct('input');
@@ -42,9 +49,11 @@ class CInput extends CTag {
 	public function setReadonly($value) {
 		if ($value) {
 			$this->setAttribute('readonly', 'readonly');
+			$this->setAttribute('tabindex', '-1');
 		}
 		else {
 			$this->removeAttribute('readonly');
+			$this->removeAttribute('tabindex');
 		}
 		return $this;
 	}
@@ -61,6 +70,23 @@ class CInput extends CTag {
 		else {
 			$this->setAttribute('disabled', 'disabled');
 		}
+
 		return $this;
+	}
+
+	public function removeAttribute($name) {
+		if ($name === 'disabled') {
+			$this->enabled = false;
+		}
+
+		return parent::removeAttribute($name);
+	}
+
+	public function setAttribute($name, $value) {
+		if ($name === 'disabled') {
+			$this->enabled = ($value !== 'disabled');
+		}
+
+		return parent::setAttribute($name, $value);
 	}
 }

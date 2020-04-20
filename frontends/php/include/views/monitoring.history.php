@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,14 +30,19 @@ $header = [
 		->addVar('page', 1)
 ];
 $header_row = [];
-$first_item = reset($data['items']);
-$host_name = $first_item['hosts'][0]['name'];
+
 $same_host = true;
 $items_numeric = true;
+$host_name = '';
 
-foreach ($data['items'] as $item) {
-	$same_host = ($same_host && $host_name === $item['hosts'][0]['name']);
-	$items_numeric = ($items_numeric && array_key_exists($item['value_type'], $data['iv_numeric']));
+if ($data['items']) {
+	$first_item = reset($data['items']);
+	$host_name = $first_item['hosts'][0]['name'];
+
+	foreach ($data['items'] as $item) {
+		$same_host = ($same_host && $host_name === $item['hosts'][0]['name']);
+		$items_numeric = ($items_numeric && array_key_exists($item['value_type'], $data['iv_numeric']));
+	}
 }
 
 if ((count($data['items']) == 1 || $same_host) && $data['itemids']) {

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 	size_t			size;
 	zbx_timespec_t		ts_now;
 
-	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_SID, buffer, sizeof(buffer)) ||
+	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_SID, buffer, sizeof(buffer), NULL) ||
 			SUCCEED != DBget_user_by_active_session(buffer, &user) || USER_TYPE_ZABBIX_ADMIN > user.type)
 	{
 		*error = zbx_strdup(NULL, "Permission denied.");
@@ -68,14 +68,14 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 		goto out;
 	}
 
-	if (FAIL == zbx_json_value_by_name(&jp_data, ZBX_PROTO_TAG_VALUE_TYPE, buffer, sizeof(buffer)))
+	if (FAIL == zbx_json_value_by_name(&jp_data, ZBX_PROTO_TAG_VALUE_TYPE, buffer, sizeof(buffer), NULL))
 	{
 		*error = zbx_strdup(NULL, "Missing value type field.");
 		goto out;
 	}
 	*value_type = atoi(buffer);
 
-	if (FAIL == zbx_json_value_by_name(&jp_data, ZBX_PROTO_TAG_SINGLE, buffer, sizeof(buffer)))
+	if (FAIL == zbx_json_value_by_name(&jp_data, ZBX_PROTO_TAG_SINGLE, buffer, sizeof(buffer), NULL))
 		*single = 0;
 	else
 		*single = (0 == strcmp(buffer, "true") ? 1 : 0);
@@ -84,14 +84,14 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 	if (SUCCEED == zbx_json_brackets_by_name(&jp_data, ZBX_PROTO_TAG_HISTORY, &jp_history))
 	{
 		size = 0;
-		if (FAIL == zbx_json_value_by_name_dyn(&jp_history, ZBX_PROTO_TAG_VALUE, values, &size))
+		if (FAIL == zbx_json_value_by_name_dyn(&jp_history, ZBX_PROTO_TAG_VALUE, values, &size, NULL))
 		{
 			*error = zbx_strdup(NULL, "Missing history value field.");
 			goto out;
 		}
 		(*values_num)++;
 
-		if (FAIL == zbx_json_value_by_name(&jp_history, ZBX_PROTO_TAG_TIMESTAMP, buffer, sizeof(buffer)))
+		if (FAIL == zbx_json_value_by_name(&jp_history, ZBX_PROTO_TAG_TIMESTAMP, buffer, sizeof(buffer), NULL))
 		{
 			*error = zbx_strdup(NULL, "Missing history timestamp field.");
 			goto out;
@@ -121,7 +121,7 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 	}
 
 	size = 0;
-	if (FAIL == zbx_json_value_by_name_dyn(&jp_data, ZBX_PROTO_TAG_VALUE, &values[*values_num], &size))
+	if (FAIL == zbx_json_value_by_name_dyn(&jp_data, ZBX_PROTO_TAG_VALUE, &values[*values_num], &size, NULL))
 	{
 		*error = zbx_strdup(NULL, "Missing value field.");
 		goto out;
@@ -145,14 +145,14 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 			goto out;
 		}
 
-		if (FAIL == zbx_json_value_by_name(&jp_step, ZBX_PROTO_TAG_TYPE, buffer, sizeof(buffer)))
+		if (FAIL == zbx_json_value_by_name(&jp_step, ZBX_PROTO_TAG_TYPE, buffer, sizeof(buffer), NULL))
 		{
 			*error = zbx_strdup(NULL, "Missing preprocessing step type field.");
 			goto out;
 		}
 		step_type = atoi(buffer);
 
-		if (FAIL == zbx_json_value_by_name(&jp_step, ZBX_PROTO_TAG_ERROR_HANDLER, buffer, sizeof(buffer)))
+		if (FAIL == zbx_json_value_by_name(&jp_step, ZBX_PROTO_TAG_ERROR_HANDLER, buffer, sizeof(buffer), NULL))
 		{
 			*error = zbx_strdup(NULL, "Missing preprocessing step type error handler field.");
 			goto out;
@@ -160,7 +160,7 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 		error_handler = atoi(buffer);
 
 		size = 0;
-		if (FAIL == zbx_json_value_by_name_dyn(&jp_step, ZBX_PROTO_TAG_PARAMS, &step_params, &size))
+		if (FAIL == zbx_json_value_by_name_dyn(&jp_step, ZBX_PROTO_TAG_PARAMS, &step_params, &size, NULL))
 		{
 			*error = zbx_strdup(NULL, "Missing preprocessing step type params field.");
 			goto out;
@@ -168,7 +168,7 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 
 		size = 0;
 		if (FAIL == zbx_json_value_by_name_dyn(&jp_step, ZBX_PROTO_TAG_ERROR_HANDLER_PARAMS,
-				&error_handler_params, &size))
+				&error_handler_params, &size, NULL))
 		{
 			*error = zbx_strdup(NULL, "Missing preprocessing step type error handler params field.");
 			goto out;
@@ -202,7 +202,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_trapper_preproc_test_execute                                 *
+ * Function: trapper_preproc_test_run                                         *
  *                                                                            *
  * Purpose: executes preprocessing test request                               *
  *                                                                            *
@@ -219,7 +219,7 @@ out:
  *           json and success is returned.                                    *
  *                                                                            *
  ******************************************************************************/
-int	zbx_trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_json *json, char **error)
+static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_json *json, char **error)
 {
 	char			*values[2] = {NULL, NULL}, *preproc_error = NULL;
 	int			ret = FAIL, i, values_num = 0, single;
@@ -353,7 +353,7 @@ int	zbx_trapper_preproc_test(zbx_socket_t *sock, const struct zbx_json_parse *jp
 
 	zbx_json_init(&json, 1024);
 
-	if (SUCCEED == (ret = zbx_trapper_preproc_test_run(jp, &json, &error)))
+	if (SUCCEED == (ret = trapper_preproc_test_run(jp, &json, &error)))
 	{
 		zbx_tcp_send_bytes_to(sock, json.buffer, json.buffer_size, CONFIG_TIMEOUT);
 	}
@@ -368,3 +368,6 @@ int	zbx_trapper_preproc_test(zbx_socket_t *sock, const struct zbx_json_parse *jp
 	return ret;
 }
 
+#ifdef HAVE_TESTS
+#	include "../../../tests/zabbix_server/trapper/trapper_preproc_test_run.c"
+#endif

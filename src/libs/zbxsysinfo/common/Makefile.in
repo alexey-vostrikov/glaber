@@ -95,10 +95,10 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_lib_ibm_db2.m4 \
 	$(top_srcdir)/m4/ax_lib_oracle_oci.m4 \
 	$(top_srcdir)/m4/ax_lib_postgresql.m4 \
 	$(top_srcdir)/m4/ax_lib_sqlite3.m4 $(top_srcdir)/m4/iconv.m4 \
-	$(top_srcdir)/m4/jabber.m4 $(top_srcdir)/m4/ldap.m4 \
-	$(top_srcdir)/m4/libcurl.m4 $(top_srcdir)/m4/libevent.m4 \
-	$(top_srcdir)/m4/libgnutls.m4 $(top_srcdir)/m4/libmbedtls.m4 \
-	$(top_srcdir)/m4/libopenssl.m4 $(top_srcdir)/m4/libssh2.m4 \
+	$(top_srcdir)/m4/ldap.m4 $(top_srcdir)/m4/libcurl.m4 \
+	$(top_srcdir)/m4/libevent.m4 $(top_srcdir)/m4/libgnutls.m4 \
+	$(top_srcdir)/m4/libmbedtls.m4 $(top_srcdir)/m4/libopenssl.m4 \
+	$(top_srcdir)/m4/libssh.m4 $(top_srcdir)/m4/libssh2.m4 \
 	$(top_srcdir)/m4/libunixodbc.m4 $(top_srcdir)/m4/libxml2.m4 \
 	$(top_srcdir)/m4/netsnmp.m4 $(top_srcdir)/m4/openipmi.m4 \
 	$(top_srcdir)/m4/pcre.m4 $(top_srcdir)/m4/pthread.m4 \
@@ -126,6 +126,7 @@ am_libcommonsysinfo_a_OBJECTS = libcommonsysinfo_a-common.$(OBJEXT) \
 	libcommonsysinfo_a-cpu.$(OBJEXT) \
 	libcommonsysinfo_a-http.$(OBJEXT) \
 	libcommonsysinfo_a-net.$(OBJEXT) \
+	libcommonsysinfo_a-dns.$(OBJEXT) \
 	libcommonsysinfo_a-system.$(OBJEXT) \
 	libcommonsysinfo_a-zabbix_stats.$(OBJEXT)
 libcommonsysinfo_a_OBJECTS = $(am_libcommonsysinfo_a_OBJECTS)
@@ -190,6 +191,7 @@ CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
+AGENT2_CONFIG_FILE = @AGENT2_CONFIG_FILE@
 AGENT_CONFIG_FILE = @AGENT_CONFIG_FILE@
 AGENT_LDFLAGS = @AGENT_LDFLAGS@
 AGENT_LIBS = @AGENT_LIBS@
@@ -204,6 +206,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CGO_CFLAGS = @CGO_CFLAGS@
+CGO_LDFLAGS = @CGO_LDFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CURL_SSL_CERT_LOCATION = @CURL_SSL_CERT_LOCATION@
@@ -223,19 +227,19 @@ EXTERNAL_SCRIPTS_PATH = @EXTERNAL_SCRIPTS_PATH@
 GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
 GNUTLS_LDFLAGS = @GNUTLS_LDFLAGS@
 GNUTLS_LIBS = @GNUTLS_LIBS@
+GO = @GO@
+GOBIN = @GOBIN@
+GOCMD = @GOCMD@
+GOWORKDIR = @GOWORKDIR@
 GREP = @GREP@
 ICONV_CFLAGS = @ICONV_CFLAGS@
 ICONV_LDFLAGS = @ICONV_LDFLAGS@
-IKSEMEL_CFLAGS = @IKSEMEL_CFLAGS@
-IKSEMEL_LIBS = @IKSEMEL_LIBS@
+ICONV_LIBS = @ICONV_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
-JABBER_CPPFLAGS = @JABBER_CPPFLAGS@
-JABBER_LDFLAGS = @JABBER_LDFLAGS@
-JABBER_LIBS = @JABBER_LIBS@
 JAR = @JAR@
 JAVAC = @JAVAC@
 LDAP_CPPFLAGS = @LDAP_CPPFLAGS@
@@ -257,7 +261,6 @@ LIBPTHREAD_LDFLAGS = @LIBPTHREAD_LDFLAGS@
 LIBPTHREAD_LIBS = @LIBPTHREAD_LIBS@
 LIBS = @LIBS@
 LIBXML2_CFLAGS = @LIBXML2_CFLAGS@
-LIBXML2_CONFIG = @LIBXML2_CONFIG@
 LIBXML2_LDFLAGS = @LIBXML2_LDFLAGS@
 LIBXML2_LIBS = @LIBXML2_LIBS@
 LIBXML2_VERSION = @LIBXML2_VERSION@
@@ -323,6 +326,9 @@ SQLITE3_VERSION = @SQLITE3_VERSION@
 SSH2_CFLAGS = @SSH2_CFLAGS@
 SSH2_LDFLAGS = @SSH2_LDFLAGS@
 SSH2_LIBS = @SSH2_LIBS@
+SSH_CFLAGS = @SSH_CFLAGS@
+SSH_LDFLAGS = @SSH_LDFLAGS@
+SSH_LIBS = @SSH_LIBS@
 STRIP = @STRIP@
 TLS_CFLAGS = @TLS_CFLAGS@
 UNIXODBC_CFLAGS = @UNIXODBC_CFLAGS@
@@ -331,6 +337,8 @@ UNIXODBC_LIBS = @UNIXODBC_LIBS@
 VERSION = @VERSION@
 ZBXGET_LDFLAGS = @ZBXGET_LDFLAGS@
 ZBXGET_LIBS = @ZBXGET_LIBS@
+ZBXJS_LDFLAGS = @ZBXJS_LDFLAGS@
+ZBXJS_LIBS = @ZBXJS_LIBS@
 ZLIB_CFLAGS = @ZLIB_CFLAGS@
 ZLIB_LDFLAGS = @ZLIB_LDFLAGS@
 ZLIB_LIBS = @ZLIB_LIBS@
@@ -396,6 +404,7 @@ libcommonsysinfo_a_SOURCES = \
 	cpu.c cpu.h \
 	http.c http.h \
 	net.c net.h \
+	dns.c dns.h \
 	system.c system.h \
 	zabbix_stats.c zabbix_stats.h
 
@@ -450,6 +459,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-common.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-cpu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-dir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-dns.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-file.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-http.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommonsysinfo_a-net.Po@am__quote@
@@ -555,6 +565,20 @@ libcommonsysinfo_a-net.obj: net.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='net.c' object='libcommonsysinfo_a-net.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcommonsysinfo_a_CFLAGS) $(CFLAGS) -c -o libcommonsysinfo_a-net.obj `if test -f 'net.c'; then $(CYGPATH_W) 'net.c'; else $(CYGPATH_W) '$(srcdir)/net.c'; fi`
+
+libcommonsysinfo_a-dns.o: dns.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcommonsysinfo_a_CFLAGS) $(CFLAGS) -MT libcommonsysinfo_a-dns.o -MD -MP -MF $(DEPDIR)/libcommonsysinfo_a-dns.Tpo -c -o libcommonsysinfo_a-dns.o `test -f 'dns.c' || echo '$(srcdir)/'`dns.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libcommonsysinfo_a-dns.Tpo $(DEPDIR)/libcommonsysinfo_a-dns.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dns.c' object='libcommonsysinfo_a-dns.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcommonsysinfo_a_CFLAGS) $(CFLAGS) -c -o libcommonsysinfo_a-dns.o `test -f 'dns.c' || echo '$(srcdir)/'`dns.c
+
+libcommonsysinfo_a-dns.obj: dns.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcommonsysinfo_a_CFLAGS) $(CFLAGS) -MT libcommonsysinfo_a-dns.obj -MD -MP -MF $(DEPDIR)/libcommonsysinfo_a-dns.Tpo -c -o libcommonsysinfo_a-dns.obj `if test -f 'dns.c'; then $(CYGPATH_W) 'dns.c'; else $(CYGPATH_W) '$(srcdir)/dns.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libcommonsysinfo_a-dns.Tpo $(DEPDIR)/libcommonsysinfo_a-dns.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dns.c' object='libcommonsysinfo_a-dns.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcommonsysinfo_a_CFLAGS) $(CFLAGS) -c -o libcommonsysinfo_a-dns.obj `if test -f 'dns.c'; then $(CYGPATH_W) 'dns.c'; else $(CYGPATH_W) '$(srcdir)/dns.c'; fi`
 
 libcommonsysinfo_a-system.o: system.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcommonsysinfo_a_CFLAGS) $(CFLAGS) -MT libcommonsysinfo_a-system.o -MD -MP -MF $(DEPDIR)/libcommonsysinfo_a-system.Tpo -c -o libcommonsysinfo_a-system.o `test -f 'system.c' || echo '$(srcdir)/'`system.c

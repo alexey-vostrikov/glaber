@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -176,6 +176,8 @@ $table = (new CTableInfo())
 		_('Discovery'),
 		_('Web'),
 		_('Interface'),
+		($data['filter']['monitored_by'] == ZBX_MONITORED_BY_PROXY
+				|| $data['filter']['monitored_by'] == ZBX_MONITORED_BY_ANY) ? _('Proxy') : null,
 		_('Templates'),
 		make_sorting_header(_('Status'), 'status', $data['sortField'], $data['sortOrder'], 'hosts.php'),
 		_('Availability'),
@@ -201,16 +203,17 @@ foreach ($data['hosts'] as $host) {
 
 	$description = [];
 
-	if ($host['proxy_hostid'] != 0) {
-		$description[] = $data['proxies'][$host['proxy_hostid']]['host'];
-		$description[] = NAME_DELIMITER;
-	}
 	if ($host['discoveryRule']) {
 		$description[] = (new CLink(CHtml::encode($host['discoveryRule']['name']),
 			(new CUrl('host_prototypes.php'))->setArgument('parent_discoveryid', $host['discoveryRule']['itemid'])
 		))
 			->addClass(ZBX_STYLE_LINK_ALT)
 			->addClass(ZBX_STYLE_ORANGE);
+		$description[] = NAME_DELIMITER;
+	}
+	elseif ($host['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
+		// Discovered host which does not contain info about parent discovery rule is inaccessible for current user.
+		$description[] = (new CSpan(_('Inaccessible discovery rule')))->addClass(ZBX_STYLE_ORANGE);
 		$description[] = NAME_DELIMITER;
 	}
 
@@ -410,6 +413,12 @@ foreach ($data['hosts'] as $host) {
 			CViewHelper::showNum($host['httpTests'])
 		],
 		$hostInterface,
+		($data['filter']['monitored_by'] == ZBX_MONITORED_BY_PROXY
+				|| $data['filter']['monitored_by'] == ZBX_MONITORED_BY_ANY)
+			? ($host['proxy_hostid'] != 0)
+				? $data['proxies'][$host['proxy_hostid']]['host']
+				: ''
+			: null,
 		$hostTemplates,
 		$status,
 		getHostAvailabilityTable($host),
@@ -426,7 +435,15 @@ $form->addItem([
 		[
 			'host.massenable' => ['name' => _('Enable'), 'confirm' => _('Enable selected hosts?')],
 			'host.massdisable' => ['name' => _('Disable'), 'confirm' => _('Disable selected hosts?')],
-			'host.export' => ['name' => _('Export')],
+			'host.export' => ['name' => _('Export'), 'redirect' =>
+				(new CUrl('zabbix.php'))
+					->setArgument('action', 'export.hosts.xml')
+					->setArgument('backurl', (new CUrl('hosts.php'))
+						->setArgument('groupid', $data['pageFilter']->groupid)
+						->setArgument('page', getPageNumber())
+						->getUrl())
+					->getUrl()
+			],
 			'host.massupdateform' => ['name' => _('Mass update')],
 			'host.massdelete' => ['name' => _('Delete'), 'confirm' => _('Delete selected hosts?')]
 		]

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -198,6 +198,7 @@ int	zbx_rwlock_create(zbx_rwlock_t *rwlock, zbx_rwlock_name_t name, char **error
 	return SUCCEED;
 }
 #ifdef HAVE_PTHREAD_PROCESS_SHARED
+
 /******************************************************************************
  *                                                                            *
  * Function: __zbx_rwlock_wrlock                                              *

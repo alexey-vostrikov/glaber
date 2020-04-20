@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -63,7 +63,7 @@ function condition_type2str($type) {
 		CONDITION_TYPE_PROXY => _('Proxy'),
 		CONDITION_TYPE_EVENT_TYPE => _('Event type'),
 		CONDITION_TYPE_HOST_METADATA => _('Host metadata'),
-		CONDITION_TYPE_EVENT_TAG => _('Tag'),
+		CONDITION_TYPE_EVENT_TAG => _('Tag name'),
 		CONDITION_TYPE_EVENT_TAG_VALUE => _('Tag value')
 	];
 
@@ -88,7 +88,7 @@ function discovery_object2str($object = null) {
  *
  * For action condition types such as: hosts, host groups, templates, proxies, triggers, discovery rules
  * and discovery checks, action condition values contain IDs. All unique IDs are first collected and then queried.
- * For other action condition types values are returned as they are or converted using simple string convertion
+ * For other action condition types values are returned as they are or converted using simple string conversion
  * functions according to action condition type.
  *
  * @param array $actions							array of actions
@@ -319,29 +319,6 @@ function actionConditionValueToString(array $actions, array $config) {
 }
 
 /**
- * Converts numerical action operation condition values to their corresponding string values according to
- * action operation condition type. Since action list does not display operation conditions,
- * so there is only an array of operation conditions for single action which is displayed in operation details.
- *
- * @param array  $conditions					array of actions operation conditions
- * @param string $condition['conditiontype']	operation condition type
- * @param string $condition['value']			operation condition value
- *
- * @return array								returns an array of action operation condition string values
- */
-function actionOperationConditionValueToString(array $conditions) {
-	$result = [];
-
-	foreach ($conditions as $condition) {
-		if ($condition['conditiontype'] == CONDITION_TYPE_EVENT_ACKNOWLEDGED) {
-			$result[] = $condition['value'] ? _('Ack') : _('Not Ack');
-		}
-	}
-
-	return $result;
-}
-
-/**
  * Returns the HTML representation of an action condition and action operation condition.
  *
  * @param string $condition_type
@@ -353,7 +330,7 @@ function actionOperationConditionValueToString(array $conditions) {
  */
 function getConditionDescription($condition_type, $operator, $value, $value2) {
 	if ($condition_type == CONDITION_TYPE_EVENT_TAG_VALUE) {
-		$description = [_('Tag')];
+		$description = [_('Value of tag')];
 		$description[] = ' ';
 		$description[] = italic(CHtml::encode($value2));
 		$description[] = ' ';
@@ -512,7 +489,7 @@ function getActionOperationDescriptions(array $actions, $type) {
 
 	if ($media_typeids) {
 		$media_types = API::Mediatype()->get([
-			'output' => ['description'],
+			'output' => ['name'],
 			'mediatypeids' => $media_typeids,
 			'preservekeys' => true
 		]);
@@ -563,7 +540,7 @@ function getActionOperationDescriptions(array $actions, $type) {
 		]);
 	}
 
-	// format the HTML ouput
+	// Format the HTML output.
 	foreach ($actions as $i => $action) {
 		if ($type == ACTION_OPERATION) {
 			foreach ($action['operations'] as $j => $operation) {
@@ -573,7 +550,7 @@ function getActionOperationDescriptions(array $actions, $type) {
 						$media_typeid = $operation['opmessage']['mediatypeid'];
 
 						if ($media_typeid != 0 && isset($media_types[$media_typeid])) {
-							$media_type = $media_types[$media_typeid]['description'];
+							$media_type = $media_types[$media_typeid]['name'];
 						}
 
 						if (array_key_exists('opmessage_usr', $operation) && $operation['opmessage_usr']) {
@@ -736,7 +713,7 @@ function getActionOperationDescriptions(array $actions, $type) {
 						$media_typeid = $operation['opmessage']['mediatypeid'];
 
 						if ($media_typeid != 0 && isset($media_types[$media_typeid])) {
-							$media_type = $media_types[$media_typeid]['description'];
+							$media_type = $media_types[$media_typeid]['name'];
 						}
 
 						if (array_key_exists('opmessage_usr', $operation) && $operation['opmessage_usr']) {
@@ -1382,7 +1359,7 @@ function getEventsActionsIconsData(array $events, array $triggers, array $r_even
 	$messages = getEventsMessages($events);
 	$severities = getEventsSeverityChanges($events, $triggers);
 	$actions = getEventsActions($events, $r_events);
-
+	
 	return [
 		'data' => [
 			'messages' => $messages['data'],
@@ -1513,7 +1490,7 @@ function getEventsActions(array $events, array $r_events = []) {
 	$userids = [];
 	$mediatypeids = [];
 	$actions = [];
-
+	
 	foreach ($events as $event) {
 		// Get alerts for event.
 		$alert_eventids[$event['eventid']] = true;
@@ -1524,7 +1501,7 @@ function getEventsActions(array $events, array $r_events = []) {
 			$r_eventids[$event['r_eventid']] = true;
 		}
 	}
-
+	
 	if ($r_eventids && !$r_events) {
 		$r_events = API::Event()->get([
 			'output' => ['clock'],
@@ -1532,27 +1509,36 @@ function getEventsActions(array $events, array $r_events = []) {
 			'preservekeys' => true
 		]);
 	}
-
+	
 	$alerts = $alert_eventids
 		? API::Alert()->get([
 			'output' => ['alerttype', 'clock', 'error', 'eventid', 'mediatypeid', 'retries', 'status', 'userid'],
 			'eventids' => array_keys($alert_eventids)
 		])
 		: [];
+	
+	
+		$alerts_by_event=[];
+		foreach ($alerts as $alert) {
+			if (!in_array( $alert['eventid'], $alerts_by_event, FALSE)) $alerts_by_event[$alert['eventid']]=[];
+			array_push($alerts_by_event[$alert['eventid']],$alert);
+		}
 
-	// Create array of actions for each event.
-	foreach ($events as $event) {
-		$event_actions = getSingleEventActions($event, $r_events, $alerts);
-		$actions[$event['eventid']] = [
-			'actions' => $event_actions['actions'],
-			'count' => $event_actions['count'],
-			'has_uncomplete_action' => $event_actions['has_uncomplete_action'],
-			'has_failed_action' => $event_actions['has_failed_action']
-		];
-		$mediatypeids += $event_actions['mediatypeids'];
-		$userids += $event_actions['userids'];
-	}
+		foreach ($events as $event) {
+			//also adding empty alert arrays if there is no alerts for them
+			if (!in_array( $event['eventid'], $alerts_by_event, FALSE)) $alerts_by_event[$event['eventid']]=[];
 
+			$event_actions = getSingleEventActions($event, $r_events, $alerts_by_event[$event['eventid']]);
+			$actions[$event['eventid']] = [
+				'actions' => $event_actions['actions'],
+				'count' => $event_actions['count'],
+				'has_uncomplete_action' => $event_actions['has_uncomplete_action'],
+				'has_failed_action' => $event_actions['has_failed_action']
+			];
+			$mediatypeids += $event_actions['mediatypeids'];
+			$userids += $event_actions['userids'];
+		}
+	
 	return [
 		'data' => $actions,
 		'mediatypeids' => $mediatypeids,
@@ -1733,7 +1719,7 @@ function getEventUpdates(array $event) {
  * @param array  $actions['messages']    Messages icon data.
  * @param array  $actions['severities']  Severity change icon data.
  * @param array  $actions['actions']     Actions icon data.
- * @param array  $mediatypes             Mediatypes with maxattempts value and description.
+ * @param array  $mediatypes             Mediatypes with maxattempts value and name.
  * @param array  $users                  User name, surname and alias.
  * @param array  $config                 Zabbix config.
  *
@@ -1894,8 +1880,8 @@ function makeEventSeverityChangesIcon(array $data, array $users, array $config) 
  * @param bool   $data['has_uncomplete_action']     Does the event have at least one uncompleted alert action.
  * @param bool   $data['has_failed_action']         Does the event have at least one failed alert action.
  * @param array  $users                             User name, surname and alias.
- * @param array  $mediatypes                        Mediatypes with maxattempts value and description.
- * @param string $mediatypes[]['description']       Mediatype description.
+ * @param array  $mediatypes                        Mediatypes with maxattempts value and name.
+ * @param string $mediatypes[]['name']              Mediatype name.
  * @param array  $config                            Zabbix config.
  *
  * @return CSpan|null
@@ -1924,7 +1910,7 @@ function makeEventActionsIcon(array $data, array $users, array $mediatypes, arra
 			}
 			elseif ($action['alerttype'] == ALERT_TYPE_MESSAGE) {
 				$message = array_key_exists($action['mediatypeid'], $mediatypes)
-					? $mediatypes[$action['mediatypeid']]['description']
+					? $mediatypes[$action['mediatypeid']]['name']
 					: '';
 			}
 		}

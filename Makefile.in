@@ -94,10 +94,10 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_lib_ibm_db2.m4 \
 	$(top_srcdir)/m4/ax_lib_oracle_oci.m4 \
 	$(top_srcdir)/m4/ax_lib_postgresql.m4 \
 	$(top_srcdir)/m4/ax_lib_sqlite3.m4 $(top_srcdir)/m4/iconv.m4 \
-	$(top_srcdir)/m4/jabber.m4 $(top_srcdir)/m4/ldap.m4 \
-	$(top_srcdir)/m4/libcurl.m4 $(top_srcdir)/m4/libevent.m4 \
-	$(top_srcdir)/m4/libgnutls.m4 $(top_srcdir)/m4/libmbedtls.m4 \
-	$(top_srcdir)/m4/libopenssl.m4 $(top_srcdir)/m4/libssh2.m4 \
+	$(top_srcdir)/m4/ldap.m4 $(top_srcdir)/m4/libcurl.m4 \
+	$(top_srcdir)/m4/libevent.m4 $(top_srcdir)/m4/libgnutls.m4 \
+	$(top_srcdir)/m4/libmbedtls.m4 $(top_srcdir)/m4/libopenssl.m4 \
+	$(top_srcdir)/m4/libssh.m4 $(top_srcdir)/m4/libssh2.m4 \
 	$(top_srcdir)/m4/libunixodbc.m4 $(top_srcdir)/m4/libxml2.m4 \
 	$(top_srcdir)/m4/netsnmp.m4 $(top_srcdir)/m4/openipmi.m4 \
 	$(top_srcdir)/m4/pcre.m4 $(top_srcdir)/m4/pthread.m4 \
@@ -216,6 +216,7 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
   | sed 's|^\./|$(prefix)/|' | grep -v '$(infodir)/dir$$'
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
+AGENT2_CONFIG_FILE = @AGENT2_CONFIG_FILE@
 AGENT_CONFIG_FILE = @AGENT_CONFIG_FILE@
 AGENT_LDFLAGS = @AGENT_LDFLAGS@
 AGENT_LIBS = @AGENT_LIBS@
@@ -230,6 +231,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CGO_CFLAGS = @CGO_CFLAGS@
+CGO_LDFLAGS = @CGO_LDFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CURL_SSL_CERT_LOCATION = @CURL_SSL_CERT_LOCATION@
@@ -249,19 +252,19 @@ EXTERNAL_SCRIPTS_PATH = @EXTERNAL_SCRIPTS_PATH@
 GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
 GNUTLS_LDFLAGS = @GNUTLS_LDFLAGS@
 GNUTLS_LIBS = @GNUTLS_LIBS@
+GO = @GO@
+GOBIN = @GOBIN@
+GOCMD = @GOCMD@
+GOWORKDIR = @GOWORKDIR@
 GREP = @GREP@
 ICONV_CFLAGS = @ICONV_CFLAGS@
 ICONV_LDFLAGS = @ICONV_LDFLAGS@
-IKSEMEL_CFLAGS = @IKSEMEL_CFLAGS@
-IKSEMEL_LIBS = @IKSEMEL_LIBS@
+ICONV_LIBS = @ICONV_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
-JABBER_CPPFLAGS = @JABBER_CPPFLAGS@
-JABBER_LDFLAGS = @JABBER_LDFLAGS@
-JABBER_LIBS = @JABBER_LIBS@
 JAR = @JAR@
 JAVAC = @JAVAC@
 LDAP_CPPFLAGS = @LDAP_CPPFLAGS@
@@ -283,7 +286,6 @@ LIBPTHREAD_LDFLAGS = @LIBPTHREAD_LDFLAGS@
 LIBPTHREAD_LIBS = @LIBPTHREAD_LIBS@
 LIBS = @LIBS@
 LIBXML2_CFLAGS = @LIBXML2_CFLAGS@
-LIBXML2_CONFIG = @LIBXML2_CONFIG@
 LIBXML2_LDFLAGS = @LIBXML2_LDFLAGS@
 LIBXML2_LIBS = @LIBXML2_LIBS@
 LIBXML2_VERSION = @LIBXML2_VERSION@
@@ -349,6 +351,9 @@ SQLITE3_VERSION = @SQLITE3_VERSION@
 SSH2_CFLAGS = @SSH2_CFLAGS@
 SSH2_LDFLAGS = @SSH2_LDFLAGS@
 SSH2_LIBS = @SSH2_LIBS@
+SSH_CFLAGS = @SSH_CFLAGS@
+SSH_LDFLAGS = @SSH_LDFLAGS@
+SSH_LIBS = @SSH_LIBS@
 STRIP = @STRIP@
 TLS_CFLAGS = @TLS_CFLAGS@
 UNIXODBC_CFLAGS = @UNIXODBC_CFLAGS@
@@ -357,6 +362,8 @@ UNIXODBC_LIBS = @UNIXODBC_LIBS@
 VERSION = @VERSION@
 ZBXGET_LDFLAGS = @ZBXGET_LDFLAGS@
 ZBXGET_LIBS = @ZBXGET_LIBS@
+ZBXJS_LDFLAGS = @ZBXJS_LDFLAGS@
+ZBXJS_LIBS = @ZBXJS_LIBS@
 ZLIB_CFLAGS = @ZLIB_CFLAGS@
 ZLIB_LDFLAGS = @ZLIB_LDFLAGS@
 ZLIB_LIBS = @ZLIB_LIBS@
@@ -694,6 +701,11 @@ distdir: $(DISTFILES)
 	  ! -type d ! -perm -400 -exec chmod a+r {} \; -o \
 	  ! -type d ! -perm -444 -exec $(install_sh) -c -m a+r {} {} \; \
 	|| chmod -R a+r "$(distdir)"
+	@if test -z "$(am__skip_length_check)" && find "$(distdir)" -type f -print | \
+	  grep '^...................................................................................................' 1>&2; then \
+	  echo 'error: the above filenames are too long' 1>&2; \
+	  exit 1; \
+	else :; fi
 dist-gzip: distdir
 	tardir=$(distdir) && $(am__tar) | GZIP=$(GZIP_ENV) gzip -c >$(distdir).tar.gz
 	$(am__post_remove_distdir)
@@ -973,14 +985,15 @@ dist-hook:
 		$(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java.new; \
 	mv $(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java.new \
 		$(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java; \
-	rm -f $(top_distdir)/conf_tests.m4
+	cat $(top_distdir)/src/go/pkg/version/version.go|sed "s/{ZABBIX_RC_NUM}/$$branch$$type_num$$type_count/g"| \
+	sed "s/{ZABBIX_REVISION}/$$zabbix_revision/g" > $(top_distdir)/src/go/pkg/version/version.go.new; \
+	mv $(top_distdir)/src/go/pkg/version/version.go.new $(top_distdir)/src/go/pkg/version/version.go
 
 	rm -rf `find $(top_distdir) -name ".gitignore" -o -name ".gitattributes"`
 	rm -f $(top_distdir)/include/config.h
 	rm -f $(top_distdir)/include/config.h.in~
 	rm -f $(top_distdir)/frontends/php/conf/zabbix.conf.php
 	rm -rf $(top_distdir)/frontends/php/tests
-	rm -f $(top_distdir)/sass/*.html
 	rm -rf $(top_distdir)/sass/img_source
 
 @DBSCHEMA_TRUE@dbschema_ibm_db2:

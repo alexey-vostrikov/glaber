@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -114,7 +114,7 @@ $data = [
 	'active_tab' => CProfile::get('web.item.graph.filter.active', 1)
 ];
 
-if ($data['action'] != HISTORY_BATCH_GRAPH && is_array($itemids)) {
+if ($data['action'] != HISTORY_BATCH_GRAPH && $itemids) {
 	$data['profileIdx2'] = reset($itemids);
 }
 

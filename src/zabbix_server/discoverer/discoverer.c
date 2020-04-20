@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 #include "discoverer.h"
 #include "../poller/checks_agent.h"
 #include "../poller/checks_snmp.h"
-#include "../../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 
 extern int		CONFIG_DISCOVERER_FORKS;
 extern unsigned char	process_type, program_type;
@@ -764,7 +764,7 @@ static int	process_discovery(void)
 			CONFIG_DISCOVERER_FORKS,
 			process_num - 1);
 
-	while (NULL != (row = DBfetch(result)))
+	while (ZBX_IS_RUNNING() && NULL != (row = DBfetch(result)))
 	{
 		int		now, delay;
 		zbx_uint64_t	druleid;
@@ -875,6 +875,8 @@ ZBX_THREAD_ENTRY(discoverer_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 #ifdef HAVE_NETSNMP
 	zbx_init_snmp();
 #endif
@@ -890,7 +892,7 @@ ZBX_THREAD_ENTRY(discoverer_thread, args)
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 		zbx_update_env(sec);
@@ -932,5 +934,9 @@ ZBX_THREAD_ENTRY(discoverer_thread, args)
 		zbx_sleep_loop(sleeptime);
 	}
 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }

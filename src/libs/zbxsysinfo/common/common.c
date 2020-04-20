@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include "dir.h"
 #include "http.h"
 #include "net.h"
+#include "dns.h"
 #include "system.h"
 #include "zabbix_stats.h"
 #include "zbxexec.h"

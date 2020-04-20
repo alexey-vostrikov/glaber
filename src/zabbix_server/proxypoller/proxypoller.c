@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "zbxjson.h"
 #include "log.h"
 #include "proxy.h"
-#include "../../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 #include "../trapper/proxydata.h"
 
 extern unsigned char	process_type, program_type;
@@ -194,10 +194,27 @@ static int	get_data_from_proxy(DC_PROXY *proxy, const char *request, char **data
 				if (0 != (s.protocol & ZBX_TCP_COMPRESS))
 					proxy->auto_compress = 1;
 
-				ret = zbx_send_proxy_data_response(proxy, &s, NULL);
+				if (!ZBX_IS_RUNNING())
+				{
+					int	flags = ZBX_TCP_PROTOCOL;
 
-				if (SUCCEED == ret)
-					*data = zbx_strdup(*data, s.buffer);
+					if (0 != (s.protocol & ZBX_TCP_COMPRESS))
+						flags |= ZBX_TCP_COMPRESS;
+
+					zbx_send_response_ext(&s, FAIL, "Zabbix server shutdown in progress", NULL,
+							flags, CONFIG_TIMEOUT);
+
+					zabbix_log(LOG_LEVEL_WARNING, "cannot process proxy data from passive proxy at"
+							" \"%s\": Zabbix server shutdown in progress", s.peer);
+					ret = FAIL;
+				}
+				else
+				{
+					ret = zbx_send_proxy_data_response(proxy, &s, NULL);
+
+					if (SUCCEED == ret)
+						*data = zbx_strdup(*data, s.buffer);
+				}
 			}
 		}
 
@@ -270,7 +287,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 			}
 			else
 			{
-				proxy->version = zbx_get_protocol_version(&jp);
+				proxy->version = zbx_get_proxy_protocol_version(&jp);
 				proxy->auto_compress = (0 != (s.protocol & ZBX_TCP_COMPRESS) ? 1 : 0);
 				proxy->lastaccess = time(NULL);
 			}
@@ -328,7 +345,7 @@ static int	proxy_process_proxy_data(DC_PROXY *proxy, const char *answer, zbx_tim
 		goto out;
 	}
 
-	proxy->version = zbx_get_protocol_version(&jp);
+	proxy->version = zbx_get_proxy_protocol_version(&jp);
 
 	if (SUCCEED != zbx_check_protocol_version(proxy))
 	{
@@ -344,7 +361,7 @@ static int	proxy_process_proxy_data(DC_PROXY *proxy, const char *answer, zbx_tim
 	{
 		char	value[MAX_STRING_LEN];
 
-		if (SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_MORE, value, sizeof(value)))
+		if (SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_MORE, value, sizeof(value), NULL))
 			*more = atoi(value);
 	}
 out:
@@ -785,6 +802,8 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 #define STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
 
@@ -796,7 +815,7 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 		zbx_update_env(sec);
@@ -843,5 +862,10 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 		//zbx_sleep_loop(sleeptime);
 		zbx_sleep_loop(1);
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }

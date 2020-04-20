@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -61,6 +61,11 @@ function mediatypeTestSend(formname) {
 			}
 
 			$form_fields.prop('disabled', false);
+
+			if ('response' in ret) {
+				jQuery('#webhook_response_value', form).val(ret.response.value);
+				jQuery('#webhook_response_type', form).text(ret.response.type);
+			}
 
 			jQuery('.preloader').remove();
 			$submit_btn

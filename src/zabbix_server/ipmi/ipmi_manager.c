@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -969,6 +969,8 @@ ZBX_THREAD_ENTRY(ipmi_manager_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	if (FAIL == zbx_ipc_service_start(&ipmi_service, ZBX_IPC_SERVICE_IPMI, &error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot start IPMI service: %s", error);
@@ -986,9 +988,7 @@ ZBX_THREAD_ENTRY(ipmi_manager_thread, args)
 
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
 
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
-
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		time_now = zbx_time();
 		now = time_now;
@@ -1059,10 +1059,13 @@ ZBX_THREAD_ENTRY(ipmi_manager_thread, args)
 		}
 	}
 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
+
 	zbx_ipc_service_close(&ipmi_service);
 	ipmi_manager_destroy(&ipmi_manager);
-
-	return 0;
 #undef STAT_INTERVAL
 }
 

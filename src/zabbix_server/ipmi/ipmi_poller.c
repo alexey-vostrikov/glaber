@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -183,6 +183,8 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	if (FAIL == zbx_ipc_async_socket_open(&ipmi_socket, ZBX_IPC_SERVICE_IPMI, SEC_PER_MIN, &error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot connect to IPMI service: %s", error);
@@ -198,9 +200,7 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
 
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
-
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		zbx_ipc_message_t	*message = NULL;
 
@@ -219,7 +219,7 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 
 		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
 
-		for (;;)
+		while (ZBX_IS_RUNNING())
 		{
 			const int ipc_timeout = 2;
 			const int ipmi_timeout = 1;
@@ -237,6 +237,9 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 		}
 
 		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
+		if (NULL == message)
+			break;
 
 		time_read = zbx_time();
 		time_idle += time_read - time_now;
@@ -260,10 +263,14 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 		message = NULL;
 	}
 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
+
 	zbx_ipc_async_socket_close(&ipmi_socket);
 
 	zbx_free_ipmi_handler();
-
 #undef STAT_INTERVAL
 }
 

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -317,6 +317,10 @@ class CHelpItems {
 					'description' => _('Disk space in bytes or in percentage from total. Returns integer for bytes; float for percentage')
 				],
 				[
+					'key' => 'vfs.fs.get',
+					'description' => _('File systems and their spaces in bytes and percentage from total. Returns JSON')
+				],
+				[
 					'key' => 'vm.memory.size[<mode>]',
 					'description' => _('Memory size in bytes or in percentage from total. Returns integer for bytes; float for percentage')
 				],
@@ -339,6 +343,10 @@ class CHelpItems {
 				[
 					'key' => 'wmi.get[<namespace>,<query>]',
 					'description' => _('Execute WMI query and return the first selected object. Returns integer, float, string or text (depending on the request)')
+				],
+				[
+					'key' => 'wmi.getall[<namespace>,<query>]',
+					'description' => _('Execute WMI query and return the JSON document with all selected objects')
 				],
 				[
 					'key' => 'zabbix.stats[<ip>,<port>]',
@@ -375,11 +383,11 @@ class CHelpItems {
 					'description' => _('Maximum number of processes supported by OS. Returns integer')
 				],
 				[
-					'key' => 'log[file,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>]',
+					'key' => 'log[file,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>,<options>]',
 					'description' => _('Log file monitoring. Returns log')
 				],
 				[
-					'key' => 'log.count[file,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>]',
+					'key' => 'log.count[file,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>,<options>]',
 					'description' => _('Count of matched lines in log file monitoring. Returns integer')
 				],
 				[
@@ -621,6 +629,10 @@ class CHelpItems {
 				[
 					'key' => 'vfs.fs.inode[fs,<mode>]',
 					'description' => _('Number or percentage of inodes. Returns integer for number; float for percentage')
+				],
+				[
+					'key' => 'vfs.fs.get',
+					'description' => _('File systems and their spaces in bytes and percentage from total. Returns JSON')
 				],
 				[
 					'key' => 'vfs.fs.size[fs,<mode>]',
@@ -968,7 +980,7 @@ class CHelpItems {
 				],
 				[
 					'key' => 'zabbix[host,discovery,interfaces]',
-					'description' => _('Returns a JSON object describing the host network interfaces configured in Zabbix. Can be used for LLD.')
+					'description' => _('Returns a JSON array describing the host network interfaces configured in Zabbix. Can be used for LLD.')
 				],
 				[
 					'key' => 'zabbix[host,<type>,available]',
@@ -1062,7 +1074,11 @@ class CHelpItems {
 				],
 				[
 					'key' => 'db.odbc.discovery[<unique short description>,dsn]',
-					'description' => _('Transform SQL query result into a JSON object for low-level discovery.')
+					'description' => _('Transform SQL query result into a JSON array for low-level discovery.')
+				],
+				[
+					'key' => 'db.odbc.get[<unique short description>,dsn]',
+					'description' => _('Transform SQL query result into a JSON array.')
 				]
 			],
 			ITEM_TYPE_JMX => [
@@ -1072,7 +1088,11 @@ class CHelpItems {
 				],
 				[
 					'key' => 'jmx.discovery[<discovery mode>,<object name>]',
-					'description' => _('Return a JSON object describing the MBean objects or their attributes. Can be used for LLD.')
+					'description' => _('Return a JSON array with LLD macros describing the MBean objects or their attributes. Can be used for LLD.')
+				],
+				[
+					'key' => 'jmx.get[<discovery mode>,<object name>]',
+					'description' => _('Return a JSON array with MBean objects or their attributes. Compared to jmx.discovery it does not define LLD macros. Can be used for LLD.')
 				]
 			]
 		];

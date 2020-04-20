@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@
 #include "checks_java.h"
 #include "checks_calculated.h"
 #include "checks_http.h"
-#include "../../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 #include "zbxjson.h"
 #include "zbxhttp.h"
 
@@ -375,7 +375,7 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 			res = get_value_external(item, result);
 			break;
 		case ITEM_TYPE_SSH:
-#ifdef HAVE_SSH2
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
 			zbx_alarm_on(CONFIG_TIMEOUT);
 			res = get_value_ssh(item, result);
 			zbx_alarm_off();
@@ -663,6 +663,8 @@ static int prepare_items(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  
 						NULL, NULL, NULL, &items[i].password, MACRO_TYPE_COMMON, NULL, 0);
 				break;
 		}
+		if (CONFIG_DEBUG_ITEM == items[i].itemid) 
+			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: prepared for polling ",items[i].itemid,__func__);
 		errcodes[i]=POLL_PREPARED;
 	}
 	
@@ -677,7 +679,9 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 
 
 	for (i = 0; i < max_items; i++ ) {
-		//zabbix_log(LOG_LEVEL_INFORMATION, "Prproc checkinmg item%d  %ld in state %d",i, items[i].itemid, errcodes[i]);
+		//if (CONFIG_DEBUG_HOST == items[i].host.hostid)
+		//	zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Prproc checkinmg item%d %ld in state %d",i, items[i].itemid, errcodes[i]);
+
 		switch (errcodes[i]) {
 			case SUCCEED:
 			case FAIL:
@@ -691,68 +695,101 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 		default:
 			continue;
 		}
-		//zabbix_log(LOG_LEVEL_INFORMATION, "Preprocessing item %ld in state %d",items[i].itemid, errcodes[i]);
+		if (CONFIG_DEBUG_HOST == items[i].host.hostid)
+			zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Preprocessing item %ld in state %d",items[i].itemid, errcodes[i]);
 
-		if (SUCCEED == errcodes[i])
-			{
-				if (0 == add_results->values_num)
-				{
-					items[i].state = ITEM_STATE_NORMAL;
-					num++;
-							
-					zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags,
-							&results[i], &timespec, items[i].state, NULL);
+
+		//host activation/dactiovation part
+		switch (errcodes[i])
+		{
+			case SUCCEED:
+			case NOTSUPPORTED:
+			case AGENT_ERROR:
+				if ((poller_type == ZBX_POLLER_TYPE_UNREACHABLE || 
+					poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP  || 
+					poller_type == ZBX_POLLER_TYPE_NORMAL) &&  CONFIG_ENABLE_HOST_DEACTIVATION )	{
+					zbx_activate_item_host(&items[i], &timespec);
 				}
-				else {
+				break;
+			case NETWORK_ERROR:
+			case GATEWAY_ERROR:
+			case TIMEOUT_ERROR:
+				/* for mass problems don't mark host as unreach for async and unreach pollers, because:
+				first, that sometimes causes a "poll" bug in mysql lib (100% thread load on waiting in a poll for mysql, probably solvable by alarm)
+				second, there seems to be no reason for that, async pollers live just fine having even all hosts unreachable */
+				if (( //HOST_AVAILABLE_FALSE != last_available &&  
+				     poller_type == ZBX_POLLER_TYPE_UNREACHABLE || 
+					 poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP  || 
+					 poller_type == ZBX_POLLER_TYPE_NORMAL) && ( 1 == CONFIG_ENABLE_HOST_DEACTIVATION) ) {	
+					zbx_deactivate_item_host(&items[i], &timespec, results[i].msg);
+				}
+				break;
+		
+			case CONFIG_ERROR:
+			case FAIL: //todo: figure what fail status mean
+				/* nothing to do */
+				break;
+			default:
+				zbx_error("unknown response code returned: %d", errcodes[i]);
+				THIS_SHOULD_NEVER_HAPPEN;
+		}
+
+
+		if (SUCCEED == errcodes[i]) {
+			if (0 == add_results->values_num) {
+				items[i].state = ITEM_STATE_NORMAL;
+				num++;
+							
+				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags,
+							&results[i], &timespec, items[i].state, NULL);
+			} else {
 				/* vmware.eventlog item returns vector of AGENT_RESULT representing events */
-					int		j;
-					zbx_timespec_t	ts_tmp = timespec;
+				int		j;
+				zbx_timespec_t	ts_tmp = timespec;
 
-					for (j = 0; j < add_results->values_num; j++)
-					{
-						AGENT_RESULT	*add_result = (AGENT_RESULT *)add_results->values[j];
+				for (j = 0; j < add_results->values_num; j++) {
+					AGENT_RESULT	*add_result = (AGENT_RESULT *)add_results->values[j];
 
-						if (ISSET_MSG(add_result))
-						{
-							items[i].state = ITEM_STATE_NOTSUPPORTED;
-							num++;
-							zbx_preprocess_item_value(items[i].itemid, items[i].value_type,
-								items[i].flags, NULL, &ts_tmp, items[i].state,
-								add_result->msg);
-						}
-						else {
-							zabbix_log(LOG_LEVEL_INFORMATION, "Prc4");
-							items[i].state = ITEM_STATE_NORMAL;
-							num++;
-							zbx_preprocess_item_value(items[i].itemid, items[i].value_type,
+					if (ISSET_MSG(add_result)) {
+				
+						items[i].state = ITEM_STATE_NOTSUPPORTED;
+						num++;
+						zbx_preprocess_item_value(items[i].itemid, items[i].value_type,
+							items[i].flags, NULL, &ts_tmp, items[i].state,
+							add_result->msg);
+					} else {
+						items[i].state = ITEM_STATE_NORMAL;
+						num++;
+						zbx_preprocess_item_value(items[i].itemid, items[i].value_type,
 								items[i].flags, add_result, &ts_tmp, items[i].state,
 								NULL);
-						}
-
+					}
 						/* ensure that every log item value timestamp is unique */
-						if (++ts_tmp.ns == 1000000000) {
-							ts_tmp.sec++;
-							ts_tmp.ns = 0;
-						}
+					if (++ts_tmp.ns == 1000000000) {
+						ts_tmp.sec++;
+						ts_tmp.ns = 0;
 					}
 				}
 			}
-			else if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i])
-			{	
-			
-				items[i].state = ITEM_STATE_NOTSUPPORTED;
-				num++;			
-			
-				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL, &timespec,
-					items[i].state, results[i].msg);
-			}
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Requeueing item %ld",items[i].itemid);		
-			DCpoller_requeue_items(&items[i].itemid, &items[i].state, &timespec.sec, &errcodes[i], 1, poller_type);
-			errcodes[i]=POLL_PREPROCESSED;	
-		}
+		} else if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {	
+			items[i].state = ITEM_STATE_NOTSUPPORTED;
+			num++;			
+			if (CONFIG_DEBUG_HOST == items[i].host.hostid) 
+				zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: about to be sent to preprocessing ",items[i].itemid,__func__);
 
-		zbx_preprocessor_flush();
-		return num;
+			zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL, &timespec,
+					items[i].state, results[i].msg);
+		}
+		
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Requeueing item %ld",items[i].itemid);		
+		//if (CONFIG_DEBUG_HOST == items[i].host.hostid) 
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: requeuening to queue %d",items[i].itemid,__func__,poller_type);
+			
+		//errcodes[i]=POLL_PREPROCESSED;	
+	}
+	
+	zbx_preprocessor_flush();
+	return num;
 }
 
 static int clean_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  int max_items , int poller_type, int force_clean) {
@@ -768,7 +805,7 @@ static int clean_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  i
 		//if ( !force_clean && PROCESSED != errcodes[i] ) continue; //only clean processed items unless force is set
 	
 		//unless there is a force clean, we only clean items being preprocessed
-		if ( !force_clean && POLL_PREPROCESSED !=errcodes[i]) continue;
+		if ( !force_clean && POLL_PREPROCESSED != errcodes[i]) continue;
 
 		//zabbix_log(LOG_LEVEL_INFORMATION, "Cleaning item %ld in state %d",items[i].itemid, errcodes[i]);
 		num++;
@@ -829,6 +866,46 @@ static int clean_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  i
 }
 extern int CONFIG_ASYNC_SNMP_POLLER_FORKS;
 extern int CONFIG_ASYNC_SNMP_AGENT_CONNS;
+/*
+static int	get_local_queue_items(zbx_binary_heap_t *local_queue, DC_ITEM	*items,	AGENT_RESULT *results, int *errcodes, int max_items) {
+	int num=0;
+	int cnt=0;
+
+	while (num < max_items && FAIL == zbx_binary_heap_empty(local_queue))
+	{
+		const zbx_binary_heap_elem_t	*min;
+		
+		min = zbx_binary_heap_find_min(local_queue);
+		
+		//this the oldest element point to future
+		if (min->key > time(NULL)) break; 
+
+		//skip non-free items
+		if (POLL_FREE != errcodes[num]) {
+			num++;
+			continue;
+		}
+
+		zbx_binary_heap_remove_min(local_queue);
+		
+		//getting item and host for the itemid, it may fail of item id is invalid
+		if (FAIL == glb_dc_get_item_host_data((zbx_uint64_t)(min->data), items[num])) 
+			continue;
+				
+		errcodes[num]=POLL_CC_FETCHED;
+		num++;
+		cnt++;
+	}
+	
+}
+
+static int	requeue_local_items(zbx_binary_heap_t *local_queue, DC_ITEM	 *items, AGENT_RESULT *results, int *errcodes, int max_items) {
+
+	
+}
+*/
+#define GLB_ASYNC_POLLER_CONF_TIME 1
+
 /******************************************************************************
  *                                                                            *
  * Function: get_values                                                       *
@@ -848,12 +925,13 @@ extern int CONFIG_ASYNC_SNMP_AGENT_CONNS;
 static int	get_values(unsigned char poller_type, int *processed_num,
 			DC_ITEM	 *items,	AGENT_RESULT *results, int *errcodes, int max_items)
 {
-	int			i, num_collected=0, num, start_time=time(NULL);
+	int	i, new_num, num_collected=0, num, now=time(NULL);
 	int last_stat_time=time(NULL);
 	int queue_idx=poller_type;
+	int next_dc_get=0;
+	int next_dc_preproc=0;
+	zbx_binary_heap_t local_queue; 
 
-//	#define MAX_ROLL_TIME 3000
-//	#define MAX_ROLL_ITERATIONS 2000
 	#define STAT_INTERVAL	5
 	static int roll = 0;
 	zbx_vector_ptr_t	add_results;
@@ -863,49 +941,43 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 	
 	for (i = 0; i < max_items; i++) 
 		errcodes[i]=POLL_FREE;
+	
 	if (ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	
 		queue_idx = ZBX_POLLER_TYPE_COUNT + process_num -1;	
 	if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type )	
 		queue_idx = ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS + process_num - 1;	
+	
+	//if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	{
+	//	zbx_hashset_create(&local_queue, 0,	ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	//}
 
-
-//	for (roll=0; (roll < MAX_ROLL_ITERATIONS && time(NULL)-start_time < MAX_ROLL_TIME) ; roll++ ) {
 	do {  //async loop supposed to never end 
-
-		//if (ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type) 
-		//	zabbix_log(LOG_LEVEL_INFORMATION, "Doing async snmp roll %d",roll);
+		now=time(NULL);
+		num=0;
+		new_num=0;
+		
 		zbx_vector_ptr_create(&add_results);	
-		//zabbix_log(LOG_LEVEL_INFORMATION,"#42 - before get poller items ");
-		//zabbix_log(LOG_LEVEL_INFORMATION,"Getting items for queue %d",queue_idx);
-
-		num = DCconfig_get_poller_items(queue_idx, items, errcodes, max_items);
 		
-		if ( 0 == num ) usleep(20000);
-		//todo: make all delays through zabbix sleep routines
-		//zabbix_log(LOG_LEVEL_INFORMATION,"#42 - before get prepare items ");
+		if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	{
+			if (now > next_dc_get ) {
+					new_num=DCconfig_get_poller_items(queue_idx, items, errcodes, max_items);
+				next_dc_get=now+GLB_ASYNC_POLLER_CONF_TIME;
+			}
+			
+		} else 
+			new_num=DCconfig_get_poller_items(queue_idx, items, errcodes, max_items);
 		
-		num=prepare_items(items, errcodes,results, max_items);
-		//zabbix_log(LOG_LEVEL_INFORMATION,"#42 - after prepare items poller type is %d ",poller_type);
-		//zabbix_log(LOG_LEVEL_INFORMATION,"%s: starting poll iteration %d",__func__,roll++);
+		prepare_items(items, errcodes,results, max_items);
 #ifdef HAVE_NETSNMP
 		if (ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
-			//zbx_alarm_on(CONFIG_TIMEOUT*2);
-			//zabbix_log(LOG_LEVEL_INFORMATION,"#42 - before get async values ");
-			num = get_values_snmp_async();
-			//zabbix_log(LOG_LEVEL_INFORMATION, "Got %d asyn values", num);
-			//zbx_alarm_off();
+			get_values_snmp_async();
 		}
 #endif
 		if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type ) 
 		{
-		//	zbx_alarm_on(CONFIG_TIMEOUT*2);
-			num = get_values_agent_async();
-		//	zbx_alarm_off();
+			get_values_agent_async();
 		}
-			//zabbix_log(LOG_LEVEL_INFORMATION,"#42 - before old style fallback ");
-		//fallback-old sync processing, still need this for LLD items a
-		//zabbix_log(LOG_LEVEL_INFORMATION, "Poller type %d, errcode is %d",poller_type,errcodes[0]);
-
+	
 		for (i = 0; i < max_items; i++) {
 			/* only process items skipped by async methods */		
 			if ( (POLL_SKIPPED == errcodes[i] && 
@@ -926,9 +998,13 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 				if (SUCCEED == is_snmp_type(items[i].type))
 				{	
 #ifdef HAVE_NETSNMP
+					if (CONFIG_DEBUG_ITEM == items[i].itemid) 
+						zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Processing item %ld via old sync way",items[i].itemid);
 					/* SNMP checks use their own timeouts */
 					get_values_snmp(&items[i], &results[i], &errcodes[i], 1);
-					
+
+					if (CONFIG_DEBUG_ITEM == items[i].itemid) 
+						zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Finished processing item %ld via old sync way, errcode is %d",items[i].itemid,errcodes[i]);
 #else
 				SET_MSG_RESULT(&results[i], zbx_strdup(NULL, "Support for SNMP checks was not compiled in."));
 				errcodes[i] = CONFIG_ERROR;
@@ -944,12 +1020,38 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 				}
 			}	
 		}
-	
+
+		float ts,te;
+		
 		num=preprocess_values(items, errcodes, results, max_items, poller_type, &add_results);
+		
+		if ((ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) 
+			&& (time(NULL) > next_dc_preproc ) ) {
+			int cnt=0;
+			//ts=zbx_time();
+			DCpoller_requeue_items(items, time(NULL),  errcodes, max_items, poller_type); 
+			//te=zbx_time();
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Timing: released %d items, spent %f sec in requeing only", num, te-ts);
+			next_dc_preproc=time(NULL)+GLB_ASYNC_POLLER_CONF_TIME;
+		} else {
+			DCpoller_requeue_items(items,time(NULL),  errcodes, max_items, poller_type); 
+		}
+
+
+		//num=preprocess_values(items, errcodes, results, max_items, poller_type, &add_results);
+		//we haven't either processed any items or got new ones to process then it's ok to sleep
+		
+		if ( num + new_num == 0 ) {
+			update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
+			usleep(100000);
+			update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+		
+		}
+		
 		*processed_num+=num;
 		//zabbix_log(LOG_LEVEL_INFORMATION, "QPoller_stat: preprocessed %d items", num);
 		
-		num=clean_values(items, errcodes, results, max_items, poller_type, 0);
+		clean_values(items, errcodes, results, max_items, poller_type, 0);
 		//zabbix_log(LOG_LEVEL_INFORMATION, "QPoller_stat: cleaned %d items", num);
 	
 		zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)free_result_ptr);
@@ -971,36 +1073,9 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 	} while (( ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) ||
 			(ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type) );
 	
-//	} while (( ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type && roll++ < GLB_ASYNC_POLLING_MAX_ITERATIONS ) ||
-//			(ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type) );
-	
-
-/*
-	if ( ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type  ) {
-		
-		int waitend = time(NULL)+20*CONFIG_TIMEOUT; 
-		int items_polling;
-		int cnt=0;
-
-		zabbix_log(LOG_LEVEL_INFORMATION,"Satrting async polling megaloop");
-		
-		do {
-			get_values_snmp_async();
-			items_polling =0;
-			for (i=0; i<max_items; i++) 
-				if (POLL_PREPARED == errcodes[i] || 
-					POLL_POLLING == errcodes[i] || 
-					POLL_QUEUED == errcodes[i]) items_polling++;
-			usleep(10000);
-		
-			if (cnt %10 == 0) zabbix_log(LOG_LEVEL_INFORMATION,"Still waiting for %d items to finish", items_polling);
-
-		} while (waitend > time(NULL) && 0 != items_polling);
-		
-		zabbix_log(LOG_LEVEL_INFORMATION,"Funished async polling megaloop with %d active itmes",items_polling);
-		//we'll keep calling async polling in shutdown mode, to finish polling of all items before 
-	}
-*/
+//	if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	{
+//		zbx_hashset_destroy(&local_queue);
+//	}
 
 	clean_values(items, errcodes, results, max_items, poller_type, 1); //forced clean
 	roll = 0;
@@ -1034,23 +1109,23 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 
 	poller_type = *(unsigned char *)((zbx_thread_args_t *)args)->args;
 	process_type = ((zbx_thread_args_t *)args)->process_type;
-
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-#ifdef HAVE_NETSNMP
-		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) {
-			zbx_init_snmp();
-		}
-#endif
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
+#ifdef HAVE_NETSNMP
+	if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type)
+		zbx_init_snmp();
+#endif
 
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_init_child();
 #endif
+	
 	switch (poller_type)
 	{
 		case ZBX_POLLER_TYPE_ASYNC_AGENT:
@@ -1070,6 +1145,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	zbx_setproctitle("%s #%d [connecting to the database]", get_process_type_string(process_type), process_num);
 	last_stat_time = time(NULL);
 
+	DBconnect(ZBX_DB_CONNECT_NORMAL);
+
 	if (NULL == (items=zbx_malloc(NULL,sizeof(DC_ITEM)*max_items))) 
 	{
 		zabbix_log(LOG_LEVEL_WARNING,"Cannot allocate memory for polling");
@@ -1085,11 +1162,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 		zabbix_log(LOG_LEVEL_WARNING,"Cannot allocate memory for polling");
 		return FAIL;
 	};
- 
-	
-	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 		zbx_update_env(sec);
@@ -1135,13 +1209,16 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			last_stat_time = time(NULL);
 		}
 
-		
 		zbx_sleep_loop(sleeptime);
 	}
+
 	zbx_free(items);
 	zbx_free(results);
 	zbx_free(errcodes);
+ 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
 
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }
-

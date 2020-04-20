@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include "log.h"
 #include "dbcache.h"
 #include "preproc.h"
+#include "daemon.h"
 
 #include "zbxserver.h"
 #include "zbxregexp.h"
@@ -667,16 +668,17 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 	substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, &buffer,
 			MACRO_TYPE_COMMON, NULL, 0);
 
+	/* Avoid the potential usage of uninitialized values when: */
+	/* 1) compile without libCURL support */
+	/* 2) update interval is invalid */
+	db_httpstep.name = NULL;
+
 	if (SUCCEED != is_time_suffix(buffer, &delay, ZBX_LENGTH_UNLIMITED))
 	{
 		err_str = zbx_dsprintf(err_str, "update interval \"%s\" is invalid", buffer);
 		lastfailedstep = -1;
 		goto httptest_error;
 	}
-
-	/* Explicitly initialize the name. If we compile without libCURL support, */
-	/* we avoid the potential usage of uninitialized values. */
-	db_httpstep.name = NULL;
 
 #ifdef HAVE_LIBCURL
 	if (NULL == (easyhandle = curl_easy_init()))
@@ -704,7 +706,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 	httpstep.httptest = httptest;
 	httpstep.httpstep = &db_httpstep;
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = DBfetch(result)) && ZBX_IS_RUNNING())
 	{
 		struct curl_slist	*headers_slist = NULL;
 		char			*header_cookie = NULL;
@@ -723,6 +725,14 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, host, NULL, NULL, NULL,
 				&db_httpstep.url, MACRO_TYPE_HTTPTEST_FIELD, NULL, 0);
 		http_substitute_variables(httptest, &db_httpstep.url);
+
+		db_httpstep.required = zbx_strdup(NULL, row[6]);
+		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, host, NULL, NULL, NULL,
+				&db_httpstep.required, MACRO_TYPE_HTTPTEST_FIELD, NULL, 0);
+
+		db_httpstep.status_codes = zbx_strdup(NULL, row[7]);
+		substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+				&db_httpstep.status_codes, MACRO_TYPE_COMMON, NULL, 0);
 
 		db_httpstep.post_type = atoi(row[8]);
 
@@ -751,19 +761,11 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 			err_str = zbx_dsprintf(err_str, "timeout \"%s\" is invalid", buffer);
 			goto httpstep_error;
 		}
-		else if (SEC_PER_HOUR < db_httpstep.timeout)
+		else if (db_httpstep.timeout < 1 || SEC_PER_HOUR < db_httpstep.timeout)
 		{
-			err_str = zbx_dsprintf(err_str, "timeout \"%s\" exceeds 1 hour limit", buffer);
+			err_str = zbx_dsprintf(err_str, "timeout \"%s\" is out of 1-3600 seconds bounds", buffer);
 			goto httpstep_error;
 		}
-
-		db_httpstep.required = zbx_strdup(NULL, row[6]);
-		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, host, NULL, NULL, NULL,
-				&db_httpstep.required, MACRO_TYPE_HTTPTEST_FIELD, NULL, 0);
-
-		db_httpstep.status_codes = zbx_strdup(NULL, row[7]);
-		substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
-				&db_httpstep.status_codes, MACRO_TYPE_COMMON, NULL, 0);
 
 		db_httpstep.follow_redirects = atoi(row[9]);
 		db_httpstep.retrieve_mode = atoi(row[10]);
@@ -876,6 +878,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest)
 		do
 		{
 			memset(&page, 0, sizeof(page));
+			errbuf[0] = '\0';
 
 			if (CURLE_OK == (err = curl_easy_perform(easyhandle)))
 				break;
@@ -1098,7 +1101,7 @@ int	process_httptests(int httppoller_num, int now)
 			HOST_STATUS_MONITORED,
 			HOST_MAINTENANCE_STATUS_OFF, MAINTENANCE_TYPE_NORMAL);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = DBfetch(result)) && ZBX_IS_RUNNING())
 	{
 		ZBX_STR2UINT64(host.hostid, row[0]);
 		strscpy(host.host, row[1]);

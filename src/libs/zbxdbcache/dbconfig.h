@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 
 //#include "../zbxcluster/cluster.h"
 #include "zbxjson.h"
-
+#include <stdatomic.h>
 
 #ifndef ZABBIX_DBCONFIG_H
 #define ZABBIX_DBCONFIG_H
@@ -36,6 +36,7 @@ typedef struct
 	const char		*recovery_expression;
 	const char		*error;
 	const char		*correlation_tag;
+	const char		*opdata;
 	int			lastchange;
 	int			nextcheck;		/* time of next trigger recalculation,    */
 							/* valid for triggers with time functions */
@@ -87,7 +88,7 @@ typedef struct
 	const char		*error;
 	const char		*delay;
 	ZBX_DC_TRIGGER		**triggers;
-	int			nextcheck;
+	_Atomic int			nextcheck;
 	int			lastclock;
 	int			mtime;
 	int			data_expected_from;
@@ -537,6 +538,7 @@ typedef struct
 	int		default_inventory_mode;
 	int		refresh_unsupported;
 	unsigned char	snmptrap_logging;
+	unsigned char	autoreg_tls_accept;
 	const char	*db_extension;
 	/* housekeeping related configuration data */
 	zbx_config_hk_t	hk;
@@ -759,6 +761,8 @@ typedef struct
 	int			sync_ts;
 	int			item_sync_ts;
 
+	unsigned int		internal_actions;		/* number of enabled internal actions */
+
 	/* maintenance processing management */
 	unsigned char		maintenance_update;		/* flag to trigger maintenance update by timers  */
 	zbx_uint64_t		*maintenance_update_flags;	/* Array of flags to manage timer maintenance updates.*/
@@ -829,14 +833,18 @@ typedef struct
 							/* by PSK identity */
 #endif
 	zbx_hashset_t		data_sessions;
-	//todo: fix this problem
+	//zbx_binary_heap_t	queues[ZBX_POLLER_TYPE_COUNT];
 	zbx_binary_heap_t	*queues;
 	zbx_binary_heap_t	pqueue;
 	zbx_binary_heap_t	timer_queue;
 	ZBX_DC_CONFIG_TABLE	*config;
 	ZBX_DC_STATUS		*status;
 	zbx_hashset_t		strpool;
-	zbx_hashset_t		problems;
+	char			autoreg_psk_identity[HOST_TLS_PSK_IDENTITY_LEN_MAX];	/* autoregistration PSK */
+	char			autoreg_psk[HOST_TLS_PSK_LEN_MAX];
+
+	//zbx_hashset_t		problems;
+	//zbx_hashset_t		ext_workers; //hashset structures for the external workers
 
 	/* cluster related fields */
 	zbx_uint64_t cluster_topology_version;
@@ -844,11 +852,10 @@ typedef struct
 	char 	*cluster_topology; /* buffer with current active topology */
 	int 	cluster_topology_need_update; /* flag that topology needs to be updated */
 	zbx_uint64_t	cluster_topology_download_host;
-
 }
 ZBX_DC_CONFIG;
 
-typedef struct
+ typedef struct
 {
 	zbx_uint64_t 	eventid;
 	char 			description[512];
@@ -861,7 +868,6 @@ ZBX_DC_PROBLEM;
 
 /* how often to run in memory problems cleanup */
 #define ZBX_PROBLEM_CLEAN_RUN 120 
-
 #define ZBX_PROBLEM_CLOSED	0
 #define ZBX_PROBLEM_OPEN	1
 
@@ -871,12 +877,14 @@ ZBX_DC_PROBLEM;
 #define ZBX_PROBLEM_CLOSED_TIMEOUT	30
 
 #define ZBX_PROXY_TIMEOUT	30
+
 extern int	sync_in_progress;
 extern ZBX_DC_CONFIG	*config;
 extern zbx_rwlock_t	config_lock;
 
 #define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock)
 #define	WRLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_wrlock(config_lock)
+#define TRY_WRLOCK_CACHE	0 == sync_in_progress ||  SUCCEED == zbx_rwlock_try_wrlock(config_lock)  
 #define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock)
 
 #define ZBX_IPMI_DEFAULT_AUTHTYPE	-1

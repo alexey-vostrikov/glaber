@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -64,108 +64,6 @@ switch ($data['method']) {
 			'sortfield' => 'name',
 			'limit' => 15
 		]);
-		break;
-
-	case 'message.mute':
-		$msgsettings = getMessageSettings();
-		$msgsettings['sounds.mute'] = 1;
-		updateMessageSettings($msgsettings);
-		break;
-
-	case 'message.unmute':
-		$msgsettings = getMessageSettings();
-		$msgsettings['sounds.mute'] = 0;
-		updateMessageSettings($msgsettings);
-		break;
-
-	case 'message.settings':
-		$msgsettings = getMessageSettings();
-		$msgsettings['timeout'] = timeUnitToSeconds($msgsettings['timeout']);
-		$result = $msgsettings;
-		break;
-
-	case 'message.get':
-		$msgsettings = getMessageSettings();
-
-		if (empty($msgsettings['triggers.severities'])) {
-			break;
-		}
-
-		$timeout = time() - timeUnitToSeconds($msgsettings['timeout']);
-		$lastMsgTime = 0;
-		if (isset($data['params']['messageLast']['events'])) {
-			$lastMsgTime = $data['params']['messageLast']['events']['time'];
-		}
-
-		$problems = getLastProblems([
-			'time_from'       => max([$lastMsgTime, $msgsettings['last.clock'], $timeout]),
-			'show_recovered'  => $msgsettings['triggers.recovery'],
-			'show_suppressed' => $msgsettings['show_suppressed'],
-			'severities'      => array_keys($msgsettings['triggers.severities']),
-			'limit'           => 15
-		]);
-
-		$used_triggers = [];
-		foreach ($problems as $problem) {
-			if (array_key_exists($problem['triggerid'], $used_triggers)) {
-				continue;
-			}
-			$used_triggers[$problem['triggerid']] = true;
-
-			$url_problems = (new CUrl('zabbix.php'))
-				->setArgument('action', 'problem.view')
-				->setArgument('filter_hostids[]', $problem['host']['hostid'])
-				->setArgument('filter_set', '1')
-				->getUrl();
-			$url_events = (new CUrl('zabbix.php'))
-				->setArgument('action', 'problem.view')
-				->setArgument('filter_triggerids[]', $problem['objectid'])
-				->setArgument('filter_set', '1')
-				->getUrl();
-			$url_tr_events = 'tr_events.php?eventid='.$problem['eventid'].'&triggerid='.$problem['objectid'];
-
-			if ($problem['resolved']) {
-				$severity = 0;
-				$title = _('Resolved');
-				$sound = $msgsettings['sounds.recovery'];
-			}
-			else {
-				$severity = $problem['severity'];
-				$title = _('Problem on');
-				$sound = $msgsettings['sounds.'.$problem['severity']];
-			}
-
-			$result[] = [
-				'type' => 3,
-				'caption' => 'events',
-				'sourceid' => $problem['eventid'],
-				'time' => $problem['clock'],
-				'priority' => $severity,
-				'sound' => $sound,
-				'severity_style' => getSeverityStyle($severity, !$problem['resolved']),
-				'title' => $title.' [url='.$url_problems.']'.CHtml::encode($problem['host']['name']).'[/url]',
-				'body' => [
-					'[url='.$url_events.']'.CHtml::encode($problem['description']).'[/url]',
-					'[url='.$url_tr_events.']'.
-					zbx_date2str(DATE_TIME_FORMAT_SECONDS, $problem['clock']).'[/url]',
-				],
-				'timeout' => $msgsettings['timeout']
-			];
-		}
-
-		CArrayHelper::sort($result, ['time', 'priority']);
-		$result = array_values($result);
-
-		break;
-
-	case 'message.closeAll':
-		$msgsettings = getMessageSettings();
-		switch (strtolower($data['params']['caption'])) {
-			case 'events':
-				$msgsettings['last.clock'] = (int) $data['params']['time'] + 1;
-				updateMessageSettings($msgsettings);
-				break;
-		}
 		break;
 
 	case 'zabbix.status':
@@ -342,34 +240,77 @@ switch ($data['method']) {
 				break;
 
 			case 'items':
-				$items = API::Item()->get([
+			case 'item_prototypes':
+				$options = [
 					'output' => ['itemid', 'hostid', 'name', 'key_'],
 					'selectHosts' => ['name'],
 					'hostids' => array_key_exists('hostid', $data) ? $data['hostid'] : null,
 					'templated' => array_key_exists('real_hosts', $data) ? false : null,
-					'webitems' => array_key_exists('webitems', $data) ? $data['webitems'] : null,
 					'search' => array_key_exists('search', $data) ? ['name' => $data['search']] : null,
 					'filter' => array_key_exists('filter', $data) ? $data['filter'] : null,
 					'limit' => $config['search_limit']
-				]);
+				];
 
-				if ($items) {
-					$items = CMacrosResolverHelper::resolveItemNames($items);
-					CArrayHelper::sort($items, [
-						['field' => 'name_expanded', 'order' => ZBX_SORT_UP]
-					]);
+				if ($data['objectName'] === 'item_prototypes') {
+					$records = API::ItemPrototype()->get($options);
+				}
+				else {
+					if (array_key_exists('webitems', $data)) {
+						$options['webitems'] = $data['webitems'];
+					}
+
+					$records = API::Item()->get($options);
+				}
+
+				if ($records) {
+					$records = CMacrosResolverHelper::resolveItemNames($records);
+					CArrayHelper::sort($records, ['name_expanded']);
 
 					if (array_key_exists('limit', $data)) {
-						$items = array_slice($items, 0, $data['limit']);
+						$records = array_slice($records, 0, $data['limit']);
 					}
 
-					foreach ($items as $item) {
+					foreach ($records as $record) {
 						$result[] = [
-							'id' => $item['itemid'],
-							'name' => $item['name_expanded'],
-							'prefix' => $item['hosts'][0]['name'].NAME_DELIMITER
+							'id' => $record['itemid'],
+							'name' => $record['name_expanded'],
+							'prefix' => $record['hosts'][0]['name'].NAME_DELIMITER
 						];
 					}
+				}
+				break;
+
+			case 'graphs':
+			case 'graph_prototypes':
+				$options = [
+					'output' => ['graphid', 'name'],
+					'selectHosts' => ['name'],
+					'hostids' => array_key_exists('hostid', $data) ? $data['hostid'] : null,
+					'templated' => array_key_exists('real_hosts', $data) ? false : null,
+					'search' => array_key_exists('search', $data) ? ['name' => $data['search']] : null,
+					'filter' => array_key_exists('filter', $data) ? $data['filter'] : null,
+					'limit' => $config['search_limit']
+				];
+
+				if ($data['objectName'] === 'graph_prototypes') {
+					$records = API::GraphPrototype()->get($options);
+				}
+				else {
+					$records = API::Graph()->get($options);
+				}
+
+				CArrayHelper::sort($records, ['name']);
+
+				if (array_key_exists('limit', $data)) {
+					$records = array_slice($records, 0, $data['limit']);
+				}
+
+				foreach ($records as $record) {
+					$result[] = [
+						'id' => $record['graphid'],
+						'name' => $record['name'],
+						'prefix' => $record['hosts'][0]['name'].NAME_DELIMITER
+					];
 				}
 				break;
 
@@ -591,6 +532,68 @@ switch ($data['method']) {
 				}
 				break;
 
+		}
+		break;
+
+	case 'patternselect.get':
+		$config = select_config();
+		$search = (array_key_exists('search', $data) && $data['search'] !== '') ? $data['search'] : null;
+		$wildcard_enabled = (strpos($search, '*') !== false);
+		$result = [];
+
+		switch ($data['objectName']) {
+			case 'hosts':
+				$options = [
+					'output' => ['name'],
+					'search' => ['name' => $search.($wildcard_enabled ? '*' : '')],
+					'searchWildcardsEnabled' => $wildcard_enabled,
+					'preservekeys' => true,
+					'limit' => $config['search_limit']
+				];
+
+				$db_result = API::Host()->get($options);
+				break;
+
+			case 'items':
+				$options = [
+					'output' => ['name'],
+					'search' => ['name' => $search.($wildcard_enabled ? '*' : '')],
+					'searchWildcardsEnabled' => $wildcard_enabled,
+					'filter' => [
+						'value_type' => [ITEM_VALUE_TYPE_UINT64, ITEM_VALUE_TYPE_FLOAT],
+						'flags' => ZBX_FLAG_DISCOVERY_NORMAL
+					],
+					'templated' => array_key_exists('real_hosts', $data) ? false : null,
+					'webitems' => array_key_exists('webitems', $data) ? $data['webitems'] : null,
+					'limit' => $config['search_limit']
+				];
+
+				$db_result = API::Item()->get($options);
+				break;
+		}
+
+		$result[] = [
+			'name' => $search,
+			'id' => $search
+		];
+
+		if ($db_result) {
+			$db_result = array_flip(zbx_objectValues($db_result, 'name'));
+
+			if (array_key_exists($search, $db_result)) {
+				unset($db_result[$search]);
+			}
+
+			if (array_key_exists('limit', $data)) {
+				$db_result = array_slice($db_result, 0, $data['limit']);
+			}
+
+			foreach ($db_result as $name => $id) {
+				$result[] = [
+					'name' => $name,
+					'id' => $name
+				];
+			}
 		}
 		break;
 

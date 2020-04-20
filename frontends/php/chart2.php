@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -75,8 +75,6 @@ $timeline = getTimeSelectorPeriod([
 	'from' => getRequest('from'),
 	'to' => getRequest('to')
 ]);
-
-CProfile::update('web.screens.graphid', $_REQUEST['graphid'], PROFILE_TYPE_ID);
 
 $graph = new CLineGraphDraw($dbGraph['graphtype']);
 

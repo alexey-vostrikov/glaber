@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -409,8 +409,8 @@ function getMenuPopupRefresh(options, trigger_elmnt) {
 				value: value
 			},
 			clickCallback: function() {
-				var obj = jQuery(this),
-					currentRate = obj.data('value');
+				var $obj = jQuery(this),
+					currentRate = $obj.data('value');
 
 				// it is a quick solution for slide refresh multiplier, should be replaced with slide.refresh or similar
 				if (options.multiplier) {
@@ -420,10 +420,13 @@ function getMenuPopupRefresh(options, trigger_elmnt) {
 							widgetRefreshRate: currentRate
 						}),
 						dataType: 'script',
-						success: function(js) { js }
+						success: function() {
+							// Set new refresh rate as current in slideshow controls.
+							trigger_elmnt.data('menu-popup').data.currentRate = currentRate;
+						}
 					});
 
-					jQuery('a', obj.closest('.menu-popup')).each(function() {
+					jQuery('a', $obj.closest('.menu-popup')).each(function() {
 						var link = jQuery(this);
 
 						if (link.data('value') == currentRate) {
@@ -438,7 +441,7 @@ function getMenuPopupRefresh(options, trigger_elmnt) {
 						}
 					});
 
-					obj.closest('.menu-popup').menuPopup('close', trigger_elmnt);
+					$obj.closest('.menu-popup').menuPopup('close', trigger_elmnt);
 				}
 				else {
 					var url = new Curl('zabbix.php');
@@ -452,8 +455,8 @@ function getMenuPopupRefresh(options, trigger_elmnt) {
 							'widgetid': options.widgetName,
 							'rf_rate': currentRate
 						},
-						success: function(resp) {
-							jQuery('a', obj.closest('.menu-popup')).each(function() {
+						success: function() {
+							jQuery('a', $obj.closest('.menu-popup')).each(function() {
 								var link = jQuery(this);
 
 								if (link.data('value') == currentRate) {
@@ -468,13 +471,16 @@ function getMenuPopupRefresh(options, trigger_elmnt) {
 								}
 							});
 
-							obj.closest('.menu-popup').menuPopup('close', trigger_elmnt);
+							// Set new refresh rate as current in widget controls.
+							trigger_elmnt.data('menu-popup').data.currentRate = currentRate;
+
+							$obj.closest('.menu-popup').menuPopup('close', trigger_elmnt);
 
 							jQuery('.dashbrd-grid-container')
 								.dashboardGrid('setWidgetRefreshRate', options.widgetName, parseInt(currentRate));
 						},
 						error: function() {
-							obj.closest('.menu-popup').menuPopup('close', trigger_elmnt);
+							$obj.closest('.menu-popup').menuPopup('close', trigger_elmnt);
 							// TODO: gentle message about failed saving of widget refresh rate
 						}
 					});
@@ -564,7 +570,7 @@ function getMenuPopupDashboard(options, trigger_elmnt) {
  * Get menu popup trigger section data.
  *
  * @param {string} options['triggerid']               Trigger ID.
- * @param {string} options['eventid']                 (optional) Required for Acknowledge and Description sections.
+ * @param {string} options['eventid']                 (optional) Required for Acknowledge section.
  * @param {object} options['items']                   Link to trigger item history page (optional).
  * @param {string} options['items'][]['name']         Item name.
  * @param {object} options['items'][]['params']       Item URL parameters ("name" => "value").
@@ -572,8 +578,6 @@ function getMenuPopupDashboard(options, trigger_elmnt) {
  * @param {string} options['acknowledge']['backurl']  Return URL.
  * @param {object} options['configuration']           Link to trigger configuration page (optional).
  * @param {bool}   options['showEvents']              Show Problems item enabled. Default: false.
- * @param {bool}   options['show_description']        Show Description item in context menu. Default: true.
- * @param {bool}   options['description_enabled']     Show Description item enabled. Default: true.
  * @param {string} options['url']                     Trigger URL link (optional).
  * @param {object} trigger_elmnt                      UI element which triggered opening of overlay dialogue.
  *
@@ -616,31 +620,6 @@ function getMenuPopupTrigger(options, trigger_elmnt) {
 		};
 	}
 
-	// description
-	if (typeof options.show_description === 'undefined' || options.show_description !== false) {
-		var trigger_descr = {
-			label: t('Description')
-		};
-
-		if (typeof options.description_enabled === 'undefined' || options.description_enabled !== false) {
-			trigger_descr.clickCallback = function() {
-				var	popup_options = {triggerid: options.triggerid};
-
-				if (typeof options.eventid !== 'undefined') {
-					popup_options.eventid = options.eventid;
-				}
-
-				jQuery(this).closest('.menu-popup').menuPopup('close', null);
-
-				return PopUp('popup.trigdesc.view', popup_options, null, trigger_elmnt);
-			}
-		}
-		else {
-			trigger_descr.disabled = true;
-		}
-		items[items.length] = trigger_descr;
-	}
-
 	// configuration
 	if (typeof options.configuration !== 'undefined' && options.configuration) {
 		var url = new Curl('triggers.php', false);
@@ -654,18 +633,18 @@ function getMenuPopupTrigger(options, trigger_elmnt) {
 		};
 	}
 
-	// url
-	if (typeof options.url !== 'undefined' && options.url.length > 0) {
-		items[items.length] = {
-			label: t('URL'),
-			url: options.url
-		};
-	}
-
 	sections[sections.length] = {
 		label: t('S_TRIGGER'),
 		items: items
 	};
+
+	// urls
+	if ('urls' in options) {
+		sections[sections.length] = {
+			label: t('Links'),
+			items: options.urls
+		};
+	}
 
 	// items
 	if (typeof options.items !== 'undefined' && objectSize(options.items) > 0) {
@@ -962,8 +941,8 @@ jQuery(function($) {
 
 			opener.attr('data-expanded', 'true');
 
-			// Close other action menus.
-			$('.menu-popup-top').not('#' + id).menuPopup('close');
+			// Close other action menus and prevent focus jumping before opening a new popup.
+			$('.menu-popup-top').not('#' + id).menuPopup('close', null, false);
 
 			if (menuPopup.length > 0) {
 				var display = menuPopup.css('display');
@@ -1083,8 +1062,10 @@ jQuery(function($) {
 		},
 		close: function(trigger_elmnt, return_focus) {
 			var menuPopup = $(this);
+
 			if (!menuPopup.is(trigger_elmnt) && menuPopup.has(trigger_elmnt).length === 0) {
 				menuPopup.data('is-active', false);
+
 				$(trigger_elmnt).removeAttr('data-expanded');
 				menuPopup.fadeOut(0);
 
@@ -1095,7 +1076,13 @@ jQuery(function($) {
 					.off('click', menuPopupDocumentCloseHandler)
 					.off('keydown', menuPopupKeyDownHandler);
 
-				removeFromOverlaysStack('menu-popup', return_focus);
+				var overlay = removeFromOverlaysStack('menu-popup', return_focus);
+
+				if (overlay && typeof overlay['element'] !== undefined) {
+					// Remove expanded attribute of the original opener.
+					$(overlay['element']).removeAttr('data-expanded');
+				}
+
 				menuPopup.remove();
 			}
 		}
@@ -1314,6 +1301,10 @@ jQuery(function($) {
 
 			if (typeof options.url !== 'undefined') {
 				link.attr('href', options.url);
+
+				if ('target' in options) {
+					link.attr('target', options.target);
+				}
 			}
 
 			if (typeof options.clickCallback !== 'undefined') {

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -142,7 +142,6 @@ class CScreenHistory extends CScreenBase {
 		}
 
 		$items = CMacrosResolverHelper::resolveItemNames($items);
-		$firstItem = reset($items);
 
 		$iv_string = [
 			ITEM_VALUE_TYPE_LOG => 1,
@@ -151,12 +150,11 @@ class CScreenHistory extends CScreenBase {
 
 		if ($this->action == HISTORY_VALUES || $this->action == HISTORY_LATEST) {
 			$options = [
-				'history' => $firstItem['value_type'],
-				'itemids' => $this->itemids,
 				'output' => API_OUTPUT_EXTEND,
 				'sortfield' => ['clock'],
 				'sortorder' => ZBX_SORT_DOWN
 			];
+
 			if ($this->action == HISTORY_LATEST) {
 				$options['limit'] = 500;
 			}
@@ -170,6 +168,7 @@ class CScreenHistory extends CScreenBase {
 				];
 			}
 
+			$is_many_items = (count($items) > 1);
 			$numeric_items = true;
 
 			foreach ($items as $item) {
@@ -192,20 +191,23 @@ class CScreenHistory extends CScreenBase {
 						$options['excludeSearch'] = true;
 					}
 				}
-				$history_data = [];
 
-				if (count($items) > 1) {
-					foreach ($items as $item) {
-						$options['itemids'] = [$item['itemid']];
-						$options['history'] = $item['value_type'];
-						$item_data = API::History()->get($options);
-						if ($item_data) {
-							$history_data = array_merge($history_data, $item_data);
-						}
-					}
+				$history_data = [];
+				$items_by_type = [];
+
+				foreach ($items as $item) {
+					$items_by_type[$item['value_type']][] = $item['itemid'];
 				}
-				else {
-					$history_data = API::History()->get($options);
+
+				foreach ($items_by_type as $value_type => $itemids) {
+					$options['history'] = $value_type;
+					$options['itemids'] = $itemids;
+
+					$item_data = API::History()->get($options);
+
+					if ($item_data) {
+						$history_data = array_merge($history_data, $item_data);
+					}
 				}
 
 				CArrayHelper::sort($history_data, [
@@ -213,13 +215,14 @@ class CScreenHistory extends CScreenBase {
 					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
 				]);
 
+				$history_data = array_slice($history_data, 0, $options['limit']);
+
 				foreach ($history_data as $history_row) {
 					$value = $history_row['value'];
 
 					if (in_array($items[$history_row['itemid']]['value_type'],
 							[ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_TEXT])) {
-						$value = rtrim($value, " \t\r\n");
-						$value = '"'.str_replace('"', '""', htmlspecialchars($value, ENT_NOQUOTES)).'"';
+						$value = '"'.$value.'"';
 					}
 					elseif ($items[$history_row['itemid']]['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
 						sscanf($value, '%f', $value);
@@ -228,9 +231,9 @@ class CScreenHistory extends CScreenBase {
 					$row = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_row['clock']).' '.$history_row['clock'].
 						' '.$value;
 
-					if (count($items) > 1) {
-						$row .= ' "'.str_replace('"', '""', $items[$history_row['itemid']]['hosts'][0]['name'].
-							NAME_DELIMITER.$items[$history_row['itemid']]['name_expanded']).'"';
+					if ($is_many_items) {
+						$row .= ' "'.$items[$history_row['itemid']]['hosts'][0]['name'].NAME_DELIMITER.
+							$items[$history_row['itemid']]['name_expanded'].'"';
 					}
 					$output[] = $row;
 				}
@@ -243,22 +246,35 @@ class CScreenHistory extends CScreenBase {
 			 * Item type: text, log
 			 */
 			elseif (!$numeric_items) {
-				$isManyItems = (count($items) > 1);
-				$useLogItem = ($firstItem['value_type'] == ITEM_VALUE_TYPE_LOG);
-				$useEventLogItem = (strpos($firstItem['key_'], 'eventlog[') === 0);
+				$use_log_item = false;
+				$use_eventlog_item = false;
+				$items_by_type = [];
+				$history_data = [];
+
+				foreach ($items as $item) {
+					$items_by_type[$item['value_type']][] = $item['itemid'];
+
+					if ($item['value_type'] == ITEM_VALUE_TYPE_LOG) {
+						$use_log_item = true;
+					}
+
+					if (strpos($item['key_'], 'eventlog[') === 0) {
+						$use_eventlog_item = true;
+					}
+				}
 
 				$history_table = (new CTableInfo())
 					->setHeader([
 						(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH),
-						$isManyItems ? _('Item') : null,
-						$useLogItem ? (new CColHeader(_('Local time')))->addClass(ZBX_STYLE_CELL_WIDTH) : null,
-						($useEventLogItem && $useLogItem)
+						$is_many_items ? _('Item') : null,
+						$use_log_item ? (new CColHeader(_('Local time')))->addClass(ZBX_STYLE_CELL_WIDTH) : null,
+						($use_eventlog_item && $use_log_item)
 							? (new CColHeader(_('Source')))->addClass(ZBX_STYLE_CELL_WIDTH)
 							: null,
-						($useEventLogItem && $useLogItem)
+						($use_eventlog_item && $use_log_item)
 							? (new CColHeader(_('Severity')))->addClass(ZBX_STYLE_CELL_WIDTH)
 							: null,
-						($useEventLogItem && $useLogItem)
+						($use_eventlog_item && $use_log_item)
 							? (new CColHeader(_('Event ID')))->addClass(ZBX_STYLE_CELL_WIDTH)
 							: null,
 						_('Value')
@@ -271,11 +287,24 @@ class CScreenHistory extends CScreenBase {
 					}
 				}
 
-				$history_data = API::History()->get($options);
+				foreach ($items_by_type as $value_type => $itemids) {
+					$options['history'] = $value_type;
+					$options['itemids'] = $itemids;
+					$item_data = API::History()->get($options);
+
+					if ($item_data) {
+						$history_data = array_merge($history_data, $item_data);
+					}
+				}
+
 				CArrayHelper::sort($history_data, [
 					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
 					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
 				]);
+
+				$url = (new CUrl($this->page_file))->formatGetArguments();
+				// Array $history_data will be modified according page and rows on page.
+				$pagination = getPagingLine($history_data, ZBX_SORT_UP, $url);
 
 				foreach ($history_data as $data) {
 					$data['value'] = rtrim($data['value'], " \t\r\n");
@@ -315,31 +344,35 @@ class CScreenHistory extends CScreenBase {
 						->addClass(ZBX_STYLE_NOWRAP)
 						->addClass($color);
 
-					if ($isManyItems) {
+					if ($is_many_items) {
 						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name_expanded']))
 							->addClass($color);
 					}
 
-					if ($useLogItem) {
-						$row[] = ($data['timestamp'] != 0)
+					if ($use_log_item) {
+						$row[] = (array_key_exists('timestamp', $data) && $data['timestamp'] != 0)
 							? (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['timestamp'])))
 								->addClass(ZBX_STYLE_NOWRAP)
 								->addClass($color)
 							: '';
 
 						// If this is a eventLog item, showing additional info.
-						if ($useEventLogItem) {
-							$row[] = (new CCol($data['source']))
-								->addClass(ZBX_STYLE_NOWRAP)
-								->addClass($color);
-							$row[] = ($data['severity'] != 0)
+						if ($use_eventlog_item) {
+							$row[] = array_key_exists('source', $data)
+								? (new CCol($data['source']))
+									->addClass(ZBX_STYLE_NOWRAP)
+									->addClass($color)
+								: '';
+							$row[] = (array_key_exists('severity', $data) && $data['severity'] != 0)
 								? (new CCol(get_item_logtype_description($data['severity'])))
 									->addClass(ZBX_STYLE_NOWRAP)
 									->addClass(get_item_logtype_style($data['severity']))
 								: '';
-							$row[] = (new CCol($data['logeventid']))
-								->addClass(ZBX_STYLE_NOWRAP)
-								->addClass($color);
+							$row[] = array_key_exists('severity', $data)
+								? (new CCol($data['logeventid']))
+									->addClass(ZBX_STYLE_NOWRAP)
+									->addClass($color)
+								: '';
 						}
 					}
 
@@ -348,24 +381,40 @@ class CScreenHistory extends CScreenBase {
 					$history_table->addRow($row);
 				}
 
-				$output[] = $history_table;
+				$output[] = [$history_table, $pagination];
 			}
 			/**
 			 * View type: 500 latest values.
 			 * Item type: numeric (unsigned, char), float.
 			 */
 			elseif ($this->action === HISTORY_LATEST) {
-				$history_table = (new CTableInfo())->makeVerticalRotation()->setHeader([
-					(new CColHeader(_('Timestamp')))
-						->addClass(ZBX_STYLE_CELL_WIDTH),
-					_('Value')
-				]);
+				$history_table = (new CTableInfo())
+					->makeVerticalRotation()
+					->setHeader([(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH), _('Value')]);
 
-				$history_data = API::History()->get($options);
+				$items_by_type = [];
+				$history_data = [];
+
+				foreach ($items as $item) {
+					$items_by_type[$item['value_type']][] = $item['itemid'];
+				}
+
+				foreach ($items_by_type as $value_type => $itemids) {
+					$options['history'] = $value_type;
+					$options['itemids'] = $itemids;
+					$item_data = API::History()->get($options);
+
+					if ($item_data) {
+						$history_data = array_merge($history_data, $item_data);
+					}
+				}
+
 				CArrayHelper::sort($history_data, [
 					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
 					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
 				]);
+
+				$history_data = array_slice($history_data, 0, $options['limit']);
 
 				foreach ($history_data as $history_row) {
 					$item = $items[$history_row['itemid']];
@@ -373,9 +422,6 @@ class CScreenHistory extends CScreenBase {
 
 					if ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
 						sscanf($value, '%f', $value);
-					}
-					else {
-						$value = rtrim($value, " \t\r\n");
 					}
 
 					if ($item['valuemapid']) {
@@ -446,7 +492,7 @@ class CScreenHistory extends CScreenBase {
 
 				$url = (new CUrl($this->page_file))->formatGetArguments();
 				// Array $history_data will be modified according page and rows on page.
-				$pagination = getPagingLine($history_data, [], $url);
+				$pagination = getPagingLine($history_data, ZBX_SORT_UP, $url);
 				$history_table = (new CTableInfo())->makeVerticalRotation()->setHeader($table_header);
 
 				foreach ($history_data as $history_data_row) {
@@ -458,11 +504,8 @@ class CScreenHistory extends CScreenBase {
 					foreach ($items as $item) {
 						$value = array_key_exists($item['itemid'], $values) ? $values[$item['itemid']] : '';
 
-						if ($value && $item['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
+						if ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
 							sscanf($value, '%f', $value);
-						}
-						else {
-							$value = rtrim($value, " \t\r\n");
 						}
 
 						if ($item['valuemapid']) {
@@ -487,7 +530,7 @@ class CScreenHistory extends CScreenBase {
 
 			$timeControlData = [];
 
-			if (($this->action == HISTORY_GRAPH || $this->action == HISTORY_BATCH_GRAPH) && !isset($iv_string[$firstItem['value_type']])) {
+			if ($this->action == HISTORY_GRAPH || $this->action == HISTORY_BATCH_GRAPH) {
 				$containerId = 'graph_cont1';
 				$output[] = (new CDiv())
 					->addClass('center')
@@ -548,16 +591,18 @@ class CScreenHistory extends CScreenBase {
 	 * @return string
 	 */
 	protected function getGraphUrl(array $itemIds) {
-		$url = new CUrl('chart.php');
-		$url->setArgument('from', $this->timeline['from']);
-		$url->setArgument('to', $this->timeline['to']);
-		$url->setArgument('itemids', $itemIds);
-		$url->setArgument('type', $this->graphType);
+		$url = (new CUrl('chart.php'))
+			->setArgument('from', $this->timeline['from'])
+			->setArgument('to', $this->timeline['to'])
+			->setArgument('itemids', $itemIds)
+			->setArgument('type', $this->graphType)
+			->setArgument('profileIdx', $this->profileIdx)
+			->setArgument('profileIdx2', $this->profileIdx2);
 
 		if ($this->action == HISTORY_BATCH_GRAPH) {
 			$url->setArgument('batch', 1);
 		}
 
-		return $url->getUrl().$this->getProfileUrlParams();
+		return $url->getUrl();
 	}
 }

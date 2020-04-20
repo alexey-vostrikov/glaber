@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -605,6 +605,8 @@ ZBX_THREAD_ENTRY(taskmanager_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
@@ -617,7 +619,7 @@ ZBX_THREAD_ENTRY(taskmanager_thread, args)
 
 	zbx_setproctitle("%s [started, idle %d sec]", get_process_type_string(process_type), sleeptime);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		zbx_sleep_loop(sleeptime);
 
@@ -643,4 +645,9 @@ ZBX_THREAD_ENTRY(taskmanager_thread, args)
 		zbx_setproctitle("%s [processed %d task(s) in " ZBX_FS_DBL " sec, idle %d sec]",
 				get_process_type_string(process_type), tasks_num, sec2 - sec1, sleeptime);
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

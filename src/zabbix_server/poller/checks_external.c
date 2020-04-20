@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include "zbxexec.h"
 
 #include "checks_external.h"
+#include "../../libs/zbxexec/worker.h"
 
 extern char	*CONFIG_EXTERNALSCRIPTS;
 
@@ -46,6 +47,9 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 	size_t		cmd_alloc = ZBX_KIBIBYTE, cmd_offset = 0;
 	int		i, ret = NOTSUPPORTED;
 	AGENT_REQUEST	request;
+	DC_EXT_WORKER worker;
+
+	bzero(&worker,sizeof(DC_EXT_WORKER));
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s'", __func__, item->key);
 
@@ -59,12 +63,16 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 
 	cmd = (char *)zbx_malloc(cmd, cmd_alloc);
 	zbx_snprintf_alloc(&cmd, &cmd_alloc, &cmd_offset, "%s/%s", CONFIG_EXTERNALSCRIPTS, get_rkey(&request));
-
 	if (-1 == access(cmd, X_OK))
 	{
+		zabbix_log(LOG_LEVEL_INFORMATION,"EXEC: script %s not found",cmd);
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "%s: %s", cmd, zbx_strerror(errno)));
 		goto out;
 	}
+	
+	//trying to acquire a worker for the cmd
+	//zbx_dc_get_ext_worker(&worker,cmd);
+
 
 	for (i = 0; i < get_rparams_num(&request); i++)
 	{
@@ -77,19 +85,41 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 		zbx_snprintf_alloc(&cmd, &cmd_alloc, &cmd_offset, " '%s'", param_esc);
 		zbx_free(param_esc);
 	}
+	
+	zabbix_log(LOG_LEVEL_DEBUG, "EXEC: runnig external cmd %s",cmd);
+//so far it's unlcear how to determine of it's a runner or a usual command
+//now i see no reason to keep that info in the  global config
+//so some mechanics should determine if cmd is a runner or if it is a usual command
+//probably by parsing "workers" configuration
+//or by some other setting of the item's key (best)
 
+//	if (worker.workerid > 0 ) {
+//			zabbix_log(LOG_LEVEL_INFORMATION, "EXEC: will use WORKER for that");
+			//adding trailing newline for the worker
+//			zbx_snprintf_alloc(&cmd, &cmd_alloc, &cmd_offset, "\n");
+//			if (SUCCEED == glb_process_worker_request(&worker, cmd, &buf)) {
+//				zbx_rtrim(buf, ZBX_WHITESPACE);
+//				set_result_type(result, ITEM_VALUE_TYPE_TEXT, buf);
+//			
+//				ret=SUCCEED;
+//			} else {
+//				SET_MSG_RESULT(result, zbx_strdup(NULL, error));		
+//			}
+//	} 
+//	else 
 	if (SUCCEED == zbx_execute(cmd, &buf, error, sizeof(error), CONFIG_TIMEOUT, ZBX_EXIT_CODE_CHECKS_DISABLED))
 	{
+		zabbix_log(LOG_LEVEL_DEBUG, "EXEC: will use fork+execv for that");
 		zbx_rtrim(buf, ZBX_WHITESPACE);
-
 		set_result_type(result, ITEM_VALUE_TYPE_TEXT, buf);
-		zbx_free(buf);
-
 		ret = SUCCEED;
 	}
 	else
 		SET_MSG_RESULT(result, zbx_strdup(NULL, error));
 out:
+//	if (worker.workerid > 0) zbx_dc_return_ext_worker(&worker);
+	
+	zbx_free(buf);
 	zbx_free(cmd);
 
 	free_request(&request);

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -168,7 +168,7 @@ static int	dbsync_compare_str(const char *value_raw, const char *value)
  * Parameter: sync  - [IN] the changeset                                      *
  *            rowid - [IN] the row identifier                                 *
  *            tag   - [IN] the row tag (see ZBX_DBSYNC_ROW_ defines)          *
- *            row   - [IN] the row contents (depending on configuration cache *
+ *            dbrow - [IN] the row contents (depending on configuration cache *
  *                         removal logic for the specific object it can be    *
  *                         NULL when used with ZBX_DBSYNC_ROW_REMOVE tag)     *
  *                                                                            *
@@ -216,7 +216,7 @@ static void	dbsync_add_row(zbx_dbsync_t *sync, zbx_uint64_t rowid, unsigned char
  *                                                                            *
  * Parameter: sync             - [IN] the changeset                           *
  *            columns_num      - [IN] the number of columns in the changeset  *
- *            get_hostids_func - [IN] the callback function used to retrieve  *
+ *            preproc_row_func - [IN] the callback function used to retrieve  *
  *                                    associated hostids (can be NULL if      *
  *                                    user macros are not resolved during     *
  *                                    synchronization process)                *
@@ -442,8 +442,7 @@ int	zbx_dbsync_next(zbx_dbsync_t *sync, zbx_uint64_t *rowid, char ***row, unsign
  *                                                                            *
  * Purpose: compares config table with cached configuration data              *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -453,6 +452,8 @@ int	zbx_dbsync_compare_config(zbx_dbsync_t *sync)
 {
 	DB_RESULT	result;
 
+#define SELECTED_CONFIG_FIELD_COUNT	29	/* number of columns in the following DBselect() */
+
 	if (NULL == (result = DBselect("select refresh_unsupported,discovery_groupid,snmptrap_logging,"
 				"severity_name_0,severity_name_1,severity_name_2,"
 				"severity_name_3,severity_name_4,severity_name_5,"
@@ -460,14 +461,15 @@ int	zbx_dbsync_compare_config(zbx_dbsync_t *sync)
 				"hk_events_discovery,hk_events_autoreg,hk_services_mode,"
 				"hk_services,hk_audit_mode,hk_audit,hk_sessions_mode,hk_sessions,"
 				"hk_history_mode,hk_history_global,hk_history,hk_trends_mode,"
-				"hk_trends_global,hk_trends,default_inventory_mode,db_extension"
+				"hk_trends_global,hk_trends,default_inventory_mode,db_extension,autoreg_tls_accept"
 			" from config"
-			" order by configid")))
+			" order by configid")))	/* if you change number of columns in DBselect(), */
+						/* adjust SELECTED_CONFIG_FIELD_COUNT */
 	{
 		return FAIL;
 	}
 
-	dbsync_prepare(sync, 28, NULL);
+	dbsync_prepare(sync, SELECTED_CONFIG_FIELD_COUNT, NULL);
 
 	if (ZBX_DBSYNC_INIT == sync->mode)
 	{
@@ -481,6 +483,84 @@ int	zbx_dbsync_compare_config(zbx_dbsync_t *sync)
 	THIS_SHOULD_NEVER_HAPPEN;
 
 	return FAIL;
+#undef SELECTED_CONFIG_FIELD_COUNT
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_dbsync_compare_autoreg_psk                                   *
+ *                                                                            *
+ * Purpose: compares 'config_autoreg_tls' table with cached configuration     *
+ *          data                                                              *
+ *                                                                            *
+ * Parameter: sync - [OUT] the changeset                                      *
+ *                                                                            *
+ * Return value: SUCCEED - the changeset was successfully calculated          *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ * Comments:                                                                  *
+ *     On success this function produces a changeset with 0 or 1 record       *
+ *     because 'config_autoreg_tls' table can have no more than 1 record.     *
+ *     If in future you want to support multiple autoregistration PSKs and/or *
+ *     select more columns in DBselect() then do not forget to sync changes   *
+ *     with DCsync_autoreg_config() !!!                                       *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_dbsync_compare_autoreg_psk(zbx_dbsync_t *sync)
+{
+	DB_RESULT	result;
+	DB_ROW		dbrow;
+	int		num_records = 0;
+
+#define CONFIG_AUTOREG_TLS_FIELD_COUNT	2	/* number of columns in the following DBselect() */
+
+	if (NULL == (result = DBselect("select tls_psk_identity,tls_psk"
+			" from config_autoreg_tls"
+			" order by autoreg_tlsid")))	/* if you change number of columns in DBselect(), */
+							/* adjust CONFIG_AUTOREG_TLS_FIELD_COUNT */
+	{
+		return FAIL;
+	}
+
+	dbsync_prepare(sync, CONFIG_AUTOREG_TLS_FIELD_COUNT, NULL);
+
+	if (ZBX_DBSYNC_INIT == sync->mode)
+	{
+		sync->dbresult = result;
+		return SUCCEED;
+	}
+
+	/* 0 or 1 records are expected */
+
+	if (NULL != (dbrow = DBfetch(result)))
+	{
+		unsigned char	tag = ZBX_DBSYNC_ROW_NONE;
+
+		if ('\0' == dbsync_env.cache->autoreg_psk_identity[0])	/* no autoregistration PSK in cache */
+		{
+			tag = ZBX_DBSYNC_ROW_ADD;
+		}
+		else if (FAIL == dbsync_compare_str(dbrow[0], dbsync_env.cache->autoreg_psk_identity) ||
+				FAIL == dbsync_compare_str(dbrow[1], dbsync_env.cache->autoreg_psk))
+		{
+			tag = ZBX_DBSYNC_ROW_UPDATE;
+		}
+
+		if (ZBX_DBSYNC_ROW_NONE != tag)
+			dbsync_add_row(sync, 0, tag, dbrow);	/* fictitious rowid 0 is used, there is only 1 record */
+
+		num_records = 1;
+	}
+	else if ('\0' != dbsync_env.cache->autoreg_psk_identity[0])
+			dbsync_add_row(sync, 0, ZBX_DBSYNC_ROW_REMOVE, NULL);
+
+	if (1 == num_records && NULL != (dbrow = DBfetch(result)))
+		zabbix_log(LOG_LEVEL_ERR, "table 'config_autoreg_tls' has multiple records");
+
+	DBfree_result(result);
+
+	return SUCCEED;
+#undef CONFIG_AUTOREG_TLS_FIELD_COUNT
 }
 
 /******************************************************************************
@@ -489,9 +569,8 @@ int	zbx_dbsync_compare_config(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares hosts table row with cached configuration data           *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            host  - [IN] the cached host                                    *
- *            row   - [IN] the database row                                   *
+ * Parameter: host  - [IN] the cached host                                    *
+ *            dbrow - [IN] the database row                                   *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -603,8 +682,7 @@ static int	dbsync_compare_host(ZBX_DC_HOST *host, const DB_ROW dbrow)
  *                                                                            *
  * Purpose: compares hosts table with cached configuration data               *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -708,8 +786,8 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares host inventory table row with cached configuration data  *
  *                                                                            *
- * Parameter: hi  - [IN] the cached host inventory data                       *
- *            row - [IN] the database row                                     *
+ * Parameter: hi    - [IN] the cached host inventory data                     *
+ *            dbrow - [IN] the database row                                   *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -737,8 +815,7 @@ static int	dbsync_compare_host_inventory(const ZBX_DC_HOST_INVENTORY *hi, const 
  *                                                                            *
  * Purpose: compares host_inventory table with cached configuration data      *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -820,8 +897,7 @@ int	zbx_dbsync_compare_host_inventory(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares hosts_templates table with cached configuration data     *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -904,7 +980,7 @@ int	zbx_dbsync_compare_host_templates(zbx_dbsync_t *sync)
  * Purpose: compares global macro table row with cached configuration data    *
  *                                                                            *
  * Parameter: gmacro - [IN] the cached global macro data                      *
- *            row    - [IN] the database row                                  *
+ *            dbrow    - [IN] the database row                                *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -951,8 +1027,7 @@ out:
  *                                                                            *
  * Purpose: compares global macros table with cached configuration data       *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -1021,7 +1096,7 @@ int	zbx_dbsync_compare_global_macros(zbx_dbsync_t *sync)
  * Purpose: compares host macro table row with cached configuration data      *
  *                                                                            *
  * Parameter: hmacro - [IN] the cached host macro data                        *
- *            row -    [IN] the database row                                  *
+ *            dbrow  - [IN] the database row                                  *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -1071,8 +1146,7 @@ out:
  *                                                                            *
  * Purpose: compares global macros table with cached configuration data       *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -1141,7 +1215,7 @@ int	zbx_dbsync_compare_host_macros(zbx_dbsync_t *sync)
  * Purpose: compares interface table row with cached configuration data       *
  *                                                                            *
  * Parameter: interface - [IN] the cached interface data                      *
- *            row       - [IN] the database row                               *
+ *            dbrow     - [IN] the database row                               *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -1191,8 +1265,7 @@ static int	dbsync_compare_interface(const ZBX_DC_INTERFACE *interface, const DB_
  *                                                                            *
  * Purpose: compares interfaces table with cached configuration data          *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -1260,9 +1333,8 @@ int	zbx_dbsync_compare_interfaces(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares items table row with cached configuration data           *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            item  - [IN] the cached item                                    *
- *            row   - [IN] the database row                                   *
+ * Parameter: item  - [IN] the cached item                                    *
+ *            dbrow - [IN] the database row                                   *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -1284,8 +1356,8 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	ZBX_DC_DEPENDENTITEM	*depitem;
 	ZBX_DC_HOST		*host;
 	ZBX_DC_HTTPITEM		*httpitem;
-	unsigned char		value_type, type, history, trends;
-	int			history_sec = 0;
+	unsigned char		value_type, type;
+	int			history_sec, trends_sec;
 
 	if (FAIL == dbsync_compare_uint64(dbrow[1], item->hostid))
 		return FAIL;
@@ -1318,20 +1390,13 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	if (FAIL == dbsync_compare_uint64(dbrow[25], item->interfaceid))
 		return FAIL;
 
-	if (ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.history_global)
-	{
-		history = (0 != dbsync_env.cache->config->hk.history);
+	if (SUCCEED != is_time_suffix(dbrow[31], &history_sec, ZBX_LENGTH_UNLIMITED))
+		history_sec = ZBX_HK_PERIOD_MAX;
+
+	if (0 != history_sec && ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.history_global)
 		history_sec = dbsync_env.cache->config->hk.history;
-	}
-	else
-	{
-		if (SUCCEED != is_time_suffix(dbrow[31], &history_sec, ZBX_LENGTH_UNLIMITED))
-			return FAIL;
 
-		history = zbx_time2bool(dbrow[31]);
-	}
-
-	if (item->history != history)
+	if (item->history != (0 != history_sec))
 		return FAIL;
 
 	if (history_sec != item->history_sec)
@@ -1359,12 +1424,13 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 		if (NULL == numitem)
 			return FAIL;
 
-		if (ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.trends_global)
-			trends = (0 != dbsync_env.cache->config->hk.trends);
-		else
-			trends = zbx_time2bool(dbrow[32]);
+		if (SUCCEED != is_time_suffix(dbrow[32], &trends_sec, ZBX_LENGTH_UNLIMITED))
+			trends_sec = ZBX_HK_PERIOD_MAX;
 
-		if (trends != numitem->trends)
+		if (0 != trends_sec && ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.trends_global)
+			trends_sec = dbsync_env.cache->config->hk.trends;
+
+		if (numitem->trends != (0 != trends_sec))
 			return FAIL;
 
 		if (FAIL == dbsync_compare_str(dbrow[35], numitem->units))
@@ -1729,10 +1795,10 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 			"select i.itemid,i.hostid,i.status,i.type,i.value_type,i.key_,"
 				"i.snmp_community,i.snmp_oid,i.port,i.snmpv3_securityname,i.snmpv3_securitylevel,"
 				"i.snmpv3_authpassphrase,i.snmpv3_privpassphrase,i.ipmi_sensor,i.delay,"
-				"i.trapper_hosts,i.logtimefmt,i.params,i.state,i.authtype,i.username,i.password,"
+				"i.trapper_hosts,i.logtimefmt,i.params,ir.state,i.authtype,i.username,i.password,"
 				"i.publickey,i.privatekey,i.flags,i.interfaceid,i.snmpv3_authprotocol,"
-				"i.snmpv3_privprotocol,i.snmpv3_contextname,i.lastlogsize,i.mtime,"
-				"i.history,i.trends,i.inventory_link,i.valuemapid,i.units,i.error,i.jmx_endpoint,"
+				"i.snmpv3_privprotocol,i.snmpv3_contextname,ir.lastlogsize,ir.mtime,"
+				"i.history,i.trends,i.inventory_link,i.valuemapid,i.units,ir.error,i.jmx_endpoint,"
 				"i.master_itemid,i.timeout,i.url,i.query_fields,i.posts,i.status_codes,"
 				"i.follow_redirects,i.post_type,i.http_proxy,i.headers,i.retrieve_mode,"
 				"i.request_method,i.output_format,i.ssl_cert_file,i.ssl_key_file,i.ssl_key_password,"
@@ -1740,6 +1806,7 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 			" from items i"
 			" inner join hosts h on i.hostid=h.hostid"
 			" left join item_discovery id on i.itemid=id.itemid"
+			" join item_rtdata ir on i.itemid=ir.itemid"
 			" where h.status in (%d,%d) and i.flags<>%d",
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE)))
 
@@ -1962,7 +2029,7 @@ int	zbx_dbsync_compare_prototype_items(zbx_dbsync_t *sync)
  * Purpose: compares triggers table row with cached configuration data        *
  *                                                                            *
  * Parameter: trigger - [IN] the cached trigger                               *
- *            row     - [IN] the database row                                 *
+ *            dbrow   - [IN] the database row                                 *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -1996,6 +2063,9 @@ static int	dbsync_compare_trigger(const ZBX_DC_TRIGGER *trigger, const DB_ROW db
 		return FAIL;
 
 	if (FAIL == dbsync_compare_str(dbrow[13], trigger->correlation_tag))
+		return FAIL;
+
+	if (FAIL == dbsync_compare_str(dbrow[14], trigger->opdata))
 		return FAIL;
 
 	return SUCCEED;
@@ -2070,8 +2140,7 @@ static char	**dbsync_trigger_preproc_row(char **row)
  *                                                                            *
  * Purpose: compares triggers table with cached configuration data            *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2091,7 +2160,7 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
 			"select distinct t.triggerid,t.description,t.expression,t.error,t.priority,t.type,t.value,"
 //			"select distinct t.triggerid,t.description,t.expression,t.error,t.priority,t.type,0,"
 				"t.state,t.lastchange,t.status,t.recovery_mode,t.recovery_expression,"
-				"t.correlation_mode,t.correlation_tag"
+				"t.correlation_mode,t.correlation_tag,opdata"
 			" from hosts h,items i,functions f,triggers t"
 			" where h.hostid=i.hostid"
 				" and i.itemid=f.itemid"
@@ -2104,7 +2173,7 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
 		return FAIL;
 	}
 
-	dbsync_prepare(sync, 14, dbsync_trigger_preproc_row);
+	dbsync_prepare(sync, 15, dbsync_trigger_preproc_row);
 
 	if (ZBX_DBSYNC_INIT == sync->mode)
 	{
@@ -2152,8 +2221,7 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares trigger_depends table with cached configuration data     *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2243,7 +2311,7 @@ int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync)
  * Purpose: compares functions table row with cached configuration data       *
  *                                                                            *
  * Parameter: function - [IN] the cached function                             *
- *            row      - [IN] the database row                                *
+ *            dbrow    - [IN] the database row                                *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2272,8 +2340,7 @@ static int	dbsync_compare_function(const ZBX_DC_FUNCTION *function, const DB_ROW
  *                                                                            *
  * Purpose: compares functions table with cached configuration data           *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2349,7 +2416,7 @@ int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync)
  * Purpose: compares expressions table row with cached configuration data     *
  *                                                                            *
  * Parameter: expression - [IN] the cached expression                         *
- *            row        - [IN] the database row                              *
+ *            dbrow      - [IN] the database row                              *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2382,8 +2449,7 @@ static int	dbsync_compare_expression(const ZBX_DC_EXPRESSION *expression, const 
  * Purpose: compares expressions, regexps tables with cached configuration    *
  *          data                                                              *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2456,7 +2522,7 @@ int	zbx_dbsync_compare_expressions(zbx_dbsync_t *sync)
  * Purpose: compares actions table row with cached configuration data         *
  *                                                                            *
  * Parameter: action - [IN] the cached action                                 *
- *            row    - [IN] the database row                                  *
+ *            dbrow  - [IN] the database row                                  *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2483,8 +2549,7 @@ static int	dbsync_compare_action(const zbx_dc_action_t *action, const DB_ROW dbr
  *                                                                            *
  * Purpose: compares actions table with cached configuration data             *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2552,7 +2617,7 @@ int	zbx_dbsync_compare_actions(zbx_dbsync_t *sync)
  *                                                                            *
  * Function: dbsync_compare_action_op                                         *
  *                                                                            *
- * Purpose: compares action opereation class and flushes update row if        *
+ * Purpose: compares action operation class and flushes update row if         *
  *          necessary                                                         *
  *                                                                            *
  * Parameter: sync     - [OUT] the changeset                                  *
@@ -2586,8 +2651,7 @@ static void	dbsync_compare_action_op(zbx_dbsync_t *sync, zbx_uint64_t actionid, 
  *                                                                            *
  * Purpose: compares actions by operation class                               *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2658,7 +2722,7 @@ int	zbx_dbsync_compare_action_ops(zbx_dbsync_t *sync)
  * Purpose: compares conditions table row with cached configuration data      *
  *                                                                            *
  * Parameter: condition - [IN] the cached action condition                    *
- *            row       - [IN] the database row                               *
+ *            dbrow     - [IN] the database row                               *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2687,8 +2751,7 @@ static int	dbsync_compare_action_condition(const zbx_dc_action_condition_t *cond
  *                                                                            *
  * Purpose: compares conditions table with cached configuration data          *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2762,8 +2825,8 @@ int	zbx_dbsync_compare_action_conditions(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares trigger tags table row with cached configuration data    *
  *                                                                            *
- * Parameter: tag - [IN] the cached trigger tag                               *
- *            row - [IN] the database row                                     *
+ * Parameter: tag   - [IN] the cached trigger tag                             *
+ *            dbrow - [IN] the database row                                   *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2789,8 +2852,7 @@ static int	dbsync_compare_trigger_tag(const zbx_dc_trigger_tag_t *tag, const DB_
  *                                                                            *
  * Purpose: compares trigger tags table with cached configuration data        *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2868,8 +2930,8 @@ int	zbx_dbsync_compare_trigger_tags(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares host tags table row with cached configuration data       *
  *                                                                            *
- * Parameter: tag - [IN] the cached host tag                                  *
- *            row - [IN] the database row                                     *
+ * Parameter: tag   - [IN] the cached host tag                                *
+ *            dbrow - [IN] the database row                                   *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2895,8 +2957,7 @@ static int	dbsync_compare_host_tag(const zbx_dc_host_tag_t *tag, const DB_ROW db
  *                                                                            *
  * Purpose: compares host tags table with cached configuration data           *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -2968,7 +3029,7 @@ int	zbx_dbsync_compare_host_tags(zbx_dbsync_t *sync)
  * Purpose: compares correlation table row with cached configuration data     *
  *                                                                            *
  * Parameter: correlation - [IN] the cached correlation rule                  *
- *            row         - [IN] the database row                             *
+ *            dbrow       - [IN] the database row                             *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -2994,8 +3055,7 @@ static int	dbsync_compare_correlation(const zbx_dc_correlation_t *correlation, c
  *                                                                            *
  * Purpose: compares correlation table with cached configuration data         *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3070,7 +3130,7 @@ int	zbx_dbsync_compare_correlations(zbx_dbsync_t *sync)
  *          configuration data                                                *
  *                                                                            *
  * Parameter: corr_condition - [IN] the cached correlation condition          *
- *            row            - [IN] the database row                          *
+ *            dbrow          - [IN] the database row                          *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3125,8 +3185,7 @@ static int	dbsync_compare_corr_condition(const zbx_dc_corr_condition_t *corr_con
  * Purpose: compares correlation condition tables with cached configuration   *
  *          data                                                              *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3212,7 +3271,7 @@ int	zbx_dbsync_compare_corr_conditions(zbx_dbsync_t *sync)
  *          configuration data                                                *
  *                                                                            *
  * Parameter: corr_operation - [IN] the cached correlation operation          *
- *            row            - [IN] the database row                          *
+ *            dbrow          - [IN] the database row                          *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3236,8 +3295,7 @@ static int	dbsync_compare_corr_operation(const zbx_dc_corr_operation_t *corr_ope
  * Purpose: compares correlation operation tables with cached configuration   *
  *          data                                                              *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3312,7 +3370,7 @@ int	zbx_dbsync_compare_corr_operations(zbx_dbsync_t *sync)
  * Purpose: compares host group table row with cached configuration data      *
  *                                                                            *
  * Parameter: group - [IN] the cached host group                              *
- *            row   - [IN] the database row                                   *
+ *            dbrow - [IN] the database row                                   *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3332,8 +3390,7 @@ static int	dbsync_compare_host_group(const zbx_dc_hostgroup_t *group, const DB_R
  *                                                                            *
  * Purpose: compares host groups table with cached configuration data         *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3442,8 +3499,8 @@ static char	**dbsync_item_pp_preproc_row(char **row)
  *                                                                            *
  * Purpose: compares item preproc table row with cached configuration data    *
  *                                                                            *
- * Parameter: group - [IN] the cached item preprocessing operation            *
- *            row   - [IN] the database row                                   *
+ * Parameter: preproc - [IN] the cached item preprocessing operation          *
+ *            dbrow   - [IN] the database row                                 *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3478,8 +3535,7 @@ static int	dbsync_compare_item_preproc(const zbx_dc_preproc_op_t *preproc, const
  *                                                                            *
  * Purpose: compares item preproc tables with cached configuration data       *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3497,15 +3553,18 @@ int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync)
 
 	if (NULL == (result = DBselect(
 			"select pp.item_preprocid,pp.itemid,pp.type,pp.params,pp.step,i.hostid,pp.error_handler,"
-				"pp.error_handler_params"
+				"pp.error_handler_params,i.type,i.key_,h.proxy_hostid"
 			" from item_preproc pp,items i,hosts h"
 			" where pp.itemid=i.itemid"
 				" and i.hostid=h.hostid"
-				" and h.proxy_hostid is null"
+				" and (h.proxy_hostid is null"
+					" or i.type in (%d,%d,%d))"
 				" and h.status in (%d,%d)"
 				" and i.flags<>%d"
 			" order by pp.itemid",
-			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE)))
+			ITEM_TYPE_INTERNAL, ITEM_TYPE_AGGREGATE, ITEM_TYPE_CALCULATED,
+			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+			ZBX_FLAG_DISCOVERY_PROTOTYPE)))
 	{
 		return FAIL;
 	}
@@ -3524,6 +3583,12 @@ int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync)
 	while (NULL != (dbrow = DBfetch(result)))
 	{
 		unsigned char	tag = ZBX_DBSYNC_ROW_NONE;
+		unsigned char	type;
+
+		ZBX_STR2UCHAR(type, dbrow[8]);
+		if (SUCCEED != DBis_null(dbrow[10]) && SUCCEED != is_item_processed_by_server(type, dbrow[9]))
+			continue;
+
 		ZBX_STR2UINT64(rowid, dbrow[0]);
 		zbx_hashset_insert(&ids, &rowid, sizeof(rowid));
 
@@ -3561,7 +3626,7 @@ int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync)
  * Purpose: compares maintenance table row with cached configuration data     *
  *                                                                            *
  * Parameter: maintenance - [IN] the cached maintenance data                  *
- *            row         - [IN] the database row                             *
+ *            dbrow       - [IN] the database row                             *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3590,8 +3655,7 @@ static int	dbsync_compare_maintenance(const zbx_dc_maintenance_t *maintenance, c
  *                                                                            *
  * Purpose: compares maintenances table with cached configuration data        *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3661,7 +3725,7 @@ int	zbx_dbsync_compare_maintenances(zbx_dbsync_t *sync)
  * Purpose: compares maintenance_tag table row with cached configuration data *
  *                                                                            *
  * Parameter: maintenance_tag - [IN] the cached maintenance tag               *
- *            row             - [IN] the database row                         *
+ *            dbrow           - [IN] the database row                         *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3687,8 +3751,7 @@ static int	dbsync_compare_maintenance_tag(const zbx_dc_maintenance_tag_t *mainte
  *                                                                            *
  * Purpose: compares maintenances table with cached configuration data        *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3759,8 +3822,8 @@ int	zbx_dbsync_compare_maintenance_tags(zbx_dbsync_t *sync)
  * Purpose: compares maintenance_period table row with cached configuration   *
  *          dat                                                               *
  *                                                                            *
- * Parameter: maintenance_period - [IN] the cached maintenance period         *
- *            row                - [IN] the database row                      *
+ * Parameter: period - [IN] the cached maintenance period                     *
+ *            dbrow  - [IN] the database row                                  *
  *                                                                            *
  * Return value: SUCCEED - the row matches configuration data                 *
  *               FAIL    - otherwise                                          *
@@ -3801,8 +3864,7 @@ static int	dbsync_compare_maintenance_period(const zbx_dc_maintenance_period_t *
  *                                                                            *
  * Purpose: compares timeperiods table with cached configuration data         *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3874,8 +3936,7 @@ int	zbx_dbsync_compare_maintenance_periods(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares maintenances_groups table with cached configuration data *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -3952,8 +4013,7 @@ int	zbx_dbsync_compare_maintenance_groups(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares maintenances_hosts table with cached configuration data  *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *
@@ -4030,8 +4090,7 @@ int	zbx_dbsync_compare_maintenance_hosts(zbx_dbsync_t *sync)
  *                                                                            *
  * Purpose: compares hosts_groups table with cached configuration data        *
  *                                                                            *
- * Parameter: cache - [IN] the configuration cache                            *
- *            sync  - [OUT] the changeset                                     *
+ * Parameter: sync - [OUT] the changeset                                      *
  *                                                                            *
  * Return value: SUCCEED - the changeset was successfully calculated          *
  *               FAIL    - otherwise                                          *

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,20 +22,22 @@
 #include "zbxalgo.h"
 #include "zbxhistory.h"
 #include "history.h"
+#include "module.h"
 
 #include "../zbxalgo/vectorimpl.h"
 
 ZBX_VECTOR_IMPL(history_record, zbx_history_record_t);
 
-extern char	*CONFIG_HISTORY_STORAGE_URL;
-extern char	*CONFIG_HISTORY_STORAGE_OPTS;
-extern char	*CONFIG_HISTORY_STORAGE_TYPE;
-extern int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME;
+//extern char	*CONFIG_HISTORY_STORAGE_URL;
+//extern char	*CONFIG_HISTORY_STORAGE_OPTS;
+//extern char	*CONFIG_HISTORY_STORAGE_TYPE;
+extern int CONFIG_VALUECACHE_FILL_TIME;
 extern int CONFIG_SERVER_STARTUP_TIME;
 
-zbx_history_iface_t	history_ifaces[ITEM_VALUE_TYPE_MAX];
+//zbx_history_iface_t	history_ifaces[ITEM_VALUE_TYPE_MAX];
 
-
+extern zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
+const char	*value_type_names[] = {"dbl", "str", "log", "uint", "text"};
 
 /************************************************************************************
  *                                                                                  *
@@ -44,19 +46,75 @@ zbx_history_iface_t	history_ifaces[ITEM_VALUE_TYPE_MAX];
  * preloads history into the value cache 											*
  * returns number of values preloaded												*
   ************************************************************************************/
-int	zbx_history_preload(int value_type)
+int	zbx_history_preload()
 {
-	
-	zbx_history_iface_t	*h_writer = &history_ifaces[value_type];
-	
+	int j;
 
-	if (NULL !=  h_writer->preload_values) {
-		return h_writer->preload_values(&history_ifaces[value_type]);
+	//zbx_history_iface_t	*h_writer = &history_ifaces[value_type];
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_VC_PRELOAD]->values_num; j++) {
+
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_VC_PRELOAD]->values[j];
+		zbx_history_preload_values_func_t preload_values = callback->callback;
+		
+		preload_values(callback->callbackData);
 	}
 
 	return SUCCEED;
 }
+/************************************************************************************
+ *                                                                                  *
+ * Function: glb_load_history_module                                                *
+ *                                                                                  *
+ * Purpose: initializes history storage for the single storage type                 *
+ *                                                                                  *
+ * Comments:  glaber approach: each module decides which data type to write and read*
+*                              based on the module's configuration                  *
+ ************************************************************************************/
+int glb_load_history_module(char *history_module) {
+	//first, splitting to module name and params:
+	char *params="";
+	void *data;
 
+	//looking if name also has params (after ;)
+	if (NULL!=(params = strchr(history_module, ';'))) {
+			*params++ = '\0';
+	} else {
+		params="";
+	}
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "loading history module \"%s\", module params \"%s\"", history_module, params);
+	//there are three steps to make a new module:
+	//1. - call init so the the module will parse it's data and return pointer to it
+	//2. - register api callbacks (this is what the module will do during the load)
+	//3. - 
+	
+	
+
+	//parsing some common vars
+	if (NULL != strstr(history_module,"clickhouse")) 
+		return glb_history_clickhouse_init(params);
+	
+	if (NULL != strstr(history_module,"victoriametrics")) 
+		return glb_history_vmetrics_init(params);
+	
+	if (NULL != strstr(history_module,"worker")) 
+		return glb_history_worker_init(params);
+		
+	
+/*
+
+	if (NULL != strstr(history_module,"sql")) {
+		zabbix_log(LOG_LEVEL_INFORMATION,"Doing SQL history storage init (why do you use glaber at all? )");
+	//	glb_sql_history_init(params);
+	} else  if (NULL != strstr(history_module,"elastics")) {
+		zabbix_log(LOG_LEVEL_INFORMATION,"Doing elastics storage init");
+	//	glb_elastics_history_init(params);
+	}
+*/
+	zabbix_log(LOG_LEVEL_WARNING,"Unknown history module type: '%s', exiting",history_module);
+	return FAIL;
+
+}
 
 
 /************************************************************************************
@@ -70,33 +128,25 @@ int	zbx_history_preload(int value_type)
  *           backend.                                                               *
  *                                                                                  *
  ************************************************************************************/
-int	zbx_history_init(char **error)
+int	glb_history_init(char **history_modules, char **error)
 {
-	int		i, ret;
+	//int		i, ret;
+	//history modules is registered via HistoryModule=<name>;<params> 
+	//dirctive where name suggest on of existing history modules:
+	//clickkhouse, victoriametrics, worker, elastics, sql
+	//worker modules is out of process runners for better compatibility
+	char	**history_module;
+	int	ret = SUCCEED;
 
-	/* TODO: support per value type specific configuration */
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	
+	if (NULL == *history_modules)
+		return SUCCEED;
 
-	const char	*opts[] = {"dbl", "str", "log", "uint", "text"};
-
-	for (i = 0; i < ITEM_VALUE_TYPE_MAX; i++)
+	for (history_module = history_modules; NULL != *history_module; history_module++)
 	{
-		if (NULL == CONFIG_HISTORY_STORAGE_URL || NULL == strstr(CONFIG_HISTORY_STORAGE_OPTS, opts[i])) 
-		{
-			zabbix_log(LOG_LEVEL_INFORMATION, "Init SQL storage engine as history storage for type %s", opts[i]);
-			ret = zbx_history_sql_init(&history_ifaces[i], i, error);
-		}
-		else if ( NULL != strstr(CONFIG_HISTORY_STORAGE_TYPE,"clickhouse")) 
-		{
-			ret = zbx_history_clickhouse_init(&history_ifaces[i], i, error);
-			zabbix_log(LOG_LEVEL_INFORMATION, "Init Clickhouse storage engine as history storage for type %s", opts[i]);
-		}
-		else 
-		{
-			ret = zbx_history_elastic_init(&history_ifaces[i], i, error);
-			zabbix_log(LOG_LEVEL_INFORMATION, "Init ElasticsSearch storage engine as history storage for type %s", opts[i]);
-		}
-
-		if (FAIL == ret)
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Loading module %s", *history_module);
+		if (SUCCEED != (ret = glb_load_history_module(*history_module)))
 			return FAIL;
 	}
 
@@ -113,17 +163,26 @@ int	zbx_history_init(char **error)
  *           here.                                                                  *
  *                                                                                  *
  ************************************************************************************/
-void	zbx_history_destroy(void)
+void zbx_history_destroy(void)
 {
-	int	i;
 
-	for (i = 0; i < ITEM_VALUE_TYPE_MAX; i++)
-	{
-		zbx_history_iface_t	*writer = &history_ifaces[i];
+	int	j,  ret = SUCCEED;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-		writer->destroy(writer);
+
+	//sending everyone the agregated data 
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_DESTROY]->values_num; j++) {
+
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_DESTROY]->values[j];
+		zbx_history_destroy_func_t destroy_module = callback->callback;
+		
+		destroy_module(callback->callbackData);
 	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
+
+
 
 /************************************************************************************
  *                                                                                  *
@@ -138,29 +197,22 @@ void	zbx_history_destroy(void)
  ************************************************************************************/
 int	zbx_history_add_values(const zbx_vector_ptr_t *history)
 {
-	int	i, flags = 0, ret = SUCCEED;
-
+	int	j,  ret = SUCCEED;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	for (i = 0; i < ITEM_VALUE_TYPE_MAX; i++)
-	{
-		zbx_history_iface_t	*writer = &history_ifaces[i];
 
-		if (0 < writer->add_values(writer, history))
-			flags |= (1 << i);
-	}
+	//sending everyone the agregated data 
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values_num; j++) {
 
-	for (i = 0; i < ITEM_VALUE_TYPE_MAX; i++)
-	{
-		zbx_history_iface_t	*writer = &history_ifaces[i];
-
-		if (0 != (flags & (1 << i)))
-			ret = writer->flush(writer);
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values[j];
+		zbx_history_add_values_func_t write_values = callback->callback;
+		
+		write_values(callback->callbackData, history);
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
-	return ret;
+	return SUCCEED;
 }
 
 /************************************************************************************
@@ -187,23 +239,21 @@ int	zbx_history_add_values(const zbx_vector_ptr_t *history)
 int	zbx_history_get_aggregated_values(zbx_uint64_t itemid, int value_type, int start,  int end, int agggregates,
 		char **buffer)
 {
-	int			ret, pos;
-	zbx_history_iface_t	*writer = &history_ifaces[value_type];
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d start:%d end:%d",
+	int j;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d start:%d end:%d",
 			__func__, itemid, value_type, start,  end);
 
-	if (NULL != writer->agg_values ) {
-		ret = writer->agg_values(writer, itemid, start, end, agggregates, buffer);
-		if (SUCCEED == ret )
-		{
-			zabbix_log(LOG_LEVEL_TRACE, "Got aggregation data: %s", buffer);
-		}
-	} else {
-		zabbix_log(LOG_LEVEL_WARNING, "WARNING: aggregation requests isn't supported by current server history module");
-	}
+	//whoever first retruns the agregated data, it's rusult is used 
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGGREGATED]->values_num; j++) {
 
-	return ret;
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGGREGATED]->values[j];
+		zbx_history_get_agg_values_func_t get_agg_values = callback->callback;
+		
+		if (SUCCEED == get_agg_values(callback->callbackData,value_type, itemid,start,end,agggregates,buffer))
+			 return SUCCEED;
+	}
+	
+	return FAIL;
 }
 
 /************************************************************************************
@@ -226,40 +276,21 @@ int	zbx_history_get_aggregated_values(zbx_uint64_t itemid, int value_type, int s
  *           all values from the specified interval if count is zero.               *
  *                                                                                  *
  ************************************************************************************/
-int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int count, int end,
-		zbx_vector_history_record_t *values)
+int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int count, int end, 	zbx_vector_history_record_t *values)
 {
-	int			ret, pos;
-	zbx_history_iface_t	*writer = &history_ifaces[value_type];
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d start:%d count:%d end:%d",
-			__func__, itemid, value_type, start, count, end);
+	int			j, ret;
 
 
-	if (time(NULL)- CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME < CONFIG_SERVER_STARTUP_TIME) {
-		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
-      	return SUCCEED;
+
+	//whoever first gets the data, it's rusult is used 
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
+
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values[j];
+		zbx_history_get_values_func_t get_values = callback->callback;
+		
+		if (SUCCEED == get_values(callback->callbackData , value_type, itemid,start,count,end,values)) 
+			return SUCCEED;
 	}
-
-	pos = values->values_num;
-	ret = writer->get_values(writer, itemid, start, count, end, values);
-
-	if (SUCCEED == ret && SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_TRACE))
-	{
-		int	i;
-		char	buffer[MAX_STRING_LEN];
-
-		for (i = pos; i < values->values_num; i++)
-		{
-			zbx_history_record_t	*h = &values->values[i];
-
-			zbx_history_value2str(buffer, sizeof(buffer), &h->value, value_type);
-			zabbix_log(LOG_LEVEL_TRACE, "  %d.%09d %s", h->timestamp.sec, h->timestamp.ns, buffer);
-		}
-	}
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s values:%d", __func__, zbx_result_string(ret),
-			values->values_num - pos);
 
 	return ret;
 }
@@ -279,11 +310,18 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
  *           the specified value type based on the history storage used.            *
  *                                                                                  *
  ************************************************************************************/
+//i believe that all metric storage systems has 
+//data aggregation built in on it's own
+//however it's always nice to have a possibility to have 
+//a way to
+
 int	zbx_history_requires_trends(int value_type)
 {
-	zbx_history_iface_t	*writer = &history_ifaces[value_type];
-
-	return 0 != writer->requires_trends ? SUCCEED : FAIL;
+//	zbx_history_iface_t	*writer = &history_ifaces[value_type];
+//	return 0 != writer->requires_trends ? SUCCEED : FAIL;
+	//there is no trend generation in glaber since original zabbix uses direct SQL writes of trends
+	//it might appear here, but as a part of history storage interface
+	return FAIL;
 }
 
 /******************************************************************************
@@ -457,3 +495,60 @@ int	zbx_history_record_compare_desc_func(const zbx_history_record_t *d1, const z
 	return d2->timestamp.sec - d1->timestamp.sec;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: glb_set_rpcess_types				                              *
+ *                                                                            *
+ * Purpose: sets types arryay if the type names are present in the setting    *
+ *                                                                            *
+ * Parameters: types_array   - [out] array to set                             *
+ * 				    setting   - [int] string containing the names             *
+ ******************************************************************************/
+
+int glb_set_process_types(u_int8_t *types_array, char *setting) {
+	
+	int i;
+	
+	for (i=0; i< ITEM_VALUE_TYPE_MAX; i++) {
+		if ( NULL != strstr(setting,value_type_names[i])) 
+			types_array[i]=1; 
+		else types_array[i]=0; 
+	}
+}
+/******************************************************************************
+ *                                                                            *
+ * Function: glb_types_array_sum				                              *
+ *                                                                            *
+ * Purpose: guess? :) to shorten the code to calc types processing logic      *
+ *                                                                            *
+******************************************************************************/
+int glb_types_array_sum(u_int8_t *types_array) {
+	int i, sum=0;
+	for (i=0; i< ITEM_VALUE_TYPE_MAX; i++) sum+=types_array[i];
+	return sum;
+}
+ history_value_t	history_str2value(char *str, unsigned char value_type)
+{
+	history_value_t	value;
+
+	switch (value_type)
+	{
+		case ITEM_VALUE_TYPE_LOG:
+			value.log = (zbx_log_value_t *)zbx_malloc(NULL, sizeof(zbx_log_value_t));
+			memset(value.log, 0, sizeof(zbx_log_value_t));
+			value.log->value = zbx_strdup(NULL, str);
+			break;
+		case ITEM_VALUE_TYPE_STR:
+		case ITEM_VALUE_TYPE_TEXT:
+			value.str = zbx_strdup(NULL, str);
+			break;
+		case ITEM_VALUE_TYPE_FLOAT:
+			value.dbl = atof(str);
+			break;
+		case ITEM_VALUE_TYPE_UINT64:
+			ZBX_STR2UINT64(value.ui64, str);
+			break;
+	}
+
+	return value;
+}

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,7 +27,10 @@
 extern int	CONFIG_TIMEOUT;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 extern int	CONFIG_UNREACHABLE_PERIOD;
-extern int	CONFIG_UNREACHABLE_DELAY;
+extern int  CONFIG_UNREACHABLE_DELAY;
+extern int  CONFIG_ENABLE_HOST_DEACTIVATION;
+extern u_int64_t CONFIG_DEBUG_ITEM;
+extern u_int64_t CONFIG_DEBUG_HOST;
 
 ZBX_THREAD_ENTRY(poller_thread, args);
 

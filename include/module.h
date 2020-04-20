@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,9 +27,14 @@
 
 /* zbx_module_api_version() MUST return this constant */
 #define ZBX_MODULE_API_VERSION	2
+/*glaber uses api extensions to process some aditional hooks, so it's version has to differ from API_VERSION */
+#define ZBX_MODULE_API_VERSION_GLABER	352
+
+
 
 /* old name alias is kept for source compatibility only, SHOULD NOT be used */
 #define ZBX_MODULE_API_VERSION_ONE	ZBX_MODULE_API_VERSION
+
 
 /* HINT: For conditional compilation with different module.h versions modules can use: */
 /* #if ZBX_MODULE_API_VERSION == X                                                     */
@@ -202,5 +207,66 @@ typedef struct
 	void	(*history_log_cb)(const ZBX_HISTORY_LOG *history, int history_num);
 }
 ZBX_HISTORY_WRITE_CBS;
+
+int	zbx_module_api_version(void);
+int	zbx_module_init(void);
+int	zbx_module_uninit(void);
+void	zbx_module_item_timeout(int timeout);
+ZBX_METRIC	*zbx_module_item_list(void);
+ZBX_HISTORY_WRITE_CBS	zbx_module_history_write_cbs(void);
+
+struct API_HOOKS {
+	char *callbackName;
+	unsigned int callbackID;
+};
+
+typedef struct  {
+	void *callback;
+	void *callbackData;
+} glb_api_callback_t;
+
+/*GLABER_API callback IDS */
+typedef enum {
+	GLB_MODULE_API_HISTORY_WRITE =	0,
+	GLB_MODULE_API_HISTORY_READ, //general history read 
+	GLB_MODULE_API_HISTORY_READ_AGGREGATED, //history read aggreagated to n points, rets max min avf, usefull for stats and graph processing
+	GLB_MODULE_API_HISTORY_READ_VC_PRELOAD,
+	GLB_MODULE_API_DESTROY, //all modules who needs deinit should register in this callback
+	 //total number of callbacks == last callback id +1 , theese two should always go last
+	GLB_MODULE_API_TOTAL_CALLBACKS,
+	GLB_MODULE_API_NO_CALLBACK,
+} 	glb_api_callback_type_t;
+
+
+
+static struct API_HOOKS APIcfg[]=
+{
+	/* FUNC NAME,			FUNC_ID */
+	{"History_Write",			GLB_MODULE_API_HISTORY_WRITE },		
+	{"History_Read",			GLB_MODULE_API_HISTORY_READ },			//read proc, one is ok for all the types
+	{"History_Read_Aggregated",	GLB_MODULE_API_HISTORY_READ_AGGREGATED },		
+	{"History_Read_VC_Preload" , GLB_MODULE_API_HISTORY_READ_VC_PRELOAD }, //for preloading the value cache
+	{"ModuleDestroy" , GLB_MODULE_API_DESTROY },
+	{NULL}
+};
+
+int  glb_register_callback(u_int16_t cb_type, void (*cb_cb)(void), void * cb_data);
+
+#define GLB_API_CALLBACK( __cb_type, __cb_data) {		\
+	int j;			\
+\
+	for (j = 0; j < API_CALLBACKS[__cb_type]->values_num; j++) {		\
+\
+				glb_api_callback_t *callback = API_CALLBACKS[__cb_type]->values[j]; \
+				\
+				int (*func_cb)(void *callbackdata, void* historydata); \
+					\
+				func_cb=(int(*)(void *callbackdata,void *historydata))callback->callback; \
+								\
+				func_cb(callback->callbackData, (void *) __cb_data); \
+						} \
+\
+}
+
 
 #endif

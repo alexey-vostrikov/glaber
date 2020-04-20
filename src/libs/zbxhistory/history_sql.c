@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -367,7 +367,11 @@ static int	db_read_values_by_time(zbx_uint64_t itemid, int value_type, zbx_vecto
 			" where itemid=" ZBX_FS_UI64,
 			table->fields, table->name, itemid);
 
-	if (1 == seconds)
+	if (ZBX_JAN_2038 == end_timestamp)
+	{
+		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " and clock>%d", end_timestamp - seconds);
+	}
+	else if (1 == seconds)
 	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " and clock=%d", end_timestamp);
 	}
@@ -613,9 +617,9 @@ out:
  * Parameters:  hist    - [IN] the history storage interface                        *
  *                                                                                  *
  ************************************************************************************/
-static void	sql_destroy(zbx_history_iface_t *hist)
+static void	sql_destroy(void *data)
 {
-	ZBX_UNUSED(hist);
+	ZBX_UNUSED(data);
 }
 
 /************************************************************************************
@@ -638,16 +642,16 @@ static void	sql_destroy(zbx_history_iface_t *hist)
  *           all values from the specified interval if count is zero.               *
  *                                                                                  *
  ************************************************************************************/
-static int	sql_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid, int start, int count, int end,
+static int	sql_get_values(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end,
 		zbx_vector_history_record_t *values)
 {
 	if (0 == count)
-		return db_read_values_by_time(itemid, hist->value_type, values, end - start, end);
+		return db_read_values_by_time(itemid, value_type, values, end - start, end);
 
 	if (0 == start)
-		return db_read_values_by_count(itemid, hist->value_type, values, count, end);
+		return db_read_values_by_count(itemid, value_type, values, count, end);
 
-	return db_read_values_by_time_and_count(itemid, hist->value_type, values, end - start, count, end);
+	return db_read_values_by_time_and_count(itemid, value_type, values, end - start, count, end);
 }
 
 /************************************************************************************
@@ -660,23 +664,42 @@ static int	sql_get_values(zbx_history_iface_t *hist, zbx_uint64_t itemid, int st
  *              history - [IN] the history data vector (may have mixed value types) *
  *                                                                                  *
  ************************************************************************************/
-static int	sql_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr_t *history)
+static int	sql_add_values(void *data, const zbx_vector_ptr_t *history)
 {
 	int	i, h_num = 0;
-
+	add_history_func_t	add_history_func;
+	for (i=0; i)
 	for (i = 0; i < history->values_num; i++)
 	{
 		const ZBX_DC_HISTORY	*h = (ZBX_DC_HISTORY *)history->values[i];
 
-		if (h->value_type == hist->value_type)
-			h_num++;
-	}
-
-	if (0 != h_num)
-	{
-		add_history_func_t	add_history_func = (add_history_func_t)hist->data;
+		switch (h->value_type)
+		{
+		case ITEM_VALUE_TYPE_FLOAT:
+			add_history_func = (void *)add_history_dbl;
+			break;
+		case ITEM_VALUE_TYPE_UINT64:
+			add_history_func = (void *)add_history_uint;
+			break;
+		case ITEM_VALUE_TYPE_STR:
+			add_history_func = (void *)add_history_str;
+			break;
+		case ITEM_VALUE_TYPE_TEXT:
+			add_history_func = (void *)add_history_text;
+			break;
+		case ITEM_VALUE_TYPE_LOG:
+			add_history_func = (void *)add_history_log;
+			break;
+		}
+		
 		add_history_func(history);
 	}
+
+	//todo: add here a) getting callback add according to the type
+	//b) filtering the type if it hasn't been allowed
+
+	//we should flush ourselves, thats a good habbit
+	sql_flush(data);
 
 	return h_num;
 }
@@ -693,10 +716,8 @@ static int	sql_add_values(zbx_history_iface_t *hist, const zbx_vector_ptr_t *his
  *           unrecoverable error occurs                                             *
  *                                                                                  *
  ************************************************************************************/
-static int	sql_flush(zbx_history_iface_t *hist)
+static int	sql_flush(void *data)
 {
-	ZBX_UNUSED(hist);
-
 	return sql_writer_flush();
 }
 
@@ -714,15 +735,16 @@ static int	sql_flush(zbx_history_iface_t *hist)
  *               FAIL    - otherwise                                                *
  *                                                                                  *
  ************************************************************************************/
-int	zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error)
+int	zbx_history_sql_init(char *params)
 {
-	ZBX_UNUSED(error);
+	//ZBX_UNUSED(error);
+	//todo: add parsing of the parameter
 
 	hist->value_type = value_type;
 
 	hist->destroy = sql_destroy;
 	hist->add_values = sql_add_values;
-	hist->flush = sql_flush;
+	
 	hist->get_values = sql_get_values;
 
 	switch (value_type)

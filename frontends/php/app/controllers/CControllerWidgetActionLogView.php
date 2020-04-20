@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ class CControllerWidgetActionLogView extends CControllerWidget {
 			'output' => ['clock', 'sendto', 'subject', 'message', 'status', 'retries', 'error', 'userid', 'actionid',
 				'mediatypeid', 'alerttype'
 			],
-			'selectMediatypes' => ['description', 'maxattempts'],
+			'selectMediatypes' => ['name', 'maxattempts'],
 			'filter' => [
 				'alerttype' => ALERT_TYPE_MESSAGE
 			],
@@ -83,7 +83,7 @@ class CControllerWidgetActionLogView extends CControllerWidget {
 		foreach ($alerts as &$alert) {
 			$alert['description'] = '';
 			if ($alert['mediatypeid'] != 0 && array_key_exists(0, $alert['mediatypes'])) {
-				$alert['description'] = $alert['mediatypes'][0]['description'];
+				$alert['description'] = $alert['mediatypes'][0]['name'];
 				$alert['maxattempts'] = $alert['mediatypes'][0]['maxattempts'];
 			}
 			unset($alert['mediatypes']);

@@ -1,6 +1,6 @@
 /*
  ** Zabbix
- ** Copyright (C) 2001-2019 Zabbix SIA
+ ** Copyright (C) 2001-2020 Zabbix SIA
  **
  ** This program is free software; you can redistribute it and/or modify
  ** it under the terms of the GNU General Public License as published by
@@ -71,6 +71,16 @@
 					},
 					this.screens[screen.id].interval
 				);
+			}
+		},
+
+		remove: function(screen) {
+			if (typeof screen.id !== 'undefined' && typeof this.screens[screen.id] !== 'undefined') {
+				if (typeof this.screens[screen.id].timeoutHandler !== 'undefined') {
+					window.clearTimeout(this.screens[screen.id].timeoutHandler);
+				}
+
+				delete this.screens[screen.id];
 			}
 		},
 
@@ -192,10 +202,8 @@
 					self.refreshImg(id);
 					break;
 
-				// SCREEN_RESOURCE_SCREEN
 				// SCREEN_RESOURCE_LLD_SIMPLE_GRAPH
 				// SCREEN_RESOURCE_LLD_GRAPH
-				case 8:
 				case 20:
 				case 19:
 					self.refreshProfile(id, ajax_url);
@@ -216,10 +224,6 @@
 					},
 					screen.interval
 				);
-
-				// refresh time control actual time
-				clearTimeout(timeControl.timeRefreshTimeoutHandler);
-				timeControl.refreshTime();
 			}
 		},
 
@@ -421,7 +425,7 @@
 		},
 
 		/**
-		 * Getting shadow box height of graph image, asynchronious. Only for line graphs on dashboard.
+		 * Getting shadow box height of graph image, asynchronous. Only for line graphs on dashboard.
 		 * Will return xhr request for line graphs.
 		 *
 		 * @param {Curl}     url  Curl object for image request.

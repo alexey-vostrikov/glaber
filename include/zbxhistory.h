@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -46,8 +46,8 @@ void	zbx_history_value2str(char *buffer, size_t size, const history_value_t *val
 #define zbx_history_record_vector_create(vector)	zbx_vector_history_record_create(vector)
 
 
-int	zbx_history_init(char **error);
-int zbx_history_preload(int value_type);
+int	glb_history_init(char **history_modules, char **error);
+int zbx_history_preload();
 
 void	zbx_history_destroy(void);
 

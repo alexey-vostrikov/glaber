@@ -2,7 +2,7 @@
 	<?= (new CRow([
 			'',
 			(new CSpan('1:'))->setAttribute('data-row-num', ''),
-			(new CLink('#{name}', 'javascript:httpconf.steps.open(#{httpstepid});')),
+			(new CLink('#{name}', 'javascript:httpconf.steps.open(#{no});')),
 			'#{timeout}',
 			(new CSpan('#{url_short}'))->setHint('#{url}', '', true, 'word-break: break-all;')
 				->setAttribute('data-hintbox', '#{enabled_hint}'),
@@ -14,11 +14,10 @@
 </script>
 
 <script type="text/x-jquery-tmpl" id="scenario-step-row">
-
 	<?= (new CRow([
 			(new CCol((new CDiv())->addClass(ZBX_STYLE_DRAG_ICON)))->addClass(ZBX_STYLE_TD_DRAG_ICON),
 			(new CSpan('1:'))->setAttribute('data-row-num', ''),
-			(new CLink('#{name}', 'javascript:httpconf.steps.open(#{httpstepid});')),
+			(new CLink('#{name}', 'javascript:httpconf.steps.open(#{no});')),
 			'#{timeout}',
 			(new CSpan('#{url_short}'))->setHint('#{url}', '', true, 'word-break: break-all;')
 				->setAttribute('data-hintbox', '#{enabled_hint}'),
@@ -28,7 +27,9 @@
 				->addClass(ZBX_STYLE_BTN_LINK)
 				->addClass('element-table-remove')
 			))->addClass(ZBX_STYLE_NOWRAP)
-		]))->addClass('sortable')->toString()
+		]))
+			->addClass('sortable')
+			->toString()
 	?>
 </script>
 
@@ -40,12 +41,12 @@
 			(new CTextBox(null, '#{name}'))
 				->setAttribute('placeholder', _('name'))
 				->setAttribute('data-type', 'name')
-				->setWidth(ZBX_TEXTAREA_TAG_WIDTH),
+				->setWidth(ZBX_TEXTAREA_HTTP_PAIR_NAME_WIDTH),
 			'&rArr;',
 			(new CTextBox(null, '#{value}'))
 				->setAttribute('placeholder', _('value'))
 				->setAttribute('data-type', 'value')
-				->setWidth(ZBX_TEXTAREA_TAG_WIDTH),
+				->setWidth(ZBX_TEXTAREA_HTTP_PAIR_VALUE_WIDTH),
 			(new CCol(
 				(new CButton(null, _('Remove')))
 					->addClass(ZBX_STYLE_BTN_LINK)
@@ -98,10 +99,10 @@
 			hidden_form = document.createElement('div');
 			hidden_form.id = 'hidden-form';
 
-			hidden_form.append(httpconf.scenario.toFragment());
-			hidden_form.append(httpconf.steps.toFragment());
+			hidden_form.appendChild(httpconf.scenario.toFragment());
+			hidden_form.appendChild(httpconf.steps.toFragment());
 
-			this.append(hidden_form);
+			this.appendChild(hidden_form);
 		});
 	});
 
@@ -495,7 +496,7 @@
 				}
 
 				if (type === 'headers') {
-					e.new_node.querySelector('[data-type="value"]').setAttribute('maxlength', 1000);
+					e.new_node.querySelector('[data-type="value"]').setAttribute('maxlength', 2000);
 				}
 			});
 
@@ -516,22 +517,22 @@
 	 * @return {DocumentFragment}
 	 */
 	Scenario.prototype.toFragment = function() {
-		var frag = new DocumentFragment(),
+		var frag = document.createDocumentFragment(),
 			iter = 0,
 			prefix;
 
 		eachPair.call(this.pairs.headers, function(pair) {
 			prefix = 'pairs[' + (iter ++) + ']';
-			frag.append(hiddenInput('type', 'headers', prefix));
-			frag.append(hiddenInput('name', pair.name, prefix));
-			frag.append(hiddenInput('value', pair.value, prefix));
+			frag.appendChild(hiddenInput('type', 'headers', prefix));
+			frag.appendChild(hiddenInput('name', pair.name, prefix));
+			frag.appendChild(hiddenInput('value', pair.value, prefix));
 		});
 
 		eachPair.call(this.pairs.variables, function(pair) {
 			prefix = 'pairs[' + (iter ++) + ']';
-			frag.append(hiddenInput('type', 'variables', prefix));
-			frag.append(hiddenInput('name', pair.name, prefix));
-			frag.append(hiddenInput('value', pair.value, prefix));
+			frag.appendChild(hiddenInput('type', 'variables', prefix));
+			frag.appendChild(hiddenInput('name', pair.name, prefix));
+			frag.appendChild(hiddenInput('value', pair.value, prefix));
 		});
 
 		return frag;
@@ -548,9 +549,9 @@
 		this.new_stepid = 0;
 		this.sort_index = [];
 
-		steps.forEach(function(step) {
-			this.data[step.httpstepid] = new Step(step);
-			this.sort_index.push(step.httpstepid);
+		steps.forEach(function(step, no) {
+			this.data[no + 1] = new Step(step);
+			this.sort_index.push(no + 1);
 		}.bind(this));
 
 		this.$container = jQuery('.httpconf-steps-dynamic-row', $tab);
@@ -563,10 +564,8 @@
 
 		this.steps_dynamic_rows = new DynamicRows(this.$container, {
 			add_before: this.$container.find('.element-table-add').closest('tr')[0],
-			template: httpconf.step_row_template,
-			data_index: 'httpstepid'
+			template: httpconf.step_row_template
 		});
-
 
 		if (!httpconf.templated) {
 			this.$container.sortable(sortableOpts());
@@ -594,7 +593,7 @@
 	 * @return {DocumentFragment}
 	 */
 	Steps.prototype.toFragment = function() {
-		var frag = new DocumentFragment(),
+		var frag = document.createDocumentFragment(),
 			iter_step = 0;
 
 		this.sort_index.forEach(function(id) {
@@ -603,49 +602,49 @@
 				prefix_step = 'steps[' + (iter_step ++) + ']',
 				prefix_pair;
 
-			frag.append(hiddenInput('follow_redirects', step.data.follow_redirects, prefix_step));
-			frag.append(hiddenInput('httpstepid',       step.data.httpstepid,       prefix_step));
-			frag.append(hiddenInput('name',             step.data.name,             prefix_step));
-			frag.append(hiddenInput('post_type',        step.data.post_type,        prefix_step));
-			frag.append(hiddenInput('required',         step.data.required,         prefix_step));
-			frag.append(hiddenInput('retrieve_mode',    step.data.retrieve_mode,    prefix_step));
-			frag.append(hiddenInput('status_codes',     step.data.status_codes,     prefix_step));
-			frag.append(hiddenInput('timeout',          step.data.timeout,          prefix_step));
-			frag.append(hiddenInput('url',              step.data.url,              prefix_step));
+			frag.appendChild(hiddenInput('follow_redirects', step.data.follow_redirects, prefix_step));
+			frag.appendChild(hiddenInput('httpstepid',       step.data.httpstepid,       prefix_step));
+			frag.appendChild(hiddenInput('name',             step.data.name,             prefix_step));
+			frag.appendChild(hiddenInput('post_type',        step.data.post_type,        prefix_step));
+			frag.appendChild(hiddenInput('required',         step.data.required,         prefix_step));
+			frag.appendChild(hiddenInput('retrieve_mode',    step.data.retrieve_mode,    prefix_step));
+			frag.appendChild(hiddenInput('status_codes',     step.data.status_codes,     prefix_step));
+			frag.appendChild(hiddenInput('timeout',          step.data.timeout,          prefix_step));
+			frag.appendChild(hiddenInput('url',              step.data.url,              prefix_step));
 
 			if (step.data.retrieve_mode != httpconf.HTTPTEST_STEP_RETRIEVE_MODE_HEADERS) {
 				if (step.data.post_type != httpconf.ZBX_POSTTYPE_FORM) {
-					frag.append(hiddenInput('posts', step.data.posts, prefix_step));
+					frag.appendChild(hiddenInput('posts', step.data.posts, prefix_step));
 				}
 				else {
 					step.data.pairs.post_fields.forEach(function(pair) {
 						prefix_pair = prefix_step + '[pairs][' + (iter_pair ++) + ']';
-						frag.append(hiddenInput('type',  'post_fields', prefix_pair));
-						frag.append(hiddenInput('name',  pair.name,     prefix_pair));
-						frag.append(hiddenInput('value', pair.value,    prefix_pair));
+						frag.appendChild(hiddenInput('type',  'post_fields', prefix_pair));
+						frag.appendChild(hiddenInput('name',  pair.name,     prefix_pair));
+						frag.appendChild(hiddenInput('value', pair.value,    prefix_pair));
 					});
 				}
 			}
 
 			step.data.pairs.query_fields.forEach(function(pair) {
 				prefix_pair = prefix_step + '[pairs][' + (iter_pair ++) + ']';
-				frag.append(hiddenInput('type',  'query_fields', prefix_pair));
-				frag.append(hiddenInput('name',  pair.name,      prefix_pair));
-				frag.append(hiddenInput('value', pair.value,     prefix_pair));
+				frag.appendChild(hiddenInput('type',  'query_fields', prefix_pair));
+				frag.appendChild(hiddenInput('name',  pair.name,      prefix_pair));
+				frag.appendChild(hiddenInput('value', pair.value,     prefix_pair));
 			});
 
 			step.data.pairs.variables.forEach(function(pair) {
 				prefix_pair = prefix_step + '[pairs][' + (iter_pair ++) + ']';
-				frag.append(hiddenInput('type',  'variables', prefix_pair));
-				frag.append(hiddenInput('name',  pair.name,   prefix_pair));
-				frag.append(hiddenInput('value', pair.value,  prefix_pair));
+				frag.appendChild(hiddenInput('type',  'variables', prefix_pair));
+				frag.appendChild(hiddenInput('name',  pair.name,   prefix_pair));
+				frag.appendChild(hiddenInput('value', pair.value,  prefix_pair));
 			});
 
 			step.data.pairs.headers.forEach(function(pair) {
 				prefix_pair = prefix_step + '[pairs][' + (iter_pair ++) + ']';
-				frag.append(hiddenInput('type',  'headers',  prefix_pair));
-				frag.append(hiddenInput('name',  pair.name,  prefix_pair));
-				frag.append(hiddenInput('value', pair.value, prefix_pair));
+				frag.appendChild(hiddenInput('type',  'headers',  prefix_pair));
+				frag.appendChild(hiddenInput('name',  pair.name,  prefix_pair));
+				frag.appendChild(hiddenInput('value', pair.value, prefix_pair));
 			});
 
 		}.bind(this));
@@ -667,19 +666,6 @@
 	};
 
 	/**
-	 * Adds or updates newly created step data with Steps object.
-	 *
-	 * @param {object} data  Step data, that holds accurate httpstepid filed.
-	 */
-	Steps.prototype.addStep = function(data) {
-		if (this.sort_index.indexOf(data.httpstepid) == -1) {
-			this.sort_index.push(data.httpstepid);
-		}
-
-		this.steps[data.httpstepid] = new Step(data);
-	};
-
-	/**
 	 * Used to validate step names with server, on PopUp form validate event.
 	 *
 	 * @return {array}  Array of strings.
@@ -687,8 +673,8 @@
 	Steps.prototype.getStepNames = function() {
 		var names = [];
 
-		for (var httpstepid in this.data) {
-			names.push(this.data[httpstepid].data.name);
+		for (var no in this.data) {
+			names.push(this.data[no].data.name);
 		}
 
 		return names;
@@ -697,10 +683,10 @@
 	/**
 	 * This method hydrates the parsed html PopUp form with data from specific step.
 	 *
-	 * @param {integer} httpstepid
+	 * @param {int} no  Step index.
 	 */
-	Steps.prototype.onStepOverlayReadyCb = function(httpstepid) {
-		var step_ref = this.data[httpstepid] ? this.data[httpstepid] : this.new_step;
+	Steps.prototype.onStepOverlayReadyCb = function(no) {
+		var step_ref = this.data[no] ? this.data[no] : this.new_step;
 		this.edit_form = new StepEditForm(jQuery('#http_step'), step_ref);
 	};
 
@@ -710,8 +696,8 @@
 	Steps.prototype.openNew = function() {
 		this.new_stepid -= 1;
 
-		this.new_step = new Step({httpstepid: this.new_stepid});
-		this.new_step.open(this.$container.find('.element-table-add'));
+		this.new_step = new Step({httpstepid: 0, no: this.new_stepid});
+		this.new_step.open(this.new_stepid, this.$container.find('.element-table-add'));
 	};
 
 	/**
@@ -719,7 +705,7 @@
 	 */
 	Steps.prototype.renderData = function() {
 		this.sort_index.forEach(function(data_index) {
-			this.steps_dynamic_rows.addRow(this.data[data_index].data);
+			this.steps_dynamic_rows.addRow(this.data[data_index].data, data_index);
 		}.bind(this));
 
 		this.onSortOrderChange();
@@ -728,11 +714,11 @@
 	/**
 	 * Opens popup for a step.
 	 *
-	 * @param {integer} httpstepid
+	 * @param {integer} no
 	 */
-	Steps.prototype.open = function(httpstepid) {
-		this.data[httpstepid]
-			.open(this.$container.find('[data-index="' + httpstepid + '"] a'));
+	Steps.prototype.open = function(no) {
+		this.data[no]
+			.open(no, this.$container.find('[data-index="' + no + '"] a'));
 	};
 
 	/**
@@ -763,10 +749,12 @@
 	 * Opens step popup - edit or create form.
 	 * Note: a callback this.onStepOverlayReadyCb is called from within popup form once it is parsed.
 	 *
+	 * @param {int}  no       Step index.
 	 * @param {Node} refocus  A node to set focus to, when popup is closed.
 	 */
-	Step.prototype.open = function(refocus) {
+	Step.prototype.open = function(no, refocus) {
 		return PopUp('popup.httpstep', {
+			no:               no,
 			httpstepid:       this.data.httpstepid,
 			templated:        httpconf.templated,
 			name:             this.data.name,
@@ -820,7 +808,7 @@
 
 			if (type === 'headers') {
 				$node.on('dynamic_rows.beforeadd', function(e, dynamic_rows) {
-					e.new_node.querySelector('[data-type="value"]').setAttribute('maxlength', 1000);
+					e.new_node.querySelector('[data-type="value"]').setAttribute('maxlength', 2000);
 				});
 			}
 
@@ -903,7 +891,7 @@
 
 	/**
 	 * @param {string} msg                 Error message.
-	 * @param {Node|jQuery} trigger_elmnt  An element that the focus will be retuned to.
+	 * @param {Node|jQuery} trigger_elmnt  An element that the focus will be returned to.
 	 */
 	StepEditForm.prototype.errorDialog = function(msg, trigger_elmnt) {
 		overlayDialogue({
@@ -1070,13 +1058,13 @@
 				return jQuery(ret.errors).insertBefore(this.$form);
 			}
 
-			if (!httpconf.steps.data[ret.params.httpstepid]) {
-				httpconf.steps.sort_index.push(ret.params.httpstepid);
-				httpconf.steps.data[ret.params.httpstepid] = this.step;
+			if (!httpconf.steps.data[ret.params.no]) {
+				httpconf.steps.sort_index.push(ret.params.no);
+				httpconf.steps.data[ret.params.no] = this.step;
 			}
 
 			ret.params.pairs = curr_pairs;
-			httpconf.steps.data[ret.params.httpstepid].update(ret.params);
+			httpconf.steps.data[ret.params.no].update(ret.params);
 			httpconf.steps.renderData();
 
 			overlayDialogueDestroy(dialogueid);

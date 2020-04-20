@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -475,7 +475,7 @@ class CControllerPopupTriggerExpr extends CController {
 
 			if ($result) {
 				$function_macro_tokens = $result->getTokensByType(
-					CTriggerExpressionParserResult::TOKEN_TYPE_FUNCTION_MACRO
+					CTriggerExprParserResult::TOKEN_TYPE_FUNCTION_MACRO
 				);
 
 				if ($function_macro_tokens) {
@@ -501,9 +501,9 @@ class CControllerPopupTriggerExpr extends CController {
 					 */
 					$tokens = $result->getTokens();
 					foreach ($tokens as $key => $token) {
-						if ($token['type'] == CTriggerExpressionParserResult::TOKEN_TYPE_FUNCTION_MACRO) {
+						if ($token['type'] == CTriggerExprParserResult::TOKEN_TYPE_FUNCTION_MACRO) {
 							if (array_key_exists($key + 2, $tokens)
-									&& $tokens[$key + 1]['type'] == CTriggerExpressionParserResult::TOKEN_TYPE_OPERATOR
+									&& $tokens[$key + 1]['type'] == CTriggerExprParserResult::TOKEN_TYPE_OPERATOR
 									&& array_key_exists($function, $this->functions)
 									&& in_array($tokens[$key + 1]['value'],
 										$this->functions[$function]['operators'])) {

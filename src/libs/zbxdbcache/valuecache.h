@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -107,5 +107,7 @@ int zbx_vc_get_cached_values(zbx_uint64_t itemid, zbx_vector_history_record_t *v
 int	zbx_vc_add_values(zbx_vector_ptr_t *history);
 
 int	zbx_vc_get_statistics(zbx_vc_stats_t *stats);
+
+void	zbx_vc_housekeeping_value_cache(void);
 
 #endif	/* ZABBIX_VALUECACHE_H */

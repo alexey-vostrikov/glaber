@@ -76,9 +76,6 @@
 /* Define to 1 if 'KERN_MAXPROC' exists. */
 /* #undef HAVE_FUNCTION_SYSCTL_KERN_MAXPROC */
 
-/* Define to 1 if you have the `getaddrinfo' function. */
-/* #undef HAVE_GETADDRINFO */
-
 /* Define to 1 if you have the `getenv' function. */
 #define HAVE_GETENV 1
 
@@ -100,9 +97,6 @@
 /* Define to 1 if you have the 'libiconv' library (-liconv) */
 #define HAVE_ICONV 1
 
-/* Define to 1 if Iksemel library should be enabled. */
-/* #undef HAVE_IKSEMEL */
-
 /* Define to 1 if you have NETLINK INET_DIAG support. */
 #define HAVE_INET_DIAG 1
 
@@ -114,9 +108,6 @@
 
 /* Define to 1 if IPv6 should be enabled. */
 /* #undef HAVE_IPV6 */
-
-/* Define to 1 if Jabber should be enabled. */
-/* #undef HAVE_JABBER */
 
 /* Define to 1 if you have the <knlist.h> header file. */
 /* #undef HAVE_KNLIST_H */
@@ -175,6 +166,9 @@
 /* Define to 1 if libxml2 libraries are available */
 /* #undef HAVE_LIBXML2 */
 
+/* Define to 1 if you have the <limits.h> header file. */
+#define HAVE_LIMITS_H 1
+
 /* Define to 1 if you have the <linux/inet_diag.h> header file. */
 #define HAVE_LINUX_INET_DIAG_H 1
 
@@ -209,7 +203,7 @@
 #define HAVE_MULTIROW_INSERT 1
 
 /* Define to 1 if MySQL libraries are available */
-#define HAVE_MYSQL 1
+/* #undef HAVE_MYSQL */
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #define HAVE_NETDB_H 1
@@ -255,7 +249,7 @@
 /* #undef HAVE_POLARSSL */
 
 /* Define to 1 if PostgreSQL libraries are available */
-/* #undef HAVE_POSTGRESQL */
+#define HAVE_POSTGRESQL 1
 
 /* Define to 1 if '/proc' file system should be used. */
 #define HAVE_PROC 1
@@ -342,11 +336,17 @@
 /* Define to 1 if SQLite libraries are available */
 /* #undef HAVE_SQLITE3 */
 
+/* Define to 1 if you have the 'libssh' library (-lssh) */
+/* #undef HAVE_SSH */
+
 /* Define to 1 if you have the 'libssh2' library (-lssh2) */
 /* #undef HAVE_SSH2 */
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #define HAVE_STDARG_H 1
+
+/* Define to 1 if you have the <stddef.h> header file. */
+#define HAVE_STDDEF_H 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -513,6 +513,9 @@
 /* Define to 1 if you have the <sys/wait.h> header file. */
 #define HAVE_SYS_WAIT_H 1
 
+/* Define to 1 if compiler keyword '__thread' supported. */
+#define HAVE_THREAD_LOCAL 1
+
 /* Define to 1 if function 'clock_gettime' exists. */
 #define HAVE_TIME_CLOCK_GETTIME 1
 
@@ -570,7 +573,7 @@
 /* Define to 1 if you are using Linux 2.6.x */
 /* #undef KERNEL_2_6 */
 
-/* Define to 1 if LDAP depricated functions is used. */
+/* Define to 1 if LDAP deprecated functions is used. */
 /* #undef LDAP_DEPRECATED */
 
 /* Defined if libcurl supports AsynchDNS */
@@ -627,7 +630,7 @@
 /* Define to 1 if you are using Mac OS X. */
 /* #undef MAC_OS_X */
 
-/* Define to 1 if OPENIPMI depricated functions is used. */
+/* Define to 1 if OPENIPMI deprecated functions is used. */
 /* #undef OPENIPMI_DEPRECATED */
 
 /* Name of package */
@@ -640,7 +643,7 @@
 #define PACKAGE_NAME "Zabbix"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Zabbix 4.2.4"
+#define PACKAGE_STRING "Zabbix 4.4.7"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "zabbix"
@@ -649,7 +652,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.2.4"
+#define PACKAGE_VERSION "4.4.7"
 
 /* Define as the return type of signal handlers (`int' or `void'). */
 #define RETSIGTYPE void
@@ -661,7 +664,7 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "4.2.4"
+#define VERSION "4.4.7"
 
 /* Define to 1 on linux and solaris platforms */
 #define ZBX_PROCSTAT_COLLECTOR 1 

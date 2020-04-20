@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,23 +17,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-var ZABBIX = ZABBIX || {};
-
-ZABBIX.namespace = function(namespace) {
-	var parts = namespace.split('.'),
-		parent = this,
-		i;
-
-	for (i = 0; i < parts.length; i++) {
-		if (typeof parent[parts[i]] === 'undefined') {
-			parent[parts[i]] = {};
-		}
-
-		parent = parent[parts[i]];
-	}
-
-	return parent;
-};
 
 ZABBIX.namespace('classes.Observer');
 
@@ -647,7 +630,7 @@ ZABBIX.apps.map = (function($) {
 					event.preventDefault();
 					event.stopPropagation();
 
-					// Recreate menu everytime due copy/paste function availability changes.
+					// Recreate menu every time due copy/paste function availability changes.
 					if (item_data.popupid) {
 						$('#' + item_data.popupid).filter('.menu-popup').remove();
 					}
@@ -1523,9 +1506,6 @@ ZABBIX.apps.map = (function($) {
 
 						$('#link-connect-to').show();
 						this.form.show();
-
-						// resize multiselect
-						$('.multiselect').multiSelect('resize');
 					}
 
 					// only one shape is selected
@@ -2349,7 +2329,10 @@ ZABBIX.apps.map = (function($) {
 					this.data.inherited_label = null;
 				}
 
-				if (this.data.label_type == CMap.LABEL_TYPE_NAME) {
+				if (this.data.label_type == CMap.LABEL_TYPE_LABEL) {
+					this.data.inherited_label = this.data.label;
+				}
+				else if (this.data.label_type == CMap.LABEL_TYPE_NAME) {
 					if (this.data.elementtype != Selement.TYPE_IMAGE) {
 						this.data.inherited_label = this.data.elements[0].elementName;
 					}
@@ -2541,7 +2524,7 @@ ZABBIX.apps.map = (function($) {
 			getDimensions: Shape.prototype.getDimensions,
 
 			/**
-			 * Updates element icon and height/witdh in case element is area type.
+			 * Updates element icon and height/width in case element is area type.
 			 */
 			updateIcon: function() {
 				var oldIconClass = this.domNode.get(0).className.match(/sysmap_iconid_\d+/);
@@ -2939,10 +2922,10 @@ ZABBIX.apps.map = (function($) {
 				switch (selement.elementtype) {
 					// host
 					case '0':
-						$('#elementNameHost').multiSelect('addData', {
+						$('#elementNameHost').multiSelect('addData', [{
 							'id': selement.elements[0].hostid,
 							'name': selement.elements[0].elementName
-						});
+						}]);
 						break;
 
 					// map
@@ -2964,10 +2947,10 @@ ZABBIX.apps.map = (function($) {
 
 					// host group
 					case '3':
-						$('#elementNameHostGroup').multiSelect('addData', {
+						$('#elementNameHostGroup').multiSelect('addData', [{
 							'id': selement.elements[0].groupid,
 							'name': selement.elements[0].elementName
-						});
+						}]);
 						break;
 				}
 			},
