@@ -86,9 +86,6 @@ int glb_load_history_module(char *history_module) {
 	//there are three steps to make a new module:
 	//1. - call init so the the module will parse it's data and return pointer to it
 	//2. - register api callbacks (this is what the module will do during the load)
-	//3. - 
-	
-	
 
 	//parsing some common vars
 	if (NULL != strstr(history_module,"clickhouse")) 
@@ -169,8 +166,6 @@ void zbx_history_destroy(void)
 	int	j,  ret = SUCCEED;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-
-	//sending everyone the agregated data 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_DESTROY]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_DESTROY]->values[j];
@@ -280,8 +275,6 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
 {
 	int			j, ret;
 
-
-
 	//whoever first gets the data, it's rusult is used 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
 
@@ -313,8 +306,7 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
 //i believe that all metric storage systems has 
 //data aggregation built in on it's own
 //however it's always nice to have a possibility to have 
-//a way to
-
+//a way to write a trends
 int	zbx_history_requires_trends(int value_type)
 {
 //	zbx_history_iface_t	*writer = &history_ifaces[value_type];

@@ -160,6 +160,9 @@ static int	clickhouse_get_agg_values(void *data, int value_type, zbx_uint64_t it
     char *field_name="value";
 	
 
+	if (0 == conf->read_aggregate_types[value_type])	
+			return SUCCEED;
+
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
 	if (end < start || aggregates <1 ) {
@@ -306,6 +309,9 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	
+	if (0 == conf->read_types[value_type])	
+			return SUCCEED;
 
     bzero(&page_r,sizeof(zbx_httppage_t));
 
@@ -714,7 +720,6 @@ static int clickhouse_preload_values(void *data) {
 	size_t q_len = 0, q_offset = 0;
 	int value_type;
 		
-
 	if (conf->preload_values > 0 ) {
 		
 		zabbix_log(LOG_LEVEL_INFORMATION,"Prefetching items to value cache");

@@ -23,6 +23,7 @@ extern int CONFIG_TIMEOUT;
 //as they'll be more universal (perhaps, will use unix domains or tcp addr for 
 //communitcation, then they could be global
 //int zbx_dc_add_ext_worker(char *path, char *params, int max_calls, int timeout, int mode_to_writer, int mode_from_writer);
+static zbx_hashset_t *workers=NULL;
 
 static int get_worker_mode(char *mode) {
     if (!strcmp(mode,"new_line")) return GLB_WORKER_MODE_NEWLINE;
@@ -114,14 +115,30 @@ DC_EXT_WORKER *glb_init_worker(char *config_line)
     return worker;
 }
 
+zbx_hash_t glb_worker_hash_func(const void * data) {
+    DC_EXT_WORKER *w = (DC_EXT_WORKER *)data;
+    return  ZBX_DEFAULT_STRING_HASH_ALGO(w->path, strlen((const char *)w->path), ZBX_DEFAULT_HASH_SEED);
+}
+
+
+int	glb_worker_compare_func(const void *d1, const void *d2) {
+    DC_EXT_WORKER *w1=(DC_EXT_WORKER *)d1,*w2=(DC_EXT_WORKER *)d2;
+
+    return strcmp(w1->path, w2->path);
+}
 
 int glb_init_external_workers(char **workers_cfg, char *scriptdir) {
     char	**worker_cfg;
 	int	ret = SUCCEED;
-
+    DC_EXT_WORKER *worker;
+    
     zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
     zabbix_log(LOG_LEVEL_INFORMATION,"Doing workers init");
 
+    if (NULL == (workers=zbx_malloc(NULL,sizeof(zbx_hashset_t)))) 
+            return FAIL;
+    
+    zbx_hashset_create(workers,5, glb_worker_hash_func, glb_worker_compare_func);
     
 	if (NULL == *workers_cfg)
 		goto out;
@@ -130,10 +147,14 @@ int glb_init_external_workers(char **workers_cfg, char *scriptdir) {
 	{
         zabbix_log(LOG_LEVEL_INFORMATION,"Init worker cfg %s",*worker_cfg);
 
-		if (NULL == glb_init_worker(*worker_cfg)) {
+		if (NULL == (worker = glb_init_worker(*worker_cfg))) {
 			goto out;
             ret = FAIL;
-        }
+        } 
+        zabbix_log(LOG_LEVEL_INFORMATION,"Created worker %s",worker->path);
+        //adding worker to the hash
+        zbx_hashset_insert(workers,worker,sizeof(DC_EXT_WORKER));
+        zabbix_log(LOG_LEVEL_INFORMATION,"Worker %s dded to the hash of workers",worker->path);
 	}
     ret = SUCCEED;
 out:
@@ -289,6 +310,11 @@ static int worker_cleanup (DC_EXT_WORKER *worker) {
     //restore the flags
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
 
+}
+
+DC_EXT_WORKER* glb_get_worker_script(char *cmd){
+    
+    return zbx_hashset_search(workers, cmd);
 }
 
 int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char **responce) {

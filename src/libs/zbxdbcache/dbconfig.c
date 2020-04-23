@@ -343,6 +343,9 @@ static zbx_uint64_t	get_item_nextcheck_seed(zbx_uint64_t itemid, zbx_uint64_t in
 	{
 		ZBX_DC_INTERFACE	*interface;
 
+		if (CONFIG_ASYNC_SNMP_POLLER_FORKS > 0) 		
+			return interfaceid;
+
 		if (NULL == (interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &interfaceid)) ||
 				SNMP_BULK_ENABLED != interface->bulk)
 		{
@@ -362,6 +365,10 @@ static zbx_uint64_t	get_item_nextcheck_seed(zbx_uint64_t itemid, zbx_uint64_t in
 		}
 	}
 	
+	if ( ITEM_TYPE_ZABBIX == type && CONFIG_ASYNC_AGENT_POLLER_CONNS > 0 ) {
+		return interfaceid;
+	}
+
 	return itemid;
 }
 
@@ -388,7 +395,8 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_HOST *host, u
 		return SUCCEED;	/* avoid unnecessary nextcheck updates when syncing items in cache */
 	}
 
-	//seed = get_item_nextcheck_seed(item->itemid, item->interfaceid, item->type, item->key);
+	seed = get_item_nextcheck_seed(item->itemid, item->interfaceid, item->type, item->key);
+	//if (CONFIG_ASYNC_SNMP_POLLER_FORKS)
 	seed=item->hostid;
 
 	/* for new items, supported items and items that are notsupported due to invalid update interval try to parse */

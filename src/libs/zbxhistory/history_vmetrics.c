@@ -161,6 +161,9 @@ static int vmetrics_get_agg_values(void *data, int value_type, zbx_uint64_t item
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
+	if (0 == conf->read_aggregate_types[value_type])	
+			return SUCCEED;
+	
 	if (CONFIG_DEBUG_ITEM == itemid)
 		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: %ld at %s:requesting average history data from %d to %d count is %d",
 				   itemid, __func__, start, end, count);
@@ -528,7 +531,10 @@ static int vmetrics_get_values(void *data, int value_type, zbx_uint64_t itemid, 
 	int step;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
-
+	
+	if (0 == conf->read_types[value_type])	
+			return SUCCEED;
+	
 	bzero(&page_r, sizeof(zbx_httppage_t));
 
 	if (NULL == (handle = curl_easy_init()))

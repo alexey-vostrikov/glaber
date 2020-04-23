@@ -47,7 +47,7 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 	size_t		cmd_alloc = ZBX_KIBIBYTE, cmd_offset = 0;
 	int		i, ret = NOTSUPPORTED;
 	AGENT_REQUEST	request;
-	DC_EXT_WORKER worker;
+	DC_EXT_WORKER *worker=NULL;
 
 	bzero(&worker,sizeof(DC_EXT_WORKER));
 
@@ -70,9 +70,8 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 		goto out;
 	}
 	
-	//trying to acquire a worker for the cmd
-	//zbx_dc_get_ext_worker(&worker,cmd);
-
+	//lets try to find a worker for the cmd
+	worker=glb_get_worker_script(cmd);
 
 	for (i = 0; i < get_rparams_num(&request); i++)
 	{
@@ -87,26 +86,22 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 	}
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "EXEC: runnig external cmd %s",cmd);
-//so far it's unlcear how to determine of it's a runner or a usual command
-//now i see no reason to keep that info in the  global config
-//so some mechanics should determine if cmd is a runner or if it is a usual command
-//probably by parsing "workers" configuration
-//or by some other setting of the item's key (best)
-
-//	if (worker.workerid > 0 ) {
-//			zabbix_log(LOG_LEVEL_INFORMATION, "EXEC: will use WORKER for that");
+	
+	//if we have a worker, let's run it!
+	if ( NULL != worker )  {
+			zabbix_log(LOG_LEVEL_INFORMATION, "EXEC: will use WORKER for that");
 			//adding trailing newline for the worker
-//			zbx_snprintf_alloc(&cmd, &cmd_alloc, &cmd_offset, "\n");
-//			if (SUCCEED == glb_process_worker_request(&worker, cmd, &buf)) {
-//				zbx_rtrim(buf, ZBX_WHITESPACE);
-//				set_result_type(result, ITEM_VALUE_TYPE_TEXT, buf);
-//			
-//				ret=SUCCEED;
-//			} else {
-//				SET_MSG_RESULT(result, zbx_strdup(NULL, error));		
-//			}
-//	} 
-//	else 
+			zbx_snprintf_alloc(&cmd, &cmd_alloc, &cmd_offset, "\n");
+			
+			if (SUCCEED == glb_process_worker_request(worker, cmd, &buf)) {
+				zbx_rtrim(buf, ZBX_WHITESPACE);
+				set_result_type(result, ITEM_VALUE_TYPE_TEXT, buf);
+				ret=SUCCEED;
+			} else {
+				SET_MSG_RESULT(result, zbx_strdup(NULL, error));		
+			}
+	} 
+	else 
 	if (SUCCEED == zbx_execute(cmd, &buf, error, sizeof(error), CONFIG_TIMEOUT, ZBX_EXIT_CODE_CHECKS_DISABLED))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "EXEC: will use fork+execv for that");

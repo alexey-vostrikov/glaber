@@ -105,6 +105,8 @@ static int	worker_get_agg_values(void *data, int value_type, zbx_uint64_t itemid
 	//creating the request
 	*buffer=NULL;
 
+	if (0 == conf->read_aggregate_types[value_type])	
+			return SUCCEED;
 	
 	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_aggregated\", \"itemid\":%d, \"start\": %d, \"steps\":%d, \"end\":%d }\n",
 				itemid,start,aggregates,end);
@@ -197,6 +199,8 @@ static int	worker_get_values(void *data, int value_type, zbx_uint64_t itemid, in
 	zbx_history_record_t	hr;
 	zbx_json_type_t type;
 	
+	if (0 == conf->read_types[value_type])	
+			return SUCCEED;
 	
 	//this isn't really nice idea since we might be getting some get_values from the zabbix frontend
 	if (time(NULL)- conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
@@ -305,8 +309,10 @@ static int	worker_add_values(void *data, const zbx_vector_ptr_t *history)
     for (i = 0; i < history->values_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)history->values[i];
-			
-		//if (hist->value_type != h->value_type)	
+	
+		if (0 == conf->write_types[h->value_type]) 
+			continue;
+	
 		if ( ITEM_VALUE_TYPE_LOG == h->value_type) continue;
 		glb_escape_worker_string(h->host_name,buffer);
 		

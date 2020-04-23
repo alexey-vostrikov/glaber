@@ -13,6 +13,8 @@ void glb_destroy_worker(DC_EXT_WORKER *runner);
 int glb_escape_worker_string(char *in_string, char *out_buffer);
 int glb_init_external_workers(char **workers_cfg, char *scriptdir);
 
+DC_EXT_WORKER* glb_get_worker_script(char *cmd);
+
 //this will not (yet) work as workers rely on FD which is different for each proc
 //zbx_uint64_t zbx_dc_get_ext_worker(DC_EXT_WORKER *worker, char *path);
 //int zbx_dc_add_ext_worker(char *path, char *params, int max_calls, int timeout, int mode_to_writer, int mode_from_writer);
