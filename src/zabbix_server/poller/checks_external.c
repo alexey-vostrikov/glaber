@@ -71,7 +71,7 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 	}
 	
 	//lets try to find a worker for the cmd
-	worker=glb_get_worker_script(cmd);
+	//worker=glb_get_worker_script(cmd);
 
 	for (i = 0; i < get_rparams_num(&request); i++)
 	{
