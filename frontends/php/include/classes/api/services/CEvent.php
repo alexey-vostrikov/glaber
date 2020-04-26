@@ -1,6 +1,5 @@
 <?php
-/*
-** Zabbix
+/** Zabbix
 ** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -442,14 +441,14 @@ class CEvent extends CApiService {
 		}
 
 		// eventid_from
-		if ($options['eventid_from'] !== null) {
-			$sqlParts['where'][] = 'e.eventid>='.zbx_dbstr($options['eventid_from']);
-		}
+		//if ($options['eventid_from'] !== null) {
+		//	$sqlParts['where'][] = 'e.eventid>='.zbx_dbstr($options['eventid_from']);
+		//}
 
 		// eventid_till
-		if ($options['eventid_till'] !== null) {
-			$sqlParts['where'][] = 'e.eventid<='.zbx_dbstr($options['eventid_till']);
-		}
+		//if ($options['eventid_till'] !== null) {
+		//	$sqlParts['where'][] = 'e.eventid<='.zbx_dbstr($options['eventid_till']);
+		//}
 
 		// value
 		if ($options['value'] !== null) {

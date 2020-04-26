@@ -2420,7 +2420,7 @@ static int start_snmp_connections(struct async_snmp_session *session) {
 	session->sess->callback = asynch_response;
 	session->sess->callback_magic = session;
 	session->current_item=item_idx;
-	session->stop_time = time(NULL) + 1;//CONFIG_TIMEOUT;
+	session->stop_time = time(NULL) + CONFIG_TIMEOUT;
 	session->state=POLL_POLLING;
 	
 	if (CONFIG_DEBUG_ITEM == conf.items[item_idx].itemid) 
@@ -2471,7 +2471,6 @@ int get_values_snmp_async()
 	AGENT_RESULT* results = conf.results;
 	struct list_item* litem;
 	
-	//if (GLB_ASYNC_POLLING_RUNNING == mode) {
 	//stage 0 adding newly added items to the list of their connections
 	for (i = 0; i < conf.max_items; i++) {
 		if ( POLL_PREPARED == conf.errcodes[i]) {
@@ -2484,7 +2483,7 @@ int get_values_snmp_async()
 	}
 	
 
-	//this is sort of a lifehack - this way i can clean snmp garbage
+	//this is sort of a lifehack - this way i can clean snmp garbage once in a while
 	if ( roll++ > GLB_ASYNC_POLLING_MAX_ITERATIONS) {
 		int cnt=0;
 		//we'll now drop all the sessions and connections to clean up snmp memory.
@@ -2503,9 +2502,8 @@ int get_values_snmp_async()
 			roll=0;
 		}
 		zabbix_log(LOG_LEVEL_INFORMATION,"Doing SNMP reset \n");
-		//now cleaning evth what's left
+		
 		snmp_close_sessions();
-		//and doing reinit
 		zbx_shutdown_snmp();
 		zbx_init_snmp();
 	}

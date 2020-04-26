@@ -1142,10 +1142,10 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 	
-	if (FAIL == glb_init_external_workers(CONFIG_EXT_WORKERS, CONFIG_EXTERNALSCRIPTS)) {
-		zabbix_log(LOG_LEVEL_CRIT, "Init external workers has failed, exiting...");
-		exit(EXIT_FAILURE);
-	}
+//d	if (FAIL == glb_init_external_workers(CONFIG_EXT_WORKERS, CONFIG_EXTERNALSCRIPTS)) {
+//		zabbix_log(LOG_LEVEL_CRIT, "Init external workers has failed, exiting...");
+//		exit(EXIT_FAILURE);
+//	}
 	
 	zbx_free_config();
 	

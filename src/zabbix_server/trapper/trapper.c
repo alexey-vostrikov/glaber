@@ -51,6 +51,8 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type);
 char *zbx_dc_get_topology();
 void zbx_dc_register_proxy_availability(u_int64_t hostid);
 
+int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
+
 #define ZBX_MAX_SECTION_ENTRIES		4
 #define ZBX_MAX_ENTRY_ATTRIBUTES	3
 
@@ -1009,85 +1011,38 @@ static int recv_getlastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	char limit_str[MAX_ID_LEN],period_str[MAX_ID_LEN];
 	int period, limit;
 	struct zbx_json_parse jp_items;
+	
 	zbx_vector_history_record_t values;
+	zbx_vector_uint64_t itemids;
+
 	struct zbx_json		json;
 	zbx_json_type_t type;
-	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	
 
 	zabbix_log(LOG_LEVEL_DEBUG,"%s: start",__func__);
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s: got request: %s", __func__, jp->start);
 	
-	//need to exec get_values for all the data
-	//zbx_vc_get_values(itemid, value_type, values, period, limit,  )
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
-	if ( SUCCEED != zbx_json_value_by_name(jp,"period" , period_str, MAX_ID_LEN,&type) ||
-		 SUCCEED != zbx_json_value_by_name(jp, "limit", limit_str, MAX_STRING_LEN,&type) ) {	
-		zabbix_log(LOG_LEVEL_WARNING,"%s: caanot process request some params are mising (period,limit)",__func__);
-		goto out;
-	}
-	
-	limit=strtol(limit_str,NULL,10);
-	period=strtol(period_str,NULL,10);
-	
 	zbx_timespec_t ts;
 	ts.sec=time(NULL);
 	ts.ns=0;
 
-	zabbix_log(LOG_LEVEL_DEBUG,"%s: parsed period:%d, limit:%d",__func__,period,limit);
-
 	if (SUCCEED == zbx_json_brackets_by_name(jp, "itemids", &jp_items))
 	{
+		zbx_vector_uint64_create(&itemids);
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
-		zbx_json_addobject(&json,ZBX_PROTO_TAG_DATA);
-	
+		
 		while (NULL != (p = zbx_json_next(&jp_items, p))) {
 			
 			zbx_uint64_t itemid=strtol(p+1,NULL,10);
-			char tmp_buf[MAX_ID_LEN];
-
-			int value_type,i;
-			char buffer[MAX_STRING_LEN];
-
-			if (FAIL == zbx_dc_get_item_type(itemid,&value_type) ) {
-				continue;
-			}
-	
-			//zabbix_log(LOG_LEVEL_INFORMATION, "Parced id %ld",itemid);
-			zbx_vector_history_record_create(&values);
-
-			if (SUCCEED == zbx_vc_get_cached_values(itemid, &values, period, limit, &ts) && values.values_num > 0) {
-				
-				//zabbix_log(LOG_LEVEL_INFORMATION,"Got %d values",values.values_num);
-				
-				zbx_snprintf(tmp_buf,MAX_ID_LEN,"%ld",itemid);
-				zbx_json_addarray(&json,tmp_buf);
-		
-				for (i=0; i< values.values_num; i++) {
-					zbx_json_addobject(&json,NULL);
-					
-					zbx_snprintf(tmp_buf,MAX_ID_LEN,"%ld",itemid);
-					zbx_json_addstring(&json,"itemid",tmp_buf,ZBX_JSON_TYPE_STRING);
-
-					zbx_snprintf(tmp_buf,MAX_ID_LEN,"%ld",values.values[i].timestamp.sec);
-					zbx_json_addstring(&json,"clock",tmp_buf,ZBX_JSON_TYPE_STRING);
-
-					zbx_snprintf(tmp_buf,MAX_ID_LEN,"%ld",values.values[i].timestamp.ns);
-					zbx_json_addstring(&json,"ns",tmp_buf,ZBX_JSON_TYPE_STRING);
-					
-					zbx_history_value2str(buffer,MAX_STRING_LEN,&values.values[i].value,value_type);
-					zbx_json_addstring(&json,"value",buffer,ZBX_JSON_TYPE_STRING);
-
-					zbx_json_close(&json);
-				}
-
-				zbx_json_close(&json);		
-			}  
-			
-			zbx_history_record_vector_destroy(&values, value_type);
-		
+			zbx_vector_uint64_append(&itemids,itemid);
 		}
-		zbx_json_close(&json);
-		
+
+		ret = glb_dc_get_lastvalues_json(&itemids, &json);
+
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "Resulting last values json is %s",json.buffer);
+		zbx_vector_uint64_destroy(&itemids);
+
 		ret = SUCCEED;
 	} else {
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
@@ -1098,7 +1053,7 @@ out:
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);
-	return 1;
+	return ret;
 }
 
 /******************************************************************************

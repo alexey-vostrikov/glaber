@@ -49,8 +49,6 @@ int	get_value_external(DC_ITEM *item, AGENT_RESULT *result)
 	AGENT_REQUEST	request;
 	DC_EXT_WORKER *worker=NULL;
 
-	bzero(&worker,sizeof(DC_EXT_WORKER));
-
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s'", __func__, item->key);
 
 	init_request(&request);

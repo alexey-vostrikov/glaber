@@ -117,7 +117,7 @@ ZBX_DC_CACHE;
 static ZBX_DC_CACHE	*cache = NULL;
 
 /* local history cache */
-#define ZBX_MAX_VALUES_LOCAL	256
+#define ZBX_MAX_VALUES_LOCAL	1024*1024
 #define ZBX_STRUCT_REALLOC_STEP	8
 #define ZBX_STRING_REALLOC_STEP	ZBX_KIBIBYTE
 
@@ -1935,6 +1935,7 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 	diff->itemid = item->itemid;
 	diff->lastclock = h->ts.sec;
 	diff->flags = flags;
+	diff->value = h->value;
 
 	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE & flags))
 		diff->lastlogsize = h->lastlogsize;

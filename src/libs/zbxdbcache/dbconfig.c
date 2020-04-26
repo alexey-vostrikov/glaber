@@ -2575,6 +2575,18 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->poller_type = ZBX_NO_POLLER;
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->schedulable = 1;
+			
+			
+			
+			if (ITEM_VALUE_TYPE_STR == value_type || ITEM_VALUE_TYPE_TEXT == value_type)
+				DCstrpool_replace(found, (const char **)&item->lastvalue.str, "");
+			else 
+				bzero((void *)&item->lastvalue,sizeof(history_value_t));
+
+			
+			item->change=0;
+			item->lastclock=0;
+
 		}
 		else
 		{
@@ -11964,6 +11976,33 @@ void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
 
 		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK & diff->flags))
 			dc_item->lastclock = diff->lastclock;
+		
+		switch (dc_item->value_type){
+			case ITEM_VALUE_TYPE_FLOAT:
+				if (dc_item->lastvalue.dbl !=0 && 
+					0 == (ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR & diff->flags) ) dc_item->change = ((diff->value.dbl - dc_item->lastvalue.dbl)/dc_item->lastvalue.dbl)*100;
+				else dc_item->change=0;
+
+				dc_item->lastvalue.dbl=diff->value.dbl;
+				break;
+			case ITEM_VALUE_TYPE_STR:
+			case ITEM_VALUE_TYPE_TEXT:
+				
+				//if (NULL != dc_item->lastvalue.str) 
+					DCstrpool_replace(1, (const char **)&dc_item->lastvalue.str, diff->value.str);
+				//else 	
+				//	DCstrpool_replace(0, (const char **)&dc_item->lastvalue.str, diff->value.str);
+
+				dc_item->change=0;
+				break;
+			case ITEM_VALUE_TYPE_UINT64:
+				if (dc_item->lastvalue.ui64 !=0 &&  0 == (ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR & diff->flags) ) dc_item->change = ((diff->value.ui64 - dc_item->lastvalue.ui64)/dc_item->lastvalue.ui64)*100;
+				else dc_item->change=0;
+
+				dc_item->lastvalue.ui64=diff->value.ui64;
+
+		}
+		zabbix_log(LOG_LEVEL_DEBUG,"Updated host's %ld item %ld",dc_item->hostid, dc_item->itemid);		
 	}
 
 	UNLOCK_CACHE;
@@ -13807,27 +13846,58 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) {
 	UNLOCK_CACHE;
 	return ret;
 }
-/*
-int glb_dc_get_item_host_data(zbx_uint64_t itemid, DC_ITEM *item) {
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_dc_get_lastvalues_json                                       *
+ *                                                                            *
+ * Purpose: generates json object holding all lastvalues from the requested   *
+ * 			itemids															  *
+ * 		data[{"itemid":1234,"lastclock":2342343,"change":45.3,"value":234},   *
+ * 			{....}, ]														  *
+ *                                                                            *
+ ******************************************************************************/
+int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json) {
 	
-	ZBX_DC_ITEM *cfg_item;
-	ZBX_DC_HOST	*cfg_host;
-	int ret=FAIL;
+	ZBX_DC_ITEM *item;
+	int i;
+	
+	ZBX_DC_HISTORY	hr;
 
 	RDLOCK_CACHE;
 	
-	if (NULL != (cfg_item=zbx_hashset_search(&config->items,&itemid))) {
-		//looking for the host
-		if (NULL != (cfg_host=zbx_hashset_search(&config->hosts,&cfg_item->hostid))) {
-			DCget_host(&item->host, cfg_host);
-			DCget_item(item, cfg_item);
-			ret = SUCCEED;
+	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
+
+	for (i=0; i<itemids->values_num; i++) {
+		if ( 
+			(NULL != (item=zbx_hashset_search(&config->items,&itemids->values[i]))) && 
+			(item->lastclock > 0)) {
+			zbx_json_addobject(json,NULL);
+
+			zbx_json_adduint64(json,"itemid",item->itemid);
+			zbx_json_adduint64(json,"lastclock",item->lastclock);
+			zbx_json_addint64(json,"change",(int)item->change);
+			zbx_json_addstring(json,"error",item->error,ZBX_JSON_TYPE_STRING);
+
+			switch	( item->value_type ) {
+				case ITEM_VALUE_TYPE_UINT64:
+					zbx_json_adduint64(json,"value",item->lastvalue.ui64);
+					break;
+				case ITEM_VALUE_TYPE_TEXT:
+				case ITEM_VALUE_TYPE_STR:
+					zbx_json_addstring(json,"value",item->lastvalue.str,ZBX_JSON_TYPE_STRING);
+					break;
+				case ITEM_VALUE_TYPE_FLOAT:
+					zbx_json_addfloat(json,"value",item->lastvalue.dbl);
+					break;
+			}	
+			
+			zbx_json_close(json);
 		}
-	}
-
+	}	
+	zbx_json_close(json);
 	UNLOCK_CACHE;
-	return ret;
+
+	return SUCCEED;
 }
-
-
-}*/

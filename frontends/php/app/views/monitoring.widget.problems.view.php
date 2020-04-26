@@ -184,10 +184,25 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 		}
 	}
 
-	$problem_link = [
-		(new CLinkAction($problem['name']))
-			->setHint(
-				make_popup_eventlist(['comments' => $problem['comments'], 'url' => $problem['url'],
+
+	if ($disable_problems_popups == '1') {
+		$problem_link = [
+			(new CLinkAction($problem['name']))
+				->setHint("Popups disabled for speed" . $disable_problems_popups
+	#			make_popup_eventlist(['comments' => $problem['comments'], 'url' => $problem['url'],
+	#				'triggerid' => $trigger['triggerid']], $eventid, $backurl, $show_timeline,
+	#				$data['fields']['show_tags'], $data['fields']['tags'], $data['fields']['tag_name_format'],
+	#				$data['fields']['tag_priority']
+	#			)
+			)
+			->setAttribute('aria-label', _xs('%1$s, Severity, %2$s', 'screen reader',
+				$problem['name'], getSeverityName($problem['severity'], $data['config'])
+			))
+		]; 
+	} else {
+		$problem_link = [
+			(new CLinkAction($problem['name']))
+				->setHint(make_popup_eventlist(['comments' => $problem['comments'], 'url' => $problem['url'],
 					'triggerid' => $trigger['triggerid']], $eventid, $backurl, $show_timeline,
 					$data['fields']['show_tags'], $data['fields']['tags'], $data['fields']['tag_name_format'],
 					$data['fields']['tag_priority']
@@ -195,8 +210,9 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 			)
 			->setAttribute('aria-label', _xs('%1$s, Severity, %2$s', 'screen reader',
 				$problem['name'], getSeverityName($problem['severity'], $data['config'])
-			))
-	];
+			)) ];
+	}
+
 
 	if ($show_opdata == OPERATIONAL_DATA_SHOW_WITH_PROBLEM && $opdata) {
 		$problem_link = array_merge($problem_link, [' (', $opdata, ')']);

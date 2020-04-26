@@ -17,7 +17,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-define('GLABER_VERSION', '1.2.0');
+define('GLABER_VERSION', '1.2.2');
 define('ZABBIX_VERSION',		'4.4.7');
 define('ZABBIX_API_VERSION',	'4.4.7');
 define('ZABBIX_EXPORT_VERSION',	'4.4');
@@ -1422,7 +1422,7 @@ define('WIDGET_SIMPLE_ITEM',	0);
 define('WIDGET_DYNAMIC_ITEM',	1);
 
 // widget defaults
-define('ZBX_WIDGET_ROWS', 20);
+define('ZBX_WIDGET_ROWS', 400);
 
 // widget field types
 define('ZBX_WIDGET_FIELD_TYPE_INT32',			0);

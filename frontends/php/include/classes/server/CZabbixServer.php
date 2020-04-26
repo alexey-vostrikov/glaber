@@ -454,7 +454,7 @@ class CZabbixServer {
 		$response = CJs::decodeJson(substr($response, ZBX_TCP_HEADER_LEN + ZBX_TCP_DATALEN_LEN));
 
 		if (!$response || !$this->normalizeResponse($response)) {
-			$this->error = _s('Incorrect response received from Zabbix server111 "%1$s".', $this->host);
+			$this->error = _s('Incorrect response received from Zabbix server, cannot parse JSON from the server "%1$s".', $this->host);
 
 			return false;
 		}

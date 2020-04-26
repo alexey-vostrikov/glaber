@@ -2595,61 +2595,6 @@ int	zbx_vc_add_values(zbx_vector_ptr_t *history)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vc_get_cacched values                                         *
- *                                                                            *
- * Purpose: get item history data for the specified time period from 
- *  the value cache 													       *
- *                                                                            *
- * Parameters: itemid     - [IN] the item id                                  *
- *             value_type - [IN] the item value type                          *
- *             values     - [OUT] the item history data stored time/value     *
- *                          pairs in descending order                         *
- *             seconds    - [IN] the time period to retrieve data for         *
- *             count      - [IN] the number of history values to retrieve     *
- *             ts         - [IN] the period end timestamp                     *
- *                                                                            *
- * Return value:  SUCCEED - the item history data was retrieved successfully  *
- *                FAIL    - the item history data was not retrieved           *
- *                                                                            *
- * Comments: If the data is not in cache, it's not read from DB, so this function *
- *           will only return the requested data if it's already in vc
- *                                                                            *
- *           If <count> is set then value range is defined as <count> values  *
- *           before <timestamp>. Otherwise the range is defined as <seconds>  *
- *           seconds before <timestamp>.                                      *
- *                                                                            *
- ******************************************************************************/
-
-
-int zbx_vc_get_cached_values(zbx_uint64_t itemid, zbx_vector_history_record_t *values, int seconds,
-		int count, const zbx_timespec_t *ts) {
-
-	zbx_vc_item_t	*item = NULL;
-	int 		ret = FAIL;
-	
-	vc_try_lock();
-
-	if (ZBX_VC_DISABLED == vc_state){
-		goto out;
-	}
-	if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache->items, &itemid))) {
-		zabbix_log(LOG_LEVEL_DEBUG,"%s: No item %ld in VC yet",__func__,itemid);
-		goto out;
-	}
-	
-	vch_item_get_values_by_time_and_count(item,values,seconds, count, ts);
-	
-	ret = SUCCEED;
-out:
-	vc_try_unlock();
-	zabbix_log(LOG_LEVEL_DEBUG,"%s: ending",__func__);
-	return ret;
-
-}
-
-
-/******************************************************************************
- *                                                                            *
  * Function: zbx_vc_get_values                                                *
  *                                                                            *
  * Purpose: get item history data for the specified time period               *

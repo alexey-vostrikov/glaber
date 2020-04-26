@@ -75,7 +75,7 @@ require_once dirname(__FILE__).'/include/views/js/monitoring.latest.js.php';
  */
 if (hasRequest('filter_set')) {
 	CProfile::update('web.latest.filter.select', getRequest('select', ''), PROFILE_TYPE_STR);
-	CProfile::update('web.latest.filter.show_without_data', getRequest('show_without_data', 0), PROFILE_TYPE_INT);
+	CProfile::update('web.latest.filter.show_without_data', getRequest('show_without_data', 1), PROFILE_TYPE_INT);
 	CProfile::update('web.latest.filter.show_details', getRequest('show_details', 0), PROFILE_TYPE_INT);
 	CProfile::update('web.latest.filter.application', getRequest('application', ''), PROFILE_TYPE_STR);
 	CProfile::updateArray('web.latest.filter.groupids', getRequest('groupids', []), PROFILE_TYPE_STR);
@@ -237,7 +237,7 @@ if ($items) {
 	if ($items) {
 		// get history
 		$history = Manager::History()->getLastValues($items, 2, ZBX_HISTORY_PERIOD);
-
+		
 		// filter items without history
 		if (!$filter['showWithoutData']) {
 			foreach ($items as $key => $item) {
@@ -252,7 +252,7 @@ if ($items) {
 		// add item last update date for sorting
 		foreach ($items as &$item) {
 			if (isset($history[$item['itemid']])) {
-				$item['lastclock'] = $history[$item['itemid']][0]['clock'];
+				$item['lastclock'] = $history[$item['itemid']]['lastclock'];
 			}
 		}
 		unset($item);
@@ -491,9 +491,8 @@ foreach ($items as $key => $item) {
 		continue;
 	}
 
-	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
-	$prevHistory = isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
-
+	$lastHistory = isset($history[$item['itemid']]) ? $history[$item['itemid']] : null;
+	
 	if (strpos($item['units'], ',') !== false) {
 		list($item['units'], $item['unitsLong']) = explode(',', $item['units']);
 	}
@@ -503,8 +502,8 @@ foreach ($items as $key => $item) {
 
 	// last check time and last value
 	if ($lastHistory) {
-		$lastClock = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
-		$lastValue = formatHistoryValue($lastHistory['value'], $item, false);
+		$lastClock = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['lastclock']);
+		$lastValue = empty($lastHistory['error']) ? formatHistoryValue($lastHistory['value'], $item, false) : '<error>';
 	}
 	else {
 		$lastClock = UNKNOWN_VALUE;
@@ -513,18 +512,18 @@ foreach ($items as $key => $item) {
 
 	// change
 	$digits = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) ? ZBX_UNITS_ROUNDOFF_MIDDLE_LIMIT : 0;
-	if ($lastHistory && $prevHistory
-			&& ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64)
-			&& (bcsub($lastHistory['value'], $prevHistory['value'], $digits) != 0)) {
+	
+	if ($lastHistory && ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64)
+			&& (round($lastHistory['change'], $digits) != 0) && empty($lastHistory['error']))  {
 
 		$change = '';
-		if (($lastHistory['value'] - $prevHistory['value']) > 0) {
+		if (($lastHistory['change'] ) > 0) {
 			$change = '+';
 		}
 
 		// for 'unixtime' change should be calculated as uptime
 		$change .= convert_units([
-			'value' => bcsub($lastHistory['value'], $prevHistory['value'], $digits),
+			'value' => round($lastHistory['value'], $digits),
 			'units' => $item['units'] == 'unixtime' ? 'uptime' : $item['units']
 		]);
 	}
@@ -552,7 +551,7 @@ foreach ($items as $key => $item) {
 		($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null
 	]))->addClass('action-container');
 
-	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
+	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_RED : null;
 
 	if ($filter['showDetails']) {
 		// item key
@@ -563,8 +562,8 @@ foreach ($items as $key => $item) {
 				->addClass(ZBX_STYLE_GREEN);
 
 		$info_icons = [];
-		if ($item['status'] == ITEM_STATUS_ACTIVE && $item['error'] !== '') {
-			$info_icons[] = makeErrorIcon($item['error']);
+		if ($itm['status'] == ITEM_STATUS_ACTIVE && !empty($lastHistory['error']) ) {
+			$info_icons[] = makeErrorIcon($lastHistory['error']);
 		}
 
 		$row = new CRow([
@@ -584,6 +583,13 @@ foreach ($items as $key => $item) {
 		]);
 	}
 	else {
+		
+		$info_icons = [];
+		if ( !empty( $lastHistory['error'] ) ) {
+			$info_icons[] = makeErrorIcon($lastHistory['error']);
+			
+		}
+
 		$row = new CRow([
 			'',
 			$checkbox,
@@ -591,8 +597,10 @@ foreach ($items as $key => $item) {
 			(new CCol($item_name))->addClass($state_css),
 			(new CCol($lastClock))->addClass($state_css),
 			(new CCol($lastValue))->addClass($state_css),
+			makeInformationList($info_icons),
 			(new CCol($change))->addClass($state_css),
 			$actions
+			
 		]);
 	}
 
@@ -651,8 +659,8 @@ foreach ($applications as $appid => $dbApp) {
  */
 $tab_rows = [];
 foreach ($items as $item) {
-	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
-	$prevHistory = isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
+	$lastHistory = isset($history[$item['itemid']]) ? $history[$item['itemid']] : null;
+	
 
 	if (strpos($item['units'], ',') !== false)
 		list($item['units'], $item['unitsLong']) = explode(',', $item['units']);
@@ -661,8 +669,8 @@ foreach ($items as $item) {
 
 	// last check time and last value
 	if ($lastHistory) {
-		$lastClock = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
-		$lastValue = formatHistoryValue($lastHistory['value'], $item, false);
+		$lastClock = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['lastclock']);
+		$lastValue = empty($lastHistory['error']) ? formatHistoryValue($lastHistory['value'], $item, false) : $lastHistory['error'];
 	}
 	else {
 		$lastClock = UNKNOWN_VALUE;
@@ -671,18 +679,19 @@ foreach ($items as $item) {
 
 	// column "change"
 	$digits = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) ? ZBX_UNITS_ROUNDOFF_MIDDLE_LIMIT : 0;
-	if (isset($lastHistory['value']) && isset($prevHistory['value'])
+	if (isset($lastHistory['value']) 
 			&& ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64)
-			&& (bcsub($lastHistory['value'], $prevHistory['value'], $digits) != 0)) {
+			&& (round($lastHistory['change'], $digits) != 0)
+			&& empty($lastHistory['error'])) {
 
 		$change = '';
-		if (($lastHistory['value'] - $prevHistory['value']) > 0) {
+		if (($lastHistory['change']) > 0) {
 			$change = '+';
 		}
 
 		// for 'unixtime' change should be calculated as uptime
 		$change .= convert_units([
-			'value' => bcsub($lastHistory['value'], $prevHistory['value'], $digits),
+			'value' => rount($lastHistory['change'], $digits),
 			'units' => $item['units'] == 'unixtime' ? 'uptime' : $item['units']
 		]);
 	}
@@ -721,8 +730,9 @@ foreach ($items as $item) {
 				->addClass(ZBX_STYLE_GREEN);
 
 		$info_icons = [];
-		if ($item['status'] == ITEM_STATUS_ACTIVE && $item['error'] !== '') {
-			$info_icons[] = makeErrorIcon($item['error']);
+
+		if ($itm['status'] == ITEM_STATUS_ACTIVE && !empty($lastHistory['error']) ) {
+			$info_icons[] = makeErrorIcon($lastHistory['error']);
 		}
 
 		$row = new CRow([
@@ -742,6 +752,12 @@ foreach ($items as $item) {
 		]);
 	}
 	else {
+		$info_icons = [];
+		if ( !empty($lastHistory['error']) ) {
+			error_log($lastHistory['error']);
+			$info_icons[] = makeErrorIcon($lastHistory['error']);
+		}
+
 		$row = new CRow([
 			'',
 			$checkbox,
@@ -750,7 +766,8 @@ foreach ($items as $item) {
 			(new CCol($lastClock))->addClass($state_css),
 			(new CCol($lastValue))->addClass($state_css),
 			(new CCol($change))->addClass($state_css),
-			$actions
+			$actions,
+			makeInformationList($info_icons)
 		]);
 	}
 
@@ -770,7 +787,7 @@ foreach ($hosts as $hostId => $dbHost) {
 
 	$hostName = (new CLinkAction($host['name']))->setMenuPopup(CMenuPopupHelper::getHost($hostId));
 	if ($host['status'] == HOST_STATUS_NOT_MONITORED) {
-		$hostName->addClass(ZBX_STYLE_RED);
+		$hostName->addClass(ZBX_STYLE_GREEN);
 	}
 
 	// add toggle row

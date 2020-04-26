@@ -745,7 +745,8 @@ typedef struct
 	int		mtime;
 	int		lastclock;
 	const char	*error;
-
+	history_value_t value;
+		
 	zbx_uint64_t	flags;
 #define ZBX_FLAGS_ITEM_DIFF_UNSET			__UINT64_C(0x0000)
 #define ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE		__UINT64_C(0x0001)

@@ -88,7 +88,7 @@ typedef struct
 	const char		*error;
 	const char		*delay;
 	ZBX_DC_TRIGGER		**triggers;
-	_Atomic int			nextcheck;
+	int			nextcheck;
 	int			lastclock;
 	int			mtime;
 	int			data_expected_from;
@@ -108,6 +108,8 @@ typedef struct
 	unsigned char		update_triggers;
 	zbx_uint64_t		templateid;
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
+	history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
+	double	change;
 }
 ZBX_DC_ITEM;
 
