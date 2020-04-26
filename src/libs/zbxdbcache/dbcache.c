@@ -2036,7 +2036,8 @@ static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
 		diff->state = history[i].state;
 		diff->lastclock = history[i].ts.sec;
 		diff->flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE | ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK;
-
+		diff->value = history[i].value;
+		
 		if (0 != (ZBX_DC_FLAG_META & history[i].flags))
 		{
 			diff->lastlogsize = history[i].lastlogsize;

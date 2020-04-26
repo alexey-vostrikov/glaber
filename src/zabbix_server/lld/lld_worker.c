@@ -140,6 +140,8 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		}
 	}
 
+	diff.value.str = value;
+
 	if (ZBX_FLAGS_ITEM_DIFF_UNSET != diff.flags)
 	{
 		zbx_vector_ptr_t	diffs;

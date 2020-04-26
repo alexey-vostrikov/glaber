@@ -2577,12 +2577,10 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->schedulable = 1;
 			
 			
-			
 			if (ITEM_VALUE_TYPE_STR == value_type || ITEM_VALUE_TYPE_TEXT == value_type)
 				DCstrpool_replace(found, (const char **)&item->lastvalue.str, "");
 			else 
 				bzero((void *)&item->lastvalue,sizeof(history_value_t));
-
 			
 			item->change=0;
 			item->lastclock=0;
