@@ -188,7 +188,7 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 	if ($disable_problems_popups == '1') {
 		$problem_link = [
 			(new CLinkAction($problem['name']))
-				->setHint("Popups disabled for speed" . $disable_problems_popups
+				->setHint("Popups disabled for speed"
 	#			make_popup_eventlist(['comments' => $problem['comments'], 'url' => $problem['url'],
 	#				'triggerid' => $trigger['triggerid']], $eventid, $backurl, $show_timeline,
 	#				$data['fields']['show_tags'], $data['fields']['tags'], $data['fields']['tag_name_format'],
