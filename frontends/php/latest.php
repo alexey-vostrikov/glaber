@@ -596,8 +596,7 @@ foreach ($items as $key => $item) {
 			'',
 			(new CCol($item_name))->addClass($state_css),
 			(new CCol($lastClock))->addClass($state_css),
-			(new CCol($lastValue))->addClass($state_css),
-			makeInformationList($info_icons),
+			( empty($lastHistory['error'])? (new CCol($lastValue))->addClass($state_css):	makeInformationList($info_icons)),
 			(new CCol($change))->addClass($state_css),
 			$actions
 			

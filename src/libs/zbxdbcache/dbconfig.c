@@ -11975,6 +11975,7 @@ void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
 		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK & diff->flags))
 			dc_item->lastclock = diff->lastclock;
 		
+		
 		switch (dc_item->value_type){
 			case ITEM_VALUE_TYPE_FLOAT:
 				if (dc_item->lastvalue.dbl !=0 && 
