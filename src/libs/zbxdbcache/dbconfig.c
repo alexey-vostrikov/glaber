@@ -2580,9 +2580,9 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			if (ITEM_VALUE_TYPE_STR == value_type || ITEM_VALUE_TYPE_TEXT == value_type)
 				DCstrpool_replace(found, (const char **)&item->lastvalue.str, "");
 			else 
-				bzero((void *)&item->lastvalue,sizeof(history_value_t));
+				item->lastvalue.ui64=0;
 			
-			item->change=0;
+			item->prevvalue.ui64=0;
 			item->lastclock=0;
 
 		}
@@ -11975,33 +11975,20 @@ void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
 		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK & diff->flags))
 			dc_item->lastclock = diff->lastclock;
 		
-		
 		switch (dc_item->value_type){
 			case ITEM_VALUE_TYPE_FLOAT:
-				if (dc_item->lastvalue.dbl !=0 && 
-					0 == (ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR & diff->flags) ) dc_item->change = ((diff->value.dbl - dc_item->lastvalue.dbl)/dc_item->lastvalue.dbl)*100;
-				else dc_item->change=0;
-
-				dc_item->lastvalue.dbl=diff->value.dbl;
+			case ITEM_VALUE_TYPE_UINT64:
+				dc_item->prevvalue=dc_item->lastvalue;
+				dc_item->lastvalue=diff->value;
 				break;
+
 			case ITEM_VALUE_TYPE_STR:
 			case ITEM_VALUE_TYPE_TEXT:
-				
-				//if (NULL != dc_item->lastvalue.str) 
-					DCstrpool_replace(1, (const char **)&dc_item->lastvalue.str, diff->value.str);
-				//else 	
-				//	DCstrpool_replace(0, (const char **)&dc_item->lastvalue.str, diff->value.str);
-
-				dc_item->change=0;
+				DCstrpool_replace(1, (const char **)&dc_item->lastvalue.str, diff->value.str);
 				break;
-			case ITEM_VALUE_TYPE_UINT64:
-				if (dc_item->lastvalue.ui64 !=0 &&  0 == (ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR & diff->flags) ) dc_item->change = ((diff->value.ui64 - dc_item->lastvalue.ui64)/dc_item->lastvalue.ui64)*100;
-				else dc_item->change=0;
-
-				dc_item->lastvalue.ui64=diff->value.ui64;
-
+			
 		}
-		zabbix_log(LOG_LEVEL_DEBUG,"Updated host's %ld item %ld",dc_item->hostid, dc_item->itemid);		
+		
 	}
 
 	UNLOCK_CACHE;
@@ -13876,12 +13863,13 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 
 			zbx_json_adduint64(json,"itemid",item->itemid);
 			zbx_json_adduint64(json,"lastclock",item->lastclock);
-			zbx_json_addint64(json,"change",(int)item->change);
+			zbx_json_adduint64(json,"nextcheck",item->nextcheck);
 			zbx_json_addstring(json,"error",item->error,ZBX_JSON_TYPE_STRING);
 
 			switch	( item->value_type ) {
 				case ITEM_VALUE_TYPE_UINT64:
 					zbx_json_adduint64(json,"value",item->lastvalue.ui64);
+					zbx_json_addint64(json,"prev_value",item->prevvalue.ui64);
 					break;
 				case ITEM_VALUE_TYPE_TEXT:
 				case ITEM_VALUE_TYPE_STR:
@@ -13889,6 +13877,7 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 					break;
 				case ITEM_VALUE_TYPE_FLOAT:
 					zbx_json_addfloat(json,"value",item->lastvalue.dbl);
+					zbx_json_addfloat(json,"prev_value",item->prevvalue.dbl);
 					break;
 			}	
 			

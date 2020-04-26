@@ -114,7 +114,7 @@ static int	worker_get_agg_values(void *data, int value_type, zbx_uint64_t itemid
 	//requesting, we'll get multiline responce simple json from there
 	glb_process_worker_request(conf->worker, request, &response);	//requesting, we'll get multiline responce simple json from there
 	
-	zabbix_log(LOG_LEVEL_INFORMATION, "Got aggregation responce :%s",response);
+	zabbix_log(LOG_LEVEL_DEBUG, "Got aggregation responce :%s",response);
 
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response from worker %s %s:",conf->worker->path, response);

@@ -2369,7 +2369,7 @@ static int start_snmp_connections(struct async_snmp_session *session) {
 
 	if ( CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)  
 		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s:Starting conn for the debug host %s",
-								conf.items[item_idx].itemid,__func__,conf.items[item_idx].host);
+								conf.items[item_idx].itemid,__func__,conf.items[item_idx].host.host);
 	
 	parsed_oid_len = MAX_OID_LEN;
 	

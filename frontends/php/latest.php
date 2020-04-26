@@ -445,11 +445,11 @@ foreach ($items as &$item) {
 		$item['delay'] = $update_interval_parser->getDelay();
 
 		if ($item['delay'][0] === '{') {
-			$item['delay'] = (new CSpan($item['delay']))->addClass(ZBX_STYLE_RED);
+			$item['delay'] = (new CSpan($item['delay']))->addClass(ZBX_STYLE_GRAY);
 		}
 	}
 	else {
-		$item['delay'] = (new CSpan($item['delay']))->addClass(ZBX_STYLE_RED);
+		$item['delay'] = (new CSpan($item['delay']))->addClass(ZBX_STYLE_GRAY);
 	}
 
 	if ($config['hk_history_global']) {
@@ -461,7 +461,7 @@ foreach ($items as &$item) {
 	}
 	else {
 		$keep_history = 0;
-		$item['history'] = (new CSpan($item['history']))->addClass(ZBX_STYLE_RED);
+		$item['history'] = (new CSpan($item['history']))->addClass(ZBX_STYLE_GRAY);
 	}
 
 	if ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64) {
@@ -474,7 +474,7 @@ foreach ($items as &$item) {
 		}
 		else {
 			$keep_trends = 0;
-			$item['trends'] = (new CSpan($item['trends']))->addClass(ZBX_STYLE_RED);
+			$item['trends'] = (new CSpan($item['trends']))->addClass(ZBX_STYLE_GRAY);
 		}
 	}
 	else {
@@ -514,16 +514,18 @@ foreach ($items as $key => $item) {
 	$digits = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) ? ZBX_UNITS_ROUNDOFF_MIDDLE_LIMIT : 0;
 	
 	if ($lastHistory && ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64)
-			&& (round($lastHistory['change'], $digits) != 0) && empty($lastHistory['error']))  {
+			&& ( bcsub($lastHistory['value'], $lastHistory['prev_value'], $digits) != 0) && empty($lastHistory['error']))  {
 
 		$change = '';
-		if (($lastHistory['change'] ) > 0) {
+		
+		if (($lastHistory['value'] - $lastHistory['prev_value']) > 0) {
 			$change = '+';
 		}
 
+
 		// for 'unixtime' change should be calculated as uptime
 		$change .= convert_units([
-			'value' => round($lastHistory['value'], $digits),
+			'value' => bcsub($lastHistory['value'], $lastHistory['prev_value'], $digits),
 			'units' => $item['units'] == 'unixtime' ? 'uptime' : $item['units']
 		]);
 	}
@@ -551,7 +553,8 @@ foreach ($items as $key => $item) {
 		($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null
 	]))->addClass('action-container');
 
-	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_RED : null;
+	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
+	$state_css =  empty($lastHistory['error']) ? $state_css : ZBX_STYLE_RED;
 
 	if ($filter['showDetails']) {
 		// item key
@@ -562,7 +565,7 @@ foreach ($items as $key => $item) {
 				->addClass(ZBX_STYLE_GREEN);
 
 		$info_icons = [];
-		if ($itm['status'] == ITEM_STATUS_ACTIVE && !empty($lastHistory['error']) ) {
+		if ($item['status'] == ITEM_STATUS_ACTIVE && !empty($lastHistory['error']) ) {
 			$info_icons[] = makeErrorIcon($lastHistory['error']);
 		}
 
@@ -629,7 +632,7 @@ foreach ($applications as $appid => $dbApp) {
 
 	$hostName = (new CLinkAction($host['name']))->setMenuPopup(CMenuPopupHelper::getHost($dbApp['hostid']));
 	if ($host['status'] == HOST_STATUS_NOT_MONITORED) {
-		$hostName->addClass(ZBX_STYLE_RED);
+		$hostName->addClass(ZBX_STYLE_GRAY);
 	}
 
 	// add toggle row
@@ -680,17 +683,19 @@ foreach ($items as $item) {
 	$digits = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) ? ZBX_UNITS_ROUNDOFF_MIDDLE_LIMIT : 0;
 	if (isset($lastHistory['value']) 
 			&& ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64)
-			&& (round($lastHistory['change'], $digits) != 0)
+			&& (bcsub($lastHistory['value'], $lastHistory['prev_value'], $digits) != 0 )
 			&& empty($lastHistory['error'])) {
 
 		$change = '';
-		if (($lastHistory['change']) > 0) {
+		
+		if (($lastHistory['value'] - $lastHistory['prev_value']) > 0) {
 			$change = '+';
 		}
 
+
 		// for 'unixtime' change should be calculated as uptime
 		$change .= convert_units([
-			'value' => rount($lastHistory['change'], $digits),
+			'value' => bcsub($lastHistory['value'], $lastHistory['prev_value'], $digits),
 			'units' => $item['units'] == 'unixtime' ? 'uptime' : $item['units']
 		]);
 	}
@@ -730,7 +735,7 @@ foreach ($items as $item) {
 
 		$info_icons = [];
 
-		if ($itm['status'] == ITEM_STATUS_ACTIVE && !empty($lastHistory['error']) ) {
+		if ($item['status'] == ITEM_STATUS_ACTIVE && !empty($lastHistory['error']) ) {
 			$info_icons[] = makeErrorIcon($lastHistory['error']);
 		}
 

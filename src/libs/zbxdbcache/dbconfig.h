@@ -108,8 +108,9 @@ typedef struct
 	unsigned char		update_triggers;
 	zbx_uint64_t		templateid;
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
+	
 	history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
-	double	change;
+	history_value_t		prevvalue;
 }
 ZBX_DC_ITEM;
 

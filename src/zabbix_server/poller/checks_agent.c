@@ -261,7 +261,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 				SET_MSG_RESULT(&conf.results[item_idx], zbx_strdup(NULL, "Zabbix Agent non-critical error"));
 				conf.errcodes[item_idx] = AGENT_ERROR;
 				
-				if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
+				if ( == conf.items[item_idx].host.hostid)
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Agent error to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 			}
@@ -281,7 +281,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 			{
 				set_result_type(&conf.results[item_idx], ITEM_VALUE_TYPE_TEXT, sess->socket->buffer);
 				
-				//if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
+				if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
 					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: proecessed responce from  host %s, item  %ld, %s", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid, sess->socket->buffer);
 			}
@@ -602,7 +602,9 @@ int get_values_agent_async()
 				cnt++;
 			}
 
-			if (0 < cnt && CONFIG_DEBUG_HOST == items[item_idx].host.hostid) zabbix_log(LOG_LEVEL_INFORMATION, "Agent timed out %d items for host %s item %ld due to prev item fail %d", cnt, conf.items[item_idx].host.host, conf.items[item_idx].itemid, result);
+			if (0 < cnt && CONFIG_DEBUG_HOST == items[item_idx].host.hostid) 
+				zabbix_log(LOG_LEVEL_INFORMATION, "Agent timed out %d items for host %s item %ld due to prev item fail %d",
+					 cnt, conf.items[item_idx].host.host, conf.items[item_idx].itemid, result);
 
 			//if (cnt > 0 ) zabbix_log(LOG_LEVEL_DEBUG, "Found additional host's items idx %ld, count %d, removing with timeout error",item_idx, cnt);
 			//setting connection free to init new connection
