@@ -272,6 +272,7 @@ int	CONFIG_PROXYDATA_FREQUENCY	= 5;	/* 1s is too frequent for n/a proxies */
 char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
 char 	**CONFIG_HISTORY_MODULE		= NULL;
+int		CONFIG_SNMP_RETRIES		=	2;
 
 char	**CONFIG_EXT_WORKERS	= NULL;
 
@@ -675,6 +676,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
+		{"SnmpRetries",			&CONFIG_SNMP_RETRIES,			TYPE_INT,
+			PARM_OPT,	1,			100},
 		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
 			PARM_OPT,	0,			0},
 		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,

@@ -503,6 +503,7 @@ foreach ($items as $key => $item) {
 	// last check time and last value
 	if ($lastHistory) {
 		$lastClock = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['lastclock']);
+		$nextClock = _('Next check')." ".zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['nextclock']);
 		$lastValue = empty($lastHistory['error']) ? formatHistoryValue($lastHistory['value'], $item, false) : '<error>';
 	}
 	else {
@@ -569,6 +570,7 @@ foreach ($items as $key => $item) {
 			$info_icons[] = makeErrorIcon($lastHistory['error']);
 		}
 
+		
 		$row = new CRow([
 			'',
 			$checkbox,
@@ -578,7 +580,7 @@ foreach ($items as $key => $item) {
 			(new CCol($item['history']))->addClass($state_css),
 			(new CCol($item['trends']))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
-			(new CCol($lastClock))->addClass($state_css),
+			(new CCol( (new CLinkAction($lastClock))->setHint($nextClock) ))->addClass($state_css),
 			(new CCol($lastValue))->addClass($state_css),
 			(new CCol($change))->addClass($state_css),
 			$actions,
@@ -598,7 +600,7 @@ foreach ($items as $key => $item) {
 			$checkbox,
 			'',
 			(new CCol($item_name))->addClass($state_css),
-			(new CCol($lastClock))->addClass($state_css),
+			(new CCol( (new CLinkAction($lastClock))->setHint($nextClock) ))->addClass($state_css),
 			( empty($lastHistory['error'])? (new CCol($lastValue))->addClass($state_css):	makeInformationList($info_icons)),
 			(new CCol($change))->addClass($state_css),
 			$actions
@@ -748,7 +750,7 @@ foreach ($items as $item) {
 			(new CCol($item['history']))->addClass($state_css),
 			(new CCol($item['trends']))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
-			(new CCol($lastClock))->addClass($state_css),
+			(new CCol( (new CLinkAction($lastClock))->setHint($nextClock) ))->addClass($state_css),
 			(new CCol($lastValue))->addClass($state_css),
 			(new CCol($change))->addClass($state_css),
 			$actions,
@@ -767,7 +769,7 @@ foreach ($items as $item) {
 			$checkbox,
 			'',
 			(new CCol($item_name))->addClass($state_css),
-			(new CCol($lastClock))->addClass($state_css),
+			(new CCol( (new CLinkAction($lastClock))->setHint($nextClock) ))->addClass($state_css),
 			(new CCol($lastValue))->addClass($state_css),
 			(new CCol($change))->addClass($state_css),
 			$actions,
