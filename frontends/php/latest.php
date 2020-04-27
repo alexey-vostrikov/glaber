@@ -580,7 +580,7 @@ foreach ($items as $key => $item) {
 			(new CCol($item['history']))->addClass($state_css),
 			(new CCol($item['trends']))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
-			(new CCol( (new CLinkAction($lastClock))->setHint($nextClock) ))->addClass($state_css),
+			(new CCol( (new CLinkAction($lastClock))->setHint($nextclock) ))->addClass($state_css),
 			(new CCol($lastValue))->addClass($state_css),
 			(new CCol($change))->addClass($state_css),
 			$actions,
