@@ -13856,9 +13856,8 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
 
 	for (i=0; i<itemids->values_num; i++) {
-		if ( 
-			(NULL != (item=zbx_hashset_search(&config->items,&itemids->values[i]))) && 
-			(item->lastclock > 0)) {
+		if ( NULL != (item=zbx_hashset_search(&config->items,&itemids->values[i])) )
+		 {
 			zbx_json_addobject(json,NULL);
 
 			zbx_json_adduint64(json,"itemid",item->itemid);
