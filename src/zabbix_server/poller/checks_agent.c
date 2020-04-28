@@ -593,12 +593,12 @@ int get_values_agent_async()
 			int cnt = 0;
 
 			zbx_list_iterator_init(hs[i]->items_list, &list_iter);
-			while (SUCCEED == zbx_list_peek(hs[i]->items_list, (void **)&item_idx) &&
-				   items[item_idx].host.hostid == items[item_idx].host.hostid)
+			while ( (SUCCEED == zbx_list_peek(hs[i]->items_list, (void **)&item_idx)) &&
+				   items[hs[i]->current_item].host.hostid == items[item_idx].host.hostid )
 			{
 				zbx_list_pop(hs[i]->items_list, (void **)&item_idx);
 				errcodes[item_idx] = TIMEOUT_ERROR;
-				SET_MSG_RESULT(&results[item_idx], zbx_dsprintf(NULL, "Skipped from polling due to other items errors"));
+				SET_MSG_RESULT(&results[item_idx], zbx_dsprintf(NULL, "Skipped from polling due to item %s timeout",items[item_idx].key_orig));
 				cnt++;
 			}
 
