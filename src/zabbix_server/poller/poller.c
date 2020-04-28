@@ -1041,7 +1041,7 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 		//we haven't either processed any items or got new ones to process then it's ok to sleep
 		if ( num + new_num == 0 ) {
 			update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
-			usleep(50000);
+			usleep(20000);
 			update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 		
 		}

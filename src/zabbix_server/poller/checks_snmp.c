@@ -2347,7 +2347,7 @@ static int start_snmp_connections(struct async_snmp_session *session) {
 	}
 	
 	//in case we process the finished state, then we'll have to check if it's the same host
-	if (POLL_FINISHED == session->state) {
+	if (POLL_FINISHED == session->state || POLL_RETRY ==session->state) {
 		if (session->current_item && conf.items[session->current_item].host.hostid == conf.items[item_idx].host.hostid) {
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Reusing the connection");
 			reuse=1;
@@ -2545,7 +2545,7 @@ int get_values_snmp_async()
 		}	
 		//we need spend at lest 100ms in the cycle to
 		//answer as much hosts as we can 
-	} while (iter++ < 10);
+	} while (iter++ < 20);
 	//stage 3 - check for timed-out data
 	//handling timeouts
 	//since all items has started in different times, then each needs to calc it's timeout separately
@@ -2572,11 +2572,11 @@ int get_values_snmp_async()
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout, NO retries left, TIMEOUT",items[hs[i]->current_item].itemid, i);
 				
 				errcodes[hs[i]->current_item]=TIMEOUT_ERROR;
-			
 				SET_MSG_RESULT(&results[hs[i]->current_item], zbx_dsprintf(NULL, "Timed out waiting for the responce"));
 				
 				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout",items[hs[i]->current_item].itemid, i);
+
 				hs[i]->state=POLL_FREE; //this will make it possible to use the connection
 				zbx_snmp_close_session(hs[i]->sess); //we'd also close the session as we don't expect data to come
 			
