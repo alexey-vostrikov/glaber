@@ -22,8 +22,8 @@
 
 #include "threads.h"
 
-#define GLB_ASYNC_POLLING_MAX_ITERATIONS 100000
-
+#define GLB_ASYNC_POLLING_MAX_ITERATIONS 100000000
+#define GLB_FAIL_COUNT_CLEAN 3 //how many items should fail in a row to clean up a host
 extern int	CONFIG_TIMEOUT;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 extern int	CONFIG_UNREACHABLE_PERIOD;
