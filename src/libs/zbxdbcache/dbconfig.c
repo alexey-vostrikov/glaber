@@ -10010,10 +10010,7 @@ int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 			queue_item->type = dc_item->type;
 			queue_item->nextcheck = dc_item->nextcheck;
 			queue_item->proxy_hostid = dc_host->proxy_hostid;
-
-			if (ITEM_TYPE_ZABBIX == queue_item->type &&  ( now - data_expected_from > 70)) {
-				zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld delayed by %d sec",queue_item->itemid, now-data_expected_from );
-			}
+			
 			zbx_vector_ptr_append(queue, queue_item);
 
 		}
