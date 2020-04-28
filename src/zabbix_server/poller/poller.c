@@ -771,7 +771,8 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 					}
 				}
 			}
-		} else if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {	
+				
+		} else { //if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {	
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
 			num++;			
 			if (CONFIG_DEBUG_HOST == items[i].host.hostid) 
@@ -1043,7 +1044,7 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 		
 		if ( num + new_num == 0 ) {
 			update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
-			usleep(100000);
+			usleep(10000);
 			update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 		
 		}

@@ -2514,6 +2514,7 @@ int get_values_snmp_async()
 	timeout.tv_usec=20000;
 	block=0;
 
+	int iter=0;
 	do {
 	//while () {
 		//usleep (10000);
@@ -2533,24 +2534,25 @@ int get_values_snmp_async()
 			snmp_read2(&fdset);
 		} else {
 			//nothing to do - no data has arrived yet, it's a good place to have a nap
-			//	usleep(10000);
+			usleep(5000);
 		}
 	
 		netsnmp_large_fd_set_cleanup(&fdset);
-	//usleep(15000);
-	
+		
 	//some connections might got free by now, starting them
 		for (i=0; i<conf.max_connections; i++) {
 			start_snmp_connections( hs[i] ); // && cnt++ < 10) ;
 		}	
-	} while (hosts > 0);
+		//we need spend at lest 100ms in the cycle to
+		//answer as much hosts as we can 
+	} while (iter++ < 10);
 	//stage 3 - check for timed-out data
 	//handling timeouts
 	//since all items has started in different times, then each needs to calc it's timeout separately
 	for (i=0; i<conf.max_connections; i++) {
 		switch (hs[i]->state)  {
 			case POLL_POLLING:
-				if (  hs[i]->stop_time > time(NULL) ) break;
+				if (  hs[i]->stop_time > time(NULL) ) continue;
 				//poll timed out,  lets see if there are retries left
 				hs[i]->retries--;
 
@@ -2563,7 +2565,7 @@ int get_values_snmp_async()
 					if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
 						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout, retries left %d",items[hs[i]->current_item].itemid, i, hs[i]->retries);
 
-					break;
+					continue;
 				}
 				
 				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
@@ -2588,7 +2590,7 @@ int get_values_snmp_async()
 					items[item_idx].host.hostid == items[hs[i]->current_item].host.hostid) {
 						zbx_list_pop(hs[i]->items_list,(void **)&item_idx);
 					errcodes[item_idx]=TIMEOUT_ERROR;
-					SET_MSG_RESULT(&results[item_idx], zbx_dsprintf(NULL, "Skipped from polling due to other items timeout"));
+					SET_MSG_RESULT(&results[item_idx], zbx_dsprintf(NULL, "Skipped from polling due to item '%s' timeout",items[hs[i]->current_item].key_orig));
 					cnt++;
 					
 					if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
