@@ -503,8 +503,18 @@ foreach ($items as $key => $item) {
 	// last check time and last value
 	if ($lastHistory) {
 		$lastClock = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['lastclock']);
-		$nextClock = _('Next check')." ".zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['nextclock']);
+		
+		if (isset( $lastHistory['nextcheck']))
+			$nextClock = _('Next check')." ".zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['nextcheck']);
+		else 
+			$nextClock = "<unknown>";
+
 		$lastValue = empty($lastHistory['error']) ? formatHistoryValue($lastHistory['value'], $item, false) : '<error>';
+	
+		if ($lastHistory['lastclock'] == 0) {
+				$lastValue ='';
+				$lastHistory['error'] ='';
+		}
 	}
 	else {
 		$lastClock = UNKNOWN_VALUE;
