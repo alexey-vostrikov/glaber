@@ -1291,14 +1291,15 @@ class CScreenProblem extends CScreenBase {
 
 		$items = zbx_toHash($items, 'itemid');
 		$history_values = Manager::History()->getLastValues($items, 1, ZBX_HISTORY_PERIOD);
-
+		//var_dump($history_values);
+	
 		if ($html) {
 			$hint_table = (new CTable())->addClass('list-table');
 		}
 
 		foreach ($items as $itemid => $item) {
-			if (array_key_exists($itemid, $history_values)) {
-				$last_value = reset($history_values[$itemid]);
+				if (array_key_exists($itemid, $history_values)) {
+				$last_value = $history_values[$itemid];
 				$last_value['value'] = formatHistoryValue(str_replace(["\r\n", "\n"], [" "], $last_value['value']),
 					$item
 				);
@@ -1316,8 +1317,8 @@ class CScreenProblem extends CScreenBase {
 				$hint_table->addRow([
 					new CCol($item['name_expanded']),
 					new CCol(
-						($last_value['clock'] !== null)
-							? zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_value['clock'])
+						($last_value['lastclock'] !== null)
+							? zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_value['lastclock'])
 							: UNRESOLVED_MACRO_STRING
 					),
 					new CCol($last_value['value']),
