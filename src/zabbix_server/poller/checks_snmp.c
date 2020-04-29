@@ -2253,11 +2253,11 @@ int asynch_response(int operation, struct snmp_session *sp, int reqid,
 		
 	sess->state=POLL_FINISHED;
 	conf.active_hosts--;
-	
 	sess->failcount=0;
+	
 	//at the moment we've finished it's good to try immediately to start the next snmp connection
 	//initiating new connection for this sesion
-	start_snmp_connections(sess);
+	//start_snmp_connections(sess);
 	
 	return 1;
 }
@@ -2557,19 +2557,19 @@ int get_values_snmp_async()
 			case POLL_POLLING:
 				if (  hs[i]->stop_time > time(NULL) ) continue;
 				//poll timed out,  lets see if there are retries left
-				hs[i]->retries--;
+				//hs[i]->retries--;
 
-				if (hs[i]->retries > 0 ) {
+				//if (hs[i]->retries > 0 ) {
 					//we've got a timeout, but withing a retry time, lets's start a new packet
 					//return the item to the list 
-					zbx_list_prepend(hs[i]->items_list,(void**)hs[i]->current_item,NULL);
-					hs[i]->state = POLL_RETRY;
+					//zbx_list_prepend(hs[i]->items_list,(void**)hs[i]->current_item,NULL);
+					//hs[i]->state = POLL_RETRY;
 
-					if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
-						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s:  Item %ld, slot %d timeout, will retry, retries left %d",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i, hs[i]->retries);
+				//	if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
+				//		zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s:  Item %ld, slot %d timeout, will retry, retries left %d",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i, hs[i]->retries);
 
-					continue;
-				}
+				//	continue;
+				//}
 				
 				errcodes[hs[i]->current_item]=TIMEOUT_ERROR;
 				hs[i]->state=POLL_FINISHED; //this will make it possible to reuse the connection

@@ -788,7 +788,7 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 				}
 			}
 				
-		} else { //if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {	
+		} else {//if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {	
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
 			num++;			
 			if (CONFIG_DEBUG_HOST == items[i].host.hostid) 
