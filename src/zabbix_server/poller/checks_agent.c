@@ -23,6 +23,7 @@
 #include "../../libs/zbxcrypto/tls_tcp_active.h"
 #include "../preprocessor/linked_list.h"
 
+
 #include "checks_agent.h"
 
 extern u_int64_t CONFIG_DEBUG_ITEM;
@@ -170,6 +171,7 @@ struct async_agent_session
 	int state;				/* state of the session - might be free or in_work */
 	int stop_time;			/* unix time till we wait for data to come */
 	zbx_list_t *items_list; /* list of items assigned to the session */
+	int 			failcount;
 };
 
 static struct async_agent_conf conf;
@@ -209,6 +211,8 @@ void handle_socket_operation(struct async_agent_session *sess)
 
 			conf.errcodes[item_idx] = NETWORK_ERROR;
 			sess->state = POLL_FINISHED;
+			sess->failcount=0;
+
 			zbx_tcp_close(sess->socket);
 
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
@@ -303,7 +307,8 @@ void handle_socket_operation(struct async_agent_session *sess)
 
 		zbx_tcp_close(sess->socket);
 		sess->socket->socket = 0;
-		
+		sess->failcount=0;
+
 		if (SUCCEED != conf.errcodes[item_idx]) 
 			sess->state = POLL_FINISHED;
 		
@@ -346,7 +351,7 @@ int init_async_agent(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 	{
 		hs[i] = zbx_malloc(NULL, sizeof(struct async_agent_session));
 		hs[i]->state = POLL_FREE;
-
+		hs[i]->failcount = 0;
 		hs[i]->items_list = zbx_malloc(NULL, sizeof(zbx_list_t));
 		zbx_list_create(hs[i]->items_list);
 		hs[i]->socket = zbx_malloc(NULL, sizeof(zbx_socket_t));
@@ -448,7 +453,8 @@ int start_agent_connection(struct async_agent_session *sess)
 		SET_MSG_RESULT(&conf.results[item_idx], zbx_strdup(NULL, "Invalid TLS connection parameters."));
 		conf.errcodes[item_idx] = CONFIG_ERROR;
 		sess->state = POLL_FINISHED;
-		
+		sess->failcount=0;
+
 		return SUCCEED;
 	}
 
@@ -466,7 +472,7 @@ int start_agent_connection(struct async_agent_session *sess)
 		if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: connection fail to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
-
+		sess->failcount=0;
 
 		return SUCCEED;
 	}
@@ -571,11 +577,8 @@ int get_values_agent_async()
 		u_int64_t item_idx = hs[i]->current_item;
 
 		if ( ((hs[i]->stop_time < time(NULL)) && ((POLL_FREE != hs[i]->state) && (POLL_FINISHED != hs[i]->state))) 
-			|| ( (POLL_FINISHED == hs[i]->state)  && (SUCCEED != conf.errcodes[item_idx]) )
-		
-		 )
+			|| ( (POLL_FINISHED == hs[i]->state)  && (SUCCEED != conf.errcodes[item_idx])))
 		{
-
 			//int item_idx=hs[snmp_conn].current_item;
 			errcodes[item_idx] = TIMEOUT_ERROR;
 			SET_MSG_RESULT(&conf.results[item_idx], zbx_dsprintf(NULL, "Timed out waiting for the responce"));
@@ -585,6 +588,18 @@ int get_values_agent_async()
 
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Operation timeout to host %s, item  %ld", conf.items[item_idx].host.host, conf.items[item_idx].itemid);
+
+			hs[i]->failcount++;
+
+			if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
+				zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld, slot %d timeout, NO retries left, TIMEOUT",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i);
+	
+			//do a host cleanout if there are several fails in a row
+			if (hs[i]->failcount < GLB_FAIL_COUNT_CLEAN ) {
+				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
+					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld, slot %d timeout, not doing cleanup yet failcount is %d",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid,i, hs[i]->failcount);
+				continue;
+			}
 
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld timed out, cleaning ",conf.items[item_idx].itemid);
 			//going through all the connection's item's and removing items of the same host with timeout error
@@ -602,9 +617,8 @@ int get_values_agent_async()
 				cnt++;
 			}
 
-			if (0 < cnt && CONFIG_DEBUG_HOST == items[item_idx].host.hostid) 
-				zabbix_log(LOG_LEVEL_INFORMATION, "Agent timed out %d items for host %s item %ld due to prev item fail %d",
-				 cnt, conf.items[item_idx].host.host, conf.items[item_idx].itemid, result);
+			zabbix_log(LOG_LEVEL_INFORMATION, "Host %s AGENT timed out %d items due to prev %d items fail",
+				 conf.items[item_idx].host.host, cnt, hs[i]->failcount);
 
 			//if (cnt > 0 ) zabbix_log(LOG_LEVEL_DEBUG, "Found additional host's items idx %ld, count %d, removing with timeout error",item_idx, cnt);
 			//setting connection free to init new connection
@@ -614,6 +628,7 @@ int get_values_agent_async()
 			//cleaning up the connection, marking as free
 			zbx_tcp_close(hs[i]->socket);
 			hs[i]->state = POLL_FREE;
+			hs[i]->failcount = 0;
 		}
 	}
 

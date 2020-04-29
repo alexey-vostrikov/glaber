@@ -677,8 +677,11 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 	
 	zbx_timespec(&timespec);
 
+	u_int64_t lasthost=0;
+	char laststate=0;
 
 	for (i = 0; i < max_items; i++ ) {
+		
 		//if (CONFIG_DEBUG_HOST == items[i].host.hostid)
 		//	zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Prproc checkinmg item%d %ld in state %d",i, items[i].itemid, errcodes[i]);
 
@@ -698,7 +701,6 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 		if (CONFIG_DEBUG_HOST == items[i].host.hostid)
 			zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Preprocessing item %ld in state %d",items[i].itemid, errcodes[i]);
 
-
 		//host activation/dactiovation part
 		switch (errcodes[i])
 		{
@@ -706,11 +708,19 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
 				if ((poller_type == ZBX_POLLER_TYPE_UNREACHABLE || 
-					poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP  || 
-					poller_type == ZBX_POLLER_TYPE_NORMAL) &&  CONFIG_ENABLE_HOST_DEACTIVATION )	{
-					zbx_activate_item_host(&items[i], &timespec);
+					poller_type == ZBX_POLLER_TYPE_ASYNC_AGENT || 
+					poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP || 
+					poller_type == ZBX_POLLER_TYPE_NORMAL ) &&  
+					( 1 == CONFIG_ENABLE_HOST_DEACTIVATION )) {
+						
+					if ( lasthost != items[i].host.hostid || laststate != HOST_AVAILABLE_TRUE ) 
+							zbx_activate_item_host(&items[i], &timespec);
 				}
+
+				lasthost = items[i].host.hostid;
+				laststate = HOST_AVAILABLE_TRUE;
 				break;
+
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
@@ -718,11 +728,17 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 				first, that sometimes causes a "poll" bug in mysql lib (100% thread load on waiting in a poll for mysql, probably solvable by alarm)
 				second, there seems to be no reason for that, async pollers live just fine having even all hosts unreachable */
 				if (( //HOST_AVAILABLE_FALSE != last_available &&  
-				     poller_type == ZBX_POLLER_TYPE_UNREACHABLE || 
-					 poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP  || 
-					 poller_type == ZBX_POLLER_TYPE_NORMAL) && ( 1 == CONFIG_ENABLE_HOST_DEACTIVATION) ) {	
+				    poller_type == ZBX_POLLER_TYPE_UNREACHABLE || 
+					poller_type == ZBX_POLLER_TYPE_ASYNC_AGENT || 
+					poller_type == ZBX_POLLER_TYPE_ASYNC_SNMP || 
+					poller_type == ZBX_POLLER_TYPE_NORMAL) && 
+					( 1 == CONFIG_ENABLE_HOST_DEACTIVATION ) ) {	
+					if ( lasthost != items[i].host.hostid || laststate != HOST_AVAILABLE_FALSE ) 
 					zbx_deactivate_item_host(&items[i], &timespec, results[i].msg);
 				}
+
+				lasthost = items[i].host.hostid;
+				laststate = HOST_AVAILABLE_FALSE;
 				break;
 		
 			case CONFIG_ERROR:

@@ -178,6 +178,10 @@ void	zbx_udp_close(zbx_socket_t *s);
 #define ZBX_DEFAULT_AGENT_PORT_STR	"10050"
 #define ZBX_DEFAULT_SERVER_PORT_STR	"10051"
 
+//how many items should fail in a row for a host to mark it unreachable and 
+//and stop trying to poll other items
+#define GLB_FAIL_COUNT_CLEAN 3
+
 int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, const char *version, int protocol,
 		int timeout);
 

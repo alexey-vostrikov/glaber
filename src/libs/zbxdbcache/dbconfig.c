@@ -8060,7 +8060,7 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, un
 	DCitem_nextcheck_update(dc_item, dc_host, new_state, flags, lastclock, NULL);
 	
 	if (CONFIG_DEBUG_HOST == dc_host->hostid) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Updated nextcheck to %d (%d)",dc_item->nextcheck, (dc_item->nextcheck - old_nextcheck));
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug host: updated nextcheck to %d (%d)",dc_item->nextcheck, (dc_item->nextcheck - old_nextcheck));
 	}
 
 	old_poller_type = dc_item->poller_type;

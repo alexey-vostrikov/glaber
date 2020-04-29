@@ -57,6 +57,8 @@ static size_t		sql_alloc = 64 * ZBX_KIBIBYTE;
 
 extern unsigned char	program_type;
 extern int CONFIG_CLUSTER_SERVER_ID;
+extern u_int64_t CONFIG_DEBUG_HOST;
+extern u_int64_t CONFIG_DEBUG_ITEM;
 
 
 #define ZBX_IDS_SIZE	9
@@ -1922,8 +1924,9 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 	}
 	else if (ITEM_STATE_NOTSUPPORTED == h->state && 0 != strcmp(item->error, h->value.err))
 	{
-		zabbix_log(LOG_LEVEL_WARNING, "error reason for \"%s:%s\" changed: %s", item->host.host,
-				item->key_orig, h->value.err);
+		if (CONFIG_DEBUG_HOST == item->host.hostid || CONFIG_DEBUG_ITEM == item->itemid)
+			zabbix_log(LOG_LEVEL_WARNING, "error reason for \"%s:%s\" changed: %s", item->host.host,
+					item->key_orig, h->value.err);
 
 		item_error = h->value.err;
 	}

@@ -2549,7 +2549,7 @@ int get_values_snmp_async()
 		//we need spend at lest 100ms in the cycle to
 		//answer as much hosts as we can 
 	} while (iter++ < 20);
-	//stage 3 - check for timed-out data
+	//stage 3 - ./runcheck for timed-out data
 	//handling timeouts
 	//since all items has started in different times, then each needs to calc it's timeout separately
 	for (i=0; i<conf.max_connections; i++) {
@@ -2566,35 +2566,32 @@ int get_values_snmp_async()
 					hs[i]->state = POLL_RETRY;
 
 					if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
-						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout, retries left %d",items[hs[i]->current_item].itemid, i, hs[i]->retries);
+						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s:  Item %ld, slot %d timeout, will retry, retries left %d",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i, hs[i]->retries);
 
 					continue;
 				}
 				
-				hs[i]->failcount++;
-				
-			
-
-				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout, NO retries left, TIMEOUT",items[hs[i]->current_item].itemid, i);
-				
-					//do a host cleanout if there are many fails in a row
-				if (hs[i]->failcount < GLB_FAIL_COUNT_CLEAN ) {
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout, not doing cleanup yet failcount is %d",items[hs[i]->current_item].itemid,i, hs[i]->failcount);
-					continue;
-				}
-				
-				zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout, doing cleanup yet failcount is %d",items[hs[i]->current_item].itemid,i, hs[i]->failcount);
-
 				errcodes[hs[i]->current_item]=TIMEOUT_ERROR;
-				SET_MSG_RESULT(&results[hs[i]->current_item], zbx_dsprintf(NULL, "Timed out waiting for the responce"));
-				
-				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout",items[hs[i]->current_item].itemid, i);
+				hs[i]->state=POLL_FINISHED; //this will make it possible to reuse the connection
+				//zbx_snmp_close_session(hs[i]->sess); //we'd also close the session as we don't expect more data to come
 
-				hs[i]->state=POLL_FREE; //this will make it possible to use the connection
-				zbx_snmp_close_session(hs[i]->sess); //we'd also close the session as we don't expect data to come
-			
+				SET_MSG_RESULT(&results[hs[i]->current_item], zbx_dsprintf(NULL, "Timed out, no responce for %d seconds, %d retries", CONFIG_TIMEOUT,CONFIG_SNMP_RETRIES));
+
+				hs[i]->failcount++;
+
+				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
+					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld, slot %d timeout, NO retries left, TIMEOUT",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i);
+	
+				//do a host cleanout if there are many fails in a row
+				
+				if (hs[i]->failcount < GLB_FAIL_COUNT_CLEAN ) {
+					if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
+						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld, slot %d timeout, not doing cleanup yet failcount is %d",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid,i, hs[i]->failcount);
+					continue;
+				}
+				if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
+					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld, slot %d timeout, doing cleanup failcount is %d",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid,i, hs[i]->failcount);
+				
 				//going through all the connection's item's and removing items of the same host with timeout error
 				zbx_list_iterator_t list_iter;
 				u_int64_t item_idx=0;
@@ -2605,16 +2602,16 @@ int get_values_snmp_async()
 					items[item_idx].host.hostid == items[hs[i]->current_item].host.hostid) {
 						zbx_list_pop(hs[i]->items_list,(void **)&item_idx);
 					errcodes[item_idx]=TIMEOUT_ERROR;
-					SET_MSG_RESULT(&results[item_idx], zbx_dsprintf(NULL, "Skipped from polling due to item '%s' timeout",items[hs[i]->current_item].key_orig));
+					SET_MSG_RESULT(&results[item_idx], zbx_dsprintf(NULL, "Skipped from polling due to %d items timed out in a row", GLB_FAIL_COUNT_CLEAN));
 					cnt++;
 					
 					if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
 						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld, slot %d timeout due to prev items error",items[item_idx].itemid, i);
 				}
 												
-				if ((cnt > 0) && (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) ) 
-						zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Found additional host's %s items count %d, removing with timeout error",
-							items[hs[i]->current_item].host.host, cnt);
+				if ((cnt > 0) ) 
+					zabbix_log(LOG_LEVEL_INFORMATION, "Host %s SNMP timed out %d items due to prev %d items fail",
+				 		conf.items[item_idx].host.host, cnt, GLB_FAIL_COUNT_CLEAN);
 				//setting connection free to init new connection 
 				break;
 			case POLL_FINISHED:
