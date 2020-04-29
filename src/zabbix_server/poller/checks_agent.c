@@ -619,7 +619,8 @@ int get_values_agent_async()
 
 			zabbix_log(LOG_LEVEL_INFORMATION, "Host %s AGENT timed out %d items due to prev %d items fail",
 				 conf.items[item_idx].host.host, cnt, hs[i]->failcount);
-
+			
+			hs[i]->failcount=0;
 			//if (cnt > 0 ) zabbix_log(LOG_LEVEL_DEBUG, "Found additional host's items idx %ld, count %d, removing with timeout error",item_idx, cnt);
 			//setting connection free to init new connection
 		}
