@@ -702,6 +702,7 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 			zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Preprocessing item %ld in state %d",items[i].itemid, errcodes[i]);
 
 		//host activation/dactiovation part
+		//it's quite strange it's done here
 		switch (errcodes[i])
 		{
 			case SUCCEED:

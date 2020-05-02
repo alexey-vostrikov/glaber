@@ -64,10 +64,7 @@ private function getLastValuesFromServer($items, $limit, $period) {
 	 
 	  $server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
 	  $last_values = $server->getLastValues(get_cookie(ZBX_SESSION_NAME),array_column($items,'itemid'),$limit, $period); 
-	  
-	  //var_dump($server->getError());
-	  //var_dump($last_values);
-	 
+	  	 
 	  if (!is_array($last_values)) return [];
 
 	  foreach ($last_values as $value) 

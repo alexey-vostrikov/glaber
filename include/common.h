@@ -111,8 +111,6 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 #define	POLL_CONNECT_SENT	-16	
 #define	POLL_REQ_SENT		-17
 #define POLL_REQUEUED		-18
-#define POLL_RETRY			-19
-
 
 #define SUCCEED_OR_FAIL(result) (FAIL != (result) ? SUCCEED : FAIL)
 const char	*zbx_sysinfo_ret_string(int ret);

@@ -343,8 +343,8 @@ static zbx_uint64_t	get_item_nextcheck_seed(zbx_uint64_t itemid, zbx_uint64_t in
 	{
 		ZBX_DC_INTERFACE	*interface;
 
-		if (CONFIG_ASYNC_SNMP_POLLER_FORKS > 0) 		
-			return interfaceid;
+	//	if (CONFIG_ASYNC_SNMP_POLLER_FORKS > 0) 		
+	//		return interfaceid;
 
 		if (NULL == (interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &interfaceid)) ||
 				SNMP_BULK_ENABLED != interface->bulk)
