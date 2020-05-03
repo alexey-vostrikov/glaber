@@ -2247,6 +2247,7 @@ int init_async_snnmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 	conf.errcodes = errcodes;
 	conf.max_items = max_items;
 	conf.max_connections = max_connections;
+
 	//zabbix_log(LOG_LEVEL_INFORMATION,"%s: doing snmp init", __func__);
 
 	if (NULL == (hs = zbx_malloc(NULL, sizeof(struct async_snmp_session *) * max_connections)))
@@ -2259,6 +2260,7 @@ int init_async_snnmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 		hs[i]->failcount = 0;
 		hs[i]->items_list = zbx_malloc(NULL, sizeof(zbx_list_t));
 		hs[i]->index = i;
+		hs[i]->current_item=-1;
 		zbx_list_create(hs[i]->items_list);
 	}
 
@@ -2330,7 +2332,7 @@ static int start_snmp_connections(struct async_snmp_session *session)
 	//in case we process the finished state, then we'll have to check if it's the same host
 	if (POLL_FINISHED == session->state)
 	{
-		if (session->current_item && conf.items[session->current_item].host.hostid == conf.items[item_idx].host.hostid)
+		if ( (-1 != session->current_item) && conf.items[session->current_item].host.hostid == conf.items[item_idx].host.hostid)
 		{
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Reusing the connection");
 			reuse = 1;
@@ -2361,7 +2363,8 @@ static int start_snmp_connections(struct async_snmp_session *session)
 		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: %ld at %s:Starting conn for the debug host %s",
 				   conf.items[item_idx].itemid, __func__, conf.items[item_idx].host.host);
 
-	if (session->current_item && conf.items[session->current_item].host.hostid != conf.items[item_idx].host.hostid)
+
+	if ( (-1 != session->current_item) && conf.items[session->current_item].host.hostid != conf.items[item_idx].host.hostid)
 	{
 		session->failcount = 0;
 		session->retries = 0;
@@ -2474,6 +2477,7 @@ int get_values_snmp_async()
 		}
 	}
 
+
 	//periodical total netsnmp cleanup
 	if (roll++ > GLB_ASYNC_POLLING_MAX_ITERATIONS)
 	{
@@ -2502,7 +2506,7 @@ int get_values_snmp_async()
 		zbx_init_snmp();
 		zabbix_log(LOG_LEVEL_INFORMATION, "Finished SNMP reset \n");
 	}
-
+	
 	//stage 1 - start new connections
 	for (i = 0; i < conf.max_connections; i++)
 	{
@@ -2512,8 +2516,9 @@ int get_values_snmp_async()
 	timeout.tv_sec = CONFIG_TIMEOUT;
 	timeout.tv_usec = 0;
 
-	do
-	{
+
+//	do
+//	{
 
 		netsnmp_large_fd_set_init(&fdset, MAX_ASYNC_SNMP_ITEMS);
 		snmp_select_info2(&fds, &fdset, &timeout, &block);
@@ -2541,9 +2546,10 @@ int get_values_snmp_async()
 			start_snmp_connections(hs[i]);
 		}
 
-	} while (hosts > 0 && iter++ < 1000);
+//	} while (hosts > 0 && iter++ < 1000);
 
 	//timeouts and retries handling is manual
+//	zabbix_log(LOG_LEVEL_INFORMATION,"AGRUM# 5");
 	for (i = 0; i < conf.max_connections; i++)
 	{
 		struct async_snmp_session *sess = hs[i];
@@ -2607,7 +2613,6 @@ int get_values_snmp_async()
 
 			zabbix_log(LOG_LEVEL_INFORMATION, "Doing cleanup due to many timed items for host %s", conf.items[sess->current_item].host.host);
 
-			//zabbix_log(LOG_LEVEL_INFORMATION,"ASVDE# 6");
 			while (SUCCEED == zbx_list_peek(sess->items_list, (void **)&item_idx) &&
 				   conf.items[item_idx].host.hostid == conf.items[sess->current_item].host.hostid)
 			{
