@@ -2561,7 +2561,7 @@ int get_values_snmp_async()
 			if (hs[i]->stop_time > time(NULL))
 				continue;
 
-			zabbix_log(LOG_LEVEL_INFORMATION, "Item %s:%s timed out, closing connection retry %d failcount %d",
+			zabbix_log(LOG_LEVEL_DEBUG, "Item %s:%s timed out, closing connection retry %d failcount %d",
 					   conf.items[hs[i]->current_item].host.host, conf.items[hs[i]->current_item].key_orig, sess->retries, sess->failcount);
 
 			zbx_snmp_close_session(hs[i]->sess);
@@ -2573,7 +2573,7 @@ int get_values_snmp_async()
 				//we've got a timeout, but withing a retry count, need to start a new packet manually
 				//return the item to the list to start it again
 
-				zabbix_log(LOG_LEVEL_INFORMATION, "Will repoll timed out item %s:%s idx is %d",
+				zabbix_log(LOG_LEVEL_DEBUG, "Will repoll timed out item %s:%s idx is %d",
 						   conf.items[sess->current_item].host.host, conf.items[sess->current_item].key_orig, sess->current_item);
 				zbx_list_prepend(sess->items_list, (void **)sess->current_item, NULL);
 				conf.errcodes[sess->current_item] = POLL_QUEUED;
@@ -2588,7 +2588,7 @@ int get_values_snmp_async()
 			sess->failcount++;
 			sess->retries = 0;
 
-			zabbix_log(LOG_LEVEL_INFORMATION, "Will skip timed out item %s:%s",
+			zabbix_log(LOG_LEVEL_DEBUG, "Will skip timed out item %s:%s",
 					   conf.items[sess->current_item].host.host, conf.items[sess->current_item].key_orig);
 			//number of retries exceeded
 			conf.errcodes[sess->current_item] = TIMEOUT_ERROR;
@@ -2611,7 +2611,7 @@ int get_values_snmp_async()
 				zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld timeout, doing cleanup failcount is %d",
 						   conf.items[sess->current_item].host.host, conf.items[sess->current_item].itemid, sess->failcount);
 
-			zabbix_log(LOG_LEVEL_INFORMATION, "Doing cleanup due to many timed items for host %s", conf.items[sess->current_item].host.host);
+			zabbix_log(LOG_LEVEL_DEBUG, "Doing cleanup due to many timed items for host %s", conf.items[sess->current_item].host.host);
 
 			while (SUCCEED == zbx_list_peek(sess->items_list, (void **)&item_idx) &&
 				   conf.items[item_idx].host.hostid == conf.items[sess->current_item].host.hostid)

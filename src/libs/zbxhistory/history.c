@@ -51,10 +51,10 @@ int	zbx_history_preload()
 	int j;
 
 	//zbx_history_iface_t	*h_writer = &history_ifaces[value_type];
-	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_VC_PRELOAD]->values_num; j++) {
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_VC_PRELOAD]->values_num; j++) {
 
-		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_VC_PRELOAD]->values[j];
-		zbx_history_preload_values_func_t preload_values = callback->callback;
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_VC_PRELOAD]->values[j];
+		glb_history_preload_values_func_t preload_values = callback->callback;
 		
 		preload_values(callback->callbackData);
 	}
@@ -169,7 +169,7 @@ void zbx_history_destroy(void)
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_DESTROY]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_DESTROY]->values[j];
-		zbx_history_destroy_func_t destroy_module = callback->callback;
+		glb_history_destroy_func_t destroy_module = callback->callback;
 		
 		destroy_module(callback->callbackData);
 	}
@@ -200,9 +200,39 @@ int	zbx_history_add_values(const zbx_vector_ptr_t *history)
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values[j];
-		zbx_history_add_values_func_t write_values = callback->callback;
+		glb_history_add_values_func_t write_values = callback->callback;
 		
 		write_values(callback->callbackData, history);
+	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+
+	return SUCCEED;
+}
+
+/************************************************************************************
+ *                                                                                  *
+ * Function: glb_history_add_trends                                                 *
+ *                                                                                  *
+ * Purpose: Sends trends to the history storage                                     *
+ *                                                                                  *
+ * Parameters: trends - [IN] the trends data to store                               *
+ *                                                                                  *
+ *                                                                                  *
+ ************************************************************************************/
+int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
+{
+	int	j,  ret = SUCCEED;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+
+	//sending everyone the agregated data 
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values_num; j++) {
+
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values[j];
+		glb_history_add_trends_func_t write_trends = callback->callback;
+		
+		if (SUCCEED == write_trends(callback->callbackData, trends, trends_num) ) return SUCCEED;
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -242,7 +272,7 @@ int	zbx_history_get_aggregated_values(zbx_uint64_t itemid, int value_type, int s
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGGREGATED]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGGREGATED]->values[j];
-		zbx_history_get_agg_values_func_t get_agg_values = callback->callback;
+		glb_history_get_agg_values_func_t get_agg_values = callback->callback;
 		
 		if (SUCCEED == get_agg_values(callback->callbackData,value_type, itemid,start,end,agggregates,buffer))
 			 return SUCCEED;
@@ -279,7 +309,7 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values[j];
-		zbx_history_get_values_func_t get_values = callback->callback;
+		glb_history_get_values_func_t get_values = callback->callback;
 		
 		if (SUCCEED == get_values(callback->callbackData , value_type, itemid,start,count,end,values)) 
 			return SUCCEED;
@@ -303,16 +333,13 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
  *           the specified value type based on the history storage used.            *
  *                                                                                  *
  ************************************************************************************/
-//i believe that all metric storage systems has 
-//data aggregation built in on it's own
-//however it's always nice to have a possibility to have 
-//a way to write a trends
 int	zbx_history_requires_trends(int value_type)
 {
-//	zbx_history_iface_t	*writer = &history_ifaces[value_type];
-//	return 0 != writer->requires_trends ? SUCCEED : FAIL;
-	//there is no trend generation in glaber since original zabbix uses direct SQL writes of trends
-	//it might appear here, but as a part of history storage interface
+	//if at least one history module was registered for writing trends, allow trends calculation
+	if (0< API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values_num) 
+		return SUCCEED;
+	
+	//zabbix_log(LOG_LEVEL_INFORMATION,"There is no callbacks for trends");
 	return FAIL;
 }
 

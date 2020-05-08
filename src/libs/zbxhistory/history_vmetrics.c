@@ -26,7 +26,7 @@
 
 #define GLB_DEFAULT_VMETRICS_TYPES "dbl, uint"
 #define GLB_DEFAULT_VMETRICS_DBNAME	"glaber"
-
+#define GLB_DEFAULT_VMETRICS_DISABLE_READ 0
 #define MAX_VMETRICS_VALUES 1024
 #define MAX_VMETRICS_POINTS 16386
 #define MAX_VMETRICS_TIMEFRAME 86400
@@ -45,16 +45,16 @@ typedef struct
 {
 	char	*read_url;
 	char	*write_url;
-//	char	*buf;
 	char 	dbname[MAX_ID_LEN];
 	char 	*username;
 	char 	*password;
 	u_int8_t read_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t write_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t read_aggregate_types[ITEM_VALUE_TYPE_MAX];
+	int		disable_read_timeout;
 
 }
-zbx_vmetrics_data_t;
+glb_vmetrics_data_t;
 
 typedef struct
 {
@@ -106,7 +106,7 @@ static void vmetrics_log_error(CURL *handle, CURLcode error, const char *errbuf,
  ************************************************************************************/
 static void vmetrics_destroy(void *data)
 {
-	zbx_vmetrics_data_t *conf = (zbx_vmetrics_data_t *)data;
+	glb_vmetrics_data_t *conf = (glb_vmetrics_data_t *)data;
 
 	//zbx_free(conf->buf);
 	zbx_free(conf->read_url);
@@ -116,6 +116,47 @@ static void vmetrics_destroy(void *data)
 	
 	zbx_free(data);
 }
+
+
+
+/************************************************************************************
+ *                                                                                  *
+ * Function: vmetrics_add_trends                                                    * 
+ *                                                                                  *
+ * Purpose: sends history data to the storage                                       *
+ *                                                                                  *
+ * Parameters:  hist    - [IN] the history storage interface                        *
+ *              history - [IN] the history data vector (may have mixed value types) *
+ *                                                                                  *
+ ************************************************************************************/
+static int	vmetrics_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
+{
+	glb_vmetrics_data_t *conf = (glb_vmetrics_data_t *)data;
+	zabbix_log(LOG_LEVEL_INFORMATION, "Start of %s()", __func__);
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s()", __func__);
+	return SUCCEED;
+}
+
+/************************************************************************************
+ *                                                                                  *
+ * Function: vmetrics_get_trends                                                    * 
+ *                                                                                  *
+ * Purpose: sends history data to the storage                                       *
+ *                                                                                  *
+ * Parameters:  hist    - [IN] the history storage interface                        *
+ *              history - [IN] the history data vector (may have mixed value types) *
+ *                                                                                  *
+ ************************************************************************************/
+static int	vmetrics_get_trends(void *data, const zbx_vector_ptr_t *trends)
+{
+	glb_vmetrics_data_t *conf = (glb_vmetrics_data_t *)data;
+	
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+
+	return SUCCEED;
+}
+
 /************************************************************************************
  *                                                                                  *
  * Function: vmetrics_get_values                                                     *
@@ -141,7 +182,7 @@ static int vmetrics_get_agg_values(void *data, int value_type, zbx_uint64_t item
 	const char *__function_name = "vmetrics_get_values";
 	int valuecount = 0;
 
-	zbx_vmetrics_data_t *conf = (zbx_vmetrics_data_t *)data;
+	glb_vmetrics_data_t *conf = (glb_vmetrics_data_t *)data;
 	size_t url_alloc = 0, url_offset = 0;
 
 	CURLcode err;
@@ -516,7 +557,7 @@ static int vmetrics_get_values(void *data, int value_type, zbx_uint64_t itemid, 
 	const char *__function_name = "vmetrics_get_values";
 	int valuecount = 0;
 
-	zbx_vmetrics_data_t *conf = (zbx_vmetrics_data_t *)data;
+	glb_vmetrics_data_t *conf = (glb_vmetrics_data_t *)data;
 	
 	CURLcode err;
 	CURL *handle = NULL;
@@ -532,6 +573,11 @@ static int vmetrics_get_values(void *data, int value_type, zbx_uint64_t itemid, 
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 	
+	//this isn't really nice idea since we might be getting some get_values from the zabbix frontend
+	if (time(NULL)- conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
+		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
+      	return SUCCEED;
+	}
 	if (0 == conf->read_types[value_type])	
 			return SUCCEED;
 	
@@ -677,7 +723,7 @@ return SUCCEED;
  ************************************************************************************/
 static int vmetrics_add_values(void *data, const zbx_vector_ptr_t *history)
 {
-	zbx_vmetrics_data_t *conf = (zbx_vmetrics_data_t *)data;
+	glb_vmetrics_data_t *conf = (glb_vmetrics_data_t *)data;
 	int i, j, num = 0;
 	ZBX_DC_HISTORY *h;
 	struct zbx_json json_idx, json;
@@ -786,7 +832,7 @@ static int vmetrics_add_values(void *data, const zbx_vector_ptr_t *history)
  ************************************************************************************/
 int	glb_history_vmetrics_init(char *params)
 {
-	zbx_vmetrics_data_t	*conf;
+	glb_vmetrics_data_t	*conf;
 
 //for clickhouse there are following params are parsed:
 //url : by default http://localhost:8123
@@ -804,8 +850,8 @@ int	glb_history_vmetrics_init(char *params)
 	size_t alloc=0,offset=0;
 	zbx_json_type_t type;
     
-	conf = (zbx_vmetrics_data_t *)zbx_malloc(NULL, sizeof(zbx_vmetrics_data_t));
-	memset(conf, 0, sizeof(zbx_vmetrics_data_t));
+	conf = (glb_vmetrics_data_t *)zbx_malloc(NULL, sizeof(glb_vmetrics_data_t));
+	memset(conf, 0, sizeof(glb_vmetrics_data_t));
 	
 	if ( SUCCEED != zbx_json_open(params, &jp_config)) {
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configureation: '%s', most likely not a valid JSON");
@@ -843,6 +889,15 @@ int	glb_history_vmetrics_init(char *params)
 
 	glb_set_process_types(conf->write_types, tmp_str);
 	
+	if ( (SUCCEED == zbx_json_value_by_name(&jp_config,"enable_trends", tmp_str, MAX_ID_LEN,&type))  &&
+		 ( strcmp(tmp_str,"0") == 0 || strcmp(tmp_str,"false")==0 )) {
+			zabbix_log(LOG_LEVEL_INFORMATION, "Trends are disabled");
+	} else {
+		zabbix_log(LOG_LEVEL_INFORMATION, "Trends are enabled");
+		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE_TRENDS,(void (*)(void))vmetrics_add_trends,conf);
+		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS,(void (*)(void))vmetrics_get_trends,conf);
+	}
+
 	if (glb_types_array_sum(conf->write_types) > 0) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Init victoriametrics module: WRITE types '%s'",tmp_str);
 		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE,(void (*)(void))vmetrics_add_values,conf);
@@ -877,6 +932,10 @@ int	glb_history_vmetrics_init(char *params)
 	if (glb_types_array_sum(conf->read_aggregate_types) > 0) {
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ_AGGREGATED,(void (*)(void))vmetrics_get_agg_values,conf);
 	}
+
+	conf->disable_read_timeout=GLB_DEFAULT_VMETRICS_DISABLE_READ;
+	if (SUCCEED ==zbx_json_value_by_name(&jp_config,"disable_reads", tmp_str, MAX_ID_LEN,&type) ) 
+			conf->disable_read_timeout =strtol(tmp_str,NULL,10);
 		
 	return SUCCEED;
 }

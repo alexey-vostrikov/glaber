@@ -16,7 +16,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-
+#include "dbcache.h"
 #ifndef ZABBIX_ZBXHISTORY_H
 #define ZABBIX_ZBXHISTORY_H
 
@@ -56,7 +56,7 @@ int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int c
 		zbx_vector_history_record_t *values);
 int zbx_history_get_aggregated_values(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates,
 		char **buffer);
-
+int glb_history_add_trends(ZBX_DC_TREND * trend, int trends_num);
 
 
 int	zbx_history_requires_trends(int value_type);

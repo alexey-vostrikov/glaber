@@ -13885,3 +13885,31 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 
 	return SUCCEED;
 }
+/************************************************
+* fetches item host names and keys to send to 	*
+* trends storage
+* when i come back this func i should reconsider
+* implementing something like go contexts for
+* pass-through item processing
+************************************************/
+void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
+	int i;
+
+	ZBX_DC_ITEM *item;
+	ZBX_DC_HOST *host;
+
+	RDLOCK_CACHE;
+
+	for (i =0 ; i < trends_num; i++) {
+		if ( (NULL!=(item=zbx_hashset_search(&config->items,&trends[i].itemid))) && 
+			(NULL!=(host=zbx_hashset_search(&config->hosts,&item->hostid)))) {
+				trends[i].host_name=zbx_strdup(NULL,host->host);
+				trends[i].item_key=zbx_strdup(NULL,item->key);
+		} else {
+				trends[i].host_name=zbx_strdup(NULL,"");
+				trends[i].item_key=zbx_strdup(NULL,"");
+		}
+	}
+
+	UNLOCK_CACHE;
+}

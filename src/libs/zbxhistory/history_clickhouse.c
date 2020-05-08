@@ -1,22 +1,3 @@
-/*
-** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
-**
-** This program is free software; you can redistribute it and/or modify
-** it under the terms of the GNU General Public License as published by
-** the Free Software Foundation; either version 2 of the License, or
-** (at your option) any later version.
-**
-** This program is distributed in the hope that it will be useful,
-** but WITHOUT ANY WARRANTY; without even the implied warranty of
-** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-** GNU General Public License for more details.
-**
-** You should have received a copy of the GNU General Public License
-** along with this program; if not, write to the Free Software
-** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-**/
-
 #include "common.h"
 #include "log.h"
 #include "zbxjson.h"
@@ -35,16 +16,15 @@ size_t	DCconfig_get_trigger_itemids_by_valuetype( int value_type, zbx_vector_uin
 
 int	zbx_vc_simple_add(zbx_uint64_t itemids, int value_type, zbx_history_record_t *record);
 
-//const char	*opts[] = {"dbl", "str", "log", "uint", "text"};
-
 extern int CONFIG_SERVER_STARTUP_TIME;
 
 #define GLB_DEFAULT_CLICKHOUSE_TYPES "dbl, str, uint, text"
 #define GLB_DEFAULT_CLICKHOUSE_DISABLE_HOST_ITEMS_NAMES	1
 #define GLB_DEFAULT_CLICKHOUSE_DISABLE_NANOSECONDS	1
-#define GLB_DEFAULT_CLICKHOUSE_DBNAME	"zabbix"
+#define GLB_DEFAULT_CLICKHOUSE_DBNAME	"glaber"
 #define GLB_DEFAULT_CLICKHOUSE_PRELOAD_VALUES 0
 #define GLB_DEFAULT_CLICKHOUSE_DISABLE_READ	1800
+#define GLB_DEFAULT_CLICKHOUSE_DISABLE_TRENDS 0
 
 typedef struct
 {
@@ -58,8 +38,9 @@ typedef struct
 	u_int8_t disable_nanoseconds;
 	u_int16_t preload_values;
 	u_int16_t disable_read_timeout;
+
 }
-zbx_clickhouse_data_t;
+glb_clickhouse_data_t;
 
 typedef struct
 {
@@ -68,6 +49,8 @@ typedef struct
 	size_t	offset;
 }
 zbx_httppage_t;
+
+static char *trend_tables[]={"trends_dbl","","","trends_uint"};
 
 static size_t	curl_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
@@ -113,7 +96,7 @@ static void	clickhouse_log_error(CURL *handle, CURLcode error, const char *errbu
  ************************************************************************************/
 static void	clickhouse_destroy(void *data)
 {
-	zbx_clickhouse_data_t	*conf = (zbx_clickhouse_data_t *)data;
+	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
 	//todo: free all the buffers as well
 	zbx_free(conf->url);
 	zbx_free(data);
@@ -144,7 +127,7 @@ static int	clickhouse_get_agg_values(void *data, int value_type, zbx_uint64_t it
 	const char		*__function_name = "clickhouse_get_agg_values";
 	int valuecount=0;
 
-	zbx_clickhouse_data_t	*conf = (zbx_clickhouse_data_t *)data;
+	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
 	size_t			url_alloc = 0, url_offset = 0;
     
 	CURLcode		err;
@@ -292,7 +275,7 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 	const char		*__function_name = "clickhouse_get_values";
 	int valuecount=0;
 
-	zbx_clickhouse_data_t	*conf = (zbx_clickhouse_data_t *)data;
+	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
 	size_t			url_alloc = 0, url_offset = 0;
     
 	CURLcode		err;
@@ -464,7 +447,34 @@ out:
 	//since otherwise history sincers will try to repeate the query 
 	return SUCCEED;
 }
+/************************************************************************************
+ *                                                                                  *
+ * Function: clickhouse_get_trends                                                     *
+ *                                                                                  *
+ * Purpose: gets item history data from history storage                             *
+ *                                                                                  *
+ * Parameters:  hist    - [IN] the history storage interface                        *
+ *              itemid  - [IN] the itemid                                           *
+ *              start   - [IN] the period start timestamp                           *
+ *              end     - [IN] the period end timestamp                             *
+ *              values  - [OUT] the item trends  data values                        *
+ *                                                                                  *
+ * Return value: SUCCEED - the history data were read successfully                  *
+ *               FAIL - otherwise                                                   *
+ *                                                                                  *
+ * Comments: This function reads <count> values from ]<start>,<end>] interval or    *
+ *           all values from the specified interval if count is zero.               *
+ *                                                                                  *
+ ************************************************************************************/
+static int	clickhouse_get_trends(void *data, int value_type, zbx_uint64_t itemid, int start, int end,
+		zbx_vector_history_record_t *values)
+{
+	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
 
+	//retrun succeeds ander any circumstances 
+	//since otherwise history syncers will try to repeat the query 
+	return SUCCEED;
+}
 /************************************************************************************
  *                                                                                  *
  * Function: clickhouse_add_values                                                     *
@@ -479,7 +489,7 @@ static int	clickhouse_add_values(void *data, const zbx_vector_ptr_t *history)
 {
 	const char	*__function_name = "clickhouse_add_values";
 
-	zbx_clickhouse_data_t	*conf = (zbx_clickhouse_data_t *)data;
+	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
 	int			i,j, num = 0;
 	ZBX_DC_HISTORY		*h;
 	struct zbx_json		json_idx, json;
@@ -525,6 +535,7 @@ static int	clickhouse_add_values(void *data, const zbx_vector_ptr_t *history)
 		if (ITEM_VALUE_TYPE_STR == h->value_type || ITEM_VALUE_TYPE_TEXT == h->value_type ) {
 		    		
             //todo: make more sensible string quotation
+			// like this host_name = zbx_dyn_escape_string();   
             for (j = 0; j < strlen(h->value.str); j++) {
 		        if ('\'' == h->value.str[j]) { 
 				    h->value.str[j]=' ';
@@ -590,6 +601,138 @@ static int	clickhouse_add_values(void *data, const zbx_vector_ptr_t *history)
 	return num;
 }
 
+
+/************************************************************************************
+ *                                                                                  *
+ * Function: clickhouse_add_trends                                                  *
+ *                                                                                  *
+ * Purpose: sends history data to the storage                                       *
+ *                                                                                  *
+ * Parameters:  hist    - [IN] the history storage interface                        *
+ *              history - [IN] the history data vector (may have mixed value types) *
+ *                                                                                  *
+ ************************************************************************************/
+static int	clickhouse_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
+{
+	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
+	int			i,j, value_type, num = 0;
+	
+	ZBX_DC_TREND *tr;
+
+
+	static struct {
+		char *buffer;
+		size_t alloc;
+		size_t offset;
+		int lastflush;
+		int trends_count;
+	} trh[ITEM_VALUE_TYPE_MAX] = {0};
+
+
+	char *host_name, *item_key;	
+	char *precision="%0.4f,";
+
+	if (0 == trends_num ) 
+		return SUCCEED;
+    
+	for (i = 0; i < trends_num; i++)
+	{  
+		value_type=trends[i].value_type;
+		
+		zabbix_log(LOG_LEVEL_INFORMATION, "Got trend data: itemid %ld %s:%s", trends[i].itemid, trends[i].host_name, trends[i].item_key);
+		if ( 0 == trends[i].num ) 
+		 	continue;
+
+		tr=&trends[i];
+
+		if (0 == trh[value_type].trends_count) {
+			zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,"INSERT INTO %s.%s (day,itemid,clock,value_min,value_max,value_avg,hostname,itemname) VALUES", conf->dbname, trend_tables[value_type]);
+		} else {
+			zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,",");
+		}
+
+		zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,"(CAST(%d as date) ,%ld,%d,", trends[i].clock,trends[i].itemid,trends[i].clock);
+    	
+		switch (tr->value_type) {
+		
+			case ITEM_VALUE_TYPE_FLOAT:
+				zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,precision,trends[i].value_min.dbl);
+				zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,precision,trends[i].value_max.dbl);
+				zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,precision,trends[i].value_avg.dbl);
+				break;
+			case ITEM_VALUE_TYPE_UINT64:
+				zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,"%ld,%ld,%ld,",
+			   			trends[i].value_min.ui64,
+						trends[i].value_max.ui64,
+						(trends[i].value_avg.ui64.lo / trends[i].num) );
+				break;
+			default:
+				THIS_SHOULD_NEVER_HAPPEN;
+				break;
+		}
+	
+		host_name = zbx_dyn_escape_string(trends[i].host_name, "'");   
+		item_key = zbx_dyn_escape_string(trends[i].item_key, "'");   
+
+		zbx_snprintf_alloc(&trh[value_type].buffer,&trh[value_type].alloc,&trh[value_type].offset,"'%s','%s')",host_name,item_key);
+		
+		zbx_free(host_name);
+		zbx_free(item_key);
+
+        trh[value_type].trends_count++;
+	}
+
+    for (value_type=0; value_type <ITEM_VALUE_TYPE_UINT64; value_type ++ ) {
+
+		if ((trh[value_type].trends_count > 8192 || trh[value_type].lastflush + 20 < time(NULL)) && trh[value_type].trends_count > 0 )
+		{ 
+			zbx_httppage_t	page_r;
+			bzero(&page_r,sizeof(zbx_httppage_t));
+			struct curl_slist	*curl_headers = NULL;
+			char  errbuf[CURL_ERROR_SIZE];
+			CURLcode		err;
+			CURL	*handle = NULL;
+
+			zabbix_log(LOG_LEVEL_INFORMATION, "It's a trends flush time for %d value type",value_type);		
+		
+			if (NULL == (handle = curl_easy_init()))
+			{
+				zabbix_log(LOG_LEVEL_ERR, "cannot initialize cURL session");
+			} else {
+
+			curl_easy_setopt(handle, CURLOPT_URL, conf->url);
+			curl_easy_setopt(handle, CURLOPT_POSTFIELDS, trh[value_type].buffer);
+			curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, curl_write_cb);
+			curl_easy_setopt(handle, CURLOPT_WRITEDATA, page_r);
+			curl_easy_setopt(handle, CURLOPT_HTTPHEADER, curl_headers);
+			curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
+			curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errbuf);
+	
+			if (CURLE_OK != (err = curl_easy_perform(handle)))
+			{
+				clickhouse_log_error(handle, err, errbuf,&page_r);
+        		zabbix_log(LOG_LEVEL_WARNING, "Failed query '%s' ,trends count is %d", trh[value_type].buffer, trh[value_type].trends_count);
+	
+			} else {
+				zabbix_log(LOG_LEVEL_DEBUG, "CLICKHOUSE: succeeded query: %s",trh[value_type].buffer);
+			}
+		}
+		
+	 	zbx_free(page_r.data);
+		curl_slist_free_all(curl_headers);
+		curl_easy_cleanup(handle);
+		
+		trh[value_type].offset=0;
+		trh[value_type].trends_count=0;
+		trh[value_type].lastflush = time(NULL);
+
+	}
+
+	}
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+
+	return num;
+}
 
 static int zbx_history_add_vc(char* url, int value_type, char *query) {
 	
@@ -710,7 +853,7 @@ out:
 static int clickhouse_preload_values(void *data) {
 	
 	int valuecount=0;
-	zbx_clickhouse_data_t *conf = data;
+	glb_clickhouse_data_t *conf = data;
 	unsigned long rows_num;
 	zbx_vector_uint64_t vector_itemids;
 	zbx_vector_history_record_t values;
@@ -793,7 +936,7 @@ static int clickhouse_preload_values(void *data) {
  ************************************************************************************/
 int	glb_history_clickhouse_init(char *params)
 {
-	zbx_clickhouse_data_t	*conf;
+	glb_clickhouse_data_t	*conf;
 
 	//for clickhouse there are following params are parsed:
 	//url :  http://localhost:8123
@@ -812,8 +955,8 @@ int	glb_history_clickhouse_init(char *params)
 	size_t alloc=0,offset=0;
 	zbx_json_type_t type;
 
-	conf = (zbx_clickhouse_data_t *)zbx_malloc(NULL, sizeof(zbx_clickhouse_data_t));
-	memset(conf, 0, sizeof(zbx_clickhouse_data_t));
+	conf = (glb_clickhouse_data_t *)zbx_malloc(NULL, sizeof(glb_clickhouse_data_t));
+	memset(conf, 0, sizeof(glb_clickhouse_data_t));
 	
 	zabbix_log(LOG_LEVEL_DEBUG,"in %s: starting init", __func__);
 
@@ -840,6 +983,7 @@ int	glb_history_clickhouse_init(char *params)
 		zbx_strlcpy(conf->dbname,tmp_str,MAX_STRING_LEN);
 	else 	zbx_strlcpy(conf->dbname,GLB_DEFAULT_CLICKHOUSE_DBNAME,MAX_STRING_LEN);
 
+	
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_CLICKHOUSE_TYPES,MAX_ID_LEN);
 	zbx_json_value_by_name(&jp_config,"write_types", tmp_str, MAX_ID_LEN,&type);
 	glb_set_process_types(conf->write_types, tmp_str);
@@ -864,7 +1008,7 @@ int	glb_history_clickhouse_init(char *params)
 	
 	if (glb_types_array_sum(conf->preload_types) > 0) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Init clickhouse module: PRELOAD types '%s'",tmp_str);
-		glb_register_callback(GLB_MODULE_API_HISTORY_READ_VC_PRELOAD,(void (*)(void))clickhouse_preload_values,conf);
+		glb_register_callback(GLB_MODULE_API_HISTORY_VC_PRELOAD,(void (*)(void))clickhouse_preload_values,conf);
 	}
 	
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_CLICKHOUSE_TYPES,MAX_ID_LEN);
@@ -876,15 +1020,22 @@ int	glb_history_clickhouse_init(char *params)
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ_AGGREGATED,(void (*)(void))clickhouse_get_agg_values,conf);
 	}
 	
+	if ( (SUCCEED == zbx_json_value_by_name(&jp_config,"enable_trends", tmp_str, MAX_ID_LEN,&type))  &&
+		 ( strcmp(tmp_str,"0") == 0 || strcmp(tmp_str,"false")==0 )) {
+			zabbix_log(LOG_LEVEL_INFORMATION, "Trends are disabled");
+	} else {
+		zabbix_log(LOG_LEVEL_INFORMATION, "Trends are enabled");
+		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE_TRENDS,(void (*)(void))clickhouse_add_trends,conf);
+		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS,(void (*)(void))clickhouse_get_trends,conf);
+	}
 
 	conf->preload_values=GLB_DEFAULT_CLICKHOUSE_PRELOAD_VALUES;
 	if (SUCCEED ==zbx_json_value_by_name(&jp_config,"read_aggregate_types", tmp_str, MAX_ID_LEN,&type) ) 
 			conf->preload_values =strtol(tmp_str,NULL,10);
 
-	conf->preload_values=GLB_DEFAULT_CLICKHOUSE_DISABLE_READ;
+	conf->disable_read_timeout=GLB_DEFAULT_CLICKHOUSE_DISABLE_READ;
 	if (SUCCEED ==zbx_json_value_by_name(&jp_config,"disable_reads", tmp_str, MAX_ID_LEN,&type) ) 
 			conf->disable_read_timeout =strtol(tmp_str,NULL,10);
-
 
 	conf->disable_nanoseconds = GLB_DEFAULT_CLICKHOUSE_DISABLE_NANOSECONDS;
 

@@ -16,18 +16,17 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+#include "dbcache.h"
 
 #ifndef ZABBIX_HISTORY_H
 #define ZABBIX_HISTORY_H
 
-//#define ZBX_HISTORY_IFACE_SQL		0
-//#define ZBX_HISTORY_IFACE_ELASTIC	1
-
-typedef void (*zbx_history_destroy_func_t)(void *data);
-typedef int (*zbx_history_add_values_func_t)(void *data, const zbx_vector_ptr_t *history);
-typedef int (*zbx_history_get_values_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, zbx_vector_history_record_t *values);
-typedef int (*zbx_history_get_agg_values_func_t)(void *data, zbx_uint64_t itemid,int value_type, int start, int end, int aggregates, char **buffer);
-typedef int (*zbx_history_preload_values_func_t)(void *data);
+typedef void (*glb_history_destroy_func_t)(void *data);
+typedef int (*glb_history_add_values_func_t)(void *data, const zbx_vector_ptr_t *history);
+typedef int (*glb_history_add_trends_func_t)(void *data, ZBX_DC_TREND *trends, int trends_num);
+typedef int (*glb_history_get_values_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, zbx_vector_history_record_t *values);
+typedef int (*glb_history_get_agg_values_func_t)(void *data, zbx_uint64_t itemid,int value_type, int start, int end, int aggregates, char **buffer);
+typedef int (*glb_history_preload_values_func_t)(void *data);
 
 /*
 struct zbx_history_iface
@@ -56,7 +55,7 @@ struct zbx_history_iface
 int glb_history_clickhouse_init(char *params);
 int glb_history_vmetrics_init(char *params);
 int glb_history_worker_init(char *params);
-
+int glb_history_sql_init(char *params);
 
 int glb_set_process_types(u_int8_t *types_array, char *setting);
 int glb_types_array_sum(u_int8_t *types_array);

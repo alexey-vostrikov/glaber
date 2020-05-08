@@ -735,18 +735,17 @@ static int	sql_flush(void *data)
  *               FAIL    - otherwise                                                *
  *                                                                                  *
  ************************************************************************************/
-int	zbx_history_sql_init(char *params)
+int	zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error)
 {
-	//ZBX_UNUSED(error);
-	//todo: add parsing of the parameter
+	ZBX_UNUSED(error);
 
 	hist->value_type = value_type;
 
 	hist->destroy = sql_destroy;
 	hist->add_values = sql_add_values;
-	
+	hist->flush = sql_flush;
 	hist->get_values = sql_get_values;
-
+	
 	switch (value_type)
 	{
 		case ITEM_VALUE_TYPE_FLOAT:

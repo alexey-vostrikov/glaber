@@ -90,12 +90,13 @@ def get_aggregated_history(request):
             " AND time <= " + str(request['end']*1000000000) +\
             " GROUP BY time(" + str(group_sec) + "s) ORDER BY time ASC"
     #will be only be able do this having enough data collected
-    logging.debug(query)
+    #logging.debug(query)
     result = client.query(query=query, epoch="rfc3339")
     points = list(result.get_points(measurement="itemid" + str(request["itemid"])))
     
     #logging.debug(result)
     
+    #perhaps, making an automatic struct export would be much compact and prettier here
     i = 0
     print("{\"itemid\":"+str(request["itemid"])+", \"data\":[",flush=True)
     first_rec = True

@@ -428,6 +428,7 @@ int	glb_history_worker_init(char *params)
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ,(void (*)(void))worker_get_values,conf);
 	}
 	
+
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_WORKER_TYPES,MAX_ID_LEN);
 	zbx_json_value_by_name(&jp_config,"read_aggregated_types", tmp_str, MAX_ID_LEN,&type);
 	glb_set_process_types(conf->read_aggregate_types, tmp_str);

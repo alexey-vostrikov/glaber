@@ -520,6 +520,8 @@ typedef struct
 	int		num;
 	int		disable_from;
 	unsigned char	value_type;
+	char *host_name; /*hostname to log to history */
+	char *item_key; /* name of metric*/
 }
 ZBX_DC_TREND;
 
@@ -535,7 +537,7 @@ typedef struct
 	unsigned char	state;
 	int		ttl;		/* time-to-live of the history value */
 	char *host_name; /*hostname to log to history */
-	char *item_key; /* name of metric h*/
+	char *item_key; /* name of metric*/
 }
 ZBX_DC_HISTORY;
 
