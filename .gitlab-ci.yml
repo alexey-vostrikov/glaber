@@ -1,172 +1,362 @@
+stages:
+  - requirements
+  - pre-build
+  - build
+  - deploy
+
+variables:
+  AWS_DEFAULT_REGION: eu-north-1
+  BUCKET_NAME: glaber
+
+download-requirements:
+  image: "python:latest"
+  stage: requirements
+  before_script:
+    - pip install awscli
+  script:
+    - aws s3 cp s3://${BUILD_BUCKET_NAME}/ ./ --recursive
+  artifacts:
+    paths:
+      - build/
+
+old-packages:
+  image: "python:latest"
+  stage: pre-build
+  before_script:
+    - pip install awscli
+  script:
+    - aws s3 cp s3://${BUCKET_NAME}/ ./ --recursive
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
+
 debian-jessie:
   stage: build
   image: debian:jessie
+  dependencies:
+   - download-requirements
+   - old-packages
   script:
     - apt-get update
-    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-7-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev lftp curl
-    - wget -q https://$CI_DOMAIN/build/debian/jessie/debian.tar.xz
+    - apt-get install -y dpkg-dev devscripts wget git dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-7-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev  curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+$(lsb_release -c -s).debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "jessie" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h 
-    - cat frontends/php/include/defines.inc.php
-    - cat include/version.h
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "jessie" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "jessie" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - mkdir -p pkgs/jessie/
-    - mv ../*.deb pkgs/jessie/
-    - cd pkgs
-    - ls jessie
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose jessie/ debian/jessie/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for JESSIE were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/debian/dists/jessie/main/binary-amd64/
+    - mkdir -p pkgs/debian/pool/main/jessie/
+    - mv ../../*.deb pkgs/debian/pool/main/jessie/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/debian/
   only:
     - tags
+    - cicd_aws
+    - testing
 
 debian-stretch:
   stage: build
   image: debian:stretch
+  dependencies:
+    - download-requirements
+    - old-packages
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
-    - wget -q https://$CI_DOMAIN/build/debian/stretch/debian.tar.xz
+    - apt-get install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+$(lsb_release -c -s).debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "stretch" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "stretch" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "stretch" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - mkdir -p pkgs/stretch/
-    - mv ../*.deb pkgs/stretch/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose stretch/ debian/stretch/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for STRETCH were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/debian/dists/stretch/main/binary-amd64/
+    - mkdir -p pkgs/debian/pool/main/stretch/
+    - mv ../../*.deb pkgs/debian/pool/main/stretch/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/debian/
   only:
     - tags
+    - cicd_aws
+    - testing
 
 debian-buster:
   stage: build
   image: debian:buster
+  dependencies:
+    - download-requirements
+    - old-packages
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
-    - wget -q https://$CI_DOMAIN/build/debian/buster/debian.tar.xz
+    - apt-get install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev default-libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+$(lsb_release -c -s).debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "buster" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "buster" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "buster" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - mkdir -p pkgs/buster/
-    - mv ../*.deb pkgs/buster/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose buster/ debian/buster/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for BUSTER were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/debian/dists/buster/main/binary-amd64/
+    - mkdir -p pkgs/debian/pool/main/buster/
+    - mv ../../*.deb pkgs/debian/pool/main/buster/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/debian/
   only:
     - tags
+    - cicd_aws
+    - testing
+
+ubuntu-focal:
+  stage: build
+  image: ubuntu:focal
+  dependencies:
+    - download-requirements
+    - old-packages
+  script:
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update
+    - apt-get install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+bionic.debian.tar.xz" -O debian.tar.xz
+    - tar -xvf debian.tar.xz
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "bionic" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "disco" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
+    - autoreconf -fvi
+    - dpkg-buildpackage -b
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/ubuntu/dists/disco/main/binary-amd64/
+    - mkdir -p pkgs/ubuntu/pool/main/disco/
+    - mv ../../*.deb pkgs/ubuntu/pool/main/disco/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/ubuntu/
+  only:
+    - tags
+    - cicd_aws
+    - testing
 
 ubuntu-disco:
   stage: build
   image: ubuntu:disco
+  dependencies:
+    - download-requirements
+    - old-packages
   script:
+    - sed -i -e 's|archive.ubuntu|old-releases.ubuntu|g' /etc/apt/sources.list
+    - sed -i -e 's|security.ubuntu|old-releases.ubuntu|g' /etc/apt/sources.list
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
-    - wget -q https://$CI_DOMAIN/build/ubuntu/disco/debian.tar.xz
+    - apt-get install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+bionic.debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "disco" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "disco" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "disco" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - mkdir -p pkgs/disco/
-    - mv ../*.deb pkgs/disco/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose disco/ ubuntu/disco/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for DISCO were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/ubuntu/dists/disco/main/binary-amd64/
+    - mkdir -p pkgs/ubuntu/pool/main/disco/
+    - mv ../../*.deb pkgs/ubuntu/pool/main/disco/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/ubuntu/
   only:
     - tags
+    - cicd_aws
+    - testing
 
 ubuntu-bionic:
   stage: build
   image: ubuntu:bionic
+  dependencies:
+    - download-requirements
+    - old-packages
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
-    - wget -q https://$CI_DOMAIN/build/ubuntu/bionic/debian.tar.xz
+    - apt-get install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+$(lsb_release -c -s).debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "bionic" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "bionic" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "bionic" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - mkdir -p pkgs/bionic/
-    - mv ../*.deb pkgs/bionic/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose bionic/ ubuntu/bionic/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for BIONIC were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/ubuntu/dists/bionic/main/binary-amd64/
+    - mkdir -p pkgs/ubuntu/pool/main/bionic/
+    - mv ../../*.deb pkgs/ubuntu/pool/main/bionic/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/ubuntu/
   only:
     - tags
+    - cicd_aws
+    - testing
 
 ubuntu-xenial:
   stage: build
   image: ubuntu:xenial
+  dependencies:
+    - download-requirements
+    - old-packages
   script:
     - apt-get update
-    - apt-get install -y lftp ssh dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
-    - wget -q https://$CI_DOMAIN/build/ubuntu/xenial/debian.tar.xz
+    - apt-get install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libmysqlclient-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev openjdk-8-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev tar xz-utils curl
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+$(lsb_release -c -s).debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
-    - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "xenial" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "xenial" "all latest updates"; else dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "xenial" "${CI_COMMIT_MESSAGE-'all latest updates'}"; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h; fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - mkdir -p pkgs/xenial/
-    - mv ../*.deb pkgs/xenial/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose xenial/ ubuntu/xenial/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for XENIAL were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p pkgs/ubuntu/dists/xenial/main/binary-amd64/
+    - mkdir -p pkgs/ubuntu/pool/main/xenial/
+    - mv ../../*.deb pkgs/ubuntu/pool/main/xenial/
+    - chmod +x ../build/deb.sh
+    - ../build/deb.sh
+  artifacts:
+    paths:
+      - ${CI_COMMIT_REF_SLUG}/pkgs/ubuntu/
   only:
     - tags
+    - cicd_aws
+    - testing
 
-centos:
+centos7:
   stage: build
   image: centos:7
+  dependencies:
+    - download-requirements
+    - old-packages
   script:
-    - yum install -y rpm-build yum-utils xz wget lftp ssh tar curl
+    - yum install -y rpm-build yum-utils xz wget tar curl createrepo
     - yum groupinstall "Development Tools" -y
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
-    - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
-    - wget -q -r -nH --cut-dirs=2 --no-parent --reject="index.html*" https://$CI_DOMAIN/rhel/7/other/
-    - yum install -y ./other/*.rpm
-    - rm -rf ./other/
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)\"/g" include/version.h; fi
+    - yum install -y build/rhel/7/other/*.rpm
     - cd ..
-    - cp -R glaber zabbix-4.2.4      
-    - tar -czvf zabbix-4.2.4.tar.gz zabbix-4.2.4       
-    - mkdir -p glaber/build/centos/7/SOURCES/
-    - mkdir -p glaber/build/centos/7/SPECS/
-    - mkdir -p glaber/build/centos/7/temp/
-    - mv zabbix-4.2.4.tar.gz glaber/build/centos/7/SOURCES/zabbix-4.2.4.tar.gz
+    - cp -R glaber zabbix-${ZABBIX_VERSION}      
+    - tar -czvf zabbix-${ZABBIX_VERSION}.tar.gz zabbix-${ZABBIX_VERSION}      
+    - mkdir -p glaber/build/centos/7/{SOURCES,SPECS,temp}
+    - mv zabbix-${ZABBIX_VERSION}.tar.gz glaber/build/centos/7/SOURCES/zabbix-${ZABBIX_VERSION}.tar.gz
     - cd glaber/build/centos/7/temp
-    - wget -q https://$CI_DOMAIN/build/centos/7/centos.src.rpm
-    - rpm2cpio ./centos.src.rpm | cpio -idmv
-    - sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.%{glaber_version}/g" zabbix.spec
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/rhel/7/SRPMS/zabbix-${ZABBIX_VERSION}-1.el7.src.rpm" -O centos.src.rpm
+    - rpm2cpio centos.src.rpm | cpio -idmv
+    - rm centos.src.rpm
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.%{glaber_version}/g" zabbix.spec; else sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)/g" zabbix.spec; fi
+    - cat zabbix.spec
     - mv zabbix.spec ../SPECS/zabbix.spec
-    - rm zabbix-4.2.4.tar.gz
+    - rm zabbix-${ZABBIX_VERSION}.tar.gz
     - mv ./* ../SOURCES/
     - cd ..
     - yum-builddep -y SPECS/zabbix.spec
-    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG}"
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG}"; else rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)"; fi
     - cd ../../../
-    - mkdir -p pkgs/centos7/
-    - mv /root/rpmbuild/RPMS/* pkgs/centos7/
-    - cd pkgs
-    - lftp -e "set ssl:verify-certificate no; set sftp:auto-confirm yes; open sftp://$CI_USER:$CI_PASS@$CI_DOMAIN:$CI_PORT; mirror -P 10 --use-pget-n=10 -X .* -X .*/ --reverse --verbose centos7/ centos/7/; bye"
-    - curl "https://api.telegram.org/bot$CI_TG_TOKEN/sendMessage?chat_id=$CI_TG_CHAT_ID&text=$(date +%Y%m%d-%H%M%S) Packages for Centos-7 were uploaded on $CI_DOMAIN!" > /dev/null 2>&1
-
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p rhel/7/
+    - cp -R /root/rpmbuild/RPMS/* rhel/7/
+    - cd rhel/7/
+    - createrepo .
+    - cd ../../../
+  artifacts:
+    paths:
+      - rhel/
   only:
     - tags
+    - cicd_aws
+    - testing
+
+centos8:
+  stage: build
+  image: centos:8
+  dependencies:
+    - download-requirements
+    - old-packages
+  script:
+    - yum install -y rpm-build yum-utils xz wget tar curl createrepo wget
+    - yum groupinstall "Development Tools" -y
+    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php; else sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)');/g" frontends/php/include/defines.inc.php; fi
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h; else sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)\"/g" include/version.h; fi
+    - cd ..
+    - cp -R glaber zabbix-${ZABBIX_VERSION}
+    - tar -czvf zabbix-${ZABBIX_VERSION}.tar.gz zabbix-${ZABBIX_VERSION}
+    - mkdir -p glaber/build/centos/8/{SOURCES,SPECS,temp}
+    - mv zabbix-${ZABBIX_VERSION}.tar.gz glaber/build/centos/8/SOURCES/zabbix-${ZABBIX_VERSION}.tar.gz
+    - cd glaber/build/centos/8/temp
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/rhel/8/SRPMS/zabbix-${ZABBIX_VERSION}-1.el8.src.rpm" -O centos.src.rpm
+    - rpm2cpio centos.src.rpm | cpio -idmv
+    - rm centos.src.rpm
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.%{glaber_version}/g" zabbix.spec; else sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)/g" zabbix.spec; fi
+    - cat zabbix.spec
+    - mv zabbix.spec ../SPECS/zabbix.spec
+    - rm zabbix-${ZABBIX_VERSION}.tar.gz
+    - mv ./* ../SOURCES/
+    - cd ..
+    - yum-builddep -y SPECS/zabbix.spec
+    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG}"; else rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)"; fi
+    - cd ../../../
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p rhel/8/
+    - cp -R /root/rpmbuild/RPMS/* rhel/8/
+    - cd rhel/8/
+    - createrepo .
+    - cd ../../../
+  artifacts:
+    paths:
+      - rhel/
+  only:
+    - tags
+    - cicd_aws
+    - testing
+
+deploys3:
+  image: "python:latest"
+  stage: deploy
+  dependencies:
+    - centos7
+    - ubuntu-xenial
+    - ubuntu-bionic
+    - ubuntu-disco
+    - ubuntu-focal
+    - debian-stretch
+    - debian-jessie
+  before_script:
+    - pip install awscli
+  script:
+    - aws s3 cp pkgs s3://${BUCKET_NAME}/${CI_COMMIT_REF_SLUG} --recursive
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
