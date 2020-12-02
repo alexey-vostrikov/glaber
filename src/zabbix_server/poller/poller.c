@@ -671,7 +671,8 @@ static int prepare_items(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  
 	zbx_free(port);
 	return num;
 }
-static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  int max_items, int poller_type, zbx_vector_ptr_t* add_results) {
+static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  int max_items, int poller_type, 
+	zbx_vector_ptr_t* add_results, zbx_hashset_t *history_cache) {
 	int i, num=0;
 	zbx_timespec_t		timespec;
 	
@@ -700,7 +701,8 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 		}
 		if (CONFIG_DEBUG_HOST == items[i].host.hostid)
 			zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Preprocessing item %ld in state %d",items[i].itemid, errcodes[i]);
-
+		
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Preprocessing item %ld in state %d idx is %d",items[i].itemid, errcodes[i],i);
 		//host activation/dactiovation part
 		//it's quite strange it's done here
 		switch (errcodes[i])
@@ -756,9 +758,11 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 			if (0 == add_results->values_num) {
 				items[i].state = ITEM_STATE_NORMAL;
 				num++;
+				
+				glb_fast_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags,
+							&results[i], &timespec, items[i].state, NULL, &items[i], history_cache, poller_type);
+				
 							
-				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags,
-							&results[i], &timespec, items[i].state, NULL);
 			} else {
 				/* vmware.eventlog item returns vector of AGENT_RESULT representing events */
 				int		j;
@@ -771,15 +775,15 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 				
 						items[i].state = ITEM_STATE_NOTSUPPORTED;
 						num++;
-						zbx_preprocess_item_value(items[i].itemid, items[i].value_type,
+						glb_fast_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type,
 							items[i].flags, NULL, &ts_tmp, items[i].state,
-							add_result->msg);
+							add_result->msg, &items[i],history_cache, poller_type );
 					} else {
 						items[i].state = ITEM_STATE_NORMAL;
 						num++;
-						zbx_preprocess_item_value(items[i].itemid, items[i].value_type,
+						glb_fast_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type,
 								items[i].flags, add_result, &ts_tmp, items[i].state,
-								NULL);
+								NULL,&items[i], history_cache, poller_type );
 					}
 						/* ensure that every log item value timestamp is unique */
 					if (++ts_tmp.ns == 1000000000) {
@@ -789,14 +793,16 @@ static int preprocess_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *result
 				}
 			}
 				
-		} else {//if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {	
-			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			num++;			
-			if (CONFIG_DEBUG_HOST == items[i].host.hostid) 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: about to be sent to preprocessing ",items[i].itemid,__func__);
+		} else {
+		if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i]) {
+				items[i].state = ITEM_STATE_NOTSUPPORTED;
+				num++;			
+				if (CONFIG_DEBUG_HOST == items[i].host.hostid) 
+					zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: about to be sent to preprocessing ",items[i].itemid,__func__);
 
-			zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL, &timespec,
-					items[i].state, results[i].msg);
+				glb_fast_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags, NULL, &timespec,
+					items[i].state, results[i].msg, &items[i],history_cache, poller_type);
+			}
 		}
 		
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Requeueing item %ld",items[i].itemid);		
@@ -827,8 +833,13 @@ static int clean_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  i
 
 		//zabbix_log(LOG_LEVEL_INFORMATION, "Cleaning item %ld in state %d",items[i].itemid, errcodes[i]);
 		num++;
-		zabbix_log(LOG_LEVEL_DEBUG,"%s, cleaning item %d state is %d",__func__, i,errcodes[i]);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"%s, cleaning item idx is %d state is %d",__func__, i,errcodes[i]);
 		zbx_free(items[i].key);
+		
+		if (NULL != items[i].preprocitem) {
+			preproc_item_clear(items[i].preprocitem);
+			zbx_free(items[i].preprocitem);
+		}
 
 		switch (items[i].type)
 		{
@@ -884,47 +895,9 @@ static int clean_values(DC_ITEM *items, int *errcodes, AGENT_RESULT *results,  i
 }
 extern int CONFIG_ASYNC_SNMP_POLLER_FORKS;
 extern int CONFIG_ASYNC_SNMP_AGENT_CONNS;
-/*
-static int	get_local_queue_items(zbx_binary_heap_t *local_queue, DC_ITEM	*items,	AGENT_RESULT *results, int *errcodes, int max_items) {
-	int num=0;
-	int cnt=0;
+#define GLB_ASYNC_POLLER_CONF_TIME 2
 
-	while (num < max_items && FAIL == zbx_binary_heap_empty(local_queue))
-	{
-		const zbx_binary_heap_elem_t	*min;
-		
-		min = zbx_binary_heap_find_min(local_queue);
-		
-		//this the oldest element point to future
-		if (min->key > time(NULL)) break; 
-
-		//skip non-free items
-		if (POLL_FREE != errcodes[num]) {
-			num++;
-			continue;
-		}
-
-		zbx_binary_heap_remove_min(local_queue);
-		
-		//getting item and host for the itemid, it may fail of item id is invalid
-		if (FAIL == glb_dc_get_item_host_data((zbx_uint64_t)(min->data), items[num])) 
-			continue;
-				
-		errcodes[num]=POLL_CC_FETCHED;
-		num++;
-		cnt++;
-	}
-	
-}
-
-static int	requeue_local_items(zbx_binary_heap_t *local_queue, DC_ITEM	 *items, AGENT_RESULT *results, int *errcodes, int max_items) {
-
-	
-}
-*/
-#define GLB_ASYNC_POLLER_CONF_TIME 1
-
-/******************************************************************************
+/**********************************************************c********************
  *                                                                            *
  * Function: get_values                                                       *
  *                                                                            *
@@ -941,11 +914,12 @@ static int	requeue_local_items(zbx_binary_heap_t *local_queue, DC_ITEM	 *items, 
  *                                                                            *
  ******************************************************************************/
 static int	get_values(unsigned char poller_type, int *processed_num,
-			DC_ITEM	 *items,	AGENT_RESULT *results, int *errcodes, int max_items)
+			DC_ITEM	 *items,	AGENT_RESULT *results, int *errcodes, int max_items, zbx_hashset_t * history_cache)
 {
 	int	i, new_num, num_collected=0, num, now=time(NULL);
 	int last_stat_time=time(NULL);
-	int queue_idx=poller_type;
+	static double get_items_t=0.0, requeu_items_t=0.0, other_times_t=0.0, buf_time=0.0, sleep_time=0.0;
+	
 	int next_dc_get=0;
 	int next_dc_preproc=0;
 	zbx_binary_heap_t local_queue; 
@@ -960,15 +934,7 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 	for (i = 0; i < max_items; i++) 
 		errcodes[i]=POLL_FREE;
 	
-	if (ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	
-		queue_idx = ZBX_POLLER_TYPE_COUNT + process_num -1;	
-	if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type )	
-		queue_idx = ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS + process_num - 1;	
-	
-	//if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	{
-	//	zbx_hashset_create(&local_queue, 0,	ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	//}
-
+		
 	do {  //async loop supposed to never end 
 		now=time(NULL);
 		num=0;
@@ -978,12 +944,16 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 		
 		if (ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )	{
 			if (now > next_dc_get ) {
-					new_num=DCconfig_get_poller_items(queue_idx, items, errcodes, max_items);
+				if (buf_time > 0.0) other_times_t+=zbx_time()-buf_time;
+				buf_time=zbx_time();
+				new_num=DCconfig_get_poller_items(poller_type, process_num, items, errcodes, max_items);
+				get_items_t+=zbx_time()-buf_time;
+				buf_time=zbx_time();
 				next_dc_get=now+GLB_ASYNC_POLLER_CONF_TIME;
 			}
 			
 		} else 
-			new_num=DCconfig_get_poller_items(queue_idx, items, errcodes, max_items);
+			new_num=DCconfig_get_poller_items(poller_type, process_num, items, errcodes, max_items);
 		
 		prepare_items(items, errcodes,results, max_items);
 #ifdef HAVE_NETSNMP
@@ -1041,15 +1011,20 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 
 		float ts,te;
 		
-		num=preprocess_values(items, errcodes, results, max_items, poller_type, &add_results);
+		num=preprocess_values(items, errcodes, results, max_items, poller_type, &add_results, history_cache);
 		
 		if ((ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) 
 			&& (time(NULL) > next_dc_preproc ) ) {
 			int cnt=0;
-			//ts=zbx_time();
+			other_times_t+=zbx_time()-buf_time;
+			buf_time=zbx_time();
+			
 			DCpoller_requeue_items(items, time(NULL),  errcodes, max_items, poller_type); 
-			//te=zbx_time();
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Timing: released %d items, spent %f sec in requeing only", num, te-ts);
+			requeu_items_t+=zbx_time()-buf_time;
+			buf_time=zbx_time();
+			
+			
+			zabbix_log(LOG_LEVEL_DEBUG,"Timing: get_items: %f, requue_items: %f, sleep_time: %f, other: %f", get_items_t,requeu_items_t, sleep_time, other_times_t);
 			next_dc_preproc=time(NULL)+GLB_ASYNC_POLLER_CONF_TIME;
 		} else {
 			DCpoller_requeue_items(items,time(NULL),  errcodes, max_items, poller_type); 
@@ -1057,13 +1032,22 @@ static int	get_values(unsigned char poller_type, int *processed_num,
 
 		//we haven't either processed any items or got new ones to process then it's ok to sleep
 		if ( num + new_num == 0 ) {
+				
+			if ((ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) ) {
+				other_times_t+=zbx_time()-buf_time;
+				buf_time=zbx_time();
+			}
 			update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
 			usleep(20000);
 			update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
-		
+			
+			if ((ZBX_POLLER_TYPE_ASYNC_AGENT == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type ) ) {
+				sleep_time+=zbx_time()-buf_time;
+				buf_time=zbx_time();
+			}
 		}
 		
-		*processed_num+=num;
+		*processed_num += num;
 		//zabbix_log(LOG_LEVEL_INFORMATION, "QPoller_stat: preprocessed %d items", num);
 		
 		clean_values(items, errcodes, results, max_items, poller_type, 0);
@@ -1117,7 +1101,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	DC_ITEM			*items;
 	AGENT_RESULT		*results;
 	int			*errcodes;
-
+	zbx_hashset_t history_cache;
 
 //#define	STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
@@ -1129,8 +1113,11 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
+	glb_preprocessing_init();
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	zbx_hashset_create(&history_cache, 1000, ZBX_DEFAULT_UINT64_HASH_FUNC,
+			ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
 #ifdef HAVE_NETSNMP
 	if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type)
@@ -1196,7 +1183,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			  init_async_agent(items, results,errcodes, max_items, CONFIG_ASYNC_AGENT_POLLER_CONNS);
 			   
 
-		processed += get_values(poller_type,&processed,items,results,errcodes,max_items);
+		processed += get_values(poller_type,&processed,items,results,errcodes,max_items,&history_cache);
 		total_sec += zbx_time() - sec;
 		
 		if (ZBX_POLLER_TYPE_ASYNC_SNMP == poller_type )  destroy_aync_snmp();
@@ -1230,7 +1217,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	zbx_free(items);
 	zbx_free(results);
 	zbx_free(errcodes);
- 
+	zbx_hashset_destroy(&history_cache);
+
 	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
 
 	while (1)

@@ -7,7 +7,5 @@ noinst_LIBRARIES = libzbxhistory.a
 
 libzbxhistory_a_SOURCES = \
 	history.c history.h \
-	history_clickhouse.c \
-	history_vmetrics.c	\
 	history_worker.c
 	

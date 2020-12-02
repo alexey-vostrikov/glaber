@@ -1124,7 +1124,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 
 	zabbix_log(LOG_LEVEL_INFORMATION,"%s: doing history preloading",__func__);
-	zbx_history_preload();
+	glb_history_preload();
 	zbx_vc_get_statistics(&stats);
 	 
 	zabbix_log(LOG_LEVEL_INFORMATION,"%s: finished history preloading, free:%ld% ( %ld MB free out %ld MB total )  ",__func__,(stats.free_size*100)/stats.total_size,

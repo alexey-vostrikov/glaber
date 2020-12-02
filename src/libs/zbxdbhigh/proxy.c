@@ -2824,7 +2824,7 @@ static void	process_item_value(const DC_ITEM *item, AGENT_RESULT *result, zbx_ti
 {
 	if (0 == item->host.proxy_hostid)
 	{
-		zbx_preprocess_item_value(item->itemid, item->value_type, item->flags, result, ts, item->state, error);
+		zbx_preprocess_item_value(item->host.hostid, item->itemid, item->value_type, item->flags, result, ts, item->state, error);
 	}
 	else
 	{
@@ -3842,7 +3842,6 @@ int	process_agent_history_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zb
 int	process_sender_history_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_timespec_t *ts, char **info)
 {
 	zbx_host_rights_t	rights = {0};
-
 	return process_client_history_data(sock, jp, ts, sender_item_validator, &rights, info);
 }
 

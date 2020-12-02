@@ -180,7 +180,7 @@ void	zbx_udp_close(zbx_socket_t *s);
 
 //how many items should fail in a row for a host to mark it unreachable and 
 //and stop trying to poll other items
-#define GLB_FAIL_COUNT_CLEAN 2
+#define GLB_FAIL_COUNT_CLEAN 6
 
 int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, const char *version, int protocol,
 		int timeout);

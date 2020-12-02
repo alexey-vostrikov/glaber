@@ -45,13 +45,16 @@ class CTrend extends CApiService {
 			// filter
 			'time_from'		=> null,
 			'time_till'		=> null,
-			// output
+			// output fields filter
 			'output'		=> API_OUTPUT_EXTEND,
+			//count output is set when only counts are requested
 			'countOutput'	=> false,
+			//data limitation
 			'limit'			=> null
 		];
 
 		$options = zbx_array_merge($default_options, $options);
+		
 
 		$storage_items = [];
 		$result = ($options['countOutput']) ? 0 : [];
@@ -64,18 +67,24 @@ class CTrend extends CApiService {
 				'webitems' => true,
 				'filter' => ['value_type' => [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]]
 			]);
-
+		
 			foreach ($items as $item) {
 				$history_source = CHistoryManager::getDataSourceType($item['value_type']);
 				$storage_items[$history_source][$item['value_type']][$item['itemid']] = true;
 			}
 		}
-
-		foreach ([ZBX_HISTORY_SOURCE_ELASTIC, ZBX_HISTORY_SOURCE_SQL] as $source) {
+		
+		foreach ([ZBX_HISTORY_SOURCE_ELASTIC, ZBX_HISTORY_SOURCE_SQL,ZBX_HISTORY_SOURCE_SERVER ] as $source) {
 			if (array_key_exists($source, $storage_items)) {
 				$options['itemids'] = $storage_items[$source];
-
+		
 				switch ($source) {
+					case ZBX_HISTORY_SOURCE_SERVER:
+						$data = $this->getFromServer($options);
+						break;
+					case ZBX_HISTORY_SOURCE_SQL:
+						$data = $this->getFromSQL($options);
+						break;
 					case ZBX_HISTORY_SOURCE_ELASTIC:
 						$data = $this->getFromElasticsearch($options);
 						break;
@@ -92,9 +101,41 @@ class CTrend extends CApiService {
 				}
 			}
 		}
-
+		
 		return is_array($result) ? $result : (string) $result;
 	}
+
+	//note: count isn't supported yet by the server server api
+	private function getFromServer($options) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	//	error_log("Server code is invoked");
+	//	error_log(json_encode($options));
+
+		$result=[];
+		if (!$options['countOutput']) {
+			error_log("no counts");
+		
+			$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : 0;
+			
+			foreach ([ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64] as $value_type) {
+			
+				foreach( array_keys($options['itemids'][$value_type]) as $itemid) {
+					error_log("Requesting item $itemid from the server".json_encode($itemid));
+					$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+					$add_result= $server->getHistoryData(get_cookie(ZBX_SESSION_NAME), $itemid, $options['time_from'], $options['time_till'], $limit, "trends"); 
+					$result=array_merge($result,$add_result);
+				}
+			}
+		
+			$result = $this->unsetExtraFields($result, ['itemid'], $options['output']);
+			error_log(count($result));
+			return $result;
+		} else {
+			error_log("WARNING: Unsupported option countOutput is invoked");
+			return [];
+		}
+	}
+
 
 	/**
 	 * SQL specific implementation of get.

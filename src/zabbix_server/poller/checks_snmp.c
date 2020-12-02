@@ -2219,20 +2219,31 @@ int asynch_response(int operation, struct snmp_session *sp, int reqid,
 	struct snmp_pdu *req;
 
 	if (CONFIG_DEBUG_HOST == conf.items[sess->current_item].host.hostid)
-		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: %ld at %s:Got responce fore the debug host",
+		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: %ld at %s:Got responce for the debug host",
 				   conf.items[sess->current_item].itemid, __func__);
 
 	if (operation != NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE)
 	{
-		//async_submit_result(STAT_TIMEOUT, sess->sess, pdu, &conf.results[sess->current_item]);
+		async_submit_result(STAT_TIMEOUT, sess->sess, pdu, &conf.results[sess->current_item]);
 	}
 	else
 	{
+		if (CONFIG_DEBUG_ITEM == conf.items[sess->current_item].itemid) 
+			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld doing submit result");
+		
+
 		async_submit_result(STAT_SUCCESS, sess->sess, pdu, &conf.results[sess->current_item]);
+		
+		if (CONFIG_DEBUG_ITEM == conf.items[sess->current_item].itemid) 
+			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld finished submit result");
+		
+		
 		conf.errcodes[sess->current_item] = SUCCEED;
 		sess->failcount = 0;
 		sess->state = POLL_FINISHED;
 		sess->retries = 0;
+		//zbx_snmp_close_session(sess->sess);
+
 	}
 
 	return SUCCEED;
@@ -2332,17 +2343,16 @@ static int start_snmp_connections(struct async_snmp_session *session)
 	//in case we process the finished state, then we'll have to check if it's the same host
 	if (POLL_FINISHED == session->state)
 	{
-		if ( (-1 != session->current_item) && conf.items[session->current_item].host.hostid == conf.items[item_idx].host.hostid)
-		{
+//		if ( (-1 != session->current_item) && conf.items[session->current_item].host.hostid == conf.items[item_idx].host.hostid)
+//		{
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Reusing the connection");
-			reuse = 1;
-		}
-		else
-		{
+//			reuse = 1;
+//		} else
+//		{
 			//reset the connection - the new host need the new connection
-			zbx_snmp_close_session(session->sess);
+//			zbx_snmp_close_session(session->sess);
 			return SUCCEED;
-		}
+//		}
 	}
 
 	if (0 != (ZBX_FLAG_DISCOVERY_RULE & conf.items[item_idx].flags) ||
@@ -2415,6 +2425,7 @@ static int start_snmp_connections(struct async_snmp_session *session)
 
 			conf.errcodes[item_idx] = NETWORK_ERROR;
 			SET_MSG_RESULT(&conf.results[item_idx], zbx_dsprintf(NULL, "Couldn't open snmp session"));
+			snmp_free_pdu(pdu);
 			return FAIL;
 		}
 	}
@@ -2434,10 +2445,10 @@ static int start_snmp_connections(struct async_snmp_session *session)
 		if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
 			zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: %ld at %s:Sent request for the debug host",
 					   conf.items[item_idx].itemid, __func__);
-	}
-	else
+	} else
 	{
 		snmp_perror("snmp_send");
+		snmp_free_pdu(pdu);
 		SET_MSG_RESULT(&conf.results[item_idx], zbx_strdup(NULL, "Couldn't send snmp packet"));
 		conf.errcodes[item_idx] = NETWORK_ERROR;
 		zbx_snmp_close_session(session->sess);
@@ -2500,11 +2511,11 @@ int get_values_snmp_async()
 			roll = 0;
 		}
 
-		zabbix_log(LOG_LEVEL_INFORMATION, "Doing SNMP reset \n");
+		zabbix_log(LOG_LEVEL_INFORMATION, "Doing SNMP reset");
 		snmp_close_sessions();
 		zbx_shutdown_snmp();
 		zbx_init_snmp();
-		zabbix_log(LOG_LEVEL_INFORMATION, "Finished SNMP reset \n");
+		zabbix_log(LOG_LEVEL_DEBUG, "Finished SNMP reset");
 	}
 	
 	//stage 1 - start new connections
@@ -2563,7 +2574,7 @@ int get_values_snmp_async()
 
 			zabbix_log(LOG_LEVEL_DEBUG, "Item %s:%s timed out, closing connection retry %d failcount %d",
 					   conf.items[hs[i]->current_item].host.host, conf.items[hs[i]->current_item].key_orig, sess->retries, sess->failcount);
-
+			snmp_sess_timeout(hs[i]->sess);
 			zbx_snmp_close_session(hs[i]->sess);
 			hs[i]->state = POLL_FREE;
 			sess->retries++;
@@ -2579,7 +2590,7 @@ int get_values_snmp_async()
 				conf.errcodes[sess->current_item] = POLL_QUEUED;
 
 				if (CONFIG_DEBUG_HOST == conf.items[sess->current_item].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s:  Item %ld timeout will retry, rety %d",
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug host %s:  Item %ld timeout will retry, rety %d",
 							   conf.items[sess->current_item].host.host, conf.items[sess->current_item].itemid, sess->retries);
 
 				break;
@@ -2601,7 +2612,7 @@ int get_values_snmp_async()
 			if (sess->failcount < GLB_FAIL_COUNT_CLEAN)
 			{
 				if (CONFIG_DEBUG_HOST == conf.items[sess->current_item].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug Item %s:%s timed not doing cleanup yet failcount is %d",
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug Item %s:%s timed not doing cleanup yet failcount is %d",
 							   conf.items[sess->current_item].host.host, conf.items[sess->current_item].key_orig, sess->failcount);
 				//we're within limits, retruning
 				break;
@@ -2627,9 +2638,9 @@ int get_values_snmp_async()
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug host: Item %ld timeout due to prev items error", conf.items[item_idx].itemid);
 			}
 
-			if ((cnt > 0))
-				zabbix_log(LOG_LEVEL_INFORMATION, "Host %s SNMP timed out %d items due to prev %d items fail",
-						   conf.items[item_idx].host.host, cnt, GLB_FAIL_COUNT_CLEAN);
+			//if ((cnt > 0))
+			//	zabbix_log(LOG_LEVEL_DEBUG, "Host %s SNMP timed out %d items due to prev %d items fail",
+			//			   conf.items[item_idx].host.host, cnt, GLB_FAIL_COUNT_CLEAN);
 			//setting connection free to init new connection
 			break;
 		case POLL_FINISHED:

@@ -837,7 +837,7 @@ typedef struct
 #endif
 	zbx_hashset_t		data_sessions;
 	//zbx_binary_heap_t	queues[ZBX_POLLER_TYPE_COUNT];
-	zbx_binary_heap_t	*queues;
+	zbx_binary_heap_t	*queues[ZBX_POLLER_TYPE_COUNT];
 	zbx_binary_heap_t	pqueue;
 	zbx_binary_heap_t	timer_queue;
 	ZBX_DC_CONFIG_TABLE	*config;
@@ -846,16 +846,18 @@ typedef struct
 	char			autoreg_psk_identity[HOST_TLS_PSK_IDENTITY_LEN_MAX];	/* autoregistration PSK */
 	char			autoreg_psk[HOST_TLS_PSK_LEN_MAX];
 
-	//zbx_hashset_t		problems;
-	//zbx_hashset_t		ext_workers; //hashset structures for the external workers
-
 	/* cluster related fields */
 	zbx_uint64_t cluster_topology_version;
 	int 	cluster_topology_last_update; /* time when local topology was calculated last */
 	char 	*cluster_topology; /* buffer with current active topology */
 	int 	cluster_topology_need_update; /* flag that topology needs to be updated */
 	zbx_uint64_t	cluster_topology_download_host;
+
+	/* preproc statistics */
+	u_int64_t no_preproc;
+	u_int64_t local_preproc;
 }
+
 ZBX_DC_CONFIG;
 
  typedef struct

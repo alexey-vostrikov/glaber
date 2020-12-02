@@ -47,7 +47,7 @@ function getSystemStatusData(array $filter) {
 	$filter_ext_ack = array_key_exists('ext_ack', $filter)
 		? $filter['ext_ack']
 		: EXTACK_OPTION_ALL;
-	
+
 	if (array_key_exists('exclude_groupids', $filter) && $filter['exclude_groupids']) {
 		if ($filter_hostids === null) {
 			// Get all groups if no selected groups defined.
@@ -77,7 +77,7 @@ function getSystemStatusData(array $filter) {
 
 		$filter_hostids = array_diff($filter_hostids, $exclude_hostids);
 	}
-	
+
 	$data = [
 		'groups' => API::HostGroup()->get([
 			'output' => ['groupid', 'name'],
@@ -90,11 +90,11 @@ function getSystemStatusData(array $filter) {
 		'actions' => [],
 		'stats' => []
 	];
-	
+
 	CArrayHelper::sort($data['groups'], [['field' => 'name', 'order' => ZBX_SORT_UP]]);
 
 	$default_stats = [];
-	
+
 	for ($severity = TRIGGER_SEVERITY_COUNT - 1; $severity >= TRIGGER_SEVERITY_NOT_CLASSIFIED; $severity--) {
 		if (in_array($severity, $filter_severities)) {
 			$default_stats[$severity] = ['count' => 0, 'problems' => [], 'count_unack' => 0, 'problems_unack' => []];
@@ -108,7 +108,7 @@ function getSystemStatusData(array $filter) {
 		$group['has_problems'] = false;
 	}
 	unset($group);
-	
+
 	$options = [
 		'output' => ['eventid', 'objectid', 'clock', 'ns', 'name', 'acknowledged', 'severity'],
 		'groupids' => array_keys($data['groups']),
@@ -120,7 +120,7 @@ function getSystemStatusData(array $filter) {
 		'sortorder' => ZBX_SORT_DOWN,
 		'preservekeys' => true
 	];
-	
+
 	if (array_key_exists('severities', $filter)) {
 		$filter_severities = implode(',', $filter['severities']);
 		$all_severities = implode(',', range(TRIGGER_SEVERITY_NOT_CLASSIFIED, TRIGGER_SEVERITY_COUNT - 1));
@@ -142,9 +142,8 @@ function getSystemStatusData(array $filter) {
 	if (array_key_exists('problem', $filter) && $filter['problem'] !== '') {
 		$options['search'] = ['name' => $filter['problem']];
 	}
-	
+
 	$problems = API::Problem()->get($options);
-	
 	if ($problems) {
 		$triggerids = [];
 
@@ -169,9 +168,9 @@ function getSystemStatusData(array $filter) {
 				['url', 'expression', 'recovery_mode', 'recovery_expression', 'opdata']
 			);
 		}
-	
+
 		$data['triggers'] = API::Trigger()->get($options);
-	
+
 		foreach ($data['triggers'] as &$trigger) {
 			CArrayHelper::sort($trigger['hosts'], [['field' => 'name', 'order' => ZBX_SORT_UP]]);
 		}
@@ -184,7 +183,7 @@ function getSystemStatusData(array $filter) {
 		}
 
 		$visible_problems = [];
-	
+
 		foreach ($problems as $eventid => $problem) {
 			$trigger = $data['triggers'][$problem['objectid']];
 
@@ -224,7 +223,7 @@ function getSystemStatusData(array $filter) {
 			}
 			unset($group);
 		}
-	
+
 		// actions & tags
 		$problems_data = API::Problem()->get([
 			'output' => ['eventid', 'r_eventid', 'clock', 'objectid', 'severity'],
@@ -233,7 +232,7 @@ function getSystemStatusData(array $filter) {
 			'selectTags' => ['tag', 'value'],
 			'preservekeys' => true
 		]);
-	
+
 		// Remove problems that were resolved between requests or set tags.
 		foreach ($data['groups'] as $groupid => &$group) {
 			foreach ($group['stats'] as $severity => &$stat) {
@@ -258,6 +257,7 @@ function getSystemStatusData(array $filter) {
 			unset($stat);
 		}
 		unset($group);
+
 		// actions
 		// Possible performance improvement: one API call may be saved, if r_clock for problem will be used.
 		$actions = getEventsActionsIconsData($problems_data, $data['triggers']);
@@ -274,6 +274,7 @@ function getSystemStatusData(array $filter) {
 				'preservekeys' => true
 			])
 		];
+
 		if (array_key_exists('show_opdata', $filter) && $filter['show_opdata'] != OPERATIONAL_DATA_SHOW_NONE) {
 			$maked_data = CScreenProblem::makeData(
 				['problems' => $problems_data, 'triggers' => $data['triggers']],

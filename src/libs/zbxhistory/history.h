@@ -22,45 +22,23 @@
 #define ZABBIX_HISTORY_H
 
 typedef void (*glb_history_destroy_func_t)(void *data);
-typedef int (*glb_history_add_values_func_t)(void *data, const zbx_vector_ptr_t *history);
+
+typedef int (*glb_history_add_func_t)(void *data, const zbx_vector_ptr_t *history);
+typedef int (*glb_history_get_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, zbx_vector_history_record_t *values);
+
 typedef int (*glb_history_add_trends_func_t)(void *data, ZBX_DC_TREND *trends, int trends_num);
-typedef int (*glb_history_get_values_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, zbx_vector_history_record_t *values);
-typedef int (*glb_history_get_agg_values_func_t)(void *data, zbx_uint64_t itemid,int value_type, int start, int end, int aggregates, char **buffer);
+//it's very logical to return vector of trend values in from hist backend, but the only use for it is to send back to 
+//the caller, so to avoid double conversion it's done via simple buffer transfer
+typedef int (*glb_history_get_agg_buff_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, char **buffer);
+typedef int (*glb_history_get_trends_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, char **buffer);
+
 typedef int (*glb_history_preload_values_func_t)(void *data);
 
-/*
-struct zbx_history_iface
-{
-	unsigned char			value_type;
-	unsigned char			requires_trends;
-	void				*data;
-
-	zbx_history_destroy_func_t	destroy;
-	zbx_history_add_values_func_t	add_values;
-	zbx_history_get_values_func_t	get_values;
-	zbx_history_get_agg_values_func_t agg_values;
-
-};
-*/
-//the first little two guys really need to be fixed, but not important to glaber yet
-//todo: come back and fix later
-
-/* SQL hist */
-//int	zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
-
-/* elastic hist */
-//int	zbx_history_elastic_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
-
 /* backend specific init funcs */
-int glb_history_clickhouse_init(char *params);
-int glb_history_vmetrics_init(char *params);
 int glb_history_worker_init(char *params);
-int glb_history_sql_init(char *params);
-
 int glb_set_process_types(u_int8_t *types_array, char *setting);
 int glb_types_array_sum(u_int8_t *types_array);
+
 history_value_t	history_str2value(char *str, unsigned char value_type);
-/* victoria metrics hist */
-//int glb_history_vmetrics_init(char *params, char **error);
 
 #endif

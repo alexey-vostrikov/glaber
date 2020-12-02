@@ -87,8 +87,7 @@ DC_EXT_WORKER *glb_init_worker(char *config_line)
     
     
     if (SUCCEED == zbx_json_value_by_name(&jp_config,"params", buff, MAX_STRING_LEN,&type)) {
-        //timeout=strtol(buff,NULL,10);
-        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed timeout: '%d'",__func__, timeout);
+        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed params: '%s'",__func__, buff);
         worker->params=zbx_strdup(NULL, buff);
     } else 
         worker->params = NULL;
@@ -96,9 +95,8 @@ DC_EXT_WORKER *glb_init_worker(char *config_line)
     worker->max_calls=GLB_DEFAULT_WORKER_MAX_CALLS;
     if (SUCCEED == zbx_json_value_by_name(&jp_config,"max_calls", buff, MAX_ID_LEN,&type)) {
         worker->max_calls=strtol(buff,NULL,10);
-        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed max_calls: '%d'",__func__, timeout);
+        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed max_calls: '%d'",__func__, worker->max_calls);
     }
-
     
     if ( ( SUCCEED != zbx_json_value_by_name(&jp_config,"mode_to_worker", buff, MAX_ID_LEN, &type) ) || 
          ( FAIL == (worker->mode_to_worker=get_worker_mode(buff) )) ) {
@@ -162,8 +160,8 @@ out:
 }
 
 static int restart_worker(DC_EXT_WORKER *worker) {
-    zabbix_log(LOG_LEVEL_INFORMATION,"Restarting worker %s pid %d", worker->path, worker->pid);
-
+    zabbix_log(LOG_LEVEL_INFORMATION,"Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
+    
     //closing pipework
     if (worker->pipe_from_worker) close(worker->pipe_from_worker);
     if (worker->pipe_to_worker) close(worker->pipe_to_worker);
@@ -237,17 +235,15 @@ static int restart_worker(DC_EXT_WORKER *worker) {
         //but..... hey, would you run an untrusted worker on your monitoring system? 
         //i don't think so... Even if someone will, than the real problem is the 
         // person's stupidity and not lack of security in the first place...
-        //And it's not something i can fix here in the code... (sure i mean stupidity)
+        //And it's not something i can fix here in the code... (sure i mean the stupidity)
         
         //ok, let the worker go
         execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *) NULL);
         //if we are here, then execl has failed. 
-        //There is nothing todo, the child is useless by now, goodbye
+        //There is nothing to do, the child is useless by now, goodbye
         _Exit(127);
     }
    
-    // pipefd[0] refers to the read end of the pipe.  pipefd[1] refers to the write end of the pipe
-
     //only the parent gets here, let's close unnecessary fds
     close(to_child[0]);
     close(from_child[1]);
@@ -257,9 +253,7 @@ static int restart_worker(DC_EXT_WORKER *worker) {
     signal(SIGCHLD, SIG_IGN); 
 
     //and make file handles to the ends we need
-    //worker->to_worker = fdopen(to_child[1], "w");
     worker->pipe_to_worker = to_child[1];
-    //worker->from_worker = fdopen(from_child[0], "r");
     worker->pipe_from_worker = from_child[0];
     
     //resetting run count
@@ -313,8 +307,7 @@ static int worker_cleanup (DC_EXT_WORKER *worker) {
 }
 
 DC_EXT_WORKER* glb_get_worker_script(char *cmd){
-    
-    return zbx_hashset_search(workers, cmd);
+      return zbx_hashset_search(workers, cmd);
 }
 
 int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char **responce) {
@@ -351,8 +344,8 @@ int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char
         zabbix_log(LOG_LEVEL_WARNING, "Got zero length request while mode is SINGLE LINE, switch to SILENT");
         return FAIL;
     }
-
-    //zabbix_log(LOG_LEVEL_INFORMATION,"Communicating to script, to_script:%d, from script:%d",worker->mode_to_worker,worker->mode_from_worker);
+    
+   // zabbix_log(LOG_LEVEL_INFORMATION,"Communicating to script, to_script:%d, from script:%d",worker->mode_to_worker,worker->mode_from_worker);
     //checking of there are no impoper end of line chars 
     switch (worker->mode_to_worker) {
         case GLB_WORKER_MODE_NEWLINE:
@@ -361,7 +354,7 @@ int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char
             //as this request might only come from glaber code
             if ( strstr(request,"\n") != request+request_len-1 ) {
                 THIS_SHOULD_NEVER_HAPPEN;
-                zabbix_log(LOG_LEVEL_INFORMATION,"No new line characer or it is inside the request");
+                zabbix_log(LOG_LEVEL_INFORMATION,"No new line characer or it is inside the request %s",request);
                 //for (int i= request_len -10; i < request_len; i++) {
                 //    zabbix_log(LOG_LEVEL_WARNING,"%c",request[i]);
                // }
@@ -428,7 +421,7 @@ int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char
     zbx_alarm_on(worker->timeout);
     
     while ( FAIL == zbx_alarm_timed_out() && continue_read )  {
-
+        //usleep(10000); 
         char buffer[MAX_STRING_LEN];
         buffer[0]=0;
         
@@ -470,7 +463,7 @@ int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char
                  continue_read=0;
                  worker_fail=1;
              } else    
-                usleep(100000); //whatever else is is it's good to time to take a nap to save some CPU heat
+                usleep(10000); //whatever else is is it's good to time to take a nap to save some CPU heat
         }
         size_t old_offset=rbuffoffset;
         
@@ -505,10 +498,7 @@ int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char
             __func__,worker->path);
     
         int resp_len=strlen(resp_buffer);
-     //   for (int i=resp_len-10; i<resp_len; i++) {
-     //       zabbix_log(LOG_LEVEL_INFORMATION,"%d",resp_buffer[i]);
-     //   }
-
+  
         restart_worker(worker);
         zbx_free(resp_buffer);
         return FAIL;
@@ -522,22 +512,35 @@ int glb_process_worker_request(DC_EXT_WORKER *worker, const char * request, char
 
     zabbix_log(LOG_LEVEL_DEBUG, "Answer wait is finished, responce length is %d, buffer is %s", strlen(resp_buffer),resp_buffer);
     worker_cleanup(worker);
-   // zabbix_log(LOG_LEVEL_INFORMATION,"Finished %s",__func__);
+
+    zabbix_log(LOG_LEVEL_DEBUG,"Finished %s",__func__);
     return SUCCEED;  
 }
 
 //this is supposed to be used to escape data before sending to workers
+//it does two things: escapes single unscaped quotes to make the string JSON valid
+//and replaces newlines with \n to make them worker - valid for line by line processing
 int glb_escape_worker_string( char *in_string, char *out_buffer) {
  
     int in=0, out=0;
     while (in_string[in] !='\0') {
-        //we don't want some special chars to appear 
-        if (in_string[in] == '\\' || in_string[in] == '\n' || in_string[in] == '\"' || in_string[in] == '\'' ) 
-            out_buffer[out++] = '\\';
+        //we don't want some special chars to appear in the json
+     
+        if ( in_string[in] == '\"'  ) {
         
-        out_buffer[out++] = in_string[in++];
-    }
-    out_buffer[out] ='\0';
+            if (0 < in &&   in_string[in-1] != '\\') {
+                out_buffer[out++] = '\\';  
+            }
+            out_buffer[out++] = in_string[in++];
+       } else 
+            if (in_string[in] == 10) {
+                out_buffer[out++] = '\\';  
+                out_buffer[out++] = 'n';  
+                in++;
+            } else 
+                out_buffer[out++] = in_string[in++];
+        }
+        out_buffer[out] ='\0';
     
     return out;
 }

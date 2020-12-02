@@ -168,23 +168,28 @@ int		server_num		= 0;
 
 u_int64_t CONFIG_DEBUG_ITEM = 0;
 u_int64_t CONFIG_DEBUG_HOST = 0;
+
+int CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_COUNT];
+
+
+int CONFIG_DISABLE_INPOLLER_PREPROC = 0;
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
-int	CONFIG_PINGER_FORKS		= 1;
-int	CONFIG_POLLER_FORKS		= 5;
-int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
-int	CONFIG_ASYNC_SNMP_POLLER_FORKS	= 1;
+//int	CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_PINGER]		= 1;
+//int	CONFIG_POLLER_FORKS		= 5;
+//int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
+// int	CONFIG_ASYNC_SNMP_POLLER_FORKS	= 1;
 int CONFIG_ASYNC_SNMP_POLLER_CONNS = 4096;
-int	CONFIG_ASYNC_AGENT_POLLER_FORKS	= 1;
+//int	CONFIG_ASYNC_AGENT_POLLER_FORKS	= 1;
 int CONFIG_ASYNC_AGENT_POLLER_CONNS = 4096;
 int	CONFIG_HTTPPOLLER_FORKS		= 1;
 int	CONFIG_IPMIPOLLER_FORKS		= 0;
 int	CONFIG_TIMER_FORKS		= 1;
 int	CONFIG_TRAPPER_FORKS		= 5;
 int	CONFIG_SNMPTRAPPER_FORKS	= 0;
-int	CONFIG_JAVAPOLLER_FORKS		= 0;
+//int	CONFIG_JAVAPOLLER_FORKS		= 0;
 int	CONFIG_ESCALATOR_FORKS		= 1;
 int	CONFIG_SELFMON_FORKS		= 1;
 int	CONFIG_DATASENDER_FORKS		= 0;
@@ -272,7 +277,7 @@ int	CONFIG_PROXYDATA_FREQUENCY	= 5;	/* 1s is too frequent for n/a proxies */
 char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
 char 	**CONFIG_HISTORY_MODULE		= NULL;
-int		CONFIG_SNMP_RETRIES		=	2;
+int		CONFIG_SNMP_RETRIES		=	3;
 
 char	**CONFIG_EXT_WORKERS	= NULL;
 
@@ -380,15 +385,15 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_ESCALATOR;
 		*local_process_num = local_server_num - server_count + CONFIG_ESCALATOR_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_IPMIPOLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_IPMI]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_IPMIPOLLER;
-		*local_process_num = local_server_num - server_count + CONFIG_IPMIPOLLER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_IPMI];
 	}
-	else if (local_server_num <= (server_count += CONFIG_JAVAPOLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_JAVAPOLLER;
-		*local_process_num = local_server_num - server_count + CONFIG_JAVAPOLLER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA];
 	}
 	else if (local_server_num <= (server_count += CONFIG_SNMPTRAPPER_FORKS))
 	{
@@ -415,35 +420,35 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_TASKMANAGER;
 		*local_process_num = local_server_num - server_count + CONFIG_TASKMANAGER_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_POLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_POLLER;
-		*local_process_num = local_server_num - server_count + CONFIG_POLLER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL];
 	}
-	else if (local_server_num <= (server_count += CONFIG_UNREACHABLE_POLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_UNREACHABLE]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_UNREACHABLE;
-		*local_process_num = local_server_num - server_count + CONFIG_UNREACHABLE_POLLER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_UNREACHABLE];
 	}
-	else if (local_server_num <= (server_count += CONFIG_ASYNC_SNMP_POLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_SNMP]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_ASYNC_SNMP;
-		*local_process_num = local_server_num - server_count + CONFIG_ASYNC_SNMP_POLLER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_SNMP];
 	}
-	else if (local_server_num <= (server_count += CONFIG_ASYNC_AGENT_POLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_AGENT]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_ASYNC_AGENT;
-		*local_process_num = local_server_num - server_count + CONFIG_ASYNC_AGENT_POLLER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_AGENT];
 	}
 	else if (local_server_num <= (server_count += CONFIG_TRAPPER_FORKS))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_TRAPPER;
 		*local_process_num = local_server_num - server_count + CONFIG_TRAPPER_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_PINGER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_PINGER]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_PINGER;
-		*local_process_num = local_server_num - server_count + CONFIG_PINGER_FORKS;
+		*local_process_num = local_server_num - server_count + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_PINGER];
 	}
 	else if (local_server_num <= (server_count += CONFIG_ALERTMANAGER_FORKS))
 	{
@@ -578,14 +583,14 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	char	*ch_error;
 	int	err = 0;
 
-	if (0 == CONFIG_UNREACHABLE_POLLER_FORKS && 0 != CONFIG_POLLER_FORKS + CONFIG_JAVAPOLLER_FORKS)
+	if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_UNREACHABLE] && 0 != CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL] + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA])
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "\"StartPollersUnreachable\" configuration parameter must not be 0"
 				" if regular or Java pollers are started");
 		err = 1;
 	}
 
-	if ((NULL == CONFIG_JAVA_GATEWAY || '\0' == *CONFIG_JAVA_GATEWAY) && 0 < CONFIG_JAVAPOLLER_FORKS)
+	if ((NULL == CONFIG_JAVA_GATEWAY || '\0' == *CONFIG_JAVA_GATEWAY) && 0 < CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA])
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "\"JavaGateway\" configuration parameter is not specified or empty");
 		err = 1;
@@ -671,7 +676,7 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
  *                                                                            *
  ******************************************************************************/
 static void	zbx_load_config(ZBX_TASK_EX *task)
-{
+{	int i;
 	static struct cfg_line	cfg[] =
 	{
 		/* PARAMETER,			VAR,					TYPE,
@@ -681,6 +686,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
 			PARM_OPT,	0,			0},
 		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
+			PARM_OPT,	0,			0},
+		{"DisableInPollerPreproc",			&CONFIG_DISABLE_INPOLLER_PREPROC,			TYPE_INT,
 			PARM_OPT,	0,			0},
 		{"EnableHostDeactivation",			&CONFIG_ENABLE_HOST_DEACTIVATION,			TYPE_INT,
 			PARM_OPT,	0,			0},
@@ -692,17 +699,19 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			250},
 		{"StartHTTPPollers",		&CONFIG_HTTPPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
-		{"StartPingers",		&CONFIG_PINGER_FORKS,			TYPE_INT,
+		{"StartPingers",		&CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_PINGER],			TYPE_INT,
+			PARM_OPT,	0,			1000},	
+		{"StartPreprocessorManagers",		&CONFIG_PREPROCMAN_FORKS,			TYPE_INT,
+			PARM_OPT,	1,			64},
+		{"StartPollers",		&CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL],			TYPE_INT,
 			PARM_OPT,	0,			1000},
-		{"StartPollers",		&CONFIG_POLLER_FORKS,			TYPE_INT,
+		{"StartPollersUnreachable",	&CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_UNREACHABLE],	TYPE_INT,
 			PARM_OPT,	0,			1000},
-		{"StartPollersUnreachable",	&CONFIG_UNREACHABLE_POLLER_FORKS,	TYPE_INT,
-			PARM_OPT,	0,			1000},
-		{"StartPollersAsyncSNMP",	&CONFIG_ASYNC_SNMP_POLLER_FORKS,	TYPE_INT,
+		{"StartPollersAsyncSNMP",	&CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_SNMP],	TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"AsynSNMPConnectionsPerPoller",	&CONFIG_ASYNC_SNMP_POLLER_CONNS,	TYPE_INT,
 			PARM_OPT,	0,			8192},
-		{"StartPollersAsyncAGENT",	&CONFIG_ASYNC_AGENT_POLLER_FORKS,	TYPE_INT,
+		{"StartPollersAsyncAGENT",	&CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_AGENT],	TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"AsynAGENTConnectionsPerPoller",	&CONFIG_ASYNC_SNMP_POLLER_CONNS,	TYPE_INT,
 			PARM_OPT,	0,			8192},
@@ -712,7 +721,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			1000},
 		{"StartTrappers",		&CONFIG_TRAPPER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},
-		{"StartJavaPollers",		&CONFIG_JAVAPOLLER_FORKS,		TYPE_INT,
+		{"StartJavaPollers",		&CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA],		TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"StartEscalators",		&CONFIG_ESCALATOR_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			100},
@@ -775,7 +784,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"LogFile",			&CONFIG_LOG_FILE,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"LogFileSize",			&CONFIG_LOG_FILE_SIZE,			TYPE_INT,
-			PARM_OPT,	0,			1024},
+			PARM_OPT,	0,			102400},
 		{"AlertScriptsPath",		&CONFIG_ALERT_SCRIPTS_PATH,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"ExternalScripts",		&CONFIG_EXTERNALSCRIPTS,		TYPE_STRING,
@@ -853,8 +862,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"SocketDir",			&CONFIG_SOCKET_PATH,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"StartAlerters",		&CONFIG_ALERTER_FORKS,			TYPE_INT,
-			PARM_OPT,	1,			100},
-		{"StartPreprocessors",		&CONFIG_PREPROCESSOR_FORKS,		TYPE_INT,
+			PARM_OPT,	0,			100},
+		{"StartPreprocessorsPerManager",		&CONFIG_PREPROCESSOR_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			1000},
 		{"HistoryStorageDateIndex",	&CONFIG_HISTORY_STORAGE_PIPELINES,	TYPE_INT,
 			PARM_OPT,	0,			1},
@@ -875,6 +884,12 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{NULL}
 	};
 
+
+	/*default fors numbeures for the pollers*/
+	for ( i = 0; i < ZBX_POLLER_TYPE_COUNT; i++ ) {
+		CONFIG_POLLERS_FORKS[i] = 1;
+	}
+	
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
 	zbx_strarr_init(&CONFIG_EXT_WORKERS);
@@ -890,7 +905,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_validate_config();
 #endif
-
+	CONFIG_PREPROCESSOR_FORKS =	CONFIG_PREPROCESSOR_FORKS * CONFIG_PREPROCMAN_FORKS;
 }
 
 /******************************************************************************
@@ -1145,11 +1160,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 	
-//d	if (FAIL == glb_init_external_workers(CONFIG_EXT_WORKERS, CONFIG_EXTERNALSCRIPTS)) {
-//		zabbix_log(LOG_LEVEL_CRIT, "Init external workers has failed, exiting...");
-//		exit(EXIT_FAILURE);
-//	}
-	
 	zbx_free_config();
 	
 	if (SUCCEED != init_database_cache(&error))
@@ -1218,12 +1228,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	DBcheck_character_set();
 
-	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
-			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
-			+ CONFIG_ASYNC_SNMP_POLLER_FORKS + CONFIG_ASYNC_AGENT_POLLER_FORKS 
+	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL]
+			+ CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_UNREACHABLE] + CONFIG_TRAPPER_FORKS + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_PINGER]
+			+ CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_SNMP] + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_AGENT] 
 			+ CONFIG_ALERTER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_TIMER_FORKS
 			+ CONFIG_HTTPPOLLER_FORKS + CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS
-			+ CONFIG_ESCALATOR_FORKS + CONFIG_IPMIPOLLER_FORKS + CONFIG_JAVAPOLLER_FORKS
+			+ CONFIG_ESCALATOR_FORKS + CONFIG_IPMIPOLLER_FORKS + CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA]
 			+ CONFIG_SNMPTRAPPER_FORKS + CONFIG_PROXYPOLLER_FORKS + CONFIG_SELFMON_FORKS
 			+ CONFIG_VMWARE_FORKS + CONFIG_TASKMANAGER_FORKS + CONFIG_IPMIMANAGER_FORKS
 			+ CONFIG_ALERTMANAGER_FORKS + CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS
@@ -1252,6 +1262,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 		if (FAIL == get_process_info_by_thread(i + 1, &thread_args.process_type, &thread_args.process_num))
 		{
+			zabbix_log(LOG_LEVEL_WARNING, "Couldn't get process info by thread num: %d",i);
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit(EXIT_FAILURE);
 		}

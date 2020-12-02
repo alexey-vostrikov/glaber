@@ -24,7 +24,7 @@ DC_EXT_WORKER* glb_get_worker_script(char *cmd);
 #define GLB_DEFAULT_WORKER_TIMEOUT 10
 
 //how many reqeusts process by a runner befeore terminate it and start a new one
-#define GLB_DEFAULT_WORKER_MAX_CALLS 1000
+#define GLB_DEFAULT_WORKER_MAX_CALLS 1000000000
 
 //how to treat input/output
 #define GLB_WORKER_MODE_SILENT      1   // no communication is expected

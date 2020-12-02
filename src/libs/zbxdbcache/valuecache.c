@@ -298,7 +298,7 @@ static int	vc_db_read_values_by_time(zbx_uint64_t itemid, int value_type, zbx_ve
 	if (0 != range_start)
 		range_start--;
 
-	return zbx_history_get_values(itemid, value_type, range_start, 0, range_end, values);
+	return glb_history_get(itemid, value_type, range_start, 0, range_end, values);
 }
 
 /************************************************************************************
@@ -352,7 +352,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 	/*        a) remove values with Tb.* timestamp from result,                              */
 	/*        b) read all values with Tb.* timestamp from database,                          */
 	/*        c) add read values to the result.                                              */
-	if (FAIL == zbx_history_get_values(itemid, value_type, range_start, count + 1, range_end, values))
+	if (FAIL == glb_history_get(itemid, value_type, range_start, count + 1, range_end, values))
 		return FAIL;
 
 	/* returned less than requested - all values are read */
@@ -389,7 +389,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 
 		offset = values->values_num;
 
-		if (FAIL == zbx_history_get_values(itemid, value_type, range_start, left, first_timestamp, values))
+		if (FAIL == glb_history_get(itemid, value_type, range_start, left, first_timestamp, values))
 			return FAIL;
 
 		/* returned less than requested - all values are read */
@@ -418,7 +418,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 		return SUCCEED;
 
 	/* re-read the first (oldest) second */
-	return zbx_history_get_values(itemid, value_type, first_timestamp - 1, 0, first_timestamp, values);
+	return glb_history_get(itemid, value_type, first_timestamp - 1, 0, first_timestamp, values);
 }
 
 /******************************************************************************
@@ -2548,7 +2548,7 @@ int	zbx_vc_add_values(zbx_vector_ptr_t *history)
 	ZBX_DC_HISTORY		*h;
 	time_t			expire_timestamp;
 
-	if (FAIL == zbx_history_add_values(history))
+	if (FAIL == glb_history_add(history))
 		return FAIL;
 
 	if (ZBX_VC_DISABLED == vc_state)

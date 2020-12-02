@@ -99,6 +99,11 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 #define	GATEWAY_ERROR	-6
 #define	CONFIG_ERROR	-7
 
+//preprocessing types - used for glaber optimized preprocessing
+#define GLB_PREPROC_MANAGER	0
+#define GLB_PREPROC_LOCAL	1
+#define GLB_NO_PREPROC	2
+
 //for efficient polling in async mode
 #define	POLL_FREE			-8
 #define POLL_CC_FETCHED		-9

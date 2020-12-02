@@ -26,6 +26,7 @@
 
 #include "httptest.h"
 #include "httppoller.h"
+#include "preproc.h"
 
 extern int		CONFIG_HTTPPOLLER_FORKS;
 extern unsigned char	process_type, program_type;
@@ -112,6 +113,7 @@ ZBX_THREAD_ENTRY(httppoller_thread, args)
 	last_stat_time = time(NULL);
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
+	glb_preprocessing_init();
 
 	while (ZBX_IS_RUNNING())
 	{

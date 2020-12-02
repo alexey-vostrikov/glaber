@@ -17,7 +17,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-define('GLABER_VERSION', '1.2.2');
+define('GLABER_VERSION', '1.3.0');
 define('ZABBIX_VERSION',		'4.4.7');
 define('ZABBIX_API_VERSION',	'4.4.7');
 define('ZABBIX_EXPORT_VERSION',	'4.4');
@@ -58,7 +58,6 @@ define('ZBX_HISTORY_PERIOD', 86400);
 
 define('ZBX_HISTORY_SOURCE_ELASTIC',	'elastic');
 define('ZBX_HISTORY_SOURCE_SQL',		'sql');
-define('ZBX_HISTORY_SOURCE_CLICKHOUSE',	'clickhouse');
 define('ZBX_HISTORY_SOURCE_SERVER',	'server');
 
 define('ELASTICSEARCH_RESPONSE_PLAIN',			0);

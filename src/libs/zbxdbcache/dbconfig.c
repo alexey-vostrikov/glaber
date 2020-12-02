@@ -32,6 +32,7 @@
 #include "cfg.h"
 #include "zbxtasks.h"
 #include "../zbxcrypto/tls_tcp_active.h"
+#include "preproc.h"
 
 #define ZBX_DBCONFIG_IMPL
 #include "dbconfig.h"
@@ -91,14 +92,16 @@ static zbx_mem_info_t	*config_mem;
 
 extern unsigned char	program_type;
 extern int		CONFIG_TIMER_FORKS;
-extern int CONFIG_ASYNC_AGENT_POLLER_FORKS;
-extern int CONFIG_ASYNC_SNMP_POLLER_FORKS;
+
+extern int CONFIG_POLLERS_FORKS[];
 extern int CONFIG_ASYNC_SNMP_POLLER_CONNS;
 extern int CONFIG_ASYNC_AGENT_POLLER_CONNS;
+extern int CONFIG_DISABLE_INPOLLER_PREPROC;
 extern int CONFIG_CLUSTER_SERVER_ID;
 extern u_int64_t CONFIG_DEBUG_ITEM;
 extern u_int64_t CONFIG_DEBUG_HOST;
 extern char * CONFIG_HOSTNAME;
+extern int CONFIG_PREPROCMAN_FORKS;
 
 ZBX_MEM_FUNC_IMPL(__config, config_mem)
 
@@ -197,8 +200,10 @@ clean:
 
 	return ret;
 }
+//todo: fix and think well
+//#don t compile till well made fix
 
-static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uint64_t itemid)
+static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uint64_t itemid, zbx_uint64_t hostid)
 {
 	switch (type)
 	{
@@ -207,7 +212,7 @@ static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uin
 					SUCCEED == cmp_key_id(key, SERVER_ICMPPINGSEC_KEY) ||
 					SUCCEED == cmp_key_id(key, SERVER_ICMPPINGLOSS_KEY))
 			{
-				if (0 == CONFIG_PINGER_FORKS)
+				if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_PINGER])
 					break;
 
 				return ZBX_POLLER_TYPE_PINGER;
@@ -221,14 +226,14 @@ static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uin
 		case ITEM_TYPE_TELNET:
 		case ITEM_TYPE_CALCULATED:
 		case ITEM_TYPE_HTTPAGENT:
-			if (0 == CONFIG_POLLER_FORKS)
+			if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL])
 				break;
 
 			return ZBX_POLLER_TYPE_NORMAL;
 		
 		case ITEM_TYPE_ZABBIX:
-			if (0 == CONFIG_ASYNC_AGENT_POLLER_FORKS ){
-				if (0 == CONFIG_POLLER_FORKS)
+			if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_AGENT]){
+				if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL])
 					break;
 
 				return ZBX_POLLER_TYPE_NORMAL;
@@ -240,16 +245,14 @@ static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uin
 			if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemid)))
 					return ZBX_POLLER_TYPE_NORMAL;
 			
-			return  (ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS
-					 + ( dc_item->hostid % CONFIG_ASYNC_AGENT_POLLER_FORKS * CONFIG_ASYNC_AGENT_POLLER_CONNS)/CONFIG_ASYNC_AGENT_POLLER_CONNS);
+			return ZBX_POLLER_TYPE_ASYNC_AGENT;
 
-			
 
 		case ITEM_TYPE_SNMPv1:
 		case ITEM_TYPE_SNMPv2c:
 		case ITEM_TYPE_SNMPv3:
-			if (0 == CONFIG_ASYNC_SNMP_POLLER_FORKS ){
-				if (0 == CONFIG_POLLER_FORKS)
+			if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_ASYNC_SNMP]){
+				if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_NORMAL])
 					break;
 
 				return ZBX_POLLER_TYPE_NORMAL;
@@ -269,17 +272,17 @@ static unsigned char poller_by_item(unsigned char type, const char *key, zbx_uin
 					//we have a queue for each async poller
 					if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemid)))
 						return ZBX_POLLER_TYPE_NORMAL;
-					return  (ZBX_POLLER_TYPE_COUNT + (dc_item->hostid % CONFIG_ASYNC_SNMP_POLLER_FORKS * CONFIG_ASYNC_SNMP_POLLER_CONNS)/CONFIG_ASYNC_SNMP_POLLER_CONNS);
+					return  ZBX_POLLER_TYPE_ASYNC_SNMP;
 				}
 			}
 
 		case ITEM_TYPE_IPMI:
-			if (0 == CONFIG_IPMIPOLLER_FORKS)
+			if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_IPMI])
 				break;
 
 			return ZBX_POLLER_TYPE_IPMI;
 		case ITEM_TYPE_JMX:
-			if (0 == CONFIG_JAVAPOLLER_FORKS)
+			if (0 == CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_JAVA])
 				break;
 
 			return ZBX_POLLER_TYPE_JAVA;
@@ -474,7 +477,7 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: set poller type to %d",dc_item->itemid,__func__,ZBX_NO_POLLER);
 		return;
 	}
-	poller_type = poller_by_item(dc_item->type, dc_item->key, dc_item->itemid);
+	poller_type = poller_by_item(dc_item->type, dc_item->key, dc_item->itemid, dc_item->hostid);
 	
 	if (0 != (flags & ZBX_HOST_UNREACHABLE))
 	{
@@ -724,7 +727,7 @@ static void	DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 	if (ZBX_LOC_QUEUE == item->location && old_poller_type != item->poller_type)
 	{
 		item->location = ZBX_LOC_NOWHERE;
-		zbx_binary_heap_remove_direct(&config->queues[old_poller_type], item->itemid);
+		zbx_binary_heap_remove_direct(&config->queues[old_poller_type][item->hostid % CONFIG_POLLERS_FORKS[item->poller_type]], item->itemid);
 	}
 
 	if (item->poller_type == ZBX_NO_POLLER)
@@ -739,12 +742,12 @@ static void	DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 	if (ZBX_LOC_QUEUE != item->location)
 	{
 		item->location = ZBX_LOC_QUEUE;
-		zbx_binary_heap_insert(&config->queues[item->poller_type], &elem);
+		zbx_binary_heap_insert(&config->queues[item->poller_type][item->hostid % CONFIG_POLLERS_FORKS[item->poller_type]], &elem);
 		if (CONFIG_DEBUG_HOST == item->hostid)
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: will requeue item %ld to queue %d", item->itemid,item->poller_type);
 	}
 	else {
-		zbx_binary_heap_update_direct(&config->queues[item->poller_type], &elem);
+		zbx_binary_heap_update_direct(&config->queues[item->poller_type][item->hostid % CONFIG_POLLERS_FORKS[item->poller_type]], &elem);
 		if (CONFIG_DEBUG_HOST == item->hostid)
 					zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: will update item %ld to queue %d", item->itemid,item->poller_type);
 	}
@@ -3204,7 +3207,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		}
 
 		if (ZBX_LOC_QUEUE == item->location)
-			zbx_binary_heap_remove_direct(&config->queues[item->poller_type], item->itemid);
+			zbx_binary_heap_remove_direct(&config->queues[item->poller_type][item->hostid % CONFIG_POLLERS_FORKS[item->poller_type]], item->itemid);
 
 		zbx_strpool_release(item->key);
 		zbx_strpool_release(item->port);
@@ -5049,6 +5052,7 @@ void	DCsync_configuration(unsigned char mode)
 	double		autoreg_csec, autoreg_csec2;
 	zbx_dbsync_t	autoreg_config_sync;
 	zbx_uint64_t	update_flags = 0;
+	int k;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -5638,10 +5642,10 @@ void	DCsync_configuration(unsigned char mode)
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() maint time : %d (%d slots)", __func__,
 				config->maintenance_periods.num_data, config->maintenance_periods.num_slots);
 
-		for (i = 0; ZBX_POLLER_TYPE_COUNT + CONFIG_ASYNC_SNMP_POLLER_FORKS> i; i++)
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "%s() queue[%d]   : %d (%d allocated)", __func__,
-					i, config->queues[i].elems_num, config->queues[i].elems_alloc);
+		for (i = 0; ZBX_POLLER_TYPE_COUNT > i; i++)
+		{	for (k = 0; k < CONFIG_POLLERS_FORKS[i]; k++)
+			zabbix_log(LOG_LEVEL_DEBUG, "%s() queue[%d][%d]   : %d (%d allocated)", __func__,
+					i, k, config->queues[i][k].elems_num, config->queues[i][k].elems_alloc);
 		}
 
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() pqueue     : %d (%d allocated)", __func__,
@@ -6056,7 +6060,7 @@ static int	__config_data_session_compare(const void *d1, const void *d2)
  ******************************************************************************/
 int	init_configuration_cache(char **error)
 {
-	int	i, ret;
+	int	i, k, ret;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() size:" ZBX_FS_UI64, __func__, CONFIG_CONF_CACHE_SIZE);
 
@@ -6071,8 +6075,13 @@ int	init_configuration_cache(char **error)
 
 	config = (ZBX_DC_CONFIG *)__config_mem_malloc_func(NULL, sizeof(ZBX_DC_CONFIG) +
 			CONFIG_TIMER_FORKS * sizeof(zbx_vector_ptr_t));
-
-	config->queues = __config_mem_malloc_func(NULL, sizeof(zbx_binary_heap_t)*(ZBX_POLLER_TYPE_COUNT+CONFIG_ASYNC_SNMP_POLLER_FORKS+CONFIG_ASYNC_AGENT_POLLER_FORKS));
+	
+	for ( i =0 ; i < ZBX_POLLER_TYPE_COUNT; i++) {
+		if (0 < CONFIG_POLLERS_FORKS[i] )
+			config->queues[i] = __config_mem_malloc_func(NULL, sizeof(zbx_binary_heap_t)*(CONFIG_POLLERS_FORKS[i]));
+		else
+			config->queues[i] = NULL;	
+	}
 
 #define CREATE_HASHSET(hashset, hashset_size)									\
 														\
@@ -6150,12 +6159,12 @@ int	init_configuration_cache(char **error)
 	CREATE_HASHSET_EXT(config->psks, 0, __config_psk_hash, __config_psk_compare);
 #endif
 
-	for (i = 0; i < ZBX_POLLER_TYPE_COUNT+CONFIG_ASYNC_SNMP_POLLER_FORKS + CONFIG_ASYNC_AGENT_POLLER_FORKS; i++)
-	{ 	
+	for (i = 0; i < ZBX_POLLER_TYPE_COUNT; i++ ) {	
 		switch (i)
 		{
 			case ZBX_POLLER_TYPE_JAVA:
-				zbx_binary_heap_create_ext(&config->queues[i],
+				for (k = 0; k < CONFIG_POLLERS_FORKS[i]; k++) 
+					zbx_binary_heap_create_ext(&config->queues[i][k],
 						__config_java_elem_compare,
 						ZBX_BINARY_HEAP_OPTION_DIRECT,
 						__config_mem_malloc_func,
@@ -6163,7 +6172,8 @@ int	init_configuration_cache(char **error)
 						__config_mem_free_func);
 				break;
 			case ZBX_POLLER_TYPE_PINGER:
-				zbx_binary_heap_create_ext(&config->queues[i],
+				for (k = 0; k < CONFIG_POLLERS_FORKS[i]; k++) 
+					zbx_binary_heap_create_ext(&config->queues[i][k],
 						__config_pinger_elem_compare,
 						ZBX_BINARY_HEAP_OPTION_DIRECT,
 						__config_mem_malloc_func,
@@ -6171,7 +6181,8 @@ int	init_configuration_cache(char **error)
 						__config_mem_free_func);
 				break;
 			default:
-				zbx_binary_heap_create_ext(&config->queues[i],
+				for (k = 0; k < CONFIG_POLLERS_FORKS[i]; k++) 
+					zbx_binary_heap_create_ext(&config->queues[i][k],
 						__config_heap_elem_compare,
 						ZBX_BINARY_HEAP_OPTION_DIRECT,
 						__config_mem_malloc_func,
@@ -6241,6 +6252,9 @@ int	init_configuration_cache(char **error)
 	
 	//this will be set as soon as fisrt server objects will be loaded
 	config->cluster_topology_need_update=0;
+	config->no_preproc = 0;
+	config->local_preproc = 0;
+
 #undef CREATE_HASHSET
 #undef CREATE_HASHSET_EXT
 out:
@@ -6667,6 +6681,58 @@ static void	DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE 
 	dst_interface->addr = (1 == dst_interface->useip ? dst_interface->ip_orig : dst_interface->dns_orig);
 	dst_interface->port = 0;
 }
+/*************************************************************************
+ * fetches  item's preproc status
+ * GLB_NO_PREPROC - no preprocessing needed, item might go to history cache just after polling
+ * GLB_PREPROC_LOCAL - independant preprocessing - might be preprocessed in the poller's fork
+ * GLB_PREPROC_MANAGER - must go through the preproc manager
+ * ****************************************************************/
+static char DCget_preproc_type(DC_ITEM* dc_item) {
+	
+	const ZBX_DC_PREPROCITEM* preproc_item=NULL;
+	const zbx_dc_preproc_op_t	*dc_op;
+	zbx_preproc_op_t		*op;
+	int i;
+
+	//looking if this is a master item
+
+	if (NULL !=  (preproc_item = (const ZBX_DC_PREPROCITEM *)zbx_hashset_search(&config->masteritems,&dc_item->itemid)))
+		return dc_item->preproc_type=GLB_PREPROC_MANAGER;
+	
+	if ( NULL != (preproc_item = (const ZBX_DC_PREPROCITEM *)zbx_hashset_search(&config->preprocitems,&dc_item->itemid))) {
+		//todo: figure out how to init preproc items
+		zbx_preproc_item_t *item;
+
+	if (NULL == (item=zbx_malloc(NULL, sizeof(zbx_preproc_item_t)))) 
+			return dc_item->preproc_type=GLB_PREPROC_MANAGER;
+
+	if (FAIL == dc_preproc_item_init(item, preproc_item->itemid)) 
+			return  dc_item->preproc_type=GLB_PREPROC_MANAGER;
+
+	//filling preprocessing steps to do the preproc job right on the poller
+	dc_item->preprocitem=item;
+
+	item->preproc_ops_num = preproc_item->preproc_ops.values_num;
+	item->preproc_ops = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) * item->preproc_ops_num);
+	item->update_time = preproc_item->update_time;
+
+	//todo - seek what will clean all this on DC_ITEM cleanup
+	for (i = 0; i < preproc_item->preproc_ops.values_num; i++)
+	{
+		dc_op = (const zbx_dc_preproc_op_t *)preproc_item->preproc_ops.values[i];
+		op = &item->preproc_ops[i];
+		op->type = dc_op->type;
+		op->params = zbx_strdup(NULL, dc_op->params);
+		op->error_handler = dc_op->error_handler;
+		op->error_handler_params = zbx_strdup(NULL, dc_op->error_handler_params);
+	}
+	
+	return  dc_item->preproc_type=GLB_PREPROC_LOCAL;
+}
+
+	//
+	return  dc_item->preproc_type=GLB_NO_PREPROC;
+}
 
 static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 {
@@ -6932,6 +6998,8 @@ static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 				/* nothing to do */;
 		}
 	}
+	dst_item->preprocitem = NULL;
+	dst_item->preproc_type = GLB_PREPROC_MANAGER;
 }
 
 void	DCconfig_clean_items(DC_ITEM *items, int *errcodes, size_t num)
@@ -7178,7 +7246,7 @@ void	DCconfig_get_items_by_itemids(DC_ITEM *items, const zbx_uint64_t *itemids, 
  *                         monitored                                          *
  *                                                                            *
  ******************************************************************************/
-static int	dc_preproc_item_init(zbx_preproc_item_t *item, zbx_uint64_t itemid)
+int	dc_preproc_item_init(zbx_preproc_item_t *item, zbx_uint64_t itemid)
 {
 	const ZBX_DC_ITEM	*dc_item;
 	const ZBX_DC_HOST	*dc_host;
@@ -7222,7 +7290,7 @@ static int	dc_preproc_item_init(zbx_preproc_item_t *item, zbx_uint64_t itemid)
  *             timestamp   - [IN/OUT] timestamp of a last update              *
  *                                                                            *
  ******************************************************************************/
-void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp)
+void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp, int manager_num)
 {
 	const ZBX_DC_PREPROCITEM	*dc_preprocitem;
 	const ZBX_DC_MASTERITEM		*dc_masteritem;
@@ -7247,8 +7315,23 @@ void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp)
 	zbx_hashset_iter_reset(&config->preprocitems, &iter);
 	while (NULL != (dc_preprocitem = (const ZBX_DC_PREPROCITEM *)zbx_hashset_iter_next(&iter)))
 	{
+		if (NULL == (dc_item = zbx_hashset_search(&config->items,&dc_preprocitem->itemid))) {
+			continue;
+		};
+		
+		//when distributed preprocessing is on, preproc manager only needs 
+		//config for master itemds and items of dependent type
+		if (0 == CONFIG_DISABLE_INPOLLER_PREPROC && 
+			NULL == (dc_masteritem = zbx_hashset_search(&config->masteritems,&dc_preprocitem->itemid)) && 
+			ITEM_TYPE_DEPENDENT != dc_item->type ) {
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Skipping item %ld from loading preproc config",dc_preprocitem->itemid);
+				continue;	
+			}
+		if ((dc_item->hostid % CONFIG_PREPROCMAN_FORKS) != manager_num  )	
+			continue;
 		if (FAIL == dc_preproc_item_init(&item_local, dc_preprocitem->itemid))
 			continue;
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Loading %ld item to preproc config",dc_preprocitem->itemid);
 
 		item = (zbx_preproc_item_t *)zbx_hashset_insert(items, &item_local, sizeof(item_local));
 
@@ -8031,14 +8114,14 @@ static int	dc_config_get_queue_nextcheck(zbx_binary_heap_t *queue)
  * Author: Alexander Vladishev, Aleksandrs Saveljevs                          *
  *                                                                            *
  ******************************************************************************/
-int	DCconfig_get_poller_nextcheck(unsigned char poller_type)
+int	DCconfig_get_poller_nextcheck(unsigned char poller_type, unsigned int process_num)
 {
 	int			nextcheck;
 	zbx_binary_heap_t	*queue;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() poller_type:%d", __func__, (int)poller_type);
 
-	queue = &config->queues[poller_type];
+	queue = &config->queues[poller_type][process_num-1];
 
 	RDLOCK_CACHE;
 
@@ -8097,6 +8180,7 @@ static void	dc_requeue_item_at(ZBX_DC_ITEM *dc_item, ZBX_DC_HOST *dc_host, int n
 	DCupdate_item_queue(dc_item, old_poller_type, old_nextcheck);
 }
 
+
 /******************************************************************************
  *                                                                            *
  * Function: DCconfig_get_poller_items                                        *
@@ -8122,18 +8206,18 @@ static void	dc_requeue_item_at(ZBX_DC_ITEM *dc_item, ZBX_DC_HOST *dc_host, int n
  *           function.                                                        *
  *                                                                            *
  ******************************************************************************/
-int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *errcodes,  int max_items)
+int	DCconfig_get_poller_items(unsigned char poller_type, unsigned int  process_num, DC_ITEM *items, int *errcodes,  int max_items)
 {
-	int			now, num = 0, cnt=0;
+	int			now, num = 0, cnt=0, queue_num;
 	zbx_binary_heap_t	*queue;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() poller_type:%d", __func__, (int)poller_type);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() poller_type:%d process num %d" , __func__, (int)poller_type, process_num);
 
 	now = time(NULL);
+	
+	queue = &config->queues[poller_type][process_num-1];
 
-	queue = &config->queues[poller_type];
-
-	WRLOCK_CACHE;
+	RDLOCK_CACHE;
 
 	while (num < max_items && FAIL == zbx_binary_heap_empty(queue))
 	{
@@ -8142,28 +8226,29 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *er
 		ZBX_DC_HOST			*dc_host;
 		ZBX_DC_ITEM			*dc_item;
 		static const ZBX_DC_ITEM	*dc_item_prev = NULL;
-
+		
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
 		if (dc_item->nextcheck > now) 
 			break;
-			
+	
 		if ( (0 != num) && 	( ZBX_POLLER_TYPE_NORMAL == poller_type ) && (SUCCEED == is_snmp_type(dc_item_prev->type))
 					 && (0 != __config_snmp_item_compare(dc_item_prev, dc_item)) ) 			
 			break;
 	
-		
 		if ( (0 != num) && 	( ZBX_POLLER_TYPE_JAVA == poller_type )	&& (ITEM_TYPE_JMX == dc_item_prev->type) && 
 				(0 != __config_java_item_compare(dc_item_prev, dc_item)) )
 			break;
+	//	zabbix_log(LOG_LEVEL_INFORMATION,"LGGG 4 %d", num);
 		
-		///for async pollers queues number is alwayas equal or exceeds ZBX_POLLER_TYPE_COUNT,  skipping non-free items for async calls
-		if (ZBX_POLLER_TYPE_COUNT <= poller_type && POLL_FREE != errcodes[num]) {
+		if ((ZBX_POLLER_TYPE_ASYNC_AGENT ==  poller_type || ZBX_POLLER_TYPE_ASYNC_SNMP ==  poller_type) 
+			&& POLL_FREE != errcodes[num] ) {
 			num++;
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"LGGG 4.5");
 			continue;
 		}
-
+	//	zabbix_log(LOG_LEVEL_INFORMATION,"LGGG 5");
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
 
@@ -8175,34 +8260,41 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *er
 			continue;
 		
 		if (SUCCEED == DCin_maintenance_without_data_collection(dc_host, dc_item))
-		{
+		{	UNLOCK_CACHE;
+			WRLOCK_CACHE;
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
+			UNLOCK_CACHE;
+			RDLOCK_CACHE;
 			continue;
 		}
-
+		
 		if (ZBX_CLUSTER_HOST_STATE_ACTIVE !=dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0) {
 			/* placing host back to queue if it doesn't belong to this server node and cluster is operational*/
+			UNLOCK_CACHE;
+			WRLOCK_CACHE;
 			dc_requeue_item(dc_item, dc_host, dc_item->state, ZBX_ITEM_COLLECTED, now);
+			UNLOCK_CACHE;
+			RDLOCK_CACHE;
 			continue;
 		}
 
 		if (CONFIG_DEBUG_ITEM == dc_item->itemid || CONFIG_DEBUG_HOST == dc_host->hostid) 
 			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: fetched to be polled from queue %d",dc_item->itemid,__func__,poller_type);
-
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Fetching item: %ld at %s: fetched to be polled from queue %d, idx is %d",dc_item->itemid,__func__,poller_type, num);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"LGGG 8");
 		dc_item_prev = dc_item;
 		dc_item->location = ZBX_LOC_POLLER;
 		DCget_host(&items[num].host, dc_host);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"LGGG 9");
 		DCget_item(&items[num], dc_item);
-		
+		//zabbix_log(LOG_LEVEL_INFORMATION,"LGGG 10");
+		DCget_preproc_type(&items[num]);
 		//there is no errcodes passed for pingers
 		if (errcodes) errcodes[num]=POLL_CC_FETCHED;
 		num++;
 		cnt++;
 	}
 
-	//for(int i=0; i < ZBX_POLLER_TYPE_COUNT+CONFIG_ASYNC_SNMP_POLLER_FORKS; i ++ ) {
-	//	zabbix_log(LOG_LEVEL_INFORMATION, "Poll queue length for type %d is %d", i, config->queues[i].elems_num);
-	//}
 	UNLOCK_CACHE;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
@@ -8228,14 +8320,14 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *er
  *           DCrequeue_items() or DCpoller_requeue_items().                   *
  *                                                                            *
  ******************************************************************************/
-int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *nextcheck)
+int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *nextcheck, unsigned int process_num)
 {
 	int			num = 0;
 	zbx_binary_heap_t	*queue;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	queue = &config->queues[ZBX_POLLER_TYPE_IPMI];
+	queue = &config->queues[ZBX_POLLER_TYPE_IPMI][process_num-1];
 
 	WRLOCK_CACHE;
 
@@ -8289,7 +8381,7 @@ int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *
 		num++;
 	}
 
-	*nextcheck = dc_config_get_queue_nextcheck(&config->queues[ZBX_POLLER_TYPE_IPMI]);
+	*nextcheck = dc_config_get_queue_nextcheck(&config->queues[ZBX_POLLER_TYPE_IPMI][process_num-1]);
 
 	UNLOCK_CACHE;
 
@@ -13886,7 +13978,7 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 	return SUCCEED;
 }
 /************************************************
-* fetches item host names and keys to send to 	*
+* fetches items host names and keys to send to 	*
 * trends storage
 * when i come back this func i should reconsider
 * implementing something like go contexts for
@@ -13911,5 +14003,33 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 		}
 	}
 
+	UNLOCK_CACHE;
+}
+
+/*******************************************************
+ * 
+ * 
+ * 
+ * 
+ * *****************************************************/
+void DC_UpdatePreprocStat(u_int64_t no_preproc, u_int64_t local_preproc) {
+
+
+	WRLOCK_CACHE;
+	config->no_preproc += no_preproc;
+	config->local_preproc += local_preproc;
+	UNLOCK_CACHE;
+
+}
+
+void DC_GetPreprocStat(u_int64_t *no_prpeproc, u_int64_t *local_preproc) {
+	RDLOCK_CACHE;
+	
+	*no_prpeproc=config->no_preproc;
+	*local_preproc=config->local_preproc;
+	
+	//config->no_preproc = 0;
+	//config->local_preproc = 0;
+	
 	UNLOCK_CACHE;
 }

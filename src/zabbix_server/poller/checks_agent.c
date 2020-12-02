@@ -192,14 +192,16 @@ void handle_socket_operation(struct async_agent_session *sess)
 	{
 
 	case POLL_CONNECT_SENT:
-//		if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-//					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Sending request to host %s, item  %ld", conf.items[item_idx].host.host, 
-//								conf.items[item_idx].itemid);
+
+		if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
+			zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Sending data to host %s, key %s item  %ld %d idx is %d", conf.items[item_idx].host.host, conf.items[item_idx].key,
+								conf.items[item_idx].itemid, sess->socket->timeout, item_idx);
 
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld sending request %ld, %s  ",conf.items[item_idx].itemid,sess,conf.items[item_idx].key);
 		if (SUCCEED != zbx_tcp_send(sess->socket, conf.items[item_idx].key))
 		{ //we are using async, so it might be that the socket still not ready, if so, we just have to wait  a bit
 			//on next call of handle op's (probably) the socket will be ready
+			
 			if (EAGAIN == zbx_socket_last_error())
 			{
 //				zabbix_log(LOG_LEVEL_TRACE, "Socket isn't ready yet for item %ld", conf.items[item_idx].itemid);
@@ -208,15 +210,16 @@ void handle_socket_operation(struct async_agent_session *sess)
 //								conf.items[item_idx].itemid);
 				return;
 			}
+			zabbix_log(LOG_LEVEL_INFORMATION,"Data send failed idx is %d",item_idx);
 
 			conf.errcodes[item_idx] = NETWORK_ERROR;
 			sess->state = POLL_FINISHED;
 			sess->failcount=0;
-
+			
 			zbx_tcp_close(sess->socket);
 
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Couldn't send request to host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Couldn't send request to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 
 			SET_MSG_RESULT(&conf.results[item_idx], zbx_strdup(NULL, "Cannot send request to the agent"));
@@ -224,9 +227,12 @@ void handle_socket_operation(struct async_agent_session *sess)
 		else
 		{
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Completed sending request to host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Completed sending request to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
-
+			
+			zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Completed sending data to host %s, item  %ld idx is %d", conf.items[item_idx].host.host, 
+								conf.items[item_idx].itemid,item_idx);
+	
 			sess->state = POLL_REQ_SENT;
 		}
 		break;
@@ -239,7 +245,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 			conf.errcodes[item_idx] = SUCCEED;
 			
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Got responce for host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Got responce for host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 			//zabbix_log(LOG_LEVEL_INFORMATION, "get value from agent result: '%s'", sess->socket->buffer);
 
@@ -256,7 +262,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 				conf.errcodes[item_idx] = NOTSUPPORTED;
 	
 				if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: responce: not supported agent  host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: responce: not supported agent  host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 
 			}
@@ -266,7 +272,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 				conf.errcodes[item_idx] = AGENT_ERROR;
 				
 				if ( CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Agent error to host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Agent error to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 			}
 			else if (0 == received_len)
@@ -277,7 +283,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 				conf.errcodes[item_idx] = NETWORK_ERROR;
 				
 				if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: empty responce host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: empty responce host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 
 			}
@@ -294,7 +300,7 @@ void handle_socket_operation(struct async_agent_session *sess)
 		{
 			//	zabbix_log(LOG_LEVEL_DEBUG, "Get value from agent failed: %s", zbx_socket_strerror());
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Failed to get value from host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Failed to get value from host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 
 			SET_MSG_RESULT(&conf.results[item_idx], zbx_dsprintf(NULL, "Get value from agent failed: %s", zbx_socket_strerror()));
@@ -324,10 +330,9 @@ void handle_socket_operation(struct async_agent_session *sess)
 			while (SUCCEED == zbx_list_iterator_next(&iterator))
 			{
 				zbx_list_iterator_peek(&iterator, (void **)&val);
-				zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: on session close found item waiting in the list %ld", conf.items[val].itemid);
+				zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: on session close found item waiting in the list %ld", conf.items[val].itemid);
 			}
 		}
-
 		break;
 	}
 }
@@ -412,7 +417,8 @@ int start_agent_connection(struct async_agent_session *sess)
 
 
 	if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-				zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent, starting connection to host %s, item  %ld", conf.items[item_idx].host.host, conf.items[item_idx].itemid);
+				zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent, starting connection to host %s, item  %ld idx is %d", 
+					conf.items[item_idx].host.host, conf.items[item_idx].itemid,item_idx);
 
 	if (SUCCEED != zbx_list_pop(sess->items_list, (void **)&item_idx))
 		return SUCCEED;
@@ -470,7 +476,7 @@ int start_agent_connection(struct async_agent_session *sess)
 		SET_MSG_RESULT(&conf.results[item_idx], zbx_strdup(NULL, "Couldn't create socket"));
 	
 		if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: connection fail to host %s, item  %ld", conf.items[item_idx].host.host, 
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: connection fail to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 		sess->failcount=0;
 
@@ -549,7 +555,7 @@ int get_values_agent_async()
 					//hs[i]->current_item = -1;
 					conf.errcodes[item_idx] = NETWORK_ERROR;
 					if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-						zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: connection failed to host %s, item  %ld", conf.items[item_idx].host.host, 
+						zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: connection failed to host %s, item  %ld", conf.items[item_idx].host.host, 
 								conf.items[item_idx].itemid);
 					continue;
 				}
@@ -587,12 +593,13 @@ int get_values_agent_async()
 			zbx_tcp_close(hs[i]->socket);
 
 			if (CONFIG_DEBUG_HOST == conf.items[item_idx].host.hostid)
-					zabbix_log(LOG_LEVEL_INFORMATION, "Debug agent: Operation timeout to host %s, item  %ld", conf.items[item_idx].host.host, conf.items[item_idx].itemid);
+					zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Operation timeout to host %s, item  %ld item idx is %d", conf.items[item_idx].host.host, conf.items[item_idx].itemid, item_idx);
 
+			zabbix_log(LOG_LEVEL_DEBUG, "Debug agent: Operation timeout to host %s, item  %ld item idx is %d", conf.items[item_idx].host.host, conf.items[item_idx].itemid, item_idx);
 			hs[i]->failcount++;
 
 			if (CONFIG_DEBUG_HOST == items[hs[i]->current_item].host.hostid ) 
-				zabbix_log(LOG_LEVEL_INFORMATION, "Debug host %s: Item %ld, slot %d timeout, NO retries left, TIMEOUT",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i);
+				zabbix_log(LOG_LEVEL_DEBUG, "Debug host %s: Item %ld, slot %d timeout, NO retries left, TIMEOUT",items[hs[i]->current_item].host.host,items[hs[i]->current_item].itemid, i);
 	
 			//do a host cleanout if there are several fails in a row
 			if (hs[i]->failcount < GLB_FAIL_COUNT_CLEAN ) {
@@ -617,8 +624,8 @@ int get_values_agent_async()
 				cnt++;
 			}
 
-			zabbix_log(LOG_LEVEL_INFORMATION, "Host %s AGENT timed out %d items due to prev %d items fail",
-				 conf.items[item_idx].host.host, cnt, hs[i]->failcount);
+			zabbix_log(LOG_LEVEL_INFORMATION, "Host %s AGENT timed out %d items due to prev %d items fail idx is %d",
+				 conf.items[item_idx].host.host, cnt, hs[i]->failcount, item_idx);
 			
 			hs[i]->failcount=0;
 			//if (cnt > 0 ) zabbix_log(LOG_LEVEL_DEBUG, "Found additional host's items idx %ld, count %d, removing with timeout error",item_idx, cnt);

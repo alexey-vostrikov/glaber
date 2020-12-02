@@ -135,9 +135,7 @@ class CProxy extends CApiService {
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
-		
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
-				
 		while ($proxy = DBfetch($res)) {
 			if ($options['countOutput']) {
 				$result = $proxy['rowscount'];
@@ -178,10 +176,11 @@ class CProxy extends CApiService {
 		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
-	
+
 		$proxies = zbx_toArray($proxies);
+
 		$this->validateCreate($proxies);
-		
+
 		foreach ($proxies as &$proxy) {
 			// Clean encryption fields.
 			if ($proxy['status'] == HOST_STATUS_PROXY_PASSIVE) {
@@ -552,7 +551,7 @@ class CProxy extends CApiService {
 			$hosts = $this->unsetExtraFields($hosts, ['proxy_hostid', 'hostid'], $options['selectHosts']);
 			$result = $relationMap->mapMany($result, $hosts, 'hosts');
 		}
-		
+
 		// adding host interface
 		if ($options['selectInterface'] !== null && $options['selectInterface'] != API_OUTPUT_COUNT) {
 			$interfaces = API::HostInterface()->get([
@@ -640,9 +639,6 @@ class CProxy extends CApiService {
 		}
 	}
 
-
-
-	
 	/**
 	 * Validates the input parameters for the create() method.
 	 *
@@ -653,7 +649,7 @@ class CProxy extends CApiService {
 	protected function validateCreate(array $proxies) {
 		$proxy_db_fields = ['host' => null, 'status' => null];
 		$names = [];
-		
+
 		$ip_range_parser = new CIPRangeParser(['v6' => ZBX_HAVE_IPV6, 'ranges' => false]);
 		$host_name_parser = new CHostNameParser();
 

@@ -145,12 +145,12 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		if (0 != sleeptime || STAT_INTERVAL <= time(NULL) - last_stat_time)
 		{
 			stats_offset = 0;
-			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "processed %d values", total_values_num);
+			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "process %d val/s", total_values_num/STAT_INTERVAL);
 
 			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 			{
-				zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, ", %d triggers",
-						total_triggers_num);
+				zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, ", %d triggers/s",
+						total_triggers_num/STAT_INTERVAL);
 			}
 
 			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, " in " ZBX_FS_DBL " sec", total_sec);
@@ -168,10 +168,11 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 		if (ZBX_SYNC_MORE == more)
 			continue;
-
+			
 		if (!ZBX_IS_RUNNING())
 			break;
-
+		//usleep(20000);
+		//if (sleeptime >0 ) zabbix_log(LOG_LEVEL_INFORMATION, "In %s() history_num: sleeping %d sec", __func__, sleeptime);
 		zbx_sleep_loop(sleeptime);
 	}
 

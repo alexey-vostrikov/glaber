@@ -120,9 +120,8 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libzbxhistory_a_AR = $(AR) $(ARFLAGS)
 libzbxhistory_a_LIBADD =
-am_libzbxhistory_a_OBJECTS = history.$(OBJEXT) \
-	history_clickhouse.$(OBJEXT) history_vmetrics.$(OBJEXT) \
-	history_worker.$(OBJEXT)
+am_libzbxhistory_a_OBJECTS = history.$(OBJEXT) history_sql.$(OBJEXT) \
+	history_elastic.$(OBJEXT)
 libzbxhistory_a_OBJECTS = $(am_libzbxhistory_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -388,9 +387,8 @@ top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libzbxhistory.a
 libzbxhistory_a_SOURCES = \
 	history.c history.h \
-	history_clickhouse.c \
-	history_vmetrics.c	\
-	history_worker.c
+	history_sql.c \
+	history_elastic.c 
 
 all: all-am
 
@@ -441,9 +439,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_clickhouse.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_vmetrics.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_worker.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_elastic.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history_sql.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\

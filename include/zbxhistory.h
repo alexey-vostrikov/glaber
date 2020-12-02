@@ -47,19 +47,19 @@ void	zbx_history_value2str(char *buffer, size_t size, const history_value_t *val
 
 
 int	glb_history_init(char **history_modules, char **error);
-int zbx_history_preload();
+int glb_history_preload();
 
 void	zbx_history_destroy(void);
 
-int	zbx_history_add_values(const zbx_vector_ptr_t *values);
-int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int count, int end,
+int	glb_history_add(const zbx_vector_ptr_t *values);
+int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, int end,
 		zbx_vector_history_record_t *values);
-int zbx_history_get_aggregated_values(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates,
+int	glb_history_get_agg_buff(zbx_uint64_t itemid, int value_type, int start, int end, int count, char **buffer);
+int glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates,
 		char **buffer);
 int glb_history_add_trends(ZBX_DC_TREND * trend, int trends_num);
-
+int	glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int count, char **buffer);
 
 int	zbx_history_requires_trends(int value_type);
-
 
 #endif

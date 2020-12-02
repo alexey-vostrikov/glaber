@@ -786,8 +786,8 @@ class CMacrosResolverGeneral {
 						$history = Manager::History()->getLastValues([$function], 1, ZBX_HISTORY_PERIOD);
 
 						if (array_key_exists($function['itemid'], $history)) {
-							$clock = $history[$function['itemid']][0]['clock'];
-							$value = $history[$function['itemid']][0]['value'];
+							$clock = $history[$function['itemid']]['lastclock'];
+							$value = $history[$function['itemid']]['value'];
 						}
 						break;
 				}

@@ -1359,7 +1359,7 @@ function getEventsActionsIconsData(array $events, array $triggers, array $r_even
 	$messages = getEventsMessages($events);
 	$severities = getEventsSeverityChanges($events, $triggers);
 	$actions = getEventsActions($events, $r_events);
-	
+
 	return [
 		'data' => [
 			'messages' => $messages['data'],
@@ -1490,7 +1490,7 @@ function getEventsActions(array $events, array $r_events = []) {
 	$userids = [];
 	$mediatypeids = [];
 	$actions = [];
-	
+
 	foreach ($events as $event) {
 		// Get alerts for event.
 		$alert_eventids[$event['eventid']] = true;
@@ -1501,7 +1501,7 @@ function getEventsActions(array $events, array $r_events = []) {
 			$r_eventids[$event['r_eventid']] = true;
 		}
 	}
-	
+
 	if ($r_eventids && !$r_events) {
 		$r_events = API::Event()->get([
 			'output' => ['clock'],

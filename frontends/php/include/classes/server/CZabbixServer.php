@@ -144,7 +144,8 @@ class CZabbixServer {
 		]);
 	}
 
-	public function getHistoryData($sid, $itemid, $start, $end, $count, $aggregate) {
+	public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
+		error_log(" Server hist called with itemid $itemid, start $start end $end count $count type $type");
 		return $this->request([
 			'request' => 'history.get',
 			'sid' => $sid,
@@ -152,7 +153,7 @@ class CZabbixServer {
 			'start'	=> $start,
 			'end' => $end,
 			'count' => $count,
-			'aggregate' => $aggregate
+			'type' => $type
 		]);
 	}
 
@@ -324,7 +325,6 @@ class CZabbixServer {
 	 * @return bool
 	 */
 	public function isRunning($sid) {
-	
 		$response = $this->request([
 			'request' => 'status.get',
 			'type' => 'ping',
@@ -368,7 +368,7 @@ class CZabbixServer {
 		// Reset object state.
 		$this->error = null;
 		$this->total = null;
-		
+
 		// Connect to the server.
 		if (!$this->connect()) {
 			return false;

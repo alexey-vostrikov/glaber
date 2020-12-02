@@ -78,7 +78,7 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 	if (NOTSUPPORTED == ping_result)
 	{
 		item.state = ITEM_STATE_NOTSUPPORTED;
-		zbx_preprocess_item_value(item.itemid, item.value_type, item.flags, NULL, ts, item.state, error);
+		zbx_preprocess_item_value(item.host.hostid, item.itemid, item.value_type, item.flags, NULL, ts, item.state, error);
 	}
 	else
 	{
@@ -90,7 +90,7 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 			SET_DBL_RESULT(&value, *value_dbl);
 
 		item.state = ITEM_STATE_NORMAL;
-		zbx_preprocess_item_value(item.itemid, item.value_type, item.flags, &value, ts, item.state, NULL);
+		zbx_preprocess_item_value(item.host.hostid, item.itemid, item.value_type, item.flags, &value, ts, item.state, NULL);
 
 		free_result(&value);
 	}
@@ -422,7 +422,7 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 	}
 
 	
-	num = DCconfig_get_poller_items(ZBX_POLLER_TYPE_PINGER, items , NULL, MAX_PINGER_ITEMS);
+	num = DCconfig_get_poller_items(ZBX_POLLER_TYPE_PINGER, process_num, items , NULL, MAX_PINGER_ITEMS);
 
 	for (i = 0; i < num; i++)
 	{
@@ -448,8 +448,8 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 			zbx_timespec(&ts);
 
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL, &ts,
-					items[i].state, error);
+			zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags, NULL, &ts,
+					items[i].state, error );
 
 			DCrequeue_items(&items[i].itemid, &items[i].state, &ts.sec, &errcode, 1);
 		}
@@ -587,6 +587,7 @@ ZBX_THREAD_ENTRY(pinger_thread, args)
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
+	glb_preprocessing_init();
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
@@ -607,7 +608,7 @@ ZBX_THREAD_ENTRY(pinger_thread, args)
 
 		free_hosts(&items, &items_count);
 
-		nextcheck = DCconfig_get_poller_nextcheck(ZBX_POLLER_TYPE_PINGER);
+		nextcheck = DCconfig_get_poller_nextcheck(ZBX_POLLER_TYPE_PINGER,process_num);
 		sleeptime = calculate_sleeptime(nextcheck, POLLER_DELAY);
 
 		zbx_setproctitle("%s #%d [got %d values in " ZBX_FS_DBL " sec, idle %d sec]",

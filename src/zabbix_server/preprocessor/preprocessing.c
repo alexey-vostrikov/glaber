@@ -30,7 +30,10 @@
 
 #define PACKED_FIELD_RAW	0
 #define PACKED_FIELD_STRING	1
-#define MAX_VALUES_LOCAL	256
+#define MAX_VALUES_LOCAL	1024
+
+extern int CONFIG_DISABLE_INPOLLER_PREPROC;
+extern int CONFIG_PREPROCMAN_FORKS;
 
 /* packed field data description */
 typedef struct
@@ -44,8 +47,9 @@ zbx_packed_field_t;
 #define PACKED_FIELD(value, size)	\
 		(zbx_packed_field_t){(value), (size), (0 == (size) ? PACKED_FIELD_STRING : PACKED_FIELD_RAW)};
 
-static zbx_ipc_message_t	cached_message;
-static int			cached_values;
+static zbx_ipc_message_t	*cached_messages={0};
+static int			cached_values=0;
+static zbx_ipc_socket_t	*sockets = NULL;
 
 /******************************************************************************
  *                                                                            *
@@ -786,35 +790,28 @@ void	zbx_preprocessor_unpack_test_result(zbx_vector_ptr_t *results, zbx_vector_p
  *                                                                            *
  ******************************************************************************/
 static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32_t size,
-		zbx_ipc_message_t *response)
+		zbx_ipc_message_t *response, int manager_num)
 {
-	char			*error = NULL;
-	static zbx_ipc_socket_t	socket = {0};
-
-	/* each process has a permanent connection to preprocessing manager */
-	if (0 == socket.fd && FAIL == zbx_ipc_socket_open(&socket, ZBX_IPC_SERVICE_PREPROCESSING, SEC_PER_MIN,
-			&error))
+		
+	if (FAIL == zbx_ipc_socket_write(&sockets[manager_num], code, data, size))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot connect to preprocessing service: %s", error);
+		zabbix_log(LOG_LEVEL_CRIT, "cannot send data %ld to preprocessing service %d",data, manager_num);
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == zbx_ipc_socket_write(&socket, code, data, size))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot send data to preprocessing service");
-		exit(EXIT_FAILURE);
-	}
-
-	if (NULL != response && FAIL == zbx_ipc_socket_read(&socket, response))
+	if (NULL != response && FAIL == zbx_ipc_socket_read(&sockets[manager_num], response))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot receive data from preprocessing service");
 		exit(EXIT_FAILURE);
 	}
 }
 
+
+void DC_UpdatePreprocStat(u_int64_t no_preproc, u_int64_t local_preproc);
+
 /******************************************************************************
  *                                                                            *
- * Function: zbx_preprocess_item_value                                        *
+ * Function: zbx_fast_preprocess_item_value                                   *
  *                                                                            *
  * Purpose: perform item value preprocessing and dependend item processing    *
  *                                                                            *
@@ -829,20 +826,259 @@ static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32
  *                               ITEM_STATE_NOTSUPPORTED                      *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocess_item_value(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error)
+void glb_fast_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error, DC_ITEM *item, zbx_hashset_t *history_cache, int poller_type) {
+		
+		zbx_preproc_item_t * preproc_item;
+		zbx_preproc_history_t *history;
+		zbx_vector_ptr_t history_out;
+		
+		zbx_preprocessing_request_t request;
+		zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
+		int 			i, ret, results_num;
+		char			*errmsg = NULL;//, *error_loc = NULL;
+		zbx_preproc_result_t	*results = NULL;
+		zbx_variant_t value={0};
+		AGENT_RESULT out_result={0};
+		static int local_preproc=0, skip_preproc=0;
+	
+		//skipping fast inpoller preproc if disabled, no item, no cache, or item type is master which needs preproc manager by now
+		//also skipping for non async poller types due to no guarantie that same item will be processed by the same poller
+		//if so - history will be empty and all history based calculations will not work correctly
+		if ( 0 < CONFIG_DISABLE_INPOLLER_PREPROC || NULL == item || NULL == history_cache || GLB_PREPROC_MANAGER == item->preproc_type || 
+			(ZBX_POLLER_TYPE_ASYNC_SNMP != poller_type && ZBX_POLLER_TYPE_ASYNC_SNMP != poller_type)	) {
+			zbx_preprocess_item_value(hostid,itemid,item_value_type,item_flags,result,ts,state,error);
+			return;
+		}	
+		
+		preproc_item=(zbx_preproc_item_t *)item->preprocitem;
+		
+		request.value.result = &out_result;
+		request.value_type = item_value_type;
+		request.value.ts = ts;
+
+		if ( NULL != preproc_item && preproc_item->preproc_ops_num > 0 ) {
+			
+			//prep 1. fetching or generating incoming history 
+			history = (zbx_preproc_history_t *)zbx_hashset_search(history_cache, &itemid);
+			
+			if (NULL == history )
+			{
+				zbx_preproc_history_t	history_local;
+				
+				history_local.itemid = itemid;
+				history = (zbx_preproc_history_t *)zbx_hashset_insert(history_cache, &history_local,sizeof(history_local));
+				zbx_vector_ptr_create(&history->history);
+
+			} 
+			
+			zbx_vector_ptr_create(&history_out);
+		
+			results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * preproc_item->preproc_ops_num);
+			memset(results, 0, sizeof(zbx_preproc_result_t) * preproc_item->preproc_ops_num);
+
+			//zabbix_log(LOG_LEVEL_INFORMATION, "Result to varaible coversion, error is %s ", error);
+			//prep 3. converting agent result to variant 
+			//oroignal conversion is done in preproc_manager.c:210 (preprocessor_create_task)
+			//but we should care about data type from th 
+			if (NULL != error ) value.type=ZBX_VARIANT_NONE; 
+			else {
+				switch (item_value_type) {
+					case ITEM_VALUE_TYPE_LOG:
+						//zabbix_log(LOG_LEVEL_INFORMATION, "LOG");
+						zbx_variant_set_str(&value, request.value.result->log->value);
+						//todo: consider proper log preprocessing
+						break;
+					case ITEM_VALUE_TYPE_UINT64:
+						//zabbix_log(LOG_LEVEL_INFORMATION, "UINT64");
+						zbx_variant_set_ui64(&value, request.value.result->ui64);
+						break;
+					case ITEM_VALUE_TYPE_FLOAT:
+						//zabbix_log(LOG_LEVEL_INFORMATION, "DBL");
+						zbx_variant_set_dbl(&value, request.value.result->dbl);
+						break;
+					case ITEM_VALUE_TYPE_STR:
+						//zabbix_log(LOG_LEVEL_INFORMATION, "STR");
+						zbx_variant_set_str(&value, request.value.result->str);
+						break;
+					case ITEM_VALUE_TYPE_TEXT:
+						//zabbix_log(LOG_LEVEL_INFORMATION, "TEXT");
+						zbx_variant_set_str(&value, request.value.result->text);
+						break;
+					default:
+						THIS_SHOULD_NEVER_HAPPEN;
+				}
+			}
+		
+			
+			//zbx_variant_copy(&value_copy, &value);
+			//zabbix_log(LOG_LEVEL_INFORMATION, "Preprocessing");
+			//exec preprocessing localy
+			//todo: figure, what holds the result after all
+			if (FAIL == (ret = worker_item_preproc_execute(item_value_type, &value, ts, preproc_item->preproc_ops, preproc_item->preproc_ops_num,
+				 &history->history,	&history_out, results, &results_num, &errmsg)) && 0 != results_num)
+		
+			{
+				int action = results[results_num - 1].action;
+
+				if (ZBX_PREPROC_FAIL_SET_ERROR != action && ZBX_PREPROC_FAIL_FORCE_ERROR != action)
+				{
+					worker_format_error(&value, results, results_num, errmsg, &error);
+					//zabbix_log(LOG_LEVEL_INFORMATION,"Freeind errmsg");
+					zbx_free(errmsg);
+				}
+				else {
+				//	error_loc = errmsg;
+				//	zabbix_log(LOG_LEVEL_INFORMATION,"error_loc is set");
+				}
+			}
+		
+			//zabbix_log(LOG_LEVEL_INFORMATION, "History cleanup");
+			//cleanup 1: adding new history to the cache
+			//adding new history data
+			zbx_vector_ptr_clear_ext(&history->history, (zbx_clean_func_t)zbx_preproc_op_history_free);
+
+			if (0 != history_out.values_num) {
+				//adding new history data to the history
+				zbx_vector_ptr_append_array(&history->history, history_out.values, history_out.values_num);
+			}	else {  //there is no history returned from the preproc
+				
+				zbx_vector_ptr_destroy(&history->history);
+				zbx_hashset_remove_direct(history_cache, history);
+				
+			}
+			//zabbix_log(LOG_LEVEL_INFORMATION, "History cleanup");			
+			zbx_vector_ptr_destroy(&history_out);
+
+			//zabbix_log(LOG_LEVEL_INFORMATION, "varaible to result conversion");
+			//now going back from the varaible to the agent result as we need it to submit to the hist cache
+			//it's done in preprocessor_set_variant_result(request, &value, error)), i will actualy will use it too
+			
+			
+			//now setting agent_result from the variant_out
+			//zabbix_log(LOG_LEVEL_INFORMATION, "set var result");
+			preprocessor_set_variant_result(&request, &value, error);
+
+			//local result doesn't have to be cleaned after as it will point to the original value fields
+			//zabbix_log(LOG_LEVEL_INFORMATION, "DC cache upload");
+
+			dc_add_history(request.value.itemid, request.value.item_value_type, request.value.item_flags, request.value.result, 
+				request.value.ts, request.value.state, request.value.error);
+	
+			//preproc_item_value_clear(&request.value);
+			//request_free_steps(&request);
+	
+			//zabbix_log(LOG_LEVEL_INFORMATION, "Memory freeing");
+			zbx_variant_clear(&value);
+			
+			//cleaing out dynamic staff that preproc set variant might allocate
+			//if (ITEM_VALUE_TYPE_STR == request.value_type) {
+			zbx_free(request.value.result->str);
+			zbx_free(request.value.result->text);
+			request.value.result->str=NULL;
+			request.value.result->text=NULL;
+
+			if ( NULL !=request.value.result->log) {
+				zbx_free(request.value.result->log->value);
+				zbx_free(request.value.result->log);
+				request.value.result->log=NULL;
+			}
+			
+		//	if ( NULL != request.value.result ) {
+		//		//zabbix_log(LOG_LEVEL_INFORMATION, "Freenig ")
+		//		free_result(&out_result);
+		//	}
+			
+			///zabbix_log(LOG_LEVEL_INFORMATION, "Memory freeing - results");
+			for (i = 0; i < results_num; i++)
+				zbx_variant_clear(&results[i].value);
+			
+			zbx_free(results);
+			
+			local_preproc++;
+			
+		} else {
+			//item had no prepoc steps - adding result to the history cache
+			dc_add_history(itemid, item_value_type, item_flags, result, ts, state, error);
+			skip_preproc++;
+		}
+		
+		if (dc_flush_history()) {
+			DC_UpdatePreprocStat( skip_preproc, local_preproc);
+			skip_preproc = 0;
+			local_preproc = 0;
+		}
+	
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: Finished", __func__);
+}
+
+void glb_preprocessing_init() {
+	int 	i;
+	char 	service[MAX_STRING_LEN];
+	char	*error = NULL;
+	
+	//zabbix_log(LOG_LEVEL_INFORMATION, "Doing preprocman sockets init");
+	
+	if (NULL == (sockets = zbx_malloc( NULL, sizeof(zbx_ipc_socket_t) * CONFIG_PREPROCMAN_FORKS))) {
+			zabbix_log(LOG_LEVEL_CRIT, "Allocate mem for IPC to preprocessing managers");
+			exit(EXIT_FAILURE);
+	};
+	
+	
+	/* each process has a permanent connection to preprocessing manager */
+	for (i = 0; i < CONFIG_PREPROCMAN_FORKS; i++ ) {
+	
+		zbx_snprintf(service,MAX_STRING_LEN,"%s%d",ZBX_IPC_SERVICE_PREPROCESSING,i);
+		
+		if (FAIL == zbx_ipc_socket_open(&sockets[i], service, SEC_PER_MIN, &error))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot connect to preprocessing service: %s", error);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	if (NULL == (cached_messages=zbx_malloc(NULL, sizeof(zbx_ipc_message_t) * CONFIG_PREPROCMAN_FORKS))) {
+		
+		zabbix_log(LOG_LEVEL_CRIT,"Couldn't allocate memory for IPC messages");
+		exit(EXIT_FAILURE);	
+	};
+	memset(cached_messages,0,sizeof(zbx_ipc_message_t) * CONFIG_PREPROCMAN_FORKS);
+	cached_values=0;
+}
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_preprocess_item_value                                        *
+ *                                                                            *
+ * Purpose: perform item value preprocessing and dependend item processing    *
+ *                                                                            *
+ * Parameters: hostid          - [IN] the hostid 							  *
+ * 			   itemid          - [IN] the itemid                              *
+ *             item_value_type - [IN] the item value type                     *
+ *             item_flags      - [IN] the item flags (e. g. lld rule)         *
+ *             result          - [IN] agent result containing the value       *
+ *                               to add                                       *
+ *             ts              - [IN] the value timestamp                     *
+ *             state           - [IN] the item state                          *
+ *             error           - [IN] the error message in case item state is *
+ *                               ITEM_STATE_NOTSUPPORTED                      *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error )
 {
 	zbx_preproc_item_value_t	value = {.itemid = itemid, .item_value_type = item_value_type, .result = result,
 					.error = error, .item_flags = item_flags, .state = state, .ts = ts};
+	int manager_num = ( hostid % CONFIG_PREPROCMAN_FORKS );
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-	preprocessor_pack_value(&cached_message, &value);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);	
+		
+	preprocessor_pack_value(&cached_messages[manager_num], &value);
 
 	if (MAX_VALUES_LOCAL < ++cached_values)
-		zbx_preprocessor_flush();
-
+			zbx_preprocessor_flush();
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	return;
 }
 
 /******************************************************************************
@@ -853,14 +1089,17 @@ void	zbx_preprocess_item_value(zbx_uint64_t itemid, unsigned char item_value_typ
  *                                                                            *
  ******************************************************************************/
 void	zbx_preprocessor_flush(void)
-{
-	if (0 < cached_message.size)
-	{
-		preprocessor_send(ZBX_IPC_PREPROCESSOR_REQUEST, cached_message.data, cached_message.size, NULL);
+{	int i;
 
-		zbx_ipc_message_clean(&cached_message);
-		zbx_ipc_message_init(&cached_message);
-		cached_values = 0;
+	for ( i = 0; i < CONFIG_PREPROCMAN_FORKS; i++ ) {
+		if (0 < cached_messages[i].size)
+		{
+			preprocessor_send(ZBX_IPC_PREPROCESSOR_REQUEST, cached_messages[i].data, cached_messages[i].size, NULL, i);
+
+			zbx_ipc_message_clean(&cached_messages[i]);
+			zbx_ipc_message_init(&cached_messages[i]);
+			cached_values = 0;
+		}
 	}
 }
 
@@ -875,13 +1114,19 @@ void	zbx_preprocessor_flush(void)
  ******************************************************************************/
 zbx_uint64_t	zbx_preprocessor_get_queue_size(void)
 {
-	zbx_uint64_t		size;
+	zbx_uint64_t		size, total_size;
 	zbx_ipc_message_t	message;
+	int i;
 
-	zbx_ipc_message_init(&message);
-	preprocessor_send(ZBX_IPC_PREPROCESSOR_QUEUE, NULL, 0, &message);
-	memcpy(&size, message.data, sizeof(zbx_uint64_t));
-	zbx_ipc_message_clean(&message);
+	for (i = 0; i < CONFIG_PREPROCMAN_FORKS; i++) {
+	
+		zbx_ipc_message_init(&message);
+		preprocessor_send(ZBX_IPC_PREPROCESSOR_QUEUE, NULL, 0, &message, i );
+		memcpy(&size, message.data, sizeof(zbx_uint64_t));
+		zbx_ipc_message_clean(&message);
+		total_size += size;
+	
+	}
 
 	return size;
 }

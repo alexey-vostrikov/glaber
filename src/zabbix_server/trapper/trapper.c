@@ -41,6 +41,7 @@
 #include "../../libs/zbxserver/zabbix_stats.h"
 #include "zbxipcservice.h"
 #include "../../libs/zbxdbcache/valuecache.h"
+#include "preproc.h"
 
 extern int CONFIG_CLUSTER_SERVER_ID;
 
@@ -1073,10 +1074,12 @@ out:
 static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 {
 
-	char  *itemid_str =NULL, *start_str=NULL, *end_str=NULL, *count_str=NULL, *agg_str=NULL;
+	char  *itemid_str =NULL, *start_str=NULL, *end_str=NULL, *count_str=NULL;
+	char req_type[MAX_ID_LEN];
+	
 	size_t  itemid_alloc=0, start_alloc=0, end_alloc=0, count_alloc=0, agg_alloc=0;
-	zbx_uint64_t itemid=0, start=0, end=0, count=0, agg=0; 
-	int value_type,i;
+	zbx_uint64_t itemid=0, start=0, end=0, count=0;
+	int value_type,i,trends;
 	zbx_vector_history_record_t	values;
 	char buffer[MAX_STRING_LEN];
 	struct zbx_json		json;
@@ -1087,22 +1090,26 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 	//parsing data
-	//to do: itemids might be an array, add support for that
+	//to do: itemids might be an array, add support for that, native ui doesn;t use it
 
+	//but it seems that grafana does, so maybe it's worth of redoing
 	if (SUCCEED == zbx_json_value_by_name_dyn(jp, "itemid", &itemid_str, &itemid_alloc,&type) &&
 		SUCCEED == zbx_json_value_by_name_dyn(jp, "start", &start_str, &start_alloc,&type) && 
 	    SUCCEED == zbx_json_value_by_name_dyn(jp, "end", &end_str, &end_alloc,&type)    ) {
 		
-		if (SUCCEED == zbx_json_value_by_name_dyn(jp, "aggregate", &agg_str, &agg_alloc,&type) ) {
-			agg=strtol(agg_str,NULL,10);
-		}
 		if (SUCCEED == zbx_json_value_by_name_dyn(jp, "count", &count_str, &count_alloc,&type) ) {
 			count=strtol(count_str,NULL,10);
 		}
+		
+		if (SUCCEED != zbx_json_value_by_name(jp, "type",req_type,MAX_ID_LEN,&type) ) {
+				zabbix_log(LOG_LEVEL_WARNING,"No request type in the history request, muste be one of (history,history_agg,trends)");
+				goto out;
+		};
 
 		itemid=strtol(itemid_str,NULL,10);
 		start=strtol(start_str,NULL, 10);
 		end=strtol(end_str,NULL, 10);
+					
 		
 		if (FAIL ==  zbx_dc_get_item_type(itemid, &value_type)) {
 			zabbix_log(LOG_LEVEL_WARNING,"%s: requested item id %ld doesn't exists in the config",__func__, itemid);
@@ -1110,12 +1117,12 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		};
 
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
-		zbx_history_record_vector_create(&values);
 		
-
-		if (agg < 1) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Non agg code is running");
-			zbx_history_get_values(itemid,value_type,start,count,end,&values);
+		
+		if ( 0 == strcmp(req_type,"history")) {
+			zabbix_log(LOG_LEVEL_INFORMATION,"History request");
+			zbx_history_record_vector_create(&values);
+			glb_history_get(itemid,value_type,start,count,end,&values);
 			zbx_json_addarray(&json,ZBX_PROTO_TAG_DATA);
 
 			for (i=0; i < values.values_num; i++) {
@@ -1131,23 +1138,32 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 			}
 		
 			zbx_json_close(&json);
-		} else {
+			zbx_history_record_vector_destroy(&values,value_type);
+		} else if ( 0 == strcmp(req_type,"history_agg")) {
 			char *buffer=NULL;
+			zabbix_log(LOG_LEVEL_DEBUG,"History aggregation request");
+						
+			if (SUCCEED == glb_history_get_agg_buff(itemid,value_type,start,end,count,&buffer) ) {
+				zabbix_log(LOG_LEVEL_DEBUG,"History aggregation request got SUCCESS responce");
+				zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,buffer);	
+				zabbix_log(LOG_LEVEL_DEBUG,"Got data %s",buffer);		
+				zbx_free(buffer);
+			} 
+
+		} if ( 0 == strcmp(req_type,"trends")) {
+			zabbix_log(LOG_LEVEL_DEBUG,"Trends request");
 			
-			//well, khm, this is a tricky part of all
-			//basic zabbix didn't have aggregation data access 
-			//procedures, so first we check if there is a working aggregation handler for 
-			//the history type
-			//for simplicity the  callback just returns all the data gathered in the buffer
-			//which is then copied as is to the request side
-			
-			if (SUCCEED == zbx_history_get_aggregated_values(itemid,value_type,start,end,agg, &buffer) ) {
+			char *buffer=NULL;
+								
+			if (SUCCEED == glb_history_get_trends(itemid,value_type,start,end,count, &buffer) ) {
+				
 				zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,buffer);			
 				zbx_free(buffer);
 			}
+			zabbix_log(LOG_LEVEL_DEBUG,"Finished trends request");
 		}
 
-		zbx_history_record_vector_destroy(&values,value_type);
+		
 	} else  {
 		zabbix_log(LOG_LEVEL_WARNING,"%s: cannot process history request on of (itemid, start, end, count) params is missing", __func__);
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
@@ -1155,7 +1171,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	           
 	
 out:
-	zabbix_log(LOG_LEVEL_DEBUG,"%s: Get data response is %s",__func__,json.buffer);
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: History responce is response is %s",__func__,json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);
@@ -1163,8 +1179,7 @@ out:
 	zbx_free(start_str);
 	zbx_free(end_str);
 	zbx_free(count_str);
-	zbx_free(agg_str);
-	
+		
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 	return 1;
 }
@@ -1812,6 +1827,7 @@ ZBX_THREAD_ENTRY(trapper_thread, args)
 	zbx_setproctitle("%s #%d [connecting to the database]", get_process_type_string(process_type), process_num);
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
+	glb_preprocessing_init();
 
 	/* configuration sync is performed by trappers on passive Zabbix proxy */
 	if (1 == process_num && 0 == CONFIG_CONFSYNCER_FORKS)

@@ -259,19 +259,20 @@ class CLineGraphDraw extends CGraphDraw {
 
 			global $HISTORY;
 
-			if ($HISTORY['storagetype'] == 'clickhouse' && !isset($HISTORY['disabletrends'])) {
-				$item['trends']=1;
-			}
+			//if ($HISTORY['storagetype'] == 'clickhouse' && !isset($HISTORY['disabletrends'])) {
+			//	$item['trends']=1;
+			//}
 			
-			$item['source'] = ($item['trends'] == 0 || ($item['history'] > time() - ($this->from_time + $this->period / 2)
-					&& $this->period / $this->sizeX <= ZBX_MAX_TREND_DIFF / ZBX_GRAPH_MAX_SKIP_CELL))
-					? 'history' : 'trends';
+		//	$item['source'] = ($item['trends'] == 0 || ($item['history'] > time() - ($this->from_time + $this->period / 2)
+		//			&& $this->period / $this->sizeX <= ZBX_MAX_TREND_DIFF / ZBX_GRAPH_MAX_SKIP_CELL))
+		//			? 'history' : 'trends';
 
-			if (isset($HISTORY['disable_trends']) ) $item['source']='history';
+			$item['source'] = 'trends';
+			//if (isset($HISTORY['disable_trends']) ) $item['source']='history';
 
 		$items[] = $item;
 		}
-
+		//#trend
 		$results = Manager::History()->getGraphAggregationByWidth($items, $this->from_time, $this->to_time, $x);
 
 		foreach ($items as $item) {

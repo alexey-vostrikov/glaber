@@ -61,11 +61,6 @@ extern zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE;
 extern zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE;
 extern zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE;
 
-extern int	CONFIG_POLLER_FORKS;
-extern int	CONFIG_UNREACHABLE_POLLER_FORKS;
-extern int	CONFIG_IPMIPOLLER_FORKS;
-extern int	CONFIG_JAVAPOLLER_FORKS;
-extern int	CONFIG_PINGER_FORKS;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 extern int	CONFIG_UNREACHABLE_PERIOD;
 extern int	CONFIG_UNREACHABLE_DELAY;
@@ -78,10 +73,10 @@ typedef struct {
     char *params;     //params
     pid_t pid;              //pid of the script
     int calls;              //number of requests processed
-    int timeout;            //how much time to wait for result until consider runner is dead or stuck
-    int max_calls;          //how many calls per run before runner restart
+    int timeout;            //how much time to wait for result until consider the worker is dead or stuck
+    int max_calls;          //how many calls per run before worker restart
 	int mode_to_worker;		//how to terminate output to worker
-	int mode_from_worker;	//which termination to expect from when parsing data from the worker
+	int mode_from_worker;	//which termination to expect from the worker when parsing returned data 
 	
 	int pipe_from_worker;	//communication pipes
 	int pipe_to_worker;
@@ -220,6 +215,8 @@ typedef struct
 	char			ssl_key_file_orig[ITEM_SSL_KEY_FILE_LEN_MAX], *ssl_key_file;
 	char			ssl_key_password_orig[ITEM_SSL_KEY_PASSWORD_LEN_MAX], *ssl_key_password;
 	char			*error;
+	void 	*preprocitem;
+	char			preproc_type; //there are 3 types of preproc an item might need  0 - no preporc 1 - independent preproc 2 - dependend preproc
 }
 DC_ITEM;
 
@@ -637,7 +634,7 @@ int	in_maintenance_without_data_collection(unsigned char maintenance_status, uns
 		unsigned char type);
 void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
 		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
-void	dc_flush_history(void);
+int		dc_flush_history(void);
 void	zbx_sync_history_cache(int *values_num, int *triggers_num, int *more);
 void	zbx_log_sync_history_cache_progress(void);
 int	init_database_cache(char **error);
@@ -687,7 +684,7 @@ int	DCconfig_get_hostid_by_name(const char *host, zbx_uint64_t *hostid);
 void	DCconfig_get_hosts_by_itemids(DC_HOST *hosts, const zbx_uint64_t *itemids, int *errcodes, size_t num);
 void	DCconfig_get_items_by_keys(DC_ITEM *items, zbx_host_key_t *keys, int *errcodes, size_t num);
 void	DCconfig_get_items_by_itemids(DC_ITEM *items, const zbx_uint64_t *itemids, int *errcodes, size_t num);
-void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp);
+void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp, int manager_num);
 void	DCconfig_get_functions_by_functionids(DC_FUNCTION *functions,
 		zbx_uint64_t *functionids, int *errcodes, size_t num);
 void	DCconfig_clean_functions(DC_FUNCTION *functions, int *errcodes, size_t num);
@@ -703,9 +700,9 @@ void	DCconfig_update_interface_snmp_stats(zbx_uint64_t interfaceid, int max_snmp
 int	DCconfig_get_suggested_snmp_vars(zbx_uint64_t interfaceid, int *bulk);
 int	DCconfig_get_interface_by_type(DC_INTERFACE *interface, zbx_uint64_t hostid, unsigned char type);
 int	DCconfig_get_interface(DC_INTERFACE *interface, zbx_uint64_t hostid, zbx_uint64_t itemid);
-int	DCconfig_get_poller_nextcheck(unsigned char poller_type);
-int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int *errcodes, int max_count);
-int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *nextcheck);
+int	DCconfig_get_poller_nextcheck(unsigned char poller_type, unsigned int process_num);
+int	DCconfig_get_poller_items(unsigned char poller_type, unsigned int server_num, DC_ITEM *items, int *errcodes, int max_count);
+int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *nextcheck, unsigned int process_num);
 int	DCconfig_get_snmp_interfaceids_by_addr(const char *addr, zbx_uint64_t **interfaceids);
 size_t	DCconfig_get_snmp_items_by_interfaceid(zbx_uint64_t interfaceid, DC_ITEM **items);
 

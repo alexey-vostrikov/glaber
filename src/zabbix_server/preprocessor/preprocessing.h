@@ -49,6 +49,28 @@ typedef struct
 }
 zbx_preproc_item_value_t;
 
+typedef enum
+{
+	REQUEST_STATE_QUEUED		= 0,		/* requires preprocessing */
+	REQUEST_STATE_PROCESSING	= 1,		/* is being preprocessed  */
+	REQUEST_STATE_DONE		= 2,		/* value is set, waiting for flush */
+	REQUEST_STATE_PENDING		= 3		/* value requires preprocessing, */
+							/* but is waiting on other request to complete */
+}
+zbx_preprocessing_states_t;
+/* preprocessing request */
+typedef struct preprocessing_request
+{
+	zbx_preprocessing_states_t	state;		/* request state */
+	struct preprocessing_request	*pending;	/* the request waiting on this request to complete */
+	zbx_preproc_item_value_t	value;		/* unpacked item value */
+	zbx_preproc_op_t		*steps;		/* preprocessing steps */
+	int				steps_num;	/* number of preprocessing steps */
+	unsigned char			value_type;	/* value type from configuration */
+							/* at the beginning of preprocessing queue */
+}
+zbx_preprocessing_request_t;
+
 zbx_uint32_t	zbx_preprocessor_pack_task(unsigned char **data, zbx_uint64_t itemid, unsigned char value_type,
 		zbx_timespec_t *ts, zbx_variant_t *value, const zbx_vector_ptr_t *history,
 		const zbx_preproc_op_t *steps, int steps_num);
@@ -70,5 +92,9 @@ zbx_uint32_t	zbx_preprocessor_pack_test_result(unsigned char **data, const zbx_p
 
 void	zbx_preprocessor_unpack_test_result(zbx_vector_ptr_t *results, zbx_vector_ptr_t *history,
 		char **error, const unsigned char *data);
-
+int	preprocessor_set_variant_result(zbx_preprocessing_request_t *request, zbx_variant_t *value, char *error);
+void	preprocessor_flush_value(const zbx_preproc_item_value_t *value);
+void	preprocessor_free_request(zbx_preprocessing_request_t *request);
+void	request_free_steps(zbx_preprocessing_request_t *request);
+void 	preproc_item_value_clear(zbx_preproc_item_value_t *value);
 #endif /* ZABBIX_PREPROCESSING_H */

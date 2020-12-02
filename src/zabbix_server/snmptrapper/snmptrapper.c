@@ -190,7 +190,7 @@ next:
 				}
 
 				items[i].state = ITEM_STATE_NORMAL;
-				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags,
+				zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags,
 						&results[i], ts, items[i].state, NULL);
 
 				itemids[i] = items[i].itemid;
@@ -199,7 +199,7 @@ next:
 				break;
 			case NOTSUPPORTED:
 				items[i].state = ITEM_STATE_NOTSUPPORTED;
-				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL,
+				zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags, NULL,
 						ts, items[i].state, results[i].msg);
 
 				itemids[i] = items[i].itemid;
@@ -629,6 +629,7 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	glb_preprocessing_init();
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trapfile:'%s'", __func__, CONFIG_SNMPTRAP_FILE);
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
