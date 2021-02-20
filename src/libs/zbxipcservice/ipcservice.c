@@ -613,6 +613,7 @@ static void	ipc_client_pop_tx_message(zbx_ipc_client_t *client)
 	client->tx_header[ZBX_IPC_MESSAGE_CODE] = message->code;
 	client->tx_header[ZBX_IPC_MESSAGE_SIZE] = message->size;
 	client->tx_data = message->data;
+	zbx_free(message);
 }
 
 /******************************************************************************
@@ -1191,7 +1192,7 @@ int	zbx_ipc_socket_open(zbx_ipc_socket_t *csocket, const char *service_name, int
 
 	while (0 != connect(csocket->fd, (struct sockaddr*)&addr, sizeof(addr)))
 	{
-		if (time(NULL) - start > timeout)
+		if (0 == timeout || time(NULL) - start > timeout)
 		{
 			*error = zbx_dsprintf(*error, "Cannot connect to service \"%s\": %s.", service_name,
 					zbx_strerror(errno));

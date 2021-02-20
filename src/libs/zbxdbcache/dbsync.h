@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 #define ZBX_DBSYNC_UPDATE_MAINTENANCE_GROUPS	__UINT64_C(0x0040)
 
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 #	define ZBX_HOST_TLS_OFFSET	4
 #else
 #	define ZBX_HOST_TLS_OFFSET	0
@@ -113,9 +113,10 @@ void	zbx_dbsync_free_env(void);
 
 void	zbx_dbsync_init(zbx_dbsync_t *sync, unsigned char mode);
 void	zbx_dbsync_clear(zbx_dbsync_t *sync);
-int	zbx_dbsync_next(zbx_dbsync_t *sync, zbx_uint64_t *rowid, char ***rows, unsigned char *tag);
+int	zbx_dbsync_next(zbx_dbsync_t *sync, zbx_uint64_t *rowid, char ***row, unsigned char *tag);
 
 int	zbx_dbsync_compare_config(zbx_dbsync_t *sync);
+int	zbx_dbsync_compare_autoreg_psk(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_inventory(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_templates(zbx_dbsync_t *sync);
@@ -139,6 +140,7 @@ int	zbx_dbsync_compare_corr_conditions(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_corr_operations(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_groups(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync);
+int	zbx_dbsync_compare_item_script_param(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_maintenances(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_maintenance_tags(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_maintenance_periods(zbx_dbsync_t *sync);

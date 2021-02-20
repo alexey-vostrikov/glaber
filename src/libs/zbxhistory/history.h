@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,46 +16,31 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+#include "dbcache.h"
 
 #ifndef ZABBIX_HISTORY_H
 #define ZABBIX_HISTORY_H
 
-#define ZBX_HISTORY_IFACE_SQL		0
-#define ZBX_HISTORY_IFACE_ELASTIC	1
-
-typedef struct zbx_history_iface zbx_history_iface_t;
-
-typedef void (*zbx_history_destroy_func_t)(struct zbx_history_iface *hist);
-typedef int (*zbx_history_add_values_func_t)(struct zbx_history_iface *hist, const zbx_vector_ptr_t *history);
-typedef int (*zbx_history_get_values_func_t)(struct zbx_history_iface *hist, zbx_uint64_t itemid, int start,
-		int count, int end, zbx_vector_history_record_t *values);
-typedef int(*zbx_history_get_agg_values_func_t)(struct zbx_history_iface *hist, zbx_uint64_t itemid, int start, int end, int aggregates, char **buffer);
-typedef int(*zbx_history_preload_values_func_t)(struct zbx_history_iface *hist);
 
 
-typedef int (*zbx_history_flush_func_t)(struct zbx_history_iface *hist);
+typedef void (*glb_history_destroy_func_t)(void *data);
 
-struct zbx_history_iface
-{
-	unsigned char			value_type;
-	unsigned char			requires_trends;
-	void				*data;
+typedef int (*glb_history_add_func_t)(void *data, const zbx_vector_ptr_t *history);
+typedef int (*glb_history_get_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
 
-	zbx_history_destroy_func_t	destroy;
-	zbx_history_add_values_func_t	add_values;
-	zbx_history_get_values_func_t	get_values;
-	zbx_history_get_agg_values_func_t agg_values;
-	zbx_history_flush_func_t	flush;
-	zbx_history_preload_values_func_t	preload_values;
-};
+typedef int (*glb_history_add_trends_func_t)(void *data, ZBX_DC_TREND *trends, int trends_num);
+//it's very logical to return vector of trend values in from hist backend, but the only use for it is to send back to 
+//the caller, so to avoid double conversion it's done via simple buffer transfer
+typedef int (*glb_history_get_agg_buff_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, char **buffer);
+typedef int (*glb_history_get_trends_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, char **buffer);
 
-/* SQL hist */
-int	zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+typedef int (*glb_history_preload_values_func_t)(void *data);
 
-/* elastic hist */
-int	zbx_history_elastic_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+/* backend specific init funcs */
+int glb_history_worker_init(char *params);
+int glb_set_process_types(u_int8_t *types_array, char *setting);
+int glb_types_array_sum(u_int8_t *types_array);
 
-/* clickhouse hist */
-int	zbx_history_clickhouse_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+history_value_t	history_str2value(char *str, unsigned char value_type);
 
 #endif

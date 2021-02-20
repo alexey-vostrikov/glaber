@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,11 +20,14 @@
 #ifndef ZABBIX_CFG_H
 #define ZABBIX_CFG_H
 
+#include "zbxalgo.h"
+
 #define	TYPE_INT		0
 #define	TYPE_STRING		1
 #define	TYPE_MULTISTRING	2
 #define	TYPE_UINT64		3
 #define	TYPE_STRING_LIST	4
+#define	TYPE_CUSTOM		5
 
 #define	PARM_OPT	0
 #define	PARM_MAND	1
@@ -57,12 +60,14 @@ struct cfg_line
 	zbx_uint64_t	max;
 };
 
+typedef int	(*cfg_custom_parameter_parser_t)(const char *value, struct cfg_line *cfg);
+
 int	parse_cfg_file(const char *cfg_file, struct cfg_line *cfg, int optional, int strict);
 
 int	check_cfg_feature_int(const char *parameter, int value, const char *feature);
 int	check_cfg_feature_str(const char *parameter, const char *value, const char *feature);
 
-typedef int	(*add_serveractive_host_f)(const char *host, unsigned short port);
-void	zbx_set_data_destination_hosts(char *active_hosts, add_serveractive_host_f cb);
+typedef int	(*add_serveractive_host_f)(const char *host, unsigned short port, zbx_vector_str_t *hostnames);
+void	zbx_set_data_destination_hosts(char *active_hosts, add_serveractive_host_f cb, zbx_vector_str_t *hostnames);
 
 #endif

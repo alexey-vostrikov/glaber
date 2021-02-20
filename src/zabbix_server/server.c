@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@
 
 #include "alerter/alerter.h"
 #include "alerter/alert_manager.h"
+#include "alerter/alert_syncer.h"
 #include "dbsyncer/dbsyncer.h"
 #include "dbconfig/dbconfig.h"
 #include "discoverer/discoverer.h"
@@ -50,6 +51,7 @@
 #include "housekeeper/housekeeper.h"
 #include "pinger/pinger.h"
 #include "poller/poller.h"
+#include "glb_poller/glb_poller.h"
 #include "timer/timer.h"
 #include "trapper/trapper.h"
 #include "snmptrapper/snmptrapper.h"
@@ -65,16 +67,22 @@
 #include "events.h"
 #include "../libs/zbxdbcache/valuecache.h"
 #include "setproctitle.h"
-#include "../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 #include "zbxipcservice.h"
 #include "zbxhistory.h"
 #include "postinit.h"
 #include "export.h"
+#include "zbxvault.h"
+#include "zbxdiag.h"
+#include "../libs/zbxexec/worker.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
 #include "ipmi/ipmi_poller.h"
 #endif
+
+zbx_uint64_t zbx_dc_get_ext_worker(GLB_EXT_WORKER *worker, char *path );
+zbx_uint64_t zbx_dc_return_ext_worker(GLB_EXT_WORKER *worker);
 
 const char	*progname = NULL;
 const char	title_message[] = "zabbix_server";
@@ -103,6 +111,12 @@ const char	*help_message[] = {
 	"                                 target is not specified",
 	"      " ZBX_LOG_LEVEL_DECREASE "=target  Decrease log level, affects all processes if",
 	"                                 target is not specified",
+	"      " ZBX_SNMP_CACHE_RELOAD "          Reload SNMP cache",
+	"      " ZBX_SECRETS_RELOAD "             Reload secrets from Vault",
+	"      " ZBX_DIAGINFO "=section           Log internal diagnostic information of the",
+	"                                 section (historycache, preprocessing, alerting,",
+	"                                 lld, valuecache, locks) or everything if section is",
+	"                                 not specified",
 	"",
 	"      Log level control targets:",
 	"        process-type             All processes of specified type",
@@ -151,24 +165,30 @@ static char	shortopts[] = "c:hVR:f";
 
 /* end of COMMAND LINE OPTIONS */
 
-int	threads_num = 0;
-pid_t	*threads = NULL;
+int		threads_num = 0;
+pid_t		*threads = NULL;
+static int	*threads_flags;
 
 unsigned char	program_type		= ZBX_PROGRAM_TYPE_SERVER;
 unsigned char	process_type		= ZBX_PROCESS_TYPE_UNKNOWN;
 int		process_num		= 0;
 int		server_num		= 0;
 
+u_int64_t CONFIG_DEBUG_ITEM = 0;
+u_int64_t CONFIG_DEBUG_HOST = 0;
+
+
+int CONFIG_DISABLE_INPOLLER_PREPROC = 0;
+int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
-int	CONFIG_PINGER_FORKS		= 1;
+int CONFIG_GLB_SNMP_FORKS		= 1;
+
 int	CONFIG_POLLER_FORKS		= 5;
+int	CONFIG_PINGER_FORKS		= 5;
 int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
-int	CONFIG_ASYNC_SNMP_POLLER_FORKS	= 1;
-int CONFIG_ASYNC_SNMP_POLLER_CONNS = 4096;
-int	CONFIG_ASYNC_AGENT_POLLER_FORKS	= 1;
-int CONFIG_ASYNC_AGENT_POLLER_CONNS = 4096;
+
 int	CONFIG_HTTPPOLLER_FORKS		= 1;
 int	CONFIG_IPMIPOLLER_FORKS		= 0;
 int	CONFIG_TIMER_FORKS		= 1;
@@ -189,6 +209,7 @@ int	CONFIG_PREPROCMAN_FORKS		= 1;
 int	CONFIG_PREPROCESSOR_FORKS	= 3;
 int	CONFIG_LLDMANAGER_FORKS		= 1;
 int	CONFIG_LLDWORKER_FORKS		= 2;
+int	CONFIG_ALERTDB_FORKS		= 1;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
 char	*CONFIG_LISTEN_IP		= NULL;
@@ -202,6 +223,7 @@ int	CONFIG_HISTSYNCER_FORKS		= 4;
 int	CONFIG_HISTSYNCER_FREQUENCY	= 1;
 int	CONFIG_CONFSYNCER_FORKS		= 1;
 int	CONFIG_CONFSYNCER_FREQUENCY	= 60;
+int CONFIG_GLB_REQUEUE_TIME =  60; //syncs the async queue each minute
 
 int	CONFIG_VMWARE_FORKS		= 0;
 int	CONFIG_VMWARE_FREQUENCY		= 60;
@@ -225,17 +247,25 @@ char	*CONFIG_EXTERNALSCRIPTS		= NULL;
 char	*CONFIG_TMPDIR			= NULL;
 char	*CONFIG_FPING_LOCATION		= NULL;
 char	*CONFIG_FPING6_LOCATION		= NULL;
+char	*CONFIG_SNMP_WORKER_LOCATION		= NULL;
 char	*CONFIG_NMAP_LOCATION		= NULL;
 char	*CONFIG_NMAP_PARAMS		= NULL;
-char	*CONFIG_HISTORY_STORAGE_TYPE	= NULL;
-char	*CONFIG_HISTORY_STORAGE_DB_NAME = NULL;
 
 char	*CONFIG_DBHOST			= NULL;
 char	*CONFIG_DBNAME			= NULL;
 char	*CONFIG_DBSCHEMA		= NULL;
 char	*CONFIG_DBUSER			= NULL;
 char	*CONFIG_DBPASSWORD		= NULL;
+char	*CONFIG_VAULTTOKEN		= NULL;
+char	*CONFIG_VAULTURL		= NULL;
+char	*CONFIG_VAULTDBPATH		= NULL;
 char	*CONFIG_DBSOCKET		= NULL;
+char	*CONFIG_DB_TLS_CONNECT		= NULL;
+char	*CONFIG_DB_TLS_CERT_FILE	= NULL;
+char	*CONFIG_DB_TLS_KEY_FILE		= NULL;
+char	*CONFIG_DB_TLS_CA_FILE		= NULL;
+char	*CONFIG_DB_TLS_CIPHER		= NULL;
+char	*CONFIG_DB_TLS_CIPHER_13	= NULL;
 char	*CONFIG_EXPORT_DIR		= NULL;
 int	CONFIG_DBPORT			= 0;
 int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
@@ -262,6 +292,12 @@ int	CONFIG_PROXYDATA_FREQUENCY	= 5;	/* 1s is too frequent for n/a proxies */
 
 char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
+char 	**CONFIG_HISTORY_MODULE		= NULL;
+char 	**CONFIG_GLB_POLLER			= NULL;
+
+int		CONFIG_SNMP_RETRIES		=	3;
+
+char	**CONFIG_EXT_WORKERS	= NULL;
 
 char	*CONFIG_USER			= NULL;
 
@@ -279,7 +315,15 @@ char	*CONFIG_TLS_CA_FILE		= NULL;
 char	*CONFIG_TLS_CRL_FILE		= NULL;
 char	*CONFIG_TLS_CERT_FILE		= NULL;
 char	*CONFIG_TLS_KEY_FILE		= NULL;
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+char	*CONFIG_TLS_CIPHER_CERT13	= NULL;
+char	*CONFIG_TLS_CIPHER_CERT		= NULL;
+char	*CONFIG_TLS_CIPHER_PSK13	= NULL;
+char	*CONFIG_TLS_CIPHER_PSK		= NULL;
+char	*CONFIG_TLS_CIPHER_ALL13	= NULL;
+char	*CONFIG_TLS_CIPHER_ALL		= NULL;
+char	*CONFIG_TLS_CIPHER_CMD13	= NULL;	/* not used in server, defined for linking with tls.c */
+char	*CONFIG_TLS_CIPHER_CMD		= NULL;	/* not used in server, defined for linking with tls.c */
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 /* the following TLS parameters are not used in server, they are defined for linking with tls.c */
 char	*CONFIG_TLS_CONNECT		= NULL;
 char	*CONFIG_TLS_ACCEPT		= NULL;
@@ -291,23 +335,21 @@ char	*CONFIG_TLS_PSK_FILE		= NULL;
 
 static char	*CONFIG_SOCKET_PATH	= NULL;
 
-char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
+//char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
 char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
-int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
+int		CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 char	CONFIG_HOSTNAME[MAX_ZBX_HOSTNAME_LEN];
 //char	CONFIG_CLUSTER_DOMAINS[MAX_ZBX_HOSTNAME_LEN];
 int 	CONFIG_CLUSTER_SERVER_ID =0;
-int CONFIG_CLUSTER_REROUTE_DATA	= 1;
+int		CONFIG_CLUSTER_REROUTE_DATA	= 1;
+
+zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 
-//clickhouse specific
-int CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME = 0;
-int CONFIG_CLICKHOUSE_DISABLE_NS_VALUE = 0;
-int CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME = 0;
-char *CONFIG_CLICKHOUSE_USERNAME = NULL;
-char *CONFIG_CLICKHOUSE_PASSWORD = NULL;
-int CONFIG_CLICKHOUSE_PRELOAD_VALUES = 5;
+int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_DISABLED;
+
+volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -322,6 +364,7 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	}
 	else if (local_server_num <= (server_count += CONFIG_CONFSYNCER_FORKS))
 	{
+		/* make initial configuration sync before worker processes are forked */
 		*local_process_type = ZBX_PROCESS_TYPE_CONFSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_CONFSYNCER_FORKS;
 	}
@@ -365,7 +408,7 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_IPMIPOLLER;
 		*local_process_num = local_server_num - server_count + CONFIG_IPMIPOLLER_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_JAVAPOLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_JAVAPOLLER_FORKS ))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_JAVAPOLLER;
 		*local_process_num = local_server_num - server_count + CONFIG_JAVAPOLLER_FORKS;
@@ -395,25 +438,20 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_TASKMANAGER;
 		*local_process_num = local_server_num - server_count + CONFIG_TASKMANAGER_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_POLLER_FORKS))
+	else if (local_server_num <= (server_count += CONFIG_POLLER_FORKS ))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_POLLER;
 		*local_process_num = local_server_num - server_count + CONFIG_POLLER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_GLB_SNMP_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_SNMP;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_SNMP_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_UNREACHABLE_POLLER_FORKS))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_UNREACHABLE;
 		*local_process_num = local_server_num - server_count + CONFIG_UNREACHABLE_POLLER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_ASYNC_SNMP_POLLER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_ASYNC_SNMP;
-		*local_process_num = local_server_num - server_count + CONFIG_ASYNC_SNMP_POLLER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_ASYNC_AGENT_POLLER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_ASYNC_AGENT;
-		*local_process_num = local_server_num - server_count + CONFIG_ASYNC_AGENT_POLLER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_TRAPPER_FORKS))
 	{
@@ -455,6 +493,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_LLDWORKER;
 		*local_process_num = local_server_num - server_count + CONFIG_LLDWORKER_FORKS;
 	}
+	else if (local_server_num <= (server_count += CONFIG_ALERTDB_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_ALERTSYNCER;
+		*local_process_num = local_server_num - server_count + CONFIG_ALERTDB_FORKS;
+	}
 	else
 		return FAIL;
 
@@ -494,6 +537,10 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_FPING_LOCATION)
 		CONFIG_FPING_LOCATION = zbx_strdup(CONFIG_FPING_LOCATION, "/usr/sbin/fping");
+	
+	if (NULL == CONFIG_SNMP_WORKER_LOCATION)
+		CONFIG_SNMP_WORKER_LOCATION = zbx_strdup(CONFIG_SNMP_WORKER_LOCATION, "glb_snmp_worker");
+		
 #ifdef HAVE_IPV6
 	if (NULL == CONFIG_FPING6_LOCATION)
 		CONFIG_FPING6_LOCATION = zbx_strdup(CONFIG_FPING6_LOCATION, "/usr/sbin/fping6");
@@ -504,12 +551,6 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_NMAP_PARAMS)
 		CONFIG_NMAP_PARAMS = zbx_strdup(CONFIG_NMAP_PARAMS, "-n -sn -PE");
 	
-	if (NULL == CONFIG_HISTORY_STORAGE_TYPE)
-		CONFIG_HISTORY_STORAGE_TYPE = zbx_strdup(CONFIG_HISTORY_STORAGE_TYPE, "clickhouse");
-
-	if (NULL == CONFIG_HISTORY_STORAGE_DB_NAME)
-		CONFIG_HISTORY_STORAGE_DB_NAME = zbx_strdup(CONFIG_HISTORY_STORAGE_DB_NAME, "zabbix");
-
 	if (NULL == CONFIG_EXTERNALSCRIPTS)
 		CONFIG_EXTERNALSCRIPTS = zbx_strdup(CONFIG_EXTERNALSCRIPTS, DEFAULT_EXTERNAL_SCRIPTS_PATH);
 #ifdef HAVE_LIBCURL
@@ -518,9 +559,6 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_SSL_KEY_LOCATION)
 		CONFIG_SSL_KEY_LOCATION = zbx_strdup(CONFIG_SSL_KEY_LOCATION, DEFAULT_SSL_KEY_LOCATION);
-
-	if (NULL == CONFIG_HISTORY_STORAGE_OPTS)
-		CONFIG_HISTORY_STORAGE_OPTS = zbx_strdup(CONFIG_HISTORY_STORAGE_OPTS, "uint,dbl,str,log,text");
 #endif
 
 #ifdef HAVE_SQLITE3
@@ -532,12 +570,24 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_SOCKET_PATH)
 		CONFIG_SOCKET_PATH = zbx_strdup(CONFIG_SOCKET_PATH, "/tmp");
-	
+
 	if (NULL == CONFIG_HOSTNAME)
 	 	gethostname(CONFIG_HOSTNAME, MAX_ZBX_HOSTNAME_LEN);
-		
+
 	if (0 != CONFIG_IPMIPOLLER_FORKS)
 		CONFIG_IPMIMANAGER_FORKS = 1;
+
+	int i;
+
+	for ( i = 0; i < GLB_MODULE_API_TOTAL_CALLBACKS ; i++ ) {
+		API_CALLBACKS[i]=zbx_malloc(NULL, sizeof(zbx_vector_ptr_t));
+		zbx_vector_ptr_create(API_CALLBACKS[i]);
+	}
+
+	if (NULL == CONFIG_VAULTURL)
+		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
+	
+	
 }
 
 /******************************************************************************
@@ -593,10 +643,11 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_str("SSLCALocation", CONFIG_SSL_CA_LOCATION, "cURL library"));
 	err |= (FAIL == check_cfg_feature_str("SSLCertLocation", CONFIG_SSL_CERT_LOCATION, "cURL library"));
 	err |= (FAIL == check_cfg_feature_str("SSLKeyLocation", CONFIG_SSL_KEY_LOCATION, "cURL library"));
-	err |= (FAIL == check_cfg_feature_str("HistoryStorageURL", CONFIG_HISTORY_STORAGE_URL, "cURL library"));
-	err |= (FAIL == check_cfg_feature_str("HistoryStorageTypes", CONFIG_HISTORY_STORAGE_OPTS, "cURL library"));
 	err |= (FAIL == check_cfg_feature_int("HistoryStorageDateIndex", CONFIG_HISTORY_STORAGE_PIPELINES,
 			"cURL library"));
+	err |= (FAIL == check_cfg_feature_str("VaultToken", CONFIG_VAULTTOKEN, "cURL library"));
+	err |= (FAIL == check_cfg_feature_str("VaultDBPath", CONFIG_VAULTDBPATH, "cURL library"));
+
 #endif
 
 #if !defined(HAVE_LIBXML2) || !defined(HAVE_LIBCURL)
@@ -609,16 +660,30 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	if (SUCCEED != zbx_validate_log_parameters(task))
 		err = 1;
 
-#if !(defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL))
+#if !(defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL))
 	err |= (FAIL == check_cfg_feature_str("TLSCAFile", CONFIG_TLS_CA_FILE, "TLS support"));
 	err |= (FAIL == check_cfg_feature_str("TLSCRLFile", CONFIG_TLS_CRL_FILE, "TLS support"));
 	err |= (FAIL == check_cfg_feature_str("TLSCertFile", CONFIG_TLS_CERT_FILE, "TLS support"));
 	err |= (FAIL == check_cfg_feature_str("TLSKeyFile", CONFIG_TLS_KEY_FILE, "TLS support"));
 #endif
+#if !(defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL))
+	err |= (FAIL == check_cfg_feature_str("TLSCipherCert", CONFIG_TLS_CIPHER_CERT, "GnuTLS or OpenSSL"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherPSK", CONFIG_TLS_CIPHER_PSK, "GnuTLS or OpenSSL"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherAll", CONFIG_TLS_CIPHER_ALL, "GnuTLS or OpenSSL"));
+#endif
+#if !defined(HAVE_OPENSSL)
+	err |= (FAIL == check_cfg_feature_str("TLSCipherCert13", CONFIG_TLS_CIPHER_CERT13, "OpenSSL 1.1.1 or newer"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherPSK13", CONFIG_TLS_CIPHER_PSK13, "OpenSSL 1.1.1 or newer"));
+	err |= (FAIL == check_cfg_feature_str("TLSCipherAll13", CONFIG_TLS_CIPHER_ALL13, "OpenSSL 1.1.1 or newer"));
+#endif
 
 #if !defined(HAVE_OPENIPMI)
 	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_IPMIPOLLER_FORKS, "IPMI support"));
 #endif
+	err |= (FAIL == zbx_db_validate_config_features());
+
+
+
 	if (0 != err)
 		exit(EXIT_FAILURE);
 }
@@ -639,29 +704,23 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
  *                                                                            *
  ******************************************************************************/
 static void	zbx_load_config(ZBX_TASK_EX *task)
-{
+{	int i;
 	static struct cfg_line	cfg[] =
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
-		{"ClickHousePreloadValues",		&CONFIG_CLICKHOUSE_PRELOAD_VALUES,		TYPE_INT,
-			PARM_OPT,	0,			1000},
-		{"ClickHouseSaveNames",		&CONFIG_CLICKHOUSE_SAVE_HOST_AND_METRIC_NAME,		TYPE_INT,
-			PARM_OPT,	0,			1},
-		{"ClickHouseDisableNanoseconds",		&CONFIG_CLICKHOUSE_DISABLE_NS_VALUE,		TYPE_INT,
-			PARM_OPT,	0,			1},
-		{"HistoryStorageType",		&CONFIG_HISTORY_STORAGE_TYPE,		TYPE_STRING,
+		{"SnmpRetries",			&CONFIG_SNMP_RETRIES,			TYPE_INT,
+			PARM_OPT,	1,			100},
+		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"HistoryStorageDBName",		&CONFIG_HISTORY_STORAGE_DB_NAME,		TYPE_STRING,
+		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"ClickHouseDisableNanoseconds",		&CONFIG_CLICKHOUSE_DISABLE_NS_VALUE,		TYPE_INT,
-			PARM_OPT,	0,			1},
-		{"ClickHouseUsername",		&CONFIG_CLICKHOUSE_USERNAME,		TYPE_STRING,
+		{"DisableInPollerPreproc",			&CONFIG_DISABLE_INPOLLER_PREPROC,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"ClickHousePassword",		&CONFIG_CLICKHOUSE_PASSWORD,		TYPE_STRING,
+		{"EnableHostDeactivation",			&CONFIG_ENABLE_HOST_DEACTIVATION,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"ClickHouseCacheFillTime",		&CONFIG_CLICKHOUSE_VALUECACHE_FILL_TIME,		TYPE_INT	,
-			PARM_OPT,	0,			365*3600*24},
+		{"ExternalWorker",			&CONFIG_EXT_WORKERS,			TYPE_MULTISTRING,
+			PARM_OPT,	0,			0},
 		{"StartDBSyncers",		&CONFIG_HISTSYNCER_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			100},
 		{"StartDiscoverers",		&CONFIG_DISCOVERER_FORKS,		TYPE_INT,
@@ -669,19 +728,15 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"StartHTTPPollers",		&CONFIG_HTTPPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"StartPingers",		&CONFIG_PINGER_FORKS,			TYPE_INT,
-			PARM_OPT,	0,			1000},
+			PARM_OPT,	0,			1000},	
+		{"StartGlaberSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},	
+		{"StartPreprocessorManagers",		&CONFIG_PREPROCMAN_FORKS,			TYPE_INT,
+			PARM_OPT,	1,			64},
 		{"StartPollers",		&CONFIG_POLLER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"StartPollersUnreachable",	&CONFIG_UNREACHABLE_POLLER_FORKS,	TYPE_INT,
 			PARM_OPT,	0,			1000},
-		{"StartPollersAsyncSNMP",	&CONFIG_ASYNC_SNMP_POLLER_FORKS,	TYPE_INT,
-			PARM_OPT,	0,			1000},
-		{"AsynSNMPConnectionsPerPoller",	&CONFIG_ASYNC_SNMP_POLLER_CONNS,	TYPE_INT,
-			PARM_OPT,	0,			8192},
-		{"StartPollersAsyncAGENT",	&CONFIG_ASYNC_AGENT_POLLER_FORKS,	TYPE_INT,
-			PARM_OPT,	0,			1000},
-		{"AsynAGENTConnectionsPerPoller",	&CONFIG_ASYNC_SNMP_POLLER_CONNS,	TYPE_INT,
-			PARM_OPT,	0,			8192},
 		{"StartIPMIPollers",		&CONFIG_IPMIPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"StartTimers",			&CONFIG_TIMER_FORKS,			TYPE_INT,
@@ -701,7 +756,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"StartSNMPTrapper",		&CONFIG_SNMPTRAPPER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"CacheSize",			&CONFIG_CONF_CACHE_SIZE,		TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(8) * ZBX_GIBIBYTE},
+			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"HistoryCacheSize",		&CONFIG_HISTORY_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"HistoryIndexCacheSize",	&CONFIG_HISTORY_INDEX_CACHE_SIZE,	TYPE_UINT64,
@@ -712,6 +767,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"CacheUpdateFrequency",	&CONFIG_CONFSYNCER_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	1,			SEC_PER_HOUR},
+		{"QueuesUpdateFrequency",	&CONFIG_GLB_REQUEUE_TIME,		TYPE_INT,
+			PARM_OPT,	1,			SEC_PER_HOUR},
 		{"HousekeepingFrequency",	&CONFIG_HOUSEKEEPING_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	0,			24},
 		{"MaxHousekeeperDelete",	&CONFIG_MAX_HOUSEKEEPER_DELETE,		TYPE_INT,
@@ -719,6 +776,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"TmpDir",			&CONFIG_TMPDIR,				TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"FpingLocation",		&CONFIG_FPING_LOCATION,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"SNMPWorkerLocation",		&CONFIG_SNMP_WORKER_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"NmapLocation",		&CONFIG_NMAP_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
@@ -751,7 +810,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"LogFile",			&CONFIG_LOG_FILE,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"LogFileSize",			&CONFIG_LOG_FILE_SIZE,			TYPE_INT,
-			PARM_OPT,	0,			1024},
+			PARM_OPT,	0,			102400},
 		{"AlertScriptsPath",		&CONFIG_ALERT_SCRIPTS_PATH,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"ExternalScripts",		&CONFIG_EXTERNALSCRIPTS,		TYPE_STRING,
@@ -766,10 +825,28 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"DBPassword",			&CONFIG_DBPASSWORD,			TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"VaultToken",			&CONFIG_VAULTTOKEN,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"VaultURL",			&CONFIG_VAULTURL,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"VaultDBPath",			&CONFIG_VAULTDBPATH,			TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"DBSocket",			&CONFIG_DBSOCKET,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"DBPort",			&CONFIG_DBPORT,				TYPE_INT,
 			PARM_OPT,	1024,			65535},
+		{"DBTLSConnect",		&CONFIG_DB_TLS_CONNECT,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBTLSCertFile",		&CONFIG_DB_TLS_CERT_FILE,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBTLSKeyFile",		&CONFIG_DB_TLS_KEY_FILE,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBTLSCAFile",			&CONFIG_DB_TLS_CA_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBTLSCipher",			&CONFIG_DB_TLS_CIPHER,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBTLSCipher13",		&CONFIG_DB_TLS_CIPHER_13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"SSHKeyLocation",		&CONFIG_SSH_KEY_LOCATION,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"LogSlowQueries",		&CONFIG_LOG_SLOW_QUERIES,		TYPE_INT,
@@ -783,6 +860,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"LoadModulePath",		&CONFIG_LOAD_MODULE_PATH,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"LoadModule",			&CONFIG_LOAD_MODULE,			TYPE_MULTISTRING,
+			PARM_OPT,	0,			0},
+		{"HistoryModule",			&CONFIG_HISTORY_MODULE,			TYPE_MULTISTRING,
 			PARM_OPT,	0,			0},
 		{"StartVMwareCollectors",	&CONFIG_VMWARE_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			250},
@@ -812,16 +891,24 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"TLSKeyFile",			&CONFIG_TLS_KEY_FILE,			TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"TLSCipherCert13",		&CONFIG_TLS_CIPHER_CERT13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherCert",		&CONFIG_TLS_CIPHER_CERT,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherPSK13",		&CONFIG_TLS_CIPHER_PSK13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherPSK",		&CONFIG_TLS_CIPHER_PSK,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherAll13",		&CONFIG_TLS_CIPHER_ALL13,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"TLSCipherAll",		&CONFIG_TLS_CIPHER_ALL,			TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"SocketDir",			&CONFIG_SOCKET_PATH,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"StartAlerters",		&CONFIG_ALERTER_FORKS,			TYPE_INT,
-			PARM_OPT,	1,			100},
-		{"StartPreprocessors",		&CONFIG_PREPROCESSOR_FORKS,		TYPE_INT,
+			PARM_OPT,	0,			100},
+		{"StartPreprocessorsPerManager",		&CONFIG_PREPROCESSOR_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			1000},
-		{"HistoryStorageURL",		&CONFIG_HISTORY_STORAGE_URL,		TYPE_STRING,
-			PARM_OPT,	0,			0},
-		{"HistoryStorageTypes",		&CONFIG_HISTORY_STORAGE_OPTS,		TYPE_STRING_LIST,
-			PARM_OPT,	0,			0},
 		{"HistoryStorageDateIndex",	&CONFIG_HISTORY_STORAGE_PIPELINES,	TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"ExportDir",			&CONFIG_EXPORT_DIR,			TYPE_STRING,
@@ -832,8 +919,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			100},
 		{"StatsAllowedIP",		&CONFIG_STATS_ALLOWED_IP,		TYPE_STRING_LIST,
 			PARM_OPT,	0,			0},
-		{"HistoryStorageType",		&CONFIG_HISTORY_STORAGE_TYPE,		TYPE_STRING,
-			PARM_OPT,	1,			0},
 		{"Hostname",			&CONFIG_HOSTNAME,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"ServerID",		&CONFIG_CLUSTER_SERVER_ID,			TYPE_INT,
@@ -843,8 +928,12 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{NULL}
 	};
 
+
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
+	zbx_strarr_init(&CONFIG_EXT_WORKERS);
+	zbx_strarr_init(&CONFIG_HISTORY_MODULE);
+	//zbx_strarr_init(&CONFIG_GLB_POLLER);
 
 	parse_cfg_file(CONFIG_FILE, cfg, ZBX_CFG_FILE_REQUIRED, ZBX_CFG_STRICT);
 
@@ -853,10 +942,13 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	CONFIG_LOG_TYPE = zbx_get_log_type(CONFIG_LOG_TYPE_STR);
 
 	zbx_validate_config(task);
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
+	zbx_db_validate_config();
+#endif
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_validate_config();
 #endif
-
+	CONFIG_PREPROCESSOR_FORKS =	CONFIG_PREPROCESSOR_FORKS * CONFIG_PREPROCMAN_FORKS;
 }
 
 /******************************************************************************
@@ -869,6 +961,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 static void	zbx_free_config(void)
 {
 	zbx_strarr_free(CONFIG_LOAD_MODULE);
+	zbx_strarr_free(CONFIG_HISTORY_MODULE);
+	//zbx_strarr_free(CONFIG_GLB_POLLER);
 }
 
 /******************************************************************************
@@ -890,9 +984,8 @@ int	main(int argc, char **argv)
 #if defined(PS_OVERWRITE_ARGV) || defined(PS_PSTAT_ARGV)
 	argv = setproctitle_save_env(argc, argv);
 #endif
-
 	progname = get_program_name(argv[0]);
-
+	
 	/* parse the command-line */
 	while ((char)EOF != (ch = (char)zbx_getopt_long(argc, argv, shortopts, longopts, NULL)))
 	{
@@ -954,6 +1047,7 @@ int	main(int argc, char **argv)
 	if (NULL == CONFIG_FILE)
 		CONFIG_FILE = zbx_strdup(NULL, DEFAULT_CONFIG_FILE);
 
+	
 	/* required for simple checks */
 	init_metrics();
 
@@ -993,6 +1087,24 @@ int	main(int argc, char **argv)
 	}
 
 	return daemon_start(CONFIG_ALLOW_ROOT, CONFIG_USER, t.flags);
+}
+
+static void	zbx_main_sigusr_handler(int flags)
+{
+	if (ZBX_RTC_DIAGINFO == ZBX_RTC_GET_MSG(flags))
+	{
+		int	scope = ZBX_RTC_GET_SCOPE(flags);
+
+		if (ZBX_DIAGINFO_ALL == scope)
+		{
+			zbx_diaginfo_scope = (1 << ZBX_DIAGINFO_HISTORYCACHE) | (1 << ZBX_DIAGINFO_VALUECACHE) |
+					(1 << ZBX_DIAGINFO_PREPROCESSING) | (1 << ZBX_DIAGINFO_LLD) |
+					(1 << ZBX_DIAGINFO_ALERTING) | (1 << ZBX_DIAGINFO_LOCKS);
+		}
+		else
+			zbx_diaginfo_scope = 1 << scope;
+	}
+
 }
 
 int	MAIN_ZABBIX_ENTRY(int flags)
@@ -1051,27 +1163,22 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 #else
 #	define SMTP_AUTH_FEATURE_STATUS	" NO"
 #endif
-#ifdef HAVE_JABBER
-#	define JABBER_FEATURE_STATUS	"YES"
-#else
-#	define JABBER_FEATURE_STATUS	" NO"
-#endif
 #ifdef HAVE_UNIXODBC
 #	define ODBC_FEATURE_STATUS	"YES"
 #else
 #	define ODBC_FEATURE_STATUS	" NO"
 #endif
-#ifdef HAVE_SSH2
-#	define SSH2_FEATURE_STATUS	"YES"
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
+#	define SSH_FEATURE_STATUS	"YES"
 #else
-#	define SSH2_FEATURE_STATUS	" NO"
+#	define SSH_FEATURE_STATUS	" NO"
 #endif
 #ifdef HAVE_IPV6
 #	define IPV6_FEATURE_STATUS	"YES"
 #else
 #	define IPV6_FEATURE_STATUS	" NO"
 #endif
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 #	define TLS_FEATURE_STATUS	"YES"
 #else
 #	define TLS_FEATURE_STATUS	" NO"
@@ -1086,36 +1193,37 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zabbix_log(LOG_LEVEL_INFORMATION, "Web monitoring:            " LIBCURL_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "VMware monitoring:         " VMWARE_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "SMTP authentication:       " SMTP_AUTH_FEATURE_STATUS);
-	zabbix_log(LOG_LEVEL_INFORMATION, "Jabber notifications:      " JABBER_FEATURE_STATUS);
-	zabbix_log(LOG_LEVEL_INFORMATION, "CURL support:			  " LIBCURL_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "ODBC:                      " ODBC_FEATURE_STATUS);
-	zabbix_log(LOG_LEVEL_INFORMATION, "SSH2 support:              " SSH2_FEATURE_STATUS);
+	zabbix_log(LOG_LEVEL_INFORMATION, "SSH support:               " SSH_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "IPv6 support:              " IPV6_FEATURE_STATUS);
 	zabbix_log(LOG_LEVEL_INFORMATION, "TLS support:               " TLS_FEATURE_STATUS);
-	if (CONFIG_CLUSTER_SERVER_ID)
-		zabbix_log(LOG_LEVEL_INFORMATION, "Cluster mode:                ENABLED");
-	else
-		zabbix_log(LOG_LEVEL_INFORMATION, "Cluster mode:                DISABLED");
-
 	zabbix_log(LOG_LEVEL_INFORMATION, "******************************");
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "using configuration file: %s", CONFIG_FILE);
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	if (SUCCEED != zbx_coredump_disable())
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot disable core dump, exiting...");
 		exit(EXIT_FAILURE);
 	}
 #endif
+	
 	if (FAIL == zbx_load_modules(CONFIG_LOAD_MODULE_PATH, CONFIG_LOAD_MODULE, CONFIG_TIMEOUT, 1))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "loading modules failed, exiting...");
 		exit(EXIT_FAILURE);
 	}
-
+	
+	if (SUCCEED != glb_history_init(CONFIG_HISTORY_MODULE,&error))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history storage: %s", error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
+	
 	zbx_free_config();
-
+	
 	if (SUCCEED != init_database_cache(&error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize database cache: %s", error);
@@ -1158,16 +1266,23 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	if (SUCCEED != zbx_history_init(&error))
+	if (FAIL == zbx_export_init(&error))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history storage: %s", error);
+		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize export: %s", error);
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == zbx_export_init(&error))
+	if (SUCCEED != zbx_vault_init_token_from_env(&error))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize export: %s", error);
+		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize vault token: %s", error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
+
+	if (SUCCEED != zbx_vault_init_db_credentials(&error))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize database credentials from vault: %s", error);
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
@@ -1187,47 +1302,30 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	if (SUCCEED != DBcheck_version())
 		exit(EXIT_FAILURE);
+	DBcheck_character_set();
 
-	DBconnect(ZBX_DB_CONNECT_NORMAL);
+	if (SUCCEED == DBcheck_double_type())
+		CONFIG_DOUBLE_PRECISION = ZBX_DB_DBL_PRECISION_ENABLED;
+	else
+		zabbix_log(LOG_LEVEL_WARNING, "database is not upgraded to use double precision values");
 
-	/* make initial configuration sync before worker processes are forked */
-	DCsync_configuration(ZBX_DBSYNC_INIT);
+	DBcheck_capabilities();
 
-
-	zbx_vc_enable();
-
-	if (SUCCEED != zbx_history_init(&error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history storage: %s", error);
-		zbx_free(error);
+	if (SUCCEED != zbx_db_check_instanceid())
 		exit(EXIT_FAILURE);
-	}
-
-
-
-	if (SUCCEED != zbx_check_postinit_tasks(&error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot complete post initialization tasks: %s", error);
-		zbx_free(error);
-		exit(EXIT_FAILURE);
-	}
-
-	/* update maintenance states */
-	zbx_dc_update_maintenances();
-
-	DBclose();
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
-			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_ASYNC_SNMP_POLLER_FORKS 
-			+ CONFIG_ASYNC_AGENT_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
+			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
+			+ CONFIG_GLB_SNMP_FORKS
 			+ CONFIG_ALERTER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_TIMER_FORKS
 			+ CONFIG_HTTPPOLLER_FORKS + CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS
 			+ CONFIG_ESCALATOR_FORKS + CONFIG_IPMIPOLLER_FORKS + CONFIG_JAVAPOLLER_FORKS
 			+ CONFIG_SNMPTRAPPER_FORKS + CONFIG_PROXYPOLLER_FORKS + CONFIG_SELFMON_FORKS
 			+ CONFIG_VMWARE_FORKS + CONFIG_TASKMANAGER_FORKS + CONFIG_IPMIMANAGER_FORKS
 			+ CONFIG_ALERTMANAGER_FORKS + CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS
-			+ CONFIG_LLDMANAGER_FORKS + CONFIG_LLDWORKER_FORKS;
+			+ CONFIG_LLDMANAGER_FORKS + CONFIG_LLDWORKER_FORKS + CONFIG_ALERTDB_FORKS;
 	threads = (pid_t *)zbx_calloc(threads, threads_num, sizeof(pid_t));
+	threads_flags = (int *)zbx_calloc(threads_flags, threads_num, sizeof(int));
 
 	if (0 != CONFIG_TRAPPER_FORKS)
 	{
@@ -1238,7 +1336,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		}
 	}
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_init_parent();
 #endif
 	zabbix_log(LOG_LEVEL_INFORMATION, "server #0 started [main process]");
@@ -1250,6 +1348,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 		if (FAIL == get_process_info_by_thread(i + 1, &thread_args.process_type, &thread_args.process_num))
 		{
+			zabbix_log(LOG_LEVEL_WARNING, "Couldn't get process info by thread num: %d",i);
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit(EXIT_FAILURE);
 		}
@@ -1261,26 +1360,39 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		{
 			case ZBX_PROCESS_TYPE_CONFSYNCER:
 				zbx_thread_start(dbconfig_thread, &thread_args, &threads[i]);
+				DCconfig_wait_sync();
+
+				DBconnect(ZBX_DB_CONNECT_NORMAL);
+
+				if (SUCCEED != zbx_check_postinit_tasks(&error))
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "cannot complete post initialization tasks: %s",
+							error);
+					zbx_free(error);
+					exit(EXIT_FAILURE);
+				}
+
+				/* update maintenance states */
+				zbx_dc_update_maintenances();
+
+				DBclose();
+
+				zbx_vc_enable();
 				break;
 			case ZBX_PROCESS_TYPE_POLLER:
 				poller_type = ZBX_POLLER_TYPE_NORMAL;
 				thread_args.args = &poller_type;
 				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
 				break;
+			case GLB_PROCESS_TYPE_SNMP:
+				poller_type = ITEM_TYPE_SNMP;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
 			case ZBX_PROCESS_TYPE_UNREACHABLE:
 				poller_type = ZBX_POLLER_TYPE_UNREACHABLE;
 				thread_args.args = &poller_type;
 				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
-				break;
-			case ZBX_PROCESS_TYPE_ASYNC_SNMP:
-				poller_type = ZBX_POLLER_TYPE_ASYNC_SNMP;
-				thread_args.args = &poller_type;
-				zbx_thread_start(poller_thread, &thread_args,&threads[i] );
-				break;
-			case ZBX_PROCESS_TYPE_ASYNC_AGENT:
-				poller_type = ZBX_POLLER_TYPE_ASYNC_AGENT;
-				thread_args.args = &poller_type;
-				zbx_thread_start(poller_thread, &thread_args,&threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_TRAPPER:
 				thread_args.args = &listen_sock;
@@ -1305,6 +1417,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				zbx_thread_start(discoverer_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_HISTSYNCER:
+				threads_flags[i] = ZBX_THREAD_WAIT_EXIT;
 				zbx_thread_start(dbsyncer_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_ESCALATOR:
@@ -1353,6 +1466,9 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_LLDWORKER:
 				zbx_thread_start(lld_worker_thread, &thread_args, &threads[i]);
 				break;
+			case ZBX_PROCESS_TYPE_ALERTSYNCER:
+				zbx_thread_start(alert_syncer_thread, &thread_args, &threads[i]);
+				break;
 		}
 	}
 
@@ -1362,6 +1478,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_problems_export_init("main-process", 0);
 	}
 
+	zbx_set_sigusr_handler(zbx_main_sigusr_handler);
+
 	while (-1 == wait(&i))	/* wait for any child to exit */
 	{
 		if (EINTR != errno)
@@ -1369,17 +1487,24 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			zabbix_log(LOG_LEVEL_ERR, "failed to wait on child processes: %s", zbx_strerror(errno));
 			break;
 		}
+
+		/* check if the wait was interrupted because of diaginfo remote command */
+		if (ZBX_DIAGINFO_UNDEFINED != zbx_diaginfo_scope)
+		{
+			zbx_diag_log_info(zbx_diaginfo_scope);
+			zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
+		}
 	}
 
 	/* all exiting child processes should be caught by signal handlers */
 	THIS_SHOULD_NEVER_HAPPEN;
 
-	zbx_on_exit();
+	zbx_on_exit(FAIL);
 
 	return SUCCEED;
 }
 
-void	zbx_on_exit(void)
+void	zbx_on_exit(int ret)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "zbx_on_exit() called");
 
@@ -1388,8 +1513,9 @@ void	zbx_on_exit(void)
 
 	if (NULL != threads)
 	{
-		zbx_threads_wait(threads, threads_num);	/* wait for all child processes to exit */
+		zbx_threads_wait(threads, threads_flags, threads_num, ret);	/* wait for all child processes to exit */
 		zbx_free(threads);
+		zbx_free(threads_flags);
 	}
 #ifdef HAVE_PTHREAD_PROCESS_SHARED
 	zbx_locks_disable();
@@ -1420,10 +1546,25 @@ void	zbx_on_exit(void)
 
 	zbx_unload_modules();
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "Zabbix Server stopped. Zabbix %s (revision %s).",
-			ZABBIX_VERSION, ZABBIX_REVISION);
+	//i see this too frequently during dev, so let it be glaber
+	//zabbix_log(LOG_LEVEL_INFORMATION, "Zabbix Server stopped. Zabbix %s (revision %s).",
+	//		ZABBIX_VERSION, ZABBIX_REVISION);
+	zabbix_log(LOG_LEVEL_INFORMATION, "Glaber Server stopped. Glaber %s (revision %s).",
+		GLABER_VERSION,ZABBIX_REVISION);
 
 	zabbix_close_log();
+
+	//freeing callbacks 
+	int i,j;
+	for ( i=0; i<GLB_MODULE_API_TOTAL_CALLBACKS; i++) {
+		//freeing all the callback structs
+		for (j=0; j < API_CALLBACKS[i]->values_num; j++) {
+			zbx_free(API_CALLBACKS[i]->values[j]);
+		}
+		//freeing vector
+		zbx_vector_ptr_destroy(API_CALLBACKS[i]);
+	}
+
 
 #if defined(PS_OVERWRITE_ARGV)
 	setproctitle_free_env();

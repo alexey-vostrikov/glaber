@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 	if (NOTSUPPORTED == ping_result)
 	{
 		item.state = ITEM_STATE_NOTSUPPORTED;
-		zbx_preprocess_item_value(item.itemid, item.value_type, item.flags, NULL, ts, item.state, error);
+		zbx_preprocess_item_value(item.host.hostid, item.itemid, item.value_type, item.flags, NULL, ts, item.state, error);
 	}
 	else
 	{
@@ -90,12 +90,12 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 			SET_DBL_RESULT(&value, *value_dbl);
 
 		item.state = ITEM_STATE_NORMAL;
-		zbx_preprocess_item_value(item.itemid, item.value_type, item.flags, &value, ts, item.state, NULL);
+		zbx_preprocess_item_value(item.host.hostid, item.itemid, item.value_type, item.flags, &value, ts, item.state, NULL);
 
 		free_result(&value);
 	}
 clean:
-	DCrequeue_items(&item.itemid, &item.state, &ts->sec, &errcode, 1);
+	DCrequeue_items(&item.itemid, &ts->sec, &errcode, 1);
 
 	DCconfig_clean_items(&item, &errcode, 1);
 
@@ -407,7 +407,7 @@ static void	add_icmpping_item(icmpitem_t **items, int *items_alloc, int *items_c
  ******************************************************************************/
 static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int *icmp_items_count)
 {
-	DC_ITEM			*items;//[MAX_PINGER_ITEMS];
+	DC_ITEM			item, *items;
 	int			i, num, count, interval, size, timeout, rc, errcode = SUCCEED;
 	char			error[MAX_STRING_LEN], *addr = NULL;
 	icmpping_t		icmpping;
@@ -415,14 +415,8 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	if (NULL == (items=zbx_malloc(NULL,sizeof(DC_ITEM)*MAX_PINGER_ITEMS))) 
-	{
-		zabbix_log(LOG_LEVEL_WARNING,"Cannot allocate memory for pinger items");
-		return;
-	}
-
-	
-	num = DCconfig_get_poller_items(ZBX_POLLER_TYPE_PINGER, items , NULL, MAX_PINGER_ITEMS);
+	items = &item;
+	num = DCconfig_get_poller_items(ZBX_POLLER_TYPE_PINGER, &items);
 
 	for (i = 0; i < num; i++)
 	{
@@ -448,17 +442,20 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 			zbx_timespec(&ts);
 
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL, &ts,
+			zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags, NULL, &ts,
 					items[i].state, error);
 
-			DCrequeue_items(&items[i].itemid, &items[i].state, &ts.sec, &errcode, 1);
+			DCrequeue_items(&items[i].itemid, &ts.sec, &errcode, 1);
 		}
 
 		zbx_free(items[i].key);
 	}
 
 	DCconfig_clean_items(items, NULL, num);
-	zbx_free(items);
+
+	if (items != &item)
+		zbx_free(items);
+
 	zbx_preprocessor_flush();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, *icmp_items_count);
@@ -533,19 +530,18 @@ static void	process_pinger_hosts(icmpitem_t *items, int items_count)
 	if (NULL == hosts)
 		hosts = (ZBX_FPING_HOST *)zbx_malloc(hosts, sizeof(ZBX_FPING_HOST) * hosts_alloc);
 
-	for (i = 0; i < items_count; i++)
+	for (i = 0; i < items_count && ZBX_IS_RUNNING(); i++)
 	{
 		add_pinger_host(&hosts, &hosts_alloc, &hosts_count, items[i].addr);
 
 		if (i == items_count - 1 || items[i].count != items[i + 1].count || items[i].interval != items[i + 1].interval ||
 				items[i].size != items[i + 1].size || items[i].timeout != items[i + 1].timeout)
 		{
-			//that useless as most of the time process status is "pinging hosts"
-			//zbx_setproctitle("%s #%d [pinging hosts]", get_process_type_string(process_type), process_num);
+			zbx_setproctitle("%s #%d [pinging hosts]", get_process_type_string(process_type), process_num);
 
 			zbx_timespec(&ts);
 
-			ping_result = do_ping(hosts, hosts_count,
+			ping_result = zbx_ping(hosts, hosts_count,
 						items[i].count, items[i].interval, items[i].size, items[i].timeout,
 						error, sizeof(error));
 
@@ -588,10 +584,13 @@ ZBX_THREAD_ENTRY(pinger_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	if (NULL == items)
 		items = (icmpitem_t *)zbx_malloc(items, sizeof(icmpitem_t) * items_alloc);
-
-	for (;;)
+	glb_preprocessing_init();
+	
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 		zbx_update_env(sec);
@@ -613,4 +612,9 @@ ZBX_THREAD_ENTRY(pinger_thread, args)
 
 		zbx_sleep_loop(sleeptime);
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

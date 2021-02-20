@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -121,13 +121,15 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 				&trigger->timespec, new_value, trigger->description,
 				trigger->expression_orig, trigger->recovery_expression_orig,
 				trigger->priority, trigger->type, &trigger->tags,
-				trigger->correlation_mode, trigger->correlation_tag, trigger->value, NULL);
+				trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
+				trigger->event_name, NULL);
 	}
 
 	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT))
 	{
 		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
-				&trigger->timespec, new_state, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, new_error);
+				&trigger->timespec, new_state, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
+				new_error);
 	}
 
 	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, flags, trigger->value, new_state,
@@ -147,7 +149,7 @@ out:
  *                                                                            *
  * Purpose: save the trigger changes to database                              *
  *                                                                            *
- * Parameters:trigger_diff - [IN] the trigger changeset                       *
+ * Parameters: trigger_diff - [IN] the trigger changeset                      *
  *                                                                            *
  ******************************************************************************/
 void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)

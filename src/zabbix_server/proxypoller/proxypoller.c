@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "zbxjson.h"
 #include "log.h"
 #include "proxy.h"
-#include "../../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 #include "../trapper/proxydata.h"
 
 extern unsigned char	process_type, program_type;
@@ -64,7 +64,7 @@ static int	connect_to_proxy(const DC_PROXY *proxy, zbx_socket_t *sock, int timeo
 			tls_arg1 = NULL;
 			tls_arg2 = NULL;
 			break;
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		case ZBX_TCP_SEC_TLS_CERT:
 			tls_arg1 = proxy->tls_issuer;
 			tls_arg2 = proxy->tls_subject;
@@ -194,10 +194,27 @@ static int	get_data_from_proxy(DC_PROXY *proxy, const char *request, char **data
 				if (0 != (s.protocol & ZBX_TCP_COMPRESS))
 					proxy->auto_compress = 1;
 
-				ret = zbx_send_proxy_data_response(proxy, &s, NULL);
+				if (!ZBX_IS_RUNNING())
+				{
+					int	flags = ZBX_TCP_PROTOCOL;
 
-				if (SUCCEED == ret)
-					*data = zbx_strdup(*data, s.buffer);
+					if (0 != (s.protocol & ZBX_TCP_COMPRESS))
+						flags |= ZBX_TCP_COMPRESS;
+
+					zbx_send_response_ext(&s, FAIL, "Zabbix server shutdown in progress", NULL,
+							flags, CONFIG_TIMEOUT);
+
+					zabbix_log(LOG_LEVEL_WARNING, "cannot process proxy data from passive proxy at"
+							" \"%s\": Zabbix server shutdown in progress", s.peer);
+					ret = FAIL;
+				}
+				else
+				{
+					ret = zbx_send_proxy_data_response(proxy, &s, NULL);
+
+					if (SUCCEED == ret)
+						*data = zbx_strdup(*data, s.buffer);
+				}
 			}
 		}
 
@@ -270,7 +287,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 			}
 			else
 			{
-				proxy->version = zbx_get_protocol_version(&jp);
+				proxy->version = zbx_get_proxy_protocol_version(&jp);
 				proxy->auto_compress = (0 != (s.protocol & ZBX_TCP_COMPRESS) ? 1 : 0);
 				proxy->lastaccess = time(NULL);
 			}
@@ -308,7 +325,7 @@ static int	proxy_process_proxy_data(DC_PROXY *proxy, const char *answer, zbx_tim
 {
 	struct zbx_json_parse	jp;
 	char			*error = NULL;
-	int			ret = FAIL;
+	int			ret = FAIL, version;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -328,25 +345,21 @@ static int	proxy_process_proxy_data(DC_PROXY *proxy, const char *answer, zbx_tim
 		goto out;
 	}
 
-	proxy->version = zbx_get_protocol_version(&jp);
+	version = zbx_get_proxy_protocol_version(&jp);
 
-	if (SUCCEED != zbx_check_protocol_version(proxy))
+	if (SUCCEED != zbx_check_protocol_version(proxy, version))
 	{
 		goto out;
 	}
 
-	if (SUCCEED != (ret = process_proxy_data(proxy, &jp, ts, &error)))
+	proxy->version = version;
+
+	if (SUCCEED != (ret = process_proxy_data(proxy, &jp, ts, HOST_STATUS_PROXY_PASSIVE, more, &error)))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "proxy \"%s\" at \"%s\" returned invalid proxy data: %s",
 				proxy->host, proxy->addr, error);
 	}
-	else
-	{
-		char	value[MAX_STRING_LEN];
 
-		if (SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_MORE, value, sizeof(value)))
-			*more = atoi(value);
-	}
 out:
 	zbx_free(error);
 
@@ -666,22 +679,28 @@ static int	process_proxy(void)
 		if (proxy.proxy_tasks_nextcheck <= now)
 			update_nextcheck |= ZBX_PROXY_TASKS_NEXTCHECK;
 
-		char	*port = NULL;
-		proxy.addr = proxy.addr_orig;
-
-		port = zbx_strdup(port, proxy.port_orig);
-		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-				&port, MACRO_TYPE_COMMON, NULL, 0);
-		if (FAIL == is_ushort(port, &proxy.port))
+		/* Check if passive proxy has been misconfigured on the server side. If it has happened more */
+		/* recently than last synchronisation of cache then there is no point to retry connecting to */
+		/* proxy again. The next reconnection attempt will happen after cache synchronisation. */
+		if (proxy.last_cfg_error_time < DCconfig_get_last_sync_time())
 		{
-			zabbix_log(LOG_LEVEL_ERR, "invalid proxy \"%s\" port: \"%s\"", proxy.host, port);
-			ret = CONFIG_ERROR;
-			zbx_free(port);
-			goto error;
-		}
-		zbx_free(port);
+			char	*port = NULL;
 
-		
+			proxy.addr = proxy.addr_orig;
+
+			port = zbx_strdup(port, proxy.port_orig);
+			substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+					&port, MACRO_TYPE_COMMON, NULL, 0);
+			if (FAIL == is_ushort(port, &proxy.port))
+			{
+				zabbix_log(LOG_LEVEL_ERR, "invalid proxy \"%s\" port: \"%s\"", proxy.host, port);
+				ret = CONFIG_ERROR;
+				zbx_free(port);
+				goto error;
+			}
+			zbx_free(port);
+
+		}
 		//sending hellos to the neighbor servers
 		//perhaps it's a good idea to send everyone 
 		//same way
@@ -761,7 +780,7 @@ error:
 			//to keep up cluster changes, we ALWAYS update proxy data  
 	//	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: calling proxy_update %d",proxy.cluster_id)
 		//updating proxy anyway, todo: figure if this is redundand and return the condition above
-		zbx_update_proxy_data(&proxy_old, proxy.version, proxy.lastaccess, proxy.auto_compress);
+		zbx_update_proxy_data(&proxy_old, proxy.version, proxy.lastaccess, proxy.auto_compress,0);
 	//	}
 
 		DCrequeue_proxy(proxy.hostid, update_nextcheck, ret);
@@ -785,10 +804,12 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 #define STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_init_child();
 #endif
 	zbx_setproctitle("%s #%d [connecting to the database]", get_process_type_string(process_type), process_num);
@@ -796,7 +817,7 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 		zbx_update_env(sec);
@@ -843,5 +864,10 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 		//zbx_sleep_loop(sleeptime);
 		zbx_sleep_loop(1);
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }

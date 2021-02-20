@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -87,7 +87,6 @@ static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_
 	size_t			num, i;
 	int			ret = FAIL, fb = -1, *lastclocks = NULL, *errcodes = NULL, value_type, regexp_ret;
 	zbx_uint64_t		*itemids = NULL;
-	unsigned char		*states = NULL;
 	AGENT_RESULT		*results = NULL;
 	AGENT_REQUEST		request;
 	zbx_vector_ptr_t	regexps;
@@ -97,7 +96,6 @@ static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_
 	num = DCconfig_get_snmp_items_by_interfaceid(interfaceid, &items);
 
 	itemids = (zbx_uint64_t *)zbx_malloc(itemids, sizeof(zbx_uint64_t) * num);
-	states = (unsigned char *)zbx_malloc(states, sizeof(unsigned char) * num);
 	lastclocks = (int *)zbx_malloc(lastclocks, sizeof(int) * num);
 	errcodes = (int *)zbx_malloc(errcodes, sizeof(int) * num);
 	results = (AGENT_RESULT *)zbx_malloc(results, sizeof(AGENT_RESULT) * num);
@@ -190,20 +188,18 @@ next:
 				}
 
 				items[i].state = ITEM_STATE_NORMAL;
-				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags,
+				zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags,
 						&results[i], ts, items[i].state, NULL);
 
 				itemids[i] = items[i].itemid;
-				states[i] = items[i].state;
 				lastclocks[i] = ts->sec;
 				break;
 			case NOTSUPPORTED:
 				items[i].state = ITEM_STATE_NOTSUPPORTED;
-				zbx_preprocess_item_value(items[i].itemid, items[i].value_type, items[i].flags, NULL,
+				zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags, NULL,
 						ts, items[i].state, results[i].msg);
 
 				itemids[i] = items[i].itemid;
-				states[i] = items[i].state;
 				lastclocks[i] = ts->sec;
 				break;
 		}
@@ -214,11 +210,10 @@ next:
 
 	zbx_free(results);
 
-	DCrequeue_items(itemids, states, lastclocks, errcodes, num);
+	DCrequeue_items(itemids, lastclocks, errcodes, num);
 
 	zbx_free(errcodes);
 	zbx_free(lastclocks);
-	zbx_free(states);
 	zbx_free(itemids);
 
 	DCconfig_clean_items(items, NULL, num);
@@ -502,14 +497,6 @@ static int	open_trap_file(void)
 	zbx_stat_t	file_buf;
 	char		*error = NULL;
 
-	if (0 != zbx_stat(CONFIG_SNMPTRAP_FILE, &file_buf))
-	{
-		error = zbx_dsprintf(error, "cannot stat SNMP trapper file \"%s\": %s", CONFIG_SNMPTRAP_FILE,
-				zbx_strerror(errno));
-		delay_trap_logs(error, LOG_LEVEL_CRIT);
-		goto out;
-	}
-
 	if (-1 == (trap_fd = open(CONFIG_SNMPTRAP_FILE, O_RDONLY)))
 	{
 		if (ENOENT != errno)	/* file exists but cannot be opened */
@@ -518,6 +505,16 @@ static int	open_trap_file(void)
 					CONFIG_SNMPTRAP_FILE, zbx_strerror(errno));
 			delay_trap_logs(error, LOG_LEVEL_CRIT);
 		}
+		goto out;
+	}
+
+	if (0 != zbx_fstat(trap_fd, &file_buf))
+	{
+		error = zbx_dsprintf(error, "cannot stat SNMP trapper file \"%s\": %s", CONFIG_SNMPTRAP_FILE,
+				zbx_strerror(errno));
+		delay_trap_logs(error, LOG_LEVEL_CRIT);
+		close(trap_fd);
+		trap_fd = -1;
 		goto out;
 	}
 
@@ -627,7 +624,10 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	glb_preprocessing_init();
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trapfile:'%s'", __func__, CONFIG_SNMPTRAP_FILE);
+
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
@@ -638,14 +638,14 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 	buffer = (char *)zbx_malloc(buffer, MAX_BUFFER_LEN);
 	*buffer = '\0';
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 		zbx_update_env(sec);
 
 		zbx_setproctitle("%s [processing data]", get_process_type_string(process_type));
 
-		while (SUCCEED == get_latest_data())
+		while (ZBX_IS_RUNNING() && SUCCEED == get_latest_data())
 			read_traps();
 		sec = zbx_time() - sec;
 
@@ -659,4 +659,9 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 
 	if (-1 != trap_fd)
 		close(trap_fd);
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

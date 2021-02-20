@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,12 +26,21 @@
 #include "zbxalgo.h"
 
 #define ZBX_MODULE_FUNC_INIT			"zbx_module_init"
+//i just coudln't resist
+#define GLB_MODULE_FUNC_INIT			"glb_module_init"
+
 #define ZBX_MODULE_FUNC_API_VERSION		"zbx_module_api_version"
 #define ZBX_MODULE_FUNC_ITEM_LIST		"zbx_module_item_list"
 #define ZBX_MODULE_FUNC_ITEM_PROCESS		"zbx_module_item_process"
 #define ZBX_MODULE_FUNC_ITEM_TIMEOUT		"zbx_module_item_timeout"
 #define ZBX_MODULE_FUNC_UNINIT			"zbx_module_uninit"
 #define ZBX_MODULE_FUNC_HISTORY_WRITE_CBS	"zbx_module_history_write_cbs"
+
+
+
+
+extern zbx_vector_ptr_t* API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
+
 
 static zbx_vector_ptr_t	modules;
 
@@ -90,6 +99,80 @@ static zbx_module_t	*zbx_register_module(void *lib, char *name)
 	zbx_vector_ptr_append(&modules, module);
 
 	return module;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_register_callback			                                  *
+ *                                                                            *
+ * Purpose: adds callnack function and it's data to callback of a type        *
+ *                                                                            *
+ * Parameters: cb_type      -type of callback to add to                       *
+ *             cb_cb 		-callback function                                *
+ * 			   cb_data 		-data that has to be passed to the callback       *
+ *                                                                            *
+ ******************************************************************************/
+int  glb_register_callback(u_int16_t cb_type, void (*cb_cb)(void), void * cb_data) {
+	glb_api_callback_t *callback;
+	
+	if (cb_type > GLB_MODULE_API_TOTAL_CALLBACKS) 
+		return FAIL;
+
+	callback=(glb_api_callback_t*)zbx_malloc(NULL, sizeof(glb_api_callback_t));
+	
+	callback->callbackData=cb_data;
+	callback->callback=cb_cb;
+			
+	zbx_vector_ptr_append(API_CALLBACKS[cb_type],callback);
+
+	return SUCCEED;
+}
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_register_module_functions                                    *
+ *                                                                            *
+ * Purpose: registers callback functions whatever present int the lib         *
+ *                                                                            *
+ * Parameters: lib           - module pointer for later reference             *
+ *             name 		 - module name                                    *
+ *                                                                            *
+ ******************************************************************************/
+
+static void glb_register_module_functions(void *lib, char *name, void *data_ptr, zbx_module_t *module) {
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s: Starting module functions registration",__func__);
+	int i;
+	
+	void (*func)(void);
+	
+
+	for ( i=0 ; i < GLB_MODULE_API_TOTAL_CALLBACKS; i++) {
+		zabbix_log(LOG_LEVEL_INFORMATION,"Checking for callback %s", APIcfg[i].callbackName);
+		
+		if (NULL == (func = (void (*)(void))dlsym(lib, APIcfg[i].callbackName)))
+		{
+			zabbix_log(LOG_LEVEL_INFORMATION, "No callback %s in module %s", APIcfg[i].callbackName, name);
+		} else {
+			zabbix_log(LOG_LEVEL_INFORMATION, "Found callback %s in module %s", APIcfg[i].callbackName, name);
+			//registering callback - adding function
+			
+			glb_api_callback_t *callback;
+
+			callback=(glb_api_callback_t*)zbx_malloc(NULL, sizeof(glb_api_callback_t));
+			
+			zabbix_log(LOG_LEVEL_INFORMATION,"Created callback struct");
+
+			if (!callback) {
+				THIS_SHOULD_NEVER_HAPPEN;
+				continue;
+			}
+
+			callback->callbackData=data_ptr;
+			callback->callback=func;
+			
+			zbx_vector_ptr_append(API_CALLBACKS[i],callback);
+			zabbix_log(LOG_LEVEL_INFORMATION,"Added callback struct");
+		}	
+	}
 }
 
 /******************************************************************************
@@ -234,13 +317,22 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 	void			(*func_timeout)(int);
 	ZBX_HISTORY_WRITE_CBS	(*func_history_write_cbs)(void);
 	zbx_module_t		*module, module_tmp;
+	char *params="";
+
+	//looking if name also has params (after ;)
+	if (NULL!=(params = strchr(name, ';'))) {
+			*params++ = '\0';
+	} else {
+		params="";
+	}
+				
 
 	if ('/' != *name)
 		zbx_snprintf(full_name, sizeof(full_name), "%s/%s", path, name);
 	else
 		zbx_snprintf(full_name, sizeof(full_name), "%s", name);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "loading module \"%s\"", full_name);
+	zabbix_log(LOG_LEVEL_INFORMATION, "loading module \"%s\", module params \"%s\"", full_name, params);
 
 	if (NULL == (lib = dlopen(full_name, RTLD_NOW)))
 	{
@@ -262,10 +354,35 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 		goto fail;
 	}
 
-	if (ZBX_MODULE_API_VERSION != (version = func_version()))
+	
+	if (ZBX_MODULE_API_VERSION != (version = func_version()) && 
+	 	ZBX_MODULE_API_VERSION_GLABER != version )
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "unsupported module \"%s\" version: %d", name, version);
 		goto fail;
+	} 
+
+	if ( ZBX_MODULE_API_VERSION_GLABER == version ) {
+		int (*glb_init)(char *, void**);
+		void *data_ptr;
+		if (NULL == (glb_init = (int (*)(char *, void ** ))dlsym(lib, GLB_MODULE_FUNC_INIT)))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "cannot find \"" GLB_MODULE_FUNC_INIT "()\""
+				" function in module \"%s\": %s", name, dlerror());
+			goto fail;
+		}
+		else if (ZBX_MODULE_OK != glb_init(params,&data_ptr))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot initialize module \"%s\"", name);
+			goto fail;
+		}
+
+		//module init functions are different for the glaber modules
+		zabbix_log(LOG_LEVEL_INFORMATION, "Registering functions for Glaber module");
+		module = zbx_register_module(lib, name);
+		glb_register_module_functions(lib,name,data_ptr,module);
+		
+		return SUCCEED;
 	}
 
 	if (NULL == (func_init = (int (*)(void))dlsym(lib, ZBX_MODULE_FUNC_INIT)))
@@ -279,6 +396,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 		goto fail;
 	}
 
+	
 	if (NULL == (func_list = (ZBX_METRIC *(*)(void))dlsym(lib, ZBX_MODULE_FUNC_ITEM_LIST)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot find \"" ZBX_MODULE_FUNC_ITEM_LIST "()\""

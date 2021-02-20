@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,13 +20,7 @@
 #ifndef ZABBIX_COMMS_H
 #define ZABBIX_COMMS_H
 
-#ifdef _WINDOWS
-#	if defined(__INT_MAX__) && __INT_MAX__ == 2147483647
-typedef int	ssize_t;
-#	else
-typedef long	ssize_t;
-#	endif
-#endif
+#include "zbxtypes.h"
 
 #ifdef _WINDOWS
 #	define ZBX_TCP_WRITE(s, b, bl)		((ssize_t)send((s), (b), (int)(bl), 0))
@@ -76,7 +70,7 @@ zbx_buf_type_t;
 #define ZBX_SOCKET_COUNT	256
 #define ZBX_STAT_BUF_LEN	2048
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 typedef struct zbx_tls_context	zbx_tls_context_t;
 #endif
 
@@ -87,7 +81,7 @@ typedef struct
 	size_t				read_bytes;
 	char				*buffer;
 	char				*next_line;
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_context_t		*tls_ctx;
 #endif
 	unsigned int 			connection_type;	/* type of connection actually established: */
@@ -111,6 +105,7 @@ const char	*zbx_socket_strerror(void);
 
 #ifndef _WINDOWS
 void	zbx_gethost_by_ip(const char *ip, char *host, size_t hostlen);
+void	zbx_getip_by_host(const char *host, char *ip, size_t iplen);
 #endif
 
 int	zbx_tcp_connect(zbx_socket_t *s, const char *source_ip, const char *ip, unsigned short port, int timeout,
@@ -183,11 +178,18 @@ void	zbx_udp_close(zbx_socket_t *s);
 #define ZBX_DEFAULT_AGENT_PORT_STR	"10050"
 #define ZBX_DEFAULT_SERVER_PORT_STR	"10051"
 
+//how many items should fail in a row for a host to mark it unreachable and 
+//and stop trying to poll other items
+#define GLB_FAIL_COUNT_CLEAN 6
+
 int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, const char *version, int protocol,
 		int timeout);
 
 #define zbx_send_response(sock, result, info, timeout) \
 		zbx_send_response_ext(sock, result, info, NULL, ZBX_TCP_PROTOCOL, timeout)
+
+#define zbx_send_response_same(sock, result, info, timeout) \
+		zbx_send_response_ext(sock, result, info, NULL, sock->protocol, timeout)
 
 #define zbx_send_proxy_response(sock, result, info, timeout) \
 		zbx_send_response_ext(sock, result, info, ZABBIX_VERSION, ZBX_TCP_PROTOCOL | ZBX_TCP_COMPRESS, timeout)

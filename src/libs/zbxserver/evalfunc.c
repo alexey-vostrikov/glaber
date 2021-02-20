@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 #include "valuecache.h"
 #include "evalfunc.h"
 #include "zbxregexp.h"
+#include "zbxtrends.h"
 
 typedef enum
 {
@@ -59,9 +60,7 @@ static const char	*zbx_type_string(zbx_value_type_t type)
  *                                                                            *
  * Purpose: get the value of sec|#num trigger function parameter              *
  *                                                                            *
- * Parameters: hostid         - [IN] hostid of the host trigger function      *
- *                              belongs to                                    *
- *             parameters     - [IN] trigger function parameters              *
+ * Parameters: parameters     - [IN] trigger function parameters              *
  *             Nparam         - [IN] specifies which parameter to extract     *
  *             parameter_type - [IN] specifies whether parameter is mandatory *
  *                              or optional                                   *
@@ -74,8 +73,8 @@ static const char	*zbx_type_string(zbx_value_type_t type)
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	get_function_parameter_int(zbx_uint64_t hostid, const char *parameters, int Nparam,
-		zbx_param_type_t parameter_type, int *value, zbx_value_type_t *type)
+static int	get_function_parameter_int(const char *parameters, int Nparam, zbx_param_type_t parameter_type,
+		int *value, zbx_value_type_t *type)
 {
 	char	*parameter;
 	int	ret = FAIL;
@@ -85,42 +84,38 @@ static int	get_function_parameter_int(zbx_uint64_t hostid, const char *parameter
 	if (NULL == (parameter = zbx_function_get_param_dyn(parameters, Nparam)))
 		goto out;
 
-	if (SUCCEED == substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL,
-			&parameter, MACRO_TYPE_COMMON, NULL, 0))
+	if ('\0' == *parameter)
 	{
-		if ('\0' == *parameter)
+		switch (parameter_type)
 		{
-			switch (parameter_type)
-			{
-				case ZBX_PARAM_OPTIONAL:
-					ret = SUCCEED;
-					break;
-				case ZBX_PARAM_MANDATORY:
-					break;
-				default:
-					THIS_SHOULD_NEVER_HAPPEN;
-			}
-		}
-		else if ('#' == *parameter)
-		{
-			*type = ZBX_VALUE_NVALUES;
-			if (SUCCEED == is_uint31(parameter + 1, value) && 0 < *value)
+			case ZBX_PARAM_OPTIONAL:
 				ret = SUCCEED;
+				break;
+			case ZBX_PARAM_MANDATORY:
+				break;
+			default:
+				THIS_SHOULD_NEVER_HAPPEN;
 		}
-		else if ('-' == *parameter)
+	}
+	else if ('#' == *parameter)
+	{
+		*type = ZBX_VALUE_NVALUES;
+		if (SUCCEED == is_uint31(parameter + 1, value) && 0 < *value)
+			ret = SUCCEED;
+	}
+	else if ('-' == *parameter)
+	{
+		if (SUCCEED == is_time_suffix(parameter + 1, value, ZBX_LENGTH_UNLIMITED))
 		{
-			if (SUCCEED == is_time_suffix(parameter + 1, value, ZBX_LENGTH_UNLIMITED))
-			{
-				*value = -(*value);
-				*type = ZBX_VALUE_SECONDS;
-				ret = SUCCEED;
-			}
-		}
-		else if (SUCCEED == is_time_suffix(parameter, value, ZBX_LENGTH_UNLIMITED))
-		{
+			*value = -(*value);
 			*type = ZBX_VALUE_SECONDS;
 			ret = SUCCEED;
 		}
+	}
+	else if (SUCCEED == is_time_suffix(parameter, value, ZBX_LENGTH_UNLIMITED))
+	{
+		*type = ZBX_VALUE_SECONDS;
+		ret = SUCCEED;
 	}
 
 	if (SUCCEED == ret)
@@ -133,8 +128,7 @@ out:
 	return ret;
 }
 
-static int	get_function_parameter_uint64(zbx_uint64_t hostid, const char *parameters, int Nparam,
-		zbx_uint64_t *value)
+static int	get_function_parameter_uint64(const char *parameters, int Nparam, zbx_uint64_t *value)
 {
 	char	*parameter;
 	int	ret = FAIL;
@@ -144,14 +138,7 @@ static int	get_function_parameter_uint64(zbx_uint64_t hostid, const char *parame
 	if (NULL == (parameter = zbx_function_get_param_dyn(parameters, Nparam)))
 		goto out;
 
-	if (SUCCEED == substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL,
-			&parameter, MACRO_TYPE_COMMON, NULL, 0))
-	{
-		if (SUCCEED == is_uint64(parameter, value))
-			ret = SUCCEED;
-	}
-
-	if (SUCCEED == ret)
+	if (SUCCEED == (ret = is_uint64(parameter, value)))
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() value:" ZBX_FS_UI64, __func__, *value);
 
 	zbx_free(parameter);
@@ -161,8 +148,7 @@ out:
 	return ret;
 }
 
-static int	get_function_parameter_float(zbx_uint64_t hostid, const char *parameters, int Nparam,
-		unsigned char flags, double *value)
+static int	get_function_parameter_float(const char *parameters, int Nparam, unsigned char flags, double *value)
 {
 	char	*parameter;
 	int	ret = FAIL;
@@ -172,20 +158,12 @@ static int	get_function_parameter_float(zbx_uint64_t hostid, const char *paramet
 	if (NULL == (parameter = zbx_function_get_param_dyn(parameters, Nparam)))
 		goto out;
 
-	if (SUCCEED == substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL,
-			&parameter, MACRO_TYPE_COMMON, NULL, 0))
+	if (SUCCEED == (ret = is_double_suffix(parameter, flags)))
 	{
-		if (SUCCEED != is_double_suffix(parameter, flags))
-			goto clean;
-
 		*value = str2double(parameter);
-
-		ret = SUCCEED;
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() value:" ZBX_FS_DBL, __func__, *value);
 	}
 
-	if (SUCCEED == ret)
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() value:" ZBX_FS_DBL, __func__, *value);
-clean:
 	zbx_free(parameter);
 out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
@@ -193,7 +171,7 @@ out:
 	return ret;
 }
 
-static int	get_function_parameter_str(zbx_uint64_t hostid, const char *parameters, int Nparam, char **value)
+static int	get_function_parameter_str(const char *parameters, int Nparam, char **value)
 {
 	int	ret = FAIL;
 
@@ -202,13 +180,8 @@ static int	get_function_parameter_str(zbx_uint64_t hostid, const char *parameter
 	if (NULL == (*value = zbx_function_get_param_dyn(parameters, Nparam)))
 		goto out;
 
-	ret = substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL,
-			value, MACRO_TYPE_COMMON, NULL, 0);
-
-	if (SUCCEED == ret)
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() value:'%s'", __func__, *value);
-	else
-		zbx_free(*value);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() value:'%s'", __func__, *value);
+	ret = SUCCEED;
 out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
@@ -228,7 +201,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LOGEVENTID(char *value, DC_ITEM *item, const char *parameters,
+static int	evaluate_LOGEVENTID(char **value, DC_ITEM *item, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	char			*arg1 = NULL;
@@ -252,7 +225,7 @@ static int	evaluate_LOGEVENTID(char *value, DC_ITEM *item, const char *parameter
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 1, &arg1))
+	if (SUCCEED != get_function_parameter_str(parameters, 1, &arg1))
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -283,9 +256,9 @@ static int	evaluate_LOGEVENTID(char *value, DC_ITEM *item, const char *parameter
 		else
 		{
 			if (ZBX_REGEXP_MATCH == regexp_ret)
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			else if (ZBX_REGEXP_NO_MATCH == regexp_ret)
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 
 			ret = SUCCEED;
 		}
@@ -321,7 +294,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LOGSOURCE(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_LOGSOURCE(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char			*arg1 = NULL;
@@ -345,7 +318,7 @@ static int	evaluate_LOGSOURCE(char *value, DC_ITEM *item, const char *parameters
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 1, &arg1))
+	if (SUCCEED != get_function_parameter_str(parameters, 1, &arg1))
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -367,11 +340,11 @@ static int	evaluate_LOGSOURCE(char *value, DC_ITEM *item, const char *parameters
 		switch (regexp_match_ex(&regexps, vc_value.value.log->source, arg1, ZBX_CASE_SENSITIVE))
 		{
 			case ZBX_REGEXP_MATCH:
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 				ret = SUCCEED;
 				break;
 			case ZBX_REGEXP_NO_MATCH:
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 				ret = SUCCEED;
 				break;
 			case FAIL:
@@ -408,7 +381,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LOGSEVERITY(char *value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
+static int	evaluate_LOGSEVERITY(char **value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
 {
 	int			ret = FAIL;
 	zbx_history_record_t	vc_value;
@@ -423,7 +396,9 @@ static int	evaluate_LOGSEVERITY(char *value, DC_ITEM *item, const zbx_timespec_t
 
 	if (SUCCEED == zbx_vc_get_value(item->itemid, item->value_type, ts, &vc_value))
 	{
-		zbx_snprintf(value, MAX_BUFFER_LEN, "%d", vc_value.value.log->severity);
+		size_t	value_alloc = 0, value_offset = 0;
+
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%d", vc_value.value.log->severity);
 		zbx_history_record_clear(&vc_value, item->value_type);
 
 		ret = SUCCEED;
@@ -571,7 +546,7 @@ static void	count_one_str(int *count, int op, const char *value, const char *pat
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_COUNT(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_COUNT(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int				arg1, op = OP_UNKNOWN, numeric_search, nparams, count = 0, i, ret = FAIL;
@@ -583,6 +558,7 @@ static int	evaluate_COUNT(char *value, DC_ITEM *item, const char *parameters, co
 	zbx_vector_ptr_t		regexps;
 	zbx_vector_history_record_t	values;
 	zbx_timespec_t			ts_end = *ts;
+	size_t				value_alloc = 0, value_offset = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -597,20 +573,19 @@ static int	evaluate_COUNT(char *value, DC_ITEM *item, const char *parameters, co
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
 	}
 
-	if (2 <= nparams && SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 2, &arg2))
+	if (2 <= nparams && SUCCEED != get_function_parameter_str(parameters, 2, &arg2))
 	{
 		*error = zbx_strdup(*error, "invalid second parameter");
 		goto out;
 	}
 
-	if (3 <= nparams && SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 3, &arg3))
+	if (3 <= nparams && SUCCEED != get_function_parameter_str(parameters, 3, &arg3))
 	{
 		*error = zbx_strdup(*error, "invalid third parameter");
 		goto out;
@@ -621,9 +596,8 @@ static int	evaluate_COUNT(char *value, DC_ITEM *item, const char *parameters, co
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 4, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 4, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid fourth parameter");
 			goto out;
@@ -833,7 +807,7 @@ static int	evaluate_COUNT(char *value, DC_ITEM *item, const char *parameters, co
 	else
 		count = values.values_num;
 
-	zbx_snprintf(value, MAX_BUFFER_LEN, "%d", count);
+	zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%d", count);
 
 	ret = SUCCEED;
 out:
@@ -876,7 +850,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_SUM(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_SUM(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				nparams, arg1, i, ret = FAIL, seconds = 0, nvalues = 0;
 	zbx_value_type_t		arg1_type;
@@ -900,8 +874,7 @@ static int	evaluate_SUM(char *value, DC_ITEM *item, const char *parameters, cons
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -912,9 +885,8 @@ static int	evaluate_SUM(char *value, DC_ITEM *item, const char *parameters, cons
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -956,7 +928,7 @@ static int	evaluate_SUM(char *value, DC_ITEM *item, const char *parameters, cons
 			result.ui64 += values.values[i].value.ui64;
 	}
 
-	zbx_history_value2str(value, MAX_BUFFER_LEN, &result, item->value_type);
+	*value = zbx_history_value2str_dyn(&result, item->value_type);
 	ret = SUCCEED;
 out:
 	zbx_history_record_vector_destroy(&values, item->value_type);
@@ -979,7 +951,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_AVG(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_AVG(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				nparams, arg1, ret = FAIL, i, seconds = 0, nvalues = 0;
 	zbx_value_type_t		arg1_type;
@@ -1002,8 +974,7 @@ static int	evaluate_AVG(char *value, DC_ITEM *item, const char *parameters, cons
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -1014,9 +985,8 @@ static int	evaluate_AVG(char *value, DC_ITEM *item, const char *parameters, cons
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -1045,19 +1015,22 @@ static int	evaluate_AVG(char *value, DC_ITEM *item, const char *parameters, cons
 
 	if (0 < values.values_num)
 	{
-		double	sum = 0;
+		double	avg = 0;
+		size_t	value_alloc = 0, value_offset = 0;
 
 		if (ITEM_VALUE_TYPE_FLOAT == item->value_type)
 		{
 			for (i = 0; i < values.values_num; i++)
-				sum += values.values[i].value.dbl;
+				avg += values.values[i].value.dbl / (i + 1) - avg / (i + 1);
 		}
 		else
 		{
 			for (i = 0; i < values.values_num; i++)
-				sum += values.values[i].value.ui64;
+				avg += values.values[i].value.ui64;
+
+			avg = avg / values.values_num;
 		}
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL, sum / values.values_num);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64, avg);
 
 		ret = SUCCEED;
 	}
@@ -1080,7 +1053,7 @@ out:
  *                                                                            *
  * Purpose: evaluate functions 'last' and 'prev' for the item                 *
  *                                                                            *
- * Parameters: value - buffer of size MAX_BUFFER_LEN                          *
+ * Parameters: value - dynamic buffer                                         *
  *             item - item (performance metric)                               *
  *             parameters - Nth last value and time shift (optional)          *
  *                                                                            *
@@ -1088,7 +1061,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LAST(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_LAST(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int				arg1 = 1, ret = FAIL;
@@ -1100,8 +1073,7 @@ static int	evaluate_LAST(char *value, DC_ITEM *item, const char *parameters, con
 
 	zbx_history_record_vector_create(&values);
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_OPTIONAL, &arg1,
-			&arg1_type))
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_OPTIONAL, &arg1, &arg1_type))
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -1115,9 +1087,8 @@ static int	evaluate_LAST(char *value, DC_ITEM *item, const char *parameters, con
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -1130,8 +1101,29 @@ static int	evaluate_LAST(char *value, DC_ITEM *item, const char *parameters, con
 	{
 		if (arg1 <= values.values_num)
 		{
-			zbx_history_value2str(value, MAX_BUFFER_LEN, &values.values[arg1 - 1].value,
-					item->value_type);
+			char	*tmp;
+
+			tmp = zbx_history_value2str_dyn(&values.values[arg1 - 1].value, item->value_type);
+
+			if (ITEM_VALUE_TYPE_STR == item->value_type ||
+					ITEM_VALUE_TYPE_TEXT == item->value_type ||
+					ITEM_VALUE_TYPE_LOG == item->value_type)
+			{
+				size_t	len;
+				char	*ptr;
+
+				len = zbx_get_escape_string_len(tmp, "\"\\");
+				ptr = *value = zbx_malloc(NULL, len + 3);
+				*ptr++ = '"';
+				zbx_escape_string(ptr, len + 1, tmp, "\"\\");
+				ptr += len;
+				*ptr++ = '"';
+				*ptr = '\0';
+				zbx_free(tmp);
+			}
+			else
+				*value = tmp;
+
 			ret = SUCCEED;
 		}
 		else
@@ -1165,7 +1157,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_MIN(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_MIN(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				nparams, arg1, i, ret = FAIL, seconds = 0, nvalues = 0;
 	zbx_value_type_t		arg1_type;
@@ -1188,8 +1180,7 @@ static int	evaluate_MIN(char *value, DC_ITEM *item, const char *parameters, cons
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -1200,9 +1191,8 @@ static int	evaluate_MIN(char *value, DC_ITEM *item, const char *parameters, cons
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -1249,8 +1239,8 @@ static int	evaluate_MIN(char *value, DC_ITEM *item, const char *parameters, cons
 					index = i;
 			}
 		}
-		zbx_history_value2str(value, MAX_BUFFER_LEN, &values.values[index].value, item->value_type);
 
+		*value = zbx_history_value2str_dyn(&values.values[index].value, item->value_type);
 		ret = SUCCEED;
 	}
 	else
@@ -1279,7 +1269,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_MAX(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_MAX(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				nparams, arg1, ret = FAIL, i, seconds = 0, nvalues = 0;
 	zbx_value_type_t		arg1_type;
@@ -1302,8 +1292,7 @@ static int	evaluate_MAX(char *value, DC_ITEM *item, const char *parameters, cons
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -1314,9 +1303,8 @@ static int	evaluate_MAX(char *value, DC_ITEM *item, const char *parameters, cons
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -1363,7 +1351,8 @@ static int	evaluate_MAX(char *value, DC_ITEM *item, const char *parameters, cons
 					index = i;
 			}
 		}
-		zbx_history_value2str(value, MAX_BUFFER_LEN, &values.values[index].value, item->value_type);
+
+		*value = zbx_history_value2str_dyn(&values.values[index].value, item->value_type);
 
 		ret = SUCCEED;
 	}
@@ -1409,7 +1398,7 @@ static int	__history_record_uint64_compare(const zbx_history_record_t *d1, const
  *               FAIL    - failed to evaluate function                        *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_PERCENTILE(char *value, DC_ITEM *item, const char *parameters,
+static int	evaluate_PERCENTILE(char **value, DC_ITEM *item, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	int				nparams, arg1, time_shift = 0, ret = FAIL, seconds = 0, nvalues = 0;
@@ -1434,8 +1423,7 @@ static int	evaluate_PERCENTILE(char *value, DC_ITEM *item, const char *parameter
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -1453,8 +1441,8 @@ static int	evaluate_PERCENTILE(char *value, DC_ITEM *item, const char *parameter
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
-			&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
+	if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift, &time_shift_type) ||
+			ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 	{
 		*error = zbx_strdup(*error, "invalid second parameter");
 		goto out;
@@ -1462,8 +1450,8 @@ static int	evaluate_PERCENTILE(char *value, DC_ITEM *item, const char *parameter
 
 	ts_end.sec -= time_shift;
 
-	if (SUCCEED != get_function_parameter_float(item->host.hostid, parameters, 3, ZBX_FLAG_DOUBLE_PLAIN,
-			&percentage) || 0.0 > percentage || 100.0 < percentage)
+	if (SUCCEED != get_function_parameter_float(parameters, 3, ZBX_FLAG_DOUBLE_PLAIN, &percentage) ||
+			0.0 > percentage || 100.0 < percentage)
 	{
 		*error = zbx_strdup(*error, "invalid third parameter");
 		goto out;
@@ -1489,7 +1477,7 @@ static int	evaluate_PERCENTILE(char *value, DC_ITEM *item, const char *parameter
 		else
 			index = (int)ceil(values.values_num * (percentage / 100));
 
-		zbx_history_value2str(value, MAX_BUFFER_LEN, &values.values[index - 1].value, item->value_type);
+		*value = zbx_history_value2str_dyn(&values.values[index - 1].value, item->value_type);
 
 		ret = SUCCEED;
 	}
@@ -1519,7 +1507,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_DELTA(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_DELTA(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int				nparams, arg1, ret = FAIL, i, seconds = 0, nvalues = 0;
@@ -1543,8 +1531,7 @@ static int	evaluate_DELTA(char *value, DC_ITEM *item, const char *parameters, co
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -1555,9 +1542,8 @@ static int	evaluate_DELTA(char *value, DC_ITEM *item, const char *parameters, co
 		int			time_shift = 0;
 		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
 
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL,
-				&time_shift, &time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type ||
-				0 > time_shift)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -1616,7 +1602,7 @@ static int	evaluate_DELTA(char *value, DC_ITEM *item, const char *parameters, co
 			result.dbl = values.values[index_max].value.dbl - values.values[index_min].value.dbl;
 		}
 
-		zbx_history_value2str(value, MAX_BUFFER_LEN, &result, item->value_type);
+		*value = zbx_history_value2str_dyn(&result, item->value_type);
 
 		ret = SUCCEED;
 	}
@@ -1646,36 +1632,61 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_NODATA(char *value, DC_ITEM *item, const char *parameters, char **error)
+static int	evaluate_NODATA(char **value, DC_ITEM *item, const char *parameters, char **error)
 {
-	int				arg1, ret = FAIL;
+	int				arg1, num, period, lazy = 1, ret = FAIL;
 	zbx_value_type_t		arg1_type;
 	zbx_vector_history_record_t	values;
 	zbx_timespec_t			ts;
+	char				*arg2 = NULL;
+	zbx_proxy_suppress_t		nodata_win;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_history_record_vector_create(&values);
 
-	if (1 < num_param(parameters))
+	if (2 < (num = num_param(parameters)))
 	{
 		*error = zbx_strdup(*error, "invalid number of parameters");
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || ZBX_VALUE_SECONDS != arg1_type || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) ||
+			ZBX_VALUE_SECONDS != arg1_type || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
 	}
 
-	zbx_timespec(&ts);
+	if (1 < num && (SUCCEED != get_function_parameter_str(parameters, 2, &arg2) ||
+			('\0' != *arg2 && 0 != (lazy = strcmp("strict", arg2)))))
+	{
+		*error = zbx_strdup(*error, "invalid second parameter");
+		goto out;
+	}
 
-	if (SUCCEED == zbx_vc_get_values(item->itemid, item->value_type, &values, arg1, 1, &ts) &&
+	zbx_timespec(&ts);
+	nodata_win.flags = ZBX_PROXY_SUPPRESS_DISABLE;
+
+	if (0 != item->host.proxy_hostid && 0 != lazy)
+	{
+		int			lastaccess;
+
+		if (SUCCEED != DCget_proxy_nodata_win(item->host.proxy_hostid, &nodata_win, &lastaccess))
+		{
+			*error = zbx_strdup(*error, "cannot retrieve proxy last access");
+			goto out;
+		}
+
+		period = arg1 + (ts.sec - lastaccess);
+	}
+	else
+		period = arg1;
+
+	if (SUCCEED == zbx_vc_get_values(item->itemid, item->value_type, &values, period, 1, &ts) &&
 			1 == values.values_num)
 	{
-		zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+		*value = zbx_strdup(*value, "0");
 	}
 	else
 	{
@@ -1694,12 +1705,25 @@ static int	evaluate_NODATA(char *value, DC_ITEM *item, const char *parameters, c
 			goto out;
 		}
 
-		zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+		if (0 != (nodata_win.flags & ZBX_PROXY_SUPPRESS_ACTIVE))
+		{
+			*error = zbx_strdup(*error, "historical data transfer from proxy is still in progress");
+			goto out;
+		}
+
+		*value = zbx_strdup(*value, "1");
+
+		if (0 != item->host.proxy_hostid && 0 != lazy)
+		{
+			zabbix_log(LOG_LEVEL_TRACE, "Nodata in %s() flag:%d values_num:%d start_time:%d period:%d",
+					__func__, nodata_win.flags, nodata_win.values_num, ts.sec - period, period);
+		}
 	}
 
 	ret = SUCCEED;
 out:
 	zbx_history_record_vector_destroy(&values, item->value_type);
+	zbx_free(arg2);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
@@ -1719,9 +1743,10 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_ABSCHANGE(char *value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
+static int	evaluate_ABSCHANGE(char **value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
 {
 	int				ret = FAIL;
+	size_t				value_alloc = 0, value_offset = 0;
 	zbx_vector_history_record_t	values;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -1738,35 +1763,35 @@ static int	evaluate_ABSCHANGE(char *value, DC_ITEM *item, const zbx_timespec_t *
 	switch (item->value_type)
 	{
 		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL,
+			zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64,
 					fabs(values.values[0].value.dbl - values.values[1].value.dbl));
 			break;
 		case ITEM_VALUE_TYPE_UINT64:
 			/* to avoid overflow */
 			if (values.values[0].value.ui64 >= values.values[1].value.ui64)
 			{
-				zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_UI64,
+				zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_UI64,
 						values.values[0].value.ui64 - values.values[1].value.ui64);
 			}
 			else
 			{
-				zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_UI64,
+				zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_UI64,
 						values.values[1].value.ui64 - values.values[0].value.ui64);
 			}
 			break;
 		case ITEM_VALUE_TYPE_LOG:
 			if (0 == strcmp(values.values[0].value.log->value, values.values[1].value.log->value))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:
 			if (0 == strcmp(values.values[0].value.str, values.values[1].value.str))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 		default:
 			*error = zbx_strdup(*error, "invalid value type");
@@ -1794,9 +1819,10 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_CHANGE(char *value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
+static int	evaluate_CHANGE(char **value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
 {
 	int				ret = FAIL;
+	size_t				value_alloc = 0, value_offset = 0;
 	zbx_vector_history_record_t	values;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -1813,31 +1839,31 @@ static int	evaluate_CHANGE(char *value, DC_ITEM *item, const zbx_timespec_t *ts,
 	switch (item->value_type)
 	{
 		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL,
+			zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64,
 					values.values[0].value.dbl - values.values[1].value.dbl);
 			break;
 		case ITEM_VALUE_TYPE_UINT64:
 			/* to avoid overflow */
 			if (values.values[0].value.ui64 >= values.values[1].value.ui64)
-				zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_UI64,
+				zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_UI64,
 						values.values[0].value.ui64 - values.values[1].value.ui64);
 			else
-				zbx_snprintf(value, MAX_BUFFER_LEN, "-" ZBX_FS_UI64,
+				zbx_snprintf_alloc(value, &value_alloc, &value_offset, "-" ZBX_FS_UI64,
 						values.values[1].value.ui64 - values.values[0].value.ui64);
 			break;
 		case ITEM_VALUE_TYPE_LOG:
 			if (0 == strcmp(values.values[0].value.log->value, values.values[1].value.log->value))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:
 			if (0 == strcmp(values.values[0].value.str, values.values[1].value.str))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 		default:
 			*error = zbx_strdup(*error, "invalid value type");
@@ -1866,7 +1892,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_DIFF(char *value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
+static int	evaluate_DIFF(char **value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
 {
 	int				ret = FAIL;
 	zbx_vector_history_record_t	values;
@@ -1885,28 +1911,28 @@ static int	evaluate_DIFF(char *value, DC_ITEM *item, const zbx_timespec_t *ts, c
 	{
 		case ITEM_VALUE_TYPE_FLOAT:
 			if (SUCCEED == zbx_double_compare(values.values[0].value.dbl, values.values[1].value.dbl))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 		case ITEM_VALUE_TYPE_UINT64:
 			if (values.values[0].value.ui64 == values.values[1].value.ui64)
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 		case ITEM_VALUE_TYPE_LOG:
 			if (0 == strcmp(values.values[0].value.log->value, values.values[1].value.log->value))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:
 			if (0 == strcmp(values.values[0].value.str, values.values[1].value.str))
-				zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "0");
 			else
-				zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+				*value = zbx_strdup(*value, "1");
 			break;
 		default:
 			*error = zbx_strdup(*error, "invalid value type");
@@ -1972,7 +1998,7 @@ static int	evaluate_STR_one(int func, zbx_vector_ptr_t *regexps, const char *val
 	return FAIL;
 }
 
-static int	evaluate_STR(char *value, DC_ITEM *item, const char *function, const char *parameters,
+static int	evaluate_STR(char **value, DC_ITEM *item, const char *function, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	char				*arg1 = NULL;
@@ -1981,6 +2007,7 @@ static int	evaluate_STR(char *value, DC_ITEM *item, const char *function, const 
 	zbx_value_type_t		arg2_type = ZBX_VALUE_NVALUES;
 	zbx_vector_ptr_t		regexps;
 	zbx_vector_history_record_t	values;
+	size_t				value_alloc = 0, value_offset = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -2009,7 +2036,7 @@ static int	evaluate_STR(char *value, DC_ITEM *item, const char *function, const 
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 1, &arg1))
+	if (SUCCEED != get_function_parameter_str(parameters, 1, &arg1))
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -2017,8 +2044,8 @@ static int	evaluate_STR(char *value, DC_ITEM *item, const char *function, const 
 
 	if (2 == nparams)
 	{
-		if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL, &arg2,
-				&arg2_type) || 0 >= arg2)
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &arg2, &arg2_type) ||
+				0 >= arg2)
 		{
 			*error = zbx_strdup(*error, "invalid second parameter");
 			goto out;
@@ -2095,7 +2122,7 @@ static int	evaluate_STR(char *value, DC_ITEM *item, const char *function, const 
 		}
 	}
 
-	zbx_snprintf(value, MAX_BUFFER_LEN, "%d", found);
+	zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%d", found);
 	ret = SUCCEED;
 out:
 	zbx_regexp_clean_expressions(&regexps);
@@ -2120,7 +2147,7 @@ out:
  *                                                                            *
  * Purpose: evaluate function 'strlen' for the item                           *
  *                                                                            *
- * Parameters: value - buffer of size MAX_BUFFER_LEN                          *
+ * Parameters: value - dynamic buffer                                         *
  *             item - item (performance metric)                               *
  *             parameters - Nth last value and time shift (optional)          *
  *                                                                            *
@@ -2128,26 +2155,76 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_STRLEN(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_STRLEN(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
-	int	ret = FAIL;
+	int				arg1 = 1, ret = FAIL;
+	zbx_value_type_t		arg1_type = ZBX_VALUE_NVALUES;
+	zbx_vector_history_record_t	values;
+	zbx_timespec_t			ts_end = *ts;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_history_record_vector_create(&values);
 
 	if (ITEM_VALUE_TYPE_STR != item->value_type && ITEM_VALUE_TYPE_TEXT != item->value_type &&
 			ITEM_VALUE_TYPE_LOG != item->value_type)
 	{
 		*error = zbx_strdup(*error, "invalid value type");
-		goto clean;
+		goto out;
 	}
 
-	if (SUCCEED == evaluate_LAST(value, item, parameters, ts, error))
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_OPTIONAL, &arg1, &arg1_type))
 	{
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_SIZE_T, (zbx_fs_size_t)zbx_strlen_utf8(value));
-		ret = SUCCEED;
+		*error = zbx_strdup(*error, "invalid first parameter");
+		goto out;
 	}
-clean:
+
+	if (ZBX_VALUE_NVALUES != arg1_type)
+		arg1 = 1;	/* non-# first parameter is ignored to support older syntax "strlen(0)" */
+
+	if (2 == num_param(parameters))
+	{
+		int			time_shift = 0;
+		zbx_value_type_t	time_shift_type = ZBX_VALUE_SECONDS;
+
+		if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
+				&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
+		{
+			*error = zbx_strdup(*error, "invalid second parameter");
+			goto out;
+		}
+
+		ts_end.sec -= time_shift;
+	}
+
+	if (SUCCEED == zbx_vc_get_values(item->itemid, item->value_type, &values, 0, arg1, &ts_end))
+	{
+		if (arg1 <= values.values_num)
+		{
+			size_t	sz, value_alloc = 0, value_offset = 0;
+			char	*hist_val;
+
+			hist_val = zbx_history_value2str_dyn(&values.values[arg1 - 1].value, item->value_type);
+			sz = zbx_strlen_utf8(hist_val);
+			zbx_free(hist_val);
+
+			zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_SIZE_T, sz);
+			ret = SUCCEED;
+		}
+		else
+		{
+			*error = zbx_strdup(*error, "not enough data");
+			goto out;
+		}
+	}
+	else
+	{
+		*error = zbx_strdup(*error, "cannot get values from value cache");
+	}
+
+	zbx_history_record_vector_destroy(&values, item->value_type);
+out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
@@ -2166,7 +2243,7 @@ clean:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_FUZZYTIME(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_FUZZYTIME(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int			arg1, ret = FAIL;
@@ -2188,8 +2265,7 @@ static int	evaluate_FUZZYTIME(char *value, DC_ITEM *item, const char *parameters
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
@@ -2213,16 +2289,16 @@ static int	evaluate_FUZZYTIME(char *value, DC_ITEM *item, const char *parameters
 	if (ITEM_VALUE_TYPE_UINT64 == item->value_type)
 	{
 		if (vc_value.value.ui64 >= fuzlow && vc_value.value.ui64 <= fuzhig)
-			zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+			*value = zbx_strdup(*value, "1");
 		else
-			zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+			*value = zbx_strdup(*value, "0");
 	}
 	else
 	{
 		if (vc_value.value.dbl >= fuzlow && vc_value.value.dbl <= fuzhig)
-			zbx_strlcpy(value, "1", MAX_BUFFER_LEN);
+			*value = zbx_strdup(*value, "1");
 		else
-			zbx_strlcpy(value, "0", MAX_BUFFER_LEN);
+			*value = zbx_strdup(*value, "0");
 	}
 
 	zbx_history_record_clear(&vc_value, item->value_type);
@@ -2240,7 +2316,7 @@ out:
  *                                                                            *
  * Purpose: evaluate logical bitwise function 'and' for the item              *
  *                                                                            *
- * Parameters: value - buffer of size MAX_BUFFER_LEN                          *
+ * Parameters: value - dynamic buffer                                         *
  *             item - item (performance metric)                               *
  *             parameters - up to 3 comma-separated fields:                   *
  *                            (1) same as the 1st parameter for function      *
@@ -2255,7 +2331,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_BAND(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_BAND(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char		*last_parameters = NULL;
@@ -2276,7 +2352,7 @@ static int	evaluate_BAND(char *value, DC_ITEM *item, const char *parameters, con
 		goto clean;
 	}
 
-	if (SUCCEED != get_function_parameter_uint64(item->host.hostid, parameters, 2, &mask))
+	if (SUCCEED != get_function_parameter_uint64(parameters, 2, &mask))
 	{
 		*error = zbx_strdup(*error, "invalid second parameter");
 		goto clean;
@@ -2288,8 +2364,10 @@ static int	evaluate_BAND(char *value, DC_ITEM *item, const char *parameters, con
 
 	if (SUCCEED == evaluate_LAST(value, item, last_parameters, ts, error))
 	{
-		ZBX_STR2UINT64(last_uint64, value);
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_UI64, last_uint64 & (zbx_uint64_t)mask);
+		ZBX_STR2UINT64(last_uint64, *value);
+		/* 'and' bit operation cannot be larger than the source value, */
+		/* so the result can just be copied in value buffer            */
+		zbx_snprintf(*value, strlen(*value) + 1, ZBX_FS_UI64, last_uint64 & (zbx_uint64_t)mask);
 		ret = SUCCEED;
 	}
 
@@ -2313,7 +2391,7 @@ clean:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_FORECAST(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_FORECAST(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char				*fit_str = NULL, *mode_str = NULL;
@@ -2326,6 +2404,7 @@ static int	evaluate_FORECAST(char *value, DC_ITEM *item, const char *parameters,
 	zbx_fit_t			fit;
 	zbx_mode_t			mode;
 	zbx_timespec_t			ts_end = *ts;
+	size_t				value_alloc = 0, value_offset = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -2343,22 +2422,21 @@ static int	evaluate_FORECAST(char *value, DC_ITEM *item, const char *parameters,
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
-			&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
+	if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift, &time_shift_type) ||
+			ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 	{
 		*error = zbx_strdup(*error, "invalid second parameter");
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 3, ZBX_PARAM_MANDATORY, &time,
-			&time_type) || ZBX_VALUE_SECONDS != time_type)
+	if (SUCCEED != get_function_parameter_int(parameters, 3, ZBX_PARAM_MANDATORY, &time, &time_type) ||
+			ZBX_VALUE_SECONDS != time_type)
 	{
 		*error = zbx_strdup(*error, "invalid third parameter");
 		goto out;
@@ -2366,7 +2444,7 @@ static int	evaluate_FORECAST(char *value, DC_ITEM *item, const char *parameters,
 
 	if (4 <= nparams)
 	{
-		if (SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 4, &fit_str) ||
+		if (SUCCEED != get_function_parameter_str(parameters, 4, &fit_str) ||
 				SUCCEED != zbx_fit_code(fit_str, &fit, &k, error))
 		{
 			*error = zbx_strdup(*error, "invalid fourth parameter");
@@ -2380,7 +2458,7 @@ static int	evaluate_FORECAST(char *value, DC_ITEM *item, const char *parameters,
 
 	if (5 == nparams)
 	{
-		if (SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 5, &mode_str) ||
+		if (SUCCEED != get_function_parameter_str(parameters, 5, &mode_str) ||
 				SUCCEED != zbx_mode_code(mode_str, &mode, error))
 		{
 			*error = zbx_strdup(*error, "invalid fifth parameter");
@@ -2439,13 +2517,14 @@ static int	evaluate_FORECAST(char *value, DC_ITEM *item, const char *parameters,
 			}
 		}
 
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL, zbx_forecast(t, x, values.values_num,
-				ts->sec - zero_time.sec - 1.0e-9 * (zero_time.ns + 1), time, fit, k, mode));
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64, zbx_forecast(t, x,
+				values.values_num, ts->sec - zero_time.sec - 1.0e-9 * (zero_time.ns + 1), time, fit, k,
+				mode));
 	}
 	else
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "no data available");
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL, ZBX_MATH_ERROR);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64, ZBX_MATH_ERROR);
 	}
 
 	ret = SUCCEED;
@@ -2476,7 +2555,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_TIMELEFT(char *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_TIMELEFT(char **value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char				*fit_str = NULL;
@@ -2488,6 +2567,7 @@ static int	evaluate_TIMELEFT(char *value, DC_ITEM *item, const char *parameters,
 	zbx_timespec_t			zero_time;
 	zbx_fit_t			fit;
 	zbx_timespec_t			ts_end = *ts;
+	size_t				value_alloc = 0, value_offset = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -2505,22 +2585,20 @@ static int	evaluate_TIMELEFT(char *value, DC_ITEM *item, const char *parameters,
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 1, ZBX_PARAM_MANDATORY, &arg1,
-			&arg1_type) || 0 >= arg1)
+	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid first parameter");
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_int(item->host.hostid, parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift,
-			&time_shift_type) || ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
+	if (SUCCEED != get_function_parameter_int(parameters, 2, ZBX_PARAM_OPTIONAL, &time_shift, &time_shift_type) ||
+			ZBX_VALUE_SECONDS != time_shift_type || 0 > time_shift)
 	{
 		*error = zbx_strdup(*error, "invalid second parameter");
 		goto out;
 	}
 
-	if (SUCCEED != get_function_parameter_float(item->host.hostid, parameters, 3, ZBX_FLAG_DOUBLE_SUFFIX,
-			&threshold))
+	if (SUCCEED != get_function_parameter_float( parameters, 3, ZBX_FLAG_DOUBLE_SUFFIX, &threshold))
 	{
 		*error = zbx_strdup(*error, "invalid third parameter");
 		goto out;
@@ -2528,7 +2606,7 @@ static int	evaluate_TIMELEFT(char *value, DC_ITEM *item, const char *parameters,
 
 	if (4 == nparams)
 	{
-		if (SUCCEED != get_function_parameter_str(item->host.hostid, parameters, 4, &fit_str) ||
+		if (SUCCEED != get_function_parameter_str(parameters, 4, &fit_str) ||
 				SUCCEED != zbx_fit_code(fit_str, &fit, &k, error))
 		{
 			*error = zbx_strdup(*error, "invalid fourth parameter");
@@ -2593,13 +2671,14 @@ static int	evaluate_TIMELEFT(char *value, DC_ITEM *item, const char *parameters,
 			}
 		}
 
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL, zbx_timeleft(t, x, values.values_num,
-				ts->sec - zero_time.sec - 1.0e-9 * (zero_time.ns + 1), threshold, fit, k));
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64, zbx_timeleft(t, x,
+				values.values_num, ts->sec - zero_time.sec - 1.0e-9 * (zero_time.ns + 1), threshold,
+				fit, k));
 	}
 	else
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "no data available");
-		zbx_snprintf(value, MAX_BUFFER_LEN, ZBX_FS_DBL, ZBX_MATH_ERROR);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, ZBX_FS_DBL64, ZBX_MATH_ERROR);
 	}
 
 	ret = SUCCEED;
@@ -2618,28 +2697,123 @@ out:
 
 /******************************************************************************
  *                                                                            *
+ * Function: evaluate_TREND                                                   *
+ *                                                                            *
+ * Purpose: evaluate trend* functions for the item                            *
+ *                                                                            *
+ * Parameters: value      - [OUT] the function result                         *
+ *             item       - [IN] item (performance metric)                    *
+ *             func       - [IN] the trend function to evaluate               *
+ *                               (avg, sum, count, delta, max, min)           *
+ *             parameters - [IN] function parameters                          *
+ *             ts         - [IN] the historical time when function must be    *
+ *                               evaluated                                    *
+ *                                                                            *
+ * Return value: SUCCEED - evaluated successfully, result is stored in 'value'*
+ *               FAIL - failed to evaluate function                           *
+ *                                                                            *
+ ******************************************************************************/
+static int	evaluate_TREND(char **value, DC_ITEM *item, const char *func, const char *parameters,
+		const zbx_timespec_t *ts, char **error)
+{
+	int		ret = FAIL, start, end;
+	char		*period = NULL, *period_shift = NULL;
+	const char	*table;
+	double		value_dbl;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	if (SUCCEED != get_function_parameter_str(parameters, 1, &period))
+	{
+		*error = zbx_strdup(*error, "invalid first parameter");
+		goto out;
+	}
+
+	if (SUCCEED != get_function_parameter_str(parameters, 2, &period_shift))
+	{
+		*error = zbx_strdup(*error, "invalid second parameter");
+		goto out;
+	}
+
+	if (SUCCEED != zbx_trends_parse_range(ts->sec, period, period_shift, &start, &end, error))
+		goto out;
+
+	switch (item->value_type)
+	{
+		case ITEM_VALUE_TYPE_FLOAT:
+			table = "trends";
+			break;
+		case ITEM_VALUE_TYPE_UINT64:
+			table = "trends_uint";
+			break;
+		default:
+			*error = zbx_strdup(*error, "unsupported value type");
+			goto out;
+	}
+
+	if (0 == strcmp(func, "avg"))
+	{
+		ret = zbx_trends_eval_avg(table, item->itemid, start, end, &value_dbl, error);
+	}
+	else if (0 == strcmp(func, "count"))
+	{
+		ret = zbx_trends_eval_count(table, item->itemid, start, end, &value_dbl, error);
+	}
+	else if (0 == strcmp(func, "delta"))
+	{
+		ret = zbx_trends_eval_delta(table, item->itemid, start, end, &value_dbl, error);
+	}
+	else if (0 == strcmp(func, "max"))
+	{
+		ret = zbx_trends_eval_max(table, item->itemid, start, end, &value_dbl, error);
+	}
+	else if (0 == strcmp(func, "min"))
+	{
+		ret = zbx_trends_eval_min(table, item->itemid, start, end, &value_dbl, error);
+	}
+	else if (0 == strcmp(func, "sum"))
+	{
+		ret = zbx_trends_eval_sum(table, item->itemid, start, end, &value_dbl, error);
+	}
+	else
+	{
+		*error = zbx_strdup(*error, "unknown trend function");
+		goto out;
+	}
+
+	if (SUCCEED == ret)
+		*value = zbx_dsprintf(*value, ZBX_FS_DBL64, value_dbl);
+out:
+	zbx_free(period);
+	zbx_free(period_shift);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: evaluate_function                                                *
  *                                                                            *
  * Purpose: evaluate function                                                 *
  *                                                                            *
- * Parameters: item - item to calculate function for                          *
- *             function - function (for example, 'max')                       *
+ * Parameters: item      - item to calculate function for                     *
+ *             function  - function (for example, 'max')                      *
  *             parameter - parameter of the function                          *
  *                                                                            *
  * Return value: SUCCEED - evaluated successfully, value contains its value   *
  *               FAIL - evaluation failed                                     *
  *                                                                            *
  ******************************************************************************/
-int	evaluate_function(char *value, DC_ITEM *item, const char *function, const char *parameter,
+int	evaluate_function(char **value, DC_ITEM *item, const char *function, const char *parameter,
 		const zbx_timespec_t *ts, char **error)
 {
 	int		ret;
 	struct tm	*tm = NULL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() function:'%s:%s.%s(%s)'", __func__,
-			item->host.host, item->key_orig, function, parameter);
-
-	*value = '\0';
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() function:'%s:%s.%s(%s)' ts:'%s\'", __func__,
+			item->host.host, item->key_orig, function, parameter, zbx_timespec_str(ts));
 
 	if (0 == strcmp(function, "last"))
 	{
@@ -2683,34 +2857,40 @@ int	evaluate_function(char *value, DC_ITEM *item, const char *function, const ch
 	}
 	else if (0 == strcmp(function, "date"))
 	{
+		size_t	value_alloc = 0, value_offset = 0;
 		time_t	now = ts->sec;
 
 		tm = localtime(&now);
-		zbx_snprintf(value, MAX_BUFFER_LEN, "%.4d%.2d%.2d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%.4d%.2d%.2d",
+				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
 		ret = SUCCEED;
 	}
 	else if (0 == strcmp(function, "dayofweek"))
 	{
+		size_t	value_alloc = 0, value_offset = 0;
 		time_t	now = ts->sec;
 
 		tm = localtime(&now);
-		zbx_snprintf(value, MAX_BUFFER_LEN, "%d", 0 == tm->tm_wday ? 7 : tm->tm_wday);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%d", 0 == tm->tm_wday ? 7 : tm->tm_wday);
 		ret = SUCCEED;
 	}
 	else if (0 == strcmp(function, "dayofmonth"))
 	{
+		size_t	value_alloc = 0, value_offset = 0;
 		time_t	now = ts->sec;
 
 		tm = localtime(&now);
-		zbx_snprintf(value, MAX_BUFFER_LEN, "%d", tm->tm_mday);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%d", tm->tm_mday);
 		ret = SUCCEED;
 	}
 	else if (0 == strcmp(function, "time"))
 	{
+		size_t	value_alloc = 0, value_offset = 0;
 		time_t	now = ts->sec;
 
 		tm = localtime(&now);
-		zbx_snprintf(value, MAX_BUFFER_LEN, "%.2d%.2d%.2d", tm->tm_hour, tm->tm_min, tm->tm_sec);
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%.2d%.2d%.2d", tm->tm_hour, tm->tm_min,
+				tm->tm_sec);
 		ret = SUCCEED;
 	}
 	else if (0 == strcmp(function, "abschange"))
@@ -2735,7 +2915,9 @@ int	evaluate_function(char *value, DC_ITEM *item, const char *function, const ch
 	}
 	else if (0 == strcmp(function, "now"))
 	{
-		zbx_snprintf(value, MAX_BUFFER_LEN, "%d", ts->sec);
+		size_t	value_alloc = 0, value_offset = 0;
+
+		zbx_snprintf_alloc(value, &value_alloc, &value_offset, "%d", ts->sec);
 		ret = SUCCEED;
 	}
 	else if (0 == strcmp(function, "fuzzytime"))
@@ -2766,16 +2948,22 @@ int	evaluate_function(char *value, DC_ITEM *item, const char *function, const ch
 	{
 		ret = evaluate_TIMELEFT(value, item, parameter, ts, error);
 	}
+	else if (0 == strncmp(function, "trend", 5))
+	{
+		ret = evaluate_TREND(value, item, function + 5, parameter, ts, error);
+	}
 	else
 	{
+		*value = zbx_malloc(*value, 1);
+		(*value)[0] = '\0';
 		*error = zbx_strdup(*error, "function is not supported");
 		ret = FAIL;
 	}
 
 	if (SUCCEED == ret)
-		del_zeros(value);
+		del_zeros(*value);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s value:'%s'", __func__, zbx_result_string(ret), value);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s value:'%s'", __func__, zbx_result_string(ret), ZBX_NULL2STR(*value));
 
 	return ret;
 }
@@ -3123,8 +3311,8 @@ static int	replace_value_by_map(char *value, size_t max_len, zbx_uint64_t valuem
 			"select newvalue"
 			" from mappings"
 			" where valuemapid=" ZBX_FS_UI64
-				" and value='%s'",
-			valuemapid, value_esc);
+				" and value" ZBX_SQL_STRCMP,
+			valuemapid, ZBX_SQL_STRVAL_EQ(value_esc));
 	zbx_free(value_esc);
 
 	if (NULL != (row = DBfetch(result)) && FAIL == DBis_null(row[0]))
@@ -3200,11 +3388,11 @@ void	zbx_format_value(char *value, size_t max_len, zbx_uint64_t valuemapid,
  *                                                                            *
  ******************************************************************************/
 int	evaluate_macro_function(char **result, const char *host, const char *key, const char *function,
-		const char *parameter)
+		const char *parameter, zbx_output_format_t format)
 {
 	zbx_host_key_t	host_key = {(char *)host, (char *)key};
 	DC_ITEM		item;
-	char		value[MAX_BUFFER_LEN], *error = NULL;
+	char		*value = NULL, *error = NULL, *resolved_params = NULL;
 	int		ret, errcode;
 	zbx_timespec_t	ts;
 
@@ -3214,7 +3402,12 @@ int	evaluate_macro_function(char **result, const char *host, const char *key, co
 
 	zbx_timespec(&ts);
 
-	if (SUCCEED != errcode || SUCCEED != evaluate_function(value, &item, function, parameter, &ts, &error))
+	/* User macros in trigger and calculated function parameters are resolved during configuration sync. */
+	/* However simple macro user parameters are not expanded, do it now.                                 */
+
+	if (SUCCEED != errcode || SUCCEED != evaluate_function(&value, &item, function,
+			(resolved_params = zbx_dc_expand_user_macros_in_func_params(parameter, item.host.hostid)),
+			&ts, &error))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot evaluate function \"%s:%s.%s(%s)\": %s", host, key, function,
 				parameter, (NULL == error ? "item does not exist" : error));
@@ -3222,26 +3415,50 @@ int	evaluate_macro_function(char **result, const char *host, const char *key, co
 	}
 	else
 	{
-		if (SUCCEED == str_in_list("last,prev", function, ','))
+		if (ZBX_FORMAT_HUMAN == format)
 		{
-			zbx_format_value(value, MAX_BUFFER_LEN, item.valuemapid, item.units, item.value_type);
-		}
-		else if (SUCCEED == str_in_list("abschange,avg,change,delta,max,min,percentile,sum,forecast", function,
-				','))
-		{
-			switch (item.value_type)
+			size_t	len;
+
+			len = strlen(value) + 1 + MAX_BUFFER_LEN;
+			value = (char *)zbx_realloc(value, len);
+
+			if (SUCCEED == str_in_list("last,prev", function, ','))
 			{
-				case ITEM_VALUE_TYPE_FLOAT:
-				case ITEM_VALUE_TYPE_UINT64:
-					add_value_suffix(value, MAX_BUFFER_LEN, item.units, item.value_type);
-					break;
-				default:
-					;
+				/* last, prev functions can return quoted and escaped string values */
+				/* which must be unquoted and unescaped before further processing   */
+				if ('"' == *value)
+				{
+					char	*src, *dst;
+
+					for (dst = value, src = dst + 1; '"' != *src; )
+					{
+						if ('\\' == *src)
+							src++;
+						if ('\0' == *src)
+							break;
+						*dst++ = *src++;
+					}
+					*dst = '\0';
+				}
+				zbx_format_value(value, len, item.valuemapid, item.units, item.value_type);
 			}
-		}
-		else if (SUCCEED == str_in_list("timeleft", function, ','))
-		{
-			add_value_suffix(value, MAX_BUFFER_LEN, "s", ITEM_VALUE_TYPE_FLOAT);
+			else if (SUCCEED == str_in_list("abschange,avg,change,delta,max,min,percentile,sum,forecast", function,
+					','))
+			{
+				switch (item.value_type)
+				{
+					case ITEM_VALUE_TYPE_FLOAT:
+					case ITEM_VALUE_TYPE_UINT64:
+						add_value_suffix(value, len, item.units, item.value_type);
+						break;
+					default:
+						;
+				}
+			}
+			else if (SUCCEED == str_in_list("timeleft", function, ','))
+			{
+				add_value_suffix(value, len, "s", ITEM_VALUE_TYPE_FLOAT);
+			}
 		}
 
 		*result = zbx_strdup(NULL, value);
@@ -3252,6 +3469,8 @@ int	evaluate_macro_function(char **result, const char *host, const char *key, co
 	zbx_free(error);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s value:'%s'", __func__, zbx_result_string(ret), value);
+	zbx_free(value);
+	zbx_free(resolved_params);
 
 	return ret;
 }

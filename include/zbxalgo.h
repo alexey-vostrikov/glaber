@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ zbx_hash_t	zbx_hash_modfnv(const void *data, size_t len, zbx_hash_t seed);
 zbx_hash_t	zbx_hash_murmur2(const void *data, size_t len, zbx_hash_t seed);
 zbx_hash_t	zbx_hash_sdbm(const void *data, size_t len, zbx_hash_t seed);
 zbx_hash_t	zbx_hash_djb2(const void *data, size_t len, zbx_hash_t seed);
+zbx_hash_t	zbx_hash_splittable64(const void *data);
 
 #define ZBX_DEFAULT_HASH_ALGO		zbx_hash_modfnv
 #define ZBX_DEFAULT_PTR_HASH_ALGO	zbx_hash_modfnv
@@ -40,14 +41,13 @@ zbx_hash_t	zbx_hash_djb2(const void *data, size_t len, zbx_hash_t seed);
 typedef zbx_hash_t (*zbx_hash_func_t)(const void *data);
 
 zbx_hash_t	zbx_default_ptr_hash_func(const void *data);
-zbx_hash_t	zbx_default_uint64_hash_func(const void *data);
 zbx_hash_t	zbx_default_string_hash_func(const void *data);
 zbx_hash_t	zbx_default_uint64_pair_hash_func(const void *data);
 
 #define ZBX_DEFAULT_HASH_SEED		0
 
 #define ZBX_DEFAULT_PTR_HASH_FUNC		zbx_default_ptr_hash_func
-#define ZBX_DEFAULT_UINT64_HASH_FUNC		zbx_default_uint64_hash_func
+#define ZBX_DEFAULT_UINT64_HASH_FUNC		zbx_hash_splittable64
 #define ZBX_DEFAULT_STRING_HASH_FUNC		zbx_default_string_hash_func
 #define ZBX_DEFAULT_UINT64_PAIR_HASH_FUNC	zbx_default_uint64_pair_hash_func
 
@@ -135,6 +135,8 @@ typedef struct
 	zbx_mem_free_func_t	mem_free_func;
 }
 zbx_hashset_t;
+
+#define ZBX_HASHSET_ENTRY_OFFSET	offsetof(ZBX_HASHSET_ENTRY_T, data)
 
 void	zbx_hashset_create(zbx_hashset_t *hs, size_t init_size,
 				zbx_hash_func_t hash_func,
@@ -339,18 +341,23 @@ void	zbx_str_free(char *data);
 
 void	uinc128_64(zbx_uint128_t *base, zbx_uint64_t value);
 void	uinc128_128(zbx_uint128_t *base, const zbx_uint128_t *value);
-void	udiv128_64(zbx_uint128_t *result, const zbx_uint128_t *base, zbx_uint64_t value);
+void	udiv128_64(zbx_uint128_t *result, const zbx_uint128_t *dividend, zbx_uint64_t value);
 void	umul64_64(zbx_uint128_t *result, zbx_uint64_t value, zbx_uint64_t factor);
 
 unsigned int	zbx_isqrt32(unsigned int value);
 
 /* expression evaluation */
 
+#define ZBX_INFINITY	(1.0 / 0.0)	/* "Positive infinity" value used as a fatal error code */
+#define ZBX_UNKNOWN	(-1.0 / 0.0)	/* "Negative infinity" value used as a code for "Unknown" */
+
 #define ZBX_UNKNOWN_STR		"ZBX_UNKNOWN"	/* textual representation of ZBX_UNKNOWN */
 #define ZBX_UNKNOWN_STR_LEN	ZBX_CONST_STRLEN(ZBX_UNKNOWN_STR)
 
 int	evaluate(double *value, const char *expression, char *error, size_t max_error_len,
 		zbx_vector_ptr_t *unknown_msgs);
+int	evaluate_unknown(const char *expression, double *value, char *error, size_t max_error_len);
+double	evaluate_string_to_double(const char *in);
 
 /* forecasting */
 

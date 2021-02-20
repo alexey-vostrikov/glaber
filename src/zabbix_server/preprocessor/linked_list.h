@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -47,11 +47,11 @@ typedef struct
 }
 zbx_list_iterator_t;
 
-void	zbx_list_create(zbx_list_t *list);
+void	zbx_list_create(zbx_list_t *queue);
 void	zbx_list_destroy(zbx_list_t *list);
-void	zbx_list_append(zbx_list_t *list, void *value, zbx_list_item_t **enqueued);
-void	zbx_list_insert_after(zbx_list_t *list, zbx_list_item_t *after, void *value, zbx_list_item_t **enqueued);
-void	zbx_list_prepend(zbx_list_t *list, void *value, zbx_list_item_t **enqueued);
+void	zbx_list_append(zbx_list_t *list, void *value, zbx_list_item_t **inserted);
+void	zbx_list_insert_after(zbx_list_t *list, zbx_list_item_t *after, void *value, zbx_list_item_t **inserted);
+void	zbx_list_prepend(zbx_list_t *list, void *value, zbx_list_item_t **inserted);
 int	zbx_list_pop(zbx_list_t *list, void **value);
 int	zbx_list_peek(const zbx_list_t *list, void **value);
 void	zbx_list_iterator_init(zbx_list_t *list, zbx_list_iterator_t *iterator);

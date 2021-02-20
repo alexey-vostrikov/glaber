@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,6 +21,37 @@
 #define ZABBIX_LLD_MANAGER_H
 
 #include "threads.h"
+
+typedef struct zbx_lld_value
+{
+	char			*value;
+	char			*error;
+	zbx_timespec_t		ts;
+
+	zbx_uint64_t		lastlogsize;
+	int			mtime;
+	unsigned char		meta;
+
+	struct	zbx_lld_value	*next;
+}
+zbx_lld_data_t;
+
+/* queue of values for one LLD rule */
+typedef struct
+{
+	/* the LLD rule id */
+	zbx_uint64_t	itemid;
+
+	/* the number of queued values */
+	int		values_num;
+
+	/* the oldest value in queue */
+	zbx_lld_data_t	*tail;
+
+	/* the newest value in queue */
+	zbx_lld_data_t	*head;
+}
+zbx_lld_rule_t;
 
 ZBX_THREAD_ENTRY(lld_manager_thread, args);
 

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 **/
 
 #include "common.h"
+#include "daemon.h"
 
 #include "zbxself.h"
 #include "log.h"
@@ -44,34 +45,6 @@ extern int	CONFIG_LLDWORKER_FORKS;
  * otherwise the rule is enqueued back in LLD queue.
  *
  */
-
-typedef struct zbx_lld_value
-{
-	char			*value;
-	char			*error;
-	zbx_timespec_t		ts;
-
-	zbx_uint64_t		lastlogsize;
-	int			mtime;
-	unsigned char		meta;
-
-	struct	zbx_lld_value	*next;
-}
-zbx_lld_data_t;
-
-/* queue of values for one LLD rule */
-typedef struct
-{
-	/* the LLD rule id */
-	zbx_uint64_t	itemid;
-
-	/* the oldest value in queue */
-	zbx_lld_data_t	*tail;
-
-	/* the newest value in queue */
-	zbx_lld_data_t	*head;
-}
-zbx_lld_rule_t;
 
 typedef struct
 {
@@ -356,23 +329,33 @@ static void	lld_queue_request(zbx_lld_manager_t *manager, const zbx_ipc_message_
 	zbx_lld_deserialize_item_value(message->data, &itemid, &data->value, &data->ts, &data->meta, &data->lastlogsize,
 			&data->mtime, &data->error);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "queuing discovery rule:" ZBX_FS_UI64, itemid);
-
 	if (NULL == (rule = zbx_hashset_search(&manager->rule_index, &itemid)))
 	{
-		zbx_lld_rule_t	rule_local = {itemid, data, data};
+		zbx_lld_rule_t	rule_local = {itemid, 0, data, data};
 
 		rule = zbx_hashset_insert(&manager->rule_index, &rule_local, sizeof(rule_local));
 		lld_queue_rule(manager, rule);
 	}
 	else
 	{
+		if (0 == data->meta && 0 == zbx_strcmp_null(data->error, rule->tail->error) &&
+				0 == zbx_strcmp_null(data->value, rule->tail->value))
+		{
+			zabbix_log(LOG_LEVEL_DEBUG, "skip repeating discovery rule values: " ZBX_FS_UI64, itemid);
+
+			lld_data_free(data);
+			goto out;
+		}
+
 		rule->tail->next = data;
 		rule->tail = data;
 	}
 
-	manager->queued_num++;
+	zabbix_log(LOG_LEVEL_DEBUG, "queuing discovery rule: " ZBX_FS_UI64, itemid);
 
+	rule->values_num++;
+	manager->queued_num++;
+out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
@@ -455,9 +438,14 @@ static void	lld_process_result(zbx_lld_manager_t *manager, zbx_ipc_client_t *cli
 	rule->head = rule->head->next;
 
 	if (NULL == rule->head)
+	{
 		zbx_hashset_remove_direct(&manager->rule_index, rule);
+	}
 	else
+	{
+		rule->values_num--;
 		lld_queue_rule(manager, rule);
+	}
 
 	lld_data_free(data);
 
@@ -465,6 +453,86 @@ static void	lld_process_result(zbx_lld_manager_t *manager, zbx_ipc_client_t *cli
 		lld_process_next_request(manager, worker);
 	else
 		zbx_queue_ptr_push(&manager->free_workers, worker);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: lld_process_diag_stats                                           *
+ *                                                                            *
+ * Purpose: processes external diagnostic statistics request                  *
+ *                                                                            *
+ * Parameters: manager - [IN] the LLD manager                                 *
+ * Parameters: client  - [IN] the external IPC connection                     *
+ *                                                                            *
+ ******************************************************************************/
+static void	lld_process_diag_stats(zbx_lld_manager_t *manager, zbx_ipc_client_t *client)
+{
+	unsigned char	*data;
+	zbx_uint32_t	data_len;
+
+	data_len = zbx_lld_serialize_diag_stats(&data, manager->rule_index.num_data, manager->queued_num);
+	zbx_ipc_client_send(client, ZBX_IPC_LLD_DIAG_STATS_RESULT, data, data_len);
+	zbx_free(data);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: lld_diag_item_compare_values_desc                                *
+ *                                                                            *
+ * Purpose: sort lld manager cache item view by second value                  *
+ *          (number of values) in descending order                            *
+ *                                                                            *
+ ******************************************************************************/
+static int	lld_diag_item_compare_values_desc(const void *d1, const void *d2)
+{
+	zbx_lld_rule_t	*r1 = *(zbx_lld_rule_t **)d1;
+	zbx_lld_rule_t	*r2 = *(zbx_lld_rule_t **)d2;
+
+	return r2->values_num - r1->values_num;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: lld_process_diag_top                                             *
+ *                                                                            *
+ * Purpose: processes external top items request                              *
+ *                                                                            *
+ * Parameters: manager - [IN] the manager                                     *
+ *             client  - [IN] the connected worker IPC client data            *
+ *             message - [IN] the received message                            *
+ *                                                                            *
+ ******************************************************************************/
+static void	lld_process_top_items(zbx_lld_manager_t *manager, zbx_ipc_client_t *client,
+		const zbx_ipc_message_t *message)
+{
+	int			limit;
+	unsigned char		*data;
+	zbx_uint32_t		data_len;
+	zbx_vector_ptr_t	view;
+	zbx_hashset_iter_t	iter;
+	zbx_lld_rule_t		*item;
+	int			items_num;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_lld_deserialize_top_items_request(message->data, &limit);
+
+	zbx_vector_ptr_create(&view);
+
+	zbx_hashset_iter_reset(&manager->rule_index, &iter);
+	while (NULL != (item = (zbx_lld_rule_t *)zbx_hashset_iter_next(&iter)))
+		zbx_vector_ptr_append(&view, item);
+
+	zbx_vector_ptr_sort(&view, lld_diag_item_compare_values_desc);
+	items_num = MIN(limit, view.values_num);
+
+	data_len = zbx_lld_serialize_top_items_result(&data, (zbx_lld_rule_t **)view.values, items_num);
+	zbx_ipc_client_send(client, ZBX_IPC_LLD_TOP_ITEMS_RESULT, data, data_len);
+
+	zbx_free(data);
+	zbx_vector_ptr_destroy(&view);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -485,9 +553,10 @@ ZBX_THREAD_ENTRY(lld_manager_thread, args)
 	char			*error = NULL;
 	zbx_ipc_client_t	*client;
 	zbx_ipc_message_t	*message;
-	double			time_stat, time_now, sec;
+	double			time_stat, time_now, sec, time_idle = 0;
 	zbx_lld_manager_t	manager;
 	zbx_uint64_t		processed_num = 0;
+	int			ret;
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
@@ -514,26 +583,31 @@ ZBX_THREAD_ENTRY(lld_manager_thread, args)
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		time_now = zbx_time();
 
 		if (STAT_INTERVAL < time_now - time_stat)
 		{
-			zbx_setproctitle("%s #%d [processed " ZBX_FS_UI64 " LLD rules during " ZBX_FS_DBL " sec]",
+			zbx_setproctitle("%s #%d [processed " ZBX_FS_UI64 " LLD rules, idle " ZBX_FS_DBL
+					"sec during " ZBX_FS_DBL " sec]",
 					get_process_type_string(process_type), process_num, processed_num,
-					time_now - time_stat);
+					time_idle, time_now - time_stat);
 
 			time_stat = time_now;
+			time_idle = 0;
 			processed_num = 0;
 		}
 
 		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
-		zbx_ipc_service_recv(&lld_service, 1, &client, &message);
+		ret = zbx_ipc_service_recv(&lld_service, 1, &client, &message);
 		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 		sec = zbx_time();
 		zbx_update_env(sec);
+
+		if (ZBX_IPC_RECV_IMMEDIATE != ret)
+			time_idle += sec - time_now;
 
 		if (NULL != message)
 		{
@@ -555,6 +629,12 @@ ZBX_THREAD_ENTRY(lld_manager_thread, args)
 					zbx_ipc_client_send(client, message->code, (unsigned char *)&manager.queued_num,
 							sizeof(zbx_uint64_t));
 					break;
+				case ZBX_IPC_LLD_DIAG_STATS:
+					lld_process_diag_stats(&manager, client);
+					break;
+				case ZBX_IPC_LLD_TOP_ITEMS:
+					lld_process_top_items(&manager, client, message);
+					break;
 			}
 
 			zbx_ipc_message_free(message);
@@ -564,8 +644,11 @@ ZBX_THREAD_ENTRY(lld_manager_thread, args)
 			zbx_ipc_client_release(client);
 	}
 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
+
 	zbx_ipc_service_close(&lld_service);
 	lld_manager_destroy(&manager);
-
-	return 0;
 }

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,19 +24,33 @@
 #include "log.h"
 #include "dbcache.h"
 #include "sysinfo.h"
+#include "../glb_poller/glb_poller.h"
 
 extern char	*CONFIG_SOURCE_IP;
 extern int	CONFIG_TIMEOUT;
 
 #ifdef HAVE_NETSNMP
-void	zbx_init_snmp(void);
-void	zbx_shutdown_snmp(void);
-int	get_value_snmp(const DC_ITEM *item, AGENT_RESULT *result);
-void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int num);
 
-int init_async_snnmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int max_items, int max_connections);
-int destroy_aync_snmp();
-int	get_values_snmp_async();
+#define ZBX_SNMP_STR_HEX	1
+#define ZBX_SNMP_STR_STRING	2
+#define ZBX_SNMP_STR_OID	3
+#define ZBX_SNMP_STR_BITS	4
+#define ZBX_SNMP_STR_ASCII	5
+#define ZBX_SNMP_STR_UNDEFINED	255
+
+void	zbx_init_snmp(void);
+int	get_value_snmp(const DC_ITEM *item, AGENT_RESULT *result, unsigned char poller_type);
+void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes, int num, unsigned char poller_type);
+void	zbx_clear_cache_snmp(unsigned char process_type, int process_num);
+
+//glaber async snmp methods
+void*   glb_snmp_init(zbx_hashset_t *items, zbx_hashset_t *hosts, int *requests, int *responces );
+void    glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item);
+void    glb_snmp_handle_async_io(void *engine); 
+unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item );
+void glb_snmp_free_item(GLB_SNMP_ITEM *snmp_item );
+void    glb_snmp_shutdown(void *engine);
+
 #endif
 
 #endif

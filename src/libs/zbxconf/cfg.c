@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -381,6 +381,9 @@ static int	__parse_cfg_file(const char *cfg_file, struct cfg_line *cfg, int leve
 	char		line[MAX_STRING_LEN + 3], *parameter, *value;
 	zbx_uint64_t	var;
 	size_t		len;
+//	int last_multuline_param=0;
+//	int last_module_param_id=0;
+
 #ifdef _WINDOWS
 	wchar_t		*wcfg_file;
 #endif
@@ -410,7 +413,16 @@ static int	__parse_cfg_file(const char *cfg_file, struct cfg_line *cfg, int leve
 			if (MAX_STRING_LEN < len && NULL == strchr("\r\n", line[MAX_STRING_LEN]))
 				goto line_too_long;
 
+	//		if ( 
 			zbx_ltrim(line, ZBX_CFG_LTRIM_CHARS);
+		// && last_multuline_param && last_module_param_id >0) {
+				//we processeng spaced section after multiline param - adding the line to extraparam of last line in the
+				//multistring array
+
+
+		//	} else {
+		//		last_module_param=0;
+		//	};
 			zbx_rtrim(line, ZBX_CFG_RTRIM_CHARS);
 
 			if ('#' == *line || '\0' == *line)
@@ -457,6 +469,7 @@ static int	__parse_cfg_file(const char *cfg_file, struct cfg_line *cfg, int leve
 				switch (cfg[i].type)
 				{
 					case TYPE_INT:
+//						last_multuline_param=0;
 						if (FAIL == str2uint64(value, "KMGT", &var))
 							goto incorrect_config;
 
@@ -466,16 +479,22 @@ static int	__parse_cfg_file(const char *cfg_file, struct cfg_line *cfg, int leve
 						*((int *)cfg[i].variable) = (int)var;
 						break;
 					case TYPE_STRING_LIST:
+//						last_multuline_param=0;
 						zbx_trim_str_list(value, ',');
 						ZBX_FALLTHROUGH;
 					case TYPE_STRING:
+//						last_multuline_param=0;
 						*((char **)cfg[i].variable) =
 								zbx_strdup(*((char **)cfg[i].variable), value);
 						break;
 					case TYPE_MULTISTRING:
 						zbx_strarr_add((char ***)cfg[i].variable, value);
+//						zabbix_log(LOG_LEVEL_INFORMATION, "Parsed multistring value %s=%s place %d",cfg[i].parameter  ,value,i);
+//						last_multuline_param=1;
+//						last_module_param=i;
 						break;
 					case TYPE_UINT64:
+//						last_multuline_param=0;
 						if (FAIL == str2uint64(value, "KMGT", &var))
 							goto incorrect_config;
 
@@ -484,7 +503,20 @@ static int	__parse_cfg_file(const char *cfg_file, struct cfg_line *cfg, int leve
 
 						*((zbx_uint64_t *)cfg[i].variable) = var;
 						break;
+					case TYPE_CUSTOM:
+						if (NULL != cfg[i].variable)
+						{
+							cfg_custom_parameter_parser_t custom_parser =
+									(cfg_custom_parameter_parser_t)cfg[i].variable;
+
+							if (SUCCEED != custom_parser(value, &cfg[i]))
+								goto incorrect_config;
+
+							continue;
+						}
+						break;
 					default:
+//						last_multuline_param=0;
 						assert(0);
 				}
 			}
@@ -586,10 +618,10 @@ int	check_cfg_feature_str(const char *parameter, const char *value, const char *
  * Function: zbx_set_data_destination_hosts                                   *
  *                                                                            *
  * Purpose: parse "ServerActive' parameter value and set destination servers  *
- *          using a calback function                                          *
+ *          using a callback function                                         *
  *                                                                            *
  ******************************************************************************/
-void	zbx_set_data_destination_hosts(char *active_hosts, add_serveractive_host_f cb)
+void	zbx_set_data_destination_hosts(char *active_hosts, add_serveractive_host_f cb, zbx_vector_str_t *hostnames)
 {
 	char	*l = active_hosts, *r;
 
@@ -607,7 +639,7 @@ void	zbx_set_data_destination_hosts(char *active_hosts, add_serveractive_host_f 
 			exit(EXIT_FAILURE);
 		}
 
-		if (SUCCEED != cb(host, port))
+		if (SUCCEED != cb(host, port, hostnames))
 		{
 			zbx_error("error parsing the \"ServerActive\" parameter: address \"%s\" specified more than"
 					" once", l);

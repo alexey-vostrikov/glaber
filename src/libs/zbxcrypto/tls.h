@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,7 +20,31 @@
 #ifndef ZABBIX_TLS_H
 #define ZABBIX_TLS_H
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+
+#if defined(HAVE_GNUTLS)
+#	include <gnutls/gnutls.h>
+#	include <gnutls/x509.h>
+#elif defined(HAVE_OPENSSL)
+#	include <openssl/ssl.h>
+#	include <openssl/err.h>
+#	include <openssl/rand.h>
+#endif
+
+#if defined(HAVE_OPENSSL) && OPENSSL_VERSION_NUMBER < 0x1010000fL || defined(LIBRESSL_VERSION_NUMBER)
+#	if !defined(LIBRESSL_VERSION_NUMBER)
+#		define OPENSSL_INIT_LOAD_SSL_STRINGS			0
+#		define OPENSSL_INIT_LOAD_CRYPTO_STRINGS		0
+#		define OPENSSL_VERSION					SSLEAY_VERSION
+#	endif
+#	define OpenSSL_version					SSLeay_version
+#	define TLS_method					TLSv1_2_method
+#	define TLS_client_method				TLSv1_2_client_method
+#	define SSL_CTX_get_ciphers(ciphers)			((ciphers)->cipher_list)
+#	if !defined(LIBRESSL_VERSION_NUMBER)
+#		define SSL_CTX_set_min_proto_version(ctx, TLSv)	1
+#	endif
+#endif
 
 #if defined(_WINDOWS)
 /* Typical thread is long-running, if necessary, it initializes TLS for itself. Zabbix sender is an exception. If */
@@ -28,32 +52,9 @@
 /* 250 values to be sent. To avoid TLS initialization on every start of 'send_value' thread we initialize TLS in  */
 /* 'main' thread and use this structure for passing minimum TLS variables into 'send_value' thread. */
 
-#if defined(HAVE_POLARSSL)
-#	include <polarssl/entropy.h>
-#	include <polarssl/ctr_drbg.h>
-#	include <polarssl/ssl.h>
-#elif defined(HAVE_GNUTLS)
-#	include <gnutls/gnutls.h>
-#elif defined(HAVE_OPENSSL)
-#	include <openssl/ssl.h>
-#endif
-
-typedef struct
+struct zbx_thread_sendval_tls_args
 {
-#if defined(HAVE_POLARSSL)
-	char			*my_psk;
-	size_t			my_psk_len;
-	char			*my_psk_identity;
-	size_t			my_psk_identity_len;
-	x509_crt		*ca_cert;
-	x509_crl		*crl;
-	x509_crt		*my_cert;
-	pk_context		*my_priv_key;
-	entropy_context		*entropy;
-	ctr_drbg_context	*ctr_drbg;
-	int			*ciphersuites_cert;
-	int			*ciphersuites_psk;
-#elif defined(HAVE_GNUTLS)
+#if defined(HAVE_GNUTLS)
 	gnutls_certificate_credentials_t	my_cert_creds;
 	gnutls_psk_client_credentials_t		my_psk_client_creds;
 	gnutls_priority_t			ciphersuites_cert;
@@ -68,21 +69,10 @@ typedef struct
 	size_t			psk_len_for_cb;
 #endif
 #endif
-}
-ZBX_THREAD_SENDVAL_TLS_ARGS;
+};
 
-void	zbx_tls_pass_vars(ZBX_THREAD_SENDVAL_TLS_ARGS *args);
-void	zbx_tls_take_vars(ZBX_THREAD_SENDVAL_TLS_ARGS *args);
 #endif	/* #if defined(_WINDOWS) */
 
-void	zbx_tls_validate_config(void);
-void	zbx_tls_library_deinit(void);
-void	zbx_tls_init_parent(void);
-void	zbx_tls_init_child(void);
-void	zbx_tls_free(void);
-void	zbx_tls_free_on_signal(void);
-void	zbx_tls_version(void);
-
-#endif	/* #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL) */
+#endif	/* #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL) */
 
 #endif	/* ZABBIX_TLS_H */

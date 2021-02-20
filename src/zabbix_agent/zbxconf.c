@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -109,6 +109,35 @@ void	load_user_parameters(char **lines)
 	}
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: load_key_access_rule                                             *
+ *                                                                            *
+ * Purpose: Adds key access rule from configuration                           *
+ *                                                                            *
+ * Parameters: value - [IN] key access rule parameter value                   *
+ *             cfg   - [IN] configuration parameter information               *
+ *                                                                            *
+ * Return value: SUCCEED - successful execution                               *
+ *               FAIL    - failed to add rule                                 *
+ *                                                                            *
+ * Author: Andrejs Tumilovics                                                 *
+ *                                                                            *
+ ******************************************************************************/
+int	load_key_access_rule(const char *value, const struct cfg_line *cfg)
+{
+	unsigned char	rule_type;
+
+	if (0 == strcmp(cfg->parameter, "AllowKey"))
+		rule_type = ZBX_KEY_ACCESS_ALLOW;
+	else if (0 == strcmp(cfg->parameter, "DenyKey"))
+		rule_type = ZBX_KEY_ACCESS_DENY;
+	else
+		return FAIL;
+
+	return add_key_access_rule(cfg->parameter, (char *)value, rule_type);
+}
+
 #ifdef _WINDOWS
 /******************************************************************************
  *                                                                            *
@@ -116,7 +145,8 @@ void	load_user_parameters(char **lines)
  *                                                                            *
  * Purpose: load performance counters from configuration                      *
  *                                                                            *
- * Parameters: lines - array of PerfCounter configuration entries             *
+ * Parameters: def_lines - array of PerfCounter configuration entries         *
+ *             eng_lines - array of PerfCounterEn configuration entries       *
  *                                                                            *
  * Return value:                                                              *
  *                                                                            *
@@ -125,71 +155,79 @@ void	load_user_parameters(char **lines)
  * Comments:                                                                  *
  *                                                                            *
  ******************************************************************************/
-void	load_perf_counters(const char **lines)
+void	load_perf_counters(const char **def_lines, const char **eng_lines)
 {
 	char		name[MAX_STRING_LEN], counterpath[PDH_MAX_COUNTER_PATH], interval[8];
-	const char	**pline;
+	const char	**pline, **lines;
 	char		*error = NULL;
 	LPTSTR		wcounterPath;
 	int		period;
 
-	for (pline = lines; NULL != *pline; pline++)
+	for (lines = def_lines;; lines = eng_lines)
 	{
-		if (3 < num_param(*pline))
+		zbx_perf_counter_lang_t lang = (lines == def_lines) ? PERF_COUNTER_LANG_DEFAULT : PERF_COUNTER_LANG_EN;
+
+		for (pline = lines; NULL != *pline; pline++)
 		{
-			error = zbx_strdup(error, "Required parameter missing.");
-			goto pc_fail;
+			if (3 < num_param(*pline))
+			{
+				error = zbx_strdup(error, "Required parameter missing.");
+				goto pc_fail;
+			}
+
+			if (0 != get_param(*pline, 1, name, sizeof(name), NULL))
+			{
+				error = zbx_strdup(error, "Cannot parse key.");
+				goto pc_fail;
+			}
+
+			if (0 != get_param(*pline, 2, counterpath, sizeof(counterpath), NULL))
+			{
+				error = zbx_strdup(error, "Cannot parse counter path.");
+				goto pc_fail;
+			}
+
+			if (0 != get_param(*pline, 3, interval, sizeof(interval), NULL))
+			{
+				error = zbx_strdup(error, "Cannot parse interval.");
+				goto pc_fail;
+			}
+
+			wcounterPath = zbx_acp_to_unicode(counterpath);
+			zbx_unicode_to_utf8_static(wcounterPath, counterpath, PDH_MAX_COUNTER_PATH);
+			zbx_free(wcounterPath);
+
+			if (FAIL == check_counter_path(counterpath, lang == PERF_COUNTER_LANG_DEFAULT))
+			{
+				error = zbx_strdup(error, "Invalid counter path.");
+				goto pc_fail;
+			}
+
+			period = atoi(interval);
+
+			if (1 > period || MAX_COLLECTOR_PERIOD < period)
+			{
+				error = zbx_strdup(NULL, "Interval out of range.");
+				goto pc_fail;
+			}
+
+			if (NULL == add_perf_counter(name, counterpath, period, lang, &error))
+			{
+				if (NULL == error)
+					error = zbx_strdup(error, "Failed to add new performance counter.");
+				goto pc_fail;
+			}
+
+			continue;
+	pc_fail:
+			zabbix_log(LOG_LEVEL_CRIT, "cannot add performance counter \"%s\": %s", *pline, error);
+			zbx_free(error);
+
+			exit(EXIT_FAILURE);
 		}
 
-		if (0 != get_param(*pline, 1, name, sizeof(name)))
-		{
-			error = zbx_strdup(error, "Cannot parse key.");
-			goto pc_fail;
-		}
-
-		if (0 != get_param(*pline, 2, counterpath, sizeof(counterpath)))
-		{
-			error = zbx_strdup(error, "Cannot parse counter path.");
-			goto pc_fail;
-		}
-
-		if (0 != get_param(*pline, 3, interval, sizeof(interval)))
-		{
-			error = zbx_strdup(error, "Cannot parse interval.");
-			goto pc_fail;
-		}
-
-		wcounterPath = zbx_acp_to_unicode(counterpath);
-		zbx_unicode_to_utf8_static(wcounterPath, counterpath, PDH_MAX_COUNTER_PATH);
-		zbx_free(wcounterPath);
-
-		if (FAIL == check_counter_path(counterpath))
-		{
-			error = zbx_strdup(error, "Invalid counter path.");
-			goto pc_fail;
-		}
-
-		period = atoi(interval);
-
-		if (1 > period || MAX_COLLECTOR_PERIOD < period)
-		{
-			error = zbx_strdup(NULL, "Interval out of range.");
-			goto pc_fail;
-		}
-
-		if (NULL == add_perf_counter(name, counterpath, period, &error))
-		{
-			if (NULL == error)
-				error = zbx_strdup(error, "Failed to add new performance counter.");
-			goto pc_fail;
-		}
-
-		continue;
-pc_fail:
-		zabbix_log(LOG_LEVEL_CRIT, "cannot add performance counter \"%s\": %s", *pline, error);
-		zbx_free(error);
-
-		exit(EXIT_FAILURE);
+		if (lines == eng_lines)
+			break;
 	}
 }
 #endif	/* _WINDOWS */

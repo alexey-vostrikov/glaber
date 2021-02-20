@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,15 +19,23 @@
 
 #include "checks_ssh.h"
 
-#ifdef HAVE_SSH2
+/* the size of temporary buffer used to read from data channel */
+#define DATA_BUFFER_SIZE	4096
 
+#if defined(HAVE_SSH2)
 #include <libssh2.h>
+#elif defined (HAVE_SSH)
+#include <libssh/libssh.h>
+#endif
 
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
 #include "comms.h"
 #include "log.h"
 
 #define SSH_RUN_KEY	"ssh.run"
+#endif
 
+#if defined(HAVE_SSH2)
 static const char	*password;
 
 static void	kbd_callback(const char *name, int name_len, const char *instruction,
@@ -82,11 +90,10 @@ static int	ssh_run(DC_ITEM *item, AGENT_RESULT *result, const char *encoding)
 	zbx_socket_t	s;
 	LIBSSH2_SESSION	*session;
 	LIBSSH2_CHANNEL	*channel;
-	int		auth_pw = 0, rc, ret = NOTSUPPORTED,
-			exitcode, bytecount = 0;
-	char		buffer[MAX_BUFFER_LEN], buf[16], *userauthlist,
-			*publickey = NULL, *privatekey = NULL, *ssherr, *output;
-	size_t		sz;
+	int		auth_pw = 0, rc, ret = NOTSUPPORTED, exitcode;
+	char		tmp_buf[DATA_BUFFER_SIZE], *userauthlist, *publickey = NULL, *privatekey = NULL, *ssherr,
+			*output, *buffer = NULL;
+	size_t		offset = 0, buf_size = DATA_BUFFER_SIZE;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -255,53 +262,44 @@ static int	ssh_run(DC_ITEM *item, AGENT_RESULT *result, const char *encoding)
 		}
 	}
 
-	for (;;)
+	buffer = (char *)zbx_malloc(buffer, buf_size);
+
+	while (0 != (rc = libssh2_channel_read(channel, tmp_buf, sizeof(tmp_buf))))
 	{
-		/* loop until we block */
-		do
+		if (rc < 0)
 		{
-			if (0 < (rc = libssh2_channel_read(channel, buf, sizeof(buf))))
-			{
-				sz = (size_t)rc;
-				if (sz > (size_t)(MAX_BUFFER_LEN - (bytecount + 1)))
-					sz = (size_t)(MAX_BUFFER_LEN - (bytecount + 1));
-				if (0 == sz)
-					continue;
+			if (LIBSSH2_ERROR_EAGAIN == rc)
+				waitsocket(s.socket, session);
 
-				memcpy(buffer + bytecount, buf, sz);
-				bytecount += sz;
-			}
-		}
-		while (rc > 0);
-
-		/* this is due to blocking that would occur otherwise so we loop on
-		 * this condition
-		 */
-		if (LIBSSH2_ERROR_EAGAIN == rc)
-			waitsocket(s.socket, session);
-		else if (rc < 0)
-		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot read data from SSH server"));
 			goto channel_close;
 		}
-		else
-			break;
+
+		if (MAX_EXECUTE_OUTPUT_LEN <= offset + rc)
+		{
+			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Command output exceeded limit of %d KB",
+					MAX_EXECUTE_OUTPUT_LEN / ZBX_KIBIBYTE));
+			goto channel_close;
+		}
+
+		zbx_str_memcpy_alloc(&buffer, &buf_size, &offset, tmp_buf, rc);
 	}
 
-	buffer[bytecount] = '\0';
-
-	output = convert_to_utf8(buffer, bytecount, encoding);
+	output = convert_to_utf8(buffer, offset, encoding);
 	zbx_rtrim(output, ZBX_WHITESPACE);
+	zbx_replace_invalid_utf8(output);
 
-	if (SUCCEED == set_result_type(result, ITEM_VALUE_TYPE_TEXT, output))
-		ret = SYSINFO_RET_OK;
+	SET_TEXT_RESULT(result, output);
+	output = NULL;
 
-	zbx_free(output);
+	ret = SYSINFO_RET_OK;
 channel_close:
 	/* close an active data channel */
 	exitcode = 127;
 	while (LIBSSH2_ERROR_EAGAIN == (rc = libssh2_channel_close(channel)))
 		waitsocket(s.socket, session);
+
+	zbx_free(buffer);
 
 	if (0 != rc)
 	{
@@ -311,7 +309,7 @@ channel_close:
 	else
 		exitcode = libssh2_channel_get_exit_status(channel);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() exitcode:%d bytecount:%d", __func__, exitcode, bytecount);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() exitcode:%d bytecount:" ZBX_FS_SIZE_T, __func__, exitcode, offset);
 
 	libssh2_channel_free(channel);
 	channel = NULL;
@@ -332,7 +330,288 @@ close:
 
 	return ret;
 }
+#elif defined(HAVE_SSH)
 
+/* example ssh.run["ls /"] */
+static int	ssh_run(DC_ITEM *item, AGENT_RESULT *result, const char *encoding)
+{
+	ssh_session	session;
+	ssh_channel	channel;
+	ssh_key 	privkey = NULL, pubkey = NULL;
+	int		rc, userauth, ret = NOTSUPPORTED;
+	char		*output, *publickey = NULL, *privatekey = NULL, *buffer = NULL;
+	char		tmp_buf[DATA_BUFFER_SIZE], userauthlist[64];
+	size_t		offset = 0, buf_size = DATA_BUFFER_SIZE;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	/* initializes an SSH session object */
+	if (NULL == (session = ssh_new()))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot initialize SSH session"));
+		zabbix_log(LOG_LEVEL_DEBUG, "Cannot initialize SSH session");
+
+		goto close;
+	}
+
+	/* set blocking mode on session */
+	ssh_set_blocking(session, 1);
+
+	/* create a session instance and start it up */
+	if (0 != ssh_options_set(session, SSH_OPTIONS_HOST, item->interface.addr) ||
+			0 != ssh_options_set(session, SSH_OPTIONS_PORT, &item->interface.port) ||
+			0 != ssh_options_set(session, SSH_OPTIONS_USER, item->username))
+	{
+		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot set SSH session options: %s",
+				ssh_get_error(session)));
+		goto session_free;
+	}
+
+	if (SSH_OK != ssh_connect(session))
+	{
+		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot establish SSH session: %s", ssh_get_error(session)));
+		goto session_free;
+	}
+
+	/* check which authentication methods are available */
+	if (SSH_AUTH_ERROR == ssh_userauth_none(session, NULL))
+	{
+		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Error during authentication: %s", ssh_get_error(session)));
+		goto session_close;
+	}
+
+	userauthlist[0] = '\0';
+
+	if (0 != (userauth = ssh_userauth_list(session, NULL)))
+	{
+		if (0 != (userauth & SSH_AUTH_METHOD_NONE))
+			offset += zbx_snprintf(userauthlist + offset, sizeof(userauthlist) - offset, "none, ");
+		if (0 != (userauth & SSH_AUTH_METHOD_PASSWORD))
+			offset += zbx_snprintf(userauthlist + offset, sizeof(userauthlist) - offset, "password, ");
+		if (0 != (userauth & SSH_AUTH_METHOD_INTERACTIVE))
+			offset += zbx_snprintf(userauthlist + offset, sizeof(userauthlist) - offset,
+					"keyboard-interactive, ");
+		if (0 != (userauth & SSH_AUTH_METHOD_PUBLICKEY))
+			offset += zbx_snprintf(userauthlist + offset, sizeof(userauthlist) - offset, "publickey, ");
+		if (0 != (userauth & SSH_AUTH_METHOD_HOSTBASED))
+			offset += zbx_snprintf(userauthlist + offset, sizeof(userauthlist) - offset, "hostbased, ");
+		if (2 <= offset)
+			userauthlist[offset-2] = '\0';
+	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() supported authentication methods: %s", __func__, userauthlist);
+
+	switch (item->authtype)
+	{
+		case ITEM_AUTHTYPE_PASSWORD:
+			if (0 != (userauth & SSH_AUTH_METHOD_PASSWORD))
+			{
+				/* we could authenticate via password */
+				if (SSH_AUTH_SUCCESS != ssh_userauth_password(session, NULL, item->password))
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Password authentication failed: %s",
+							ssh_get_error(session)));
+					goto session_close;
+				}
+				else
+					zabbix_log(LOG_LEVEL_DEBUG, "%s() password authentication succeeded", __func__);
+			}
+			else if (0 != (userauth & SSH_AUTH_METHOD_INTERACTIVE))
+			{
+				/* or via keyboard-interactive */
+				while (SSH_AUTH_INFO == (rc = ssh_userauth_kbdint(session, item->username, NULL)))
+				{
+					if (1 == ssh_userauth_kbdint_getnprompts(session) &&
+							0 != ssh_userauth_kbdint_setanswer(session, 0, item->password))
+					{
+						zabbix_log(LOG_LEVEL_DEBUG,"Cannot set answer: %s",
+								ssh_get_error(session));
+					}
+				}
+
+				if (SSH_AUTH_SUCCESS != rc)
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Keyboard-interactive authentication"
+							" failed: %s", ssh_get_error(session)));
+					goto session_close;
+				}
+				else
+				{
+					zabbix_log(LOG_LEVEL_DEBUG, "%s() keyboard-interactive authentication"
+							" succeeded", __func__);
+				}
+			}
+			else
+			{
+				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Unsupported authentication method."
+						" Supported methods: %s", userauthlist));
+				goto session_close;
+			}
+			break;
+		case ITEM_AUTHTYPE_PUBLICKEY:
+			if (0 != (userauth & SSH_AUTH_METHOD_PUBLICKEY))
+			{
+				if (NULL == CONFIG_SSH_KEY_LOCATION)
+				{
+					SET_MSG_RESULT(result, zbx_strdup(NULL, "Authentication by public key failed."
+							" SSHKeyLocation option is not set"));
+					goto session_close;
+				}
+
+				/* or by public key */
+				publickey = zbx_dsprintf(publickey, "%s/%s", CONFIG_SSH_KEY_LOCATION, item->publickey);
+				privatekey = zbx_dsprintf(privatekey, "%s/%s", CONFIG_SSH_KEY_LOCATION,
+						item->privatekey);
+
+				if (SUCCEED != zbx_is_regular_file(publickey))
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot access public key file %s",
+							publickey));
+					goto session_close;
+				}
+
+				if (SUCCEED != zbx_is_regular_file(privatekey))
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot access private key file %s",
+							privatekey));
+					goto session_close;
+				}
+
+				if (SSH_OK != ssh_pki_import_pubkey_file(publickey, &pubkey))
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Failed to import public key: %s",
+							ssh_get_error(session)));
+					goto session_close;
+				}
+
+				if (SSH_AUTH_SUCCESS != ssh_userauth_try_publickey(session, NULL, pubkey))
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Public key try failed: %s",
+							ssh_get_error(session)));
+					goto session_close;
+				}
+
+				if (SSH_OK != (rc = ssh_pki_import_privkey_file(privatekey, item->password, NULL, NULL,
+						&privkey)))
+				{
+					if (SSH_EOF == rc)
+					{
+						SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot import private key"
+								" file \"%s\" because it does not exist or permission"
+								" denied", privatekey));
+						goto session_close;
+					}
+
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot import private key \"%s\"",
+							privatekey));
+
+					zabbix_log(LOG_LEVEL_DEBUG, "%s() failed to import private key \"%s\", rc:%d",
+							__func__, privatekey, rc);
+
+					goto session_close;
+				}
+
+				if (SSH_AUTH_SUCCESS != ssh_userauth_publickey(session, NULL, privkey))
+				{
+					SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Public key authentication failed:"
+							" %s", ssh_get_error(session)));
+					goto session_close;
+				}
+				else
+					zabbix_log(LOG_LEVEL_DEBUG, "%s() authentication by public key succeeded",
+							__func__);
+			}
+			else
+			{
+				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Unsupported authentication method."
+						" Supported methods: %s", userauthlist));
+				goto session_close;
+			}
+			break;
+	}
+
+	if (NULL == (channel = ssh_channel_new(session)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot create generic session channel"));
+		goto session_close;
+	}
+
+	while (SSH_OK != (rc = ssh_channel_open_session(channel)))
+	{
+		if (SSH_AGAIN != rc)
+		{
+			SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot establish generic session channel"));
+			goto channel_free;
+		}
+	}
+
+	/* request a shell on a channel and execute command */
+	dos2unix(item->params);	/* CR+LF (Windows) => LF (Unix) */
+
+	while (SSH_OK != (rc = ssh_channel_request_exec(channel, item->params)))
+	{
+		if (SSH_AGAIN != rc)
+		{
+			SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot request a shell"));
+			goto channel_free;
+		}
+	}
+
+	buffer = (char *)zbx_malloc(buffer, buf_size);
+	offset = 0;
+
+	while (0 != (rc = ssh_channel_read(channel, tmp_buf, sizeof(tmp_buf), 0)))
+	{
+		if (rc < 0)
+		{
+			if (SSH_AGAIN == rc)
+				continue;
+
+			SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot read data from SSH server"));
+			goto channel_close;
+		}
+
+		if (MAX_EXECUTE_OUTPUT_LEN <= offset + rc)
+		{
+			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Command output exceeded limit of %d KB",
+					MAX_EXECUTE_OUTPUT_LEN / ZBX_KIBIBYTE));
+			goto channel_close;
+		}
+
+		zbx_str_memcpy_alloc(&buffer, &buf_size, &offset, tmp_buf, rc);
+	}
+
+	output = convert_to_utf8(buffer, offset, encoding);
+	zbx_rtrim(output, ZBX_WHITESPACE);
+	zbx_replace_invalid_utf8(output);
+
+	SET_TEXT_RESULT(result, output);
+	output = NULL;
+
+	ret = SYSINFO_RET_OK;
+channel_close:
+	ssh_channel_close(channel);
+	zbx_free(buffer);
+channel_free:
+	ssh_channel_free(channel);
+session_close:
+	if (NULL != privkey)
+		ssh_key_free(privkey);
+	if (NULL != pubkey)
+		ssh_key_free(pubkey);
+	ssh_disconnect(session);
+session_free:
+	ssh_free(session);
+close:
+	zbx_free(publickey);
+	zbx_free(privatekey);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+	return ret;
+}
+#endif
+
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
 int	get_value_ssh(DC_ITEM *item, AGENT_RESULT *result)
 {
 	AGENT_REQUEST	request;
@@ -384,5 +663,4 @@ out:
 
 	return ret;
 }
-
-#endif	/* HAVE_SSH2 */
+#endif	/* defined(HAVE_SSH2) || defined(HAVE_SSH) */

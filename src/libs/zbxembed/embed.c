@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,12 @@
 
 #include "common.h"
 #include "log.h"
+#include "zbxjson.h"
 #include "zbxembed.h"
+#include "embed.h"
+#include "httprequest.h"
+#include "zabbix.h"
+#include "global.h"
 
 #include "duktape.h"
 
@@ -30,19 +35,6 @@
 
 /* maximum number of consequent runtime errors after which it's treated as fatal error */
 #define ZBX_ES_MAX_CONSEQUENT_RT_ERROR	3
-
-struct zbx_es_env
-{
-	duk_context	*ctx;
-	size_t		total_alloc;
-	time_t		start_time;
-
-	char		*error;
-	int		rt_error_num;
-	int		fatal_error;
-
-	jmp_buf		loc;
-};
 
 #define ZBX_ES_SCRIPT_HEADER	"function(value){"
 #define ZBX_ES_SCRIPT_FOOTER	"\n}"
@@ -141,7 +133,7 @@ int	zbx_es_check_timeout(void *udata)
 {
 	zbx_es_env_t	*env = (zbx_es_env_t *)udata;
 
-	if (time(NULL) - env->start_time > ZBX_ES_TIMEOUT)
+	if (time(NULL) - env->start_time.sec > env->timeout)
 		return 1;
 
 	return 0;
@@ -210,15 +202,36 @@ int	zbx_es_init_env(zbx_es_t *es, char **error)
 		goto out;
 	}
 
+	/* initialize Zabbix object */
+	zbx_es_init_zabbix(es, error);
+
 	/* remove Duktape object */
 	duk_push_global_object(es->env->ctx);
 	duk_del_prop_string(es->env->ctx, -1, "Duktape");
 	duk_pop(es->env->ctx);
 
+	es_init_global_functions(es);
+
+	/* put environment object to be accessible from duktape C calls */
+	duk_push_global_stash(es->env->ctx);
+	duk_push_pointer(es->env->ctx, (void *)es->env);
+	if (1 != duk_put_prop_string(es->env->ctx, -2, "\xff""\xff""zbx_env"))
+	{
+		*error = zbx_strdup(*error, duk_safe_to_string(es->env->ctx, -1));
+		duk_pop(es->env->ctx);
+		return FAIL;
+	}
+
+	/* initialize CurlHttpRequest prototype */
+	if (FAIL == zbx_es_init_httprequest(es, error))
+		goto out;
+
+	es->env->timeout = ZBX_ES_TIMEOUT;
 	ret = SUCCEED;
 out:
 	if (SUCCEED != ret)
 	{
+		zbx_es_debug_disable(es);
 		zbx_free(es->env->error);
 		zbx_free(es->env);
 	}
@@ -256,6 +269,7 @@ int	zbx_es_destroy_env(zbx_es_t *es, char **error)
 	}
 
 	duk_destroy_heap(es->env->ctx);
+	zbx_es_debug_disable(es);
 	zbx_free(es->env->error);
 	zbx_free(es->env);
 
@@ -422,7 +436,15 @@ int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size,
 	void		*buffer;
 	volatile int	ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() param:%s", __func__, param);
+
+	zbx_timespec(&es->env->start_time);
+
+	if (NULL != es->env->json)
+	{
+		zbx_json_clean(es->env->json);
+		zbx_json_addarray(es->env->json, "logs");
+	}
 
 	if (SUCCEED == zbx_es_fatal_error(es))
 	{
@@ -442,8 +464,6 @@ int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size,
 	memcpy(buffer, code, size);
 	duk_load_function(es->env->ctx);
 	duk_push_string(es->env->ctx, param);
-
-	es->env->start_time = time(NULL);
 
 	if (DUK_EXEC_SUCCESS != duk_pcall(es->env->ctx, 1))
 	{
@@ -473,12 +493,18 @@ int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size,
 	if (0 == duk_check_type(es->env->ctx, -1, DUK_TYPE_UNDEFINED))
 	{
 		if (0 != duk_check_type(es->env->ctx, -1, DUK_TYPE_NULL))
+		{
+			ret = SUCCEED;
 			*output = NULL;
+			zabbix_log(LOG_LEVEL_DEBUG, "%s() output: null", __func__);
+		}
 		else
-			*output = zbx_strdup(NULL, duk_safe_to_string(es->env->ctx, -1));
-
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() output:'%s'", __func__, ZBX_NULL2EMPTY_STR(*output));
-		ret = SUCCEED;
+		{
+			if (SUCCEED != (ret = zbx_cesu8_to_utf8(duk_safe_to_string(es->env->ctx, -1), output)))
+				*error = zbx_strdup(*error, "could not convert return value to utf8");
+			else
+				zabbix_log(LOG_LEVEL_DEBUG, "%s() output:'%s'", __func__, *output);
+		}
 	}
 	else
 		*error = zbx_strdup(*error, "undefined return value");
@@ -486,7 +512,54 @@ int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size,
 	duk_pop(es->env->ctx);
 	es->env->rt_error_num = 0;
 out:
+	if (NULL != es->env->json)
+	{
+		zbx_json_close(es->env->json);
+		zbx_json_adduint64(es->env->json, "ms", zbx_get_duration_ms(&es->env->start_time));
+	}
+
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s %s", __func__, zbx_result_string(ret), ZBX_NULL2EMPTY_STR(*error));
 
 	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_es_set_timeout                                               *
+ *                                              es_init_global_functions                              *
+ * Purpose: sets script execution timeout                                     *
+ *                                                                            *
+ * Parameters: es      - [IN] the embedded scripting engine                   *
+ *             timeout - [IN] the script execution timeout in seconds         *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_es_set_timeout(zbx_es_t *es, int timeout)
+{
+	es->env->timeout = timeout;
+}
+
+void	zbx_es_debug_enable(zbx_es_t *es)
+{
+	if (NULL == es->env->json)
+	{
+		es->env->json = zbx_malloc(NULL, sizeof(struct zbx_json));
+		zbx_json_init(es->env->json, ZBX_JSON_STAT_BUF_LEN);
+	}
+}
+
+const char	*zbx_es_debug_info(const zbx_es_t *es)
+{
+	if (NULL == es->env->json)
+		return NULL;
+
+	return es->env->json->buffer;
+}
+
+void	zbx_es_debug_disable(zbx_es_t *es)
+{
+	if (NULL == es->env->json)
+		return;
+
+	zbx_json_free(es->env->json);
+	zbx_free(es->env->json);
 }

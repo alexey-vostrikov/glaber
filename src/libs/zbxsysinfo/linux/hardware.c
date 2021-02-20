@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,10 +20,50 @@
 #include "../common/common.h"
 #include "sysinfo.h"
 #include <sys/mman.h>
+#include <setjmp.h>
+#include <signal.h>
 #include "zbxalgo.h"
 #include "hardware.h"
 #include "zbxregexp.h"
 #include "log.h"
+
+
+static ZBX_THREAD_LOCAL volatile char sigbus_handler_set;
+static ZBX_THREAD_LOCAL sigjmp_buf sigbus_jmp_buf;
+
+
+static void sigbus_handler(int signal)
+{
+	siglongjmp(sigbus_jmp_buf, signal);
+}
+
+static void install_sigbus_handler(void)
+{
+	struct sigaction act;
+
+	if (0 == sigbus_handler_set)
+	{
+		sigbus_handler_set = 1;
+		act.sa_handler = &sigbus_handler;
+		act.sa_flags = SA_NODEFER;
+		sigemptyset(&act.sa_mask);
+		sigaction(SIGBUS, &act, NULL);
+	}
+}
+
+static void remove_sigbus_handler(void)
+{
+	struct sigaction act;
+
+	if (0 != sigbus_handler_set)
+	{
+		act.sa_handler = SIG_DFL;
+		act.sa_flags = SA_NODEFER;
+		sigemptyset(&act.sa_mask);
+		sigaction(SIGBUS, &act, NULL);
+	}
+	sigbus_handler_set = 0;
+}
 
 /******************************************************************************
  *                                                                            *
@@ -94,13 +134,13 @@ static size_t	get_chassis_type(char *buf, int bufsize, int type)
 	return zbx_snprintf(buf, bufsize, " %s", chassis_types[type]);
 }
 
-static int	get_dmi_info(char *buf, int bufsize, int flags)
+static int	get_dmi_info(char *buf, int bufsize, volatile int flags)
 {
-	int		ret = SYSINFO_RET_FAIL, fd, offset = 0;
-	unsigned char	membuf[SMBIOS_ENTRY_POINT_SIZE], *smbuf = NULL, *data;
-	size_t		len, fp;
-	void		*mmp = NULL;
-	static long	pagesize = 0;
+	volatile int		ret = SYSINFO_RET_FAIL, fd, offset = 0;
+	unsigned char	*volatile smbuf = NULL, *data;
+	void		*volatile mmp = NULL;
+	volatile size_t	len, page, page_offset;
+	static size_t	pagesize = 0;
 	static int	smbios_status = SMBIOS_STATUS_UNKNOWN;
 	static size_t	smbios_len, smbios;	/* length and address of SMBIOS table (if found) */
 
@@ -126,33 +166,48 @@ static int	get_dmi_info(char *buf, int bufsize, int flags)
 	}
 	else if (-1 != (fd = open(DEV_MEM, O_RDONLY)))
 	{
-		if (SMBIOS_STATUS_UNKNOWN == smbios_status)	/* look for SMBIOS table only once */
+		if (SMBIOS_STATUS_UNKNOWN == smbios_status &&	/* look for SMBIOS table only once */
+			(size_t)-1 != (pagesize = sysconf(_SC_PAGESIZE)))
 		{
-			pagesize = sysconf(_SC_PAGESIZE);
+			/* on some platforms mmap() result does not indicate that address is not available, */
+			/* but then SIGBUS is raised accessing the memory */
+			install_sigbus_handler();
 
 			/* find smbios entry point - located between 0xF0000 and 0xFFFFF (according to the specs) */
-			for (fp = 0xf0000; 0xfffff > fp; fp += 16)
+			for(page = 0xf0000; page < 0xfffff; page += pagesize)
 			{
-				memset(membuf, 0, sizeof(membuf));
+				/* mmp needs to be a multiple of pagesize for munmap */
+				if (MAP_FAILED == (mmp = mmap(0, pagesize, PROT_READ, MAP_SHARED, fd, page)))
+					goto close;
 
-				len = fp % pagesize;	/* mmp needs to be a multiple of pagesize for munmap */
-				if (MAP_FAILED == (mmp = mmap(0, len + SMBIOS_ENTRY_POINT_SIZE, PROT_READ, MAP_SHARED,
-						fd, fp - len)))
+				if (0 != sigsetjmp(sigbus_jmp_buf, 0)) /* we get here if memory address is not valid */
 				{
+					munmap(mmp, pagesize);
 					goto close;
 				}
 
-				memcpy(membuf, (char *)mmp + len, sizeof(membuf));
-				munmap(mmp, len + SMBIOS_ENTRY_POINT_SIZE);
-
-				if (0 == strncmp((char *)membuf, "_DMI_", 5))	/* entry point found */
+				for(page_offset = 0; page_offset < pagesize; page_offset += 16)
 				{
-					smbios_len = membuf[7] << 8 | membuf[6];
-					smbios = (size_t)membuf[11] << 24 | (size_t)membuf[10] << 16 |
-							(size_t)membuf[9] << 8 | membuf[8];
-					smbios_status = SMBIOS_STATUS_OK;
-					break;
+					data = (unsigned char *)mmp + page_offset;
+
+					if (0 == strncmp((char *)data, "_DMI_", 5))	/* entry point found */
+					{
+						smbios_len = data[7] << 8 | data[6];
+						smbios = (size_t)data[11] << 24 | (size_t)data[10] << 16 |
+								(size_t)data[9] << 8 | data[8];
+
+						if (0 == smbios || 0 == smbios_len)
+							smbios_status = SMBIOS_STATUS_ERROR;
+						else
+							smbios_status = SMBIOS_STATUS_OK;
+
+						break;
+					}
 				}
+
+				munmap(mmp, pagesize);
+				if (SMBIOS_STATUS_UNKNOWN != smbios_status)
+					break;
 			}
 		}
 
@@ -168,7 +223,9 @@ static int	get_dmi_info(char *buf, int bufsize, int flags)
 		if (MAP_FAILED == (mmp = mmap(0, len + smbios_len, PROT_READ, MAP_SHARED, fd, smbios - len)))
 			goto clean;
 
-		memcpy(smbuf, (char *)mmp + len, smbios_len);
+		if (0 == sigsetjmp(sigbus_jmp_buf, 0))
+			memcpy(smbuf, (char *)mmp + len, smbios_len);
+
 		munmap(mmp, len + smbios_len);
 	}
 	else
@@ -220,6 +277,7 @@ clean:
 	zbx_free(smbuf);
 close:
 	close(fd);
+	remove_sigbus_handler();
 
 	return ret;
 }
@@ -264,9 +322,9 @@ int	SYSTEM_HW_CHASSIS(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return ret;
 }
 
-static zbx_uint64_t	get_cpu_max_freq(int cpu_num)
+static zbx_uint64_t	get_cpu_max_freq(int cpu_num, int *status)
 {
-	zbx_uint64_t	freq = FAIL;
+	zbx_uint64_t	freq = ZBX_MAX_UINT64;
 	char		filename[MAX_STRING_LEN];
 	FILE		*f;
 
@@ -277,10 +335,14 @@ static zbx_uint64_t	get_cpu_max_freq(int cpu_num)
 	if (NULL != f)
 	{
 		if (1 != fscanf(f, ZBX_FS_UI64, &freq))
-			freq = FAIL;
+			*status = FAIL;
+		else
+			*status = SUCCEED;
 
 		fclose(f);
 	}
+	else
+		*status = FAIL;
 
 	return freq;
 }
@@ -289,14 +351,14 @@ static size_t	print_freq(char *buffer, size_t size, int filter, int cpu, zbx_uin
 {
 	size_t	offset = 0;
 
-	if (HW_CPU_SHOW_MAXFREQ == filter && FAIL != (int)maxfreq)
+	if (HW_CPU_SHOW_MAXFREQ == filter && ZBX_MAX_UINT64 != maxfreq)
 	{
 		if (HW_CPU_ALL_CPUS == cpu)
 			offset += zbx_snprintf(buffer + offset, size - offset, " " ZBX_FS_UI64 "MHz", maxfreq / 1000);
 		else
 			offset += zbx_snprintf(buffer + offset, size - offset, " " ZBX_FS_UI64, maxfreq * 1000);
 	}
-	else if (HW_CPU_SHOW_CURFREQ == filter && FAIL != (int)curfreq)
+	else if (HW_CPU_SHOW_CURFREQ == filter && ZBX_MAX_UINT64 != curfreq)
 	{
 		if (HW_CPU_ALL_CPUS == cpu)
 			offset += zbx_snprintf(buffer + offset, size - offset, " " ZBX_FS_UI64 "MHz", curfreq);
@@ -305,10 +367,10 @@ static size_t	print_freq(char *buffer, size_t size, int filter, int cpu, zbx_uin
 	}
 	else if (HW_CPU_SHOW_ALL == filter)
 	{
-		if (FAIL != (int)curfreq)
+		if (ZBX_MAX_UINT64 != curfreq)
 			offset += zbx_snprintf(buffer + offset, size - offset, " working at " ZBX_FS_UI64 "MHz", curfreq);
 
-		if (FAIL != (int)maxfreq)
+		if (ZBX_MAX_UINT64 != maxfreq)
 			offset += zbx_snprintf(buffer + offset, size - offset, " (maximum " ZBX_FS_UI64 "MHz)", maxfreq / 1000);
 	}
 
@@ -318,7 +380,7 @@ static size_t	print_freq(char *buffer, size_t size, int filter, int cpu, zbx_uin
 int     SYSTEM_HW_CPU(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	int		ret = SYSINFO_RET_FAIL, filter, cpu, cur_cpu = -1, offset = 0;
-	zbx_uint64_t	maxfreq = FAIL, curfreq = FAIL;
+	zbx_uint64_t	maxfreq = ZBX_MAX_UINT64, curfreq = ZBX_MAX_UINT64;
 	char		line[MAX_STRING_LEN], name[MAX_STRING_LEN], tmp[MAX_STRING_LEN], buffer[MAX_BUFFER_LEN], *param;
 	FILE		*f;
 
@@ -374,7 +436,7 @@ int     SYSTEM_HW_CPU(AGENT_REQUEST *request, AGENT_RESULT *result)
 			if (-1 != cur_cpu && (HW_CPU_ALL_CPUS == cpu || cpu == cur_cpu))	/* print info about the previous cpu */
 				offset += print_freq(buffer + offset, sizeof(buffer) - offset, filter, cpu, maxfreq, curfreq);
 
-			curfreq = FAIL;
+			curfreq = ZBX_MAX_UINT64;
 			cur_cpu = atoi(tmp);
 
 			if (HW_CPU_ALL_CPUS != cpu && cpu != cur_cpu)
@@ -383,10 +445,14 @@ int     SYSTEM_HW_CPU(AGENT_REQUEST *request, AGENT_RESULT *result)
 			if (HW_CPU_ALL_CPUS == cpu || HW_CPU_SHOW_ALL == filter)
 				offset += zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "\nprocessor %d:", cur_cpu);
 
-			if ((HW_CPU_SHOW_ALL == filter || HW_CPU_SHOW_MAXFREQ == filter) &&
-					FAIL != (int)(maxfreq = get_cpu_max_freq(cur_cpu)))
+			if (HW_CPU_SHOW_ALL == filter || HW_CPU_SHOW_MAXFREQ == filter)
 			{
-				ret = SYSINFO_RET_OK;
+				int	max_freq_status;
+
+				maxfreq = get_cpu_max_freq(cur_cpu, &max_freq_status);
+
+				if (SUCCEED == max_freq_status)
+					ret = SYSINFO_RET_OK;
 			}
 		}
 

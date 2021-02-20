@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2018 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -59,6 +59,8 @@
 
 /* time period after which value cache will switch back to normal mode */
 #define ZBX_VC_LOW_MEMORY_RESET_PERIOD		SEC_PER_DAY
+
+#define ZBX_VC_LOW_MEMORY_ITEM_PRINT_LIMIT	25
 
 static zbx_mem_info_t	*vc_mem = NULL;
 
@@ -173,6 +175,17 @@ typedef struct
 	/* to database and is used to check if the requested time     */
 	/* interval should be cached.                                 */
 	int		db_cached_from;
+
+	/* The maximum number of values returned by one request       */
+	/* during last hourly interval.                               */
+	int		last_hourly_num;
+
+	/* The maximum number of values returned by one request       */
+	/* during current hourly interval.                            */
+	int		hourly_num;
+
+	/* The hour of hourly_num                                     */
+	int		hour;
 
 	/* The number of cache hits for this item.                    */
 	/* Used to evaluate if the item must be dropped from cache    */
@@ -296,7 +309,7 @@ static int	vc_db_read_values_by_time(zbx_uint64_t itemid, int value_type, zbx_ve
 	if (0 != range_start)
 		range_start--;
 
-	return zbx_history_get_values(itemid, value_type, range_start, 0, range_end, values);
+	return glb_history_get(itemid, value_type, range_start, 0, range_end, GLB_GISTORY_GET_TRIGGERS, values);
 }
 
 /************************************************************************************
@@ -350,7 +363,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 	/*        a) remove values with Tb.* timestamp from result,                              */
 	/*        b) read all values with Tb.* timestamp from database,                          */
 	/*        c) add read values to the result.                                              */
-	if (FAIL == zbx_history_get_values(itemid, value_type, range_start, count + 1, range_end, values))
+	if (FAIL == glb_history_get(itemid, value_type, range_start, count + 1, range_end, GLB_GISTORY_GET_TRIGGERS, values))
 		return FAIL;
 
 	/* returned less than requested - all values are read */
@@ -387,7 +400,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 
 		offset = values->values_num;
 
-		if (FAIL == zbx_history_get_values(itemid, value_type, range_start, left, first_timestamp, values))
+		if (FAIL == glb_history_get(itemid, value_type, range_start, left, first_timestamp,  GLB_GISTORY_GET_TRIGGERS, values))
 			return FAIL;
 
 		/* returned less than requested - all values are read */
@@ -416,7 +429,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 		return SUCCEED;
 
 	/* re-read the first (oldest) second */
-	return zbx_history_get_values(itemid, value_type, first_timestamp - 1, 0, first_timestamp, values);
+	return glb_history_get(itemid, value_type, first_timestamp - 1, 0, first_timestamp, GLB_GISTORY_GET_TRIGGERS, values);
 }
 
 /******************************************************************************
@@ -646,8 +659,21 @@ static void	vc_update_statistics(zbx_vc_item_t *item, int hits, int misses)
 {
 	if (NULL != item)
 	{
+		int	hour;
+
 		item->hits += hits;
 		item->last_accessed = time(NULL);
+
+		hour = item->last_accessed / SEC_PER_HOUR;
+		if (hour != item->hour)
+		{
+			item->last_hourly_num = item->hourly_num;
+			item->hourly_num = 0;
+			item->hour = hour;
+		}
+
+		if (hits + misses > item->hourly_num)
+			item->hourly_num = hits + misses;
 	}
 
 	if (ZBX_VC_ENABLED == vc_state)
@@ -655,6 +681,65 @@ static void	vc_update_statistics(zbx_vc_item_t *item, int hits, int misses)
 		vc_cache->hits += hits;
 		vc_cache->misses += misses;
 	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: vc_compare_items_by_total_values                                 *
+ *                                                                            *
+ * Purpose: is used to sort items by value count in descending order          *
+ *                                                                            *
+ ******************************************************************************/
+static int	vc_compare_items_by_total_values(const void *d1, const void *d2)
+{
+	zbx_vc_item_t	*c1 = *(zbx_vc_item_t **)d1;
+	zbx_vc_item_t	*c2 = *(zbx_vc_item_t **)d2;
+
+	ZBX_RETURN_IF_NOT_EQUAL(c2->values_total, c1->values_total);
+
+	return 0;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: vc_dump_items_statistics                                         *
+ *                                                                            *
+ * Purpose: find out items responsible for low memory                         *
+ *                                                                            *
+ ******************************************************************************/
+static void	vc_dump_items_statistics(void)
+{
+	zbx_vc_item_t		*item;
+	zbx_hashset_iter_t	iter;
+	int			i, total = 0, limit;
+	zbx_vector_ptr_t	items;
+
+	zabbix_log(LOG_LEVEL_WARNING, "=== most used items statistics for value cache ===");
+
+	zbx_vector_ptr_create(&items);
+
+	zbx_hashset_iter_reset(&vc_cache->items, &iter);
+
+	while (NULL != (item = (zbx_vc_item_t *)zbx_hashset_iter_next(&iter)))
+	{
+		zbx_vector_ptr_append(&items, item);
+		total += item->values_total;
+	}
+
+	zbx_vector_ptr_sort(&items, vc_compare_items_by_total_values);
+
+	for (i = 0, limit = MIN(items.values_num, ZBX_VC_LOW_MEMORY_ITEM_PRINT_LIMIT); i < limit; i++)
+	{
+		item = (zbx_vc_item_t *)items.values[i];
+
+		zabbix_log(LOG_LEVEL_WARNING, "itemid:" ZBX_FS_UI64 " active range:%d hits:" ZBX_FS_UI64 " count:%d"
+				" perc:" ZBX_FS_DBL "%%", item->itemid, item->active_range, item->hits,
+				item->values_total, 100 * (double)item->values_total / total);
+	}
+
+	zbx_vector_ptr_destroy(&items);
+
+	zabbix_log(LOG_LEVEL_WARNING, "==================================================");
 }
 
 /******************************************************************************
@@ -683,10 +768,69 @@ static void	vc_warn_low_memory(void)
 	else if (now - vc_cache->last_warning_time > ZBX_VC_LOW_MEMORY_WARNING_PERIOD)
 	{
 		vc_cache->last_warning_time = now;
+		vc_dump_items_statistics();
+		zbx_mem_dump_stats(LOG_LEVEL_WARNING, vc_mem);
 
 		zabbix_log(LOG_LEVEL_WARNING, "value cache is fully used: please increase ValueCacheSize"
 				" configuration parameter");
 	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: vc_release_unused_items                                          *
+ *                                                                            *
+ * Purpose: frees space in cache by dropping items not accessed for more than *
+ *          24 hours                                                          *
+ *                                                                            *
+ * Parameters: source_item - [IN] the item requesting more space to store its *
+ *                                data                                        *
+ *                                                                            *
+ * Return value:  number of bytes freed                                       *
+ *                                                                            *
+ ******************************************************************************/
+static size_t	vc_release_unused_items(const zbx_vc_item_t *source_item)
+{
+	int			timestamp;
+	zbx_hashset_iter_t	iter;
+	zbx_vc_item_t		*item;
+	size_t			freed = 0;
+
+	if (NULL == vc_cache)
+		return freed;
+
+	timestamp = time(NULL) - ZBX_VC_ITEM_EXPIRE_PERIOD;
+
+	zbx_hashset_iter_reset(&vc_cache->items, &iter);
+
+	while (NULL != (item = (zbx_vc_item_t *)zbx_hashset_iter_next(&iter)))
+	{
+		if (item->last_accessed < timestamp && 0 == item->refcount && source_item != item)
+		{
+			freed += vch_item_free_cache(item) + sizeof(zbx_vc_item_t);
+			zbx_hashset_iter_remove(&iter);
+		}
+	}
+
+	return freed;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_vc_housekeeping_value_cache                                  *
+ *                                                                            *
+ * Purpose: release unused items from value cache                             *
+ *                                                                            *
+ * Comments: If unused items are not cleared from value cache periodically    *
+ *           then they will only be cleared when value cache is full, see     *
+ *           vc_release_space().                                              *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_vc_housekeeping_value_cache(void)
+{
+	vc_try_lock();
+	vc_release_unused_items(NULL);
+	vc_try_unlock();
 }
 
 /******************************************************************************
@@ -710,29 +854,16 @@ static void	vc_release_space(zbx_vc_item_t *source_item, size_t space)
 {
 	zbx_hashset_iter_t		iter;
 	zbx_vc_item_t			*item;
-	int				timestamp, i;
-	size_t				freed = 0;
+	int				i;
+	size_t				freed;
 	zbx_vector_vc_itemweight_t	items;
-
-	timestamp = time(NULL) - ZBX_VC_ITEM_EXPIRE_PERIOD;
 
 	/* reserve at least min_free_request bytes to avoid spamming with free space requests */
 	if (space < vc_cache->min_free_request)
 		space = vc_cache->min_free_request;
 
 	/* first remove items with the last accessed time older than a day */
-	zbx_hashset_iter_reset(&vc_cache->items, &iter);
-
-	while (NULL != (item = (zbx_vc_item_t *)zbx_hashset_iter_next(&iter)))
-	{
-		if (0 == item->refcount && source_item != item && item->last_accessed < timestamp)
-		{
-			freed += vch_item_free_cache(item) + sizeof(zbx_vc_item_t);
-			zbx_hashset_iter_remove(&iter);
-		}
-	}
-
-	if (freed >= space)
+	if ((freed = vc_release_unused_items(source_item)) >= space)
 		return;
 
 	/* failed to free enough space by removing old items, entering low memory mode */
@@ -1898,7 +2029,7 @@ static int	vch_item_cache_values_by_time(zbx_vc_item_t *item, int range_start)
 		range_end = item->tail->slots[item->tail->first_value].timestamp.sec - 1;
 	}
 	else
-		range_end = time(NULL);
+		range_end = ZBX_JAN_2038;
 
 	/* update cache if necessary */
 	if (range_start < range_end)
@@ -1995,7 +2126,7 @@ static int	vch_item_cache_values_by_time_and_count(zbx_vc_item_t *item, int rang
 		if (NULL != item->head)
 			range_end = item->tail->slots[item->tail->first_value].timestamp.sec - 1;
 		else
-			range_end = time(NULL);
+			range_end = ZBX_JAN_2038;
 
 		vc_try_unlock();
 
@@ -2133,7 +2264,7 @@ static void	vch_item_get_values_by_time_and_count(zbx_vc_item_t *item, zbx_vecto
 		/* return empty vector with success */
 		goto out;
 	}
-
+	
 	/* fill the values vector with item history values until the <count> values are read    */
 	/* or no more values within specified time period                                       */
 	/* fill the values vector with item history values until the start timestamp is reached */
@@ -2391,7 +2522,7 @@ void	zbx_vc_destroy(void)
  * Purpose: resets value cache                                                *
  *                                                                            *
  * Comments: All items and their historical data are removed,                 *
- *           cache working mode, statistics reseted.                          *
+ *           cache working mode, statistics reset.                            *
  *                                                                            *
  ******************************************************************************/
 void	zbx_vc_reset(void)
@@ -2444,7 +2575,7 @@ int	zbx_vc_add_values(zbx_vector_ptr_t *history)
 	ZBX_DC_HISTORY		*h;
 	time_t			expire_timestamp;
 
-	if (FAIL == zbx_history_add_values(history))
+	if (FAIL == glb_history_add(history))
 		return FAIL;
 
 	if (ZBX_VC_DISABLED == vc_state)
@@ -2488,62 +2619,6 @@ int	zbx_vc_add_values(zbx_vector_ptr_t *history)
 
 	return SUCCEED;
 }
-
-/******************************************************************************
- *                                                                            *
- * Function: zbx_vc_get_cacched values                                         *
- *                                                                            *
- * Purpose: get item history data for the specified time period from 
- *  the value cache 													       *
- *                                                                            *
- * Parameters: itemid     - [IN] the item id                                  *
- *             value_type - [IN] the item value type                          *
- *             values     - [OUT] the item history data stored time/value     *
- *                          pairs in descending order                         *
- *             seconds    - [IN] the time period to retrieve data for         *
- *             count      - [IN] the number of history values to retrieve     *
- *             ts         - [IN] the period end timestamp                     *
- *                                                                            *
- * Return value:  SUCCEED - the item history data was retrieved successfully  *
- *                FAIL    - the item history data was not retrieved           *
- *                                                                            *
- * Comments: If the data is not in cache, it's not read from DB, so this function *
- *           will only return the requested data if it's already in vc
- *                                                                            *
- *           If <count> is set then value range is defined as <count> values  *
- *           before <timestamp>. Otherwise the range is defined as <seconds>  *
- *           seconds before <timestamp>.                                      *
- *                                                                            *
- ******************************************************************************/
-
-
-int zbx_vc_get_cached_values(zbx_uint64_t itemid, zbx_vector_history_record_t *values, int seconds,
-		int count, const zbx_timespec_t *ts) {
-
-	zbx_vc_item_t	*item = NULL;
-	int 		ret = FAIL;
-	
-	zabbix_log(LOG_LEVEL_DEBUG,"%s: retrieving itemid:%ld, sec:%ld, count: %ld",__func__, itemid,seconds,count);
-	vc_try_lock();
-
-	if (ZBX_VC_DISABLED == vc_state)
-		goto out;
-
-	if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache->items, &itemid))) {
-		zabbix_log(LOG_LEVEL_DEBUG,"%s: No item in VC yet",__func__);
-		goto out;
-	}
-	
-	vch_item_get_values_by_time_and_count(item,values,seconds, count, ts);
-	
-	ret = SUCCEED;
-out:
-	vc_try_unlock();
-	zabbix_log(LOG_LEVEL_DEBUG,"%s: ending",__func__);
-	return ret;
-
-}
-
 
 /******************************************************************************
  *                                                                            *
@@ -2767,6 +2842,92 @@ void	zbx_vc_disable(void)
 	vc_state = ZBX_VC_DISABLED;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_hc_get_diag_stats                                            *
+ *                                                                            *
+ * Purpose: get value cache diagnostic statistics                             *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_vc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num, int *mode)
+{
+	zbx_hashset_iter_t	iter;
+	zbx_vc_item_t		*item;
+
+	*values_num = 0;
+
+	if (ZBX_VC_DISABLED == vc_state)
+	{
+		*items_num = 0;
+		*mode = -1;
+		return;
+	}
+
+	vc_try_lock();
+
+	*items_num = vc_cache->items.num_data;
+	*mode = vc_cache->mode;
+
+	zbx_hashset_iter_reset(&vc_cache->items, &iter);
+	while (NULL != (item = (zbx_vc_item_t *)zbx_hashset_iter_next(&iter)))
+		*values_num += item->values_total;
+
+	vc_try_unlock();
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_hc_get_mem_stats                                             *
+ *                                                                            *
+ * Purpose: get value cache shared memory statistics                          *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_vc_get_mem_stats(zbx_mem_stats_t *mem)
+{
+	if (ZBX_VC_DISABLED == vc_state)
+	{
+		memset(mem, 0, sizeof(zbx_mem_stats_t));
+		return;
+	}
+
+	vc_try_lock();
+	zbx_mem_get_stats(vc_mem, mem);
+	vc_try_unlock();
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_vc_get_item_stats                                            *
+ *                                                                            *
+ * Purpose: get statistics of cached items                                    *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_vc_get_item_stats(zbx_vector_ptr_t *stats)
+{
+	zbx_hashset_iter_t	iter;
+	zbx_vc_item_t		*item;
+	zbx_vc_item_stats_t	*item_stats;
+
+	if (ZBX_VC_DISABLED == vc_state)
+		return;
+
+	vc_try_lock();
+
+	zbx_vector_ptr_reserve(stats, vc_cache->items.num_data);
+
+	zbx_hashset_iter_reset(&vc_cache->items, &iter);
+	while (NULL != (item = (zbx_vc_item_t *)zbx_hashset_iter_next(&iter)))
+	{
+		item_stats = (zbx_vc_item_stats_t *)zbx_malloc(NULL, sizeof(zbx_vc_item_stats_t));
+		item_stats->itemid = item->itemid;
+		item_stats->values_num = item->values_total;
+		item_stats->hourly_num = item->last_hourly_num;
+		zbx_vector_ptr_append(stats, item_stats);
+	}
+
+	vc_try_unlock();
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -2780,7 +2941,7 @@ void	zbx_vc_disable(void)
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-int	zbx_vc_simple_add(zbx_uint64_t itemid, zbx_history_record_t *record)
+int	zbx_vc_simple_add(zbx_uint64_t itemid, int value_type, zbx_history_record_t *record)
 {
 	zbx_vc_item_t		*item;
 	time_t			expire_timestamp;
@@ -2792,14 +2953,23 @@ int	zbx_vc_simple_add(zbx_uint64_t itemid, zbx_history_record_t *record)
 
 	vc_try_lock();
 
-	if (NULL != (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache->items, &itemid)))
+	if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache->items, &itemid))) {
+		zbx_vc_item_t   new_item = {.itemid = itemid, .value_type = value_type};
+	
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld doesn't exists in VC, adding a new one",itemid);
+	
+		if (NULL ==(item = (zbx_vc_item_t *)zbx_hashset_insert(&vc_cache->items, &new_item, sizeof(zbx_vc_item_t)))) {
+			zabbix_log(LOG_LEVEL_INFORMATION, "Couldnt add item  %ld to VC",itemid);
+		};
+	}
+
+	if (NULL != item)
 	{
 		if (0 == (item->state & ZBX_ITEM_STATE_REMOVE_PENDING))
 		{
 			vc_item_addref(item);
 
-			if ( item->last_accessed < expire_timestamp ||
-					FAIL == vch_item_add_value_at_head(item, record))
+			if ( FAIL == vch_item_add_value_at_head(item, record))
 			{
 				item->state |= ZBX_ITEM_STATE_REMOVE_PENDING;
 			}
@@ -2807,7 +2977,7 @@ int	zbx_vc_simple_add(zbx_uint64_t itemid, zbx_history_record_t *record)
 			vc_item_release(item);
 			
 		}
-	}
+	} 
 
 	vc_try_unlock();
 

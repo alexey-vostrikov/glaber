@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #define ZBX_PROTO_TAG_DATA			"data"
 #define ZBX_PROTO_TAG_REGEXP			"regexp"
 #define ZBX_PROTO_TAG_DELAY			"delay"
+#define ZBX_PROTO_TAG_REFRESH_UNSUPPORTED	"refresh_unsupported"
 #define ZBX_PROTO_TAG_DRULE			"drule"
 #define ZBX_PROTO_TAG_DCHECK			"dcheck"
 #define ZBX_PROTO_TAG_HOST			"host"
@@ -43,6 +44,7 @@
 #define ZBX_PROTO_TAG_LOGSEVERITY		"severity"
 #define ZBX_PROTO_TAG_LOGEVENTID		"eventid"
 #define ZBX_PROTO_TAG_PORT			"port"
+#define ZBX_PROTO_TAG_TLS_ACCEPTED		"tls_accepted"
 #define ZBX_PROTO_TAG_PROXY			"proxy"
 #define ZBX_PROTO_TAG_REQUEST			"request"
 #define ZBX_PROTO_TAG_RESPONSE			"response"
@@ -68,7 +70,7 @@
 #define ZBX_PROTO_TAG_HOST_AVAILABILITY		"host availability"
 #define ZBX_PROTO_TAG_HISTORY_DATA		"history data"
 #define ZBX_PROTO_TAG_DISCOVERY_DATA		"discovery data"
-#define ZBX_PROTO_TAG_AUTO_REGISTRATION		"auto registration"
+#define ZBX_PROTO_TAG_AUTOREGISTRATION		"auto registration"
 #define ZBX_PROTO_TAG_MORE			"more"
 #define ZBX_PROTO_TAG_ITEMID			"itemid"
 #define ZBX_PROTO_TAG_TTL			"ttl"
@@ -119,6 +121,61 @@
 #define ZBX_PROTO_TAG_MESSAGE			"message"
 #define ZBX_PROTO_TAG_PREVIOUS			"previous"
 #define ZBX_PROTO_TAG_SINGLE			"single"
+#define ZBX_PROTO_TAG_INTERFACE			"interface"
+#define ZBX_PROTO_TAG_FLAGS			"flags"
+#define ZBX_PROTO_TAG_PARAMETERS		"parameters"
+#define ZBX_PROTO_TAG_PROXY_HOSTID		"proxy_hostid"
+#define ZBX_PROTO_TAG_INTERFACE_ID		"interfaceid"
+#define ZBX_PROTO_TAG_USEIP			"useip"
+#define ZBX_PROTO_TAG_ADDRESS			"address"
+#define ZBX_PROTO_TAG_TLS_CONNECT		"tls_connect"
+#define ZBX_PROTO_TAG_TLS_ISSUER		"tls_issuer"
+#define ZBX_PROTO_TAG_TLS_SUBJECT		"tls_subject"
+#define ZBX_PROTO_TAG_TLS_PSK_IDENTITY		"tls_psk_identity"
+#define ZBX_PROTO_TAG_TLS_PSK			"tls_psk"
+#define ZBX_PROTO_TAG_FOLLOW_REDIRECTS		"follow_redirects"
+#define ZBX_PROTO_TAG_POST_TYPE			"post_type"
+#define ZBX_PROTO_TAG_RETRIEVE_MODE		"retrieve_mode"
+#define ZBX_PROTO_TAG_REQUEST_METHOD		"request_method"
+#define ZBX_PROTO_TAG_OUTPUT_FORMAT		"output_format"
+#define ZBX_PROTO_TAG_VERIFY_PEER		"verify_peer"
+#define ZBX_PROTO_TAG_VERIFY_HOST		"verify_host"
+#define ZBX_PROTO_TAG_SNMP_OID			"snmp_oid"
+#define ZBX_PROTO_TAG_DETAILS			"details"
+#define ZBX_PROTO_TAG_VERSION			"version"
+#define ZBX_PROTO_TAG_COMMUNITY			"community"
+#define	ZBX_PROTO_TAG_SECURITYNAME		"securityname"
+#define ZBX_PROTO_TAG_SECURITYLEVEL		"securitylevel"
+#define ZBX_PROTO_TAG_AUTHPASSPHRASE		"authpassphrase"
+#define ZBX_PROTO_TAG_PRIVPASSPHRASE		"privpassphrase"
+#define ZBX_PROTO_TAG_AUTHPROTOCOL		"authprotocol"
+#define ZBX_PROTO_TAG_PRIVPROTOCOL		"privprotocol"
+#define ZBX_PROTO_TAG_CONTEXTNAME		"contextname"
+#define ZBX_PROTO_TAG_IPMI_SENSOR		"ipmi_sensor"
+#define ZBX_PROTO_TAG_TIMEOUT			"timeout"
+#define ZBX_PROTO_TAG_URL			"url"
+#define ZBX_PROTO_TAG_QUERY_FIELDS		"query_fields"
+#define ZBX_PROTO_TAG_POSTS			"posts"
+#define ZBX_PROTO_TAG_STATUS_CODES		"status_codes"
+#define ZBX_PROTO_TAG_HTTP_PROXY		"http_proxy"
+#define ZBX_PROTO_TAG_HTTP_HEADERS		"headers"
+#define ZBX_PROTO_TAG_SSL_CERT_FILE		"ssl_cert_file"
+#define ZBX_PROTO_TAG_SSL_KEY_FILE		"ssl_key_file"
+#define ZBX_PROTO_TAG_SSL_KEY_PASSWORD		"ssl_key_password"
+#define ZBX_PROTO_TAG_MAINTENANCE_STATUS	"maintenance_status"
+#define ZBX_PROTO_TAG_MAINTENANCE_TYPE		"maintenance_type"
+#define ZBX_PROTO_TAG_SNMP_AVAILABLE		"snmp_available"
+#define ZBX_PROTO_TAG_IPMI_AVAILABLE		"ipmi_available"
+#define ZBX_PROTO_TAG_IPMI_AUTHTYPE		"ipmi_authtype"
+#define ZBX_PROTO_TAG_IPMI_PRIVILEGE		"ipmi_privilege"
+#define ZBX_PROTO_TAG_IPMI_USERNAME		"ipmi_username"
+#define ZBX_PROTO_TAG_IPMI_PASSWORD		"ipmi_password"
+#define ZBX_PROTO_TAG_JMX_AVAILABLE		"jmx_available"
+#define ZBX_PROTO_TAG_DATA_TYPE			"datatype"
+#define ZBX_PROTO_TAG_PROXY_DELAY		"proxy_delay"
+#define ZBX_PROTO_TAG_EXPRESSIONS		"expressions"
+#define ZBX_PROTO_TAG_EXPRESSION		"expression"
+#define ZBX_PROTO_TAG_CLIENTIP			"clientip"
 
 #define ZBX_PROTO_VALUE_CLUSTER_HELLO "cluster_hello"
 #define ZBX_PROTO_SERVER_ID	"server_id"
@@ -160,7 +217,9 @@
 #define ZBX_PROTO_VALUE_ZABBIX_STATS_QUEUE	"queue"
 
 #define ZBX_PROTO_VALUE_ZABBIX_ALERT_SEND	"alert.send"
+#define ZBX_PROTO_VALUE_ZABBIX_ITEM_TEST	"item.test"
 #define ZBX_PROTO_VALUE_PREPROCESSING_TEST	"preprocessing.test"
+#define ZBX_PROTO_VALUE_EXPRESSIONS_EVALUATE	"expressions.evaluate"
 
 typedef enum
 {
@@ -225,18 +284,38 @@ const char	*zbx_json_next_value_dyn(const struct zbx_json_parse *jp, const char 
 		size_t *string_alloc, zbx_json_type_t *type);
 const char	*zbx_json_pair_next(const struct zbx_json_parse *jp, const char *p, char *name, size_t len);
 const char	*zbx_json_pair_by_name(const struct zbx_json_parse *jp, const char *name);
-int		zbx_json_value_by_name(const struct zbx_json_parse *jp, const char *name, char *string, size_t len);
-int		zbx_json_value_by_name_dyn(const struct zbx_json_parse *jp, const char *name, char **string, size_t *string_alloc);
-int		zbx_json_brackets_open(const char *p, struct zbx_json_parse *out);
+int		zbx_json_value_by_name(const struct zbx_json_parse *jp, const char *name, char *string, size_t len,
+		zbx_json_type_t *type);
+int		zbx_json_value_by_name_dyn(const struct zbx_json_parse *jp, const char *name, char **string,
+		size_t *string_alloc, zbx_json_type_t *type);
+int		zbx_json_brackets_open(const char *p, struct zbx_json_parse *jp);
 int		zbx_json_brackets_by_name(const struct zbx_json_parse *jp, const char *name, struct zbx_json_parse *out);
 int		zbx_json_object_is_empty(const struct zbx_json_parse *jp);
 int		zbx_json_count(const struct zbx_json_parse *jp);
 const char	*zbx_json_decodevalue(const char *p, char *string, size_t size, zbx_json_type_t *type);
 const char	*zbx_json_decodevalue_dyn(const char *p, char **string, size_t *string_alloc, zbx_json_type_t *type);
 void		zbx_json_escape(char **string);
+int		zbx_json_open_path(const struct zbx_json_parse *jp, const char *path, struct zbx_json_parse *out);
 
-int	zbx_json_path_check(const char *path, char * error, size_t errlen);
-int	zbx_json_path_open(const struct zbx_json_parse *jp, const char *path, struct zbx_json_parse *out);
-void	zbx_json_value_dyn(const struct zbx_json_parse *jp, char **string, size_t *string_alloc);
+void	zbx_json_log(const struct zbx_json_parse *jp, int loglevel);
+
+/* jsonpath support */
+
+typedef struct zbx_jsonpath_segment zbx_jsonpath_segment_t;
+
+typedef struct
+{
+	zbx_jsonpath_segment_t	*segments;
+	int			segments_num;
+	int			segments_alloc;
+
+	/* set to 1 when jsonpath points at single location */
+	unsigned char		definite;
+}
+zbx_jsonpath_t;
+
+void	zbx_jsonpath_clear(zbx_jsonpath_t *jsonpath);
+int	zbx_jsonpath_compile(const char *path, zbx_jsonpath_t *jsonpath);
+int	zbx_jsonpath_query(const struct zbx_json_parse *jp, const char *path, char **output);
 
 #endif /* ZABBIX_ZJSON_H */

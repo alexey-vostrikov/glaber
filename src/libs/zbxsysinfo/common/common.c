@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,9 +26,11 @@
 #include "dir.h"
 #include "http.h"
 #include "net.h"
+#include "dns.h"
 #include "system.h"
 #include "zabbix_stats.h"
 #include "zbxexec.h"
+#include "modbtype.h"
 
 #if !defined(_WINDOWS)
 #	define VFS_TEST_FILE "/etc/passwd"
@@ -44,6 +46,14 @@ extern int	CONFIG_TIMEOUT;
 
 static int	ONLY_ACTIVE(AGENT_REQUEST *request, AGENT_RESULT *result);
 static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result);
+static int	SYSTEM_RUN_LOCAL(AGENT_REQUEST *request, AGENT_RESULT *result);
+
+ZBX_METRIC	parameters_common_local[] =
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
+{
+	{"system.run",		CF_HAVEPARAMS,	SYSTEM_RUN_LOCAL, 	"echo test"},
+	{NULL}
+};
 
 ZBX_METRIC	parameters_common[] =
 /*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
@@ -83,8 +93,17 @@ ZBX_METRIC	parameters_common[] =
 
 	{"zabbix.stats",	CF_HAVEPARAMS,	ZABBIX_STATS,		"127.0.0.1,10051"},
 
+	{"modbus.get",		CF_HAVEPARAMS,	MODBUS_GET,		"tcp://127.0.0.1"},
+
 	{NULL}
 };
+
+static const char	*user_parameter_dir = NULL;
+
+void	set_user_parameter_dir(const char *path)
+{
+	user_parameter_dir = path;
+}
 
 static int	ONLY_ACTIVE(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
@@ -95,28 +114,13 @@ static int	ONLY_ACTIVE(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_FAIL;
 }
 
-int	EXECUTE_USER_PARAMETER(AGENT_REQUEST *request, AGENT_RESULT *result)
-{
-	char	*command;
-
-	if (1 != request->nparam)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Too many parameters."));
-		return SYSINFO_RET_FAIL;
-	}
-
-	command = get_rparam(request, 0);
-
-	return EXECUTE_STR(command, result);
-}
-
-int	EXECUTE_STR(const char *command, AGENT_RESULT *result)
+static int	execute_str(const char *command, AGENT_RESULT *result, const char* dir)
 {
 	int		ret = SYSINFO_RET_FAIL;
 	char		*cmd_result = NULL, error[MAX_STRING_LEN];
 
 	if (SUCCEED != zbx_execute(command, &cmd_result, error, sizeof(error), CONFIG_TIMEOUT,
-			ZBX_EXIT_CODE_CHECKS_DISABLED))
+			ZBX_EXIT_CODE_CHECKS_DISABLED, dir))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, error));
 		goto out;
@@ -134,6 +138,22 @@ out:
 	zbx_free(cmd_result);
 
 	return ret;
+}
+
+int	EXECUTE_USER_PARAMETER(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	if (1 != request->nparam)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Too many parameters."));
+		return SYSINFO_RET_FAIL;
+	}
+
+	return execute_str(get_rparam(request, 0), result, user_parameter_dir);
+}
+
+int	EXECUTE_STR(const char *command, AGENT_RESULT *result)
+{
+	return execute_str(command, result, NULL);
 }
 
 int	EXECUTE_DBL(const char *command, AGENT_RESULT *result)
@@ -170,7 +190,7 @@ int	EXECUTE_INT(const char *command, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
+static int	system_run(AGENT_REQUEST *request, AGENT_RESULT *result, int level)
 {
 	char	*command, *flag;
 
@@ -189,10 +209,7 @@ static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return SYSINFO_RET_FAIL;
 	}
 
-	if (1 == CONFIG_LOG_REMOTE_COMMANDS)
-		zabbix_log(LOG_LEVEL_WARNING, "Executing command '%s'", command);
-	else
-		zabbix_log(LOG_LEVEL_DEBUG, "Executing command '%s'", command);
+	zabbix_log(level, "Executing command '%s'", command);
 
 	if (NULL == flag || '\0' == *flag || 0 == strcmp(flag, "wait"))	/* default parameter */
 	{
@@ -216,3 +233,21 @@ static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
 
 	return SYSINFO_RET_OK;
 }
+
+static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	int	level;
+
+	level = LOG_LEVEL_DEBUG;
+
+	if (0 != CONFIG_LOG_REMOTE_COMMANDS)
+		level = LOG_LEVEL_WARNING;
+
+	return system_run(request, result, level);
+}
+
+static int	SYSTEM_RUN_LOCAL(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	return system_run(request, result, LOG_LEVEL_DEBUG);
+}
+

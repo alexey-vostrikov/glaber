@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,13 +30,29 @@ extern int		CONFIG_CONFSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
 
+static volatile sig_atomic_t	secrets_reload;
+
 static void	zbx_dbconfig_sigusr_handler(int flags)
 {
-	if (ZBX_RTC_CONFIG_CACHE_RELOAD == ZBX_RTC_GET_MSG(flags))
+	int	msg;
+
+	/* it is assumed that only one signal is used at a time, any subsequent signals are ignored */
+	if (ZBX_RTC_CONFIG_CACHE_RELOAD == (msg = ZBX_RTC_GET_MSG(flags)))
 	{
 		if (0 < zbx_sleep_get_remainder())
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "forced reloading of the configuration cache");
+			zbx_wakeup();
+		}
+		else
+			zabbix_log(LOG_LEVEL_WARNING, "configuration cache reloading is already in progress");
+	}
+	else if (ZBX_RTC_SECRETS_RELOAD == msg)
+	{
+		if (0 < zbx_sleep_get_remainder())
+		{
+			secrets_reload = 1;
+			zabbix_log(LOG_LEVEL_WARNING, "forced reloading of the secrets");
 			zbx_wakeup();
 		}
 		else
@@ -62,6 +78,7 @@ static void	zbx_dbconfig_sigusr_handler(int flags)
 ZBX_THREAD_ENTRY(dbconfig_thread, args)
 {
 	double	sec = 0.0;
+	int	nextcheck = 0;
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
@@ -70,19 +87,22 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	zbx_setproctitle("%s [waiting %d sec for processes]", get_process_type_string(process_type),
-			CONFIG_CONFSYNCER_FREQUENCY);
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 	zbx_set_sigusr_handler(zbx_dbconfig_sigusr_handler);
-
-	/* the initial configuration sync is done by server before worker processes are forked */
-	zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
+	sec = zbx_time();
+	zbx_setproctitle("%s [syncing configuration]", get_process_type_string(process_type));
+	DCsync_configuration(ZBX_DBSYNC_INIT, NULL);
+	zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
+			get_process_type_string(process_type), (sec = zbx_time() - sec), CONFIG_CONFSYNCER_FREQUENCY);
+	zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
+
+	while (ZBX_IS_RUNNING())
 	{
 		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, syncing configuration]",
 				get_process_type_string(process_type), sec);
@@ -90,13 +110,28 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		sec = zbx_time();
 		zbx_update_env(sec);
 
-		DCsync_configuration(ZBX_DBSYNC_UPDATE);
-		DCupdate_hosts_availability();
+		if (1 == secrets_reload)
+		{
+			DCsync_configuration(ZBX_SYNC_SECRETS, NULL);
+			secrets_reload = 0;
+		}
+		else
+		{
+			DCsync_configuration(ZBX_DBSYNC_UPDATE, NULL);
+			DCupdate_hosts_availability();
+			nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
+		}
+
 		sec = zbx_time() - sec;
 
 		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
 				get_process_type_string(process_type), sec, CONFIG_CONFSYNCER_FREQUENCY);
 
-		zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
+		zbx_sleep_loop(nextcheck - time(NULL));
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

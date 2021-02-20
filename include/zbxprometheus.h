@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,9 +20,9 @@
 #ifndef __zbxprometheus_h__
 #define __zbxprometheus_h__
 
-int	zbx_prometheus_pattern(const char *data, const char *filter_data, const char *output,
-						char **value, char **err);
-int	zbx_prometheus_to_json(const char *data, const char *filter_data, char **value, char **err);
+int	zbx_prometheus_pattern(const char *data, const char *filter_data, const char *output, char **value,
+		char **error);
+int	zbx_prometheus_to_json(const char *data, const char *filter_data, char **value, char **error);
 
 int	zbx_prometheus_validate_filter(const char *pattern, char **error);
 int	zbx_prometheus_validate_label(const char *label);

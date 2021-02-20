@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,8 +16,6 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-
-#include <stddef.h>
 
 #include "common.h"
 #include "log.h"
@@ -227,7 +225,7 @@ void	*zbx_hashset_insert_ext(zbx_hashset_t *hs, const void *data, size_t size, s
 		/* recalculate new slot */
 		slot = hash % hs->num_slots;
 
-		if (NULL == (entry = (ZBX_HASHSET_ENTRY_T *)hs->mem_malloc_func(NULL, offsetof(ZBX_HASHSET_ENTRY_T, data) + size)))
+		if (NULL == (entry = (ZBX_HASHSET_ENTRY_T *)hs->mem_malloc_func(NULL, ZBX_HASHSET_ENTRY_OFFSET + size)))
 			return NULL;
 
 		memcpy((char *)entry->data + offset, (const char *)data + offset, size - offset);
@@ -330,7 +328,7 @@ void	zbx_hashset_remove_direct(zbx_hashset_t *hs, const void *data)
 	if (0 == hs->num_slots)
 		return;
 
-	data_entry = (ZBX_HASHSET_ENTRY_T *)((const char *)data - offsetof(ZBX_HASHSET_ENTRY_T, data));
+	data_entry = (ZBX_HASHSET_ENTRY_T *)((const char *)data - ZBX_HASHSET_ENTRY_OFFSET);
 
 	slot = data_entry->hash % hs->num_slots;
 	iter_entry = hs->slots[slot];

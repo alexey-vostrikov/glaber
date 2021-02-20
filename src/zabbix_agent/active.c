@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,19 +24,17 @@
 #include "cfg.h"
 #include "log.h"
 #include "sysinfo.h"
-#include "logfiles.h"
-#ifdef _WINDOWS
-#	include "eventlog.h"
-#	include <delayimp.h>
-#endif
+#include "logfiles/logfiles.h"
 #include "comms.h"
 #include "threads.h"
 #include "zbxjson.h"
 #include "alias.h"
+#include "metrics.h"
 
 extern unsigned char			program_type;
 extern ZBX_THREAD_LOCAL unsigned char	process_type;
 extern ZBX_THREAD_LOCAL int		server_num, process_num;
+extern ZBX_THREAD_LOCAL char		*CONFIG_HOSTNAME;
 
 #if defined(ZABBIX_SERVICE)
 #	include "service.h"
@@ -44,46 +42,13 @@ extern ZBX_THREAD_LOCAL int		server_num, process_num;
 #	include "daemon.h"
 #endif
 
-#include "../libs/zbxcrypto/tls.h"
+#include "zbxcrypto.h"
 
-ZBX_THREAD_LOCAL static ZBX_ACTIVE_BUFFER	buffer;
-ZBX_THREAD_LOCAL static zbx_vector_ptr_t	active_metrics;
-ZBX_THREAD_LOCAL static zbx_vector_ptr_t	regexps;
-ZBX_THREAD_LOCAL static char			*session_token;
-ZBX_THREAD_LOCAL static zbx_uint64_t		last_valueid = 0;
-
-#ifdef _WINDOWS
-LONG WINAPI	DelayLoadDllExceptionFilter(PEXCEPTION_POINTERS excpointers)
-{
-	LONG		disposition = EXCEPTION_EXECUTE_HANDLER;
-	PDelayLoadInfo	delayloadinfo = (PDelayLoadInfo)(excpointers->ExceptionRecord->ExceptionInformation[0]);
-
-	switch (excpointers->ExceptionRecord->ExceptionCode)
-	{
-		case VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND):
-			zabbix_log(LOG_LEVEL_DEBUG, "function %s was not found in %s",
-					delayloadinfo->dlp.szProcName, delayloadinfo->szDll);
-			break;
-		case VcppException(ERROR_SEVERITY_ERROR, ERROR_PROC_NOT_FOUND):
-			if (delayloadinfo->dlp.fImportByName)
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "function %s was not found in %s",
-						delayloadinfo->dlp.szProcName, delayloadinfo->szDll);
-			}
-			else
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "function ordinal %d was not found in %s",
-						delayloadinfo->dlp.dwOrdinal, delayloadinfo->szDll);
-			}
-			break;
-		default:
-			disposition = EXCEPTION_CONTINUE_SEARCH;
-			break;
-	}
-
-	return disposition;
-}
-#endif
+static ZBX_THREAD_LOCAL ZBX_ACTIVE_BUFFER	buffer;
+static ZBX_THREAD_LOCAL zbx_vector_ptr_t	active_metrics;
+static ZBX_THREAD_LOCAL zbx_vector_ptr_t	regexps;
+static ZBX_THREAD_LOCAL char			*session_token;
+static ZBX_THREAD_LOCAL zbx_uint64_t		last_valueid = 0;
 
 static void	init_active_metrics(void)
 {
@@ -138,14 +103,6 @@ static void	free_active_metrics(void)
 }
 #endif
 
-static int	metric_ready_to_process(const ZBX_ACTIVE_METRIC *metric)
-{
-	if (ITEM_STATE_NOTSUPPORTED == metric->state && 0 == metric->refresh_unsupported)
-		return FAIL;
-
-	return SUCCEED;
-}
-
 static int	get_min_nextcheck(void)
 {
 	int	i, min = -1;
@@ -155,9 +112,6 @@ static int	get_min_nextcheck(void)
 	for (i = 0; i < active_metrics.values_num; i++)
 	{
 		const ZBX_ACTIVE_METRIC	*metric = (const ZBX_ACTIVE_METRIC *)active_metrics.values[i];
-
-		if (SUCCEED != metric_ready_to_process(metric))
-			continue;
 
 		if (metric->nextcheck < min || -1 == min)
 			min = metric->nextcheck;
@@ -214,15 +168,6 @@ static void	add_check(const char *key, const char *key_orig, int refresh, zbx_ui
 			metric->refresh = refresh;
 		}
 
-		if (ITEM_STATE_NOTSUPPORTED == metric->state)
-		{
-			/* Currently receiving list of active checks works as a signal to refresh unsupported */
-			/* items. Hopefully in the future this will be controlled by server (ZBXNEXT-2633). */
-			metric->refresh_unsupported = 1;
-			metric->start_time = 0.0;
-			metric->processed_bytes = 0;
-		}
-
 		goto out;
 	}
 
@@ -234,7 +179,6 @@ static void	add_check(const char *key, const char *key_orig, int refresh, zbx_ui
 	metric->refresh = refresh;
 	metric->nextcheck = 0;
 	metric->state = ITEM_STATE_NORMAL;
-	metric->refresh_unsupported = 0;
 	metric->lastlogsize = lastlogsize;
 	metric->mtime = mtime;
 	/* existing log[], log.count[] and eventlog[] data can be skipped */
@@ -329,7 +273,8 @@ static int	mode_parameter_is_skip(unsigned char flags, const char *itemkey)
 static int	parse_list_of_checks(char *str, const char *host, unsigned short port)
 {
 	const char		*p;
-	char			name[MAX_STRING_LEN], key_orig[MAX_STRING_LEN], expression[MAX_STRING_LEN],
+	size_t			name_alloc = 0, key_orig_alloc = 0;
+	char			*name = NULL, *key_orig = NULL, expression[MAX_STRING_LEN],
 				tmp[MAX_STRING_LEN], exp_delimiter;
 	zbx_uint64_t		lastlogsize;
 	struct zbx_json_parse	jp;
@@ -348,7 +293,7 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 		goto out;
 	}
 
-	if (SUCCEED != zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_RESPONSE, tmp, sizeof(tmp)))
+	if (SUCCEED != zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_RESPONSE, tmp, sizeof(tmp), NULL))
 	{
 		zabbix_log(LOG_LEVEL_ERR, "cannot parse list of active checks: %s", zbx_json_strerror());
 		goto out;
@@ -356,7 +301,7 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 
 	if (0 != strcmp(tmp, ZBX_PROTO_VALUE_SUCCESS))
 	{
-		if (SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, tmp, sizeof(tmp)))
+		if (SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, tmp, sizeof(tmp), NULL))
 			zabbix_log(LOG_LEVEL_WARNING, "no active checks on server [%s:%hu]: %s", host, port, tmp);
 		else
 			zabbix_log(LOG_LEVEL_WARNING, "no active checks on server");
@@ -381,18 +326,22 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 			goto out;
 		}
 
-		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_KEY, name, sizeof(name)) || '\0' == *name)
+		if (SUCCEED != zbx_json_value_by_name_dyn(&jp_row, ZBX_PROTO_TAG_KEY, &name, &name_alloc, NULL) ||
+				'\0' == *name)
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", ZBX_PROTO_TAG_KEY);
 			continue;
 		}
 
-		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_KEY_ORIG, key_orig, sizeof(key_orig))
-				|| '\0' == *key_orig) {
-			zbx_strlcpy(key_orig, name, sizeof(key_orig));
+		if (SUCCEED != zbx_json_value_by_name_dyn(&jp_row, ZBX_PROTO_TAG_KEY_ORIG, &key_orig, &key_orig_alloc,
+				NULL) || '\0' == *key_orig)
+		{
+			size_t offset = 0;
+			zbx_strcpy_alloc(&key_orig, &key_orig_alloc, &offset, name);
 		}
 
-		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_DELAY, tmp, sizeof(tmp)) || '\0' == *tmp)
+		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_DELAY, tmp, sizeof(tmp), NULL) ||
+				'\0' == *tmp)
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", ZBX_PROTO_TAG_DELAY);
 			continue;
@@ -400,14 +349,15 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 
 		delay = atoi(tmp);
 
-		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_LASTLOGSIZE, tmp, sizeof(tmp)) ||
+		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_LASTLOGSIZE, tmp, sizeof(tmp), NULL) ||
 				SUCCEED != is_uint64(tmp, &lastlogsize))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", ZBX_PROTO_TAG_LASTLOGSIZE);
 			continue;
 		}
 
-		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_MTIME, tmp, sizeof(tmp)) || '\0' == *tmp)
+		if (SUCCEED != zbx_json_value_by_name(&jp_row, ZBX_PROTO_TAG_MTIME, tmp, sizeof(tmp), NULL) ||
+				'\0' == *tmp)
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", ZBX_PROTO_TAG_MTIME);
 			mtime = 0;
@@ -471,20 +421,20 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 				goto out;
 			}
 
-			if (SUCCEED != zbx_json_value_by_name(&jp_row, "name", name, sizeof(name)))
+			if (SUCCEED != zbx_json_value_by_name_dyn(&jp_row, "name", &name, &name_alloc, NULL))
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", "name");
 				continue;
 			}
 
-			if (SUCCEED != zbx_json_value_by_name(&jp_row, "expression", expression, sizeof(expression)) ||
-					'\0' == *expression)
+			if (SUCCEED != zbx_json_value_by_name(&jp_row, "expression", expression, sizeof(expression),
+					NULL) || '\0' == *expression)
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", "expression");
 				continue;
 			}
 
-			if (SUCCEED != zbx_json_value_by_name(&jp_row, "expression_type", tmp, sizeof(tmp)) ||
+			if (SUCCEED != zbx_json_value_by_name(&jp_row, "expression_type", tmp, sizeof(tmp), NULL) ||
 					'\0' == *tmp)
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", "expression_type");
@@ -493,7 +443,7 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 
 			expression_type = atoi(tmp);
 
-			if (SUCCEED != zbx_json_value_by_name(&jp_row, "exp_delimiter", tmp, sizeof(tmp)))
+			if (SUCCEED != zbx_json_value_by_name(&jp_row, "exp_delimiter", tmp, sizeof(tmp), NULL))
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", "exp_delimiter");
 				continue;
@@ -502,7 +452,7 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 			exp_delimiter = tmp[0];
 
 			if (SUCCEED != zbx_json_value_by_name(&jp_row, "case_sensitive", tmp,
-					sizeof(tmp)) || '\0' == *tmp)
+					sizeof(tmp), NULL) || '\0' == *tmp)
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "cannot retrieve value of tag \"%s\"", "case_sensitive");
 				continue;
@@ -518,10 +468,76 @@ static int	parse_list_of_checks(char *str, const char *host, unsigned short port
 out:
 	zbx_vector_str_clear_ext(&received_metrics, zbx_str_free);
 	zbx_vector_str_destroy(&received_metrics);
+	zbx_free(key_orig);
+	zbx_free(name);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
+}
+
+/*********************************************************************************
+ *                                                                               *
+ * Function: process_config_item                                                 *
+ *                                                                               *
+ * Purpose: process configuration item and set it value to respective parameter  *
+ *                                                                               *
+ * Parameters: json   - pointer to JSON structure where to put resulting value   *
+ *             config - pointer to configuration parameter                       *
+ *             length - length of configuration parameter                        *
+ *             proto  - configuration parameter prototype                        *
+ *                                                                               *
+ ********************************************************************************/
+static void process_config_item(struct zbx_json *json, char *config, size_t length, const char *proto)
+{
+	char		**value;
+	AGENT_RESULT	result;
+	const char	*config_name;
+	const char	*config_type;
+
+	if (CONFIG_HOST_METADATA_ITEM == config)
+	{
+		config_name = "HostMetadataItem";
+		config_type = "metadata";
+	}
+	else /* CONFIG_HOST_INTERFACE_ITEM */
+	{
+		config_name = "HostInterfaceItem";
+		config_type = "interface";
+	}
+
+	init_result(&result);
+
+	if (SUCCEED == process(config, PROCESS_LOCAL_COMMAND | PROCESS_WITH_ALIAS, &result) &&
+			NULL != (value = GET_STR_RESULT(&result)) && NULL != *value)
+	{
+		if (SUCCEED != zbx_is_utf8(*value))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "cannot get host %s using \"%s\" item specified by"
+					" \"%s\" configuration parameter: returned value is not"
+					" an UTF-8 string",config_type, config, config_name);
+		}
+		else
+		{
+			if (length < zbx_strlen_utf8(*value))
+			{
+				size_t	bytes;
+
+				zabbix_log(LOG_LEVEL_WARNING, "the returned value of \"%s\" item specified by"
+						" \"%s\" configuration parameter is too long,"
+						" using first %d characters", config, config_name, (int)length);
+
+				bytes = zbx_strlen_utf8_nchars(*value, length);
+				(*value)[bytes] = '\0';
+			}
+			zbx_json_addstring(json, proto, *value, ZBX_JSON_TYPE_STRING);
+		}
+	}
+	else
+		zabbix_log(LOG_LEVEL_WARNING, "cannot get host %s using \"%s\" item specified by"
+				" \"%s\" configuration parameter",config_type, config,config_name);
+
+	free_result(&result);
 }
 
 /******************************************************************************
@@ -543,7 +559,7 @@ out:
  ******************************************************************************/
 static int	refresh_active_checks(const char *host, unsigned short port)
 {
-	ZBX_THREAD_LOCAL static int	last_ret = SUCCEED;
+	static ZBX_THREAD_LOCAL int	last_ret = SUCCEED;
 	int				ret;
 	char				*tls_arg1, *tls_arg2;
 	zbx_socket_t			s;
@@ -562,42 +578,16 @@ static int	refresh_active_checks(const char *host, unsigned short port)
 	}
 	else if (NULL != CONFIG_HOST_METADATA_ITEM)
 	{
-		char		**value;
-		AGENT_RESULT	result;
+		process_config_item(&json, CONFIG_HOST_METADATA_ITEM, HOST_METADATA_LEN, ZBX_PROTO_TAG_HOST_METADATA);
+	}
 
-		init_result(&result);
-
-		if (SUCCEED == process(CONFIG_HOST_METADATA_ITEM, PROCESS_LOCAL_COMMAND | PROCESS_WITH_ALIAS, &result) &&
-				NULL != (value = GET_STR_RESULT(&result)) && NULL != *value)
-		{
-			if (SUCCEED != zbx_is_utf8(*value))
-			{
-				zabbix_log(LOG_LEVEL_WARNING, "cannot get host metadata using \"%s\" item specified by"
-						" \"HostMetadataItem\" configuration parameter: returned value is not"
-						" an UTF-8 string", CONFIG_HOST_METADATA_ITEM);
-			}
-			else
-			{
-				if (HOST_METADATA_LEN < zbx_strlen_utf8(*value))
-				{
-					size_t	bytes;
-
-					zabbix_log(LOG_LEVEL_WARNING, "the returned value of \"%s\" item specified by"
-							" \"HostMetadataItem\" configuration parameter is too long,"
-							" using first %d characters", CONFIG_HOST_METADATA_ITEM,
-							HOST_METADATA_LEN);
-
-					bytes = zbx_strlen_utf8_nchars(*value, HOST_METADATA_LEN);
-					(*value)[bytes] = '\0';
-				}
-				zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST_METADATA, *value, ZBX_JSON_TYPE_STRING);
-			}
-		}
-		else
-			zabbix_log(LOG_LEVEL_WARNING, "cannot get host metadata using \"%s\" item specified by"
-					" \"HostMetadataItem\" configuration parameter", CONFIG_HOST_METADATA_ITEM);
-
-		free_result(&result);
+	if (NULL != CONFIG_HOST_INTERFACE)
+	{
+		zbx_json_addstring(&json, ZBX_PROTO_TAG_INTERFACE, CONFIG_HOST_INTERFACE, ZBX_JSON_TYPE_STRING);
+	}
+	else if (NULL != CONFIG_HOST_INTERFACE_ITEM)
+	{
+		process_config_item(&json, CONFIG_HOST_INTERFACE_ITEM, HOST_INTERFACE_LEN, ZBX_PROTO_TAG_INTERFACE);
 	}
 
 	if (NULL != CONFIG_LISTEN_IP)
@@ -622,7 +612,7 @@ static int	refresh_active_checks(const char *host, unsigned short port)
 			tls_arg1 = NULL;
 			tls_arg2 = NULL;
 			break;
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		case ZBX_TCP_SEC_TLS_CERT:
 			tls_arg1 = CONFIG_TLS_SERVER_CERT_ISSUER;
 			tls_arg2 = CONFIG_TLS_SERVER_CERT_SUBJECT;
@@ -707,12 +697,12 @@ static int	check_response(char *response)
 	ret = zbx_json_open(response, &jp);
 
 	if (SUCCEED == ret)
-		ret = zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_RESPONSE, value, sizeof(value));
+		ret = zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_RESPONSE, value, sizeof(value), NULL);
 
 	if (SUCCEED == ret && 0 != strcmp(value, ZBX_PROTO_VALUE_SUCCESS))
 		ret = FAIL;
 
-	if (SUCCEED == ret && SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, info, sizeof(info)))
+	if (SUCCEED == ret && SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, info, sizeof(info), NULL))
 		zabbix_log(LOG_LEVEL_DEBUG, "info from server: '%s'", info);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
@@ -817,7 +807,7 @@ static int	send_buffer(const char *host, unsigned short port)
 			tls_arg1 = NULL;
 			tls_arg2 = NULL;
 			break;
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		case ZBX_TCP_SEC_TLS_CERT:
 			tls_arg1 = CONFIG_TLS_SERVER_CERT_ISSUER;
 			tls_arg2 = CONFIG_TLS_SERVER_CERT_SUBJECT;
@@ -945,7 +935,7 @@ ret:
  *                                                                            *
  ******************************************************************************/
 static int	process_value(const char *server, unsigned short port, const char *host, const char *key,
-		const char *value, unsigned char state, zbx_uint64_t *lastlogsize, const int *mtime,
+		const char *value, unsigned char state, zbx_uint64_t *lastlogsize, int *mtime,
 		unsigned long *timestamp, const char *source, unsigned short *severity, unsigned long *logeventid,
 		unsigned char flags)
 {
@@ -1095,493 +1085,25 @@ static int	need_meta_update(ZBX_ACTIVE_METRIC *metric, zbx_uint64_t lastlogsize_
 	return ret;
 }
 
-static int	check_number_of_parameters(unsigned char flags, const AGENT_REQUEST *request, char **error)
-{
-	int	parameter_num, max_parameter_num;
-
-	if (0 == (parameter_num = get_rparams_num(request)))
-	{
-		*error = zbx_strdup(*error, "Invalid number of parameters.");
-		return FAIL;
-	}
-
-	if (0 != (ZBX_METRIC_FLAG_LOG_LOG & flags) && 0 != (ZBX_METRIC_FLAG_LOG_COUNT & flags))	/* log.count */
-		max_parameter_num = 6;
-	else if (0 != (ZBX_METRIC_FLAG_LOG_LOGRT & flags) && 0 == (ZBX_METRIC_FLAG_LOG_COUNT & flags))	/* logrt */
-		max_parameter_num = 8;
-	else
-		max_parameter_num = 7;	/* log or logrt.count */
-
-	if (max_parameter_num < parameter_num)
-	{
-		*error = zbx_strdup(*error, "Too many parameters.");
-		return FAIL;
-	}
-
-	return SUCCEED;
-}
-
-static int	init_max_lines_per_sec(int is_count_item, const AGENT_REQUEST *request, int *max_lines_per_sec,
+#if !defined(_WINDOWS) && !defined(__MINGW32__)
+static int	process_eventlog_check(char *server, unsigned short port, zbx_vector_ptr_t *regular_expressions,
+		ZBX_ACTIVE_METRIC *metric, zbx_process_value_func_t process_value_cb, zbx_uint64_t *lastlogsize_sent,
 		char **error)
 {
-	const char	*p;
-	int		rate;
-
-	if (NULL == (p = get_rparam(request, 3)) || '\0' == *p)
-	{
-		if (0 == is_count_item)				/* log[], logrt[] */
-			*max_lines_per_sec = CONFIG_MAX_LINES_PER_SECOND;
-		else						/* log.count[], logrt.count[] */
-			*max_lines_per_sec = MAX_VALUE_LINES_MULTIPLIER * CONFIG_MAX_LINES_PER_SECOND;
-
-		return SUCCEED;
-	}
-
-	if (MIN_VALUE_LINES > (rate = atoi(p)) ||
-			(0 == is_count_item && MAX_VALUE_LINES < rate) ||
-			(1 == is_count_item && MAX_VALUE_LINES_MULTIPLIER * MAX_VALUE_LINES < rate))
-	{
-		*error = zbx_strdup(*error, "Invalid fourth parameter.");
-		return FAIL;
-	}
-
-	*max_lines_per_sec = rate;
-	return SUCCEED;
-}
-
-static int	init_max_delay(int is_count_item, const AGENT_REQUEST *request, float *max_delay, char **error)
-{
-	const char	*max_delay_str;
-	float		max_delay_tmp;
-	int		max_delay_par_nr;
-
-	/* <maxdelay> is parameter 6 for log[], logrt[], but parameter 5 for log.count[], logrt.count[] */
-
-	if (0 == is_count_item)
-		max_delay_par_nr = 6;
-	else
-		max_delay_par_nr = 5;
-
-	if (NULL == (max_delay_str = get_rparam(request, max_delay_par_nr)) || '\0' == *max_delay_str)
-	{
-		*max_delay = 0.0f;
-		return SUCCEED;
-	}
-
-	if (SUCCEED != is_double(max_delay_str) || 0.0f > (max_delay_tmp = (float)atof(max_delay_str)))
-	{
-		*error = zbx_dsprintf(*error, "Invalid %s parameter.", (5 == max_delay_par_nr) ? "sixth" : "seventh");
-		return FAIL;
-	}
-
-	*max_delay = max_delay_tmp;
-	return SUCCEED;
-}
-
-static int	init_rotation_type(unsigned char flags, const AGENT_REQUEST *request, int *rotation_type, char **error)
-{
-	if (0 != (ZBX_METRIC_FLAG_LOG_LOGRT & flags))
-	{
-		char	*options;
-		int	options_par_nr;
-
-		if (0 == (ZBX_METRIC_FLAG_LOG_COUNT & flags))	/* logrt */
-			options_par_nr = 7;
-		else						/* logrt.count */
-			options_par_nr = 6;
-
-		if (NULL != (options = get_rparam(request, options_par_nr)) && '\0' != *options)
-		{
-			if (0 == strcmp(options, "copytruncate"))
-			{
-				*rotation_type = ZBX_LOG_ROTATION_LOGCPT;
-				return SUCCEED;
-			}
-
-			if (0 != strcmp(options, "rotate"))
-			{
-				*error = zbx_dsprintf(*error, "Invalid %s parameter.", (6 == options_par_nr) ?
-						"seventh" : "eighth");
-				return FAIL;
-			}
-		}
-	}
-
-	*rotation_type = ZBX_LOG_ROTATION_LOGRT;	/* default */
-	return SUCCEED;
-}
-
-static int	process_log_check(char *server, unsigned short port, ZBX_ACTIVE_METRIC *metric,
-		zbx_uint64_t *lastlogsize_sent, int *mtime_sent, char **error)
-{
-	AGENT_REQUEST		request;
-	const char		*filename, *regexp, *encoding, *skip, *output_template;
-	char			*encoding_uc = NULL;
-	int			max_lines_per_sec, ret = FAIL, s_count, p_count, s_count_orig, is_count_item,
-				mtime_orig, big_rec_orig, logfiles_num_new = 0, jumped = 0, rotation_type;
-	zbx_uint64_t		lastlogsize_orig;
-	float			max_delay;
-	struct st_logfile	*logfiles_new = NULL;
-
-	if (0 != (ZBX_METRIC_FLAG_LOG_COUNT & metric->flags))
-		is_count_item = 1;
-	else
-		is_count_item = 0;
-
-	init_request(&request);
-
-	/* Expected parameters by item: */
-	/* log        [file,       <regexp>,<encoding>,<maxlines>,    <mode>,<output>,<maxdelay>]            7 params */
-	/* log.count  [file,       <regexp>,<encoding>,<maxproclines>,<mode>,         <maxdelay>]            6 params */
-	/* logrt      [file_regexp,<regexp>,<encoding>,<maxlines>,    <mode>,<output>,<maxdelay>, <options>] 8 params */
-	/* logrt.count[file_regexp,<regexp>,<encoding>,<maxproclines>,<mode>,         <maxdelay>, <options>] 7 params */
-
-	if (SUCCEED != parse_item_key(metric->key, &request))
-	{
-		*error = zbx_strdup(*error, "Invalid item key format.");
-		goto out;
-	}
-
-	if (SUCCEED != check_number_of_parameters(metric->flags, &request, error))
-		goto out;
-
-	/* parameter 'file' or 'file_regexp' */
-
-	if (NULL == (filename = get_rparam(&request, 0)) || '\0' == *filename)
-	{
-		*error = zbx_strdup(*error, "Invalid first parameter.");
-		goto out;
-	}
-
-	/* parameter 'regexp' */
-
-	if (NULL == (regexp = get_rparam(&request, 1)))
-	{
-		regexp = "";
-	}
-	else if ('@' == *regexp && SUCCEED != zbx_global_regexp_exists(regexp + 1, &regexps))
-	{
-		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", regexp + 1);
-		goto out;
-	}
-
-	/* parameter 'encoding' */
-
-	if (NULL == (encoding = get_rparam(&request, 2)))
-	{
-		encoding = "";
-	}
-	else
-	{
-		encoding_uc = zbx_strdup(encoding_uc, encoding);
-		zbx_strupper(encoding_uc);
-		encoding = encoding_uc;
-	}
-
-	/* parameter 'maxlines' or 'maxproclines' */
-	if (SUCCEED !=  init_max_lines_per_sec(is_count_item, &request, &max_lines_per_sec, error))
-		goto out;
-
-	/* parameter 'mode' */
-
-	if (NULL == (skip = get_rparam(&request, 4)) || '\0' == *skip || 0 == strcmp(skip, "all"))
-	{
-		metric->skip_old_data = 0;
-	}
-	else if (0 != strcmp(skip, "skip"))
-	{
-		*error = zbx_strdup(*error, "Invalid fifth parameter.");
-		goto out;
-	}
-
-	/* parameter 'output' (not used for log.count[], logrt.count[]) */
-	if (1 == is_count_item || (NULL == (output_template = get_rparam(&request, 5))))
-		output_template = "";
-
-	/* parameter 'maxdelay' */
-	if (SUCCEED != init_max_delay(is_count_item, &request, &max_delay, error))
-		goto out;
-
-	/* parameter 'options' */
-	if (SUCCEED != init_rotation_type(metric->flags, &request, &rotation_type, error))
-		goto out;
-
-	/* jumping over fast growing log files is not supported with 'copytruncate' */
-	if (ZBX_LOG_ROTATION_LOGCPT == rotation_type && 0.0f != max_delay)
-	{
-		*error = zbx_strdup(*error, "maxdelay > 0 is not supported with copytruncate option.");
-		goto out;
-	}
-
-	/* do not flood Zabbix server if file grows too fast */
-	s_count = max_lines_per_sec * metric->refresh;
-
-	/* do not flood local system if file grows too fast */
-	if (0 == is_count_item)
-	{
-		p_count = MAX_VALUE_LINES_MULTIPLIER * s_count;	/* log[], logrt[] */
-	}
-	else
-	{
-		/* In log.count[] and logrt.count[] items the variable 's_count' (max number of lines allowed to be */
-		/* sent to server) is used for counting matching lines in logfile(s). 's_count' is counted from max */
-		/* value down towards 0. */
-
-		p_count = s_count_orig = s_count;
-
-		/* remember current state, we may need to restore it if log.count[] or logrt.count[] result cannot */
-		/* be sent to server */
-
-		lastlogsize_orig = metric->lastlogsize;
-		mtime_orig = metric->mtime;
-		big_rec_orig = metric->big_rec;
-
-		/* process_logrt() may modify old log file list 'metric->logfiles' but currently modifications are */
-		/* limited to 'retry' flag in existing list elements. We do not preserve original 'retry' flag values */
-		/* as there is no need to "rollback" their modifications if log.count[] or logrt.count[] result can */
-		/* not be sent to server. */
-	}
-
-	ret = process_logrt(metric->flags, filename, &metric->lastlogsize, &metric->mtime, lastlogsize_sent, mtime_sent,
-			&metric->skip_old_data, &metric->big_rec, &metric->use_ino, error, &metric->logfiles,
-			&metric->logfiles_num, &logfiles_new, &logfiles_num_new, encoding, &regexps, regexp,
-			output_template, &p_count, &s_count, process_value, server, port, CONFIG_HOSTNAME,
-			metric->key_orig, &jumped, max_delay, &metric->start_time, &metric->processed_bytes,
-			rotation_type);
-
-	if (0 == is_count_item && NULL != logfiles_new)
-	{
-		/* for log[] and logrt[] items - switch to the new log file list */
-
-		destroy_logfile_list(&metric->logfiles, NULL, &metric->logfiles_num);
-		metric->logfiles = logfiles_new;
-		metric->logfiles_num = logfiles_num_new;
-	}
-
-	if (SUCCEED == ret)
-	{
-		metric->error_count = 0;
-
-		if (1 == is_count_item)
-		{
-			/* send log.count[] or logrt.count[] item value to server */
-
-			int	match_count;			/* number of matching lines */
-			char	buf[ZBX_MAX_UINT64_LEN];
-
-			match_count = s_count_orig - s_count;
-
-			zbx_snprintf(buf, sizeof(buf), "%d", match_count);
-
-			if (SUCCEED == process_value(server, port, CONFIG_HOSTNAME, metric->key_orig, buf,
-					ITEM_STATE_NORMAL, &metric->lastlogsize, &metric->mtime, NULL, NULL, NULL, NULL,
-					metric->flags | ZBX_METRIC_FLAG_PERSISTENT) || 0 != jumped)
-			{
-				/* if process_value() fails (i.e. log(rt).count result cannot be sent to server) but */
-				/* a jump took place to meet <maxdelay> then we discard the result and keep the state */
-				/* after jump */
-
-				*lastlogsize_sent = metric->lastlogsize;
-				*mtime_sent = metric->mtime;
-
-				/* switch to the new log file list */
-				destroy_logfile_list(&metric->logfiles, NULL, &metric->logfiles_num);
-				metric->logfiles = logfiles_new;
-				metric->logfiles_num = logfiles_num_new;
-			}
-			else
-			{
-				/* unable to send data and no jump took place, restore original state to try again */
-				/* during the next check */
-
-				metric->lastlogsize = lastlogsize_orig;
-				metric->mtime =  mtime_orig;
-				metric->big_rec = big_rec_orig;
-
-				/* the old log file list 'metric->logfiles' stays in its place, drop the new list */
-				destroy_logfile_list(&logfiles_new, NULL, &logfiles_num_new);
-			}
-		}
-	}
-	else
-	{
-		metric->error_count++;
-
-		if (1 == is_count_item)
-		{
-			/* restore original state to try again during the next check */
-
-			metric->lastlogsize = lastlogsize_orig;
-			metric->mtime =  mtime_orig;
-			metric->big_rec = big_rec_orig;
-
-			/* the old log file list 'metric->logfiles' stays in its place, drop the new list */
-			destroy_logfile_list(&logfiles_new, NULL, &logfiles_num_new);
-		}
-
-		/* suppress first two errors */
-		if (3 > metric->error_count)
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "suppressing log(rt)(.count) processing error #%d: %s",
-					metric->error_count, NULL != *error ? *error : "unknown error");
-
-			zbx_free(*error);
-			ret = SUCCEED;
-		}
-	}
-out:
-	zbx_free(encoding_uc);
-	free_request(&request);
-
-	return ret;
-}
-
-static int	process_eventlog_check(char *server, unsigned short port, ZBX_ACTIVE_METRIC *metric,
-		zbx_uint64_t *lastlogsize_sent, char **error)
-{
-	int 		ret = FAIL;
-
-#ifdef _WINDOWS
-	AGENT_REQUEST	request;
-	const char	*filename, *pattern, *maxlines_persec, *key_severity, *key_source, *key_logeventid, *skip;
-	int		rate;
-	OSVERSIONINFO	versionInfo;
-
-	init_request(&request);
-
-	if (SUCCEED != parse_item_key(metric->key, &request))
-	{
-		*error = zbx_strdup(*error, "Invalid item key format.");
-		goto out;
-	}
-
-	if (0 == get_rparams_num(&request))
-	{
-		*error = zbx_strdup(*error, "Invalid number of parameters.");
-		goto out;
-	}
-
-	if (7 < get_rparams_num(&request))
-	{
-		*error = zbx_strdup(*error, "Too many parameters.");
-		goto out;
-	}
-
-	if (NULL == (filename = get_rparam(&request, 0)) || '\0' == *filename)
-	{
-		*error = zbx_strdup(*error, "Invalid first parameter.");
-		goto out;
-	}
-
-	if (NULL == (pattern = get_rparam(&request, 1)))
-	{
-		pattern = "";
-	}
-	else if ('@' == *pattern && SUCCEED != zbx_global_regexp_exists(pattern + 1, &regexps))
-	{
-		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", pattern + 1);
-		goto out;
-	}
-
-	if (NULL == (key_severity = get_rparam(&request, 2)))
-	{
-		key_severity = "";
-	}
-	else if ('@' == *key_severity && SUCCEED != zbx_global_regexp_exists(key_severity + 1, &regexps))
-	{
-		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", key_severity + 1);
-		goto out;
-	}
-
-	if (NULL == (key_source = get_rparam(&request, 3)))
-	{
-		key_source = "";
-	}
-	else if ('@' == *key_source && SUCCEED != zbx_global_regexp_exists(key_source + 1, &regexps))
-	{
-		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", key_source + 1);
-		goto out;
-	}
-
-	if (NULL == (key_logeventid = get_rparam(&request, 4)))
-	{
-		key_logeventid = "";
-	}
-	else if ('@' == *key_logeventid && SUCCEED != zbx_global_regexp_exists(key_logeventid + 1, &regexps))
-	{
-		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", key_logeventid + 1);
-		goto out;
-	}
-
-	if (NULL == (maxlines_persec = get_rparam(&request, 5)) || '\0' == *maxlines_persec)
-	{
-		rate = CONFIG_MAX_LINES_PER_SECOND;
-	}
-	else if (MIN_VALUE_LINES > (rate = atoi(maxlines_persec)) || MAX_VALUE_LINES < rate)
-	{
-		*error = zbx_strdup(*error, "Invalid sixth parameter.");
-		goto out;
-	}
-
-	if (NULL == (skip = get_rparam(&request, 6)) || '\0' == *skip || 0 == strcmp(skip, "all"))
-	{
-		metric->skip_old_data = 0;
-	}
-	else if (0 != strcmp(skip, "skip"))
-	{
-		*error = zbx_strdup(*error, "Invalid seventh parameter.");
-		goto out;
-	}
-
-	versionInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	GetVersionEx(&versionInfo);
-
-	if (versionInfo.dwMajorVersion >= 6)	/* Windows Vista, 7 or Server 2008 */
-	{
-		__try
-		{
-			zbx_uint64_t	lastlogsize = metric->lastlogsize;
-			EVT_HANDLE	eventlog6_render_context = NULL;
-			EVT_HANDLE	eventlog6_query = NULL;
-			zbx_uint64_t	eventlog6_firstid = 0;
-			zbx_uint64_t	eventlog6_lastid = 0;
-
-			if (SUCCEED != initialize_eventlog6(filename, &lastlogsize, &eventlog6_firstid,
-					&eventlog6_lastid, &eventlog6_render_context, &eventlog6_query, error))
-			{
-				finalize_eventlog6(&eventlog6_render_context, &eventlog6_query);
-				goto out;
-			}
-
-			ret = process_eventslog6(server, port, filename, &eventlog6_render_context, &eventlog6_query,
-					lastlogsize, eventlog6_firstid, eventlog6_lastid, &regexps, pattern,
-					key_severity, key_source, key_logeventid, rate, process_value, metric,
-					lastlogsize_sent, error);
-
-			finalize_eventlog6(&eventlog6_render_context, &eventlog6_query);
-		}
-		__except (DelayLoadDllExceptionFilter(GetExceptionInformation()))
-		{
-			zabbix_log(LOG_LEVEL_WARNING, "failed to process eventlog");
-		}
-	}
-	else if (versionInfo.dwMajorVersion < 6)    /* Windows versions before Vista */
-	{
-		ret = process_eventslog(server, port, filename, &regexps, pattern, key_severity, key_source,
-				key_logeventid, rate, process_value, metric, lastlogsize_sent, error);
-	}
-out:
-	free_request(&request);
-#else	/* not _WINDOWS */
 	ZBX_UNUSED(server);
 	ZBX_UNUSED(port);
+	ZBX_UNUSED(regular_expressions);
 	ZBX_UNUSED(metric);
+	ZBX_UNUSED(process_value_cb);
 	ZBX_UNUSED(lastlogsize_sent);
 	ZBX_UNUSED(error);
-#endif	/* _WINDOWS */
 
-	return ret;
+	return FAIL;
 }
+#else
+int	process_eventlog_check(char *server, unsigned short port, zbx_vector_ptr_t *regexps, ZBX_ACTIVE_METRIC *metric,
+		zbx_process_value_func_t process_value_cb, zbx_uint64_t *lastlogsize_sent, char **error);
+#endif
 
 static int	process_common_check(char *server, unsigned short port, ZBX_ACTIVE_METRIC *metric, char **error)
 {
@@ -1631,9 +1153,6 @@ static void	process_active_checks(char *server, unsigned short port)
 		if (metric->nextcheck > now)
 			continue;
 
-		if (SUCCEED != metric_ready_to_process(metric))
-			continue;
-
 		/* for meta information update we need to know if something was sent at all during the check */
 		lastlogsize_last = metric->lastlogsize;
 		mtime_last = metric->mtime;
@@ -1648,9 +1167,12 @@ static void	process_active_checks(char *server, unsigned short port)
 			error = zbx_strdup(error, "Incorrect update interval.");
 		}
 		else if (0 != ((ZBX_METRIC_FLAG_LOG_LOG | ZBX_METRIC_FLAG_LOG_LOGRT) & metric->flags))
-			ret = process_log_check(server, port, metric, &lastlogsize_sent, &mtime_sent, &error);
+		{
+			ret = process_log_check(server, port, &regexps, metric, process_value, &lastlogsize_sent,
+					&mtime_sent, &error);
+		}
 		else if (0 != (ZBX_METRIC_FLAG_LOG_EVENTLOG & metric->flags))
-			ret = process_eventlog_check(server, port, metric, &lastlogsize_sent, &error);
+			ret = process_eventlog_check(server, port, &regexps, metric, process_value, &lastlogsize_sent, &error);
 		else
 			ret = process_common_check(server, port, metric, &error);
 
@@ -1661,9 +1183,7 @@ static void	process_active_checks(char *server, unsigned short port)
 			perror = (NULL != error ? error : ZBX_NOTSUPPORTED_MSG);
 
 			metric->state = ITEM_STATE_NOTSUPPORTED;
-			metric->refresh_unsupported = 0;
 			metric->error_count = 0;
-			metric->start_time = 0.0;
 			metric->processed_bytes = 0;
 
 			zabbix_log(LOG_LEVEL_WARNING, "active check \"%s\" is not supported: %s", metric->key, perror);
@@ -1685,7 +1205,6 @@ static void	process_active_checks(char *server, unsigned short port)
 				{
 					/* item became supported */
 					metric->state = ITEM_STATE_NORMAL;
-					metric->refresh_unsupported = 0;
 				}
 
 				if (SUCCEED == need_meta_update(metric, lastlogsize_sent, mtime_sent, old_state,
@@ -1740,7 +1259,6 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 	ZBX_THREAD_ACTIVECHK_ARGS activechk_args;
 
 	time_t	nextcheck = 0, nextrefresh = 0, nextsend = 0, now, delta, lastcheck = 0;
-	double	time_now;
 
 	assert(args);
 	assert(((zbx_thread_args_t *)args)->args);
@@ -1754,23 +1272,22 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 
 	activechk_args.host = zbx_strdup(NULL, ((ZBX_THREAD_ACTIVECHK_ARGS *)((zbx_thread_args_t *)args)->args)->host);
 	activechk_args.port = ((ZBX_THREAD_ACTIVECHK_ARGS *)((zbx_thread_args_t *)args)->args)->port;
+	CONFIG_HOSTNAME = zbx_strdup(NULL, ((ZBX_THREAD_ACTIVECHK_ARGS *)((zbx_thread_args_t *)args)->args)->hostname);
 
 	zbx_free(args);
 
 	session_token = zbx_create_token(0);
 
-#if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
+#if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_init_child();
 #endif
 	init_active_metrics();
 
 	while (ZBX_IS_RUNNING())
 	{
-		time_now = zbx_time();
-		zbx_update_env(time_now);
-		now = (int)time_now;
+		zbx_update_env(zbx_time());
 
-		if (now >= nextsend)
+		if ((now = time(NULL)) >= nextsend)
 		{
 			send_buffer(activechk_args.host, activechk_args.port);
 			nextsend = time(NULL) + 1;
@@ -1831,5 +1348,10 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 	ZBX_DO_EXIT();
 
 	zbx_thread_exit(EXIT_SUCCESS);
+#else
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #endif
 }

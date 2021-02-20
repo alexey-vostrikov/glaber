@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -50,7 +50,8 @@ typedef struct
 }
 zbx_str_uint64_pair_t;
 
-ZBX_VECTOR_DECL(str_uint64_pair, zbx_str_uint64_pair_t)
+ZBX_PTR_VECTOR_DECL(str_uint64_pair, zbx_str_uint64_pair_t)
+int	zbx_str_uint64_pair_name_compare(const void *p1, const void *p2);
 
 /* performance counter data */
 typedef struct
@@ -94,20 +95,39 @@ typedef struct
 }
 zbx_vmware_perf_entity_t;
 
+#define ZBX_VMWARE_DS_NONE		0
+#define ZBX_VMWARE_DS_MOUNTED		1
+#define ZBX_VMWARE_DS_ACCESSIBLE	2
+#define ZBX_VMWARE_DS_READ		4
+#define ZBX_VMWARE_DS_WRITE		8
+#define ZBX_VMWARE_DS_READWRITE		(ZBX_VMWARE_DS_READ | ZBX_VMWARE_DS_WRITE)
+#define ZBX_VMWARE_DS_READ_FILTER	(ZBX_VMWARE_DS_MOUNTED | ZBX_VMWARE_DS_ACCESSIBLE | ZBX_VMWARE_DS_READ)
+#define ZBX_VMWARE_DS_WRITE_FILTER	(ZBX_VMWARE_DS_MOUNTED | ZBX_VMWARE_DS_ACCESSIBLE | ZBX_VMWARE_DS_READWRITE)
+
 typedef struct
 {
-	char			*name;
-	char			*uuid;
-	char			*id;
-	zbx_uint64_t		capacity;
-	zbx_uint64_t		free_space;
-	zbx_uint64_t		uncommitted;
-	zbx_vector_str_t	hv_uuids;
+	char				*name;
+	char				*uuid;
+	char				*id;
+	zbx_uint64_t			capacity;
+	zbx_uint64_t			free_space;
+	zbx_uint64_t			uncommitted;
+	zbx_vector_str_uint64_pair_t	hv_uuids_access;
 }
 zbx_vmware_datastore_t;
 
 int	vmware_ds_name_compare(const void *d1, const void *d2);
 ZBX_PTR_VECTOR_DECL(vmware_datastore, zbx_vmware_datastore_t *)
+
+typedef struct
+{
+	char			*name;
+	char			*id;
+}
+zbx_vmware_datacenter_t;
+
+int	vmware_dc_name_compare(const void *d1, const void *d2);
+ZBX_PTR_VECTOR_DECL(vmware_datacenter, zbx_vmware_datacenter_t *)
 
 #define ZBX_VMWARE_DEV_TYPE_NIC		1
 #define ZBX_VMWARE_DEV_TYPE_DISK	2
@@ -148,6 +168,7 @@ typedef struct
 	char			*datacenter_name;
 	char			*parent_name;
 	char			*parent_type;
+	char			*ip;
 	char			**props;
 	zbx_vector_str_t	ds_names;
 	zbx_vector_ptr_t	vms;
@@ -176,7 +197,8 @@ typedef struct
 {
 	zbx_uint64_t	last_key;	/* lastlogsize when vmware.eventlog[] item was polled last time */
 	unsigned char	skip_old;	/* skip old event log records */
-
+	unsigned char	oom;		/* no enough memory to store new events */
+	zbx_uint64_t	req_sz;		/* memory size required to store events */
 }
 zbx_vmware_eventlog_state_t;
 
@@ -200,6 +222,7 @@ typedef struct
 	zbx_vector_ptr_t		events;			/* vector of pointers to zbx_vmware_event_t structures */
 	int				max_query_metrics;	/* max count of Datastore perfCounters in one request */
 	zbx_vector_vmware_datastore_t	datastores;
+	zbx_vector_vmware_datacenter_t	datacenters;
 }
 zbx_vmware_data_t;
 
@@ -224,6 +247,10 @@ typedef struct
 
 	/* the vmware service instance version */
 	char				*version;
+
+	/* the vmware service instance version numeric */
+	unsigned short			major_version;
+	unsigned short			minor_version;
 
 	/* the vmware service instance fullname */
 	char				*fullname;
@@ -250,6 +277,7 @@ typedef struct
 {
 	zbx_vector_ptr_t	services;
 	zbx_hashset_t		strpool;
+	zbx_uint64_t		strpool_sz;
 }
 zbx_vmware_t;
 
@@ -318,8 +346,12 @@ zbx_vmware_perf_entity_t	*zbx_vmware_service_get_perf_entity(zbx_vmware_service_
 #define ZBX_VMWARE_VMPROP_STORAGE_UNSHARED		13
 #define ZBX_VMWARE_VMPROP_STORAGE_UNCOMMITTED		14
 #define ZBX_VMWARE_VMPROP_UPTIME			15
+#define ZBX_VMWARE_VMPROP_IPADDRESS			16
+#define ZBX_VMWARE_VMPROP_GUESTHOSTNAME			17
+#define ZBX_VMWARE_VMPROP_GUESTFAMILY			18
+#define ZBX_VMWARE_VMPROP_GUESTFULLNAME			19
 
-#define ZBX_VMWARE_VMPROPS_NUM				16
+#define ZBX_VMWARE_VMPROPS_NUM				20
 
 /* vmware service types */
 #define ZBX_VMWARE_TYPE_UNKNOWN	0

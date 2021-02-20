@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@
 #include "scripts.h"
 
 extern int	CONFIG_TRAPPER_TIMEOUT;
+extern int	CONFIG_IPMIPOLLER_FORKS;
 
 static int	zbx_execute_script_on_agent(const DC_HOST *host, const char *command, char **result,
 		char *error, size_t max_error_len)
@@ -52,7 +53,7 @@ static int	zbx_execute_script_on_agent(const DC_HOST *host, const char *command,
 	}
 
 	port = zbx_strdup(port, item.interface.port_orig);
-	substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+	substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, NULL,
 			&port, MACRO_TYPE_COMMON, NULL, 0);
 
 	if (SUCCEED != (ret = is_ushort(port, &item.interface.port)))
@@ -68,7 +69,7 @@ static int	zbx_execute_script_on_agent(const DC_HOST *host, const char *command,
 		goto fail;
 	}
 
-	item.key = zbx_dsprintf(item.key, "system.run[%s,%s]", param, NULL == result ? "nowait" : "wait");
+	item.key = zbx_dsprintf(item.key, "system.run[%s%s]", param, NULL == result ? ",nowait" : "");
 	item.value_type = ITEM_VALUE_TYPE_TEXT;
 
 	init_result(&agent_result);
@@ -106,7 +107,7 @@ static int	zbx_execute_script_on_terminal(const DC_HOST *host, const zbx_script_
 	DC_ITEM		item;
 	int             (*function)(DC_ITEM *, AGENT_RESULT *);
 
-#ifdef HAVE_SSH2
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
 	assert(ZBX_SCRIPT_TYPE_SSH == script->type || ZBX_SCRIPT_TYPE_TELNET == script->type);
 #else
 	assert(ZBX_SCRIPT_TYPE_TELNET == script->type);
@@ -146,7 +147,7 @@ static int	zbx_execute_script_on_terminal(const DC_HOST *host, const zbx_script_
 			break;
 	}
 
-#ifdef HAVE_SSH2
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
 	if (ZBX_SCRIPT_TYPE_SSH == script->type)
 	{
 		item.key = zbx_dsprintf(item.key, "ssh.run[,,%s]", script->port);
@@ -157,7 +158,7 @@ static int	zbx_execute_script_on_terminal(const DC_HOST *host, const zbx_script_
 #endif
 		item.key = zbx_dsprintf(item.key, "telnet.run[,,%s]", script->port);
 		function = get_value_telnet;
-#ifdef HAVE_SSH2
+#if defined(HAVE_SSH2) || defined(HAVE_SSH)
 	}
 #endif
 	item.value_type = ITEM_VALUE_TYPE_TEXT;
@@ -207,6 +208,7 @@ static int	DBget_script_by_scriptid(zbx_uint64_t scriptid, zbx_script_t *script,
 		ZBX_STR2UCHAR(script->type, row[0]);
 		ZBX_STR2UCHAR(script->execute_on, row[1]);
 		script->command = zbx_strdup(script->command, row[2]);
+		script->command_orig = zbx_strdup(script->command_orig, row[2]);
 		ZBX_DBROW2UINT64(*groupid, row[3]);
 		ZBX_STR2UCHAR(script->host_access, row[4]);
 		ret = SUCCEED;
@@ -306,6 +308,7 @@ void	zbx_script_clean(zbx_script_t *script)
 	zbx_free(script->privatekey);
 	zbx_free(script->password);
 	zbx_free(script->command);
+	zbx_free(script->command_orig);
 }
 
 /******************************************************************************
@@ -316,7 +319,7 @@ void	zbx_script_clean(zbx_script_t *script)
  *                                                                            *
  * Parameters: host          - [IN] the host the script will be executed on   *
  *             script        - [IN/OUT] the script to prepare                 *
- *             user          - [IN] the user executing script                 *
+ *             user          - [IN] the user executing script (can be NULL)   *
  *             error         - [OUT] the error message output buffer          *
  *             mas_error_len - [IN] the size of error message output buffer   *
  *                                                                            *
@@ -333,7 +336,8 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 		size_t max_error_len)
 {
 	int		ret = FAIL;
-	zbx_uint64_t	groupid;
+	zbx_uint64_t	groupid, userid;
+	zbx_uint64_t	*p_userid = NULL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -343,13 +347,13 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 			dos2unix(script->command);	/* CR+LF (Windows) => LF (Unix) */
 			break;
 		case ZBX_SCRIPT_TYPE_SSH:
-			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, NULL,
 					&script->publickey, MACRO_TYPE_COMMON, NULL, 0);
-			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, NULL,
 					&script->privatekey, MACRO_TYPE_COMMON, NULL, 0);
 			ZBX_FALLTHROUGH;
 		case ZBX_SCRIPT_TYPE_TELNET:
-			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, NULL,
 					&script->port, MACRO_TYPE_COMMON, NULL, 0);
 
 			if ('\0' != *script->port && SUCCEED != (ret = is_ushort(script->port, NULL)))
@@ -358,10 +362,10 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 				goto out;
 			}
 
-			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
-					&script->username, MACRO_TYPE_COMMON, NULL, 0);
-			substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
-					&script->password, MACRO_TYPE_COMMON, NULL, 0);
+			substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+					NULL, &script->username, MACRO_TYPE_COMMON, NULL, 0);
+			substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL,
+					NULL, &script->password, MACRO_TYPE_COMMON, NULL, 0);
 			break;
 		case ZBX_SCRIPT_TYPE_GLOBAL_SCRIPT:
 			if (SUCCEED != DBget_script_by_scriptid(script->scriptid, script, &groupid))
@@ -383,10 +387,28 @@ int	zbx_script_prepare(zbx_script_t *script, const DC_HOST *host, const zbx_user
 				goto out;
 			}
 
-			if (SUCCEED != substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, host, NULL, NULL,
-					NULL, &script->command, MACRO_TYPE_SCRIPT, error, max_error_len))
+			if (user != NULL)
+			{
+				/* zbx_script_prepare() receives 'user' as const-pointer but */
+				/* substitute_simple_macros() takes 'userid' as non-const pointer. */
+				/* Make a copy to preserve const-correctness. */
+				userid = user->userid;
+				p_userid = &userid;
+			}
+
+			if (SUCCEED != substitute_simple_macros_unmasked(NULL, NULL, NULL, p_userid, NULL, host, NULL,
+					NULL, NULL, NULL, &script->command, MACRO_TYPE_SCRIPT, error, max_error_len))
 			{
 				goto out;
+			}
+
+			/* expand macros in command_orig used for non-secure logging */
+			if (SUCCEED != substitute_simple_macros(NULL, NULL, NULL, p_userid, NULL, host, NULL, NULL,
+					NULL, NULL, &script->command_orig, MACRO_TYPE_SCRIPT, error, max_error_len))
+			{
+				/* script command_orig is a copy of script command - if the script command  */
+				/* macro substitution succeeded, then it will succeed also for command_orig */
+				THIS_SHOULD_NEVER_HAPPEN;
 			}
 
 			/* DBget_script_by_scriptid() may overwrite script type with anything but global script... */
@@ -446,7 +468,7 @@ int	zbx_script_execute(const zbx_script_t *script, const DC_HOST *host, char **r
 				case ZBX_SCRIPT_EXECUTE_ON_SERVER:
 				case ZBX_SCRIPT_EXECUTE_ON_PROXY:
 					ret = zbx_execute(script->command, result, error, max_error_len,
-							CONFIG_TRAPPER_TIMEOUT, ZBX_EXIT_CODE_CHECKS_ENABLED);
+							CONFIG_TRAPPER_TIMEOUT, ZBX_EXIT_CODE_CHECKS_ENABLED, NULL);
 					break;
 				default:
 					zbx_snprintf(error, max_error_len, "Invalid 'Execute on' option \"%d\".",
@@ -455,6 +477,13 @@ int	zbx_script_execute(const zbx_script_t *script, const DC_HOST *host, char **r
 			break;
 		case ZBX_SCRIPT_TYPE_IPMI:
 #ifdef HAVE_OPENIPMI
+			if (0 == CONFIG_IPMIPOLLER_FORKS)
+			{
+				zbx_strlcpy(error, "Cannot perform IPMI request: configuration parameter"
+						" \"StartIPMIPollers\" is 0.", max_error_len);
+				break;
+			}
+
 			if (SUCCEED == (ret = zbx_ipmi_execute_command(host, script->command, error, max_error_len)))
 			{
 				if (NULL != result)
@@ -465,7 +494,7 @@ int	zbx_script_execute(const zbx_script_t *script, const DC_HOST *host, char **r
 #endif
 			break;
 		case ZBX_SCRIPT_TYPE_SSH:
-#ifndef HAVE_SSH2
+#if !defined(HAVE_SSH2) && !defined(HAVE_SSH)
 			zbx_strlcpy(error, "Support for SSH script was not compiled in.", max_error_len);
 			break;
 #endif
@@ -505,6 +534,8 @@ zbx_uint64_t	zbx_script_create_task(const zbx_script_t *script, const DC_HOST *h
 	else
 		port = 0;
 
+	DBbegin();
+
 	taskid = DBget_maxid("task");
 
 	task = zbx_tm_task_create(taskid, ZBX_TM_TASK_REMOTE_COMMAND, ZBX_TM_STATUS_NEW, now,
@@ -513,8 +544,6 @@ zbx_uint64_t	zbx_script_create_task(const zbx_script_t *script, const DC_HOST *h
 	task->data = zbx_tm_remote_command_create(script->type, script->command, script->execute_on, port,
 			script->authtype, script->username, script->password, script->publickey, script->privatekey,
 			taskid, host->hostid, alertid);
-
-	DBbegin();
 
 	if (FAIL == zbx_tm_save_task(task))
 		taskid = 0;

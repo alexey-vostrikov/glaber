@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -350,7 +350,7 @@ static size_t	procstat_strdup(void *base, const char *str)
  *          other process.                                                    *
  *                                                                            *
  * Comments: This function logs critical error and exits in the case of       *
- *           shared memory segement operation failure.                        *
+ *           shared memory segment operation failure.                         *
  *                                                                            *
  ******************************************************************************/
 static void	procstat_reattach(void)

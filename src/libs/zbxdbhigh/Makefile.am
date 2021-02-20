@@ -8,19 +8,22 @@ endif
 noinst_LIBRARIES = libzbxdbhigh.a
 
 libzbxdbhigh_a_SOURCES = \
-	host.c \
 	db.c \
 	dbschema.c \
-	proxy.c \
 	discovery.c \
+	event.c \
+	export.c \
+	host.c \
+	item.c \
 	itservices.c \
+	lld_macro.c \
+	maintenance.c \
+	proxy.c \
 	template_item.c \
 	template.h \
 	trigger.c \
-	event.c \
-	export.c \
-	maintenance.c \
-	item.c \
-	lld_macro.c
+	tag.c \
+	lld_override.c
 
-libzbxdbhigh_a_CFLAGS = -I@top_srcdir@/src/zabbix_server/
+libzbxdbhigh_a_CFLAGS = \
+	-I$(top_srcdir)/src/zabbix_server/

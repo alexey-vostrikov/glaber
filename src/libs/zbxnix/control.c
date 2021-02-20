@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 **/
 
 #include "control.h"
+#include "zbxdiag.h"
 
 static int	parse_log_level_options(const char *opt, size_t len, unsigned int *scope, unsigned int *data)
 {
@@ -151,6 +152,70 @@ int	parse_rtc_options(const char *opt, unsigned char program_type, int *message)
 			0 == strcmp(opt, ZBX_HOUSEKEEPER_EXECUTE))
 	{
 		command = ZBX_RTC_HOUSEKEEPER_EXECUTE;
+		scope = 0;
+		data = 0;
+	}
+	else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER | ZBX_PROGRAM_TYPE_PROXY)) &&
+			0 == strcmp(opt, ZBX_SNMP_CACHE_RELOAD))
+	{
+#ifdef HAVE_NETSNMP
+		command = ZBX_RTC_SNMP_CACHE_RELOAD;
+		/* Scope is ignored for SNMP. R/U pollers, trapper, discoverer and taskmanager always get targeted. */
+		scope = 0;
+		data = 0;
+#else
+		zbx_error("invalid runtime control option: no SNMP support enabled");
+		return FAIL;
+#endif
+	}
+	else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER | ZBX_PROGRAM_TYPE_PROXY)) &&
+			0 == strncmp(opt, ZBX_DIAGINFO, ZBX_CONST_STRLEN(ZBX_DIAGINFO)))
+	{
+		command = ZBX_RTC_DIAGINFO;
+		data = 0;
+		scope = ZBX_DIAGINFO_ALL;
+
+		if ('=' == opt[ZBX_CONST_STRLEN(ZBX_DIAGINFO)])
+		{
+			const char	*section = opt + ZBX_CONST_STRLEN(ZBX_DIAGINFO) + 1;
+
+			if (0 == strcmp(section, ZBX_DIAG_HISTORYCACHE))
+			{
+				scope = ZBX_DIAGINFO_HISTORYCACHE;
+			}
+			else if (0 == strcmp(section, ZBX_DIAG_PREPROCESSING))
+			{
+				scope = ZBX_DIAGINFO_PREPROCESSING;
+			}
+			else if (0 == strcmp(section, ZBX_DIAG_LOCKS))
+			{
+				scope = ZBX_DIAGINFO_LOCKS;
+			}
+			else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER)))
+			{
+				if (0 == strcmp(section, ZBX_DIAG_VALUECACHE))
+					scope = ZBX_DIAGINFO_VALUECACHE;
+				else if (0 == strcmp(section, ZBX_DIAG_LLD))
+					scope = ZBX_DIAGINFO_LLD;
+				else if (0 == strcmp(section, ZBX_DIAG_ALERTING))
+					scope = ZBX_DIAGINFO_ALERTING;
+			}
+
+			if (0 == scope)
+			{
+				zbx_error("invalid diaginfo section: %s", section);
+				return FAIL;
+			}
+		}
+		else if ('\0' != opt[ZBX_CONST_STRLEN(ZBX_DIAGINFO)])
+		{
+			zbx_error("invalid runtime control option: %s", opt);
+			return FAIL;
+		}
+	}
+	else if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) && 0 == strcmp(opt, ZBX_SECRETS_RELOAD))
+	{
+		command = ZBX_RTC_SECRETS_RELOAD;
 		scope = 0;
 		data = 0;
 	}

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern int CONFIG_PREPROCMAN_FORKS;
 
 #define ZBX_PREPROC_VALUE_PREVIEW_LEN		100
 
@@ -124,7 +125,7 @@ static void	worker_format_result(int step, const zbx_preproc_result_t *result, c
  *             error        - [OUT] the formatted error message               *
  *                                                                            *
  ******************************************************************************/
-static void	worker_format_error(const zbx_variant_t *value, zbx_preproc_result_t *results, int results_num,
+void	worker_format_error(const zbx_variant_t *value, zbx_preproc_result_t *results, int results_num,
 		const char *errmsg, char **error)
 {
 	char			*value_str, *err_step;
@@ -211,7 +212,7 @@ static void	worker_format_error(const zbx_variant_t *value, zbx_preproc_result_t
  *               FAIL - otherwise, error contains the error message           *
  *                                                                            *
  ******************************************************************************/
-static int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
 		zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
 		zbx_preproc_result_t *results, int *results_num, char **error)
 {
@@ -222,17 +223,20 @@ static int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *
 		zbx_preproc_op_t	*op = &steps[i];
 		zbx_variant_t		history_value;
 		zbx_timespec_t		history_ts;
-
+		
+		
 		zbx_preproc_history_pop_value(history_in, i, &history_value, &history_ts);
-
+		
 		if (FAIL == (ret = zbx_item_preproc(value_type, value, ts, op, &history_value, &history_ts, error)))
 		{
+		
 			results[i].action = op->error_handler;
 			ret = zbx_item_preproc_handle_error(value, op, error);
+			zbx_variant_clear(&history_value);
 		}
 		else
 			results[i].action = ZBX_PREPROC_FAIL_DEFAULT;
-
+		
 		if (SUCCEED == ret)
 		{
 			if (NULL == *error)
@@ -240,7 +244,7 @@ static int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *
 				/* result history is kept to report results of steps before failing step, */
 				/* which means it can be omitted for the last step.                       */
 				if (i != steps_num - 1)
-					zbx_variant_set_variant(&results[i].value, value);
+					zbx_variant_copy(&results[i].value, value);
 				else
 					zbx_variant_set_none(&results[i].value);
 			}
@@ -251,10 +255,9 @@ static int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *
 				ret = FAIL;
 			}
 		}
-
+	
 		if (SUCCEED != ret)
 		{
-			zbx_variant_clear(&history_value);
 			break;
 		}
 
@@ -267,7 +270,7 @@ static int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *
 		if (ZBX_VARIANT_NONE == value->type)
 			break;
 	}
-
+	
 	*results_num = (i == steps_num ? i : i + 1);
 
 	return ret;
@@ -302,7 +305,7 @@ static void	worker_preprocess_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t 
 	zbx_preprocessor_unpack_task(&itemid, &value_type, &ts, &value, &history_in, &steps, &steps_num,
 			message->data);
 
-	zbx_variant_set_variant(&value_start, &value);
+	zbx_variant_copy(&value_start, &value);
 	results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * steps_num);
 	memset(results, 0, sizeof(zbx_preproc_result_t) * steps_num);
 
@@ -326,7 +329,7 @@ static void	worker_preprocess_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t 
 
 		result = (SUCCEED == ret ? zbx_variant_value_desc(&value) : error);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s(): %s", __func__, zbx_variant_value_desc(&value_start));
-		zabbix_log(LOG_LEVEL_DEBUG, "%s: %s %s",__func__,  zbx_result_string(ret), result);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s: %s %s",__func__, zbx_result_string(ret), result);
 	}
 
 	size = zbx_preprocessor_pack_result(&data, &value, &history_out, error);
@@ -385,7 +388,7 @@ static void	worker_test_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t *messa
 			message->data);
 
 	zbx_variant_set_str(&value, value_str);
-	zbx_variant_set_variant(&value_start, &value);
+	zbx_variant_copy(&value_start, &value);
 
 	results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * steps_num);
 	memset(results, 0, sizeof(zbx_preproc_result_t) * steps_num);
@@ -428,6 +431,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	char			*error = NULL;
 	zbx_ipc_socket_t	socket;
 	zbx_ipc_message_t	message;
+	char 			service[MAX_STRING_LEN];
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
@@ -438,10 +442,12 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	zbx_es_init(&es_engine);
 
 	zbx_ipc_message_init(&message);
+	
+	zbx_snprintf(service,MAX_STRING_LEN,"%s%d",ZBX_IPC_SERVICE_PREPROCESSING_WORKER, (process_num-1) % CONFIG_PREPROCMAN_FORKS);
 
-	if (FAIL == zbx_ipc_socket_open(&socket, ZBX_IPC_SERVICE_PREPROCESSING_WORKER, SEC_PER_MIN, &error))
+	if (FAIL == zbx_ipc_socket_open(&socket, service, SEC_PER_MIN, &error))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannozbx_item_preproct connect to preprocessing service: %s", error);
+		zabbix_log(LOG_LEVEL_CRIT, "cannot connect to preprocessing service: %s", error);
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
@@ -452,11 +458,11 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
-
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
-	for (;;)
+	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
+
+	while (ZBX_IS_RUNNING())
 	{
 		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
 
@@ -482,7 +488,10 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 		zbx_ipc_message_clean(&message);
 	}
 
-	zbx_es_destroy(&es_engine);
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
 
-	return 0;
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
+
+	zbx_es_destroy(&es_engine);
 }

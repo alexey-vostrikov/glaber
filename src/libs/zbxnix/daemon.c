@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -221,7 +221,8 @@ static void	user1_signal_handler(int sig, siginfo_t *siginfo, void *context)
 						" cannot be performed for a passive proxy");
 				return;
 			}
-
+			ZBX_FALLTHROUGH;
+		case ZBX_RTC_SECRETS_RELOAD:
 			zbx_signal_process_by_type(ZBX_PROCESS_TYPE_CONFSYNCER, 1, flags);
 			break;
 		case ZBX_RTC_HOUSEKEEPER_EXECUTE:
@@ -234,6 +235,16 @@ static void	user1_signal_handler(int sig, siginfo_t *siginfo, void *context)
 			else
 				zbx_signal_process_by_type(ZBX_RTC_GET_SCOPE(flags), ZBX_RTC_GET_DATA(flags), flags);
 			break;
+		case ZBX_RTC_SNMP_CACHE_RELOAD:
+			zbx_signal_process_by_type(ZBX_PROCESS_TYPE_UNREACHABLE, ZBX_RTC_GET_DATA(flags), flags);
+			zbx_signal_process_by_type(ZBX_PROCESS_TYPE_POLLER, ZBX_RTC_GET_DATA(flags), flags);
+			zbx_signal_process_by_type(ZBX_PROCESS_TYPE_TRAPPER, ZBX_RTC_GET_DATA(flags), flags);
+			zbx_signal_process_by_type(ZBX_PROCESS_TYPE_DISCOVERER, ZBX_RTC_GET_DATA(flags), flags);
+			zbx_signal_process_by_type(ZBX_PROCESS_TYPE_TASKMANAGER, ZBX_RTC_GET_DATA(flags), flags);
+			break;
+		default:
+			if (NULL != zbx_sigusr_handler)
+				zbx_sigusr_handler(flags);
 	}
 #endif
 }
@@ -365,7 +376,8 @@ int	daemon_start(int allow_root, const char *user, unsigned int flags)
 		if (-1 == chdir("/"))	/* this is to eliminate warning: ignoring return value of chdir */
 			assert(0);
 
-		zbx_redirect_stdio(LOG_TYPE_FILE == CONFIG_LOG_TYPE ? CONFIG_LOG_FILE : NULL);
+		if (FAIL == zbx_redirect_stdio(LOG_TYPE_FILE == CONFIG_LOG_TYPE ? CONFIG_LOG_FILE : NULL))
+			exit(EXIT_FAILURE);
 	}
 
 	if (FAIL == create_pid_file(CONFIG_PID_FILE))

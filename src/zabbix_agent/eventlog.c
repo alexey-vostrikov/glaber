@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,11 +19,17 @@
 
 #include "common.h"
 #include "log.h"
+#include "logfiles/logfiles.h"
+#include "sysinfo.h"
 #include "zbxregexp.h"
 #include "winmeta.h"
+#include <strsafe.h>
 #include "eventlog.h"
+#include <delayimp.h>
+#include <sddl.h>
 
-#define	DEFAULT_EVENT_CONTENT_SIZE 256
+#define	DEFAULT_EVENT_CONTENT_SIZE	256
+#define MAX_NAME			256
 
 static const wchar_t	*RENDER_ITEMS[] = {
 	L"/Event/System/Provider/@Name",
@@ -51,6 +57,61 @@ static const wchar_t	*RENDER_ITEMS[] = {
 #define	VAR_EVENT_DATA_COUNT(p)			(p[7].Count)
 
 #define	EVENTLOG_REG_PATH TEXT("SYSTEM\\CurrentControlSet\\Services\\EventLog\\")
+
+#ifndef INFORMATION_TYPE
+#	define INFORMATION_TYPE	"Information"
+#endif
+#ifndef WARNING_TYPE
+#	define WARNING_TYPE	"Warning"
+#endif
+#ifndef ERROR_TYPE
+#	define ERROR_TYPE	"Error"
+#endif
+#ifndef AUDIT_FAILURE
+#	define AUDIT_FAILURE	"Failure Audit"
+#endif
+#ifndef AUDIT_SUCCESS
+#	define AUDIT_SUCCESS	"Success Audit"
+#endif
+#ifndef CRITICAL_TYPE
+#	define CRITICAL_TYPE	"Critical"
+#endif
+#ifndef VERBOSE_TYPE
+#	define VERBOSE_TYPE	"Verbose"
+#endif
+
+extern int	CONFIG_EVENTLOG_MAX_LINES_PER_SECOND;
+
+LONG WINAPI	DelayLoadDllExceptionFilter(PEXCEPTION_POINTERS excpointers)
+{
+	LONG		disposition = EXCEPTION_EXECUTE_HANDLER;
+	PDelayLoadInfo	delayloadinfo = (PDelayLoadInfo)(excpointers->ExceptionRecord->ExceptionInformation[0]);
+
+	switch (excpointers->ExceptionRecord->ExceptionCode)
+	{
+		case VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND):
+			zabbix_log(LOG_LEVEL_DEBUG, "function %s was not found in %s",
+					delayloadinfo->dlp.szProcName, delayloadinfo->szDll);
+			break;
+		case VcppException(ERROR_SEVERITY_ERROR, ERROR_PROC_NOT_FOUND):
+			if (delayloadinfo->dlp.fImportByName)
+			{
+				zabbix_log(LOG_LEVEL_DEBUG, "function %s was not found in %s",
+						delayloadinfo->dlp.szProcName, delayloadinfo->szDll);
+			}
+			else
+			{
+				zabbix_log(LOG_LEVEL_DEBUG, "function ordinal %d was not found in %s",
+						delayloadinfo->dlp.dwOrdinal, delayloadinfo->szDll);
+			}
+			break;
+		default:
+			disposition = EXCEPTION_CONTINUE_SEARCH;
+			break;
+	}
+
+	return disposition;
+}
 
 /* open event logger and return number of records */
 static int	zbx_open_eventlog(LPCTSTR wsource, HANDLE *eventlog_handle, zbx_uint64_t *FirstID,
@@ -531,6 +592,94 @@ out:
 	return out_message;
 }
 
+static void	replace_sid_to_account(PSID sidVal, char **out_message)
+{
+	DWORD	nlen = MAX_NAME, dlen = MAX_NAME;
+	wchar_t	name[MAX_NAME], dom[MAX_NAME], *sid = NULL;
+	int	iUse;
+	char	userName[MAX_NAME * 4], domName[MAX_NAME * 4], sidName[MAX_NAME * 4], *tmp, buffer[MAX_NAME * 8];
+
+	if (0 == LookupAccountSid(NULL, sidVal, name, &nlen, dom, &dlen, (PSID_NAME_USE)&iUse))
+	{
+		/* don't replace security ID if no mapping between account names and security IDs was done */
+		zabbix_log(LOG_LEVEL_DEBUG, "LookupAccountSid failed:%s", strerror_from_system(GetLastError()));
+		return;
+	}
+
+	if (0 == nlen)
+	{
+		zabbix_log(LOG_LEVEL_DEBUG, "LookupAccountSid returned empty user name");
+		return;
+	}
+
+	if (0 == ConvertSidToStringSid(sidVal, &sid))
+	{
+		zabbix_log(LOG_LEVEL_DEBUG, "ConvertSidToStringSid failed:%s", strerror_from_system(GetLastError()));
+		return;
+	}
+
+	zbx_unicode_to_utf8_static(sid, sidName, sizeof(sidName));
+	zbx_unicode_to_utf8_static(name, userName, sizeof(userName));
+
+	if (0 != dlen)
+	{
+		zbx_unicode_to_utf8_static(dom, domName, sizeof(domName));
+		zbx_snprintf(buffer, sizeof(buffer), "%s\\%s", domName, userName);
+	}
+	else
+		zbx_strlcpy(buffer, userName, sizeof(buffer));	/* NULL SID */
+
+	tmp = *out_message;
+	*out_message = string_replace(*out_message, sidName, buffer);
+
+	LocalFree(sid);
+	zbx_free(tmp);
+}
+
+static void	replace_sids_to_accounts(EVT_HANDLE event_bookmark, char **out_message)
+{
+	DWORD		status, dwBufferSize = 0, dwBufferUsed = 0, dwPropertyCount = 0, i;
+	PEVT_VARIANT	renderedContent = NULL;
+	EVT_HANDLE	render_context;
+
+	if (NULL == (render_context = EvtCreateRenderContext(0, NULL, EvtRenderContextUser)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "EvtCreateRenderContext failed:%s", strerror_from_system(GetLastError()));
+		goto cleanup;
+	}
+
+	if (TRUE != EvtRender(render_context, event_bookmark, EvtRenderEventValues, dwBufferSize, renderedContent,
+			&dwBufferUsed, &dwPropertyCount))
+	{
+		if (ERROR_INSUFFICIENT_BUFFER != (status = GetLastError()))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "EvtRender failed:%s", strerror_from_system(status));
+			goto cleanup;
+		}
+
+		dwBufferSize = dwBufferUsed;
+		renderedContent = (PEVT_VARIANT)zbx_malloc(NULL, dwBufferSize);
+
+		if (TRUE != EvtRender(render_context, event_bookmark, EvtRenderEventValues, dwBufferSize,
+				renderedContent, &dwBufferUsed, &dwPropertyCount))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "EvtRender failed:%s", strerror_from_system(GetLastError()));
+			goto cleanup;
+		}
+	}
+
+	for (i = 0; i < dwPropertyCount; i++)
+	{
+		if (EvtVarTypeSid == renderedContent[i].Type)
+			replace_sid_to_account(renderedContent[i].SidVal, out_message);
+	}
+cleanup:
+	if (NULL != render_context)
+		EvtClose(render_context);
+
+	zbx_free(renderedContent);
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: zbx_parse_eventlog_message6                                      *
@@ -609,6 +758,9 @@ static int	zbx_parse_eventlog_message6(const wchar_t *wsource, EVT_HANDLE *rende
 	*out_timestamp = (unsigned long)((VAR_TIME_CREATED(renderedContent) - sec_1970) / 10000000);
 	*out_eventid = VAR_EVENT_ID(renderedContent);
 	*out_message = expand_message6(pprovider, *event_bookmark);
+
+	if (NULL != *out_message)
+		replace_sids_to_accounts(*event_bookmark, out_message);
 
 	tmp_str = zbx_unicode_to_utf8(wsource);
 
@@ -712,8 +864,8 @@ out:
 int	process_eventslog6(const char *server, unsigned short port, const char *eventlog_name, EVT_HANDLE *render_context,
 		EVT_HANDLE *query, zbx_uint64_t lastlogsize, zbx_uint64_t FirstID, zbx_uint64_t LastID,
 		zbx_vector_ptr_t *regexps, const char *pattern, const char *key_severity, const char *key_source,
-		const char *key_logeventid, int rate, zbx_process_value_t process_value_cb, ZBX_ACTIVE_METRIC *metric,
-		zbx_uint64_t *lastlogsize_sent, char **error)
+		const char *key_logeventid, int rate, zbx_process_value_func_t process_value_cb,
+		ZBX_ACTIVE_METRIC *metric, zbx_uint64_t *lastlogsize_sent, char **error)
 {
 #	define EVT_ARRAY_SIZE	100
 
@@ -1237,7 +1389,7 @@ static void	zbx_parse_eventlog_message(const wchar_t *wsource, const EVENTLOGREC
  ******************************************************************************/
 int	process_eventslog(const char *server, unsigned short port, const char *eventlog_name, zbx_vector_ptr_t *regexps,
 		const char *pattern, const char *key_severity, const char *key_source, const char *key_logeventid,
-		int rate, zbx_process_value_t process_value_cb, ZBX_ACTIVE_METRIC *metric,
+		int rate, zbx_process_value_func_t process_value_cb, ZBX_ACTIVE_METRIC *metric,
 		zbx_uint64_t *lastlogsize_sent, char **error)
 {
 	int		ret = FAIL;
@@ -1524,6 +1676,145 @@ out:
 	zbx_free(eventlog_name_w);
 	zbx_free(pELRs);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+	return ret;
+}
+
+int	process_eventlog_check(char *server, unsigned short port, zbx_vector_ptr_t *regexps, ZBX_ACTIVE_METRIC *metric,
+		zbx_process_value_func_t process_value_cb, zbx_uint64_t *lastlogsize_sent, char **error)
+{
+	int 		ret = FAIL;
+	AGENT_REQUEST	request;
+	const char	*filename, *pattern, *maxlines_persec, *key_severity, *key_source, *key_logeventid, *skip;
+	int		rate;
+	OSVERSIONINFO	versionInfo;
+
+	init_request(&request);
+
+	if (SUCCEED != parse_item_key(metric->key, &request))
+	{
+		*error = zbx_strdup(*error, "Invalid item key format.");
+		goto out;
+	}
+
+	if (0 == get_rparams_num(&request))
+	{
+		*error = zbx_strdup(*error, "Invalid number of parameters.");
+		goto out;
+	}
+
+	if (7 < get_rparams_num(&request))
+	{
+		*error = zbx_strdup(*error, "Too many parameters.");
+		goto out;
+	}
+
+	if (NULL == (filename = get_rparam(&request, 0)) || '\0' == *filename)
+	{
+		*error = zbx_strdup(*error, "Invalid first parameter.");
+		goto out;
+	}
+
+	if (NULL == (pattern = get_rparam(&request, 1)))
+	{
+		pattern = "";
+	}
+	else if ('@' == *pattern && SUCCEED != zbx_global_regexp_exists(pattern + 1, regexps))
+	{
+		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", pattern + 1);
+		goto out;
+	}
+
+	if (NULL == (key_severity = get_rparam(&request, 2)))
+	{
+		key_severity = "";
+	}
+	else if ('@' == *key_severity && SUCCEED != zbx_global_regexp_exists(key_severity + 1, regexps))
+	{
+		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", key_severity + 1);
+		goto out;
+	}
+
+	if (NULL == (key_source = get_rparam(&request, 3)))
+	{
+		key_source = "";
+	}
+	else if ('@' == *key_source && SUCCEED != zbx_global_regexp_exists(key_source + 1, regexps))
+	{
+		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", key_source + 1);
+		goto out;
+	}
+
+	if (NULL == (key_logeventid = get_rparam(&request, 4)))
+	{
+		key_logeventid = "";
+	}
+	else if ('@' == *key_logeventid && SUCCEED != zbx_global_regexp_exists(key_logeventid + 1, regexps))
+	{
+		*error = zbx_dsprintf(*error, "Global regular expression \"%s\" does not exist.", key_logeventid + 1);
+		goto out;
+	}
+
+	if (NULL == (maxlines_persec = get_rparam(&request, 5)) || '\0' == *maxlines_persec)
+	{
+		rate = CONFIG_EVENTLOG_MAX_LINES_PER_SECOND;
+	}
+	else if (MIN_VALUE_LINES > (rate = atoi(maxlines_persec)) || MAX_VALUE_LINES < rate)
+	{
+		*error = zbx_strdup(*error, "Invalid sixth parameter.");
+		goto out;
+	}
+
+	if (NULL == (skip = get_rparam(&request, 6)) || '\0' == *skip || 0 == strcmp(skip, "all"))
+	{
+		metric->skip_old_data = 0;
+	}
+	else if (0 != strcmp(skip, "skip"))
+	{
+		*error = zbx_strdup(*error, "Invalid seventh parameter.");
+		goto out;
+	}
+
+	versionInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+	GetVersionEx(&versionInfo);
+
+	if (versionInfo.dwMajorVersion >= 6)	/* Windows Vista, 7 or Server 2008 */
+	{
+		__try
+		{
+
+			zbx_uint64_t	lastlogsize = metric->lastlogsize;
+			EVT_HANDLE	eventlog6_render_context = NULL;
+			EVT_HANDLE	eventlog6_query = NULL;
+			zbx_uint64_t	eventlog6_firstid = 0;
+			zbx_uint64_t	eventlog6_lastid = 0;
+
+			if (SUCCEED != initialize_eventlog6(filename, &lastlogsize, &eventlog6_firstid,
+					&eventlog6_lastid, &eventlog6_render_context, &eventlog6_query, error))
+			{
+				finalize_eventlog6(&eventlog6_render_context, &eventlog6_query);
+				goto out;
+			}
+
+			ret = process_eventslog6(server, port, filename, &eventlog6_render_context, &eventlog6_query,
+					lastlogsize, eventlog6_firstid, eventlog6_lastid, regexps, pattern,
+					key_severity, key_source, key_logeventid, rate, process_value_cb, metric,
+					lastlogsize_sent, error);
+
+			finalize_eventlog6(&eventlog6_render_context, &eventlog6_query);
+		}
+		__except (DelayLoadDllExceptionFilter(GetExceptionInformation()))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "failed to process eventlog");
+		}
+	}
+	else if (versionInfo.dwMajorVersion < 6)    /* Windows versions before Vista */
+	{
+		ret = process_eventslog(server, port, filename, regexps, pattern, key_severity, key_source,
+				key_logeventid, rate, process_value_cb, metric, lastlogsize_sent, error);
+	}
+out:
+	free_request(&request);
 
 	return ret;
 }
