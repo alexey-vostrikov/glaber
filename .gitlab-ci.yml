@@ -7,9 +7,9 @@ debian-jessie:
     - wget -q https://$CI_DOMAIN/build/debian/jessie/debian.tar.xz
     - tar -xvf debian.tar.xz
     - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "jessie" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui./git/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h 
-    - cat frontends/php/include/defines.inc.php
+    - cat ui/include/defines.inc.php
     - cat include/version.h
     - autoreconf -fvi
     - dpkg-buildpackage -b
@@ -32,7 +32,7 @@ debian-stretch:
     - wget -q https://$CI_DOMAIN/build/debian/stretch/debian.tar.xz
     - tar -xvf debian.tar.xz
     - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "stretch" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
     - autoreconf -fvi
     - dpkg-buildpackage -b
@@ -54,7 +54,7 @@ debian-buster:
     - wget -q https://$CI_DOMAIN/build/debian/buster/debian.tar.xz
     - tar -xvf debian.tar.xz
     - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "buster" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
     - autoreconf -fvi
     - dpkg-buildpackage -b
@@ -76,7 +76,7 @@ ubuntu-disco:
     - wget -q https://$CI_DOMAIN/build/ubuntu/disco/debian.tar.xz
     - tar -xvf debian.tar.xz
     - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "disco" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
     - autoreconf -fvi
     - dpkg-buildpackage -b
@@ -98,7 +98,7 @@ ubuntu-bionic:
     - wget -q https://$CI_DOMAIN/build/ubuntu/bionic/debian.tar.xz
     - tar -xvf debian.tar.xz
     - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "bionic" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
     - autoreconf -fvi
     - dpkg-buildpackage -b
@@ -120,7 +120,7 @@ ubuntu-xenial:
     - wget -q https://$CI_DOMAIN/build/ubuntu/xenial/debian.tar.xz
     - tar -xvf debian.tar.xz
     - dch -v "1:4.2.4-1+glaber~${CI_COMMIT_TAG}" --distribution "xenial" "all latest updates"
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
     - autoreconf -fvi
     - dpkg-buildpackage -b
@@ -139,7 +139,7 @@ centos:
   script:
     - yum install -y rpm-build yum-utils xz wget lftp ssh tar curl
     - yum groupinstall "Development Tools" -y
-    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" frontends/php/include/defines.inc.php
+    - sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
     - sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
     - wget -q -r -nH --cut-dirs=2 --no-parent --reject="index.html*" https://$CI_DOMAIN/rhel/7/other/
     - yum install -y ./other/*.rpm
