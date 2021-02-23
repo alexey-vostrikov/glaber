@@ -42,6 +42,7 @@ old-packages:
     - tags
     - cicd_aws
     - testing
+    - packages
 
 .build_deb: &build_deb
   <<: *build_common
