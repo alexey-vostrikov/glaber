@@ -61,7 +61,7 @@ old-packages:
       if [[ $(lsb_release -i -s | tr '[:upper:]' '[:lower:]') == 'ubuntu' ]]; then
         export RELEASE=$(lsb_release -r -s)
       else
-        export RELEASE=$(lsb_release -i -s | cut -f1 -d".")
+        export RELEASE=$(lsb_release -r -s | cut -f1 -d".")
       fi
     - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/${DISTRIBUTION_TYPE}/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+${DISTRIBUTION_TYPE}${RELEASE}.debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
