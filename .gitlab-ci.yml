@@ -52,12 +52,17 @@ old-packages:
   before_script:
     - export DEBIAN_FRONTEND=noninteractive
     - apt-get update
-    - apt-get --ignore-missing install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl golang-go
+    - apt-get --ignore-missing install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl golang-go libssh-dev
   after_script:
     - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
     - export DISTRIBUTION_TYPE=$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')
     - export DISTRIBUTION=$(lsb_release -c -s)
-    - export RELEASE=$(lsb_release -r -s)
+    - >
+      if [[ $(lsb_release -i -s | tr '[:upper:]' '[:lower:]') == 'ubuntu' ]]
+        export RELEASE=$(lsb_release -r -s)
+      else
+        export RELEASE=$(lsb_release -i -s | cut -f1 -d".")
+      fi
     - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/${DISTRIBUTION_TYPE}/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+${DISTRIBUTION_TYPE}${RELEASE}.debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
     - >
