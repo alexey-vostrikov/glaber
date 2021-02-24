@@ -58,7 +58,7 @@ old-packages:
     - export DISTRIBUTION_TYPE=$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')
     - export DISTRIBUTION=$(lsb_release -c -s)
     - >
-      if [[ $(lsb_release -i -s | tr '[:upper:]' '[:lower:]') == 'ubuntu' ]]
+      if [[ $(lsb_release -i -s | tr '[:upper:]' '[:lower:]') == 'ubuntu' ]]; then
         export RELEASE=$(lsb_release -r -s)
       else
         export RELEASE=$(lsb_release -i -s | cut -f1 -d".")
