@@ -57,7 +57,8 @@ old-packages:
     - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
     - export DISTRIBUTION_TYPE=$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')
     - export DISTRIBUTION=$(lsb_release -c -s)
-    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/${DISTRIBUTION_TYPE}/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+${DISTRIBUTION}.debian.tar.xz" -O debian.tar.xz
+    - export RELEASE=$(lsb_release -r -s)
+    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/${DISTRIBUTION_TYPE}/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+${DISTRIBUTION_TYPE}${RELEASE}.debian.tar.xz" -O debian.tar.xz
     - tar -xvf debian.tar.xz
     - >
       if [[ $CI_COMMIT_BRANCH == "master" ]]; then 
