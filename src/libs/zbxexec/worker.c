@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <signal.h>
-#include <stropts.h>
+//#include <stropts.h>
 #include "dbcache.h"
 #include "zbxipcservice.h"
 
