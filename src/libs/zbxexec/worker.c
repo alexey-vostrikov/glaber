@@ -560,7 +560,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     //it's the caller's business to free it
     *responce = resp_buffer;
 
-    zabbix_log(LOG_LEVEL_DEBUG, "Answer wait is finished, responce length is %d, buffer is %s", strlen(resp_buffer), resp_buffer);
+    zabbix_log(LOG_LEVEL_DEBUG, "Answer wait is finished, responce length is %zu, buffer is %s", strlen(resp_buffer), resp_buffer);
     return SUCCEED;
 };
 
