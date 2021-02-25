@@ -337,6 +337,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     int worker_fail = 0;
     int request_len = 0;
     int write_fail = 0;
+    int i;
 
     if (worker->calls++ >= worker->max_calls)
     {
@@ -398,7 +399,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
             zabbix_log(LOG_LEVEL_WARNING, "Request size: %d, request ptr is %ld match ptr is %ld", request_len, request, strstr(request, "\n\n"));
             zabbix_log(LOG_LEVEL_WARNING, "Request FAIL: no empty line or it's inside the request: '%s'", request);
          
-            for (int i = request_len - 10; i < request_len; i++)
+            for (i = request_len - 10; i < request_len; i++)
             {
                 zabbix_log(LOG_LEVEL_WARNING, "%d %d %d", request_len, i, request[i]);
             }
