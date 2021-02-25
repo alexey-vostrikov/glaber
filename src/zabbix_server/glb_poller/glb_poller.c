@@ -287,7 +287,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responces) {
 	
 	switch (item_type) {
-#ifdef HAVE_NETSNMP		
+#ifdef HAVE_NETSNMP
 		case ITEM_TYPE_SNMP:
 			return glb_snmp_init(hosts, items, requests, responces);
 			break;
@@ -532,7 +532,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					//an item may wait for some time while other items will be polled and thus get timedout
 					//so after one minute of waiting we consider it timed out
 					if (glb_item->lastpolltime + SEC_PER_MIN < now && GLB_ITEM_STATE_POLLING == glb_item->state) {
-						zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld has timed  out in the poller, resetting it's queue state",glb_item->itemid);
+						zabbix_log(LOG_LEVEL_DEBUG, "Item %ld has timedout in the poller, resetting it's queue state",glb_item->itemid);
 						glb_item->state = GLB_ITEM_STATE_QUEUED;
 					}
 				}

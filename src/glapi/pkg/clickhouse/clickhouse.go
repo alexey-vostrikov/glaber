@@ -424,7 +424,7 @@ func (he ClickHouseHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*his
 						m.Logeventid = uint64(metric.GetInt("logeventid"))
 						m.Severity =  uint8(metric.GetInt("severity"))
 				}
-				log.Print("Parsed retruned value",m)
+				//log.Print("Parsed retruned value",m)
 				dumpf(&m,wr,i)			 
 			}
 		}

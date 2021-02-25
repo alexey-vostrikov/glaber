@@ -266,7 +266,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
 
     //setting to ignore sigchild which in trun let kernel know that
     //it's ok to shutdown childs completely
-    signal(SIGCHLD, SIG_IGN);
+    //signal(SIGCHLD, SIG_IGN);
 
     //and make file handles to the ends we need
     worker->pipe_to_worker = to_child[1];
@@ -450,6 +450,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     int wait_count = 0;
     char *resp_buffer = NULL;
     size_t rbuflen = 0, rbuffoffset = 0;
+    double wait_start;
 
     int empty_line = 0;
     int continue_read = 1;
@@ -457,7 +458,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     int worker_fail = 0;
 
     zbx_alarm_on(worker->timeout);
-
+    wait_start = zbx_time();
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
         //usleep(10000);
@@ -504,9 +505,9 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         {
             //we've got nothing from the worker, which is most likely means that worker has died
 
-            if (SUCCEED != worker_is_alive(worker))
+            if (SUCCEED != worker_is_alive(worker) || (zbx_time() - wait_start > worker->timeout))
             {
-                zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s has died during request process", worker->path);
+                zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s has died during request process or not responding", worker->path);
                 continue_read = 0;
                 worker_fail = 1;
             }

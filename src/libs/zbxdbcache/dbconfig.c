@@ -9239,7 +9239,7 @@ static int glb_might_be_async_polled ( ZBX_DC_ITEM *zbx_dc_item, ZBX_DC_HOST *zb
 	ZBX_DC_SNMPITEM *snmpitem;
 
 	if ( CONFIG_GLB_SNMP_FORKS == 0 ) return FAIL;
-
+#ifdef HAVE_NETSNMP	
 	if ( zbx_dc_item->type == ITEM_TYPE_SNMP ) {
 			snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&zbx_dc_item->itemid);
 			//avoiding dynamic and discovery items from being processed by async glb pollers
@@ -9251,7 +9251,7 @@ static int glb_might_be_async_polled ( ZBX_DC_ITEM *zbx_dc_item, ZBX_DC_HOST *zb
 			}
 	
 	}
- 
+ #endif
  	return FAIL;
 }
 /******************************************************************************
@@ -9452,11 +9452,13 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 
 	//this might change when i rollback queues change 
 	switch (item_type) {
+#ifdef HAVE_NETSNMP			
 		case ITEM_TYPE_SNMP:
 			zbx_hashset_iter_reset(&config->snmpitems,&iter);
 			forks = CONFIG_GLB_SNMP_FORKS;
 
 			queue_num = ZBX_POLLER_TYPE_NORMAL;
+#endif
 		break;
 		default:
 			zabbix_log(LOG_LEVEL_WARNING,"Glaber poller doesn't support item type %d yet, this is programming BUG",item_type);

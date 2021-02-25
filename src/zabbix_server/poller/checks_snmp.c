@@ -2328,7 +2328,7 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 	
 	zbx_snprintf(error_str,MAX_STRING_LEN, "Timed out, no responce for %d seconds %d retries", CONFIG_TIMEOUT, 2 );
 	
-	zabbix_log(LOG_LEVEL_INFORMATION, "host %ld item %ld timed out %s", glb_item->hostid,  glb_item->itemid, error_str);
+	zabbix_log(LOG_LEVEL_DEBUG, "host %ld item %ld timed out %s", glb_item->hostid,  glb_item->itemid, error_str);
 	zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags ,
 									NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
 			
@@ -2347,7 +2347,7 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 			zbx_snprintf(error_str,MAX_STRING_LEN,"Skipped from polling due to %d items timed out in a row, last failed item id is %ld", 
 							GLB_FAIL_COUNT_CLEAN, glb_item->itemid);
 			
-			zabbix_log(LOG_LEVEL_INFORMATION, "host %ld item %ld timed out %s", glb_item->hostid,  glb_next_item->itemid, error_str);
+			zabbix_log(LOG_LEVEL_DEBUG, "host %ld item %ld timed out %s", glb_item->hostid,  glb_next_item->itemid, error_str);
 			zbx_preprocess_item_value(glb_next_item->hostid, glb_next_item->itemid, glb_next_item->value_type, glb_next_item->flags ,
 									NULL , &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
 		}
@@ -2416,8 +2416,8 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 		}
 	} else {
 			DEBUG_ITEM(glb_item->itemid,"Async SNMP responce TIMEOUT event")	
-			zabbix_log(LOG_LEVEL_INFORMATION, "Async snmp timeout event for itemid %ld, request time is %d",
-						glb_item->itemid, time(NULL) - conn->finish_time);	
+			//zabbix_log(LOG_LEVEL_, "Async snmp timeout event for itemid %ld, request time is %d",
+			//			glb_item->itemid, time(NULL) - conn->finish_time);	
 			glb_snmp_handle_timeout(conn);
 
 	}
@@ -2627,7 +2627,6 @@ void glb_snmp_reset_snmp(void *engine){
 	//periodical total netsnmp cleanup
 	if (roll++ > GLB_ASYNC_POLLING_MAX_ITERATIONS)
 	{
-		zabbix_log(LOG_LEVEL_INFORMATION, "Cleaning all connections before SNMP reset");
 		int i, cnt = 0;
 		//we'll now drop all the sessions and connections to clean up snmp memory.
 		//we'll have to retry all the items then

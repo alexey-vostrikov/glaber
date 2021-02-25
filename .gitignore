@@ -1,0 +1,9 @@
+Makefile
+Makiefile.in
+config.log
+config.status
+glb_hist_clickhouse
+*.a
+*.o
+.deps/
+Makefile.in

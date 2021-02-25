@@ -34,7 +34,7 @@ int	zbx_vc_simple_add(zbx_uint64_t itemids, zbx_history_record_t *record);
 extern int CONFIG_SERVER_STARTUP_TIME;
 
 #define GLB_DEFAULT_WORKER_PRELOAD_VALUES 0
-#define GLB_DEFAULT_WORKER_DISABLE_READ	1800
+#define GLB_DEFAULT_WORKER_DISABLE_READ	0
 #define GLB_DEFAULT_WORKER_WRITE_TYPES "dbl, str, uint, text, log"
 #define GLB_DEFAULT_WORKER_READ_TYPES "dbl, str, uint, text"
 
@@ -624,7 +624,7 @@ int	glb_history_worker_init(char *params)
 	//preload_types: (str, text, ui64, double)
 	//preload_values: 10
 	//read_aggregate_types: (str, text, ui64, double) 
-	//disable_reads: 1800 by default (how long not to do readings)
+	//disable_reads: 0 sec by default (how long not to do readings)
 
 	 //history mode expects old good JSON as a config, let's parse it
     struct zbx_json_parse jp, jp_config;
