@@ -79,7 +79,7 @@ old-packages:
       fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
-    - cd ${CI_COMMIT_REF_SLUG}
+  #- cd ${CI_COMMIT_REF_SLUG}
     - mkdir -p pkgs/${DISTRIBUTION_TYPE}/dists/${DISTRIBUTION}/main/binary-amd64/
     - mkdir -p pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
     - mv ../../*.deb pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
@@ -154,10 +154,14 @@ debian-buster:
 ubuntu-focal:
   <<: *build_deb_modern
   image: ubuntu:focal
+  script:
+    - apt-get libssh-dev
 
 ubuntu-bionic:
   <<: *build_deb_modern
   image: ubuntu:bionic
+  script:
+    - apt-get libssh-dev
 
 ubuntu-xenial:
   <<: *build_deb
