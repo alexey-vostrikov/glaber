@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <signal.h>
-#include <stropts.h>
+//#include <stropts.h>
 #include "dbcache.h"
 #include "zbxipcservice.h"
 
@@ -266,7 +266,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
 
     //setting to ignore sigchild which in trun let kernel know that
     //it's ok to shutdown childs completely
-    signal(SIGCHLD, SIG_IGN);
+    //signal(SIGCHLD, SIG_IGN);
 
     //and make file handles to the ends we need
     worker->pipe_to_worker = to_child[1];
@@ -337,6 +337,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     int worker_fail = 0;
     int request_len = 0;
     int write_fail = 0;
+    int i;
 
     if (worker->calls++ >= worker->max_calls)
     {
@@ -398,7 +399,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
             zabbix_log(LOG_LEVEL_WARNING, "Request size: %d, request ptr is %ld match ptr is %ld", request_len, request, strstr(request, "\n\n"));
             zabbix_log(LOG_LEVEL_WARNING, "Request FAIL: no empty line or it's inside the request: '%s'", request);
          
-            for (int i = request_len - 10; i < request_len; i++)
+            for (i = request_len - 10; i < request_len; i++)
             {
                 zabbix_log(LOG_LEVEL_WARNING, "%d %d %d", request_len, i, request[i]);
             }
@@ -450,6 +451,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     int wait_count = 0;
     char *resp_buffer = NULL;
     size_t rbuflen = 0, rbuffoffset = 0;
+    double wait_start;
 
     int empty_line = 0;
     int continue_read = 1;
@@ -457,7 +459,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     int worker_fail = 0;
 
     zbx_alarm_on(worker->timeout);
-
+    wait_start = zbx_time();
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
         //usleep(10000);
@@ -504,9 +506,9 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         {
             //we've got nothing from the worker, which is most likely means that worker has died
 
-            if (SUCCEED != worker_is_alive(worker))
+            if (SUCCEED != worker_is_alive(worker) || (zbx_time() - wait_start > worker->timeout))
             {
-                zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s has died during request process", worker->path);
+                zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s has died during request process or not responding", worker->path);
                 continue_read = 0;
                 worker_fail = 1;
             }
@@ -560,7 +562,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     //it's the caller's business to free it
     *responce = resp_buffer;
 
-    zabbix_log(LOG_LEVEL_DEBUG, "Answer wait is finished, responce length is %d, buffer is %s", strlen(resp_buffer), resp_buffer);
+    zabbix_log(LOG_LEVEL_DEBUG, "Answer wait is finished, responce length is %zu, buffer is %s", strlen(resp_buffer), resp_buffer);
     return SUCCEED;
 };
 

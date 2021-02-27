@@ -183,7 +183,7 @@ int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
-int CONFIG_GLB_SNMP_FORKS		= 1;
+int CONFIG_GLB_SNMP_FORKS		= 0;
 
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_PINGER_FORKS		= 5;
@@ -682,7 +682,9 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 #endif
 	err |= (FAIL == zbx_db_validate_config_features());
 
-
+#if !defined(HAVE_NETSNMP)
+	err |= (FAIL == check_cfg_feature_int("StartGlaberSNMPPollers", CONFIG_GLB_SNMP_FORKS, "SNMP support"));
+#endif
 
 	if (0 != err)
 		exit(EXIT_FAILURE);

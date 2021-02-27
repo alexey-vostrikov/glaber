@@ -3827,12 +3827,16 @@ static int	sender_item_validator(DC_ITEM *item, zbx_socket_t *sock, void *args, 
 			break;
 		case ITEM_TYPE_TRAPPER:
 			break;
+		
 		default:
+		if (0 == item->allow_traps) {
 			*error = zbx_dsprintf(*error, "cannot process item \"%s\" trap:"
 					" item type \"%d\" cannot be used with traps",
 					zbx_truncate_itemkey(item->key_orig, VALUE_ERRMSG_MAX, key_short,
 					sizeof(key_short)), item->type);
 			return FAIL;
+		}
+		break;
 	}
 
 	if ('\0' != *item->trapper_hosts)	/* list of allowed hosts not empty */

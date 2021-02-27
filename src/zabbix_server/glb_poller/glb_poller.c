@@ -62,6 +62,7 @@ void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
 
 	switch (glb_item->item_type)
 	{
+#ifdef HAVE_NETSNMP
 		case ITEM_TYPE_SNMP:
 			glb_snmp_item = (GLB_SNMP_ITEM*) glb_item->itemdata;
 			glb_snmp_free_item( glb_snmp_item );
@@ -70,7 +71,7 @@ void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
 			glb_item->itemdata = NULL;
 
 			break;
-
+#endif
 		default:
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot free unsupport item typ %d, this is a BUG",glb_item->item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -90,12 +91,13 @@ void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 
 	switch (glb_item->item_type)
 	{
+#ifdef HAVE_NETSNMP
 	case ITEM_TYPE_SNMP:
 		//adding the item to the connection's joblist
 		glb_snmp_add_poll_item(engine, glb_item);
 		
 		break;
-	
+#endif
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",glb_item->item_type);
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -235,6 +237,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	//item-type specific init
 	switch (glb_item->item_type )
 	{
+#ifdef HAVE_NETSNMP
 	case ITEM_TYPE_SNMP:
 		if (NULL == (glb_snmp_item = zbx_malloc(NULL, sizeof(GLB_SNMP_ITEM)))) {
 			zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
@@ -255,7 +258,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		}
 		
 		break;
-
+#endif
 	default:
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -284,9 +287,11 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responces) {
 	
 	switch (item_type) {
+#ifdef HAVE_NETSNMP
 		case ITEM_TYPE_SNMP:
 			return glb_snmp_init(hosts, items, requests, responces);
 			break;
+#endif
 		default: 
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot init worker for item type %d, this is a BUG",item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -302,10 +307,12 @@ void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_
 void glb_poller_engine_shutdown(void *engine, unsigned char item_type) {
 	
 	switch (item_type) {
+#ifdef HAVE_NETSNMP
 		case ITEM_TYPE_SNMP:
 			glb_snmp_shutdown(engine); 
 			return;
 			break;
+#endif
 		default: 
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot shutdown engine for item type %d, this is a BUG",item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -341,10 +348,11 @@ int  host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now) {
 void glb_poller_handle_async_io(void *engine, unsigned char item_type ) {
 	switch (item_type)
 	{
+#ifdef HAVE_NETSNMP
 	case ITEM_TYPE_SNMP:
 		glb_snmp_handle_async_io(engine);
 		break;
-	
+#endif	
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",item_type);
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -524,7 +532,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					//an item may wait for some time while other items will be polled and thus get timedout
 					//so after one minute of waiting we consider it timed out
 					if (glb_item->lastpolltime + SEC_PER_MIN < now && GLB_ITEM_STATE_POLLING == glb_item->state) {
-						zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld has timed  out in the poller, resetting it's queue state",glb_item->itemid);
+						zabbix_log(LOG_LEVEL_DEBUG, "Item %ld has timedout in the poller, resetting it's queue state",glb_item->itemid);
 						glb_item->state = GLB_ITEM_STATE_QUEUED;
 					}
 				}

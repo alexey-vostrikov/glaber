@@ -229,18 +229,48 @@ int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
  *           all values from the specified interval if count is zero.               *
  *                                                                                  *
  ************************************************************************************/
+#define GET_ACCOUNT_INTERVAL 5
 int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive,  zbx_vector_history_record_t *values)
 {
 	int			j, ret;
+	double last_run;
+	static int next_account_time=0;
+	static double get_runtime = 0.0;
+	static char enabled_gets = 1;
+
+	if (time(NULL) > next_account_time) {
+		
+		//resetting counters
+		enabled_gets = 1;
+		get_runtime = 0.0;
+		
+		next_account_time = time(NULL) + GET_ACCOUNT_INTERVAL;
+	
+	} 
+
+	if (enabled_gets && ( get_runtime > GET_ACCOUNT_INTERVAL * 0.5 )) {
+		enabled_gets = 0;
+		zabbix_log(LOG_LEVEL_WARNING,"Suppressing getting history for %d sec due to too long get time", next_account_time - time(NULL));
+
+	}
+
+	if ( !enabled_gets && !interactive ) 
+		return SUCCEED;
 
 	//whoever first gets the data, it's rusult is used 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values[j];
 		glb_history_get_func_t get_values = callback->callback;
+		last_run = zbx_time();
 		
-		if (SUCCEED == get_values(callback->callbackData , value_type, itemid,start,count,end,interactive, values)) 
+		if (SUCCEED == get_values(callback->callbackData , value_type, itemid, start, count, end, interactive, values)) {
+			get_runtime += zbx_time() - last_run;	
+			zabbix_log(LOG_LEVEL_DEBUG,"Current runtime is %f stat is %d",get_runtime,enabled_gets);
 			return SUCCEED;
+		}
+		
+		get_runtime += zbx_time() - last_run;	
 	}
 
 	return ret;
