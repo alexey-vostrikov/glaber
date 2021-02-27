@@ -149,7 +149,7 @@ debian-buster:
   <<: *build_deb
   image: debian:buster
   script:
-    - apt-get install -y libmysqlclient-dev
+    - apt-get install -y libmariadb-dev
 
 ubuntu-focal:
   <<: *build_deb_modern
