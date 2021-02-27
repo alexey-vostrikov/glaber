@@ -52,9 +52,9 @@ old-packages:
   before_script:
     - export DEBIAN_FRONTEND=noninteractive
     - apt-get update
-    - apt-get --ignore-missing install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl golang-go libssh-dev
+    - apt-get --ignore-missing install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl golang-go
   after_script:
-    - export GOPATH=$HOME/go
+    - export GOPATH=$HOME/go:/builds/mikler/glaber/src/go
     - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
     - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
     - export DISTRIBUTION_TYPE=$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')
