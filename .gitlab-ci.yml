@@ -50,10 +50,10 @@ old-packages:
     DISTRIBUTION_TYPE: ${CI_JOB_IMAGE:0:6}
     DISTRIBUTION: ${CI_JOB_IMAGE:7}
   before_script:
-    - export DEBIAN_FRONTEND=noninteractive
     - apt-get update
     - apt-get --ignore-missing install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl golang-go
   after_script:
+    - export DEBIAN_FRONTEND=noninteractive
     - export GOPATH=$HOME/go:/builds/mikler/glaber/src/go
     - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
     - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
@@ -79,6 +79,9 @@ old-packages:
       fi
     - autoreconf -fvi
     - dpkg-buildpackage -b
+    - echo $PWD
+    - ls ./
+    - ls ../
   #- cd ${CI_COMMIT_REF_SLUG}
     - mkdir -p pkgs/${DISTRIBUTION_TYPE}/dists/${DISTRIBUTION}/main/binary-amd64/
     - mkdir -p pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
@@ -149,19 +152,19 @@ debian-buster:
   <<: *build_deb
   image: debian:buster
   script:
-    - apt-get install -y libmariadb-dev
+    - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev
 
 ubuntu-focal:
   <<: *build_deb_modern
   image: ubuntu:focal
   script:
-    - apt-get libssh-dev
+    - apt-get install -y default-libmysqlclient-dev libssh-dev
 
 ubuntu-bionic:
   <<: *build_deb_modern
   image: ubuntu:bionic
   script:
-    - apt-get libssh-dev
+    - apt-get install -y libssh-dev default-libmysqlclient-dev
 
 ubuntu-xenial:
   <<: *build_deb
