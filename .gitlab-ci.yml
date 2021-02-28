@@ -89,7 +89,7 @@ old-packages:
     - ./build/deb.sh
   artifacts:
     paths:
-      - ${CI_COMMIT_REF_SLUG}/pkgs/${CI_JOB_IMAGE:7}/
+      - pkgs/${CI_JOB_IMAGE:7}/
 
 .build_deb_modern: &build_deb_modern
   <<: *build_deb
