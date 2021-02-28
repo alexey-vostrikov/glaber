@@ -85,7 +85,7 @@ old-packages:
   #- cd ${CI_COMMIT_REF_SLUG}
     - mkdir -p pkgs/${DISTRIBUTION_TYPE}/dists/${DISTRIBUTION}/main/binary-amd64/
     - mkdir -p pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
-    - mv ../../*.deb pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
+    - mv ../*.deb pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
     - chmod +x ../build/deb.sh
     - ../build/deb.sh
   artifacts:
