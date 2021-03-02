@@ -185,9 +185,9 @@ centos8:
   before_script:
     - dnf -y install dnf-plugins-core epel-release
     - dnf config-manager --set-enabled powertools
-    - dnf install OpenIPMI-devel
+    - dnf -y install OpenIPMI-devel
 
-    
+
 deploys3:
   image: "python:latest"
   stage: deploy
