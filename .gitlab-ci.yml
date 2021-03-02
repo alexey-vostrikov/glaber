@@ -187,6 +187,7 @@ centos8:
     - dnf config-manager --set-enabled powertools
     - dnf install OpenIPMI-devel
 
+    
 deploys3:
   image: "python:latest"
   stage: deploy
