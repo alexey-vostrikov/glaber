@@ -250,7 +250,7 @@ int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, i
 
 	if (enabled_gets && ( get_runtime > GET_ACCOUNT_INTERVAL * 0.5 )) {
 		enabled_gets = 0;
-		zabbix_log(LOG_LEVEL_WARNING,"Suppressing getting history for %d sec due to too long get time", next_account_time - time(NULL));
+		zabbix_log(LOG_LEVEL_WARNING,"Suppressing getting history for %ld sec due to too long get time", next_account_time - time(NULL));
 
 	}
 
