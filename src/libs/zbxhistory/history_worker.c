@@ -113,7 +113,7 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
 	if (0 == conf->read_trend_types[value_type])	
 			return FAIL;
 	
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_trends\", \"itemid\":%d, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }\n",
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_trends\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }\n",
 				itemid,value_type,start,aggregates,end);
 	
 	
@@ -212,7 +212,7 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 	if (0 == conf->read_agg_types[value_type])	
 			return FAIL;
 	
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_agg\", \"itemid\":%d, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }\n",
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_agg\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }\n",
 				itemid,value_type,start,aggregates,end);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Sending request %s",request);
@@ -318,7 +318,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	}
 	
 	//creating the request
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_history\", \"itemid\":%d, \"start\": %d, \"count\":%d, \"end\":%d, \"value_type\":%d }\n",
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_history\", \"itemid\":%ld, \"start\": %d, \"count\":%d, \"end\":%d, \"value_type\":%d }\n",
 				itemid,start,count,end,value_type);
 	
 	glb_process_worker_request(conf->worker, request, &response);
@@ -468,7 +468,7 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 		glb_escape_worker_string(h->item_key,buffer);
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
 		
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time_sec\":%ld, \"time_ns\":%ld, \"value_type\":%d, ", h->itemid,h->ts.sec,h->ts.ns, h->value_type);
+		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time_sec\":%ld, \"time_ns\":%d, \"value_type\":%d, ", h->itemid,h->ts.sec,h->ts.ns, h->value_type);
     		
 		//type-dependent part
 		switch (h->value_type) {
@@ -485,7 +485,7 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 					
 					glb_escape_worker_string(h->value.log->source,buffer);   
 					zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,
-						"\"logeventid\":%ld, \"severity\":%d, \"source\":\"%s\"",h->value.log->logeventid, h->value.log->severity, buffer);
+						"\"logeventid\":%d, \"severity\":%d, \"source\":\"%s\"",h->value.log->logeventid, h->value.log->severity, buffer);
 					
 				}
 				//warn: intentionally no break here!
@@ -547,7 +547,7 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 	if (0 == trends_num) 
 		return SUCCEED;
 	
-	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_trends\", \"aggmetrics\":[", buffer);
+	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_trends\", \"aggmetrics\":[");
     
     for (i = 0; i < trends_num; i++)
 	{
@@ -556,14 +556,14 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 		
 		glb_escape_worker_string(trends[i].host_name,buffer);
 		
-		if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",", buffer);
+		if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
 		
 		buffer[0]='\0';
 		glb_escape_worker_string(trends[i].item_key,buffer);
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
 		
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time\":%ld, \"value_type\":%d, ", trends[i].itemid,trends[i].clock, trends[i].value_type);
+		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time\":%d, \"value_type\":%d, ", trends[i].itemid,trends[i].clock, trends[i].value_type);
     	
 		switch (trends[i].value_type) {
 			case ITEM_VALUE_TYPE_FLOAT:
