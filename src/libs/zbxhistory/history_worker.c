@@ -650,7 +650,6 @@ int	glb_history_worker_init(char *params)
 	conf->worker->mode_from_worker=GLB_WORKER_MODE_EMPTYLINE;
 	conf->worker->mode_to_worker=GLB_WORKER_MODE_NEWLINE;
 	
-	
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_WORKER_WRITE_TYPES,MAX_STRING_LEN);
 	zbx_json_value_by_name(&jp_config,"write_types", tmp_str, MAX_STRING_LEN,&type);
 	glb_set_process_types(conf->write_types, tmp_str);
