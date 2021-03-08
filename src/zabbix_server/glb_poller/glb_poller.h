@@ -44,15 +44,6 @@
 #define GLB_PROTO_ERRCODE "errcode"
 #define GLB_PROTO_ERROR "error"
 
-
-//typedef struct
-//{
-
-//	const char *key;
-//	const char *value;
-
-//} GLB_KEY_VAL;
-
 typedef struct
 {
 
@@ -75,11 +66,8 @@ typedef struct
 
 typedef struct
 {
-
 	zbx_uint64_t itemid;
 	zbx_uint64_t hostid;
-	//GLB_KEY_VAL params[GLB_MAX_ITEM_PARAMS];
-	//char params_count;
 	char state;
 	unsigned char value_type;
 	unsigned int ttl;
@@ -87,7 +75,7 @@ typedef struct
 	unsigned char item_type;
 	unsigned char flags;
 	unsigned int lastpolltime;
-	void *itemdata; //item type specific data
+	void *itemdata;		 //item type specific data
 } GLB_POLLER_ITEM;
 
 typedef struct {
@@ -106,6 +94,7 @@ typedef struct {
 	const char *snmpv3_privpassphrase;
 
 } GLB_SNMP_ITEM;
+
 
 
 void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);

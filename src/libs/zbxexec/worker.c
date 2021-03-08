@@ -1,4 +1,6 @@
 /***************************************
+* This is a good place for a copyright - here it is. The copyright.
+*
 * An external worker is a long - running script 
 * which is capable of processing simple and 
 * similar tasks lots of times
@@ -12,7 +14,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <signal.h>
-//#include <stropts.h>
 #include "dbcache.h"
 #include "zbxipcservice.h"
 
@@ -36,7 +37,7 @@ static int get_worker_mode(char *mode)
     return FAIL;
 }
 
-GLB_EXT_WORKER *glb_init_worker(char *config_line)
+GLB_EXT_WORKER *glb_init_worker_json(char *config_line)
 {
     char path[MAX_STRING_LEN],
         params[MAX_STRING_LEN],
@@ -118,7 +119,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
 zbx_hash_t glb_worker_hash_func(const void *data)
 {
-    GLB_EXT_WORKER *w = (GLB_EXT_WORKER *)data;
+w    GLB_EXT_WORKER *w = (GLB_EXT_WORKER *)data;
     return ZBX_DEFAULT_STRING_HASH_ALGO(w->path, strlen((const char *)w->path), ZBX_DEFAULT_HASH_SEED);
 }
 
@@ -409,9 +410,10 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         break;
     }
     //zabbix_log(LOG_LEVEL_INFORMATION, "Setting alarm to %d",worker->timeout);
-    //so, lets write to the worker's pipe
+    
     zbx_alarm_on(worker->timeout);
-
+    
+    //so, lets write to the worker's pipe
     int wr_len = write(worker->pipe_to_worker, request, strlen(request));
 
     if (0 > wr_len)
@@ -440,6 +442,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     
     return SUCCEED;
 };
+
 int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     if (GLB_WORKER_MODE_SILENT == worker->mode_from_worker)
     {
@@ -460,6 +463,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
 
     zbx_alarm_on(worker->timeout);
     wait_start = zbx_time();
+
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
         //usleep(10000);

@@ -2210,7 +2210,7 @@ typedef struct {
 
 
 /******************************************************************************
- * warp function to use zbx snmp conn										  * 
+ * wrap function to use zbx snmp conn										  * 
  * ***************************************************************************/
 static struct snmp_session * glb_snmp_open_conn(GLB_POLLER_ITEM *glb_item){
 	DC_ITEM dc_item;
