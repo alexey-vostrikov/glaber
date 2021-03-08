@@ -141,7 +141,7 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
         char clck[MAX_ID_LEN], ns[MAX_ID_LEN],value[MAX_STRING_LEN];
         
         struct zbx_json_parse	jp_row;
-		//this is just a json check value by value
+		
         if (SUCCEED == zbx_json_brackets_open(p, &jp_row)) {
 							
             if (SUCCEED == zbx_json_value_by_name(&jp_row, "clock", clck,MAX_ID_LEN, &type) &&

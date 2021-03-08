@@ -110,6 +110,7 @@ extern char * CONFIG_HOSTNAME;
 extern int CONFIG_PREPROCMAN_FORKS;
 extern int  CONFIG_GLB_REQUEUE_TIME;
 extern int CONFIG_GLB_SNMP_FORKS;
+extern int CONFIG_GLB_PINGER_FORKS;
 
 ZBX_MEM_FUNC_IMPL(__config, config_mem)
 
@@ -9460,6 +9461,12 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 			queue_num = ZBX_POLLER_TYPE_NORMAL;
 #endif
 		break;
+
+		case ITEM_TYPE_SIMPLE:
+			zbx_hashset_iter_reset(&config->simpleitems,&iter);
+			forks = CONFIG_GLB_PINGER_FORKS;
+
+			queue_num = ZBX_POLLER_TYPE_PINGER;
 		default:
 			zabbix_log(LOG_LEVEL_WARNING,"Glaber poller doesn't support item type %d yet, this is programming BUG",item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -9488,12 +9495,12 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 			continue;
 		
 		if (SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item))
-		{	dc_requeue_item(zbx_dc_item, zbx_dc_host, ZBX_ITEM_COLLECTED, now);
+		{	//dc_requeue_item(zbx_dc_item, zbx_dc_host, ZBX_ITEM_COLLECTED, now);
 			continue;
 		}
 		
 		if (ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0) {
-			dc_requeue_item(zbx_dc_item, zbx_dc_host, ZBX_ITEM_COLLECTED, now + CONFIG_TIMEOUT);
+			//dc_requeue_item(zbx_dc_item, zbx_dc_host, ZBX_ITEM_COLLECTED, now + CONFIG_TIMEOUT);
 			continue;
 		}
 

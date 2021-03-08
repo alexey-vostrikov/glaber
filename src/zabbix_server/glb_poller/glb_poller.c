@@ -100,8 +100,7 @@ void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 		break;
 #endif
 	case ITEM_TYPE_SIMPLE:
-		//adding the item to the connection's joblist
-		glb_pinger_add_poll_item(engine, glb_item);
+		glb_pinger_start_ping(engine, glb_item);
 		break;
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",glb_item->item_type);
@@ -314,7 +313,7 @@ void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_
 			break;
 #endif
 		case ITEM_TYPE_SIMPLE:
-			return glb_pinger_init(hosts, items, requests, responces);
+			return glb_pinger_init(items, requests, responces);
 			break;
 
 		default: 

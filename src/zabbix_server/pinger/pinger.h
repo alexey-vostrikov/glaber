@@ -21,7 +21,10 @@
 #define ZABBIX_PINGER_H
 
 #include "threads.h"
+#include "zbxicmpping.h"
 
 ZBX_THREAD_ENTRY(pinger_thread, args);
+int	parse_key_params(const char *key, const char *host_addr, icmpping_t *icmpping, char **addr, int *count,
+		int *interval, int *size, int *timeout, icmppingsec_type_t *type, char *error, int max_error_len);
 
 #endif

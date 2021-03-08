@@ -19,7 +19,15 @@
 
 #ifndef GLABER_PINGER_H
 #define GLABER_PINGER_H
-#include <zbxicmpping.h>
+#include "zbxicmpping.h"
+#include "glb_poller.h"
+
+typedef struct
+{
+	u_int64_t time;
+	u_int64_t itemid; //using weak linking assuming events might be outdated
+
+} GLB_PINGER_EVENT;
 
 typedef struct {
 	const char *key;
@@ -28,6 +36,7 @@ typedef struct {
 	int 	count;
 	int 	interval;
 	int 	size;
+	unsigned char curr_idx;
 	int 	*results;	//array to hold all the measurnemts
 	char *ip;
 } GLB_PINGER_ITEM;
@@ -35,5 +44,8 @@ typedef struct {
 unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item);
 void glb_pinger_free_item(GLB_PINGER_ITEM *glb_pinger_item );
 void glb_pinger_shutdown(void *engine);
+int glb_pinger_start_ping(void *engine, GLB_POLLER_ITEM *glb_item);
+void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces );
+void  glb_pinger_handle_async_io(void *engine);
 
 #endif

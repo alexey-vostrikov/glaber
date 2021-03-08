@@ -90,6 +90,7 @@ static zbx_mutex_t	sm_lock = ZBX_MUTEX_NULL;
 extern char	*CONFIG_FILE;
 extern int 	CONFIG_POLLERS_FORKS[];
 extern int 	CONFIG_GLB_SNMP_FORKS;
+extern int 	CONFIG_GLB_PINGER_FORKS;
 extern int	CONFIG_HTTPPOLLER_FORKS;
 extern int	CONFIG_TRAPPER_FORKS;
 extern int	CONFIG_SNMPTRAPPER_FORKS;
@@ -205,6 +206,8 @@ int	get_process_type_forks(unsigned char proc_type)
 			return CONFIG_ALERTDB_FORKS;
 		case GLB_PROCESS_TYPE_SNMP:
 			return CONFIG_GLB_SNMP_FORKS;
+		case GLB_PROCESS_TYPE_PINGER:
+			return CONFIG_GLB_PINGER_FORKS;
 		
 	}
 	zabbix_log(LOG_LEVEL_WARNING,"Unknown process type %d, This is a BUG",proc_type );

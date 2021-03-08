@@ -184,6 +184,7 @@ int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int CONFIG_GLB_SNMP_FORKS		= 0;
+int CONFIG_GLB_PINGER_FORKS		= 0;
 
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_PINGER_FORKS		= 5;
@@ -447,6 +448,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = GLB_PROCESS_TYPE_SNMP;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_SNMP_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_GLB_PINGER_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_PINGER;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_UNREACHABLE_POLLER_FORKS))
 	{
@@ -731,7 +737,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1000},
 		{"StartPingers",		&CONFIG_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},	
-		{"StartGlaberSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
+		{"StartGlbSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},	
+		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},	
 		{"StartPreprocessorManagers",		&CONFIG_PREPROCMAN_FORKS,			TYPE_INT,
 			PARM_OPT,	1,			64},
@@ -1318,7 +1326,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
 			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
-			+ CONFIG_GLB_SNMP_FORKS
+			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_PINGER_FORKS
 			+ CONFIG_ALERTER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_TIMER_FORKS
 			+ CONFIG_HTTPPOLLER_FORKS + CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS
 			+ CONFIG_ESCALATOR_FORKS + CONFIG_IPMIPOLLER_FORKS + CONFIG_JAVAPOLLER_FORKS

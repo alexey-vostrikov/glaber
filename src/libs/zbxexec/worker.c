@@ -37,7 +37,7 @@ static int get_worker_mode(char *mode)
     return FAIL;
 }
 
-GLB_EXT_WORKER *glb_init_worker_json(char *config_line)
+GLB_EXT_WORKER *glb_init_worker(char *config_line)
 {
     char path[MAX_STRING_LEN],
         params[MAX_STRING_LEN],
@@ -119,7 +119,7 @@ GLB_EXT_WORKER *glb_init_worker_json(char *config_line)
 
 zbx_hash_t glb_worker_hash_func(const void *data)
 {
-w    GLB_EXT_WORKER *w = (GLB_EXT_WORKER *)data;
+    GLB_EXT_WORKER *w = (GLB_EXT_WORKER *)data;
     return ZBX_DEFAULT_STRING_HASH_ALGO(w->path, strlen((const char *)w->path), ZBX_DEFAULT_HASH_SEED);
 }
 
@@ -168,7 +168,23 @@ out:
 
 static int restart_worker(GLB_EXT_WORKER *worker)
 {
+    #define RST_ACCOUNT_PERIOD  20
+    #define RST_MAX_RESTARTS    5
+
+    static unsigned int count_rst_time=0, restarts=0;
+    unsigned int now=time(NULL);
+
     zabbix_log(LOG_LEVEL_INFORMATION, "Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
+       
+    if (now > count_rst_time) {
+        zabbix_log(LOG_LEVEL_INFORMATION,"Zeroing restart limit");
+        count_rst_time=now + RST_ACCOUNT_PERIOD;
+        restarts = 0;
+    }
+    if (restarts++ > RST_MAX_RESTARTS ) {
+        zabbix_log(LOG_LEVEL_INFORMATION,"Restart is delayed in %d seconds to avoid system hammering", count_rst_time - now);
+        return FAIL;
+    }
 
     //closing pipework
     if (worker->pipe_from_worker)
@@ -344,14 +360,16 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "%s worker %s pid %d exceeded number of requests (%d), restarting it",
                    __func__, worker->path, worker->pid, worker->max_calls);
-        restart_worker(worker);
+        if (SUCCEED != restart_worker(worker)) 
+            return FAIL;
         zabbix_log(LOG_LEVEL_INFORMATION, "%s: worker restarted, new pid is %d", __func__, worker->pid);
     };
 
     if (SUCCEED != worker_is_alive(worker))
     {
         zabbix_log(LOG_LEVEL_WARNING, "%s: worker %s is not running, starting", __func__, worker->path);
-        restart_worker(worker);
+        if (SUCCEED != restart_worker(worker)) 
+            return FAIL;
     }
     else
     {

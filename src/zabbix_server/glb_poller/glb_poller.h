@@ -101,6 +101,7 @@ void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, DC_ITEM *dc_item, void *poll_engine);
 
+
 ZBX_THREAD_ENTRY(glbpoller_thread, args);
 
 GLB_POLLER_ITEM *glb_get_poller_item(zbx_uint64_t itemid);

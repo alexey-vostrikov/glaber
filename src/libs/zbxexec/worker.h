@@ -5,9 +5,7 @@
 #include <sys/types.h>
 #include "dbcache.h"
 
-
-
-GLB_EXT_WORKER*  glb_init_worker(char *params);
+GLB_EXT_WORKER* glb_init_worker(char *params);
 int glb_process_worker_request(GLB_EXT_WORKER *runner, const char * request, char **responce);
 
 //theese two are for async communication or situations when there is no input or output expected
