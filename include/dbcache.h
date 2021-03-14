@@ -36,8 +36,9 @@
 #define	ZBX_POLLER_TYPE_IPMI		2
 #define	ZBX_POLLER_TYPE_PINGER		3
 #define	ZBX_POLLER_TYPE_JAVA		4
-#define	GLB_POLLER_TYPE_GLABER_SNMP		5
-#define	ZBX_POLLER_TYPE_COUNT		6	/* number of poller types */
+#define	GLB_POLLER_TYPE_SNMP		5
+#define	GLB_POLLER_TYPE_PINGER		6
+#define	ZBX_POLLER_TYPE_COUNT		7	/* number of poller types */
 
 #define MAX_JAVA_ITEMS		32
 #define MAX_SNMP_ITEMS		128
@@ -79,6 +80,7 @@ typedef struct {
 	int mode_from_worker;	//which termination to expect from the worker when parsing returned data 
 	int pipe_from_worker;	//communication pipes
 	int pipe_to_worker;
+	unsigned char async_mode; //worker is working in async mode - we don't wait it for the answer
 }
 GLB_EXT_WORKER;
 

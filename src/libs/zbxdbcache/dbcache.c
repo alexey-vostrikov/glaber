@@ -3013,11 +3013,12 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		ZBX_DC_TREND		*trends = NULL;
 		*more = ZBX_SYNC_DONE;
 
+		zabbix_log(LOG_LEVEL_INFORMATION, "Trying to lock cache to fetch the items");		
 		LOCK_CACHE;
 		hc_pop_items(&history_items);		/* select and take items out of history cache */
 		UNLOCK_CACHE;
 
-	//	zabbix_log(LOG_LEVEL_INFORMATION, "Fetched %d items from the history",history_items.values_num);		
+		zabbix_log(LOG_LEVEL_INFORMATION, "Fetched %d items from the history",history_items.values_num);		
 
 		if (0 != history_items.values_num)
 		{
@@ -3166,6 +3167,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 		if (0 != history_num)
 		{
+			zabbix_log(LOG_LEVEL_INFORMATION, "Locking: Retrurning items to the history cache");
 			LOCK_CACHE;
 			hc_push_items(&history_items);	/* return items to history cache */
 			cache->history_num -= history_num;
@@ -3182,7 +3184,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			}
 
 			UNLOCK_CACHE;
-
+			zabbix_log(LOG_LEVEL_INFORMATION, "Unlocked: Retrurning items to the history cache");
 			*values_num += history_num;
 		}
 
