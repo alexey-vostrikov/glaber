@@ -3,7 +3,8 @@
 noinst_LIBRARIES = libglbpoller.a
 
 libglbpoller_a_SOURCES = \
-	glb_poller.c
+	glb_poller.c \
+	glb_poller.h
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \
