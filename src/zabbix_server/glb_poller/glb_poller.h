@@ -27,6 +27,8 @@
 #define GLB_EVENT_NEW_ITEMS_CHECK 2
 #define GLB_EVENT_AGING 3
 
+#define GLB_DNS_CACHE_TIME 300 //for how long name to ip resolvings have to be remembered
+
 //#define GLB_GET_MAX_ITEMS 256 //do not make it too big! - arrays of this size are allocated from stack
 
 #define GLB_ITEM_STATE_NEW 1
@@ -96,10 +98,12 @@ typedef struct {
 } GLB_SNMP_ITEM;
 
 
-
+int event_elem_compare(const void *d1, const void *d2);
 void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, DC_ITEM *dc_item, void *poll_engine);
+
+u_int64_t glb_ms_time(); //retruns time in millisecodns
 
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args);

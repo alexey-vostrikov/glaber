@@ -2185,7 +2185,7 @@ void	zbx_clear_cache_snmp(unsigned char process_type, int process_num)
 }
 
 
-#define GLB_MAX_SNMP_CONNS 16386
+#define GLB_MAX_SNMP_CONNS 8192
 #define  CONFIG_SNMP_RETRIES 2
 
 typedef struct
@@ -2197,6 +2197,7 @@ typedef struct
 	int retries;			   /* how many retries already passed */
 	zbx_list_t items_list;    /* list of itemids assigned to the session */
 	void* conf; 
+	int idx;
 }  GLB_ASYNC_SNMP_CONNECTION;
 
 typedef struct {
@@ -2279,7 +2280,8 @@ unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item) {
 	snmp_item->snmpv3_privprotocol = dc_item->snmpv3_privprotocol;
 	snmp_item->snmpv3_privpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_privpassphrase);
 	snmp_item->oid = zbx_heap_strpool_intern(translated_oid);
-	
+	snmp_item->state = POLL_QUEUED;
+
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
 	return SUCCEED;
 }
@@ -2318,12 +2320,16 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 
 	zbx_timespec(&timespec);
+
 	
 	conn->state = POLL_FINISHED;
 
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d timed out",conn->idx);
+
 	if (NULL == (glb_item = zbx_hashset_search(conf->items,&conn->current_item))) 
 	 	return FAIL; 
-
+	
+	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
 	add_host_fail(conf->hosts, glb_item->hostid, now);
 	
 	zbx_snprintf(error_str,MAX_STRING_LEN, "Timed out, no responce for %d seconds %d retries", CONFIG_TIMEOUT, 2 );
@@ -2333,6 +2339,7 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 									NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
 			
 	glb_item->state=GLB_ITEM_STATE_QUEUED;
+	glb_snmp_item->state = POLL_QUEUED;	
 	
 	if ( SUCCEED == host_is_failed(conf->hosts,glb_item->hostid, now) ) {
 		zabbix_log(LOG_LEVEL_DEBUG, "Doing local queue cleanup due to too many timed items for host %ld", glb_item->hostid);
@@ -2376,6 +2383,7 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 	zbx_timespec_t		timespec;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d callback",conn->idx);
 
 	var = pdu->variables;
 	zbx_timespec(&timespec);
@@ -2386,14 +2394,17 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 		zabbix_log(LOG_LEVEL_DEBUG, "Responce for aged item has arrived, ignoring");
 		return SUCCEED;
 	};
-	
+	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
+
 	*conf->responces += 1;
 	glb_item->state = GLB_ITEM_STATE_QUEUED;
+	glb_snmp_item->state = POLL_QUEUED;
 
 	if (operation == NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
 		
 		if (SNMP_ERR_NOERROR == pdu->errstat)
 		{  
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d got SUCCEED responce",conn->idx);
 			while (var)
 			{	
 				init_result(&result);
@@ -2403,18 +2414,18 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 				DEBUG_ITEM(glb_item->itemid,"Async SNMP responce processing for the item");
 
 				zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , &result ,&timespec, ITEM_STATE_NORMAL, NULL);
-					
-	
+						
 				var = var->next_variable;
 				free_result(&result);
 			}
 			
-		
 		} else {
-			zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 0 , NULL,
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d got FAIL responce",conn->idx);
+			zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , NULL,
 				&timespec,ITEM_STATE_NOTSUPPORTED, "Cannot parse response pdu");
 		}
 	} else {
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d got snmp timeout callback",conn->idx);
 			DEBUG_ITEM(glb_item->itemid,"Async SNMP responce TIMEOUT event")	
 			//zabbix_log(LOG_LEVEL_, "Async snmp timeout event for itemid %ld, request time is %d",
 			//			glb_item->itemid, time(NULL) - conn->finish_time);	
@@ -2444,17 +2455,30 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
 	zbx_timespec(&timespec);
+
+
+//todo: remove after debugging
+//	zbx_list_iterator_t list_iter;
+//	zbx_list_iterator_init(&conn->items_list, &list_iter);
+//	int place=0;
+//	uint64_t t_item;
 	
+//	while (SUCCEED == zbx_list_iterator_next(&list_iter)) {
+//		zbx_list_iterator_peek(&list_iter,(void **)&t_item);
+//		place++;
+			
+//		if (CONFIG_DEBUG_ITEM == t_item)  {
+//			zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld is in the %d place in connection list, now polling item %ld",t_item,place, conn->current_item);
+//			break;
+//		}
+
+//	}
+
 	//check if connection is free and there are items in the list
 	if ( (POLL_FREE != conn->state && POLL_FINISHED != conn->state) || 
 		 SUCCEED != zbx_list_peek(&conn->items_list, (void **)&item_idx)) {
 		 DEBUG_ITEM(item_idx,"Not starting the connection right now, it's in busy state");
-		 
-		 GLB_POLLER_ITEM *tmp_item;
-
-		 if (NULL != (tmp_item = (GLB_POLLER_ITEM *)zbx_hashset_search(conf->items, &conn->current_item))) {
-			 GLB_SNMP_ITEM *tmp_snmp = (GLB_SNMP_ITEM*)tmp_item->itemdata;
-		 } 
+	
 		 return FAIL;
 	}
 
@@ -2463,12 +2487,12 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 		zabbix_log(LOG_LEVEL_WARNING,"Coudln't find item with id %ld in the items hashset", item_idx);
 		//no such item anymore, pop it, and call myself to start the next item
 		zbx_list_pop(&conn->items_list, (void **)&item_idx);
-		zabbix_log(LOG_LEVEL_WARNING,"Popped item %ld", item_idx);
+	
 		DEBUG_ITEM(item_idx,"Popped item, doesn't exists in the items");
 		glb_snmp_start_connection(conn);
 		return SUCCEED;
 	} 
-
+	
 	DEBUG_ITEM(glb_item->itemid,"Fetched item from the list to be polled");
 
 	if (POLL_FINISHED == conn->state) 
@@ -2477,9 +2501,7 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 	conn->state = POLL_FREE;
 	
 	zbx_list_pop(&conn->items_list, (void **)&item_idx);
-	//checking if the item 
-	
-	//now starting the connection
+
 	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM *)glb_item->itemdata;	
 	
 	if (NULL == snmp_parse_oid(glb_snmp_item->oid, parsed_oid, &parsed_oid_len)) {
@@ -2504,8 +2526,6 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 		return FAIL;
 	}
 	
-//	if (0 == reuse_old_sess)
-//	{
 	if (NULL == (conn->sess = glb_snmp_open_conn(glb_item)))
 	{
 		zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags,
@@ -2513,17 +2533,17 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 		snmp_free_pdu(pdu);
 		return FAIL;
 	}
-//	}
+
 
 	conn->sess->callback = glb_snmp_callback;
 	conn->sess->timeout = CONFIG_TIMEOUT * 1000 * 1000;
 	conn->sess->callback_magic = conn;
-	conn->sess->retries = 3;
+	conn->sess->retries = CONFIG_SNMP_RETRIES;
 	conn->current_item = glb_item->itemid;
-	conn->finish_time = time(NULL) + CONFIG_TIMEOUT;
+	conn->finish_time = time(NULL) + CONFIG_TIMEOUT * CONFIG_SNMP_RETRIES + 1; 
 	
 	DEBUG_ITEM(glb_item->itemid, "Sending SNMP packet");
-	//zabbix_log(LOG_LEVEL_INFORMATION,"Itemd %ld: sending a packet",glb_item->itemid);
+	
 	if (!snmp_send(conn->sess, pdu))
 	{
 		snmp_perror("snmp_send");
@@ -2533,12 +2553,14 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 									NULL, &timespec, ITEM_STATE_NOTSUPPORTED,  "Couldn't send snmp packet");
 		zbx_snmp_close_session(conn->sess);
 		conn->state = POLL_FREE;
-		
+		glb_snmp_item->state = POLL_QUEUED;
 		return FAIL;
 	}
 	*conf->requests += 1;
-
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d SENT REQUEST to host %s",conn->idx, glb_snmp_item->interface_addr);
 	conn->state = POLL_POLLING;
+	glb_snmp_item->state = POLL_POLLING;
+
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 	return SUCCEED;
 }
@@ -2570,6 +2592,7 @@ void* glb_snmp_init(zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, i
 		conf->connections[i].state = POLL_FREE;
 		conf->connections[i].current_item=-1;
 		conf->connections[i].conf = (void*)conf;
+		conf->connections[i].idx=i;
 
 		zbx_list_create(&conf->connections[i].items_list);
 	}
@@ -2585,13 +2608,29 @@ static void  glb_snmp_start_new_connections(void *engine) {
 	int i, item_idx;
 	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
+	int now=time(NULL);
 
 	for (i = 0; i < GLB_MAX_SNMP_CONNS; i++) {
-		if ( (POLL_FREE == conf->connections[i].state || POLL_FINISHED == conf->connections[i].state) &&  
-		     SUCCEED == zbx_list_peek(&conf->connections[i].items_list, (void **)&item_idx) ) {
-			
-			 glb_snmp_start_connection(&conf->connections[i]);
-		 }
+		if (POLL_POLLING == conf->connections[i].state && conf->connections[i].finish_time < now &&
+				 -1 != conf->connections[i].current_item) {			 
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Unhandled by SNMP conn%d timeout event for item %ld", i, conf->connections[i].current_item);
+			glb_snmp_handle_timeout(&conf->connections[i]); 	
+		}
+		
+		//starting new cons or closing sockets for free ones
+		if ( (POLL_FREE == conf->connections[i].state || POLL_FINISHED == conf->connections[i].state) ) {
+		    if ( SUCCEED == zbx_list_peek(&conf->connections[i].items_list, (void **)&item_idx) ) {
+				 glb_snmp_start_connection(&conf->connections[i]);
+			} else {
+				//closing the session
+					
+				if (POLL_FINISHED == conf->connections[i].state) {
+					//zabbix_log(LOG_LEVEL_INFORMATION,"Connetction conn%d CLOSED marked as freee state is %d", i,conf->connections[i].state );
+					conf->connections[i].state=POLL_FREE;
+					zbx_snmp_close_session(conf->connections[i].sess);
+				}
+			}
+		}
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
@@ -2601,17 +2640,20 @@ static void  glb_snmp_start_new_connections(void *engine) {
  * ***************************************************************************/
 void   glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
-	
+	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
+
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
 	int idx=glb_item->hostid % GLB_MAX_SNMP_CONNS;
  	
-	zbx_list_append(&conf->connections[idx].items_list, (void **)glb_item->itemid, NULL);
-	
-	
-	DEBUG_ITEM(glb_item->itemid,"Added to list, starting connection");
-
-	glb_snmp_start_connection(&conf->connections[idx]);
+	 if ( POLL_QUEUED == glb_snmp_item->state) {
+		zbx_list_append(&conf->connections[idx].items_list, (void **)glb_item->itemid, NULL);
+		DEBUG_ITEM(glb_item->itemid,"Added to list, starting connection");
+		glb_snmp_start_connection(&conf->connections[idx]);
+	 } else {
+		zabbix_log(LOG_LEVEL_INFORMATION,"Not adding item %ld to the conn%d list: still in %d state",glb_item->itemid,idx,glb_snmp_item->state);
+		DEBUG_ITEM(glb_item->itemid,"Not added to list, still polling");
+	 }
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 
@@ -2654,24 +2696,22 @@ void glb_snmp_reset_snmp(void *engine){
 	}
 }
 
-
 /******************************************************************************
  * handles i/o - calls selects/snmp_recieve, 								  * 
- * note: doesn't care about the timeouts - it's done by the poller globbaly   *
  * ***************************************************************************/
 void  glb_snmp_handle_async_io(void *engine) {
 
 	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
 	int block = 0, fds = 0, hosts = 0;
 	netsnmp_large_fd_set fdset;
-	
+	static int last_timeout_time = 0; 
+
 	struct timeval timeout={0};
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 	//todo: make select less frequent on abasence of payload work
 	//also set up setprocinfo correctly
-	
-	//all asyn logic will happen here when libsnmp will call callback upon data arrival
+		//all asyn logic will happen here when libsnmp will call callback upon data arrival
 		
 	netsnmp_large_fd_set_init(&fdset, GLB_MAX_SNMP_CONNS);
 	snmp_select_info2(&fds, &fdset, &timeout, &block);
@@ -2679,17 +2719,29 @@ void  glb_snmp_handle_async_io(void *engine) {
 	hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, &timeout);
 	
 	if (hosts < 0)
-		zabbix_log(LOG_LEVEL_DEBUG, "End of %s() Something unexpected happened with fds ", __func__);
+		zabbix_log(LOG_LEVEL_WARNING, "End of %s() Something unexpected happened with fds ", __func__);
 	else if (hosts > 0)
 		snmp_read2(&fdset); //calling this will call snmp callback function for arrived responces
 	else 
-		snmp_timeout(); 
+		snmp_timeout();
+
+	//having not a big number of responces - then sleep a bit
+//	if (hosts < GLB_MAX_SNMP_CONNS / 20 ) {
+//		usleep(10000);
+//	}
+		
+//	if ( time(NULL) != last_timeout_time) {
+//	 	snmp_timeout(); 
+//		last_timeout_time = time(NULL);
+//	}
+	
 
 	netsnmp_large_fd_set_cleanup(&fdset);
 	
 	glb_snmp_reset_snmp(engine);
-
+	
 	glb_snmp_start_new_connections(engine); //some connections might fail due to temporarry errors, like network fails, restart them once in a while
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 /******************************************************************************

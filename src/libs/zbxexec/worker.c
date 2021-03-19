@@ -94,6 +94,14 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     }
     else
         worker->params = NULL;
+    
+    if (SUCCEED == zbx_json_value_by_name(&jp_config, "timeout", buff, MAX_STRING_LEN, &type))
+    {
+        worker->timeout = strtol(buff, NULL, 10);
+        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed timeout: '%d'", __func__, worker->timeout);
+    }
+    else
+        worker->timeout = CONFIG_TIMEOUT;
 
     worker->max_calls = GLB_DEFAULT_WORKER_MAX_CALLS;
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "max_calls", buff, MAX_ID_LEN, &type))
@@ -113,6 +121,8 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     {
         worker->mode_from_worker = GLB_DEFAULT_MODE_FROM_WORKER;
     }
+
+    worker->async_mode = 0;
 
     return worker;
 }
@@ -166,26 +176,28 @@ out:
     return ret;
 }
 
-static int restart_worker(GLB_EXT_WORKER *worker)
+//static 
+int restart_worker(GLB_EXT_WORKER *worker)
 {
     #define RST_ACCOUNT_PERIOD  20
     #define RST_MAX_RESTARTS    5
+    zabbix_log(LOG_LEVEL_INFORMATION, "In %s()", __func__);
 
     static unsigned int count_rst_time=0, restarts=0;
     unsigned int now=time(NULL);
 
-    zabbix_log(LOG_LEVEL_INFORMATION, "Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
-       
     if (now > count_rst_time) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"Zeroing restart limit");
+        zabbix_log(LOG_LEVEL_DEBUG,"Zeroing restart limit");
         count_rst_time=now + RST_ACCOUNT_PERIOD;
         restarts = 0;
     }
+     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() aeferfgqe", __func__);
     if (restarts++ > RST_MAX_RESTARTS ) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"Restart is delayed in %d seconds to avoid system hammering", count_rst_time - now);
+        zabbix_log(LOG_LEVEL_INFORMATION,"Restart of worker %s delayed in %d seconds to avoid system hammering", worker->path, count_rst_time - now);
         return FAIL;
     }
 
+    zabbix_log(LOG_LEVEL_INFORMATION, "Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
     //closing pipework
     if (worker->pipe_from_worker)
         close(worker->pipe_from_worker);
@@ -193,7 +205,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         close(worker->pipe_to_worker);
 
     //first of all, killing the old one if exists
-    if (worker->pid && !kill(worker->pid, 0))
+    if ( 0 != worker->pid && !kill(worker->pid, 0))
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "Killing old worker instance pid %d", worker->pid);
         //bye the process, you (probably) served us well
@@ -207,7 +219,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
             kill(worker->pid, SIGKILL);
         }
     }
-
+    
     //the new worker's live starts here
     int from_child[2];
     int to_child[2];
@@ -224,7 +236,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         close((from_child)[1]);
         return FAIL;
     }
-
+    
     //ok, it;s a fork(burn) time
     worker->pid = fork();
 
@@ -271,6 +283,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         //And it's not something i can fix here in the code... (sure i mean the stupidity)
 
         //ok, let the worker go
+    
         execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *)NULL);
         //if we are here, then execl has failed.
         //There is nothing to do, the child is useless by now, goodbye
@@ -291,8 +304,8 @@ static int restart_worker(GLB_EXT_WORKER *worker)
 
     //resetting run count
     worker->calls = 0;
-
     zabbix_log(LOG_LEVEL_DEBUG, "New worker instance pid is %d", worker->pid);
+    zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     return SUCCEED;
 }
 
@@ -427,7 +440,6 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         }
         break;
     }
-    //zabbix_log(LOG_LEVEL_INFORMATION, "Setting alarm to %d",worker->timeout);
     
     zbx_alarm_on(worker->timeout);
     
@@ -462,6 +474,8 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
 };
 
 int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
+      
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
     if (GLB_WORKER_MODE_SILENT == worker->mode_from_worker)
     {
         //no need to read anything from the script, we've done
@@ -476,26 +490,29 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
 
     int empty_line = 0;
     int continue_read = 1;
-    int read_bytes = 0;
+    int read_len = 0;
     int worker_fail = 0;
 
     zbx_alarm_on(worker->timeout);
     wait_start = zbx_time();
 
+    if (0 != worker->async_mode) {
+        int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
+        fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
+    }
+
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
         //usleep(10000);
-        char buffer[MAX_STRING_LEN];
+        char buffer[MAX_STRING_LEN*10];
         buffer[0] = 0;
 
         //doing non-blocking read. Checking if we eneded up with new line or
         //just a line to understand that all the data has been recieved
-        int read_len = read(worker->pipe_from_worker, buffer, MAX_STRING_LEN);
-        //zabbix_log(LOG_LEVEL_INFORMATION,"EXEC: read %d bytes from the worker", read_len);
-        //setting trailing zero
+        read_len = read(worker->pipe_from_worker, buffer, MAX_STRING_LEN*10);
         buffer[read_len] = 0;
 
-        if (-1 == read_len)
+        if (-1 == read_len )
         {
             //this was supposed to be used in non-blocking mode, but
             //since in raw descriptor mode it works fine even in blocking mode + alaram
@@ -506,10 +523,14 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                 //we've reached end of input, it's ok
                 //but if this happens not fisrt time, lets sleep a bit to save CPU
                 //while waitng for some new data to appear
-                if (wait_count++ > 1)
+                
+                if (wait_count++ > 1 && worker->async_mode == 0)
                 {
                     usleep(1000);
-                    zabbix_log(LOG_LEVEL_INFORMATION, "Waiting for new data from the worker");
+                   // zabbix_log(LOG_LEVEL_DEBUG, "Waiting for new data for SYNC responce from the worker");
+                } else {
+                   // zabbix_log(LOG_LEVEL_INFORMATION, "Not waiting for new data from the worker due to ASYNC mode");
+                    continue_read = 0;
                 }
             }
             else
@@ -520,10 +541,12 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                 zabbix_log(LOG_LEVEL_INFORMATION, "Socket read failed errno is %d", errno);
             }
         }
-        else
-        {
-            zabbix_log(LOG_LEVEL_DEBUG, "Read %d bytes from the worker", read_len);
-        }
+   //     else
+     //   {
+       //     zabbix_log(LOG_LEVEL_INFORMATION, "Read %d bytes from the worker", read_len);
+     //   }
+
+        //zabbix_log(LOG_LEVEL_INFORMATION, "read len check");
         if (0 == read_len)
         {
             //we've got nothing from the worker, which is most likely means that worker has died
@@ -543,15 +566,14 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         //we've got a line, lets put it to the buffer
 
         zbx_snprintf_alloc(&resp_buffer, &rbuflen, &rbuffoffset, "%s", buffer);
-        //zabbix_log(LOG_LEVEL_INFORMATION, "Read %d from the script",read_len);
-
+        
         switch (worker->mode_from_worker)
         {
         case GLB_WORKER_MODE_NEWLINE:
             if (rbuflen > 1 && NULL != strstr(buffer, "\n"))
             {
                 continue_read = 0;
-                zabbix_log(LOG_LEVEL_INFORMATION, "Found newline char in SINLE mode, finishing reading");
+                zabbix_log(LOG_LEVEL_DEBUG, "Found newline char in SINLE mode, finishing reading");
             }
             break;
         case GLB_WORKER_MODE_EMPTYLINE:
@@ -563,7 +585,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
             break;
         }
     }
-
+    
     //lets see if actually has red something or it's a timeout has happened
     if (SUCCEED == zbx_alarm_timed_out() || 1 == continue_read || 1 == worker_fail)
     {
@@ -571,20 +593,22 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
 
+        sleep(1);
         int resp_len = strlen(resp_buffer);
-
+    
         restart_worker(worker);
+        
         zbx_free(resp_buffer);
         return FAIL;
     }
 
     zbx_alarm_off();
-
     //setting the responce buffer
     //it's the caller's business to free it
+   // zabbix_log(LOG_LEVEL_INFORMATION,"In %s: setting responce", __func__);
     *responce = resp_buffer;
-
-    zabbix_log(LOG_LEVEL_DEBUG, "Answer wait is finished, responce length is %zu, buffer is %s", strlen(resp_buffer), resp_buffer);
+    //zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished", __func__);
+    if ( 1 > read_len) return POLL_NODATA;
     return SUCCEED;
 };
 

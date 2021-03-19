@@ -50,6 +50,7 @@
 #include "httppoller/httppoller.h"
 #include "housekeeper/housekeeper.h"
 #include "pinger/pinger.h"
+#include "glb_poller/glb_pinger.h"
 #include "poller/poller.h"
 #include "glb_poller/glb_poller.h"
 #include "timer/timer.h"
@@ -183,8 +184,9 @@ int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
-int CONFIG_GLB_SNMP_FORKS		= 0;
-int CONFIG_GLB_PINGER_FORKS		= 0;
+int CONFIG_GLB_SNMP_FORKS		= 1;
+int CONFIG_GLB_PINGER_FORKS		= 1;
+int CONFIG_DEFAULT_ICMP_METHOD  = GLB_ICMP;
 
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_PINGER_FORKS		= 5;
@@ -248,9 +250,7 @@ char	*CONFIG_EXTERNALSCRIPTS		= NULL;
 char	*CONFIG_TMPDIR			= NULL;
 char	*CONFIG_FPING_LOCATION		= NULL;
 char	*CONFIG_FPING6_LOCATION		= NULL;
-char	*CONFIG_SNMP_WORKER_LOCATION		= NULL;
-char	*CONFIG_NMAP_LOCATION		= NULL;
-char	*CONFIG_NMAP_PARAMS		= NULL;
+char 	*CONFIG_GLBMAP_LOCATION		= NULL;
 
 char	*CONFIG_DBHOST			= NULL;
 char	*CONFIG_DBNAME			= NULL;
@@ -274,6 +274,7 @@ int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
 int	CONFIG_UNSAFE_USER_PARAMETERS	= 0;
 
 char	*CONFIG_SNMPTRAP_FILE		= NULL;
+char 	*DEFAULT_ICMP_METHOD_STR = NULL;
 
 char	*CONFIG_JAVA_GATEWAY		= NULL;
 int	CONFIG_JAVA_GATEWAY_PORT	= ZBX_DEFAULT_GATEWAY_PORT;
@@ -544,19 +545,14 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_FPING_LOCATION)
 		CONFIG_FPING_LOCATION = zbx_strdup(CONFIG_FPING_LOCATION, "/usr/sbin/fping");
 	
-	if (NULL == CONFIG_SNMP_WORKER_LOCATION)
-		CONFIG_SNMP_WORKER_LOCATION = zbx_strdup(CONFIG_SNMP_WORKER_LOCATION, "glb_snmp_worker");
-		
+	if (NULL == CONFIG_GLBMAP_LOCATION)
+		CONFIG_GLBMAP_LOCATION = zbx_strdup(CONFIG_GLBMAP_LOCATION, "/usr/sbin/glbmap");
+
 #ifdef HAVE_IPV6
 	if (NULL == CONFIG_FPING6_LOCATION)
 		CONFIG_FPING6_LOCATION = zbx_strdup(CONFIG_FPING6_LOCATION, "/usr/sbin/fping6");
 #endif
-	if (NULL == CONFIG_NMAP_LOCATION)
-		CONFIG_NMAP_LOCATION = zbx_strdup(CONFIG_NMAP_LOCATION, "/usr/bin/nmap");
 
-	if (NULL == CONFIG_NMAP_PARAMS)
-		CONFIG_NMAP_PARAMS = zbx_strdup(CONFIG_NMAP_PARAMS, "-n -sn -PE");
-	
 	if (NULL == CONFIG_EXTERNALSCRIPTS)
 		CONFIG_EXTERNALSCRIPTS = zbx_strdup(CONFIG_EXTERNALSCRIPTS, DEFAULT_EXTERNAL_SCRIPTS_PATH);
 #ifdef HAVE_LIBCURL
@@ -592,8 +588,11 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_VAULTURL)
 		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
-	
-	
+
+	if ( NULL != DEFAULT_ICMP_METHOD_STR && 0 == strstr(DEFAULT_ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
+		CONFIG_DEFAULT_ICMP_METHOD = ZBX_ICMP;
+	}
+
 }
 
 /******************************************************************************
@@ -642,6 +641,7 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		zbx_free(ch_error);
 		err = 1;
 	}
+
 #if !defined(HAVE_IPV6)
 	err |= (FAIL == check_cfg_feature_str("Fping6Location", CONFIG_FPING6_LOCATION, "IPv6 support"));
 #endif
@@ -692,6 +692,7 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_int("StartGlaberSNMPPollers", CONFIG_GLB_SNMP_FORKS, "SNMP support"));
 #endif
 
+
 	if (0 != err)
 		exit(EXIT_FAILURE);
 }
@@ -740,7 +741,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"StartGlbSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
-			PARM_OPT,	0,			10},	
+			PARM_OPT,	0,			10},
+		{"DefaultICMPMethod",		&DEFAULT_ICMP_METHOD_STR,			TYPE_STRING,
+			PARM_OPT,	0,			0},		
 		{"StartPreprocessorManagers",		&CONFIG_PREPROCMAN_FORKS,			TYPE_INT,
 			PARM_OPT,	1,			64},
 		{"StartPollers",		&CONFIG_POLLER_FORKS,			TYPE_INT,
@@ -787,11 +790,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"FpingLocation",		&CONFIG_FPING_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
-		{"SNMPWorkerLocation",		&CONFIG_SNMP_WORKER_LOCATION,			TYPE_STRING,
-			PARM_OPT,	0,			0},
-		{"NmapLocation",		&CONFIG_NMAP_LOCATION,			TYPE_STRING,
-			PARM_OPT,	0,			0},
-		{"NmapParams",		&CONFIG_NMAP_PARAMS,			TYPE_STRING,
+		{"GlbmapLocation",		&CONFIG_GLBMAP_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"Fping6Location",		&CONFIG_FPING6_LOCATION,		TYPE_STRING,
 			PARM_OPT,	0,			0},
@@ -1396,6 +1395,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				break;
 			case GLB_PROCESS_TYPE_SNMP:
 				poller_type = ITEM_TYPE_SNMP;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_PINGER:
+				poller_type = ITEM_TYPE_SIMPLE;
 				thread_args.args = &poller_type;
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	

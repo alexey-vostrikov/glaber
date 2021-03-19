@@ -718,6 +718,7 @@ void	DCconfig_update_interface_snmp_stats(zbx_uint64_t interfaceid, int max_snmp
 int	DCconfig_get_suggested_snmp_vars(zbx_uint64_t interfaceid, int *bulk);
 int	DCconfig_get_interface_by_type(DC_INTERFACE *interface, zbx_uint64_t hostid, unsigned char type);
 int	DCconfig_get_interface(DC_INTERFACE *interface, zbx_uint64_t hostid, zbx_uint64_t itemid);
+unsigned int DCconfig_get_item_sync_ts(void);
 int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, unsigned char item_type, unsigned int  process_num, void *poll_engine);
 int	DCconfig_get_poller_nextcheck(unsigned char poller_type);
 int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items);

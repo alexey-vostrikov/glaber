@@ -22,23 +22,40 @@
 #include "zbxicmpping.h"
 #include "glb_poller.h"
 
+#define GLB_ICMP 20
+#define ZBX_ICMP 21
+
+#define GLB_ICMP_NAME "glbmap"
+#define ZBX_ICMP_NAME "fping"
+
 typedef struct
 {
-	u_int64_t time;
+	double time;
 	u_int64_t itemid; //using weak linking assuming events might be outdated
 
 } GLB_PINGER_EVENT;
 
 typedef struct {
-	const char *key;
-	unsigned int finish_time;
-	icmppingsec_type_t	type;
-	int 	count;
-	int 	interval;
-	int 	size;
-	unsigned char curr_idx;
-	int 	*results;	//array to hold all the measurnemts
-	char *ip;
+	//config params
+	//const char *key;
+	u_int64_t finish_time;
+	icmpping_t icmpping; //type of measurement (accesibility check or rtt)
+	icmppingsec_type_t	type; //type of rtt check - min,max,avg
+	int 	interval; //in ms time between packets
+	int 	size; //payload size
+	char *addr; //hostname to use
+	unsigned int lastresolve; //when it was last resolved, it's a kind of a DNS cache
+	char *ip; //ip address of the host
+	int count; //how many packets to send
+    unsigned int timeout; //timeout in ms - for how long to wait for the packet
+	
+	//measurement values, zeored each measurement
+	double	min;
+	double	sum;
+	double	max;
+	int	rcv;
+//	int	cnt;
+
 } GLB_PINGER_ITEM;
 
 unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item);
@@ -47,5 +64,6 @@ void glb_pinger_shutdown(void *engine);
 int glb_pinger_start_ping(void *engine, GLB_POLLER_ITEM *glb_item);
 void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces );
 void  glb_pinger_handle_async_io(void *engine);
+int  glb_can_process_glb_pinger(const char *key);
 
 #endif

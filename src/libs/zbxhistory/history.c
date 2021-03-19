@@ -192,8 +192,7 @@ int	glb_history_add(const zbx_vector_ptr_t *history)
 int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
 {
 	int	j,  ret = SUCCEED;
-	//zabbix_log(LOG_LEVEL_INFORMATION, "In %s()", __func__);
-
+	
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values[j];
@@ -201,8 +200,6 @@ int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
 		
 		if (SUCCEED == write_trends(callback->callbackData, trends, trends_num) ) return SUCCEED;
 	}
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s()", __func__);
 
 	return SUCCEED;
 }

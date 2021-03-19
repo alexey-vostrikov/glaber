@@ -233,7 +233,7 @@ static void	process_values(icmpitem_t *items, int first_index, int last_index, Z
 		goto out;
 	}
 
-	if (6 < get_rparams_num(&request) || (ICMPPINGSEC != *icmpping && 5 < get_rparams_num(&request)))
+	if (7 < get_rparams_num(&request) || (ICMPPINGSEC != *icmpping && 6 < get_rparams_num(&request)))
 	{
 		zbx_snprintf(error, max_error_len, "Too many arguments.");
 		goto out;

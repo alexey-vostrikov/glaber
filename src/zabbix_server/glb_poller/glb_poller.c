@@ -18,9 +18,20 @@
 extern unsigned char process_type, program_type;
 extern int server_num, process_num;
 extern int CONFIG_GLB_REQUEUE_TIME;
+extern int CONFIG_CONFSYNCER_FREQUENCY;
+
 extern char *CONFIG_SNMP_WORKER_LOCATION;
 
-static int event_elem_compare(const void *d1, const void *d2)
+u_int64_t glb_ms_time() {
+	u_int64_t sec;
+
+	zbx_timespec_t	ts;
+	zbx_timespec(&ts);
+
+	sec = ts.sec;
+	return sec * 1000 + ts.ns/1000000;
+}
+int event_elem_compare(const void *d1, const void *d2)
 {
 	const zbx_binary_heap_elem_t *e1 = (const zbx_binary_heap_elem_t *)d1;
 	const zbx_binary_heap_elem_t *e2 = (const zbx_binary_heap_elem_t *)d2;
@@ -35,6 +46,7 @@ static int event_elem_compare(const void *d1, const void *d2)
 /* this is a good candidate for macro */
 static void add_event(zbx_binary_heap_t *events, char type, zbx_uint64_t id, unsigned int time)
 {
+//	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	GLB_POLLER_EVENT *event = zbx_malloc(NULL, sizeof(GLB_POLLER_EVENT));
 
 	event->id = id;
@@ -43,6 +55,7 @@ static void add_event(zbx_binary_heap_t *events, char type, zbx_uint64_t id, uns
 
 	zbx_binary_heap_elem_t elem = {time, (const void *)event};
 	zbx_binary_heap_insert(events, &elem);
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished", __func__);	
 }
 
 /****************************************************************
@@ -122,11 +135,11 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 	char *error;
 	GLB_POLLER_HOST *glb_host;
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s - started", __func__);
+	//zabbix_log(LOG_LEVEL_INFORMATION, "In %s - started", __func__);
 
 	if (SUCCEED != zbx_interval_preproc(glb_item->delay, &simple_interval, &custom_intervals, &error))
 	{
-		zabbix_log(LOG_LEVEL_DEBUG, "Itemd %ld has wrong delay time set :%s", glb_item->itemid, glb_item->delay);
+		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s", glb_item->itemid, glb_item->delay);
 		//glb_item->nextcheck = ZBX_JAN_2038;
 		return FAIL;
 	}
@@ -148,7 +161,7 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 		DEBUG_ITEM(glb_item->itemid,"Sheduled next poll event")
 		add_event(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck);
 	} else {
-		zabbix_log(LOG_LEVEL_DEBUG, "No host has been fount for itemid %ld", glb_item->itemid);
+		zabbix_log(LOG_LEVEL_INFORMATION, "No host has been fount for itemid %ld", glb_item->itemid);
 	}
 	return SUCCEED;
 }
@@ -176,8 +189,10 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(items, &dc_item->itemid)))
 	{
-
-			zabbix_log(LOG_LEVEL_DEBUG, "Item %ld already in the local queue, state is %d, cleaning", glb_item->itemid, glb_item->state);
+			//only updating items which are about to expire, otherwize it produces long fetching times
+			if (glb_item->ttl - now > GLB_AGING_PERIOD * 2 ) 
+				return SUCCEED;
+			
 			DEBUG_ITEM(dc_item->itemid, "Item already int the local queue, cleaning");
 			glb_free_item_data(glb_item);
 			zbx_heap_strpool_release(glb_item->delay);
@@ -194,7 +209,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		glb_item = zbx_hashset_insert(items, glb_item, sizeof(GLB_POLLER_ITEM));
 		
 		glb_item->state = GLB_ITEM_STATE_NEW;
-		
+		zabbix_log(LOG_LEVEL_DEBUG,"Adding new item %ld to the local queue1", dc_item->itemid);
 		//this is new item, checking if the host exists
 		if (NULL == (glb_host = (GLB_POLLER_HOST *)zbx_hashset_search(hosts, &dc_item->host.hostid)))
 		{
@@ -224,7 +239,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	glb_item->lastpolltime = 0;
 	glb_item->delay = zbx_heap_strpool_intern(dc_item->delay);
 	glb_item->value_type = dc_item->value_type;
-	glb_item->ttl = now + CONFIG_GLB_REQUEUE_TIME * 1.5; //updating item's aging
+	glb_item->ttl = now + CONFIG_CONFSYNCER_FREQUENCY * 1.5; //updating item's aging
 
 	glb_item->flags = dc_item->flags;
 	glb_item->item_type = dc_item->type;
@@ -264,10 +279,10 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 			zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
 			exit(-1);
 		}
-	
+		
 		DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
 		glb_item->itemdata = (void *)glb_pinger_item;
-
+		
 		if (SUCCEED  != glb_pinger_init_item(dc_item, glb_pinger_item )) {
 			zabbix_log(LOG_LEVEL_WARNING, "Coudln't init pinger item %ld, not placing to the poll queue", glb_item->itemid);
 			//removing the item from the hashset
@@ -287,14 +302,13 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	}
 
 	if (GLB_ITEM_STATE_NEW == glb_item->state) {
-
-		zabbix_log(LOG_LEVEL_DEBUG,"Adding item %ld to the events queue ", glb_item->itemid);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Adding item %ld to the events queue ", glb_item->itemid);
 		glb_item->state = GLB_ITEM_STATE_QUEUED;
 		add_item_check_event(events, hosts, glb_item, now);
 
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s finished", __func__);
+	//zabbix_log(LOG_LEVEL_INFORMATION, "%s finished", __func__);
 	return SUCCEED;
 }
 
@@ -457,7 +471,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 			switch (event->type) {
 			
 			case GLB_EVENT_ITEM_POLL:
-				zabbix_log(LOG_LEVEL_DEBUG, "Item %ld poll event", event->id);
+				//zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld poll event", event->id);
 				if (NULL != (glb_item = zbx_hashset_search(&items, &event->id)) && 
 					NULL != (glb_host = zbx_hashset_search(&hosts, &glb_item->hostid))) {
 						
@@ -487,6 +501,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 						}
 					}
 				} 
+			//zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld poll event finished", event->id);
 			break;
 
 			case GLB_EVENT_AGING: {
@@ -581,8 +596,8 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 		if (next_stat_time < now ) {
 			next_stat_time = now + STAT_INTERVAL;
-			zbx_setproctitle("%s #%d [sent %d reqs/sec, recv %d vals/sec, items in: %ld, events planned: %d]",
- 					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responces/STAT_INTERVAL, items.num_data, events.elems_num);
+			zbx_setproctitle("%s #%d [chck %d hosts/sec, got %d results/sec, items in: %ld, events planned: %d - %d]",
+ 					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responces/STAT_INTERVAL, items.num_data, events.elems_num, time(NULL));
 			requests = 0; 
 			responces = 0;
 		

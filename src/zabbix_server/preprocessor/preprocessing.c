@@ -981,7 +981,7 @@ static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32
 }
 
 
-void DC_UpdatePreprocStat(u_int64_t no_preproc, u_int64_t local_preproc);
+//void DC_UpdatePreprocStat(u_int64_t no_preproc, u_int64_t local_preproc);
 
 /******************************************************************************
  *                                                                            *
