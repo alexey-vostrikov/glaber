@@ -21,5 +21,6 @@ EXTRA_DIST = \
 	zabbix_agent2.man \
 	zabbix_get.man \
 	zabbix_sender.man \
+	zabbix_js.man \
 	zabbix_proxy.man \
 	zabbix_server.man
