@@ -175,7 +175,9 @@ int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
 int	CONFIG_PINGER_FORKS		= 5;
 int CONFIG_GLB_SNMP_FORKS = 5;
 int CONFIG_IPMIPOLLER_FORKS = 1;
-int CONFIG_GLB_REQUEUE_TIME = 120;
+//int CONFIG_GLB_REQUEUE_TIME = 120;
+int CONFIG_GLB_PINGER_FORKS		= 1;
+int CONFIG_DEFAULT_ICMP_METHOD  = GLB_ICMP;
 
 static int	CONFIG_PROXYMODE	= ZBX_PROXYMODE_ACTIVE;
 int	CONFIG_DATASENDER_FORKS		= 1;
@@ -464,6 +466,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = GLB_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
 	}
+	else if (local_server_num <= (server_count += CONFIG_GLB_PINGER_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_PINGER;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
+	}
 	else
 		return FAIL;
  
@@ -566,6 +573,11 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_VAULTURL)
 		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
+
+	if ( NULL != DEFAULT_ICMP_METHOD_STR && 0 == strstr(DEFAULT_ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
+		CONFIG_DEFAULT_ICMP_METHOD = ZBX_ICMP;
+	}
+
 	
 	memset(SERVER_LIST,sizeof(T_ZBX_SERVER)*ZBX_CLUSTER_MAX_SERVERS,0);
 }
@@ -762,6 +774,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"StartGlaberSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},	
+		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},
+		{"DefaultICMPMethod",		&DEFAULT_ICMP_METHOD_STR,			TYPE_STRING,
+			PARM_OPT,	0,			0},	
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,
 			PARM_OPT,	ZBX_PROXYMODE_ACTIVE,	ZBX_PROXYMODE_PASSIVE},
 		{"Servers",			&CONFIG_SERVERS,				TYPE_STRING,
