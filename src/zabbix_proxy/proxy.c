@@ -179,6 +179,9 @@ int CONFIG_IPMIPOLLER_FORKS = 1;
 //int CONFIG_GLB_REQUEUE_TIME = 120;
 int CONFIG_GLB_PINGER_FORKS		= 1;
 int CONFIG_DEFAULT_ICMP_METHOD  = GLB_ICMP;
+char 	*DEFAULT_ICMP_METHOD_STR = NULL;
+char 	*CONFIG_GLBMAP_LOCATION		= NULL;
+int	CONFIG_CONFSYNCER_FREQUENCY	= 120;
 
 static int	CONFIG_PROXYMODE	= ZBX_PROXYMODE_ACTIVE;
 int	CONFIG_DATASENDER_FORKS		= 1;
@@ -578,7 +581,8 @@ static void	zbx_set_defaults(void)
 	if ( NULL != DEFAULT_ICMP_METHOD_STR && 0 == strstr(DEFAULT_ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
 		CONFIG_DEFAULT_ICMP_METHOD = ZBX_ICMP;
 	}
-
+	if (NULL == CONFIG_GLBMAP_LOCATION)
+		CONFIG_GLBMAP_LOCATION = zbx_strdup(CONFIG_GLBMAP_LOCATION, "/usr/sbin/glbmap");
 	
 	memset(SERVER_LIST,sizeof(T_ZBX_SERVER)*ZBX_CLUSTER_MAX_SERVERS,0);
 }
@@ -735,7 +739,7 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 #endif
 
 #if !defined(HAVE_OPENIPMI)
-	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_POLLER_FORKS[ZBX_POLLER_TYPE_IPMI], "IPMI support"));
+	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_IPMIMANAGER_FORKS, "IPMI support"));
 #endif
 	
 	if ( SUCCEED != parse_servers() ) {
@@ -777,6 +781,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},
+		{"GlbmapLocation",		&CONFIG_GLBMAP_LOCATION,			TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"DefaultICMPMethod",		&DEFAULT_ICMP_METHOD_STR,			TYPE_STRING,
 			PARM_OPT,	0,			0},	
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,

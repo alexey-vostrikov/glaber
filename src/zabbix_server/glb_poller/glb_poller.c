@@ -506,7 +506,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 			case GLB_EVENT_AGING: {
 				//removing outdated items, that hasn't been updated for 1,5 server sync times
-				zabbix_log(LOG_LEVEL_DEBUG, "Aging processing CONFIG_GLB_REQUEUE_TIME is %d", CONFIG_GLB_REQUEUE_TIME);
+				//zabbix_log(LOG_LEVEL_DEBUG, "Aging processing CONFIG_GLB_REQUEUE_TIME is %d", CONFIG_GLB_REQUEUE_TIME);
 				GLB_POLLER_ITEM *glb_item;
 				zbx_hashset_iter_t iter;
 				//zbx_vector_uint64_t deleted_items;
@@ -567,7 +567,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 				last_cache_reload = cache_time;
 				
 				num = DCconfig_get_glb_poller_items(&events, &hosts, &items, item_type, process_num, poll_engine);
-				zabbix_log(LOG_LEVEL_INFORMATION, "Event: got %d new items from the config cache next reload in %d seconds ", num, CONFIG_GLB_REQUEUE_TIME);
+				zabbix_log(LOG_LEVEL_INFORMATION, "Event: got %d new items from the config cache", num);
 				
 				//todo: rethink this - looks like it creates problems - under high load a poller might get too busy
 				//and sometimes items wait for several minutes in internal queues to be polled. Adding the same item again and again
