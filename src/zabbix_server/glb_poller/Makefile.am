@@ -4,7 +4,9 @@ noinst_LIBRARIES = libglbpoller.a
 
 libglbpoller_a_SOURCES = \
 	glb_poller.c \
-	glb_poller.h
+	glb_pinger.c \
+	glb_poller.h \
+	glb_pinger.h
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \

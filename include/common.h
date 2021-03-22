@@ -129,6 +129,7 @@ extern zbx_uint64_t CONFIG_DEBUG_ITEM;
 #define	POLL_CONNECT_SENT	-16	
 #define	POLL_REQ_SENT		-17
 #define POLL_REQUEUED		-18
+#define POLL_NODATA			-19
 
 #define SUCCEED_OR_FAIL(result) (FAIL != (result) ? SUCCEED : FAIL)
 const char	*zbx_sysinfo_ret_string(int ret);
@@ -532,7 +533,8 @@ const char	*zbx_alert_type_string(unsigned char type);
 
 /* item states */
 #define ITEM_STATE_NORMAL		0
-#define ITEM_STATE_NOTSUPPORTED		1
+#define ITEM_STATE_NOTSUPPORTED	1
+#define ITEM_STATE_UNKNOWN		2
 const char	*zbx_item_state_string(unsigned char state);
 
 /* group statuses */
@@ -589,7 +591,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define ZBX_PROCESS_TYPE_LLDWORKER	29
 #define ZBX_PROCESS_TYPE_ALERTSYNCER	30
 #define GLB_PROCESS_TYPE_SNMP	31
-#define ZBX_PROCESS_TYPE_COUNT		32	/* number of process types */
+#define GLB_PROCESS_TYPE_PINGER	32
+#define ZBX_PROCESS_TYPE_COUNT		33	/* number of process types */
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char proc_type);
 int		get_process_type_by_name(const char *proc_type_str);

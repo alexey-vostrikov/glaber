@@ -17,6 +17,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+
+#ifndef ZBX_ICMPPING_H
+#define ZBX_ICMPPING_H
 #include "common.h"
 
 typedef struct
@@ -62,3 +65,4 @@ icmpitem_t;
 
 int	zbx_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int period, int size, int timeout,
 		char *error, size_t max_error_len);
+#endif

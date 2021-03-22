@@ -27,15 +27,9 @@
 #define GLB_EVENT_NEW_ITEMS_CHECK 2
 #define GLB_EVENT_AGING 3
 
-//#define GLB_GET_MAX_ITEMS 256 //do not make it too big! - arrays of this size are allocated from stack
+#define GLB_DNS_CACHE_TIME 300 //for how long name to ip resolvings have to be remembered
 
-#define GLB_ITEM_STATE_NEW 1
-#define GLB_ITEM_STATE_POLLING 2
-#define GLB_ITEM_STATE_QUEUED 3
-
-
-//#define GLB_MAX_ITEM_PARAMS 16 //so far SNMP needs 7 params, maybe other's will need more, increase!
-#define GLB_AGING_PERIOD 62	 //how often to clean up the items
+#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
 
 #define GLB_MAX_FAILS 6 //how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
@@ -43,15 +37,6 @@
 #define GLB_PROTO_VALUE "value"
 #define GLB_PROTO_ERRCODE "errcode"
 #define GLB_PROTO_ERROR "error"
-
-
-//typedef struct
-//{
-
-//	const char *key;
-//	const char *value;
-
-//} GLB_KEY_VAL;
 
 typedef struct
 {
@@ -75,11 +60,8 @@ typedef struct
 
 typedef struct
 {
-
 	zbx_uint64_t itemid;
 	zbx_uint64_t hostid;
-	//GLB_KEY_VAL params[GLB_MAX_ITEM_PARAMS];
-	//char params_count;
 	char state;
 	unsigned char value_type;
 	unsigned int ttl;
@@ -87,7 +69,7 @@ typedef struct
 	unsigned char item_type;
 	unsigned char flags;
 	unsigned int lastpolltime;
-	void *itemdata; //item type specific data
+	void *itemdata;		 //item type specific data
 } GLB_POLLER_ITEM;
 
 typedef struct {
@@ -104,13 +86,17 @@ typedef struct {
 	const char *snmpv3_contextname;
 	const char *snmpv3_authpassphrase;
 	const char *snmpv3_privpassphrase;
-
+	char state;
 } GLB_SNMP_ITEM;
 
 
+int event_elem_compare(const void *d1, const void *d2);
 void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, DC_ITEM *dc_item, void *poll_engine);
+
+u_int64_t glb_ms_time(); //retruns time in millisecodns
+
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args);
 

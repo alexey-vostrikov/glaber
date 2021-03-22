@@ -199,7 +199,8 @@ static void	process_values(icmpitem_t *items, int first_index, int last_index, Z
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static int	parse_key_params(const char *key, const char *host_addr, icmpping_t *icmpping, char **addr, int *count,
+//static we need this at glb_pinger
+ int	parse_key_params(const char *key, const char *host_addr, icmpping_t *icmpping, char **addr, int *count,
 		int *interval, int *size, int *timeout, icmppingsec_type_t *type, char *error, int max_error_len)
 {
 	const char	*tmp;
@@ -232,7 +233,7 @@ static int	parse_key_params(const char *key, const char *host_addr, icmpping_t *
 		goto out;
 	}
 
-	if (6 < get_rparams_num(&request) || (ICMPPINGSEC != *icmpping && 5 < get_rparams_num(&request)))
+	if (7 < get_rparams_num(&request) || (ICMPPINGSEC != *icmpping && 6 < get_rparams_num(&request)))
 	{
 		zbx_snprintf(error, max_error_len, "Too many arguments.");
 		goto out;

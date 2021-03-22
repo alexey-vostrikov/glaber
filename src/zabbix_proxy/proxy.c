@@ -331,11 +331,6 @@ char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
 char	*CONFIG_HISTORY_STORAGE_TYPE		= NULL;
 char	*CONFIG_HISTORY_STORAGE_DB_NAME		= NULL;
 
-
-char *CONFIG_NMAP_PARAMS = NULL;
-char *CONFIG_NMAP_LOCATION = NULL;
-
-
 int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
@@ -463,6 +458,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = GLB_PROCESS_TYPE_SNMP;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_SNMP_FORKS;
+	}
+	else if (local_server_num <= (server_count +=CONFIG_GLB_PINGER_FORKS ))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_PINGER;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
 	}
 	else
 		return FAIL;

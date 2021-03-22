@@ -36,8 +36,9 @@
 #define	ZBX_POLLER_TYPE_IPMI		2
 #define	ZBX_POLLER_TYPE_PINGER		3
 #define	ZBX_POLLER_TYPE_JAVA		4
-#define	GLB_POLLER_TYPE_GLABER_SNMP		5
-#define	ZBX_POLLER_TYPE_COUNT		6	/* number of poller types */
+#define	GLB_POLLER_TYPE_SNMP		5
+#define	GLB_POLLER_TYPE_PINGER		6
+#define	ZBX_POLLER_TYPE_COUNT		7	/* number of poller types */
 
 #define MAX_JAVA_ITEMS		32
 #define MAX_SNMP_ITEMS		128
@@ -79,6 +80,7 @@ typedef struct {
 	int mode_from_worker;	//which termination to expect from the worker when parsing returned data 
 	int pipe_from_worker;	//communication pipes
 	int pipe_to_worker;
+	unsigned char async_mode; //worker is working in async mode - we don't wait it for the answer
 }
 GLB_EXT_WORKER;
 
@@ -716,6 +718,7 @@ void	DCconfig_update_interface_snmp_stats(zbx_uint64_t interfaceid, int max_snmp
 int	DCconfig_get_suggested_snmp_vars(zbx_uint64_t interfaceid, int *bulk);
 int	DCconfig_get_interface_by_type(DC_INTERFACE *interface, zbx_uint64_t hostid, unsigned char type);
 int	DCconfig_get_interface(DC_INTERFACE *interface, zbx_uint64_t hostid, zbx_uint64_t itemid);
+unsigned int DCconfig_get_item_sync_ts(void);
 int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, unsigned char item_type, unsigned int  process_num, void *poll_engine);
 int	DCconfig_get_poller_nextcheck(unsigned char poller_type);
 int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items);
