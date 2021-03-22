@@ -29,15 +29,7 @@
 
 #define GLB_DNS_CACHE_TIME 300 //for how long name to ip resolvings have to be remembered
 
-//#define GLB_GET_MAX_ITEMS 256 //do not make it too big! - arrays of this size are allocated from stack
-
-#define GLB_ITEM_STATE_NEW 1
-#define GLB_ITEM_STATE_POLLING 2
-#define GLB_ITEM_STATE_QUEUED 3
-
-
-//#define GLB_MAX_ITEM_PARAMS 16 //so far SNMP needs 7 params, maybe other's will need more, increase!
-#define GLB_AGING_PERIOD 62	 //how often to clean up the items
+#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
 
 #define GLB_MAX_FAILS 6 //how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
@@ -94,7 +86,7 @@ typedef struct {
 	const char *snmpv3_contextname;
 	const char *snmpv3_authpassphrase;
 	const char *snmpv3_privpassphrase;
-
+	char state;
 } GLB_SNMP_ITEM;
 
 

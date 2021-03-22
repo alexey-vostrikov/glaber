@@ -30,7 +30,7 @@
 
 typedef struct
 {
-	double time;
+	u_int64_t time;
 	u_int64_t itemid; //using weak linking assuming events might be outdated
 
 } GLB_PINGER_EVENT;
@@ -45,15 +45,20 @@ typedef struct {
 	int 	size; //payload size
 	char *addr; //hostname to use
 	unsigned int lastresolve; //when it was last resolved, it's a kind of a DNS cache
+	char state; //internal item state to distinguish async ops
 	char *ip; //ip address of the host
 	int count; //how many packets to send
     unsigned int timeout; //timeout in ms - for how long to wait for the packet
-	
+	u_int64_t lastpacket_sent; //to control proper intrevals between packets in case is for some reason 
+							   //there was a deleay in sending a packet, we need control that next 
+							   //packet won't be sent too fast
+
 	//measurement values, zeored each measurement
 	double	min;
 	double	sum;
 	double	max;
 	int	rcv;
+	int sent;
 //	int	cnt;
 
 } GLB_PINGER_ITEM;

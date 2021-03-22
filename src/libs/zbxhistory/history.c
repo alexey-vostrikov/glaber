@@ -76,7 +76,7 @@ int glb_load_history_module(char *history_module) {
 		params="";
 	}
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "loading history module \"%s\", module params \"%s\"", history_module, params);
+	zabbix_log(LOG_LEVEL_DEBUG, "loading history module \"%s\", module params \"%s\"", history_module, params);
 
 	if (NULL != strstr(history_module,"worker")) 
 		return glb_history_worker_init(params);

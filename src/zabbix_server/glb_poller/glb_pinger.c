@@ -35,6 +35,7 @@ typedef struct {
 	int *requests;
 	int *responces;
     GLB_EXT_WORKER *worker;
+  //  unsigned int pause_till;
 } GLB_PINGER_CONF;
 
 extern int CONFIG_GLB_PINGER_FORKS;
@@ -50,8 +51,9 @@ extern char *CONFIG_SOURCE_IP;
  * andd dc_get_poller_items to fetch items for the polling
  * ******************************************************************/
 
-#define ZBX_ICMP_KEY_SET "'fping']"
-#define GLB_ICMP_KEY_SET "'glbmap']"
+/*
+//#define ZBX_ICMP_KEY_SET "fping]"
+#define GLB_ICMP_KEY_SET "glbmap]"
 
 int glb_can_process_glb_pinger(const char *key) {
 
@@ -70,7 +72,7 @@ int glb_can_process_glb_pinger(const char *key) {
     
     return FAIL;
 }
-
+*/
 //static int isIpAddress(char *addr)
 //{
 //  struct sockaddr_in sa;
@@ -90,14 +92,16 @@ static void glb_pinger_submit_result(GLB_POLLER_ITEM *glb_item, int status, char
     u_int64_t value_uint64;
     double value_dbl;
     AGENT_RESULT result;
-    
-    init_result(&result);
+    GLB_PINGER_ITEM *glb_pinger_item=(GLB_PINGER_ITEM *)glb_item->itemdata;
 
+    init_result(&result);
+    
+    
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Starting, itemid is %ld, status is %d", __func__,glb_item->itemid, status);
     
     switch (status) {
         case SUCCEED: {
-            GLB_PINGER_ITEM *glb_pinger_item=(GLB_PINGER_ITEM *)glb_item->itemdata;
+           
             //value calculaition logic is taken from pinger.c process_value
             switch (glb_pinger_item->icmpping)
 			{
@@ -146,7 +150,7 @@ static void glb_pinger_submit_result(GLB_POLLER_ITEM *glb_item, int status, char
 
             free_result(&result);
             break;
-        }
+         }
         default:
             zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 0 ,
                      NULL,ts,ITEM_STATE_NOTSUPPORTED, error);
@@ -154,7 +158,11 @@ static void glb_pinger_submit_result(GLB_POLLER_ITEM *glb_item, int status, char
     }
     
     //marking that polling has finished
-    glb_item->state = GLB_ITEM_STATE_QUEUED;
+    glb_item->state = POLL_QUEUED;
+    glb_pinger_item->state = POLL_QUEUED;
+    
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: marked item %ld as available for polling ", __func__,glb_item->itemid);
+    
     glb_item->lastpolltime = time(NULL);
   
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
@@ -223,21 +231,20 @@ unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item
 					&interval, &size, &timeout, &type, error, sizeof(error)))
 	    return FAIL;
     
-    
-    
-    //so it's enough to form th proper pinger_item
     pinger_item->ip = NULL;
     pinger_item->addr = zbx_strdup(NULL, dc_item->interface.addr);
     pinger_item->lastresolve=0;
     pinger_item->type = type;
     pinger_item->count = count;
-    pinger_item->interval = interval;
+
+    if (interval > 20 )
+        pinger_item->interval = interval;
+    else 
+        pinger_item->interval = 20;
+
     pinger_item->size = size;
     pinger_item->timeout = timeout;
     pinger_item->icmpping = icmpping;
-    
-    //index of the current measurment
-    //pinger_item->results = zbx_malloc(NULL, sizeof(unsigned int)*count);
     pinger_item->finish_time = 0;
 
     pinger_item->min = 0;
@@ -245,7 +252,7 @@ unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item
 	pinger_item->max = 0;
 	pinger_item->rcv = 0;
 	
-    // pinger_item->cnt = 0;
+    zbx_free(parsed_key);
     return SUCCEED;
 }
 
@@ -259,8 +266,10 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
     char ip_addr[MAX_ID_LEN];
     char *ip;
     unsigned int now = time(NULL);
-  //  zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
     GLB_PINGER_ITEM *glb_pinger_item = (GLB_PINGER_ITEM*)glb_item->itemdata;
+
+    glb_pinger_item->lastpacket_sent = glb_ms_time();
 
     if (glb_pinger_item->lastresolve < time(NULL) - GLB_DNS_CACHE_TIME) {
         //doing resolving 
@@ -279,7 +288,7 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
                 return FAIL;
             }
         }
-        glb_pinger_item->ip=zbx_strdup(NULL,ip);
+        glb_pinger_item->ip=zbx_strdup(glb_pinger_item->ip,ip);
         glb_pinger_item->lastresolve = now;
         
         zabbix_log(LOG_LEVEL_DEBUG, "Host %s resolved to %s will cache it for %d seconds",glb_pinger_item->addr, ip, GLB_DNS_CACHE_TIME);
@@ -295,8 +304,10 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
         glb_pinger_submit_result(glb_item,CONFIG_ERROR,"Couldn't start or pass request to glbmap",&ts);
         return FAIL;
     }
-   
-  // zabbix_log(LOG_LEVEL_INFORMATION, "In %s: Ended", __func__);
+    glb_pinger_item->sent++;
+    glb_pinger_item->lastpacket_sent = glb_ms_time();
+
+  zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
    return SUCCEED;
 }
 /******************************************************************************
@@ -331,7 +342,7 @@ void glb_pinger_handle_timeouts(GLB_PINGER_CONF *conf) {
     zbx_timespec_t ts;
     
     zbx_timespec(&ts);
-    //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
     
     //once a second, may be long if we check a few millions of hosts   
     if (last_check + 1000 > glb_time ) return;
@@ -339,23 +350,21 @@ void glb_pinger_handle_timeouts(GLB_PINGER_CONF *conf) {
     
     zbx_hashset_iter_reset(conf->items,&iter);
     while (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_iter_next(&iter))) {
-      //  zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started11 itemid is %ld", __func__,glb_item->itemid);
-
          GLB_PINGER_ITEM *glb_pinger_item = (GLB_PINGER_ITEM*)glb_item->itemdata;
          //we've got the item, checking for timeouts:
-         if (glb_pinger_item->finish_time < glb_time && GLB_ITEM_STATE_POLLING == glb_item->state) {
-                //timeout item, fixing the result
-                //timeout is a normal result for ping, so setting succeed
-                //even if no packets has arrived, processing will calc proper result like 100% loss
-                zabbix_log(LOG_LEVEL_DEBUG,"Item %ld set to queued state in the timeout handler fisnish time is %ld now is %ld",
-                            glb_item->itemid,glb_pinger_item->finish_time,glb_time );
+         if ( glb_pinger_item->sent == glb_pinger_item->count &&  
+              glb_pinger_item->lastpacket_sent < glb_time - CONFIG_TIMEOUT * 1000 && 
+              POLL_POLLING == glb_pinger_item->state) {
+                                
+                zabbix_log(LOG_LEVEL_DEBUG,"In %s: Item %ld set to queued state in the timeout handler",
+                            __func__, glb_item->itemid );
                 *conf->responces += 1;
+                //this is timout but overall operation has succeeded
                 glb_pinger_submit_result( glb_item, SUCCEED, NULL, &ts);
-               // glb_item->state = GLB_ITEM_STATE_QUEUED;
             }
     }
         
-   // zabbix_log(LOG_LEVEL_INFORMATION, "In %s: Ended", __func__);
+   zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 
 
@@ -369,31 +378,37 @@ int glb_pinger_start_ping(void *engine, GLB_POLLER_ITEM *glb_item)
     //zbx_timespec_t ts;
     int i;
     u_int64_t glb_time = glb_ms_time();
-    //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 	    
     GLB_PINGER_ITEM *glb_pinger_item = (GLB_PINGER_ITEM*)glb_item->itemdata;
     char request[MAX_STRING_LEN];
     
-    //cleaning the hsitory
+    //not starting new pings for sheduled items or if we're too busy
+//    if  ( time(NULL) < conf->pause_till ) {
+  //      
+    //    zabbix_log(LOG_LEVEL_DEBUG,"Not starting pinging of item %ld",glb_item->itemid);
+ //       return FAIL;
+ //   }
+   
     glb_pinger_item->rcv = 0;
     glb_pinger_item->min = 0;
     glb_pinger_item->max = 0;
     glb_pinger_item->sum = 0;
-    
-    if (glb_pinger_item->timeout > 0 ) //if timeout for a packet is set, we give healthy margin of 0,1 sec for async ops
-        glb_pinger_item->finish_time = glb_time + (glb_pinger_item->count-1)*glb_pinger_item->interval+glb_pinger_item->timeout+100;
-    else //otherwize whole pinging should complete in config timeout time after the last [acket]
-        glb_pinger_item->finish_time = glb_time + (glb_pinger_item->count-1)*glb_pinger_item->interval + CONFIG_TIMEOUT * 1000; 
-
-    //if ( SUCCEED != glb_pinger_send_ping(conf,glb_item) ) 
-     //   return FAIL;
-    
+    glb_pinger_item->sent = 0;
+  
+ 
     *conf->requests += 1;
 
+    glb_pinger_item->state = POLL_POLLING;
+
     //now we should plan all the packets in the probe, we use milliseconds-key
-    u_int64_t send_time = glb_time;;
-    zabbix_log(LOG_LEVEL_DEBUG, "Planing %d pings for item %ld to host %s interval is %d",glb_pinger_item->count-1, glb_item->itemid, glb_pinger_item->addr,glb_pinger_item->interval);
+    u_int64_t send_time = glb_time;
+
+    zabbix_log(LOG_LEVEL_DEBUG, "Planing %d pings for item %ld to host %s interval is %d",
+                glb_pinger_item->count, glb_item->itemid, glb_pinger_item->addr,glb_pinger_item->interval);
     
+    glb_pinger_item->lastpacket_sent = 0;
+
     for (i=0; i< glb_pinger_item->count; i++) {
         //creating new events
         GLB_PINGER_EVENT *event=zbx_malloc(NULL,sizeof(GLB_POLLER_EVENT));        
@@ -405,16 +420,17 @@ int glb_pinger_start_ping(void *engine, GLB_POLLER_ITEM *glb_item)
 	    zbx_binary_heap_insert(&conf->packet_events, &elem);
     }
    
-    //zabbix_log(LOG_LEVEL_INFORMATION, "In %s: Ended", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
     return SUCCEED;
+
 }
 
 #define GLB_MAX_SEND_TIME 10
 
 static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
-    zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started", __func__);
-    uint64_t current_time = glb_ms_time();
-    uint64_t finish_send_time =current_time + GLB_MAX_SEND_TIME;
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
+    uint64_t current_glb_time = glb_ms_time();
+    uint64_t finish_send_time =current_glb_time + GLB_MAX_SEND_TIME;
     GLB_POLLER_ITEM *glb_item;
     int sent_packets =0 ;
     
@@ -424,20 +440,59 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
 		min = zbx_binary_heap_find_min(&conf->packet_events);
 			
 		GLB_PINGER_EVENT *pinger_event = (GLB_PINGER_EVENT *)min->data;
+        u_int64_t etime=pinger_event->time;
+        u_int64_t itemid=pinger_event->itemid;
+      
         
-        if (pinger_event->time > current_time) 
+        if (etime > current_glb_time) 
             break;
+
+   //     if (glb_ms_time() - etime > CONFIG_TIMEOUT ) {
+   //         zabbix_log(LOG_LEVEL_DEBUG,"In %s : warn: inetrnal queue is %ld mseconds late", __func__, current_glb_time - pinger_event->time );
+   //         zabbix_log(LOG_LEVEL_WARNING,"New ping will not be sent for next %d seconds, we're too slow", CONFIG_TIMEOUT);
+   //         conf->pause_till = time(NULL) + CONFIG_TIMEOUT;
         
+   //     }
+
+
         zbx_binary_heap_remove_min(&conf->packet_events);
+        zbx_free(pinger_event);        
+
+        if (NULL != (glb_item = zbx_hashset_search(conf->items, &itemid))) {
+            GLB_PINGER_ITEM *glb_pinger_item = (GLB_PINGER_ITEM*)glb_item->itemdata;
+            
+            //report state error, but unresloved are ok 
+            if (NULL != glb_pinger_item->ip && POLL_POLLING != glb_pinger_item->state ) {
+                zabbix_log(LOG_LEVEL_WARNING,"In %s: sheduled item %ld addr %s in state %d. This is a BUG", 
+                                        __func__, glb_item->itemid,glb_pinger_item->ip, glb_pinger_item->state );
+                continue;
+            } 
+
+            if (glb_pinger_item->lastpacket_sent + glb_pinger_item->interval > current_glb_time ) {
+                //this packet is too fast, lets requeue it
+                zabbix_log(LOG_LEVEL_DEBUG,"Rescheduling next packet for item %ld host %s", glb_item->itemid, glb_pinger_item->ip);
+
+                GLB_PINGER_EVENT *event=zbx_malloc(NULL,sizeof(GLB_POLLER_EVENT));        
+                event->time = glb_pinger_item->lastpacket_sent + glb_pinger_item->interval;
+                event->itemid = glb_item->itemid;
+
+                zbx_binary_heap_elem_t elem = {event->time, (const void *)event};
+	            zbx_binary_heap_insert(&conf->packet_events, &elem);
+                
+                continue;
+            }
     
-        if (NULL != (glb_item = zbx_hashset_search(conf->items, &pinger_event->itemid))) {
-            //sending a new packet 
             glb_pinger_send_ping(conf,glb_item);
+           
+            //updating timings here to compensate delays
+            //glb_pinger_item->finish_time = current_glb_time + CONFIG_TIMEOUT *1000;
+            
+
             sent_packets++;
         }
-        zbx_free(pinger_event);
+      
     }
-    zabbix_log(LOG_LEVEL_INFORMATION, "In %s: Ended %d sent", __func__, sent_packets);
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended %d sent", __func__, sent_packets);
 }
 /*************************************************************************
  * Account the packet, signals by exit status that polling has finished
@@ -459,8 +514,12 @@ static int glb_pinger_process_response(GLB_PINGER_ITEM *glb_pinger_item, int rtt
         return POLL_FINISHED;
     
     } else {
-        //zabbix_log(LOG_LEVEL_INFORMATION,"Host %s got responce %d out of %d %s", glb_pinger_item->ip, glb_pinger_item->rcv, glb_pinger_item->count);
+        //we prolong the tiemout
+      //  glb_pinger_item->finish_time = glb_ms_time() + CONFIG_TIMEOUT * 1000;
+        zabbix_log(LOG_LEVEL_DEBUG,"Host %s got responce %d out of %d %s", glb_pinger_item->ip, glb_pinger_item->rcv, glb_pinger_item->count);
     }
+
+
     return SUCCEED;
 }
 
@@ -470,7 +529,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
     zbx_json_type_t type;
     zbx_timespec_t ts;
 
-   // zabbix_log(LOG_LEVEL_INFORMATION,"In %s: starting", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
     
     zbx_timespec(&ts);
     //reading all the responces we have so far from the worker
@@ -488,7 +547,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
 
             zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s", line);
             if (SUCCEED != zbx_json_open(line, &jp_resp)) {
-		        zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from gkbmap %s", line);
+		        zabbix_log(LOG_LEVEL_DEBUG, "Couldn't ropen JSON response from gkbmap %s", line);
 		        line = strtok(NULL, "\n");
                 
                 continue;
@@ -520,8 +579,8 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
                 }
             
                 //checking if the item has been polled right now
-                if ( GLB_ITEM_STATE_POLLING != glb_poller_item->state) {
-                    zabbix_log(LOG_LEVEL_WARNING,"Arrided responce for item %ld which is not in polling state (%d)",itemid_l,glb_poller_item->state);
+                if ( POLL_POLLING != glb_pinger_item->state) {
+                    zabbix_log(LOG_LEVEL_DEBUG,"Arrived responce for item %ld which is not in polling state (%d) (DUP!)",itemid_l,glb_poller_item->state);
                 }
             
                 //ok, looks like we can process the data right now
@@ -529,6 +588,10 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
                     *conf->responces += 1;
                   
                     glb_pinger_submit_result(glb_poller_item,SUCCEED,NULL, &ts);
+                    
+                    //theese are two different things, need to set both
+                    glb_pinger_item->state = POLL_QUEUED; 
+                    glb_poller_item->state = POLL_QUEUED;
                 } 
             } else {
                 zabbix_log(LOG_LEVEL_DEBUG, "Couldn't find an item with itemid %ld",itemid_l);
@@ -537,8 +600,8 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
         }
         zbx_free(worker_response);
     }
-    //zbx_free(worker_response);
-    // zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished", __func__);
+   
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
 }
 
 
@@ -549,7 +612,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
 void  glb_pinger_handle_async_io(void *engine) {
 
 	GLB_PINGER_CONF *conf = (GLB_PINGER_CONF*)engine;
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 
     //parses and submits arrived ICMP responces
     glb_pinger_process_worker_results(conf);
@@ -560,7 +623,7 @@ void  glb_pinger_handle_async_io(void *engine) {
     //handling timed-out items
     glb_pinger_handle_timeouts(engine); //timed out items will be marked as -1 result and next retry will be made
 	
-	(LOG_LEVEL_INFORMATION, "In %s: Ended", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 
 
@@ -587,6 +650,7 @@ void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces ) {
     conf->items = items;
     conf->requests = requests;
 	conf->responces = responces;
+  //  conf->pause_till = 0;
 
     //creating internal structs to keep pinged items 
     //and internal events tree

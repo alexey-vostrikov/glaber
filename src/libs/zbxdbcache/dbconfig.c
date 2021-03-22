@@ -217,6 +217,61 @@ clean:
 
 	return ret;
 }
+/*************************************************************
+ * returns SUCCEED if the item can be async polled and 
+ * doesn't have to be put in any zabbix standard queues
+ * **********************************************************/
+static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
+
+	switch (zbx_dc_item->type) {
+		case ITEM_TYPE_SNMP: {
+			ZBX_DC_SNMPITEM *snmpitem;
+#ifdef HAVE_NETSNMP				
+			if ( CONFIG_GLB_SNMP_FORKS == 0 ) return FAIL;
+			snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&zbx_dc_item->itemid);
+
+			//avoiding dynamic and discovery items from being processed by async glb pollers
+			if  ( NULL != snmpitem &&  (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags || ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type) )  {
+					zabbix_log(LOG_LEVEL_DEBUG, "Item %ld host %s oid %s type %d might not be async poled, will do normal poll",
+				   			zbx_dc_item->itemid, zbx_dc_host->host, snmpitem->snmp_oid, snmpitem->snmp_oid_type);
+		  	  	return FAIL;
+			}
+			
+			return SUCCEED;
+#endif
+		}
+		return FAIL;
+		break;
+		
+		case ITEM_TYPE_SIMPLE: {
+			if (0 == CONFIG_GLB_PINGER_FORKS )  return FAIL;
+
+			if (SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPING_KEY) ||
+				SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGSEC_KEY) ||
+				SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGLOSS_KEY)) 	{  
+				
+				if (NULL != strstr(zbx_dc_item->key,"glbmap]")) return SUCCEED;
+    			if (NULL != strstr(zbx_dc_item->key,"fping]")) return FAIL;
+    
+    			//method isn't set per item, looking at default
+    			if (CONFIG_DEFAULT_ICMP_METHOD == GLB_ICMP) return SUCCEED;
+    
+    			//default method is ZBX, so we will only process if there are no zbx pingers are started
+    			if ( 1 > CONFIG_PINGER_FORKS ) return SUCCEED;
+    
+    			return FAIL;
+				}
+				
+			return FAIL;
+		}
+		break;
+		default: 
+		
+		return FAIL;
+	}
+
+	return FAIL;
+}
 
 static unsigned char poller_by_item(unsigned char type, const char *key)
 {
@@ -226,10 +281,7 @@ static unsigned char poller_by_item(unsigned char type, const char *key)
 			if (SUCCEED == cmp_key_id(key, SERVER_ICMPPING_KEY) ||
 				SUCCEED == cmp_key_id(key, SERVER_ICMPPINGSEC_KEY) ||
 				SUCCEED == cmp_key_id(key, SERVER_ICMPPINGLOSS_KEY)) 	{  
-					//if item is glb pinger processable, not putting to the zbx queue
-					if ( SUCCEED == glb_can_process_glb_pinger(key)) 
-						break;
-
+				
 					if (0 == CONFIG_PINGER_FORKS)
 						break;
 
@@ -410,6 +462,11 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_HOST *host, i
 static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, int flags)
 {
 	unsigned char	poller_type;
+
+	if (SUCCEED == glb_might_be_async_polled(dc_item,dc_host)) {
+		dc_item->poller_type = ZBX_NO_POLLER;
+		return;
+	}
 
 	if (0 != dc_host->proxy_hostid && SUCCEED != is_item_processed_by_server(dc_item->type, dc_item->key))
 	{
@@ -2975,7 +3032,8 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->update_triggers = 0;
 			item->nextcheck = 0;
 			item->lastclock = 0;
-			item->state = (unsigned char)atoi(row[12]);
+			item->state = ITEM_STATE_UNKNOWN;
+			//(unsigned char)atoi(row[12]);
 			ZBX_STR2UINT64(item->lastlogsize, row[20]);
 			item->mtime = atoi(row[21]);
 			DCstrpool_replace(found, &item->error, row[27]);
@@ -9207,8 +9265,13 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, in
 	DCitem_poller_type_update(dc_item, dc_host, flags);
 
 	//if (CONFIG_DEBUG_ITEM == dc_item->itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item: %ld sheduled in %d sec, to poller type %d -> %d", 
-			dc_item->itemid, dc_item->nextcheck - time(NULL),old_poller_type, dc_item->poller_type );
+	if ( 20 == dc_item->type) {	
+		ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&dc_item->itemid);
+			//avoiding dynamic and discovery items from being processed by async glb pollers
+			
+		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item type %d key %s oid %s type %d: flags is %d, %ld sheduled in %d sec, to poller type %d -> %d", 
+			dc_item->type, dc_item->key, snmpitem->snmp_oid, snmpitem->snmp_oid_type, dc_item->flags, dc_item->itemid, dc_item->nextcheck - time(NULL),old_poller_type, dc_item->poller_type );
+	}
 
 	DCupdate_item_queue(dc_item, old_poller_type, old_nextcheck);
 }
@@ -9240,26 +9303,7 @@ static void	dc_requeue_item_at(ZBX_DC_ITEM *dc_item, ZBX_DC_HOST *dc_host, int n
 	DCupdate_item_queue(dc_item, old_poller_type, old_nextcheck);
 }
 
-static int glb_might_be_async_polled ( ZBX_DC_ITEM *zbx_dc_item, ZBX_DC_HOST *zbx_dc_host ) {
-	ZBX_DC_SNMPITEM *snmpitem;
 
-	if ( CONFIG_GLB_SNMP_FORKS == 0 ) return FAIL;
-#ifdef HAVE_NETSNMP	
-	if ( zbx_dc_item->type == ITEM_TYPE_SNMP ) {
-			snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&zbx_dc_item->itemid);
-			//avoiding dynamic and discovery items from being processed by async glb pollers
-			if  ( NULL != snmpitem &&  (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags) || (ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type) )  
-			  	  return FAIL;
-			else {
-			  if (CONFIG_DEBUG_ITEM == zbx_dc_item->itemid) 
-			  	zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld host %s oid %s might be async poled, skipping from the normal poll",zbx_dc_item->itemid, zbx_dc_host->host, snmpitem->snmp_oid);
-			  return SUCCEED;
-			}
-	
-	}
- #endif
- 	return FAIL;
-}
 /******************************************************************************
  *                                                                            *
  * Function: DCconfig_get_poller_items                                        *
@@ -9516,49 +9560,22 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 		}
 
 		//doing type-specific checks here
-		switch ( zbx_dc_item->type ) {
-			case ITEM_TYPE_SNMP: {
-				ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)item;
-				//avoiding dynamic and discovery items from being processed by async glb pollers
-				if  ( (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags) || (ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type) )  {
-					if (CONFIG_DEBUG_ITEM == zbx_dc_item->itemid)
-						zabbix_log(LOG_LEVEL_INFORMATION, "Skipping dynamic snmp item %ld",zbx_dc_item->itemid % forks, process_num-1, forks);
-					continue;
-				
-				}
-			}
-			break;
-			case ITEM_TYPE_SIMPLE: {
-				if (SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPING_KEY) ||
-					SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGSEC_KEY) ||
-					SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGLOSS_KEY))
-				{   
-
-					if ( FAIL == glb_can_process_glb_pinger(zbx_dc_item->key) ) 
-						continue; 
-				} else {
-					//skipping non icmp items
-					continue;
-				}
-			break;
-			}
-		}	
+		if (FAIL == glb_might_be_async_polled(zbx_dc_item,zbx_dc_host)) {
+			continue;
+		}
 
 		DEBUG_ITEM(zbx_dc_item->itemid,"Item fetched for placement to the local queue");
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Fetched item %ld for processing",zbx_dc_item->itemid);
-		//creating/updating the item in the local hash
-		//this will also add events to poll the new items
-		
-		//convering the item to the dc_item
-		//todo: this might be avoided if dc_item, interface and type specific data are used together
-		
+				
 		DC_ITEM dc_item;
 		int errcode=SUCCEED;
 		AGENT_RESULT result;
 
+		//it's quite a lot of work done there, maybe it's better
+		//to rework to use zbx_dc_item as well as zbx_dc_host
+		// TODO: consider reworking to save some CPU cycles
 		DCget_host(&dc_item.host, zbx_dc_host);
 		DCget_item(&dc_item, zbx_dc_item);
-		
 		zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
 		glb_create_item(events, hosts, items, &dc_item, poll_engine);
 		init_result(&result);

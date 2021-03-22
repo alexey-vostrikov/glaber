@@ -533,7 +533,8 @@ const char	*zbx_alert_type_string(unsigned char type);
 
 /* item states */
 #define ITEM_STATE_NORMAL		0
-#define ITEM_STATE_NOTSUPPORTED		1
+#define ITEM_STATE_NOTSUPPORTED	1
+#define ITEM_STATE_UNKNOWN		2
 const char	*zbx_item_state_string(unsigned char state);
 
 /* group statuses */

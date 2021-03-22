@@ -59,7 +59,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     struct zbx_json_parse jp, jp_config;
 
-    zabbix_log(LOG_LEVEL_INFORMATION, "%s: got config: '%s'", __func__, config_line);
+    zabbix_log(LOG_LEVEL_DEBUG, "%s: got config: '%s'", __func__, config_line);
     if (NULL == (worker = zbx_malloc(NULL, sizeof(GLB_EXT_WORKER))))
     {
         return NULL;

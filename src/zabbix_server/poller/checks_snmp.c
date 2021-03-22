@@ -2236,7 +2236,7 @@ static struct snmp_session * glb_snmp_open_conn(GLB_POLLER_ITEM *glb_item){
 
 	
 	if (NULL == (sess = zbx_snmp_open_session(&dc_item, error, sizeof(error)))) {
-		zabbix_log(LOG_LEVEL_WARNING, "Couldn't open snmp socket to host %s, :%s",snmp_item->interface_addr, error);
+		zabbix_log(LOG_LEVEL_DEBUG, "Couldn't open snmp socket to host %s, :%s",snmp_item->interface_addr, error);
 		return NULL;
 	};
 	
@@ -2338,7 +2338,7 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 	zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags ,
 									NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
 			
-	glb_item->state=GLB_ITEM_STATE_QUEUED;
+	glb_item->state= POLL_QUEUED;
 	glb_snmp_item->state = POLL_QUEUED;	
 	
 	if ( SUCCEED == host_is_failed(conf->hosts,glb_item->hostid, now) ) {
@@ -2350,7 +2350,7 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 
 			zbx_list_pop(&conn->items_list, (void **)&item_idx);
 
-			glb_next_item->state = GLB_ITEM_STATE_QUEUED; //indicate we're not processing the item anymore
+			glb_next_item->state = POLL_QUEUED; //indicate we're not processing the item anymore
 			zbx_snprintf(error_str,MAX_STRING_LEN,"Skipped from polling due to %d items timed out in a row, last failed item id is %ld", 
 							GLB_FAIL_COUNT_CLEAN, glb_item->itemid);
 			
@@ -2397,7 +2397,7 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
 
 	*conf->responces += 1;
-	glb_item->state = GLB_ITEM_STATE_QUEUED;
+	glb_item->state = POLL_QUEUED;
 	glb_snmp_item->state = POLL_QUEUED;
 
 	if (operation == NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
@@ -2406,14 +2406,21 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 		{  
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d got SUCCEED responce",conn->idx);
 			while (var)
-			{	
+			{	int ret;
+
 				init_result(&result);
-				zbx_snmp_set_result(var, &result, &snmp_type);
+				
+				if (SUCCEED == zbx_snmp_set_result(var, &result, &snmp_type)) {
+			
+					DEBUG_ITEM(glb_item->itemid,"Async SNMP SUCCEED RESULT processing for the item");
+					zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , &result ,&timespec, ITEM_STATE_NORMAL, NULL);
+				} else {
+					DEBUG_ITEM(glb_item->itemid,"Async SNMP FAILED RESULT processing for the item");
+					DEBUG_ITEM(glb_item->itemid,result.msg);
 
-				zabbix_log(LOG_LEVEL_DEBUG, "In %s: preprocessing glb_item: %ld", __func__,glb_item);
-				DEBUG_ITEM(glb_item->itemid,"Async SNMP responce processing for the item");
-
-				zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , &result ,&timespec, ITEM_STATE_NORMAL, NULL);
+					zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , NULL,
+					&timespec,ITEM_STATE_NOTSUPPORTED, result.msg);
+				}
 						
 				var = var->next_variable;
 				free_result(&result);
@@ -2651,7 +2658,7 @@ void   glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 		DEBUG_ITEM(glb_item->itemid,"Added to list, starting connection");
 		glb_snmp_start_connection(&conf->connections[idx]);
 	 } else {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Not adding item %ld to the conn%d list: still in %d state",glb_item->itemid,idx,glb_snmp_item->state);
+		zabbix_log(LOG_LEVEL_DEBUG,"Not adding item %ld to the conn%d list: still in %d state",glb_item->itemid,idx,glb_snmp_item->state);
 		DEBUG_ITEM(glb_item->itemid,"Not added to list, still polling");
 	 }
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
@@ -2680,7 +2687,7 @@ void glb_snmp_reset_snmp(void *engine){
 				snmp_close(conf->connections[i].sess);
 				
 				if (NULL != (glb_item=zbx_hashset_search(conf->items,&conf->connections[i].current_item ))){
-					glb_item->state = GLB_ITEM_STATE_QUEUED;
+					glb_item->state = POLL_QUEUED;
 				}
 				
 				cnt++;

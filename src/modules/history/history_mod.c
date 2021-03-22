@@ -311,7 +311,7 @@ int glb_module_init(char *config_line, void **data)
     int timeout = GLB_DEFAULT_RUNNER_TIMEOUT;
     int max_calls = GLB_DEFAULT_RUNNER_MAX_CALLS;
 
-    zabbix_log(LOG_LEVEL_INFORMATION, "%s: got config: '%s'", __func__, config_line);   
+    zabbix_log(LOG_LEVEL_DEBUG, "%s: got config: '%s'", __func__, config_line);   
 
     //history mode expects old good JSON as a config, let's parse it
     struct zbx_json_parse jp, jp_config;

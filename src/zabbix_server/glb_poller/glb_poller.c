@@ -60,8 +60,7 @@ static void add_event(zbx_binary_heap_t *events, char type, zbx_uint64_t id, uns
 
 /****************************************************************
  * deletes the item, does all the cleaning job, including items *
- * and hosts hashsets. Doesn't care about events - it uses  	*
- * weak linking
+ * and hosts hashsets. 
  ****************************************************************/
 //static
 void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
@@ -98,10 +97,9 @@ void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
 * adds an item to the joblist 					*
 * for a certain connection type					*
 ************************************************/
-//static
-void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
+static void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 
-	glb_item->state = GLB_ITEM_STATE_POLLING;
+	glb_item->state = POLL_POLLING;
 	glb_item->lastpolltime = time(NULL);
 
 	switch (glb_item->item_type)
@@ -189,10 +187,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(items, &dc_item->itemid)))
 	{
-			//only updating items which are about to expire, otherwize it produces long fetching times
-			if (glb_item->ttl - now > GLB_AGING_PERIOD * 2 ) 
-				return SUCCEED;
-			
+			//maybe it's better to make updtaing of an item, not recreating here
 			DEBUG_ITEM(dc_item->itemid, "Item already int the local queue, cleaning");
 			glb_free_item_data(glb_item);
 			zbx_heap_strpool_release(glb_item->delay);
@@ -208,7 +203,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		glb_item->itemid = dc_item->itemid;
 		glb_item = zbx_hashset_insert(items, glb_item, sizeof(GLB_POLLER_ITEM));
 		
-		glb_item->state = GLB_ITEM_STATE_NEW;
+		glb_item->state = POLL_FREE;
 		zabbix_log(LOG_LEVEL_DEBUG,"Adding new item %ld to the local queue1", dc_item->itemid);
 		//this is new item, checking if the host exists
 		if (NULL == (glb_host = (GLB_POLLER_HOST *)zbx_hashset_search(hosts, &dc_item->host.hostid)))
@@ -234,7 +229,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		glb_host->items++;
 	}
 	
-	//commont attributes
+	//common attributes
 	glb_item->itemid = dc_item->itemid;
 	glb_item->lastpolltime = 0;
 	glb_item->delay = zbx_heap_strpool_intern(dc_item->delay);
@@ -301,9 +296,9 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		exit (-1);
 	}
 
-	if (GLB_ITEM_STATE_NEW == glb_item->state) {
+	if ( POLL_FREE == glb_item->state) {
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Adding item %ld to the events queue ", glb_item->itemid);
-		glb_item->state = GLB_ITEM_STATE_QUEUED;
+		glb_item->state = POLL_QUEUED;
 		add_item_check_event(events, hosts, glb_item, now);
 
 	}
@@ -485,14 +480,19 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 						add_item_check_event(&events, &hosts, glb_item, glb_host->disabled_till);
 
 					} else {
-					     //normal polling
+	
 						add_item_check_event(&events, &hosts, glb_item, now);
-						//but only if the item is not still being polled
-						if ( GLB_ITEM_STATE_QUEUED != glb_item->state || glb_item->ttl < now ) {
+						
+						//the only state common poller logic care - _QUEUED - such an items are considred
+						//to be pollabale, updatable and etc. All other states indicates the item is busy
+						//with type specific poller logic
+						if ( POLL_QUEUED != glb_item->state || glb_item->ttl < now ) {
 							zabbix_log(LOG_LEVEL_DEBUG, "Not sending item %ld to polling, it's in the %d state or aged", glb_item->itemid, glb_item->state);
 						} else {
 							//ok, adding the item to the poller's internal logic for polling
-							glb_item->state = GLB_ITEM_STATE_POLLING;
+							
+							//todo:remove this state to internal poller logic
+							glb_item->state = POLL_POLLING;
 					
 							DEBUG_ITEM(glb_item->itemid,"Starting poller item poll");
 							DEBUG_HOST(glb_item->hostid,"Satrting poller item poll");
@@ -509,23 +509,22 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 				zabbix_log(LOG_LEVEL_DEBUG, "Aging processing CONFIG_GLB_REQUEUE_TIME is %d", CONFIG_GLB_REQUEUE_TIME);
 				GLB_POLLER_ITEM *glb_item;
 				zbx_hashset_iter_t iter;
-				zbx_vector_uint64_t deleted_items;
+				//zbx_vector_uint64_t deleted_items;
 				int cnt = 0, i;
 
 				zbx_hashset_iter_reset(&items, &iter);
-				zbx_vector_uint64_create(&deleted_items);
+				//zbx_vector_uint64_create(&deleted_items);
+
 				//items are cleaned out in a bit conservatively  as this prevents creating extra events
 				while (glb_item = zbx_hashset_iter_next(&iter)) {
-					if (glb_item->ttl < now && 	GLB_ITEM_STATE_QUEUED == glb_item->state ) {
+					if (glb_item->ttl < now && 	POLL_QUEUED == glb_item->state ) {
 					
 						DEBUG_ITEM(glb_item->itemid,"Item aged");
-						zabbix_log(LOG_LEVEL_DEBUG, "Marking aged item %ld for deletion, ttl is %ld",glb_item->itemid, glb_item->ttl);	
+						zabbix_log(LOG_LEVEL_INFORMATION, "Marking aged item %ld for deletion, ttl is %ld",glb_item->itemid, glb_item->ttl);	
 			
 						cnt++;
 
 						glb_free_item_data(glb_item);
-						
-						zabbix_log(LOG_LEVEL_DEBUG, "Finding the host");	
 						
 						if (NULL != (glb_host=zbx_hashset_search(&hosts, &glb_item->hostid))) {
 							
@@ -536,18 +535,20 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 							}
 						}
 						
+						//shoul
 						//zbx_hashset_remove_direct(&items, glb_item);
-						zbx_vector_uint64_append(&deleted_items, glb_item->itemid);
+						zbx_hashset_iter_remove(&iter);
+						//zbx_vector_uint64_append(&deleted_items, glb_item->itemid);
 					}
 				}
 
 				//now deleting all items marked for the deletion
-				for (i = 0; i < deleted_items.values_num; i++) {
-					zabbix_log(LOG_LEVEL_DEBUG, "Deleting aged item %ld ",deleted_items.values[i]);	
-					zbx_hashset_remove(&items,&deleted_items.values[i]);
-				}
+				//for (i = 0; i < deleted_items.values_num; i++) {
+				//	zabbix_log(LOG_LEVEL_DEBUG, "Deleting aged item %ld ",deleted_items.values[i]);	
+				//	zbx_hashset_remove(&items,&deleted_items.values[i]);
+				//}
 
-				zbx_vector_uint64_destroy(&deleted_items);
+				//zbx_vector_uint64_destroy(&deleted_items);
 				add_event(&events, GLB_EVENT_AGING, 0, now + GLB_AGING_PERIOD);
 				zabbix_log(LOG_LEVEL_DEBUG, "Finished aging, %d items",cnt);
 			}
@@ -555,25 +556,36 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 			case GLB_EVENT_NEW_ITEMS_CHECK: {
 				int num;
-				zabbix_log(LOG_LEVEL_INFORMATION, "Event: getting new items from the config cache");
+				static unsigned int last_cache_reload=0;
+				add_event(&events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + 2); 
+				
+				unsigned int cache_time =  DCconfig_get_item_sync_ts();
+
+				if (cache_time == last_cache_reload) 
+					break;
+				
+				last_cache_reload = cache_time;
+				
 				num = DCconfig_get_glb_poller_items(&events, &hosts, &items, item_type, process_num, poll_engine);
 				zabbix_log(LOG_LEVEL_INFORMATION, "Event: got %d new items from the config cache next reload in %d seconds ", num, CONFIG_GLB_REQUEUE_TIME);
-				add_event(&events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + CONFIG_GLB_REQUEUE_TIME); 
 				
-				//also checking if item's has been for too long at poller's, such an items marking as queued again, so they could 
-				//be sent once more
+				//todo: rethink this - looks like it creates problems - under high load a poller might get too busy
+				//and sometimes items wait for several minutes in internal queues to be polled. Adding the same item again and again
+				//just wastes memory.
+				//also it's better to get rid of lots state constants, und use unified ones POLL_*
+
+				//so, perhaps, it's better to control with 100% precision  of machine state tha returns items to the queue
 				zbx_hashset_iter_t iter;
 				zbx_hashset_iter_reset(&items, &iter );
 				while ( NULL != (glb_item=zbx_hashset_iter_next(&iter))) {
 					//an item may wait for some time while other items will be polled and thus get timedout
 					//so after one minute of waiting we consider its timed out anyway whatever the poll process thinks about it
 					//but it's a poller's business to submit timeout result
-					if (glb_item->lastpolltime + SEC_PER_MIN < now && GLB_ITEM_STATE_POLLING == glb_item->state) {
+					if (glb_item->lastpolltime + SEC_PER_MIN < now && POLL_POLLING == glb_item->state) {
 						zabbix_log(LOG_LEVEL_DEBUG, "Item %ld has timedout in the poller, resetting it's queue state",glb_item->itemid);
-						glb_item->state = GLB_ITEM_STATE_QUEUED;
+						glb_item->state = POLL_QUEUED;
 					}
 				}
-				
 			}
 			break;
 				
@@ -590,14 +602,14 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		glb_poller_handle_async_io(poll_engine, item_type);
 		
 		if ( old_activity == requests + responces ) 
-			usleep(5000);
+			usleep(100000);
 		
 		old_activity = requests + responces;
 
 		if (next_stat_time < now ) {
 			next_stat_time = now + STAT_INTERVAL;
-			zbx_setproctitle("%s #%d [chck %d hosts/sec, got %d results/sec, items in: %ld, events planned: %d - %d]",
- 					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responces/STAT_INTERVAL, items.num_data, events.elems_num, time(NULL));
+			zbx_setproctitle("%s #%d [sent %d chks/sec, got %d chcks/sec, items: %ld, events planned: %d]",
+ 					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responces/STAT_INTERVAL, items.num_data, events.elems_num);
 			requests = 0; 
 			responces = 0;
 		
