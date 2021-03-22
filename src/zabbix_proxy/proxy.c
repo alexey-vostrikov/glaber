@@ -44,7 +44,7 @@
 #include "housekeeper/housekeeper.h"
 #include "../zabbix_server/pinger/pinger.h"
 #include "../zabbix_server/poller/poller.h"
-#include "../zabbix_server/glb_poller/glb_poller.h"
+#include "../zabbix_server/glb_poller/glb_pinger.h"
 #include "../zabbix_server/trapper/trapper.h"
 #include "../zabbix_server/trapper/proxydata.h"
 #include "../zabbix_server/snmptrapper/snmptrapper.h"
