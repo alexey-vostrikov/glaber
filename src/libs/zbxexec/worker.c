@@ -351,7 +351,7 @@ static int worker_cleanup(GLB_EXT_WORKER *worker)
     }
 
     if (bytes > 0)
-        zabbix_log(LOG_LEVEL_INFORMATION, "GARBAGE DETECTED  %d bytes of garbage from %s: %s", bytes, worker->path, buffer);
+        zabbix_log(LOG_LEVEL_INFORMATION, "GARBAGE DETECTED  %d bytes of garbage from %s: %s", bytes, worker->path, *buffer);
 
     //restore the flags
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
@@ -428,7 +428,6 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         //make sure that all the request is just an empty line or end of line is in the end of request
         if (!strcmp(request, "\n") || strstr(request, "\n\n") != request + request_len - 2)
         {
-            zabbix_log(LOG_LEVEL_WARNING, "Request size: %d, request ptr is %ld match ptr is %ld", request_len, request, strstr(request, "\n\n"));
             zabbix_log(LOG_LEVEL_WARNING, "Request FAIL: no empty line or it's inside the request: '%s'", request);
          
             for (i = request_len - 10; i < request_len; i++)
@@ -457,7 +456,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
 
     if (wr_len != strlen(request))
     {
-        zabbix_log(LOG_LEVEL_WARNING, "WARNING: wrote less bytes then buffer size: %d of %d, consider decreasing amount of data or increase write timeout or worker has died", wr_len, strlen(request));
+        zabbix_log(LOG_LEVEL_WARNING, "WARNING: wrote less bytes then buffer size: %d of %ld, consider decreasing amount of data or increase write timeout or worker has died", wr_len, strlen(request));
         restart_worker(worker);
         return FAIL;
     }
