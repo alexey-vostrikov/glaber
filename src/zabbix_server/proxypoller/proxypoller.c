@@ -250,7 +250,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 	zbx_socket_t	s;
 	struct zbx_json	j;
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: CLUSTER: sending configuration to the proxy %s(%d)", __func__, proxy->host,proxy->hostid);
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: CLUSTER: sending configuration to the proxy %s(%ld)", __func__, proxy->host,proxy->hostid);
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	zbx_json_addstring(&j, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_PROXY_CONFIG, ZBX_JSON_TYPE_STRING);

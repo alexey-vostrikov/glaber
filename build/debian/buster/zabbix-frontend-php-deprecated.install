@@ -1,0 +1,4 @@
+ui/* usr/share/zabbix
+debian/conf/example.apache.conf usr/share/doc/zabbix-frontend-php-deprecated
+debian/conf/example.nginx.conf usr/share/doc/zabbix-frontend-php-deprecated
+debian/conf/example.php-fpm.conf usr/share/doc/zabbix-frontend-php-deprecated

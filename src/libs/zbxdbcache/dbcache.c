@@ -3461,7 +3461,7 @@ static void	dc_local_add_history_dbl(zbx_uint64_t itemid, unsigned char item_val
 		item_value->value.value_dbl = value_orig;
 	
 	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as dbl" );
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as dbl",itemid );
 }
 
 static void	dc_local_add_history_uint(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
@@ -3522,7 +3522,7 @@ static void	dc_local_add_history_text(zbx_uint64_t itemid, unsigned char item_va
 		item_value->value.value_str.len = 0;
 	
 	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as text" );
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as text", itemid );
 }
 
 static void	dc_local_add_history_log(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
@@ -3584,7 +3584,7 @@ static void	dc_local_add_history_log(zbx_uint64_t itemid, unsigned char item_val
 		}
 	}
 	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as log" );
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as log",itemid );
 }
 
 static void	dc_local_add_history_notsupported(zbx_uint64_t itemid, const zbx_timespec_t *ts, const char *error,
@@ -3633,7 +3633,7 @@ static void	dc_local_add_history_lld(zbx_uint64_t itemid, const zbx_timespec_t *
 	string_values_offset += item_value->value.value_str.len;
 	
 	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as LLD" );
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as LLD", itemid );
 }
 
 static void	dc_local_add_history_empty(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
@@ -3651,7 +3651,7 @@ static void	dc_local_add_history_empty(zbx_uint64_t itemid, unsigned char item_v
 	item_value->flags = flags;
 	
 	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as empty" );
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as empty", itemid );
 }
 
 /******************************************************************************
