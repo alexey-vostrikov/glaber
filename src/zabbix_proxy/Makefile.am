@@ -5,7 +5,8 @@ SUBDIRS = \
 	housekeeper \
 	proxyconfig \
 	datasender \
-	taskmanager
+	taskmanager \
+	../zabbix_server/glb_poller
 
 sbin_PROGRAMS = zabbix_proxy
 
@@ -48,7 +49,7 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxsysinfo/simple/libsimplesysinfo.a \
 	$(top_builddir)/src/libs/zbxsysinfo/$(ARCH)/libspechostnamesysinfo.a \
 	$(top_builddir)/src/libs/zbxlog/libzbxlog.a \
-	$(top_builddir)/src/libs/glb_poller/libglbpoller.a \
+	$(top_builddir)/src/zabbix_server/glb_poller/libglbpoller.a \
 	$(top_builddir)/src/libs/zbxserver/libzbxserver.a \
 	$(top_builddir)/src/libs/zbxserver/libzbxserver_proxy.a \
 	$(top_builddir)/src/libs/zbxdbcache/libzbxdbcache.a \
