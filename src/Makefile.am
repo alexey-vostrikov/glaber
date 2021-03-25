@@ -46,6 +46,7 @@ endif
 if SERVER
 SERVER_SUBDIRS = \
 	zabbix_server \
+	glapi \
 	zabbix_js
 endif
 

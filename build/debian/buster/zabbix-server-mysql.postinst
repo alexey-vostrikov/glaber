@@ -11,7 +11,8 @@ if [ "$1" = "configure" ]; then
             --home /var/lib/zabbix/ --no-create-home \
             zabbix
     fi
-
+    
+    setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
     chown zabbix:zabbix /var/log/zabbix -R
 fi
 

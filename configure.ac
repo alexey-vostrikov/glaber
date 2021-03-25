@@ -2080,6 +2080,7 @@ AC_OUTPUT([
 	src/zabbix_proxy/datasender/Makefile
 	src/zabbix_proxy/taskmanager/Makefile
 	src/zabbix_java/Makefile
+	src/glapi/Makefile
 	man/Makefile
 	])
 
