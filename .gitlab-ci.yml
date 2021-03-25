@@ -35,9 +35,9 @@ variables:
 
 .build_common: &build_common
   stage: build
-  dependencies:
-    - download-requirements
-    - old-packages
+  #dependencies:
+  #  - download-requirements
+  #  - old-packages
   only:
     - tags
     - cicd_aws
