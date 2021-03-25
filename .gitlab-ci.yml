@@ -1,6 +1,6 @@
 stages:
-  - requirements
-  - pre-build
+#  - requirements
+#  - pre-build
   - build
   - deploy
 
@@ -8,30 +8,30 @@ variables:
   AWS_DEFAULT_REGION: eu-north-1
   BUCKET_NAME: glaber
 
-download-requirements:
-  image: "python:latest"
-  stage: requirements
-  before_script:
-    - pip install awscli
-  script:
-    - aws s3 cp s3://${BUILD_BUCKET_NAME}/ ./ --recursive
-  artifacts:
-    paths:
-      - build/
+#download-requirements:
+#  image: "python:latest"
+#  stage: requirements
+#  before_script:
+#    - pip install awscli
+#  script:
+#    - aws s3 cp s3://${BUILD_BUCKET_NAME}/ ./ --recursive
+#  artifacts:
+#    paths:
+#      - build/
 
-old-packages:
-  image: "python:latest"
-  stage: pre-build
-  before_script:
-    - pip install awscli
-  script:
-    - aws s3 cp s3://${BUCKET_NAME}/ ./ --recursive
-  artifacts:
-    paths:
-      - ${CI_COMMIT_REF_SLUG}/
-  environment:
-    name: ${CI_COMMIT_REF_SLUG}
-    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
+#old-packages:
+#  image: "python:latest"
+#  stage: pre-build
+#  before_script:
+#    - pip install awscli
+#  script:
+#    - aws s3 cp s3://${BUCKET_NAME}/ ./ --recursive
+#  artifacts:
+#    paths:
+#      - ${CI_COMMIT_REF_SLUG}/
+#  environment:
+#    name: ${CI_COMMIT_REF_SLUG}
+#    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
 
 .build_common: &build_common
   stage: build
@@ -211,13 +211,13 @@ deploys3:
   image: "python:latest"
   stage: deploy
   dependencies:
-    - centos7
-    - centos8
-    - ubuntu-xenial
-    - ubuntu-bionic
-    - ubuntu-focal
-    - debian-stretch
-    - debian-jessie
+#    - centos7
+#    - centos8
+#    - ubuntu-xenial
+#    - ubuntu-bionic
+#    - ubuntu-focal
+#    - debian-stretch
+#    - debian-jessie
     - debian-buster
   before_script:
     - pip install awscli
