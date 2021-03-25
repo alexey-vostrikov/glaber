@@ -149,7 +149,7 @@ debian-stretch:
   image: debian:stretch
 
 debian-buster:
-  <<: *build_deb
+  stage: build
   image: debian:buster
   script:
     - apt-get --ignore-missing install -y build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl
@@ -170,6 +170,7 @@ debian-buster:
     - mv src/zmap src/glbmap
     - cd ../..
     - dpkg-buildpackage -b --no-sign
+
 ubuntu-focal:
   <<: *build_deb_modern
   image: ubuntu:focal
