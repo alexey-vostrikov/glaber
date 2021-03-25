@@ -11,11 +11,11 @@ GOARCH=`go env GOARCH`
 all: build
 
 build:
-	go build  -v -n -o ./bin cmd/history/glb_hist_clickhouse.go
+	go build cmd/history/glb_hist_clickhouse.go
 
 clean:
 	go clean ./...
-	rm -f bin/glb_hist_clickhouse
+	rm glb_hist_clickhouse
 
 install:
 	go install cmd/history/glb_hist_clickhouse
