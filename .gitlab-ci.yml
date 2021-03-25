@@ -159,6 +159,7 @@ debian-buster:
     - export PATH=$PATH:/usr/local/go/bin
     - go version
     - git clone https://gitlab.com/mikler/glaber.git
+    - ls
     - cd glaber
     - ./bootstrap.sh
     - ./configure
