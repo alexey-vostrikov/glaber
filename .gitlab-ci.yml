@@ -183,9 +183,10 @@ ubuntu-bionic:
     - apt-get install -y libssh-dev default-libmysqlclient-dev
 
 ubuntu-xenial:
+  <<: *build_deb
   image: ubuntu:xenial
   script:
-    - apt-get install -y libssh-dev default-libmysqlclient-dev
+    - apt-get install -y libmysqlclient-dev
 
 
 centos7:
