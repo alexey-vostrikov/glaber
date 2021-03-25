@@ -11,7 +11,7 @@ GOARCH=`go env GOARCH`
 all: build
 
 build:
-	go build -o bin cmd/history/glb_hist_clickhouse.go
+	go build -o ./bin cmd/history/glb_hist_clickhouse.go
 
 clean:
 	go clean ./...
