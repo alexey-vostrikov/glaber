@@ -167,10 +167,27 @@ ubuntu-bionic:
     - apt-get install -y libssh-dev default-libmysqlclient-dev
 
 ubuntu-xenial:
-  <<: *build_deb
+  ##<<: *build_deb
   image: ubuntu:xenial
   script:
-    - apt-get install -y libmysqlclient-dev
+     - apt-get --ignore-missing install -y build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl
+    - wget "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
+    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
+    - export PATH=$PATH:/usr/local/go/bin
+    - go version
+    - git clone https://gitlab.com/mikler/glaber.git
+    - cd glaber
+    - ./bootstrap.sh
+    - ./configure
+    - make dbschema gettext css
+    - autoreconf -fvi
+    - cp -r build/debian/buster/ debian
+    - cd debian 
+    - git clone https://gitlab.com/mikler/glbmap.git
+    - cd glbmap && cmake . && make -j4
+    - mv src/zmap src/glbmap
+    - cd ../..
+    - dpkg-buildpackage -b --no-sign
 
 centos7:
   <<: *build_rpm
