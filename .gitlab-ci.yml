@@ -2,11 +2,11 @@ stages:
 #  - requirements
 #  - pre-build
   - build
-  - deploy
+#  - deploy
 
-variables:
-  AWS_DEFAULT_REGION: eu-north-1
-  BUCKET_NAME: glaber
+#variables:
+#  AWS_DEFAULT_REGION: eu-north-1
+#  BUCKET_NAME: glaber
 
 #download-requirements:
 #  image: "python:latest"
@@ -33,124 +33,26 @@ variables:
 #    name: ${CI_COMMIT_REF_SLUG}
 #    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
 
-.build_common: &build_common
-  stage: build
-  #dependencies:
-  #  - download-requirements
-  #  - old-packages
+
+#debian-jessie:
+#  <<: *build_deb
+#  image: debian:jessie
+#  script:
+#    - apt-get install -y libmysqlclient-dev openjdk-7-jdk
+
+#debian-stretch:
+#  <<: *build_deb_modern
+#  image: debian:stretch
+
+debian-buster:
+ # stage: build
+  image: debian:buster
   only:
     - tags
     - cicd_aws
     - testing
     - packages
 
-.build_deb: &build_deb
-  <<: *build_common
-  variables:
-    DISTRIBUTION_TYPE: ${CI_JOB_IMAGE:0:6}
-    DISTRIBUTION: ${CI_JOB_IMAGE:7}
-  before_script:
-    - apt-get update
-    - apt-get --ignore-missing install -y dpkg-dev devscripts wget dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl golang-go
-    - go version
-  after_script:
-    - export DEBIAN_FRONTEND=noninteractive
-    - export GOPATH=$HOME/go:/builds/mikler/glaber/src/go
-    - export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
-    - export DISTRIBUTION_TYPE=$(lsb_release -i -s | tr '[:upper:]' '[:lower:]')
-    - export DISTRIBUTION=$(lsb_release -c -s)
-    - >
-      if [[ $(lsb_release -i -s | tr '[:upper:]' '[:lower:]') == 'ubuntu' ]]; then
-        export RELEASE=$(lsb_release -r -s)
-      else
-        export RELEASE=$(lsb_release -r -s | cut -f1 -d".")
-      fi
-    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/${DISTRIBUTION_TYPE}/pool/main/z/zabbix/zabbix_${ZABBIX_VERSION}-1+${DISTRIBUTION_TYPE}${RELEASE}.debian.tar.xz" -O debian.tar.xz
-    - tar -xvf debian.tar.xz
-    - >
-      if [[ $CI_COMMIT_BRANCH == "master" ]]; then 
-        dch -v "1:${ZABBIX_VERSION}-1+glaber~${CI_COMMIT_TAG}" --distribution "${DISTRIBUTION}" "all latest updates"
-        sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
-        sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
-      else 
-        dch -v "1:${ZABBIX_VERSION}+glaber~${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)" --distribution "${DISTRIBUTION}" "${CI_COMMIT_MESSAGE-'all latest updates'}"
-        sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)');/g" ui/include/defines.inc.php
-        sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[_]/-}-$(date +%F)\"/g" include/version.h
-      fi
-    - autoreconf -fvi
-    - dpkg-buildpackage -b
-    - echo $PWD
-    - ls ./
-    - ls ../
-    - mkdir -p pkgs/${DISTRIBUTION_TYPE}/dists/${DISTRIBUTION}/main/binary-amd64/
-    - mkdir -p pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
-    - mv ../*.deb pkgs/${DISTRIBUTION_TYPE}/pool/main/${DISTRIBUTION}/
-    - chmod +x ./build/deb.sh
-    - ./build/deb.sh
-  artifacts:
-    paths:
-      - pkgs/${CI_JOB_IMAGE:7}/
-
-.build_deb_modern: &build_deb_modern
-  <<: *build_deb
-  script:
-    - apt-get install -y default-libmysqlclient-dev
-
-.build_rpm: &build_rpm
-  <<: *build_common
-  script:
-    - yum install -y rpm-build yum-utils xz wget tar curl createrepo
-    - yum groupinstall "Development Tools" -y
-    - export ZABBIX_VERSION=$(cut -d "=" -f2 <<< `cat configure | grep PACKAGE_VERSION=` | tr -d "'")
-    - > 
-      if [[ $CI_COMMIT_BRANCH == "master" ]]; then 
-        sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_TAG}');/g" ui/include/defines.inc.php
-        sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_TAG}\"/g" include/version.h
-      else 
-        sed -i "s/.*GLABER_VERSION.*/define('GLABER_VERSION', '${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)');/g" ui/include/defines.inc.php
-        sed -i "s/.*GLABER_VERSION.*/#define GLABER_VERSION \"${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)\"/g" include/version.h
-      fi
-    - if [[ $CENTOS == "7" ]]; then yum install -y build/rhel/7/other/*.rpm; fi
-    - cd ..
-    - cp -R glaber zabbix-${ZABBIX_VERSION}
-    - tar -czvf zabbix-${ZABBIX_VERSION}.tar.gz zabbix-${ZABBIX_VERSION}
-    - mkdir -p glaber/build/centos/${CENTOS}/{SOURCES,SPECS,temp}
-    - mv zabbix-${ZABBIX_VERSION}.tar.gz glaber/build/centos/${CENTOS}/SOURCES/zabbix-${ZABBIX_VERSION}.tar.gz
-    - cd glaber/build/centos/${CENTOS}/temp
-    - wget "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION:0:3}/rhel/${CENTOS}/SRPMS/zabbix-${ZABBIX_VERSION}-1.el${CENTOS}.src.rpm" -O centos.src.rpm
-    - rpm2cpio centos.src.rpm | cpio -idmv
-    - rm centos.src.rpm
-    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.%{glaber_version}/g" zabbix.spec; else sed -i "s/%{?alphatag:0.}1%{?alphatag}/%{?alphatag:0.}1%{?alphatag}.glaber.${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)/g" zabbix.spec; fi
-    - mv zabbix.spec ../SPECS/zabbix.spec
-    - rm zabbix-${ZABBIX_VERSION}.tar.gz
-    - mv ./* ../SOURCES/
-    - cd ..
-    - yum-builddep -y SPECS/zabbix.spec
-    - if [[ $CI_COMMIT_BRANCH == "master" ]]; then rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_TAG}"; else rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version ${CI_COMMIT_BRANCH//[-]/_}_$(date +%Y%m%d)"; fi
-    - cd ../../../
-    - cd ${CI_COMMIT_REF_SLUG}
-    - mkdir -p rhel/${CENTOS}/
-    - cp -R /root/rpmbuild/RPMS/* rhel/${CENTOS}/
-    - cd rhel/${CENTOS}/
-    - createrepo .
-  artifacts:
-    paths:
-      - rhel/
-
-debian-jessie:
-  <<: *build_deb
-  image: debian:jessie
-  script:
-    - apt-get install -y libmysqlclient-dev openjdk-7-jdk
-
-debian-stretch:
-  <<: *build_deb_modern
-  image: debian:stretch
-
-debian-buster:
-  stage: build
-  image: debian:buster
   script:
     - apt-get update
     - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl default-libmysqlclient-dev libssh-dev
@@ -174,43 +76,43 @@ debian-buster:
     - dpkg-buildpackage -b --no-sign
     - sshpass   -v -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/
 
-ubuntu-focal:
-  <<: *build_deb_modern
-  image: ubuntu:focal
-  script:
-    - apt-get install -y default-libmysqlclient-dev libssh-dev
+#ubuntu-focal:
+#  <<: *build_deb_modern
+#  image: ubuntu:focal
+#  script:
+#    - apt-get install -y default-libmysqlclient-dev libssh-dev
 
-ubuntu-bionic:
-  <<: *build_deb_modern
-  image: ubuntu:bionic
-  script:
-    - apt-get install -y libssh-dev default-libmysqlclient-dev
+#ubuntu-bionic:
+#  <<: *build_deb_modern
+#  image: ubuntu:bionic
+#  script:
+#    - apt-get install -y libssh-dev default-libmysqlclient-dev
 
-ubuntu-xenial:
-  <<: *build_deb
-  image: ubuntu:xenial
-  script:
-    - apt-get install -y libmysqlclient-dev
-
-
-centos7:
-  <<: *build_rpm
-  image: centos:7
-  variables:
-    CENTOS: 7
-
-centos8:
-  <<: *build_rpm
-  image: centos:8
-  variables:
-    CENTOS: 8
-  before_script:
-    - dnf -y install dnf-plugins-core epel-release
-    - dnf config-manager --set-enabled powertools
-    - dnf -y install OpenIPMI-devel
+#ubuntu-xenial:
+#  <<: *build_deb
+#  image: ubuntu:xenial
+#  script:
+#    - apt-get install -y libmysqlclient-dev
 
 
-deploys3:
+#centos7:
+#  <<: *build_rpm
+#  image: centos:7
+#  variables:
+#    CENTOS: 7
+
+#centos8:
+#  <<: *build_rpm
+#  image: centos:8
+#  variables:
+#    CENTOS: 8
+#  before_script:
+#    - dnf -y install dnf-plugins-core epel-release
+#    - dnf config-manager --set-enabled powertools
+#    - dnf -y install OpenIPMI-devel
+
+
+#deploys3:
   image: "python:latest"
   stage: deploy
   dependencies:
@@ -221,12 +123,12 @@ deploys3:
 #    - ubuntu-focal
 #    - debian-stretch
 #    - debian-jessie
-    - debian-buster
-  before_script:
-    - pip install awscli
-  script:
-    - aws s3 cp pkgs s3://${BUCKET_NAME}/${CI_COMMIT_REF_SLUG} --recursive
-  environment:
-    name: ${CI_COMMIT_REF_SLUG}
-    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
+#    - debian-buster
+#  before_script:
+#    - pip install awscli
+#  script:
+#    - aws s3 cp pkgs s3://${BUCKET_NAME}/${CI_COMMIT_REF_SLUG} --recursive
+#  environment:
+#    name: ${CI_COMMIT_REF_SLUG}
+#    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
 
