@@ -172,6 +172,9 @@ debian-buster:
     - mv src/zmap src/glbmap
     - cd ../..
     - dpkg-buildpackage -b --no-sign
+    - ls /builds
+    - ls /builds/mikler
+    - ls /builds/mikler/glaber
     - sshpass   -v -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /build/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/
 
 ubuntu-focal:
