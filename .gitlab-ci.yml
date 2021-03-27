@@ -1,9 +1,6 @@
 debian-buster:
   image: debian:buster
   only:
-    - tags
-    - testing
-    - packages
     - master
   script:
     - apt-get update
