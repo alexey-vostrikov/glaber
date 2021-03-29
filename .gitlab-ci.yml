@@ -46,6 +46,7 @@ debian-stretch:
     - dpkg-buildpackage -b --no-sign
     - sshpass   -v -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/stretch
 
+
 #ubuntu-focal:
 #  <<: *build_deb_modern
 #  image: ubuntu:focal
