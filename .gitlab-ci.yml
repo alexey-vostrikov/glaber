@@ -59,9 +59,9 @@ debian-buster:
 
 
 #deploys3:
-  image: "python:latest"
-  stage: deploy
-  dependencies:
+#  image: "python:latest"
+#  stage: deploy
+#  dependencies:
 #    - centos7
 #    - centos8
 #    - ubuntu-xenial
