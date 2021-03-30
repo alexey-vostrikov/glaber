@@ -106,23 +106,3 @@ debian-jessie:
 #    - dnf -y install OpenIPMI-devel
 
 
-#deploys3:
-#  image: "python:latest"
-#  stage: deploy
-#  dependencies:
-#    - centos7
-#    - centos8
-#    - ubuntu-xenial
-#    - ubuntu-bionic
-#    - ubuntu-focal
-#    - debian-stretch
-#    - debian-jessie
-#    - debian-buster
-#  before_script:
-#    - pip install awscli
-#  script:
-#    - aws s3 cp pkgs s3://${BUCKET_NAME}/${CI_COMMIT_REF_SLUG} --recursive
-#  environment:
-#    name: ${CI_COMMIT_REF_SLUG}
-#    url: http://${BUCKET_NAME}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com/${CI_COMMIT_REF_SLUG}
-
