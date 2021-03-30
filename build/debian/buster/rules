@@ -172,6 +172,4 @@ override_dh_fixperms:
 	chmod 600 debian/zabbix-server-pgsql/etc/zabbix/zabbix_server.conf
 	chmod 600 debian/zabbix-proxy-mysql/etc/zabbix/zabbix_proxy.conf
 	chmod 600 debian/zabbix-proxy-pgsql/etc/zabbix/zabbix_proxy.conf
-	chmod 1700 /usr/bin/glbmap
-	chmod 755 /usr/bin/glb_hist_clickhouse
 
