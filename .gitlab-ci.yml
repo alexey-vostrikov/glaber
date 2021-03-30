@@ -61,7 +61,7 @@ debian-jessie:
     - ./configure
     - make dbschema gettext
     - autoreconf -fvi
-    - cp -r build/debian/stretch/ debian
+    - cp -r build/debian/jessie/ debian
     - cd debian 
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
