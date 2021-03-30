@@ -1,0 +1,2 @@
+debian/conf/nginx.conf etc/zabbix/
+debian/conf/php-fpm.conf etc/zabbix
