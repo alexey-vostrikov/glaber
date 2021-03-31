@@ -7,7 +7,6 @@ Build-Depends: debhelper (>= 9),
                pkg-config,
                libpcre3-dev,
                libssl-dev
-
 Standards-Version: 3.9.5
 Homepage: https://glaber.io
 
