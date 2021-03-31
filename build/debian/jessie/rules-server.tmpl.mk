@@ -17,16 +17,16 @@ update_conf_server:
 		> debian/conf/zabbix_server.conf
 
 install_frontend: run_dh_install
-	find debian/zabbix-frontend-php/usr/share/zabbix -name .htaccess | xargs rm -f
-	find debian/zabbix-frontend-php/usr/share/zabbix/locale -name '*.po' | xargs rm -f
-	find debian/zabbix-frontend-php/usr/share/zabbix/locale -name '*.sh' | xargs rm -f
-	rm -f debian/zabbix-frontend-php/usr/share/zabbix/assets/fonts/DejaVuSans.ttf
+	find debian/glaber-frontend-php/usr/share/zabbix -name .htaccess | xargs rm -f
+	find debian/glaber-frontend-php/usr/share/zabbix/locale -name '*.po' | xargs rm -f
+	find debian/glaber-frontend-php/usr/share/zabbix/locale -name '*.sh' | xargs rm -f
+	rm -f debian/glaber-frontend-php/usr/share/zabbix/assets/fonts/DejaVuSans.ttf
 	sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
 		debian/zabbix-frontend-php/usr/share/zabbix/include/defines.inc.php
 
 installinit_server:
-	dh_installinit --no-start -p zabbix-server-mysql --name=zabbix-server
-	dh_installinit --no-start -p zabbix-server-pgsql --name=zabbix-server
+	dh_installinit --no-start -p glaber-server-mysql --name=zabbix-server
+	dh_installinit --no-start -p glaber-server-pgsql --name=zabbix-server
 
 clean_server: run_dh_clean
 	rm -f debian/conf/zabbix_server.conf

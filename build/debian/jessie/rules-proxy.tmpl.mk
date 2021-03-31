@@ -16,9 +16,9 @@ update_conf_proxy:
 		> debian/conf/zabbix_proxy.conf
 
 installinit_proxy:
-	dh_installinit --no-start -p zabbix-proxy-mysql --name=zabbix-proxy
-	dh_installinit --no-start -p zabbix-proxy-pgsql --name=zabbix-proxy
-	dh_installinit --no-start -p zabbix-proxy-sqlite3 --name=zabbix-proxy
+	dh_installinit --no-start -p glaber-proxy-mysql --name=zabbix-proxy
+	dh_installinit --no-start -p glaber-proxy-pgsql --name=zabbix-proxy
+	dh_installinit --no-start -p glaber-proxy-sqlite3 --name=zabbix-proxy
 
 clean_proxy: run_dh_clean
 	rm -f debian/conf/zabbix_proxy.conf
