@@ -44,7 +44,7 @@ debian-stretch:
     - mv src/zmap src/glbmap && chmod +s src/glbmap
     - cd ../..
     - dpkg-buildpackage -b --no-sign
-    - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/stretch
+    - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber* ${SCP_USER}@glaber.io:~/debian/stretch
 
 debian-jessie:
   image: debian:jessie
