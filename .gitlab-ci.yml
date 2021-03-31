@@ -3,6 +3,11 @@
     - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
     - export PATH=$PATH:/usr/local/go/bin
     - go version
+.prepare_sources: &prepare_sources
+    ./bootstrap.sh
+    - ./configure
+    - make dbschema gettext
+    - autoreconf -fvi
 
 debian-buster:
   image: debian:buster
@@ -91,12 +96,11 @@ ubuntu-bionic:
   script:
     - apt-get update
     - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl default-libmysqlclient-dev libssh-dev
+     
      *build_go
-      ./bootstrap.sh
-    - ./configure
-    - make dbschema gettext
-    - autoreconf -fvi
-    - cp -r build/ubuntu/bionic/ debian
+     *prepare_sources
+     
+      cp -r build/ubuntu/bionic/ debian
     - cd debian 
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
