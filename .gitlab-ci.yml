@@ -17,7 +17,7 @@ debian-buster:
     - cd debian 
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
-    - mv src/zmap src/glbmap
+    - mv src/zmap src/glbmap && chmod +s src/glbmap
     - cd ../..
     - dpkg-buildpackage -b --no-sign
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/buster
@@ -41,7 +41,7 @@ debian-stretch:
     - cd debian 
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
-    - mv src/zmap src/glbmap
+    - mv src/zmap src/glbmap && chmod +s src/glbmap
     - cd ../..
     - dpkg-buildpackage -b --no-sign
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/stretch
@@ -65,7 +65,7 @@ debian-jessie:
     - cd debian 
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
-    - mv src/zmap src/glbmap
+    - mv src/zmap src/glbmap && chmod +s src/glbmap
     - cd ../..
     - dpkg-buildpackage -b -us
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/zabbix* ${SCP_USER}@glaber.io:~/debian/jessie
