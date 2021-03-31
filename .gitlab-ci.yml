@@ -88,7 +88,6 @@ debian-jessie:
 #    - apt-get install -y default-libmysqlclient-dev libssh-dev
 
 ubuntu-bionic:
-#  <<: *build_deb_modern
   image: ubuntu:bionic
   only:
     - master
@@ -99,7 +98,7 @@ ubuntu-bionic:
     - *prepare_sources
     - cp -r build/ubuntu/bionic/ debian && cd debian 
     - *glbmap
-      - cd ../..
+    - cd ../..
     - dpkg-buildpackage -b -us
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/ubuntu/bionic
 
