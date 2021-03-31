@@ -1,7 +1,7 @@
-Source: zabbix
+Source: Glaber
 Section: net
 Priority: optional
-Maintainer: Zabbix Packager <info@zabbix.com>
+Maintainer: Mikhail Makurov <makurov@gmail.com>
 Build-Depends: debhelper (>= 9),
                quilt (>= 0.40) | devscripts (>= 2.17.12),
                pkg-config,
@@ -20,74 +20,73 @@ Build-Depends: debhelper (>= 9),
                libpcre3-dev,
                libssl-dev
 Standards-Version: 3.9.5
-Homepage: https://www.zabbix.com
+Homepage: https://glaber.io
 
 
-Package: zabbix-server-mysql
+Package: glaber-server-mysql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client | default-mysql-client, fping, adduser, lsb-base
 Pre-Depends: debconf
 Recommends: snmpd
-Suggests: zabbix-frontend-php, logrotate, virtual-mysql-server
-Conflicts: zabbix-server-pgsql
-Description: Zabbix network monitoring solution - server (MySQL)
+Suggests: glaber-frontend-php, logrotate, virtual-mysql-server
+Conflicts: zabbix-server-pgsql, glaber-server-pgsql
+Description: Glaber server, based on Zabbix network monitoring solution - server (MySQL)
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
- .
- This package provides the software needed to integrate a host as a Zabbix
- client. It collects information from Zabbix clients and stores it in a
- MySQL database.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
 
-
-Package: zabbix-server-pgsql
+Package: glaber-server-pgsql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
 Pre-Depends: debconf
 Recommends: snmpd
-Suggests: zabbix-frontend-php, logrotate, postgresql-client, postgresql (>= 8.1)
-Conflicts: zabbix-server-mysql
-Description: Zabbix network monitoring solution - server (PostgreSQL)
+Suggests: glaber-frontend-php, logrotate, postgresql-client, postgresql (>= 8.1)
+Conflicts: zabbix-server-mysql, glaber-server-mysql
+Description: Glaber server, based on Zabbix network monitoring solution - server (PostgreSQL)
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
- .
- This package provides the software needed to integrate a host as a Zabbix
- client. It collects information from Zabbix clients and stores it in a
- PostgreSQL database.
+.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
 
-
-Package: zabbix-frontend-php
+Package: glaber-frontend-php
 Architecture: all
 Depends: ${misc:Depends}
  php-mbstring, php-bcmath, php-xml,
  php-mysql | php-pgsql, php-gd, php-ldap,
  fonts-dejavu | ttf-dejavu-core | ttf-japanese-gothic
-Suggests: zabbix-apache-conf, zabbix-nginx-conf
-Description: Zabbix network monitoring solution - PHP front-end
+Suggests: glaber-apache-conf, glaber-nginx-conf
+Description: Glaber server, based on Zabbix network monitoring solution - server (Frontend)
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
- .
- This package provides a web-browsable front-end to the Zabbix server, which
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+.
+ This package provides a web-browsable front-end to the Glaber server, which
  can display graphs of the data collected from clients.
 
 
-Package: zabbix-apache-conf
+Package: glaber-apache-conf
 Architecture: all
-Depends: zabbix-frontend-php, apache2 | httpd, libapache2-mod-php | php
-Description: Zabbix network monitoring solution - apache configuration for front-end
+Depends: glaber-frontend-php, apache2 | httpd, libapache2-mod-php | php
+Description: Glaber server, based on Zabbix network monitoring solution - apache conf for fron-end
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
- .
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+.
  This package provides automatic configuration of zabbix frontend with apache web server.
 
 
-Package: zabbix-nginx-conf
+Package: glaber-nginx-conf
 Architecture: all
 Depends: zabbix-frontend-php, nginx, php-fpm
-Description: Zabbix network monitoring solution - nginx and php-fpm configuration for front-end
+Description: Glaber server based on Zabbix network monitoring solution - nginx and php-fpm configuration for front-end
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
@@ -95,42 +94,44 @@ Description: Zabbix network monitoring solution - nginx and php-fpm configuratio
  This package provides automatic configuration of zabbix frontend with nginx web server.
 
 
-Package: zabbix-proxy-mysql
+Package: glaber-proxy-mysql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client, fping, adduser, lsb-base
 Suggests: logrotate, virtual-mysql-server
-Conflicts: zabbix-proxy-pgsql, zabbix-proxy-sqlite3
-Description: Zabbix network monitoring solution - proxy (MySQL)
+Conflicts: glaber-proxy-pgsql, glaber-proxy-sqlite3, zabbix-proxy-pgsql, zabbix-proxy-sqltie3
+Description: Glaber network monitoring solution - proxy (MySQL). Glaber is a Zabbix fork.
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
  .
- This package provides the software needed to integrate a host as a Zabbix
+ This package provides the software needed to integrate a host as a Glaber
  proxy. It collects information from Zabbix agents, temporarily stores it
- in a MySQL database and then passes it to a Zabbix server.
+ in a MySQL database and then passes it to a Glaber server.
 
 
-Package: zabbix-proxy-pgsql
+Package: glaber-proxy-pgsql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
 Suggests: logrotate, postgresql-client, postgresql (>= 8.1)
-Conflicts: zabbix-proxy-mysql, zabbix-proxy-sqlite3
-Description: Zabbix network monitoring solution - proxy (PostgreSQL)
+Conflicts: glaber-proxy-mysql, glaber-proxy-sqlite3, zabbix-proxy-mysql, zabbix-proxy-sqlite3
+Description:  Glaber  network monitoring solution - proxy (PostgreSQL). Glaber is a Zabbix fork. 
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
  .
- This package provides the software needed to integrate a host as a Zabbix
+ This package provides the software needed to integrate a host as a Glaber
  proxy. It collects information from Zabbix agents, temporarily stores it
- in a PostgreSQL database and then passes it to a Zabbix server.
+ in a PostgreSQL database and then passes it to a Glaber server.
 
 
-Package: zabbix-proxy-sqlite3
+Package: glaber-proxy-sqlite3
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, sqlite3, fping, adduser, lsb-base
 Suggests: logrotate
-Conflicts: zabbix-proxy-pgsql, zabbix-proxy-mysql
-Description: Zabbix network monitoring solution - proxy (SQLite3)
+Conflicts: glaber-proxy-pgsql, glaber-proxy-mysql3, zabbix-proxy-pgsql, zabbix-proxy-mysql3, 
+Description: Glaber network monitoring solution - proxy (SQLite3). Glaber is a Zabbix fork.
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
