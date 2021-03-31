@@ -22,7 +22,6 @@ Build-Depends: debhelper (>= 9),
 Standards-Version: 3.9.5
 Homepage: https://glaber.io
 
-
 Package: glaber-server-mysql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client | default-mysql-client, fping, adduser, lsb-base
@@ -69,7 +68,6 @@ Description: Glaber server, based on Zabbix network monitoring solution - server
  This package provides a web-browsable front-end to the Glaber server, which
  can display graphs of the data collected from clients.
 
-
 Package: glaber-apache-conf
 Architecture: all
 Depends: glaber-frontend-php, apache2 | httpd, libapache2-mod-php | php
@@ -82,7 +80,6 @@ Description: Glaber server, based on Zabbix network monitoring solution - apache
  .
  This package provides automatic configuration of zabbix frontend with apache web server.
 
-
 Package: glaber-nginx-conf
 Architecture: all
 Depends: zabbix-frontend-php, nginx, php-fpm
@@ -92,7 +89,6 @@ Description: Glaber server based on Zabbix network monitoring solution - nginx a
  thousands of servers, virtual machines and network devices.
  .
  This package provides automatic configuration of zabbix frontend with nginx web server.
-
 
 Package: glaber-proxy-mysql
 Architecture: any
@@ -110,7 +106,6 @@ Description: Glaber network monitoring solution - proxy (MySQL). Glaber is a Zab
  proxy. It collects information from Zabbix agents, temporarily stores it
  in a MySQL database and then passes it to a Glaber server.
 
-
 Package: glaber-proxy-pgsql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
@@ -124,7 +119,6 @@ Description:  Glaber  network monitoring solution - proxy (PostgreSQL). Glaber i
  This package provides the software needed to integrate a host as a Glaber
  proxy. It collects information from Zabbix agents, temporarily stores it
  in a PostgreSQL database and then passes it to a Glaber server.
-
 
 Package: glaber-proxy-sqlite3
 Architecture: any

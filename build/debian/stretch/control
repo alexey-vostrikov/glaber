@@ -11,7 +11,6 @@ Build-Depends: debhelper (>= 9),
 Standards-Version: 3.9.5
 Homepage: https://glaber.io
 
-
 Package: glaber-server-mysql
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client | default-mysql-client, fping, adduser, lsb-base
