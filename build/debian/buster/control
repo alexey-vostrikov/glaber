@@ -1,4 +1,4 @@
-Source: Glaber
+Source: glaber
 Section: net
 Priority: optional
 Maintainer: Mikhail Makurov <makurov@gmail.com>
@@ -48,7 +48,7 @@ Description: Glaber server, based on Zabbix network monitoring solution - server
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
  thousands of servers, virtual machines and network devices.
-.
+ .
  Glaber makes it quite faster by using NoSQL data engines,
  optimized architecture and asyncronius polling
 
@@ -65,7 +65,7 @@ Description: Glaber server, based on Zabbix network monitoring solution - server
  thousands of servers, virtual machines and network devices.
  Glaber makes it quite faster by using NoSQL data engines,
  optimized architecture and asyncronius polling
-.
+ .
  This package provides a web-browsable front-end to the Glaber server, which
  can display graphs of the data collected from clients.
 
@@ -79,7 +79,7 @@ Description: Glaber server, based on Zabbix network monitoring solution - apache
  thousands of servers, virtual machines and network devices.
  Glaber makes it quite faster by using NoSQL data engines,
  optimized architecture and asyncronius polling
-.
+ .
  This package provides automatic configuration of zabbix frontend with apache web server.
 
 

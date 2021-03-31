@@ -52,16 +52,16 @@ update_conf_server:
 		> debian/conf/zabbix_server.conf
 
 install_frontend: run_dh_install
-	find debian/zabbix-frontend-php/usr/share/zabbix -name .htaccess | xargs rm -f
-	find debian/zabbix-frontend-php/usr/share/zabbix/locale -name '*.po' | xargs rm -f
-	find debian/zabbix-frontend-php/usr/share/zabbix/locale -name '*.sh' | xargs rm -f
-	rm -f debian/zabbix-frontend-php/usr/share/zabbix/assets/fonts/DejaVuSans.ttf
+	find debian/glaber-frontend-php/usr/share/zabbix -name .htaccess | xargs rm -f
+	find debian/glaber-frontend-php/usr/share/zabbix/locale -name '*.po' | xargs rm -f
+	find debian/glaber-frontend-php/usr/share/zabbix/locale -name '*.sh' | xargs rm -f
+	rm -f debian/glaber-frontend-php/usr/share/zabbix/assets/fonts/DejaVuSans.ttf
 	sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
-		debian/zabbix-frontend-php/usr/share/zabbix/include/defines.inc.php
+		debian/glaber-frontend-php/usr/share/zabbix/include/defines.inc.php
 
 installinit_server:
-	dh_installinit --no-start -p zabbix-server-mysql --name=zabbix-server
-	dh_installinit --no-start -p zabbix-server-pgsql --name=zabbix-server
+	dh_installinit --no-start -p glaber-server-mysql --name=zabbix-server
+	dh_installinit --no-start -p glaber-server-pgsql --name=zabbix-server
 
 clean_server: run_dh_clean
 	rm -f debian/conf/zabbix_server.conf
@@ -89,9 +89,9 @@ update_conf_proxy:
 		> debian/conf/zabbix_proxy.conf
 
 installinit_proxy:
-	dh_installinit --no-start -p zabbix-proxy-mysql --name=zabbix-proxy
-	dh_installinit --no-start -p zabbix-proxy-pgsql --name=zabbix-proxy
-	dh_installinit --no-start -p zabbix-proxy-sqlite3 --name=zabbix-proxy
+	dh_installinit --no-start -p glaber-proxy-mysql --name=zabbix-proxy
+	dh_installinit --no-start -p glaber-proxy-pgsql --name=zabbix-proxy
+	dh_installinit --no-start -p glaber-proxy-sqlite3 --name=zabbix-proxy
 
 clean_proxy: run_dh_clean
 	rm -f debian/conf/zabbix_proxy.conf
@@ -168,8 +168,8 @@ override_dh_installinit: $(INSTALLINIT_TARGETS)
 
 override_dh_fixperms:
 	dh_fixperms
-	chmod 600 debian/zabbix-server-mysql/etc/zabbix/zabbix_server.conf
-	chmod 600 debian/zabbix-server-pgsql/etc/zabbix/zabbix_server.conf
-	chmod 600 debian/zabbix-proxy-mysql/etc/zabbix/zabbix_proxy.conf
-	chmod 600 debian/zabbix-proxy-pgsql/etc/zabbix/zabbix_proxy.conf
+	chmod 600 debian/glaber-server-mysql/etc/zabbix/zabbix_server.conf
+	chmod 600 debian/glaber-server-pgsql/etc/zabbix/zabbix_server.conf
+	chmod 600 debian/glaber-proxy-mysql/etc/zabbix/zabbix_proxy.conf
+	chmod 600 debian/glaber-proxy-pgsql/etc/zabbix/zabbix_proxy.conf
 
