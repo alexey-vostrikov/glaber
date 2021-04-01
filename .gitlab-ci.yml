@@ -114,7 +114,7 @@ ubuntu-bionic:
     - *prepare_sources
     - cp -r build/ubuntu/bionic/ debian && cd debian 
     - *build_glbmap
-    - cd ${CI_BUILDS_DIR}
+    - cd ${CI_PROJECT_DIR}
     - pwd && ls
     - dpkg-buildpackage -b -us
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/ubuntu/bionic
