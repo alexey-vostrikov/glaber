@@ -9,6 +9,7 @@
     - cd glbmap && cmake . && make -j4
     - mv src/zmap src/glbmap && chmod +s src/glbmap
     - cd ${CI_PROJECT_DIR}
+    - pwd && ls
 
 .prepare_sources: &prepare_sources
     - ./bootstrap.sh
@@ -81,7 +82,7 @@ debian-jessie:
     - master
   script:
     - *install_common_apt 
-    - apt-get install -y libmysqlclient-dev libssl-dev ruby-sass
+    - apt-get install -y libmysqlclient-dev libssl-dev ruby-sass libc6-dev
     - *build_go
     - *prepare_sources
     - *build_glbmap
@@ -137,6 +138,17 @@ ubuntu-xenial:
     - dpkg-buildpackage -b --us
     - *upload_packages
 
+
+centos-8:
+  variables:
+    OS: centos
+    OS_VER: 8
+  image: ${OS}:${OS_VER}
+  only:
+    - master
+  script:
+    - yum install -y rpm-build yum-utils xz wget tar curl createrepo
+    - yum groupinstall "Development Tools" -y
 
 #centos7:
 #  <<: *build_rpm
