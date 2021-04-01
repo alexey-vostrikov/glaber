@@ -66,7 +66,7 @@ debian-stretch:
     - master
   script:
     - *install_common_apt 
-    - apt-get install -y sass libmysqlclient-dev libssh-dev
+    - apt-get install -y sass  default-libmysqlclient-dev libssh-dev
     - *build_go
     - *prepare_sources
     - *build_glbmap
