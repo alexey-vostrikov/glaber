@@ -20,7 +20,7 @@
 
 .install_common_apt: &install_common_apt
     - apt-get update
-    - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl 
+    - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev curl libssl-dev
 
 .upload_packages: &upload_packages
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
@@ -34,7 +34,7 @@ debian-buster:
     - master
   script:
     - *install_common_apt 
-    - apt-get install -y default-libmysqlclient-dev libssh-dev sass
+    - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
     - *build_go
     - *prepare_sources
     - *build_glbmap
@@ -50,7 +50,7 @@ debian-bullseye:
     - master
   script:
     - *install_common_apt 
-    - apt-get install -y default-libmysqlclient-dev libssh-dev sass
+    - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
     - *build_go
     - *prepare_sources
     - *build_glbmap
@@ -66,7 +66,7 @@ debian-stretch:
     - master
   script:
     - *install_common_apt 
-    - apt-get install -y sass  default-libmysqlclient-dev libssh-dev
+    - apt-get install -y sass  default-libmysqlclient-dev 
     - *build_go
     - *prepare_sources
     - *build_glbmap
@@ -82,7 +82,7 @@ debian-jessie:
     - master
   script:
     - *install_common_apt 
-    - apt-get install -y libmysqlclient-dev libssl-dev ruby-sass libc6-dev
+    - apt-get install -y libmysqlclient-dev ruby-sass libc6-dev
     - *build_go
     - *prepare_sources
     - *build_glbmap
