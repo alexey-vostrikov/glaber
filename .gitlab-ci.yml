@@ -19,7 +19,6 @@
 .install_common_apt: &install_common_apt
     - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl 
 
-
 .upload_packages: &upload_packages
      sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/debian/buster
 
@@ -119,11 +118,23 @@ ubuntu-bionic:
     - dpkg-buildpackage -b -us
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/ubuntu/bionic
 
-#ubuntu-xenial:
-#  <<: *build_deb
-#  image: ubuntu:xenial
-#  script:
-#    - apt-get install -y libmysqlclient-dev
+ubuntu-xenial:
+  variables:
+    OS: ubuntu
+    OS_VER: xenial
+  image: ${OS}:${OS_VER}
+  only:
+    - master
+  script:
+    - *install_common_apt
+    - apt-get install -y libmysqlclient-dev
+    - *build_go
+    - *prepare_sources
+    - cp -r build/${OS}/${OS_VER}/ debian && cd debian 
+    - *build_glbmap
+    - pwd && ls
+    - dpkg-buildpackage -b --no-sign
+    - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
 
 
 #centos7:
@@ -133,13 +144,13 @@ ubuntu-bionic:
 #    CENTOS: 7
 
 #centos8:
-#  <<: *build_rpm
-#  image: centos:8
-#  variables:
-#    CENTOS: 8
-#  before_script:
-#    - dnf -y install dnf-plugins-core epel-release
-#    - dnf config-manager --set-enabled powertools
-#    - dnf -y install OpenIPMI-devel
+ # <<: *build_rpm
+ # image: centos:8
+ # variables:
+ #   CENTOS: 8
+ # before_script:
+ #   - dnf -y install dnf-plugins-core epel-release
+ #   - dnf config-manager --set-enabled powertools
+ #   - dnf -y install OpenIPMI-devel
 
 
