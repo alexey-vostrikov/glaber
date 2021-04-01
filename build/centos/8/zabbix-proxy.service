@@ -1,0 +1,30 @@
+[Unit]
+Description=Zabbix Proxy
+After=syslog.target
+After=network.target
+After=mysql.service
+After=mysqld.service
+After=mariadb.service
+After=postgresql.service
+After=pgbouncer.service
+After=postgresql-9.4.service
+After=postgresql-9.5.service
+After=postgresql-9.6.service
+After=postgresql-10.service
+After=postgresql-11.service
+After=postgresql-12.service
+
+[Service]
+Environment="CONFFILE=/etc/zabbix/zabbix_proxy.conf"
+EnvironmentFile=-/etc/sysconfig/zabbix-proxy
+Type=forking
+Restart=on-failure
+PIDFile=/run/zabbix/zabbix_proxy.pid
+KillMode=control-group
+ExecStart=/usr/sbin/zabbix_proxy -c $CONFFILE
+ExecStop=/bin/kill -SIGTERM $MAINPID
+RestartSec=10s
+TimeoutSec=0
+
+[Install]
+WantedBy=multi-user.target
