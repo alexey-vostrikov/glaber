@@ -135,7 +135,7 @@ ubuntu-xenial:
     - *build_go
     - *prepare_sources
     - *build_glbmap
-    - dpkg-buildpackage -b --us
+    - dpkg-buildpackage -b -us
     - *upload_packages
 
 
