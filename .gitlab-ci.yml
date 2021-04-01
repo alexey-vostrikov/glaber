@@ -1,24 +1,40 @@
+.build_go: &build_go
+    - wget --no-verbose "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
+    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
+    - export PATH=$PATH:/usr/local/go/bin
+    - go version
+
+.build_glbmap: &build_glbmap
+    - git clone https://gitlab.com/mikler/glbmap.git
+    - cd glbmap && cmake . && make -j4
+    - mv src/zmap src/glbmap && chmod +s src/glbmap
+    - cd ../..
+
+.prepare_sources: &prepare_sources
+    - ./bootstrap.sh
+    - ./configure
+    - make dbschema gettext
+    - autoreconf -fvi
+
+.install_common_apt: &install_common_apt
+    - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl 
+
+
+.upload_packages: &upload_packages
+     sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/debian/buster
+
 debian-buster:
   image: debian:buster
   only:
     - master
   script:
     - apt-get update
-    - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev sass dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev libssl-dev curl default-libmysqlclient-dev libssh-dev
-    - wget --no-verbose "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
-    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
-    - export PATH=$PATH:/usr/local/go/bin
-    - go version
-    - ./bootstrap.sh
-    - ./configure
-    - make dbschema gettext css
-    - autoreconf -fvi
-    - cp -r build/debian/buster/ debian
-    - cd debian 
-    - git clone https://gitlab.com/mikler/glbmap.git
-    - cd glbmap && cmake . && make -j4
-    - mv src/zmap src/glbmap && chmod +s src/glbmap
-    - cd ../..
+    - *install_common_apt 
+    - apt-get install default-libmysqlclient-dev libssh-dev
+    - *build_go
+    - *prepare_sources
+    - cp -r build/debian/buster/ debian && cd debian 
+    - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/debian/buster
 
@@ -70,18 +86,38 @@ debian-jessie:
     - dpkg-buildpackage -b -us
     - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/debian/jessie
 
+ubuntu-focal:
+  image: ubuntu:bionic
+  only:
+    - master
+  script:
+    - apt-get update
+    - *install_common_apt
+    - apt-get --ignore-missing install -y default-libmysqlclient-dev libssh-dev
+    - *build_go
+    - *prepare_sources
+    - cp -r build/ubuntu/focal/ debian && cd debian 
+    - *build_glbmap
+    - pwd && ls
+    -  dpkg-buildpackage -b --no-sign
+    - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/ubuntu/focal
 
-#ubuntu-focal:
-#  <<: *build_deb_modern
-#  image: ubuntu:focal
-#  script:
-#    - apt-get install -y default-libmysqlclient-dev libssh-dev
-
-#ubuntu-bionic:
-#  <<: *build_deb_modern
-#  image: ubuntu:bionic
-#  script:
-#    - apt-get install -y libssh-dev default-libmysqlclient-dev
+ubuntu-bionic:
+  image: ubuntu:bionic
+  only:
+    - master
+  script:
+    - apt-get update
+    - *install_common_apt
+    - apt-get --ignore-missing install -y default-libmysqlclient-dev libssh-dev
+    - *build_go
+    - *prepare_sources
+    - cp -r build/ubuntu/bionic/ debian && cd debian 
+    - *build_glbmap
+    - cd ${CI_PROJECT_DIR}
+    - pwd && ls
+    - dpkg-buildpackage -b -us
+    - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/ubuntu/bionic
 
 #ubuntu-xenial:
 #  <<: *build_deb
