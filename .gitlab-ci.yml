@@ -14,7 +14,6 @@
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
     - mv src/zmap src/glbmap && chmod +s src/glbmap
-    - cd ../..
 
 debian-buster:
   image: debian:buster
