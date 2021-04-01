@@ -103,7 +103,7 @@ ubuntu-focal:
     - *build_go
     - *prepare_sources
     - *build_glbmap
-    - dpkg-buildpackage -b -no-sign
+    - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
 ubuntu-bionic:
