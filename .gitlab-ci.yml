@@ -13,6 +13,7 @@
 
 .set_glb_version: &set_glb_version
     - export GLABER_VERSION=`cat include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)"`
+    - echo $GLABER_VERSION
 
 .prepare_sources: &prepare_sources
     - *set_glb_version
