@@ -1,4 +1,4 @@
-Name:		zabbix
+Name:		glaber
 Version:	5.2.4
 Release:	%{?alphatag:0.}1%{?alphatag}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
@@ -33,12 +33,6 @@ Patch1:		fping3-sourceip-option.patch
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %{!?build_agent: %global build_agent 1}
-
-%if 0%{?rhel} >= 6
-%ifarch x86_64
-%{!?build_agent2: %global build_agent2 1}
-%endif
-%endif
 
 %if 0%{?rhel} >= 7
 %{!?build_proxy: %global build_proxy 1}
@@ -97,75 +91,6 @@ Zabbix is the ultimate enterprise-level software designed for
 real-time monitoring of millions of metrics collected from tens of
 thousands of servers, virtual machines and network devices.
 
-%package agent
-Summary:		Old Zabbix Agent
-Group:			Applications/Internet
-Requires:		logrotate
-Requires(pre):		/usr/sbin/useradd
-%if 0%{?rhel} >= 7
-Requires(post):		systemd
-Requires(preun):	systemd
-Requires(preun):	systemd
-%else
-Requires(post):		/sbin/chkconfig
-Requires(preun):	/sbin/chkconfig
-Requires(preun):	/sbin/service
-Requires(postun):	/sbin/service
-%endif
-Obsoletes:		zabbix
-
-%if 0%{?build_agent2} != 1
-%description agent
-Zabbix agent to be installed on monitored systems.
-
-%else
-%description agent
-Old implementation of zabbix agent.
-To be installed on monitored systems.
-
-%package agent2
-Summary:		New Zabbix Agent
-Group:			Applications/Internet
-Requires:		logrotate
-%if 0%{?rhel} >= 7
-Requires(post):		systemd
-Requires(preun):	systemd
-Requires(preun):	systemd
-%else
-Requires(post):		/sbin/chkconfig
-Requires(preun):	/sbin/chkconfig
-Requires(preun):	/sbin/service
-Requires(postun):	/sbin/service
-%endif
-Obsoletes:		zabbix
-
-%description agent2
-New implementation of zabbix agent.
-To be installed on monitored systems.
-%endif
-
-%package get
-Summary:		Zabbix Get
-Group:			Applications/Internet
-
-%description get
-Zabbix get command line utility.
-
-%package sender
-Summary:		Zabbix Sender
-Group:			Applications/Internet
-
-%description sender
-Zabbix sender command line utility.
-
-%if 0%{?rhel} >= 7
-%package js
-Summary:		Zabbix JS
-Group:			Applications/Internet
-
-%description js
-Zabbix js command line utility.
-
 %package proxy-mysql
 Summary:		Zabbix proxy for MySQL or MariaDB database
 Group:			Applications/Internet
@@ -210,7 +135,6 @@ Obsoletes:		zabbix-proxy
 
 %description proxy-sqlite3
 Zabbix proxy with SQLite3 database support.
-%endif
 
 %if 0%{?rhel} >= 8
 %package server-mysql
@@ -328,21 +252,6 @@ Requires(preun):	%{_sbindir}/update-alternatives
 %description web-japanese
 Japanese font configuration for Zabbix web frontend
 %endif
-
-%if 0%{?rhel} >= 7
-%package java-gateway
-Summary:		Zabbix java gateway
-Group:			Applications/Internet
-Requires:		java-headless >= 1.6.0
-Requires(post):		systemd
-Requires(preun):	systemd
-Requires(postun):	systemd
-Obsoletes:		zabbix
-
-%description java-gateway
-Zabbix java gateway
-%endif
-
 
 #
 # prep
@@ -487,21 +396,6 @@ fi
 %endif
 
 
-# add agents and java-gateway to pass 3
-build_conf_3="
-%if 0%{?build_agent}
-	--enable-agent
-%endif
-%if 0%{?build_agent2}
-	--enable-agent2
-%endif
-%if 0%{?build_java_gateway}
-	--enable-java
-%endif
-	$build_conf_3
-"
-
-
 # pass 1
 if [ -n "$build_conf_1" ]; then
 	%configure $build_conf_common $build_conf_1
@@ -550,69 +444,10 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zabbix
 mkdir -p $RPM_BUILD_ROOT%{_datadir}
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/man/man8
 
-
-%if 0%{?build_agent2}
-make DESTDIR=$RPM_BUILD_ROOT GOBIN=$RPM_BUILD_ROOT%{_sbindir} install
-%else
-make DESTDIR=$RPM_BUILD_ROOT install
-%endif
-
-
-%if 0%{?build_agent}
-cat conf/zabbix_agentd.conf | sed \
-	-e "/# User=zabbix/a# NOTE: This option is overriden by settings in systemd service file!" \
-	-e '/^# PidFile=/a \\nPidFile=%{_localstatedir}/run/zabbix/zabbix_agentd.pid' \
-	-e 's|^LogFile=.*|LogFile=%{_localstatedir}/log/zabbix/zabbix_agentd.log|g' \
-	-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
-	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix/zabbix_agentd.d/*.conf' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf
-mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.d
-install -dm 755 $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
-cat %{SOURCE3} | sed \
-	-e 's|COMPONENT|agentd|g' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-agent
-%if 0%{rhel} >= 7
-install -Dm 0644 -p %{SOURCE10} $RPM_BUILD_ROOT%{_unitdir}/zabbix-agent.service
-install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-agent.conf
-%else
-install -Dm 0755 -p %{SOURCE5} $RPM_BUILD_ROOT%{_sysconfdir}/init.d/zabbix-agent
-install -Dm 0644 -p %{SOURCE20} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/zabbix-agent
-%endif
-%else
-%if 0%{?build_agent2}
-rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_agentd
-rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf
-%endif
-%endif
-
-
-%if 0%{?build_agent2}
-cat src/go/conf/zabbix_agent2.conf | sed \
-	-e '/^# PidFile=/a \\nPidFile=%{_localstatedir}/run/zabbix/zabbix_agent2.pid' \
-	-e 's|^LogFile=.*|LogFile=%{_localstatedir}/log/zabbix/zabbix_agent2.log|g' \
-	-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
-	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix/zabbix_agent2.d/*.conf' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agent2.conf
-cat %{SOURCE3} | sed \
-	-e 's|COMPONENT|agent2|g' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-agent2
-mkdir $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agent2.d
-cp man/zabbix_agent2.man $RPM_BUILD_ROOT%{_mandir}/man8/zabbix_agent2.8
-%if 0%{rhel} >= 7
-install -Dm 0644 -p %{SOURCE19} $RPM_BUILD_ROOT%{_unitdir}/zabbix-agent2.service
-install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix_agent2.conf
-%else
-install -Dm 0755 -p %{SOURCE21} $RPM_BUILD_ROOT%{_sysconfdir}/init.d/zabbix-agent2
-install -Dm 0644 -p %{SOURCE22} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/zabbix-agent2
-%endif
-%endif
-
-
 %if 0%{?build_server} || 0%{?build_proxy}
 mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix
 mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT/usr/lib/zabbix
 %endif
-
 
 %if 0%{?build_proxy}
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.d
@@ -693,134 +528,6 @@ rm -rf $RPM_BUILD_ROOT
 #
 # files & scriptlets
 #
-
-
-%if 0%{?build_agent}
-
-%files agent
-%defattr(-,root,root,-)
-%doc AUTHORS ChangeLog COPYING NEWS README conf/zabbix_agentd/userparameter_mysql.conf
-%config(noreplace) %{_sysconfdir}/zabbix/zabbix_agentd.conf
-%config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-agent
-%dir %{_sysconfdir}/zabbix/zabbix_agentd.d
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
-%{_sbindir}/zabbix_agentd
-%{_mandir}/man8/zabbix_agentd.8*
-%if 0%{?rhel} >= 7
-%{_unitdir}/zabbix-agent.service
-%{_prefix}/lib/tmpfiles.d/zabbix-agent.conf
-%else
-%{_sysconfdir}/init.d/zabbix-agent
-%config(noreplace) %{_sysconfdir}/sysconfig/zabbix-agent
-%endif
-
-%files get
-%defattr(-,root,root,-)
-%doc AUTHORS ChangeLog COPYING NEWS README
-%{_bindir}/zabbix_get
-%{_mandir}/man1/zabbix_get.1*
-
-%files sender
-%defattr(-,root,root,-)
-%doc AUTHORS ChangeLog COPYING NEWS README
-%{_bindir}/zabbix_sender
-%{_mandir}/man1/zabbix_sender.1*
-
-%pre agent
-getent group zabbix > /dev/null || groupadd -r zabbix
-getent passwd zabbix > /dev/null || \
-	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix -s /sbin/nologin \
-	-c "Zabbix Monitoring System" zabbix
-:
-
-%post agent
-%if 0%{?rhel} >= 7
-%systemd_post zabbix-agent.service
-%else
-/sbin/chkconfig --add zabbix-agent || :
-%endif
-
-%preun agent
-if [ "$1" = 0 ]; then
-%if 0%{?rhel} >= 7
-%systemd_preun zabbix-agent.service
-%else
-/sbin/service zabbix-agent stop >/dev/null 2>&1
-/sbin/chkconfig --del zabbix-agent
-%endif
-fi
-:
-
-%postun agent
-%if 0%{?rhel} >= 7
-%systemd_postun_with_restart zabbix-agent.service
-%else
-if [ $1 -ge 1 ]; then
-/sbin/service zabbix-agent try-restart >/dev/null 2>&1 || :
-fi
-%endif
-
-%posttrans agent
-# preserve old userparameter_mysql.conf file during upgrade
-if [ -f %{_sysconfdir}/zabbix/zabbix_agentd.d/userparameter_mysql.conf.rpmsave ] && [ ! -f %{_sysconfdir}/zabbix/zabbix_agentd.d/userparameter_mysql.conf ]; then
-       cp -vn %{_sysconfdir}/zabbix/zabbix_agentd.d/userparameter_mysql.conf.rpmsave %{_sysconfdir}/zabbix/zabbix_agentd.d/userparameter_mysql.conf
-fi
-:
-%endif
-
-
-
-%if 0%{?build_agent2}
-%files agent2
-%defattr(-,root,root,-)
-%doc AUTHORS ChangeLog COPYING NEWS README
-%config(noreplace) %{_sysconfdir}/zabbix/zabbix_agent2.conf
-%config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-agent2
-%dir %{_sysconfdir}/zabbix/zabbix_agent2.d
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
-%{_sbindir}/zabbix_agent2
-%{_mandir}/man8/zabbix_agent2.8*
-%if 0%{?rhel} >= 7
-%{_unitdir}/zabbix-agent2.service
-%{_prefix}/lib/tmpfiles.d/zabbix_agent2.conf
-%else
-%{_sysconfdir}/init.d/zabbix-agent2
-%config(noreplace) %{_sysconfdir}/sysconfig/zabbix-agent2
-%endif
-
-%pre agent2
-getent group zabbix > /dev/null || groupadd -r zabbix
-getent passwd zabbix > /dev/null || \
-	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix -s /sbin/nologin \
-	-c "Zabbix Monitoring System" zabbix
-:
-
-%post agent2
-%systemd_post zabbix-agent2.service
-# make sure that agent2 log file is create with proper attributes (ZBX-18243)
-if [ $1 == 1 ] && [ ! -f %{_localstatedir}/log/zabbix/zabbix_agent2.log ]; then
-	touch %{_localstatedir}/log/zabbix/zabbix_agent2.log
-	chown zabbix:zabbix %{_localstatedir}/log/zabbix/zabbix_agent2.log
-fi
-:
-
-%preun agent2
-%systemd_preun zabbix-agent2.service
-:
-
-%postun agent2
-%systemd_postun_with_restart zabbix-agent2.service
-%endif
-
-
-%if 0%{?build_server} || 0%{?build_proxy}
-%files js
-%defattr(-,root,root,-)
-%doc AUTHORS ChangeLog COPYING NEWS README
-%{_bindir}/zabbix_js
-%endif
 
 
 %if 0%{?build_proxy}
@@ -1122,42 +829,6 @@ if [ "$1" = 0 ]; then
 /usr/sbin/update-alternatives --remove zabbix-web-font \
 	%{_datadir}/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc
 fi
-:
-%endif
-
-
-%if 0%{?build_java_gateway}
-%files java-gateway
-%defattr(-,root,root,-)
-%doc AUTHORS ChangeLog COPYING NEWS README
-%config(noreplace) %{_sysconfdir}/zabbix/zabbix_java_gateway.conf
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
-%{_datadir}/zabbix-java-gateway
-%{_sbindir}/zabbix_java_gateway
-%{_unitdir}/zabbix-java-gateway.service
-%{_prefix}/lib/tmpfiles.d/zabbix-java-gateway.conf
-%config(noreplace) %{_sysconfdir}/zabbix/zabbix_java_gateway_logback.xml
-
-%pre java-gateway
-getent group zabbix > /dev/null || groupadd -r zabbix
-getent passwd zabbix > /dev/null || \
-	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix -s /sbin/nologin \
-	-c "Zabbix Monitoring System" zabbix
-:
-
-%post java-gateway
-%systemd_post zabbix-java-gateway.service
-:
-
-%preun java-gateway
-if [ $1 -eq 0 ]; then
-%systemd_preun zabbix-java-gateway.service
-fi
-:
-
-%postun java-gateway
-%systemd_postun_with_restart zabbix-java-gateway.service
 :
 %endif
 
