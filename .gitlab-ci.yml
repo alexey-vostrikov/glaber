@@ -1,6 +1,7 @@
 .build_go: &build_go
     - wget --no-verbose "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
     - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
+    - rm ./go1.16.2.linux-amd64.tar.gz
     - export PATH=$PATH:/usr/local/go/bin
     - go version
 
@@ -9,12 +10,11 @@
     - cd glbmap && cmake . && make -j4
     - mv src/zmap src/glbmap && chmod +s src/glbmap
     - cd ${CI_PROJECT_DIR}
-    - pwd && ls
-
+    
 .set_glb_version: &set_glb_version
     - export GLABER_VERSION=`cat include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)"`
     - echo $GLABER_VERSION
-
+    
 .prepare_sources: &prepare_sources
     - *set_glb_version
     - ./bootstrap.sh
@@ -24,8 +24,25 @@
     - cp -r build/${OS}/${OS_VER}/ debian && cd debian
     - sed -i "1 s/\d+\.\d+\.\d+/$GLABER_VERSION/g" changelog
 
-.apply_glb_version_deb: &aaply_glb_version
-    - 
+.prepare_rpm_sources: &prepare_rpm_sources
+    - *set_glb_version
+    - ./bootstrap.sh
+    - ./configure
+    - make dbschema gettext
+    - autoreconf -fvi
+    - cd ..
+    - cp -r glaber glaber-$GLABER_VERSION
+    - cd glaber-$GLABER_VERSION
+    - git clone https://gitlab.com/mikler/glbmap.git
+    - cd glbmap && cmake . && make -j4
+    - mv src/zmap ../zmap && chmod +s ../glbmap && cd ..
+    - rm -rf glbmap
+    - mv zmap glbmap && cd ..
+    - tar -czvf glaber-$GLABER_VERSION.tar.gz glaber-$GLABER_VERSION
+    - cd ${CI_PROJECT_DIR}
+    - cp -r build/${OS}/${OS_VER}/ centos && cd centos
+    - mv ../glaber-$GLABER_VERSION.tar.gz ./build/centos/SOURCES/glaber-$GLABER_VERSION.tar.gz
+    - sed -i "2 s/Version:.*/Version:\t$GLABER_VERSION/g" build/centos/SPECS/zabbix.spec
 
 .install_common_apt: &install_common_apt
     - apt-get update
@@ -156,9 +173,16 @@ centos-8:
   only:
     - master
   script:
+    - dnf -y install dnf-plugins-core epel-release
+    - dnf config-manager --set-enabled powertools
+    - dnf -y install OpenIPMI-devel
     - yum install -y rpm-build yum-utils xz wget tar curl createrepo
-    - yum groupinstall "Development Tools" -y
-
+    - yum install -y rpm-build yum-utils xz wget tar curl cmake json-c-devel gengetopt libunistring-devel libpcap-devel
+    - *build_go
+    - *prepare_rpm_sources
+    - cd ./build/centos
+    - yum-builddep -y SPECS/zabbix.spec
+    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
 #centos7:
 #  <<: *build_rpm
 #  image: centos:7
