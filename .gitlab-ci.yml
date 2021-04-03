@@ -11,12 +11,21 @@
     - cd ${CI_PROJECT_DIR}
     - pwd && ls
 
+.set_glb_version: &set_glb_version
+    - export GLABER_VERSION=`cat include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)"`
+    - echo $GLABER_VERSION
+
 .prepare_sources: &prepare_sources
+    - *set_glb_version
     - ./bootstrap.sh
     - ./configure
     - make dbschema gettext
     - autoreconf -fvi
-    - cp -r build/${OS}/${OS_VER}/ debian && cd debian 
+    - cp -r build/${OS}/${OS_VER}/ debian && cd debian
+    - sed -i "1 s/\d+\.\d+\.\d+/$GLABER_VERSION/g" changelog
+
+.apply_glb_version_deb: &aaply_glb_version
+    - 
 
 .install_common_apt: &install_common_apt
     - apt-get update
