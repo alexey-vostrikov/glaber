@@ -178,6 +178,7 @@ centos-8:
     - dnf -y install dnf-plugins-core epel-release
     - dnf config-manager --set-enabled powertools
     - dnf -y install OpenIPMI-devel
+    - yum groupinstall "Development Tools" -y
     - yum install -y rpm-build yum-utils xz wget tar curl createrepo
     - yum install -y rpm-build yum-utils xz wget tar curl cmake json-c-devel gengetopt libunistring-devel libpcap-devel
     - *build_go
