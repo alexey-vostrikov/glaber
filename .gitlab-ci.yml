@@ -14,7 +14,7 @@
 .set_glb_version: &set_glb_version
     - export GLABER_VERSION=`cat include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)"`
     - echo $GLABER_VERSION
-    
+
 .prepare_sources: &prepare_sources
     - *set_glb_version
     - ./bootstrap.sh
@@ -49,6 +49,8 @@
     - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev curl libssl-dev
 
 .upload_packages: &upload_packages
+  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
+.upload_rpms: &upload_rpms
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
 
 debian-buster:
@@ -183,6 +185,12 @@ centos-8:
     - cd ./build/centos
     - yum-builddep -y SPECS/zabbix.spec
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
+    - cd ${CI_COMMIT_REF_SLUG}
+    - mkdir -p rhel/${CENTOS}/
+    - cp -R /root/rpmbuild/RPMS/* rhel/${CENTOS}/
+    - cd rhel/${CENTOS}/
+    - ls -al && pwd
+    
 #centos7:
 #  <<: *build_rpm
 #  image: centos:7
