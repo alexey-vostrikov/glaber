@@ -40,7 +40,7 @@
     - mv zmap glbmap && cd ..
     - tar -czvf glaber-$GLABER_VERSION.tar.gz glaber-$GLABER_VERSION
     - cd ${CI_PROJECT_DIR}
-    - cp -r build/${OS}/${OS_VER}/ build/centos
+    - cp -r build/${OS}/${OS_VER}/* build/centos
     - mv ../glaber-$GLABER_VERSION.tar.gz build/centos/SOURCES/glaber-$GLABER_VERSION.tar.gz
     - sed -i "2 s/Version:.*/Version:\t$GLABER_VERSION/g" build/centos/SPECS/zabbix.spec
 
