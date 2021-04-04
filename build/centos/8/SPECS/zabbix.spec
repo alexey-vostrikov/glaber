@@ -4,7 +4,7 @@ Release:	%{?alphatag:0.}1%{?alphatag}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet
 License:	GPLv2+
-URL:		http://www.zabbix.com/
+URL:		http://glaber.io
 Source0:	%{name}-%{version}%{?alphatag}.tar.gz
 Source1:	zabbix-web22.conf
 Source2:	zabbix-web24.conf
@@ -79,87 +79,93 @@ BuildRequires:	systemd
 %endif
 
 %description
+Glaber is a fork of Zabbix with efficiency and speed improvements.
 Zabbix is the ultimate enterprise-level software designed for
 real-time monitoring of millions of metrics collected from tens of
 thousands of servers, virtual machines and network devices.
 
 %package proxy-mysql
-Summary:		Zabbix proxy for MySQL or MariaDB database
+Summary:		Glaber proxy for MySQL or MariaDB database
 Group:			Applications/Internet
 Requires:		fping
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
-Provides:		zabbix-proxy = %{version}-%{release}
-Provides:		zabbix-proxy-implementation = %{version}-%{release}
+Provides:		glaber-proxy = %{version}-%{release}
+Provides:		glaber-proxy-implementation = %{version}-%{release}
 Obsoletes:		zabbix
 Obsoletes:		zabbix-proxy
+Obsoletes:		glaber-proxy
 
 %description proxy-mysql
-Zabbix proxy with MySQL or MariaDB database support.
+Glaber proxy with MySQL or MariaDB database support.
 
 %package proxy-pgsql
-Summary:		Zabbix proxy for PostgreSQL database
+Summary:		Glaber proxy for PostgreSQL database
 Group:			Applications/Internet
 Requires:		fping
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
-Provides:		zabbix-proxy = %{version}-%{release}
-Provides:		zabbix-proxy-implementation = %{version}-%{release}
+Provides:		glaber-proxy = %{version}-%{release}
+Provides:		glaber-proxy-implementation = %{version}-%{release}
 Obsoletes:		zabbix
 Obsoletes:		zabbix-proxy
+Obsoletes:		glaber-proxy
 
 %description proxy-pgsql
-Zabbix proxy with PostgreSQL database support.
+Glaber proxy with PostgreSQL database support.
 
 %package proxy-sqlite3
-Summary:		Zabbix proxy for SQLite3 database
+Summary:		Glaber proxy for SQLite3 database
 Group:			Applications/Internet
 Requires:		fping
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
-Provides:		zabbix-proxy = %{version}-%{release}
-Provides:		zabbix-proxy-implementation = %{version}-%{release}
+Provides:		glaber-proxy = %{version}-%{release}
+Provides:		glaber-proxy-implementation = %{version}-%{release}
 Obsoletes:		zabbix
 Obsoletes:		zabbix-proxy
+Obsoletes:		glaber-proxy
 
 %description proxy-sqlite3
 Zabbix proxy with SQLite3 database support.
 
 %if 0%{?rhel} >= 8
 %package server-mysql
-Summary:		Zabbix server for MySQL or MariaDB database
+Summary:		Glaber server for MySQL or MariaDB database
 Group:			Applications/Internet
 Requires:		fping
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
-Provides:		zabbix-server = %{version}-%{release}
-Provides:		zabbix-server-implementation = %{version}-%{release}
+Provides:		glaber-server = %{version}-%{release}
+Provides:		glaber-server-implementation = %{version}-%{release}
 Obsoletes:		zabbix
 Obsoletes:		zabbix-server
+Obsoletes:		glaber-server
 
 %description server-mysql
 Zabbix server with MySQL or MariaDB database support.
 
 %package server-pgsql
-Summary:		Zabbix server for PostgresSQL database
+Summary:		Glaber server for PostgresSQL database
 Group:			Applications/Internet
 Requires:		fping
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
-Provides:		zabbix-server = %{version}-%{release}
-Provides:		zabbix-server-implementation = %{version}-%{release}
+Provides:		glaber-server = %{version}-%{release}
+Provides:		glaber-server-implementation = %{version}-%{release}
 Obsoletes:		zabbix
 Obsoletes:		zabbix-server
+Obsoletes:		glaber-server
 %description server-pgsql
-Zabbix server with PostgresSQL database support.
+Glaber server with PostgresSQL database support.
 
 %package web
-Summary:		Zabbix web frontend common package
+Summary:		Glaber web frontend common package
 Group:			Application/Internet
 BuildArch:		noarch
 Requires:		dejavu-sans-fonts
@@ -167,13 +173,13 @@ Requires(post):		%{_sbindir}/update-alternatives
 Requires(preun):	%{_sbindir}/update-alternatives
 
 %description web
-Zabbix web frontend common package
+Glaber web frontend common package
 
 %package web-deps
 Summary:		PHP dependencies metapackage for frontend
 Group:			Application/Internet
 BuildArch:		noarch
-Requires:		zabbix-web = %{version}-%{release}
+Requires:		glaber-web = %{version}-%{release}
 Requires:		php-gd >= 7.2
 Requires:		php-bcmath >= 7.2
 Requires:		php-mbstring >= 7.2
@@ -181,68 +187,68 @@ Requires:		php-xml >= 7.2
 Requires:		php-ldap >= 7.2
 Requires:		php-json >= 7.2
 Requires:		php-fpm >= 7.2
-Requires:		zabbix-web = %{version}-%{release}
-Requires:		zabbix-web-database = %{version}-%{release}
+Requires:		glaber-web = %{version}-%{release}
+Requires:		glaber-web-database = %{version}-%{release}
 
 %description web-deps
 PHP dependencies metapackage for frontend
 
 %package web-mysql
-Summary:		Zabbix web frontend for MySQL
+Summary:		Glaber web frontend for MySQL
 Group:			Applications/Internet
 BuildArch:		noarch
-Requires:		zabbix-web = %{version}-%{release}
-Requires:		zabbix-web-deps = %{version}-%{release}
+Requires:		glaber-web = %{version}-%{release}
+Requires:		glaber-web-deps = %{version}-%{release}
 Requires:		php-mysqlnd
-Provides:		zabbix-web-database = %{version}-%{release}
+Provides:		glaber-web-database = %{version}-%{release}
 
 %description web-mysql
-Zabbix web frontend for MySQL
+Glaber web frontend for MySQL
 
 %package web-pgsql
-Summary:		Zabbix web frontend for PostgreSQL
+Summary:		Glaber web frontend for PostgreSQL
 Group:			Applications/Internet
 BuildArch:		noarch
-Requires:		zabbix-web = %{version}-%{release}
-Requires:		zabbix-web-deps = %{version}-%{release}
+Requires:		glaber-web = %{version}-%{release}
+Requires:		glaber-web-deps = %{version}-%{release}
 Requires:		php-pgsql
-Provides:		zabbix-web-database = %{version}-%{release}
+Provides:		glaber-web-database = %{version}-%{release}
 
 %description web-pgsql
-Zabbix web frontend for PostgreSQL
+Glaber web frontend for PostgreSQL
 
 %package apache-conf
 Summary:		Automatic zabbix frontend configuration with apache
 Group:			Applications/Internet
 BuildArch:		noarch
-Requires:		zabbix-web-deps = %{version}-%{release}
+Requires:		glaber-web-deps = %{version}-%{release}
 Requires:		httpd
 
 %description apache-conf
 Zabbix frontend configuration for apache
 
 %package nginx-conf
-Summary:		Zabbix frontend configuration for nginx and php-fpm
+Summary:		Glaber frontend configuration for nginx and php-fpm
 Group:			Applications/Internet
 BuildArch:		noarch
-Requires:		zabbix-web-deps = %{version}-%{release}
+Requires:		glaber-web-deps = %{version}-%{release}
 Requires:		nginx
 
 %description nginx-conf
-Zabbix frontend configuration for nginx and php-fpm
+Glaber frontend configuration for nginx and php-fpm
 
 %package web-japanese
-Summary:		Japanese font settings for Zabbix frontend
+Summary:		Japanese font settings for Glaber frontend
 Group:			Applications/Internet
 BuildArch:		noarch
 Requires:		google-noto-sans-cjk-ttc-fonts
 Requires:		glibc-langpack-ja
-Requires:		zabbix-web = %{version}-%{release}
+Requires:		glaber-web = %{version}-%{release}
 Requires(post):		%{_sbindir}/update-alternatives
 Requires(preun):	%{_sbindir}/update-alternatives
 
 %description web-japanese
-Japanese font configuration for Zabbix web frontend
+Japanese font configuration for Glaber web frontend
 %endif
 
 #
@@ -649,6 +655,8 @@ fi
 %{_unitdir}/zabbix-server.service
 %{_prefix}/lib/tmpfiles.d/zabbix-server.conf
 %{_sbindir}/zabbix_server_mysql
+%{_sbindir}/glb_hist_clickhouse
+%{_sbindir}/glbmap
 
 %pre server-mysql
 getent group zabbix > /dev/null || groupadd -r zabbix
