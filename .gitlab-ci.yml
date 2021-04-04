@@ -186,7 +186,7 @@ centos-8:
     - cd ./build/centos
     - yum-builddep -y SPECS/zabbix.spec
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
-    
+    - *upload_rpms
     
 #centos7:
 #  <<: *build_rpm
