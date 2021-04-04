@@ -180,14 +180,15 @@ centos-8:
     - dnf config-manager --set-enabled powertools
     - dnf -y install OpenIPMI-devel
     - yum groupinstall "Development Tools" -y
-    - yum install -y rpm-build yum-utils xz wget tar curl cmake json-c-devel gengetopt libunistring-devel libpcap-devel gmp-devel
+    - yum install -y rpm-build yum-utils xz wget tar curl cmake json-c-devel gengetopt libunistring-devel libpcap-devel gmp-devel sshpass
     - *build_go
     - *prepare_rpm_sources
-    - cd ./build/centos
+    - cd build/centos
     - yum-builddep -y SPECS/zabbix.spec
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
     - *upload_rpms
-    
+
+
 #centos7:
 #  <<: *build_rpm
 #  image: centos:7
