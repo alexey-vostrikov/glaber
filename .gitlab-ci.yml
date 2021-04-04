@@ -23,6 +23,7 @@
     - autoreconf -fvi
     - cp -r build/${OS}/${OS_VER}/ debian && cd debian
     - sed -i "1 s/\d+\.\d+\.\d+/$GLABER_VERSION/g" changelog
+    - head -n 5 changelog
 
 .prepare_rpm_sources: &prepare_rpm_sources
     - *set_glb_version
