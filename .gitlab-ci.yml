@@ -50,10 +50,11 @@
 
 .upload_packages: &upload_packages
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/repo/rhel/8 && createrepo ."
+
 
 .upload_rpms: &upload_rpms
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/ ${SCP_USER}@glaber.io:/var/www/glaber.io/repo/rhel/8/${OS_VER}/
+  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/repo/rhel/8 && createrepo ."
 
 debian-buster:
   variables:
