@@ -50,8 +50,9 @@
 
 .upload_packages: &upload_packages
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
+
 .upload_rpms: &upload_rpms
-  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
+  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/ ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}/
 
 debian-buster:
   variables:
@@ -185,11 +186,7 @@ centos-8:
     - cd ./build/centos
     - yum-builddep -y SPECS/zabbix.spec
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
-    - cd ${CI_COMMIT_REF_SLUG}
-    - mkdir -p rhel/${CENTOS}/
-    - cp -R /root/rpmbuild/RPMS/* rhel/${CENTOS}/
-    - cd rhel/${CENTOS}/
-    - ls -al && pwd
+    
     
 #centos7:
 #  <<: *build_rpm
