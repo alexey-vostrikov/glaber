@@ -179,8 +179,8 @@ int CONFIG_GLB_SNMP_FORKS = 5;
 int CONFIG_IPMIPOLLER_FORKS = 1;
 //int CONFIG_GLB_REQUEUE_TIME = 120;
 int CONFIG_GLB_PINGER_FORKS		= 1;
-int CONFIG_DEFAULT_ICMP_METHOD  = GLB_ICMP;
-char 	*DEFAULT_ICMP_METHOD_STR = NULL;
+int CONFIG_ICMP_METHOD  = GLB_ICMP;
+char 	*CONFIG_ICMP_METHOD_STR = NULL;
 char 	*CONFIG_GLBMAP_LOCATION		= NULL;
 int	CONFIG_CONFSYNCER_FREQUENCY	= 120;
 
@@ -579,9 +579,13 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_VAULTURL)
 		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
 
-	if ( NULL != DEFAULT_ICMP_METHOD_STR && 0 == strstr(DEFAULT_ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
-		CONFIG_DEFAULT_ICMP_METHOD = ZBX_ICMP;
+	if ( NULL != ICMP_METHOD_STR && NULL != strstr(ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
+		zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Zabbix ICMP (fping)");
+		CONFIG_ICMP_METHOD = ZBX_ICMP;
+	} else {
+		zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Glaber ICMP (async + glbmap)");
 	}
+
 	if (NULL == CONFIG_GLBMAP_LOCATION)
 		CONFIG_GLBMAP_LOCATION = zbx_strdup(CONFIG_GLBMAP_LOCATION, "/usr/sbin/glbmap");
 	
@@ -749,7 +753,15 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 
 	err |= (FAIL == zbx_db_validate_config_features());
 	
-	
+	if ( 0 == CONFIG_PINGER_FORKS &&  ZBX_ICMP == CONFIG_ICMP_METHOD) {
+		zbx_error("Cannot use default ICMP method fping without any PINGER poller enabled, set StartPingers > 0 in the server config file");
+		exit(EXIT_FAILURE);
+	}
+
+	if ( 0 == CONFIG_GLB_PINGER_FORKS &&  GLB_ICMP == CONFIG_ICMP_METHOD) {
+		zbx_error("Cannot use default ICMP method glbmap without any Glaber pinger poller enabled, set StartGlbPingers > 0 or set DefaultICMPMethod=fping in the server config file");
+		exit(EXIT_FAILURE);
+	}
 
 	if (0 != err)
 		exit(EXIT_FAILURE);
