@@ -112,7 +112,7 @@ extern int CONFIG_PREPROCMAN_FORKS;
 extern int  CONFIG_GLB_REQUEUE_TIME;
 extern int CONFIG_GLB_SNMP_FORKS;
 extern int CONFIG_GLB_PINGER_FORKS;
-extern int CONFIG_DEFAULT_ICMP_METHOD;
+extern int CONFIG_ICMP_METHOD;
 
 ZBX_MEM_FUNC_IMPL(__config, config_mem)
 
@@ -254,7 +254,7 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
     			if (NULL != strstr(zbx_dc_item->key,"fping]")) return FAIL;
     
     			//method isn't set per item, looking at default
-    			if (CONFIG_DEFAULT_ICMP_METHOD == GLB_ICMP) return SUCCEED;
+    			if (CONFIG_ICMP_METHOD == GLB_ICMP) return SUCCEED;
     
     			//default method is ZBX, so we will only process if there are no zbx pingers are started
     			if ( 1 > CONFIG_PINGER_FORKS ) return SUCCEED;
@@ -9588,7 +9588,7 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 
 	UNLOCK_CACHE;
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s():%d", __func__, num);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
 
 	return num;
 }
@@ -11766,6 +11766,7 @@ static void	dc_status_update(void)
 								dc_proxy_host->items_active_notsupported++;
 							break;
 						default:
+							zabbix_log(LOG_LEVEL_INFORMATION,"Unknow item state %d", dc_item->state);
 							THIS_SHOULD_NEVER_HAPPEN;
 					}
 

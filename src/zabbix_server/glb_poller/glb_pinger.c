@@ -40,7 +40,7 @@ typedef struct {
 
 extern int CONFIG_GLB_PINGER_FORKS;
 extern int CONFIG_PINGER_FORKS;
-extern int CONFIG_DEFAULT_ICMP_METHOD;
+extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_GLBMAP_LOCATION;
 extern char *CONFIG_SOURCE_IP;
 
