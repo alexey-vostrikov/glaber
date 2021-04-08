@@ -567,7 +567,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 				last_cache_reload = cache_time;
 				
 				num = DCconfig_get_glb_poller_items(&events, &hosts, &items, item_type, process_num, poll_engine);
-				zabbix_log(LOG_LEVEL_INFORMATION, "Event: got %d new items from the config cache", num);
+				zabbix_log(LOG_LEVEL_DEBUG, "Event: got %d new items from the config cache", num);
 				
 				//todo: rethink this - looks like it creates problems - under high load a poller might get too busy
 				//and sometimes items wait for several minutes in internal queues to be polled. Adding the same item again and again

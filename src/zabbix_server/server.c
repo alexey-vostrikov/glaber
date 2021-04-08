@@ -186,7 +186,7 @@ int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int CONFIG_GLB_SNMP_FORKS		= 1;
 int CONFIG_GLB_PINGER_FORKS		= 1;
-int CONFIG_DEFAULT_ICMP_METHOD  = GLB_ICMP;
+int CONFIG_ICMP_METHOD  = GLB_ICMP;
 
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_PINGER_FORKS		= 5;
@@ -275,7 +275,7 @@ int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
 int	CONFIG_UNSAFE_USER_PARAMETERS	= 0;
 
 char	*CONFIG_SNMPTRAP_FILE		= NULL;
-char 	*DEFAULT_ICMP_METHOD_STR = NULL;
+char 	*ICMP_METHOD_STR = NULL;
 
 char	*CONFIG_JAVA_GATEWAY		= NULL;
 int	CONFIG_JAVA_GATEWAY_PORT	= ZBX_DEFAULT_GATEWAY_PORT;
@@ -590,8 +590,11 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_VAULTURL)
 		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
 
-	if ( NULL != DEFAULT_ICMP_METHOD_STR && 0 == strstr(DEFAULT_ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
-		CONFIG_DEFAULT_ICMP_METHOD = ZBX_ICMP;
+	if ( NULL != ICMP_METHOD_STR && NULL != strstr(ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
+			zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Zabbix ICMP (fping)");
+		CONFIG_ICMP_METHOD = ZBX_ICMP;
+	} else {
+		zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Glaber ICMP (async + glbmap)");
 	}
 
 }
@@ -693,6 +696,15 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_int("StartGlaberSNMPPollers", CONFIG_GLB_SNMP_FORKS, "SNMP support"));
 #endif
 
+	if ( 0 == CONFIG_PINGER_FORKS &&  ZBX_ICMP == CONFIG_ICMP_METHOD) {
+		zbx_error("Cannot use default ICMP method fping without any PINGER poller enabled, set StartPingers > 0 in the server config file");
+		exit(EXIT_FAILURE);
+	}
+
+	if ( 0 == CONFIG_GLB_PINGER_FORKS &&  GLB_ICMP == CONFIG_ICMP_METHOD) {
+		zbx_error("Cannot use default ICMP method glbmap without any Glaber pinger poller enabled, set StartGlbPingers > 0 or set DefaultICMPMethod=fping in the server config file");
+		exit(EXIT_FAILURE);
+	}
 
 	if (0 != err)
 		exit(EXIT_FAILURE);
@@ -743,7 +755,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},
-		{"DefaultICMPMethod",		&DEFAULT_ICMP_METHOD_STR,			TYPE_STRING,
+		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
 			PARM_OPT,	0,			0},		
 		{"StartPreprocessorManagers",		&CONFIG_PREPROCMAN_FORKS,			TYPE_INT,
 			PARM_OPT,	1,			64},
