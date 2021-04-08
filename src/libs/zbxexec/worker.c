@@ -191,13 +191,13 @@ int restart_worker(GLB_EXT_WORKER *worker)
         count_rst_time=now + RST_ACCOUNT_PERIOD;
         restarts = 0;
     }
-     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() aeferfgqe", __func__);
+     
     if (restarts++ > RST_MAX_RESTARTS ) {
         zabbix_log(LOG_LEVEL_INFORMATION,"Restart of worker %s delayed in %d seconds to avoid system hammering", worker->path, count_rst_time - now);
         return FAIL;
     }
 
-    zabbix_log(LOG_LEVEL_INFORMATION, "Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
+    zabbix_log(LOG_LEVEL_DEBUG, "Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
     //closing pipework
     if (worker->pipe_from_worker)
         close(worker->pipe_from_worker);
