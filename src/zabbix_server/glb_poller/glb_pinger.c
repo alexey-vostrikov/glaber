@@ -514,9 +514,9 @@ static int glb_pinger_process_response(GLB_PINGER_ITEM *glb_pinger_item, int rtt
         return POLL_FINISHED;
     
     } else {
-        //we prolong the tiemout
+       //we prolong the tiemout
       //  glb_pinger_item->finish_time = glb_ms_time() + CONFIG_TIMEOUT * 1000;
-        zabbix_log(LOG_LEVEL_DEBUG,"Host %s got responce %d out of %d %s", glb_pinger_item->ip, glb_pinger_item->rcv, glb_pinger_item->count);
+      // zabbix_log(LOG_LEVEL_DEBUG,"Host %s got responce %d out of %d %s", glb_pinger_item->ip, glb_pinger_item->rcv, glb_pinger_item->count);
     }
 
 
