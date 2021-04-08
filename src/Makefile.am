@@ -2,6 +2,7 @@
 
 DIST_SUBDIRS = \
 	go \
+	glapi \
 	libs \
 	zabbix_agent \
 	zabbix_get \
@@ -45,6 +46,7 @@ endif
 if SERVER
 SERVER_SUBDIRS = \
 	zabbix_server \
+	glapi \
 	zabbix_js
 endif
 
@@ -69,6 +71,7 @@ PROXY_SUBDIRS = \
 	zabbix_server/odbc \
 	zabbix_server/scripts \
 	zabbix_server/preprocessor \
+	zabbix_server/glb_poller \
 	zabbix_proxy \
 	zabbix_js
 	

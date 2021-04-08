@@ -154,7 +154,7 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 		zbx_custom_interval_free(custom_intervals);
 		
 		if (CONFIG_DEBUG_ITEM == glb_item->itemid)
-			zabbix_log(LOG_LEVEL_INFORMATION, "In %s - Added item %ld poll event in %d sec", __func__, glb_item->itemid, nextcheck - now);
+			zabbix_log(LOG_LEVEL_INFORMATION, "In %s - Added item %ld poll event in %ld sec", __func__, glb_item->itemid, nextcheck - now);
 
 		DEBUG_ITEM(glb_item->itemid,"Sheduled next poll event")
 		add_event(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck);
@@ -473,7 +473,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					DEBUG_ITEM(glb_item->itemid,"Item poll event");
 					//checking if host is disabled
 					if (glb_host->disabled_till > now) { 
-						zabbix_log(LOG_LEVEL_DEBUG, "Skipping item %ld from polling, host is down for %d sec",
+						zabbix_log(LOG_LEVEL_DEBUG, "Skipping item %ld from polling, host is down for %ld sec",
 					  	glb_item->itemid, glb_host->disabled_till - now);
 
 						//replaning item polling after disabled_till time
@@ -608,7 +608,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 		if (next_stat_time < now ) {
 			next_stat_time = now + STAT_INTERVAL;
-			zbx_setproctitle("%s #%d [sent %d chks/sec, got %d chcks/sec, items: %ld, events planned: %d]",
+			zbx_setproctitle("%s #%d [sent %d chks/sec, got %d chcks/sec, items: %d, events planned: %d]",
  					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responces/STAT_INTERVAL, items.num_data, events.elems_num);
 			requests = 0; 
 			responces = 0;

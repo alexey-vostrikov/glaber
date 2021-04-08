@@ -1,0 +1,606 @@
+glaber (1:2.0.5-1+ubuntu20.04) stable; urgency=low
+
+  * update to 5.2.4
+  * added fonts-dejavu as an alternative dependency to zabbix-frontend-php package
+
+ -- Zabbix Packager <info@zabbix.com>  Thu, 07 Jan 2021 15:16:25 +0200
+
+zabbix (1:5.2.3-1) stable; urgency=low
+
+  * update to 5.2.3
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 21 Dec 2020 09:23:40 +0200
+
+zabbix (1:5.2.2-2) stable; urgency=low
+
+  * build of 5.2.2 on focal arm64
+
+ -- Zabbix Packager <info@zabbix.com>  Wed, 09 Dec 2020 16:03:21 +0200
+
+zabbix (1:5.2.2-1) stable; urgency=low
+
+  * update to 5.2.2
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 30 Nov 2020 10:11:40 +0200
+
+zabbix (1:5.2.1-1) stable; urgency=low
+
+  * update to 5.2.1
+
+ -- Zabbix Packager <info@zabbix.com>  Fri, 30 Oct 2020 14:10:06 +0200
+
+zabbix (1:5.2.0-1) stable; urgency=low
+
+  * update to 5.2.0
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 26 Oct 2020 10:17:13 +0200
+
+zabbix (1:5.2.0~rc2-1) stable; urgency=low
+
+  * update to 5.2.0rc2
+  * replaced /var/run with /run in zabbix conf files on buster to prevent warning messages
+
+ -- Zabbix Packager <info@zabbix.com>  Thu, 22 Oct 2020 12:33:39 +0300
+
+zabbix (1:5.2.0~rc1-2) stable; urgency=low
+
+  * correct build of 5.2.0rc1
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 20 Oct 2020 16:13:21 +0300
+
+zabbix (1:5.2.0~rc1-1) stable; urgency=low
+
+  * update to 5.2.0rc1
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 20 Oct 2020 09:54:21 +0300
+
+zabbix (1:5.2.0~beta2-1) stable; urgency=low
+
+  * update to 5.2.0beta2
+  * building against libssh instead of libssh2 on focal, bionic & buster
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 12 Oct 2020 14:31:21 +0300
+
+zabbix (1:5.2.0~beta1-1) stable; urgency=low
+
+  * update to 5.2.0beta1
+  * added User=zabbix & Group=zabbix to all service files
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 28 Sep 2020 10:00:00 +0300
+
+zabbix (1:5.2.0~alpha3-1) stable; urgency=low
+
+  * update to 5.2.0alpha3
+  * rewrote rules file to do parallel builds
+  * overriding ExternalScripts & AlertScriptsPath in binaries instead of config files (ZBX-17983)
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 14 Sep 2020 10:00:00 +0300
+
+zabbix (1:5.2.0~alpha2-1) stable; urgency=low
+
+  * update to 5.2.0alpha2
+  * building only agent on debian <= 9 & ubuntu <= 1604
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 31 Aug 2020 10:00:00 +0300
+
+zabbix (1:5.2.0~alpha1-1) stable; urgency=low
+
+  * update to 5.2.0alpha1
+  * replaced codenames in package names with distro & numeric version
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 17 Aug 2020 10:00:00 +0300
+
+zabbix (1:5.0.2-1) stable; urgency=low
+
+  * update to 5.0.2
+  * removed ZBX-17801 patch
+  * moved db server packages from server/proxy Recommends to Suggests (ZBX-17510)
+  * building with compat level 10
+  * replaced /etc/init.d/$NAME with $0 in init scripts (ZBX-17798)
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 13 Jul 2020 10:00:00 +0300
+
+zabbix (1:5.0.1-1) stable; urgency=low
+
+  * update to 5.0.1
+  * added patch that fixes (ZBX-17801)
+
+ -- Zabbix Packager <info@zabbix.com>  Thu, 28 May 2020 10:00:00 +0300
+
+zabbix (1:5.0.0-1) stable; urgency=low
+
+  * update to 5.0.0
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 11 May 2020 10:00:00 +0300
+
+zabbix (1:5.0.0~rc1-1) stable; urgency=low
+
+  * update to 5.0.0rc1
+  * moved frontends/php to ui directory
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 05 May 2020 10:00:00 +0300
+
+zabbix (1:5.0.0~beta2-1) stable; urgency=low
+
+  * update to 5.0.0beta2
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 27 Apr 2020 10:00:00 +0300
+
+zabbix (1:5.0.0~beta1-1) stable; urgency=low
+
+  * update to 5.0.0beta1
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 14 Apr 2020 09:18:35 +0300
+
+zabbix (1:5.0.0~alpha4-1) stable; urgency=low
+
+  * update to 5.0.0alpha4
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 30 Mar 2020 10:00:00 +0200
+
+zabbix (1:5.0.0~alpha3-1) stable; urgency=low
+
+  * update to 5.0.0alpha3
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 16 Mar 2020 09:07:13 +0200
+
+zabbix (1:5.0.0~alpha2-1) stable; urgency=low
+
+  * update to 5.0.0alpha2
+  * fixed missing php module dependencies
+  * building zabbix-frontend-php-deprecated on stretch, jessie, xenial & trusty
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 17 Feb 2020 10:10:00 +0200
+
+zabbix (1:5.0.0~alpha1-1) stable; urgency=low
+
+  * update to 5.0.0alpha1
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 27 Jan 2020 13:26:15 +0200
+
+zabbix (1:4.4.4-1) stable; urgency=low
+
+  * update to 4.4.4
+  * added After=<database>.service directives to server and proxy service files
+
+ -- Zabbix Packager <info@zabbix.com>  Thu, 19 Dec 2019 12:38:59 +0200
+
+zabbix (1:4.4.3-1) stable; urgency=low
+
+  * update to 4.4.3
+  * added User=zabbix and Group=zabbix directives to agent service file
+
+ -- Zabbix Packager <info@zabbix.com>  Wed, 27 Nov 2019 10:39:26 +0200
+
+zabbix (1:4.4.2-1) stable; urgency=low
+
+  * update to 4.4.2
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 25 Nov 2019 18:07:39 +0200
+
+zabbix (1:4.4.1-1) stable; urgency=low
+
+  * update to 4.4.1
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 28 Oct 2019 15:46:36 +0200
+
+zabbix (1:4.4.0-1) stable; urgency=low
+
+  * update to 4.4.0
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 7 Oct 2019 10:58:57 +0300
+
+zabbix (1:4.4.0~rc1-1) stable; urgency=low
+
+  * update to 4.4.0rc1
+
+ -- Zabbix Packager <info@zabbix.com>  Thu, 03 Oct 2019 18:19:25 +0300
+
+zabbix (1:4.4.0~beta1-1) stable; urgency=low
+
+  * update to 4.4.0beta1
+  * added zabbix-agent2 package
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 24 Sep 2019 11:03:24 +0300
+
+zabbix (1:4.4.0~alpha3-1) stable; urgency=low
+
+  * update to 4.4.0alpha3
+
+ -- Zabbix Packager <info@zabbix.com>  Wed, 18 Sep 2019 11:11:50 +0300
+
+zabbix (1:4.4.0~alpha2-1) stable; urgency=low
+
+  * update to 4.4.0alpha2
+
+ -- Zabbix Packager <info@zabbix.com>  Thu, 15 Aug 2019 12:07:23 +0200
+
+zabbix (1:4.4.0~alpha1-1) stable; urgency=low
+
+  * update to 4.4.0alpha1
+  * removed apache config from zabbix-frontend-php package
+  * added dedicated zabbix-apache-conf and zabbix-nginx-conf packages
+
+ -- Zabbix Packager <info@zabbix.com>  Wed, 17 Jul 2019 15:21:00 +0200
+
+zabbix (1:4.2.0-1) stable; urgency=low
+
+  * update to 4.2.0
+  * removed jabber notifications support and dependency on iksemel library
+
+ -- Zabbix Packager <info@zabbix.com>  Fri, 29 Mar 2019 15:11:47 +0200
+
+zabbix (1:4.2.0~rc2-1) stable; urgency=low
+
+  * update to 4.2.0rc2
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 26 Mar 2019 16:14:10 +0200
+
+zabbix (1:4.2.0~rc1-1) stable; urgency=low
+
+  * update to 4.2.0rc1
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 18 Mar 2019 17:02:45 +0200
+
+zabbix (1:4.2.0~beta2-1) stable; urgency=low
+
+  * update to 4.2.0beta2
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 04 Mar 2019 15:34:43 +0200
+
+zabbix (1:4.2.0~beta1-1) stable; urgency=low
+
+  * update to 4.2.0beta1
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 18 Feb 2019 16:59:29 +0200
+
+zabbix (1:4.2.0~alpha3-3) stable; urgency=low
+
+  * build of 4.2.0alpha3 with *.mo files
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 30 Jan 2019 13:30:00 +0200
+
+zabbix (1:4.2.0~alpha3-2) stable; urgency=low
+
+  * added timescaledb.sql to zabbix-server-pgsql package
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 30 Jan 2019 13:30:00 +0200
+
+zabbix (1:4.2.0~alpha3-1) stable; urgency=low
+
+  * update to 4.2.0alpha3
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 28 Jan 2019 18:00:13 +0200
+
+zabbix (1:4.2.0~alpha2-1) stable; urgency=low
+
+  * update to 4.2.0alpha2
+
+ -- Zabbix Packager <info@zabbix.com>  Fri, 21 Dec 2018 14:48:15 +0200
+
+zabbix (1:4.2.0~alpha1-1) stable; urgency=low
+
+  * update to 4.2.0alpha1
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 27 Nov 2018 20:46:17 +0200
+
+zabbix (1:4.0.1-1) stable; urgency=low
+
+  * update to 4.0.1
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 29 Oct 2018 18:45:05 +0200
+
+zabbix (1:4.0.0-2) stable; urgency=low
+
+  * update to 4.0.0
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 01 Oct 2018 11:14:47 +0300
+
+zabbix (1:4.0.0rc3-1) stable; urgency=low
+
+  * update to 4.0.0rc3
+
+ -- Zabbix Packager <info@zabbix.com>  Fri, 28 Sep 2018 16:46:58 +0300
+
+zabbix (1:4.0.0rc2-1) stable; urgency=low
+
+  * update to 4.0.0rc2
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 25 Sep 2018 13:25:47 +0300
+
+zabbix (1:4.0.0rc1-1) stable; urgency=low
+
+  * update to 4.0.0rc1
+
+ -- Zabbix Packager <info@zabbix.com>  Wed, 19 Sep 2018 10:20:35 +0300
+
+zabbix (1:4.0.0beta2-1) stable; urgency=low
+
+  * update to 4.0.0beta2
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 10 Sep 2018 11:48:20 +0300
+
+zabbix (1:4.0.0beta1-1) stable; urgency=low
+
+  * update to 4.0.0beta1
+
+ -- Zabbix Packager <info@zabbix.com>  Tue, 28 Aug 2018 09:29:23 +0300
+
+zabbix (1:4.0.0alpha9-1) stable; urgency=low
+
+  * update to 4.0.0alpha9
+  * add PHP variable max_input_vars = 10000, overriding default 1000
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 23 Jul 2018 14:59:31 +0300
+
+zabbix (1:4.0.0alpha8-1) stable; urgency=low
+
+  * update to 4.0.0alpha8
+
+ -- Zabbix Packager <info@zabbix.com>  Mon, 18 Jun 2018 11:56:39 +0300
+
+zabbix (1:4.0.0alpha7-1) stable; urgency=low
+
+  * update to 4.0.0alpha7
+
+ -- Zabbix Packager <info@zabbix.com>  Wed, 30 May 2018 11:43:31 +0300
+
+zabbix (1:4.0.0alpha6-1) stable; urgency=low
+
+  * update to 4.0.0alpha6
+  * add support for Ubuntu 18.04 (Bionic)
+  * move enabling JMX interface on Zabbix java gateway to zabbix_java_gateway.conf
+
+ -- Zabbix Packager <info@zabbix.com>  Fri, 27 Apr 2018 13:31:10 +0300
+
+zabbix (1:4.0.0alpha5-1) stable; urgency=low
+
+  * update to 4.0.0alpha5
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Mon, 26 Mar 2018 15:36:44 +0300
+
+zabbix (1:4.0.0alpha4-1) stable; urgency=low
+
+  * update to 4.0.0alpha4
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Tue, 27 Feb 2018 08:09:03 +0200
+
+zabbix (1:4.0.0alpha3-1) stable; urgency=low
+
+  * update to 4.0.0alpha3
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Mon, 05 Feb 2018 21:42:14 +0200
+
+zabbix (1:4.0.0alpha2-1) stable; urgency=low
+
+  * update to 4.0.0alpha2
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Mon, 09 Jan 2018 09:37:32 +0200
+
+zabbix (1:4.0.0alpha1-1) stable; urgency=low
+
+  * update to 4.0.0alpha1
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Tue, 19 Dec 2017 18:21:30 +0200
+
+zabbix (1:3.4.4-4) stable; urgency=low
+
+  * fix zabbix-frontend-php.postinst error "a2enconf: not found"
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Thu, 23 Nov 2017 18:14:20 +0200
+
+zabbix (1:3.4.4-3) stable; urgency=low
+
+  * move postgresql-client from "Depends" to "Suggests" in
+    zabbix-server-pgsql and zabbix-proxy-pgsql
+  * add libssl-dev to Build-Depends
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Fri, 17 Nov 2017 18:13:43 +0200
+
+zabbix (1:3.4.4-2) stable; urgency=low
+
+  * add missing translation (.mo) files
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Thu, 09 Nov 2017 10:07:03 +0300
+
+zabbix (1:3.4.4-1) stable; urgency=low
+
+  * update to 3.4.4
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Tue, 07 Nov 2017 17:30:03 +0300
+
+zabbix (1:3.4.3-2) stable; urgency=low
+
+  * fix corrupted zabbix-frontend-php postinst script
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Tue, 17 Oct 2017 17:00:03 +0300
+
+zabbix (1:3.4.3-1) stable; urgency=low
+
+  * update to 3.4.3
+  * fix incorrect path to truetype font of zabbix-frontend-php postinst script
+  * fix zabbix-frontend-php dependencies on Debian 9 and Ubuntu 1604
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Tue, 17 Oct 2017 17:00:03 +0300
+
+zabbix (1:3.4.2-1) stable; urgency=low
+
+  * update to 3.4.2
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Thu, 25 Sep 2017 18:54:03 +0300
+
+zabbix (1:3.4.1-1) stable; urgency=low
+
+  * update to 3.4.1
+  * add zabbix-frontend-php dependencies: php-mbstring, php-bcmath, php-xml
+  * change SocketDir to /var/run/zabbix
+  * change SNMPTrapperFile to /var/log/snmptrap/snmptrap.log
+  * change DBUser to zabbix
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Mon, 28 Aug 2017 08:05:29 +0300
+
+zabbix (1:3.4.0-1) stable; urgency=low
+
+  * update to 3.4.0
+
+ -- Vladimir Levijev <vladimir.levijev@zabbix.com>  Mon, 21 Aug 2017 12:31:29 +0300
+
+zabbix (1:3.4.0-1alpha1) stable; urgency=low
+
+  * update to 3.4.0alpla1
+  * add libpcre and libevent for compile option
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Wed, 26 Apr 2017 02:46:13 +0900
+
+zabbix (1:3.2.5-1) stable; urgency=low
+
+  * update to 3.2.5
+  * fix missing age parameter in tmpfile conf file
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Sun, 23 Apr 2017 02:36:41 +0900
+
+zabbix (1:3.2.4-1) stable; urgency=low
+
+  * update to 3.2.4
+  * add TimeoutSec for systemd service file
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Mon, 27 Feb 2017 21:20:15 +0900
+
+zabbix (1:3.2.3-1) stable; urgency=low
+
+  * update to 3.2.3
+  * add php-pgsql to dependency
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Wed, 21 Dec 2016 19:36:43 +0900
+
+zabbix (1:3.2.2-1) stable; urgency=high
+
+  * update to 3.2.2
+  * use virtual-mysql-server for suggest package
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Thu, 08 Dec 2016 01:19:12 +0900
+
+zabbix (1:3.2.1-1) stable; urgency=low
+
+  * update to 3.2.1
+  * use zabbix user and group for Java Gateway
+  * add SuccessExitStatus=143 for Java Gateway service file
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Sun, 02 Oct 2016 21:36:52 +0900
+
+zabbix (1:3.2.0-1) stable; urgency=low
+
+  * update to 3.2.0
+  * add *.conf for Include parameter in agent configuration file
+  * add libapache2-mod-php for dependency
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Tue, 13 Sep 2016 18:10:36 +0200
+
+zabbix (1:3.2.0rc2-1) stable; urgency=low
+
+  * update to 3.2.0rc2
+  * add mod_php7 section for apache configuration
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Mon, 12 Sep 2016 23:57:28 +0200
+
+zabbix (1:3.2.0rc1-1) stable; urgency=low
+
+  * update to 3.2.0rc1
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Fri, 09 Sep 2016 11:45:02 +0900
+
+zabbix (1:3.2.0beta2-1) stable; urgency=low
+
+  * update to 3.2.0beta2
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Thu, 01 Sep 2016 23:27:46 +0900
+
+zabbix (1:3.2.0beta1-1) stable; urgency=low
+
+  * update to 3.2.0beta1
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Fri, 26 Aug 2016 11:21:23 +0900
+
+zabbix (1:3.2.0alpha1-1) stable; urgency=low
+
+  * update to 3.2.0alpha1
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Fri, 12 Aug 2016 00:41:27 +0900
+
+zabbix (1:3.0.4-1) stable; urgency=low
+
+  * update to 3.0.4
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Sun, 24 Jul 2016 15:07:21 +0900
+
+zabbix (1:3.0.3-2) stable; urgency=low
+
+  * support ubuntu 16.04
+  * add systemd service file
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Thu, 14 Jul 2016 21:10:18 +0900
+
+zabbix (1:3.0.3-1) stable; urgency=low
+
+  * update to 3.0.3
+  * add php5-mysqlnd to dependency
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Sun, 22 May 2016 16:15:31 +0900
+
+zabbix (1:3.0.2-1) stable; urgency=low
+
+  * update to 3.0.2
+  * add fping3-sourceip-option.patch
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Wed, 20 Apr 2016 21:34:39 +0900
+
+zabbix (1:3.0.1-1) stable; urgency=low
+
+  * update to 3.0.1
+  * remove DBSocker parameter
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Sun, 28 Feb 2016 15:32:14 +0900
+
+zabbix (1:3.0.0-1) stable; urgency=low
+
+  * update to 3.0.0
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Mon, 15 Feb 2016 22:04:49 +0900
+
+zabbix (1:3.0.0rc2-1) stable; urgency=low
+
+  * update to 3.0.0rc2
+  * add TIMEOUT parameter for java gateway conf
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Thu, 11 Feb 2016 20:29:30 +0900
+
+zabbix (1:3.0.0rc1-1) stable; urgency=low
+
+  * update to 3.0.0rc1
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Thu, 04 Feb 2016 22:21:24 +0900
+
+zabbix (1:3.0.0beta2-1) stable; urgency=low
+
+  * update to 3.0.0beta2
+  * include environment file under /etc/default during startup
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Sat, 30 Jan 2016 20:32:13 +0900
+
+zabbix (1:3.0.0beta1-2) stable; urgency=low
+
+  * remove DejaVu font, add font-config patch
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Mon, 25 Jan 2016 14:44:54 +0900
+
+zabbix (1:3.0.0beta1-1) stable; urgency=low
+
+  * update to 3.0.0beta1
+
+ -- Kodai Terashima <kodai.terashima@zabbix.com>  Thu, 21 Jan 2016 13:52:48 +0900
+
+zabbix (1:3.0.0alpha6-1) stable; urgency=low
+
+  * Release 3.0.0alpha6-1
+
+ -- Koadi Terashima <kodai.terashima@zabbix.com>  Thu, 14 Jan 2016 10:20:51 +0900

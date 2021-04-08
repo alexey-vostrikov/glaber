@@ -432,7 +432,7 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_HOST *host, i
 		item->schedulable = 0;
 
 		if (CONFIG_DEBUG_ITEM == item->itemid || CONFIG_DEBUG_HOST == item->hostid) 
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: nextcheck is set to %d (+%d sec)",
+			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: nextcheck is set to %d (+%ld sec)",
 								item->itemid,__func__, item->nextcheck, item->nextcheck-time(NULL));
 			
 		return FAIL;
@@ -9270,7 +9270,8 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, in
 			//avoiding dynamic and discovery items from being processed by async glb pollers
 			
 		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item type %d key %s oid %s type %d: flags is %d, %ld sheduled in %d sec, to poller type %d -> %d", 
-			dc_item->type, dc_item->key, snmpitem->snmp_oid, snmpitem->snmp_oid_type, dc_item->flags, dc_item->itemid, dc_item->nextcheck - time(NULL),old_poller_type, dc_item->poller_type );
+			dc_item->type, dc_item->key, snmpitem->snmp_oid, snmpitem->snmp_oid_type, dc_item->flags, dc_item->itemid, 
+			dc_item->nextcheck - time(NULL),old_poller_type, dc_item->poller_type );
 	}
 
 	DCupdate_item_queue(dc_item, old_poller_type, old_nextcheck);
