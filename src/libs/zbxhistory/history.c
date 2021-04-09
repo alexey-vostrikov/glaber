@@ -428,6 +428,64 @@ void	zbx_history_record_clear(zbx_history_record_t *value, int value_type)
 			history_logfree(value->value.log);
 	}
 }
+/*********************************************************************
+ * parses json, looks for value_type and itemid fields 
+ * also parses value field according to value_type
+ * if value_type is log, then additional log fields are searched and 
+ * parsed too
+ * ******************************************************************/
+int glb_history_json2val(struct zbx_json_parse *jp, u_int64_t * itemid, char *value_type, zbx_history_record_t * value){
+	char  itemid_str[MAX_ID_LEN],  value_type_str[MAX_ID_LEN], timestamp_str[MAX_ID_LEN], value_str[MAX_STRING_LEN];
+	zbx_json_type_t type;
+
+	if (SUCCEED != zbx_json_value_by_name(jp,"itemid",itemid_str,MAX_ID_LEN, &type) ||
+	    SUCCEED != zbx_json_value_by_name(jp,"value_type",value_type_str,MAX_ID_LEN, &type) ||
+		SUCCEED != zbx_json_value_by_name(jp,"value",value_str,MAX_STRING_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"ts",timestamp_str,MAX_ID_LEN, &type) 
+		 ) {
+			return FAIL;
+		}
+	*value_type=strtol(value_type_str,NULL,10);
+	*itemid=strtol(itemid_str,NULL,10);
+
+	switch (*value_type) {
+		case ITEM_VALUE_TYPE_STR:
+		case ITEM_VALUE_TYPE_TEXT:
+			value->value.str=zbx_strdup(NULL,value_str);
+			break;
+		case ITEM_VALUE_TYPE_UINT64:
+			value->value.ui64 = strtol(value_str,NULL,10);
+			break;
+		case ITEM_VALUE_TYPE_FLOAT:
+			value->value.dbl = strtof(value_str,NULL);
+			break;
+		case ITEM_VALUE_TYPE_LOG:
+			value->value.log = zbx_malloc(NULL, sizeof(zbx_log_value_t));
+			if ( NULL == value->value.log) return FAIL;
+			char tmp_str[MAX_STRING_LEN];
+
+			if (SUCCEED == zbx_json_value_by_name(jp,"logeventid",tmp_str,MAX_STRING_LEN, &type)) {
+				value->value.log->logeventid=strtol(tmp_str,NULL,10);
+			} else value->value.log->logeventid = 0;
+			
+			if (SUCCEED == zbx_json_value_by_name(jp,"source",tmp_str,MAX_STRING_LEN, &type)) {
+				value->value.log->source=zbx_strdup(NULL,tmp_str);
+			} else value->value.log->source = zbx_strdup(NULL,"");
+			
+
+			if (SUCCEED == zbx_json_value_by_name(jp,"severity",tmp_str,MAX_STRING_LEN, &type)) {
+				value->value.log->severity=strtol(tmp_str,NULL,10);
+			} else value->value.log->severity = 0;
+			
+			value->value.log->value=zbx_strdup(NULL,value_str);
+			break;
+		default:
+			zabbix_log(LOG_LEVEL_WARNING,"Unknown item_value_type %d",value_type);
+			THIS_SHOULD_NEVER_HAPPEN;
+			return FAIL;
+	}
+	return SUCCEED;
+}
 
 /******************************************************************************
  *                                                                            *

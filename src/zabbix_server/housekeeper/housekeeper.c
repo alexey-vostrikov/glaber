@@ -1170,6 +1170,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		hk_period = get_housekeeping_period(time_slept);
 
 		zabbix_log(LOG_LEVEL_WARNING, "executing housekeeper");
+		zabbix_log(LOG_LEVEL_WARNING,"Dumping ValueCache data");
+		glb_vc_dump_cache();
+		zabbix_log(LOG_LEVEL_WARNING,"Finished dumping ValueCache data");
 
 		now = time(NULL);
 
