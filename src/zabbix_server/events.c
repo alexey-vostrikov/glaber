@@ -1905,7 +1905,7 @@ void	zbx_export_events(void)
 
 		if (SUCCEED == zbx_is_export_enabled())
 			zbx_problems_export_write(json.buffer, json.buffer_size);
-		 zabbix_log(LOG_LEVEL_INFORMATION,"Exporting %s",json.buffer);
+		// zabbix_log(LOG_LEVEL_INFORMATION,"Exporting %s",json.buffer);
 		hist->value.log->value=strdup(json.buffer);
 		zbx_vector_ptr_append(&hist_events,hist);
 

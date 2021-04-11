@@ -33,6 +33,7 @@
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern int CONFIG_VCDUMP_FREQUENCY;
 
 static int	hk_period;
 
@@ -1109,7 +1110,7 @@ static int	get_housekeeping_period(double time_slept)
 ZBX_THREAD_ENTRY(housekeeper_thread, args)
 {
 	int	now, d_history_and_trends, d_cleanup, d_events, d_problems, d_sessions, d_services, d_audit, sleeptime,
-		records;
+		records, next_vc_dump_time;
 	double	sec, time_slept, time_now;
 	char	sleeptext[25];
 	zbx_vc_stats_t stats;
@@ -1144,6 +1145,8 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		zbx_snprintf(sleeptext, sizeof(sleeptext), "idle for %d hour(s)", CONFIG_HOUSEKEEPING_FREQUENCY);
 	}
 
+	next_vc_dump_time = time(NULL) + CONFIG_VCDUMP_FREQUENCY;
+	
 	hk_history_compression_init();
 
 	zbx_set_sigusr_handler(zbx_housekeeper_sigusr_handler);
@@ -1153,13 +1156,43 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		sec = zbx_time();
 		
 		//doing history storage data preloading
-
+		//TODO: make a task queue, as housekeeper will be used for bunch of
+		//different things	
 		
+		while ( (0 == CONFIG_HOUSEKEEPING_FREQUENCY && zbx_sleep_get_remainder()) || 
+				( 0 < CONFIG_HOUSEKEEPING_FREQUENCY && sleeptime > 0) ) {
+			
+			now = time(NULL);
+			if (next_vc_dump_time < now ) {
+				//dumping value cache
+				next_vc_dump_time = now + CONFIG_VCDUMP_FREQUENCY;
+
+				zbx_vc_stats_t stats;
+				static u_int64_t old_hits=0, old_misses=0;
+				zbx_vc_get_statistics(&stats);
+				zabbix_log(LOG_LEVEL_INFORMATION,"Valuecache stats: hits: %ld, misses: %ld, efficiency %ld%%", stats.hits-old_hits, stats.misses-old_misses,  	
+						((stats.hits-old_hits)*100)/(stats.hits-old_hits + stats.misses-old_misses +1 ));
+				old_misses = stats.misses;
+				old_hits = stats.hits;
+
+				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
+				glb_vc_dump_cache();
+				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
+				
+			}
+			//stats->hits = vc_cache->hits;
+			
+			sleep(1);
+			sleeptime--;
+		}
+		
+		sleep(1);
+/*
 		if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 			zbx_sleep_forever();
 		else
 			zbx_sleep_loop(sleeptime);
-
+*/
 		if (!ZBX_IS_RUNNING())
 			break;
 
@@ -1171,7 +1204,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 		zabbix_log(LOG_LEVEL_WARNING, "executing housekeeper");
 
-		now = time(NULL);
+		
 
 		zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 		DBconnect(ZBX_DB_CONNECT_NORMAL);

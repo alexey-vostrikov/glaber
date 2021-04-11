@@ -64,6 +64,9 @@
 /* indicates that all values from database are cached */
 #define ZBX_ITEM_STATUS_CACHED_ALL	1
 
+#define GLB_VCDUMP_RECORD_TYPE_ITEM 1
+#define GLB_VCDUMP_RECORD_TYPE_VALUE 2
+
 /* the cache statistics */
 typedef struct
 {
@@ -123,5 +126,6 @@ void	zbx_vc_housekeeping_value_cache(void);
 void	zbx_vc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num, int *mode);
 void	zbx_vc_get_mem_stats(zbx_mem_stats_t *mem);
 void	zbx_vc_get_item_stats(zbx_vector_ptr_t *stats);
-
+int 	glb_vc_dump_cache();
+int 	glb_vc_load_cache();
 #endif	/* ZABBIX_VALUECACHE_H */

@@ -42,5 +42,8 @@ int glb_set_process_types(u_int8_t *types_array, char *setting);
 int glb_types_array_sum(u_int8_t *types_array);
 
 history_value_t	history_str2value(char *str, unsigned char value_type);
+int glb_history_json2val(struct zbx_json_parse *jp, u_int64_t * itemid, char *value_type, zbx_history_record_t * value);
+//int glb_history_val2(struct json_parse *jp, u_int64_t * itemid, char *value_type, zbx_history_record_t * value){
+
 
 #endif

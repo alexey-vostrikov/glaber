@@ -187,6 +187,8 @@ int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int CONFIG_GLB_SNMP_FORKS		= 1;
 int CONFIG_GLB_PINGER_FORKS		= 1;
 int CONFIG_ICMP_METHOD  = GLB_ICMP;
+char *CONFIG_VCDUMP_LOCATION	= NULL;
+int CONFIG_VCDUMP_FREQUENCY	= 60;
 
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_PINGER_FORKS		= 5;
@@ -757,6 +759,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			10},
 		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
 			PARM_OPT,	0,			0},		
+		{"ValueCacheDumpLocation",		&CONFIG_VCDUMP_LOCATION,			TYPE_STRING,
+			PARM_OPT,	0,			0},		
+		{"ValueCacheDumpFrequency",		&CONFIG_VCDUMP_FREQUENCY,			TYPE_INT,
+			PARM_OPT,	10,			SEC_PER_HOUR},			
 		{"StartPreprocessorManagers",		&CONFIG_PREPROCMAN_FORKS,			TYPE_INT,
 			PARM_OPT,	1,			64},
 		{"StartPollers",		&CONFIG_POLLER_FORKS,			TYPE_INT,
@@ -1279,6 +1285,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history value cache: %s", error);
 		zbx_free(error);
 		exit(EXIT_FAILURE);
+	}
+
+	if (FAIL == glb_vc_load_cache()) {
+		zabbix_log(LOG_LEVEL_CRIT, "cannot preload value cache, startup might take longer");
+		//exit(EXIT_FAILURE);
 	}
 
 	if (SUCCEED != zbx_create_itservices_lock(&error))
