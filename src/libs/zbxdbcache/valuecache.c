@@ -3164,7 +3164,7 @@ int glb_vc_dump_cache() {
 	//of something is wrong, this way will have a bit outdated but functional copy of the cache
 	zbx_snprintf(new_file,MAX_STRING_LEN,"%s%s",CONFIG_VCDUMP_LOCATION,".new");
 	//zbx_snprintf_alloc(buffer,alloc_len,offset,)
-	if (-1 == (fd = zbx_open(new_file, O_WRONLY | O_CREAT | O_TRUNC))) {
+	if (-1 == (fd = open(new_file, O_WRONLY | O_CREAT | O_TRUNC, 0600))) {
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s, value cache will not be dumped",CONFIG_VCDUMP_LOCATION);
 		return FAIL;
 	}
