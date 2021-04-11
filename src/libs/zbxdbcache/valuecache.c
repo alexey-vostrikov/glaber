@@ -3187,12 +3187,12 @@ int glb_vc_dump_cache() {
 		//tail is the oldest value
 		zbx_vc_chunk_t *curr_chunk=item->tail;
 		
-		int c_count = 0;		
+		int c_count = 0, i;		
 		while (NULL != curr_chunk ) {
 			zabbix_log(LOG_LEVEL_DEBUG,"In %s: processing chunk %d (%d-%d)",__func__, c_count, curr_chunk->first_value, curr_chunk->last_value);
 			
 			//now iterating over values
-			for (int i = curr_chunk->first_value;  i <= curr_chunk->last_value; i++) {
+			for ( i = curr_chunk->first_value;  i <= curr_chunk->last_value; i++) {
 
 				zabbix_log(LOG_LEVEL_DEBUG, "In %s: dumping data value %d ts is %d",__func__, i , curr_chunk->slots[i].timestamp.sec);
 			
