@@ -11764,7 +11764,10 @@ static void	dc_status_update(void)
 							if (NULL != dc_proxy_host)
 								dc_proxy_host->items_active_notsupported++;
 							break;
+						case ITEM_STATE_UNKNOWN:
+							break;	
 						default:
+							zabbix_log(LOG_LEVEL_WARNING,"Unknown item state %d", dc_item->state);
 							THIS_SHOULD_NEVER_HAPPEN;
 					}
 

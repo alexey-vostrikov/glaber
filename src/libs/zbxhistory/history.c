@@ -428,27 +428,26 @@ void	zbx_history_record_clear(zbx_history_record_t *value, int value_type)
 			history_logfree(value->value.log);
 	}
 }
+
 /*********************************************************************
  * parses json, looks for value_type and itemid fields 
  * also parses value field according to value_type
  * if value_type is log, then additional log fields are searched and 
  * parsed too
  * ******************************************************************/
-int glb_history_json2val(struct zbx_json_parse *jp, u_int64_t * itemid, char *value_type, zbx_history_record_t * value){
-	char  itemid_str[MAX_ID_LEN],  value_type_str[MAX_ID_LEN], timestamp_str[MAX_ID_LEN], value_str[MAX_STRING_LEN];
+int glb_history_json2val(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value){
+	char  timestamp_str[MAX_ID_LEN], value_str[MAX_STRING_LEN];
 	zbx_json_type_t type;
 
-	if (SUCCEED != zbx_json_value_by_name(jp,"itemid",itemid_str,MAX_ID_LEN, &type) ||
-	    SUCCEED != zbx_json_value_by_name(jp,"value_type",value_type_str,MAX_ID_LEN, &type) ||
-		SUCCEED != zbx_json_value_by_name(jp,"value",value_str,MAX_STRING_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"ts",timestamp_str,MAX_ID_LEN, &type) 
-		 ) {
+	if ( SUCCEED != zbx_json_value_by_name(jp,"value",value_str,MAX_STRING_LEN, &type) || 
+		 SUCCEED != zbx_json_value_by_name(jp,"ts",timestamp_str,MAX_ID_LEN, &type) ) {
 			return FAIL;
 		}
-	*value_type=strtol(value_type_str,NULL,10);
-	*itemid=strtol(itemid_str,NULL,10);
+		
+	value->timestamp.sec = strtol(timestamp_str,NULL,10);
+	value->timestamp.ns = 0;
 
-	switch (*value_type) {
+	switch (value_type) {
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:
 			value->value.str=zbx_strdup(NULL,value_str);

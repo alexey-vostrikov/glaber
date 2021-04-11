@@ -39,6 +39,7 @@ int zbx_history_record_compare_desc_func(const zbx_history_record_t *d1, const z
 void zbx_history_value2str(char *buffer, size_t size, const history_value_t *value, int value_type);
 char *zbx_history_value2str_dyn(const history_value_t *value, int value_type);
 void zbx_history_value_print(char *buffer, size_t size, const history_value_t *value, int value_type);
+int glb_history_json2val(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
 
 /* In most cases zbx_history_record_vector_destroy() function should be used to free the  */
 /* value vector filled by zbx_vc_get_value* functions. This define simply better          */

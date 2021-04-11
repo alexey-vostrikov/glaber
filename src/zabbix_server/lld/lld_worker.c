@@ -103,7 +103,6 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NORMAL, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL,
 						NULL, NULL);
-				zabbix_log(LOG_LEVEL_INFORMATION,"After add event");
 			}
 			else
 			{
@@ -113,7 +112,6 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NOTSUPPORTED, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0,
 						NULL, NULL, error);
-				zabbix_log(LOG_LEVEL_INFORMATION,"After add event");
 			}
 
 			zbx_process_events(NULL, NULL);
