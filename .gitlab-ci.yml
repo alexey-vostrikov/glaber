@@ -22,7 +22,7 @@
     - make dbschema gettext
     - autoreconf -fvi
     - cp -r build/${OS}/${OS_VER}/ debian && cd debian
-    - sed -i "1 s/(.*+/(1:$GLABER_VERSION-1+/g" changelog
+    - sed -i "1 s/(.*+/(1:$GLABER_VERSION-${CI_COMMIT_SHORT_SHA}+/g" changelog
     - head -n 5 changelog
 
 .prepare_rpm_sources: &prepare_rpm_sources
@@ -51,7 +51,7 @@
 
 .upload_packages: &upload_packages
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/db --outdir /var/www/glaber.io/repo/${OS_VER} includedeb ${OS_VER}  ~/${OS}/${OS_VER}/*.deb && rm ~/${OS}/${OS_VER}/*.deb"
+  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/db --outdir /var/www/glaber.io/repo/${OS_VER} includedeb ${OS_VER}  ~/${OS}/${OS_VER}/*.deb; rm ~/${OS}/${OS_VER}/*.deb"
 
 
 .upload_rpms: &upload_rpms
