@@ -619,9 +619,10 @@ int glb_process_worker_request(GLB_EXT_WORKER *worker, const char *request, char
     
     worker_cleanup(worker);
     
-    if (SUCCEED == glb_worker_request(worker,request) ) {
-            glb_worker_responce(worker, responce);
-    } else return FAIL;
+    if (SUCCEED != glb_worker_request(worker,request) ||
+        SUCCEED != glb_worker_responce(worker, responce) )
+        
+        return FAIL;
     
     zabbix_log(LOG_LEVEL_DEBUG, "Finished %s", __func__);
     return SUCCEED;
