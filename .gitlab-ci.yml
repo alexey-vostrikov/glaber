@@ -51,7 +51,7 @@
 
 .upload_packages: &upload_packages
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/db --outdir /var/www/glaber.io/repo/${OS}/${OS_VER} includedeb ${OS_VER}  ~/${OS}/${OS_VER}/*.deb; rm ~/${OS}/${OS_VER}/*.deb"
+  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/db --outdir /var/www/glaber.io/repo/${OS}/ includedeb ${OS_VER}  ~/${OS}/${OS_VER}/*.deb; rm ~/${OS}/${OS_VER}/*.deb"
 
 
 .upload_rpms: &upload_rpms
