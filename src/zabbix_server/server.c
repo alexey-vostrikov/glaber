@@ -253,6 +253,7 @@ char	*CONFIG_TMPDIR			= NULL;
 char	*CONFIG_FPING_LOCATION		= NULL;
 char	*CONFIG_FPING6_LOCATION		= NULL;
 char 	*CONFIG_GLBMAP_LOCATION		= NULL;
+char 	*CONFIG_GLBMAP_OPTIONS		= NULL;
 //int		CONFIG_GLB_REUEUE_TIME	= 120;
 
 char	*CONFIG_DBHOST			= NULL;
@@ -810,6 +811,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"FpingLocation",		&CONFIG_FPING_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"GlbmapLocation",		&CONFIG_GLBMAP_LOCATION,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"GlbmapOptions",		&CONFIG_GLBMAP_OPTIONS,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"Fping6Location",		&CONFIG_FPING6_LOCATION,		TYPE_STRING,
 			PARM_OPT,	0,			0},

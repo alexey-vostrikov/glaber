@@ -42,6 +42,7 @@ extern int CONFIG_GLB_PINGER_FORKS;
 extern int CONFIG_PINGER_FORKS;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_GLBMAP_LOCATION;
+extern char *CONFIG_GLBMAP_OPTIONS;
 extern char *CONFIG_SOURCE_IP;
 
 /********************************************************************
@@ -664,6 +665,9 @@ void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces ) {
     if ( NULL != CONFIG_SOURCE_IP && SUCCEED == is_ip4(CONFIG_SOURCE_IP) ) {
         zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s",CONFIG_SOURCE_IP);
     } 
+    if ( NULL != CONFIG_GLBMAP_OPTIONS ) {
+         zbx_snprintf(add_params,MAX_STRING_LEN," %s",CONFIG_GLBMAP_OPTIONS);
+    }
     
     zbx_snprintf(init_string,MAX_STRING_LEN,"{ \"path\":\"%s %s -v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=\\\"saddr,rtt,itemid,success\\\"\" }\n",
         CONFIG_GLBMAP_LOCATION, add_params);

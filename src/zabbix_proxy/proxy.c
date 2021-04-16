@@ -182,6 +182,8 @@ int CONFIG_GLB_PINGER_FORKS		= 1;
 int CONFIG_ICMP_METHOD  = GLB_ICMP;
 char 	*ICMP_METHOD_STR = NULL;
 char 	*CONFIG_GLBMAP_LOCATION		= NULL;
+char 	*CONFIG_GLBMAP_OPTIONS		= NULL;
+
 int	CONFIG_CONFSYNCER_FREQUENCY	= 120;
 
 static int	CONFIG_PROXYMODE	= ZBX_PROXYMODE_ACTIVE;
@@ -796,6 +798,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			10},
 		{"GlbmapLocation",		&CONFIG_GLBMAP_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"GlbmapOptions",		&CONFIG_GLBMAP_OPTIONS,			TYPE_STRING,
+			PARM_OPT,	0,			0},		
 		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
 			PARM_OPT,	0,			0},	
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,
