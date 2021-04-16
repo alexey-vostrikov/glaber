@@ -9269,7 +9269,7 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, in
 		ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&dc_item->itemid);
 			//avoiding dynamic and discovery items from being processed by async glb pollers
 			
-		zabbix_log(LOG_LEVEL_INFORMATION, "Debug item type %d key %s oid %s type %d: flags is %d, %ld sheduled in %d sec, to poller type %d -> %d", 
+		zabbix_log(LOG_LEVEL_DEBUG, "Debug item type %d key %s oid %s type %d: flags is %d, %ld sheduled in %d sec, to poller type %d -> %d", 
 			dc_item->type, dc_item->key, snmpitem->snmp_oid, snmpitem->snmp_oid_type, dc_item->flags, dc_item->itemid, 
 			dc_item->nextcheck - time(NULL),old_poller_type, dc_item->poller_type );
 	}
