@@ -687,7 +687,8 @@ class CProxy extends CApiService {
 		$hostids = [];
 
 		foreach ($proxies as $proxy) {
-			if ($proxy['status'] != HOST_STATUS_PROXY_ACTIVE && $proxy['status'] != HOST_STATUS_PROXY_PASSIVE) {
+			if ($proxy['status'] != HOST_STATUS_PROXY_ACTIVE && $proxy['status'] != HOST_STATUS_PROXY_PASSIVE &&
+			                               $proxy['status'] != HOST_STATUS_SERVER && $proxy['status'] != HOST_STATUS_DOMAIN) {
 				self::exception(ZBX_API_ERROR_PARAMETERS,
 					_s('Incorrect value used for proxy status "%1$s".', $proxy['status'])
 				);
