@@ -36,9 +36,9 @@
     - cd glaber-$GLABER_VERSION
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
-    - mv src/zmap ../zmap && chmod +s ../glbmap && cd ..
+    - mv src/zmap ../zmap &&  cd ..
     - rm -rf glbmap
-    - mv zmap glbmap && cd ..
+    - mv zmap glbmap && chmod +s ./glbmap && cd ..
     - tar -czvf glaber-$GLABER_VERSION.tar.gz glaber-$GLABER_VERSION
     - cd ${CI_PROJECT_DIR}
     - cp -r build/${OS}/${OS_VER}/* build/centos
