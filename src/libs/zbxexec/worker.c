@@ -328,7 +328,7 @@ static int worker_is_alive(GLB_EXT_WORKER *worker)
 //makes sure worker is ready to answer requests
 //starts the script if needed, restarts after max_calls
 //kills on timeout
-static int worker_cleanup(GLB_EXT_WORKER *worker)
+static void worker_cleanup(GLB_EXT_WORKER *worker)
 {
 
     char *buffer[MAX_STRING_LEN];
@@ -341,7 +341,7 @@ static int worker_cleanup(GLB_EXT_WORKER *worker)
     /* Save the current flags */
     int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
     if (flags == -1)
-        return 0;
+        return;
 
     fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
 
