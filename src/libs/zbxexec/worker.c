@@ -17,6 +17,10 @@
 #include "dbcache.h"
 #include "zbxipcservice.h"
 
+#if (__FreeBSD_version) > 700000
+#define ENODATA 245
+#endif
+
 extern int CONFIG_TIMEOUT;
 
 //todo: look if there is proc in the dbconfig.c
