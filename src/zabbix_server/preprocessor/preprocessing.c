@@ -32,7 +32,7 @@
 #define PACKED_FIELD_STRING	1
 #define MAX_VALUES_LOCAL	1024
 
-extern int CONFIG_DISABLE_INPOLLER_PREPROC;
+//extern int CONFIG_DISABLE_INPOLLER_PREPROC;
 extern int CONFIG_PREPROCMAN_FORKS;
 
 /* packed field data description */
@@ -144,7 +144,7 @@ zbx_uint32_t	preprocessor_pack_value(zbx_ipc_message_t *message, zbx_preproc_ite
 	unsigned char		ts_marker, result_marker, log_marker;
 
 	DEBUG_ITEM(value->itemid,"Packing item");
-	
+
 	ts_marker = (NULL != value->ts);
 	result_marker = (NULL != value->result_ptr->result);
 	*offset++ = PACKED_FIELD(&value->itemid, sizeof(zbx_uint64_t));
@@ -970,7 +970,7 @@ static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32
 		
 	if (FAIL == zbx_ipc_socket_write(&sockets[manager_num], code, data, size))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot send data %ld to preprocessing service %d",data, manager_num);
+		zabbix_log(LOG_LEVEL_CRIT, "cannot send data to preprocessing service %d", manager_num);
 		exit(EXIT_FAILURE);
 	}
 

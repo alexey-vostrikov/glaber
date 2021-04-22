@@ -1016,7 +1016,7 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 				" and flags<>%d",
 			proxy_hostid, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE);
 	*/
-	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: prefetched %ld hosts for configuration of proxy %ld", hosts->values_num, proxy_hostid);
+	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: prefetched %d hosts for configuration of proxy %ld", hosts->values_num, proxy_hostid);
 	for ( i =0 ; i < hosts->values_num ; i++ )
 	//while (NULL != (row = DBfetch(result)))
 	{

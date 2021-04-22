@@ -179,7 +179,7 @@ u_int64_t CONFIG_DEBUG_ITEM = 0;
 u_int64_t CONFIG_DEBUG_HOST = 0;
 
 
-int CONFIG_DISABLE_INPOLLER_PREPROC = 0;
+//int CONFIG_DISABLE_INPOLLER_PREPROC = 0;
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
@@ -740,8 +740,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"DisableInPollerPreproc",			&CONFIG_DISABLE_INPOLLER_PREPROC,			TYPE_INT,
-			PARM_OPT,	0,			0},
+	//	{"DisableInPollerPreproc",			&CONFIG_DISABLE_INPOLLER_PREPROC,			TYPE_INT,
+	//		PARM_OPT,	0,			0},
 		{"EnableHostDeactivation",			&CONFIG_ENABLE_HOST_DEACTIVATION,			TYPE_INT,
 			PARM_OPT,	0,			0},
 		{"ExternalWorker",			&CONFIG_EXT_WORKERS,			TYPE_MULTISTRING,

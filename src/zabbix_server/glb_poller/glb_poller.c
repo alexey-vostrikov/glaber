@@ -520,7 +520,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					if (glb_item->ttl < now && 	POLL_QUEUED == glb_item->state ) {
 					
 						DEBUG_ITEM(glb_item->itemid,"Item aged");
-						zabbix_log(LOG_LEVEL_INFORMATION, "Marking aged item %ld for deletion, ttl is %ld",glb_item->itemid, glb_item->ttl);	
+						zabbix_log(LOG_LEVEL_INFORMATION, "Marking aged item %ld for deletion, ttl is %d",glb_item->itemid, glb_item->ttl);	
 			
 						cnt++;
 
