@@ -3131,7 +3131,7 @@ int glb_vc_load_cache() {
 		
 		
 		if (SUCCEED != zbx_json_open(line, &jp)) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Cannot parse line '%s', incorrect JSON");
+			zabbix_log(LOG_LEVEL_INFORMATION,"Cannot parse line '%s', incorrect JSON", line);
 			continue;
 		}
 

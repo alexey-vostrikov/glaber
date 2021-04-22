@@ -468,7 +468,8 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 		glb_escape_worker_string(h->item_key,buffer);
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
 		
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time_sec\":%ld, \"time_ns\":%d, \"value_type\":%d, ", h->itemid,h->ts.sec,h->ts.ns, h->value_type);
+		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time_sec\":%d, \"time_ns\":%d, \"value_type\":%d, ", 
+				h->itemid,h->ts.sec,h->ts.ns, h->value_type);
     		
 		//type-dependent part
 		switch (h->value_type) {

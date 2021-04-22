@@ -9273,7 +9273,7 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, in
 		ZBX_DC_SNMPITEM *snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&dc_item->itemid);
 			//avoiding dynamic and discovery items from being processed by async glb pollers
 			
-		zabbix_log(LOG_LEVEL_DEBUG, "Debug item type %d key %s oid %s type %d: flags is %d, %ld sheduled in %d sec, to poller type %d -> %d", 
+		zabbix_log(LOG_LEVEL_DEBUG, "Debug item type %d key %s oid %s type %d: flags is %d, %ld sheduled in %ld sec, to poller type %d -> %d", 
 			dc_item->type, dc_item->key, snmpitem->snmp_oid, snmpitem->snmp_oid_type, dc_item->flags, dc_item->itemid, 
 			dc_item->nextcheck - time(NULL),old_poller_type, dc_item->poller_type );
 	}
@@ -9540,14 +9540,14 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 			continue;
 
 		if (CONFIG_DEBUG_ITEM == zbx_dc_item->itemid)
-				zabbix_log(LOG_LEVEL_INFORMATION, "Item found in the async polling cycle ",zbx_dc_item->itemid);
+				zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld found in the async polling cycle ",zbx_dc_item->itemid);
 		
 		if (NULL == (zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &zbx_dc_item->hostid))) 
 			continue;
 
 		if (zbx_dc_host->hostid % forks != (process_num - 1) ) {
 			if (CONFIG_DEBUG_ITEM == zbx_dc_item->itemid)
-				zabbix_log(LOG_LEVEL_INFORMATION, "Skipping item, it belongs to other process %d %d forks ",zbx_dc_host->hostid % forks, process_num-1, forks);
+				zabbix_log(LOG_LEVEL_INFORMATION, "Skipping item, it belongs to other process %ld %d forks ",zbx_dc_host->hostid % forks, process_num-1, forks);
 			continue;
 		}
 
@@ -14980,7 +14980,7 @@ long int DC_generate_topology() {
 
 								} else {
 									//there is no servers handling this proxy
-									zabbix_log(LOG_LEVEL_INFORMATION,"Proxy %d seems to be down, last heard of it %ld seconds ago",server->hostid, 
+									zabbix_log(LOG_LEVEL_INFORMATION,"Proxy %ld seems to be down, last heard of it %ld seconds ago",server->hostid, 
 												time(NULL)- server->cluster_lastheard );
 									//THIS_SHOULD_NEVER_HAPPEN;
 									resolve_domain=default_domain_id;
