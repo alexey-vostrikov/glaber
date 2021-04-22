@@ -32,7 +32,7 @@
 #define PACKED_FIELD_STRING	1
 #define MAX_VALUES_LOCAL	1024
 
-extern int CONFIG_DISABLE_INPOLLER_PREPROC;
+//extern int CONFIG_DISABLE_INPOLLER_PREPROC;
 extern int CONFIG_PREPROCMAN_FORKS;
 
 /* packed field data description */

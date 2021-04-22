@@ -103,7 +103,7 @@ extern int CONFIG_POLLER_FORKS;
 extern int CONFIG_IPMIPOLLER_FORKS;
 extern int CONFIG_JAVAPOLLER_FORKS;
 extern int CONFIG_PINGER_FORKS;
-extern int CONFIG_DISABLE_INPOLLER_PREPROC;
+//extern int CONFIG_DISABLE_INPOLLER_PREPROC;
 extern int CONFIG_CLUSTER_SERVER_ID;
 extern u_int64_t CONFIG_DEBUG_ITEM;
 extern u_int64_t CONFIG_DEBUG_HOST;
@@ -8270,12 +8270,12 @@ void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp, int
 		
 		//when distributed preprocessing is on, preproc manager only needs 
 		//config for master itemds and items of dependent type
-		if (0 == CONFIG_DISABLE_INPOLLER_PREPROC && 
-			NULL == (dc_masteritem = zbx_hashset_search(&config->masteritems,&dc_preprocitem->itemid)) && 
-			ITEM_TYPE_DEPENDENT != dc_item->type ) {
+		//if (0 == CONFIG_DISABLE_INPOLLER_PREPROC && 
+		//	NULL == (dc_masteritem = zbx_hashset_search(&config->masteritems,&dc_preprocitem->itemid)) && 
+		//	ITEM_TYPE_DEPENDENT != dc_item->type ) {
 			//	zabbix_log(LOG_LEVEL_INFORMATION,"Skipping item %ld from loading preproc config",dc_preprocitem->itemid);
-				continue;	
-			}
+		//		continue;	
+		//	}
 		
 		//if ((dc_item->hostid % CONFIG_PREPROCMAN_FORKS) != manager_num  )	
 		//	continue;
