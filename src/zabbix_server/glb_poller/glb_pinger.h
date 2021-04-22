@@ -28,6 +28,11 @@
 #define GLB_ICMP_NAME "glbmap"
 #define ZBX_ICMP_NAME "fping"
 
+#define GLB_DEFAULT_ICMP_TIMEOUT 500
+#define GLB_DEFAULT_ICMP_INTERVAL 1000
+#define GLB_DEFAULT_ICMP_SIZE 68
+
+
 typedef struct
 {
 	u_int64_t time;

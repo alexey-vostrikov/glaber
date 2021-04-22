@@ -466,7 +466,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 			switch (event->type) {
 			
 			case GLB_EVENT_ITEM_POLL:
-				//zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld poll event", event->id);
+				zabbix_log(LOG_LEVEL_DEBUG, "Item %ld poll event", event->id);
 				if (NULL != (glb_item = zbx_hashset_search(&items, &event->id)) && 
 					NULL != (glb_host = zbx_hashset_search(&hosts, &glb_item->hostid))) {
 						
@@ -535,20 +535,10 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 							}
 						}
 						
-						//shoul
-						//zbx_hashset_remove_direct(&items, glb_item);
 						zbx_hashset_iter_remove(&iter);
-						//zbx_vector_uint64_append(&deleted_items, glb_item->itemid);
 					}
 				}
 
-				//now deleting all items marked for the deletion
-				//for (i = 0; i < deleted_items.values_num; i++) {
-				//	zabbix_log(LOG_LEVEL_DEBUG, "Deleting aged item %ld ",deleted_items.values[i]);	
-				//	zbx_hashset_remove(&items,&deleted_items.values[i]);
-				//}
-
-				//zbx_vector_uint64_destroy(&deleted_items);
 				add_event(&events, GLB_EVENT_AGING, 0, now + GLB_AGING_PERIOD);
 				zabbix_log(LOG_LEVEL_DEBUG, "Finished aging, %d items",cnt);
 			}

@@ -217,7 +217,7 @@ int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *value, 
 		zbx_preproc_result_t *results, int *results_num, char **error)
 {
 	int		i, ret = SUCCEED;
-
+	
 	for (i = 0; i < steps_num; i++)
 	{
 		zbx_preproc_op_t	*op = &steps[i];
@@ -304,7 +304,10 @@ static void	worker_preprocess_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t 
 
 	zbx_preprocessor_unpack_task(&itemid, &value_type, &ts, &value, &history_in, &steps, &steps_num,
 			message->data);
-
+	DEBUG_ITEM(itemid, "Unpacked in worker for preprocessing");
+	if (CONFIG_DEBUG_ITEM == itemid) {
+		zabbix_log(LOG_LEVEL_INFORMATION,"Will run preprocessing for item %ld, %d steps",itemid,steps_num);
+	}
 	zbx_variant_copy(&value_start, &value);
 	results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * steps_num);
 	memset(results, 0, sizeof(zbx_preproc_result_t) * steps_num);

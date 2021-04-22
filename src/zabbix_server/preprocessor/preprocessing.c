@@ -143,6 +143,7 @@ zbx_uint32_t	preprocessor_pack_value(zbx_ipc_message_t *message, zbx_preproc_ite
 	zbx_packed_field_t	fields[23], *offset = fields;	/* 23 - max field count */
 	unsigned char		ts_marker, result_marker, log_marker;
 
+	DEBUG_ITEM(value->itemid,"Packing item");
 	
 	ts_marker = (NULL != value->ts);
 	result_marker = (NULL != value->result_ptr->result);
@@ -1086,6 +1087,8 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigne
 	int manager_num = ( hostid % CONFIG_PREPROCMAN_FORKS );
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	DEBUG_ITEM(itemid,"Starting item preprocessing");
 
 	if (ITEM_STATE_NORMAL == state)
 	{
