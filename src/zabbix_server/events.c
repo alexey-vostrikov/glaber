@@ -2760,6 +2760,12 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 		zbx_vector_ptr_reserve(&internal_events, events.values_num);
 
 		/* assign event identifiers - they are required to set correlation event ids */
+		/* there is a problem here - hense we won't use the events table anymore
+		/* an unique event id must be generated without help of DBget_maxid */
+        /* having a unique id within a cluster even bigger problem, so perhaps
+		some combination of time, server id, object id and the last known value used by this machine is a 
+		good candidate for unique id */
+
 		eventid = DBget_maxid_num("events", events.values_num);
 		for (i = 0; i < events.values_num; i++)
 		{
@@ -2887,15 +2893,17 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 		//export is used to keep problems hash in memory, but data is flushed to dissk only if export is enabled
 		//inside zbx_export_events() 
 		
-		//if (SUCCEED == zbx_is_export_enabled())
-		zbx_export_events();
+		if (SUCCEED == zbx_is_export_enabled())
+			zbx_export_events();
 
 		zbx_clean_events();
+
 		zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);
 		zbx_vector_ptr_destroy(&trigger_diff);
 	}
 
 	DCconfig_clean_triggers(&trigger, &errcode, 1);
-
+	
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 	return (0 == processed_num ? FAIL : SUCCEED);
 }

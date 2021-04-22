@@ -420,9 +420,6 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         {
             THIS_SHOULD_NEVER_HAPPEN;
             zabbix_log(LOG_LEVEL_INFORMATION, "No new line characer or it is inside the request %s", request);
-            //for (int i= request_len -10; i < request_len; i++) {
-            //    zabbix_log(LOG_LEVEL_WARNING,"%c",request[i]);
-            // }
             return FAIL;
         }
         break;
@@ -436,7 +433,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
          
             for (i = request_len - 10; i < request_len; i++)
             {
-                zabbix_log(LOG_LEVEL_WARNING, "%d %d %d", request_len, i, request[i]);
+                zabbix_log(LOG_LEVEL_DEBUG, "%d %d %d", request_len, i, request[i]);
             }
 
             return FAIL;
@@ -477,7 +474,6 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
 };
 
 int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
-      
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
     if (GLB_WORKER_MODE_SILENT == worker->mode_from_worker)
     {
@@ -489,8 +485,12 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     int wait_count = 0;
     char *resp_buffer = NULL;
     size_t rbuflen = 0, rbuffoffset = 0;
-    double wait_start;
 
+    static char *resp_tail = NULL; // for situations when we've got a tail left from the prev responce,
+                                 // this will hold line that remains;
+    static size_t taillen = 0, tailoffset = 0;
+    
+    double wait_start;
     int empty_line = 0;
     int continue_read = 1;
     int read_len = 0;
@@ -503,10 +503,11 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
         fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
     }
+    
+    //putting first to the buffer what left from the previous request
 
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
-        //usleep(10000);
         char buffer[MAX_STRING_LEN*10];
         buffer[0] = 0;
 
@@ -544,10 +545,6 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                 zabbix_log(LOG_LEVEL_INFORMATION, "Socket read failed errno is %d", errno);
             }
         }
-   //     else
-     //   {
-       //     zabbix_log(LOG_LEVEL_INFORMATION, "Read %d bytes from the worker", read_len);
-     //   }
 
         //zabbix_log(LOG_LEVEL_INFORMATION, "read len check");
         if (0 == read_len)

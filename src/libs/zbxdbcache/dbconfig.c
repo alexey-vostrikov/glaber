@@ -8276,8 +8276,12 @@ void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp, int
 			//	zabbix_log(LOG_LEVEL_INFORMATION,"Skipping item %ld from loading preproc config",dc_preprocitem->itemid);
 				continue;	
 			}
-		if ((dc_item->hostid % CONFIG_PREPROCMAN_FORKS) != manager_num  )	
-			continue;
+		
+		//if ((dc_item->hostid % CONFIG_PREPROCMAN_FORKS) != manager_num  )	
+		//	continue;
+		
+		DEBUG_ITEM(dc_item->itemid, "Adding preprocessing step to the preproc manager steps");
+		
 		if (FAIL == dc_preproc_item_init(&item_local, dc_preprocitem->itemid))
 			continue;
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Loading %ld item to preproc config",dc_preprocitem->itemid);
@@ -15670,6 +15674,77 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) {
 	return ret;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: glb_dc_get_host_state_json                                        *
+ *                                                                            *
+ * Purpose: generates json object holding host states for the requestd 
+ * 		hosts																  *
+ * 		data[{"itemid":1234,"lastclock":2342343,"change":45.3,"value":234},   *
+ * 			{....}, ]														  *
+ *                                                                            *
+ ******************************************************************************/
+int glb_dc_get_triggers_status_json(zbx_vector_uint64_t *triggerids, struct zbx_json *json) {
+	
+	ZBX_DC_TRIGGER *trigger;
+	int i;
+
+	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);	
+	RDLOCK_CACHE;
+	
+	for (i=0; i<triggerids->values_num; i++) {
+	
+		if ( NULL != (trigger = (ZBX_DC_TRIGGER*)zbx_hashset_search(&config->triggers,&triggerids->values[i])) ) {
+			zbx_json_addobject(json,NULL);
+			zbx_json_adduint64(json,"triggerid",trigger->triggerid);
+			zbx_json_adduint64(json,"status",trigger->status);
+			zbx_json_adduint64(json,"state",trigger->state);
+			zbx_json_close(json);			
+		}
+	}
+	UNLOCK_CACHE;
+	zbx_json_close(json);
+	
+	return SUCCEED;
+}
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: glb_dc_get_host_state_json                                        *
+ *                                                                            *
+ * Purpose: generates json object holding host states for the requestd 
+ * 		hosts																  *
+ * 		data[{"itemid":1234,"lastclock":2342343,"change":45.3,"value":234},   *
+ * 			{....}, ]														  *
+ *                                                                            *
+ ******************************************************************************/
+int glb_dc_get_hosts_status_json(zbx_vector_uint64_t *hostids, struct zbx_json *json) {
+	
+	ZBX_DC_HOST *host;
+	int i;
+
+	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);	
+	RDLOCK_CACHE;
+	
+	for (i=0; i<hostids->values_num; i++) {
+	
+		if ( NULL != (host= (ZBX_DC_HOST*)zbx_hashset_search(&config->hosts,&hostids->values[i])) ) {
+			zbx_json_addobject(json,NULL);
+			zbx_json_adduint64(json,"hostid",host->hostid);
+			zbx_json_adduint64(json,"status",host->status);
+			zbx_json_adduint64(json,"available",host->available);
+			zbx_json_adduint64(json,"snmp_available",host->snmp_available);
+			zbx_json_adduint64(json,"ipmi_available",host->ipmi_available);
+			zbx_json_adduint64(json,"jmx_available",host->jmx_available);
+			zbx_json_close(json);			
+		}
+	}
+	UNLOCK_CACHE;
+	zbx_json_close(json);
+	
+	return SUCCEED;
+}
 
 /******************************************************************************
  *                                                                            *

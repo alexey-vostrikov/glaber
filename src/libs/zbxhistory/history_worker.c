@@ -488,7 +488,10 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 						"\"logeventid\":%d, \"severity\":%d, \"source\":\"%s\"",h->value.log->logeventid, h->value.log->severity, buffer);
 					
 				}
-				//warn: intentionally no break here!
+				glb_escape_worker_string(h->value.log->value,buffer);  
+				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value\":\"%s\"", buffer);
+				break;
+				
 			case ITEM_VALUE_TYPE_STR:
 			case ITEM_VALUE_TYPE_TEXT:
 				buffer[0]=0;
