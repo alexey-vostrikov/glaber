@@ -2893,15 +2893,17 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 		//export is used to keep problems hash in memory, but data is flushed to dissk only if export is enabled
 		//inside zbx_export_events() 
 		
-		//if (SUCCEED == zbx_is_export_enabled())
-		zbx_export_events();
+		if (SUCCEED == zbx_is_export_enabled())
+			zbx_export_events();
 
 		zbx_clean_events();
+
 		zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);
 		zbx_vector_ptr_destroy(&trigger_diff);
 	}
 
 	DCconfig_clean_triggers(&trigger, &errcode, 1);
-
+	
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 	return (0 == processed_num ? FAIL : SUCCEED);
 }

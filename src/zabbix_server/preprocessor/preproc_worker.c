@@ -306,7 +306,7 @@ static void	worker_preprocess_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t 
 			message->data);
 	DEBUG_ITEM(itemid, "Unpacked in worker for preprocessing");
 	if (CONFIG_DEBUG_ITEM == itemid) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Will run preprocessing for item %ld, %d steps",itemid,steps_num);
+		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Will run preprocessing for item %ld, %d steps",itemid,steps_num);
 	}
 	zbx_variant_copy(&value_start, &value);
 	results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * steps_num);

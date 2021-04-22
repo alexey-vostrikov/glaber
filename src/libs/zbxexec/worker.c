@@ -479,10 +479,9 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     }
 
     int wait_count = 0;
-    static char *resp_buffer = NULL;
-    
-    
-    static size_t rbuflen = 0, rbuffoffset = 0;
+    char *resp_buffer = NULL;
+    size_t rbuflen = 0, rbuffoffset = 0;
+
     static char *resp_tail = NULL; // for situations when we've got a tail left from the prev responce,
                                  // this will hold line that remains;
     static size_t taillen = 0, tailoffset = 0;
@@ -500,6 +499,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
         fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
     }
+    
     //putting first to the buffer what left from the previous request
 
     while (FAIL == zbx_alarm_timed_out() && continue_read)
