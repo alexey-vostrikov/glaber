@@ -352,16 +352,16 @@ static void glb_worker_process_results(GLB_WORKER_CONF *conf) {
     zbx_hashset_iter_reset(&conf->workers,&iter);
     while (NULL != (worker = zbx_hashset_iter_next(&iter))) {
         //we only query alive workers
-        zabbix_log(LOG_LEVEL_INFORMATION,"Will read data from worker %s", worker->worker.path);
+        zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s", worker->worker.path);
         if (SUCCEED == worker_is_alive(&worker->worker)) { //only read from alive workers
-            zabbix_log(LOG_LEVEL_INFORMATION,"Calling async read");
+            zabbix_log(LOG_LEVEL_DEBUG,"Calling async read");
             while (SUCCEED == async_buffered_responce(&worker->worker, &worker_response)) {
               
-                zabbix_log(LOG_LEVEL_INFORMATION,"Parsing line %s from worker %s", worker_response, worker->worker.path);
+                zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s from worker %s", worker_response, worker->worker.path);
                 glb_worker_submit_result(conf, worker_response);
             }
         } else {
-         zabbix_log(LOG_LEVEL_INFORMATION,"Will %s is not alive, skipping", worker->worker.path);
+         zabbix_log(LOG_LEVEL_DEBUG,"Will %s is not alive, skipping", worker->worker.path);
         }
     }
 

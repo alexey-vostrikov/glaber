@@ -533,12 +533,12 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
                 //and copying it all back to the begining of the circle_buffer
                 buffoffset = 0;
                 
-                zabbix_log(LOG_LEVEL_INFORMATION, "In %s() copying to the start of the buffer ", __func__);
+                zabbix_log(LOG_LEVEL_DEBUG, "In %s() copying to the start of the buffer ", __func__);
                 zbx_strcpy_alloc(&circle_buffer,&bufsize,&buffoffset,tmp_buff);
                 zbx_free(tmp_buff);
             }
         } 
-        zabbix_log(LOG_LEVEL_INFORMATION, "In %s() finished buffer operations, will read from worker ", __func__);
+        zabbix_log(LOG_LEVEL_DEBUG, "In %s() finished buffer operations, will read from worker ", __func__);
         //ok, there is either no data in the buffer or it's incomplete, it's aleady in the start of the buffer
         //reading next piece of data from the worker
         
@@ -563,7 +563,7 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
 
 int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     
-    zabbix_log(LOG_LEVEL_INFORMATION,"In %s: starting", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
     
     if (GLB_WORKER_MODE_SILENT == worker->mode_from_worker)
     {
