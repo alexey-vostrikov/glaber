@@ -65,6 +65,17 @@ $pageHeader
 		->setArgument('showGuiMessaging', $show_gui_messaging)
 		->getUrl()
 	);
+	if (defined('GLB_DEFAULT_MENUPOS')) {
+
+		$position=CProfile::get('menupos',GLB_DEFAULT_MENUPOS);
+
+		$pageHeader
+			->addCssFile('assets/styles/position.css')
+			->addJsFile((new CUrl('js/position.js'))->getUrl())
+			->addJs('$(document).ready(function(){
+			positionTo'.$position.'();
+			})');
+	}
 
 if ($scripts) {
 	$pageHeader->addJsFile((new CUrl('jsLoader.php'))

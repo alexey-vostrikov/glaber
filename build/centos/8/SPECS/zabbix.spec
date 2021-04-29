@@ -441,6 +441,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix
 mkdir -p $RPM_BUILD_ROOT/usr/sbin
 mkdir -p $RPM_BUILD_ROOT/usr/share/zabbix
 mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix/externalscripts
+mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix/workerscripts
 mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix/alertscripts
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man8
 #mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT/usr/lib/zabbix
@@ -471,7 +472,8 @@ install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-
 #mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.d
 install -m 0755 -p src/zabbix_server/zabbix_server_* $RPM_BUILD_ROOT%{_sbindir}/
 install -m 0755 -p src/glapi/glb_hist_clickhouse $RPM_BUILD_ROOT%{_sbindir}/
-install -m 1755 -p ./glbmap $RPM_BUILD_ROOT%{_sbindir}/
+install -m 0755 -p ./glbmap $RPM_BUILD_ROOT%{_sbindir}/
+setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
 #rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
 #mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts $RPM_BUILD_ROOT/usr/lib/zabbix
 cat conf/zabbix_server.conf | sed \
@@ -480,6 +482,7 @@ cat conf/zabbix_server.conf | sed \
 	-e '/^# LogFileSize=/a \\nLogFileSize=0' \
 	-e 's:^# AlertScriptsPath=${datadir}/zabbix/alertscripts:# AlertScriptsPath=/usr/lib/zabbix/alertscripts:' \
 	-e 's:^# ExternalScripts=${datadir}/zabbix/externalscripts:# ExternalScripts=/usr/lib/zabbix/externalscripts:' \
+	-e 's:^# WorkerScripts=${datadir}/zabbix/workerscripts:# WorkerScripts=/usr/lib/zabbix/workerscripts:' \
 	-e 's|^DBUser=root|DBUser=zabbix|g' \
 	-e '/^# SNMPTrapperFile=.*/a \\nSNMPTrapperFile=/var/log/snmptrap/snmptrap.log' \
 	-e '/^# SocketDir=.*/a \\nSocketDir=/var/run/zabbix' \
@@ -522,6 +525,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc database/mysql/schema.sql.gz
 %attr(0600,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_proxy.conf
 %dir /usr/lib/zabbix/externalscripts
+%dir /usr/lib/zabbix/workerscripts
 %config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-proxy
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
@@ -563,6 +567,7 @@ fi
 %doc database/postgresql/schema.sql.gz
 %attr(0600,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_proxy.conf
 %dir /usr/lib/zabbix/externalscripts
+%dir /usr/lib/zabbix/workerscripts
 %config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-proxy
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
@@ -604,6 +609,7 @@ fi
 %doc database/sqlite3/schema.sql.gz
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_proxy.conf
 %dir /usr/lib/zabbix/externalscripts
+%dir /usr/lib/zabbix/workerscripts
 %config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-proxy
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
@@ -649,6 +655,7 @@ fi
 %attr(0600,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_server.conf
 %dir /usr/lib/zabbix/alertscripts
 %dir /usr/lib/zabbix/externalscripts
+%dir /usr/lib/zabbix/workerscripts
 %config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-server
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
@@ -694,7 +701,7 @@ fi
 %doc database/postgresql/timescaledb.sql.gz
 %attr(0600,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_server.conf
 %dir /usr/lib/zabbix/alertscripts
-%dir /usr/lib/zabbix/externalscripts
+%dir /usr/lib/zabbix/workerscripts
 %config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-server
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix

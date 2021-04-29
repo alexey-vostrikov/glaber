@@ -1529,6 +1529,9 @@ define('THEME_DEFAULT', 'default');
 // the default theme
 define('ZBX_DEFAULT_THEME', 'blue-theme');
 
+// default menu position
+//define('GLB_DEFAULT_MENUPOS', 'left');
+
 // date format context, usable for translators
 define('DATE_FORMAT_CONTEXT', 'Date format (see http://php.net/date)');
 

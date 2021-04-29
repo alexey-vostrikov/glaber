@@ -3978,7 +3978,8 @@ z-select[disabled] button,
 
 .screen-table {
   background-color: #ffffff;
-  width: 100%; }
+  table-layout: fixed;
+  overflow:hidden; }
   .screen-table td {
     padding: 2px 3px; }
   .screen-table .table-forms {

@@ -112,7 +112,9 @@ extern int CONFIG_PREPROCMAN_FORKS;
 extern int  CONFIG_GLB_REQUEUE_TIME;
 extern int CONFIG_GLB_SNMP_FORKS;
 extern int CONFIG_GLB_PINGER_FORKS;
+extern int CONFIG_GLB_WORKER_FORKS;
 extern int CONFIG_ICMP_METHOD;
+extern char *CONFIG_WORKERS_DIR;
 
 ZBX_MEM_FUNC_IMPL(__config, config_mem)
 
@@ -242,7 +244,7 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		}
 		return FAIL;
 		break;
-		
+		//typical script will look key will look like this: wisi.py["{HOST.CONN}", "1.3.6.1.4.1.7465.20.2.9.4.4.5.1.2.1.7.1.2"] 
 		case ITEM_TYPE_SIMPLE: {
 			if (0 == CONFIG_GLB_PINGER_FORKS )  return FAIL;
 
@@ -265,9 +267,47 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			return FAIL;
 		}
 		break;
-		default: 
 		
-		return FAIL;
+		case ITEM_TYPE_EXTERNAL: {
+			if (0 == CONFIG_GLB_WORKER_FORKS )  return FAIL;
+	
+			//checking if the script exists in the CONFIG_WORKERS_DIR 
+			char		*cmd = NULL;
+			size_t		cmd_alloc = ZBX_KIBIBYTE, cmd_offset = 0;
+			int		ret = FAIL;
+
+			AGENT_REQUEST	request;
+			init_request(&request);
+
+			if (NULL == CONFIG_WORKERS_DIR) {
+				zabbix_log(LOG_LEVEL_DEBUG,"Workers dir is not set, not using glb_worker for item %ld, key %s",
+						zbx_dc_item->itemid, zbx_dc_item->key);
+				return FAIL;
+			}
+
+			if (SUCCEED != parse_item_key(zbx_dc_item->key, &request)) 
+				return FAIL;
+
+			cmd = (char *)zbx_malloc(cmd, cmd_alloc);
+			zbx_snprintf_alloc(&cmd, &cmd_alloc, &cmd_offset, "%s/%s", CONFIG_WORKERS_DIR, get_rkey(&request));
+
+			if (-1 != access(cmd, X_OK)) {
+				ret = SUCCEED; 
+				zabbix_log(LOG_LEVEL_DEBUG ,"Found command '%s' - ok for adding to glb_worker",cmd);
+			} else {
+				zabbix_log(LOG_LEVEL_DEBUG ,"Couldn't find command '%s' - not adding to workers",cmd);
+			}
+			zbx_free(cmd);
+			free_request(&request);
+			zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+			return ret;
+		}
+
+		break; 
+
+		default: 
+			return FAIL;
 	}
 
 	return FAIL;
@@ -9522,6 +9562,13 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 
 			queue_num = ZBX_POLLER_TYPE_PINGER;
 			break;
+		
+		case ITEM_TYPE_EXTERNAL:
+			zbx_hashset_iter_reset(&config->items,&iter);
+			forks = CONFIG_GLB_WORKER_FORKS;
+
+			queue_num = ZBX_POLLER_TYPE_NORMAL;
+			break;	
 
 		default:
 			zabbix_log(LOG_LEVEL_WARNING,"Glaber poller doesn't support item type %d yet, this is a programming BUG",item_type);
@@ -9536,11 +9583,17 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 
 		//so we know the item, looking for the dc item
 		//as all type specifi types has itemid first (for a reason), we can safely do this
-		if (NULL == ( zbx_dc_item = zbx_hashset_search(&config->items, item))) 
+		
+		if ( ITEM_TYPE_EXTERNAL == item_type) //external items do not their own hash, so using all items
+			zbx_dc_item = item; 
+		else if (NULL == ( zbx_dc_item = zbx_hashset_search(&config->items, item))) 
 			continue;
-
-		if (CONFIG_DEBUG_ITEM == zbx_dc_item->itemid)
-				zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld found in the async polling cycle ",zbx_dc_item->itemid);
+		
+		//to prevent fetching wrong type items
+		if (zbx_dc_item->type != item_type) 
+			continue;
+	
+		DEBUG_ITEM(zbx_dc_item->itemid,"Item found in the async polling cycle ");
 		
 		if (NULL == (zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &zbx_dc_item->hostid))) 
 			continue;
@@ -9555,14 +9608,12 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 			continue;
 		
 		if (SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item))
-		{	//dc_requeue_item(zbx_dc_item, zbx_dc_host, ZBX_ITEM_COLLECTED, now);
 			continue;
-		}
 		
-		if (ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0) {
-			//dc_requeue_item(zbx_dc_item, zbx_dc_host, ZBX_ITEM_COLLECTED, now + CONFIG_TIMEOUT);
+		
+		if (ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0) 
 			continue;
-		}
+		
 
 		//doing type-specific checks here
 		if (FAIL == glb_might_be_async_polled(zbx_dc_item,zbx_dc_host)) {
@@ -9578,7 +9629,7 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 
 		//it's quite a lot of work done there, maybe it's better
 		//to rework to use zbx_dc_item as well as zbx_dc_host
-		// TODO: consider reworking to save some CPU cycles
+		//TODO: consider reworking to save some CPU cycles
 		DCget_host(&dc_item.host, zbx_dc_host);
 		DCget_item(&dc_item, zbx_dc_item);
 		zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);

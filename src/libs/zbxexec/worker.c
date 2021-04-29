@@ -241,7 +241,7 @@ int restart_worker(GLB_EXT_WORKER *worker)
         return FAIL;
     }
     
-    //ok, it;s a fork(burn) time
+    //ok, it;s a fork(born) time
     worker->pid = fork();
 
     if (0 > worker->pid)
@@ -308,14 +308,18 @@ int restart_worker(GLB_EXT_WORKER *worker)
 
     //resetting run count
     worker->calls = 0;
+    if (worker->async_mode) {
+        //to prevent bombing with other async requests in the same process in async mode
+        //having a nap
+        sleep(2);
+    }
     zabbix_log(LOG_LEVEL_DEBUG, "New worker instance pid is %d", worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     return SUCCEED;
 }
 
-static int worker_is_alive(GLB_EXT_WORKER *worker)
+int worker_is_alive(GLB_EXT_WORKER *worker)
 {
-
     if (!worker->pid)
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "Worker hasn't been running before");
@@ -323,7 +327,7 @@ static int worker_is_alive(GLB_EXT_WORKER *worker)
     }
     if (kill(worker->pid, 0))
     {
-        zabbix_log(LOG_LEVEL_DEBUG, "kill to worker's pid has returned non 0");
+        zabbix_log(LOG_LEVEL_INFORMATION, "sending kill to worker's pid %d has returned non 0",worker->pid);
         return FAIL;
     }
     return SUCCEED;
@@ -472,9 +476,95 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     
     return SUCCEED;
 };
+/*
+
+/****************************************************************
+* to assist async workeres and to split data by responces 
+* 
+****************************************************************/
+int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
+    //char *read_buffer=NULL; //we read from worker here 
+    static char *circle_buffer=NULL; //this is constant circle buffer we use to retrun responces
+                                     //since we know the maximim reponce returned from worker has 
+    static size_t buffoffset = 0, bufsize = 0;                                     
+    static size_t start,  //points to the first character of the string
+                  end; //points to \0 at the end of last data chunk
+    char *delim, *request_end=NULL;
+    char *wresp;
+    
+    static char datapresent = 0;
+
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+    switch  (worker->mode_from_worker) {
+        case GLB_WORKER_MODE_NEWLINE: 
+            delim = "\n";
+            break;
+        case GLB_WORKER_MODE_EMPTYLINE:
+            delim = "\n\n";
+            break;
+    }
+    
+    while (1) { //we might need to repeat data 
+    
+        //logic is following - if have any complete data redy in the buffer, send it right away
+        if ( datapresent ) {
+            //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() there are data buffered ", __func__);
+            if ( NULL != (request_end = strstr(circle_buffer + start, delim) )) {
+                //ok, there is complete request data in the buffer, returning it
+                //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found some data ready to send ", __func__);
+                *response = circle_buffer + start;
+                request_end[0]=0; //setting 0 at the end of responce 
+                zabbix_log(LOG_LEVEL_DEBUG, "In %s() will respond with: %s", __func__, *response);
+         
+                start = request_end - circle_buffer + strlen(delim); //setting start to the begining of the new responce
+                //zabbix_log(LOG_LEVEL_INFORMATION, "In %s(): buffer remainings '%s' strlen is %d", __func__, circle_buffer + start, strlen(circle_buffer + start));
+                if (0 == circle_buffer[start] ) { //reaching 0 means evth has been sent from the buffer
+                        datapresent = 0;
+                        start = 0;
+                }
+                //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() datapresent is set to %d ", __func__,datapresent);
+                return SUCCEED;
+            } else { //there is an incomplete data sitting in the buffer which starts as start marker
+                zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found incomplete data: %s at %d", __func__, circle_buffer + start, start);
+                char *tmp_buff = zbx_malloc(NULL, MAX_STRING_LEN);
+                size_t offset = 0, allocated = MAX_STRING_LEN;
+                zbx_strcpy_alloc(&tmp_buff,&allocated, &offset, circle_buffer+start);
+                //and copying it all back to the begining of the circle_buffer
+                buffoffset = 0;
+                
+                zabbix_log(LOG_LEVEL_INFORMATION, "In %s() copying to the start of the buffer ", __func__);
+                zbx_strcpy_alloc(&circle_buffer,&bufsize,&buffoffset,tmp_buff);
+                zbx_free(tmp_buff);
+            }
+        } 
+        zabbix_log(LOG_LEVEL_INFORMATION, "In %s() finished buffer operations, will read from worker ", __func__);
+        //ok, there is either no data in the buffer or it's incomplete, it's aleady in the start of the buffer
+        //reading next piece of data from the worker
+        
+        if (SUCCEED == glb_worker_responce(worker,&wresp)) {
+           // zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Adding worker response '%s' at %d ", __func__,wresp, start);
+            if (datapresent) 
+                buffoffset = strlen(circle_buffer);
+            else 
+                buffoffset = 0;
+            zbx_strcpy_alloc(&circle_buffer, &bufsize, &buffoffset, wresp);
+            datapresent = 1;
+            //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() new buffer is '%s'", __func__,circle_buffer);
+            zbx_free(wresp); 
+        } else { //nothing retruned yet, exiting, no reason to burn CPU here
+            *response = NULL;
+            return FAIL;
+        }
+    } 
+    zabbix_log(LOG_LEVEL_INFORMATION, "End of %s()", __func__);
+}
+
 
 int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
-    zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
+    
+    zabbix_log(LOG_LEVEL_INFORMATION,"In %s: starting", __func__);
+    
     if (GLB_WORKER_MODE_SILENT == worker->mode_from_worker)
     {
         //no need to read anything from the script, we've done
@@ -485,27 +575,23 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     int wait_count = 0;
     char *resp_buffer = NULL;
     size_t rbuflen = 0, rbuffoffset = 0;
-
-    static char *resp_tail = NULL; // for situations when we've got a tail left from the prev responce,
-                                 // this will hold line that remains;
-    static size_t taillen = 0, tailoffset = 0;
-    
+     
     double wait_start;
-    int empty_line = 0;
+
     int continue_read = 1;
-    int read_len = 0;
+    int read_len = 0, total_len = 0;
     int worker_fail = 0;
 
     zbx_alarm_on(worker->timeout);
     wait_start = zbx_time();
 
     if (0 != worker->async_mode) {
+        //zabbix_log(LOG_LEVEL_INFORMATION,"Set operation to non blocking mode");
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
         fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
     }
     
-    //putting first to the buffer what left from the previous request
-
+   
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
         char buffer[MAX_STRING_LEN*10];
@@ -513,80 +599,77 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
 
         //doing non-blocking read. Checking if we eneded up with new line or
         //just a line to understand that all the data has been recieved
+        //zabbix_log(LOG_LEVEL_INFORMATION,"Calling read");
         read_len = read(worker->pipe_from_worker, buffer, MAX_STRING_LEN*10);
-        buffer[read_len] = 0;
-
-        if (-1 == read_len )
-        {
-            //this was supposed to be used in non-blocking mode, but
-            //since in raw descriptor mode it works fine even in blocking mode + alaram
-            //this code isn't needed so far.
-            //todo: either remove or switch scripting to the sync mode
-            if (EAGAIN == errno || EWOULDBLOCK == errno || ENODATA == errno)
-            {
-                //we've reached end of input, it's ok
-                //but if this happens not fisrt time, lets sleep a bit to save CPU
-                //while waitng for some new data to appear
-                
-                if (wait_count++ > 1 && worker->async_mode == 0)
-                {
-                    usleep(1000);
-                   // zabbix_log(LOG_LEVEL_DEBUG, "Waiting for new data for SYNC responce from the worker");
-                } else {
-                   // zabbix_log(LOG_LEVEL_INFORMATION, "Not waiting for new data from the worker due to ASYNC mode");
-                    continue_read = 0;
-                }
-            }
-            else
-            {
-                //this might happen if script dies
-                continue_read = 0;
-
-                zabbix_log(LOG_LEVEL_INFORMATION, "Socket read failed errno is %d", errno);
-            }
-        }
-
-        //zabbix_log(LOG_LEVEL_INFORMATION, "read len check");
-        if (0 == read_len)
-        {
-            //we've got nothing from the worker, which is most likely means that worker has died
-
-            if (SUCCEED != worker_is_alive(worker) || (zbx_time() - wait_start > worker->timeout))
-            {
-                zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s has died during request process or not responding", worker->path);
-                continue_read = 0;
-                worker_fail = 1;
-            }
-            else
-                usleep(10000); //whatever else is is it's good to time to take a nap to save some CPU heat
-        }
-        size_t old_offset = rbuffoffset;
-
-        //todo: get rid of dynamic allocations here
-        //we've got a line, lets put it to the buffer
-
-        zbx_snprintf_alloc(&resp_buffer, &rbuflen, &rbuffoffset, "%s", buffer);
+        //zabbix_log(LOG_LEVEL_INFORMATION,"finished read");
         
-        switch (worker->mode_from_worker)
-        {
-        case GLB_WORKER_MODE_NEWLINE:
-            if (rbuflen > 1 && NULL != strstr(buffer, "\n"))
-            {
-                continue_read = 0;
-                zabbix_log(LOG_LEVEL_DEBUG, "Found newline char in SINLE mode, finishing reading");
-            }
-            break;
-        case GLB_WORKER_MODE_EMPTYLINE:
-            if ((!strcmp(buffer, "\n")) || (NULL != strstr(buffer, "\n\n")))
-            {
-                zabbix_log(LOG_LEVEL_DEBUG, "Found empty line char in MULTI mode, finishing reading");
-                continue_read = 0;
-            }
-            break;
+        switch (read_len) {
+            case -1: 
+                //this was supposed to be used in non-blocking mode, but
+                //since in raw descriptor mode it works fine even in blocking mode + alaram
+                //this code isn't needed so far.
+                //todo: either remove or switch scripting to the sync mode
+                if (EAGAIN == errno || EWOULDBLOCK == errno || ENODATA == errno)
+                {
+                    //we've reached end of input, it's ok
+                    //but if this happens not fisrt time, lets sleep a bit to save CPU
+                    //while waitng for some new data to appear
+                
+                    if (wait_count++ > 1 && worker->async_mode == 0) {
+                        usleep(10000);
+                        zabbix_log(LOG_LEVEL_DEBUG, "Waiting for new data for SYNC responce from the worker");
+                    } else {
+                        zabbix_log(LOG_LEVEL_DEBUG, "Not waiting for new data from the worker due to ASYNC mode");
+                        continue_read = 0;
+                    }
+                } else {
+                    //this might happen if script dies
+                    continue_read = 0;
+                    zabbix_log(LOG_LEVEL_INFORMATION, "Socket read failed errno is %d", errno);
+                }
+                break;
+            case 0: //we've got nothing from the worker, which is most likely means that worker has died
+                //but it's ok there is nothing from async worker
+               // if (worker->async_mode) 
+               //     break;
+                if (SUCCEED != worker_is_alive(worker) || (zbx_time() - wait_start > worker->timeout)) {
+                    zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s has died during request process or not responding", worker->path);
+                    continue_read = 0;
+                    worker_fail = 1;
+                } else
+                    usleep(10000); //whatever else is is it's good to time to take a nap to save some CPU heat
+                break;
+            
+            default: //succesifull read
+                buffer[read_len] = 0;
+                total_len += read_len;
+                //todo: get rid of dynamic allocations here
+                //we've got a line, lets put it to the buffer
+                zabbix_log(LOG_LEVEL_DEBUG, "Adding %s to response buffer",buffer);
+                zbx_snprintf_alloc(&resp_buffer, &rbuflen, &rbuffoffset, "%s", buffer);
+        
+                //if this is sync worker, then checking we've got the responce to stop
+                //for async ones, we just reading whatever ready in the pipe, not bothering about endings
+                if ( 0 == worker->async_mode ) {
+                    switch (worker->mode_from_worker) {
+                        case GLB_WORKER_MODE_NEWLINE:
+                            if (rbuflen > 1 && NULL != strstr(buffer, "\n")) {       
+                                continue_read = 0;
+                                zabbix_log(LOG_LEVEL_DEBUG, "Found newline char in SINLE mode, finishing reading");
+                            }
+                            break;
+                        case GLB_WORKER_MODE_EMPTYLINE:
+                            if ((!strcmp(buffer, "\n")) || (NULL != strstr(buffer, "\n\n"))) {
+                                zabbix_log(LOG_LEVEL_DEBUG, "Found empty line char in MULTI mode, finishing reading");
+                                continue_read = 0;
+                            }
+                            break;
+                    }
+                }
         }
-    }
-    
-    //lets see if actually has red something or it's a timeout has happened
+    } //read data loop was here
+
+    //lets see if actuallyred something or it's a timeout has happened
     if (SUCCEED == zbx_alarm_timed_out() || 1 == continue_read || 1 == worker_fail)
     {
         zabbix_log(LOG_LEVEL_WARNING,
@@ -604,11 +687,10 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
 
     zbx_alarm_off();
     //setting the responce buffer
-    //it's the caller's business to free it
-   // zabbix_log(LOG_LEVEL_INFORMATION,"In %s: setting responce", __func__);
     *responce = resp_buffer;
+     zabbix_log(LOG_LEVEL_DEBUG,"In %s: setting responce: %s, read len is %d", __func__,*responce, total_len);
     //zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished", __func__);
-    if ( 1 > read_len) return POLL_NODATA;
+    if ( 1 > total_len ) return POLL_NODATA;
     return SUCCEED;
 };
 

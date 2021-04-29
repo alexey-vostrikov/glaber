@@ -118,7 +118,7 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 	if (isset($ZBX_SERVER_NAME) && $ZBX_SERVER_NAME !== '') {
 		$pageTitle = $ZBX_SERVER_NAME.NAME_DELIMITER;
 	}
-	$pageTitle .= isset($page['title']) ? $page['title'] : _('Zabbix');
+	$pageTitle .= isset($page['title']) ? $page['title'] : _('Glaber');
 
 	if ((defined('ZBX_PAGE_DO_REFRESH') || defined('ZBX_PAGE_DO_JS_REFRESH')) && CWebUser::getRefresh() != 0) {
 		$pageTitle .= ' ['._s('refreshed every %1$s sec.', CWebUser::getRefresh()).']';
@@ -145,6 +145,7 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 		}
 	}
 	$pageHeader->addCssFile('assets/styles/'.CHtml::encode($theme).'.css');
+	
 
 	if ($page['file'] == 'sysmap.php') {
 		$pageHeader->addCssFile('imgstore.php?css=1&output=css');
@@ -152,11 +153,23 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 
 	$pageHeader
 		->addJsFile((new CUrl('js/browsers.js'))->getUrl())
+		->addCssFile('assets/styles/position.css')
 		->addJsBeforeScripts(
 			'var PHP_TZ_OFFSET = '.date('Z').','.
 				'PHP_ZBX_FULL_DATE_TIME = "'.ZBX_FULL_DATE_TIME.'";'
 		);
+	
+	if (defined('GLB_DEFAULT_MENUPOS')) {
+		$pageHeader
+			->addCssFile('assets/styles/position.css')
+			->addJsFile((new CUrl('js/position.js'))->getUrl())
+			->addJs('$(document).ready(function(){
+				positionTo'.$position.'();
+			})');
 
+		$position=CProfile::get('menupos',GLB_DEFAULT_MENUPOS);
+	}
+	
 	// Show GUI messages in pages with menus and in fullscreen mode.
 	if (!defined('ZBX_PAGE_NO_JSLOADER')) {
 		$pageHeader->addJsFile((new CUrl('jsLoader.php'))

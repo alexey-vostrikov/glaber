@@ -1358,6 +1358,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "glb_snmp_poller";
 		case GLB_PROCESS_TYPE_PINGER:
 			return "glb_pinger";
+		case GLB_PROCESS_TYPE_WORKER:
+			return "glb_worker";			
 	}
 
 	zbx_error("Unknown process type %d",proc_type);

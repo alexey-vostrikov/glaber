@@ -142,6 +142,7 @@ override_dh_auto_build: $(BUILD_TARGETS) build_with_sqlite build_with_pgsql buil
 
 define build_with
 	export EXTERNAL_SCRIPTS_PATH=/usr/lib/zabbix/externalscripts; \
+	export WORKER_SCRIPTS_PATH=/usr/lib/zabbix/workerscripts; \
 	export ALERT_SCRIPTS_PATH=/usr/lib/zabbix/alertscripts; \
 	cd $(CURDIR)/debian/tmp.build-$(1) && make && cd -
 endef

@@ -1088,7 +1088,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigne
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	DEBUG_ITEM(itemid,"Starting item preprocessing");
+	DEBUG_ITEM(itemid,"Preparing item to send to preprocessing");
 
 	if (ITEM_STATE_NORMAL == state)
 	{

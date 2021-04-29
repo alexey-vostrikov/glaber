@@ -113,8 +113,12 @@ class CControllerUserProfileEdit extends CControllerUserEditGeneral {
 			'url' => $this->user['url'],
 			'messages' => $this->getInput('messages', []) + getMessageSettings(),
 			'form_refresh' => 0,
-			'action' => $this->getAction()
+			'action' => $this->getAction(),
 		];
+
+		if (defined('GLB_DEFAULT_MENUPOS')) {
+			$data['menupos'] =  CProfile::get('menupos',GLB_DEFAULT_MENUPOS);
+		}
 
 		if (CWebUser::$data['type'] > USER_TYPE_ZABBIX_USER) {
 			$data['medias'] = $this->user['medias'];

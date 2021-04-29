@@ -11,6 +11,7 @@
 #include "log.h"
 #include "glb_poller.h"
 #include "glb_pinger.h"
+#include "glb_worker.h"
 #include "../poller/poller.h"
 #include "../poller/checks_snmp.h"
 #include "../../libs/zbxexec/worker.h"
@@ -46,7 +47,7 @@ int event_elem_compare(const void *d1, const void *d2)
 /* this is a good candidate for macro */
 static void add_event(zbx_binary_heap_t *events, char type, zbx_uint64_t id, unsigned int time)
 {
-//	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	GLB_POLLER_EVENT *event = zbx_malloc(NULL, sizeof(GLB_POLLER_EVENT));
 
 	event->id = id;
@@ -55,7 +56,7 @@ static void add_event(zbx_binary_heap_t *events, char type, zbx_uint64_t id, uns
 
 	zbx_binary_heap_elem_t elem = {time, (const void *)event};
 	zbx_binary_heap_insert(events, &elem);
-//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished", __func__);	
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);	
 }
 
 /****************************************************************
@@ -81,6 +82,10 @@ void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
 #endif
 		case ITEM_TYPE_SIMPLE: /* only pinger items are handled actually */
 			glb_pinger_free_item( (GLB_PINGER_ITEM*) glb_item->itemdata );
+			break;
+		
+		case ITEM_TYPE_EXTERNAL: /* only pinger items are handled actually */
+			glb_worker_free_item( (GLB_WORKER_ITEM*) glb_item->itemdata );
 			break;
 		
 		default:
@@ -112,6 +117,10 @@ static void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_ite
 #endif
 	case ITEM_TYPE_SIMPLE:
 		glb_pinger_start_ping(engine, glb_item);
+		break;
+	case ITEM_TYPE_EXTERNAL:
+		zabbix_log(LOG_LEVEL_WARNING,"Starting request to worker");
+		glb_worker_send_request(engine, glb_item);
 		break;
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",glb_item->item_type);
@@ -187,10 +196,12 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(items, &dc_item->itemid)))
 	{
-			//maybe it's better to make updtaing of an item, not recreating here
 			DEBUG_ITEM(dc_item->itemid, "Item already int the local queue, cleaning");
-			glb_free_item_data(glb_item);
-			zbx_heap_strpool_release(glb_item->delay);
+
+			if (POLL_QUEUED == glb_item->state) {
+				glb_free_item_data(glb_item);
+				zbx_heap_strpool_release(glb_item->delay);
+			}
 
 	} else	{
 		
@@ -231,69 +242,94 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	
 	//common attributes
 	glb_item->itemid = dc_item->itemid;
-	glb_item->lastpolltime = 0;
+	//glb_item->lastpolltime = 0;
 	glb_item->delay = zbx_heap_strpool_intern(dc_item->delay);
 	glb_item->value_type = dc_item->value_type;
 	glb_item->ttl = now + CONFIG_CONFSYNCER_FREQUENCY * 1.5; //updating item's aging
-
 	glb_item->flags = dc_item->flags;
 	glb_item->item_type = dc_item->type;
 
-	//item-type specific init
-	switch (glb_item->item_type )
-	{
+	if (POLL_POLLING != glb_item->state) {
+		//item-type specific init
+		switch (glb_item->item_type )
+		{
 #ifdef HAVE_NETSNMP
-	case ITEM_TYPE_SNMP: {
-		GLB_SNMP_ITEM *glb_snmp_item; 
+		case ITEM_TYPE_SNMP: {
+			GLB_SNMP_ITEM *glb_snmp_item; 
 
-		if (NULL == (glb_snmp_item = zbx_malloc(NULL, sizeof(GLB_SNMP_ITEM)))) {
-			zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
-			exit(-1);
-		}
+			if (NULL == (glb_snmp_item = zbx_malloc(NULL, sizeof(GLB_SNMP_ITEM)))) {
+				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
+				exit(-1);
+			}
 	
-		DEBUG_ITEM(glb_item->itemid,"Doing SNMP spcecific init");
-		glb_item->itemdata = (void *)glb_snmp_item;
+			DEBUG_ITEM(glb_item->itemid,"Doing SNMP spcecific init");
+			glb_item->itemdata = (void *)glb_snmp_item;
 
-		if (SUCCEED  != glb_snmp_init_item(dc_item, glb_snmp_item )) {
-			zabbix_log(LOG_LEVEL_WARNING, "Coudln't init snmp_item %ld not placing to the poll queue", glb_item->itemid);
+			if (SUCCEED  != glb_snmp_init_item(dc_item, glb_snmp_item )) {
+				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init snmp_item %ld not placing to the poll queue", glb_item->itemid);
 			//removing the item from the hashset
-			zbx_free(glb_snmp_item);
-			zbx_heap_strpool_release(glb_item->delay);
-			zbx_hashset_remove_direct(items,glb_item);
+				zbx_free(glb_snmp_item);
+				zbx_heap_strpool_release(glb_item->delay);
+				zbx_hashset_remove_direct(items,glb_item);
 
-			return FAIL;
-		}
+				return FAIL;
+			}
 		
-		break;
-	}
+			break;
+		}
 #endif
-	case ITEM_TYPE_SIMPLE: {
-		GLB_PINGER_ITEM *glb_pinger_item; 
+		case ITEM_TYPE_SIMPLE: {
+			GLB_PINGER_ITEM *glb_pinger_item; 
 		
-		if (NULL == (glb_pinger_item = zbx_malloc(NULL, sizeof(GLB_PINGER_ITEM)))) {
-			zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
-			exit(-1);
-		}
+			if (NULL == (glb_pinger_item = zbx_malloc(NULL, sizeof(GLB_PINGER_ITEM)))) {
+				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
+				exit(-1);
+			}
 		
-		DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
-		glb_item->itemdata = (void *)glb_pinger_item;
+			DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
+			glb_item->itemdata = (void *)glb_pinger_item;
 		
-		if (SUCCEED  != glb_pinger_init_item(dc_item, glb_pinger_item )) {
-			zabbix_log(LOG_LEVEL_WARNING, "Coudln't init pinger item %ld, not placing to the poll queue", glb_item->itemid);
-			//removing the item from the hashset
-			zbx_free(glb_pinger_item);
-			zbx_heap_strpool_release(glb_item->delay);
-			zbx_hashset_remove_direct(items,glb_item);
+			if (SUCCEED  != glb_pinger_init_item(dc_item, glb_pinger_item )) {
+				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init pinger item %ld, not placing to the poll queue", glb_item->itemid);
+				//removing the item from the hashset
+				zbx_free(glb_pinger_item);
+				zbx_heap_strpool_release(glb_item->delay);
+				zbx_hashset_remove_direct(items,glb_item);
 
-			return FAIL;
-		}
+				return FAIL;
+			}
 		
-		break;
-	}
-	default:
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit (-1);
+			break;
+		}
+		case ITEM_TYPE_EXTERNAL: {
+			GLB_WORKER_ITEM *glb_worker_item; 
+		
+			if (NULL == (glb_worker_item = zbx_malloc(NULL, sizeof(GLB_WORKER_ITEM)))) {
+				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
+				exit(-1);
+			}
+		
+			//zabbix_log(LOG_LEVEL_INFORMATION, "Doing async worker item %ld init", glb_item->itemid);
+			DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
+			glb_item->itemdata = (void *)glb_worker_item;
+		
+			if (SUCCEED  != glb_worker_init_item(dc_item, glb_worker_item )) {
+				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
+				//removing the item from the hashset
+				zbx_free(glb_worker_item);
+				zbx_heap_strpool_release(glb_item->delay);
+				zbx_hashset_remove_direct(items,glb_item);
+
+				return FAIL;
+			}
+		
+			break;
+		}
+		default:
+			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
+			THIS_SHOULD_NEVER_HAPPEN;
+			exit (-1);
+		}
 	}
 
 	if ( POLL_FREE == glb_item->state) {
@@ -303,15 +339,13 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 
 	}
 
-	//zabbix_log(LOG_LEVEL_INFORMATION, "%s finished", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s finished", __func__);
 	return SUCCEED;
 }
 
 /******************************************************************
- * inits the proper worker for the item_type 					  *
- * since worker init accepts json as a param, forms the			  *
- * json string and passes to the worker init sequence			  *
- * //TODO: this somehow must fit to external script logic         *
+* inits the proper worker for the item_type 					  *
+*
  * ***************************************************************/
 void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responces) {
 	
@@ -323,6 +357,10 @@ void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_
 #endif
 		case ITEM_TYPE_SIMPLE:
 			return glb_pinger_init(items, requests, responces);
+			break;
+		
+		case ITEM_TYPE_EXTERNAL:
+			return glb_worker_init(items, requests, responces);
 			break;
 
 		default: 
@@ -347,6 +385,9 @@ void glb_poller_engine_shutdown(void *engine, unsigned char item_type) {
 #endif
 		case ITEM_TYPE_SIMPLE:
 			glb_pinger_shutdown(engine); 
+			break;
+		case ITEM_TYPE_EXTERNAL:
+			glb_worker_shutdown(engine); 
 			break;
 		default: 
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot shutdown engine for item type %d, this is a BUG",item_type);
@@ -389,6 +430,9 @@ static void glb_poller_handle_async_io(void *engine, unsigned char item_type ) {
 #endif	
 	case ITEM_TYPE_SIMPLE:
 		glb_pinger_handle_async_io(engine);
+		break;
+	case ITEM_TYPE_EXTERNAL:
+		glb_worker_handle_async_io(engine);
 		break;
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",item_type);
@@ -437,6 +481,8 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't init polling engine for item type %d, exiting", item_type);
 		exit(-1);
 	}
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+		server_num, get_process_type_string(process_type), process_num);
 
  	zbx_setproctitle("%s #%d [connecting to the database]", get_process_type_string(process_type), process_num);
 
@@ -493,6 +539,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 							
 							//todo:remove this state to internal poller logic
 							glb_item->state = POLL_POLLING;
+							glb_item->lastpolltime = now;
 					
 							DEBUG_ITEM(glb_item->itemid,"Starting poller item poll");
 							DEBUG_HOST(glb_item->hostid,"Satrting poller item poll");
@@ -559,11 +606,6 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 				num = DCconfig_get_glb_poller_items(&events, &hosts, &items, item_type, process_num, poll_engine);
 				zabbix_log(LOG_LEVEL_DEBUG, "Event: got %d new items from the config cache", num);
 				
-				//todo: rethink this - looks like it creates problems - under high load a poller might get too busy
-				//and sometimes items wait for several minutes in internal queues to be polled. Adding the same item again and again
-				//just wastes memory.
-				//also it's better to get rid of lots state constants, und use unified ones POLL_*
-
 				//so, perhaps, it's better to control with 100% precision  of machine state tha returns items to the queue
 				zbx_hashset_iter_t iter;
 				zbx_hashset_iter_reset(&items, &iter );
@@ -591,9 +633,10 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		
 		glb_poller_handle_async_io(poll_engine, item_type);
 		
-		if ( old_activity == requests + responces ) 
+		if ( old_activity == requests + responces ) {
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Nothing to do, sleeping");
 			usleep(100000);
-		
+		}
 		old_activity = requests + responces;
 
 		if (next_stat_time < now ) {

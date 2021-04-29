@@ -140,6 +140,7 @@ const char	*help_message[] = {
 	"Some configuration parameter default locations:",
 	"  AlertScriptsPath               \"" DEFAULT_ALERT_SCRIPTS_PATH "\"",
 	"  ExternalScripts                \"" DEFAULT_EXTERNAL_SCRIPTS_PATH "\"",
+	"  WorkerScripts                  \"" DEFAULT_WORKER_SCRIPTS_PATH "\"",
 #ifdef HAVE_LIBCURL
 	"  SSLCertLocation                \"" DEFAULT_SSL_CERT_LOCATION "\"",
 	"  SSLKeyLocation                 \"" DEFAULT_SSL_KEY_LOCATION "\"",
@@ -186,6 +187,7 @@ int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int CONFIG_GLB_SNMP_FORKS		= 1;
 int CONFIG_GLB_PINGER_FORKS		= 1;
+int CONFIG_GLB_WORKER_FORKS		= 0;
 int CONFIG_ICMP_METHOD  = GLB_ICMP;
 char *CONFIG_VCDUMP_LOCATION	= NULL;
 int CONFIG_VCDUMP_FREQUENCY	= 60;
@@ -249,6 +251,7 @@ int	CONFIG_UNAVAILABLE_DELAY	= 60;
 int	CONFIG_LOG_LEVEL		= LOG_LEVEL_WARNING;
 char	*CONFIG_ALERT_SCRIPTS_PATH	= NULL;
 char	*CONFIG_EXTERNALSCRIPTS		= NULL;
+char	*CONFIG_WORKERS_DIR		= NULL;
 char	*CONFIG_TMPDIR			= NULL;
 char	*CONFIG_FPING_LOCATION		= NULL;
 char	*CONFIG_FPING6_LOCATION		= NULL;
@@ -459,6 +462,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = GLB_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
 	}
+	else if (local_server_num <= (server_count += CONFIG_GLB_WORKER_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_WORKER;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_WORKER_FORKS;
+	}
 	else if (local_server_num <= (server_count += CONFIG_UNREACHABLE_POLLER_FORKS))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_UNREACHABLE;
@@ -559,6 +567,10 @@ static void	zbx_set_defaults(void)
 
 	if (NULL == CONFIG_EXTERNALSCRIPTS)
 		CONFIG_EXTERNALSCRIPTS = zbx_strdup(CONFIG_EXTERNALSCRIPTS, DEFAULT_EXTERNAL_SCRIPTS_PATH);
+		
+	if (NULL == CONFIG_WORKERS_DIR)
+		CONFIG_WORKERS_DIR = zbx_strdup(CONFIG_WORKERS_DIR, DEFAULT_WORKER_SCRIPTS_PATH);
+			
 #ifdef HAVE_LIBCURL
 	if (NULL == CONFIG_SSL_CERT_LOCATION)
 		CONFIG_SSL_CERT_LOCATION = zbx_strdup(CONFIG_SSL_CERT_LOCATION, DEFAULT_SSL_CERT_LOCATION);
@@ -758,6 +770,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},
+		{"StartGlbWorkers",		&CONFIG_GLB_WORKER_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},
 		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
 			PARM_OPT,	0,			0},		
 		{"ValueCacheDumpLocation",		&CONFIG_VCDUMP_LOCATION,			TYPE_STRING,
@@ -846,6 +860,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"ExternalScripts",		&CONFIG_EXTERNALSCRIPTS,		TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"WorkerScripts",		&CONFIG_WORKERS_DIR,		TYPE_STRING,
+			PARM_OPT,	0,			0},	
 		{"DBHost",			&CONFIG_DBHOST,				TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"DBName",			&CONFIG_DBNAME,				TYPE_STRING,
@@ -1352,7 +1368,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
 			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
-			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_PINGER_FORKS
+			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_PINGER_FORKS + CONFIG_GLB_WORKER_FORKS
 			+ CONFIG_ALERTER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_TIMER_FORKS
 			+ CONFIG_HTTPPOLLER_FORKS + CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS
 			+ CONFIG_ESCALATOR_FORKS + CONFIG_IPMIPOLLER_FORKS + CONFIG_JAVAPOLLER_FORKS
@@ -1427,6 +1443,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				break;	
 			case GLB_PROCESS_TYPE_PINGER:
 				poller_type = ITEM_TYPE_SIMPLE;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_WORKER:
+				poller_type = ITEM_TYPE_EXTERNAL;
 				thread_args.args = &poller_type;
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	

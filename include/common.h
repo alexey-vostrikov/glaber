@@ -469,6 +469,9 @@ zbx_graph_yaxis_types_t;
 /* special item key used for ICMP ping loss packages */
 #define SERVER_ICMPPINGLOSS_KEY	"icmppingloss"
 
+/* item key to distinguish extrnal calls */
+#define SERVER_EXTERNAL_KEY	"script"
+
 /* runtime control options */
 #define ZBX_CONFIG_CACHE_RELOAD	"config_cache_reload"
 #define ZBX_SECRETS_RELOAD	"secrets_reload"
@@ -592,7 +595,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define ZBX_PROCESS_TYPE_ALERTSYNCER	30
 #define GLB_PROCESS_TYPE_SNMP	31
 #define GLB_PROCESS_TYPE_PINGER	32
-#define ZBX_PROCESS_TYPE_COUNT		33	/* number of process types */
+#define GLB_PROCESS_TYPE_WORKER	33
+#define ZBX_PROCESS_TYPE_COUNT		34	/* number of process types */
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char proc_type);
 int		get_process_type_by_name(const char *proc_type_str);

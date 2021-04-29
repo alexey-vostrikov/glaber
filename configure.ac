@@ -1880,6 +1880,7 @@ AGENT_CONFIG_FILE="${sysconfdir}/zabbix_agentd.conf"
 AGENT2_CONFIG_FILE="${sysconfdir}/zabbix_agent2.conf"
 
 EXTERNAL_SCRIPTS_PATH="${datadir}/zabbix/externalscripts"
+WORKER_SCRIPTS_PATH="${datadir}/zabbix/workerscripts"
 ALERT_SCRIPTS_PATH="${datadir}/zabbix/alertscripts"
 
 CURL_SSL_CERT_LOCATION="${datadir}/zabbix/ssl/certs"
@@ -1940,7 +1941,10 @@ AC_SUBST(PROXY_CONFIG_FILE)
 AC_SUBST(AGENT_CONFIG_FILE)
 AC_SUBST(AGENT2_CONFIG_FILE)
 
+
 AC_SUBST(EXTERNAL_SCRIPTS_PATH)
+AC_SUBST(WORKER_SCRIPTS_PATH)
+
 AC_SUBST(ALERT_SCRIPTS_PATH)
 
 AC_SUBST(CURL_SSL_CERT_LOCATION)
@@ -2106,6 +2110,9 @@ AGENT2_CONFIG_FILE=`eval echo "${AGENT2_CONFIG_FILE}"`
 EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
 EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
 
+WORKER_SCRIPTS_PATH=`eval echo "${WORKER_SCRIPTS_PATH}"`
+WORKER_SCRIPTS_PATH=`eval echo "${WORKER_SCRIPTS_PATH}"`
+
 ALERT_SCRIPTS_PATH=`eval echo "${ALERT_SCRIPTS_PATH}"`
 ALERT_SCRIPTS_PATH=`eval echo "${ALERT_SCRIPTS_PATH}"`
 
@@ -2202,6 +2209,7 @@ echo "    SNMP:                  ${have_snmp}
     Libraries:             ${SERVER_LIBS} ${LIBS}
     Configuration file:    ${SERVER_CONFIG_FILE}
     External scripts:      ${EXTERNAL_SCRIPTS_PATH}
+	Worker scripts:        ${WORKER_SCRIPTS_PATH}
     Alert scripts:         ${ALERT_SCRIPTS_PATH}
     Modules:               ${LOAD_MODULE_PATH}"
 

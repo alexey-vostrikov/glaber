@@ -118,6 +118,7 @@ const char	*help_message[] = {
 	"",
 	"Some configuration parameter default locations:",
 	"  ExternalScripts                \"" DEFAULT_EXTERNAL_SCRIPTS_PATH "\"",
+	"  WorkerScripts                \"" DEFAULT_WORKER_SCRIPTS_PATH "\"",
 #ifdef HAVE_LIBCURL
 	"  SSLCertLocation                \"" DEFAULT_SSL_CERT_LOCATION "\"",
 	"  SSLKeyLocation                 \"" DEFAULT_SSL_KEY_LOCATION "\"",
@@ -549,6 +550,9 @@ static void	zbx_set_defaults(void)
 #endif
 	if (NULL == CONFIG_EXTERNALSCRIPTS)
 		CONFIG_EXTERNALSCRIPTS = zbx_strdup(CONFIG_EXTERNALSCRIPTS, DEFAULT_EXTERNAL_SCRIPTS_PATH);
+
+	if (NULL == CONFIG_WORKERSCRIPTS)
+		CONFIG_WORKERSCRIPTS = zbx_strdup(CONFIG_WORKERSCRIPTS, DEFAULT_WORKER_SCRIPTS_PATH);
 
 	if (NULL == CONFIG_LOAD_MODULE_PATH)
 		CONFIG_LOAD_MODULE_PATH = zbx_strdup(CONFIG_LOAD_MODULE_PATH, DEFAULT_LOAD_MODULE_PATH);
