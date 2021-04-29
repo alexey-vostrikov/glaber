@@ -183,6 +183,7 @@ int CONFIG_ICMP_METHOD  = GLB_ICMP;
 char 	*ICMP_METHOD_STR = NULL;
 char 	*CONFIG_GLBMAP_LOCATION		= NULL;
 char 	*CONFIG_GLBMAP_OPTIONS		= NULL;
+int CONFIG_GLB_WORKER_FORKS		= 0;
 
 int	CONFIG_CONFSYNCER_FREQUENCY	= 120;
 
@@ -277,6 +278,7 @@ char	*CONFIG_DB_TLS_CA_FILE		= NULL;
 char	*CONFIG_DB_TLS_CIPHER		= NULL;
 char	*CONFIG_DB_TLS_CIPHER_13	= NULL;
 char	*CONFIG_EXPORT_DIR		= NULL;
+char	*CONFIG_WORKERS_DIR		= NULL;
 int	CONFIG_DBPORT			= 0;
 int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
 int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
@@ -473,10 +475,10 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = GLB_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_GLB_PINGER_FORKS))
+	else if (local_server_num <= (server_count +=CONFIG_GLB_WORKER_FORKS ))
 	{
-		*local_process_type = GLB_PROCESS_TYPE_PINGER;
-		*local_process_num = local_server_num - server_count + CONFIG_GLB_PINGER_FORKS;
+		*local_process_type = GLB_PROCESS_TYPE_WORKER;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_WORKER_FORKS;
 	}
 	else
 		return FAIL;
@@ -551,9 +553,9 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_EXTERNALSCRIPTS)
 		CONFIG_EXTERNALSCRIPTS = zbx_strdup(CONFIG_EXTERNALSCRIPTS, DEFAULT_EXTERNAL_SCRIPTS_PATH);
 
-	if (NULL == CONFIG_WORKERSCRIPTS)
-		CONFIG_WORKERSCRIPTS = zbx_strdup(CONFIG_WORKERSCRIPTS, DEFAULT_WORKER_SCRIPTS_PATH);
-
+	if (NULL == CONFIG_WORKERS_DIR)
+		CONFIG_WORKERS_DIR = zbx_strdup(CONFIG_WORKERS_DIR, DEFAULT_EXTERNAL_SCRIPTS_PATH);
+	
 	if (NULL == CONFIG_LOAD_MODULE_PATH)
 		CONFIG_LOAD_MODULE_PATH = zbx_strdup(CONFIG_LOAD_MODULE_PATH, DEFAULT_LOAD_MODULE_PATH);
 #ifdef HAVE_LIBCURL
@@ -799,6 +801,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},
+		{"StartGlbWorkers",		&CONFIG_GLB_WORKER_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},
 		{"GlbmapLocation",		&CONFIG_GLBMAP_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"GlbmapOptions",		&CONFIG_GLBMAP_OPTIONS,			TYPE_STRING,
@@ -893,6 +897,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"LogFileSize",			&CONFIG_LOG_FILE_SIZE,			TYPE_INT,
 			PARM_OPT,	0,			1024},
 		{"ExternalScripts",		&CONFIG_EXTERNALSCRIPTS,		TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"WorkerScripts",		&CONFIG_WORKERS_DIR,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"DBHost",			&CONFIG_DBHOST,				TYPE_STRING,
 			PARM_OPT,	0,			0},

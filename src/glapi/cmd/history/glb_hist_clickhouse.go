@@ -2,7 +2,7 @@ package main
 
 import (
 	"glaber.io/glapi/pkg/histapi"
-	"glaber.io/glapi/pkg/histback"
+	"glaber.io/glapi/pkg/histback/clickhouse"
 	"flag"
 	"log"
 	"os"
