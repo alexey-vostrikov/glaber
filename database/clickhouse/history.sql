@@ -1,3 +1,4 @@
+CREATE DATABASE glaber;
 CREATE TABLE glaber.history_dbl (   day Date,  
                                 itemid UInt64,  
                                 clock DateTime,  
