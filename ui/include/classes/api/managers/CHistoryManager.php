@@ -44,41 +44,6 @@ class CHistoryManager {
 	}
 
 	/**
-	 * SQL specific implementation of getItemsHavingValues.
-	 *
-	 * @see CHistoryManager::getItemsHavingValues
-	 */
-	private function getItemsHavingValuesFromSql(array $items, $period = null) {
-		$results = [];
-
-		if ($period) {
-			$period = time() - $period;
-		}
-
-		$items = zbx_toHash($items, 'itemid');
-
-		$itemids_by_type = [];
-
-		foreach ($items as $itemid => $item) {
-			$itemids_by_type[$item['value_type']][] = $itemid;
-		}
-
-		foreach ($itemids_by_type as $type => $type_itemids) {
-			$type_results = DBfetchColumn(DBselect(
-				'SELECT itemid'.
-				' FROM '.self::getTableName($type).
-				' WHERE '.dbConditionInt('itemid', $type_itemids).
-					($period ? ' AND clock>'.$period : '').
-				' GROUP BY itemid'
-			), 'itemid');
-
-			$results += array_intersect_key($items, array_flip($type_results));
-		}
-
-		return $results;
-	}
-
-	/**
 	 * Returns the last $limit history objects for the given items.
 	 *
 	 * @param array $items   An array of items with the 'itemid' and 'value_type' properties.
@@ -240,10 +205,10 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 		foreach ($items as $item) {
 		
 			$results[$item['itemid']]['data'] = [];
-		
-			error_log(print_r($agg_results,1));
-			error_log(print_r($trend_results,1));
-			error_log(print_r($results,1));
+			
+			//error_log(print_r($agg_results,1));
+			//error_log(print_r($trend_results,1));
+			//error_log(print_r($results,1));
 
 			if (isset($trend_results[$item['itemid']]['data']) && is_array($trend_results[$item['itemid']]['data'])) 
 				$results[$item['itemid']]['data'] += $trend_results[$item['itemid']]['data'];
@@ -284,29 +249,11 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 	 */
 	//TODO implement this based on server's request
 	 public function getAggregatedValue(array $item, $aggregation, $time_from) {
-		switch (self::getDataSourceType($item['value_type'])) {
-			case ZBX_HISTORY_SOURCE_CLICKHOUSE:
-				return $this->getAggregatedValueFromClickhouse($item, $aggregation, $time_from);
-		
-			default:
-				return $this->getAggregatedValueFromSql($item, $aggregation, $time_from);
-		}
+//		switch (self::getDataSourceType($item['value_type'])) {
+			   return $this->getAggregatedValueFromServer($item, $aggregation, $time_from);
 	}
-
-	private function getAggregatedValueFromClickhouse(array $item, $aggregation, $time_from) {
-
-		global $HISTORY;
-		$query_text =
-			'SELECT '.$aggregation.'(value) AS value'.
-			' FROM '. $HISTORY['dbname']. '.history_buffer '.
-			' WHERE clock>toDateTime('.$time_from.')'.
-			' AND itemid='.$item['itemid'].
-			' HAVING COUNT(*)>0';
-		
-
-		$value = CClickHouseHelper::query($query_text,0,array());
-
-		return $value;
+	private function getAggregatedValueFromServer(array $item, $aggregation, $time_from) {
+		error_log("Requested aggregated value for items $item, agg: $aggregation, from: $time_from");
 
 	}
 	
@@ -339,7 +286,8 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 	 * @return bool
 	 */
 	public function deleteHistory(array $items) {
-		return $this->deleteHistoryFromSql($items) && $this->deleteHistoryFromElasticsearch(array_keys($items));
+		return;
+		//return $this->deleteHistoryFromSql($items) && $this->deleteHistoryFromElasticsearch(array_keys($items));
 	}
 
 	/**

@@ -613,8 +613,9 @@ class CLineGraphDraw extends CGraphDraw {
 			$item = get_item_by_itemid($this->ymax_itemid);
 			if ($item) {
 				$history = Manager::History()->getLastValues([$item]);
+			
 				if (isset($history[$item['itemid']])) {
-					return $history[$item['itemid']][0]['value'];
+					return $history[$item['itemid']]['value'];
 				}
 			}
 		}

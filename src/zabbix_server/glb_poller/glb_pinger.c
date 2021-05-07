@@ -497,7 +497,7 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
 static int glb_pinger_process_response(GLB_PINGER_CONF *conf, GLB_PINGER_ITEM *glb_pinger_item, int rtt) {
 
     if ( rtt > glb_pinger_item->timeout ) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"Ignoring packet from host %s as it came after timeout rtt:%d  timeout: %d)",glb_pinger_item->ip, rtt,  glb_pinger_item->timeout );
+        zabbix_log(LOG_LEVEL_DEBUG,"Ignoring packet from host %s as it came after timeout rtt:%d  timeout: %d)",glb_pinger_item->ip, rtt,  glb_pinger_item->timeout );
         return SUCCEED;
     }
 

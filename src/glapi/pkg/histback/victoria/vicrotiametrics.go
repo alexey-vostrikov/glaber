@@ -469,7 +469,7 @@ func (he VictoriaHist) Flush () int {
 		}	
 	}
 
-	log.Print("Flushed records:",flushed)
+	//log.Print("Flushed records:",flushed)
 	
 	return flushed
 	
