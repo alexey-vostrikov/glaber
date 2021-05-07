@@ -1,0 +1,13 @@
+#!/bin/sh
+killall -9 zabbix_server
+rm src/zabbix_server/zabbix_server
+rm /var/log/zabbix/zabbix_server.log
+echo "started" >  /var/log/zabbix/zabbix_server.log
+chown zabbix /var/log/zabbix/zabbix_server.log
+make
+#cd ../..
+#mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix_server
+#mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix_server
+TZ='Asia/Yekaterinburg'; export TZ
+src/zabbix_server/zabbix_server -c /etc/zabbix/zabbix_server.conf
+tail -f /var/log/zabbix/zabbix_server.log

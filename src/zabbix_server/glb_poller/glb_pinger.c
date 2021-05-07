@@ -460,7 +460,7 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
             
             //report state error, but unresloved are ok 
             if (NULL != glb_pinger_item->ip && POLL_POLLING != glb_pinger_item->state ) {
-                zabbix_log(LOG_LEVEL_WARNING,"In %s: sheduled item %ld addr %s in state %d. (DUP!)", 
+                zabbix_log(LOG_LEVEL_DEBUG,"In %s: sheduled item %ld addr %s in state %d. (DUP!)", 
                                         __func__, glb_item->itemid,glb_pinger_item->ip, glb_pinger_item->state );
                 continue;
             } 
@@ -565,7 +565,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
             
             //checking if the item has been polled right now
             if ( POLL_POLLING != glb_pinger_item->state) {
-                zabbix_log(LOG_LEVEL_INFORMATION,"Arrived responce for item %ld which is not in polling state (%d) (DUP!)",itemid_l,glb_poller_item->state);
+                zabbix_log(LOG_LEVEL_DEBUG,"Arrived responce for item %ld which is not in polling state (%d) (DUP!)",itemid_l,glb_poller_item->state);
             }
             
             //ok, looks like we can process the data right now
@@ -584,76 +584,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
             zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find an item with itemid %ld (response: '%s'",itemid_l,worker_response);
         }
     }
-/*
-    while (SUCCEED == glb_worker_responce(conf->worker,&worker_response)) {
-        //parsing responce for itemid, rtt, ip fields
-        char itemid_s[MAX_ID_LEN], ip[MAX_ID_LEN], rtt_s[MAX_ID_LEN];
-        u_int64_t itemid_l;
-        int rtt_l;
-        struct zbx_json_parse jp_resp;
-        GLB_POLLER_ITEM *glb_poller_item;
-  
-        char *line = strtok(worker_response, "\n");
-        // loop through the string to extract all other tokens
-        while ( line != NULL ) {
 
-            zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s", line);
-            if (SUCCEED != zbx_json_open(line, &jp_resp)) {
-		        zabbix_log(LOG_LEVEL_DEBUG, "Couldn't ropen JSON response from glbmap %s", line);
-		        line = strtok(NULL, "\n");
-                
-                continue;
-	        }
-
-            //if (SUCCEED != zbx_json_parse(jp_resp, *worker_responce)) 
-            //zabbix_log(LOG_LEVEL_WARNING,"Cannot parse response from the glbmap: %s",responce);
-
-            if (SUCCEED != zbx_json_value_by_name(&jp_resp, "saddr", ip, MAX_ID_LEN, &type) ||
-                SUCCEED != zbx_json_value_by_name(&jp_resp, "rtt", rtt_s, MAX_ID_LEN, &type) ||
-                SUCCEED != zbx_json_value_by_name(&jp_resp, "itemid", itemid_s, MAX_ID_LEN, &type)       
-            ) {
-                zabbix_log(LOG_LEVEL_WARNING,"Cannot parse response from the glbmap: %s",worker_response);
-                 line = strtok(NULL, "\n");
-
-                continue;
-            }
-        
-            rtt_l = strtol(rtt_s,NULL,10);
-            itemid_l = strtol(itemid_s,NULL,10);
-
-            if (NULL != (glb_poller_item = zbx_hashset_search(conf->items,&itemid_l)) ) {
-                GLB_PINGER_ITEM *glb_pinger_item =(GLB_PINGER_ITEM *)glb_poller_item->itemdata;
-                if (glb_pinger_item->ip != NULL && 0 != strcmp( ip, glb_pinger_item->ip) ) {
-                    zabbix_log(LOG_LEVEL_WARNING,"Arrived ICMP responce with mismatched ip %s and itemid %ld",ip, itemid_l);
-                     line = strtok(NULL, "\n");
-                    continue;
-                }
-            
-                //checking if the item has been polled right now
-                if ( POLL_POLLING != glb_pinger_item->state) {
-                    zabbix_log(LOG_LEVEL_DEBUG,"Arrived responce for item %ld which is not in polling state (%d) (DUP!)",itemid_l,glb_poller_item->state);
-                }
-            
-                //ok, looks like we can process the data right now
-                if (POLL_FINISHED == glb_pinger_process_response(glb_pinger_item, rtt_l)) {
-                    
-                    zabbix_log(LOG_LEVEL_DEBUG, "Got the final packet for the item %ld",glb_poller_item->itemid);
-                    *conf->responces += 1;
-                  
-                    glb_pinger_submit_result(glb_poller_item,SUCCEED,NULL, &ts);
-                    
-                    //theese are two different things, need to set both
-                    glb_pinger_item->state = POLL_QUEUED; 
-                    glb_poller_item->state = POLL_QUEUED;
-                } 
-            } else {
-                zabbix_log(LOG_LEVEL_DEBUG, "Couldn't find an item with itemid %ld",itemid_l);
-            }
-            line = strtok(NULL, "\n");
-        }
-        zbx_free(worker_response);
-    }
-  */ 
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
 }
 

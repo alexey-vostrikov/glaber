@@ -33,6 +33,7 @@ type ClickHouseHist struct {
 	sql_buffer 	[histApi.ITEM_VALUE_TYPE_MAX]*bytebufferpool.ByteBuffer
 	agg_sql_buf [histApi.ITEM_VALUE_TYPE_MAX]*bytebufferpool.ByteBuffer
 	parser *fastjson.Parser
+	quotter *strings.Replacer
 }
 
 
@@ -58,7 +59,7 @@ func Init(he *ClickHouseHist, url string,dbname string , batch int ,flush int ,d
 	he.parser = new(fastjson.Parser)
 	he.cluster_suffix = cluster_suffix
 	he.buf = bytebufferpool.Get()
-	
+	he.quotter = strings.NewReplacer("\n","\\n","\"","\\\"")
 
 	for i := 0; i < histApi.ITEM_VALUE_TYPE_MAX; i++ {
 		he.sql_buffer[i]=bytebufferpool.Get()
@@ -417,10 +418,10 @@ func (he ClickHouseHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*his
 					case histApi.ITEM_VALUE_TYPE_FLOAT:
 						m.Value_dbl = float64(metric.GetFloat64("value"))
 					case histApi.ITEM_VALUE_TYPE_STR, histApi.ITEM_VALUE_TYPE_TEXT:
-						m.Value_str = string(metric.GetStringBytes("value"))
+						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value")))
 					case histApi.ITEM_VALUE_TYPE_LOG:
 						m.Source = string(metric.GetStringBytes("source"))
-						m.Value_str = string(metric.GetStringBytes("value_str"))
+						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value_str")))
 						m.Logeventid = uint64(metric.GetInt("logeventid"))
 						m.Severity =  uint8(metric.GetInt("severity"))
 				}

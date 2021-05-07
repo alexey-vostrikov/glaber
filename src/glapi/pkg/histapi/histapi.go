@@ -113,7 +113,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				writer.Flush()
 
 			case "put_history":
-				//log.Print("Processing put request")
+			//	log.Print("Processing put request")
 				for _,metric := range v.GetArray("metrics") {
 					m := Metric {
 						Host :string(metric.GetStringBytes("hostname")),
@@ -146,6 +146,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				writer.Flush()
 
 			case "put_trends":
+				log.Print( "Processing put trends request", string(request) )
 				for _,metric := range v.GetArray("aggmetrics") {
 					m := AggMetric {
 						Host :string(metric.GetStringBytes("hostname")),
@@ -155,6 +156,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 						Value_type: uint8(metric.GetInt("value_type")),
 						Count: uint64(metric.GetInt64("count")),
 					} 
+					log.Print("Got a trend")
 					switch m.Value_type {
 						case ITEM_VALUE_TYPE_UINT64:
 							m.AvgInt = uint64(metric.GetInt64("avgint"))
@@ -175,7 +177,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				writer.Flush()
 			
 			case "get_trends":
-				//log.Print( string(request) )
+				log.Print( string(request) )
 
 				hr := HistoryRequest {
 					Itemid: uint64(v.GetInt64("itemid")),
@@ -208,7 +210,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 
 
 			default:
-				//log.Print("Unknown request type or EOF")
+				log.Print("Unknown request type or EOF")
 				return
 		}
 		if (lastflush + 5 < time.Now().Unix() ) {

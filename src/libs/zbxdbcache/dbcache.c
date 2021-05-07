@@ -2573,13 +2573,15 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 			{
 				h->flags |= ZBX_DC_FLAG_NOTRENDS;
 			}
-			else if (now - h->ts.sec > item->trends_sec)
-			{
-				h->flags |= ZBX_DC_FLAG_NOTRENDS;
-				zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside "
-						"trends storage period", item->host.host, item->key_orig,
-						zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
-			}
+		//Glaber: if trends is set then writing the trends, don't care about the aging
+		//hisstory backend will rule that on it's own
+		//	else if (now - h->ts.sec > item->trends_sec)
+		//	{
+		//		h->flags |= ZBX_DC_FLAG_NOTRENDS;
+		//		zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside "
+		//				"trends storage period", item->host.host, item->key_orig,
+		//				zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
+		//	}
 		}
 		else
 			h->flags |= ZBX_DC_FLAG_NOTRENDS;

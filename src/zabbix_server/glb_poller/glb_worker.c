@@ -223,7 +223,7 @@ GLB_WORKER_T * glb_worker_create_worker(GLB_WORKER_CONF *conf, GLB_WORKER_ITEM *
     worker.workerid = glb_worker_item->workerid;
     worker.worker.path = (char *)zbx_heap_strpool_intern(glb_worker_item->full_cmd);
     worker.worker.async_mode = 1;
-    worker.worker.max_calls = 10000;
+    worker.worker.max_calls = GLB_WORKER_MAXCALLS;
     worker.worker.mode_from_worker=GLB_WORKER_MODE_NEWLINE;
     worker.worker.mode_to_worker = GLB_WORKER_MODE_NEWLINE;
     worker.worker.timeout = CONFIG_TIMEOUT;

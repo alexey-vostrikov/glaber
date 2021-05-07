@@ -663,6 +663,7 @@ fi
 %{_prefix}/lib/tmpfiles.d/zabbix-server.conf
 %{_sbindir}/zabbix_server_mysql
 %{_sbindir}/glb_hist_clickhouse
+%{_sbindir}/glb_hist_victoria
 %{_sbindir}/glbmap
 
 %pre server-mysql
@@ -710,6 +711,7 @@ fi
 %{_prefix}/lib/tmpfiles.d/zabbix-server.conf
 %{_sbindir}/zabbix_server_pgsql
 %{_sbindir}/glb_hist_clickhouse
+%{_sbindir}/glb_hist_victoria
 %{_sbindir}/glbmap
 
 %pre server-pgsql
