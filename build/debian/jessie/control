@@ -47,6 +47,7 @@ Depends: ${misc:Depends}
  php-mysql | php-pgsql, php-gd, php-ldap,
  fonts-dejavu | ttf-dejavu-core | ttf-japanese-gothic
 Suggests: glaber-apache-conf, glaber-nginx-conf
+Conflicts: zabbix-frontend-php
 Description: Glaber server, based on Zabbix network monitoring solution - server (Frontend)
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
@@ -73,7 +74,7 @@ Description: Glaber server, based on Zabbix network monitoring solution - apache
 
 Package: glaber-nginx-conf
 Architecture: all
-Depends: zabbix-frontend-php, nginx, php-fpm
+Depends: glaber-frontend-php, nginx, php-fpm
 Description: Glaber server based on Zabbix network monitoring solution - nginx and php-fpm configuration for front-end
  Zabbix is the ultimate enterprise-level software designed for
  real-time monitoring of millions of metrics collected from tens of
