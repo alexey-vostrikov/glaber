@@ -201,37 +201,15 @@ typedef struct
 }
 zbx_vc_item_t;
 
-/* struct to be used as a circular buffer */
-typedef struct {
-	
-	/*indexes of the first and the last elements */
-	unsigned int first;
-	unsigned int last;
-	
-
-	//consider using zbx_vector_ptr_here
-	/*number of the elements in the ring */
-	unsigned int data_num;
-	
-	/*data array*/
-	void *data;
-
-} glb_ring_ptr_t;
-
 typedef struct {
 	u_int64_t triggerid;
 	/* trigger state, <UNKNOWN> on start time */
 	/*id of last event happend. When trigger switches from <UNKNOWN> state
 	* no event is created */
 	char state; 
-	
-	u_int64_t lasteventid; 
-	u_int64_t lasteventtime;
-	
-	/* curcular ring holding events data stored by arrival time */
-	glb_ring_ptr_t events;  
-}
-vc_trigger_t;
+	zbx_hashset_t events;
+
+} vc_trigger_t;
 
 typedef struct {
 	u_int64_t hostid;
@@ -239,9 +217,8 @@ typedef struct {
 	unsigned char snmp_state;
 	unsigned char ipmi_state;
 	unsigned char jmx_state;
-	u_int64_t nextcheck;
-
-	
+	u_int64_t nextcheck; /* calculated next check time */
+	zbx_hashset_t triggers; /*hashset of triggers states related to the host */
 } 
 vc_host_t;
 
@@ -272,38 +249,9 @@ typedef struct
 	/* the string pool for str, text and log item values */
 	zbx_hashset_t	strpool;
 
-	/****** glaber specific **********/
-	/**************************************************************
-	 * so the idea is to keep all runtime date int the state objects
-	 * or perhaps, valuecache
-	 * but this might be not only values, but also trigger states
-	 * events, host and it's agents state.
-	 * So far i have found the followng parts of the UI that need 
-	 * fix to show the state from the memory:
-	 * - problems - allthow it's ok to load and show them form the
-	 * history backend or sql, there are two concerns:
-	 *  - problems and events tables dualism, so it might be feasible to get rid of
-	 * one of them, and so far i think it's the problmes table
-	 *  - widgets that show current problems - they have to use current trigger
-	 * states from the memory and only after that load the event statuses, so 
-	 * i need to cache trigger states with some history and fix api (CProblem) that
-	 * fetches data from the event and problem tables to use memory only data or
-	 * use history backend to get events, so that problems and events and event_recovery
-	 * tables aren't used anymore
-	 *  - host state and it's agent's statuses to show in UI, also some
-	 *  additional host info, like debug or when it's going to go to 
-	 * the normal state
-	 *  - add nextcheck info to the item's state and move last values from the 
-	 * configuration hash to item state hash
-	 *  - probably at the second stage or during getting rid of the events tables
-	 * i will need to figure how to deal with alerts
-	 * 
-	 * since a lot of updates will be coming to the value_cache this way
-	 * it shuould be some kind of mass processing 
-	 * **********************************************************************/
-	zbx_hashset_t triggers; /* holds trigger state and it's history - ring buffer of events maxed by count and age*/
-							/* trigger object has it's state as well as state change time, number of events, last event */
+	
 	zbx_hashset_t hosts; /* host state as well as agent stauses for the host */
+						
 
 }
 zbx_vc_cache_t;
@@ -361,6 +309,44 @@ static void	vc_try_unlock(void)
 	if (ZBX_VC_ENABLED == vc_state && 0 == vc_locked)
 		zbx_mutex_unlock(vc_lock);
 }
+
+
+/*******************************************************************************
+ * Funtion: vc_add_event
+ * 
+ * Purpose: adds event to the host->trigger
+ * ******************************************************************************/
+void vc_add_trigger(DB_TRIGGER trigger) {
+	zabbix_log(LOG_LEVEL_INFORMATION, "In %s:", __func__);
+	
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "Finished %s:", __func__);
+}
+
+/*******************************************************************************
+ * Funtion: vc_add_event
+ * 
+ * Purpose: adds event to the host->trigger
+ * ******************************************************************************/
+void vc_add_host(DC_HOST host) {
+	zabbix_log(LOG_LEVEL_INFORMATION, "In %s:", __func__);
+	
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "Finished %s:", __func__);
+}
+
+/*******************************************************************************
+ * Funtion: vc_add_event
+ * 
+ * Purpose: adds event to the host->trigger
+ * ******************************************************************************/
+static void vc_add_event(DC_HOST host, DB_EVENT event) {
+	zabbix_log(LOG_LEVEL_INFORMATION, "In %s:", __func__);
+	
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "Finished %s:", __func__);
+}
+
 
 /*********************************************************************************
  *                                                                               *
