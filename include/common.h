@@ -596,7 +596,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_SNMP	31
 #define GLB_PROCESS_TYPE_PINGER	32
 #define GLB_PROCESS_TYPE_WORKER	33
-#define ZBX_PROCESS_TYPE_COUNT		34	/* number of process types */
+#define GLB_PROCESS_TYPE_SERVER	34
+#define ZBX_PROCESS_TYPE_COUNT		35	/* number of process types */
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char proc_type);
 int		get_process_type_by_name(const char *proc_type_str);
@@ -1626,7 +1627,8 @@ char	*zbx_expression_extract_constant(const char *src, const zbx_strloc_t *loc);
 #define ZBX_PREPROC_PROMETHEUS_TO_JSON		23
 #define ZBX_PREPROC_CSV_TO_JSON			24
 #define ZBX_PREPROC_STR_REPLACE			25
-#define ZBX_PREPROC_VALIDATE_NOT_SUPPORTED	26
+#define GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG	126 //to avoid future confluicts with new types zaabix might introduce
+#define ZBX_PREPROC_VALIDATE_NOT_SUPPORTED	27
 
 /* custom on fail actions */
 #define ZBX_PREPROC_FAIL_DEFAULT	0

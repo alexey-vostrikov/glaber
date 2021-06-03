@@ -47,7 +47,8 @@ extern unsigned char	program_type;
  * Comments: helper function for get_hostid_by_host                           *
  *                                                                            *
  ******************************************************************************/
-static void	db_register_host(const char *host, const char *ip, unsigned short port, unsigned int connection_type,
+//static
+ void	db_register_host(const char *host, const char *ip, unsigned short port, unsigned int connection_type,
 		const char *host_metadata, zbx_conn_flags_t flag, const char *interface)
 {
 	char		dns[INTERFACE_DNS_LEN_MAX];

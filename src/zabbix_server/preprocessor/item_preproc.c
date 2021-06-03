@@ -35,6 +35,7 @@
 
 #include "item_preproc.h"
 
+
 extern zbx_es_t	es_engine;
 
 /******************************************************************************
@@ -1159,7 +1160,7 @@ out:
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_validate_regex(const zbx_variant_t *value, const char *params, char **error)
+static int	  item_preproc_validate_regex(const zbx_variant_t *value, const char *params, char **error)
 {
 	zbx_variant_t	value_str;
 	int		ret = FAIL;
@@ -1515,6 +1516,203 @@ static int	item_preproc_throttle_value(zbx_variant_t *value, const zbx_timespec_
 		zbx_variant_clear(value);
 	else
 		*history_ts = *ts;
+
+	return SUCCEED;
+}
+
+#define GLB_FUNC_UNKNOWN	0
+#define GLB_FUNC_SUM	1
+#define GLB_FUNC_COUNT	2
+#define GLB_FUNC_AVG	3
+#define GLB_FUNC_MAX	4
+#define GLB_FUNC_MIN	5
+
+static char get_agg_func(const char *func_name) {
+
+	if (0 == strcmp(func_name,"sum")) return GLB_FUNC_SUM;
+	if (0 == strcmp(func_name,"count")) return GLB_FUNC_COUNT;
+	if (0 == strcmp(func_name,"avg")) return GLB_FUNC_AVG;
+	if (0 == strcmp(func_name,"max")) return GLB_FUNC_MAX;
+	if (0 == strcmp(func_name,"min")) return GLB_FUNC_MIN;
+	
+	return GLB_FUNC_UNKNOWN;
+}
+/******************************************************************************
+ *                                                                            *
+ * Function: item_preproc_throttle_value_agg                            *
+ *                                                                            *
+ * Purpose: throttles value by aggregating values by aggregation func         *
+ *                                                                            *
+ * Parameters: value         - [IN/OUT] the value to process                  *
+ *             ts            - [IN] the value timestamp                       *
+ *             params        - [IN] the throttle period                       *
+ *             history_value - [IN] historical data of item with delta        *
+ *                                  preprocessing operation                   *
+ *             errmsg        - [OUT] error message                            *
+ *                                                                            *
+ * Return value: SUCCEED - the value was calculated successfully              *
+ *               FAIL - otherwise                                             *
+ *                                                                            *
+ ******************************************************************************/
+static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
+		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+{
+	int	ret, timeout, period = 0, len_time, len_aggf;
+	char *ptr;
+	const char *time, *aggf_name;
+	char func = GLB_FUNC_UNKNOWN;
+
+	
+	//one special case, if previous step fails, it expected to return string "NaN"
+	//in such just discard the value
+	if (ZBX_VARIANT_STR == value->type && 0 == strcmp(value->data.str,"NaN")) {
+		zbx_variant_clear(value);
+		return SUCCEED;
+	}
+	
+	//there are two params - aggregation time and aggregation function
+	time = params;
+
+	if (NULL == (ptr = strchr(params, '\n')))
+	{
+		THIS_SHOULD_NEVER_HAPPEN;
+		*errmsg = zbx_strdup(*errmsg, "cannot find second parameter");
+		return FAIL;
+	}
+
+	if (0 == (len_time = ptr - params))
+	{
+		*errmsg = zbx_strdup(*errmsg, "first parameter is expected");
+		return FAIL;
+	}
+	aggf_name = ptr + 1;
+	len_aggf = strlen(ptr + 1);
+	
+	func = get_agg_func(aggf_name);
+	
+	if (GLB_FUNC_UNKNOWN == func) {
+		*errmsg = zbx_dsprintf(*errmsg, "invalid function name: %s", aggf_name);
+		return FAIL;
+	}
+
+	if (FAIL == is_time_suffix(time, &timeout, len_time))
+	{
+		*errmsg = zbx_dsprintf(*errmsg, "invalid time period: %s", params);
+		zbx_variant_clear(history_value);
+		return FAIL;
+	}
+	
+	//all type of metrics except count require numerical values, converting
+	if ( GLB_FUNC_COUNT != func && ZBX_VARIANT_DBL != value->type && ZBX_VARIANT_UI64 != value->type) {
+		
+		if (ZBX_VARIANT_STR != value->type ) {
+			zbx_variant_clear(history_value);
+			zbx_variant_clear(value);
+			return FAIL;
+		}
+	
+		//ok, lets check if there is an unsinged int 
+		errno = 0;
+		char *p = value->data.str;
+
+//		u_int64_t int_val = strtoull(value->data.str,&p,10);
+//		if ( errno != 0 || p == value->data.str || 0 != *p ) {
+			zbx_variant_convert(value,ZBX_VARIANT_DBL);
+//		} else {
+//			zbx_variant_convert(value,ZBX_VARIANT_UI64);
+//		}
+	}
+			
+	//history value hasn't been init - means we're starting
+	if (ZBX_VARIANT_NONE == history_value->type) {
+		if ( GLB_FUNC_COUNT == func ) {
+			zbx_variant_set_ui64(history_value,0);
+		} else {
+//			switch (value->type) {
+//				case ZBX_VARIANT_UI64:
+//					zbx_variant_set_ui64(history_value,value->data.ui64);
+//					break;
+//				case ZBX_VARIANT_DBL:
+					zbx_variant_set_dbl(history_value,value->data.dbl);
+//					break;
+//				default: 
+//					THIS_SHOULD_NEVER_HAPPEN;
+//					return FAIL;
+//			}
+		}
+		
+		history_ts->ns = 0;
+		history_ts->sec = ts->sec;
+	}
+		
+	//keep the number in the nanosecond part of the history data value
+	
+
+	if ( GLB_FUNC_MIN == func ) {
+//		switch (value->type) {
+//			case ZBX_VARIANT_UI64:
+				zbx_variant_set_ui64(history_value, MIN(history_value->data.ui64,value->data.ui64));
+//				break;
+//			case ZBX_VARIANT_DBL:
+				zbx_variant_set_dbl(history_value, MIN(history_value->data.dbl,value->data.dbl));
+//				break;
+//		}
+	} else if ( GLB_FUNC_MAX == func ) {
+//		switch (history_value->type) {
+//			case ZBX_VARIANT_UI64:
+//				zbx_variant_set_ui64(history_value,MAX(history_value->data.ui64,value->data.ui64));
+//				break;
+//			case ZBX_VARIANT_DBL:
+				zbx_variant_set_dbl(history_value,MAX(history_value->data.dbl,value->data.dbl));
+//				break;
+//		}
+	} else if ( GLB_FUNC_AVG == func || GLB_FUNC_SUM ==func ) {
+		if (0 != history_ts->ns) {
+//			switch (history_value->type) {
+//				case ZBX_VARIANT_UI64:
+//					zbx_variant_set_ui64(history_value, history_value->data.ui64 + value->data.ui64);
+//					break;
+//				case ZBX_VARIANT_DBL:
+					zbx_variant_set_dbl(history_value, history_value->data.dbl + value->data.dbl);
+//					break;
+//			}
+		}
+		
+	} else if ( GLB_FUNC_COUNT == func ) {
+		//noop here
+	} else {
+		zabbix_log(LOG_LEVEL_WARNING, "Unknown function %d for aggregation", func);
+		THIS_SHOULD_NEVER_HAPPEN;
+	}
+	history_ts->ns++;
+	//cleaning up the value, we won't need it until emition
+	zbx_variant_clear(value); 
+	
+	//now lets see if we've got the timeout and aggregation is ready to be emmited
+	if (history_ts->sec + timeout < ts->sec ) {
+		
+		if ( GLB_FUNC_MIN == func ||  GLB_FUNC_MAX == func || GLB_FUNC_SUM == func ) {
+			zbx_variant_copy(value,history_value);
+
+		} else if ( GLB_FUNC_AVG == func ) {
+//			switch (history_value->type) {
+//			case ZBX_VARIANT_UI64:
+//				zbx_variant_set_ui64(value,history_value->data.ui64/history_ts->ns);
+//				break;
+//			case ZBX_VARIANT_DBL:
+				zbx_variant_set_dbl(value,history_value->data.dbl/history_ts->ns);
+//				break;
+//			}
+		} else if ( GLB_FUNC_COUNT == func ) {
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Emmitting count %d",history_ts->ns);
+			zbx_variant_set_ui64(value,history_ts->ns);
+		}
+	
+		zbx_variant_clear(history_value);
+	} else {
+		zabbix_log(LOG_LEVEL_DEBUG,"Result is not ready to be emmited, %d seconds left, %d values collected", history_ts->sec + timeout - ts->sec , history_ts->ns);	
+
+	}
 
 	return SUCCEED;
 }
@@ -2181,6 +2379,10 @@ int	zbx_item_preproc(unsigned char value_type, zbx_variant_t *value, const zbx_t
 			break;
 		case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 			ret = item_preproc_throttle_timed_value(value, ts, op->params, history_value, history_ts,
+					error);
+			break;
+		case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
+			ret = item_preproc_throttle_value_agg(value, ts, op->params, history_value, history_ts, value_type,
 					error);
 			break;
 		case ZBX_PREPROC_SCRIPT:

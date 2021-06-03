@@ -1346,6 +1346,34 @@ abstract class CItemGeneral extends CApiService {
 						}
 						break;
 
+
+						case  GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
+							// Check if 'params' are not empty and if second parameter contains (after \n) is not empty.
+							if (is_array($preprocessing['params'])) {
+								self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect arguments passed to function.'));
+							}
+							elseif ($preprocessing['params'] === '' || $preprocessing['params'] === null
+									|| $preprocessing['params'] === false) {
+								self::exception(ZBX_API_ERROR_PARAMETERS,
+									_s('Incorrect value for field "%1$s": %2$s.', 'params', _('cannot be empty'))
+								);
+							}
+		
+							$params = explode("\n", $preprocessing['params']);
+							
+							if ($params[0] === '') {
+								self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
+									'params', _('first parameter is expected')
+								));
+							}
+		
+							if ( !in_array($params[1],array('min','max','avg','count','sum'))) {
+								self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
+									'params', _('Second param must be one of \'min\',\'max\',\'avg\',\'count\',\'sum\'')
+								));
+							}
+						break;
+
 					case ZBX_PREPROC_REGSUB:
 					case ZBX_PREPROC_ERROR_FIELD_REGEX:
 					case ZBX_PREPROC_STR_REPLACE:
@@ -1624,6 +1652,7 @@ abstract class CItemGeneral extends CApiService {
 					case ZBX_PREPROC_LTRIM:
 					case ZBX_PREPROC_TRIM:
 					case ZBX_PREPROC_THROTTLE_VALUE:
+					case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
 					case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 					case ZBX_PREPROC_SCRIPT:
 					case ZBX_PREPROC_STR_REPLACE:

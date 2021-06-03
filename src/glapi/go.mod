@@ -10,4 +10,5 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/fastjson v1.6.1
 	gitlab.com/mikler/gosnmpquerier v0.0.0-20210107085610-0b27357ac29e // indirect
+	gopkg.in/mcuadros/go-syslog.v2 v2.3.0 // indirect
 )

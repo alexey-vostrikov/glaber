@@ -100,9 +100,6 @@ int glb_load_history_module(char *history_module) {
  ************************************************************************************/
 int	glb_history_init(char **history_modules, char **error)
 {
-	//int		i, ret;
-	
-	//worker modules is out of process runners for better compatibility
 	char	**history_module;
 	int	ret = SUCCEED;
 

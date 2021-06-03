@@ -169,7 +169,9 @@ foreach ($data['rows'] as $row_index => $row) {
 
 	if ($last_history) {
 		$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_history['lastclock']);
-		$last_value = formatHistoryValue($last_history['value'], $item, false);
+		if (isset($last_history['value'])) {
+			$last_value = formatHistoryValue($last_history['value'], $item, false);
+		} else $last_value = "<unknown>";
 		$change = '';
 
 		if (isset($last_history['prev_value']) && in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64])) {

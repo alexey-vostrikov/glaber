@@ -82,6 +82,8 @@ static int	str_to_preproc_type(const char *str)
 		return ZBX_PREPROC_CSV_TO_JSON;
 	if (0 == strcmp(str, "ZBX_PREPROC_STR_REPLACE"))
 		return ZBX_PREPROC_STR_REPLACE;
+	if (0 == strcmp(str, "GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG"))
+		return GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG;
 
 	fail_msg("unknow preprocessing step type: %s", str);
 	return FAIL;

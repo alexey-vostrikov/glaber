@@ -230,7 +230,8 @@ int	CONFIG_HISTSYNCER_FORKS		= 4;
 int	CONFIG_HISTSYNCER_FREQUENCY	= 1;
 int	CONFIG_CONFSYNCER_FORKS		= 1;
 int	CONFIG_CONFSYNCER_FREQUENCY	= 60;
-int CONFIG_GLB_REQUEUE_TIME =  60; //syncs the async queue each minute
+int CONFIG_GLB_REQUEUE_TIME =  60; //syncs the async queue once a minute
+int CONFIG_EXT_SERVER_FORKS = 0;
 
 int	CONFIG_VMWARE_FORKS		= 0;
 int	CONFIG_VMWARE_FREQUENCY		= 60;
@@ -302,11 +303,9 @@ int	CONFIG_PROXYDATA_FREQUENCY	= 5;	/* 1s is too frequent for n/a proxies */
 char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
 char 	**CONFIG_HISTORY_MODULE		= NULL;
-char 	**CONFIG_GLB_POLLER			= NULL;
-
 int		CONFIG_SNMP_RETRIES		=	3;
 
-char	**CONFIG_EXT_WORKERS	= NULL;
+char	**CONFIG_EXT_SERVERS	= NULL;
 
 char	*CONFIG_USER			= NULL;
 
@@ -466,6 +465,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = GLB_PROCESS_TYPE_WORKER;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_WORKER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_EXT_SERVER_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_SERVER;
+		*local_process_num = local_server_num - server_count + CONFIG_EXT_SERVER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_UNREACHABLE_POLLER_FORKS))
 	{
@@ -721,6 +725,11 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		exit(EXIT_FAILURE);
 	}
 
+	if (NULL != *CONFIG_EXT_SERVERS) {
+		zabbix_log(LOG_LEVEL_WARNING,"Enabling worker server process");
+		CONFIG_EXT_SERVER_FORKS = 1;
+	}
+
 	if (0 != err)
 		exit(EXIT_FAILURE);
 }
@@ -756,7 +765,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	//		PARM_OPT,	0,			0},
 		{"EnableHostDeactivation",			&CONFIG_ENABLE_HOST_DEACTIVATION,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"ExternalWorker",			&CONFIG_EXT_WORKERS,			TYPE_MULTISTRING,
+//		{"ExternalWorker",			&CONFIG_EXT_WORKERS,			TYPE_MULTISTRING,
+//			PARM_OPT,	0,			0},
+		{"WorkerServer",			&CONFIG_EXT_SERVERS,			TYPE_MULTISTRING,
 			PARM_OPT,	0,			0},
 		{"StartDBSyncers",		&CONFIG_HISTSYNCER_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			100},
@@ -978,9 +989,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
-	zbx_strarr_init(&CONFIG_EXT_WORKERS);
+	zbx_strarr_init(&CONFIG_EXT_SERVERS);
 	zbx_strarr_init(&CONFIG_HISTORY_MODULE);
-	//zbx_strarr_init(&CONFIG_GLB_POLLER);
 
 	parse_cfg_file(CONFIG_FILE, cfg, ZBX_CFG_FILE_REQUIRED, ZBX_CFG_STRICT);
 
@@ -1009,7 +1019,6 @@ static void	zbx_free_config(void)
 {
 	zbx_strarr_free(CONFIG_LOAD_MODULE);
 	zbx_strarr_free(CONFIG_HISTORY_MODULE);
-	//zbx_strarr_free(CONFIG_GLB_POLLER);
 }
 
 /******************************************************************************
@@ -1451,6 +1460,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				thread_args.args = &poller_type;
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	
+			case GLB_PROCESS_TYPE_SERVER:
+				poller_type = ITEM_TYPE_TRAPPER;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;		
 			case ZBX_PROCESS_TYPE_UNREACHABLE:
 				poller_type = ZBX_POLLER_TYPE_UNREACHABLE;
 				thread_args.args = &poller_type;
