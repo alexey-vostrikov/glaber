@@ -13,6 +13,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request);
 int glb_worker_responce(GLB_EXT_WORKER *worker, char ** responce);
 int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response);
 int worker_is_alive(GLB_EXT_WORKER *worker);
+int glb_start_worker(GLB_EXT_WORKER *worker);
 
 void glb_destroy_worker(GLB_EXT_WORKER *runner);
 int glb_escape_worker_string(char *in_string, char *out_buffer);

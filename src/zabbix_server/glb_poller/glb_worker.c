@@ -32,7 +32,7 @@ static int glb_worker_submit_result(GLB_WORKER_CONF *conf, char *response) {
     char value[MAX_STRING_LEN],itemid_s[MAX_ID_LEN],time_sec_s[MAX_ID_LEN], time_ns_s[MAX_ID_LEN];
     u_int64_t itemid;
     unsigned int time_sec = 0, time_ns = 0;
-    zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Started", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: Started", __func__);
     GLB_WORKER_ITEM *glb_worker_item; 
     GLB_POLLER_ITEM *glb_item;
     AGENT_RESULT	result;
@@ -70,7 +70,7 @@ static int glb_worker_submit_result(GLB_WORKER_CONF *conf, char *response) {
     zbx_rtrim(value, ZBX_WHITESPACE);
     
     set_result_type(&result, ITEM_VALUE_TYPE_TEXT, value);
-    zabbix_log(LOG_LEVEL_INFORMATION,"Send value %s to preprocessing",value);
+    //zabbix_log(LOG_LEVEL_INFORMATION,"Send value %s to preprocessing",value);
 	zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 
                                                 glb_item->flags , &result , &ts, ITEM_STATE_NORMAL, NULL);
     
@@ -118,9 +118,6 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
         goto out;
     }
     
-    
-    
-
     //itemid is always needed in dynamic params, generating new list only having dynamic data
     zbx_snprintf_alloc(&cmd,&cmd_alloc,&cmd_offset,"%s/%s", CONFIG_WORKERS_DIR, get_rkey(&request));
     worker_item->full_cmd = zbx_heap_strpool_intern(cmd);
@@ -271,12 +268,12 @@ int glb_worker_send_request(void *engine, GLB_POLLER_ITEM *glb_item) {
         return FAIL;
     }
 
-    zabbix_log(LOG_LEVEL_INFORMATION, "Request finished");
+    zabbix_log(LOG_LEVEL_DEBUG, "Request finished");
     
     //glb_config_item->sent++;
     glb_worker_item->lastrequest = glb_ms_time();
 
-   zabbix_log(LOG_LEVEL_INFORMATION, "In %s: Ended", __func__);
+   zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
    return SUCCEED;
 }
 /******************************************************************************
@@ -365,7 +362,7 @@ static void glb_worker_process_results(GLB_WORKER_CONF *conf) {
         }
     }
 
-    zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
 }
 
 

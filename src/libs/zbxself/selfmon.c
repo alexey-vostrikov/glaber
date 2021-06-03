@@ -122,6 +122,7 @@ extern int  CONFIG_PINGER_FORKS;
 extern int  CONFIG_JAVAPOLLER_FORKS;
 extern int  CONFIG_POLLER_FORKS;
 extern int  CONFIG_GLB_WORKER_FORKS;
+extern int  CONFIG_EXT_SERVER_FORKS;
 
 extern unsigned char	process_type;
 extern int		process_num;
@@ -211,6 +212,9 @@ int	get_process_type_forks(unsigned char proc_type)
 			return CONFIG_GLB_PINGER_FORKS;
 		case GLB_PROCESS_TYPE_WORKER:
 			return CONFIG_GLB_WORKER_FORKS;
+		case GLB_PROCESS_TYPE_SERVER:
+			return CONFIG_EXT_SERVER_FORKS;
+			
 		
 	}
 	zabbix_log(LOG_LEVEL_WARNING,"Unknown process type %d, This is a BUG",proc_type );

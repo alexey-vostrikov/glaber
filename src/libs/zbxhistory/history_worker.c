@@ -36,7 +36,7 @@ extern int CONFIG_SERVER_STARTUP_TIME;
 #define GLB_DEFAULT_WORKER_PRELOAD_VALUES 0
 #define GLB_DEFAULT_WORKER_DISABLE_READ	0
 #define GLB_DEFAULT_WORKER_WRITE_TYPES "dbl, str, uint, text, log"
-#define GLB_DEFAULT_WORKER_READ_TYPES "dbl, str, uint, text"
+#define GLB_DEFAULT_WORKER_READ_TYPES "dbl, str, uint, text, log"
 
 #define GLB_DEFAULT_WORKER_TREND_TYPES "dbl, uint"
 #define GLB_DEFAULT_WORKER_READ_AGG_TYPES "dbl, uint"
@@ -322,10 +322,12 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 				itemid,start,count,end,value_type);
 	
 	glb_process_worker_request(conf->worker, request, &response);
-	zabbix_log(LOG_LEVEL_DEBUG,"worker pid is %d",conf->worker->pid);
-
+	
 	if (NULL == response)
 			return SUCCEED;
+	if (ITEM_VALUE_TYPE_LOG == value_type)
+		 zabbix_log(LOG_LEVEL_INFORMATION, "Got the LOG response: '%s'", response);
+	
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse responce from worker: '%s'",response);
 		return SUCCEED;
@@ -371,8 +373,10 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 						break;
 					
 					case ITEM_VALUE_TYPE_LOG:
+							hr.value.log = zbx_malloc(NULL,sizeof(zbx_log_value_t));
+							
 						if (SUCCEED != zbx_json_value_by_name(&jp_row, "value_str", value, MAX_STRING_LEN,&type)) continue;
-						hr.value = history_str2value(value, value_type);
+							hr.value.log->value = zbx_strdup(NULL,value);
 						
 						if (SUCCEED == zbx_json_value_by_name(&jp_row, "logeventid", logeventid, MAX_ID_LEN,&type)) 
 							hr.value.log->logeventid=atoi(logeventid);
@@ -383,7 +387,6 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 							hr.value.log->severity=atoi(severity);
 						else 
 							hr.value.log->severity=0;
-
 						
 						source=zbx_malloc(NULL,MAX_ID_LEN);
 						if (SUCCEED == zbx_json_value_by_name(&jp_row, "source", source, MAX_ID_LEN,&type)) 
@@ -392,9 +395,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 							hr.value.log->source=NULL;
 							zbx_free(source);
 						}
-						
 						zbx_vector_history_record_append_ptr(values, &hr);
-
 						break;
 					case ITEM_VALUE_TYPE_STR:
 					case ITEM_VALUE_TYPE_TEXT:
@@ -480,17 +481,26 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 		   		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_dbl\":%f",h->value.dbl);
 				break;
 			case ITEM_VALUE_TYPE_LOG:
-				zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data: %s",h->value.str);
+				//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data: %s",h->value.log->value);
 				if (h->value.log) {
 					buffer[0]=0;
+
+					zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"logeventid\":%d, \"severity\":%d",h->value.log->logeventid,h->value.log->severity);
 					
-					glb_escape_worker_string(h->value.log->source,buffer);   
-					zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,
-						"\"logeventid\":%d, \"severity\":%d, \"source\":\"%s\"",h->value.log->logeventid, h->value.log->severity, buffer);
-					
+					if ( NULL != h->value.log->source) {
+						glb_escape_worker_string(h->value.log->source,buffer);  
+						zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"source\":\"%s\"",h->value.log->source, buffer);
+					}	
+				
+					//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 3"); 
+					if ( NULL != h->value.log->value) {
+						glb_escape_worker_string(h->value.log->value,buffer);  
+					//	zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 4"); 
+						zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"value_str\":\"%s\"", buffer);
+					}
 				}
-				glb_escape_worker_string(h->value.log->value,buffer);  
-				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value\":\"%s\"", buffer);
+				//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 5"); 
+				//zabbix_log(LOG_LEVEL_INFORMATION,"Will send %s",req_buffer);
 				break;
 				
 			case ITEM_VALUE_TYPE_STR:
@@ -506,6 +516,7 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 		}
 		
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Will send %s",req_buffer);
 		num++;
 	}
   

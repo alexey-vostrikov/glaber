@@ -130,7 +130,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     return worker;
 }
-
+/*
 zbx_hash_t glb_worker_hash_func(const void *data)
 {
     GLB_EXT_WORKER *w = (GLB_EXT_WORKER *)data;
@@ -179,9 +179,8 @@ int glb_init_external_workers(char **workers_cfg, char *scriptdir)
 out:
     return ret;
 }
-
-//static 
-int restart_worker(GLB_EXT_WORKER *worker)
+*/
+static int restart_worker(GLB_EXT_WORKER *worker)
 {
     #define RST_ACCOUNT_PERIOD  20
     #define RST_MAX_RESTARTS    5
@@ -305,7 +304,7 @@ int restart_worker(GLB_EXT_WORKER *worker)
     //and make file handles to the ends we need
     worker->pipe_to_worker = to_child[1];
     worker->pipe_from_worker = from_child[0];
-
+    //zabbix_log(LOG_LEVEL_INFORMATION,"Set worker pid to %d", worker->pid);
     //resetting run count
     worker->calls = 0;
     if (worker->async_mode) {
@@ -316,6 +315,10 @@ int restart_worker(GLB_EXT_WORKER *worker)
     zabbix_log(LOG_LEVEL_DEBUG, "New worker instance pid is %d", worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     return SUCCEED;
+}
+
+int glb_start_worker(GLB_EXT_WORKER *worker) {
+    return restart_worker(worker);
 }
 
 int worker_is_alive(GLB_EXT_WORKER *worker)
@@ -670,12 +673,12 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     } //read data loop was here
 
     //lets see if actuallyred something or it's a timeout has happened
-    if (SUCCEED == zbx_alarm_timed_out() || 1 == continue_read || 1 == worker_fail)
+    if (SUCCEED == zbx_alarm_timed_out() || 1 == worker_fail)
     {
         zabbix_log(LOG_LEVEL_WARNING,
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
-
+        zabbix_log(LOG_LEVEL_INFORMATION,"Continue read: %d, worker_fail: %d",continue_read,worker_fail);
         sleep(1);
         int resp_len = strlen(resp_buffer);
     
@@ -716,7 +719,7 @@ int glb_process_worker_request(GLB_EXT_WORKER *worker, const char *request, char
 //and replaces newlines with \n to make them worker - valid for line by line processing
 int glb_escape_worker_string(char *in_string, char *out_buffer)
 {
-
+    
     int in = 0, out = 0;
     while (in_string[in] != '\0')
     {

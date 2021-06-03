@@ -1341,8 +1341,8 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
 	
-	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d", ZBX_IPC_SERVICE_PREPROCESSING, process_num - 1);
-	zbx_snprintf(worker_service,MAX_STRING_LEN,"%s%d", ZBX_IPC_SERVICE_PREPROCESSING_WORKER, process_num - 1);
+	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d", GLB_IPC_SERVICE_PREPROCESSING, process_num - 1);
+	zbx_snprintf(worker_service,MAX_STRING_LEN,"%s%d", GLB_IPC_SERVICE_PREPROCESSING_WORKER, process_num - 1);
 
 
 	zbx_setproctitle("%s #%d starting", get_process_type_string(process_type), process_num);

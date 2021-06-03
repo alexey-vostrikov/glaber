@@ -199,12 +199,24 @@ class CHistory extends CApiService {
 			    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
 	    //new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT); 
+			//if ( !is_null($result) && count($result) > 0)
+			//	$result = array_merge($result, $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history")); 
+			//else 
+			$data = $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history");
+				error_log("$itemid :". print_r($result,true));
+
+			if (is_array($result)) {
+				$result = array_merge($result, $data);
+			}
+			else {
+				$result += $data;
+			}
+
 			
-			$values = $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history"); 
 		
 		}
-//		error_log(print_r($values));
-		return $values;
+		//error_log(print_r($values,true));
+		return $result;
 	}
 
 

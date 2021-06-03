@@ -128,7 +128,14 @@ class CLocalApiClient extends CApiClient {
 			}
 
 			// call API method
+			//error_log("About to call $api $method");
+			//error_log(print_r($params,true));
+			
 			$result = call_user_func_array([$this->serviceFactory->getObject($api), $method], [$params]);
+
+			//error_log("Result is");
+			//error_log(print_r($result,true));
+
 
 			// if the method was called successfully - commit the transaction
 			if ($newTransaction) {

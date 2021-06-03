@@ -143,7 +143,7 @@ class CApplication extends CApiService {
 		}
 
 		// hostids
-		if (!is_null($options['hostids'])) {
+		if (!is_null($options['hostids']) && count($options['hostids']) > 0) {
 			zbx_value2array($options['hostids']);
 
 			$sqlParts['where']['hostid'] = dbConditionInt('a.hostid', $options['hostids']);

@@ -382,7 +382,7 @@ func (he ClickHouseHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*his
 
     fmt.Fprintf(buf, " format JSON SETTINGS output_format_json_quote_64bit_integers='0'");
 	
-	//log.Print("Will do query:",buf.String())
+//	log.Print("Will do query:",buf.String())
 	resp, err := http.Post(he.url, "text/html",strings.NewReader(buf.String()))
 
 	if err != nil {
@@ -421,7 +421,7 @@ func (he ClickHouseHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*his
 						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value")))
 					case histApi.ITEM_VALUE_TYPE_LOG:
 						m.Source = string(metric.GetStringBytes("source"))
-						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value_str")))
+						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value")))
 						m.Logeventid = uint64(metric.GetInt("logeventid"))
 						m.Severity =  uint8(metric.GetInt("severity"))
 				}

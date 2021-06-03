@@ -12,6 +12,7 @@
 #include "glb_poller.h"
 #include "glb_pinger.h"
 #include "glb_worker.h"
+#include "glb_server.h"
 #include "../poller/poller.h"
 #include "../poller/checks_snmp.h"
 #include "../../libs/zbxexec/worker.h"
@@ -64,7 +65,7 @@ static void add_event(zbx_binary_heap_t *events, char type, zbx_uint64_t id, uns
  * and hosts hashsets. 
  ****************************************************************/
 //static
-void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
+void glb_free_item_data(void *engine, GLB_POLLER_ITEM *glb_item)
 {
 	if (NULL == glb_item->itemdata) {
 		zabbix_log(LOG_LEVEL_WARNING, "Called clearing of item %ld which is already cleared, this is BUG", glb_item->itemid);
@@ -88,6 +89,10 @@ void glb_free_item_data(GLB_POLLER_ITEM *glb_item)
 			glb_worker_free_item( (GLB_WORKER_ITEM*) glb_item->itemdata );
 			break;
 		
+		case ITEM_TYPE_TRAPPER: 
+			glb_server_free_item(engine, glb_item );
+			break;
+
 		default:
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot free unsupport item typ %d, this is a BUG",glb_item->item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -118,10 +123,11 @@ static void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_ite
 	case ITEM_TYPE_SIMPLE:
 		glb_pinger_start_ping(engine, glb_item);
 		break;
+
 	case ITEM_TYPE_EXTERNAL:
-		zabbix_log(LOG_LEVEL_WARNING,"Starting request to worker");
 		glb_worker_send_request(engine, glb_item);
 		break;
+
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",glb_item->item_type);
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -142,7 +148,7 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 	char *error;
 	GLB_POLLER_HOST *glb_host;
 	
-	//zabbix_log(LOG_LEVEL_INFORMATION, "In %s - started", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s - started", __func__);
 
 	if (SUCCEED != zbx_interval_preproc(glb_item->delay, &simple_interval, &custom_intervals, &error))
 	{
@@ -180,7 +186,6 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 * updates it (old key vals are released), udpates or creates      *
 * a hosts entry for the item						  			  *
 ******************************************************************/
-//static
 int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, DC_ITEM *dc_item, void *poll_engine)
 {
 	GLB_POLLER_ITEM *glb_item;
@@ -199,7 +204,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 			DEBUG_ITEM(dc_item->itemid, "Item already int the local queue, cleaning");
 
 			if (POLL_QUEUED == glb_item->state) {
-				glb_free_item_data(glb_item);
+				glb_free_item_data(poll_engine, glb_item);
 				zbx_heap_strpool_release(glb_item->delay);
 			}
 
@@ -266,7 +271,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 			glb_item->itemdata = (void *)glb_snmp_item;
 
 			if (SUCCEED  != glb_snmp_init_item(dc_item, glb_snmp_item )) {
-				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init snmp_item %ld not placing to the poll queue", glb_item->itemid);
+				zabbix_log(LOG_LEVEL_DEBUG, "Coudln't init snmp_item %ld not placing to the poll queue", glb_item->itemid);
 			//removing the item from the hashset
 				zbx_free(glb_snmp_item);
 				zbx_heap_strpool_release(glb_item->delay);
@@ -325,6 +330,39 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		
 			break;
 		}
+		
+		case ITEM_TYPE_TRAPPER:
+		//server items will be automatically requested from CC on arrival and cached 
+		//in the internal index
+
+		/*
+		 {
+			GLB_SERVER_ITEM *glb_server_item; 
+		
+			if (NULL == (glb_server_item = zbx_malloc(NULL, sizeof(GLB_SERVER_ITEM)))) {
+				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
+				exit(-1);
+			}
+		
+			//zabbix_log(LOG_LEVEL_INFORMATION, "Doing async worker item %ld init", glb_item->itemid);
+			DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
+			glb_item->itemdata = (void *)glb_server_item;
+		
+			if (SUCCEED  != glb_server_init_item(poll_engine, dc_item, glb_server_item )) {
+				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
+				//removing the item from the hashset
+				zbx_free(glb_server_item);
+				zbx_heap_strpool_release(glb_item->delay);
+				zbx_hashset_remove_direct(items,glb_item);
+
+				return FAIL;
+			}
+		
+			break;
+			
+		}
+		*/
+		break;
 		default:
 			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -332,7 +370,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		}
 	}
 
-	if ( POLL_FREE == glb_item->state) {
+	if ( POLL_FREE == glb_item->state &&  ITEM_TYPE_TRAPPER != glb_item->item_type) {
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Adding item %ld to the events queue ", glb_item->itemid);
 		glb_item->state = POLL_QUEUED;
 		add_item_check_event(events, hosts, glb_item, now);
@@ -363,6 +401,10 @@ void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_
 			return glb_worker_init(items, requests, responces);
 			break;
 
+		case ITEM_TYPE_TRAPPER:
+			return glb_server_init(requests, responces);
+			break;
+
 		default: 
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot init worker for item type %d, this is a BUG",item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -386,9 +428,15 @@ void glb_poller_engine_shutdown(void *engine, unsigned char item_type) {
 		case ITEM_TYPE_SIMPLE:
 			glb_pinger_shutdown(engine); 
 			break;
+
 		case ITEM_TYPE_EXTERNAL:
 			glb_worker_shutdown(engine); 
 			break;
+
+		case ITEM_TYPE_TRAPPER:
+			glb_server_shutdown(engine); 
+			break;
+
 		default: 
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot shutdown engine for item type %d, this is a BUG",item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -434,6 +482,11 @@ static void glb_poller_handle_async_io(void *engine, unsigned char item_type ) {
 	case ITEM_TYPE_EXTERNAL:
 		glb_worker_handle_async_io(engine);
 		break;
+	
+	case ITEM_TYPE_TRAPPER:
+		glb_server_handle_async_io(engine);
+		break;
+
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",item_type);
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -548,7 +601,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 						}
 					}
 				} 
-			//zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld poll event finished", event->id);
+			
 			break;
 
 			case GLB_EVENT_AGING: {
@@ -571,7 +624,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 			
 						cnt++;
 
-						glb_free_item_data(glb_item);
+						glb_free_item_data(poll_engine, glb_item);
 						
 						if (NULL != (glb_host=zbx_hashset_search(&hosts, &glb_item->hostid))) {
 							
