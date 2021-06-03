@@ -69,6 +69,10 @@ class CJsonRpc {
 		}
 
 		foreach (zbx_toArray($this->_jsonDecoded) as $call) {
+			
+			//error_log("Calling ");
+			//error_log(print_r($call,true));
+
 			$call = is_array($call) ? $call : [$call];
 
 			// notification

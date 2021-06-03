@@ -223,7 +223,12 @@
 						placeholder_0: <?= json_encode(_('search string')) ?>,
 						placeholder_1: <?= json_encode(_('replacement')) ?>
 					}));
-
+				case '<?= GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG ?>':
+					return $(preproc_param_double_tmpl.evaluate({
+						rowNum: index,
+						placeholder_0: <?= json_encode(_('seconds')) ?>,
+						placeholder_1: <?= json_encode(_('sum|count|min|max|avg')) ?>
+					}));
 				default:
 					return '';
 			}
@@ -343,6 +348,7 @@
 					case '<?= ZBX_PREPROC_LTRIM ?>':
 					case '<?= ZBX_PREPROC_TRIM ?>':
 					case '<?= ZBX_PREPROC_THROTTLE_VALUE ?>':
+					case '<?= GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG ?>':	
 					case '<?= ZBX_PREPROC_THROTTLE_TIMED_VALUE ?>':
 					case '<?= ZBX_PREPROC_SCRIPT ?>':
 					case '<?= ZBX_PREPROC_STR_REPLACE ?>':

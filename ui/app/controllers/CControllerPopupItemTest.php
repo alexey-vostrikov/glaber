@@ -254,7 +254,7 @@ abstract class CControllerPopupItemTest extends CController {
 	 * @var array
 	 */
 	protected static $preproc_steps_using_prev_value = [ZBX_PREPROC_DELTA_VALUE, ZBX_PREPROC_DELTA_SPEED,
-		ZBX_PREPROC_THROTTLE_VALUE, ZBX_PREPROC_THROTTLE_TIMED_VALUE
+		ZBX_PREPROC_THROTTLE_VALUE, ZBX_PREPROC_THROTTLE_TIMED_VALUE, GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG
 	];
 
 	/**

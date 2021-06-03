@@ -174,6 +174,8 @@ unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item
     char ip_addr[MAX_ID_LEN], *ip=NULL;
     char *parsed_key = NULL;
     char error[MAX_STRING_LEN];
+    char *addr = NULL;
+
 
 	zbx_timespec_t timespec;
     icmpping_t icmpping;
@@ -186,12 +188,12 @@ unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item
 				sizeof(error)))
         return FAIL;
 	
-    if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &dc_item->interface.addr, &count,
+    if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
 					&interval, &size, &timeout, &type, error, sizeof(error)))
 	    return FAIL;
     
     pinger_item->ip = NULL;
-    pinger_item->addr = zbx_strdup(NULL, dc_item->interface.addr);
+    pinger_item->addr = addr;
     pinger_item->lastresolve=0;
     pinger_item->type = type;
     pinger_item->count = count;
@@ -581,7 +583,51 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
                 glb_poller_item->state = POLL_QUEUED;
             } 
         } else {
-            zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find an item with itemid %ld (response: '%s'",itemid_l,worker_response);
+            //probably, for some reason the echo data is broken
+            zabbix_log(LOG_LEVEL_DEBUG, "Couldn't find an item with itemid %ld (response: '%s'",itemid_l,worker_response);
+            
+            //lets try to find the item by ip address
+            //perhaps it's better to create the ip->itemid map to make searches faster
+            //but i've only seen a few hosts breaking echo data out of thousands - actually some version of Microtik
+            
+            zbx_hashset_iter_t iter;
+            GLB_POLLER_ITEM *glb_poller_item;
+            u_int32_t rtt;
+
+            zbx_hashset_iter_reset(conf->items,&iter);
+            
+            while (NULL != (glb_poller_item = (GLB_POLLER_ITEM*)zbx_hashset_iter_next(&iter))) {
+                //checking if the item has matched ip 
+                GLB_PINGER_ITEM *glb_pinger_item = (GLB_PINGER_ITEM*)glb_poller_item->itemdata;
+
+                if ( NULL!= glb_pinger_item->ip && 0 == strcmp(glb_pinger_item->ip,ip)) {
+                   
+                    //rtt will be quite broken if calculated anyway, so setting it to some predefined number
+                    //rtt = glb_ms_time()-glb_pinger_item->lastpacket_sent-conf->async_delay;
+                    rtt = GLB_PINGER_DEFAULT_RTT;
+                    zabbix_log(LOG_LEVEL_DEBUG,"Item is matched by ip %s rtt is %d",ip,rtt);
+             
+                    if ( POLL_POLLING != glb_pinger_item->state) {
+                        zabbix_log(LOG_LEVEL_DEBUG,"Arrived responce for item %ld which is not in polling state (%d) (DUP!)",itemid_l,glb_poller_item->state);
+                    }
+
+                    //ok, looks like we can process the data right now
+                    if (POLL_FINISHED == glb_pinger_process_response(conf, glb_pinger_item, rtt)) {
+            
+                        zabbix_log(LOG_LEVEL_DEBUG, "Got the final packet for the item with broken echo data %ld",glb_poller_item->itemid);
+                        *conf->responces += 1;
+                  
+                        glb_pinger_submit_result(glb_poller_item,SUCCEED,NULL, &ts);
+                    
+                        //theese are two different things, need to set both
+                        glb_pinger_item->state = POLL_QUEUED; 
+                        glb_poller_item->state = POLL_QUEUED;
+                    } 
+                    //breaking the long cycle
+                    break;
+                }
+            }
+
         }
     }
 

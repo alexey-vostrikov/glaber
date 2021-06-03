@@ -106,7 +106,7 @@ class CControllerExport extends CController {
 
 				return;
 		}
-
+		error_log("Calling export");
 		$result = API::Configuration()->export($params);
 
 		if ($result) {

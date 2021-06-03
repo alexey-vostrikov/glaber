@@ -221,6 +221,7 @@ int	CONFIG_PREPROCESSOR_FORKS	= 3;
 int	CONFIG_LLDMANAGER_FORKS		= 0;
 int	CONFIG_LLDWORKER_FORKS		= 0;
 int	CONFIG_ALERTDB_FORKS		= 0;
+int CONFIG_EXT_SERVER_FORKS = 0;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
 char	*CONFIG_LISTEN_IP		= NULL;
@@ -304,6 +305,7 @@ int	CONFIG_SERVER_STARTUP_TIME	= 0;
 
 char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
+char	**CONFIG_EXT_SERVERS	= NULL;
 
 char	*CONFIG_USER			= NULL;
 
@@ -479,6 +481,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = GLB_PROCESS_TYPE_WORKER;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_WORKER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_EXT_SERVER_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_SERVER;
+		*local_process_num = local_server_num - server_count + CONFIG_EXT_SERVER_FORKS;
 	}
 	else
 		return FAIL;
@@ -770,6 +777,11 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		exit(EXIT_FAILURE);
 	}
 
+	if (NULL != *CONFIG_EXT_SERVERS) {
+		zabbix_log(LOG_LEVEL_WARNING,"Enabling worker server process");
+		CONFIG_EXT_SERVER_FORKS = 1;
+	}
+
 	if (0 != err)
 		exit(EXIT_FAILURE);
 }
@@ -806,7 +818,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"GlbmapLocation",		&CONFIG_GLBMAP_LOCATION,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"GlbmapOptions",		&CONFIG_GLBMAP_OPTIONS,			TYPE_STRING,
-			PARM_OPT,	0,			0},		
+			PARM_OPT,	0,			0},	
+		{"WorkerServer",			&CONFIG_EXT_SERVERS,			TYPE_MULTISTRING,
+			PARM_OPT,	0,			0},	
 		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
 			PARM_OPT,	0,			0},	
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,
@@ -825,7 +839,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			250},
 		{"StartHTTPPollers",		&CONFIG_HTTPPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
-			
 		{"StartPingers",		&CONFIG_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"StartPollers",		&CONFIG_POLLER_FORKS,			TYPE_INT,
@@ -1014,6 +1027,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
+	zbx_strarr_init(&CONFIG_EXT_SERVERS);
 
 	parse_cfg_file(CONFIG_FILE, cfg, ZBX_CFG_FILE_REQUIRED, ZBX_CFG_STRICT);
 

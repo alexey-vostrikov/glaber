@@ -304,6 +304,7 @@ static void	worker_preprocess_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t 
 
 	zbx_preprocessor_unpack_task(&itemid, &value_type, &ts, &value, &history_in, &steps, &steps_num,
 			message->data);
+			
 	DEBUG_ITEM(itemid, "Unpacked in worker for preprocessing");
 	if (CONFIG_DEBUG_ITEM == itemid) {
 		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: Will run preprocessing for item %ld, %d steps",itemid,steps_num);
@@ -446,7 +447,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 
 	zbx_ipc_message_init(&message);
 	
-	zbx_snprintf(service,MAX_STRING_LEN,"%s%d",ZBX_IPC_SERVICE_PREPROCESSING_WORKER, (process_num-1) % CONFIG_PREPROCMAN_FORKS);
+	zbx_snprintf(service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING_WORKER, (process_num-1) % CONFIG_PREPROCMAN_FORKS);
 
 	if (FAIL == zbx_ipc_socket_open(&socket, service, SEC_PER_MIN, &error))
 	{

@@ -73,47 +73,26 @@ class CTrend extends CApiService {
 			]);
 		
 			foreach ($items as $item) {
-				$history_source = CHistoryManager::getDataSourceType($item['value_type']);
-				$storage_items[$history_source][$item['value_type']][$item['itemid']] = true;
+		//		$history_source = ZBX_HISTORY_SOURCE_SERVER;
+			//	error_log(print_r($item,true));
+			//	$storage_items[$item['value_type']][$item['itemid']] = true;
+				array_push($storage_items,$item['itemid']);
 			}
 		}
 		
-		foreach ([ZBX_HISTORY_SOURCE_ELASTIC, ZBX_HISTORY_SOURCE_SQL,ZBX_HISTORY_SOURCE_SERVER ] as $source) {
-			if (array_key_exists($source, $storage_items)) {
-				$options['itemids'] = $storage_items[$source];
+		$options['itemids'] = $storage_items;
 		
-				switch ($source) {
-					case ZBX_HISTORY_SOURCE_SERVER:
-						$data = $this->getFromServer($options);
-						break;
-					case ZBX_HISTORY_SOURCE_SQL:
-						$data = $this->getFromSQL($options);
-						break;
-					case ZBX_HISTORY_SOURCE_ELASTIC:
-						$data = $this->getFromElasticsearch($options);
-						break;
-
-					default:
-						$data = $this->getFromSql($options);
-				}
-
-				if (is_array($result)) {
-					$result = array_merge($result, $data);
-				}
-				else {
-					$result += $data;
-				}
-			}
-		}
+			
+		$data = $this->getFromServer($options);
 		
-		return is_array($result) ? $result : (string) $result;
+		return is_array($data) ? $data : (string) $data;
 	}
 
 	//note: count isn't supported yet by the server server api
 	private function getFromServer($options) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-	//	error_log("Server code is invoked");
-	//	error_log(json_encode($options));
+		error_log("Server code is invoked");
+		error_log(print_r($options));
 
 		$result=[];
 		if (!$options['countOutput']) {
@@ -121,16 +100,16 @@ class CTrend extends CApiService {
 		
 			$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : 0;
 			
-			foreach ([ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64] as $value_type) {
-			
-				foreach( array_keys($options['itemids'][$value_type]) as $itemid) {
-					error_log("Requesting item $itemid from the server".json_encode($itemid));
-					$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+			foreach( $options['itemids'] as $itemid) {
+					error_log("Requesting item $itemid from the server");
+					$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::ITEM_TEST_TIMEOUT)),
+					ZBX_SOCKET_BYTES_LIMIT);
 					$add_result= $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $limit, "trends"); 
 					$result=array_merge($result,$add_result);
-				}
 			}
-		
+			
 			$result = $this->unsetExtraFields($result, ['itemid'], $options['output']);
 			error_log(count($result));
 			return $result;
@@ -138,219 +117,5 @@ class CTrend extends CApiService {
 			error_log("WARNING: Unsupported option countOutput is invoked");
 			return [];
 		}
-	}
-
-
-	/**
-	 * SQL specific implementation of get.
-	 *
-	 * @see CTrend::get
-	 */
-	private function getFromSql($options) {
-		$sql_where = [];
-
-		if ($options['time_from'] !== null) {
-			$sql_where['clock_from'] = 't.clock>='.zbx_dbstr($options['time_from']);
-		}
-
-		if ($options['time_till'] !== null) {
-			$sql_where['clock_till'] = 't.clock<='.zbx_dbstr($options['time_till']);
-		}
-
-		if (!$options['countOutput']) {
-			$sql_limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : null;
-
-			$sql_fields = [];
-
-			if (is_array($options['output'])) {
-				foreach ($options['output'] as $field) {
-					if ($this->hasField($field, 'trends') && $this->hasField($field, 'trends_uint')) {
-						$sql_fields[] = 't.'.$field;
-					}
-				}
-			}
-			elseif ($options['output'] == API_OUTPUT_EXTEND) {
-				$sql_fields[] = 't.*';
-			}
-
-			// An empty field set or invalid output method (string). Select only "itemid" instead of everything.
-			if (!$sql_fields) {
-				$sql_fields[] = 't.itemid';
-			}
-
-			$result = [];
-
-			foreach ($options['itemids'] as $value_type => $items) {
-				if ($sql_limit !== null && $sql_limit <= 0) {
-					break;
-				}
-
-				$sql_from = ($value_type == ITEM_VALUE_TYPE_FLOAT) ? 'trends' : 'trends_uint';
-				$sql_where['itemid'] = dbConditionInt('t.itemid', array_keys($items));
-
-				$res = DBselect(
-					'SELECT '.implode(',', $sql_fields).
-					' FROM '.$sql_from.' t'.
-					' WHERE '.implode(' AND ', $sql_where),
-					$sql_limit
-				);
-
-				while ($row = DBfetch($res)) {
-					$result[] = $row;
-				}
-
-				if ($sql_limit !== null) {
-					$sql_limit -= count($result);
-				}
-			}
-
-			$result = $this->unsetExtraFields($result, ['itemid'], $options['output']);
-		}
-		else {
-			$result = 0;
-
-			foreach ($options['itemids'] as $value_type => $items) {
-				$sql_from = ($value_type == ITEM_VALUE_TYPE_FLOAT) ? 'trends' : 'trends_uint';
-				$sql_where['itemid'] = dbConditionInt('t.itemid', array_keys($items));
-
-				$res = DBselect(
-					'SELECT COUNT(*) AS rowscount'.
-					' FROM '.$sql_from.' t'.
-					' WHERE '.implode(' AND ', $sql_where)
-				);
-
-				if ($row = DBfetch($res)) {
-					$result += $row['rowscount'];
-				}
-			}
-		}
-
-		return $result;
-	}
-
-	/**
-	 * Elasticsearch specific implementation of get.
-	 *
-	 * @see CTrend::get
-	 */
-	private function getFromElasticsearch($options) {
-		$query_must = [];
-		$value_types = [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64];
-
-		$query = [
-			'aggs' => [
-				'group_by_itemid' => [
-					'terms' => [
-						'field' => 'itemid'
-					],
-					'aggs' => [
-						'group_by_clock' => [
-							'date_histogram' => [
-								'field' => 'clock',
-								'interval' => '1h',
-								'min_doc_count' => 1
-							],
-							'aggs' => [
-								'max_value' => [
-									'max' => [
-										'field' => 'value'
-									]
-								],
-								'avg_value' => [
-									'avg' => [
-										'field' => 'value'
-									]
-								],
-								'min_value' => [
-									'min' => [
-										'field' => 'value'
-									]
-								]
-							]
-						]
-					]
-				]
-			],
-			'size' => 0
-		];
-
-		if ($options['time_from'] !== null) {
-			$query_must[] = [
-				'range' => [
-					'clock' => [
-						'gte' => $options['time_from']
-					]
-				]
-			];
-		}
-
-		if ($options['time_till'] !== null) {
-			$query_must[] = [
-				'range' => [
-					'clock' => [
-						'lte' => $options['time_till']
-					]
-				]
-			];
-		}
-
-		$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : null;
-		$result = [];
-
-		if ($options['countOutput']) {
-			$result = 0;
-		}
-
-		foreach (CHistoryManager::getElasticsearchEndpoints($value_types) as $type => $endpoint) {
-			if (!array_key_exists($type, $options['itemids'])) {
-				continue;
-			}
-
-			$itemids = array_keys($options['itemids'][$type]);
-
-			if (!$itemids) {
-				continue;
-			}
-
-			$query['query']['bool']['must'] = [
-				'terms' => [
-					'itemid' => $itemids
-				]
-			] + $query_must;
-
-			$query['aggs']['group_by_itemid']['terms']['size'] = count($itemids);
-
-			$data = CElasticsearchHelper::query('POST', $endpoint, $query);
-
-			foreach ($data['group_by_itemid']['buckets'] as $item) {
-				if (!$options['countOutput']) {
-					foreach ($item['group_by_clock']['buckets'] as $histogram) {
-						if ($limit !== null) {
-							// Limit is reached, no need to continue.
-							if ($limit <= 0) {
-								break 3;
-							}
-
-							$limit--;
-						}
-
-						$result[] = [
-							'itemid' => $item['key'],
-							// Field key_as_string is used to get seconds instead of milliseconds.
-							'clock' => $histogram['key_as_string'],
-							'num' => $histogram['doc_count'],
-							'min_value' => $histogram['min_value']['value'],
-							'avg_value' => $histogram['avg_value']['value'],
-							'max_value' => $histogram['max_value']['value']
-						];
-					}
-				}
-				else {
-					$result += count($item['group_by_clock']['buckets']);
-				}
-			}
-		}
-
-		return $result;
 	}
 }

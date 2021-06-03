@@ -1037,11 +1037,13 @@ void glb_preprocessing_init() {
 			exit(EXIT_FAILURE);
 	};
 	
+	//char preproc_service[MAX_STRING_LEN];
+	//zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
 	
 	/* each process has a permanent connection to preprocessing manager */
 	for (i = 0; i < CONFIG_PREPROCMAN_FORKS; i++ ) {
 	
-		zbx_snprintf(service,MAX_STRING_LEN,"%s%d",ZBX_IPC_SERVICE_PREPROCESSING,i);
+		zbx_snprintf(service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,i);
 		
 		if (FAIL == zbx_ipc_socket_open(&sockets[i], service, SEC_PER_MIN, &error))
 		{
@@ -1299,10 +1301,13 @@ int	zbx_preprocessor_test(unsigned char value_type, const char *value, const zbx
 	zbx_uint32_t	size;
 	int		ret = FAIL;
 	unsigned char	*result;
+	char preproc_service[MAX_STRING_LEN];
 
 	size = preprocessor_pack_test_request(&data, value_type, value, ts, history, steps);
-
-	if (SUCCEED != zbx_ipc_async_exchange(ZBX_IPC_SERVICE_PREPROCESSING, ZBX_IPC_PREPROCESSOR_TEST_REQUEST,
+	
+	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
+	
+	if (SUCCEED != zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_TEST_REQUEST,
 			SEC_PER_MIN, data, size, &result, error))
 	{
 		goto out;
@@ -1328,8 +1333,10 @@ out:
 int	zbx_preprocessor_get_diag_stats(int *values_num, int *values_preproc_num, char **error)
 {
 	unsigned char	*result;
+	char preproc_service[MAX_STRING_LEN];
 
-	if (SUCCEED != zbx_ipc_async_exchange(ZBX_IPC_SERVICE_PREPROCESSING, ZBX_IPC_PREPROCESSOR_DIAG_STATS,
+	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
+	if (SUCCEED != zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_DIAG_STATS,
 			SEC_PER_MIN, NULL, 0, &result, error))
 	{
 		return FAIL;
@@ -1353,10 +1360,15 @@ int	zbx_preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **er
 	int		ret;
 	unsigned char	*data, *result;
 	zbx_uint32_t	data_len;
+	char preproc_service[MAX_STRING_LEN];
 
 	data_len = zbx_preprocessor_pack_top_items_request(&data, limit);
 
-	if (SUCCEED != (ret = zbx_ipc_async_exchange(ZBX_IPC_SERVICE_PREPROCESSING, ZBX_IPC_PREPROCESSOR_TOP_ITEMS,
+		
+
+	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
+
+	if (SUCCEED != (ret = zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_TOP_ITEMS,
 			SEC_PER_MIN, data, data_len, &result, error)))
 	{
 		goto out;

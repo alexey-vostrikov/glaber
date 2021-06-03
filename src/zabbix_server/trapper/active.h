@@ -29,5 +29,6 @@ extern int	CONFIG_TIMEOUT;
 
 int	send_list_of_active_checks(zbx_socket_t *sock, char *request);
 int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *jp);
-
+void	db_register_host(const char *host, const char *ip, unsigned short port, unsigned int connection_type,
+		const char *host_metadata, zbx_conn_flags_t flag, const char *interface);
 #endif

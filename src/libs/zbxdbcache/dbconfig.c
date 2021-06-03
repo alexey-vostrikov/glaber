@@ -226,6 +226,8 @@ clean:
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
 
 	switch (zbx_dc_item->type) {
+		case ITEM_TYPE_TRAPPER: 
+			return SUCCEED;
 		case ITEM_TYPE_SNMP: {
 			ZBX_DC_SNMPITEM *snmpitem;
 #ifdef HAVE_NETSNMP				
@@ -9545,7 +9547,6 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 	
 	RDLOCK_CACHE;
 
-	//this might change when i rollback queues change 
 	switch (item_type) {
 #ifdef HAVE_NETSNMP			
 		case ITEM_TYPE_SNMP:
@@ -9566,6 +9567,14 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 		case ITEM_TYPE_EXTERNAL:
 			zbx_hashset_iter_reset(&config->items,&iter);
 			forks = CONFIG_GLB_WORKER_FORKS;
+
+			queue_num = ZBX_POLLER_TYPE_NORMAL;
+			break;	
+
+		case ITEM_TYPE_TRAPPER:
+			zbx_hashset_iter_reset(&config->trapitems,&iter);
+			//so far only one instance of a server is expected
+			forks = 1;
 
 			queue_num = ZBX_POLLER_TYPE_NORMAL;
 			break;	
@@ -9613,7 +9622,6 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 		
 		if (ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0) 
 			continue;
-		
 
 		//doing type-specific checks here
 		if (FAIL == glb_might_be_async_polled(zbx_dc_item,zbx_dc_host)) {

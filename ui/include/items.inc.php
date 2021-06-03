@@ -1778,6 +1778,10 @@ function getParamFieldLabelByType($itemType) {
  */
 function get_preprocessing_types($type = null, $grouped = true, array $supported_types = []) {
 	$types = [
+		GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG => [
+			'group' => _('Aggregation'),
+			'name' => _('Aggregate over time')
+		],
 		ZBX_PREPROC_REGSUB => [
 			'group' => _('Text'),
 			'name' => _('Regular expression')

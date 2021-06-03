@@ -1408,6 +1408,13 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 					->setAttribute('placeholder', _('seconds'))
 					->setWidth(ZBX_TEXTAREA_NUMERIC_BIG_WIDTH);
 				break;
+				
+			case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
+				$params = [
+					$step_param_0->setAttribute('placeholder', _('seconds')),
+					$step_param_1->setAttribute('placeholder', _('Aggregation type'))
+				];
+				break;
 
 			case ZBX_PREPROC_SCRIPT:
 				$params = new CMultilineInput($step_param_0->getName(), $step_param_0_value, [
@@ -1476,6 +1483,7 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 			case ZBX_PREPROC_LTRIM:
 			case ZBX_PREPROC_TRIM:
 			case ZBX_PREPROC_THROTTLE_VALUE:
+			case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
 			case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 			case ZBX_PREPROC_SCRIPT:
 			case ZBX_PREPROC_STR_REPLACE:

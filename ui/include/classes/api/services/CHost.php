@@ -196,10 +196,9 @@ class CHost extends CHostGeneral {
 		if (!is_null($options['hostids'])) {
 			zbx_value2array($options['hostids']);
 			$sqlParts['where']['hostid'] = dbConditionInt('h.hostid', $options['hostids']);
-		}
-
-		// groupids
-		if (!is_null($options['groupids'])) {
+		}	
+		
+		if (!is_null($options['groupids']) && count($options['groupids']) > 0) {
 			zbx_value2array($options['groupids']);
 
 			$sqlParts['from']['hosts_groups'] = 'hosts_groups hg';

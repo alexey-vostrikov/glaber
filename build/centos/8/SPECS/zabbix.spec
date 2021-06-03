@@ -473,6 +473,7 @@ install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-
 install -m 0755 -p src/zabbix_server/zabbix_server_* $RPM_BUILD_ROOT%{_sbindir}/
 install -m 0755 -p src/glapi/glb_hist_clickhouse $RPM_BUILD_ROOT%{_sbindir}/
 install -m 0755 -p src/glapi/glb_hist_victoria $RPM_BUILD_ROOT%{_sbindir}/
+install -m 0755 -p src/glapi/glb_log_listener $RPM_BUILD_ROOT%{_sbindir}/
 install -m 0755 -p ./glbmap $RPM_BUILD_ROOT%{_sbindir}/
 #setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
 #rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
@@ -665,6 +666,7 @@ fi
 %{_sbindir}/zabbix_server_mysql
 %{_sbindir}/glb_hist_clickhouse
 %{_sbindir}/glb_hist_victoria
+%{_sbindir}/glb_log_listener
 %{_sbindir}/glbmap
 
 %pre server-mysql
@@ -713,6 +715,7 @@ fi
 %{_sbindir}/zabbix_server_pgsql
 %{_sbindir}/glb_hist_clickhouse
 %{_sbindir}/glb_hist_victoria
+%{_sbindir}/glb_log_listener
 %{_sbindir}/glbmap
 
 %pre server-pgsql
