@@ -11,8 +11,12 @@ import (
 
 //a nice way to checkout the template and make sure it works:
 //https://regex101.com/r/oJ4vP8/1
+//https://nginx.org/en/docs/http/ngx_http_log_module.html#log_format
+//log_format combined '$remote_addr - $remote_user [$time_local] '
+// '"$request" $status $body_bytes_sent '
+// '"$http_referer" "$http_user_agent"';
 var templates = map[string]string {
-	"nginx_combined":  `^(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) (?P<domain>[^ ]+) \- \[(?P<datetime>\d{2}\/[a-zA-Z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (?:\+|\-)\d{4})\] "(?P<method>\w+) (?P<url>[^ ]+) (?P<proto>[^ ]+)" (?P<status>\d+) (?P<bytes>\d+) "(?P<referer>[^\"]*)" "(?P<agent>[^\"]*)"(?:\s+(?P<http_x_forwarded_for>[^ ]+))?$`,
+	"nginx_combined":  `^(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) (?P<host>[^ ]+) \- \[(?P<datetime>\d{2}\/[a-zA-Z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (?:\+|\-)\d{4})\] "(?P<request_method>\w+) (?P<request_uri>[^ ]+) (?P<server_protocol>[^ ]+)" (?P<status>\d+) (?P<bytes_sent>\d+) "(?P<http_referer>[^\"]*)" "(?P<http_user_agent>[^\"]*)"(?:\s+(`,
 	"json": "",
 }
 
@@ -26,7 +30,7 @@ var dateformats = map[string]string {
 func main() {
 	var listenUDP,listenTCP,format string;
 	var compiled_pattern * regexp.Regexp
-	
+		
 	flag.StringVar(&listenUDP,"listenUDP","0.0.0.0:514","UDP listen address")
 	flag.StringVar(&listenTCP,"listenTCP","0.0.0.0:514","TCP listen address")
 	flag.StringVar(&format,"format","nginx_combined1","Log format, possible types: nginx, json, syslog")

@@ -711,16 +711,20 @@ void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces ) {
 	};
 
     if ( NULL != CONFIG_SOURCE_IP && SUCCEED == is_ip4(CONFIG_SOURCE_IP) ) {
-        zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s",CONFIG_SOURCE_IP);
+        zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s ",CONFIG_SOURCE_IP);
     } 
     if ( NULL != CONFIG_GLBMAP_OPTIONS ) {
-         zbx_snprintf(add_params,MAX_STRING_LEN," %s",CONFIG_GLBMAP_OPTIONS);
+         zbx_snprintf(add_params,MAX_STRING_LEN,"%s ",CONFIG_GLBMAP_OPTIONS);
     }
     
-    zbx_snprintf(init_string,MAX_STRING_LEN,"{ \"path\":\"%s %s -v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=\\\"saddr,rtt,itemid,success\\\"\" }\n",
+    zbx_snprintf(init_string,MAX_STRING_LEN,"{\"path\":\"%s\", \"params\":\"%s-v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=saddr,rtt,itemid,success\"}\n",
         CONFIG_GLBMAP_LOCATION, add_params);
 
 	conf->worker = glb_init_worker(init_string);
+    if (NULL == conf->worker) {
+        zabbix_log(LOG_LEVEL_WARNING,"Cannot create pinger woker, check the coniguration: '%s'",init_string);
+        exit(-1);
+    }
     conf->worker->mode_to_worker = GLB_WORKER_MODE_NEWLINE;
     conf->worker->mode_from_worker = GLB_WORKER_MODE_NEWLINE;
     conf->worker->async_mode = 1;

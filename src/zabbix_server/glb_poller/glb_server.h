@@ -33,7 +33,7 @@ typedef struct {
 	const char *lld_macro_name;  // name of macro with name of the keys to submit in the LLD JSON
 	const char *item_key; //prefix for the item to conform key format
 	const char *interface_param;
-	GLB_EXT_WORKER worker;
+	GLB_EXT_WORKER *worker;
 } GLB_SERVER_T;
 
 

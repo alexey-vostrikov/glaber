@@ -44,7 +44,7 @@ static int get_worker_mode(char *mode)
 GLB_EXT_WORKER *glb_init_worker(char *config_line)
 {
     char path[MAX_STRING_LEN],
-        params[MAX_STRING_LEN],
+      //  params[MAX_STRING_LEN],
         buff[MAX_STRING_LEN];
 
     int i = 0;
@@ -58,7 +58,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     GLB_EXT_WORKER *worker = NULL;
 
     path[0] = 0;
-    params[0] = 0;
+    //params[0] = 0;
     buff[0] = 0;
 
     struct zbx_json_parse jp, jp_config;
@@ -74,14 +74,14 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     //we expect JSON as a config, let's parse it
     if (SUCCEED != zbx_json_open(config_line, &jp_config))
     {
-        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configureation: '%s', most likely not a valid JSON", config_line);
+        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: '%s', most likely not a valid JSON", config_line);
         zbx_free(worker);
         return NULL;
     }
 
     if (SUCCEED != zbx_json_value_by_name(&jp_config, "path", path, MAX_STRING_LEN, &type))
     {
-        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configureation: couldn't find 'path' parameter");
+        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: couldn't find 'path' parameter");
         zbx_free(worker);
         return NULL;
     }
@@ -94,10 +94,35 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "params", buff, MAX_STRING_LEN, &type))
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed params: '%s'", __func__, buff);
-        worker->params = zbx_strdup(NULL, buff);
+        
+        char prevchar = 0, *params=NULL;
+        int i=0, args_num=2;
+        
+        worker->args[0]=worker->path;
+        worker->args[1]=zbx_strdup(NULL, buff);
+
+        params = worker->args[1];
+
+        while (  0 != params[i] && args_num < GLB_WORKER_ARGS_MAX) {
+            
+            if ( ' ' == params[i] && '\\' != prevchar ) {
+                params[i]=0;
+                worker->args[args_num++]=params+i+1;
+            }
+        
+            prevchar = params[i];
+            i++;
+        }
+        worker->args[args_num]=NULL;
+        
+        //for (i=0; i<args_num; i++) {
+        //    zabbix_log(LOG_LEVEL_INFORMATION, "Param %d: %s",i,worker->args[i]);
+        //}
     }
-    else
-        worker->params = NULL;
+    else {
+        worker->args[0] = worker->path;
+        worker->args[1] = NULL;
+    }
     
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "timeout", buff, MAX_STRING_LEN, &type))
     {
@@ -130,56 +155,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     return worker;
 }
-/*
-zbx_hash_t glb_worker_hash_func(const void *data)
-{
-    GLB_EXT_WORKER *w = (GLB_EXT_WORKER *)data;
-    return ZBX_DEFAULT_STRING_HASH_ALGO(w->path, strlen((const char *)w->path), ZBX_DEFAULT_HASH_SEED);
-}
 
-int glb_worker_compare_func(const void *d1, const void *d2)
-{
-    GLB_EXT_WORKER *w1 = (GLB_EXT_WORKER *)d1, *w2 = (GLB_EXT_WORKER *)d2;
-
-    return strcmp(w1->path, w2->path);
-}
-
-int glb_init_external_workers(char **workers_cfg, char *scriptdir)
-{
-    char **worker_cfg;
-    int ret = SUCCEED;
-    GLB_EXT_WORKER *worker;
-
-    zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-    zabbix_log(LOG_LEVEL_INFORMATION, "Doing workers init");
-
-    if (NULL == (workers = zbx_malloc(NULL, sizeof(zbx_hashset_t))))
-        return FAIL;
-
-    zbx_hashset_create(workers, 5, glb_worker_hash_func, glb_worker_compare_func);
-
-    if (NULL == *workers_cfg)
-        goto out;
-
-    for (worker_cfg = workers_cfg; NULL != *worker_cfg; worker_cfg++)
-    {
-        zabbix_log(LOG_LEVEL_INFORMATION, "Init worker cfg %s", *worker_cfg);
-
-        if (NULL == (worker = glb_init_worker(*worker_cfg)))
-        {
-            goto out;
-            ret = FAIL;
-        }
-        zabbix_log(LOG_LEVEL_INFORMATION, "Created worker %s", worker->path);
-        //adding worker to the hash
-        zbx_hashset_insert(workers, worker, sizeof(GLB_EXT_WORKER));
-        zabbix_log(LOG_LEVEL_INFORMATION, "Worker %s dded to the hash of workers", worker->path);
-    }
-    ret = SUCCEED;
-out:
-    return ret;
-}
-*/
 static int restart_worker(GLB_EXT_WORKER *worker)
 {
     #define RST_ACCOUNT_PERIOD  20
@@ -200,7 +176,8 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         return FAIL;
     }
 
-    zabbix_log(LOG_LEVEL_DEBUG, "Restarting worker %s %s pid %d", worker->path, worker->params, worker->pid);
+    zabbix_log(LOG_LEVEL_DEBUG, "Restarting worker %s pid %d", worker->path, worker->pid);
+    
     //closing pipework
     if (worker->pipe_from_worker)
         close(worker->pipe_from_worker);
@@ -208,19 +185,25 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         close(worker->pipe_to_worker);
 
     //first of all, killing the old one if exists
-    if ( 0 != worker->pid && !kill(worker->pid, 0))
+    if ( worker->pid > 0  && !kill(worker->pid, 0))
     {
+        int exitstatus;
         zabbix_log(LOG_LEVEL_INFORMATION, "Killing old worker instance pid %d", worker->pid);
         //bye the process, you (probably) served us well
         kill(worker->pid, SIGINT);
+        
+        //this is mandatory, to get red if zombies
+        waitpid(worker->pid, &exitstatus,WNOHANG);
+        zabbix_log(LOG_LEVEL_INFORMATION, "Waitpid returned %d", exitstatus);
+        
         //that's enough for shutdown
-        usleep(10000);
-        if (!kill(worker->pid, 0))
-        {
+        //usleep(10000);
+        //if (!kill(worker->pid, 0))
+       // {
             //worker must be unable to process sigterm, lets do a sigkill
-            zabbix_log(LOG_LEVEL_INFORMATION, "Stil alive, killing old worker instance pid with SIGKILL %d", worker->pid);
-            kill(worker->pid, SIGKILL);
-        }
+       //     zabbix_log(LOG_LEVEL_INFORMATION, "Stil alive, killing old worker instance pid with SIGKILL %d", worker->pid);
+       //     kill(worker->pid, SIGKILL);
+       // }
     }
     
     //the new worker's live starts here
@@ -250,6 +233,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         close((from_child)[1]);
         close((to_child)[0]);
         close((to_child)[1]);
+        worker->pid = 0;
         return FAIL;
     }
 
@@ -286,8 +270,20 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         //And it's not something i can fix here in the code... (sure i mean the stupidity)
 
         //ok, let the worker go
-    
-        execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *)NULL);
+        //this params processing code must be moved to the worker init 
+        
+        
+        //execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *)NULL);
+        zabbix_log(LOG_LEVEL_INFORMATION,"Starting worker %s", worker->path);
+
+        for (int i=0; NULL != worker->args[i]; i++) {
+            zabbix_log(LOG_LEVEL_DEBUG,"Starting with arg[%d]=%s",i,worker->args[i]);
+        }
+        
+        if ( -1 == execv(worker->path, worker->args ))  {
+            zabbix_log(LOG_LEVEL_WARNING,"Couldn't start %s command: errno is %d",worker->path,errno);
+        }
+
         //if we are here, then execl has failed.
         //There is nothing to do, the child is useless by now, goodbye
         _Exit(127);
@@ -312,7 +308,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         //having a nap
         sleep(2);
     }
-    zabbix_log(LOG_LEVEL_DEBUG, "New worker instance pid is %d", worker->pid);
+    zabbix_log(LOG_LEVEL_INFORMATION, "Satrted worker '%s' pid is %d", worker->path, worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     return SUCCEED;
 }
@@ -756,7 +752,7 @@ void glb_destroy_worker(GLB_EXT_WORKER *worker)
         kill(worker->pid, SIGINT);
 
     zbx_free(worker->path);
-    zbx_free(worker->params);
+    zbx_free(worker->args[0]);
     zbx_free(worker);
 }
 //ok, now the logic how we work with the worker modules:

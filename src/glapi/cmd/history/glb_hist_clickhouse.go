@@ -16,9 +16,8 @@ func main() {
 	var disable_ns,save_names bool
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
-	logger.Print("Started")
-	logger.Print(os.Args)
-
+	//logger.Print("Clickhouse metricsStarted")
+	
 	flag.StringVar(&url,"url","http://localhost:8123","clickhouse http/https address")
 	flag.StringVar(&dbname,"dbname","glaber","db name to upload metrics")
 	flag.StringVar(&cluster_suffix,"suffix","","Write table suffix name (usualy '_sharded') to use on clustered Clickhouse installs")

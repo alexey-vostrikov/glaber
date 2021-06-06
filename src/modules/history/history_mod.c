@@ -317,24 +317,24 @@ int glb_module_init(char *config_line, void **data)
     struct zbx_json_parse jp, jp_config;
     
     if ( SUCCEED != zbx_json_open(config_line, &jp_config)) {
-		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configureation: '%s', most likely not a valid JSON");
+		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: '%s', most likely not a valid JSON");
 		return FAIL;
 	}
 
     zabbix_log(LOG_LEVEL_INFORMATION, "before path serach: %s",jp_config.start );
     if 	( SUCCEED != zbx_json_value_by_name(&jp_config,"path", path, MAX_STRING_LEN))  {
-        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configureation: couldn't find 'path' parameter");
+        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: couldn't find 'path' parameter");
 		return FAIL;
     } else {
         zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed path: '%s'", __func__, path);
     }
 
 	if (SUCCEED == zbx_json_value_by_name(&jp_config,"params", params, MAX_STRING_LEN))
-        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed params: '%s'", __func__, params);
+        zabbix_log(LOG_LEVEL_DEBUG, "%s: parsed params: '%s'", __func__, params);
 
 	if (SUCCEED == zbx_json_value_by_name(&jp_config,"timeout", timeout_str, MAX_ID_LEN)) {
         timeout=strtol(timeout_str,NULL,10);
-        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed timeout: '%d'",timeout);
+        zabbix_log(LOG_LEVEL_DEBUG, "%s: parsed timeout: '%d'",timeout);
     }
 
     if (SUCCEED == zbx_json_value_by_name(&jp_config,"max_calls", max_calls_str, MAX_ID_LEN)) {

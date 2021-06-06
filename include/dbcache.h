@@ -55,6 +55,8 @@
 
 #define ZBX_SNMPTRAP_LOGGING_ENABLED	1
 
+#define GLB_WORKER_ARGS_MAX	1024
+
 extern int	CONFIG_TIMEOUT;
 
 extern zbx_uint64_t	CONFIG_CONF_CACHE_SIZE;
@@ -71,7 +73,8 @@ extern int	CONFIG_PROXYDATA_FREQUENCY;
 
 typedef struct {
 	char *path;       //path to executable to run
-    char *params;     //params
+	char *args[GLB_WORKER_ARGS_MAX];
+    //char *params;     //params
     pid_t pid;              //pid of the script
     int calls;              //number of requests processed
     int timeout;            //how much time to wait for result until consider the worker is dead or stuck
