@@ -160,6 +160,8 @@ static int restart_worker(GLB_EXT_WORKER *worker)
 {
     #define RST_ACCOUNT_PERIOD  20
     #define RST_MAX_RESTARTS    5
+    int i;
+    
     zabbix_log(LOG_LEVEL_INFORMATION, "In %s()", __func__);
 
     static unsigned int count_rst_time=0, restarts=0;
@@ -276,7 +278,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         //execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *)NULL);
         zabbix_log(LOG_LEVEL_INFORMATION,"Starting worker %s", worker->path);
 
-        for (int i=0; NULL != worker->args[i]; i++) {
+        for (i=0; NULL != worker->args[i]; i++) {
             zabbix_log(LOG_LEVEL_DEBUG,"Starting with arg[%d]=%s",i,worker->args[i]);
         }
         
