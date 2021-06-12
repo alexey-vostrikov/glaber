@@ -676,7 +676,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         zabbix_log(LOG_LEVEL_WARNING,
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
-        zabbix_log(LOG_LEVEL_INFORMATION,"Continue read: %d, worker_fail: %d",continue_read,worker_fail);
+        zabbix_log(LOG_LEVEL_INFORMATION,"Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
         sleep(1);
         int resp_len = strlen(resp_buffer);
     

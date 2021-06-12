@@ -196,13 +196,14 @@ else {
 	$timezone_select
 		->addOptions(CSelect::createOptionsFromArray($data['timezones']))
 		->setValue($data['timezone']);
+	$theme_select->addOptions(CSelect::createOptionsFromArray(APP::getThemes()));
 
-	if (defined('GLB_DEFAULT_MENUPOS')) {
-		$panel_select = (new CSelect('menupos'))
-			->setFocusableElementId('label-panel')
-			->addOptions(CSelect::createOptionsFromArray(array( 'left' => _("Left"), 'top' => _("Top"), 'right' => _("Right"),  'bottom' =>_("Bottom"))))
-			->setValue($data['menupos']);
-	}
+	//	if (defined('GLB_DEFAULT_MENUPOS')) {
+//		$panel_select = (new CSelect('menupos'))
+//			->setFocusableElementId('label-panel')
+//			->addOptions(CSelect::createOptionsFromArray(array( 'left' => _("Left"), 'top' => _("Top"), 'right' => _("Right"),  'bottom' =>_("Bottom"))))
+//			->setValue($data['menupos']);
+//	}
 }
 
 $user_form_list
@@ -243,11 +244,11 @@ $user_form_list
 		(new CTextBox('url', $data['url']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	);
 
-	if (defined('GLB_DEFAULT_MENUPOS')) {
-		$user_form_list
-			->addRow(_('Menu position'),
-		($panel_select));
-	}
+//	if (defined('GLB_DEFAULT_MENUPOS')) {
+//		$user_form_list
+//			->addRow(_('Menu position'),
+//		($panel_select));
+//	}
 
 $tabs->addTab('userTab', _('User'), $user_form_list);
 

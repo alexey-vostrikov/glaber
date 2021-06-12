@@ -33,7 +33,7 @@ func main() {
 		
 	flag.StringVar(&listenUDP,"listenUDP","0.0.0.0:514","UDP listen address")
 	flag.StringVar(&listenTCP,"listenTCP","0.0.0.0:514","TCP listen address")
-	flag.StringVar(&format,"format","nginx_combined1","Log format, possible types: nginx, json, syslog")
+	flag.StringVar(&format,"format","nginx_combined","Log format, possible types: nginx, json, syslog")
 	flag.Parse()
 	
 	

@@ -159,16 +159,16 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 				'PHP_ZBX_FULL_DATE_TIME = "'.ZBX_FULL_DATE_TIME.'";'
 		);
 	
-	if (defined('GLB_DEFAULT_MENUPOS')) {
-		$pageHeader
-			->addCssFile('assets/styles/position.css')
-			->addJsFile((new CUrl('js/position.js'))->getUrl())
-			->addJs('$(document).ready(function(){
-				positionTo'.$position.'();
-			})');
-
-		$position=CProfile::get('menupos',GLB_DEFAULT_MENUPOS);
-	}
+//	if (defined('GLB_DEFAULT_MENUPOS')) {
+//		$pageHeader
+//			->addCssFile('assets/styles/position.css')
+//			->addJsFile((new CUrl('js/position.js'))->getUrl())
+//			->addJs('$(document).ready(function(){
+//				positionTo'.$position.'();
+//			})');
+//
+//		$position=CProfile::get('menupos',GLB_DEFAULT_MENUPOS);
+//	}
 	
 	// Show GUI messages in pages with menus and in fullscreen mode.
 	if (!defined('ZBX_PAGE_NO_JSLOADER')) {

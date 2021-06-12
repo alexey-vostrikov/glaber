@@ -177,8 +177,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				writer.Flush()
 			
 			case "get_trends":
-				log.Print( string(request) )
-
+				//log.Print( string(request) )
 				hr := HistoryRequest {
 					Itemid: uint64(v.GetInt64("itemid")),
 					Value_type: uint8(v.GetInt("value_type")),

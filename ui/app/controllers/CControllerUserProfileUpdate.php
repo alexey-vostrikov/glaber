@@ -113,10 +113,10 @@ class CControllerUserProfileUpdate extends CControllerUserUpdateGeneral {
 		$result = $result && (bool) API::User()->update($user);
 		
 		//saving updated menu position
-		if (defined('GLB_DEFAULT_MENUPOS')) {
-			$menupos = getRequest('menupos', CProfile::get('menupos', GLB_DEFAULT_MENUPOS));
-			CProfile::update('menupos', $menupos, PROFILE_TYPE_STR);
-		}
+		//if (defined('GLB_DEFAULT_MENUPOS')) {
+		//	$menupos = getRequest('menupos', CProfile::get('menupos', GLB_DEFAULT_MENUPOS));
+		//	CProfile::update('menupos', $menupos, PROFILE_TYPE_STR);
+		//}
 
 
 		$result = DBend($result);

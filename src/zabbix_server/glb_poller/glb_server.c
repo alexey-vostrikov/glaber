@@ -363,7 +363,7 @@ int  glb_server_create_worker(GLB_SERVER_CONF *conf, char *worker_cfg) {
     if (SUCCEED == zbx_json_value_by_name(&jp, "metadata", tmp_str, MAX_ID_LEN, &type)) 
         worker.auto_reg_metadata = zbx_heap_strpool_intern(tmp_str);
     
-    if (SUCCEED == zbx_json_value_by_name(&jp, "item_key", tmp_str, MAX_ID_LEN, &type)) 
+    if (SUCCEED == zbx_json_value_by_name(&jp, "item_name", tmp_str, MAX_ID_LEN, &type)) 
         worker.item_key = zbx_heap_strpool_intern(tmp_str);
     
     if (SUCCEED == zbx_json_value_by_name(&jp, "interface_param", tmp_str, MAX_ID_LEN, &type)) 

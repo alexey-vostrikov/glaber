@@ -180,7 +180,7 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 	public function getGraphAggregationByInterval(array $items, $time_from, $time_to, $function, $interval) {
 		return $this->getGraphAggregationByIntervalFromServer($items,$time_from, $time_to, $function, $interval);
 	}
-
+	
 	/**
 	 * Returns history value aggregation for graphs.
 	 *
@@ -196,29 +196,32 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 	public function getGraphAggregationByWidth(array $items, $time_from, $time_to, $width = null) {
 		$results = [];
 		$agg_results = [];
-		$trend_results = [];
 		
-		//combine history agregation and trends data
 		$agg_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"history_agg");
-		$trend_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"trends");
-		
+
 		foreach ($items as $item) {
 		
 			$results[$item['itemid']]['data'] = [];
-			
-			//error_log(print_r($agg_results,1));
-			//error_log(print_r($trend_results,1));
-			//error_log(print_r($results,1));
+			$history_start = $time_to;
 
-			if (isset($trend_results[$item['itemid']]['data']) && is_array($trend_results[$item['itemid']]['data'])) 
-				$results[$item['itemid']]['data'] += $trend_results[$item['itemid']]['data'];
-	
-			if (isset($agg_results[$item['itemid']]['data']) && is_array($agg_results[$item['itemid']]['data']))
+			if (isset($agg_results[$item['itemid']]['data']) && is_array($agg_results[$item['itemid']]['data'])) {
 				$results[$item['itemid']]['data'] += $agg_results[$item['itemid']]['data'];
 
-		
+				foreach ( $agg_results[$item['itemid']]['data'] as $value) {
+					if ( $value['clock'] < $history_start ) 
+						$history_start = $value['clock'];
+				}
+			}
+						
+			if ($history_start - $time_from > 3600 ) {
+				$trend_results = [];
+				$trend_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $history_start, $width,"trends");		
+				
+				if (isset($trend_results[$item['itemid']]['data']) && is_array($trend_results[$item['itemid']]['data'])) 
+					$results[$item['itemid']]['data'] += $trend_results[$item['itemid']]['data'];
+			} 
 		}
-	//	error_log(print_r($results,true));
+
 		return $results;
 	}
 	
