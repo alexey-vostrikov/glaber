@@ -73,16 +73,11 @@ class CTrend extends CApiService {
 			]);
 		
 			foreach ($items as $item) {
-		//		$history_source = ZBX_HISTORY_SOURCE_SERVER;
-			//	error_log(print_r($item,true));
-			//	$storage_items[$item['value_type']][$item['itemid']] = true;
 				array_push($storage_items,$item['itemid']);
 			}
 		}
 		
 		$options['itemids'] = $storage_items;
-		
-			
 		$data = $this->getFromServer($options);
 		
 		return is_array($data) ? $data : (string) $data;
@@ -91,27 +86,41 @@ class CTrend extends CApiService {
 	//note: count isn't supported yet by the server server api
 	private function getFromServer($options) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-		error_log("Server code is invoked");
-		error_log(print_r($options));
+		//error_log("Server trend code is invoked");
+		//error_log(print_r($options,true));
 
 		$result=[];
 		if (!$options['countOutput']) {
-			error_log("no counts");
-		
-			$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : 0;
-			
+			//error_log("no counts");
+			//if limit is unset, then assume 5k points is enough
+			$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : 5000;
+
 			foreach( $options['itemids'] as $itemid) {
-					error_log("Requesting item $itemid from the server");
 					$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::ITEM_TEST_TIMEOUT)),
 					ZBX_SOCKET_BYTES_LIMIT);
 					$add_result= $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $limit, "trends"); 
+
+								
+					//trend data arrives in "aggregated format" so that fields must be renamed max->value_max min->value_min avg->value_avg
+					foreach ($add_result as $idx=>$key)  {
+
+						$add_result[$idx]['value_min']=$key['min'];
+						unset($add_result[$idx]['min']);
+						
+						$add_result[$idx]['value_max']=$key['max'];
+						unset($add_result[$idx]['max']);
+						
+						$add_result[$idx]['value_avg']=$key['avg'];
+						unset($add_result[$idx]['avg']);
+					}
+
 					$result=array_merge($result,$add_result);
 			}
-			
+
 			$result = $this->unsetExtraFields($result, ['itemid'], $options['output']);
-			error_log(count($result));
+		
 			return $result;
 		} else {
 			error_log("WARNING: Unsupported option countOutput is invoked");

@@ -184,6 +184,9 @@ class CHistory extends CApiService {
 	 */
 	private function getFromServer($options) {
 		global $HISTORY;
+		
+		//error_log(print_r($options,true));
+		
 		$result = [];
 		
 		if ($options['itemids'] !== null) {
@@ -198,19 +201,18 @@ class CHistory extends CApiService {
 			    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 			    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
-	    //new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT); 
-			//if ( !is_null($result) && count($result) > 0)
-			//	$result = array_merge($result, $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history")); 
-			//else 
+	    
 			$data = $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history");
-				error_log("$itemid :". print_r($result,true));
-
-			if (is_array($result)) {
+			
+			//error_log("$itemid :". print_r($result,true));
+			//error_log(print_r($data,true));
+			
+			if (is_array($data)) {
 				$result = array_merge($result, $data);
 			}
-			else {
-				$result += $data;
-			}
+		//	else {
+		//		$result["] += $data;
+		//	}
 
 			
 		

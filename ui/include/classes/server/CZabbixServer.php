@@ -160,7 +160,6 @@ class CZabbixServer {
 	}
 
 	public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
-		//error_log(" Server hist called with itemid $itemid, start $start end $end count $count type $type");
 		return $this->request([
 			'request' => 'history.get',
 			'sid' => $sid,

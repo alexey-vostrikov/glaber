@@ -198,30 +198,56 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 		$agg_results = [];
 		
 		$agg_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"history_agg");
+		
 
 		foreach ($items as $item) {
 		
 			$results[$item['itemid']]['data'] = [];
 			$history_start = $time_to;
-
+			//error_log(print_r($agg_results,1));
+			//error_log(print_r($trend_results,1));
+			//error_log(print_r($results,1));
+			
 			if (isset($agg_results[$item['itemid']]['data']) && is_array($agg_results[$item['itemid']]['data'])) {
+			
+				
 				$results[$item['itemid']]['data'] += $agg_results[$item['itemid']]['data'];
+
+
 
 				foreach ( $agg_results[$item['itemid']]['data'] as $value) {
 					if ( $value['clock'] < $history_start ) 
 						$history_start = $value['clock'];
 				}
+				
+
+				//fix: remove after testing - this test's 
+				//$history_start += 3 * 86000;
+				//foreach ($results[$item['itemid']]['data'] as $idx => $value) {
+				//	if ($value["clock"] < $history_start) {
+				//		unset($results[$item['itemid']]['data'][$idx]);
+				//	}
+				//}
+				
 			}
 						
 			if ($history_start - $time_from > 3600 ) {
+			
 				$trend_results = [];
-				$trend_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $history_start, $width,"trends");		
+				$trend_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"trends");		
 				
+				//now using only points that has timestamps prior to the history start
 				if (isset($trend_results[$item['itemid']]['data']) && is_array($trend_results[$item['itemid']]['data'])) 
-					$results[$item['itemid']]['data'] += $trend_results[$item['itemid']]['data'];
+				{
+					foreach($trend_results[$item['itemid']]['data'] as $idx=>$key) {
+						if ($key['clock'] < $history_start)
+						 array_push($results[$item['itemid']]['data'],$trend_results[$item['itemid']]['data'][$idx]);
+					}
+				}
 			} 
-		}
 
+		
+		}
 		return $results;
 	}
 	

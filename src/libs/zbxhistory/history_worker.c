@@ -254,7 +254,9 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 				//all attributes are here, so we know that jp_row holds the values, we just add jp_row 
 				//to the output buffer (or we might be generating own )
 				size_t buf_size=jp_row.end-jp_row.start+1;
-				if (valuecount > 0) zbx_snprintf_alloc(buffer,&allocd,&offset,",");
+				if (valuecount > 0) 
+					zbx_snprintf_alloc(buffer,&allocd,&offset,",");
+				
 				zbx_strncpy_alloc(buffer,&allocd,&offset,jp_row.start,buf_size);
 		
 				valuecount++;
