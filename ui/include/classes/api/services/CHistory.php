@@ -217,140 +217,24 @@ class CHistory extends CApiService {
 			
 		
 		}
-		//error_log(print_r($values,true));
-		return $result;
-	}
-
-
-	/**
-	 * SQL specific implementation of get.
-	 *
-	 * @see CHistory::get
-	 */
-	private function getFromSql($options) {
-		$result = [];
-		$sql_parts = [
-			'select'	=> ['history' => 'h.itemid'],
-			'from'		=> [
-				'history' => $this->tableName.' h'
-			],
-			'where'		=> [],
-			'group'		=> [],
-			'order'		=> []
-		];
-
-		// itemids
-		if ($options['itemids'] !== null) {
-			$sql_parts['where']['itemid'] = dbConditionInt('h.itemid', $options['itemids']);
-		}
-
-		// time_from
-		if ($options['time_from'] !== null) {
-			$sql_parts['where']['clock_from'] = 'h.clock>='.$options['time_from'];
-		}
-
-		// time_till
-		if ($options['time_till'] !== null) {
-			$sql_parts['where']['clock_till'] = 'h.clock<='.$options['time_till'];
-		}
-
-		// filter
-		if ($options['filter'] !== null) {
-			$this->dbFilter($sql_parts['from']['history'], $options, $sql_parts);
-		}
-
-		// search
-		if ($options['search'] !== null) {
-			zbx_db_search($sql_parts['from']['history'], $options, $sql_parts);
-		}
-
-		$sql_parts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sql_parts);
-		$sql_parts = $this->applyQuerySortOptions($this->tableName, $this->tableAlias(), $options, $sql_parts);
-
-		$db_res = DBselect(self::createSelectQueryFromParts($sql_parts), $options['limit']);
-
-		while ($data = DBfetch($db_res)) {
-			if ($options['countOutput']) {
-				$result = $data['rowscount'];
+		
+		
+		//maybe it's better to add a sortfield here, but it's unlikely 
+		//that it could be anything but clock
+		if (isset($options['sortorder'])) {
+			switch ($options['sortorder']) {
+				case 'ASC': 
+					usort($result, function($a,$b) { return $a['clock'] - $b['clock']; });
+				break;
+	
+				case 'DESC': 
+					usort($result, function($a,$b) { return $b['clock'] - $a['clock']; });
+				break;					 
 			}
-			else {
-				$result[] = $data;
-			}
+
 		}
 
 		return $result;
 	}
-
-	/**
-	 * Elasticsearch specific implementation of get.
-	 *
-	 * @see CHistory::get
-	 */
-	private function getFromElasticsearch($options) {
-		$query = [];
-		$schema = DB::getSchema($this->tableName);
-
-		// itemids
-		if ($options['itemids'] !== null) {
-			$query['query']['bool']['must'][] = [
-				'terms' => [
-					'itemid' => $options['itemids']
-				]
-			];
-		}
-
-		// time_from
-		if ($options['time_from'] !== null) {
-			$query['query']['bool']['must'][] = [
-				'range' => [
-					'clock' => [
-						'gte' => $options['time_from']
-					]
-				]
-			];
-		}
-
-		// time_till
-		if ($options['time_till'] !== null) {
-			$query['query']['bool']['must'][] = [
-				'range' => [
-					'clock' => [
-						'lte' => $options['time_till']
-					]
-				]
-			];
-		}
-
-		// filter
-		if ($options['filter'] !== null) {
-			$query = CElasticsearchHelper::addFilter(DB::getSchema($this->tableName), $query, $options);
-		}
-
-		// search
-		if ($options['search'] !== null) {
-			$query = CElasticsearchHelper::addSearch($schema, $query, $options);
-		}
-
-		// output
-		if ($options['countOutput'] === false && $options['output'] !== API_OUTPUT_EXTEND) {
-			$query['_source'] = $options['output'];
-		}
-
-		// sorting
-		if ($options['sortfield']) {
-			$query = CElasticsearchHelper::addSort($query, $options);
-		}
-
-		// limit
-		if ($options['limit'] !== null) {
-			$query['size'] = $options['limit'];
-		}
-
-		$endpoints = CHistoryManager::getElasticsearchEndpoints($options['history']);
-		if ($endpoints) {
-			return CElasticsearchHelper::query('POST', reset($endpoints), $query);
-		}
-
-		return null;
-	}
+		
 }

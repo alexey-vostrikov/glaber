@@ -94,33 +94,52 @@ class CTrend extends CApiService {
 			//error_log("no counts");
 			//if limit is unset, then assume 5k points is enough
 			$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : 5000;
-
+			$result = [];
 			foreach( $options['itemids'] as $itemid) {
 					$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::ITEM_TEST_TIMEOUT)),
 					ZBX_SOCKET_BYTES_LIMIT);
-					$add_result= $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $limit, "trends"); 
+					$add_result = $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $limit, "trends"); 
 
 								
-					//trend data arrives in "aggregated format" so that fields must be renamed max->value_max min->value_min avg->value_avg
-					foreach ($add_result as $idx=>$key)  {
+					if (is_array($add_result)) {
+						//trend data arrives in "aggregated format" so that fields must be renamed max->value_max min->value_min avg->value_avg
+						foreach ($add_result as $idx=>$key)  {
 
-						$add_result[$idx]['value_min']=$key['min'];
-						unset($add_result[$idx]['min']);
+							$add_result[$idx]['value_min']=$key['min'];
+							unset($add_result[$idx]['min']);
 						
-						$add_result[$idx]['value_max']=$key['max'];
-						unset($add_result[$idx]['max']);
+							$add_result[$idx]['value_max']=$key['max'];
+							unset($add_result[$idx]['max']);
 						
-						$add_result[$idx]['value_avg']=$key['avg'];
-						unset($add_result[$idx]['avg']);
+							$add_result[$idx]['value_avg']=$key['avg'];
+							unset($add_result[$idx]['avg']);
+						}
+					
+						if (is_array($result)) {
+							$result=array_merge($result,$add_result);
+						} else {
+							$result=$add_result;
+						}
 					}
-
-					$result=array_merge($result,$add_result);
 			}
 
 			$result = $this->unsetExtraFields($result, ['itemid'], $options['output']);
+
+			if (isset($options['sortorder'])) {
+				switch ($options['sortorder']) {
+					case 'ASC': 
+						usort($result, function($a,$b) { return $a['clock'] - $b['clock']; });
+					break;
 		
+					case 'DESC': 
+						usort($result, function($a,$b) { return $b['clock'] - $a['clock']; });
+					break;					 
+				}
+	
+			}
+
 			return $result;
 		} else {
 			error_log("WARNING: Unsupported option countOutput is invoked");
