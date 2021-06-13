@@ -525,6 +525,7 @@ class CItem extends CItemGeneral {
 
 		foreach ($items_rtdata as $key => &$value) {
 			$value['itemid'] = $itemids[$key];
+			$value['mtime'] = time();
 		}
 		unset($value);
 
@@ -567,11 +568,14 @@ class CItem extends CItemGeneral {
 		CArrayHelper::sort($items, ['itemid']);
 
 		$data = [];
+		$rtdata = [];
 		foreach ($items as $item) {
 			unset($item['flags']); // flags cannot be changed
 			$data[] = ['values' => $item, 'where' => ['itemid' => $item['itemid']]];
+			$rtdata[] = ['values' => ['mtime' => time()], 'where' => ['itemid' => $item['itemid']]];
 		}
 		DB::update('items', $data);
+		DB::update('item_rtdata', $rtdata);
 
 		$itemApplications = [];
 		$applicationids = [];
