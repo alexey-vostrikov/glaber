@@ -17,7 +17,7 @@
 typedef struct {
   //  zbx_hashset_t *items;
   	int *requests;
-	int *responces;
+	int *responses;
     zbx_hashset_t workers;
     zbx_hashset_t items_idx; //index to quickly locate itemids for arrived data
     zbx_hashset_t lld_items_reg; //index of already registered lld items
@@ -266,7 +266,7 @@ static int glb_server_submit_result(GLB_SERVER_CONF *conf, char *response, GLB_S
         add_host_key_regdata(conf, host, json_key, worker->lld_key_name, worker->lld_macro_name);
     }
 
-    //autoregistration data is checked and submitted during checking all the worker responces once 
+    //autoregistration data is checked and submitted during checking all the worker responses once 
     //each 1/2 time interval of config cache reload 
 
     
@@ -438,8 +438,8 @@ static void glb_server_process_results(GLB_SERVER_CONF *conf) {
     GLB_SERVER_T *worker;
     static unsigned int last_reg_send = 0;
     
-    //reading responces from all the workers we have
-    //reading all the responces we have so far from the worker
+    //reading responses from all the workers we have
+    //reading all the responses we have so far from the worker
     
     //worker iteration loop on the top
     zbx_hashset_iter_reset(&conf->workers,&iter);
@@ -585,7 +585,7 @@ static int	server_idx_cmp_func(const void *d1, const void *d2)
 /******************************************************************************
  * init
  * ***************************************************************************/
-void* glb_server_init( int *requests, int *responces ) {
+void* glb_server_init( int *requests, int *responses ) {
 	int i, ret;
 	static GLB_SERVER_CONF *conf;
     char **worker_cfg;
@@ -598,7 +598,7 @@ void* glb_server_init( int *requests, int *responces ) {
 		}
         
     conf->requests = requests;
-	conf->responces = responces;
+	conf->responses = responses;
 
 
     if (NULL == CONFIG_WORKERS_DIR ) {

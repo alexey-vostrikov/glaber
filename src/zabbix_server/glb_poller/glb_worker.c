@@ -1,8 +1,7 @@
-/**********************************************************************************
+/************************************************************************
     Glb worker script item - execs scripts assuming they are workers
     supports async and sync flow
-
- */
+ ***********************************************************************/
 #include "log.h"
 #include "common.h"
 #include "zbxserver.h"
@@ -17,9 +16,10 @@ typedef struct {
 	zbx_hashset_t *items;
     zbx_binary_heap_t events;
 	int *requests;
-	int *responces;
+	int *responses;
     zbx_hashset_t workers;
- } GLB_WORKER_CONF;
+ } 
+ GLB_WORKER_CONF;
 
 extern int CONFIG_GLB_WORKER_FORKS;
 extern char  *CONFIG_WORKERS_DIR;
@@ -55,13 +55,13 @@ static int glb_worker_submit_result(GLB_WORKER_CONF *conf, char *response) {
         return FAIL;
     }
 
-    
     itemid = strtol(itemid_s,NULL,10); 
     //looking for the item
     if (NULL == ( glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(conf->items, &itemid))) {
         zabbix_log(LOG_LEVEL_WARNING, "Worker returned response with unknown itemid %ld, response is skipped",itemid);
         return FAIL;
     }
+
     glb_worker_item = (GLB_WORKER_ITEM*)glb_item->itemdata;      
     //it maybe feasible to allow a script to set the precise time 
     //but for now just using the current one 
@@ -141,66 +141,13 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
     zbx_snprintf_alloc(&key_dyn, &dyn_alloc, &dyn_offset, "\n");
     zabbix_log(LOG_LEVEL_INFORMATION,"Parsed params: %s", key_dyn);
     worker_item->params_dyn = key_dyn;
-    //zabbix_log(LOG_LEVEL_INFORMATION,"Parsed static params: %s",params_stat);
-    //static params will go to cmd_full along with command name
-    //if (NULL == params_stat)
-    //    zbx_snprintf_alloc(&cmd,&cmd_alloc,&cmd_offset,"%s/%s", CONFIG_WORKERS_DIR, get_rkey(&request));
-    //else 
-    //    zbx_snprintf_alloc(&cmd,&cmd_alloc,&cmd_offset,"%s/%s %s", CONFIG_WORKERS_DIR, get_rkey(&request), params_stat);
-    
-    
-    //will use this addr as a id for the worker
-    //worker_item->workerid = (u_int64_t)worker_item->full_cmd;
-    
-    //translating dynamic params
-    //for worker params we will use parsed parameters, cache them to config cache reload time
-    //if (SUCCEED != substitute_key_macros(&key_dyn, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
-	//			sizeof(error))) {
-      //  zabbix_log(LOG_LEVEL_INFORMATION,"Failed to apply macroses to dynamic params %s",params_dyn);
-    //    goto out;
-   // }
-    //no reason to intern - this is always different per item
-    //zabbix_log(LOG_LEVEL_INFORMATION,"Translated dynamic params is %s",key_dyn);
-     
+       
     free_request(&request);
-    //now converting dynamic params in key form to list of params
-    //init_request(&request);
-    
-    //spliiting params to dynamic and static ones
-    //dyn_offset = 0;
-   // dyn_alloc = 0;
-   // if (SUCCEED != parse_item_key(key_dyn, &request)) {
-	//    zabbix_log(LOG_LEVEL_INFORMATION,"Failed to parse dyn key %s", params_dyn);
-    //    goto out;
-   // }
-/*
-    for (i = 0; i < get_rparams_num(&request); i++)
-	{
-		const char	*param;
-		char		*param_esc;
-
-		param = get_rparam(&request, i);
-		param_esc = zbx_dyn_escape_shell_single_quote(param);
-     
-        //skipping params that have macroses
-        zbx_snprintf_alloc(&params_dyn, &dyn_alloc, &dyn_offset, " '%s'", param_esc);
-		zbx_free(param_esc);
-	}
-    //using new line termination to signal end of the command
-    zbx_snprintf_alloc(&params_dyn, &dyn_alloc, &dyn_offset, "\n");
-    zabbix_log(LOG_LEVEL_INFORMATION, "Dynamic params is %s", params_dyn);
-    worker_item->params_dyn = params_dyn;
-    //we use unparsed parameters as identification of a worker and to make it full run path
-    //getting full path for the worker
-    //zbx_snprintf_alloc(&cmd,&cmd_alloc,&cmd_offset,"%s/%s", CONFIG_WORKERS_DIR, get_rkey(&request));
-
-*/
 
     ret = SUCCEED;
 out:
     zbx_free(parsed_key);
     zbx_free(params_stat);
-    //zbx_free(key_dyn);
     zbx_free(cmd);
     free_request(&request);
     
@@ -342,8 +289,8 @@ static void glb_worker_process_results(GLB_WORKER_CONF *conf) {
     GLB_POLLER_ITEM *glb_poller_item;
     zbx_hashset_iter_t iter;
     GLB_WORKER_T *worker;
-    //reading responces from all the workers we have
-    //reading all the responces we have so far from the worker
+    //reading responses from all the workers we have
+    //reading all the responses we have so far from the worker
     
     //worker iteration loop on the top
     zbx_hashset_iter_reset(&conf->workers,&iter);
@@ -381,7 +328,7 @@ void  glb_worker_handle_async_io(void *engine) {
     conf->async_delay=glb_ms_time()-lastrun;
     lastrun=glb_ms_time();
 
-    //parses and submits arrived ICMP responces
+    //parses and submits arrived ICMP responses
     glb_worker_process_results(conf);
   
     //handling timed-out items
@@ -395,7 +342,7 @@ void  glb_worker_handle_async_io(void *engine) {
 /******************************************************************************
  * inits async structures - static connection pool							  *
  * ***************************************************************************/
-void* glb_worker_init(zbx_hashset_t *items, int *requests, int *responces ) {
+void* glb_worker_init(zbx_hashset_t *items, int *requests, int *responses ) {
 	int i;
 	static GLB_WORKER_CONF *conf;
 	char init_string[MAX_STRING_LEN];
@@ -414,7 +361,7 @@ void* glb_worker_init(zbx_hashset_t *items, int *requests, int *responces ) {
     conf->items = items;
     zbx_hashset_create(&conf->workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
     conf->requests = requests;
-	conf->responces = responces;
+	conf->responses = responses;
 
     if (NULL == CONFIG_WORKERS_DIR ) {
         zabbix_log(LOG_LEVEL_WARNING, "Warning: trying to run glb_worker without 'WorkersScript' set in the config file, not starting");

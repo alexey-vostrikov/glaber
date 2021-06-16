@@ -472,6 +472,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = GLB_PROCESS_TYPE_SNMP;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_SNMP_FORKS;
 	}
+	else if (local_server_num <= (server_count +=CONFIG_GLB_AGENT_FORKS ))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_AGENT;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_AGENT_FORKS;
+	}
 	else if (local_server_num <= (server_count +=CONFIG_GLB_PINGER_FORKS ))
 	{
 		*local_process_type = GLB_PROCESS_TYPE_PINGER;

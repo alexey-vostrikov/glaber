@@ -44,7 +44,7 @@ void	get_values_snmp(const DC_ITEM *items, AGENT_RESULT *results, int *errcodes,
 void	zbx_clear_cache_snmp(unsigned char process_type, int process_num);
 
 //glaber async snmp methods
-void*   glb_snmp_init(zbx_hashset_t *items, zbx_hashset_t *hosts, int *requests, int *responces );
+void*   glb_snmp_init(zbx_hashset_t *items, zbx_hashset_t *hosts, int *requests, int *responses );
 void    glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item);
 void    glb_snmp_handle_async_io(void *engine); 
 unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item );

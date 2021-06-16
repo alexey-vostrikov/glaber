@@ -73,7 +73,7 @@ unsigned int glb_pinger_init_item(DC_ITEM *dc_item, GLB_PINGER_ITEM *pinger_item
 void glb_pinger_free_item(GLB_PINGER_ITEM *glb_pinger_item );
 void glb_pinger_shutdown(void *engine);
 int glb_pinger_start_ping(void *engine, GLB_POLLER_ITEM *glb_item);
-void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces );
+void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responses );
 void  glb_pinger_handle_async_io(void *engine);
 int  glb_can_process_glb_pinger(const char *key);
 

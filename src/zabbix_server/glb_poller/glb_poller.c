@@ -13,6 +13,7 @@
 #include "glb_pinger.h"
 #include "glb_worker.h"
 #include "glb_server.h"
+#include "glb_agent.h"
 #include "../poller/poller.h"
 #include "../poller/checks_snmp.h"
 #include "../../libs/zbxexec/worker.h"
@@ -90,9 +91,13 @@ void glb_free_item_data(void *engine, GLB_POLLER_ITEM *glb_item)
 			break;
 		
 		case ITEM_TYPE_TRAPPER: 
-			glb_server_free_item(engine, glb_item );
+			glb_server_free_item(engine, glb_item);
 			break;
 
+		case ITEM_TYPE_AGENT: 
+			glb_agent_free_item((GLB_AGENT_ITEM*)glb_item->itemdata);
+			break;
+			
 		default:
 			zabbix_log(LOG_LEVEL_WARNING,"Cannot free unsupport item typ %d, this is a BUG",glb_item->item_type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -126,6 +131,10 @@ static void glb_poller_schedule_poll_item(void *engine, GLB_POLLER_ITEM *glb_ite
 
 	case ITEM_TYPE_EXTERNAL:
 		glb_worker_send_request(engine, glb_item);
+		break;
+
+	case ITEM_TYPE_AGENT:
+		glb_agent_add_poll_item(engine, glb_item);
 		break;
 
 	default:
@@ -332,26 +341,23 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		}
 		
 		case ITEM_TYPE_TRAPPER:
-		//server items will be automatically requested from CC on arrival and cached 
-		//in the internal index
-
-		/*
-		 {
-			GLB_SERVER_ITEM *glb_server_item; 
+		break;
 		
-			if (NULL == (glb_server_item = zbx_malloc(NULL, sizeof(GLB_SERVER_ITEM)))) {
+		case ITEM_TYPE_ZABBIX: {
+			GLB_AGENT_ITEM *glb_agent_item; 
+		
+			if (NULL == (glb_agent_item = zbx_malloc(NULL, sizeof(GLB_AGENT_ITEM)))) {
 				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
 				exit(-1);
 			}
 		
-			//zabbix_log(LOG_LEVEL_INFORMATION, "Doing async worker item %ld init", glb_item->itemid);
-			DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
-			glb_item->itemdata = (void *)glb_server_item;
+			DEBUG_ITEM(glb_item->itemid,"Doing AGENT spcecific init");
+			glb_item->itemdata = (void *)glb_agent_item;
 		
-			if (SUCCEED  != glb_server_init_item(poll_engine, dc_item, glb_server_item )) {
+			if (SUCCEED  != glb_agent_init_item(dc_item, glb_agent_item )) {
 				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
 				//removing the item from the hashset
-				zbx_free(glb_server_item);
+				zbx_free(glb_agent_item);
 				zbx_heap_strpool_release(glb_item->delay);
 				zbx_hashset_remove_direct(items,glb_item);
 
@@ -359,10 +365,9 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 			}
 		
 			break;
-			
 		}
-		*/
-		break;
+		
+
 		default:
 			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
 			THIS_SHOULD_NEVER_HAPPEN;
@@ -385,24 +390,28 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 * inits the proper worker for the item_type 					  *
 *
  * ***************************************************************/
-void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responces) {
+void *glb_poller_engine_init(unsigned char item_type, zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responses) {
 	
 	switch (item_type) {
 #ifdef HAVE_NETSNMP
 		case ITEM_TYPE_SNMP:
-			return glb_snmp_init(hosts, items, requests, responces);
+			return glb_snmp_init(hosts, items, requests, responses);
 			break;
 #endif
 		case ITEM_TYPE_SIMPLE:
-			return glb_pinger_init(items, requests, responces);
+			return glb_pinger_init(items, requests, responses);
 			break;
 		
 		case ITEM_TYPE_EXTERNAL:
-			return glb_worker_init(items, requests, responces);
+			return glb_worker_init(items, requests, responses);
 			break;
 
 		case ITEM_TYPE_TRAPPER:
-			return glb_server_init(requests, responces);
+			return glb_server_init(requests, responses);
+			break;
+		
+		case ITEM_TYPE_AGENT:
+			return glb_agent_init(items, hosts, requests, responses);
 			break;
 
 		default: 
@@ -423,6 +432,10 @@ void glb_poller_engine_shutdown(void *engine, unsigned char item_type) {
 #ifdef HAVE_NETSNMP
 		case ITEM_TYPE_SNMP:
 			glb_snmp_shutdown(engine); 
+			break;
+
+		case ITEM_TYPE_AGENT:
+			glb_agent_shutdown(engine); 
 			break;
 #endif
 		case ITEM_TYPE_SIMPLE:
@@ -487,6 +500,10 @@ static void glb_poller_handle_async_io(void *engine, unsigned char item_type ) {
 		glb_server_handle_async_io(engine);
 		break;
 
+	case ITEM_TYPE_AGENT:
+		glb_agent_handle_async_io(engine);
+		break;
+
 	default:
 		zabbix_log(LOG_LEVEL_WARNING,"Unsupported item type %d has been send to polling, this is a BUG",item_type);
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -499,7 +516,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
 	//time_t last_stat_time, total_sec = 0.0;
 	double sec;
-	int requests = 0, responces = 0, sleeptime = 0, next_stat_time = 0;
+	int requests = 0, responses = 0, sleeptime = 0, next_stat_time = 0;
 	unsigned char item_type;
 
 	//zbx_hashset_ptr_t strpooll; //strings pool for string interning
@@ -530,7 +547,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	add_event(&events, GLB_EVENT_AGING, 0, time(NULL) + 1);
 	add_event(&events, GLB_EVENT_NEW_ITEMS_CHECK, 0, time(NULL) + process_num);
 
-	if (NULL == ( poll_engine = glb_poller_engine_init(item_type, &hosts, &items, &requests, &responces))) {
+	if (NULL == ( poll_engine = glb_poller_engine_init(item_type, &hosts, &items, &requests, &responses))) {
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't init polling engine for item type %d, exiting", item_type);
 		exit(-1);
 	}
@@ -686,18 +703,18 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		
 		glb_poller_handle_async_io(poll_engine, item_type);
 		
-		if ( old_activity == requests + responces ) {
+		if ( old_activity == requests + responses ) {
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Nothing to do, sleeping");
 			usleep(100000);
 		}
-		old_activity = requests + responces;
+		old_activity = requests + responses;
 
 		if (next_stat_time < now ) {
 			next_stat_time = now + STAT_INTERVAL;
 			zbx_setproctitle("%s #%d [sent %d chks/sec, got %d chcks/sec, items: %d, events planned: %d]",
- 					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responces/STAT_INTERVAL, items.num_data, events.elems_num);
+ 					get_process_type_string(process_type), process_num, requests/STAT_INTERVAL, responses/STAT_INTERVAL, items.num_data, events.elems_num);
 			requests = 0; 
-			responces = 0;
+			responses = 0;
 		
 		}
 	}

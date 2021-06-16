@@ -47,7 +47,7 @@ typedef struct {
 unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *glb_worker_item);
 void glb_worker_free_item(GLB_WORKER_ITEM *glb_worker_item );
 
-void* glb_worker_init(zbx_hashset_t *items, int *requests, int *responces );
+void* glb_worker_init(zbx_hashset_t *items, int *requests, int *responses );
 void glb_worker_shutdown(void *engine);
 
 void  glb_worker_handle_async_io(void *engine);
