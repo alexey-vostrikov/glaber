@@ -684,7 +684,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					//so after one minute of waiting we consider its timed out anyway whatever the poll process thinks about it
 					//but it's a poller's business to submit timeout result
 					if (glb_item->lastpolltime + SEC_PER_MIN < now && POLL_POLLING == glb_item->state) {
-						zabbix_log(LOG_LEVEL_DEBUG, "Item %ld has timedout in the poller, resetting it's queue state",glb_item->itemid);
+						zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld has timed out in the poller, resetting it's queue state",glb_item->itemid);
 						glb_item->state = POLL_QUEUED;
 					}
 				}

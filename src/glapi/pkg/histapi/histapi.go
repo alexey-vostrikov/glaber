@@ -95,7 +95,10 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 		
 		if ( nil != err ) {
 		  log.Print(err)
-		  return
+		  log.Print(string(request))
+		  fmt.Fprint(writer,"\n")
+		  writer.Flush()
+		  continue
 		}
 	
 		switch string(v.GetStringBytes("request")) {

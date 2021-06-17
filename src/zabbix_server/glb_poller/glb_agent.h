@@ -22,6 +22,7 @@ typedef struct
 typedef struct {
 	zbx_hashset_t *items;  //hashsets of items and hosts to change their state
 	zbx_hashset_t *hosts;  
+	zbx_hashset_t lists_idx;
 	GLB_ASYNC_AGENT_CONNECTION conns[GLB_MAX_AGENT_CONNS]; 
 	int *requests;
 	int *responses;

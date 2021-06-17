@@ -94,21 +94,32 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 	zbx_timespec(&timespec);
 
 //todo: remove after debugging
-//	zbx_list_iterator_t list_iter;
-//	zbx_list_iterator_init(&conn->items_list, &list_iter);
-//	int place=0;
-//	uint64_t t_item;
+
+	static unsigned int last_stat=0;
+	if (time(NULL) > last_stat+5 ) {
+		int total = 0;
+		last_stat = time(NULL);
+		for (int i=0; i < GLB_MAX_AGENT_CONNS; i++) {
+			zbx_list_iterator_t list_iter;
+			zbx_list_iterator_init(&conf->conns[i].items_list, &list_iter);
+			int place=0;
+			uint64_t t_item;
 	
-//	while (SUCCEED == zbx_list_iterator_next(&list_iter)) {
-//		zbx_list_iterator_peek(&list_iter,(void **)&t_item);
-//		place++;
+			while (SUCCEED == zbx_list_iterator_next(&list_iter)) {
+	//		zbx_list_iterator_peek(&list_iter,(void **)&t_item);
+				place++;
 			
 //		if (CONFIG_DEBUG_ITEM == t_item)  {
-//			zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld is in the %d place in connection list, now polling item %ld",t_item,place, conn->current_item);
+		//	zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld is in the %d place in connection list, now polling item %ld",t_item,place, conn->current_item);
 //			break;
 //		}
 
-//	}
+			}
+			total += place;
+		//	if (place > 100) zabbix_log(LOG_LEVEL_INFORMATION, "Connection %d list size is %d", i, place);
+		}
+		zabbix_log(LOG_LEVEL_INFORMATION, "Total list size is %d, total hash size is %ld", total, conf->lists_idx.num_data);
+	}
 	//check if connection is free and there are items in the list
 	if ( (POLL_FREE != conn->state ) || 
 		 SUCCEED != zbx_list_peek(&conn->items_list, (void **)&itemid)) {
@@ -122,7 +133,7 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 		zabbix_log(LOG_LEVEL_WARNING,"Coudln't find item with id %ld in the items hashset", itemid);
 		//no such item anymore, pop it, and call myself to start the next item
 		zbx_list_pop(&conn->items_list, (void **)&itemid);
-	
+		zbx_hashset_remove(&conf->lists_idx,&itemid);
 		DEBUG_ITEM(itemid,"Popped item doesn't exists in the items");
 		
 		//this will init next item fetch
@@ -133,7 +144,8 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 	
 	DEBUG_ITEM(glb_poller_item->itemid,"Fetched item from the list to be polled");
 
-	zbx_list_pop(&conn->items_list, (void **)&itemid);
+	zbx_list_pop(&conn->items_list, NULL);
+	zbx_hashset_remove(&conf->lists_idx,&glb_poller_item->itemid);
 
 	GLB_AGENT_ITEM *glb_agent_item = (GLB_AGENT_ITEM *)glb_poller_item->itemdata;	
 	
@@ -192,8 +204,10 @@ void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT
 		if (NULL == (glb_poller_item = (GLB_POLLER_ITEM *)zbx_hashset_search(conf->items,&conn->current_item))) 
 			return;
 		itemid = glb_poller_item->itemid;
-
+		
 		zbx_timespec(&timespec);
+		add_host_fail(conf->hosts,glb_poller_item->hostid,timespec.sec);
+		
 		zbx_preprocess_item_value(glb_poller_item->hostid, glb_poller_item->itemid, glb_poller_item->value_type, glb_poller_item->flags ,
 									NULL , &timespec, ITEM_STATE_NOTSUPPORTED, "Timed out waiting for the responce" );
 
@@ -215,8 +229,9 @@ void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT
 
 					zbx_snprintf(error_str,MAX_STRING_LEN,"Skipped from polling due to %d items timed out in a row, last failed item id is %ld", 
 										GLB_FAIL_COUNT_CLEAN, glb_poller_item->itemid);
-			
-					zabbix_log(LOG_LEVEL_DEBUG, "host %ld item %ld timed out %s", glb_poller_item->hostid,  glb_next_item->itemid, error_str);
+					zbx_hashset_remove(&conf->lists_idx,&glb_next_item->itemid);
+
+					zabbix_log(LOG_LEVEL_INFORMATION, "host %ld item %ld timed out %s", glb_poller_item->hostid,  glb_next_item->itemid, error_str);
 					DEBUG_ITEM(glb_poller_item->itemid, "Agent cleaned without polling due to host not answering to 6 requests in the row")
 					zbx_preprocess_item_value(glb_next_item->hostid, glb_next_item->itemid, glb_next_item->value_type, glb_next_item->flags ,
 									NULL , &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
@@ -253,7 +268,7 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 	
 	tmp_s.socket = conn->socket;
 	tmp_s.buffer = tmp_s.buf_stat;
-
+	
 	switch (conn->state) {
 	
 		case POLL_CONNECT_SENT:
@@ -412,8 +427,9 @@ void    glb_agent_shutdown(void *engine) {
 		close(conf->conns[i].socket);
 		zbx_list_destroy(&conf->conns[i].items_list);
 	}
+	zbx_hashset_destroy(&conf->lists_idx);
 	zbx_free(conf);
-	
+
 	//items and hosts has to be freed by poller layer
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
@@ -428,11 +444,19 @@ void   glb_agent_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_poller_item) {
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
+	//checking if the item is still in the poller to not
+	//put it once again
+	if (NULL != zbx_hashset_search(&conf->lists_idx,&glb_poller_item->itemid)) {
+		zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld is still in the list, not adding to polling again",glb_poller_item->itemid);
+		return;
+	}
+
 	int idx=glb_poller_item->hostid % GLB_MAX_AGENT_CONNS;
  	
 	zbx_list_append(&conf->conns[idx].items_list, (void **)glb_poller_item->itemid, NULL);
-		
-	DEBUG_ITEM(glb_poller_item->itemid,"Added to list, starting connection");
+	zbx_hashset_insert(&conf->lists_idx,&glb_poller_item->itemid, sizeof(glb_poller_item->itemid));
+
+	DEBUG_ITEM(glb_poller_item->itemid,"Added to list, and items index starting connection");
 	glb_agent_start_connection( conf, &conf->conns[idx]);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
@@ -459,6 +483,8 @@ void    *glb_agent_init(zbx_hashset_t *items, zbx_hashset_t *hosts, int *request
 	engine->hosts = hosts;
 	engine->requests = requests;
 	engine->responses = responses;
+	
+	zbx_hashset_create(&engine->lists_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
 	for (i = 0; i < GLB_MAX_AGENT_CONNS; i++)
 	{
