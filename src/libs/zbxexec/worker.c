@@ -725,9 +725,11 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
 
         if (in_string[in] == '\"')
         {
-            //if (0 < in && in_string[in - 1] != '\\')
-            //{
+
+       //     if (0 < in && in_string[in - 1] != '\\')
+         //   {
             out_buffer[out++] = '\\';
+           // }
             out_buffer[out++] = in_string[in++];
         }
         else if (in_string[in] == 10)
