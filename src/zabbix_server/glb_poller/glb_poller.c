@@ -162,7 +162,6 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 	if (SUCCEED != zbx_interval_preproc(glb_item->delay, &simple_interval, &custom_intervals, &error))
 	{
 		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s", glb_item->itemid, glb_item->delay);
-		//glb_item->nextcheck = ZBX_JAN_2038;
 		return FAIL;
 	}
 
@@ -177,10 +176,9 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 		}
 		zbx_custom_interval_free(custom_intervals);
 		
-		if (CONFIG_DEBUG_ITEM == glb_item->itemid)
+		if (CONFIG_DEBUG_ITEM == glb_item->itemid) 
 			zabbix_log(LOG_LEVEL_INFORMATION, "In %s - Added item %ld poll event in %ld sec", __func__, glb_item->itemid, nextcheck - now);
-
-		DEBUG_ITEM(glb_item->itemid,"Sheduled next poll event")
+			
 		add_event(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck);
 	} else {
 		zabbix_log(LOG_LEVEL_INFORMATION, "No host has been fount for itemid %ld", glb_item->itemid);
@@ -256,7 +254,6 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	
 	//common attributes
 	glb_item->itemid = dc_item->itemid;
-	//glb_item->lastpolltime = 0;
 	glb_item->delay = zbx_heap_strpool_intern(dc_item->delay);
 	glb_item->value_type = dc_item->value_type;
 	glb_item->ttl = now + CONFIG_CONFSYNCER_FREQUENCY * 1.5; //updating item's aging
@@ -603,6 +600,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 						//to be pollabale, updatable and etc. All other states indicates the item is busy
 						//with type specific poller logic
 						if ( POLL_QUEUED != glb_item->state || glb_item->ttl < now ) {
+							DEBUG_ITEM(glb_item->itemid, "Skipping from polling, no in QUEUED state");
 							zabbix_log(LOG_LEVEL_DEBUG, "Not sending item %ld to polling, it's in the %d state or aged", glb_item->itemid, glb_item->state);
 						} else {
 							//ok, adding the item to the poller's internal logic for polling

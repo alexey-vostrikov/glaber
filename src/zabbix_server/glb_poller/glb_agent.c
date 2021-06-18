@@ -17,10 +17,7 @@ extern char *CONFIG_SOURCE_IP;
  * initiates async tcp connection    										  * 
  * ***************************************************************************/
 #ifdef HAVE_IPV6
-int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port)
-	//zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, const char *ip, unsigned short port,
-	//	int timeout, unsigned int tls_connect, const char *tls_arg1, const char *tls_arg2)
-{
+int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port) {
 	int		ret = FAIL;
 	struct addrinfo	*ai = NULL, hints;
 	struct addrinfo	*ai_bind = NULL;
@@ -33,12 +30,12 @@ int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsi
 	
 	if (0 != getaddrinfo(ip, service, &hints, &ai))
 	{
-		zabbix_log(LOG_LEVEL_WARNING,"cannot  resolve %s", ip);
+		zabbix_log(LOG_LEVEL_DEBUG,"cannot resolve %s", ip);
 		goto out;
 	}
 
 	if (ZBX_SOCKET_ERROR == (*sock = socket(ai->ai_family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, ai->ai_protocol))) {
-		zabbix_log(LOG_LEVEL_WARNING,"cannot create socket [[%s]:%hu]", ip, port);
+		zabbix_log(LOG_LEVEL_DEBUG,"cannot create socket [[%s]:%hu]", ip, port);
 		goto out;
 	}
 
@@ -167,44 +164,17 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 	
 	zbx_timespec(&timespec);
 
-//todo: remove after debugging
+	if ( POLL_FREE != conn->state )  return FAIL;
 
-	static unsigned int last_stat=0;
-	if (time(NULL) > last_stat+5 ) {
-		int total = 0, i;
-		last_stat = time(NULL);
-		for (i=0; i < GLB_MAX_AGENT_CONNS; i++) {
-			zbx_list_iterator_t list_iter;
-			zbx_list_iterator_init(&conf->conns[i].items_list, &list_iter);
-			int place=0;
-			uint64_t t_item;
-	
-			while (SUCCEED == zbx_list_iterator_next(&list_iter)) {
-	//		zbx_list_iterator_peek(&list_iter,(void **)&t_item);
-				place++;
-			
-//		if (CONFIG_DEBUG_ITEM == t_item)  {
-		//	zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld is in the %d place in connection list, now polling item %ld",t_item,place, conn->current_item);
-//			break;
-//		}
-
-			}
-			total += place;
-		//	if (place > 100) zabbix_log(LOG_LEVEL_INFORMATION, "Connection %d list size is %d", i, place);
-		}
-		zabbix_log(LOG_LEVEL_DEBUG, "Total list size is %d, total hash size is %ld", total, conf->lists_idx.num_data);
-	}
-	//check if connection is free and there are items in the list
-	if ( (POLL_FREE != conn->state ) || 
-		 SUCCEED != zbx_list_peek(&conn->items_list, (void **)&itemid)) {
-		 DEBUG_ITEM(itemid,"Not starting the connection right now, it's in busy state");
-
+	if (SUCCEED != zbx_list_peek(&conn->items_list, (void **)&itemid)) {
+		 DEBUG_ITEM(itemid,"Not starting the connection right now, busy with another item");
 		 return FAIL;
 	}
 
 	//finding the item, as we use weak linking, an item might be cleaned, then it's ok, we just have to pick a next one
 	while (NULL == (glb_poller_item =(GLB_POLLER_ITEM *)zbx_hashset_search(conf->items, &itemid)) ) {
 		zabbix_log(LOG_LEVEL_WARNING,"Coudln't find item with id %ld in the items hashset", itemid);
+	
 		//no such item anymore, pop it, and call myself to start the next item
 		zbx_list_pop(&conn->items_list, (void **)&itemid);
 		zbx_hashset_remove(&conf->lists_idx,&itemid);
@@ -228,11 +198,6 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 	
 	DEBUG_ITEM(glb_poller_item->itemid, "Sending AGENT request");
 	
-	//conn->socket.buf_type = ZBX_BUF_TYPE_STAT;
-	//conn->socket.buffer = conn->socket.buf_stat;
-	
-	//if (SUCCEED != zbx_list_pop(&conn->items_list, (void **)&itemid))
-	//	return SUCCEED;
 
 	//cheick if the item is agent type
 	zabbix_log(LOG_LEVEL_TRACE, "In %s()  addr:'%s' key:'%s'", __func__,
@@ -242,7 +207,7 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 	
 	if (SUCCEED != (ret = glb_async_tcp_connect(&conn->socket, CONFIG_SOURCE_IP, glb_agent_item->interface_addr, glb_agent_item->interface_port)))
 	{
-		zabbix_log(LOG_LEVEL_INFORMATION, "Failed to send syn for item %ld, coudn't connect or create socket",glb_poller_item->itemid);
+		zabbix_log(LOG_LEVEL_DEBUG, "Failed to send syn for item %ld, coudn't connect or create socket",glb_poller_item->itemid);
 		close(conn->socket);
 		
 		zbx_preprocess_item_value(glb_poller_item->hostid, glb_poller_item->itemid, glb_poller_item->value_type, glb_poller_item->flags ,
@@ -251,8 +216,6 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 		return SUCCEED;
 	}
 
-	//zabbix_log(LOG_LEVEL_INFORMATION, "Agent connection syn has been sent %ld ",glb_poller_item->itemid);
-	//marking item and connection as in polling state now
 	conn->current_item = glb_poller_item->itemid;
 	conn->state = POLL_CONNECT_SENT;
 	conn->finish_time = time(NULL) + CONFIG_TIMEOUT + 1;
@@ -288,8 +251,11 @@ void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT
 		//freeing up the connections
 		conn->state = POLL_FREE; //this will make it possible to reuse the connection
 		close(conn->socket);
-		DEBUG_ITEM(glb_poller_item->itemid, "Agent connection timeout")
+		glb_poller_item->state = POLL_QUEUED;
+		zbx_hashset_remove(&conf->lists_idx,&glb_poller_item->itemid);
 		
+		DEBUG_ITEM(glb_poller_item->itemid, "Agent connection timeout");
+
 		//handling retries
 		if ( SUCCEED == host_is_failed(conf->hosts, glb_poller_item->hostid, timespec.sec) ) {
 			zabbix_log(LOG_LEVEL_DEBUG, "Doing local queue cleanup due to too many timed items for host %ld", glb_poller_item->hostid);
@@ -344,7 +310,8 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 	tmp_s.buffer = tmp_s.buf_stat;
 	
 	switch (conn->state) {
-	
+		case POLL_FREE: 
+			return;
 		case POLL_CONNECT_SENT:
 			ret = getsockopt(conn->socket, SOL_SOCKET, SO_ERROR, &result, &result_len);
 			if (0 > ret)
@@ -394,8 +361,6 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 			if (0 == count)
 				return;
 		
-			//recieving the data
-			//zabbix_log(LOG_LEVEL_INFORMATION,"handle req send start");
 			if (FAIL != (received_len = zbx_tcp_recv_ext(&tmp_s, 0))) {
 			
 				//zabbix_log(LOG_LEVEL_INFORMATION, "get value from agent result: '%s'", conn->socket->buffer);
@@ -444,12 +409,13 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 			close(conn->socket);
 			conn->socket = 0;
 			conn->state = POLL_FREE;
+			glb_poller_item->state = POLL_QUEUED;
 			
 			break;
 		
 		default:
 			THIS_SHOULD_NEVER_HAPPEN;
-			zabbix_log(LOG_LEVEL_WARNING,"Called handle socket operations in neither connect_sent or req_sent modes");
+			zabbix_log(LOG_LEVEL_WARNING,"Called handle socket operations in unexpected state: %d", conn->state);
 			
 	}
 		
@@ -518,20 +484,20 @@ void   glb_agent_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_poller_item) {
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
-	//checking if the item is still in the poller to not
-	//put it once again
+	//checking if the item is still in the poller to not put it once again
 	if (NULL != zbx_hashset_search(&conf->lists_idx,&glb_poller_item->itemid)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Item %ld is still in the list, not adding to polling again",glb_poller_item->itemid);
+		zabbix_log(LOG_LEVEL_DEBUG, "Item %ld is still in the list, not adding to polling again",glb_poller_item->itemid);
+		DEBUG_ITEM(glb_poller_item->itemid, "Item is still waiting to be polled, not adding to the list");
 		return;
 	}
 
 	int idx=glb_poller_item->hostid % GLB_MAX_AGENT_CONNS;
- 	
+
 	zbx_list_append(&conf->conns[idx].items_list, (void **)glb_poller_item->itemid, NULL);
 	zbx_hashset_insert(&conf->lists_idx,&glb_poller_item->itemid, sizeof(glb_poller_item->itemid));
 
 	DEBUG_ITEM(glb_poller_item->itemid,"Added to list, and items index starting connection");
-	glb_agent_start_connection( conf, &conf->conns[idx]);
+	glb_agent_start_connection(conf, &conf->conns[idx]);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
@@ -586,12 +552,7 @@ void    glb_agent_handle_async_io(void *engine) {
 	{
 		GLB_ASYNC_AGENT_CONNECTION *conn = &conf->conns[i];
 				
-		if (POLL_FREE == conn->state) {
-			
-			glb_agent_start_connection(conf,conn);
-			continue;
-		}
-
+		glb_agent_start_connection(conf,conn);
 		handle_socket_operations(conf, conn);
 		glb_agent_handle_timeout(conf, conn);
 	}

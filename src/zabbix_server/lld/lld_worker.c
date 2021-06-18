@@ -97,7 +97,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 
 			if (ITEM_STATE_NORMAL == state)
 			{
-				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became supported",
+				zabbix_log(LOG_LEVEL_DEBUG, "discovery rule \"%s:%s\" became supported",
 						item.host.host, item.key_orig);
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
@@ -106,7 +106,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			}
 			else
 			{
-				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became not supported: %s",
+				zabbix_log(LOG_LEVEL_DEBUG, "discovery rule \"%s:%s\" became not supported: %s",
 						item.host.host, item.key_orig, error);
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
