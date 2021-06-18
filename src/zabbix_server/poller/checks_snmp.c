@@ -2205,7 +2205,7 @@ typedef struct {
 	zbx_hashset_t *hosts;  
 	GLB_ASYNC_SNMP_CONNECTION *connections; //allocated dynamicaly, quite big to fit in the stack
 	int *requests;
-	int *responces;
+	int *responses;
 } GLB_ASYNC_SNMP_CONF;
 
 
@@ -2396,7 +2396,7 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 	};
 	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
 
-	*conf->responces += 1;
+	*conf->responses += 1;
 	glb_item->state = POLL_QUEUED;
 	glb_snmp_item->state = POLL_QUEUED;
 
@@ -2575,7 +2575,7 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 /******************************************************************************
  * inits async structures - static connection pool							  *
  * ***************************************************************************/
-void* glb_snmp_init(zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responces ) {
+void* glb_snmp_init(zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responses ) {
 	int i;
 	static GLB_ASYNC_SNMP_CONF *conf;
 	
@@ -2592,7 +2592,7 @@ void* glb_snmp_init(zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, i
 	conf->items = items;
 	conf->hosts = hosts;
 	conf->requests = requests;
-	conf->responces = responces;
+	conf->responses = responses;
 
 	for (i = 0; i < GLB_MAX_SNMP_CONNS; i++)
 	{
@@ -2653,14 +2653,10 @@ void   glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 
 	int idx=glb_item->hostid % GLB_MAX_SNMP_CONNS;
  	
-	 if ( POLL_QUEUED == glb_snmp_item->state) {
-		zbx_list_append(&conf->connections[idx].items_list, (void **)glb_item->itemid, NULL);
-		DEBUG_ITEM(glb_item->itemid,"Added to list, starting connection");
-		glb_snmp_start_connection(&conf->connections[idx]);
-	 } else {
-		zabbix_log(LOG_LEVEL_DEBUG,"Not adding item %ld to the conn%d list: still in %d state",glb_item->itemid,idx,glb_snmp_item->state);
-		DEBUG_ITEM(glb_item->itemid,"Not added to list, still polling");
-	 }
+	zbx_list_append(&conf->connections[idx].items_list, (void **)glb_item->itemid, NULL);
+	DEBUG_ITEM(glb_item->itemid,"Added to list, starting connection");
+	glb_snmp_start_connection(&conf->connections[idx]);
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 
@@ -2728,11 +2724,11 @@ void  glb_snmp_handle_async_io(void *engine) {
 	if (hosts < 0)
 		zabbix_log(LOG_LEVEL_WARNING, "End of %s() Something unexpected happened with fds ", __func__);
 	else if (hosts > 0)
-		snmp_read2(&fdset); //calling this will call snmp callback function for arrived responces
+		snmp_read2(&fdset); //calling this will call snmp callback function for arrived responses
 	else 
 		snmp_timeout();
 
-	//having not a big number of responces - then sleep a bit
+	//having not a big number of responses - then sleep a bit
 //	if (hosts < GLB_MAX_SNMP_CONNS / 20 ) {
 //		usleep(10000);
 //	}

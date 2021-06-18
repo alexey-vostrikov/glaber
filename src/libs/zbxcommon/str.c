@@ -1361,7 +1361,9 @@ const char	*get_process_type_string(unsigned char proc_type)
 		case GLB_PROCESS_TYPE_WORKER:
 			return "glb_worker";
 		case GLB_PROCESS_TYPE_SERVER:
-			return "glb_server";				
+			return "glb_server";
+		case GLB_PROCESS_TYPE_AGENT:
+			return "glb_agent_poller";		
 	}
 
 	zbx_error("Unknown process type %d",proc_type);

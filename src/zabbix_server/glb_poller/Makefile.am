@@ -10,7 +10,9 @@ libglbpoller_a_SOURCES = \
 	glb_poller.h \
 	glb_pinger.h \
 	glb_worker.h \
-	glb_server.h
+	glb_server.h \
+	glb_agent.c	\
+	glb_agent.h
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \

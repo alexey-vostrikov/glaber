@@ -188,6 +188,8 @@ int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int CONFIG_GLB_SNMP_FORKS		= 1;
 int CONFIG_GLB_PINGER_FORKS		= 1;
 int CONFIG_GLB_WORKER_FORKS		= 0;
+int CONFIG_GLB_AGENT_FORKS		= 0;
+
 int CONFIG_ICMP_METHOD  = GLB_ICMP;
 char *CONFIG_VCDUMP_LOCATION	= NULL;
 int CONFIG_VCDUMP_FREQUENCY	= 60;
@@ -465,6 +467,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = GLB_PROCESS_TYPE_WORKER;
 		*local_process_num = local_server_num - server_count + CONFIG_GLB_WORKER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_GLB_AGENT_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_AGENT;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_AGENT_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_EXT_SERVER_FORKS))
 	{
@@ -778,6 +785,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"StartPingers",		&CONFIG_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},	
 		{"StartGlbSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},
+		{"StartGlbAgentPollers",		&CONFIG_GLB_AGENT_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},
@@ -1377,7 +1386,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
 			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
-			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_PINGER_FORKS + CONFIG_GLB_WORKER_FORKS
+			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_AGENT_FORKS 
+			+ CONFIG_GLB_PINGER_FORKS + CONFIG_GLB_WORKER_FORKS
 			+ CONFIG_ALERTER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_TIMER_FORKS
 			+ CONFIG_HTTPPOLLER_FORKS + CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS
 			+ CONFIG_ESCALATOR_FORKS + CONFIG_IPMIPOLLER_FORKS + CONFIG_JAVAPOLLER_FORKS
@@ -1462,6 +1472,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				break;	
 			case GLB_PROCESS_TYPE_SERVER:
 				poller_type = ITEM_TYPE_TRAPPER;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_AGENT:
+				poller_type = ITEM_TYPE_ZABBIX;
 				thread_args.args = &poller_type;
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;		

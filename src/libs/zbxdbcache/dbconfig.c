@@ -111,8 +111,10 @@ extern char * CONFIG_HOSTNAME;
 extern int CONFIG_PREPROCMAN_FORKS;
 extern int  CONFIG_GLB_REQUEUE_TIME;
 extern int CONFIG_GLB_SNMP_FORKS;
+extern int CONFIG_GLB_AGENT_FORKS;
 extern int CONFIG_GLB_PINGER_FORKS;
 extern int CONFIG_GLB_WORKER_FORKS;
+extern int CONFIG_GLB_AGENT_FORKS;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_WORKERS_DIR;
 
@@ -228,6 +230,15 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 	switch (zbx_dc_item->type) {
 		case ITEM_TYPE_TRAPPER: 
 			return SUCCEED;
+
+		case ITEM_TYPE_AGENT: 
+			if ( CONFIG_GLB_AGENT_FORKS == 0 ) return FAIL;
+			
+			//tls handshake isn't implemented in async mode yet
+			if ( ZBX_TCP_SEC_UNENCRYPTED != zbx_dc_host->tls_connect) return FAIL;
+
+			return SUCCEED;
+
 		case ITEM_TYPE_SNMP: {
 			ZBX_DC_SNMPITEM *snmpitem;
 #ifdef HAVE_NETSNMP				
@@ -269,7 +280,7 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			return FAIL;
 		}
 		break;
-		
+	
 		case ITEM_TYPE_EXTERNAL: {
 			if (0 == CONFIG_GLB_WORKER_FORKS )  return FAIL;
 	
@@ -9548,15 +9559,20 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 	RDLOCK_CACHE;
 
 	switch (item_type) {
+		case ITEM_TYPE_AGENT:
+			zbx_hashset_iter_reset(&config->items,&iter);
+			forks = CONFIG_GLB_AGENT_FORKS;
+			queue_num = ZBX_POLLER_TYPE_NORMAL;
+			break;
+
 #ifdef HAVE_NETSNMP			
 		case ITEM_TYPE_SNMP:
 			zbx_hashset_iter_reset(&config->snmpitems,&iter);
 			forks = CONFIG_GLB_SNMP_FORKS;
 
 			queue_num = ZBX_POLLER_TYPE_NORMAL;
-#endif
 		break;
-
+#endif
 		case ITEM_TYPE_SIMPLE:
 			zbx_hashset_iter_reset(&config->simpleitems,&iter);
 			forks = CONFIG_GLB_PINGER_FORKS;
@@ -9593,12 +9609,13 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 		//so we know the item, looking for the dc item
 		//as all type specifi types has itemid first (for a reason), we can safely do this
 		
-		if ( ITEM_TYPE_EXTERNAL == item_type) //external items do not their own hash, so using all items
+		//external and agent items do not their own hash, so using all items
+		if ( ITEM_TYPE_EXTERNAL == item_type || ITEM_TYPE_AGENT == item_type ) 
 			zbx_dc_item = item; 
 		else if (NULL == ( zbx_dc_item = zbx_hashset_search(&config->items, item))) 
 			continue;
 		
-		//to prevent fetching wrong type items
+		//only need the desiserd item types
 		if (zbx_dc_item->type != item_type) 
 			continue;
 	
@@ -9616,6 +9633,7 @@ int	DCconfig_get_glb_poller_items(zbx_binary_heap_t *events, zbx_hashset_t *host
 		if (HOST_STATUS_MONITORED != zbx_dc_host->status) 			
 			continue;
 		
+
 		if (SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item))
 			continue;
 		
