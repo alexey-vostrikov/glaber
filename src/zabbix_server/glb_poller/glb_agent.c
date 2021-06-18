@@ -171,9 +171,9 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 
 	static unsigned int last_stat=0;
 	if (time(NULL) > last_stat+5 ) {
-		int total = 0;
+		int total = 0, i;
 		last_stat = time(NULL);
-		for (int i=0; i < GLB_MAX_AGENT_CONNS; i++) {
+		for (i=0; i < GLB_MAX_AGENT_CONNS; i++) {
 			zbx_list_iterator_t list_iter;
 			zbx_list_iterator_init(&conf->conns[i].items_list, &list_iter);
 			int place=0;
