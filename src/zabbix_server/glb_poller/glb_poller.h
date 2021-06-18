@@ -19,7 +19,7 @@
 
 #ifndef GLABER_POLLER_H
 #define GLABER_POLLER_H
-
+#include "dbcache.h"
 #include "threads.h"
 
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000

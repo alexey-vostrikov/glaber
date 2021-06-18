@@ -480,12 +480,12 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
 /*
 
 /****************************************************************
-* to assist async workeres and to split data by responces 
+* to assist async workeres and to split data by responses 
 * 
 ****************************************************************/
 int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
     //char *read_buffer=NULL; //we read from worker here 
-    static char *circle_buffer=NULL; //this is constant circle buffer we use to retrun responces
+    static char *circle_buffer=NULL; //this is constant circle buffer we use to retrun responses
                                      //since we know the maximim reponce returned from worker has 
     static size_t buffoffset = 0, bufsize = 0;                                     
     static size_t start,  //points to the first character of the string

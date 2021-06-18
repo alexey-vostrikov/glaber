@@ -34,7 +34,7 @@ typedef struct {
     zbx_hashset_t *items;
     zbx_binary_heap_t packet_events;
 	int *requests;
-	int *responces;
+	int *responses;
     GLB_EXT_WORKER *worker;
   //  unsigned int pause_till;
 } GLB_PINGER_CONF;
@@ -330,7 +330,7 @@ void glb_pinger_handle_timeouts(GLB_PINGER_CONF *conf) {
                                 
                     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Item %ld set to queued state in the timeout handler",
                             __func__, glb_item->itemid );
-                    *conf->responces += 1;
+                    *conf->responses += 1;
                     //this is timout but overall operation has succeeded
                     glb_pinger_submit_result( glb_item, SUCCEED, NULL, &ts);
                 } else {
@@ -532,7 +532,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
     struct zbx_json_parse jp_resp;
     GLB_POLLER_ITEM *glb_poller_item;
 
-    //reading all the responces we have so far from the worker
+    //reading all the responses we have so far from the worker
     while (SUCCEED == async_buffered_responce(conf->worker, &worker_response)) {
         
         zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s", worker_response);
@@ -574,7 +574,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
             if (POLL_FINISHED == glb_pinger_process_response(conf, glb_pinger_item, rtt_l)) {
             
                 zabbix_log(LOG_LEVEL_DEBUG, "Got the final packet for the item %ld",glb_poller_item->itemid);
-                *conf->responces += 1;
+                *conf->responses += 1;
                   
                 glb_pinger_submit_result(glb_poller_item,SUCCEED,NULL, &ts);
                     
@@ -615,7 +615,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
                     if (POLL_FINISHED == glb_pinger_process_response(conf, glb_pinger_item, rtt)) {
             
                         zabbix_log(LOG_LEVEL_DEBUG, "Got the final packet for the item with broken echo data %ld",glb_poller_item->itemid);
-                        *conf->responces += 1;
+                        *conf->responses += 1;
                   
                         glb_pinger_submit_result(glb_poller_item,SUCCEED,NULL, &ts);
                     
@@ -663,7 +663,7 @@ void  glb_pinger_handle_async_io(void *engine) {
 
     lastrun=glb_ms_time();
 
-    //parses and submits arrived ICMP responces
+    //parses and submits arrived ICMP responses
     glb_pinger_process_worker_results(conf);
 
     //send next packets after waiting for delay
@@ -680,7 +680,7 @@ void  glb_pinger_handle_async_io(void *engine) {
 /******************************************************************************
  * inits async structures - static connection pool							  *
  * ***************************************************************************/
-void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces ) {
+void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responses ) {
 	int i;
 	static GLB_PINGER_CONF *conf;
 	char init_string[MAX_STRING_LEN];
@@ -698,7 +698,7 @@ void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responces ) {
     //zbx_hashset_create(&conf->pinged_items, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
     conf->items = items;
     conf->requests = requests;
-	conf->responces = responces;
+	conf->responses = responses;
   //  conf->pause_till = 0;
 
     //creating internal structs to keep pinged items 

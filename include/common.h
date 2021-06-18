@@ -210,6 +210,9 @@ typedef enum
 	ITEM_TYPE_SCRIPT	/* 21 */
 }
 zbx_item_type_t;
+//this looks much more informative
+#define ITEM_TYPE_AGENT ITEM_TYPE_ZABBIX
+
 const char	*zbx_agent_type_string(zbx_item_type_t item_type);
 
 typedef enum
@@ -597,7 +600,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_PINGER	32
 #define GLB_PROCESS_TYPE_WORKER	33
 #define GLB_PROCESS_TYPE_SERVER	34
-#define ZBX_PROCESS_TYPE_COUNT		35	/* number of process types */
+#define GLB_PROCESS_TYPE_AGENT	35
+#define ZBX_PROCESS_TYPE_COUNT		36	/* number of process types */
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char proc_type);
 int		get_process_type_by_name(const char *proc_type_str);

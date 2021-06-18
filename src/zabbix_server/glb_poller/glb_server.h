@@ -36,22 +36,15 @@ typedef struct {
 	GLB_EXT_WORKER *worker;
 } GLB_SERVER_T;
 
-
 typedef struct {
 	const char *hostname; //item's hostname value (strpooled)
 	const char *key; //item key value (strpooled)
 } GLB_SERVER_ITEM;
 
-
-
-
 //unsigned int glb_server_init_item(void *engine, DC_ITEM *dc_item, GLB_SERVER_ITEM *glb_worker_item);
-
 void glb_server_free_item(void* engine,GLB_POLLER_ITEM *glb_worker_item );
-
-void* glb_server_init(int *requests, int *responces );
+void* glb_server_init(int *requests, int *responses );
 void  glb_server_shutdown(void *engine);
-
 void  glb_server_handle_async_io(void *engine);
 
 #endif
