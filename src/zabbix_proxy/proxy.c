@@ -184,7 +184,7 @@ char 	*ICMP_METHOD_STR = NULL;
 char 	*CONFIG_GLBMAP_LOCATION		= NULL;
 char 	*CONFIG_GLBMAP_OPTIONS		= NULL;
 int CONFIG_GLB_WORKER_FORKS		= 0;
-
+int CONFIG_GLB_AGENT_FORKS = 0;
 int	CONFIG_CONFSYNCER_FREQUENCY	= 120;
 
 static int	CONFIG_PROXYMODE	= ZBX_PROXYMODE_ACTIVE;
@@ -856,6 +856,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1000},
 		{"StartJavaPollers",		&CONFIG_JAVAPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
+		{"StartGlbAgentPollers",		&CONFIG_GLB_AGENT_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			10},	
 		{"JavaGateway",			&CONFIG_JAVA_GATEWAY,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"JavaGatewayPort",		&CONFIG_JAVA_GATEWAY_PORT,		TYPE_INT,

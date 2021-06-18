@@ -16,8 +16,78 @@ extern char *CONFIG_SOURCE_IP;
 /******************************************************************************
  * initiates async tcp connection    										  * 
  * ***************************************************************************/
-//static int glb_agent_connect(conn->socket, CONFIG_SOURCE_IP, glb_agent_item->interface_addr, glb_agent_item->interface_port) {
-static int glb_agent_tcp_connect(GLB_ASYNC_AGENT_CONNECTION *conn, const char *source_ip, const char *ip, unsigned int port) {
+#ifdef HAVE_IPV6
+int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port)
+	//zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, const char *ip, unsigned short port,
+	//	int timeout, unsigned int tls_connect, const char *tls_arg1, const char *tls_arg2)
+{
+	int		ret = FAIL;
+	struct addrinfo	*ai = NULL, hints;
+	struct addrinfo	*ai_bind = NULL;
+	char		service[8], *error = NULL;
+	
+	zbx_snprintf(service, sizeof(service), "%hu", port);
+	memset(&hints, 0x00, sizeof(struct addrinfo));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	
+	if (0 != getaddrinfo(ip, service, &hints, &ai))
+	{
+		zabbix_log(LOG_LEVEL_WARNING,"cannot  resolve %s", ip);
+		goto out;
+	}
+
+	if (ZBX_SOCKET_ERROR == (*sock = socket(ai->ai_family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, ai->ai_protocol))) {
+		zabbix_log(LOG_LEVEL_WARNING,"cannot create socket [[%s]:%hu]", ip, port);
+		goto out;
+	}
+
+	if (NULL != source_ip)
+	{
+		memset(&hints, 0x00, sizeof(struct addrinfo));
+
+		hints.ai_family = PF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_NUMERICHOST;
+
+		if (0 != getaddrinfo(source_ip, NULL, &hints, &ai_bind))
+		{
+			zabbix_log(LOG_LEVEL_WARNING," invalid source IP address '%s'",source_ip);
+			close(*sock);
+			goto out;
+		}
+
+		if (ZBX_PROTO_ERROR == bind(*sock, ai_bind->ai_addr, ai_bind->ai_addrlen))
+		{
+			zabbix_log(LOG_LEVEL_WARNING,"Couldn't bind ip to the source ip %s",source_ip);
+			close(*sock);
+			goto out;
+		}
+	}
+
+	if (ZBX_PROTO_ERROR == connect(*sock, ai->ai_addr, (socklen_t)ai->ai_addrlen)) {
+
+		if (EINPROGRESS == errno) {
+			ret = SUCCEED;
+		} else {
+			zabbix_log(LOG_LEVEL_WARNING,"Couldn't start connection on the socket %d",errno);
+			close(*sock);
+		}
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	if (NULL != ai)
+		freeaddrinfo(ai);
+
+	if (NULL != ai_bind)
+		freeaddrinfo(ai_bind);
+
+	return ret;
+}
+#else 
+int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port) {
 
 	ZBX_SOCKADDR	servaddr_in;
 	struct addrinfo	hints, *ai;
@@ -28,23 +98,25 @@ static int glb_agent_tcp_connect(GLB_ASYNC_AGENT_CONNECTION *conn, const char *s
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
+
 	if (0 != getaddrinfo(ip, NULL, &hints, &ai)) {
 		zabbix_log(LOG_LEVEL_DEBUG,"Getaddrinfo failed for name: %s",ip);
 		return FAIL;
 	}
+
 	servaddr_in.sin_family = AF_INET;
 	servaddr_in.sin_addr = ((struct sockaddr_in *)ai->ai_addr)->sin_addr;
 	servaddr_in.sin_port = htons(port);
 
 	freeaddrinfo(ai);
 	
-	if (ZBX_SOCKET_ERROR == (conn->socket = socket(AF_INET, SOCK_STREAM| SOCK_NONBLOCK | SOCK_CLOEXEC, 0)))
+	if (ZBX_SOCKET_ERROR == (*sock = socket(AF_INET, SOCK_STREAM| SOCK_NONBLOCK | SOCK_CLOEXEC, 0)))
 	{
 		zabbix_log(LOG_LEVEL_WARNING,"Couldn't exec gettraddrinfo");
 		return FAIL;
 	}
 
-	setsockopt(conn->socket,SOL_SOCKET,SO_REUSEADDR,&true,sizeof(int));
+	setsockopt(*sock,SOL_SOCKET,SO_REUSEADDR,&true,sizeof(int));
 
 	if (NULL != source_ip)
 	{
@@ -56,23 +128,25 @@ static int glb_agent_tcp_connect(GLB_ASYNC_AGENT_CONNECTION *conn, const char *s
 		source_addr.sin_addr.s_addr = inet_addr(source_ip);
 		source_addr.sin_port = 0;
 
-		if (ZBX_PROTO_ERROR == bind(conn->socket, (struct sockaddr *)&source_addr, sizeof(source_addr)))
+		if (ZBX_PROTO_ERROR == bind(*sock, (struct sockaddr *)&source_addr, sizeof(source_addr)))
 		{
 			zabbix_log(LOG_LEVEL_WARNING,"Couldn't bind ip to the source ip %s",source_ip);
-			close(conn->socket);
+			close(*sock);
 			return FAIL;
 		}
 	}
 
-	if (ZBX_PROTO_ERROR == connect(conn->socket, (struct sockaddr *)&servaddr_in, sizeof(servaddr_in))) {
+	if (ZBX_PROTO_ERROR == connect(*sock, (struct sockaddr *)&servaddr_in, sizeof(servaddr_in))) {
 		if (EINPROGRESS == errno) 
 			return SUCCEED; 
-
+		
+		close(*sock);
 		zabbix_log(LOG_LEVEL_WARNING,"Couldn't start connection on the socket %d",errno);
 		return FAIL;
 	}
 	return SUCCEED;
 }
+#endif
 
 /******************************************************************************
  * starts a connection for the session 										  * 
@@ -118,7 +192,7 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 			total += place;
 		//	if (place > 100) zabbix_log(LOG_LEVEL_INFORMATION, "Connection %d list size is %d", i, place);
 		}
-		zabbix_log(LOG_LEVEL_INFORMATION, "Total list size is %d, total hash size is %ld", total, conf->lists_idx.num_data);
+		zabbix_log(LOG_LEVEL_DEBUG, "Total list size is %d, total hash size is %ld", total, conf->lists_idx.num_data);
 	}
 	//check if connection is free and there are items in the list
 	if ( (POLL_FREE != conn->state ) || 
@@ -166,7 +240,7 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 
 	//zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld connecting ",conf.items[itemid].itemid);
 	
-	if (SUCCEED != (ret = glb_agent_tcp_connect(conn, CONFIG_SOURCE_IP, glb_agent_item->interface_addr, glb_agent_item->interface_port)))
+	if (SUCCEED != (ret = glb_async_tcp_connect(&conn->socket, CONFIG_SOURCE_IP, glb_agent_item->interface_addr, glb_agent_item->interface_port)))
 	{
 		zabbix_log(LOG_LEVEL_INFORMATION, "Failed to send syn for item %ld, coudn't connect or create socket",glb_poller_item->itemid);
 		close(conn->socket);
@@ -231,7 +305,7 @@ void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT
 										GLB_FAIL_COUNT_CLEAN, glb_poller_item->itemid);
 					zbx_hashset_remove(&conf->lists_idx,&glb_next_item->itemid);
 
-					zabbix_log(LOG_LEVEL_INFORMATION, "host %ld item %ld timed out %s", glb_poller_item->hostid,  glb_next_item->itemid, error_str);
+					zabbix_log(LOG_LEVEL_DEBUG, "host %ld item %ld timed out %s", glb_poller_item->hostid,  glb_next_item->itemid, error_str);
 					DEBUG_ITEM(glb_poller_item->itemid, "Agent cleaned without polling due to host not answering to 6 requests in the row")
 					zbx_preprocess_item_value(glb_next_item->hostid, glb_next_item->itemid, glb_next_item->value_type, glb_next_item->flags ,
 									NULL , &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
