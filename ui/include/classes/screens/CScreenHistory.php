@@ -82,6 +82,13 @@ class CScreenHistory extends CScreenBase {
 	public $page_file;
 
 	/**
+	 * String containing id for time control
+	 *
+	 * @var string
+	 */
+	//protected $screenid;
+
+	/**
 	 * Init screen data.
 	 *
 	 * @param array		$options
@@ -108,6 +115,11 @@ class CScreenHistory extends CScreenBase {
 		$this->itemids = array_key_exists('itemids', $options) ?  $options['itemids'] : [];
 		$this->plaintext = isset($options['plaintext']) ? $options['plaintext'] : false;
 		$this->page_file = array_key_exists('pageFile', $options) ? $options['pageFile'] : null;
+		//for proper timeticker work we need to set differnt dataIds to all 
+		//different screens. Now there are two screens poss
+		
+
+		$this->dataId = isset($options['screenid']) ? $options['screenid'] : 'historyGraph';
 
 		if (!$this->itemids && array_key_exists('graphid', $options)) {
 			$itemids = API::Item()->get([
@@ -126,7 +138,7 @@ class CScreenHistory extends CScreenBase {
 	 */
 	public function get() {
 		$output = [];
-
+		
 		$items = API::Item()->get([
 			'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'valuemapid', 'history', 'trends'],
 			'selectHosts' => ['name'],
@@ -145,7 +157,8 @@ class CScreenHistory extends CScreenBase {
 
 		$iv_string = [
 			ITEM_VALUE_TYPE_LOG => 1,
-			ITEM_VALUE_TYPE_TEXT => 1
+			ITEM_VALUE_TYPE_TEXT => 1,
+			ITEM_VALUE_TYPE_STR => 1
 		];
 
 		if ($this->action == HISTORY_VALUES || $this->action == HISTORY_LATEST) {
@@ -175,7 +188,22 @@ class CScreenHistory extends CScreenBase {
 					break;
 				}
 			}
+			
+			//if there are logs, we'll sort output showvalues data in ascending order
+			$has_logs = false;
+			foreach ($items as $item) {
+				if ( ITEM_VALUE_TYPE_LOG == $item['value_type'] ) {
+					$has_logs = true;
+					break;
+				}
+			}
 
+
+			if ($numeric_items) {
+				$this->dataId = 'numeric'; 
+			} else {
+				$this->dataId = 'text';
+			}
 			/**
 			 * View type: As plain text.
 			 * Item type: numeric (unsigned, char), float, text, log.
@@ -200,14 +228,14 @@ class CScreenHistory extends CScreenBase {
 				foreach ($items_by_type as $value_type => $itemids) {
 					$options['history'] = $value_type;
 					$options['itemids'] = $itemids;
-
+					
 					$item_data = API::History()->get($options);
 
 					if ($item_data) {
 						$history_data = array_merge($history_data, $item_data);
 					}
 				}
-
+								
 				CArrayHelper::sort($history_data, [
 					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
 					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
@@ -294,12 +322,13 @@ class CScreenHistory extends CScreenBase {
 						$history_data = array_merge($history_data, $item_data);
 					}
 				}
-
+				$sort_order = $has_logs? ZBX_SORT_UP : ZBX_SORT_DOWN;
+				
 				CArrayHelper::sort($history_data, [
-					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
-					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
+					['field' => 'clock', 'order' => $sort_order],
+					['field' => 'ns', 'order' => $sort_order]
 				]);
-
+				
 				// Array $history_data will be modified according page and rows on page.
 				$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
 					new CUrl($this->page_file)
@@ -527,8 +556,6 @@ class CScreenHistory extends CScreenBase {
 		if (str_in_array($this->action, [HISTORY_VALUES, HISTORY_GRAPH, HISTORY_BATCH_GRAPH])) {
 			$graphDims = getGraphDims();
 
-			$this->dataId = 'historyGraph';
-
 			$timeControlData = [];
 
 			if ($this->action == HISTORY_GRAPH || $this->action == HISTORY_BATCH_GRAPH) {
@@ -536,7 +563,7 @@ class CScreenHistory extends CScreenBase {
 				$output[] = (new CDiv())
 					->addClass('center')
 					->setId($containerId);
-
+				
 				$timeControlData['id'] = $this->getDataId();
 				$timeControlData['containerid'] = $containerId;
 				$timeControlData['src'] = $this->getGraphUrl($this->itemids);
@@ -559,6 +586,7 @@ class CScreenHistory extends CScreenBase {
 			zbx_add_post_js('timeControl.addObject("'.$this->getDataId().'", '.json_encode($this->timeline).', '.
 				json_encode($timeControlData).');'
 			);
+			
 		}
 
 		if ($this->mode != SCREEN_MODE_JS) {
