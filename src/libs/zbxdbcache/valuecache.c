@@ -23,9 +23,8 @@
 #include "ipc.h"
 #include "dbcache.h"
 #include "zbxhistory.h"
-
+#include "../zbxexec/worker.h"
 #include "valuecache.h"
-
 #include "vectorimpl.h"
 
 /*
@@ -3215,7 +3214,7 @@ int glb_vc_dump_cache() {
 	size_t buff_alloc, buff_offset;
 	char *buffer = NULL;
 
-	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN], tmp_val[MAX_STRING_LEN];
+	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN], tmp_val[MAX_STRING_LEN], tmp_val2[MAX_STRING_LEN*2];
 	size_t len;
 
 	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: starting", __func__);
@@ -3261,8 +3260,10 @@ int glb_vc_dump_cache() {
 				zabbix_log(LOG_LEVEL_DEBUG, "In %s: dumping data value %d ts is %d",__func__, i , curr_chunk->slots[i].timestamp.sec);
 			
 				zbx_history_value2str(tmp_val,MAX_STRING_LEN,&curr_chunk->slots[i].value,item->value_type);
-				    zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"type\":%d, \"itemid\":%ld, \"ts\":%d, \"value\":\"%s\"}\n",
-					GLB_VCDUMP_RECORD_TYPE_VALUE,item->itemid,curr_chunk->slots[i].timestamp.sec,tmp_val);
+				//new lines and quites fixes
+				glb_escape_worker_string(tmp_val,tmp_val2);
+				zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"type\":%d, \"itemid\":%ld, \"ts\":%d, \"value\":\"%s\"}\n",
+				GLB_VCDUMP_RECORD_TYPE_VALUE,item->itemid,curr_chunk->slots[i].timestamp.sec,tmp_val2);
 			
 				//if (-1 == write(fd,tmp,len)) {
 				//	zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",CONFIG_VCDUMP_LOCATION);

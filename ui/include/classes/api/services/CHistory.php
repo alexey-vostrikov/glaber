@@ -210,14 +210,8 @@ class CHistory extends CApiService {
 			if (is_array($data)) {
 				$result = array_merge($result, $data);
 			}
-		//	else {
-		//		$result["] += $data;
-		//	}
-
-			
-		
+	
 		}
-		
 		
 		//maybe it's better to add a sortfield here, but it's unlikely 
 		//that it could be anything but clock

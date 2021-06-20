@@ -230,9 +230,11 @@ foreach ($data['rows'] as $row_index => $row) {
 		$item_trends = '';
 	}
 
-	$is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
+	$is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || 
+			     $item['value_type'] == ITEM_VALUE_TYPE_UINT64 );
 
-	$checkbox = (new CCheckBox('itemids['.$item['itemid'].']', $item['itemid']))->setEnabled($is_graph);
+	//$checkbox = (new CCheckBox('itemids['.$item['itemid'].']', $item['itemid']))->setEnabled($is_graph);
+	$checkbox = (new CCheckBox('itemids['.$item['itemid'].']', $item['itemid']))->setEnabled(1);
 
 	$item_name = (new CDiv([
 		(new CSpan($item['name_expanded']))->addClass('label'),
