@@ -1,0 +1,509 @@
+zabbix_export:
+  version: '5.2'
+  date: '2021-06-22T12:10:24Z'
+  groups:
+    -
+      name: 'Шаблоны - Web'
+  templates:
+    -
+      template: web_log
+      name: 'Web server log monitoring'
+      groups:
+        -
+          name: 'Шаблоны - Web'
+      applications:
+        -
+          name: 'website logging'
+      discovery_rules:
+        -
+          name: 'New sites discovery'
+          type: TRAP
+          key: log_discovery
+          delay: '0'
+          lifetime: 365d
+          description: 'Rule to auto-create new sites. This item discovery key should be passed as a parameter to worker server scripts.'
+          item_prototypes:
+            -
+              name: '{#SITENAME} AVG backend time'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},avg_backend_time]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.upstream_response_time
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - avg
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} AVG request time'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},avg_request_time]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.request_time
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - avg
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} - Total logs per minute'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},count_per_minute]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} GET  requests'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},get_requests]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: MATCHES_REGEX
+                  parameters:
+                    - '"request_method"\s*:\s*"GET"'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} Incoming traffic'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},incoming_traffic]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.request_length
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - sum
+                -
+                  type: MULTIPLIER
+                  parameters:
+                    - '0.13333333'
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} MAX backend time'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},max_backend_time]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.upstream_response_time
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - max
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} MAX request time'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},max_request_time]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.request_time
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - max
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} MIN backend time'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},min_backend_time]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.upstream_response_time
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - min
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} MIN request time'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},min_request_time]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.request_time
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - min
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} Outgoing traffic'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},outgoing_traffic]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - $.bytes_sent
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - sum
+                -
+                  type: MULTIPLIER
+                  parameters:
+                    - '0.13333333'
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} POST requests'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},post_requests]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: MATCHES_REGEX
+                  parameters:
+                    - '"request_method"\s*:\s*"POST"'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} ubnormal logs'
+              type: DEPENDENT
+              key: 'log[{#SITENAME},ubnoramal_logs]'
+              delay: '0'
+              trends: '0'
+              value_type: LOG
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - '$.[?($.upstream_response_time > 10 || $.request_length > 1000000 || $.bytes_sent>10000000)]'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: 'Log {#SITENAME}'
+              type: TRAP
+              key: 'log[{#SITENAME}]'
+              delay: '0'
+              trends: '0'
+              value_type: LOG
+              description: 'Primary log item LLD.'
+            -
+              name: '{#SITENAME} 2XX responses count'
+              type: DEPENDENT
+              key: 'status2xx_count[{#SITENAME}]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - '$[?($.status >=200 && $.status<=299)]'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} 3XX responses count'
+              type: DEPENDENT
+              key: 'status3xx_count[{#SITENAME}]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - '$[?($.status >=300 && $.status<=399)]'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} 4XX responses count'
+              type: DEPENDENT
+              key: 'status4xx_count[{#SITENAME}]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - '$[?($.status >=400 && $.status<=499)]'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+            -
+              name: '{#SITENAME} 5XX responses count'
+              type: DEPENDENT
+              key: 'status5xx_count[{#SITENAME}]'
+              delay: '0'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - '$[?($.status >=500 && $.status<=599)]'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: NaN
+                -
+                  type: DISCARD_AGGREGATE
+                  parameters:
+                    - '60'
+                    - count
+              master_item:
+                key: 'log[{#SITENAME}]'
+          graph_prototypes:
+            -
+              name: '{#SITENAME} backend response times'
+              graph_items:
+                -
+                  sortorder: '1'
+                  color: FF0000
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},max_backend_time]'
+                -
+                  sortorder: '2'
+                  color: 2774A4
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},avg_backend_time]'
+                -
+                  sortorder: '3'
+                  color: 4CAF50
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},min_backend_time]'
+            -
+              name: '{#SITENAME} Hits'
+              graph_items:
+                -
+                  sortorder: '1'
+                  color: 1A7C11
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},count_per_minute]'
+                -
+                  sortorder: '2'
+                  color: F63100
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},get_requests]'
+                -
+                  sortorder: '3'
+                  color: 2774A4
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},post_requests]'
+            -
+              name: '{#SITENAME} request times'
+              graph_items:
+                -
+                  sortorder: '1'
+                  color: FF0000
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},max_backend_time]'
+                -
+                  sortorder: '2'
+                  color: 0040FF
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},avg_request_time]'
+                -
+                  sortorder: '3'
+                  color: 66BB6A
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},min_request_time]'
+            -
+              name: '{#SITENAME} response codes'
+              graph_items:
+                -
+                  sortorder: '1'
+                  color: 1A7C11
+                  item:
+                    host: web_log
+                    key: 'status2xx_count[{#SITENAME}]'
+                -
+                  sortorder: '2'
+                  color: 0040FF
+                  item:
+                    host: web_log
+                    key: 'status3xx_count[{#SITENAME}]'
+                -
+                  sortorder: '3'
+                  color: FFA000
+                  item:
+                    host: web_log
+                    key: 'status4xx_count[{#SITENAME}]'
+                -
+                  sortorder: '4'
+                  color: E91E63
+                  item:
+                    host: web_log
+                    key: 'status5xx_count[{#SITENAME}]'
+            -
+              name: '{#SITENAME} site traffic'
+              graph_items:
+                -
+                  sortorder: '1'
+                  color: 1A7C11
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},incoming_traffic]'
+                -
+                  sortorder: '2'
+                  color: F63100
+                  item:
+                    host: web_log
+                    key: 'log[{#SITENAME},outgoing_traffic]'
+      dashboards:
+        -
+          name: 'Sites dashboard'
+          widgets:
+            -
+              type: GRAPH_PROTOTYPE
+              name: 'Backend response times'
+              width: '22'
+              height: '5'
+              fields:
+                -
+                  type: INTEGER
+                  name: show_legend
+                  value: '0'
+                -
+                  type: INTEGER
+                  name: columns
+                  value: '3'
+                -
+                  type: GRAPH_PROTOTYPE
+                  name: graphid
+                  value:
+                    name: '{#SITENAME} backend response times'
+                    host: web_log
+            -
+              type: GRAPH_PROTOTYPE
+              name: Hits
+              'y': '10'
+              width: '22'
+              height: '5'
+              fields:
+                -
+                  type: INTEGER
+                  name: columns
+                  value: '3'
+                -
+                  type: GRAPH_PROTOTYPE
+                  name: graphid
+                  value:
+                    name: '{#SITENAME} Hits'
+                    host: web_log
+            -
+              type: GRAPH_PROTOTYPE
+              name: 'Site traffic'
+              'y': '5'
+              width: '22'
+              height: '5'
+              fields:
+                -
+                  type: INTEGER
+                  name: columns
+                  value: '3'
+                -
+                  type: INTEGER
+                  name: show_legend
+                  value: '0'
+                -
+                  type: GRAPH_PROTOTYPE
+                  name: graphid
+                  value:
+                    name: '{#SITENAME} site traffic'
+                    host: web_log
