@@ -167,17 +167,12 @@ int CONFIG_VALUECACHE_FILL_TIME=0;
 int *CONFIG_HISTORY_PRELOAD_VALUES = 0;
 char *CONFIG_VCDUMP_LOCATION = NULL;
 
-//int CONFIG_POLLERS_FORKS[ZBX_POLLER_TYPE_COUNT]={0};
-
-int CONFIG_ASYNC_AGENT_POLLER_CONNS = 4096;
-int CONFIG_ASYNC_SNMP_POLLER_CONNS = 4096;
 
 int	CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
 int	CONFIG_PINGER_FORKS		= 5;
-int CONFIG_GLB_SNMP_FORKS = 5;
+int CONFIG_GLB_SNMP_FORKS = 1;
 int CONFIG_IPMIPOLLER_FORKS = 1;
-//int CONFIG_GLB_REQUEUE_TIME = 120;
 int CONFIG_GLB_PINGER_FORKS		= 1;
 int CONFIG_ICMP_METHOD  = GLB_ICMP;
 char 	*ICMP_METHOD_STR = NULL;
@@ -412,11 +407,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_HISTSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_HISTSYNCER_FORKS;
 	}
-	else if (local_server_num <= (server_count += CONFIG_IPMIMANAGER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_IPMIPOLLER;
-		*local_process_num = local_server_num - server_count + CONFIG_IPMIMANAGER_FORKS;
-	}
+//	else if (local_server_num <= (server_count += CONFIG_IPMIMANAGER_FORKS))
+//	{
+//		*local_process_type = ZBX_PROCESS_TYPE_IPMIPOLLER;
+//		*local_process_num = local_server_num - server_count + CONFIG_IPMIMANAGER_FORKS;
+//	}
 	else if (local_server_num <= (server_count += CONFIG_JAVAPOLLER_FORKS ))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_JAVAPOLLER;
@@ -592,8 +587,8 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_SOCKET_PATH)
 		CONFIG_SOCKET_PATH = zbx_strdup(CONFIG_SOCKET_PATH, "/tmp");
 
-	if (0 != CONFIG_POLLER_FORKS)
-		CONFIG_IPMIMANAGER_FORKS = 1;
+//	if (0 != CONFIG_POLLER_FORKS)
+//		CONFIG_IPMIMANAGER_FORKS = 1;
 
 	if (NULL == CONFIG_VAULTURL)
 		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
@@ -814,7 +809,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"StartGlaberSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
+		{"StartGlbSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_GLB_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},
@@ -1355,6 +1350,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	DBcheck_character_set();
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_HEARTBEAT_FORKS + CONFIG_DATASENDER_FORKS
+			+ CONFIG_GLB_AGENT_FORKS + CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_PINGER_FORKS +
+			+ CONFIG_GLB_WORKER_FORKS +  CONFIG_EXT_SERVER_FORKS
 			+ CONFIG_POLLER_FORKS + CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS
 			+ CONFIG_PINGER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_HTTPPOLLER_FORKS
 			+ CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS + CONFIG_IPMIPOLLER_FORKS
@@ -1395,6 +1392,32 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	
 		switch (thread_args.process_type)
 		{
+			case GLB_PROCESS_TYPE_SNMP:
+				poller_type = ITEM_TYPE_SNMP;
+				thread_args.args = &poller_type;
+				zabbix_log(LOG_LEVEL_INFORMATION,"Starting ASYNC snmp poller");
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_PINGER:
+				poller_type = ITEM_TYPE_SIMPLE;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_WORKER:
+				poller_type = ITEM_TYPE_EXTERNAL;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_SERVER:
+				poller_type = ITEM_TYPE_TRAPPER;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
+			case GLB_PROCESS_TYPE_AGENT:
+				poller_type = ITEM_TYPE_ZABBIX;
+				thread_args.args = &poller_type;
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;	
 			case ZBX_PROCESS_TYPE_CONFSYNCER:
 				zbx_thread_start(proxyconfig_thread, &thread_args, &threads[i]);
 				DCconfig_wait_sync();
@@ -1468,6 +1491,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_PREPROCESSOR:
 				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
+
 		}	
 	}
 
