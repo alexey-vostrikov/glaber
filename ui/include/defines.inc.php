@@ -21,7 +21,7 @@
 define('ZABBIX_VERSION',		'5.2.4');
 define('ZABBIX_API_VERSION',	'5.2.4');
 define('ZABBIX_EXPORT_VERSION',	'5.2');
-define('GLABER_VERSION','2.4.8');
+define('GLABER_VERSION','2.4.9');
 
 define('ZABBIX_DB_VERSION',		5020000);
 
@@ -1444,6 +1444,7 @@ define('WIDGET_GRAPH',				'graph');
 define('WIDGET_GRAPH_PROTOTYPE',	'graphprototype');
 define('WIDGET_HOST_AVAIL',			'hostavail');
 define('WIDGET_MAP',				'map');
+define('WIDGET_TOPOLOGY',			'topology');
 define('WIDGET_NAV_TREE',			'navtree');
 define('WIDGET_PLAIN_TEXT',			'plaintext');
 define('WIDGET_PROBLEM_HOSTS',		'problemhosts');
