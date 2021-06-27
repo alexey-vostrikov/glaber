@@ -248,7 +248,7 @@ int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, i
 
 	}
 
-	if ( !enabled_gets && !interactive ) 
+	if ( !enabled_gets && GLB_HISTORY_GET_NON_INTERACTIVE == interactive   ) 
 		return SUCCEED;
 
 	//whoever first gets the data, it's rusult is used 

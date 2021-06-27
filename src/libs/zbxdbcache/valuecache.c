@@ -373,7 +373,7 @@ static int	vc_db_read_values_by_time(zbx_uint64_t itemid, int value_type, zbx_ve
 	if (0 != range_start)
 		range_start--;
 
-	return glb_history_get(itemid, value_type, range_start, 0, range_end, GLB_GISTORY_GET_TRIGGERS, values);
+	return glb_history_get(itemid, value_type, range_start, 0, range_end, GLB_HISTORY_GET_NON_INTERACTIVE, values);
 }
 
 /************************************************************************************
@@ -427,7 +427,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 	/*        a) remove values with Tb.* timestamp from result,                              */
 	/*        b) read all values with Tb.* timestamp from database,                          */
 	/*        c) add read values to the result.                                              */
-	if (FAIL == glb_history_get(itemid, value_type, range_start, count + 1, range_end, GLB_GISTORY_GET_TRIGGERS, values))
+	if (FAIL == glb_history_get(itemid, value_type, range_start, count + 1, range_end, GLB_HISTORY_GET_NON_INTERACTIVE, values))
 		return FAIL;
 
 	/* returned less than requested - all values are read */
@@ -464,7 +464,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 
 		offset = values->values_num;
 
-		if (FAIL == glb_history_get(itemid, value_type, range_start, left, first_timestamp,  GLB_GISTORY_GET_TRIGGERS, values))
+		if (FAIL == glb_history_get(itemid, value_type, range_start, left, first_timestamp,  GLB_HISTORY_GET_NON_INTERACTIVE, values))
 			return FAIL;
 
 		/* returned less than requested - all values are read */
@@ -493,7 +493,7 @@ static int	vc_db_read_values_by_time_and_count(zbx_uint64_t itemid, int value_ty
 		return SUCCEED;
 
 	/* re-read the first (oldest) second */
-	return glb_history_get(itemid, value_type, first_timestamp - 1, 0, first_timestamp, GLB_GISTORY_GET_TRIGGERS, values);
+	return glb_history_get(itemid, value_type, first_timestamp - 1, 0, first_timestamp, GLB_HISTORY_GET_NON_INTERACTIVE, values);
 }
 
 /******************************************************************************

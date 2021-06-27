@@ -47,8 +47,8 @@ int glb_history_json2val(struct zbx_json_parse *jp, char value_type, zbx_history
 #define zbx_history_record_vector_create(vector) zbx_vector_history_record_create(vector)
 
 
-#define GLB_GISTORY_GET_INTERACTIVE 1
-#define GLB_GISTORY_GET_TRIGGERS 2
+#define GLB_HISTORY_GET_INTERACTIVE 1
+#define GLB_HISTORY_GET_NON_INTERACTIVE 0
 
 int zbx_history_init(char **error);
 void zbx_history_destroy(void);
