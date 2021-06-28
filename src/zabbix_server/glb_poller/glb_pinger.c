@@ -371,20 +371,12 @@ int glb_pinger_start_ping(void *engine, GLB_POLLER_ITEM *glb_item)
     GLB_PINGER_ITEM *glb_pinger_item = (GLB_PINGER_ITEM*)glb_item->itemdata;
     char request[MAX_STRING_LEN];
     
-    //not starting new pings for sheduled items or if we're too busy
-//    if  ( time(NULL) < conf->pause_till ) {
-  //      
-    //    zabbix_log(LOG_LEVEL_DEBUG,"Not starting pinging of item %ld",glb_item->itemid);
- //       return FAIL;
- //   }
-   
     glb_pinger_item->rcv = 0;
     glb_pinger_item->min = 0;
     glb_pinger_item->max = 0;
     glb_pinger_item->sum = 0;
     glb_pinger_item->sent = 0;
   
- 
     *conf->requests += 1;
 
     glb_pinger_item->state = POLL_POLLING;
@@ -706,7 +698,7 @@ void* glb_pinger_init(zbx_hashset_t *items, int *requests, int *responses ) {
 	//creating the glb_map worker
     if (-1 == access(CONFIG_GLBMAP_LOCATION, X_OK))
 	{
-        zabbix_log(LOG_LEVEL_WARNING,"Couldn't find glb map at the path: %s or it isn't set to be executable: %s", CONFIG_GLBMAP_LOCATION, zbx_strerror(errno));
+        zabbix_log(LOG_LEVEL_WARNING,"Couldn't find glbmap at the path: %s or it isn't set to be executable: %s", CONFIG_GLBMAP_LOCATION, zbx_strerror(errno));
 		exit(-1);
 	};
 

@@ -132,8 +132,7 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
 
 		param = get_rparam(&request, i);
 		param_esc = zbx_dyn_escape_shell_single_quote(param);
-        //skipping params that have macroses
-    
+          
         zbx_snprintf_alloc(&key_dyn, &dyn_alloc, &dyn_offset, " '%s'", param_esc);
 		zbx_free(param_esc);
 	}
