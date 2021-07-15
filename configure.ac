@@ -19,7 +19,7 @@ dnl
 
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([Zabbix],[5.2.4])
+AC_INIT([Zabbix],[5.4.2])
 AC_CONFIG_SRCDIR(src/zabbix_server/server.c)
 AM_INIT_AUTOMAKE([subdir-objects filename-length-max=99])
 
@@ -1358,6 +1358,17 @@ test "x$agent2" = "xyes" -a "x$HAVE_THREAD_LOCAL" = "xno" && AC_MSG_ERROR([C com
 [agent2=no])
 AM_CONDITIONAL(AGENT2, test "x$agent2" = "xyes")
 
+AC_ARG_ENABLE(webservice,[  --enable-webservice         Turn on build of Zabbix web service],
+[case "${enableval}" in
+  yes) webservice=yes ;;
+  no)  webservice=no ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-webservice]) ;;
+esac
+test "x$webservice" = "xyes" -a "x$HAVE_THREAD_LOCAL" = "xno" && AC_MSG_ERROR([C compiler is not compatible with webservice assembly])
+],
+[webservice=no])
+AM_CONDITIONAL(WEBSERVICE, test "x$webservice" = "xyes")
+
 AC_ARG_ENABLE(java,[  --enable-java           Turn on build of Zabbix Java gateway],
 [case "${enableval}" in
   yes) java=yes ;;
@@ -1532,11 +1543,9 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 			have_libxml2="yes"
 		fi
 	fi
-	SERVER_LDFLAGS="$SERVER_LDFLAGS $LIBXML2_LDFLAGS"
-	SERVER_LIBS="$SERVER_LIBS $LIBXML2_LIBS"
-
-	PROXY_LDFLAGS="$PROXY_LDFLAGS $LIBXML2_LDFLAGS"
-	PROXY_LIBS="$PROXY_LIBS $LIBXML2_LIBS"
+	
+	LDFLAGS="$LDFLAGS $LIBXML2_LDFLAGS"
+	LIBS="$LIBS $LIBXML2_LIBS"
 
 	AC_SUBST(LIBXML2_CFLAGS)
 
@@ -1566,11 +1575,12 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 			have_snmp="yes"
 		fi
 	fi
-	SERVER_LDFLAGS="$SERVER_LDFLAGS $SNMP_LDFLAGS"
+	SERVER_LDFLAGS="$SNMP_LDFLAGS $SERVER_LDFLAGS"
 	SERVER_LIBS="$SERVER_LIBS $SNMP_LIBS"
 
-	PROXY_LDFLAGS="$PROXY_LDFLAGS $SNMP_LDFLAGS"
+	PROXY_LDFLAGS="$SNMP_LDFLAGS $PROXY_LDFLAGS"
 	PROXY_LIBS="$PROXY_LIBS $SNMP_LIBS"
+
 
 	AC_SUBST(SNMP_CFLAGS)
 
@@ -1782,6 +1792,14 @@ if test "x$agent2" = "xyes"; then
 	AC_DEFINE(ZBX_BUILD_AGENT2,1,[Define to 1 if Agent2 is being built.])
 fi
 
+if test "x$webservice" = "xyes"; then
+	AC_CHECK_PROGS([GO], [go], [no])
+	if test "x$GO" = "xno"; then
+		AC_MSG_ERROR([Unable to find "go" executable in path])
+	fi
+	AC_DEFINE(ZBX_BUILD_WEBSERVICE,1,[Define to 1 if Web Service is being built.])
+fi
+
 if test "x$java" = "xyes"; then
 	AC_CHECK_PROGS([JAVAC], [javac], [no])
 	if test "x$JAVAC" = "xno"; then
@@ -1878,9 +1896,9 @@ SERVER_CONFIG_FILE="${sysconfdir}/zabbix_server.conf"
 PROXY_CONFIG_FILE="${sysconfdir}/zabbix_proxy.conf"
 AGENT_CONFIG_FILE="${sysconfdir}/zabbix_agentd.conf"
 AGENT2_CONFIG_FILE="${sysconfdir}/zabbix_agent2.conf"
+WEBSERVICE_CONFIG_FILE="${sysconfdir}/zabbix_web_service.conf"
 
 EXTERNAL_SCRIPTS_PATH="${datadir}/zabbix/externalscripts"
-WORKER_SCRIPTS_PATH="${datadir}/zabbix/workerscripts"
 ALERT_SCRIPTS_PATH="${datadir}/zabbix/alertscripts"
 
 CURL_SSL_CERT_LOCATION="${datadir}/zabbix/ssl/certs"
@@ -1902,30 +1920,32 @@ if test "x$HAVE_START_GROUP" = "xyes"; then
 	LD_END_GROUP=-Wl,--end-group
 fi
 
-CGO_CFLAGS=$TLS_CFLAGS
-CGO_LDFLAGS="$AGENT_LDFLAGS $LD_START_GROUP \
-	\${abs_top_builddir}/src/zabbix_agent/logfiles/libzbxlogfiles.a \
-	\${abs_top_builddir}/src/libs/zbxcomms/libzbxcomms.a \
-	\${abs_top_builddir}/src/libs/zbxcommon/libzbxcommon.a \
-	\${abs_top_builddir}/src/libs/zbxcrypto/libzbxcrypto.a \
-	\${abs_top_builddir}/src/libs/zbxsys/libzbxsys.a \
-	\${abs_top_builddir}/src/libs/zbxnix/libzbxnix.a \
-	\${abs_top_builddir}/src/libs/zbxconf/libzbxconf.a \
-	\${abs_top_builddir}/src/libs/zbxhttp/libzbxhttp.a \
-	\${abs_top_builddir}/src/libs/zbxcompress/libzbxcompress.a \
-	\${abs_top_builddir}/src/libs/zbxregexp/libzbxregexp.a \
-	\${abs_top_builddir}/src/libs/zbxsysinfo/libzbxagent2sysinfo.a \
-	\${abs_top_builddir}/src/libs/zbxsysinfo/common/libcommonsysinfo.a \
-	\${abs_top_builddir}/src/libs/zbxsysinfo/simple/libsimplesysinfo.a \
-	\${abs_top_builddir}/src/libs/zbxsysinfo/"$ARCH"/libspechostnamesysinfo.a \
-	\${abs_top_builddir}/src/libs/zbxsysinfo/"$ARCH"/libspecsysinfo.a \
-	\${abs_top_builddir}/src/libs/zbxexec/libzbxexec.a \
-	\${abs_top_builddir}/src/libs/zbxalgo/libzbxalgo.a \
-	\${abs_top_builddir}/src/libs/zbxjson/libzbxjson.a \
-	$LIBS $AGENT_LIBS $LD_END_GROUP"
+if test "x$agent2" = "xyes"; then
+	CGO_CFLAGS=$TLS_CFLAGS
+	CGO_LDFLAGS="$AGENT_LDFLAGS $LD_START_GROUP \
+		\${abs_top_builddir}/src/zabbix_agent/logfiles/libzbxlogfiles.a \
+		\${abs_top_builddir}/src/libs/zbxcomms/libzbxcomms.a \
+		\${abs_top_builddir}/src/libs/zbxcommon/libzbxcommon.a \
+		\${abs_top_builddir}/src/libs/zbxcrypto/libzbxcrypto.a \
+		\${abs_top_builddir}/src/libs/zbxsys/libzbxsys.a \
+		\${abs_top_builddir}/src/libs/zbxnix/libzbxnix.a \
+		\${abs_top_builddir}/src/libs/zbxconf/libzbxconf.a \
+		\${abs_top_builddir}/src/libs/zbxhttp/libzbxhttp.a \
+		\${abs_top_builddir}/src/libs/zbxcompress/libzbxcompress.a \
+		\${abs_top_builddir}/src/libs/zbxregexp/libzbxregexp.a \
+		\${abs_top_builddir}/src/libs/zbxsysinfo/libzbxagent2sysinfo.a \
+		\${abs_top_builddir}/src/libs/zbxsysinfo/common/libcommonsysinfo.a \
+		\${abs_top_builddir}/src/libs/zbxsysinfo/simple/libsimplesysinfo.a \
+		\${abs_top_builddir}/src/libs/zbxsysinfo/"$ARCH"/libspechostnamesysinfo.a \
+		\${abs_top_builddir}/src/libs/zbxsysinfo/"$ARCH"/libspecsysinfo.a \
+		\${abs_top_builddir}/src/libs/zbxexec/libzbxexec.a \
+		\${abs_top_builddir}/src/libs/zbxalgo/libzbxalgo.a \
+		\${abs_top_builddir}/src/libs/zbxjson/libzbxjson.a \
+		$LIBS $AGENT_LIBS $LD_END_GROUP"
 
-AC_SUBST(CGO_CFLAGS)
-AC_SUBST(CGO_LDFLAGS)
+	AC_SUBST(CGO_CFLAGS)
+	AC_SUBST(CGO_LDFLAGS)
+fi
 
 AC_SUBST(ZBXGET_LDFLAGS)
 AC_SUBST(ZBXGET_LIBS)
@@ -1940,11 +1960,9 @@ AC_SUBST(SERVER_CONFIG_FILE)
 AC_SUBST(PROXY_CONFIG_FILE)
 AC_SUBST(AGENT_CONFIG_FILE)
 AC_SUBST(AGENT2_CONFIG_FILE)
-
+AC_SUBST(WEBSERVICE_CONFIG_FILE)
 
 AC_SUBST(EXTERNAL_SCRIPTS_PATH)
-AC_SUBST(WORKER_SCRIPTS_PATH)
-
 AC_SUBST(ALERT_SCRIPTS_PATH)
 
 AC_SUBST(CURL_SSL_CERT_LOCATION)
@@ -2036,6 +2054,7 @@ AC_OUTPUT([
 	src/libs/zbxhttp/Makefile
 	src/libs/zbxserver/Makefile
 	src/libs/zbxicmpping/Makefile
+	src/libs/zbxeval/Makefile
 	src/libs/zbxexec/Makefile
 	src/libs/zbxself/Makefile
 	src/libs/zbxmodules/Makefile
@@ -2049,6 +2068,7 @@ AC_OUTPUT([
 	src/libs/zbxvault/Makefile
 	src/libs/zbxdiag/Makefile
 	src/libs/zbxtrends/Makefile
+	src/libs/zbxavailability/Makefile
 	src/zabbix_agent/Makefile
 	src/zabbix_agent/logfiles/Makefile
 	src/zabbix_get/Makefile
@@ -2063,7 +2083,6 @@ AC_OUTPUT([
 	src/zabbix_server/httppoller/Makefile
 	src/zabbix_server/pinger/Makefile
 	src/zabbix_server/poller/Makefile
-	src/zabbix_server/glb_poller/Makefile
 	src/zabbix_server/snmptrapper/Makefile
 	src/zabbix_server/timer/Makefile
 	src/zabbix_server/trapper/Makefile
@@ -2076,7 +2095,9 @@ AC_OUTPUT([
 	src/zabbix_server/odbc/Makefile
 	src/zabbix_server/scripts/Makefile
 	src/zabbix_server/preprocessor/Makefile
+	src/zabbix_server/availability/Makefile
 	src/zabbix_server/lld/Makefile
+	src/zabbix_server/reporter/Makefile
 	src/zabbix_proxy/Makefile
 	src/zabbix_proxy/heart/Makefile
 	src/zabbix_proxy/housekeeper/Makefile
@@ -2084,7 +2105,6 @@ AC_OUTPUT([
 	src/zabbix_proxy/datasender/Makefile
 	src/zabbix_proxy/taskmanager/Makefile
 	src/zabbix_java/Makefile
-	src/glapi/Makefile
 	man/Makefile
 	])
 
@@ -2107,11 +2127,11 @@ AGENT_CONFIG_FILE=`eval echo "${AGENT_CONFIG_FILE}"`
 AGENT2_CONFIG_FILE=`eval echo "${AGENT2_CONFIG_FILE}"`
 AGENT2_CONFIG_FILE=`eval echo "${AGENT2_CONFIG_FILE}"`
 
-EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
-EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
+WEBSERVICE_CONFIG_FILE=`eval echo "${WEBSERVICE_CONFIG_FILE}"`
+WEBSERVICE_CONFIG_FILE=`eval echo "${WEBSERVICE_CONFIG_FILE}"`
 
-WORKER_SCRIPTS_PATH=`eval echo "${WORKER_SCRIPTS_PATH}"`
-WORKER_SCRIPTS_PATH=`eval echo "${WORKER_SCRIPTS_PATH}"`
+EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
+EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
 
 ALERT_SCRIPTS_PATH=`eval echo "${ALERT_SCRIPTS_PATH}"`
 ALERT_SCRIPTS_PATH=`eval echo "${ALERT_SCRIPTS_PATH}"`
@@ -2209,7 +2229,6 @@ echo "    SNMP:                  ${have_snmp}
     Libraries:             ${SERVER_LIBS} ${LIBS}
     Configuration file:    ${SERVER_CONFIG_FILE}
     External scripts:      ${EXTERNAL_SCRIPTS_PATH}
-	Worker scripts:        ${WORKER_SCRIPTS_PATH}
     Alert scripts:         ${ALERT_SCRIPTS_PATH}
     Modules:               ${LOAD_MODULE_PATH}"
 
@@ -2259,6 +2278,9 @@ fi
 
 echo "
   Enable agent 2:        ${agent2}"
+
+echo "
+  Enable web service:    ${webservice}"
 
 echo "
   Enable Java gateway:   ${java}"
