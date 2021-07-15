@@ -1,4 +1,4 @@
-package histApi
+package pollApi
 
 import (
 	"github.com/valyala/fastjson"
@@ -40,22 +40,22 @@ type AsyncMetricPoller interface {
 }
 
 
-func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer, log *log.Logger) {
+func ServePoll ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer, log *log.Logger) {
 
 	var request []byte
 	var err error
 	var in_records int
 	var lastflush int64
 	
-	//log.Print("Waiting for a request\n")
+	log.Print("Waiting for a request\n")
 	
 	var p fastjson.Parser
 	for {
 		
 		request, err = (*reader).ReadBytes('\n')
-		//log.Print("Got request:",string(request))
+		log.Print("Got request:",string(request))
 		if ( nil !=err ) {
-			//log.Print(err)
+			log.Print(err)
 		  	return
 		}
 				
@@ -66,15 +66,17 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 		  return
 		}
 	
+		//there is only one type of poll request possible: 
+
 		switch string(v.GetStringBytes("request")) {
-			case "get_metric":
-				hr := HistoryRequest {
+			case "poll":
+				pr := PollRequest {
 					Itemid: uint64(v.GetInt64("itemid")),
-					Value_type: uint8(v.GetInt("value_type")),
-					Start  :uint64(v.GetInt64("start")),
-					End:  uint64(v.GetInt64("end")),
-					Count: uint64(v.GetInt64("count")),
+					Ip: uint8(v.GetInt("addr")),
+					Key  :uint64(v.GetInt64("key")),
 				}
+				
+				pe.ProcessRequest()
 				fmt.Fprint(writer,"{\"metrics\":[")
 				he.ReadMetrics(hr,dumpMetric,writer,log) 
 				fmt.Fprintln(writer,"]}\n");

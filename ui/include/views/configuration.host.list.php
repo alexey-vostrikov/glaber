@@ -35,7 +35,7 @@ $widget = (new CWidget())
 			))
 			->addItem(
 				(new CButton('form', _('Import')))
-					->onClick('redirect("conf.import.php?rules_preset=host")')
+					->onClick('return PopUp("popup.import", {rules_preset: "host"}, null, this);')
 					->removeId()
 			)
 		))->setAttribute('aria-label', _('Content controls'))
@@ -46,45 +46,10 @@ if (!$filter_tags) {
 	$filter_tags = [['tag' => '', 'value' => '', 'operator' => TAG_OPERATOR_LIKE]];
 }
 
-$filter_tags_table = (new CTable())
-	->setId('filter-tags')
-	->addRow((new CCol(
-		(new CRadioButtonList('filter_evaltype', (int) $data['filter']['evaltype']))
-			->addValue(_('And/Or'), TAG_EVAL_TYPE_AND_OR)
-			->addValue(_('Or'), TAG_EVAL_TYPE_OR)
-			->setModern(true)
-		))->setColSpan(4)
-	);
-
-$i = 0;
-foreach ($filter_tags as $tag) {
-	$filter_tags_table->addRow([
-		(new CTextBox('filter_tags['.$i.'][tag]', $tag['tag']))
-			->setAttribute('placeholder', _('tag'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-		(new CRadioButtonList('filter_tags['.$i.'][operator]', (int) $tag['operator']))
-			->addValue(_('Contains'), TAG_OPERATOR_LIKE)
-			->addValue(_('Equals'), TAG_OPERATOR_EQUAL)
-			->setModern(true),
-		(new CTextBox('filter_tags['.$i.'][value]', $tag['value']))
-			->setAttribute('placeholder', _('value'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-		(new CCol(
-			(new CButton('filter_tags['.$i.'][remove]', _('Remove')))
-				->addClass(ZBX_STYLE_BTN_LINK)
-				->addClass('element-table-remove')
-		))->addClass(ZBX_STYLE_NOWRAP)
-	], 'form_row');
-
-	$i++;
-}
-$filter_tags_table->addRow(
-	(new CCol(
-		(new CButton('filter_tags_add', _('Add')))
-			->addClass(ZBX_STYLE_BTN_LINK)
-			->addClass('element-table-add')
-	))->setColSpan(3)
-);
+$filter_tags_table = CTagFilterFieldHelper::getTagFilterField([
+	'evaltype' => $data['filter']['evaltype'],
+	'tags' => $filter_tags
+]);
 
 // filter
 $filter = new CFilter(new CUrl('hosts.php'));
@@ -180,7 +145,6 @@ $table = (new CTableInfo())
 			(new CCheckBox('all_hosts'))->onClick("checkAll('".$form->getName()."', 'all_hosts', 'hosts');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
 		make_sorting_header(_('Name'), 'name', $data['sortField'], $data['sortOrder'], 'hosts.php'),
-		_('Applications'),
 		_('Items'),
 		_('Triggers'),
 		_('Graphs'),
@@ -216,19 +180,13 @@ foreach ($data['hosts'] as $host) {
 		}
 	}
 
-	$host_interface = '';
-	if ($interface !== null) {
-		$host_interface = ($interface['useip'] == INTERFACE_USE_IP) ? $interface['ip'] : $interface['dns'];
-		if (array_key_exists('port', $interface) && $interface['port'] !== '') {
-			$host_interface .= NAME_DELIMITER.$interface['port'];
-		}
-	}
-
 	$description = [];
 
 	if ($host['discoveryRule']) {
 		$description[] = (new CLink(CHtml::encode($host['discoveryRule']['name']),
-			(new CUrl('host_prototypes.php'))->setArgument('parent_discoveryid', $host['discoveryRule']['itemid'])
+			(new CUrl('host_prototypes.php'))
+				->setArgument('parent_discoveryid', $host['discoveryRule']['itemid'])
+				->setArgument('context', 'host')
 		))
 			->addClass(ZBX_STYLE_LINK_ALT)
 			->addClass(ZBX_STYLE_ORANGE);
@@ -407,19 +365,11 @@ foreach ($data['hosts'] as $host) {
 		new CCheckBox('hosts['.$host['hostid'].']', $host['hostid']),
 		(new CCol($description))->addClass(ZBX_STYLE_NOWRAP),
 		[
-			new CLink(_('Applications'),
-				(new CUrl('zabbix.php'))
-					->setArgument('action', 'application.list')
-					->setArgument('filter_set', '1')
-					->setArgument('filter_hostids', [$host['hostid']])
-			),
-			CViewHelper::showNum($host['applications'])
-		],
-		[
 			new CLink(_('Items'),
 				(new CUrl('items.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$host['hostid']])
+					->setArgument('context', 'host')
 			),
 			CViewHelper::showNum($host['items'])
 		],
@@ -428,6 +378,7 @@ foreach ($data['hosts'] as $host) {
 				(new CUrl('triggers.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$host['hostid']])
+					->setArgument('context', 'host')
 			),
 			CViewHelper::showNum($host['triggers'])
 		],
@@ -436,6 +387,7 @@ foreach ($data['hosts'] as $host) {
 				(new CUrl('graphs.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$host['hostid']])
+					->setArgument('context', 'host')
 			),
 			CViewHelper::showNum($host['graphs'])
 		],
@@ -444,6 +396,7 @@ foreach ($data['hosts'] as $host) {
 				(new CUrl('host_discovery.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$host['hostid']])
+					->setArgument('context', 'host')
 			),
 			CViewHelper::showNum($host['discoveries'])
 		],
@@ -452,10 +405,11 @@ foreach ($data['hosts'] as $host) {
 				(new CUrl('httpconf.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$host['hostid']])
+					->setArgument('context', 'host')
 			),
 			CViewHelper::showNum($host['httpTests'])
 		],
-		$host_interface,
+		getHostInterface($interface),
 		($data['filter']['monitored_by'] == ZBX_MONITORED_BY_PROXY
 				|| $data['filter']['monitored_by'] == ZBX_MONITORED_BY_ANY)
 			? ($host['proxy_hostid'] != 0)
@@ -464,7 +418,7 @@ foreach ($data['hosts'] as $host) {
 			: null,
 		$hostTemplates,
 		$status,
-		getHostAvailabilityTable($host),
+		getHostAvailabilityTable($host['interfaces']),
 		$encryption,
 		makeInformationList($info_icons),
 		$data['tags'][$host['hostid']]
@@ -485,7 +439,12 @@ $form->addItem([
 						->getUrl()
 				)
 			],
-			'host.massupdateform' => ['name' => _('Mass update')],
+			'popup.massupdate.host' => [
+				'content' => (new CButton('', _('Mass update')))
+					->onClick("return openMassupdatePopup(this, 'popup.massupdate.host');")
+					->addClass(ZBX_STYLE_BTN_ALT)
+					->removeAttribute('id')
+			],
 			'host.massdelete' => ['name' => _('Delete'), 'confirm' => _('Delete selected hosts?')]
 		]
 	)

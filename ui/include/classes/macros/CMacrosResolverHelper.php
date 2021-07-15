@@ -577,23 +577,6 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Resolve function parameter macros to "parameter_expanded" field.
-	 *
-	 * @static
-	 *
-	 * @param array  $data
-	 * @param string $data[n]['hostid']
-	 * @param string $data[n]['parameter']
-	 *
-	 * @return array
-	 */
-	public static function resolveFunctionParameters(array $data) {
-		self::init();
-
-		return self::$macrosResolver->resolveFunctionParameters($data);
-	}
-
-	/**
 	 * Expand functional macros in given map label.
 	 *
 	 * @param string $label			label to expand
@@ -706,7 +689,8 @@ class CMacrosResolverHelper {
 	 * @param array  $data['texts_support_macros']               List of texts potentially could contain macros.
 	 * @param array  $data['texts_support_user_macros']          List of texts potentially could contain user macros.
 	 * @param array  $data['texts_support_lld_macros']           List of texts potentially could contain LLD macros.
-	 * @param int    $data['hostids']                            Hostid for which tested item belongs to.
+	 * @param int    $data['hostid']                             Hostid for which tested item belongs to.
+	 * @param array  $data['macros_values']                      Values for supported macros.
 	 *
 	 * @return array
 	 */

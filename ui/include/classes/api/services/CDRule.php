@@ -588,8 +588,7 @@ class CDRule extends CApiService {
 				if ($dcheck['snmpv3_securitylevel'] == ITEM_SNMPV3_SECURITYLEVEL_AUTHNOPRIV
 						|| $dcheck['snmpv3_securitylevel'] == ITEM_SNMPV3_SECURITYLEVEL_AUTHPRIV) {
 					if (!array_key_exists('snmpv3_authprotocol', $dcheck)
-							|| $dcheck['snmpv3_authprotocol'] != ITEM_AUTHPROTOCOL_MD5
-								&& $dcheck['snmpv3_authprotocol'] != ITEM_AUTHPROTOCOL_SHA) {
+							|| !array_key_exists($dcheck['snmpv3_authprotocol'], getSnmpV3AuthProtocols())) {
 						self::exception(ZBX_API_ERROR_PARAMETERS,
 							_s('Incorrect value "%1$s" for "%2$s" field.',
 								$dcheck['snmpv3_authprotocol'], 'snmpv3_authprotocol'
@@ -601,8 +600,7 @@ class CDRule extends CApiService {
 				// snmpv3 privprotocol
 				if ($dcheck['snmpv3_securitylevel'] == ITEM_SNMPV3_SECURITYLEVEL_AUTHPRIV) {
 					if (!array_key_exists('snmpv3_privprotocol', $dcheck)
-							|| $dcheck['snmpv3_privprotocol'] != ITEM_PRIVPROTOCOL_DES
-								&& $dcheck['snmpv3_privprotocol'] != ITEM_PRIVPROTOCOL_AES) {
+							|| !array_key_exists($dcheck['snmpv3_privprotocol'], getSnmpV3PrivProtocols())) {
 						self::exception(ZBX_API_ERROR_PARAMETERS,
 							_s('Incorrect value "%1$s" for "%2$s" field.',
 								$dcheck['snmpv3_privprotocol'], 'snmpv3_privprotocol'
@@ -631,13 +629,13 @@ class CDRule extends CApiService {
 
 			switch ($dcheck['snmpv3_securitylevel']) {
 				case ITEM_SNMPV3_SECURITYLEVEL_NOAUTHNOPRIV:
-					$dcheck['snmpv3_authprotocol'] = ITEM_AUTHPROTOCOL_MD5;
-					$dcheck['snmpv3_privprotocol'] = ITEM_PRIVPROTOCOL_DES;
+					$dcheck['snmpv3_authprotocol'] = ITEM_SNMPV3_AUTHPROTOCOL_MD5;
+					$dcheck['snmpv3_privprotocol'] = ITEM_SNMPV3_PRIVPROTOCOL_DES;
 					$dcheck['snmpv3_authpassphrase'] = '';
 					$dcheck['snmpv3_privpassphrase'] = '';
 					break;
 				case ITEM_SNMPV3_SECURITYLEVEL_AUTHNOPRIV:
-					$dcheck['snmpv3_privprotocol'] = ITEM_PRIVPROTOCOL_DES;
+					$dcheck['snmpv3_privprotocol'] = ITEM_SNMPV3_PRIVPROTOCOL_DES;
 					$dcheck['snmpv3_privpassphrase'] = '';
 					break;
 			}
@@ -694,6 +692,12 @@ class CDRule extends CApiService {
 		$this->validateCreate($drules);
 
 		$druleids = DB::insert('drules', $drules);
+
+		array_walk($drules, function (&$drule, $index) use ($druleids) {
+			$drule['druleid'] = $druleids[$index];
+		});
+
+		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_DISCOVERY_RULE, $drules);
 
 		$create_dchecks = [];
 		foreach ($drules as $dnum => $drule) {
@@ -755,8 +759,6 @@ class CDRule extends CApiService {
 
 		$default_values = DB::getDefaults('dchecks');
 
-		$upd_drules = [];
-
 		foreach ($drules as $drule) {
 			$db_drule = $db_drules[$drule['druleid']];
 
@@ -799,6 +801,8 @@ class CDRule extends CApiService {
 				DB::replace('dchecks', $db_dchecks, array_merge($old_dchecks, $new_dchecks));
 			}
 		}
+
+		$this->addAuditBulk(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_DISCOVERY_RULE, $drules, $db_drules);
 
 		return ['druleids' => $druleids];
 	}
@@ -911,16 +915,22 @@ class CDRule extends CApiService {
 		// Adding Discovery Checks
 		if (!is_null($options['selectDChecks'])) {
 			if ($options['selectDChecks'] != API_OUTPUT_COUNT) {
+				$dchecks = [];
 				$relationMap = $this->createRelationMap($result, 'druleid', 'dcheckid', 'dchecks');
-				$dchecks = API::DCheck()->get([
-					'output' => $options['selectDChecks'],
-					'dcheckids' => $relationMap->getRelatedIds(),
-					'nopermissions' => true,
-					'preservekeys' => true
-				]);
-				if (!is_null($options['limitSelects'])) {
-					order_result($dchecks, 'dcheckid');
+				$related_ids = $relationMap->getRelatedIds();
+
+				if ($related_ids) {
+					$dchecks = API::DCheck()->get([
+						'output' => $options['selectDChecks'],
+						'dcheckids' => $related_ids,
+						'nopermissions' => true,
+						'preservekeys' => true
+					]);
+					if (!is_null($options['limitSelects'])) {
+						order_result($dchecks, 'dcheckid');
+					}
 				}
+
 				$result = $relationMap->mapMany($result, $dchecks, 'dchecks', $options['limitSelects']);
 			}
 			else {
@@ -942,15 +952,21 @@ class CDRule extends CApiService {
 		// Adding Discovery Hosts
 		if (!is_null($options['selectDHosts'])) {
 			if ($options['selectDHosts'] != API_OUTPUT_COUNT) {
+				$dhosts = [];
 				$relationMap = $this->createRelationMap($result, 'druleid', 'dhostid', 'dhosts');
-				$dhosts = API::DHost()->get([
-					'output' => $options['selectDHosts'],
-					'dhostids' => $relationMap->getRelatedIds(),
-					'preservekeys' => true
-				]);
-				if (!is_null($options['limitSelects'])) {
-					order_result($dhosts, 'dhostid');
+				$related_ids = $relationMap->getRelatedIds();
+
+				if ($related_ids) {
+					$dhosts = API::DHost()->get([
+						'output' => $options['selectDHosts'],
+						'dhostids' => $related_ids,
+						'preservekeys' => true
+					]);
+					if (!is_null($options['limitSelects'])) {
+						order_result($dhosts, 'dhostid');
+					}
 				}
+
 				$result = $relationMap->mapMany($result, $dhosts, 'dhosts', $options['limitSelects']);
 			}
 			else {

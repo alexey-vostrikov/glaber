@@ -179,41 +179,39 @@ if ($data['allowed_ui_conf_hosts'] && $data['rwHost']) {
 		->setArgument('form', 'update')
 		->setArgument('hostid', $data['host']['hostid'])
 	);
-	$applicationsLink = new CLink(_('Applications'),
-		(new CUrl('zabbix.php'))
-			->setArgument('action', 'application.list')
-			->setArgument('filter_set', '1')
-			->setArgument('filter_hostids', [$data['host']['hostid']])
-	);
-
 	$itemsLink = new CLink(_('Items'),
 		(new CUrl('items.php'))
 			->setArgument('filter_set', '1')
 			->setArgument('filter_hostids', [$data['host']['hostid']])
+			->setArgument('context', 'host')
 	);
 	$triggersLink = new CLink(_('Triggers'),
 		(new CUrl('triggers.php'))
 			->setArgument('filter_set', '1')
 			->setArgument('filter_hostids', [$data['host']['hostid']])
+			->setArgument('context', 'host')
 	);
 	$graphsLink = new CLink(_('Graphs'),
 		(new CUrl('graphs.php'))
 			->setArgument('filter_set', '1')
 			->setArgument('filter_hostids', [$data['host']['hostid']])
+			->setArgument('context', 'host')
 	);
 	$discoveryLink = new CLink(_('Discovery'),
 		(new CUrl('host_discovery.php'))
 			->setArgument('filter_set', '1')
 			->setArgument('filter_hostids', [$data['host']['hostid']])
+			->setArgument('context', 'host')
 	);
-	$webLink = new CLink(_('Web'), (new CUrl('httpconf.php'))
+	$webLink = new CLink(_('Web'),
+		(new CUrl('httpconf.php'))
 			->setArgument('filter_set', '1')
 			->setArgument('filter_hostids', [$data['host']['hostid']])
+			->setArgument('context', 'host')
 	);
 }
 else {
 	$hostLink = _('Host');
-	$applicationsLink = _('Application');
 	$itemsLink = _('Items');
 	$triggersLink = _('Triggers');
 	$graphsLink = _('Graphs');
@@ -224,7 +222,6 @@ else {
 $overviewFormList->addRow(_('Configuration'),
 	new CHorList([
 		$hostLink,
-		(new CSpan([$applicationsLink, CViewHelper::showNum($data['host']['applications'])])),
 		(new CSpan([$itemsLink, CViewHelper::showNum($data['host']['items'])])),
 		(new CSpan([$triggersLink, CViewHelper::showNum($data['host']['triggers'])])),
 		(new CSpan([$graphsLink, CViewHelper::showNum($data['host']['graphs'])])),

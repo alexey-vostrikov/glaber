@@ -38,7 +38,11 @@ typedef struct
 	const char		*correlation_tag;
 	const char		*opdata;
 	const char		*event_name;
+	const unsigned char	*expression_bin;
+	const unsigned char	*recovery_expression_bin;
 	int			lastchange;
+	int			revision;
+	int			timer_revision;
 	unsigned char		topoindex;
 	unsigned char		priority;
 	unsigned char		type;
@@ -49,10 +53,17 @@ typedef struct
 	unsigned char		functional;		/* see TRIGGER_FUNCTIONAL_* defines      */
 	unsigned char		recovery_mode;		/* see TRIGGER_RECOVERY_MODE_* defines   */
 	unsigned char		correlation_mode;	/* see ZBX_TRIGGER_CORRELATION_* defines */
+	unsigned char		timer;
 
 	zbx_vector_ptr_t	tags;
 }
 ZBX_DC_TRIGGER;
+
+/* specifies if trigger expression/recovery expression has timer functions */
+/* (date, time, now, dayofweek or dayofmonth)                              */
+#define ZBX_TRIGGER_TIMER_DEFAULT		0x00
+#define ZBX_TRIGGER_TIMER_EXPRESSION		0x01
+#define ZBX_TRIGGER_TIMER_RECOVERY_EXPRESSION	0x02
 
 typedef struct zbx_dc_trigger_deplist
 {
@@ -89,7 +100,6 @@ typedef struct
 	const char		*delay;
 	ZBX_DC_TRIGGER		**triggers;
 	int			nextcheck;
-	int			lastclock;
 	int			mtime;
 	int			data_expected_from;
 	int			history_sec;
@@ -109,8 +119,11 @@ typedef struct
 	zbx_uint64_t		templateid;
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
 	
+	//TODO: move to global state or consider thinking of arch when it's kept here
 	history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
 	history_value_t		prevvalue;
+
+	zbx_vector_ptr_t	tags;
 }
 ZBX_DC_ITEM;
 
@@ -234,8 +247,9 @@ ZBX_DC_JMXITEM;
 
 typedef struct
 {
-	zbx_uint64_t	itemid;
-	const char	*params;
+	zbx_uint64_t		itemid;
+	const char		*params;
+	const unsigned char	*formula_bin;
 }
 ZBX_DC_CALCITEM;
 
@@ -317,39 +331,10 @@ typedef struct
 	const char	*name;
 	int		maintenance_from;
 	int		data_expected_from;
-	int		errors_from;
-	int		disable_until;
-	int		snmp_errors_from;
-	int		snmp_disable_until;
-	int		ipmi_errors_from;
-	int		ipmi_disable_until;
-	int		jmx_errors_from;
-	int		jmx_disable_until;
-
-	/* item statistics per interface type */
-	int		items_num;
-	int		snmp_items_num;
-	int		ipmi_items_num;
-	int		jmx_items_num;
-
-	/* timestamp of last availability status (available/error) field change on any interface */
-	int		availability_ts;
 
 	unsigned char	maintenance_status;
 	unsigned char	maintenance_type;
-	unsigned char	available;
-	unsigned char	snmp_available;
-	unsigned char	ipmi_available;
-	unsigned char	jmx_available;
 	unsigned char	status;
-	/* cluster state considered in fetching items during poller items queue fetch */
-	unsigned char 	cluster_state;
-	zbx_uint64_t cluster_server_host_id; //hostid of the server responsible for processing the host
-										 //we need this for fast rerouting of data
-
-	
-	/* flag to reset host availability to unknown */
-	unsigned char	reset_availability;
 
 	/* flag to force update for all items */
 	unsigned char	update_items;
@@ -362,14 +347,14 @@ typedef struct
 	const char	*tls_subject;
 	ZBX_DC_PSK	*tls_dc_psk;
 #endif
-	const char	*error;
-	const char	*snmp_error;
-	const char	*ipmi_error;
-	const char	*jmx_error;
 
 	zbx_vector_ptr_t	interfaces_v;	/* for quick finding of all host interfaces in */
 						/* 'config->interfaces' hashset */
-	
+
+	/* cluster state considered in fetching items during poller items queue fetch */
+	unsigned char 	cluster_state;
+	zbx_uint64_t cluster_server_host_id; //hostid of the server responsible for processing the host
+										 //we need this for fast rerouting of data
 }
 ZBX_DC_HOST;
 
@@ -506,9 +491,19 @@ typedef struct
 	const char	*ip;
 	const char	*dns;
 	const char	*port;
+	const char	*error;
 	unsigned char	type;
 	unsigned char	main;
 	unsigned char	useip;
+	unsigned char	available;
+	int		disable_until;
+	int		errors_from;
+	/* timestamp of last availability status (available/error) field change on interface */
+	int		availability_ts;
+	/* flag to reset interface availability to unknown */
+	unsigned char	reset_availability;
+	/* item statistics per interface */
+	int		items_num;
 }
 ZBX_DC_INTERFACE;
 
@@ -636,6 +631,15 @@ typedef struct
 	const char	*value;
 }
 zbx_dc_trigger_tag_t;
+
+typedef struct
+{
+	zbx_uint64_t	itemtagid;
+	zbx_uint64_t	itemid;
+	const char	*tag;
+	const char	*value;
+}
+zbx_dc_item_tag_t;
 
 typedef struct
 {
@@ -872,8 +876,9 @@ typedef struct
 	zbx_hashset_t		actions;
 	zbx_hashset_t		action_conditions;
 	zbx_hashset_t		trigger_tags;
+	zbx_hashset_t		item_tags;
 	zbx_hashset_t		host_tags;
-	zbx_hashset_t		host_tags_index;		/* host tag index by hostid */
+	zbx_hashset_t		host_tags_index;	/* host tag index by hostid */
 	zbx_hashset_t		correlations;
 	zbx_hashset_t		corr_conditions;
 	zbx_hashset_t		corr_operations;
@@ -998,13 +1003,14 @@ char	*dc_expand_user_macros_in_expression(const char *text, zbx_uint64_t *hostid
 char	*dc_expand_user_macros_in_func_params(const char *params, zbx_uint64_t hostid);
 char	*dc_expand_user_macros_in_calcitem(const char *formula, zbx_uint64_t hostid);
 
-/******************************************************************************
- *                                                                            *
- * dc_expand_user_macros - has no autoquoting                                 *
- * for triggers and calculated items use                                      *
- * dc_expand_user_macros_in_expression - which autoquotes macros that are     *
- * not already quoted and cannot be casted to a double                        *
- *                                                                            *
- ******************************************************************************/
 char	*dc_expand_user_macros(const char *text, zbx_uint64_t *hostids, int hostids_num);
+int	dc_expand_user_macros_len(const char *text, size_t text_len, zbx_uint64_t *hostids, int hostids_num,
+		char **value, char **error);
+
+#define ZBX_TRIGGER_TIMER_NONE			0x0000
+#define ZBX_TRIGGER_TIMER_TRIGGER		0x0001
+#define ZBX_TRIGGER_TIMER_FUNCTION_TIME		0x0002
+#define ZBX_TRIGGER_TIMER_FUNCTION_TREND	0x0004
+#define ZBX_TRIGGER_TIMER_FUNCTION		(ZBX_TRIGGER_TIMER_FUNCTION_TIME | ZBX_TRIGGER_TIMER_FUNCTION_TREND)
+
 #endif

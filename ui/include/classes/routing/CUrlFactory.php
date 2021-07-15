@@ -36,9 +36,6 @@ class CUrlFactory {
 			'remove' => ['itemid'],
 			'add' => ['hostid', 'parent_discoveryid']
 		],
-		'discoveryconf.php' => [
-			'remove' => ['druleid']
-		],
 		'graphs.php' => [
 			'remove' => ['graphid'],
 			'add' => ['hostid', 'parent_discoveryid']
@@ -65,13 +62,6 @@ class CUrlFactory {
 		],
 		'maintenance.php' => [
 			'remove' => ['maintenanceid']
-		],
-		'screenconf.php' => [
-			'remove' => ['screenid'],
-			'add' => ['templateid']
-		],
-		'slideconf.php' => [
-			'remove' => ['slideshowid']
 		],
 		'sysmaps.php' => [
 			'remove' => ['sysmapid']

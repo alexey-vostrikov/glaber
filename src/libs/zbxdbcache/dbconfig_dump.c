@@ -40,8 +40,6 @@ static void	DCdump_config(void)
 
 	zabbix_log(LOG_LEVEL_TRACE, "db:");
 	zabbix_log(LOG_LEVEL_TRACE, "  extension: %s", config->config->db.extension);
-	zabbix_log(LOG_LEVEL_TRACE, "  history_compression_availability: %d",
-			config->config->db.history_compression_availability);
 	zabbix_log(LOG_LEVEL_TRACE, "  history_compression_status: %d",
 			config->config->db.history_compression_status);
 	zabbix_log(LOG_LEVEL_TRACE, "  history_compress_older: %d", config->config->db.history_compress_older);
@@ -106,26 +104,9 @@ static void	DCdump_hosts(void)
 		zabbix_log(LOG_LEVEL_TRACE, "  proxy_hostid:" ZBX_FS_UI64, host->proxy_hostid);
 		zabbix_log(LOG_LEVEL_TRACE, "  data_expected_from:%d", host->data_expected_from);
 
-		zabbix_log(LOG_LEVEL_TRACE, "  zabbix:[available:%u, errors_from:%d disable_until:%d error:'%s']",
-				host->available, host->errors_from, host->disable_until, host->error);
-		zabbix_log(LOG_LEVEL_TRACE, "  snmp:[available:%u, errors_from:%d disable_until:%d error:'%s']",
-				host->snmp_available, host->snmp_errors_from, host->snmp_disable_until,
-				host->snmp_error);
-		zabbix_log(LOG_LEVEL_TRACE, "  ipmi:[available:%u, errors_from:%d disable_until:%d error:'%s']",
-				host->ipmi_available, host->ipmi_errors_from, host->ipmi_disable_until,
-				host->ipmi_error);
-		zabbix_log(LOG_LEVEL_TRACE, "  jmx:[available:%u, errors_from:%d disable_until:%d error:'%s']",
-				host->jmx_available, host->jmx_errors_from, host->jmx_disable_until, host->jmx_error);
-
-		/* timestamp of last availability status (available/error) field change on any interface */
-		zabbix_log(LOG_LEVEL_TRACE, "  availability_ts:%d", host->availability_ts);
-
 		zabbix_log(LOG_LEVEL_TRACE, "  maintenanceid:" ZBX_FS_UI64 " maintenance_status:%u maintenance_type:%u"
 				" maintenance_from:%d", host->maintenanceid, host->maintenance_status,
 				host->maintenance_type, host->maintenance_from);
-
-		zabbix_log(LOG_LEVEL_TRACE, "  number of items: zabbix:%d snmp:%d ipmi:%d jmx:%d", host->items_num,
-				host->snmp_items_num, host->ipmi_items_num, host->jmx_items_num);
 
 		/* 'tls_connect' and 'tls_accept' must be respected even if encryption support is not compiled in */
 		zabbix_log(LOG_LEVEL_TRACE, "  tls:[connect:%u accept:%u]", host->tls_connect, host->tls_accept);
@@ -424,9 +405,14 @@ static void	DCdump_interfaces(void)
 		interface = (ZBX_DC_INTERFACE *)index.values[i];
 
 		zbx_snprintf_alloc(&if_msg, &alloc, &offset, "interfaceid:" ZBX_FS_UI64 " hostid:" ZBX_FS_UI64
-				" ip:'%s' dns:'%s' port:'%s' type:%u main:%u useip:%u",
+				" ip:'%s' dns:'%s' port:'%s' type:%u main:%u useip:%u"
+				" available:%u errors_from:%d disable_until:%d error:'%s' availability_ts:%d"
+				" reset_availability:%d items_num %d",
 				interface->interfaceid, interface->hostid, interface->ip, interface->dns,
-				interface->port, interface->type, interface->main, interface->useip);
+				interface->port, interface->type, interface->main, interface->useip,
+				interface->available, interface->errors_from, interface->disable_until,
+				interface->error, interface->availability_ts, interface->reset_availability,
+				interface->items_num);
 
 		if (INTERFACE_TYPE_SNMP == interface->type &&
 				NULL != (snmp = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp,
@@ -590,6 +576,28 @@ typedef struct
 }
 zbx_trace_item_t;
 
+static void	DCdump_item_tags(const ZBX_DC_ITEM *item)
+{
+	int			i;
+	zbx_vector_ptr_t	index;
+
+	zbx_vector_ptr_create(&index);
+
+	zbx_vector_ptr_append_array(&index, item->tags.values, item->tags.values_num);
+	zbx_vector_ptr_sort(&index, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
+
+	zabbix_log(LOG_LEVEL_TRACE, "  tags:");
+
+	for (i = 0; i < index.values_num; i++)
+	{
+		zbx_dc_item_tag_t	*tag = (zbx_dc_item_tag_t *)index.values[i];
+		zabbix_log(LOG_LEVEL_TRACE, "      tagid:" ZBX_FS_UI64 " tag:'%s' value:'%s'",
+				tag->itemtagid, tag->tag, tag->value);
+	}
+
+	zbx_vector_ptr_destroy(&index);
+}
+
 static void	DCdump_items(void)
 {
 	ZBX_DC_ITEM		*item;
@@ -637,8 +645,7 @@ static void	DCdump_items(void)
 		zabbix_log(LOG_LEVEL_TRACE, "  flags:%u status:%u", item->flags, item->status);
 		zabbix_log(LOG_LEVEL_TRACE, "  valuemapid:" ZBX_FS_UI64, item->valuemapid);
 		zabbix_log(LOG_LEVEL_TRACE, "  lastlogsize:" ZBX_FS_UI64 " mtime:%d", item->lastlogsize, item->mtime);
-		zabbix_log(LOG_LEVEL_TRACE, "  delay:'%s' nextcheck:%d lastclock:%d", item->delay, item->nextcheck,
-				item->lastclock);
+		zabbix_log(LOG_LEVEL_TRACE, "  delay:'%s' nextcheck:%d", item->delay, item->nextcheck);
 		zabbix_log(LOG_LEVEL_TRACE, "  data_expected_from:%d", item->data_expected_from);
 		zabbix_log(LOG_LEVEL_TRACE, "  history:%d history_sec:%d", item->history, item->history_sec);
 		zabbix_log(LOG_LEVEL_TRACE, "  poller_type:%u location:%u", item->poller_type, item->location);
@@ -650,6 +657,9 @@ static void	DCdump_items(void)
 			if (NULL != (ptr = zbx_hashset_search(trace_items[j].hashset, &item->itemid)))
 				trace_items[j].dump_func(ptr);
 		}
+
+		if (0 != item->tags.values_num)
+			DCdump_item_tags(item);
 
 		if (NULL != item->triggers)
 		{

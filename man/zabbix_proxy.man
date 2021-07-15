@@ -105,7 +105,7 @@ Log level control targets
 .RS 4
 .TP 4
 .I process\-type
-All processes of specified type (configuration\ syncer, data\ sender, discoverer, heartbeat\ sender, history\ syncer, housekeeper, http\ poller, icmp\ pinger, ipmi\ manager, ipmi\ poller, java\ poller, poller, self\-monitoring, snmp\ trapper, task\ manager, trapper, unreachable\ poller, vmware\ collector)
+All processes of specified type (configuration\ syncer, data\ sender, discoverer, heartbeat\ sender, history\ syncer, housekeeper, http\ poller, icmp\ pinger, ipmi\ manager, ipmi\ poller, java\ poller, poller, self\-monitoring, snmp\ trapper, task\ manager, trapper, unreachable\ poller, vmware\ collector, history\ poller, availability\ manager)
 .RE
 .RS 4
 .TP 4
@@ -136,6 +136,7 @@ Documentation
 .BR zabbix_sender (1),
 .BR zabbix_server (8),
 .BR zabbix_js (1),
-.BR zabbix_agent2 (8)
+.BR zabbix_agent2 (8),
+.BR zabbix_web_service (8)
 .SH AUTHOR
 Alexei Vladishev <alex@zabbix.com>

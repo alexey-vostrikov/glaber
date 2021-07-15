@@ -23,6 +23,7 @@
 #include "common.h"
 #include "module.h"
 #include "dbcache.h"
+#include "zbxvariant.h"
 
 /* preprocessing step execution result */
 typedef struct
@@ -41,12 +42,10 @@ typedef struct
 }
 zbx_preproc_item_stats_t;
 
-
 /* the following functions are implemented differently for server and proxy */
 
-void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, zbx_uint64_t hostid, unsigned char item_value_type, unsigned char item_flags,
 		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error);
-
 void	zbx_preprocessor_flush(void);
 zbx_uint64_t	zbx_preprocessor_get_queue_size(void);
 
@@ -57,14 +56,16 @@ int	zbx_preprocessor_test(unsigned char value_type, const char *value, const zbx
 		const zbx_vector_ptr_t *steps, zbx_vector_ptr_t *results, zbx_vector_ptr_t *history,
 		char **preproc_error, char **error);
 
-int	zbx_preprocessor_get_diag_stats(int *values_num, int *values_preproc_num, char **error);
-
+int	zbx_preprocessor_get_diag_stats(int *total, int *queued, int *processing, int *done,
+		int *pending, char **error);
 
 int	zbx_preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **error);
+int	zbx_preprocessor_get_top_oldest_preproc_items(int limit, zbx_vector_ptr_t *items, char **error);
 
+//TODO: since inpoller preproc was dismissed, figure if this is still needed
 void glb_fast_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
 		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error, DC_ITEM *item, zbx_hashset_t *history_cache, int poller_type);
  
 void glb_preprocessing_init();
-void	preproc_item_clear(zbx_preproc_item_t *item);
+void preproc_item_clear(zbx_preproc_item_t *item);
 #endif /* ZABBIX_PREPROC_H */

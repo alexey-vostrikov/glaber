@@ -112,7 +112,7 @@ func (he VictoriaHist) WriteTrends(agg_metric *histApi.AggMetric, log *log.Logge
 
 	fmt.Fprintf(buf,",count=%d %d000000000\n",agg_metric.Count, agg_metric.Time) 
 
-	log.Print(buf)
+	//log.Print(buf)
 	(*he.metrics)[agg_metric.Value_type]++
 	
 }
@@ -351,7 +351,7 @@ func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.A
 func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histApi.Metric, *bufio.Writer, int), wr *bufio.Writer, log *log.Logger)  {
 
 	var buf strings.Builder
-	log.Print("Reading history metrics")
+	//log.Print("Reading history metrics")
 
 	if (0 == hr.Start ) {
 		//if start isn't stated, assume 24hours
@@ -368,12 +368,12 @@ func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histA
 	}
 	step := int32( (hr.End - hr.Start ) / hr.Count)
 
-	log.Print("Start:",hr.Start, ", end:",hr.End," count:",hr.Count)
+	//log.Print("Start:",hr.Start, ", end:",hr.End," count:",hr.Count)
 	
 	fmt.Fprintf(&buf,"%s/api/v1/query_range?query=item_%d{dbname=\"%s\"}&start=%d&end=%d&step=%ds",
 	he.baseurl, hr.Itemid, he.dbname, hr.Start, hr.End, step)
 
-	log.Print("Sending items query: ", buf.String());
+	//log.Print("Sending items query: ", buf.String());
 
 	resp, err := http.Get(buf.String() )
 
@@ -381,7 +381,7 @@ func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histA
 		log.Print(err)
   	} else {
 		
-		log.Print("Got responce")
+		//log.Print("Got responce")
 		body, _ := ioutil.ReadAll(resp.Body)
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -390,8 +390,8 @@ func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histA
 			log.Println(resp)   
 	  	} else {
 			
-			log.Print(string(body)) 
-			log.Print("Parsing responce");
+			//log.Print(string(body)) 
+			//log.Print("Parsing responce");
 			
 			//todo - as soon as we have some data, create parsing here and returning it as metrics
 			v,err := he.parser.Parse(string(body))

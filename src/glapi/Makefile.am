@@ -21,6 +21,6 @@ clean:
 	rm glb_log_listener
 
 install:
-	go install cmd/history/glb_hist_clickhouse
-	go install cmd/history/glb_hist_victoria
-	go install cmd/server/glb_log_listener
+#	go install cmd/history/glb_hist_clickhouse
+#	go install cmd/history/glb_hist_victoria
+#	go install cmd/server/glb_log_listener

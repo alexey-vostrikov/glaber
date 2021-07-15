@@ -846,7 +846,8 @@ zbx_uint64_t	DBget_maxid_num(const char *tablename, int num)
 			0 == strcmp(tablename, "alerts") ||
 			0 == strcmp(tablename, "escalations") ||
 			0 == strcmp(tablename, "autoreg_host") ||
-			0 == strcmp(tablename, "event_suppress"))
+			0 == strcmp(tablename, "event_suppress") ||
+			0 == strcmp(tablename, "trigger_queue"))
 		return DCget_nextid(tablename, num);
 
 	return DBget_nextid(tablename, num);
@@ -854,48 +855,116 @@ zbx_uint64_t	DBget_maxid_num(const char *tablename, int num)
 
 /******************************************************************************
  *                                                                            *
- * Function: DBcheck_capabilities                                             *
+ * Function: DBextract_version                                                *
  *                                                                            *
- * Purpose: checks DBMS for optional features and adjusting configuration     *
+ * Purpose: connects to DB and tries to detect DB version                     *
  *                                                                            *
  ******************************************************************************/
-void	DBcheck_capabilities(void)
+zbx_uint32_t	DBextract_version(struct zbx_json *json)
 {
-#ifdef HAVE_POSTGRESQL
-	int	compression_available = OFF;
+	zbx_uint32_t	ret;
+
+	DBconnect(ZBX_DB_CONNECT_NORMAL);
+	ret = zbx_dbms_version_extract(json);
+	DBclose();
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: DBflush_version_requirements                                     *
+ *                                                                            *
+ * Purpose: writes a json entry in DB with the result for the front-end       *
+ *                                                                            *
+ * Parameters: version - [IN] entry of DB versions                            *
+ *                                                                            *
+ ******************************************************************************/
+void	DBflush_version_requirements(const char *version)
+{
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	/* Timescale compression feature is available in PostgreSQL 10.2 and TimescaleDB 1.5.0 */
-	if (100002 <= zbx_dbms_get_version())
-	{
-		DB_RESULT	result;
-		DB_ROW		row;
-		int		major, minor, patch, version;
-
-		if (NULL == (result = DBselect("select extversion from pg_extension where extname = 'timescaledb'")))
-			goto out;
-
-		if (NULL == (row = DBfetch(result)))
-			goto clean;
-
-		zabbix_log(LOG_LEVEL_DEBUG, "TimescaleDB version: %s", (char*)row[0]);
-
-		sscanf((const char*)row[0], "%d.%d.%d", &major, &minor, &patch);
-		version = major * 10000;
-		version += minor * 100;
-		version += patch;
-
-		if (10500 <= version)
-			compression_available = ON;
-clean:
-		DBfree_result(result);
-	}
-out:
-	DBexecute("update config set compression_availability=%d", compression_available);
+	if (ZBX_DB_OK > DBexecute("update config set dbversion_status='%s'", version))
+		zabbix_log(LOG_LEVEL_CRIT, "Failed to set dbversion_status");
 
 	DBclose();
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: DBcheck_capabilities                                             *
+ *                                                                            *
+ * Purpose: checks DBMS for optional features and exit if is not suitable     *
+ *                                                                            *
+ * Parameters: db_version - [IN] version of DB                                *
+ *                                                                            *
+ * Return value: SUCCEED - if optional features were checked successfully     *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ ******************************************************************************/
+int	DBcheck_capabilities(zbx_uint32_t db_version)
+{
+	int	ret = SUCCEED;
+#ifdef HAVE_POSTGRESQL
+
+#define MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB	100002
+#define MIN_TIMESCALEDB_VERSION			10500
+	int		timescaledb_version;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	DBconnect(ZBX_DB_CONNECT_NORMAL);
+
+	if (FAIL == DBfield_exists("config", "db_extension"))
+		goto out;
+
+	if (NULL == (result = DBselect("select db_extension from config")))
+		goto out;
+
+	if (NULL == (row = DBfetch(result)))
+		goto clean;
+
+	if (0 != zbx_strcmp_null(row[0], ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
+		goto clean;
+
+	ret = FAIL;	/* In case of major upgrade, db_extension may be missing */
+
+	/* Timescale compression feature is available in PostgreSQL 10.2 and TimescaleDB 1.5.0 */
+	if (MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB > db_version)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "PostgreSQL version %lu is not supported with TimescaleDB, minimum is %d",
+				(unsigned long)db_version, MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB);
+		goto clean;
+	}
+
+	if (0 == (timescaledb_version = zbx_tsdb_get_version()))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "Cannot determine TimescaleDB version");
+		goto clean;
+	}
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "TimescaleDB version: %d", timescaledb_version);
+
+	if (MIN_TIMESCALEDB_VERSION > timescaledb_version)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "TimescaleDB version %d is not supported, minimum is %d",
+				timescaledb_version, MIN_TIMESCALEDB_VERSION);
+		goto clean;
+	}
+
+	ret = SUCCEED;
+clean:
+	DBfree_result(result);
+out:
+	DBclose();
+#else
+	ZBX_UNUSED(db_version);
 #endif
+	return ret;
 }
 
 #define MAX_EXPRESSIONS	950
@@ -1384,7 +1453,7 @@ const char	*zbx_user_string(zbx_uint64_t userid)
 	DB_RESULT	result;
 	DB_ROW		row;
 
-	result = DBselect("select name,surname,alias from users where userid=" ZBX_FS_UI64, userid);
+	result = DBselect("select name,surname,username from users where userid=" ZBX_FS_UI64, userid);
 
 	if (NULL != (row = DBfetch(result)))
 		zbx_snprintf(buf_string, sizeof(buf_string), "%s %s (%s)", row[0], row[1], row[2]);
@@ -1400,24 +1469,24 @@ const char	*zbx_user_string(zbx_uint64_t userid)
  *                                                                            *
  * Function: DBget_user_names                                                 *
  *                                                                            *
- * Purpose: get user alias, name and surname                                  *
+ * Purpose: get user username, name and surname                               *
  *                                                                            *
- * Parameters: userid - [IN] user id                                          *
- *             alias   - [OUT] user alias                                     *
- *             name    - [OUT] user name                                      *
- *             surname - [OUT] user surname                                   *
+ * Parameters: userid     - [IN] user id                                      *
+ *             username   - [OUT] user alias                                  *
+ *             name       - [OUT] user name                                   *
+ *             surname    - [OUT] user surname                                *
  *                                                                            *
  * Return value: SUCCEED or FAIL                                              *
  *                                                                            *
  ******************************************************************************/
-int	DBget_user_names(zbx_uint64_t userid, char **alias, char **name, char **surname)
+int	DBget_user_names(zbx_uint64_t userid, char **username, char **name, char **surname)
 {
 	int		ret = FAIL;
 	DB_RESULT	result;
 	DB_ROW		row;
 
 	if (NULL == (result = DBselect(
-			"select alias,name,surname"
+			"select username,name,surname"
 			" from users"
 			" where userid=" ZBX_FS_UI64, userid)))
 	{
@@ -1427,7 +1496,7 @@ int	DBget_user_names(zbx_uint64_t userid, char **alias, char **name, char **surn
 	if (NULL == (row = DBfetch(result)))
 		goto out;
 
-	*alias = zbx_strdup(NULL, row[0]);
+	*username = zbx_strdup(NULL, row[0]);
 	*name = zbx_strdup(NULL, row[1]);
 	*surname = zbx_strdup(NULL, row[2]);
 
@@ -2072,9 +2141,6 @@ int	DBtxn_ongoing(void)
 int	DBtable_exists(const char *table_name)
 {
 	char		*table_name_esc;
-#ifdef HAVE_POSTGRESQL
-	char		*table_schema_esc;
-#endif
 	DB_RESULT	result;
 	int		ret;
 
@@ -2090,18 +2156,12 @@ int	DBtable_exists(const char *table_name)
 				" and lower(tname)='%s'",
 			table_name_esc);
 #elif defined(HAVE_POSTGRESQL)
-	table_schema_esc = DBdyn_escape_string(NULL == CONFIG_DBSCHEMA || '\0' == *CONFIG_DBSCHEMA ?
-			"public" : CONFIG_DBSCHEMA);
-
 	result = DBselect(
 			"select 1"
 			" from information_schema.tables"
 			" where table_name='%s'"
 				" and table_schema='%s'",
-			table_name_esc, table_schema_esc);
-
-	zbx_free(table_schema_esc);
-
+			table_name_esc, zbx_db_get_schema_esc());
 #elif defined(HAVE_SQLITE3)
 	result = DBselect(
 			"select 1"
@@ -2130,7 +2190,7 @@ int	DBfield_exists(const char *table_name, const char *field_name)
 	char		*table_name_esc, *field_name_esc;
 	int		ret;
 #elif defined(HAVE_POSTGRESQL)
-	char		*table_name_esc, *field_name_esc, *table_schema_esc;
+	char		*table_name_esc, *field_name_esc;
 	int		ret;
 #elif defined(HAVE_SQLITE3)
 	char		*table_name_esc;
@@ -2167,8 +2227,6 @@ int	DBfield_exists(const char *table_name, const char *field_name)
 
 	DBfree_result(result);
 #elif defined(HAVE_POSTGRESQL)
-	table_schema_esc = DBdyn_escape_string(NULL == CONFIG_DBSCHEMA || '\0' == *CONFIG_DBSCHEMA ?
-			"public" : CONFIG_DBSCHEMA);
 	table_name_esc = DBdyn_escape_string(table_name);
 	field_name_esc = DBdyn_escape_string(field_name);
 
@@ -2178,11 +2236,10 @@ int	DBfield_exists(const char *table_name, const char *field_name)
 			" where table_name='%s'"
 				" and column_name='%s'"
 				" and table_schema='%s'",
-			table_name_esc, field_name_esc, table_schema_esc);
+			table_name_esc, field_name_esc, zbx_db_get_schema_esc());
 
 	zbx_free(field_name_esc);
 	zbx_free(table_name_esc);
-	zbx_free(table_schema_esc);
 
 	ret = (NULL == DBfetch(result) ? FAIL : SUCCEED);
 
@@ -2212,9 +2269,6 @@ int	DBfield_exists(const char *table_name, const char *field_name)
 int	DBindex_exists(const char *table_name, const char *index_name)
 {
 	char		*table_name_esc, *index_name_esc;
-#if defined(HAVE_POSTGRESQL)
-	char		*table_schema_esc;
-#endif
 	DB_RESULT	result;
 	int		ret;
 
@@ -2234,18 +2288,13 @@ int	DBindex_exists(const char *table_name, const char *index_name)
 				" and lower(index_name)='%s'",
 			table_name_esc, index_name_esc);
 #elif defined(HAVE_POSTGRESQL)
-	table_schema_esc = DBdyn_escape_string(NULL == CONFIG_DBSCHEMA || '\0' == *CONFIG_DBSCHEMA ?
-				"public" : CONFIG_DBSCHEMA);
-
 	result = DBselect(
 			"select 1"
 			" from pg_indexes"
 			" where tablename='%s'"
 				" and indexname='%s'"
 				" and schemaname='%s'",
-			table_name_esc, index_name_esc, table_schema_esc);
-
-	zbx_free(table_schema_esc);
+			table_name_esc, index_name_esc, zbx_db_get_schema_esc());
 #endif
 
 	ret = (NULL == DBfetch(result) ? FAIL : SUCCEED);
@@ -2441,12 +2490,11 @@ void	DBcheck_character_set(void)
 #elif defined(HAVE_POSTGRESQL)
 #define OID_LENGTH_MAX		20
 
-	char		*database_name_esc, *schema_name_esc, oid[OID_LENGTH_MAX];
+	char		*database_name_esc, oid[OID_LENGTH_MAX];
 	DB_RESULT	result;
 	DB_ROW		row;
 
 	database_name_esc = DBdyn_escape_string(CONFIG_DBNAME);
-	schema_name_esc = (NULL != CONFIG_DBSCHEMA) ? DBdyn_escape_string(CONFIG_DBSCHEMA) : strdup("public");
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 	result = DBselect(
@@ -2473,7 +2521,7 @@ void	DBcheck_character_set(void)
 			"select oid"
 			" from pg_namespace"
 			" where nspname='%s'",
-			schema_name_esc);
+			zbx_db_get_schema_esc());
 
 	if (NULL == result || NULL == (row = DBfetch(result)) || '\0' == **row)
 	{
@@ -2538,7 +2586,6 @@ void	DBcheck_character_set(void)
 out:
 	DBfree_result(result);
 	DBclose();
-	zbx_free(schema_name_esc);
 	zbx_free(database_name_esc);
 #endif
 }
@@ -3349,68 +3396,108 @@ int	DBlock_ids(const char *table_name, const char *field_name, zbx_vector_uint64
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_sql_add_host_availability                                    *
+ * Function: zbx_sql_add_interface_availability                               *
  *                                                                            *
- * Purpose: adds host availability update to sql statement                    *
+ * Purpose: adds interface availability update to sql statement               *
  *                                                                            *
- * Parameters: sql        - [IN/OUT] the sql statement                        *
+ * Parameters: ia           [IN] the interface availability data              *
+ *             sql        - [IN/OUT] the sql statement                        *
  *             sql_alloc  - [IN/OUT] the number of bytes allocated for sql    *
  *                                   statement                                *
  *             sql_offset - [IN/OUT] the number of bytes used in sql          *
  *                                   statement                                *
- *             ha           [IN] the host availability data                   *
+ *                                                                            *
+ * Return value: SUCCEED - sql statement is created                           *
+ *               FAIL    - no interface availability is set                   *
  *                                                                            *
  ******************************************************************************/
-int	zbx_sql_add_host_availability(char **sql, size_t *sql_alloc, size_t *sql_offset,
-		const zbx_host_availability_t *ha)
+static int	zbx_sql_add_interface_availability(const zbx_interface_availability_t *ia, char **sql,
+		size_t *sql_alloc, size_t *sql_offset)
 {
-	const char	*field_prefix[ZBX_AGENT_MAX] = {"", "snmp_", "ipmi_", "jmx_"};
 	char		delim = ' ';
-	int		i;
 
-	if (FAIL == zbx_host_availability_is_set(ha))
+	if (FAIL == zbx_interface_availability_is_set(ia))
 		return FAIL;
 
-	zbx_strcpy_alloc(sql, sql_alloc, sql_offset, "update hosts set");
+	zbx_strcpy_alloc(sql, sql_alloc, sql_offset, "update interface set");
 
-	for (i = 0; i < ZBX_AGENT_MAX; i++)
+	if (0 != (ia->agent.flags & ZBX_FLAGS_AGENT_STATUS_AVAILABLE))
 	{
-		if (0 != (ha->agents[i].flags & ZBX_FLAGS_AGENT_STATUS_AVAILABLE))
-		{
-			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%c%savailable=%d", delim, field_prefix[i],
-					(int)ha->agents[i].available);
-			delim = ',';
-		}
-
-		if (0 != (ha->agents[i].flags & ZBX_FLAGS_AGENT_STATUS_ERROR))
-		{
-			char	*error_esc;
-
-			error_esc = DBdyn_escape_field("hosts", "error", ha->agents[i].error);
-			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%c%serror='%s'", delim, field_prefix[i],
-					error_esc);
-			zbx_free(error_esc);
-			delim = ',';
-		}
-
-		if (0 != (ha->agents[i].flags & ZBX_FLAGS_AGENT_STATUS_ERRORS_FROM))
-		{
-			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%c%serrors_from=%d", delim, field_prefix[i],
-					ha->agents[i].errors_from);
-			delim = ',';
-		}
-
-		if (0 != (ha->agents[i].flags & ZBX_FLAGS_AGENT_STATUS_DISABLE_UNTIL))
-		{
-			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%c%sdisable_until=%d", delim, field_prefix[i],
-					ha->agents[i].disable_until);
-			delim = ',';
-		}
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%cavailable=%d", delim, (int)ia->agent.available);
+		delim = ',';
 	}
 
-	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, " where hostid=" ZBX_FS_UI64, ha->hostid);
+	if (0 != (ia->agent.flags & ZBX_FLAGS_AGENT_STATUS_ERROR))
+	{
+		char	*error_esc;
+
+		error_esc = DBdyn_escape_field("interface", "error", ia->agent.error);
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%cerror='%s'", delim, error_esc);
+		zbx_free(error_esc);
+		delim = ',';
+	}
+
+	if (0 != (ia->agent.flags & ZBX_FLAGS_AGENT_STATUS_ERRORS_FROM))
+	{
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%cerrors_from=%d", delim, ia->agent.errors_from);
+		delim = ',';
+	}
+
+	if (0 != (ia->agent.flags & ZBX_FLAGS_AGENT_STATUS_DISABLE_UNTIL))
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%cdisable_until=%d", delim, ia->agent.disable_until);
+
+	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, " where interfaceid=" ZBX_FS_UI64, ia->interfaceid);
 
 	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_db_update_interface_availabilities                           *
+ *                                                                            *
+ * Purpose: sync interface availabilities updates into database               *
+ *                                                                            *
+ * Parameters: interface_availabilities [IN] the interface availability data  *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_db_update_interface_availabilities(const zbx_vector_availability_ptr_t *interface_availabilities)
+{
+	int	txn_error;
+	char	*sql = NULL;
+	size_t	sql_alloc = 4 * ZBX_KIBIBYTE;
+	int	i;
+
+	sql = (char *)zbx_malloc(sql, sql_alloc);
+
+	do
+	{
+		size_t	sql_offset = 0;
+
+		DBbegin();
+		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+		for (i = 0; i < interface_availabilities->values_num; i++)
+		{
+			if (SUCCEED != zbx_sql_add_interface_availability(interface_availabilities->values[i], &sql,
+					&sql_alloc, &sql_offset))
+			{
+				continue;
+			}
+
+			zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, ";\n");
+			DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
+		}
+
+		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+		if (16 < sql_offset)
+			DBexecute("%s", sql);
+
+		txn_error = DBcommit();
+	}
+	while (ZBX_DB_DOWN == txn_error);
+
+	zbx_free(sql);
 }
 
 /******************************************************************************
@@ -3460,6 +3547,56 @@ int	DBget_user_by_active_session(const char *sessionid, zbx_user_t *user)
 out:
 	DBfree_result(result);
 	zbx_free(sessionid_esc);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: DBget_user_by_auth_token                                         *
+ *                                                                            *
+ * Purpose: validate that token is not expired and is active and then get     *
+ *          associated user data                                              *
+ *                                                                            *
+ * Parameters: formatted_auth_token_hash - [IN] auth token to validate        *
+ *             user                      - [OUT] user information             *
+ *                                                                            *
+ * Return value:  SUCCEED - token is valid and user data was retrieved        *
+ *                FAIL    - otherwise                                         *
+ *                                                                            *
+ ******************************************************************************/
+int	DBget_user_by_auth_token(const char *formatted_auth_token_hash, zbx_user_t *user)
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() auth token:%s", __func__, formatted_auth_token_hash);
+
+	if (NULL == (result = DBselect(
+			"select u.userid,u.roleid,r.type"
+				" from token t,users u,role r"
+			" where t.userid=u.userid"
+				" and t.token='%s'"
+				" and u.roleid=r.roleid"
+				" and t.status=%d"
+				" and (t.expires_at=%d or t.expires_at > %lu)",
+			formatted_auth_token_hash, ZBX_AUTH_TOKEN_ENABLED, ZBX_AUTH_TOKEN_NEVER_EXPIRES, time(NULL))))
+	{
+		goto out;
+	}
+
+	if (NULL == (row = DBfetch(result)))
+		goto out;
+
+	ZBX_STR2UINT64(user->userid, row[0]);
+	ZBX_STR2UINT64(user->roleid, row[1]);
+	user->type = atoi(row[2]);
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
@@ -3587,3 +3724,25 @@ int	zbx_db_check_instanceid(void)
 
 	return ret;
 }
+
+#if defined(HAVE_POSTGRESQL)
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_db_get_schema_esc                                            *
+ *                                                                            *
+ * Purpose: returns escaped DB schema name                                    *
+ *                                                                            *
+ ******************************************************************************/
+char	*zbx_db_get_schema_esc(void)
+{
+	static char	*name;
+
+	if (NULL == name)
+	{
+		name = DBdyn_escape_string(NULL == CONFIG_DBSCHEMA || '\0' == *CONFIG_DBSCHEMA ?
+				"public" : CONFIG_DBSCHEMA);
+	}
+
+	return name;
+}
+#endif

@@ -30,8 +30,12 @@ if (!empty($this->data['hostid'])) {
 	$widget->setNavigation(getHostNavigation('web', $this->data['hostid']));
 }
 
+$url = (new CUrl('httpconf.php'))
+	->setArgument('context', $data['context'])
+	->getUrl();
+
 // create form
-$http_form = (new CForm())
+$http_form = (new CForm('post', $url))
 	->setId('http-form')
 	->setName('httpForm')
 	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
@@ -60,29 +64,9 @@ $name_text_box = (new CTextBox('name', $this->data['name'], $this->data['templat
 if (!$this->data['templated']) {
 	$name_text_box->setAttribute('autofocus', 'autofocus');
 }
-$http_form_list->addRow((new CLabel(_('Name'), 'name'))->setAsteriskMark(), $name_text_box);
 
-// Application
-if ($this->data['application_list']) {
-	$applications = zbx_array_merge([''], $this->data['application_list']);
-	$http_form_list->addRow(new CLabel(_('Application'), 'label-application'),
-		(new CSelect('applicationid'))
-			->setFocusableElementId('label-application')
-			->setValue($this->data['applicationid'])
-			->addOptions(CSelect::createOptionsFromArray($applications))
-	);
-}
-else {
-	$http_form_list->addRow(_('Application'), new CSpan(_('No applications found.')));
-}
-
-// New application
 $http_form_list
-	->addRow(new CLabel(_('New application'), 'new_application'),
-		(new CSpan(
-			(new CTextBox('new_application', $this->data['new_application']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-		))->addClass(ZBX_STYLE_FORM_NEW_GROUP)
-	)
+	->addRow((new CLabel(_('Name'), 'name'))->setAsteriskMark(), $name_text_box)
 	->addRow((new CLabel(_('Update interval'), 'delay'))->setAsteriskMark(),
 		(new CTextBox('delay', $data['delay']))
 			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
@@ -250,6 +234,15 @@ $http_step_form_list->addRow((new CLabel(_('Steps'), $steps_table->getId()))->se
 $http_tab = (new CTabView())
 	->addTab('scenarioTab', _('Scenario'), $http_form_list)
 	->addTab('stepTab', _('Steps'), $http_step_form_list, TAB_INDICATOR_STEPS)
+	->addTab('tags-tab', _('Tags'),
+		new CPartial('configuration.tags.tab', [
+			'source' => 'httptest',
+			'tags' => $data['tags'],
+			'show_inherited_tags' => $data['show_inherited_tags'],
+			'readonly' => false
+		]),
+		TAB_INDICATOR_TAGS
+	)
 	->addTab('authenticationTab', _('Authentication'), $http_authentication_form_list, TAB_INDICATOR_HTTP_AUTH);
 if (!$this->data['form_refresh']) {
 	$http_tab->setSelected(0);
@@ -269,16 +262,17 @@ if (!empty($this->data['httptestid'])) {
 		);
 	}
 
-	$buttons[] = (new CButtonDelete(_('Delete web scenario?'), url_params(['form', 'httptestid', 'hostid'])))
-		->setEnabled(!$data['templated']);
-	$buttons[] = new CButtonCancel();
+	$buttons[] = (new CButtonDelete(_('Delete web scenario?'), url_params(['form', 'httptestid', 'hostid', 'context']),
+		'context'
+	))->setEnabled(!$data['templated']);
+	$buttons[] = new CButtonCancel(url_param('context'));
 
 	$http_tab->setFooter(makeFormFooter(new CSubmit('update', _('Update')), $buttons));
 }
 else {
 	$http_tab->setFooter(makeFormFooter(
 		new CSubmit('add', _('Add')),
-		[new CButtonCancel()]
+		[new CButtonCancel(url_param('context'))]
 	));
 }
 

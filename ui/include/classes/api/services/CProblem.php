@@ -56,7 +56,6 @@ class CProblem extends CApiService {
 			'eventids'					=> null,
 			'groupids'					=> null,
 			'hostids'					=> null,
-			'applicationids'			=> null,
 			'objectids'					=> null,
 
 			'editable'					=> false,
@@ -235,27 +234,6 @@ class CProblem extends CApiService {
 			}
 		}
 
-		// applicationids
-		if ($options['applicationids'] !== null) {
-			zbx_value2array($options['applicationids']);
-
-			// triggers
-			if ($options['object'] == EVENT_OBJECT_TRIGGER) {
-				$sqlParts['from']['f'] = 'functions f';
-				$sqlParts['from']['ia'] = 'items_applications ia';
-				$sqlParts['where']['p-f'] = 'p.objectid=f.triggerid';
-				$sqlParts['where']['f-ia'] = 'f.itemid=ia.itemid';
-				$sqlParts['where']['ia'] = dbConditionInt('ia.applicationid', $options['applicationids']);
-			}
-			// items
-			elseif ($options['object'] == EVENT_OBJECT_ITEM) {
-				$sqlParts['from']['ia'] = 'items_applications ia';
-				$sqlParts['where']['p-ia'] = 'p.objectid=ia.itemid';
-				$sqlParts['where']['ia'] = dbConditionInt('ia.applicationid', $options['applicationids']);
-			}
-			// ignore this filter for lld rules
-		}
-
 		// severities
 		if ($options['severities'] !== null) {
 			// triggers
@@ -336,9 +314,6 @@ class CProblem extends CApiService {
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
-//		error_log("Will do query");
-//		error_log(self::createSelectQueryFromParts($sqlParts));
-		
 		$res = DBselect(self::createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($event = DBfetch($res)) {
 			if ($options['countOutput']) {

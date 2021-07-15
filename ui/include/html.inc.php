@@ -163,7 +163,7 @@ function get_icon($type, $params = []) {
 					->setTitle(_('Normal view'))
 					->setAttribute('data-layout-mode', ZBX_LAYOUT_NORMAL)
 					->addClass(ZBX_LAYOUT_MODE)
-					->addClass(ZBX_STYLE_BTN_DASHBRD_NORMAL)
+					->addClass(ZBX_STYLE_BTN_DASHBOARD_NORMAL)
 					->addClass(ZBX_STYLE_BTN_MIN);
 			}
 			else {
@@ -175,11 +175,6 @@ function get_icon($type, $params = []) {
 			}
 
 			return $icon;
-
-		case 'screenconf':
-			return (new CRedirectButton(SPACE, null))
-				->addClass(ZBX_STYLE_BTN_CONF)
-				->setTitle(_('Refresh interval'));
 
 		case 'overviewhelp':
 			return (new CRedirectButton(SPACE, null))
@@ -199,15 +194,14 @@ function get_icon($type, $params = []) {
 function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 	$options = [
 		'output' => [
-			'hostid', 'status', 'name', 'maintenance_status', 'flags', 'available', 'snmp_available',
-			'jmx_available', 'ipmi_available', 'error', 'snmp_error', 'jmx_error', 'ipmi_error'
+			'hostid', 'status', 'name', 'maintenance_status', 'flags'
 		],
 		'selectHostDiscovery' => ['ts_delete'],
+		'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error'],
 		'hostids' => [$hostid],
 		'editable' => true
 	];
 	if ($lld_ruleid == 0) {
-		$options['selectApplications'] = API_OUTPUT_COUNT;
 		$options['selectItems'] = API_OUTPUT_COUNT;
 		$options['selectTriggers'] = API_OUTPUT_COUNT;
 		$options['selectGraphs'] = API_OUTPUT_COUNT;
@@ -225,7 +219,6 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 			'editable' => true
 		];
 		if ($lld_ruleid == 0) {
-			$options['selectApplications'] = API_OUTPUT_COUNT;
 			$options['selectItems'] = API_OUTPUT_COUNT;
 			$options['selectTriggers'] = API_OUTPUT_COUNT;
 			$options['selectGraphs'] = API_OUTPUT_COUNT;
@@ -310,7 +303,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		$list
 			->addItem(new CBreadcrumbs([new CSpan(new CLink(_('All hosts'), new CUrl('hosts.php'))), $host]))
 			->addItem($status)
-			->addItem(getHostAvailabilityTable($db_host));
+			->addItem(getHostAvailabilityTable($db_host['interfaces']));
 
 		if ($db_host['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $db_host['hostDiscovery']['ts_delete'] != 0) {
 			$info_icons = [getHostLifetimeIndicator(time(), $db_host['hostDiscovery']['ts_delete'])];
@@ -322,31 +315,19 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		->setAttribute('role', 'navigation')
 		->setAttribute('aria-label', _('Content menu'));
 
+	$context = $is_template ? 'template' : 'host';
+
 	/*
 	 * the count of rows
 	 */
 	if ($lld_ruleid == 0) {
-		// applications
-		$applications = new CSpan([
-			new CLink(_('Applications'),
-				(new CUrl('zabbix.php'))
-					->setArgument('action', 'application.list')
-					->setArgument('filter_set', '1')
-					->setArgument('filter_hostids', [$db_host['hostid']])
-			),
-			CViewHelper::showNum($db_host['applications'])
-		]);
-		if ($current_element == 'applications') {
-			$applications->addClass(ZBX_STYLE_SELECTED);
-		}
-		$content_menu->addItem($applications);
-
 		// items
 		$items = new CSpan([
 			new CLink(_('Items'),
 				(new CUrl('items.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$db_host['hostid']])
+					->setArgument('context', $context)
 			),
 			CViewHelper::showNum($db_host['items'])
 		]);
@@ -361,6 +342,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 				(new CUrl('triggers.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$db_host['hostid']])
+					->setArgument('context', $context)
 			),
 			CViewHelper::showNum($db_host['triggers'])
 		]);
@@ -374,6 +356,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 			new CLink(_('Graphs'), (new CUrl('graphs.php'))
 				->setArgument('filter_set', '1')
 				->setArgument('filter_hostids', [$db_host['hostid']])
+				->setArgument('context', $context)
 			),
 			CViewHelper::showNum($db_host['graphs'])
 		]);
@@ -403,6 +386,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 			new CLink(_('Discovery rules'), (new CUrl('host_discovery.php'))
 				->setArgument('filter_set', '1')
 				->setArgument('filter_hostids', [$db_host['hostid']])
+				->setArgument('context', $context)
 			),
 			CViewHelper::showNum($db_host['discoveries'])
 		]);
@@ -417,6 +401,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 				(new CUrl('httpconf.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$db_host['hostid']])
+					->setArgument('context', $context)
 			),
 			CViewHelper::showNum($db_host['httpTests'])
 		]);
@@ -429,7 +414,10 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		$discovery_rule = (new CSpan())->addItem(
 			new CLink(
 				CHtml::encode($db_discovery_rule['name']),
-				'host_discovery.php?form=update&itemid='.$db_discovery_rule['itemid']
+					(new CUrl('host_discovery.php'))
+						->setArgument('form', 'update')
+						->setArgument('itemid', $db_discovery_rule['itemid'])
+						->setArgument('context', $context)
 			)
 		);
 
@@ -442,13 +430,18 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 				(new CUrl('host_discovery.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$db_host['hostid']])
+					->setArgument('context', $context)
 			)),
 			$discovery_rule
 		]));
 
 		// item prototypes
 		$item_prototypes = new CSpan([
-			new CLink(_('Item prototypes'), 'disc_prototypes.php?parent_discoveryid='.$db_discovery_rule['itemid']),
+			new CLink(_('Item prototypes'),
+				(new CUrl('disc_prototypes.php'))
+					->setArgument('parent_discoveryid', $db_discovery_rule['itemid'])
+					->setArgument('context', $context)
+			),
 			CViewHelper::showNum($db_discovery_rule['items'])
 		]);
 		if ($current_element == 'items') {
@@ -459,7 +452,9 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		// trigger prototypes
 		$trigger_prototypes = new CSpan([
 			new CLink(_('Trigger prototypes'),
-				'trigger_prototypes.php?parent_discoveryid='.$db_discovery_rule['itemid']
+				(new CUrl('trigger_prototypes.php'))
+					->setArgument('parent_discoveryid', $db_discovery_rule['itemid'])
+					->setArgument('context', $context)
 			),
 			CViewHelper::showNum($db_discovery_rule['triggers'])
 		]);
@@ -470,10 +465,14 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 
 		// graph prototypes
 		$graph_prototypes = new CSpan([
-			new CLink(_('Graph prototypes'), 'graphs.php?parent_discoveryid='.$db_discovery_rule['itemid']),
+			new CLink(_('Graph prototypes'),
+				(new CUrl('graphs.php'))
+					->setArgument('parent_discoveryid', $db_discovery_rule['itemid'])
+					->setArgument('context', $context)
+			),
 			CViewHelper::showNum($db_discovery_rule['graphs'])
 		]);
-		if ($current_element == 'graphs') {
+		if ($current_element === 'graphs') {
 			$graph_prototypes->addClass(ZBX_STYLE_SELECTED);
 		}
 		$content_menu->addItem($graph_prototypes);
@@ -481,7 +480,11 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		// host prototypes
 		if ($db_host['flags'] == ZBX_FLAG_DISCOVERY_NORMAL) {
 			$host_prototypes = new CSpan([
-				new CLink(_('Host prototypes'), 'host_prototypes.php?parent_discoveryid='.$db_discovery_rule['itemid']),
+				new CLink(_('Host prototypes'),
+					(new CUrl('host_prototypes.php'))
+						->setArgument('parent_discoveryid', $db_discovery_rule['itemid'])
+						->setArgument('context', $context)
+				),
 				CViewHelper::showNum($db_discovery_rule['hostPrototypes'])
 			]);
 			if ($current_element == 'hosts') {
@@ -570,38 +573,45 @@ function makeFormFooter(CButtonInterface $main_button = null, array $other_butto
 }
 
 /**
- * Returns zbx, snmp, jmx, ipmi availability status icons and the discovered host lifetime indicator.
+ * Create HTML helper element for host interfaces availability.
  *
- * @param array $host		an array of host data
+ * @param array $host_interfaces                                Array of arrays of host interfaces.
+ * @param int   $host_interfaces[]['type']                      Interface type.
+ * @param int   $host_interfaces[]['available']                 Interface availability.
+ * @param int   $host_interfaces[]['useip']                     Interface use IP or DNS.
+ * @param int   $host_interfaces[]['ip']                        Interface IP address.
+ * @param int   $host_interfaces[]['dns']                       Interface domain name.
+ * @param int   $host_interfaces[]['port']                      Interface port.
+ * @param int   $host_interfaces[]['details']['version']        Interface SNMP version.
+ * @param int   $host_interfaces[]['details']['contextname']    Interface context name for SNMP version 3.
+ * @param int   $host_interfaces[]['details']['community']      Interface community for SNMP non version 3 interface.
+ * @param int   $host_interfaces[]['details']['securitylevel']  Security level for SNMP version 3 interface.
+ * @param int   $host_interfaces[]['details']['authprotocol']   Authentication protocol for SNMP version 3 interface.
+ * @param int   $host_interfaces[]['details']['privprotocol']   Privacy protocol for SNMP version 3 interface.
+ * @param int   $host_interfaces[]['error']                     Interface error message.
  *
- * @return CDiv
+ * @return CHostAvailability
  */
-function getHostAvailabilityTable($host) {
-	$container = (new CDiv())->addClass(ZBX_STYLE_STATUS_CONTAINER);
+function getHostAvailabilityTable($host_interfaces): CHostAvailability {
+	$interfaces = [];
 
-	foreach (['ZBX' => '', 'SNMP' => 'snmp_', 'JMX' => 'jmx_', 'IPMI' => 'ipmi_'] as $type => $prefix) {
-		switch ($host[$prefix.'available']) {
-			case HOST_AVAILABLE_TRUE:
-				$ai = (new CSpan($type))->addClass(ZBX_STYLE_STATUS_GREEN);
-				break;
-			case HOST_AVAILABLE_FALSE:
-				$ai = (new CSpan($type))->addClass(ZBX_STYLE_STATUS_RED);
+	foreach ($host_interfaces as $interface) {
+		$description = null;
 
-				if ($host[$prefix.'error'] !== '') {
-					$ai
-						->addClass(ZBX_STYLE_CURSOR_POINTER)
-						->setHint($host[$prefix.'error'], ZBX_STYLE_RED);
-				}
-
-				break;
-			case HOST_AVAILABLE_UNKNOWN:
-				$ai = (new CSpan($type))->addClass(ZBX_STYLE_STATUS_GREY);
-				break;
+		if ($interface['type'] == INTERFACE_TYPE_SNMP) {
+			$description = getSnmpInterfaceDescription($interface);
 		}
-		$container->addItem($ai);
+
+		$interfaces[] = [
+			'type' => $interface['type'],
+			'available' => $interface['available'],
+			'interface' => getHostInterface($interface),
+			'description' => $description,
+			'error' => ($interface['available'] == INTERFACE_AVAILABLE_TRUE) ? '' : $interface['error']
+		];
 	}
 
-	return $container;
+	return (new CHostAvailability())->setInterfaces($interfaces);
 }
 
 /**
@@ -649,33 +659,6 @@ function getHostLifetimeIndicator($current_time, $ts_delete) {
 	else {
 		$warning = _s(
 			'The host is not discovered anymore and will be deleted in %1$s (on %2$s at %3$s).',
-			zbx_date2age($current_time, $ts_delete),
-			zbx_date2str(DATE_FORMAT, $ts_delete),
-			zbx_date2str(TIME_FORMAT, $ts_delete)
-		);
-	}
-
-	return makeWarningIcon($warning);
-}
-
-/**
- * Returns the discovered application lifetime indicator.
- *
- * @param string $current_time	current Unix timestamp
- * @param array  $ts_delete		deletion timestamp of the application
- *
- * @return CDiv
- */
-function getApplicationLifetimeIndicator($current_time, $ts_delete) {
-	// Check if the element should've been deleted in the past.
-	if ($current_time > $ts_delete) {
-		$warning = _(
-			'The application is not discovered anymore and will be deleted the next time discovery rule is processed.'
-		);
-	}
-	else {
-		$warning = _s(
-			'The application is not discovered anymore and will be deleted in %1$s (on %2$s at %3$s).',
 			zbx_date2age($current_time, $ts_delete),
 			zbx_date2str(DATE_FORMAT, $ts_delete),
 			zbx_date2str(TIME_FORMAT, $ts_delete)
@@ -810,6 +793,34 @@ function makePageFooter($with_version = true) {
 }
 
 /**
+ * Get drop-down submenu item list for the User settings section.
+ *
+ * @return array|null  Menu definition for CWidget::setTitleSubmenu.
+ */
+function getUserSettingsSubmenu(): ?array {
+	if (!CWebUser::checkAccess(CRoleHelper::ACTIONS_MANAGE_API_TOKENS)) {
+		return null;
+	}
+
+	$profile_url = (new CUrl('zabbix.php'))
+		->setArgument('action', 'userprofile.edit')
+		->getUrl();
+
+	$tokens_url = (new CUrl('zabbix.php'))
+		->setArgument('action', 'user.token.list')
+		->getUrl();
+
+	return [
+		'main_section' => [
+			'items' => array_filter([
+				$profile_url => _('User profile'),
+				$tokens_url  => _('API tokens')
+			])
+		]
+	];
+}
+
+/**
  * Get drop-down submenu item list for the Administration->General section.
  *
  * @return array  Menu definition for CWidget::setTitleSubmenu.
@@ -843,10 +854,6 @@ function getAdministrationGeneralSubmenu() {
 		->setArgument('action', 'macros.edit')
 		->getUrl();
 
-	$valuemap_url = (new CUrl('zabbix.php'))
-		->setArgument('action', 'valuemap.list')
-		->getUrl();
-
 	$trigdisplay_url = (new CUrl('zabbix.php'))
 		->setArgument('action', 'trigdisplay.edit')
 		->getUrl();
@@ -855,13 +862,19 @@ function getAdministrationGeneralSubmenu() {
 		->setArgument('action', 'module.list')
 		->getUrl();
 
+	$tokens_url = (new CUrl('zabbix.php'))
+		->setArgument('action', 'token.list')
+		->getUrl();
+
 	$miscconfig_url = (new CUrl('zabbix.php'))
 		->setArgument('action', 'miscconfig.edit')
 		->getUrl();
 
+	$can_access_tokens = (!CWebUser::isGuest() && CWebUser::checkAccess(CRoleHelper::ACTIONS_MANAGE_API_TOKENS));
+
 	return [
 		'main_section' => [
-			'items' => [
+			'items' => array_filter([
 				$gui_url          => _('GUI'),
 				$autoreg_url      => _('Autoregistration'),
 				$housekeeping_url => _('Housekeeping'),
@@ -869,11 +882,11 @@ function getAdministrationGeneralSubmenu() {
 				$iconmap_url      => _('Icon mapping'),
 				$regex_url        => _('Regular expressions'),
 				$macros_url       => _('Macros'),
-				$valuemap_url     => _('Value mapping'),
 				$trigdisplay_url  => _('Trigger displaying options'),
 				$modules_url      => _('Modules'),
+				$tokens_url       => $can_access_tokens ? _('API tokens') : null,
 				$miscconfig_url   => _('Other')
-			]
+			])
 		]
 	];
 }

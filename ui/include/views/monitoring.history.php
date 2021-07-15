@@ -70,7 +70,7 @@ if (hasRequest('filter')) {
 	$header['right']->addVar('filter', $data['filter']);
 }
 if (hasRequest('mark_color')) {
-	$header['right']->addVar('mark_color', getRequest('mark_color'));
+	$header['right']->addVar('mark_color', $data['mark_color']);
 }
 
 $actions = [
@@ -159,7 +159,7 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 					]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 				)
 				->addRow(_('Value'),
-					(new CTextBox('filter', getRequest('filter', '')))
+					(new CTextBox('filter', $data['filter']))
 						->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 						->removeId()
 				);
@@ -195,25 +195,22 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 
 // create history screen
 if ($data['itemids']) {
-
-	//splitting items into 2 groups - numerical and tex/log ones
 	$items = API::Item()->get([
 		'output' => ['itemid', 'value_type' ],
 		'itemids' => $data['itemids'],
 		'webitems' => true,
 		'preservekeys' => true
 	]);
-
+	
 	$items_by_type=[];
-	
-	
+
 	$iv_string = [
 		ITEM_VALUE_TYPE_LOG => 1,
 		ITEM_VALUE_TYPE_TEXT => 1,
 		ITEM_VALUE_TYPE_STR => 1
 	];
-
 	
+		
 	foreach( $items as $itemid => $item) {
 		if 	(array_key_exists($item['value_type'], $iv_string)) {
 			$items_by_type['text'][$itemid] = $itemid;
@@ -221,18 +218,18 @@ if ($data['itemids']) {
 			$items_by_type['numeric'][$itemid] = $itemid;
 		}
 	}
-
+	
 	$screens=[];
 
 	foreach( $items_by_type as $typename => $type_items) {
 		if (count($type_items) == 0) 
 			continue;
-
+		
 		if ('text' == $typename ) 
 			$action = HISTORY_VALUES ;
 		else 
 			$action = $data['action'];
-
+		
 		$screens[$typename] = CScreenBuilder::getScreen([
 			'resourcetype' => SCREEN_RESOURCE_HISTORY,
 			'action' => $action,
@@ -254,9 +251,9 @@ if ($data['itemids']) {
 			'screenid' => $typename
 		]);
 	}
-
 }
 
+// append plaintext to widget
 if ($data['plaintext']) {
 	foreach ($header_row as $text) {
 		$historyWidget->addItem([new CSpan($text), BR()]);

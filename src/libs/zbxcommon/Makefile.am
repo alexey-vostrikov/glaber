@@ -16,5 +16,7 @@ libzbxcommon_a_SOURCES = \
 	zbxgetopt.c \
 	time.c
 	
-libzbxcommon_a_CFLAGS = $(ICONV_CFLAGS)\
-	-I$(top_srcdir)/src/libs/zbxalgo 
+libzbxcommon_a_CFLAGS = $(ICONV_CFLAGS) $(LIBXML2_CFLAGS)
+
+#this was in 5.2, retrun in case of compile fail
+#-I$(top_srcdir)/src/libs/zbxalgo 

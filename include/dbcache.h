@@ -26,6 +26,7 @@
 #include "zbxalgo.h"
 #include "zbxjson.h"
 #include "memalloc.h"
+#include "zbxeval.h"
 
 #define ZBX_SYNC_DONE		0
 #define	ZBX_SYNC_MORE		1
@@ -36,17 +37,15 @@
 #define	ZBX_POLLER_TYPE_IPMI		2
 #define	ZBX_POLLER_TYPE_PINGER		3
 #define	ZBX_POLLER_TYPE_JAVA		4
-#define	GLB_POLLER_TYPE_SNMP		5
-#define	GLB_POLLER_TYPE_PINGER		6
-#define	ZBX_POLLER_TYPE_COUNT		7	/* number of poller types */
+#define	ZBX_POLLER_TYPE_HISTORY		5
+#define	GLB_POLLER_TYPE_SNMP		6
+#define	GLB_POLLER_TYPE_PINGER		7
+#define	ZBX_POLLER_TYPE_COUNT		8	/* number of poller types */
 
 #define MAX_JAVA_ITEMS		32
 #define MAX_SNMP_ITEMS		128
 #define MAX_POLLER_ITEMS	128	/* MAX(MAX_JAVA_ITEMS, MAX_SNMP_ITEMS) */
-#define MAX_PINGER_ITEMS	256
-#define MAX_UNREACH_ITEMS		64 //we don't want this to be too big, but it's better for efficiency if thats more then one item 
-#define MAX_ASYNC_SNMP_ITEMS		16384//16384//4096
-#define MAX_ASYNC_AGENT_ITEMS		4096
+#define MAX_PINGER_ITEMS	128
 
 #define ZBX_TRIGGER_DEPENDENCY_LEVELS_MAX	32
 
@@ -70,6 +69,7 @@ extern int	CONFIG_UNREACHABLE_DELAY;
 extern int	CONFIG_HISTSYNCER_FORKS;
 extern int	CONFIG_PROXYCONFIG_FREQUENCY;
 extern int	CONFIG_PROXYDATA_FREQUENCY;
+extern int	CONFIG_HISTORYPOLLER_FORKS;
 
 typedef struct {
 	char *path;       //path to executable to run
@@ -98,6 +98,10 @@ typedef struct
 	unsigned char	useip;
 	unsigned char	type;
 	unsigned char	main;
+	unsigned char	available;
+	int		disable_until;
+	char		error[INTERFACE_ERROR_LEN_MAX];
+	int		errors_from;
 }
 DC_INTERFACE;
 
@@ -125,38 +129,22 @@ typedef struct
 	unsigned char	maintenance_status;
 	unsigned char	maintenance_type;
 	int		maintenance_from;
-	int		errors_from;
-	unsigned char	available;
-	int		disable_until;
-	int		snmp_errors_from;
-	unsigned char	snmp_available;
-	int		snmp_disable_until;
-	int		ipmi_errors_from;
-	unsigned char	ipmi_available;
-	int		ipmi_disable_until;
 	signed char	ipmi_authtype;
 	unsigned char	ipmi_privilege;
 	char		ipmi_username[HOST_IPMI_USERNAME_LEN_MAX];
 	char		ipmi_password[HOST_IPMI_PASSWORD_LEN_MAX];
-	int		jmx_errors_from;
-	unsigned char	jmx_available;
-	int		jmx_disable_until;
 	char		inventory_mode;
 	unsigned char	status;
 	unsigned char	cluster_state;
 	unsigned char	tls_connect;
 	unsigned char	tls_accept;
+	zbx_uint64_t		cluster_server_host_id;
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	char		tls_issuer[HOST_TLS_ISSUER_LEN_MAX];
 	char		tls_subject[HOST_TLS_SUBJECT_LEN_MAX];
 	char		tls_psk_identity[HOST_TLS_PSK_IDENTITY_LEN_MAX];
 	char		tls_psk[HOST_TLS_PSK_LEN_MAX];
 #endif
-	char		error[HOST_ERROR_LEN_MAX];
-	char		snmp_error[HOST_ERROR_LEN_MAX];
-	char		ipmi_error[HOST_ERROR_LEN_MAX];
-	char		jmx_error[HOST_ERROR_LEN_MAX];
-	zbx_uint64_t		cluster_server_host_id;
 }
 DC_HOST;
 
@@ -193,8 +181,6 @@ typedef struct
 	char			*delay;
 	int			history_sec;
 	int			trends_sec;
-	int			nextcheck;
-	int			lastclock;
 	int			mtime;
 	char			trapper_hosts[ITEM_TRAPPER_HOSTS_LEN_MAX];
 	char			logtimefmt[ITEM_LOGTIMEFMT_LEN_MAX];
@@ -223,8 +209,7 @@ typedef struct
 	char			ssl_key_password_orig[ITEM_SSL_KEY_PASSWORD_LEN_MAX], *ssl_key_password;
 	char			*script_params;
 	char			*error;
-	//void 	*preprocitem;
-	//char			preproc_type; //there are 3 types of preproc an item might need  0 - no preporc 1 - independent preproc 2 - dependend preproc
+	unsigned char		*formula_bin;
 }
 DC_ITEM;
 
@@ -261,9 +246,6 @@ typedef struct _DC_TRIGGER
 {
 	zbx_uint64_t		triggerid;
 	char			*description;
-	char			*expression_orig;
-	char			*recovery_expression_orig;
-	/* temporary values, allocated during processing and freed right after */
 	char			*expression;
 	char			*recovery_expression;
 
@@ -272,6 +254,8 @@ typedef struct _DC_TRIGGER
 	char			*correlation_tag;
 	char			*opdata;
 	char			*event_name;
+	unsigned char		*expression_bin;
+	unsigned char		*recovery_expression_bin;
 	zbx_timespec_t		timespec;
 	int			lastchange;
 	unsigned char		topoindex;
@@ -287,6 +271,9 @@ typedef struct _DC_TRIGGER
 	unsigned char		flags;
 
 	zbx_vector_ptr_t	tags;
+
+	zbx_eval_context_t	*eval_ctx;
+	zbx_eval_context_t	*eval_ctx_r;
 }
 DC_TRIGGER;
 
@@ -390,7 +377,6 @@ typedef struct
 {
 	char		*extension;
 	unsigned char	history_compression_status;
-	unsigned char	history_compression_availability;
 	int		history_compress_older;
 }
 zbx_config_db_t;
@@ -603,6 +589,7 @@ typedef struct
 	zbx_uint64_t		itemid;
 	unsigned char		type;
 	unsigned char		value_type;
+	unsigned char		fast_preprocess; //flag to signal that preproc is simple, no worker needed
 
 	int			dep_itemids_num;
 	int			preproc_ops_num;
@@ -693,6 +680,26 @@ zbx_uint64_t	DCget_nextid(const char *table_name, int num);
 #define ZBX_DBSYNC_UPDATE	1
 #define ZBX_SYNC_SECRETS	2
 
+#define ZBX_ITEM_GET_MISC		0x001
+#define ZBX_ITEM_GET_DELAY		0x002
+#define ZBX_ITEM_GET_EMPTY_ERROR	0x004
+#define ZBX_ITEM_GET_NUM		0x008
+#define ZBX_ITEM_GET_EMPTY_UNITS	0x010
+#define ZBX_ITEM_GET_LOGTIMEFMT		0x020
+#define ZBX_ITEM_GET_POLLINFO		0x040
+#define ZBX_ITEM_GET_INTERFACE		0x080
+#define ZBX_ITEM_GET_HOSTNAME		0x100
+#define ZBX_ITEM_GET_HOSTINFO		0x200
+#define ZBX_ITEM_GET_MAINTENANCE	0x400
+#define ZBX_ITEM_GET_INVENTORY		0x800
+
+#define ZBX_ITEM_GET_ALL		(~(unsigned int)0)
+
+#define ZBX_ITEM_GET_SYNC		(ZBX_ITEM_GET_INVENTORY|ZBX_ITEM_GET_NUM)
+#define ZBX_ITEM_GET_SYNC_EXPORT	(ZBX_ITEM_GET_INVENTORY|ZBX_ITEM_GET_NUM|ZBX_ITEM_GET_HOSTNAME)
+
+#define ZBX_ITEM_GET_PROCESS		(ZBX_ITEM_GET_MAINTENANCE|ZBX_ITEM_GET_MISC|ZBX_ITEM_GET_LOGTIMEFMT)
+
 void	DCsync_configuration(unsigned char mode, const struct zbx_json_parse *jp_kvs_paths);
 int	init_configuration_cache(char **error);
 void	free_configuration_cache(void);
@@ -705,6 +712,8 @@ int	DCconfig_get_hostid_by_name(const char *host, zbx_uint64_t *hostid);
 void	DCconfig_get_hosts_by_itemids(DC_HOST *hosts, const zbx_uint64_t *itemids, int *errcodes, size_t num);
 void	DCconfig_get_items_by_keys(DC_ITEM *items, zbx_host_key_t *keys, int *errcodes, size_t num);
 void	DCconfig_get_items_by_itemids(DC_ITEM *items, const zbx_uint64_t *itemids, int *errcodes, size_t num);
+void	DCconfig_get_items_by_itemids_partial(DC_ITEM *items, const zbx_uint64_t *itemids, int *errcodes, size_t num,
+		unsigned int mode);
 void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, int *timestamp, int manager_num);
 void	DCconfig_get_functions_by_functionids(DC_FUNCTION *functions,
 		zbx_uint64_t *functionids, int *errcodes, size_t num);
@@ -794,14 +803,13 @@ void	DCget_autoregistration_psk(char *psk_identity_buf, size_t psk_identity_buf_
 #define ZBX_MACRO_SECRET_MASK	"******"
 
 void	DCget_user_macro(const zbx_uint64_t *hostids, int hostids_num, const char *macro, char **replace_to);
-char	*DCexpression_expand_user_macros(const char *expression);
 char	*zbx_dc_expand_func_params_user_macros(zbx_uint64_t hostid, const char *params);
 
-int	DChost_activate(zbx_uint64_t hostid, unsigned char agent_type, const zbx_timespec_t *ts,
-		zbx_agent_availability_t *in, zbx_agent_availability_t *out);
+int	DCinterface_activate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, zbx_agent_availability_t *in,
+		zbx_agent_availability_t *out);
 
-int	DChost_deactivate(zbx_uint64_t hostid, unsigned char agent_type, const zbx_timespec_t *ts,
-		zbx_agent_availability_t *in, zbx_agent_availability_t *out, const char *error_msg);
+int	DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, zbx_agent_availability_t *in,
+		zbx_agent_availability_t *out, const char *error_msg);
 
 #define ZBX_QUEUE_FROM_DEFAULT	6	/* default lower limit for delay (in seconds) */
 #define ZBX_QUEUE_TO_INFINITY	-1	/* no upper limit for delay */
@@ -840,20 +848,20 @@ unsigned int	DCget_internal_action_count(void);
 void	zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags);
 void	zbx_config_clean(zbx_config_t *cfg);
 
-int	DCset_hosts_availability(zbx_vector_ptr_t *availabilities);
+int	DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities);
 
-int	DCreset_hosts_availability(zbx_vector_ptr_t *hosts);
-void	DCupdate_hosts_availability(void);
+int	DCreset_interfaces_availability(zbx_vector_availability_ptr_t *interfaces);
+void	DCupdate_interfaces_availability(void);
 
 void	zbx_dc_get_actions_eval(zbx_vector_ptr_t *actions, unsigned char opflags);
 
-int	DCget_hosts_availability(zbx_vector_ptr_t *hosts, int *ts);
-void	DCtouch_hosts_availability(const zbx_vector_uint64_t *hostids);
+int	DCget_interfaces_availability(zbx_vector_ptr_t *interfaces, int *ts);
+void	DCtouch_interfaces_availability(const zbx_vector_uint64_t *interfaceids);
 
-void	zbx_host_availability_init(zbx_host_availability_t *availability, zbx_uint64_t hostid);
-void	zbx_host_availability_clean(zbx_host_availability_t *ha);
-void	zbx_host_availability_free(zbx_host_availability_t *availability);
-int	zbx_host_availability_is_set(const zbx_host_availability_t *ha);
+void	zbx_interface_availability_init(zbx_interface_availability_t *availability, zbx_uint64_t interfaceid);
+void	zbx_interface_availability_clean(zbx_interface_availability_t *ia);
+void	zbx_interface_availability_free(zbx_interface_availability_t *availability);
+int	zbx_interface_availability_is_set(const zbx_interface_availability_t *ia);
 
 void	zbx_set_availability_diff_ts(int ts);
 
@@ -863,7 +871,7 @@ void	zbx_dc_correlation_rules_free(zbx_correlation_rules_t *rules);
 void	zbx_dc_correlation_rules_get(zbx_correlation_rules_t *rules);
 
 void	zbx_dc_get_nested_hostgroupids(zbx_uint64_t *groupids, int groupids_num, zbx_vector_uint64_t *nested_groupids);
-void	zbx_dc_get_nested_hostgroupids_by_names(zbx_vector_str_t *groups, zbx_vector_uint64_t *nested_groupids);
+void	zbx_dc_get_hostids_by_group_name(const char *name, zbx_vector_uint64_t *hostids);
 
 #define ZBX_HC_ITEM_STATUS_NORMAL	0
 #define ZBX_HC_ITEM_STATUS_BUSY		1
@@ -1015,8 +1023,10 @@ int	zbx_lld_macro_value_by_name(const struct zbx_json_parse *jp_row, const zbx_v
 		const char *macro, char **value);
 int	zbx_lld_macro_paths_compare(const void *d1, const void *d2);
 
+void	zbx_dc_get_item_tags(zbx_uint64_t itemid, zbx_vector_ptr_t *item_tags);
 void	zbx_dc_get_item_tags_by_functionids(const zbx_uint64_t *functionids, size_t functionids_num,
 		zbx_vector_ptr_t *item_tags);
+void	zbx_dc_get_item_tags(zbx_uint64_t itemid, zbx_vector_ptr_t *item_tags);
 
 unsigned char	zbx_dc_set_macro_env(unsigned char env);
 
@@ -1024,6 +1034,9 @@ const char	*zbx_dc_get_instanceid(void);
 
 char	*zbx_dc_expand_user_macros(const char *text, zbx_uint64_t hostid);
 char	*zbx_dc_expand_user_macros_in_func_params(const char *params, zbx_uint64_t hostid);
+int	zbx_dc_expand_user_macros_len(const char *text, size_t text_len, zbx_uint64_t *hostids, int hostids_num,
+		char **value, char **error);
+
 
 /* diagnostic data */
 void	zbx_hc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num);
@@ -1034,10 +1047,10 @@ typedef struct
 {
 	zbx_uint64_t		objectid;
 	zbx_uint64_t		triggerid;
-	zbx_function_type_t	type;
+	zbx_uint32_t		type;
 	zbx_time_unit_t		trend_base;
 	unsigned char		lock;		/* 1 if the timer has locked trigger, 0 otherwise */
-	int			revision;	/* function revision */
+	int			revision;	/* revision */
 	zbx_timespec_t		eval_ts;	/* the history time for which trigger must be recalculated */
 	zbx_timespec_t		exec_ts;	/* real time when the timer must be executed */
 	const char		*parameter;	/* function parameters (for trend functions) */
@@ -1053,5 +1066,11 @@ void	zbx_dc_free_timers(zbx_vector_ptr_t *timers);
 
 int	zbx_db_trigger_queue_locked(void);
 void	zbx_db_trigger_queue_unlock(void);
+
+void	zbx_get_host_interfaces_availability(zbx_uint64_t	hostid, zbx_agent_availability_t *agents);
+
+int	zbx_hc_check_proxy(zbx_uint64_t proxyid);
+
+void	zbx_dc_eval_expand_user_macros(zbx_eval_context_t *ctx);
 
 	#endif
