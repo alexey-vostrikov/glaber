@@ -1245,7 +1245,7 @@ static void	zbx_check_db(void)
 		exit(EXIT_FAILURE);
 	}
 
-	zbx_history_check_version(&db_ver);
+	//zbx_history_check_version(&db_ver);
 	DBflush_version_requirements(db_ver.buffer);
 	zbx_json_free(&db_ver);
 }

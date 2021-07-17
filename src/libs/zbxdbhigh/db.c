@@ -2760,6 +2760,7 @@ void	zbx_db_insert_prepare(zbx_db_insert_t *self, const char *table, ...)
 	/* find the table and fields in database schema */
 	if (NULL == (ptable = DBget_table(table)))
 	{
+		zabbix_log(LOG_LEVEL_WARNING,"Couldn't find table %s",table);
 		THIS_SHOULD_NEVER_HAPPEN;
 		exit(EXIT_FAILURE);
 	}

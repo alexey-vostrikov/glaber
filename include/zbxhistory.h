@@ -22,6 +22,10 @@
 
 #include "zbxvariant.h"
 #include "zbxjson.h"
+#include "dbcache.h"
+
+#define GLB_HISTORY_GET_NON_INTERACTIVE 2
+#define GLB_HISTORY_GET_INTERACTIVE 3
 
 /* the item history value */
 typedef struct

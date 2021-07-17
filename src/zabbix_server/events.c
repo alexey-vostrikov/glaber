@@ -1799,7 +1799,6 @@ void	zbx_export_events(void)
 	zbx_vector_uint64_t	hostids;
 	zbx_hashset_iter_t	iter;
 	zbx_event_recovery_t	*recovery;
-	zbx_vector_ptr_t hist_events;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() events:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)events.values_num);
 
@@ -1810,17 +1809,12 @@ void	zbx_export_events(void)
 	sql = (char *)zbx_malloc(sql, sql_alloc);
 	zbx_hashset_create(&hosts, events.values_num, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_vector_uint64_create(&hostids);
-	
-	zbx_vector_ptr_create(&hist_events);
 
 	for (i = 0; i < events.values_num; i++)
 	{
 		DC_HOST		*host;
 		DB_EVENT	*event;
-		
-		ZBX_DC_HISTORY *hist = zbx_malloc(NULL,sizeof(ZBX_DC_HISTORY));
-		hist->value.log=zbx_malloc(NULL, sizeof(zbx_log_t));
-		
+
 		event = (DB_EVENT *)events.values[i];
 
 		if (EVENT_SOURCE_TRIGGERS != event->source || 0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
@@ -1889,26 +1883,12 @@ void	zbx_export_events(void)
 		zbx_hashset_clear(&hosts);
 		zbx_vector_uint64_clear(&hostids);
 
-		if (SUCCEED == zbx_is_export_enabled())
-			zbx_problems_export_write(json.buffer, json.buffer_size);
-		
-		hist->value.log->value=strdup(json.buffer);
-		hist->host_name="";
-		hist->item_key="";
-		hist->itemid=event->trigger.triggerid;
-		hist->ts.sec=event->clock;
-		hist->ts.ns=event->ns;
-
-		zbx_vector_ptr_append(&hist_events,hist);
+		zbx_problems_export_write(json.buffer, json.buffer_size);
 	}
 
 	zbx_hashset_iter_reset(&event_recovery, &iter);
 	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
 	{
-		
-		ZBX_DC_HISTORY *hist = zbx_malloc(NULL,sizeof(ZBX_DC_HISTORY));
-		hist->value.log=zbx_malloc(NULL, sizeof(zbx_log_t));
-		
 		if (EVENT_SOURCE_TRIGGERS != recovery->r_event->source)
 			continue;
 
@@ -1920,42 +1900,13 @@ void	zbx_export_events(void)
 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_EVENTID, recovery->r_event->eventid);
 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_PROBLEM_EVENTID, recovery->eventid);
 
-
-		hist->value_type=ITEM_VALUE_TYPE_LOG;
-		hist->value.log->logeventid=recovery->r_event->eventid;
-		hist->value.log->severity=0;
-		hist->value.log->source="recovery";
-		hist->value.log->timestamp=recovery->r_event->clock;
-		hist->itemid=recovery->eventid;
-		hist->ts.sec=recovery->r_event->clock;
-		hist->ts.ns=0;
-	    
-		hist->host_name="";
-		hist->item_key="";
-
-		if (SUCCEED == zbx_is_export_enabled())
-			zbx_problems_export_write(json.buffer, json.buffer_size);
-		// zabbix_log(LOG_LEVEL_INFORMATION,"Exporting %s",json.buffer);
-		hist->value.log->value=strdup(json.buffer);
-		zbx_vector_ptr_append(&hist_events,hist);
-
+		zbx_problems_export_write(json.buffer, json.buffer_size);
 	}
-	if (zbx_is_export_enabled())
-		zbx_problems_export_flush();
-	
-	//glb_history_add(&hist_events);
 
-	for (i=0; i< hist_events.values_num; i++) {
-		ZBX_DC_HISTORY *hist=hist_events.values[i];
-		zbx_free(hist->value.log->value);
-		zbx_free(hist->value.log);
-	}	
+	zbx_problems_export_flush();
 
 	zbx_hashset_destroy(&hosts);
-	
 	zbx_vector_uint64_destroy(&hostids);
-	zbx_vector_ptr_destroy(&hist_events);
-	
 	zbx_free(sql);
 	zbx_json_free(&json);
 exit:

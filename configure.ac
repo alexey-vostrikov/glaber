@@ -2019,6 +2019,7 @@ AC_OUTPUT([
 	database/sqlite3/Makefile
 	misc/Makefile
 	src/Makefile
+	src/glapi/Makefile
 	src/go/Makefile
 	src/libs/Makefile
 	src/libs/zbxlog/Makefile
@@ -2095,6 +2096,7 @@ AC_OUTPUT([
 	src/zabbix_server/odbc/Makefile
 	src/zabbix_server/scripts/Makefile
 	src/zabbix_server/preprocessor/Makefile
+	src/zabbix_server/glb_poller/Makefile
 	src/zabbix_server/availability/Makefile
 	src/zabbix_server/lld/Makefile
 	src/zabbix_server/reporter/Makefile

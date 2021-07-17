@@ -4098,7 +4098,7 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const DB_
 				}
 				else if (0 == strcmp(m, MVAR_HOST_DESCRIPTION))
 				{
-					ret = DBget_trigger_value(event->trigger.expression, &replace_to, N_functionid,
+					ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid,
 							ZBX_REQUEST_HOST_DESCRIPTION);
 				}
 				else if (0 == strcmp(m, MVAR_HOST_CONN))
@@ -5160,13 +5160,13 @@ static void	zbx_substitute_functions_results(zbx_hashset_t *ifuncs, zbx_vector_p
 			continue;
 		}
 
-		if (ZBX_CLUSTER_HOST_STATE_ACTIVE != items[i].host.cluster_state)
-		{
-			func->error = zbx_dsprintf(func->error, "Cannot evaluate function \"%s:%s.%s(%s)\":"
-					" item belongs to a host processed on other cluster node.",
-					items[i].host.host, items[i].key_orig, func->function, func->parameter);
-			continue;
-		}
+	//	if (ZBX_CLUSTER_HOST_STATE_ACTIVE != items[i].host.cluster_state)
+	//	{
+	//		func->error = zbx_dsprintf(func->error, "Cannot evaluate function \"%s:%s.%s(%s)\":"
+	//				" item belongs to a host processed on other cluster node.",
+	//				items[i].host.host, items[i].key_orig, func->function, func->parameter);
+	//		continue;
+	//	}
 
 		log_expression(__func__, i, tr->eval_ctx);
 

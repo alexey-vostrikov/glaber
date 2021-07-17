@@ -3024,6 +3024,7 @@ void	zbx_vc_flush_stats(void)
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
+/*
 int	zbx_vc_simple_add(zbx_uint64_t itemid, int value_type, zbx_history_record_t *record)
 {
 	zbx_vc_item_t		*item;
@@ -3066,7 +3067,7 @@ int	zbx_vc_simple_add(zbx_uint64_t itemid, int value_type, zbx_history_record_t 
 
 	return SUCCEED;
 }
-
+*/
 /*****************************************************************
  * parses json to item metadata
    ****************************************************************/
@@ -3090,7 +3091,7 @@ static int  glb_parse_item_metadata(struct zbx_json_parse  *jp, zbx_vc_item_t *i
 
 	item->itemid = strtol(itemid_str,NULL,10);
 	item->value_type = strtol(value_type_str,NULL,10);
-	item->state = strtol(state_str,NULL,10);
+	//item->state = strtol(state_str,NULL,10);
 	item->status = strtol(status_str,NULL,10);
 	item->range_sync_hour = strtol(range_sync_hour_str,NULL,10);
 	item->active_range = strtol(active_range_str,NULL,10);
@@ -3100,8 +3101,8 @@ static int  glb_parse_item_metadata(struct zbx_json_parse  *jp, zbx_vc_item_t *i
 	item->values_total = 0;//strtol(values_total_str,NULL,10);
 	item->db_cached_from = strtol(db_cached_from_str,NULL,10);
 	
-	zabbix_log(LOG_LEVEL_DEBUG,"Parsed item metadata: itemid: %ld, value_type:%d, state:%d, status:%d, range_sync_hour: %d, values_total:%d, last_accessed: %d, active_range: %d, db_cached_from:%d", 
-					item->itemid, item->value_type, item->state, item->status, item->range_sync_hour, item->values_total, item->last_accessed, item->active_range, item->db_cached_from);
+	zabbix_log(LOG_LEVEL_DEBUG,"Parsed item metadata: itemid: %ld, value_type:%d, status:%d, range_sync_hour: %d, values_total:%d, last_accessed: %d, active_range: %d, db_cached_from:%d", 
+					item->itemid, item->value_type, item->status, item->range_sync_hour, item->values_total, item->last_accessed, item->active_range, item->db_cached_from);
 
 	return SUCCEED;
 
@@ -3179,7 +3180,7 @@ int glb_vc_load_cache() {
 					itemid = strtol(tmp_str,NULL,10);
 
 					if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache->items,&itemid ))) {
-						zabbix_log(LOG_LEVEL_WARNING,"Couldn't find itemid in VC %ld",itemid);
+						//zabbix_log(LOG_LEVEL_WARNING,"Couldn't find itemid in VC %ld",itemid);
 						continue;
 					}
 					
@@ -3250,13 +3251,13 @@ int glb_vc_dump_cache() {
 		return FAIL;
 	}
 	
-	vc_try_lock();
+	RDLOCK_CACHE;
 	zbx_hashset_iter_reset(&vc_cache->items,&iter);
 	
 	while (NULL != (item=(zbx_vc_item_t*)zbx_hashset_iter_next(&iter))) {
 
-		zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, "{\"type\":%d, \"itemid\":%ld, \"value_type\":%d, \"state\":%d, \"status\":%d, \"range_sync_hour\":%d, \"values_total\":%d, \"last_accessed\":%d, \"active_range\":%d, \"db_cached_from\":%d}\n", 
-					GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid, item->value_type, item->state, 
+		zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, "{\"type\":%d, \"itemid\":%ld, \"value_type\":%d, \"status\":%d, \"range_sync_hour\":%d, \"values_total\":%d, \"last_accessed\":%d, \"active_range\":%d, \"db_cached_from\":%d}\n", 
+					GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid, item->value_type,  
 					item->status, item->range_sync_hour, item->values_total, 
 					item->last_accessed, item->active_range, item->db_cached_from);
 		buff_items++;
@@ -3296,19 +3297,18 @@ int glb_vc_dump_cache() {
 		items++;
 
 		if (buff_items > BUFFER_ITEMS) {
-			vc_try_unlock();
+			//vc_try_unlock();
 			//dumping the buffer
 			if (-1 == write(fd,buffer,buff_offset)) {
 				zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",new_file);
 				break;
 			}
 			buff_offset=0;
-			vc_try_lock();
+			//vc_try_lock();
 		}
 
 	}
-	
-	vc_try_unlock();
+	UNLOCK_CACHE;
 	//dumping remainings in the buffer
 	if (-1 == write(fd,buffer,buff_offset)) {
 		zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",new_file);

@@ -52,7 +52,7 @@ class CWidgetConfig {
 			WIDGET_GRAPH_PROTOTYPE		=> _('Graph prototype'),
 			WIDGET_HOST_AVAIL			=> _('Host availability'),
 			WIDGET_MAP					=> _('Map'),
-			WIDGET_TOPOLOGY				=> _('Topology'),
+//			WIDGET_TOPOLOGY				=> _('Topology'),
 			WIDGET_NAV_TREE				=> _('Map navigation tree'),
 			WIDGET_PLAIN_TEXT			=> _('Plain text'),
 			WIDGET_PROBLEM_HOSTS		=> _('Problem hosts'),
@@ -161,7 +161,7 @@ class CWidgetConfig {
 			WIDGET_GRAPH_PROTOTYPE		=> ['width' => 16,	'height' => 5],
 			WIDGET_HOST_AVAIL			=> ['width' => 6,	'height' => 3],
 			WIDGET_MAP					=> ['width' => 18,	'height' => 5],
-			WIDGET_TOPOLOGY				=> ['width' => 18,	'height' => 5],
+	//		WIDGET_TOPOLOGY				=> ['width' => 18,	'height' => 5],
 			WIDGET_NAV_TREE				=> ['width' => 6,	'height' => 5],
 			WIDGET_PLAIN_TEXT			=> ['width' => 6,	'height' => 3],
 			WIDGET_PROBLEM_HOSTS		=> ['width' => 12,	'height' => 5],
@@ -258,7 +258,7 @@ class CWidgetConfig {
 			case WIDGET_SVG_GRAPH:
 			case WIDGET_TRIG_OVER:
 			case WIDGET_WEB:
-			case WIDGET_TOPOLOGY:
+	//		case WIDGET_TOPOLOGY:
 				return SEC_PER_MIN;
 
 			case WIDGET_CLOCK:
@@ -369,7 +369,7 @@ class CWidgetConfig {
 				case WIDGET_CLOCK:
 				case WIDGET_GRAPH:
 				case WIDGET_MAP:
-				case WIDGET_TOPOLOGY:
+	//			case WIDGET_TOPOLOGY:
 				case WIDGET_SVG_GRAPH:
 					return true;
 
@@ -444,8 +444,8 @@ class CWidgetConfig {
 			case WIDGET_MAP:
 				return new CWidgetFormMap($data, $templateid);
 			
-			case WIDGET_TOPOLOGY:
-				return new CWidgetFormTopology($data, $templateid);
+	//		case WIDGET_TOPOLOGY:
+	//			return new CWidgetFormTopology($data, $templateid);
 
 			case WIDGET_NAV_TREE:
 				return new CWidgetFormNavTree($data, $templateid);

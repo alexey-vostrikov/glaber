@@ -122,6 +122,9 @@ typedef struct
 	//TODO: move to global state or consider thinking of arch when it's kept here
 	history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
 	history_value_t		prevvalue;
+	u_int64_t			lastclock;
+	u_int64_t			prevclock;
+
 
 	zbx_vector_ptr_t	tags;
 }
@@ -347,7 +350,6 @@ typedef struct
 	const char	*tls_subject;
 	ZBX_DC_PSK	*tls_dc_psk;
 #endif
-
 	zbx_vector_ptr_t	interfaces_v;	/* for quick finding of all host interfaces in */
 						/* 'config->interfaces' hashset */
 

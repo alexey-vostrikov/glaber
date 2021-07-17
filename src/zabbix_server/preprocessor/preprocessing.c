@@ -1109,7 +1109,7 @@ void glb_preprocessing_init() {
  *                               ITEM_STATE_NOTSUPPORTED                      *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, zbx_uint64_t hostid, unsigned char item_value_type,
+void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsigned char item_value_type,
 		unsigned char item_flags, AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error)
 {
 	zbx_preproc_item_value_t	value = {.itemid = itemid, .hostid = hostid, .item_value_type = item_value_type,

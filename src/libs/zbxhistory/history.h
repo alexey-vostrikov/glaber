@@ -21,6 +21,8 @@
 #define ZABBIX_HISTORY_H
 
 #include "zbxjson.h"
+#include "dbcache.h"
+
 //TODO: consider putting Glaber history implementation to a separate files
 typedef void (*glb_history_destroy_func_t)(void *data);
 
