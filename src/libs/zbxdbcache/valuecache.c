@@ -318,42 +318,6 @@ static int	vch_item_add_values_at_tail(zbx_vc_item_t *item, const zbx_history_re
 static void	vch_item_clean_cache(zbx_vc_item_t *item);
 
 
-/*******************************************************************************
- * Funtion: vc_add_event
- * 
- * Purpose: adds event to the host->trigger
- * ******************************************************************************/
-void vc_add_trigger(DB_TRIGGER trigger) {
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s:", __func__);
-	
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "Finished %s:", __func__);
-}
-
-/*******************************************************************************
- * Funtion: vc_add_event
- * 
- * Purpose: adds event to the host->trigger
- * ******************************************************************************/
-void vc_add_host(DC_HOST host) {
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s:", __func__);
-	
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "Finished %s:", __func__);
-}
-
-/*******************************************************************************
- * Funtion: vc_add_event
- * 
- * Purpose: adds event to the host->trigger
- * ******************************************************************************/
-static void vc_add_event(DC_HOST host, DB_EVENT event) {
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s:", __func__);
-	
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "Finished %s:", __func__);
-}
-
 
 /*********************************************************************************
  *                                                                               *

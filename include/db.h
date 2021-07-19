@@ -778,6 +778,7 @@ typedef struct
 	unsigned char	state;
 	int		mtime;
 	const char	*error;
+	unsigned int value_type;
 	history_value_t value;
 		
 	zbx_uint64_t	flags;

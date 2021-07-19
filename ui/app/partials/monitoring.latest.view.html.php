@@ -90,21 +90,7 @@ foreach ($data['items'] as $itemid => $item) {
 	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
 	$prevHistory = isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
 	
-	//error_log(print_r($history[$item['itemid']],true));
-	//show_error_message("Last history: ".$item['itemid']." |||||'".print_r($lastHistory,true)."'|||||");
-	//show_error_message("Prev history:|||||'".print_r($lastHistory,true)."'|||||");
-	//show_error_message("Prev history:'".print_r($prevHistory,true)."'");
-	// Row history data preparation.
-	//$last_history = (array_key_exists($itemid, $data['history']) 
-	//			  && array_key_exists($itemid, $data['history']['lastclock'])
-	//			  && $data['history']['lastclock']>0  )
-	//	? ((count($data['history'][$itemid]) > 0) ? $data['history'][$itemid] : null)
-	//	: null;
-	
-	
-
 	if ($lastHistory) {
-		//$prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
 		$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
 		if ($lastHistory['clock'] > 0) {
 			$last_value = formatHistoryValue($lastHistory['value'], $item, false);

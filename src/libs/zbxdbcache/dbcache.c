@@ -3157,6 +3157,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 					zbx_free(trends[i].item_key);
 					zbx_free(trends[i].host_name);
 				}
+				
 				//TODO: figure wtf is the function
 				if (0 != trends_num)
 					zbx_tfc_invalidate_trends(trends, trends_num);
