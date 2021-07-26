@@ -55,6 +55,7 @@ typedef struct
 	zbx_result_ptr_t	*result_ptr;	 /* item value (if any) to be shared between master and dependent items */
 	zbx_timespec_t		*ts;		 /* timestamp of a value */
 	char			*error;		 /* error message (if any) */
+	//char			*key;		/* item key with expanded macroses */
 	unsigned char		item_flags;	 /* item flags */
 	unsigned char		state;		 /* item state */
 }

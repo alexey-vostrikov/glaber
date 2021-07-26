@@ -331,7 +331,7 @@ static int	get_last_n_value(const DC_ITEM *item, const char *parameters, const z
 
 	ts_end.sec -= time_shift;
 
-	if (SUCCEED != zbx_vc_get_values(item->itemid, item->value_type, &values, 0, arg1, &ts_end))
+	if (SUCCEED != zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, 0, arg1, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1003,7 +1003,7 @@ static int	evaluate_COUNT(zbx_variant_t *value, DC_ITEM *item, const char *param
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1188,7 +1188,7 @@ static int	evaluate_SUM(zbx_variant_t *value, DC_ITEM *item, const char *paramet
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1276,7 +1276,7 @@ static int	evaluate_AVG(zbx_variant_t  *value, DC_ITEM *item, const char *parame
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1405,7 +1405,7 @@ static int	evaluate_MIN(zbx_variant_t *value, DC_ITEM *item, const char *paramet
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1505,7 +1505,7 @@ static int	evaluate_MAX(zbx_variant_t *value, DC_ITEM *item, const char *paramet
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1618,7 +1618,7 @@ static int	evaluate_PERCENTILE(zbx_variant_t  *value, DC_ITEM *item, const char 
 		goto out;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1719,7 +1719,7 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	else
 		period = arg1;
 
-	if (SUCCEED == zbx_vc_get_values(item->itemid, item->value_type, &values, period, 1, &ts) &&
+	if (SUCCEED == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, period, 1, &ts) &&
 			1 == values.values_num)
 	{
 		zbx_variant_set_dbl(value, 0);
@@ -1789,7 +1789,7 @@ static int	evaluate_CHANGE(zbx_variant_t *value, DC_ITEM *item, const zbx_timesp
 
 	zbx_history_record_vector_create(&values);
 
-	if (SUCCEED != zbx_vc_get_values(item->itemid, item->value_type, &values, 0, 2, ts) ||
+	if (SUCCEED != zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, 0, 2, ts) ||
 			2 > values.values_num)
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
@@ -1884,7 +1884,7 @@ static int	evaluate_FUZZYTIME(zbx_variant_t *value, DC_ITEM *item, const char *p
 		goto out;
 	}
 
-	if (SUCCEED != zbx_vc_get_value(item->itemid, item->value_type, ts, &vc_value))
+	if (SUCCEED != zbx_vc_get_value(item->host.hostid, item->itemid, item->value_type, ts, &vc_value))
 	{
 		*error = zbx_strdup(*error, "cannot get value from value cache");
 		goto out;
@@ -2083,7 +2083,7 @@ static int	evaluate_FORECAST(zbx_variant_t *value, DC_ITEM *item, const char *pa
 
 	ts_end.sec -= time_shift;
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -2228,7 +2228,7 @@ static int	evaluate_TIMELEFT(zbx_variant_t *value, DC_ITEM *item, const char *pa
 
 	ts_end.sec -= time_shift;
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -2417,7 +2417,7 @@ static int	validate_params_and_get_data(DC_ITEM *item, const char *parameters, c
 			return FAIL;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->itemid, item->value_type, values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		return FAIL;
@@ -2489,7 +2489,7 @@ static int	evaluate_FIRST(zbx_variant_t *value, DC_ITEM *item, const char *param
 
 	ts_end.sec -= time_shift;
 
-	if (SUCCEED == zbx_vc_get_values(item->itemid, item->value_type, &values, seconds, 0, &ts_end))
+	if (SUCCEED == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, 0, &ts_end))
 	{
 		if (0 < values.values_num)
 		{

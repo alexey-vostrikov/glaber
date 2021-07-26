@@ -531,6 +531,7 @@ ZBX_DC_TREND;
 typedef struct
 {
 	zbx_uint64_t	itemid;
+	zbx_uint64_t	hostid;
 	history_value_t	value;
 	zbx_uint64_t	lastlogsize;
 	zbx_timespec_t	ts;

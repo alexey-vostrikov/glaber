@@ -1068,7 +1068,7 @@ static int	DBget_history_log_value(zbx_uint64_t itemid, char **replace_to, int r
 	if (SUCCEED != errcode || ITEM_VALUE_TYPE_LOG != item.value_type)
 		goto out;
 
-	if (SUCCEED != zbx_vc_get_value(itemid, item.value_type, &ts, &value))
+	if (SUCCEED != zbx_vc_get_value(item.host.hostid, itemid, item.value_type, &ts, &value))
 		goto out;
 
 	zbx_vc_flush_stats();
@@ -1142,7 +1142,7 @@ static int	DBitem_get_value(zbx_uint64_t itemid, char **lastvalue, int raw, zbx_
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	result = DBselect(
-			"select value_type,valuemapid,units"
+			"select value_type,valuemapid,units,hostid"
 			" from items"
 			" where itemid=" ZBX_FS_UI64,
 			itemid);
@@ -1151,12 +1151,14 @@ static int	DBitem_get_value(zbx_uint64_t itemid, char **lastvalue, int raw, zbx_
 	{
 		unsigned char		value_type;
 		zbx_uint64_t		valuemapid;
+		zbx_uint64_t 		hostid;
 		zbx_history_record_t	vc_value;
 
 		value_type = (unsigned char)atoi(row[0]);
 		ZBX_DBROW2UINT64(valuemapid, row[1]);
+		hostid = (unsigned char)atoi(row[3]);
 
-		if (SUCCEED == zbx_vc_get_value(itemid, value_type, ts, &vc_value))
+		if (SUCCEED == zbx_vc_get_value(hostid, itemid, value_type, ts, &vc_value))
 		{
 			char	tmp[MAX_BUFFER_LEN];
 

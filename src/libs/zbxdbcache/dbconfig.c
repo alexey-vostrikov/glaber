@@ -8375,8 +8375,6 @@ static void	DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_tri
 			zbx_vector_ptr_append(&dst_trigger->tags, tag);
 		}
 	}
-	//dst_item->preprocitem = NULL;
-	//dst_item->preproc_type = GLB_PREPROC_MANAGER;
 }
 
 void	zbx_free_tag(zbx_tag_t *tag)
@@ -16176,34 +16174,6 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 		}
 	}
 
-	UNLOCK_CACHE;
-}
-
-/*******************************************************
- * preproc stat related numbers get/update procs 
- * 
- * 
- * 
- * *****************************************************/
-void DC_UpdatePreprocStat(u_int64_t no_preproc, u_int64_t local_preproc) {
-
-
-	WRLOCK_CACHE;
-	config->no_preproc += no_preproc;
-	config->local_preproc += local_preproc;
-	UNLOCK_CACHE;
-
-}
-
-void DC_GetPreprocStat(u_int64_t *no_prpeproc, u_int64_t *local_preproc) {
-	RDLOCK_CACHE;
-	
-	*no_prpeproc=config->no_preproc;
-	*local_preproc=config->local_preproc;
-	
-	//config->no_preproc = 0;
-	//config->local_preproc = 0;
-	
 	UNLOCK_CACHE;
 }
 

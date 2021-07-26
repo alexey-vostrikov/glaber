@@ -779,6 +779,7 @@ typedef struct
 	int		mtime;
 	const char	*error;
 	unsigned int value_type;
+	u_int64_t hostid;
 	history_value_t value;
 		
 	zbx_uint64_t	flags;

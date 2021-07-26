@@ -2074,6 +2074,7 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 
 	diff = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t));
 	diff->itemid = item->itemid;
+	diff->hostid = item->host.hostid;
 	diff->flags = flags;
 	diff->value = h->value;
 
@@ -2232,6 +2233,8 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 
 	zbx_vector_ptr_create(&history_values);
 	zbx_vector_ptr_reserve(&history_values, history_num);
+
+	//
 
 	for (i = 0; i < history_num; i++)
 	{
@@ -2599,18 +2602,18 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		int		index;
 
 		/* discard history items that are older than compression age */
-		if (0 != compression_age && h->ts.sec < compression_age)
-		{
-			if (SEC_PER_HOUR < (now - last_history_discard)) /* log once per hour */
-			{
-				zabbix_log(LOG_LEVEL_TRACE, "discarding history that is pointing to"
-							" compressed history period");
-				last_history_discard = now;
-			}
-
-			h->flags |= ZBX_DC_FLAG_UNDEF;
-			continue;
-		}
+		//note: this is timescale specific, not actual in Glaber
+		//if (0 != compression_age && h->ts.sec < compression_age)
+		//{
+		//	if (SEC_PER_HOUR < (now - last_history_discard)) /* log once per hour */
+		//	{
+		//		zabbix_log(LOG_LEVEL_TRACE, "discarding history that is pointing to"
+		//					" compressed history period");
+		//		last_history_discard = now;
+		//	}
+		//	h->flags |= ZBX_DC_FLAG_UNDEF;
+		//	continue;
+		//}
 
 		if (FAIL == (index = zbx_vector_uint64_bsearch(itemids, h->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
 		{
@@ -2637,13 +2640,14 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		{
 			h->flags |= ZBX_DC_FLAG_NOHISTORY;
 		}
-		else if (now - h->ts.sec > item->history_sec)
-		{
-			h->flags |= ZBX_DC_FLAG_NOHISTORY;
-			zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside history "
-					"storage period", item->host.host, item->key_orig,
-					zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
-		}
+		//In Glaber all retention handles history backend, not Glaber
+		//else if (now - h->ts.sec > item->history_sec)
+		//{
+		//	h->flags |= ZBX_DC_FLAG_NOHISTORY;
+		//	zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside history "
+		//			"storage period", item->host.host, item->key_orig,
+		//			zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
+		//}
 
 		if (ITEM_VALUE_TYPE_FLOAT == item->value_type || ITEM_VALUE_TYPE_UINT64 == item->value_type)
 		{
@@ -2665,6 +2669,10 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 			h->flags |= ZBX_DC_FLAG_NOTRENDS;
 
 		h->host_name = (char *)item->host.host;
+		//TODO: need translated item key here, not ORIG, and it's worth of
+		//good thinking how to do it - as translating is heavily involves 
+		//config cache which means extra locking. Maybe the best idea will be 
+		//passing real key from the poller alongside with the history value
 		h->item_key = (char *)item->key_orig;
 
 		normalize_item_value(item, h);
@@ -3143,13 +3151,16 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 			DCmass_prepare_history(history, &itemids, items, errcodes, history_num, &item_diff,
 					&inventory_values, compression_age, &proxy_subscribtions);
-
+			
+			//at this call history will be added to the history storage
+			//and state cache
 			if (FAIL != (ret = DBmass_add_history(history, history_num)))
 			{
+				//TODO: remove item value from the diff
 				DCconfig_items_apply_changes(&item_diff);
+				//trends has to use glaber specific trends state cache
 				DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
 				DC_get_trends_items_keys(trends,trends_num);
-
 				glb_history_add_trends(trends,trends_num);
 				
 				//doing keys and item names cleanup

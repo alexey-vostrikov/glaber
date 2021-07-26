@@ -828,7 +828,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"WorkerServer",			&CONFIG_EXT_SERVERS,			TYPE_MULTISTRING,
 			PARM_OPT,	0,			0},
 		{"StartDBSyncers",		&CONFIG_HISTSYNCER_FORKS,		TYPE_INT,
-			PARM_OPT,	1,			100},
+			PARM_OPT,	1,			32},
 		{"StartDiscoverers",		&CONFIG_DISCOVERER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			250},
 		{"StartHTTPPollers",		&CONFIG_HTTPPOLLER_FORKS,		TYPE_INT,

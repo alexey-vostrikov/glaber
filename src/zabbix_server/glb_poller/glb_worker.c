@@ -193,7 +193,6 @@ int glb_worker_send_request(void *engine, GLB_POLLER_ITEM *glb_item) {
 
     glb_worker_item->lastrequest = glb_ms_time();
 
-    //
     GLB_WORKER_T *worker = (GLB_WORKER_T *)zbx_hashset_search(&conf->workers,&glb_worker_item->workerid);
     
     if (NULL == worker ) {
@@ -202,11 +201,11 @@ int glb_worker_send_request(void *engine, GLB_POLLER_ITEM *glb_item) {
         worker = glb_worker_create_worker(conf, glb_worker_item);
     }
     
-    zabbix_log(LOG_LEVEL_INFORMATION, "Will do request: %s to worker %s",glb_worker_item->params_dyn, glb_worker_item->full_cmd);
+    zabbix_log(LOG_LEVEL_DEBUG, "Will do request: %s to worker %s",glb_worker_item->params_dyn, glb_worker_item->full_cmd);
     if (SUCCEED != glb_worker_request(&worker->worker, glb_worker_item->params_dyn) ) {
         //sending config error status for the item
         zbx_timespec(&ts);
-        zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request for ping: %s",request);
+        zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request %s",request);
         
         zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 
                                                 glb_item->flags , NULL , &ts, ITEM_STATE_NOTSUPPORTED, "Couldn't send request to the script");
@@ -216,7 +215,6 @@ int glb_worker_send_request(void *engine, GLB_POLLER_ITEM *glb_item) {
 
     zabbix_log(LOG_LEVEL_DEBUG, "Request finished");
     
-    //glb_config_item->sent++;
     glb_worker_item->lastrequest = glb_ms_time();
 
    zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);

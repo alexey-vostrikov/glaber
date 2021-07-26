@@ -1421,7 +1421,7 @@ static int	expression_eval_many(zbx_expression_eval_t *eval, zbx_expression_quer
 
 		zbx_history_record_vector_create(&values);
 
-		if (SUCCEED == zbx_vc_get_values(dcitem->itemid, dcitem->value_type, &values, seconds, count, ts) &&
+		if (SUCCEED == zbx_vc_get_values(dcitem->host.hostid,  dcitem->itemid, dcitem->value_type, &values, seconds, count, ts) &&
 				0 < values.values_num)
 		{
 			evaluate_history_func(&values, dcitem->value_type, item_func, &result);

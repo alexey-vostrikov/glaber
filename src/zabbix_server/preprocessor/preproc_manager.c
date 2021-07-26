@@ -852,9 +852,12 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 	if (REQUEST_STATE_QUEUED == state && 0 <= notsupp_shift)
 	{
 		request->value_type = item->value_type;
-		if (NULL != item && 1 == item->fast_preprocess && ITEM_STATE_NOTSUPPORTED != value->state) {
-			//before fast preprocessing adding the result_ptr
+		if (NULL != item && 1 == item->fast_preprocess 
+			//&& ITEM_STATE_NOTSUPPORTED != value->state 
+			) {
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld will be fast-preprocessed",item->itemid);
+			//fast preproccessing will do immediate preproc without consuming an extra memory and sending data to worker
+			//flag ->fast_preprocess is set for all realtively fast items - for now for all except javascript ones
 			glb_fast_preprocess_item(manager, request, item);
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld finished fast-preprocessing",item->itemid);
 			request->state = REQUEST_STATE_DONE;
@@ -1690,21 +1693,13 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 		time_now = zbx_time();
 
 		if (STAT_INTERVAL < time_now - time_stat)
-		{	u_int64_t local_preproc, no_preproc;
-
-			DC_GetPreprocStat(&no_preproc, &local_preproc);
-			zbx_setproctitle("%s #%d [queued " ZBX_FS_UI64 ", %.0f values/sec, (%.0f/sec mngr, %.0f/sec loc, %.0f/sec no_preprc) idle "
+		{	zbx_setproctitle("%s #%d [queued " ZBX_FS_UI64 ", %.0f values/sec, idle "
 					ZBX_FS_DBL " sec during " ZBX_FS_DBL " sec]",
 					"p_manager", process_num,
-					manager.queued_num, 
-					(manager.processed_num + no_preproc + local_preproc - old_no_preproc - old_local_preproc)/(time_now - time_stat),
-					manager.processed_num/(time_now - time_stat), (local_preproc-old_local_preproc)/(time_now - time_stat), (no_preproc-old_no_preproc)/(time_now - time_stat),
-					 time_idle, time_now - time_stat);
+					manager.queued_num, manager.processed_num/(time_now - time_stat), time_idle, time_now - time_stat);
 
 			time_stat = time_now;
 			time_idle = 0;
-			old_no_preproc=no_preproc;
-			old_local_preproc=local_preproc;
 			manager.processed_num = 0;
 		}
 

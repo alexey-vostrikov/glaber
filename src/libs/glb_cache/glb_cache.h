@@ -144,7 +144,8 @@ int glb_init_state(char **error) {
 			__vc_mem_malloc_func, __vc_mem_realloc_func, __vc_mem_free_func);
         if (NULL == state[i].items.slots) {
 		    *error = zbx_strdup(*error, "cannot allocate items cache table storage");
-		goto out;
+		    goto out;
+        }
 
         zbx_hashset_create_ext(&state[i].strpool, STATE_STRPOOL_INIT_SIZE,
 			vc_strpool_hash_func, vc_strpool_compare_func, NULL,
@@ -199,6 +200,10 @@ void	glb_state_destroy(void)
 /************************************************
  * Cache and state manupulating functions       *
  * **********************************************/
+static glb_state_item_add_value(ts_item,const zbx_item_diff_t * diff) {
+
+}
+
 
 /********************************************************************
  * there could be two sources of values:                            *
@@ -208,31 +213,42 @@ void	glb_state_destroy(void)
  * the cache and then history backend returns vector of metrics     *
  * ******************************************************************/
 int glb_state_add_values(const zbx_vector_ptr_t *item_diff) {
-    int i; state_idx=0;
+    
+    int i, state_idx=0;
+    const zbx_item_diff_t	*diff;
+    GLB_CACHE_TS_ELEMENT *ts_item;
 
     if (0 == item_diff->values_num)
 		return;
     
     for (i = 0; i < item_diff->values_num; i++) {
+        diff = (const zbx_item_diff_t *)item_diff->values[i];
+
         //only relocking cache if host relates to another cache piece or hasn't been locked yet
         if (i = 0) {
-            state_idx = item_diff.hostid % CONFIG_PREPROCMAN_FORKS;
+            state_idx = diff->hostid % CONFIG_PREPROCMAN_FORKS;
             WRLOCK_CACHE(state_idx);
-        } else if ( state_idx != item_diff[i].hostid % CONFIG_PREPROCMAN_FORKS ) {
+        } else if ( state_idx != diff->hostid % CONFIG_PREPROCMAN_FORKS ) {
             UNLOCK_CACHE(state_idx);
-            state_idx = item_diff.hostid % CONFIG_PREPROCMAN_FORKS;
+            state_idx = diff->hostid % CONFIG_PREPROCMAN_FORKS;
             WRLOCK_CACHE(state_idx);
         }
 
         //adding the new data: first fetching the item 
-        if (NULL == (item = (GLB_ST*)zbx_hashset_search(&state[state_idx].items,&diff[i].itemid ))) {
-            //oops, there is no item, adding a new one 
-            
-            .....
-            item=zbx_hashset_insert();
-        }
+        if (NULL == (ts_item = (GLB_CACHE_TS_ELEMENT*)zbx_hashset_search(&state[state_idx].items,&diff[i].itemid ))) {
+            //oops, there is no item (yet), adding a new one 
+            GLB_CACHE_TS_ELEMENT ts_item_loc;
+            bzero(&ts_item_loc,sizeof(GLB_CACHE_TS_ELEMENT));
+            //initial data size is 2 elements, not less
+            ts_item_loc.data = __vc_mem_malloc_func(NULL, 2 * sizeof(zbx_history_record_t));
+            zbx_history_record_t *dst = (zbx_history_record_t *)ts_item_loc.data;
+            dst->value = diff->value;
+            dst->timestamp = diff->mtime;
 
-        glb_state_item_add_value(item,diff);
+            ts_item=(GLB_CACHE_TS_ELEMENT*)zbx_hashset_insert(&state[state_idx].items,&ts_item_loc,sizeof(GLB_CACHE_TS_ELEMENT));
+        }
+        //adding the value to the item
+        glb_state_item_add_value(ts_item,diff);
     }
     UNLOCK_CACHE(last_lock_idx);
 

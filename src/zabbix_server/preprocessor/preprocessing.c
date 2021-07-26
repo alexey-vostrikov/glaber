@@ -748,6 +748,7 @@ zbx_uint32_t	zbx_preprocessor_unpack_value(zbx_preproc_item_value_t *value, unsi
 	offset += zbx_deserialize_char(offset, &value->item_flags);
 	offset += zbx_deserialize_char(offset, &value->state);
 	offset += zbx_deserialize_str(offset, &value->error, value_len);
+	//offset += zbx_deserialize_str(offset, &value->key, value_len);
 	offset += zbx_deserialize_char(offset, &ts_marker);
 
 	if (0 != ts_marker)

@@ -54,8 +54,7 @@ static void glb_pinger_submit_result(GLB_POLLER_ITEM *glb_item, int status, char
     GLB_PINGER_ITEM *glb_pinger_item=(GLB_PINGER_ITEM *)glb_item->itemdata;
 
     init_result(&result);
-    
-    
+        
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Starting, itemid is %ld, status is %d", __func__,glb_item->itemid, status);
     
     switch (status) {
@@ -132,10 +131,37 @@ static void glb_pinger_submit_result(GLB_POLLER_ITEM *glb_item, int status, char
  * whenever glbmap starts supporting ipv6, this will be obsoleted
  * it's a fixed zbx_host_by_ip func
  * ***************************************************************************/
+#define MAX_RESOLVE_TIME 3
+#define RESOLVE_ACCOUNT_TIME 5
+
 static  int	zbx_getipv4_by_host(const char *host, char *ip, size_t iplen)
 {
 	struct addrinfo	hints, *ai = NULL;
     int rc = FAIL;
+
+    static u_int64_t resolve_time;
+    u_int64_t time_start; //in ms
+    static unsigned int last_resolve_reset, resolve_fail_count;
+
+
+    //if resolving takes significant time, we'll fail
+    //to not to interrupt normal polling flow
+    if (resolve_time > MAX_RESOLVE_TIME * 1000 ) {
+        resolve_fail_count++;
+        return FAIL;
+    }
+
+    if (last_resolve_reset < time(NULL) + RESOLVE_ACCOUNT_TIME) {
+        if (resolve_fail_count > 0) {
+            zabbix_log(LOG_LEVEL_INFORMATION, "glb_icmp: limiting DNS due to slow response: there was %d resolve fails during %d seconds",
+                    resolve_fail_count, RESOLVE_ACCOUNT_TIME);
+        }
+        resolve_time = 0;
+        resolve_fail_count = 0;
+        last_resolve_reset = time(NULL);
+    }
+
+    time_start = glb_ms_time();
 
 	assert(ip);
 
@@ -162,6 +188,8 @@ out:
 	if (NULL != ai)
 		freeaddrinfo(ai);
     
+    resolve_time += glb_ms_time() - time_start;
+
     return rc;
 }
 
@@ -249,7 +277,7 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
             //lets try to resolve the string to ipv4 addr, if we cannot - then dismiss the host as 
             //glbmap doesn't support ipv6 addr space yet
             if (SUCCEED == zbx_getipv4_by_host( glb_pinger_item->addr, ip_addr, MAX_ID_LEN)) {
-                ip =ip_addr;
+                ip = ip_addr;
             } else {
                 zbx_timespec(&ts);
                 glb_pinger_submit_result(glb_item,CONFIG_ERROR,"Cannot resolve item to IPv4 addr, check hostname or use fping to IPv6",&ts);
@@ -348,8 +376,6 @@ void glb_pinger_handle_timeouts(GLB_PINGER_CONF *conf) {
                                        
                     glb_pinger_submit_result( glb_item, SUCCEED, "Internal pinging error has happened", &ts);
                 }
-
-
          }
     }
         
@@ -431,20 +457,16 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
         u_int64_t itemid=pinger_event->itemid;
       
         if (tmp_time + 10 < time(NULL)) {
-            zabbix_log(LOG_LEVEL_DEBUG,"Internal pinging queue size is %d",conf->packet_events.elems_num);
+            
+            if (glb_ms_time() - etime > 10 * 1000 ) {
+                zabbix_log(LOG_LEVEL_WARNING,"Internal pinging queue size is %d",conf->packet_events.elems_num);
+                zabbix_log(LOG_LEVEL_WARNING,"Pinging is late %d milliseconds", glb_ms_time() - etime); 
+            }
             tmp_time=time(NULL);
         }
 
         if (etime > current_glb_time) 
             break;
-        //remembering queue delay
-
-   //     if (glb_ms_time() - etime > CONFIG_TIMEOUT ) {
-   //         zabbix_log(LOG_LEVEL_DEBUG,"In %s : warn: inetrnal queue is %ld mseconds late", __func__, current_glb_time - pinger_event->time );
-   //         zabbix_log(LOG_LEVEL_WARNING,"New ping will not be sent for next %d seconds, we're too slow", CONFIG_TIMEOUT);
-   //         conf->pause_till = time(NULL) + CONFIG_TIMEOUT;
-    
-   //     }
 
         zbx_binary_heap_remove_min(&conf->packet_events);
         zbx_free(pinger_event);        
