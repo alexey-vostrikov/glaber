@@ -3096,14 +3096,38 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->schedulable = 1;
 			
-			
-			if (ITEM_VALUE_TYPE_STR == value_type || ITEM_VALUE_TYPE_TEXT == value_type)
-				DCstrpool_replace(found, (const char **)&item->lastvalue.str, "");
-			else 
-				item->lastvalue.ui64=0;
-			
-			item->prevvalue.ui64=0;
 			item->lastclock=0;
+
+			switch (value_type) {
+				case ITEM_VALUE_TYPE_STR:
+				case ITEM_VALUE_TYPE_TEXT:
+					DCstrpool_replace(found, (const char **)&item->lastvalue.str, "");
+					DCstrpool_replace(found, (const char **)&item->prevvalue.str, "");
+					break;
+				case ITEM_VALUE_TYPE_FLOAT:
+					item->lastvalue.dbl = 0.0;
+					item->prevvalue.dbl = 0.0;
+					break;
+				case ITEM_VALUE_TYPE_UINT64:
+					item->lastvalue.ui64 = 0;
+					item->prevvalue.ui64 = 0;
+					break;
+				case ITEM_VALUE_TYPE_LOG:
+					item->lastvalue.log = __config_mem_malloc_func(NULL, sizeof(zbx_log_value_t));
+					item->prevvalue.log = __config_mem_malloc_func(NULL, sizeof(zbx_log_value_t));
+					bzero(item->lastvalue.log, sizeof(zbx_log_value_t));
+					bzero(item->prevvalue.log, sizeof(zbx_log_value_t));
+					DCstrpool_replace(found, (const char **)&item->lastvalue.log->value, "");
+					DCstrpool_replace(found, (const char **)&item->prevvalue.log->value, "");
+					break;
+				default:
+					THIS_SHOULD_NEVER_HAPPEN;
+					exit(-1);
+
+			}
+			
+			item->lastclock=0;
+			//item->prevclock=0;
 
 		}
 		else
@@ -13511,6 +13535,8 @@ void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
 		//this must be gone with introduction of "global state"
 		//or perhaps it's better to store the values in the VC 
 		//when it's ready to do so
+	//	dc_item->prevclock = dc_item->lastclock;
+		dc_item->lastclock = now;
 		switch (dc_item->value_type){
 			case ITEM_VALUE_TYPE_FLOAT:
 			case ITEM_VALUE_TYPE_UINT64:
@@ -13520,10 +13546,18 @@ void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
 
 			case ITEM_VALUE_TYPE_STR:
 			case ITEM_VALUE_TYPE_TEXT:
-				DCstrpool_replace(1, (const char **)&dc_item->lastvalue.str, diff->value.str);
+				zbx_strpool_release(dc_item->prevvalue.str);
+				dc_item->prevvalue.str = dc_item->lastvalue.str;
+				DCstrpool_replace(0, (const char **)&dc_item->lastvalue.str, diff->value.str);
+				break;
+			case ITEM_VALUE_TYPE_LOG:
+				zbx_strpool_release(dc_item->prevvalue.log->value);
+				dc_item->prevvalue.log->value=dc_item->lastvalue.log->value;
+				DCstrpool_replace(0, (const char **)&dc_item->lastvalue.log->value,diff->value.log->value);
 				break;
 			
 		}
+
 		
 	}
 	UNLOCK_CACHE;
@@ -15866,6 +15900,10 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 				case ITEM_VALUE_TYPE_FLOAT:
 					zbx_json_addfloat(json,"value",item->lastvalue.dbl);
 					zbx_json_addfloat(json,"prev_value",item->prevvalue.dbl);
+					break;
+				case ITEM_VALUE_TYPE_LOG:
+					zbx_json_addstring(json,"value",item->lastvalue.log->value,ZBX_JSON_TYPE_STRING);
+					zbx_json_addstring(json,"prev_value",item->lastvalue.log->value,ZBX_JSON_TYPE_STRING);
 					break;
 			}	
 			

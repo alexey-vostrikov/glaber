@@ -406,6 +406,7 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 			}
 
 			*conf->responses += 1;	
+			zbx_tcp_close(&tmp_s);
 			close(conn->socket);
 			conn->socket = 0;
 			conn->state = POLL_FREE;
