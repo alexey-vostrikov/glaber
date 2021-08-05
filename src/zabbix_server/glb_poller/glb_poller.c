@@ -665,7 +665,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 				add_event(&events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + 5); 
 	
 				num = DCconfig_get_glb_poller_items(&events, &hosts, &items, item_type, process_num, poll_engine);
-				zabbix_log(LOG_LEVEL_INFORMATION, "Event: got %d new items from the config cache", num);
+				zabbix_log(LOG_LEVEL_DEBUG, "Event: got %d new items from the config cache", num);
 				
 				//so, perhaps, it's better to control with 100% precision  of machine state tha returns items to the queue
 				zbx_hashset_iter_t iter;
