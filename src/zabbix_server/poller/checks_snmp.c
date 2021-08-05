@@ -32,6 +32,8 @@
 #include "../glb_poller/glb_poller.h"
 #include "preproc.h"
 #include "../preprocessor/linked_list.h"
+
+extern int CONFIG_GLB_SNMP_CONTENTION;
 /*
  * SNMP Dynamic Index Cache
  * ========================
@@ -2188,6 +2190,7 @@ void	zbx_clear_cache_snmp(unsigned char process_type, int process_num)
 #define GLB_MAX_SNMP_CONNS 8192
 #define  CONFIG_SNMP_RETRIES 2
 
+
 typedef struct
 {
 	struct snmp_session *sess; /* SNMP session data */
@@ -2651,8 +2654,15 @@ void   glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
-	int idx=glb_item->hostid % GLB_MAX_SNMP_CONNS;
- 	
+	//int idx=glb_item->hostid % GLB_MAX_SNMP_CONNS;
+	//if contention is set, them distributing among connections 
+	//will be a bit different - hostid defines which "connection group is used"
+
+	int idx = ( glb_item->hostid % (GLB_MAX_SNMP_CONNS/CONFIG_GLB_SNMP_CONTENTION) ) * CONFIG_GLB_SNMP_CONTENTION +
+			glb_item->itemid % CONFIG_GLB_SNMP_CONTENTION;
+	//zabbix_log(LOG_LEVEL_INFORMATION, "Calculated index for host id %ld itemid %ld is %d",
+	//		glb_item->hostid, glb_item->itemid, idx);
+
 	zbx_list_append(&conf->connections[idx].items_list, (void **)glb_item->itemid, NULL);
 	DEBUG_ITEM(glb_item->itemid,"Added to list, starting connection");
 	glb_snmp_start_connection(&conf->connections[idx]);
