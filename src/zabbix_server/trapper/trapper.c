@@ -1158,13 +1158,18 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		
 			zbx_json_close(&json);
 			zbx_history_record_vector_destroy(&values,value_type);
-		} else if ( 0 == strcmp(req_type,"history_agg")) {
+	} else if ( 0 == strcmp(req_type,"history_agg")) {
 			char *buffer=NULL;
 			zabbix_log(LOG_LEVEL_DEBUG,"History aggregation request");
 						
 			if (SUCCEED == glb_history_get_agg_buff(itemid,value_type,start,end,count,&buffer) ) {
 				zabbix_log(LOG_LEVEL_DEBUG,"History aggregation request got SUCCESS responce");
-				zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,buffer);	
+				
+				if (NULL != buffer ) 
+					zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,buffer);	
+				else 
+					zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,"[]");
+
 				zabbix_log(LOG_LEVEL_DEBUG,"Got data %s",buffer);		
 				zbx_free(buffer);
 			} 
@@ -1176,11 +1181,16 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 								
 			if (SUCCEED == glb_history_get_trends(itemid,value_type,start,end,count, &buffer) ) {
 				
-				zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,buffer);			
+				if (NULL != buffer )
+					zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,buffer);			
+				else 
+					zbx_json_addraw(&json,ZBX_PROTO_TAG_DATA,"[]");	
+
 				zbx_free(buffer);
 			}
 			zabbix_log(LOG_LEVEL_DEBUG,"Finished trends request");
 		}
+
 
 		
 	} else  {
