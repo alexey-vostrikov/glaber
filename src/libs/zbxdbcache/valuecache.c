@@ -83,10 +83,10 @@ int func_count;
 //this is very strange, i would say weird idea, instead of passing 
 //memery structure pointer and defining proper callbacks doing like this...
 //but this doesn't work in partitionized shared memory pools
-//so fuck it off
 //ZBX_MEM_FUNC_IMPL(__vc, vc_mem)
-//i'd better just use  zbx_mem_malloc(__info, old, size), but... i'll need to rewrite all hashset then
-//fuck again to create all allocations dynamically, i'll need some workaround, like this
+//so fuck it off
+//i'd better just use  zbx_mem_malloc(__info, old, size), but... i'll need to rewrite all hashset and other memory related suff then
+//fuck again to create all allocations dynamically, i'll need some workaround, like this:
 ZBX_MEM_FUNC_IMPL(__vc0, vc_mem[0])
 ZBX_MEM_FUNC_IMPL(__vc1, vc_mem[1])
 ZBX_MEM_FUNC_IMPL(__vc2, vc_mem[2])
@@ -241,6 +241,7 @@ typedef struct
 
 	/* the first (oldest) chunk of item history data              */
 	zbx_vc_chunk_t	*tail;
+	
 }
 zbx_vc_item_t;
 
@@ -253,17 +254,6 @@ typedef struct {
 	zbx_hashset_t events;
 
 } vc_trigger_t;
-
-typedef struct {
-	u_int64_t hostid;
-	unsigned char zbx_state;
-	unsigned char snmp_state;
-	unsigned char ipmi_state;
-	unsigned char jmx_state;
-	u_int64_t nextcheck; /* calculated next check time */
-	zbx_hashset_t triggers; /*hashset of triggers states related to the host */
-} 
-vc_host_t;
 
 /* the value cache data  */
 typedef struct

@@ -1942,8 +1942,8 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 	if (ITEM_STATE_NOTSUPPORTED == hdata->state)
 		return;
 
-	if (0 == (hdata->flags & ZBX_DC_FLAG_NOHISTORY))
-		hdata->ttl = item->history_sec;
+	//if (0 == (hdata->flags & ZBX_DC_FLAG_NOHISTORY))
+	//	hdata->ttl = item->history_sec;
 
 	if (item->value_type == hdata->value_type)
 	{
@@ -2017,6 +2017,9 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 	const char	*item_error = NULL;
 	zbx_item_diff_t	*diff;
 
+	THIS_SHOULD_NEVER_HAPPEN;
+	exit(-1);
+
 	if (0 != (ZBX_DC_FLAG_META & h->flags))
 	{
 		if (item->lastlogsize != h->lastlogsize)
@@ -2029,7 +2032,6 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 	if (h->state != item->state)
 	{
 		flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE;
-
 		
 		if (ITEM_STATE_UNKNOWN != item->state) {
 			if (ITEM_STATE_NOTSUPPORTED == h->state)
@@ -2057,6 +2059,7 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 			}
 		}
 	}
+
 	else if (ITEM_STATE_NOTSUPPORTED == h->state && 0 != strcmp(item->error, h->value.err))
 	{
 		if (CONFIG_DEBUG_HOST == item->host.hostid || CONFIG_DEBUG_ITEM == item->itemid)
@@ -2073,10 +2076,27 @@ static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_
 		return NULL;
 
 	diff = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t));
+	bzero(diff, sizeof(zbx_item_diff_t));
+
 	diff->itemid = item->itemid;
 	diff->hostid = item->host.hostid;
 	diff->flags = flags;
-	diff->value = h->value;
+
+	if (ITEM_STATE_NOTSUPPORTED == h->state ) {
+		
+		diff->flags |=ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR;
+		if (NULL == diff->value.err) {
+			diff->value.err = "UNSUPPORTED for unknown reason (poller didn't set the reason)";
+		}
+	} else {
+		if (  0 == (ZBX_DC_FLAGS_NOT_FOR_EXPORT & h->flags) ) {
+			diff->flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_VALUE;
+			diff->value = h->value;
+		} else {
+			diff->flags |=ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR;
+			diff->value.err = "*UNSET*"; 
+		}
+	}	
 
 	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE & flags))
 		diff->lastlogsize = h->lastlogsize;
@@ -2163,53 +2183,7 @@ static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_ptr_create(&item_diff);
-	zbx_vector_ptr_reserve(&item_diff, history_num);
-
-	/* preallocate zbx_item_diff_t structures for item_diff vector */
-	diffs = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t) * history_num);
-
-	for (i = 0; i < history_num; i++)
-	{
-		zbx_item_diff_t	*diff = &diffs[i];
-
-		diff->itemid = history[i].itemid;
-		diff->state = history[i].state;
-		diff->flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE;
-
-		if (0 != (ZBX_DC_FLAG_META & history[i].flags))
-		{
-			diff->lastlogsize = history[i].lastlogsize;
-			diff->mtime = history[i].mtime;
-			diff->value = history[i].value;
-			diff->flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME | ZBX_FLAGS_ITEM_DIFF_UPDATE_VALUE;
-			
-		}
-
-		zbx_vector_ptr_append(&item_diff, diff);
-	}
-
-	if (0 != item_diff.values_num)
-	{
-		size_t	sql_offset = 0;
-
-		zbx_vector_ptr_sort(&item_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
-		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-		zbx_db_save_item_changes(&sql, &sql_alloc, &sql_offset, &item_diff,
-				ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME);
-
-		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-		if (sql_offset > 16)	/* In ORACLE always present begin..end; */
-			DBexecute("%s", sql);
-
-		DCconfig_items_apply_changes(&item_diff);
-	}
-
-	zbx_vector_ptr_destroy(&item_diff);
-	zbx_free(diffs);
+	DCconfig_items_apply_changes(history,history_num);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -2583,7 +2557,7 @@ static void	DCmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
  *                                                                            *
  ******************************************************************************/
 static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uint64_t *itemids,
-		const DC_ITEM *items, const int *errcodes, int history_num, zbx_vector_ptr_t *item_diff,
+		const DC_ITEM *items, const int *errcodes, int history_num, 
 		zbx_vector_ptr_t *inventory_values, int compression_age, zbx_vector_uint64_pair_t *proxy_subscribtions)
 {
 	static time_t	last_history_discard = 0;
@@ -2600,20 +2574,6 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		const DC_ITEM	*item;
 		zbx_item_diff_t	*diff;
 		int		index;
-
-		/* discard history items that are older than compression age */
-		//note: this is timescale specific, not actual in Glaber
-		//if (0 != compression_age && h->ts.sec < compression_age)
-		//{
-		//	if (SEC_PER_HOUR < (now - last_history_discard)) /* log once per hour */
-		//	{
-		//		zabbix_log(LOG_LEVEL_TRACE, "discarding history that is pointing to"
-		//					" compressed history period");
-		//		last_history_discard = now;
-		//	}
-		//	h->flags |= ZBX_DC_FLAG_UNDEF;
-		//	continue;
-		//}
 
 		if (FAIL == (index = zbx_vector_uint64_bsearch(itemids, h->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
 		{
@@ -2637,49 +2597,21 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		}
 
 		if (0 == item->history)
-		{
 			h->flags |= ZBX_DC_FLAG_NOHISTORY;
-		}
-		//In Glaber all retention handles history backend, not Glaber
-		//else if (now - h->ts.sec > item->history_sec)
-		//{
-		//	h->flags |= ZBX_DC_FLAG_NOHISTORY;
-		//	zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside history "
-		//			"storage period", item->host.host, item->key_orig,
-		//			zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
-		//}
-
-		if (ITEM_VALUE_TYPE_FLOAT == item->value_type || ITEM_VALUE_TYPE_UINT64 == item->value_type)
-		{
-			if (0 == item->trends)
-			{
+		
+		if ( 0 == item->trends || (ITEM_VALUE_TYPE_FLOAT != item->value_type &&
+							       ITEM_VALUE_TYPE_UINT64 != item->value_type) ) {
 				h->flags |= ZBX_DC_FLAG_NOTRENDS;
-			}
-		//Glaber: if trends is set then writing the trends, don't care about the aging
-		//hisstory backend will rule that on it's own
-		//	else if (now - h->ts.sec > item->trends_sec)
-		//	{
-		//		h->flags |= ZBX_DC_FLAG_NOTRENDS;
-		//		zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside "
-		//				"trends storage period", item->host.host, item->key_orig,
-		//				zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
-		//	}
 		}
-		else
-			h->flags |= ZBX_DC_FLAG_NOTRENDS;
-
-		h->host_name = (char *)item->host.host;
+		
 		//TODO: need translated item key here, not ORIG, and it's worth of
 		//good thinking how to do it - as translating is heavily involves 
 		//config cache which means extra locking. Maybe the best idea will be 
 		//passing real key from the poller alongside with the history value
+		h->host_name = (char *)item->host.host;
 		h->item_key = (char *)item->key_orig;
 
 		normalize_item_value(item, h);
-
-		if (NULL != (diff = calculate_item_update(item, h)))
-			zbx_vector_ptr_append(item_diff, diff);
-
 		DCinventory_value_add(inventory_values, item, h);
 
 		if (0 != item->host.proxy_hostid && FAIL == is_item_processed_by_server(item->type, item->key_orig))
@@ -2691,7 +2623,6 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 	}
 
 	zbx_vector_ptr_sort(inventory_values, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-	zbx_vector_ptr_sort(item_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -3140,6 +3071,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 			for (i = 0; i < history_num; i++) {
 				zbx_vector_uint64_append(&itemids, history[i].itemid);
+				
 				if (CONFIG_DEBUG_ITEM == history[i].itemid) {
 					zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld - processing in history sync", history[i].itemid);
 				}
@@ -3149,15 +3081,15 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			DCconfig_get_items_by_itemids_partial(items, itemids.values, errcodes, history_num,
 					item_retrieve_mode);
 
-			DCmass_prepare_history(history, &itemids, items, errcodes, history_num, &item_diff,
+			DCmass_prepare_history(history, &itemids, items, errcodes, history_num, 
 					&inventory_values, compression_age, &proxy_subscribtions);
 			
 			//at this call history will be added to the history storage
 			//and state cache
 			if (FAIL != (ret = DBmass_add_history(history, history_num)))
 			{
-				//TODO: remove item value from the diff
-				DCconfig_items_apply_changes(&item_diff);
+		
+				DCconfig_items_apply_changes(history, history_num);
 				//trends has to use glaber specific trends state cache
 				DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
 				DC_get_trends_items_keys(trends,trends_num);

@@ -3099,6 +3099,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->poller_type = ZBX_NO_POLLER;
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->schedulable = 1;
+
 			switch (value_type) {
 				case ITEM_VALUE_TYPE_STR:
 				case ITEM_VALUE_TYPE_TEXT:
@@ -3106,17 +3107,16 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 					break;
 				case ITEM_VALUE_TYPE_FLOAT:
 					item->lastvalue.dbl = 0.0;
+					item->prevvalue.dbl = 0.0;
 					break;
 				case ITEM_VALUE_TYPE_UINT64:
 					item->lastvalue.ui64 = 0;
+					item->prevvalue.ui64 = 0;
 					break;
 				case ITEM_VALUE_TYPE_LOG:
 					item->lastvalue.log = __config_mem_malloc_func(NULL, sizeof(zbx_log_value_t));
-					item->prevvalue.log = __config_mem_malloc_func(NULL, sizeof(zbx_log_value_t));
 					bzero(item->lastvalue.log, sizeof(zbx_log_value_t));
-					bzero(item->prevvalue.log, sizeof(zbx_log_value_t));
 					DCstrpool_replace(found, (const char **)&item->lastvalue.log->value, "");
-					DCstrpool_replace(found, (const char **)&item->prevvalue.log->value, "");
 					break;
 				default:
 					THIS_SHOULD_NEVER_HAPPEN;
@@ -8445,6 +8445,8 @@ void	DCconfig_get_items_by_keys(DC_ITEM *items, zbx_host_key_t *keys, int *errco
 
 	for (i = 0; i < num; i++)
 	{
+	//	zabbix_log(LOG_LEVEL_DEBUG,"Getting host %s item %s", keys[i].host, keys[i].key);
+
 		if (NULL == (dc_host = DCfind_host(keys[i].host)) ||
 				NULL == (dc_item = DCfind_item(dc_host->hostid, keys[i].key)))
 		{
@@ -13708,48 +13710,45 @@ unlock:
  * Function: DCconfig_items_apply_changes                                     *
  *                                                                            *
  * Purpose: apply item state, error, mtime, lastlogsize changes to            *
- *          configuration cache                                               *
- *                                                                            *
+ *         according to arrived history *                                                                            *
  ******************************************************************************/
-void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
+void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 {
 	int			i;
-	const zbx_item_diff_t	*diff;
 	ZBX_DC_ITEM		*dc_item;
 	
 	unsigned int now = time(NULL);
+	
 	zbx_custom_interval_t *custom_intervals=NULL;
 	int simple_interval;
 	char *error;
 	
-	if (0 == item_diff->values_num)
+	if (0 == history_num)
 		return;
 
+	//TODO: instead of locking and saving in config cache,
+	//move item state to the striped and statefull state cache
 	WRLOCK_CACHE;
 
-	for (i = 0; i < item_diff->values_num; i++)
+	for (i = 0; i < history_num; i++)
 	{
-		diff = (const zbx_item_diff_t *)item_diff->values[i];
-
-		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &diff->itemid)))
+		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &history[i].itemid)))
 			continue;
+		
+		
+		if ( 0 != (ZBX_DC_FLAG_META & history[i].flags ) ) {
+			dc_item->mtime = history[i].mtime;
+			dc_item->lastlogsize = history[i].lastlogsize; 
+		}
 
-		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE & diff->flags))
-			dc_item->lastlogsize = diff->lastlogsize;
+		dc_item->prevclock = dc_item->lastclock;
+		dc_item->lastclock = history[i].ts.sec;
+		
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Set lastclock to %d",dc_item->lastclock);
 
-		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME & diff->flags))
-			dc_item->mtime = diff->mtime;
-
-		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR & diff->flags))
-			DCstrpool_replace(1, &dc_item->error, diff->error);
-
-		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE & diff->flags))
-			dc_item->state = diff->state;
-
-		//updating nextcheck based on lastclock so Queues ui could draw correctly
-		//todo: this related to the item state and should be moved to the global state
-		//in the future
-		//TODO: check if AGENT queues has gone
+		//TODO: avoid this unnecessary calc and better make proper handling
+		//of the data during poll queue calculation
+		//updating nextcheck on pollers having own queues
 		if (  (ITEM_TYPE_SIMPLE == dc_item->type &&  CONFIG_GLB_PINGER_FORKS > 0 ) ||
 			  ( ITEM_TYPE_SNMP == dc_item->type &&  CONFIG_GLB_SNMP_FORKS > 0) ||
 			  ( ITEM_TYPE_AGENT == dc_item->type &&  CONFIG_GLB_AGENT_FORKS > 0) ) {
@@ -13762,33 +13761,73 @@ void	DCconfig_items_apply_changes(const zbx_vector_ptr_t *item_diff)
 				zbx_custom_interval_free(custom_intervals);
 			}
 		}
+	
+
+		if (ITEM_STATE_NOTSUPPORTED == history[i].state) {
+			dc_item->state = ITEM_STATE_NOTSUPPORTED;
+			if ( NULL != history[i].value.err )
+				DCstrpool_replace(1, &dc_item->error, history[i].value.err);
+			else 
+				DCstrpool_replace(1, &dc_item->error, "");
+			//TODO: allow writing poll codes and errmesages to the history
+			history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
+			continue;
+		}
+
+
+
+
+		if (  0 != ( (ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOVALUE) & history[i].flags) ) {
+			//the item has no data to export 
+			history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
+			continue;
+		} else {
+
+			if (dc_item->value_type != history[i].value_type) {
+				zabbix_log(LOG_LEVEL_INFORMATION, "Arrived hsitory value with type mismatch itemid %ld, expected type %d, arrived type %d",
+					dc_item->itemid, dc_item->value_type, history[i].value_type);
+				THIS_SHOULD_NEVER_HAPPEN;
+				continue;
+			}
+
+			if ( 0 != (ZBX_DC_FLAG_LLD & history[i].flags)) {
+				if ( ITEM_VALUE_TYPE_TEXT != dc_item->value_type ) {
+					THIS_SHOULD_NEVER_HAPPEN;
+				} else 
+					DCstrpool_replace(1, (const char **)&dc_item->lastvalue.str, history[i].value.str);
+				continue;
+			}
+
+			switch (dc_item->value_type) {
 			
-		//this must be gone with introduction of "global state"
-		//or perhaps it's better to store the values in the VC 
-		//when it's ready to do so
-		dc_item->prevclock = dc_item->lastclock;
-		dc_item->lastclock = now;
-		switch (dc_item->value_type){
 			case ITEM_VALUE_TYPE_FLOAT:
-			case ITEM_VALUE_TYPE_UINT64:
-				dc_item->prevvalue=dc_item->lastvalue;
-				dc_item->lastvalue=diff->value;
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Updating dbl itemid %ld  %f->%f",	dc_item->itemid, dc_item->lastvalue.dbl, history[i].value.dbl );
+				dc_item->prevvalue.dbl=dc_item->lastvalue.dbl;
+				dc_item->lastvalue.dbl=history[i].value.dbl;
 				break;
 
+			case ITEM_VALUE_TYPE_UINT64:
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Updating ui64 itemid %ld  %ld->%ld", dc_item->itemid, dc_item->lastvalue.ui64, history[i].value.ui64 );
+				dc_item->prevvalue.ui64=dc_item->lastvalue.ui64;
+				dc_item->lastvalue.ui64=history[i].value.ui64;
+				break;
+		
 			case ITEM_VALUE_TYPE_STR:
 			case ITEM_VALUE_TYPE_TEXT:
-				zbx_strpool_release(dc_item->prevvalue.str);
-				dc_item->prevvalue.str = dc_item->lastvalue.str;
-				DCstrpool_replace(0, (const char **)&dc_item->lastvalue.str, diff->value.str);
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Updating str itemid %ld",dc_item->itemid);
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Updating %s ->%s",dc_item->lastvalue.str, history[i].value.str);
+				DCstrpool_replace(1, (const char **)&dc_item->lastvalue.str, history[i].value.str);
 				break;
 			case ITEM_VALUE_TYPE_LOG:
-				zbx_strpool_release(dc_item->prevvalue.log->value);
-				dc_item->prevvalue.log->value=dc_item->lastvalue.log->value;
-				DCstrpool_replace(0, (const char **)&dc_item->lastvalue.log->value,diff->value.log->value);
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Updating log itemid %ld",dc_item->itemid);
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Updating %s -> %s",dc_item->lastvalue.log->value, history[i].value.log->value);
+				DCstrpool_replace(1, (const char **)&dc_item->lastvalue.log->value,history[i].value.log->value);
 				break;
-			
+			default:
+				THIS_SHOULD_NEVER_HAPPEN;
+				break;
+			}
 		}
-		
 	}
 
 	UNLOCK_CACHE;
@@ -16097,50 +16136,45 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 	for (i=0; i<itemids->values_num; i++) {
 		if ( NULL != (item=zbx_hashset_search(&config->items,&itemids->values[i])) ) {
 			
-		//	zbx_json_addarray(json,NULL);
+			//	zbx_json_addarray(json,NULL);
+			zbx_json_addobject(json,NULL);
 
-			for (j = 0; j < 2; j++) {
-				if (j == 0) { 
-					val = &item->lastvalue;
-					clock = item->lastclock;
-				} else {
-					val = &item->prevvalue;
-					clock = item->prevclock;
-				}
-				
-				//if ( clock == 0 ) continue;
-				
-				zbx_json_addobject(json,NULL);
+			zbx_json_adduint64(json,"itemid",item->itemid);
+			zabbix_log(LOG_LEVEL_INFORMATION,"Got lastclock %ld", item->lastclock);
 
-				zbx_json_adduint64(json,"itemid",item->itemid);
-				zbx_json_adduint64(json,"clock",item->lastclock);
+			zbx_json_adduint64(json,"clock", item->lastclock);
 				
-				zbx_json_adduint64(json,"nextcheck",item->nextcheck);
-				zbx_json_addstring(json,"error",item->error,ZBX_JSON_TYPE_STRING);
+			zbx_json_adduint64(json,"nextcheck",item->nextcheck);
+			zbx_json_addstring(json,"error",item->error,ZBX_JSON_TYPE_STRING);
 
-				switch	( item->value_type ) {
-					case ITEM_VALUE_TYPE_UINT64:
-						zbx_json_adduint64(json,"value",val->ui64);
-						break;
-					case ITEM_VALUE_TYPE_TEXT:
-					case ITEM_VALUE_TYPE_STR:
-						zbx_json_addstring(json,"value",val->str,ZBX_JSON_TYPE_STRING);
-						break;
-					case ITEM_VALUE_TYPE_LOG:
-						zbx_json_addstring(json,"value",val->log->value,ZBX_JSON_TYPE_STRING);
-						break;					
-					case ITEM_VALUE_TYPE_FLOAT:
-						zbx_json_addfloat(json,"value",val->dbl);
-						break;
-					default:
-						THIS_SHOULD_NEVER_HAPPEN;
-						exit(-1);
-				}
-				
-				zbx_json_close(json);	
-			}	
+			switch (item->value_type) {
 			
-		//	zbx_json_close(json);
+				case ITEM_VALUE_TYPE_TEXT:
+				case ITEM_VALUE_TYPE_STR:
+					zbx_json_addstring(json,"value",item->lastvalue.str,ZBX_JSON_TYPE_STRING);
+					break;
+
+				case ITEM_VALUE_TYPE_LOG:
+					zbx_json_addstring(json,"value",item->lastvalue.log->value,ZBX_JSON_TYPE_STRING);
+					break;
+
+				case ITEM_VALUE_TYPE_FLOAT: 
+					zbx_json_addfloat(json,"value",item->lastvalue.dbl);
+					zbx_json_adduint64(json,"prevclock",item->prevclock);
+					zbx_json_addfloat(json,"prevvalue",item->prevvalue.dbl);
+					break;
+
+				case ITEM_VALUE_TYPE_UINT64:
+					zbx_json_adduint64(json,"value",item->lastvalue.ui64);
+					zbx_json_adduint64(json,"prevclock",item->prevclock);
+					zbx_json_adduint64(json,"prevvalue",item->prevvalue.ui64);
+					break;
+
+				default:
+					THIS_SHOULD_NEVER_HAPPEN;
+					exit(-1);
+			}
+			zbx_json_close(json);			
 		}
 	}	
 	zbx_json_close(json);

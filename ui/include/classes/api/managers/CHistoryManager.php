@@ -82,7 +82,11 @@ class CHistoryManager {
 
 	  foreach ($last_values as $value) 
 	  {
-			 $result[$value['itemid']][$i]=$value;
+			if (!isset($result[$value['itemid']])) 
+				$result[$value['itemid']]=[];
+			
+			array_push($result[$value['itemid']], $value);
+			//$result[$value['itemid']][$i]=$value;
 			 //error_log(print_r($result,true));
 			 //$result[$value['itemid']][0]=$value;
 
@@ -168,9 +172,6 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 
 	return $result;
 }
-
-
-
 
 	/**
 	 * Returns history value aggregation for graphs.

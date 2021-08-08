@@ -328,7 +328,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	if (NULL == response)
 			return SUCCEED;
 	if (ITEM_VALUE_TYPE_LOG == value_type)
-		 zabbix_log(LOG_LEVEL_INFORMATION, "Got the LOG response: '%s'", response);
+		 zabbix_log(LOG_LEVEL_DEBUG, "Got the LOG response: '%s'", response);
 	
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse responce from worker: '%s'",response);

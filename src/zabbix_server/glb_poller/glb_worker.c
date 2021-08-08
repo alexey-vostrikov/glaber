@@ -98,8 +98,8 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
     char *parsed_key = NULL, *cmd = NULL, *params_dyn = NULL, *key_dyn = NULL, *params_stat = NULL;
     size_t		dyn_alloc = 0, stat_alloc = 0, dyn_offset = 0, stat_offset = 0, cmd_alloc = ZBX_KIBIBYTE, cmd_offset = 0;
     int ret = FAIL, i;
-    zabbix_log(LOG_LEVEL_INFORMATION,"Staring %s",__func__);
-    zabbix_log(LOG_LEVEL_INFORMATION,"Item key is %s",dc_item->key_orig);
+    zabbix_log(LOG_LEVEL_DEBUG,"Staring %s",__func__);
+    zabbix_log(LOG_LEVEL_DEBUG,"Item key is %s",dc_item->key_orig);
     init_request(&request);
 
     cmd = (char *)zbx_malloc(cmd, cmd_alloc);
@@ -138,7 +138,7 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
 	}
     
     zbx_snprintf_alloc(&key_dyn, &dyn_alloc, &dyn_offset, "\n");
-    zabbix_log(LOG_LEVEL_INFORMATION,"Parsed params: %s", key_dyn);
+    zabbix_log(LOG_LEVEL_DEBUG,"Parsed params: %s", key_dyn);
     worker_item->params_dyn = key_dyn;
        
     free_request(&request);

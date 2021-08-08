@@ -1282,12 +1282,20 @@ class CScreenProblem extends CScreenBase {
 		}
 
 		foreach ($items as $itemid => $item) {
-			if (array_key_exists($itemid, $history_values)) {
+			if (array_key_exists($itemid, $history_values) && isset($history_values[$itemid])) {
 				$last_value = array();
-				$last_value = $history_values[$itemid];
+				$last_value = $history_values[$itemid][0];
+				
 				$last_value['value'] = formatHistoryValue(str_replace(["\r\n", "\n"], [" "], $last_value['value']),
-					$item
-				);
+					$item);
+				if ( isset($last_value['error']) && strlen($last_value['error']) >0 ) {
+					#$last_value['value'] = ;
+					$last_value['value'] = (new CSpan(UNRESOLVED_MACRO_STRING))
+							->addClass(ZBX_STYLE_RED);
+							
+				} else 
+					unset($last_value['error']);
+				
 			}
 			else {
 				$last_value = [
@@ -1302,11 +1310,13 @@ class CScreenProblem extends CScreenBase {
 				$hint_table->addRow([
 					new CCol($item['name_expanded']),
 					new CCol(
-						($last_value['lastclock'] !== null)
-							? zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_value['lastclock'])
+						($last_value['clock'] !== null)
+							? zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_value['clock'])
 							: UNRESOLVED_MACRO_STRING
 					),
-					new CCol($last_value['value']),
+					new CCol( (isset($last_value['error']))
+						? $last_value['error']
+						: $last_value['value']),
 					new CCol(
 						($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64)
 							? (CWebUser::checkAccess(CRoleHelper::UI_MONITORING_LATEST_DATA)

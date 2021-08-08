@@ -73,9 +73,10 @@ else {
 	]);
 }
 
-// Latest data rows.
+//Latest data rows.
 foreach ($data['items'] as $itemid => $item) {
 	$is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
+
 	$checkbox = (new CCheckBox('itemids['.$itemid.']', $itemid))->setEnabled($is_graph);
 	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
 
@@ -88,18 +89,50 @@ foreach ($data['items'] as $itemid => $item) {
 	//show_error_message("Last history:'".print_r($history,true)."'");
 
 	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
-	$prevHistory = isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
+	$prevHistory = [];//isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
+
+	if (isset($lastHistory['prevvalue']) && isset($lastHistory['prevclock']) && $lastHistory['prevclock'] > 0 ) {
+		$prevHistory['value'] = $lastHistory['prevvalue'];
+		$prevHistory['clock'] = $lastHistory['prevclock'];
+		//show_error_message("Last history:'".print_r($prevHistory,true)."'");
+	}
+	
+	//show_error_message("Prev history:'".print_r($history,true)."'");
 	
 	if ($lastHistory) {
-		$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
-		if ($lastHistory['clock'] > 0) {
-			$last_value = formatHistoryValue($lastHistory['value'], $item, false);
+			$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
+		
+		if ( isset($lastHistory['nextcheck']) && $lastHistory['nextcheck'] > 0 )
+				$last_check = (new CSpan($last_check))
+						->addClass(ZBX_STYLE_LINK_ACTION)
+						->setHint("Next: ". zbx_date2str(DATE_TIME_FORMAT_SECONDS,$lastHistory['nextcheck']), 'hintbox-wrap');
+
+		if ($lastHistory['clock'] > 0 ) {
+			if (isset($lastHistory['error']) &&  strlen($lastHistory['error'])>0 ) {
+				$last_value = (new CSpan('UNSUPPORTED'))
+					->addClass(ZBX_STYLE_RED)
+					->addClass(ZBX_STYLE_LINK_ACTION)
+					->setHint($lastHistory['error'], 'hintbox-wrap');
+			} else {
+				$last_value = formatHistoryValue($lastHistory['value'], $item, false);
+				if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
+					 ITEM_VALUE_TYPE_LOG == $item['value_type'] ) && 
+					 mb_strlen($last_value) > 20 ) {
+						$last_value = (new CSpan($last_value))
+							->addClass(ZBX_STYLE_LINK_ACTION)
+							->setHint($lastHistory['value'], 'hintbox-wrap');
+					 }
+
+			}
 			
 		} else $last_value='';
 
 		$change = '';
 
-		if ( $lastHistory['clock'] > 0 && $prevHistory && in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64])) {
+		if ( $lastHistory['clock'] > 0 &&
+			(!isset($lastHistory['error']) || strlen($lastHistory['error']) <1 ) && 
+		    isset($prevHistory) && 
+			in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]) ) {
 			$history_diff = $lastHistory['value'] - $prevHistory['value'];
 
 			if ($history_diff != 0) {
