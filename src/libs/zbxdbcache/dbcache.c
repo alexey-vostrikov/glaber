@@ -1917,98 +1917,6 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 	zbx_variant_clear(&value_var);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: calculate_item_update                                            *
- *                                                                            *
- * Purpose: calculates what item fields must be updated                       *
- *                                                                            *
- * Parameters: item      - [IN] the item                                      *
- *             h         - [IN] the historical data to process                *
- *                                                                            *
- * Return value: The update data. This data must be freed by the caller.      *
- *                                                                            *
- * Comments: Will generate internal events when item state switches.          *
- *                                                                            *
- ******************************************************************************/
-static zbx_item_diff_t	*calculate_item_update(const DC_ITEM *item, const ZBX_DC_HISTORY *h)
-{
-	zbx_uint64_t	flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK;
-	const char	*item_error = NULL;
-	zbx_item_diff_t	*diff;
-
-	if (0 != (ZBX_DC_FLAG_META & h->flags))
-	{
-		if (item->lastlogsize != h->lastlogsize)
-			flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE;
-
-		if (item->mtime != h->mtime)
-			flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME;
-	}
-
-	if (h->state != item->state)
-	{
-		flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE;
-
-		
-		if (ITEM_STATE_UNKNOWN != item->state) {
-			if (ITEM_STATE_NOTSUPPORTED == h->state)
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "item \"%s:%s\" became not supported: %s",
-					item->host.host, item->key_orig, h->value.str);
-
-				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_ITEM, item->itemid, &h->ts, h->state, NULL,
-					NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, h->value.err);
-
-				if (0 != strcmp(item->error, h->value.err))
-					item_error = h->value.err;
-			}
-			else 
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "item \"%s:%s\" became supported",
-					item->host.host, item->key_orig);
-
-				/* we know it's EVENT_OBJECT_ITEM because LLDRULE that becomes */
-				/* supported is handled in lld_process_discovery_rule()        */
-				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_ITEM, item->itemid, &h->ts, h->state,
-					NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, NULL);
-
-				item_error = "";
-			}
-		}
-	}
-	else if (ITEM_STATE_NOTSUPPORTED == h->state && 0 != strcmp(item->error, h->value.err))
-	{
-		if (CONFIG_DEBUG_HOST == item->host.hostid || CONFIG_DEBUG_ITEM == item->itemid)
-			zabbix_log(LOG_LEVEL_WARNING, "error reason for \"%s:%s\" changed: %s", item->host.host,
-					item->key_orig, h->value.err);
-
-		item_error = h->value.err;
-	}
-
-	if (NULL != item_error)
-		flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR;
-
-	diff = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t));
-	diff->itemid = item->itemid;
-	diff->lastclock = h->ts.sec;
-	diff->flags = flags;
-	diff->value = h->value;
-
-	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE & flags))
-		diff->lastlogsize = h->lastlogsize;
-
-	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME & flags))
-		diff->mtime = h->mtime;
-
-	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE & flags))
-		diff->state = h->state;
-
-	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR & flags))
-		diff->error = item_error;
-
-	return diff;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -2071,70 +1979,16 @@ static void	DBmass_update_items(const zbx_vector_ptr_t *item_diff, const zbx_vec
  ******************************************************************************/
 static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
 {
-	size_t			sql_offset = 0;
 	int			i;
 	zbx_vector_ptr_t	item_diff;
 	zbx_item_diff_t		*diffs;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_ptr_create(&item_diff);
-	zbx_vector_ptr_reserve(&item_diff, history_num);
-
-	/* preallocate zbx_item_diff_t structures for item_diff vector */
-	diffs = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t) * history_num);
-
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-	for (i = 0; i < history_num; i++)
-	{
-		zbx_item_diff_t	*diff = &diffs[i];
-
-		diff->itemid = history[i].itemid;
-		diff->state = history[i].state;
-		diff->lastclock = history[i].ts.sec;
-		diff->flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE | ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK;
-		diff->value = history[i].value;
-		
-		if (0 != (ZBX_DC_FLAG_META & history[i].flags))
-		{
-			diff->lastlogsize = history[i].lastlogsize;
-			diff->mtime = history[i].mtime;
-			diff->flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME;
-		}
-
-		zbx_vector_ptr_append(&item_diff, diff);
-
-		if (ITEM_STATE_NOTSUPPORTED == history[i].state)
-			continue;
-
-		if (0 == (ZBX_DC_FLAG_META & history[i].flags))
-			continue;
-
-		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-				"update item_rtdata"
-				" set lastlogsize=" ZBX_FS_UI64
-					",mtime=%d"
-				" where itemid=" ZBX_FS_UI64 ";\n",
-				history[i].lastlogsize, history[i].mtime, history[i].itemid);
-
-		DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
-	}
-
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-	if (sql_offset > 16)	/* In ORACLE always present begin..end; */
-		DBexecute("%s", sql);
-
-	if (0 != item_diff.values_num)
-		DCconfig_items_apply_changes(&item_diff);
-
-	zbx_vector_ptr_destroy(&item_diff);
-	zbx_free(diffs);
+	DCconfig_items_apply_changes(history,history_num);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
-
 /******************************************************************************
  *                                                                            *
  * Function: DBmass_add_history                                               *
@@ -2502,7 +2356,7 @@ static void	DCmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
  *                                                                            *
  ******************************************************************************/
 static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uint64_t *itemids,
-		const DC_ITEM *items, const int *errcodes, int history_num, zbx_vector_ptr_t *item_diff,
+		const DC_ITEM *items, const int *errcodes, int history_num, 
 		zbx_vector_ptr_t *inventory_values, int compression_age, zbx_vector_uint64_pair_t *proxy_subscribtions)
 {
 	static time_t	last_history_discard = 0;
@@ -2590,9 +2444,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		h->item_key = (char *)item->key_orig;
 
 		normalize_item_value(item, h);
-
-		diff = calculate_item_update(item, h);
-		zbx_vector_ptr_append(item_diff, diff);
+		
 		DCinventory_value_add(inventory_values, item, h);
 
 		if (0 != item->host.proxy_hostid && FAIL == is_item_processed_by_server(item->type, item->key_orig))
@@ -2604,8 +2456,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 	}
 
 	zbx_vector_ptr_sort(inventory_values, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-	zbx_vector_ptr_sort(item_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
@@ -2957,7 +2808,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 					history_text_num, history_log_num, txn_error, compression_age;
 	time_t				sync_start;
 	zbx_vector_uint64_t		triggerids ;
-	zbx_vector_ptr_t		history_items, trigger_diff, item_diff, inventory_values, trigger_timers;
+	zbx_vector_ptr_t		history_items, trigger_diff, inventory_values, trigger_timers;
 	zbx_vector_uint64_pair_t	trends_diff, proxy_subscribtions;
 	ZBX_DC_HISTORY			history[ZBX_HC_SYNC_MAX];
 
@@ -2994,7 +2845,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	compression_age = hc_get_history_compression_age();
 
 	zbx_vector_ptr_create(&inventory_values);
-	zbx_vector_ptr_create(&item_diff);
 	zbx_vector_ptr_create(&trigger_diff);
 	zbx_vector_uint64_pair_create(&trends_diff);
 	zbx_vector_uint64_pair_create(&proxy_subscribtions);
@@ -3057,7 +2907,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 			DCconfig_get_items_by_itemids(items, itemids.values, errcodes, history_num);
 
-			DCmass_prepare_history(history, &itemids, items, errcodes, history_num, &item_diff,
+			DCmass_prepare_history(history, &itemids, items, errcodes, history_num,
 					&inventory_values, compression_age, &proxy_subscribtions);
 
 			if (FAIL != (ret = DBmass_add_history(history, history_num)))
@@ -3065,7 +2915,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 				//this will set dc states correctly 
 				//for true state handling it's better to create 
 				//VC_items_apply_changes()
-				DCconfig_items_apply_changes(&item_diff);
+				DCconfig_items_apply_changes(history, history_num);
 
 				//trends export code
 				//this will recalc trends and if time has come retrun them in &trends for exporting
@@ -3110,7 +2960,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			zbx_clean_events();
 
 			zbx_vector_ptr_clear_ext(&inventory_values, (zbx_clean_func_t)DCinventory_value_free);
-			zbx_vector_ptr_clear_ext(&item_diff, (zbx_clean_func_t)zbx_ptr_free);
+		
 		}
 
 		if (FAIL != ret)
@@ -3261,7 +3111,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 	zbx_vector_ptr_destroy(&history_items);
 	zbx_vector_ptr_destroy(&inventory_values);
-	zbx_vector_ptr_destroy(&item_diff);
 	zbx_vector_ptr_destroy(&trigger_diff);
 	zbx_vector_uint64_pair_destroy(&trends_diff);
 	zbx_vector_uint64_pair_destroy(&proxy_subscribtions);

@@ -66,7 +66,9 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 	zbx_uint64_t		itemid, lastlogsize;
 	char			*value, *error;
 	zbx_timespec_t		ts;
-	zbx_item_diff_t		diff;
+	
+	ZBX_DC_HISTORY hist = {0};
+
 	DC_ITEM			item;
 	int			errcode, mtime;
 	unsigned char		state, meta;
@@ -81,8 +83,6 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 
 	zabbix_log(LOG_LEVEL_DEBUG, "processing discovery rule:" ZBX_FS_UI64, itemid);
 
-	diff.flags = ZBX_FLAGS_ITEM_DIFF_UNSET;
-
 	if (NULL != error || NULL != value)
 	{
 		if (NULL == error && SUCCEED == lld_process_discovery_rule(itemid, value, &error))
@@ -90,11 +90,14 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		else
 			state = ITEM_STATE_NOTSUPPORTED;
 
+		hist.value_type = ITEM_VALUE_TYPE_TEXT;
+		hist.value.str = value;
+		hist.ts = ts;
+
 		if (state != item.state)
 		{
-			diff.state = state;
-			diff.flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE;
-
+			hist.state = state;
+			
 			if (ITEM_STATE_NORMAL == state)
 			{
 				zabbix_log(LOG_LEVEL_DEBUG, "discovery rule \"%s:%s\" became supported",
@@ -121,47 +124,18 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		/* with successful LLD processing LLD error will be set to empty string */
 		if (NULL != error && 0 != strcmp(error, item.error))
 		{
-			diff.error = error;
-			diff.flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR;
+			hist.value.err = error;
 		}
 	}
 
 	if (0 != meta)
 	{
-		if (item.lastlogsize != lastlogsize)
-		{
-			diff.lastlogsize = lastlogsize;
-			diff.flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE;
-		}
-		if (item.mtime != mtime)
-		{
-			diff.mtime = mtime;
-			diff.flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME;
-		}
+		hist.lastlogsize = lastlogsize;
+		hist.mtime = mtime;
+		hist.flags |= ZBX_DC_FLAG_META;
 	}
 
-	if (ZBX_FLAGS_ITEM_DIFF_UNSET != diff.flags)
-	{
-		zbx_vector_ptr_t	diffs;
-		char			*sql = NULL;
-		size_t			sql_alloc = 0, sql_offset = 0;
-
-		zbx_vector_ptr_create(&diffs);
-		diff.itemid = itemid;
-		zbx_vector_ptr_append(&diffs, &diff);
-
-		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
-		zbx_db_save_item_changes(&sql, &sql_alloc, &sql_offset, &diffs);
-		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
-		if (16 < sql_offset)
-			DBexecute("%s", sql);
-
-		DCconfig_items_apply_changes(&diffs);
-
-		zbx_vector_ptr_destroy(&diffs);
-		zbx_free(sql);
-	}
-
+	DCconfig_items_apply_changes(&hist,1);
 	DCconfig_clean_items(&item, &errcode, 1);
 out:
 	zbx_free(value);

@@ -90,6 +90,7 @@ typedef struct
 	ZBX_DC_TRIGGER		**triggers;
 	int			nextcheck;
 	int			lastclock;
+	int			prevclock;
 	int			mtime;
 	int			data_expected_from;
 	int			history_sec;

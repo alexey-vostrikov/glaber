@@ -3136,7 +3136,7 @@ int glb_vc_load_cache() {
 				if (SUCCEED == glb_parse_item_metadata(&jp,&new_item) ) {
 					//let's see if the item is there already
 					if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_insert(&vc_cache->items, &new_item, sizeof(zbx_vc_item_t)))) {
-						zabbix_log(LOG_LEVEL_DEBUG, "Couldnt add item %ld to VC, it's already there, skipping", new_item.itemid);
+						zabbix_log(LOG_LEVEL_INFORMATION, "Couldnt add item %ld to VC, it's already there, skipping", new_item.itemid);
 					};
 					items++;
 				}

@@ -157,14 +157,10 @@ foreach ($data['rows'] as $row_index => $row) {
 	// Row history data preparation.
 
 	if (array_key_exists($item['itemid'], $data['history'])) {
-	//	error_log( print_r($data['history'][$item['itemid']],1));
 		$last_history = $data['history'][$item['itemid']];
-	//	$last_history = (count($data['history'][$item['itemid']]) > 0) ? $data['history'][$item['itemid']][0] : null;
-	//	$prev_history = (count($data['history'][$item['itemid']]) > 1) ? $data['history'][$item['itemid']][1] : null;
 	}
 	else {
 		$last_history = null;
-	//	$prev_history = null;
 	}
 
 	if ($last_history) {
