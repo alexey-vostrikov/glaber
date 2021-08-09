@@ -1402,9 +1402,9 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == glb_vc_load_cache()) {
-		zabbix_log(LOG_LEVEL_CRIT, "cannot preload value cache, startup might take longer");
-		//exit(EXIT_FAILURE);
+	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_vc_load_cache()) {
+		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
+		exit(EXIT_FAILURE);
 	}
 
 	if (SUCCEED != zbx_create_itservices_lock(&error))

@@ -3089,16 +3089,15 @@ static int  glb_parse_item_metadata(struct zbx_json_parse  *jp, zbx_vc_item_t *i
 		last_accessed_str[MAX_ID_LEN], active_range_str[MAX_ID_LEN], db_cached_from_str[MAX_ID_LEN];
 	zbx_json_type_t type;	
 
-	if (SUCCEED != zbx_json_value_by_name(jp,"itemid",itemid_str,MAX_ID_LEN, &type) ||
-		SUCCEED != zbx_json_value_by_name(jp,"hostid",hostid_str,MAX_ID_LEN, &type) || 
-	    SUCCEED != zbx_json_value_by_name(jp,"value_type",value_type_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"state",state_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"status",status_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"range_sync_hour",range_sync_hour_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"values_total",values_total_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"last_accessed",last_accessed_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"active_range",active_range_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"db_cached_from",db_cached_from_str,MAX_ID_LEN, &type) 
+	if (SUCCEED != zbx_json_value_by_name(jp,"i",itemid_str,MAX_ID_LEN, &type) ||
+		SUCCEED != zbx_json_value_by_name(jp,"h",hostid_str,MAX_ID_LEN, &type) || 
+	    SUCCEED != zbx_json_value_by_name(jp,"vt",value_type_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"ss",status_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"rsh",range_sync_hour_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"vtl",values_total_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"la",last_accessed_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"ar",active_range_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"dcf",db_cached_from_str,MAX_ID_LEN, &type) 
 	) return FAIL;
 
 	item->itemid = strtol(itemid_str,NULL,10);
@@ -3136,13 +3135,25 @@ int glb_vc_load_cache() {
 	char type_str[MAX_ID_LEN];
 	
 	zabbix_log(LOG_LEVEL_INFORMATION, "Reading valuecache from %s",CONFIG_VCDUMP_LOCATION);
-	
-	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "r"))) {
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for reading cache will not be restored from the dump",CONFIG_VCDUMP_LOCATION);
+	sleep(1);
+
+	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "a"))) {
+		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for access check, exiting",CONFIG_VCDUMP_LOCATION);
+		//checking if we have the permissions on creating and writing the file
 		return FAIL;
 	}
+	fclose(fp);
+
+	//reopening the file in the read mode	
+	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "r"))) {
+		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for reading",CONFIG_VCDUMP_LOCATION);
+		//checking if we have the permissions on creating and writing the file
+		return FAIL;
+	}
+
 	while ((read = getline(&line, &len, fp)) != -1) {
 		int vc_idx;
+		
 		//ok, detecting the type of record
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Retrieved line of length %zu:", read);
         //zabbix_log(LOG_LEVEL_INFORMATION,"%s", line);
@@ -3153,7 +3164,7 @@ int glb_vc_load_cache() {
 		}
 
 		//reading type of the record
-		if (SUCCEED != zbx_json_value_by_name(&jp, "type", type_str, MAX_ID_LEN, &j_type)) {
+		if (SUCCEED != zbx_json_value_by_name(&jp, "t", type_str, MAX_ID_LEN, &j_type)) {
         	zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse line no 'type' parameter");
         	continue;
     	}
@@ -3168,9 +3179,11 @@ int glb_vc_load_cache() {
 				if (SUCCEED == glb_parse_item_metadata(&jp,&new_item) ) {
 					//let's see if the item is there already
 					if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_insert(&vc_cache[vc_idx]->items, &new_item, sizeof(zbx_vc_item_t)))) {
-						zabbix_log(LOG_LEVEL_DEBUG, "Couldnt add item %ld to VC, it's already there, skipping", new_item.itemid);
+						zabbix_log(LOG_LEVEL_INFORMATION, "Couldnt add item %ld to VC, it's already there, skipping", new_item.itemid);
 					};
 					items++;
+				} else {
+					zabbix_log(LOG_LEVEL_INFORMATION, "Failed to parse an item metadata: %s", jp.start);
 				}
 				break;
 			}
@@ -3186,15 +3199,15 @@ int glb_vc_load_cache() {
 
 					bzero(&value, sizeof(value));
 
-					if (FAIL == zbx_json_value_by_name(&jp,"itemid",tmp_str,MAX_ID_LEN, &type) ) {
-						zabbix_log(LOG_LEVEL_DEBUG,"Couldn't find itemid in the value record: %s",jp.start);
+					if (FAIL == zbx_json_value_by_name(&jp,"i",tmp_str,MAX_ID_LEN, &type) ) {
+						zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't find itemid in the value record: %s",jp.start);
 						continue;
 					}
 					
 					itemid = strtol(tmp_str,NULL,10);
 
-					if (FAIL == zbx_json_value_by_name(&jp,"hostid",tmp_str,MAX_ID_LEN, &type) ) {
-						zabbix_log(LOG_LEVEL_DEBUG,"Couldn't find hostid in the value record: %s",jp.start);
+					if (FAIL == zbx_json_value_by_name(&jp,"h",tmp_str,MAX_ID_LEN, &type) ) {
+						zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't find hostid in the value record: %s",jp.start);
 						continue;
 					}
 
@@ -3208,14 +3221,14 @@ int glb_vc_load_cache() {
 					
 					if (SUCCEED == glb_history_json2val(&jp, item->value_type, &value) ) {
 						if ( value.timestamp.sec < expire_timestamp ) {
-								zabbix_log(LOG_LEVEL_DEBUG,"Item %ld value timestamp %d is too old not adding to VC",
-									item->itemid, value.timestamp.sec);
+								zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld value timestamp %d is too old (%d second in the past) not adding to VC",
+									item->itemid, value.timestamp.sec, time(NULL) - value.timestamp.sec );
 							zbx_history_record_clear(&value,item->value_type);
 							continue;
 						}
 						 
 						if (FAIL == vch_item_add_value_at_head(vc_idx, item,&value)) {
-							zabbix_log(LOG_LEVEL_DEBUG,"Item %ld add to cache failed, item marked to be removed",item->itemid);
+							zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld add to cache failed, item marked to be removed",item->itemid);
 						} 
 						vals++;
 						zbx_history_record_clear(&value,item->value_type);
@@ -3227,7 +3240,7 @@ int glb_vc_load_cache() {
 				break;
 			}
 			default: 
-				//zabbix_log(LOG_LEVEL_INFORMATION,"Unknown type of record '%s', ignoring line",type_str);
+				zabbix_log(LOG_LEVEL_INFORMATION,"Unknown type of record '%s', ignoring line",type_str);
 				break;
 			
 		}
@@ -3280,10 +3293,14 @@ int glb_vc_dump_cache() {
 		RDLOCK_CACHE(i);
 		zbx_hashset_iter_reset(&vc_cache[i]->items,&iter);
 	
-		while (NULL != (item=(zbx_vc_item_t*)zbx_hashset_iter_next(&iter))) {
+		//to save disk space a bit, i am using acronyms:
+		//t -type, i -itemid, vt - value_type, s - status, rsh -range_sync_hour, vtl - values_total, h -hostid
 
-			zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, "{\"type\":%d, \"itemid\":%ld, \"value_type\":%d, \"status\":%d, \"range_sync_hour\":%d, \"values_total\":%d, \"last_accessed\":%d, \"active_range\":%d, \"db_cached_from\":%d}\n", 
-		    			GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid, item->value_type,  
+
+		while (NULL != (item=(zbx_vc_item_t*)zbx_hashset_iter_next(&iter))) {
+			zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, 
+				"{\"t\":%d,\"i\":%ld,\"h\":%ld,\"vt\":%d,\"ss\":%d,\"st\":%d,\"rsh\":%d,\"vtl\":%d,\"la\":%d,\"ar\":%d,\"dcf\":%d}\n", 
+		    			GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid,item->hostid, item->value_type,  
 						item->status, item->range_sync_hour, item->values_total, 
 						item->last_accessed, item->active_range, item->db_cached_from);
 			buff_items++;
@@ -3305,15 +3322,12 @@ int glb_vc_dump_cache() {
 					zabbix_log(LOG_LEVEL_DEBUG, "In %s: dumping data value %d ts is %d",__func__, i , curr_chunk->slots[i].timestamp.sec);
 			
 					zbx_history_value2str(tmp_val,MAX_STRING_LEN,&curr_chunk->slots[i].value,item->value_type);
-				//new lines and quites fixes
+		
 					glb_escape_worker_string(tmp_val,tmp_val2);
-					zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"type\":%d, \"itemid\":%ld, \"ts\":%d, \"value\":\"%s\"}\n",
-						GLB_VCDUMP_RECORD_TYPE_VALUE,item->itemid,curr_chunk->slots[i].timestamp.sec,tmp_val2);
+					zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"t\":%d,\"i\":%ld,\"h\":%ld,\"ts\":%d,\"v\":\"%s\"}\n",
+						GLB_VCDUMP_RECORD_TYPE_VALUE,item->itemid, item->hostid, curr_chunk->slots[i].timestamp.sec,tmp_val2);
 			
-				//if (-1 == write(fd,tmp,len)) {
-				//	zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",CONFIG_VCDUMP_LOCATION);
-				//	break;
-				//	}
+		
 					vals++;	
 				}
 			
