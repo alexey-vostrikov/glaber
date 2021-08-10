@@ -914,7 +914,7 @@ static int recv_getlastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 
 		ret = glb_dc_get_lastvalues_json(&itemids, &json);
 
-		zabbix_log(LOG_LEVEL_INFORMATION, "Resulting last values json is %s",json.buffer);
+		zabbix_log(LOG_LEVEL_DEBUG, "Resulting last values json is %s",json.buffer);
 		zbx_vector_uint64_destroy(&itemids);
 
 		ret = SUCCEED;
@@ -923,7 +923,7 @@ static int recv_getlastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	}
 
 out:
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: Response is %s",__func__, json.buffer);
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: Response is %s",__func__, json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);

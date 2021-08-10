@@ -208,7 +208,7 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(items, &dc_item->itemid)))
 	{
-			DEBUG_ITEM(dc_item->itemid, "Item already int the local queue, cleaning");
+			DEBUG_ITEM(dc_item->itemid, "Item already in the local queue, cleaning");
 
 			if (POLL_QUEUED == glb_item->state) {
 				glb_free_item_data(poll_engine, glb_item);
