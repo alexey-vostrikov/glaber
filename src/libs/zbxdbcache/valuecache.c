@@ -26,6 +26,7 @@
 #include "../zbxexec/worker.h"
 #include "valuecache.h"
 #include "vectorimpl.h"
+#include <zlib.h>
 
 /*
  * The cache (zbx_vc_cache_t) is organized as a hashset of item records (zbx_vc_item_t).
@@ -3089,15 +3090,15 @@ static int  glb_parse_item_metadata(struct zbx_json_parse  *jp, zbx_vc_item_t *i
 		last_accessed_str[MAX_ID_LEN], active_range_str[MAX_ID_LEN], db_cached_from_str[MAX_ID_LEN];
 	zbx_json_type_t type;	
 
-	if (SUCCEED != zbx_json_value_by_name(jp,"i",itemid_str,MAX_ID_LEN, &type) ||
-		SUCCEED != zbx_json_value_by_name(jp,"h",hostid_str,MAX_ID_LEN, &type) || 
-	    SUCCEED != zbx_json_value_by_name(jp,"vt",value_type_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"ss",status_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"rsh",range_sync_hour_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"vtl",values_total_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"la",last_accessed_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"ar",active_range_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"dcf",db_cached_from_str,MAX_ID_LEN, &type) 
+	if (SUCCEED != zbx_json_value_by_name(jp,"itemid",itemid_str,MAX_ID_LEN, &type) ||
+		SUCCEED != zbx_json_value_by_name(jp,"hostid",hostid_str,MAX_ID_LEN, &type) || 
+	    SUCCEED != zbx_json_value_by_name(jp,"value_type",value_type_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"status",status_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"range_sync_hour",range_sync_hour_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"values_total",values_total_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"last_accessed",last_accessed_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"active_range",active_range_str,MAX_ID_LEN, &type) || 
+		SUCCEED != zbx_json_value_by_name(jp,"db_cached_from",db_cached_from_str,MAX_ID_LEN, &type) 
 	) return FAIL;
 
 	item->itemid = strtol(itemid_str,NULL,10);
@@ -3127,15 +3128,18 @@ static int  glb_parse_item_metadata(struct zbx_json_parse  *jp, zbx_vc_item_t *i
  ****************************************************************/
 int glb_vc_load_cache() {
 	FILE *fp;
+	gzFile gzfile;
+
 	size_t read, len =0;
-	char *line = NULL;
+	char line[MAX_STRING_LEN];
 	int req_type=0, items = 0, vals = 0;
 	struct zbx_json_parse jp;
 	zbx_json_type_t j_type;
 	char type_str[MAX_ID_LEN];
 	
 	zabbix_log(LOG_LEVEL_INFORMATION, "Reading valuecache from %s",CONFIG_VCDUMP_LOCATION);
-	sleep(1);
+	//sleep(1);
+	//return SUCCEED;
 
 	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "a"))) {
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for access check, exiting",CONFIG_VCDUMP_LOCATION);
@@ -3144,14 +3148,14 @@ int glb_vc_load_cache() {
 	}
 	fclose(fp);
 
-	//reopening the file in the read mode	
-	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "r"))) {
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for reading",CONFIG_VCDUMP_LOCATION);
+	//reopening the file in the read mode as gzipped file
+	if ( Z_NULL == (gzfile = gzopen(CONFIG_VCDUMP_LOCATION, "r"))) {
+		zabbix_log(LOG_LEVEL_WARNING, "Cannot open gzipped file %s for reading",CONFIG_VCDUMP_LOCATION);
 		//checking if we have the permissions on creating and writing the file
 		return FAIL;
 	}
 
-	while ((read = getline(&line, &len, fp)) != -1) {
+	while (Z_NULL != gzgets(gzfile, line, MAX_STRING_LEN) ) {
 		int vc_idx;
 		
 		//ok, detecting the type of record
@@ -3164,8 +3168,8 @@ int glb_vc_load_cache() {
 		}
 
 		//reading type of the record
-		if (SUCCEED != zbx_json_value_by_name(&jp, "t", type_str, MAX_ID_LEN, &j_type)) {
-        	zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse line no 'type' parameter");
+		if (SUCCEED != zbx_json_value_by_name(&jp, "type", type_str, MAX_ID_LEN, &j_type)) {
+        	zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse line '%s': no 'type' parameter",line);
         	continue;
     	}
 		req_type = strtol(type_str,NULL,10);
@@ -3199,14 +3203,14 @@ int glb_vc_load_cache() {
 
 					bzero(&value, sizeof(value));
 
-					if (FAIL == zbx_json_value_by_name(&jp,"i",tmp_str,MAX_ID_LEN, &type) ) {
+					if (FAIL == zbx_json_value_by_name(&jp,"itemid",tmp_str,MAX_ID_LEN, &type) ) {
 						zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't find itemid in the value record: %s",jp.start);
 						continue;
 					}
 					
 					itemid = strtol(tmp_str,NULL,10);
 
-					if (FAIL == zbx_json_value_by_name(&jp,"h",tmp_str,MAX_ID_LEN, &type) ) {
+					if (FAIL == zbx_json_value_by_name(&jp,"hostid",tmp_str,MAX_ID_LEN, &type) ) {
 						zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't find hostid in the value record: %s",jp.start);
 						continue;
 					}
@@ -3245,9 +3249,10 @@ int glb_vc_load_cache() {
 			
 		}
     }
-	fclose(fp);
+	gzclose(gzfile);
 	
 	zabbix_log(LOG_LEVEL_INFORMATION,"Finished loading valuecache data, loaded %d items; %d values",items,vals);
+	//exit(-1);
 
 	return SUCCEED;
 }
@@ -3258,12 +3263,12 @@ int glb_vc_load_cache() {
  * VC data - if write times will be slow, redo in a cache non-blocking 
  * maner or implement buffering
 *****************************************************************/
-#define BUFFER_ITEMS 8192
+#define BUFFER_ITEMS 1024*1024
 int glb_vc_dump_cache() {
 
 	zbx_hashset_iter_t iter;
 	zbx_vc_item_t *item;
-	int items = 0, vals = 0,  fd, buff_items = 0, i;
+	int items = 0, vals = 0, buff_items = 0, i;
 	
 	size_t buff_alloc, buff_offset;
 	char *buffer = NULL;
@@ -3276,13 +3281,19 @@ int glb_vc_dump_cache() {
     if (NULL == CONFIG_VCDUMP_LOCATION )
 	 		return FAIL;
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "Will dump value cache to %s",CONFIG_VCDUMP_LOCATION);
+	zabbix_log(LOG_LEVEL_INFORMATION, "Will dump value cache to %s",CONFIG_VCDUMP_LOCATION);
 	//old cache file is renamed to *.old postfix due to possibility of corrupting or not completing the dump
 	//of something is wrong, this way will have a bit outdated but functional copy of the cache
 	zbx_snprintf(new_file,MAX_STRING_LEN,"%s%s",CONFIG_VCDUMP_LOCATION,".new");
 	//zbx_snprintf_alloc(buffer,alloc_len,offset,)
-	if (-1 == (fd = open(new_file, O_WRONLY | O_CREAT | O_TRUNC, 0600))) {
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s, value cache will not be dumped",CONFIG_VCDUMP_LOCATION);
+	
+	gzFile gzfile = gzopen(new_file,"wb");
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "Cache file has been opened");
+
+//	if (-1 == (fd = open(new_file, O_WRONLY | O_CREAT | O_TRUNC, 0600))) {
+	if (Z_NULL == gzfile) {
+		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s, value cache will not be dumped",new_file);
 		return FAIL;
 	}
 
@@ -3299,17 +3310,12 @@ int glb_vc_dump_cache() {
 
 		while (NULL != (item=(zbx_vc_item_t*)zbx_hashset_iter_next(&iter))) {
 			zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, 
-				"{\"t\":%d,\"i\":%ld,\"h\":%ld,\"vt\":%d,\"ss\":%d,\"st\":%d,\"rsh\":%d,\"vtl\":%d,\"la\":%d,\"ar\":%d,\"dcf\":%d}\n", 
+				"{\"type\":%d,\"itemid\":%ld,\"hostid\":%ld,\"value_type\":%d,\"status\":%d,\"range_sync_hour\":%d,\"values_total\":%d,\"last_accessed\":%d,\"active_range\":%d,\"db_cached_from\":%d}\n", 
 		    			GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid,item->hostid, item->value_type,  
-						item->status, item->range_sync_hour, item->values_total, 
+				item->status, item->range_sync_hour, item->values_total, 
 						item->last_accessed, item->active_range, item->db_cached_from);
 			buff_items++;
-//		if (-1 == write(fd,tmp,len)) {
-//			zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",new_file);
-//			break;
-//		}
 
-		//tail is the oldest value
 			zbx_vc_chunk_t *curr_chunk=item->tail;
 		
 			int c_count = 0, i;		
@@ -3324,7 +3330,7 @@ int glb_vc_dump_cache() {
 					zbx_history_value2str(tmp_val,MAX_STRING_LEN,&curr_chunk->slots[i].value,item->value_type);
 		
 					glb_escape_worker_string(tmp_val,tmp_val2);
-					zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"t\":%d,\"i\":%ld,\"h\":%ld,\"ts\":%d,\"v\":\"%s\"}\n",
+					zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"type\":%d,\"itemid\":%ld,\"hostid\":%ld,\"ts\":%d,\"value\":\"%s\"}\n",
 						GLB_VCDUMP_RECORD_TYPE_VALUE,item->itemid, item->hostid, curr_chunk->slots[i].timestamp.sec,tmp_val2);
 			
 		
@@ -3339,8 +3345,9 @@ int glb_vc_dump_cache() {
 			if (buff_items > BUFFER_ITEMS) {
 				//vc_try_unlock();
 				//dumping the buffer
-				if (-1 == write(fd,buffer,buff_offset)) {
-					zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",new_file);
+				//if (-1 == write(fd,buffer,buff_offset)) {
+				if ( 0 >= gzwrite(gzfile,buffer,buff_offset))	{
+					zabbix_log(LOG_LEVEL_WARNING,"Cannot write to cache %s, errno is %d",new_file,errno);
 					break;
 				}
 				buff_offset=0;
@@ -3351,12 +3358,12 @@ int glb_vc_dump_cache() {
 	}
 	
 	//dumping remainings in the buffer
-	if (-1 == write(fd,buffer,buff_offset)) {
-		zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s",new_file);
+	if ( 0 >= gzwrite(gzfile,buffer,buff_offset)) {
+		zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s, errno is %d",new_file, errno);
 	}
 
 	zbx_free(buffer);
-	close(fd);
+	gzclose(gzfile);
 
 	if (0 != rename(new_file, CONFIG_VCDUMP_LOCATION)) {
 		zabbix_log(LOG_LEVEL_WARNING,"Couldn't rename %s -> %s (%s)", new_file, CONFIG_VCDUMP_LOCATION,strerror(errno));

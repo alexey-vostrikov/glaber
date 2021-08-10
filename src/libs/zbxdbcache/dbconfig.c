@@ -16136,12 +16136,9 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 	for (i=0; i<itemids->values_num; i++) {
 		if ( NULL != (item=zbx_hashset_search(&config->items,&itemids->values[i])) ) {
 			
-			//	zbx_json_addarray(json,NULL);
 			zbx_json_addobject(json,NULL);
 
 			zbx_json_adduint64(json,"itemid",item->itemid);
-			zabbix_log(LOG_LEVEL_INFORMATION,"Got lastclock %ld", item->lastclock);
-
 			zbx_json_adduint64(json,"clock", item->lastclock);
 				
 			zbx_json_adduint64(json,"nextcheck",item->nextcheck);
