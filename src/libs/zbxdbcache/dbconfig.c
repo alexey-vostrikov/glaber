@@ -15917,7 +15917,7 @@ int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *js
 			zbx_json_addobject(json,NULL);
 
 			zbx_json_adduint64(json,"itemid",item->itemid);
-			zabbix_log(LOG_LEVEL_INFORMATION,"Got lastclock %ld", item->lastclock);
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Got lastclock %ld", item->lastclock);
 
 			zbx_json_adduint64(json,"clock", item->lastclock);
 				

@@ -103,8 +103,8 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 	
 		switch string(v.GetStringBytes("request")) {
 			case "get_history":
-				log.Print("Get request")
-				log.Print( string(request) )
+			//	log.Print("Get request")
+			//	log.Print( string(request) )
 
 				hr := HistoryRequest {
 					Itemid: uint64(v.GetInt64("itemid")),
