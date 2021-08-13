@@ -13493,8 +13493,9 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 	{
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &history[i].itemid)))
 			continue;
-		
-		
+
+		zabbix_log(LOG_LEVEL_INFORMATION, "Handling item %ld", dc_item->itemid);
+
 		if ( 0 != (ZBX_DC_FLAG_META & history[i].flags ) ) {
 			dc_item->mtime = history[i].mtime;
 			dc_item->lastlogsize = history[i].lastlogsize; 
@@ -13524,6 +13525,7 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 		if (dc_item->state != history[i].state ) {
 			dc_item->state = history[i].state;
 			if (ITEM_STATE_NOTSUPPORTED == history[i].state) {
+					zabbix_log(LOG_LEVEL_INFORMATION,"Handling unsupported item");
 					if ( NULL != history[i].value.err )
 					DCstrpool_replace(1, &dc_item->error, history[i].value.err);
 				else 
@@ -13532,6 +13534,7 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 				history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
 				continue;
 			}
+			zabbix_log(LOG_LEVEL_INFORMATION,"Resetting error text");
 			DCstrpool_replace(1, &dc_item->error, "");
 		}
 		
