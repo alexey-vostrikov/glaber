@@ -2727,6 +2727,7 @@ int	zbx_vc_get_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_re
 	if (ZBX_VC_MODE_LOWMEM == vc_cache->mode)
 		vc_warn_low_memory();
 	
+	//here we just checking that item is in the cache, and if it's not, creating a new one
 	if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache->items, &itemid)))
 	{
 		if (ZBX_VC_MODE_NORMAL == vc_cache->mode)
@@ -2739,12 +2740,13 @@ int	zbx_vc_get_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_re
 		else
 			goto out;
 	}
-
+	//increasing reference count - HZ why it's used
 	vc_item_addref(item);
 
 	if (0 != (item->state & ZBX_ITEM_STATE_REMOVE_PENDING) || item->value_type != value_type)
 		goto out;
-
+	//trying to get requested items from the value cache
+	//this will not request the database, only will fetch from the cache
 	ret = vch_item_get_values(item, values, seconds, count, ts);
 out:
 	if (FAIL == ret)

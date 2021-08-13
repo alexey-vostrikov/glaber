@@ -13522,8 +13522,8 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 		}
 	
 
-		if (ITEM_STATE_NOTSUPPORTED == history[i].state) {
-			dc_item->state = ITEM_STATE_NOTSUPPORTED;
+		if (dc_item->state != history[i].state) {
+			dc_item->state = history[i].state;
 			if ( NULL != history[i].value.err )
 				DCstrpool_replace(1, &dc_item->error, history[i].value.err);
 			else 
@@ -13532,8 +13532,6 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 			history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
 			continue;
 		}
-
-
 
 
 		if (  0 != ( (ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOVALUE) & history[i].flags) ) {
