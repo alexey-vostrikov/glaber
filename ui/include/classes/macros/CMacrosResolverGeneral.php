@@ -795,7 +795,7 @@ class CMacrosResolverGeneral {
 						));
 
 						if (array_key_exists($function['itemid'], $history)) {
-							$clock = $history[$function['itemid']]['lastclock'];
+							$clock = $history[$function['itemid']]['clock'];
 							$value = $history[$function['itemid']]['value'];
 						}
 						break;

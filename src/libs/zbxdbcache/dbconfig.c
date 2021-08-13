@@ -13521,19 +13521,20 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 			}
 		}
 	
-
-		if (dc_item->state != history[i].state) {
+		if (dc_item->state != history[i].state ) {
 			dc_item->state = history[i].state;
-			if ( NULL != history[i].value.err )
-				DCstrpool_replace(1, &dc_item->error, history[i].value.err);
-			else 
-				DCstrpool_replace(1, &dc_item->error, "");
-			//TODO: allow writing poll codes and errmesages to the history
-			history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
-			continue;
+			if (ITEM_STATE_NOTSUPPORTED == history[i].state) {
+					if ( NULL != history[i].value.err )
+					DCstrpool_replace(1, &dc_item->error, history[i].value.err);
+				else 
+					DCstrpool_replace(1, &dc_item->error, "");
+				//TODO: allow writing poll codes and errmesages to the history
+				history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
+				continue;
+			}
+			DCstrpool_replace(1, &dc_item->error, "");
 		}
-
-
+		
 		if (  0 != ( (ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOVALUE) & history[i].flags) ) {
 			//the item has no data to export 
 			history[i].flags |= ZBX_DC_FLAG_NOHISTORY | ZBX_DC_FLAG_NOTRENDS;
