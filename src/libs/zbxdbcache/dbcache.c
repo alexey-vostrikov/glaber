@@ -2497,6 +2497,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		//passing real key from the poller alongside with the history value
 		h->host_name = (char *)item->host.host;
 		h->item_key = (char *)item->key_orig;
+		h->hostid = item->host.hostid;
 
 		normalize_item_value(item, h);
 		DCinventory_value_add(inventory_values, item, h);

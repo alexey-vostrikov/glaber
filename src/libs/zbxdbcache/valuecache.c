@@ -78,6 +78,7 @@ static int	vc_state = ZBX_VC_DISABLED;
 extern zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE;
 extern char	*CONFIG_VCDUMP_LOCATION;
 extern int	CONFIG_HISTSYNCER_FORKS;
+#define  VC_STRIPES (1)
 
 int func_count;
 
@@ -917,7 +918,7 @@ void	zbx_vc_housekeeping_value_cache(void)
 	int i;
 	if (ZBX_VC_DISABLED == vc_state)
 		return;
-	for ( i = 0; i < CONFIG_HISTSYNCER_FORKS; i++ ) {
+	for ( i = 0; i < VC_STRIPES; i++ ) {
 		WRLOCK_CACHE(i);
 		vc_release_unused_items(i, NULL);
 		UNLOCK_CACHE(i);
@@ -2076,7 +2077,7 @@ static int	vch_item_cache_values_by_time(unsigned int vc_idx, zbx_vc_item_t **it
 {
 	int				ret, range_end;
 	zbx_vector_history_record_t	records;
-	zbx_uint64_t			itemid;
+	zbx_uint64_t			itemid, hostid;
 	unsigned char			value_type;
 
 	if (ZBX_ITEM_STATUS_CACHED_ALL == (*item)->status)
@@ -2100,6 +2101,7 @@ static int	vch_item_cache_values_by_time(unsigned int vc_idx, zbx_vc_item_t **it
 		return SUCCEED;
 
 	zbx_vector_history_record_create(&records);
+	hostid = (*item)->hostid;
 	itemid = (*item)->itemid;
 	value_type = (*item)->value_type;
 
@@ -2118,7 +2120,8 @@ static int	vch_item_cache_values_by_time(unsigned int vc_idx, zbx_vc_item_t **it
 
 	if (NULL == (*item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache[vc_idx]->items, &itemid)))
 	{
-		zbx_vc_item_t	new_item = {.itemid = itemid, .value_type = value_type};
+		zbx_vc_item_t	new_item = {.itemid = itemid, .value_type = value_type, .hostid = hostid };
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Insert new item with hostid %ld",hostid);
 
 		if (NULL == (*item = (zbx_vc_item_t *)zbx_hashset_insert(&vc_cache[vc_idx]->items, &new_item, sizeof(new_item))))
 			goto out;
@@ -2166,7 +2169,7 @@ static int	vch_item_cache_values_by_time_and_count(unsigned int vc_idx, zbx_vc_i
 {
 	int				ret = SUCCEED, cached_records = 0, range_end, records_offset;
 	zbx_vector_history_record_t	records;
-	zbx_uint64_t			itemid;
+	zbx_uint64_t			itemid, hostid;
 	unsigned char			value_type;
 
 	if (ZBX_ITEM_STATUS_CACHED_ALL == (*item)->status)
@@ -2202,6 +2205,8 @@ static int	vch_item_cache_values_by_time_and_count(unsigned int vc_idx, zbx_vc_i
 
 	itemid = (*item)->itemid;
 	value_type = (*item)->value_type;
+	hostid = (*item)->hostid;
+
 	UNLOCK_CACHE(vc_idx);
 
 	zbx_vector_history_record_create(&records);
@@ -2228,7 +2233,8 @@ static int	vch_item_cache_values_by_time_and_count(unsigned int vc_idx, zbx_vc_i
 
 	if (NULL == (*item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache[vc_idx]->items, &itemid)))
 	{
-		zbx_vc_item_t	new_item = {.itemid = itemid, .value_type = value_type};
+		zbx_vc_item_t	new_item = {.itemid = itemid, .value_type = value_type, .hostid = hostid };
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Insert new item with hostid %ld",hostid);
 
 		if (NULL == (*item = (zbx_vc_item_t *)zbx_hashset_insert(&vc_cache[vc_idx]->items, &new_item, sizeof(new_item))))
 			goto out;
@@ -2524,12 +2530,12 @@ int	zbx_vc_init(char **error)
 	
 
 	//this might be inprecise, but definetly exceeding
-	size_reserved = zbx_mem_required_size(1, "value cache size", "ValueCacheSize") * CONFIG_HISTSYNCER_FORKS;
+	size_reserved = zbx_mem_required_size(1, "value cache size", "ValueCacheSize") * VC_STRIPES;
 
 	CONFIG_VALUE_CACHE_SIZE -= size_reserved;
 
-	for (i = 0; i < CONFIG_HISTSYNCER_FORKS; i++ ) {
-		if (SUCCEED != zbx_mem_create(&vc_mem[i], CONFIG_VALUE_CACHE_SIZE / CONFIG_HISTSYNCER_FORKS, "value cache size", "ValueCacheSize", 1, error))
+	for (i = 0; i < VC_STRIPES; i++ ) {
+		if (SUCCEED != zbx_mem_create(&vc_mem[i], CONFIG_VALUE_CACHE_SIZE / VC_STRIPES, "value cache size", "ValueCacheSize", 1, error))
 			goto out;
 
 
@@ -2592,7 +2598,7 @@ void	zbx_vc_destroy(void)
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 	int i;
 
-	for (i = 0; i < CONFIG_HISTSYNCER_FORKS; i++ ){
+	for (i = 0; i < VC_STRIPES; i++ ){
 		if (NULL != vc_cache[0]) {
 			zbx_vector_vc_itemupdate_destroy(&vc_itemupdates[i]);
 
@@ -2624,7 +2630,7 @@ void	zbx_vc_reset(void)
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 	int i;
 
-	for (i = 0; i < CONFIG_HISTSYNCER_FORKS; i++ ){
+	for (i = 0; i < VC_STRIPES; i++ ){
 		if (NULL != vc_cache) {
 			zbx_vc_item_t		*item;
 			zbx_hashset_iter_t	iter;
@@ -2685,7 +2691,7 @@ int	zbx_vc_add_values(zbx_vector_ptr_t *history)
 	{
 		
 		h = (ZBX_DC_HISTORY *)history->values[i];
-		vc_idx = h->hostid % CONFIG_HISTSYNCER_FORKS;
+		vc_idx = h->hostid % VC_STRIPES;
 
 		if ( 0 == i )  {
 			WRLOCK_CACHE(vc_idx);
@@ -2717,6 +2723,8 @@ int	zbx_vc_add_values(zbx_vector_ptr_t *history)
 			/* try to remove old (unused) chunks if a new chunk was added */
 			if (head != item->head)
 				vch_item_clean_cache(vc_idx, item);
+
+		} else {
 
 		}
 	}
@@ -2757,9 +2765,7 @@ int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, 
 	zbx_vc_item_t	*item, new_item;
 	int 		ret = FAIL, cache_used = 1;
 
-	//TODO: remove when valuecache operations will be fixed
-	hostid = 0;
-	int vc_idx = hostid % CONFIG_HISTSYNCER_FORKS;
+	int vc_idx = hostid % VC_STRIPES;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d seconds:%d count:%d sec:%d ns:%d",
 			__func__, itemid, value_type, seconds, count, ts->sec, ts->ns);
@@ -2779,6 +2785,10 @@ int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, 
 
 		memset(&new_item, 0, sizeof(new_item));
 		new_item.itemid = itemid;
+		
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Set new item host id to %ld",hostid);
+		new_item.hostid = hostid;
+		
 		new_item.value_type = value_type;
 		item = &new_item;
 	}
@@ -2878,7 +2888,7 @@ int	zbx_vc_get_statistics(zbx_vc_stats_t *stats)
 	stats->total_size = 0;
 	stats->free_size = 0;
 	
-	for (i = 0; i < CONFIG_HISTSYNCER_FORKS; i++) {
+	for (i = 0; i < VC_STRIPES; i++) {
 		RDLOCK_CACHE(i);
 
 		stats->hits += vc_cache[i]->hits;
@@ -2939,7 +2949,7 @@ void	zbx_vc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num, in
 		*mode = -1;
 		return;
 	}
-	for ( i = 0; i < CONFIG_HISTSYNCER_FORKS; i++ ) {
+	for ( i = 0; i < VC_STRIPES; i++ ) {
 		RDLOCK_CACHE(i);
 
 		*items_num = vc_cache[i]->items.num_data;
@@ -2970,7 +2980,7 @@ void	zbx_vc_get_mem_stats(zbx_mem_stats_t *mem)
 		return;
 	}
 
-	for ( i = 0; i < CONFIG_HISTSYNCER_FORKS; i++ ) {
+	for ( i = 0; i < VC_STRIPES; i++ ) {
 		memset(&temp_mem, 0, sizeof(zbx_mem_stats_t));
 		RDLOCK_CACHE(i);
 		zbx_mem_get_stats(vc_mem[i], &temp_mem);
@@ -3005,7 +3015,7 @@ void	zbx_vc_get_item_stats(zbx_vector_ptr_t *stats)
 
 	if (ZBX_VC_DISABLED == vc_state)
 		return;
-	for ( i = 0; i < CONFIG_HISTSYNCER_FORKS; i++) {
+	for ( i = 0; i < VC_STRIPES; i++) {
 		RDLOCK_CACHE(i);
 
 		zbx_vector_ptr_reserve(stats, vc_cache[i]->items.num_data);
@@ -3039,7 +3049,7 @@ void	zbx_vc_flush_stats(void)
 
 	now = time(NULL);
 
-	for (vc_idx = 0; vc_idx < CONFIG_HISTSYNCER_FORKS; vc_idx ++ ) {
+	for (vc_idx = 0; vc_idx < VC_STRIPES; vc_idx ++ ) {
 		if (ZBX_VC_DISABLED == vc_state || 0 == vc_itemupdates[vc_idx].values_num)
 			return;
 
@@ -3219,7 +3229,7 @@ int glb_vc_load_cache() {
 					}
 
 					hostid = strtol(tmp_str,NULL,10);
-					vc_idx = hostid % CONFIG_HISTSYNCER_FORKS;				
+					vc_idx = hostid % VC_STRIPES;				
 
 					if (NULL == (item = (zbx_vc_item_t *)zbx_hashset_search(&vc_cache[vc_idx]->items,&itemid ))) {
 						zabbix_log(LOG_LEVEL_WARNING,"Couldn't find itemid in VC %ld",itemid);
@@ -3300,7 +3310,7 @@ int glb_vc_dump_cache() {
 		return FAIL;
 	}
 
-	for ( i = 0; i < CONFIG_HISTSYNCER_FORKS; i++) {
+	for ( i = 0; i < VC_STRIPES; i++) {
 		if ( NULL == vc_cache[i]) 
 			continue;
 		
@@ -3314,7 +3324,7 @@ int glb_vc_dump_cache() {
 		while (NULL != (item=(zbx_vc_item_t*)zbx_hashset_iter_next(&iter))) {
 			zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, 
 				"{\"type\":%d,\"itemid\":%ld,\"hostid\":%ld,\"value_type\":%d,\"status\":%d,\"range_sync_hour\":%d,\"values_total\":%d,\"last_accessed\":%d,\"active_range\":%d,\"db_cached_from\":%d}\n", 
-		    			GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid,item->hostid, item->value_type,  
+		    			GLB_VCDUMP_RECORD_TYPE_ITEM, item->itemid, item->hostid, item->value_type,  
 				item->status, item->range_sync_hour, item->values_total, 
 						item->last_accessed, item->active_range, item->db_cached_from);
 			buff_items++;
