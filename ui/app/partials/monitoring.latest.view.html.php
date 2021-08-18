@@ -131,7 +131,7 @@ foreach ($data['items'] as $itemid => $item) {
 
 		if ( $lastHistory['clock'] > 0 &&
 			(!isset($lastHistory['error']) || strlen($lastHistory['error']) <1 ) && 
-		    isset($prevHistory) && 
+		    isset($prevHistory) && isset($prevHistory['value'])
 			in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]) ) {
 			$history_diff = $lastHistory['value'] - $prevHistory['value'];
 

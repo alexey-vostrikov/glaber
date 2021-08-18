@@ -2756,6 +2756,9 @@ int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, 
 {
 	zbx_vc_item_t	*item, new_item;
 	int 		ret = FAIL, cache_used = 1;
+
+	//TODO: remove when valuecache operations will be fixed
+	hostid = 0;
 	int vc_idx = hostid % CONFIG_HISTSYNCER_FORKS;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64 " value_type:%d seconds:%d count:%d sec:%d ns:%d",

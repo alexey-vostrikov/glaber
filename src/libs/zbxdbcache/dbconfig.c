@@ -13764,6 +13764,7 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 	
 		if (dc_item->state != history[i].state ) {
 			dc_item->state = history[i].state;
+			
 			if (ITEM_STATE_NOTSUPPORTED == history[i].state) {
 		//			zabbix_log(LOG_LEVEL_INFORMATION,"Handling unsupported item");
 					if ( NULL != history[i].value.err )

@@ -2097,6 +2097,9 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 	for (i = 0; i < history_num; i++)
 	{
 		ZBX_DC_HISTORY	*h = &history[i];
+		
+		//TODO: remove when the value cache operations will be fixed
+		h->hostid = 0;
 
 		if (0 != (ZBX_DC_FLAGS_NOT_FOR_HISTORY & h->flags))
 			continue;
@@ -2742,8 +2745,8 @@ static void	proxy_prepare_history(ZBX_DC_HISTORY *history, int history_num)
 			continue;
 
 		/* store errors or first value after an error */
-		if (ITEM_STATE_NOTSUPPORTED == history[i].state || ITEM_STATE_NOTSUPPORTED == items[i].state)
-			continue;
+		//if (ITEM_STATE_NOTSUPPORTED == history[i].state || ITEM_STATE_NOTSUPPORTED == items[i].state)
+		//	continue;
 
 		/* store items linked to host inventory */
 		if (0 != items[i].inventory_link)
