@@ -29,6 +29,7 @@
 
 #include "trapper_auth.h"
 #include "trapper_item_test.h"
+extern int CONFIG_IPMIPOLLER_FORKS;
 
 static void	dump_item(const DC_ITEM *item)
 {
