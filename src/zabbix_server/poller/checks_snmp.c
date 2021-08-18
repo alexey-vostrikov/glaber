@@ -31,6 +31,9 @@
 #include "zbxjson.h"
 #include "../glb_poller/glb_poller.h"
 #include "preproc.h"
+
+extern int CONFIG_GLB_SNMP_CONTENTION;
+
 /*
  * SNMP Dynamic Index Cache
  * ========================
