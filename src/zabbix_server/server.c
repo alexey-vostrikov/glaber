@@ -63,8 +63,11 @@
 #include "taskmanager/taskmanager.h"
 #include "preprocessor/preproc_manager.h"
 #include "preprocessor/preproc_worker.h"
+#include "availability/avail_manager.h"
 #include "lld/lld_manager.h"
 #include "lld/lld_worker.h"
+#include "reporter/report_manager.h"
+#include "reporter/report_writer.h"
 #include "events.h"
 #include "../libs/zbxdbcache/valuecache.h"
 #include "setproctitle.h"
@@ -75,15 +78,13 @@
 #include "export.h"
 #include "zbxvault.h"
 #include "zbxdiag.h"
+#include "zbxtrends.h"
 #include "../libs/zbxexec/worker.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
 #include "ipmi/ipmi_poller.h"
 #endif
-
-zbx_uint64_t zbx_dc_get_ext_worker(GLB_EXT_WORKER *worker, char *path );
-zbx_uint64_t zbx_dc_return_ext_worker(GLB_EXT_WORKER *worker);
 
 const char	*progname = NULL;
 const char	title_message[] = "zabbix_server";
@@ -129,7 +130,7 @@ const char	*help_message[] = {
 	"                                 preprocessing worker, proxy poller,",
 	"                                 self-monitoring, snmp trapper, task manager,",
 	"                                 timer, trapper, unreachable poller,",
-	"                                 vmware collector)",
+	"                                 vmware collector, history poller, availability manager)",
 	"        process-type,N           Process type and number (e.g., poller,3)",
 	"        pid                      Process identifier, up to 65535. For larger",
 	"                                 values specify target as \"process-type,N\"",
@@ -220,6 +221,10 @@ int	CONFIG_PREPROCESSOR_FORKS	= 3;
 int	CONFIG_LLDMANAGER_FORKS		= 1;
 int	CONFIG_LLDWORKER_FORKS		= 2;
 int	CONFIG_ALERTDB_FORKS		= 1;
+int	CONFIG_HISTORYPOLLER_FORKS	= 5;
+int	CONFIG_AVAILMAN_FORKS		= 1;
+int	CONFIG_REPORTMANAGER_FORKS	= 0;
+int	CONFIG_REPORTWRITER_FORKS	= 0;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
 char	*CONFIG_LISTEN_IP		= NULL;
@@ -245,6 +250,7 @@ zbx_uint64_t	CONFIG_CONF_CACHE_SIZE		= 8 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
+zbx_uint64_t	CONFIG_TREND_FUNC_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 512 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_EXPORT_FILE_SIZE		= ZBX_GIBIBYTE;
@@ -279,6 +285,7 @@ char	*CONFIG_DB_TLS_CA_FILE		= NULL;
 char	*CONFIG_DB_TLS_CIPHER		= NULL;
 char	*CONFIG_DB_TLS_CIPHER_13	= NULL;
 char	*CONFIG_EXPORT_DIR		= NULL;
+char	*CONFIG_EXPORT_TYPE		= NULL;
 int	CONFIG_DBPORT			= 0;
 int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
 int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
@@ -358,7 +365,9 @@ zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 
-int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_DISABLED;
+int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_ENABLED;
+
+char	*CONFIG_WEBSERVICE_URL	= NULL;
 
 volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 
@@ -529,6 +538,26 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_ALERTSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_ALERTDB_FORKS;
 	}
+	else if (local_server_num <= (server_count += CONFIG_HISTORYPOLLER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_HISTORYPOLLER;
+		*local_process_num = local_server_num - server_count + CONFIG_HISTORYPOLLER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_AVAILMAN_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_AVAILMAN;
+		*local_process_num = local_server_num - server_count + CONFIG_AVAILMAN_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_REPORTMANAGER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_REPORTMANAGER;
+		*local_process_num = local_server_num - server_count + CONFIG_REPORTMANAGER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_REPORTWRITER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_REPORTWRITER;
+		*local_process_num = local_server_num - server_count + CONFIG_REPORTWRITER_FORKS;
+	}
 	else
 		return FAIL;
 
@@ -606,7 +635,7 @@ static void	zbx_set_defaults(void)
 
 	if (0 != CONFIG_IPMIPOLLER_FORKS)
 		CONFIG_IPMIMANAGER_FORKS = 1;
-
+	
 	int i;
 
 	for ( i = 0; i < GLB_MODULE_API_TOTAL_CALLBACKS ; i++ ) {
@@ -617,13 +646,15 @@ static void	zbx_set_defaults(void)
 	if (NULL == CONFIG_VAULTURL)
 		CONFIG_VAULTURL = zbx_strdup(CONFIG_VAULTURL, "https://127.0.0.1:8200");
 
+	if (0 != CONFIG_REPORTWRITER_FORKS)
+		CONFIG_REPORTMANAGER_FORKS = 1;
+
 	if ( NULL != ICMP_METHOD_STR && NULL != strstr(ICMP_METHOD_STR,ZBX_ICMP_NAME) ) {
 			zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Zabbix ICMP (fping)");
 		CONFIG_ICMP_METHOD = ZBX_ICMP;
 	} else {
 		zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Glaber ICMP (async + glbmap)");
 	}
-
 }
 
 /******************************************************************************
@@ -660,6 +691,13 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
+	if (0 != CONFIG_TREND_FUNC_CACHE_SIZE && 128 * ZBX_KIBIBYTE > CONFIG_TREND_FUNC_CACHE_SIZE)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "\"TrendFunctionCacheSize\" configuration parameter must be either 0"
+				" or greater than 128KB");
+		err = 1;
+	}
+
 	if (NULL != CONFIG_SOURCE_IP && SUCCEED != is_supported_ip(CONFIG_SOURCE_IP))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "invalid \"SourceIP\" configuration parameter: '%s'", CONFIG_SOURCE_IP);
@@ -670,6 +708,12 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "invalid entry in \"StatsAllowedIP\" configuration parameter: %s", ch_error);
 		zbx_free(ch_error);
+		err = 1;
+	}
+
+	if (SUCCEED != 	zbx_validate_export_type(CONFIG_EXPORT_TYPE, NULL))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "invalid \"ExportType\" configuration parameter: %s", CONFIG_EXPORT_TYPE);
 		err = 1;
 	}
 
@@ -685,6 +729,7 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_str("VaultToken", CONFIG_VAULTTOKEN, "cURL library"));
 	err |= (FAIL == check_cfg_feature_str("VaultDBPath", CONFIG_VAULTDBPATH, "cURL library"));
 
+	err |= (FAIL == check_cfg_feature_int("StartReportWriters", CONFIG_REPORTWRITER_FORKS, "cURL library"));
 #endif
 
 #if !defined(HAVE_LIBXML2) || !defined(HAVE_LIBCURL)
@@ -718,6 +763,12 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_IPMIPOLLER_FORKS, "IPMI support"));
 #endif
 	err |= (FAIL == zbx_db_validate_config_features());
+
+	if (0 != CONFIG_REPORTWRITER_FORKS && NULL == CONFIG_WEBSERVICE_URL)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "\"WebServiceURL\" configuration parameter must be set when "
+				" setting \"StartReportWriters\" configuration parameter");
+	}
 
 #if !defined(HAVE_NETSNMP)
 	err |= (FAIL == check_cfg_feature_int("StartGlbSNMPPollers", CONFIG_GLB_SNMP_FORKS, "SNMP support"));
@@ -778,7 +829,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"WorkerServer",			&CONFIG_EXT_SERVERS,			TYPE_MULTISTRING,
 			PARM_OPT,	0,			0},
 		{"StartDBSyncers",		&CONFIG_HISTSYNCER_FORKS,		TYPE_INT,
-			PARM_OPT,	1,			100},
+			PARM_OPT,	1,			32},
 		{"StartDiscoverers",		&CONFIG_DISCOVERER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			250},
 		{"StartHTTPPollers",		&CONFIG_HTTPPOLLER_FORKS,		TYPE_INT,
@@ -833,6 +884,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"TrendCacheSize",		&CONFIG_TRENDS_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
+		{"TrendFunctionCacheSize",	&CONFIG_TREND_FUNC_CACHE_SIZE,		TYPE_UINT64,
+			PARM_OPT,	0,			__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"CacheUpdateFrequency",	&CONFIG_CONFSYNCER_FREQUENCY,		TYPE_INT,
@@ -983,11 +1036,19 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"ExportDir",			&CONFIG_EXPORT_DIR,			TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"ExportType",			&CONFIG_EXPORT_TYPE,			TYPE_STRING_LIST,
+			PARM_OPT,	0,			0},
 		{"ExportFileSize",		&CONFIG_EXPORT_FILE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	ZBX_MEBIBYTE,	ZBX_GIBIBYTE},
 		{"StartLLDProcessors",		&CONFIG_LLDWORKER_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			100},
 		{"StatsAllowedIP",		&CONFIG_STATS_ALLOWED_IP,		TYPE_STRING_LIST,
+			PARM_OPT,	0,			0},
+		{"StartHistoryPollers",		&CONFIG_HISTORYPOLLER_FORKS,		TYPE_INT,
+			PARM_OPT,	0,			1000},
+		{"StartReportWriters",		&CONFIG_REPORTWRITER_FORKS,		TYPE_INT,
+			PARM_OPT,	0,			100},
+		{"WebServiceURL",		&CONFIG_WEBSERVICE_URL,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"Hostname",			&CONFIG_HOSTNAME,			TYPE_STRING,
 			PARM_OPT,	0,			0},
@@ -1175,6 +1236,23 @@ static void	zbx_main_sigusr_handler(int flags)
 
 }
 
+static void	zbx_check_db(void)
+{
+	struct zbx_json	db_ver;
+
+	zbx_json_initarray(&db_ver, ZBX_JSON_STAT_BUF_LEN);
+
+	if (SUCCEED != DBcheck_capabilities(DBextract_version(&db_ver)) || SUCCEED != DBcheck_version())
+	{
+		zbx_json_free(&db_ver);
+		exit(EXIT_FAILURE);
+	}
+
+	//zbx_history_check_version(&db_ver);
+	DBflush_version_requirements(db_ver.buffer);
+	zbx_json_free(&db_ver);
+}
+
 int	MAIN_ZABBIX_ENTRY(int flags)
 {
 	zbx_socket_t	listen_sock;
@@ -1327,14 +1405,21 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == glb_vc_load_cache()) {
-		zabbix_log(LOG_LEVEL_CRIT, "cannot preload value cache, startup might take longer");
-		//exit(EXIT_FAILURE);
+	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_vc_load_cache()) {
+		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
+		exit(EXIT_FAILURE);
 	}
 
 	if (SUCCEED != zbx_create_itservices_lock(&error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot create IT services lock: %s", error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
+
+	if (SUCCEED != zbx_tfc_init(&error))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize trends read cache: %s", error);
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
@@ -1373,16 +1458,16 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	if (SUCCEED != DBcheck_version())
-		exit(EXIT_FAILURE);
+	zbx_check_db();
+
 	DBcheck_character_set();
 
-	if (SUCCEED == DBcheck_double_type())
-		CONFIG_DOUBLE_PRECISION = ZBX_DB_DBL_PRECISION_ENABLED;
-	else
+	if (SUCCEED != DBcheck_double_type())
+	{
+		CONFIG_DOUBLE_PRECISION = ZBX_DB_DBL_PRECISION_DISABLED;
+		ZBX_DOUBLE_EPSILON = 0.000001;
 		zabbix_log(LOG_LEVEL_WARNING, "database is not upgraded to use double precision values");
-
-	DBcheck_capabilities();
+	}
 
 	if (SUCCEED != zbx_db_check_instanceid())
 		exit(EXIT_FAILURE);
@@ -1397,7 +1482,9 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			+ CONFIG_SNMPTRAPPER_FORKS + CONFIG_PROXYPOLLER_FORKS + CONFIG_SELFMON_FORKS
 			+ CONFIG_VMWARE_FORKS + CONFIG_TASKMANAGER_FORKS + CONFIG_IPMIMANAGER_FORKS
 			+ CONFIG_ALERTMANAGER_FORKS + CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS
-			+ CONFIG_LLDMANAGER_FORKS + CONFIG_LLDWORKER_FORKS + CONFIG_ALERTDB_FORKS;
+			+ CONFIG_LLDMANAGER_FORKS + CONFIG_LLDWORKER_FORKS + CONFIG_ALERTDB_FORKS
+			+ CONFIG_HISTORYPOLLER_FORKS + CONFIG_AVAILMAN_FORKS + CONFIG_REPORTMANAGER_FORKS
+			+ CONFIG_REPORTWRITER_FORKS;
 	threads = (pid_t *)zbx_calloc(threads, threads_num, sizeof(pid_t));
 	threads_flags = (int *)zbx_calloc(threads_flags, threads_num, sizeof(int));
 
@@ -1563,14 +1650,33 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_ALERTSYNCER:
 				zbx_thread_start(alert_syncer_thread, &thread_args, &threads[i]);
 				break;
+			case ZBX_PROCESS_TYPE_HISTORYPOLLER:
+				poller_type = ZBX_POLLER_TYPE_HISTORY;
+				thread_args.args = &poller_type;
+				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
+				break;
+			case ZBX_PROCESS_TYPE_AVAILMAN:
+				threads_flags[i] = ZBX_THREAD_WAIT_EXIT;
+				zbx_thread_start(availability_manager_thread, &thread_args, &threads[i]);
+				break;
+			case ZBX_PROCESS_TYPE_REPORTMANAGER:
+				zbx_thread_start(report_manager_thread, &thread_args, &threads[i]);
+				break;
+			case ZBX_PROCESS_TYPE_REPORTWRITER:
+				zbx_thread_start(report_writer_thread, &thread_args, &threads[i]);
+				break;
 		}
 	}
 
-	if (SUCCEED == zbx_is_export_enabled())
-	{
-		zbx_history_export_init("main-process", 0);
+	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
 		zbx_problems_export_init("main-process", 0);
-	}
+
+	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_HISTORY))
+		zbx_history_export_init("main-process", 0);
+
+	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_TRENDS))
+		zbx_trends_export_init("main-process", 0);
+
 
 	zbx_set_sigusr_handler(zbx_main_sigusr_handler);
 

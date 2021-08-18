@@ -63,19 +63,19 @@ static void	lld_register_worker(zbx_ipc_socket_t *socket)
  ******************************************************************************/
 static void	lld_process_task(zbx_ipc_message_t *message)
 {
-	zbx_uint64_t		itemid, lastlogsize;
+	zbx_uint64_t		itemid, hostid, lastlogsize;
 	char			*value, *error;
 	zbx_timespec_t		ts;
 	
+	
 	ZBX_DC_HISTORY hist = {0};
-
 	DC_ITEM			item;
 	int			errcode, mtime;
 	unsigned char		state, meta;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_lld_deserialize_item_value(message->data, &itemid, &value, &ts, &meta, &lastlogsize, &mtime, &error);
+	zbx_lld_deserialize_item_value(message->data, &itemid, &hostid, &value, &ts, &meta, &lastlogsize, &mtime, &error);
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 	if (SUCCEED != errcode)
@@ -89,6 +89,10 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			state = ITEM_STATE_NORMAL;
 		else
 			state = ITEM_STATE_NOTSUPPORTED;
+		
+		hist.value_type = ITEM_VALUE_TYPE_TEXT;
+		hist.value.str = value;
+		hist.ts = ts;
 
 		hist.value_type = ITEM_VALUE_TYPE_TEXT;
 		hist.value.str = value;

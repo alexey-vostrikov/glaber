@@ -29,7 +29,7 @@
 
 
 size_t	DCconfig_get_trigger_itemids_by_valuetype( int value_type, zbx_vector_uint64_t *vector_itemids);
-int	zbx_vc_simple_add(zbx_uint64_t itemids, zbx_history_record_t *record);
+//int	zbx_vc_simple_add(zbx_uint64_t itemids, zbx_history_record_t *record);
 
 extern int CONFIG_SERVER_STARTUP_TIME;
 
@@ -328,7 +328,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	if (NULL == response)
 			return SUCCEED;
 	if (ITEM_VALUE_TYPE_LOG == value_type)
-		 zabbix_log(LOG_LEVEL_INFORMATION, "Got the LOG response: '%s'", response);
+		 zabbix_log(LOG_LEVEL_DEBUG, "Got the LOG response: '%s'", response);
 	
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse responce from worker: '%s'",response);

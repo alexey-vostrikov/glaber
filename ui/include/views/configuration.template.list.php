@@ -30,45 +30,10 @@ if (!$filter_tags) {
 	$filter_tags = [['tag' => '', 'value' => '', 'operator' => TAG_OPERATOR_LIKE]];
 }
 
-$filter_tags_table = (new CTable())
-	->setId('filter-tags')
-	->addRow((new CCol(
-		(new CRadioButtonList('filter_evaltype', (int) $data['filter']['evaltype']))
-			->addValue(_('And/Or'), TAG_EVAL_TYPE_AND_OR)
-			->addValue(_('Or'), TAG_EVAL_TYPE_OR)
-			->setModern(true)
-		))->setColSpan(4)
-	);
-
-$i = 0;
-foreach ($filter_tags as $tag) {
-	$filter_tags_table->addRow([
-		(new CTextBox('filter_tags['.$i.'][tag]', $tag['tag']))
-			->setAttribute('placeholder', _('tag'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-		(new CRadioButtonList('filter_tags['.$i.'][operator]', (int) $tag['operator']))
-			->addValue(_('Contains'), TAG_OPERATOR_LIKE)
-			->addValue(_('Equals'), TAG_OPERATOR_EQUAL)
-			->setModern(true),
-		(new CTextBox('filter_tags['.$i.'][value]', $tag['value']))
-			->setAttribute('placeholder', _('value'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-		(new CCol(
-			(new CButton('filter_tags['.$i.'][remove]', _('Remove')))
-				->addClass(ZBX_STYLE_BTN_LINK)
-				->addClass('element-table-remove')
-		))->addClass(ZBX_STYLE_NOWRAP)
-	], 'form_row');
-
-	$i++;
-}
-$filter_tags_table->addRow(
-	(new CCol(
-		(new CButton('filter_tags_add', _('Add')))
-			->addClass(ZBX_STYLE_BTN_LINK)
-			->addClass('element-table-add')
-	))->setColSpan(3)
-);
+$filter_tags_table = CTagFilterFieldHelper::getTagFilterField([
+	'evaltype' => $data['filter']['evaltype'],
+	'tags' => $filter_tags
+]);
 
 $filter = new CFilter(new CUrl('templates.php'));
 $filter
@@ -130,7 +95,9 @@ $widget = (new CWidget())
 				)
 			)
 			->addItem(
-				(new CButton('form', _('Import')))->onClick('redirect("conf.import.php?rules_preset=template")')
+				(new CButton('form', _('Import')))
+					->onClick('return PopUp("popup.import", {rules_preset: "template"}, null, this);')
+					->removeId()
 			)
 		))->setAttribute('aria-label', _('Content controls'))
 	)
@@ -148,7 +115,6 @@ $table = (new CTableInfo())
 			(new CUrl('templates.php'))->getUrl()
 		),
 		_('Hosts'),
-		_('Applications'),
 		_('Items'),
 		_('Triggers'),
 		_('Graphs'),
@@ -237,19 +203,11 @@ foreach ($data['templates'] as $template) {
 			CViewHelper::showNum(count(array_intersect_key($template['hosts'], $data['editable_hosts'])))
 		],
 		[
-			new CLink(_('Applications'),
-				(new CUrl('zabbix.php'))
-					->setArgument('action', 'application.list')
-					->setArgument('filter_set', '1')
-					->setArgument('filter_hostids', [$template['templateid']])
-			),
-			CViewHelper::showNum($template['applications'])
-		],
-		[
 			new CLink(_('Items'),
 				(new CUrl('items.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$template['templateid']])
+					->setArgument('context', 'template')
 			),
 			CViewHelper::showNum($template['items'])
 		],
@@ -258,6 +216,7 @@ foreach ($data['templates'] as $template) {
 				(new CUrl('triggers.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$template['templateid']])
+					->setArgument('context', 'template')
 			),
 			CViewHelper::showNum($template['triggers'])
 		],
@@ -266,6 +225,7 @@ foreach ($data['templates'] as $template) {
 				(new CUrl('graphs.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$template['templateid']])
+					->setArgument('context', 'template')
 			),
 			CViewHelper::showNum($template['graphs'])
 		],
@@ -273,7 +233,9 @@ foreach ($data['templates'] as $template) {
 			new CLink(_('Dashboards'),
 				(new CUrl('zabbix.php'))
 					->setArgument('action', 'template.dashboard.list')
-					->setArgument('templateid', $template['templateid'])),
+					->setArgument('templateid', $template['templateid'])
+					->setArgument('context', 'template')
+			),
 			CViewHelper::showNum($template['dashboards'])
 		],
 		[
@@ -281,6 +243,7 @@ foreach ($data['templates'] as $template) {
 				(new CUrl('host_discovery.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$template['templateid']])
+					->setArgument('context', 'template')
 			),
 			CViewHelper::showNum($template['discoveries'])
 		],
@@ -289,6 +252,7 @@ foreach ($data['templates'] as $template) {
 				(new CUrl('httpconf.php'))
 					->setArgument('filter_set', '1')
 					->setArgument('filter_hostids', [$template['templateid']])
+					->setArgument('context', 'template')
 			),
 			CViewHelper::showNum($template['httpTests'])
 		],
@@ -310,7 +274,12 @@ $form->addItem([
 						->getUrl()
 				)
 			],
-			'template.massupdateform' => ['name' => _('Mass update')],
+			'popup.massupdate.template' => [
+				'content' => (new CButton('', _('Mass update')))
+					->onClick("return openMassupdatePopup(this, 'popup.massupdate.template');")
+					->addClass(ZBX_STYLE_BTN_ALT)
+					->removeAttribute('id')
+			],
 			'template.massdelete' => ['name' => _('Delete'), 'confirm' => _('Delete selected templates?')],
 			'template.massdeleteclear' => ['name' => _('Delete and clear'),
 				'confirm' => _('Delete and clear selected templates? (Warning: all linked hosts will be cleared!)')

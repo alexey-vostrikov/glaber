@@ -1,7 +1,6 @@
 #ifndef GLABER_AGENT_H
 #define GLABER_AGENT_H
 
-#include "../preprocessor/linked_list.h"
 #include "zbxalgo.h"
 #include "glb_poller.h"
 #include "dbcache.h"

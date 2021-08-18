@@ -53,14 +53,15 @@ class CControllerWidgetProblemsBySvView extends CControllerWidget {
 			'evaltype' => $fields['evaltype'],
 			'tags' => $fields['tags']
 		];
+
 		$data = getSystemStatusData($filter);
-		
+
 		if ($filter['show_type'] == WIDGET_PROBLEMS_BY_SV_SHOW_TOTALS) {
 			$data['groups'] = getSystemStatusTotals($data);
 		}
 
 		$this->setResponse(new CControllerResponseData([
-			'name' => $this->getInput('name', $this->getDefaultHeader()),
+			'name' => $this->getInput('name', $this->getDefaultName()),
 			'initial_load' => (bool) $this->getInput('initial_load', 0),
 			'data' => $data,
 			'filter' => $filter,

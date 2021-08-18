@@ -52,25 +52,34 @@ class CLegacyAction extends CAction {
 		$denied = [];
 		$action = $this->getAction();
 
+		/*
+		 * Overwrite legacy action in case user is located in sub-section like items, triggers etc. That will make
+		 * sure to hide left menu and display error in case user has no access to templates or hosts.
+		 */
+		if (in_array(getRequest('context', ''), ['host', 'template']) && in_array($action, ['items.php', 'triggers.php',
+				'graphs.php', 'host_discovery.php', 'httpconf.php', 'disc_prototypes.php', 'trigger_prototypes.php',
+				'host_prototypes.php'])) {
+			$action = (getRequest('context') === 'host') ? 'hosts.php' : 'templates.php';
+		}
+
 		if ($user_type < USER_TYPE_ZABBIX_USER) {
 			$denied = ['chart.php', 'chart2.php', 'chart3.php', 'chart4.php', 'chart5.php', 'chart6.php', 'chart7.php',
 				'history.php', 'hostinventories.php', 'hostinventoriesoverview.php', 'httpdetails.php', 'image.php',
-				'imgstore.php', 'jsrpc.php', 'map.import.php', 'map.php', 'overview.php', 'toptriggers.php',
-				'tr_events.php', 'screenconf.php', 'screenedit.php', 'screen.import.php', 'screens.php',
-				'slideconf.php', 'slides.php', 'srv_status.php', 'sysmap.php', 'sysmaps.php', 'report2.php'
+				'imgstore.php', 'jsrpc.php', 'map.php', 'overview.php', 'toptriggers.php', 'tr_events.php',
+				'srv_status.php', 'sysmap.php', 'sysmaps.php', 'report2.php'
 			];
 		}
 
 		if ($user_type < USER_TYPE_ZABBIX_ADMIN) {
-			$denied = array_merge($denied, ['actionconf.php', 'conf.import.php',
-				'disc_prototypes.php', 'discoveryconf.php', 'graphs.php', 'host_discovery.php', 'host_prototypes.php',
+			$denied = array_merge($denied, ['actionconf.php',
+				'disc_prototypes.php', 'graphs.php', 'host_discovery.php', 'host_prototypes.php',
 				'hostgroups.php', 'hosts.php', 'httpconf.php', 'items.php', 'maintenance.php', 'report4.php',
 				'services.php', 'templates.php', 'trigger_prototypes.php', 'triggers.php'
 			]);
 		}
 
 		if ($user_type != USER_TYPE_SUPER_ADMIN) {
-			$denied = array_merge($denied, ['auditacts.php', 'correlation.php', 'queue.php']);
+			$denied = array_merge($denied, ['auditacts.php']);
 		}
 
 		if (in_array($action, $denied)) {
@@ -80,23 +89,12 @@ class CLegacyAction extends CAction {
 		$rule_actions = [];
 
 		if (in_array($user_type, [USER_TYPE_ZABBIX_USER, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN])) {
-			if ($action === 'screenconf.php' || $action === 'screenedit.php') {
-				return getRequest('templateid', false)
-					? $this->checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES)
-					: $this->checkAccess(CRoleHelper::UI_MONITORING_SCREENS);
-			}
-
 			$rule_actions = [
 				CRoleHelper::UI_MONITORING_PROBLEMS => ['tr_events.php'],
-				CRoleHelper::UI_MONITORING_HOSTS => ['host_screen.php', 'httpdetails.php'],
+				CRoleHelper::UI_MONITORING_HOSTS => ['httpdetails.php'],
 				CRoleHelper::UI_MONITORING_OVERVIEW => ['overview.php'],
 				CRoleHelper::UI_MONITORING_LATEST_DATA => ['history.php'],
-				CRoleHelper::UI_MONITORING_SCREENS => ['screen.import.php', 'screens.php', 'slideconf.php',
-					'slides.php'
-				],
-				CRoleHelper::UI_MONITORING_MAPS => ['image.php', 'map.import.php', 'map.php', 'sysmap.php',
-					'sysmaps.php'
-				],
+				CRoleHelper::UI_MONITORING_MAPS => ['image.php', 'map.php', 'sysmap.php', 'sysmaps.php'],
 				CRoleHelper::UI_MONITORING_SERVICES => ['chart5.php', 'srv_status.php'],
 				CRoleHelper::UI_INVENTORY_OVERVIEW => ['hostinventoriesoverview.php'],
 				CRoleHelper::UI_INVENTORY_HOSTS => ['hostinventories.php'],
@@ -113,16 +111,13 @@ class CLegacyAction extends CAction {
 				CRoleHelper::UI_CONFIGURATION_HOSTS => ['hosts.php'],
 				CRoleHelper::UI_CONFIGURATION_MAINTENANCE => ['maintenance.php'],
 				CRoleHelper::UI_CONFIGURATION_ACTIONS => ['actionconf.php'],
-				CRoleHelper::UI_CONFIGURATION_DISCOVERY => ['discoveryconf.php'],
 				CRoleHelper::UI_CONFIGURATION_SERVICES => ['services.php']
 			];
 		}
 
 		if ($user_type == USER_TYPE_SUPER_ADMIN) {
 			$rule_actions += [
-				CRoleHelper::UI_REPORTS_ACTION_LOG => ['auditacts.php'],
-				CRoleHelper::UI_CONFIGURATION_EVENT_CORRELATION => ['correlation.php'],
-				CRoleHelper::UI_ADMINISTRATION_QUEUE => ['queue.php']
+				CRoleHelper::UI_REPORTS_ACTION_LOG => ['auditacts.php']
 			];
 		}
 

@@ -23,8 +23,9 @@
 #include "zbxhistory.h"
 #include "history.h"
 #include "module.h"
-
+#include "../zbxdbcache/valuecache.h"
 #include "../zbxalgo/vectorimpl.h"
+
 
 ZBX_VECTOR_IMPL(history_record, zbx_history_record_t);
 
@@ -652,7 +653,38 @@ int	zbx_history_record_compare_desc_func(const zbx_history_record_t *d1, const z
 
 /******************************************************************************
  *                                                                            *
- * Function: glb_set_rpcess_types				                              *
+ * Function: zbx_history_value2variant                                        *
+ *                                                                            *
+ * Purpose: converts history value to variant value                           *
+ *                                                                            *
+ * Parameters: value      - [IN] the value to convert                         *
+ *             value_type - [IN] the history value type                       *
+ *             var        - [IN] the output value                             *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_history_value2variant(const history_value_t *value, unsigned char value_type, zbx_variant_t *var)
+{
+	switch (value_type)
+	{
+		case ITEM_VALUE_TYPE_FLOAT:
+			zbx_variant_set_dbl(var, value->dbl);
+			break;
+		case ITEM_VALUE_TYPE_UINT64:
+			zbx_variant_set_ui64(var, value->ui64);
+			break;
+		case ITEM_VALUE_TYPE_STR:
+		case ITEM_VALUE_TYPE_TEXT:
+			zbx_variant_set_str(var, zbx_strdup(NULL, value->str));
+			break;
+		case ITEM_VALUE_TYPE_LOG:
+			zbx_variant_set_str(var, zbx_strdup(NULL, value->log->value));
+	}
+}
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: glb_set_process_types				                              *
  *                                                                            *
  * Purpose: sets types arryay if the type names are present in the setting    *
  *                                                                            *
@@ -673,6 +705,7 @@ int glb_set_process_types(u_int8_t *types_array, char *setting) {
 		else types_array[i]=0; 
 	}
 }
+
 /******************************************************************************
  *                                                                            *
  * Function: glb_types_array_sum				                              *
@@ -685,7 +718,8 @@ int glb_types_array_sum(u_int8_t *types_array) {
 	for (i=0; i< ITEM_VALUE_TYPE_MAX; i++) sum+=types_array[i];
 	return sum;
 }
- history_value_t	history_str2value(char *str, unsigned char value_type)
+
+history_value_t	history_str2value(char *str, unsigned char value_type)
 {
 	history_value_t	value;
 

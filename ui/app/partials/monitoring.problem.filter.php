@@ -71,15 +71,6 @@ $left_column = (new CFormList())
 			->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 			->setId('hostids_#{uniqid}')
 	)
-	->addRow(_('Application'), [
-		(new CTextBox('application', $data['application']))
-			->setId('application_#{uniqid}')
-			->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-		(new CButton('application_select', _('Select')))
-			->setId('application_select_#{uniqid}')
-			->addClass(ZBX_STYLE_BTN_GREY)
-	])
 	->addRow((new CLabel(_('Triggers'), 'triggerids_#{uniqid}_ms')),
 		(new CMultiSelect([
 			'name' => 'triggerids[]',
@@ -180,13 +171,22 @@ foreach ($data['tags'] as $tag) {
 		(new CTextBox('tags['.$i.'][tag]', $tag['tag']))
 			->setAttribute('placeholder', _('tag'))
 			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-		(new CRadioButtonList('tags['.$i.'][operator]', (int) $tag['operator']))
-			->addValue(_('Contains'), TAG_OPERATOR_LIKE)
-			->addValue(_('Equals'), TAG_OPERATOR_EQUAL)
-			->setModern(true),
+		(new CSelect('tags['.$i.'][operator]'))
+			->addOptions(CSelect::createOptionsFromArray([
+				TAG_OPERATOR_EXISTS => _('Exists'),
+				TAG_OPERATOR_EQUAL => _('Equals'),
+				TAG_OPERATOR_LIKE => _('Contains'),
+				TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
+				TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
+				TAG_OPERATOR_NOT_LIKE => _('Does not contain')
+			]))
+			->setValue($tag['operator'])
+			->setFocusableElementId('tags-'.$i.'#{uniqid}-operator-select')
+			->setId('tags_'.$i.'#{uniqid}_operator'),
 		(new CTextBox('tags['.$i.'][value]', $tag['value']))
 			->setAttribute('placeholder', _('value'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
+			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+			->setId('tags_'.$i.'#{uniqid}_value'),
 		(new CCol(
 			(new CButton('tags['.$i.'][remove]', _('Remove')))
 				->addClass(ZBX_STYLE_BTN_LINK)
@@ -353,14 +353,21 @@ if (array_key_exists('render_html', $data)) {
 				->setAttribute('placeholder', _('tag'))
 				->removeId()
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-			(new CRadioButtonList('tags[#{rowNum}][operator]', TAG_OPERATOR_LIKE))
-				->addValue(_('Contains'), TAG_OPERATOR_LIKE, 'tags_0#{rowNum}#{uniqid}')
-				->addValue(_('Equals'), TAG_OPERATOR_EQUAL, 'tags_1#{rowNum}#{uniqid}')
-				->setModern(true)
-				->setId('tags_#{rowNum}#{uniqid}'),
+			(new CSelect('tags[#{rowNum}][operator]'))
+				->addOptions(CSelect::createOptionsFromArray([
+					TAG_OPERATOR_EXISTS => _('Exists'),
+					TAG_OPERATOR_EQUAL => _('Equals'),
+					TAG_OPERATOR_LIKE => _('Contains'),
+					TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
+					TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
+					TAG_OPERATOR_NOT_LIKE => _('Does not contain')
+				]))
+				->setValue(TAG_OPERATOR_LIKE)
+				->setFocusableElementId('tags-#{rowNum}#{uniqid}-operator-select')
+				->setId('tags_#{rowNum}#{uniqid}_operator'),
 			(new CTextBox('tags[#{rowNum}][value]', '#{value}'))
 				->setAttribute('placeholder', _('value'))
-				->removeId()
+				->setId('tags_#{rowNum}#{uniqid}_value')
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
 			(new CCol(
 				(new CButton('tags[#{rowNum}][remove]', _('Remove')))
@@ -382,9 +389,9 @@ if (array_key_exists('render_html', $data)) {
 		$('[name="filter_new"],[name="filter_update"]').hide()
 			.filter(data.filter_configurable ? '[name="filter_update"]' : '[name="filter_new"]').show();
 
-		let fields = ['show', 'application', 'name', 'tag_priority', 'show_opdata', 'show_suppressed', 'show_tags',
-				'unacknowledged', 'compact_view', 'show_timeline', 'details', 'highlight_row', 'age_state', 'age',
-				'tag_name_format', 'evaltype'
+		let fields = ['show', 'name', 'tag_priority', 'show_opdata', 'show_suppressed', 'show_tags', 'unacknowledged',
+				'compact_view', 'show_timeline', 'details', 'highlight_row', 'age_state', 'age', 'tag_name_format',
+				'evaltype'
 			],
 			eventHandler = {
 				show: () => {
@@ -467,14 +474,24 @@ if (array_key_exists('render_html', $data)) {
 			data.tags.push({'tag': '', 'value': '', 'operator': <?= TAG_OPERATOR_LIKE ?>});
 		}
 
-		$('#filter-tags_' + data.uniqid, container).dynamicRows({
-			template: '#filter-tag-row-tmpl',
-			rows: data.tags,
-			counter: 0,
-			dataCallback: (tag) => {
-				tag.uniqid = data.uniqid
-				return tag;
-			}
+		$('#filter-tags_' + data.uniqid, container)
+			.dynamicRows({
+				template: '#filter-tag-row-tmpl',
+				rows: data.tags,
+				counter: 0,
+				dataCallback: (tag) => {
+					tag.uniqid = data.uniqid
+					return tag;
+				}
+			})
+			.on('afteradd.dynamicRows', function() {
+				var rows = this.querySelectorAll('.form_row');
+				new CTagFilterItem(rows[rows.length - 1]);
+			});
+
+		// Init existing fields once loaded.
+		document.querySelectorAll('#filter-tags_' + data.uniqid + ' .form_row').forEach(row => {
+			new CTagFilterItem(row);
 		});
 
 		// Host groups multiselect.
@@ -519,20 +536,6 @@ if (array_key_exists('render_html', $data)) {
 					dstfld1: 'hostids_' + data.uniqid,
 				}
 			}
-		});
-
-		// Application
-		$('#application_select_' + data.uniqid).on('click', function() {
-			let options = {
-					srctbl: 'applications',
-					srcfld1: 'name',
-					dstfrm: 'zbx_filter',
-					dstfld1: 'application_' + data.uniqid,
-					with_applications: '1',
-					real_hosts: '1'
-				};
-
-			PopUp('popup.generic', $.extend(options, getFirstMultiselectValue('hostids_' + data.uniqid)), null, this);
 		});
 
 		// Triggers multiselect.

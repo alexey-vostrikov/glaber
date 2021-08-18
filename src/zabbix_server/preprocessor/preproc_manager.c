@@ -31,7 +31,7 @@
 
 #include "preprocessing.h"
 #include "preproc_manager.h"
-#include "linked_list.h"
+#include "zbxalgo.h"
 #include "preproc_history.h"
 
 extern unsigned char	process_type, program_type;
@@ -107,7 +107,7 @@ typedef struct
 zbx_preprocessing_manager_t;
 
 static void	preprocessor_enqueue_dependent(zbx_preprocessing_manager_t *manager,
-		zbx_preproc_item_value_t *source_value, zbx_list_item_t *master);
+		const zbx_preproc_item_value_t *source_value, zbx_list_item_t *master);
 
 /* cleanup functions */
 
@@ -516,7 +516,8 @@ void	preprocessor_flush_value(const zbx_preproc_item_value_t *value)
 				value->ts, value->state, value->error);
 	}
 	else
-		zbx_lld_process_agent_result(value->itemid, value->result_ptr->result, value->ts, value->error);
+		zbx_lld_process_agent_result(value->itemid, value->hostid, value->result_ptr->result, value->ts,
+				value->error);
 }
 
 /******************************************************************************
@@ -625,7 +626,7 @@ static void	preprocessor_link_items(zbx_preprocessing_manager_t *manager, zbx_li
  *             source  - [IN]  value to be copied                             *
  *                                                                            *
  ******************************************************************************/
-static void	preprocessor_copy_value(zbx_preproc_item_value_t *target, zbx_preproc_item_value_t *source)
+static void	preprocessor_copy_value(zbx_preproc_item_value_t *target, const zbx_preproc_item_value_t *source)
 {
 	memcpy(target, source, sizeof(zbx_preproc_item_value_t));
 
@@ -637,6 +638,140 @@ static void	preprocessor_copy_value(zbx_preproc_item_value_t *target, zbx_prepro
 		target->ts = (zbx_timespec_t *)zbx_malloc(NULL, sizeof(zbx_timespec_t));
 		memcpy(target->ts, source->ts, sizeof(zbx_timespec_t));
 	}
+}
+/*****************************************************************************
+ * Function: glb_fast_preprocess_item 										 *
+ * 
+ * Purpose: immediately preprocesses the preproc request					
+ * params: request [IN/OUT] preprocessing request with value set
+ * 			item   [IN] preprocessing params for the value
+ * 
+ * ***************************************************************************/
+static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
+				zbx_preprocessing_request_t *request, zbx_preproc_item_t *item) {
+	zbx_variant_t value = {0};
+	zbx_preproc_history_t	*item_preproc_history;
+	zbx_vector_ptr_t	*history_in, history_static;
+	zbx_vector_ptr_t history_out;
+	zbx_preproc_result_t *results;
+	int results_num, ret;
+	char	*errmsg = NULL, *error = NULL;
+	zbx_preproc_item_value_t *preproc_value = &request->value; 
+
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start", __func__);
+	//1. to preprocess a value we need the incoming value in variant format, but in request it's in the agent_result
+	// so converting the result to value
+	
+	if (ITEM_STATE_NOTSUPPORTED == preproc_value->state) {
+		zbx_variant_set_str(&value, "");
+//		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: NOT supported, set to empty str", __func__);
+	} else if (ISSET_LOG(preproc_value->result_ptr->result)) {
+		zbx_variant_set_str(&value, preproc_value->result_ptr->result->log->value);
+//		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to LOG", __func__);
+	} else if (ISSET_UI64(preproc_value->result_ptr->result)) {
+		zbx_variant_set_ui64(&value, preproc_value->result_ptr->result->ui64);
+//		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to UI64", __func__);
+	} else if (ISSET_DBL(preproc_value->result_ptr->result)) {
+		zbx_variant_set_dbl(&value, preproc_value->result_ptr->result->dbl);
+//		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to DBL", __func__);
+	} else if (ISSET_STR(preproc_value->result_ptr->result)) {
+		zbx_variant_set_str(&value, zbx_strdup(NULL, preproc_value->result_ptr->result->text));
+//		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to STR", __func__);
+	} else if (ISSET_TEXT(preproc_value->result_ptr->result)) {
+		zbx_variant_set_str(&value, zbx_strdup(NULL, preproc_value->result_ptr->result->text));
+//		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to TXT: '%ld' len is %d",
+			 //__func__,preproc_value->result_ptr->result->text,strlen(preproc_value->result_ptr->result->text));
+	}
+	else
+		THIS_SHOULD_NEVER_HAPPEN;
+	
+	
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: After convert: variant type is '%s', value is '%s'", __func__,
+	//	zbx_variant_type_desc(&value),zbx_variant_value_desc(&value));
+	
+	//2. fetching preprocessing history to history_in ptr, the history is kept in heap 
+	// in the manager->history hash
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: History fetch", __func__);
+	zbx_vector_ptr_create(&history_static);
+
+	if (NULL != (item_preproc_history = (zbx_preproc_history_t *)zbx_hashset_search(&manager->history_cache,
+				&preproc_value->itemid))) {
+		history_in = &item_preproc_history->history;
+	} else {
+		//
+		history_in = &history_static;
+	}
+	
+	//3. preparing the history out vector to store the results
+	zbx_vector_ptr_create(&history_out);
+	
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Results creation", __func__);
+	//4. preparing the results vector
+	results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * item->preproc_ops_num);
+	memset(results, 0, sizeof(zbx_preproc_result_t) * item->preproc_ops_num);
+
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Executing preprocessing", __func__);
+	
+	//5. doing the preprocessing
+	if (FAIL == (ret = worker_item_preproc_execute(preproc_value->item_value_type, &value ,preproc_value->ts,
+			item->preproc_ops, item->preproc_ops_num, history_in,
+			&history_out, results, &results_num, &errmsg)) && 0 != results_num) {
+		
+		int action = results[results_num - 1].action;
+			
+		if (ZBX_PREPROC_FAIL_SET_ERROR != action && ZBX_PREPROC_FAIL_FORCE_ERROR != action) {
+			worker_format_error(&value, results, results_num, errmsg, &error);
+			zbx_free(errmsg);
+		} else
+			error = errmsg;
+//		zabbix_log(LOG_LEVEL_INFORMATION, "In %s: preprocessing failed with message: '%s'",error);
+	}
+
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: After preproc execute: variant type is %s, value is %s", __func__,
+//		zbx_variant_type_desc(&value),zbx_variant_value_desc(&value));
+	//item is preprocessed now
+	//6. setting back result from variant
+	preprocessor_set_variant_result(request, &value, error);
+
+	//7. saving the new preprocessing history
+	//old history has to be cleaned anyway 
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Saving new history", __func__);
+	
+	if (NULL != item_preproc_history) 	{
+		zbx_vector_ptr_clear_ext(&item_preproc_history->history, (zbx_clean_func_t)zbx_preproc_op_history_free);
+	}
+
+	if (0 != history_out.values_num) {
+		if (NULL == item_preproc_history) {
+			zbx_preproc_history_t	history_local;
+
+			history_local.itemid = preproc_value->itemid;
+			item_preproc_history = (zbx_preproc_history_t *)zbx_hashset_insert(&manager->history_cache, &history_local,
+					sizeof(history_local));
+			zbx_vector_ptr_create(&item_preproc_history->history);
+		}
+
+		zbx_vector_ptr_append_array(&item_preproc_history->history, history_out.values, history_out.values_num);
+		zbx_vector_ptr_clear(&history_out);
+
+	} else {
+		if (NULL != item_preproc_history) {
+			zbx_vector_ptr_destroy(&item_preproc_history->history);
+			zbx_hashset_remove_direct(&manager->history_cache, item_preproc_history);
+		}
+	}
+	//preprocessor_set_request_state_done(manager, request, (zbx_list_item_t *)queue_item);
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Before cleanup: variant type is %s, value is %s", __func__,
+//		zbx_variant_type_desc(&value),zbx_variant_value_desc(&value));
+	//8. cleanup
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Cleanup", __func__);
+	zbx_vector_ptr_destroy(&history_out);
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Cleanup 1", __func__);
+	zbx_vector_ptr_destroy(&history_static);
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Cleanup 3", __func__);
+	zbx_free(results);
+//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Finished", __func__);
+	//manager->preproc_num--;
 }
 
 /******************************************************************************
@@ -651,7 +786,7 @@ static void	preprocessor_copy_value(zbx_preproc_item_value_t *target, zbx_prepro
  *                             (NULL for the end of the queue)                *
  *                                                                            *
  ******************************************************************************/
-static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager, zbx_preproc_item_value_t *value,
+static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_preproc_item_value_t *value,
 		zbx_list_item_t *master)
 {
 	zbx_preprocessing_request_t	*request;
@@ -678,20 +813,21 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager, zbx_prepr
 	{
 		state = REQUEST_STATE_DONE;
 
-		if (NULL == manager->queue.head)
-		{
+		//if (NULL == manager->queue.head)
+		//{
 			/* queue is empty and item is done, it can be flushed */
-			preprocessor_flush_value(value);
-			manager->processed_num++;
-			preprocessor_enqueue_dependent(manager, value, NULL);
-			preproc_item_value_clear(value);
+		//	preprocessor_flush_value(value);
+		manager->processed_num++;
+		//	preprocessor_enqueue_dependent(manager, value, NULL);
+		//	preproc_item_value_clear(value);
 
-			goto out;
-		}
+		//	goto out;
+		//}
 	}
 	else
 		state = REQUEST_STATE_QUEUED;
-
+	
+	
 	request = (zbx_preprocessing_request_t *)zbx_malloc(NULL, sizeof(zbx_preprocessing_request_t));
 	memset(request, 0, sizeof(zbx_preprocessing_request_t));
 	memcpy(&request->value, value, sizeof(zbx_preproc_item_value_t));
@@ -716,20 +852,34 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager, zbx_prepr
 	if (REQUEST_STATE_QUEUED == state && 0 <= notsupp_shift)
 	{
 		request->value_type = item->value_type;
-		request->steps = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) *
-				(item->preproc_ops_num - notsupp_shift));
-		request->steps_num = item->preproc_ops_num - notsupp_shift;
+		if (NULL != item && 1 == item->fast_preprocess 
+			//&& ITEM_STATE_NOTSUPPORTED != value->state 
+			) {
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld will be fast-preprocessed",item->itemid);
+			//fast preproccessing will do immediate preproc without consuming an extra memory and sending data to worker
+			//flag ->fast_preprocess is set for all realtively fast items - for now for all except javascript ones
+			glb_fast_preprocess_item(manager, request, item);
+			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld finished fast-preprocessing",item->itemid);
+			request->state = REQUEST_STATE_DONE;
+			manager->processed_num++;
+		
+		} else {
+		
+			request->steps = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) *
+					(item->preproc_ops_num - notsupp_shift));
+			request->steps_num = item->preproc_ops_num - notsupp_shift;
 
-		for (i = 0; i < item->preproc_ops_num - notsupp_shift; i++)
-		{
-			request->steps[i].type = item->preproc_ops[i + notsupp_shift].type;
-			request->steps[i].params = zbx_strdup(NULL, item->preproc_ops[i + notsupp_shift].params);
-			request->steps[i].error_handler = item->preproc_ops[i + notsupp_shift].error_handler;
-			request->steps[i].error_handler_params = zbx_strdup(NULL,
-					item->preproc_ops[i + notsupp_shift].error_handler_params);
+			for (i = 0; i < item->preproc_ops_num - notsupp_shift; i++)
+			{
+				request->steps[i].type = item->preproc_ops[i + notsupp_shift].type;
+				request->steps[i].params = zbx_strdup(NULL, item->preproc_ops[i + notsupp_shift].params);
+				request->steps[i].error_handler = item->preproc_ops[i + notsupp_shift].error_handler;
+				request->steps[i].error_handler_params = zbx_strdup(NULL,
+						item->preproc_ops[i + notsupp_shift].error_handler_params);
+			}
+			manager->preproc_num++;
 		}
-
-		manager->preproc_num++;
+		
 	}
 
 	/* priority items are enqueued at the beginning of the line */
@@ -765,7 +915,7 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager, zbx_prepr
 
 	/* if no preprocessing is needed, dependent items are enqueued */
 	if (REQUEST_STATE_DONE == request->state)
-		preprocessor_enqueue_dependent(manager, value, enqueued_at);
+		preprocessor_enqueue_dependent(manager, &request->value, enqueued_at);
 
 	manager->queued_num++;
 out:
@@ -785,7 +935,7 @@ out:
  *                                                                            *
  ******************************************************************************/
 static void	preprocessor_enqueue_dependent(zbx_preprocessing_manager_t *manager,
-		zbx_preproc_item_value_t *source_value, zbx_list_item_t *master)
+		const zbx_preproc_item_value_t *source_value, zbx_list_item_t *master)
 {
 	int				i;
 	zbx_preproc_item_t		*item, item_local;
@@ -880,6 +1030,35 @@ static void	preprocessor_add_test_request(zbx_preprocessing_manager_t *manager, 
 
 /******************************************************************************
  *                                                                            *
+ * Function: create_result_with_meta                                          *
+ *                                                                            *
+ * Purpose: create new result and copy meta information from previous result  *
+ *                                                                            *
+ * Parameters: result_old - [IN] result that can contain meta information     *
+ *                                                                            *
+ * Return value: pointer newly allocated result                               *
+ *                                                                            *
+ ******************************************************************************/
+static AGENT_RESULT	*create_result_with_meta(const AGENT_RESULT *result_old)
+{
+	AGENT_RESULT	*result;
+
+	result = zbx_malloc(NULL, sizeof(AGENT_RESULT));
+
+	init_result(result);
+
+	if (NULL == result_old || 0 == ISSET_META(result_old))
+		return result;
+
+	result->type = AR_META;
+	result->lastlogsize = result_old->lastlogsize;
+	result->mtime = result_old->mtime;
+
+	return result;
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: preprocessor_set_variant_result                                  *
  *                                                                            *
  * Purpose: get result data from variant and error message                    *
@@ -908,11 +1087,14 @@ int	preprocessor_set_variant_result(zbx_preprocessing_request_t *request,
 
 	if (ZBX_VARIANT_NONE == value->type)
 	{
+		AGENT_RESULT	*result;
+
+		result = create_result_with_meta(request->value.result_ptr->result);
+
 		preproc_item_result_free(&request->value);
 		request->value.result_ptr = (zbx_result_ptr_t *)zbx_malloc(NULL, sizeof(zbx_result_ptr_t));
 		request->value.result_ptr->refcount = 1;
-		request->value.result_ptr->result = zbx_malloc(NULL, sizeof(AGENT_RESULT));
-		init_result(request->value.result_ptr->result);
+		request->value.result_ptr->result = result;
 		zbx_free(request->value.error);
 		request->value.state = ITEM_STATE_NORMAL;
 		ret = FAIL;
@@ -936,9 +1118,9 @@ int	preprocessor_set_variant_result(zbx_preprocessing_request_t *request,
 	if (FAIL != (ret = zbx_variant_convert(value, type)))
 	{
 		/* old result is shared between dependent and master items, it cannot be modified, create new result */
-		AGENT_RESULT	*result = zbx_malloc(NULL, sizeof(AGENT_RESULT));
+		AGENT_RESULT	*result;
 
-		init_result(result);
+		result = create_result_with_meta(request->value.result_ptr->result);
 
 		if (ITEM_STATE_NOTSUPPORTED == request->value.state)
 			request->value.state = ITEM_STATE_NORMAL;
@@ -1114,6 +1296,80 @@ static void	preprocessor_flush_test_result(zbx_preprocessing_manager_t *manager,
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
+static	void	preprocessor_get_items_totals(zbx_preprocessing_manager_t *manager, int *total, int *queued,
+		int *processing, int *done, int *pending)
+{
+#define ZBX_MAX_REQUEST_STATE_PRINT_LIMIT	25
+
+	zbx_preproc_item_stats_t	*item;
+	zbx_list_iterator_t		iterator;
+	zbx_preprocessing_request_t	*request;
+	zbx_hashset_t			items;
+
+	*total = 0;
+	*queued = 0;
+	*processing = 0;
+	*done = 0;
+	*pending = 0;
+
+	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+	zbx_list_iterator_init(&manager->queue, &iterator);
+	while (SUCCEED == zbx_list_iterator_next(&iterator))
+	{
+		zbx_list_iterator_peek(&iterator, (void **)&request);
+
+		if (NULL == (item = zbx_hashset_search(&items, &request->value.itemid)))
+		{
+			zbx_preproc_item_stats_t	item_local = {.itemid = request->value.itemid};
+
+			item = zbx_hashset_insert(&items, &item_local, sizeof(item_local));
+		}
+
+		switch(request->state)
+		{
+			case REQUEST_STATE_QUEUED:
+				if (*queued < ZBX_MAX_REQUEST_STATE_PRINT_LIMIT)
+				{
+					zabbix_log(LOG_LEVEL_DEBUG, "oldest queued itemid: " ZBX_FS_UI64
+							" values:%d pos:%d", item->itemid, item->values_num, *total);
+				}
+				(*queued)++;
+				break;
+			case REQUEST_STATE_PROCESSING:
+				if (*processing < ZBX_MAX_REQUEST_STATE_PRINT_LIMIT)
+				{
+					zabbix_log(LOG_LEVEL_DEBUG, "oldest processing itemid: " ZBX_FS_UI64
+							" values:%d pos:%d", item->itemid, item->values_num, *total);
+				}
+				(*processing)++;
+				break;
+			case REQUEST_STATE_DONE:
+				if (*done < ZBX_MAX_REQUEST_STATE_PRINT_LIMIT)
+				{
+					zabbix_log(LOG_LEVEL_DEBUG, "oldest done itemid: " ZBX_FS_UI64
+							" values:%d pos:%d", item->itemid, item->values_num, *total);
+				}
+				(*done)++;
+				break;
+			case REQUEST_STATE_PENDING:
+				if (*pending < ZBX_MAX_REQUEST_STATE_PRINT_LIMIT)
+				{
+					zabbix_log(LOG_LEVEL_DEBUG, "oldest pending itemid: " ZBX_FS_UI64
+							" values:%d pos:%d", item->itemid, item->values_num, *total);
+				}
+				(*pending)++;
+				break;
+		}
+
+		item->values_num++;
+		(*total)++;
+	}
+
+	zbx_hashset_destroy(&items);
+#undef ZBX_MAX_REQUEST_STATE_PRINT_LIMIT
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: preprocessor_get_diag_stats                                      *
@@ -1128,10 +1384,13 @@ static void	preprocessor_get_diag_stats(zbx_preprocessing_manager_t *manager, zb
 {
 	unsigned char	*data;
 	zbx_uint32_t	data_len;
+	int		total, queued, processing, done, pending;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	data_len = zbx_preprocessor_pack_diag_stats(&data, manager->queued_num, manager->preproc_num);
+	preprocessor_get_items_totals(manager, &total, &queued, &processing, &done, &pending);
+
+	data_len = zbx_preprocessor_pack_diag_stats(&data, total, queued, processing, done, pending);
 	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_DIAG_STATS_RESULT, data, data_len);
 	zbx_free(data);
 
@@ -1153,6 +1412,34 @@ static int	preproc_sort_item_by_values_desc(const void *d1, const void *d2)
 	return i2->values_num - i1->values_num;
 }
 
+static	void	preprocessor_get_items_view(zbx_preprocessing_manager_t *manager, zbx_hashset_t *items,
+		zbx_vector_ptr_t *view)
+{
+	zbx_preproc_item_stats_t	*item;
+	zbx_list_iterator_t		iterator;
+	zbx_preprocessing_request_t	*request;
+
+	zbx_list_iterator_init(&manager->queue, &iterator);
+	while (SUCCEED == zbx_list_iterator_next(&iterator))
+	{
+		zbx_list_iterator_peek(&iterator, (void **)&request);
+
+		if (NULL == (item = zbx_hashset_search(items, &request->value.itemid)))
+		{
+			zbx_preproc_item_stats_t	item_local = {.itemid = request->value.itemid};
+
+			item = zbx_hashset_insert(items, &item_local, sizeof(item_local));
+			zbx_vector_ptr_append(view, item);
+		}
+		/* There might be processed, but not yet flushed items at the start of queue with    */
+		/* freed preprocessing steps and steps_num being zero. Because of that keep updating */
+		/* items steps_num to have preprocessing steps of last queued item.                  */
+		item->steps_num = request->steps_num;
+		item->values_num++;
+	}
+}
+
+
 /******************************************************************************
  *                                                                            *
  * Function: preprocessor_get_top_items                                       *
@@ -1167,15 +1454,11 @@ static int	preproc_sort_item_by_values_desc(const void *d1, const void *d2)
 static void	preprocessor_get_top_items(zbx_preprocessing_manager_t *manager, zbx_ipc_client_t *client,
 		zbx_ipc_message_t *message)
 {
-	int				limit;
-	unsigned char			*data;
-	zbx_uint32_t			data_len;
-	zbx_hashset_t			items;
-	zbx_vector_ptr_t		view;
-	zbx_list_iterator_t		iterator;
-	zbx_preprocessing_request_t	*request;
-	zbx_preproc_item_stats_t	*item;
-	int				items_num;
+	int			limit;
+	unsigned char		*data;
+	zbx_uint32_t		data_len;
+	zbx_hashset_t		items;
+	zbx_vector_ptr_t	view;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -1184,32 +1467,61 @@ static void	preprocessor_get_top_items(zbx_preprocessing_manager_t *manager, zbx
 	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_vector_ptr_create(&view);
 
-	zbx_list_iterator_init(&manager->queue, &iterator);
-	while (SUCCEED == zbx_list_iterator_next(&iterator))
-	{
-		zbx_list_iterator_peek(&iterator, (void **)&request);
-
-		if (NULL == (item = zbx_hashset_search(&items, &request->value.itemid)))
-		{
-			zbx_preproc_item_stats_t	item_local = {.itemid = request->value.itemid};
-
-			item = zbx_hashset_insert(&items, &item_local, sizeof(item_local));
-			zbx_vector_ptr_append(&view, item);
-		}
-		/* There might be processed, but not yet flushed items at the start of queue with    */
-		/* freed preprocessing steps and steps_num being zero. Because of that keep updating */
-		/* items steps_num to have preprocessing steps of last queued item.                  */
-		item->steps_num = request->steps_num;
-		item->values_num++;
-	}
+	preprocessor_get_items_view(manager, &items, &view);
 
 	zbx_vector_ptr_sort(&view, preproc_sort_item_by_values_desc);
-	items_num = MIN(limit, view.values_num);
 
-	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view.values, items_num);
+	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view.values,
+			MIN(limit, view.values_num));
 	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_TOP_ITEMS_RESULT, data, data_len);
 	zbx_free(data);
 
+	zbx_vector_ptr_destroy(&view);
+	zbx_hashset_destroy(&items);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+static void	preprocessor_get_oldest_preproc_items(zbx_preprocessing_manager_t *manager, zbx_ipc_client_t *client,
+		zbx_ipc_message_t *message)
+{
+	int			limit, i;
+	unsigned char		*data;
+	zbx_uint32_t		data_len;
+	zbx_hashset_t		items;
+	zbx_vector_ptr_t	view, view_preproc;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_preprocessor_unpack_top_request(&limit, message->data);
+
+	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	zbx_vector_ptr_create(&view);
+	zbx_vector_ptr_create(&view_preproc);
+	zbx_vector_ptr_reserve(&view_preproc, limit);
+
+	preprocessor_get_items_view(manager, &items, &view);
+
+	for (i = 0; i < view.values_num && 0 < limit; i++)
+	{
+		zbx_preproc_item_stats_t	*item;
+
+		item = (zbx_preproc_item_stats_t *)view.values[i];
+
+		/* only items with preprocessing can slow down queue */
+		if (0 == item->steps_num)
+			continue;
+
+		zbx_vector_ptr_append(&view_preproc, item);
+		limit--;
+	}
+
+	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view_preproc.values,
+			MIN(limit, view_preproc.values_num));
+	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_TOP_ITEMS_RESULT, data, data_len);
+	zbx_free(data);
+
+	zbx_vector_ptr_destroy(&view_preproc);
 	zbx_vector_ptr_destroy(&view);
 	zbx_hashset_destroy(&items);
 
@@ -1381,21 +1693,13 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 		time_now = zbx_time();
 
 		if (STAT_INTERVAL < time_now - time_stat)
-		{	u_int64_t local_preproc, no_preproc;
-
-			DC_GetPreprocStat(&no_preproc, &local_preproc);
-			zbx_setproctitle("%s #%d [queued " ZBX_FS_UI64 ", %.0f values/sec, (%.0f/sec mngr, %.0f/sec loc, %.0f/sec no_preprc) idle "
+		{	zbx_setproctitle("%s #%d [queued " ZBX_FS_UI64 ", %.0f values/sec, idle "
 					ZBX_FS_DBL " sec during " ZBX_FS_DBL " sec]",
 					"p_manager", process_num,
-					manager.queued_num, 
-					(manager.processed_num + no_preproc + local_preproc - old_no_preproc - old_local_preproc)/(time_now - time_stat),
-					manager.processed_num/(time_now - time_stat), (local_preproc-old_local_preproc)/(time_now - time_stat), (no_preproc-old_no_preproc)/(time_now - time_stat),
-					 time_idle, time_now - time_stat);
+					manager.queued_num, manager.processed_num/(time_now - time_stat), time_idle, time_now - time_stat);
 
 			time_stat = time_now;
 			time_idle = 0;
-			old_no_preproc=no_preproc;
-			old_local_preproc=local_preproc;
 			manager.processed_num = 0;
 		}
 
@@ -1451,6 +1755,9 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 					break;
 				case ZBX_IPC_PREPROCESSOR_TOP_ITEMS:
 					preprocessor_get_top_items(&manager, client, message);
+					break;
+				case ZBX_IPC_PREPROCESSOR_TOP_OLDEST_PREPROC_ITEMS:
+					preprocessor_get_oldest_preproc_items(&manager, client, message);
 					break;
 			}
 

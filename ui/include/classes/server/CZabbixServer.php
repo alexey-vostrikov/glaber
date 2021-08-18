@@ -141,22 +141,32 @@ class CZabbixServer {
 	}
 
 	/**
-	 * Executes a script on the given host and returns the result.
+	 * Executes a script on the given host or event and returns the result.
 	 *
-	 * @param $scriptId
-	 * @param $hostId
-	 * @param $sid
+	 * @param string      $scriptid
+	 * @param string      $sid
+	 * @param null|string $hostid
+	 * @param null|string $eventid
 	 *
 	 * @return bool|array
 	 */
-	public function executeScript($scriptId, $hostId, $sid) {
-		return $this->request([
+	public function executeScript(string $scriptid, string $sid, ?string $hostid = null, ?string $eventid = null) {
+		$params = [
 			'request' => 'command',
-			'scriptid' => $scriptId,
-			'hostid' => $hostId,
+			'scriptid' => $scriptid,
 			'sid' => $sid,
 			'clientip' => CWebUser::getIp()
-		]);
+		];
+
+		if ($hostid !== null) {
+			$params['hostid'] = $hostid;
+		}
+
+		if ($eventid !== null) {
+			$params['eventid'] = $eventid;
+		}
+
+		return $this->request($params);
 	}
 
 	public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
@@ -282,6 +292,34 @@ class CZabbixServer {
 	public function testMediaType(array $data, $sid) {
 		return $this->request([
 			'request' => 'alert.send',
+			'sid' => $sid,
+			'data' => $data
+		]);
+	}
+
+	/**
+	 * Request server to test report.
+	 *
+	 * @param array  $data                       Array of report test data to send.
+	 * @param string $data['name']               Report name (used to make attachment file name).
+	 * @param string $data['dashboardid']        Dashboard ID.
+	 * @param string $data['userid']             User ID used to access the dashboard.
+	 * @param string $data['period']             Report period. Possible values:
+	 *                                            0 - ZBX_REPORT_PERIOD_DAY;
+	 *                                            1 - ZBX_REPORT_PERIOD_WEEK;
+	 *                                            2 - ZBX_REPORT_PERIOD_MONTH;
+	 *                                            3 - ZBX_REPORT_PERIOD_YEAR.
+	 * @param string $data['now']                Report generation time (seconds since Epoch).
+	 * @param array  $data['params']             Report parameters.
+	 * @param string $data['params']['subject']  Report message subject.
+	 * @param string $data['params']['body']     Report message text.
+	 * @param string $sid                        User session ID.
+	 *
+	 * @return bool|array
+	 */
+	public function testReport(array $data, string $sid) {
+		return $this->request([
+			'request' => 'report.test',
 			'sid' => $sid,
 			'data' => $data
 		]);
@@ -550,7 +588,7 @@ class CZabbixServer {
 		}
 
 		// An error on the server side occurred.
-		$this->error = $response['info'];
+		$this->error = rtrim($response['info']);
 
 		return false;
 	}

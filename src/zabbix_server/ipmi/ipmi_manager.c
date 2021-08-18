@@ -36,6 +36,7 @@
 #include "ipmi.h"
 
 #include "../poller/poller.h"
+#include "zbxavailability.h"
 
 #define ZBX_IPMI_MANAGER_DELAY	1
 
@@ -640,52 +641,63 @@ static zbx_ipmi_manager_host_t	*ipmi_manager_cache_host(zbx_ipmi_manager_t *mana
  *                                                                            *
  * Purpose: updates cached host                                               *
  *                                                                            *
- * Parameters: manager - [IN] the IPMI manager                                *
- *             host    - [IN] the host                                        *
+ * Parameters: manager   - [IN] the IPMI manager                              *
+ *             interface - [IN] the interface                                 *
+ *             hostid    - [IN] the host                                        *
  *                                                                            *
  ******************************************************************************/
-static void	ipmi_manager_update_host(zbx_ipmi_manager_t *manager, const DC_HOST *host)
+static void	ipmi_manager_update_host(zbx_ipmi_manager_t *manager, const DC_INTERFACE *interface,
+		zbx_uint64_t hostid)
 {
 	zbx_ipmi_manager_host_t	*ipmi_host;
 
-	if (NULL == (ipmi_host = (zbx_ipmi_manager_host_t *)zbx_hashset_search(&manager->hosts, &host->hostid)))
+	if (NULL == (ipmi_host = (zbx_ipmi_manager_host_t *)zbx_hashset_search(&manager->hosts, &hostid)))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
 		return;
 	}
 
-	ipmi_host->disable_until = host->ipmi_disable_until;
+	ipmi_host->disable_until = interface->disable_until;
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: ipmi_manager_activate_host                                       *
+ * Function: ipmi_manager_activate_interface                                  *
  *                                                                            *
- * Purpose: tries to activate item's host after receiving response            *
+ * Purpose: tries to activate item's interface after receiving response       *
  *                                                                            *
  * Parameters: manager - [IN] the IPMI manager                                *
  *             itemid  - [IN] the item identifier                             *
  *             ts      - [IN] the activation timestamp                        *
  *                                                                            *
  ******************************************************************************/
-static void	ipmi_manager_activate_host(zbx_ipmi_manager_t *manager, zbx_uint64_t itemid, zbx_timespec_t *ts)
+static void	ipmi_manager_activate_interface(zbx_ipmi_manager_t *manager, zbx_uint64_t itemid, zbx_timespec_t *ts)
 {
-	DC_ITEM	item;
-	int	errcode;
+	DC_ITEM		item;
+	int		errcode;
+	unsigned char	*data = NULL;
+	size_t		data_alloc = 0, data_offset = 0;
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
-	zbx_activate_item_host(&item, ts);
-	ipmi_manager_update_host(manager, &item.host);
+	zbx_activate_item_interface(ts, &item, &data, &data_alloc, &data_offset);
+	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
 
 	DCconfig_clean_items(&item, &errcode, 1);
+
+	if (NULL != data)
+	{
+		zbx_availability_flush(data, data_offset);
+		zbx_free(data);
+	}
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: ipmi_manager_deactivate_host                                     *
+ * Function: ipmi_manager_deactivate_interface                                *
  *                                                                            *
- * Purpose: tries to deactivate item's host after receiving host level error  *
+ * Purpose: tries to deactivate item's interface after receiving              *
+ *          host level error                                                  *
  *                                                                            *
  * Parameters: manager - [IN] the IPMI manager                                *
  *             itemid  - [IN] the item identifier                             *
@@ -693,18 +705,26 @@ static void	ipmi_manager_activate_host(zbx_ipmi_manager_t *manager, zbx_uint64_t
  *             error   - [IN] the error                                       *
  *                                                                            *
  ******************************************************************************/
-static void	ipmi_manager_deactivate_host(zbx_ipmi_manager_t *manager, zbx_uint64_t itemid, zbx_timespec_t *ts,
+static void	ipmi_manager_deactivate_interface(zbx_ipmi_manager_t *manager, zbx_uint64_t itemid, zbx_timespec_t *ts,
 		const char *error)
 {
-	DC_ITEM	item;
-	int	errcode;
+	DC_ITEM		item;
+	int		errcode;
+	unsigned char	*data = NULL;
+	size_t		data_alloc = 0, data_offset = 0;
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
-	zbx_deactivate_item_host(&item, ts, error);
-	ipmi_manager_update_host(manager, &item.host);
+	zbx_deactivate_item_interface(ts, &item, &data, &data_alloc, &data_offset, error);
+	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
 
 	DCconfig_clean_items(&item, &errcode, 1);
+
+	if (NULL != data)
+	{
+		zbx_availability_flush(data, data_offset);
+		zbx_free(data);
+	}
 }
 
 /******************************************************************************
@@ -788,8 +808,8 @@ static int	ipmi_manager_schedule_requests(zbx_ipmi_manager_t *manager, int now, 
 		{
 
 			zbx_timespec(&ts);
-			zbx_preprocess_item_value(0,items[i].itemid, items[i].value_type, 0, NULL, &ts, state, error);
-			
+			zbx_preprocess_item_value(0,items[i].itemid, items[i].host.hostid, items[i].value_type,
+					items[i].flags, NULL, &ts, state, error);
 			DCrequeue_items(&items[i].itemid, &ts.sec, &errcode, 1);
 			zbx_free(error);
 			continue;
@@ -921,12 +941,12 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 		case SUCCEED:
 		case NOTSUPPORTED:
 		case AGENT_ERROR:
-			ipmi_manager_activate_host(manager, itemid, &ts);
+			ipmi_manager_activate_interface(manager, itemid, &ts);
 			break;
 		case NETWORK_ERROR:
 		case GATEWAY_ERROR:
 		case TIMEOUT_ERROR:
-			ipmi_manager_deactivate_host(manager, itemid, &ts, value);
+			ipmi_manager_deactivate_interface(manager, itemid, &ts, value);
 			break;
 		case CONFIG_ERROR:
 			/* nothing to do */
@@ -943,7 +963,8 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 				init_result(&result);
 				SET_TEXT_RESULT(&result, value);
 				value = NULL;
-				zbx_preprocess_item_value(0,itemid, ITEM_VALUE_TYPE_TEXT, 0, &result, &ts, state,NULL);
+				zbx_preprocess_item_value(0, itemid, poller->request->hostid, ITEM_VALUE_TYPE_TEXT, flags,
+						&result, &ts, state, NULL);
 				free_result(&result);
 			}
 			break;
@@ -952,7 +973,8 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 		case AGENT_ERROR:
 		case CONFIG_ERROR:
 			state = ITEM_STATE_NOTSUPPORTED;
-			zbx_preprocess_item_value(0,itemid, ITEM_VALUE_TYPE_TEXT, 0, NULL, &ts, state, value);
+			zbx_preprocess_item_value(0, itemid, poller->request->hostid, ITEM_VALUE_TYPE_TEXT, flags, NULL,
+					&ts, state, value);
 			break;
 		default:
 			/* don't change item's state when network related error occurs */

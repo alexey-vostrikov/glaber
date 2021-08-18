@@ -17,9 +17,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include "dbcache.h"
 #include "zbxself.h"
 #include "common.h"
-#include "dbcache.h"
+#include "selfmon.h"
 
 #ifndef _WINDOWS
 #	include "mutexs.h"
@@ -87,6 +88,12 @@ static int			shm_id;
 static zbx_mutex_t	sm_lock = ZBX_MUTEX_NULL;
 #endif
 
+extern int  CONFIG_UNREACHABLE_POLLER_FORKS;
+extern int  CONFIG_PINGER_FORKS;
+extern int  CONFIG_JAVAPOLLER_FORKS;
+extern int  CONFIG_POLLER_FORKS;
+extern int  CONFIG_GLB_WORKER_FORKS;
+extern int  CONFIG_EXT_SERVER_FORKS;
 extern char	*CONFIG_FILE;
 extern int 	CONFIG_POLLERS_FORKS[];
 extern int 	CONFIG_GLB_SNMP_FORKS;
@@ -118,12 +125,8 @@ extern int	CONFIG_PREPROCESSOR_FORKS;
 extern int	CONFIG_LLDMANAGER_FORKS;
 extern int	CONFIG_LLDWORKER_FORKS;
 extern int	CONFIG_ALERTDB_FORKS;
-extern int  CONFIG_UNREACHABLE_POLLER_FORKS;
-extern int  CONFIG_PINGER_FORKS;
-extern int  CONFIG_JAVAPOLLER_FORKS;
-extern int  CONFIG_POLLER_FORKS;
-extern int  CONFIG_GLB_WORKER_FORKS;
-extern int  CONFIG_EXT_SERVER_FORKS;
+extern int	CONFIG_HISTORYPOLLER_FORKS;
+extern int	CONFIG_AVAILMAN_FORKS;
 
 extern unsigned char	process_type;
 extern int		process_num;
@@ -145,6 +148,16 @@ int	get_process_type_forks(unsigned char proc_type)
 {
 	switch (proc_type)
 	{
+		case GLB_PROCESS_TYPE_SNMP:
+			return CONFIG_GLB_SNMP_FORKS;
+		case GLB_PROCESS_TYPE_AGENT:
+			return CONFIG_GLB_AGENT_FORKS;
+		case GLB_PROCESS_TYPE_PINGER:
+			return CONFIG_GLB_PINGER_FORKS;
+		case GLB_PROCESS_TYPE_WORKER:
+			return CONFIG_GLB_WORKER_FORKS;
+		case GLB_PROCESS_TYPE_SERVER:
+			return CONFIG_EXT_SERVER_FORKS;
 		case ZBX_PROCESS_TYPE_POLLER:
 			return CONFIG_POLLER_FORKS;
 		case ZBX_PROCESS_TYPE_UNREACHABLE:
@@ -207,22 +220,13 @@ int	get_process_type_forks(unsigned char proc_type)
 			return CONFIG_LLDWORKER_FORKS;
 		case ZBX_PROCESS_TYPE_ALERTSYNCER:
 			return CONFIG_ALERTDB_FORKS;
-		case GLB_PROCESS_TYPE_SNMP:
-			return CONFIG_GLB_SNMP_FORKS;
-		case GLB_PROCESS_TYPE_AGENT:
-			return CONFIG_GLB_AGENT_FORKS;
-		case GLB_PROCESS_TYPE_PINGER:
-			return CONFIG_GLB_PINGER_FORKS;
-		case GLB_PROCESS_TYPE_WORKER:
-			return CONFIG_GLB_WORKER_FORKS;
-		case GLB_PROCESS_TYPE_SERVER:
-			return CONFIG_EXT_SERVER_FORKS;
-			
-		
+		case ZBX_PROCESS_TYPE_HISTORYPOLLER:
+			return CONFIG_HISTORYPOLLER_FORKS;
+		case ZBX_PROCESS_TYPE_AVAILMAN:
+			return CONFIG_AVAILMAN_FORKS;
 	}
-	zabbix_log(LOG_LEVEL_WARNING,"Unknown process type %d, This is a BUG",proc_type );
-	THIS_SHOULD_NEVER_HAPPEN;
-	exit(EXIT_FAILURE);
+
+	return get_component_process_type_forks(proc_type);
 }
 
 #ifndef _WINDOWS

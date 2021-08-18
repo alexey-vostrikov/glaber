@@ -28,8 +28,8 @@ class CAudit {
 	 */
 	static private $supported_type = [
 		AUDIT_RESOURCE_ACTION => 				['actionid', 'name', 'actions'],
-		AUDIT_RESOURCE_APPLICATION =>			['applicationid', 'name', 'applications'],
 		AUDIT_RESOURCE_AUTHENTICATION =>		['configid', null, 'config'],
+		AUDIT_RESOURCE_AUTH_TOKEN =>			['tokenid', 'name', 'token'],
 		AUDIT_RESOURCE_AUTOREGISTRATION =>		['configid', null, 'config'],
 		AUDIT_RESOURCE_CORRELATION =>			['correlationid', 'name', 'correlation'],
 		AUDIT_RESOURCE_DASHBOARD =>				['dashboardid', 'name', 'dashboard'],
@@ -44,15 +44,18 @@ class CAudit {
 		AUDIT_RESOURCE_ITEM =>					['itemid', 'name', 'items'],
 		AUDIT_RESOURCE_ITEM_PROTOTYPE =>		['itemid', 'name', 'items'],
 		AUDIT_RESOURCE_MACRO =>					['globalmacroid', 'macro', 'globalmacro'],
+		AUDIT_RESOURCE_MAINTENANCE =>			['maintenanceid', 'name', 'maintenances'],
 		AUDIT_RESOURCE_MEDIA_TYPE =>			['mediatypeid', 'name', 'media_type'],
 		AUDIT_RESOURCE_MODULE =>				['moduleid', 'id', 'module'],
 		AUDIT_RESOURCE_PROXY =>					['proxyid', 'host', 'hosts'],
 		AUDIT_RESOURCE_SCENARIO =>				['httptestid', 'name', 'httptest'],
+		AUDIT_RESOURCE_SCHEDULED_REPORT =>		['reportid', 'name', 'report'],
 		AUDIT_RESOURCE_SCRIPT =>				['scriptid', 'name', 'scripts'],
 		AUDIT_RESOURCE_SETTINGS =>				['configid', null, 'config'],
+		AUDIT_RESOURCE_TEMPLATE =>				['templateid', 'name', 'hosts'],
 		AUDIT_RESOURCE_TRIGGER =>				['triggerid', 'description', 'triggers'],
 		AUDIT_RESOURCE_TRIGGER_PROTOTYPE =>		['triggerid', 'description', 'triggers'],
-		AUDIT_RESOURCE_USER =>					['userid', 'alias', 'users'],
+		AUDIT_RESOURCE_USER =>					['userid', 'username', 'users'],
 		AUDIT_RESOURCE_USER_GROUP =>			['usrgrpid', 'name', 'usrgrp'],
 		AUDIT_RESOURCE_VALUE_MAP =>				['valuemapid', 'name', 'valuemaps'],
 		AUDIT_RESOURCE_TEMPLATE_DASHBOARD =>	['dashboardid', 'name', 'dashboard']
@@ -90,18 +93,24 @@ class CAudit {
 	 */
 	static public function addBulk($userid, $ip, $action, $resourcetype, array $objects, array $objects_old = null) {
 		$masked_fields = [
-			'users' => [
-				'fields' => ['passwd' => true]
-			],
 			'config' => [
+				'fields' => ['tls_psk_identity' => true, 'tls_psk' => true]
+			],
+			'globalmacro' => [
+				'fields' => ['value' => true],
+				'conditions' => ['type' => ZBX_MACRO_TYPE_SECRET]
+			],
+			'hosts' => [
 				'fields' => ['tls_psk_identity' => true, 'tls_psk' => true]
 			],
 			'media_type' => [
 				'fields' => ['passwd' => true]
 			],
-			'globalmacro' => [
-				'fields' => ['value' => true],
-				'conditions' => ['type' => ZBX_MACRO_TYPE_SECRET]
+			'token' => [
+				'fields' => ['token' => true]
+			],
+			'users' => [
+				'fields' => ['passwd' => true]
 			]
 		];
 

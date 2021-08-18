@@ -526,7 +526,7 @@ int sync_lld_data(GLB_SERVER_CONF *conf) {
             zabbix_log(LOG_LEVEL_DEBUG,"Will submit LLD %s",lld_val);
             
             //zbx_lld_process_agent_result(dc_item.itemid, &result, &ts, error);
-            zbx_lld_process_value(dc_item.itemid, lld_val, &ts, AR_META,0,time(NULL),NULL);
+            zbx_lld_process_value(dc_item.itemid, dc_item.host.hostid, lld_val, &ts, AR_META,0,time(NULL),NULL);
             
             //, 0, error);
            	

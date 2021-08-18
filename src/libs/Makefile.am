@@ -33,7 +33,9 @@ DIST_SUBDIRS = \
 	zbxprometheus \
 	zbxvault \
 	zbxdiag \
-	zbxtrends
+	zbxtrends \
+	zbxavailability \
+	zbxeval
 
 if SERVER
 SERVER_SUBDIRS = \
@@ -55,7 +57,9 @@ SERVER_SUBDIRS = \
 	zbxprometheus \
 	zbxvault \
 	zbxdiag \
-	zbxtrends
+	zbxtrends \
+	zbxavailability \
+	zbxeval
 else
 if PROXY
 PROXY_SUBDIRS = \
@@ -76,7 +80,9 @@ PROXY_SUBDIRS = \
 	zbxprometheus \
 	zbxvault \
 	zbxdiag \
-	zbxtrends
+	zbxtrends \
+	zbxavailability \
+	zbxeval
 endif
 endif
 

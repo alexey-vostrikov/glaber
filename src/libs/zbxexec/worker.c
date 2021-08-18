@@ -87,13 +87,13 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     }
     else
     {
-        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed worker path: '%s'", __func__, path);
+        zabbix_log(LOG_LEVEL_DEBUG, "%s: parsed worker path: '%s'", __func__, path);
         worker->path = zbx_strdup(NULL, path);
     }
 
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "params", buff, MAX_STRING_LEN, &type))
     {
-        zabbix_log(LOG_LEVEL_INFORMATION, "%s: parsed params: '%s'", __func__, buff);
+        zabbix_log(LOG_LEVEL_DEBUG, "%s: parsed params: '%s'", __func__, buff);
         
         char prevchar = 0, *params=NULL;
         int i=0, args_num=2;
@@ -310,7 +310,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         //having a nap
         sleep(2);
     }
-    zabbix_log(LOG_LEVEL_INFORMATION, "Satrted worker '%s' pid is %d", worker->path, worker->pid);
+    zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     return SUCCEED;
 }

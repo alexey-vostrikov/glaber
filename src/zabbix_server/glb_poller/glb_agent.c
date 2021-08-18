@@ -405,8 +405,13 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 									NULL , &timespec, ITEM_STATE_NOTSUPPORTED, err_str);
 			}
 
+<<<<<<< HEAD
 			*conf->responses += 1;	
 			zbx_tcp_close(&tmp_s);
+=======
+			*conf->responses += 1;
+			zbx_tcp_close(&tmp_s);	
+>>>>>>> 5_4_sources
 			close(conn->socket);
 			conn->socket = 0;
 			conn->state = POLL_FREE;

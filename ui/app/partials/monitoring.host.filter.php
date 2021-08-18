@@ -41,15 +41,22 @@ foreach (array_values($data['tags']) as $i => $tag) {
 			->setAttribute('placeholder', _('tag'))
 			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 			->removeId(),
-		(new CRadioButtonList('tags['.$i.'][operator]', (int) $tag['operator']))
-			->addValue(_('Contains'), TAG_OPERATOR_LIKE, 'tags_0'.$i.'_#{uniqid}')
-			->addValue(_('Equals'), TAG_OPERATOR_EQUAL, 'tags_1'.$i.'_#{uniqid}')
-			->setId('tags_'.$i.'_#{uniqid}')
-			->setModern(true),
+		(new CSelect('tags['.$i.'][operator]'))
+			->addOptions(CSelect::createOptionsFromArray([
+				TAG_OPERATOR_EXISTS => _('Exists'),
+				TAG_OPERATOR_EQUAL => _('Equals'),
+				TAG_OPERATOR_LIKE => _('Contains'),
+				TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
+				TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
+				TAG_OPERATOR_NOT_LIKE => _('Does not contain')
+			]))
+			->setValue($tag['operator'])
+			->setFocusableElementId('tags-'.$i.'#{uniqid}-operator-select')
+			->setId('tags_'.$i.'#{uniqid}_operator'),
 		(new CTextBox('tags['.$i.'][value]', $tag['value']))
 			->setAttribute('placeholder', _('value'))
 			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-			->removeId(),
+			->setId('tags_'.$i.'#{uniqid}_value'),
 		(new CCol(
 			(new CButton('tags['.$i.'][remove]', _('Remove')))
 				->addClass(ZBX_STYLE_BTN_LINK)
@@ -183,14 +190,21 @@ if (array_key_exists('render_html', $data)) {
 				->setAttribute('placeholder', _('tag'))
 				->removeId()
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-			(new CRadioButtonList('tags[#{rowNum}][operator]', TAG_OPERATOR_LIKE))
-				->addValue(_('Contains'), TAG_OPERATOR_LIKE, 'tags_0#{rowNum}#{uniqid}')
-				->addValue(_('Equals'), TAG_OPERATOR_EQUAL, 'tags_1#{rowNum}#{uniqid}')
-				->setModern(true)
-				->setId('tags_#{rowNum}#{uniqid}'),
+			(new CSelect('tags[#{rowNum}][operator]'))
+				->addOptions(CSelect::createOptionsFromArray([
+					TAG_OPERATOR_EXISTS => _('Exists'),
+					TAG_OPERATOR_EQUAL => _('Equals'),
+					TAG_OPERATOR_LIKE => _('Contains'),
+					TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
+					TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
+					TAG_OPERATOR_NOT_LIKE => _('Does not contain')
+				]))
+				->setValue(TAG_OPERATOR_LIKE)
+				->setFocusableElementId('tags-#{rowNum}#{uniqid}-operator-select')
+				->setId('tags_#{rowNum}#{uniqid}_operator'),
 			(new CTextBox('tags[#{rowNum}][value]', '#{value}'))
 				->setAttribute('placeholder', _('value'))
-				->removeId()
+				->setId('tags_#{rowNum}#{uniqid}_value')
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
 			(new CCol(
 				(new CButton('tags[#{rowNum}][remove]', _('Remove')))
@@ -199,7 +213,8 @@ if (array_key_exists('render_html', $data)) {
 					->removeId()
 			))->addClass(ZBX_STYLE_NOWRAP)
 		]))
-			->addClass('form_row'))
+			->addClass('form_row')
+	)
 	->show();
 ?>
 <script type="text/javascript">
@@ -249,14 +264,24 @@ if (array_key_exists('render_html', $data)) {
 			data.tags.push({'tag': '', 'value': '', 'operator': <?= TAG_OPERATOR_LIKE ?>, uniqid: data.uniqid});
 		}
 
-		$('#tags_' + data.uniqid, container).dynamicRows({
-			template: '#filter-tag-row-tmpl',
-			rows: data.tags,
-			counter: 0,
-			dataCallback: (tag) => {
-				tag.uniqid = data.uniqid;
-				return tag;
-			}
+		$('#tags_' + data.uniqid, container)
+			.dynamicRows({
+				template: '#filter-tag-row-tmpl',
+				rows: data.tags,
+				counter: 0,
+				dataCallback: (tag) => {
+					tag.uniqid = data.uniqid;
+					return tag;
+				}
+			})
+			.on('afteradd.dynamicRows', function() {
+				var rows = this.querySelectorAll('.form_row');
+				new CTagFilterItem(rows[rows.length - 1]);
+			});
+
+		// Init existing fields once loaded.
+		document.querySelectorAll('#tags_' + data.uniqid + ' .form_row').forEach(row => {
+			new CTagFilterItem(row);
 		});
 
 		// Input, radio and single checkboxes.

@@ -40,13 +40,13 @@ TTL day + INTERVAL 6 MONTH;
 CREATE TABLE glaber.history_log (   day Date,  
                                 itemid UInt64,  
                                 clock DateTime,  
+                                logeventid UInt64,
+                                source  String,
+                                severity UInt8,
                                 hostname String,
                                 itemname String,
                                 ns UInt32, 
-                                value String,  
-                                logeventid UInt64,
-                                source  String,
-	                            severity UInt8
+                                value String
                             ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(day)
 ORDER BY (itemid, clock) 

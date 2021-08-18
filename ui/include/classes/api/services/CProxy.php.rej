@@ -1,0 +1,21 @@
+--- ui/include/classes/api/services/CProxy.php	2021-01-18 21:20:45.000000000 +0500
++++ ui/include/classes/api/services/CProxy.php	2021-04-16 11:39:44.094112423 +0500
+@@ -295,15 +314,15 @@
+ 
+ 		$db_proxies = $this->get([
+ 			'output' => ['proxyid', 'hostid', 'host', 'status', 'tls_connect', 'tls_accept', 'tls_issuer',
+-				'tls_subject', 'tls_psk_identity', 'tls_psk'
++				'tls_subject', 'tls_psk_identity', 'tls_psk', 'error'
+ 			],
+ 			'proxyids' => $proxyids,
+ 			'editable' => true,
+-			'preservekeys' => true
++			'preservekeys' => true,
++			
+ 		]);
+ 
+ 		$this->validateUpdate($proxies, $db_proxies);
+-
+ 		foreach ($proxies as &$proxy) {
+ 			$status = array_key_exists('status', $proxy) ? $proxy['status'] : $db_proxies[$proxy['proxyid']]['status'];
+ 
