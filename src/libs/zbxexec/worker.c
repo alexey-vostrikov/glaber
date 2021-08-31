@@ -738,6 +738,12 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
             out_buffer[out++] = 'n';
             in++;
         }
+        else if (in_string[in] == '"')
+        {
+            out_buffer[out++] = '\\';
+            out_buffer[out++] = '"';
+            in++;
+        }
         else
             out_buffer[out++] = in_string[in++];
     }
