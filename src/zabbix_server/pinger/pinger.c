@@ -300,6 +300,9 @@ static void	process_values(icmpitem_t *items, int first_index, int last_index, Z
 		else if (0 == strcmp(tmp, "max"))
 		{
 			*type = ICMPPINGSEC_MAX;
+		} else if (0 == strcmp(tmp, "fping"))
+		{
+		  //just ignore, it's ok 
 		}
 		else
 		{
