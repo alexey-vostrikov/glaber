@@ -194,7 +194,7 @@ func (he ClickHouseHist) ReadTrends (hr histApi.HistoryRequest, dumpf func(*hist
 		log.Print(err)
   	} else {
 		
-		//log.Print("Got responce")
+	//	log.Print("Got responce")
 		body, _ := ioutil.ReadAll(resp.Body)
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
