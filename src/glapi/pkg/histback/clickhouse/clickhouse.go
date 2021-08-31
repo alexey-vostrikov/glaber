@@ -59,7 +59,7 @@ func Init(he *ClickHouseHist, url string,dbname string , batch int ,flush int ,d
 	he.parser = new(fastjson.Parser)
 	he.cluster_suffix = cluster_suffix
 	he.buf = bytebufferpool.Get()
-	he.quotter = strings.NewReplacer("\n","\\n","\"","\\\"")
+	he.quotter = strings.NewReplacer("\n","\\n","\"","\\\"","'","\\'", "\\","\\\\")
 
 	for i := 0; i < histApi.ITEM_VALUE_TYPE_MAX; i++ {
 		he.sql_buffer[i]=bytebufferpool.Get()
@@ -103,15 +103,15 @@ func (he ClickHouseHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) 
 			fmt.Fprintf(buf,",%f",metric.Value_dbl)
 
 		case histApi.ITEM_VALUE_TYPE_STR: 
-			fmt.Fprintf(buf,",'%s'",strings.Replace(metric.Value_str, "'", "\\'", -1))
-		
+			fmt.Fprintf(buf,",'%s'",he.quotter.Replace(string(metric.Value_str)))
+				
 		case histApi.ITEM_VALUE_TYPE_TEXT:
-			fmt.Fprintf(buf,",'%s'",strings.Replace(metric.Value_str, "'", "\\'", -1))
-
+			fmt.Fprintf(buf,",'%s'",he.quotter.Replace(string(metric.Value_str)))
+	
 		case histApi.ITEM_VALUE_TYPE_LOG:
-			fmt.Fprintf(buf,", '%s', %d, %d, '%s'",strings.Replace(strings.Replace(metric.Value_str, "\\\"", "\"", -1), "'", "\\'", -1),
+			fmt.Fprintf(buf,", '%s', %d, %d, '%s'",he.quotter.Replace(string(metric.Value_str)),
 						metric.Logeventid, metric.Severity, 
-						strings.Replace(metric.Source, "'", "\\'", -1))
+						he.quotter.Replace(metric.Source))
 
 		default:
 			log.Panic("Unsupported value type: ", metric.Value_type)
@@ -122,12 +122,11 @@ func (he ClickHouseHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) 
 	}
 		
 	if he.save_names {
-		fmt.Fprintf(buf,",'%s','%s'", strings.Replace(metric.Host, "'", "\\'", -1), 
-									strings.Replace(metric.Item_key, "'", "\\'", -1))
+		fmt.Fprintf(buf,",'%s','%s'",he.quotter.Replace(metric.Host), 
+									he.quotter.Replace(metric.Item_key))
 	}
 	
 	fmt.Fprintf(buf,")")
-	//log.Print(buf)
 	(*he.metrics)[metric.Value_type]++
 	
 }
@@ -159,7 +158,7 @@ func (he ClickHouseHist) WriteTrends(agg_metric *histApi.AggMetric, log *log.Log
 	}
 
 			
-	fmt.Fprintf(buf,",%d,'%s','%s'",agg_metric.Count, agg_metric.Host, agg_metric.Item_key)
+	fmt.Fprintf(buf,",%d,'%s','%s'",agg_metric.Count, he.quotter.Replace(agg_metric.Host), he.quotter.Replace(agg_metric.Item_key))
 	
 
 	fmt.Fprintf(buf,")")
