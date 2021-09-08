@@ -852,18 +852,18 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 	if (REQUEST_STATE_QUEUED == state && 0 <= notsupp_shift)
 	{
 		request->value_type = item->value_type;
-		if (NULL != item && 1 == item->fast_preprocess 
+	//	if (NULL != item && 1 == item->fast_preprocess 
 			//&& ITEM_STATE_NOTSUPPORTED != value->state 
-			) {
+	//		) {
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld will be fast-preprocessed",item->itemid);
 			//fast preproccessing will do immediate preproc without consuming an extra memory and sending data to worker
 			//flag ->fast_preprocess is set for all realtively fast items - for now for all except javascript ones
-			glb_fast_preprocess_item(manager, request, item);
+	//		glb_fast_preprocess_item(manager, request, item);
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld finished fast-preprocessing",item->itemid);
-			request->state = REQUEST_STATE_DONE;
-			manager->processed_num++;
+	//		request->state = REQUEST_STATE_DONE;
+	//		manager->processed_num++;
 		
-		} else {
+	//	} else {
 		
 			request->steps = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) *
 					(item->preproc_ops_num - notsupp_shift));
@@ -878,7 +878,7 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 						item->preproc_ops[i + notsupp_shift].error_handler_params);
 			}
 			manager->preproc_num++;
-		}
+	//	}
 		
 	}
 
