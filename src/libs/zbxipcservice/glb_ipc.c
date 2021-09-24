@@ -27,6 +27,7 @@
 #include "memalloc.h"
 #include "zbxalgo.h"
 #include "glb_ipc.h"
+#include "glb_lock.h"
 #include <pthread.h>
 
 
@@ -107,12 +108,10 @@ static glb_ipc_type_t local_ipc[GLB_IPC_TYPE_COUNT];
 glb_ipc_queue_item_t *glb_ipc_get_item(glb_ipc_queue_t *queue) {
 	glb_ipc_queue_item_t *elem = NULL;
 	
-	while (0 != pthread_mutex_trylock(&queue->p_lock)) {
-		usleep(50);
-	};
-	
+	glb_lock_block(&queue->p_lock);
+
 	if (NULL == queue->first) {
-		pthread_mutex_unlock(&queue->p_lock);
+		glb_lock_unlock(&queue->p_lock);
 		return NULL;
 	} 
 
@@ -125,7 +124,7 @@ glb_ipc_queue_item_t *glb_ipc_get_item(glb_ipc_queue_t *queue) {
 	
 	queue->count--;
 
-	pthread_mutex_unlock(&queue->p_lock);
+	glb_lock_unlock(&queue->p_lock);
 	return elem;
 }
 /*****************************************************************
@@ -135,9 +134,7 @@ unsigned int glb_ipc_put_items(glb_ipc_queue_t *queue,  glb_ipc_queue_item_t *it
 
 	glb_ipc_queue_item_t *old_last = NULL;
 	
-	while (0 != pthread_mutex_trylock(&queue->p_lock)) {
-		usleep(50);
-	};
+	glb_lock_block(&queue->p_lock);
 	
 	if (NULL == new_last ) 
 		new_last = item;
@@ -158,7 +155,7 @@ unsigned int glb_ipc_put_items(glb_ipc_queue_t *queue,  glb_ipc_queue_item_t *it
 		queue->count += count;
 	}
 	
-	pthread_mutex_unlock(&queue->p_lock);
+	glb_lock_unlock(&queue->p_lock);
 
 	return SUCCEED;
 }
@@ -223,20 +220,7 @@ static  glb_ipc_queue_item_t *glb_ipc_get_item_nolock1( glb_ipc_queue_t *queue) 
 	return old_head;
 }
 */
-int glb_ipc_init_lock(pthread_mutex_t *lock) {
-	pthread_mutexattr_t	mta;
 
-	if (0 != pthread_mutexattr_init(&mta))
-		return FAIL;
-	
-	if (0 != pthread_mutexattr_setpshared(&mta, PTHREAD_PROCESS_SHARED))
-		return FAIL;
-	
-	if (pthread_mutex_init(lock, &mta)!= 0)
-        return FAIL;
-    
-	return SUCCEED;
-}
 
 /************************************************
  * Global init, should be called before forks	*
@@ -264,10 +248,10 @@ int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
 	
 	//locks
 	for (i=0; i<GLB_IPC_BUFFERS; i++) {
-		glb_ipc_init_lock(&glb_ipc->buffers[i].q_lock);	
+		glb_lock_init(&glb_ipc->buffers[i].q_lock);	
 	}
 
-	glb_ipc_init_lock(&glb_ipc->mem_lock);
+	glb_lock_init(&glb_ipc->mem_lock);
 	
 	for ( ipc_type = 0; GLB_IPC_NONE != comm_types[ipc_type].type; ipc_type++ ) {
 		void *data;
@@ -285,10 +269,10 @@ int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
 			glb_ipc->ipc[ipc_type].queued[i].count = 0;
 			glb_ipc->ipc[ipc_type].queued[i].first = NULL;
 			glb_ipc->ipc[ipc_type].queued[i].last = NULL;
-			glb_ipc_init_lock(&glb_ipc->ipc[ipc_type].queued[i].p_lock);
+			glb_lock_init(&glb_ipc->ipc[ipc_type].queued[i].p_lock);
 		}	
 		
-		glb_ipc_init_lock(&glb_ipc->ipc[ipc_type].free.p_lock);
+		glb_lock_init(&glb_ipc->ipc[ipc_type].free.p_lock);
 			
 		glb_ipc_queue_item_t *prev_elem = NULL;
 		//TODO: return mass addition of queue elements - they aren't expected to be free at all
@@ -464,21 +448,17 @@ void *glb_ipc_malloc(size_t size) {
 	void *ret;
 	int num;
 	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: locking memory");
-	while ( pthread_mutex_trylock(&glb_ipc->mem_lock)) {
-		usleep(50);
-	};	
-	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: locked mem, calling zbx_mem_malloc");
-	zabbix_log(LOG_LEVEL_INFORMATION,"Memory stats: total %ld, used %ld, free %ld%%", ipc_mem->total_size, ipc_mem->used_size, (ipc_mem->free_size*100)/ipc_mem->total_size);
+	
+	glb_lock_block(&glb_ipc->mem_lock);
+	
+//	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: locked mem, calling zbx_mem_malloc");
+//	zabbix_log(LOG_LEVEL_INFORMATION,"Memory stats: total %ld, used %ld, free %ld%%", ipc_mem->total_size, ipc_mem->used_size, (ipc_mem->free_size*100)/ipc_mem->total_size);
 
 	ret = zbx_mem_malloc(ipc_mem, NULL,size);
-	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: returned from zbx_mem_malloc");
+	
 
-	num = pthread_mutex_unlock(&glb_ipc->mem_lock);	
-	if (0 != num ) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Pthread unlock failed and retruned %d", num);
-		exit(-1);
-	}
-
+	glb_lock_unlock(&glb_ipc->mem_lock);
+	
 	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: unlocked memory");
 	return ret;
 }
@@ -534,15 +514,15 @@ static unsigned int glb_ipc_calc_buf_idx(size_t data_size) {
 	
 	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: buffer index is %d", __func__, buf_idx);
 	//try to fetch an item from the buffers
-	while (pthread_mutex_trylock(&glb_ipc->buffers[buf_idx].q_lock)) {usleep(50);};
+	glb_lock_block(&glb_ipc->buffers[buf_idx].q_lock);
 	
 	if ( NULL != glb_ipc->buffers[buf_idx].first ) {
 		buffer = glb_ipc->buffers[buf_idx].first;
 		glb_ipc->buffers[buf_idx].first = buffer->next;
 		 
 	}
-	//glb_ipc->buffers[buf_idx].last = NULL;
-	pthread_mutex_unlock(&glb_ipc->buffers[buf_idx].q_lock);
+	glb_lock_unlock(&glb_ipc->buffers[buf_idx].q_lock);	
+	
 	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocated from buffer queue %d", __func__, buf_idx);
 
 	if (NULL == buffer )  {
@@ -604,13 +584,12 @@ void glb_ipc_release_buffer(glb_ipc_buffer_t *buffer) {
 	buffer->lastuse = time(NULL);
 	zabbix_log(LOG_LEVEL_INFORMATION, " %s IPC:clean Putting  buffer item back to free buffers", __func__);
 
-	while (pthread_mutex_trylock(&glb_ipc->buffers[buffer->buf_idx].q_lock)) {
-		usleep(50);
-	}
+	glb_lock_block(&glb_ipc->buffers[buffer->buf_idx].q_lock);
+
 	buffer->next = glb_ipc->buffers[buffer->buf_idx].first;
 	glb_ipc->buffers[buffer->buf_idx].first = buffer;
 	
-	pthread_mutex_unlock(&glb_ipc->buffers[buffer->buf_idx].q_lock);
+	glb_lock_unlock(&glb_ipc->buffers[buffer->buf_idx].q_lock);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "In %s: finished", __func__);
 	}
@@ -848,6 +827,20 @@ int glb_ipc_dump_queue_stats() {
 	zabbix_log(LOG_LEVEL_INFORMATION,"* end of IPC queues dump                        *");
 	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");
 };
+
+//that's pretty strange destroy proc yet
+void	glb_ipc_destroy(void)
+{
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+    //there is no reason to go and waste time on 
+    //destroying all the objects, on existing
+    //shared mem will get freed immediately
+
+    //however to make things right, this proc is here
+    //TODO:implement full objects destroy sequence
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
 
 //p.s. my intention was to do a simple IPC handling in less then 500 lines. 
 //However i failed this, too many comments by now, so far 730 lines 

@@ -75,3 +75,4 @@ void glb_ipc_dump_metric( GLB_METRIC *metric);
 int glb_ipc_dump_queue_stats();
 glb_ipc_buffer_t *glb_ipc_get_buffer(size_t raw_size);
 void glb_ipc_release_buffer(glb_ipc_buffer_t *buffer);
+void	glb_ipc_destroy(void);
