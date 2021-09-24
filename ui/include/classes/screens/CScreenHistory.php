@@ -336,6 +336,7 @@ class CScreenHistory extends CScreenBase {
 				$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
 					new CUrl($this->page_file)
 				);
+				
 
 				foreach ($history_data as $data) {
 					$data['value'] = rtrim($data['value'], " \t\r\n");
@@ -354,6 +355,13 @@ class CScreenHistory extends CScreenBase {
 						}
 						elseif ($pos === false && $this->filterTask == FILTER_TASK_INVERT_MARK) {
 							$color = $this->markColor;
+						} 
+
+						if ($pos !== false && $this->filterTask == FILTER_TASK_HIDE) {
+							continue;
+						}
+						if ($pos == false && $this->filterTask == FILTER_TASK_SHOW ) {
+							continue;
 						}
 
 						switch ($color) {
