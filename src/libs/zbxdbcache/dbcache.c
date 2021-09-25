@@ -41,6 +41,7 @@
 #include "zbxtrends.h"
 #include "zbxalgo.h"
 #include "../zbxalgo/vectorimpl.h"
+#include "glb_cache.h"
 
 static zbx_mem_info_t	*hc_index_mem = NULL;
 static zbx_mem_info_t	*hc_mem = NULL;
@@ -2108,7 +2109,7 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 	}
 
 	if (0 != history_values.values_num)
-		ret = zbx_vc_add_values(&history_values);
+		ret = glb_cache_add_values(&history_values);
 
 	zbx_vector_ptr_destroy(&history_values);
 

@@ -1703,7 +1703,9 @@ static int	evaluate_NODATA(char **value, DC_ITEM *item, const char *parameters, 
 	}
 	else
 		period = arg1;
-
+	//TODO: fix for optimal cache usage here
+	THIS_SHOULD_NEVER_HAPPEN;
+	exit(-1);
 	if (SUCCEED == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, period, 1, &ts) &&
 			1 == values.values_num)
 	{

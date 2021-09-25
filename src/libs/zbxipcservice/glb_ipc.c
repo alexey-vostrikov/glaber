@@ -30,8 +30,6 @@
 #include "glb_lock.h"
 #include <pthread.h>
 
-
-
 #define GLB_IPC_UNLOCKED 		0
 #define GLB_IPC_LOCKED 			1
 

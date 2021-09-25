@@ -452,8 +452,7 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
 	
 	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_history\", \"metrics\":[");
     //converitng the data to string
-	zabbix_log(LOG_LEVEL_DEBUG, "Started 1 %s()", __func__);	
-    for (i = 0; i < history->values_num; i++)
+	for (i = 0; i < history->values_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)history->values[i];
 	

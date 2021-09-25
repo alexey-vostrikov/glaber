@@ -1071,7 +1071,7 @@ static int	DBget_history_log_value(zbx_uint64_t itemid, char **replace_to, int r
 	if (SUCCEED != zbx_vc_get_value(item.host.hostid, itemid, item.value_type, &ts, &value))
 		goto out;
 
-	zbx_vc_flush_stats();
+//	zbx_vc_flush_stats();
 
 	switch (request)
 	{
@@ -1162,7 +1162,7 @@ static int	DBitem_get_value(zbx_uint64_t itemid, char **lastvalue, int raw, zbx_
 		{
 			char	tmp[MAX_BUFFER_LEN];
 
-			zbx_vc_flush_stats();
+//			zbx_vc_flush_stats();
 			zbx_history_value_print(tmp, sizeof(tmp), &vc_value.value, value_type);
 			zbx_history_record_clear(&vc_value, value_type);
 
@@ -4619,7 +4619,7 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const DB_
 		pos++;
 	}
 
-	zbx_vc_flush_stats();
+//	zbx_vc_flush_stats();
 
 	zbx_free(user_username);
 	zbx_free(user_name);
@@ -5066,7 +5066,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 		}
 	}
 
-	zbx_vc_flush_stats();
+//	zbx_vc_flush_stats();
 
 	DCconfig_clean_items(items, errcodes, itemids.values_num);
 	zbx_vector_uint64_destroy(&itemids);

@@ -20,7 +20,7 @@
 #include "common.h"
 #include "zbxalgo.h"
 #include "memalloc.h"
-#include "../../libs/zbxdbcache/valuecache.h"
+#include "../../libs/zbxdbcache/glb_cache.h"
 #include "zbxlld.h"
 #include "zbxalert.h"
 #include "zbxdiag.h"
@@ -140,7 +140,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			zbx_mem_stats_t	mem;
 
 			time1 = zbx_time();
-			zbx_vc_get_mem_stats(&mem);
+			glb_cache_get_mem_stats(&mem);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 

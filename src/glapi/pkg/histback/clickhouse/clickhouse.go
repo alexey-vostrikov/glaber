@@ -59,8 +59,8 @@ func Init(he *ClickHouseHist, url string,dbname string , batch int ,flush int ,d
 	he.parser = new(fastjson.Parser)
 	he.cluster_suffix = cluster_suffix
 	he.buf = bytebufferpool.Get()
-	he.quotter = strings.NewReplacer("\n","\\n","\"","\\\"","'","\\'", "\\","\\\\")
-
+	he.SQLquotter = strings.NewReplacer("\n","\\n","\"","\\\"","'","\\'", "\\","\\\\")
+	he.JSONquotter = strings.NewReplacer("\n","\\n","\"","\\\"", "\\","\\\\")
 	for i := 0; i < histApi.ITEM_VALUE_TYPE_MAX; i++ {
 		he.sql_buffer[i]=bytebufferpool.Get()
 		he.agg_sql_buf[i]=bytebufferpool.Get()
