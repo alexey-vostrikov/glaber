@@ -24,7 +24,7 @@
 #include "zbxmockassert.h"
 #include "zbxmockutil.h"
 
-#include "valuecache.h"
+#include "glb_cache.h"
 #include "zbxserver.h"
 
 #include "mocks/valuecache/valuecache_mock.h"

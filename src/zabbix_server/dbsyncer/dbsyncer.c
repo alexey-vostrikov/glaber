@@ -107,7 +107,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
-#define STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
+#define STAT_INTERVAL	1	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
 
 	zbx_setproctitle("%s #%d [connecting to the database]", process_name, process_num);

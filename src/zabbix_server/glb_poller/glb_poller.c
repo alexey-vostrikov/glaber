@@ -14,6 +14,7 @@
 #include "glb_worker.h"
 #include "glb_server.h"
 #include "glb_agent.h"
+#include "glb_cache.h"
 #include "../poller/poller.h"
 #include "../poller/checks_snmp.h"
 #include "../../libs/zbxexec/worker.h"
@@ -178,7 +179,12 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 		
 		if (CONFIG_DEBUG_ITEM == glb_item->itemid) 
 			zabbix_log(LOG_LEVEL_INFORMATION, "In %s - Added item %ld poll event in %ld sec", __func__, glb_item->itemid, nextcheck - now);
-			
+		glb_cache_item_meta_t meta;
+		meta.lastdata = now;
+		meta.nextcheck = nextcheck;
+		
+		glb_cache_update_item_meta( glb_item->itemid, &meta, 
+					GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_NEXTCHECK);
 		add_event(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck);
 	} else {
 		zabbix_log(LOG_LEVEL_INFORMATION, "No host has been fount for itemid %ld", glb_item->itemid);
@@ -206,17 +212,8 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	DEBUG_ITEM(dc_item->itemid,"Creating/updating glb item");
 	DEBUG_HOST(dc_item->host.hostid,"Creating/updating glb item");
 
-	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(items, &dc_item->itemid)))
+	if (NULL == (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(items, &dc_item->itemid)))
 	{
-			DEBUG_ITEM(dc_item->itemid, "Item already in the local queue, cleaning");
-
-			if (POLL_QUEUED == glb_item->state) {
-				glb_free_item_data(poll_engine, glb_item);
-				zbx_heap_strpool_release(glb_item->delay);
-			}
-
-	} else	{
-		
 		DEBUG_ITEM(dc_item->itemid,"Adding new item");
 		zabbix_log(LOG_LEVEL_DEBUG,"Adding new item %ld to the local queue", dc_item->itemid);
 
@@ -227,148 +224,104 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		glb_item = zbx_hashset_insert(items, glb_item, sizeof(GLB_POLLER_ITEM));
 		
 		glb_item->state = POLL_FREE;
-		zabbix_log(LOG_LEVEL_DEBUG,"Adding new item %ld to the local queue1", dc_item->itemid);
-		//this is new item, checking if the host exists
-		if (NULL == (glb_host = (GLB_POLLER_HOST *)zbx_hashset_search(hosts, &dc_item->host.hostid)))
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "Creating a new host %ld",dc_item->host.hostid);
-			//the new host
-			GLB_POLLER_HOST new_host = {0};
-
-			zabbix_log(LOG_LEVEL_DEBUG, "Creating new host %s addr is %s:%hu", dc_item->host.host,
-					   dc_item->interface.addr, dc_item->interface.port);
-
-			new_host.hostid = dc_item->host.hostid;
-			glb_host = zbx_hashset_insert(hosts, &new_host, sizeof(GLB_POLLER_HOST));
-			glb_item->hostid = dc_item->host.hostid;
-		
-		}
-		else
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "Host exists for the item %ld",dc_item->host.hostid);
-			//item new, but host exist, remembering the host found
-			glb_item->hostid = glb_host->hostid;
-		}
-		glb_host->items++;
 	}
 	
+	if (NULL == (glb_host = (GLB_POLLER_HOST *)zbx_hashset_search(hosts, &dc_item->host.hostid))) {
+		zabbix_log(LOG_LEVEL_DEBUG, "Creating a new host %ld",dc_item->host.hostid);
+		//the new host
+		GLB_POLLER_HOST new_host = {0};
+
+		zabbix_log(LOG_LEVEL_DEBUG, "Creating new host %s addr is %s:%hu", dc_item->host.host,
+					   dc_item->interface.addr, dc_item->interface.port);
+
+		new_host.hostid = dc_item->host.hostid;
+		glb_host = zbx_hashset_insert(hosts, &new_host, sizeof(GLB_POLLER_HOST));
+	} 
+
+	glb_host->items++;
+	glb_item->hostid = dc_item->host.hostid;
+	
 	//common attributes
-	glb_item->itemid = dc_item->itemid;
+	zbx_heap_strpool_release(glb_item->delay);
 	glb_item->delay = zbx_heap_strpool_intern(dc_item->delay);
 	glb_item->value_type = dc_item->value_type;
 	glb_item->ttl = now + CONFIG_CONFSYNCER_FREQUENCY * 1.5; //updating item's aging
 	glb_item->flags = dc_item->flags;
 	glb_item->item_type = dc_item->type;
 
-	if (POLL_POLLING != glb_item->state) {
-		//item-type specific init
-		switch (glb_item->item_type )
-		{
+	size_t item_size;
+	void *item_data = NULL;
+	//allocating itemdata
+	if (NULL == glb_item->itemdata ) {
+		switch (glb_item->item_type) {
 #ifdef HAVE_NETSNMP
-		case ITEM_TYPE_SNMP: {
-			GLB_SNMP_ITEM *glb_snmp_item; 
-
-			if (NULL == (glb_snmp_item = zbx_malloc(NULL, sizeof(GLB_SNMP_ITEM)))) {
-				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
-				exit(-1);
-			}
-	
-			DEBUG_ITEM(glb_item->itemid,"Doing SNMP spcecific init");
-			glb_item->itemdata = (void *)glb_snmp_item;
-
-			if (SUCCEED  != glb_snmp_init_item(dc_item, glb_snmp_item )) {
-				zabbix_log(LOG_LEVEL_DEBUG, "Coudln't init snmp_item %ld not placing to the poll queue", glb_item->itemid);
-			//removing the item from the hashset
-				zbx_free(glb_snmp_item);
-				zbx_heap_strpool_release(glb_item->delay);
-				zbx_hashset_remove_direct(items,glb_item);
-
-				return FAIL;
-			}
-		
+		case ITEM_TYPE_SNMP: 
+			item_size = sizeof(GLB_SNMP_ITEM);
 			break;
-		}
 #endif
-		case ITEM_TYPE_SIMPLE: {
-			GLB_PINGER_ITEM *glb_pinger_item; 
-		
-			if (NULL == (glb_pinger_item = zbx_malloc(NULL, sizeof(GLB_PINGER_ITEM)))) {
-				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
-				exit(-1);
-			}
-		
-			DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
-			glb_item->itemdata = (void *)glb_pinger_item;
-		
-			if (SUCCEED  != glb_pinger_init_item(dc_item, glb_pinger_item )) {
-				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init pinger item %ld, not placing to the poll queue", glb_item->itemid);
-				//removing the item from the hashset
-				zbx_free(glb_pinger_item);
-				zbx_heap_strpool_release(glb_item->delay);
-				zbx_hashset_remove_direct(items,glb_item);
-
-				return FAIL;
-			}
-		
+		case ITEM_TYPE_SIMPLE: 
+			item_size = sizeof(GLB_PINGER_ITEM);
 			break;
-		}
-		case ITEM_TYPE_EXTERNAL: {
-			GLB_WORKER_ITEM *glb_worker_item; 
-		
-			if (NULL == (glb_worker_item = zbx_malloc(NULL, sizeof(GLB_WORKER_ITEM)))) {
-				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
-				exit(-1);
-			}
-		
-			//zabbix_log(LOG_LEVEL_INFORMATION, "Doing async worker item %ld init", glb_item->itemid);
-			DEBUG_ITEM(glb_item->itemid,"Doing Pinger spcecific init");
-			glb_item->itemdata = (void *)glb_worker_item;
-		
-			if (SUCCEED  != glb_worker_init_item(dc_item, glb_worker_item )) {
-				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
-				//removing the item from the hashset
-				zbx_free(glb_worker_item);
-				zbx_heap_strpool_release(glb_item->delay);
-				zbx_hashset_remove_direct(items,glb_item);
-
-				return FAIL;
-			}
-		
+		case ITEM_TYPE_EXTERNAL: 
+			item_size = sizeof(GLB_WORKER_ITEM);
 			break;
-		}
-		
 		case ITEM_TYPE_TRAPPER:
-		break;
-		
-		case ITEM_TYPE_ZABBIX: {
-			GLB_AGENT_ITEM *glb_agent_item; 
-		
-			if (NULL == (glb_agent_item = zbx_malloc(NULL, sizeof(GLB_AGENT_ITEM)))) {
-				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
-				exit(-1);
-			}
-		
-			DEBUG_ITEM(glb_item->itemid,"Doing AGENT spcecific init");
-			glb_item->itemdata = (void *)glb_agent_item;
-		
-			if (SUCCEED  != glb_agent_init_item(dc_item, glb_agent_item )) {
-				zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
-				//removing the item from the hashset
-				zbx_free(glb_agent_item);
-				zbx_heap_strpool_release(glb_item->delay);
-				zbx_hashset_remove_direct(items,glb_item);
-
-				return FAIL;
-			}
-		
+			item_size = 0;
 			break;
-		}
-		
-
+		case ITEM_TYPE_ZABBIX: 
+			item_size = sizeof(GLB_AGENT_ITEM);
+			break;
 		default:
 			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit (-1);
+		}
+		
+		if (0 < item_size) {
+			if (NULL == (item_data = zbx_malloc(NULL, item_size))) {
+				zabbix_log(LOG_LEVEL_WARNING, "Couldn't allocate mem for the new item, exiting");
+				exit(-1);
+			}
+		
+			bzero(item_data,item_size);
+			glb_item->itemdata = item_data;
+		}
+		
+	}
+
+	int res = SUCCEED;
+
+	if (POLL_POLLING != glb_item->state) {
+		switch (glb_item->item_type ) {
+#ifdef HAVE_NETSNMP
+		case ITEM_TYPE_SNMP: 
+			res = glb_snmp_init_item(dc_item, glb_item->itemdata );
+			break;
+#endif
+		case ITEM_TYPE_SIMPLE: 
+			res = glb_pinger_init_item(dc_item, glb_item->itemdata);
+			break;
+		case ITEM_TYPE_EXTERNAL: 
+			res = glb_worker_init_item(dc_item, glb_item->itemdata );		
+			break;
+		case ITEM_TYPE_TRAPPER:
+			break;
+		case ITEM_TYPE_ZABBIX: 
+			res = glb_agent_init_item(dc_item, glb_item->itemdata );
+			break;
+		default:
+			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
+			THIS_SHOULD_NEVER_HAPPEN;
+			exit (-1);
+		}
+
+		if (FAIL == res ) {
+			zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
+			//removing the item from the hashset
+			zbx_free(glb_item->itemdata);
+			zbx_heap_strpool_release(glb_item->delay);
+			zbx_hashset_remove_direct(items,glb_item);
+			return FAIL;
 		}
 	}
 
@@ -376,7 +329,6 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Adding item %ld to the events queue ", glb_item->itemid);
 		glb_item->state = POLL_QUEUED;
 		add_item_check_event(events, hosts, glb_item, now);
-
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "%s finished", __func__);
@@ -662,7 +614,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 			case GLB_EVENT_NEW_ITEMS_CHECK: {
 				int num;
 
-				add_event(&events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + 5); 
+				add_event(&events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + 120); 
 	
 				num = DCconfig_get_glb_poller_items(&events, &hosts, &items, item_type, process_num, poll_engine);
 				zabbix_log(LOG_LEVEL_DEBUG, "Event: got %d new items from the config cache", num);

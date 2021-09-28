@@ -24,7 +24,7 @@
 #include "zbxvariant.h"
 #include "zbxeval.h"
 
-#include "valuecache.h"
+#include "glb_cache.h"
 #include "macrofunc.h"
 #ifdef HAVE_LIBXML2
 #	include <libxml/parser.h>

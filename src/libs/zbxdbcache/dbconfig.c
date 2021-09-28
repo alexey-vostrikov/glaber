@@ -3099,7 +3099,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->poller_type = ZBX_NO_POLLER;
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->schedulable = 1;
-
+/*
 			switch (value_type) {
 				case ITEM_VALUE_TYPE_STR:
 				case ITEM_VALUE_TYPE_TEXT:
@@ -3126,7 +3126,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			
 			item->lastclock=0;
 			item->prevclock=0;
-
+*/
 			zbx_vector_ptr_create_ext(&item->tags, __config_mem_malloc_func, __config_mem_realloc_func,
 					__config_mem_free_func);
 		}
@@ -13712,6 +13712,8 @@ unlock:
  * Purpose: apply item state, error, mtime, lastlogsize changes to            *
  *         according to arrived history *                                                                            *
  ******************************************************************************/
+/*
+
 void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 {
 	int			i;
@@ -13741,8 +13743,8 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 			dc_item->lastlogsize = history[i].lastlogsize; 
 		}
 
-		dc_item->prevclock = dc_item->lastclock;
-		dc_item->lastclock = history[i].ts.sec;
+		//dc_item->prevclock = dc_item->lastclock;
+		//dc_item->lastclock = history[i].ts.sec;
 		
 		//zabbix_log(LOG_LEVEL_INFORMATION,"Set lastclock to %d",dc_item->lastclock);
 
@@ -13834,7 +13836,7 @@ void	DCconfig_items_apply_changes(ZBX_DC_HISTORY *history, int history_num)
 
 	UNLOCK_CACHE;
 }
-
+*/
 /******************************************************************************
  *                                                                            *
  * Function: DCconfig_update_inventory_values                                 *
@@ -16112,75 +16114,7 @@ int glb_dc_get_triggers_status_json(zbx_vector_uint64_t *triggerids, struct zbx_
 }
 
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_dc_get_lastvalues_json                                       *
- *                                                                            *
- * Purpose: generates json object holding two last values from the requested  *
- * 			itemids															  *
- * 		data[{"itemid":1234,"clock":2342343,"value":234, "nextcheck":2342342},*
- * 			 {"itemid":1234,"clock":2342300,"value":200, "nextcheck":2342342},*
- * 			{....}, ]														  *
- *  //TODO: this should go from config cache to the state cache               *
- ******************************************************************************/
-int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json) {
-	
-	ZBX_DC_ITEM *item;
-	int i,j;
-	history_value_t *val;
-	u_int64_t clock;
-	ZBX_DC_HISTORY	hr;
 
-	RDLOCK_CACHE;
-	
-	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
-
-	for (i=0; i<itemids->values_num; i++) {
-		if ( NULL != (item=zbx_hashset_search(&config->items,&itemids->values[i])) ) {
-			
-			zbx_json_addobject(json,NULL);
-
-			zbx_json_adduint64(json,"itemid",item->itemid);
-			zbx_json_adduint64(json,"clock", item->lastclock);
-				
-			zbx_json_adduint64(json,"nextcheck",item->nextcheck);
-			zbx_json_addstring(json,"error",item->error,ZBX_JSON_TYPE_STRING);
-
-			switch (item->value_type) {
-			
-				case ITEM_VALUE_TYPE_TEXT:
-				case ITEM_VALUE_TYPE_STR:
-					zbx_json_addstring(json,"value",item->lastvalue.str,ZBX_JSON_TYPE_STRING);
-					break;
-
-				case ITEM_VALUE_TYPE_LOG:
-					zbx_json_addstring(json,"value",item->lastvalue.log->value,ZBX_JSON_TYPE_STRING);
-					break;
-
-				case ITEM_VALUE_TYPE_FLOAT: 
-					zbx_json_addfloat(json,"value",item->lastvalue.dbl);
-					zbx_json_adduint64(json,"prevclock",item->prevclock);
-					zbx_json_addfloat(json,"prevvalue",item->prevvalue.dbl);
-					break;
-
-				case ITEM_VALUE_TYPE_UINT64:
-					zbx_json_adduint64(json,"value",item->lastvalue.ui64);
-					zbx_json_adduint64(json,"prevclock",item->prevclock);
-					zbx_json_adduint64(json,"prevvalue",item->prevvalue.ui64);
-					break;
-
-				default:
-					THIS_SHOULD_NEVER_HAPPEN;
-					exit(-1);
-			}
-			zbx_json_close(json);			
-		}
-	}	
-	zbx_json_close(json);
-	UNLOCK_CACHE;
-
-	return SUCCEED;
-}
 /************************************************
 * fetches items host names and keys to send to 	*
 * trends storage

@@ -36,7 +36,7 @@
 #include "../../libs/zbxserver/zabbix_stats.h"
 #include "zbxipcservice.h"
 #include "../poller/checks_snmp.h"
-#include "../../libs/zbxdbcache/valuecache.h"
+#include "../../libs/zbxdbcache/glb_cache.h"
 #include "preproc.h"
 
 extern int CONFIG_CLUSTER_SERVER_ID;
@@ -47,7 +47,7 @@ int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp);
 int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type);
 char *zbx_dc_get_topology();
 void zbx_dc_register_proxy_availability(u_int64_t hostid);
-int glb_dc_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
+
  
 
 
@@ -912,7 +912,7 @@ static int recv_getlastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 			zbx_vector_uint64_append(&itemids,itemid);
 		}
 
-		ret = glb_dc_get_lastvalues_json(&itemids, &json);
+		ret = glb_cache_get_lastvalues_json(&itemids, &json, -1); //recieving default cache minimum size
 
 		zabbix_log(LOG_LEVEL_DEBUG, "Resulting last values json is %s",json.buffer);
 		zbx_vector_uint64_destroy(&itemids);

@@ -23,7 +23,6 @@
 #include "zbxhistory.h"
 #include "history.h"
 #include "module.h"
-#include "../zbxdbcache/valuecache.h"
 #include "../zbxalgo/vectorimpl.h"
 
 

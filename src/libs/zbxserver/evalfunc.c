@@ -21,7 +21,7 @@
 #include "db.h"
 #include "log.h"
 #include "zbxserver.h"
-#include "valuecache.h"
+#include "glb_cache.h"
 #include "evalfunc.h"
 #include "zbxregexp.h"
 #include "zbxtrends.h"
@@ -1703,11 +1703,16 @@ static int	evaluate_NODATA(char **value, DC_ITEM *item, const char *parameters, 
 	}
 	else
 		period = arg1;
-	//TODO: fix for optimal cache usage here
-	THIS_SHOULD_NEVER_HAPPEN;
-	exit(-1);
-	if (SUCCEED == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, period, 1, &ts) &&
-			1 == values.values_num)
+
+	if (SUCCEED != (ret = glb_cache_get_item_values(item->itemid, item->value_type, &values, 0 , 1, ts.sec))) {
+		//there was a problem fetching the data
+		*error = zbx_strdup(*error, "Couldn't fetch item, DB backend returned FAIL");
+		goto out;
+	} 
+
+	//there was no problem in fetching the data, check if the latest item is withing the period
+	if (1 == values.values_num && 
+		time(NULL) - values.values[0].timestamp.sec <=period  )
 	{
 		*value = zbx_strdup(*value, "0");
 	}

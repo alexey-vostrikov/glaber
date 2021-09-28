@@ -30,7 +30,6 @@
 #include "events.h"
 #include "memalloc.h"
 #include "zbxalgo.h"
-#include "valuecache.h"
 #include "zbxmodules.h"
 #include "module.h"
 #include "export.h"
@@ -2068,8 +2067,13 @@ static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
 	zbx_item_diff_t		*diffs;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	//all item updates are happening in preprocessing 
+	//just before putting the item to the queue of preprocessing 
+	//so it's not necessary to do it here
 
-	DCconfig_items_apply_changes(history,history_num);
+	//DCconfig_items_apply_changes(history,history_num);
+	//THIS_SHOULD_NEVER_HAPPEN;
+	//exit(-1);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -2976,7 +2980,12 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			if (FAIL != (ret = DBmass_add_history(history, history_num)))
 			{
 		
-				DCconfig_items_apply_changes(history, history_num);
+				//DCconfig_items_apply_changes(history, history_num);
+				
+				//MAKE SURE ITEM'S meta is updated in the state cache
+				//THIS_SHOULD_NEVER_HAPPEN;
+				//exit(-1);
+
 				//trends has to use glaber specific trends state cache
 				DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
 				DC_get_trends_items_keys(trends,trends_num);

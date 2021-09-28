@@ -120,10 +120,10 @@ typedef struct
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
 	
 	//TODO: move to global state or consider thinking of arch when it's kept here
-	history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
-	history_value_t		prevvalue;
-	u_int64_t			lastclock;
-	u_int64_t			prevclock;
+	//history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
+	//history_value_t		prevvalue;
+	//u_int64_t			lastclock;
+	//u_int64_t			prevclock;
 
 	zbx_vector_ptr_t	tags;
 }

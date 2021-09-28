@@ -69,7 +69,6 @@
 #include "reporter/report_manager.h"
 #include "reporter/report_writer.h"
 #include "events.h"
-//#include "../libs/zbxdbcache/valuecache.h"
 #include "setproctitle.h"
 #include "zbxcrypto.h"
 #include "zbxipcservice.h"

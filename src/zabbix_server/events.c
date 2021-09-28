@@ -391,6 +391,7 @@ static int	save_events(void)
 
 	for (i = 0; i < events.values_num; i++)
 	{
+		
 		event = (DB_EVENT *)events.values[i];
 
 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
