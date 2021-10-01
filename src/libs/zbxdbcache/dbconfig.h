@@ -107,7 +107,6 @@ typedef struct
 	unsigned char		type;
 	unsigned char		value_type;
 	unsigned char		poller_type;
-	unsigned char		state;
 	unsigned char		db_state;
 	unsigned char		inventory_link;
 	unsigned char		location;

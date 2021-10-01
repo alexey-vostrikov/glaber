@@ -23,11 +23,18 @@ extern size_t CONFIG_VALUE_CACHE_SIZE;
 #define  GLB_CACHE_ITEM_UPDATE_LASTDATA     0x01
 #define  GLB_CACHE_ITEM_UPDATE_NEXTCHECK    0x02
 #define  GLB_CACHE_ITEM_UPDATE_STATE        0x04
+#define  GLB_CACHE_ITEM_UPDATE_ERRORMSG     0x08
+#define  GLB_CACHE_ITEM_UPDATE_ERRORCODE    0x10
+
+#define GLB_CACHE_MIN_COUNT     4
+#define GLB_CACHE_MAX_COUNT     1024*1024 
 
 typedef struct {
     int state;
     int lastdata;
     int nextcheck;
+    char *error;
+    int errcode;
 } glb_cache_item_meta_t;
 
 typedef struct {
@@ -87,12 +94,19 @@ int glb_cache_get_statistics(glb_cache_stats_t *stats);
 int glb_vc_load_cache();
 int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats);
 int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
+
 void glb_cache_get_item_stats(zbx_vector_ptr_t *stats);
+int glb_cache_get_item_state(u_int64_t itemid);
 
 int glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags);
-int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
+
 
 int glb_cache_housekeep();
 int glb_cache_init();
 void glb_cache_destroy(void);
+
+int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
+int glb_cache_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
+
+
 #endif

@@ -190,6 +190,15 @@ class CZabbixServer {
 			'period' => $period
 		]);
 	}
+
+	public function getItemsState($sid, array $itemids) {
+		return $this->request([
+			'request' => 'itemsstate.get',
+			'sid' => $sid,
+			'itemids' => $itemids,
+		]);
+	}
+
 	/**
 	 * Request server to test item preprocessing steps.
 	 *
@@ -495,6 +504,7 @@ class CZabbixServer {
 
 		// Send the command.
 		$json = json_encode($params);
+		//show_error_message("Doing request: $json");
 		if (fwrite($this->socket, ZBX_TCP_HEADER.pack('V', strlen($json))."\x00\x00\x00\x00".$json) === false) {
 			$this->error = _s('Cannot send command, check connection with Zabbix server "%1$s".', $this->host);
 			return false;

@@ -865,69 +865,90 @@ out:
 
 	return ret;
 }
-/******************************************************************************
- *                                                                            *
- * Function: recv_getlastvalues                                               *
- *                                                                            *
- * Purpose: reading value cache for latest values
- *                                                                            *
- * Parameters:  sock  - [IN] the request socket                               *
- *              jp    - [IN] the request data                                 *
- *                                                                            *
- * Return value:  SUCCEED - processed successfully                            *
- *                FAIL - an error occurred                                    *
- *                                                                            *
- ******************************************************************************/
-static int recv_getlastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) {
-	
-	int ret = FAIL;
-	const char *p = NULL;
-	char limit_str[MAX_ID_LEN],period_str[MAX_ID_LEN];
-	int period, limit;
-	struct zbx_json_parse jp_items;
-	
-	zbx_vector_history_record_t values;
-	zbx_vector_uint64_t itemids;
 
-	struct zbx_json		json;
-	zbx_json_type_t type;
+/*parses array with ids and make uint vector out of then*/
+static int json_ids_to_vector(struct zbx_json_parse *jp, zbx_vector_uint64_t *ids, char *tag){
 	
+	const char *id_ptr = NULL, *num_start_pos = NULL;
+	struct zbx_json_parse jp_ids;
+
+	if (SUCCEED == zbx_json_brackets_by_name(jp, tag, &jp_ids)) {
+		while (NULL != (id_ptr = zbx_json_next(&jp_ids, id_ptr))) {
+			
+			//it's possible that ids are passed as array of the strings, so need to
+			//skip quotes if they are
+			if (NULL != (num_start_pos = strstr(id_ptr,"\""))) 
+				num_start_pos++;
+			else 
+				num_start_pos = id_ptr;
+	
+			zbx_uint64_t itemid=strtol(num_start_pos,NULL,10);
+			
+			zabbix_log(LOG_LEVEL_INFORMATION,"%s: appending item %ld",__func__, itemid);
+			zbx_vector_uint64_append(ids,itemid);
+		}
+	} 
+	return ids->values_num;
+}
+
+static void get_items_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	zbx_vector_uint64_t itemids;
+	struct zbx_json		response_json;
 
 	zabbix_log(LOG_LEVEL_DEBUG,"%s: start",__func__);
 	
+	zbx_json_init(&response_json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&response_json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	
+	zbx_vector_uint64_create(&itemids);
+	
+	if (0 < json_ids_to_vector(jp, &itemids, "itemids") ) 
+		glb_cache_get_items_status_json(&itemids, &response_json);
+		
+	zbx_vector_uint64_destroy(&itemids);
+	zbx_json_close(&response_json);
+	
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: Response is %s",__func__, response_json.buffer);
+	(void)zbx_tcp_send(sock, response_json.buffer);
+
+	zbx_json_free(&response_json);
+}
+
+
+static void get_items_lastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	const char *p = NULL;
+
+	zbx_vector_uint64_t itemids;
+	struct zbx_json		json;
+	char count_str[MAX_ID_LEN];
+	size_t count_alloc;
+	zbx_json_type_t type;
+
+	int count = -1;
+
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: start",__func__);
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
-	zbx_timespec_t ts;
-	ts.sec=time(NULL);
-	ts.ns=0;
+	zbx_vector_uint64_create(&itemids);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
 
-	if (SUCCEED == zbx_json_brackets_by_name(jp, "itemids", &jp_items))
-	{
-		zbx_vector_uint64_create(&itemids);
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
-		
-		while (NULL != (p = zbx_json_next(&jp_items, p))) {
+	if (SUCCEED == zbx_json_value_by_name(jp, "count", count_str, MAX_ID_LEN, &type) ) {
+			count=strtol(count_str,NULL,10);
 			
-			zbx_uint64_t itemid=strtol(p+1,NULL,10);
-			zbx_vector_uint64_append(&itemids,itemid);
-		}
-
-		ret = glb_cache_get_lastvalues_json(&itemids, &json, -1); //recieving default cache minimum size
-
-		zabbix_log(LOG_LEVEL_DEBUG, "Resulting last values json is %s",json.buffer);
-		zbx_vector_uint64_destroy(&itemids);
-
-		ret = SUCCEED;
-	} else {
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
+			if (count == 0 || count > GLB_CACHE_MAX_COUNT) 
+				count = -1;
 	}
 
-out:
-	zabbix_log(LOG_LEVEL_DEBUG,"%s: Response is %s",__func__, json.buffer);
+	if (0 < json_ids_to_vector(jp, &itemids, "itemids") )  
+		glb_cache_get_lastvalues_json(&itemids, &json, count); 
+
+	zbx_json_close(&json);
+	zbx_vector_uint64_destroy(&itemids);
+		
+	zabbix_log(LOG_LEVEL_INFORMATION,"%s: Response is %s",__func__, json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);
-	return ret;
 }
 
 /******************************************************************************
@@ -1583,16 +1604,17 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 				ret = send_internal_stats_json(sock, &jp);
 			}
 			else if (0 == strcmp(value, ZBX_PROTO_VALUE_PREPROCESSING_TEST))
-				{
-					if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
-						ret = zbx_trapper_preproc_test(sock, &jp);
-				} else if (0 == strcmp(value, ZBX_PROTO_VALUE_GET_LASTVALUES))
-				{
-						ret = recv_getlastvalues(sock, &jp);
-				} 
-				else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_HELLO))
-				{
-						ret = recv_server_hello(sock, &jp);
+			{
+				if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
+					ret = zbx_trapper_preproc_test(sock, &jp);
+			} else if (0 == strcmp(value, "lastvalues.get"))
+				get_items_lastvalues(sock, &jp);
+			else if (0 == strcmp(value, "itemsstate.get"))
+				get_items_state(sock,&jp);
+			
+			else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_HELLO))
+			{
+				ret = recv_server_hello(sock, &jp);
 			}
 			 else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_TOPOLGY))
 			{	

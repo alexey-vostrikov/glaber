@@ -49,6 +49,7 @@
 #include "zbxtrends.h"
 #include "zbxvault.h"
 #include "zbxserialize.h"
+#include "glb_cache.h"
 
 int	sync_in_progress = 0;
 
@@ -3087,10 +3088,6 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->triggers = NULL;
 			item->update_triggers = 0;
 			item->nextcheck = 0;
-			item->state = ITEM_STATE_UNKNOWN;
-			//GLABER doesn't keep item state in the DB, but in the STATE
-			//item->state = (unsigned char)atoi(row[12]);
-			//TODO: remove all other fields related to the state
 			ZBX_STR2UINT64(item->lastlogsize, row[20]);
 			item->mtime = atoi(row[21]);
 			DCstrpool_replace(found, &item->error, row[27]);
@@ -7927,7 +7924,8 @@ static void	DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE 
 	dst_interface->addr = (1 == dst_interface->useip ? dst_interface->ip_orig : dst_interface->dns_orig);
 	dst_interface->port = 0;
 }
-
+//THIS is very heavy and quite a bad call does lots of allocations and
+//searches, better avoid and replace with mission specific calls
 static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned int mode)
 {
 	const ZBX_DC_NUMITEM		*numitem;
@@ -7949,7 +7947,7 @@ static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned 
 	dst_item->type = src_item->type;
 	dst_item->value_type = src_item->value_type;
 
-	dst_item->state = src_item->state;
+	dst_item->state = glb_cache_get_item_state(src_item->itemid);
 	dst_item->lastlogsize = src_item->lastlogsize;
 	dst_item->mtime = src_item->mtime;
 
@@ -12074,8 +12072,8 @@ static void	dc_status_update(void)
 						if (NULL != dc_proxy)
 							dc_proxy->required_performance += 1.0 / delay;
 					}
-
-					switch (dc_item->state)
+					int state = glb_cache_get_item_state(dc_item->itemid);
+					switch (state)
 					{
 						case ITEM_STATE_NORMAL:
 							config->status->items_active_normal++;
@@ -12092,7 +12090,7 @@ static void	dc_status_update(void)
 						case ITEM_STATE_UNKNOWN:
 							break;	
 						default:
-							zabbix_log(LOG_LEVEL_WARNING,"Unknown item state %d", dc_item->state);
+							zabbix_log(LOG_LEVEL_WARNING,"Unknown item state %d", state);
 							THIS_SHOULD_NEVER_HAPPEN;
 					}
 

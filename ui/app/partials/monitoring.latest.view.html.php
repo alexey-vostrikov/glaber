@@ -85,74 +85,67 @@ foreach ($data['items'] as $itemid => $item) {
 		($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null
 	]))->addClass('action-container');
 
+
 	$history = $data['history'];
-	//show_error_message("Last history:'".print_r($history,true)."'");
 
-	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
-	$prevHistory = [];//isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
+	$last_history = array_key_exists($itemid, $data['history'])
+		? ((count($data['history'][$itemid]) > 0) ? $data['history'][$itemid][0] : null)
+		: null;
 
-	if (isset($lastHistory['prevvalue']) && isset($lastHistory['prevclock']) && $lastHistory['prevclock'] > 0 ) {
-		$prevHistory['value'] = $lastHistory['prevvalue'];
-		$prevHistory['clock'] = $lastHistory['prevclock'];
-		//show_error_message("Last history:'".print_r($prevHistory,true)."'");
-	}
 	
-	//show_error_message("Prev history:'".print_r($history,true)."'");
-	
-	if ($lastHistory) {
-			$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
+	if ($last_history) {
 		
-		if ( isset($lastHistory['nextcheck']) && $lastHistory['nextcheck'] > 0 )
-				$last_check = (new CSpan($last_check))
-						->addClass(ZBX_STYLE_LINK_ACTION)
-						->setHint("Next: ". zbx_date2str(DATE_TIME_FORMAT_SECONDS,$lastHistory['nextcheck']), 'hintbox-wrap');
+			$prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
+			$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_history['clock']);
+			
+			
 
-		if ($lastHistory['clock'] > 0 ) {
-			if (isset($lastHistory['error']) &&  strlen($lastHistory['error'])>0 ) {
-				$last_value = (new CSpan('UNSUPPORTED'))
-					->addClass(ZBX_STYLE_RED)
-					->addClass(ZBX_STYLE_LINK_ACTION)
-					->setHint($lastHistory['error'], 'hintbox-wrap');
-			} else {
-				$last_value = formatHistoryValue($lastHistory['value'], $item, false);
-				if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
+			$last_value = formatHistoryValue($last_history['value'], $item, false);
+			if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
 					 ITEM_VALUE_TYPE_LOG == $item['value_type'] ) && 
 					 mb_strlen($last_value) > 20 ) {
 						$last_value = (new CSpan($last_value))
 							->addClass(ZBX_STYLE_LINK_ACTION)
-							->setHint($lastHistory['value'], 'hintbox-wrap');
+							->setHint($last_history['value'], 'hintbox-wrap');
 					 }
-
-			}
-			
-		} else $last_value='';
-
-		$change = '';
-
-		if ( $lastHistory['clock'] > 0 &&
-			(!isset($lastHistory['error']) || strlen($lastHistory['error']) <1 ) && 
-		    isset($prevHistory) && isset($prevHistory['value']) &&
-			in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]) ) {
-			$history_diff = $lastHistory['value'] - $prevHistory['value'];
-
-			if ($history_diff != 0) {
-				if ($history_diff > 0) {
-					$change = '+';
+			$change = '';
+	
+			if ($prev_history && in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64])) {
+				$history_diff = $last_history['value'] - $prev_history['value'];
+	
+				if ($history_diff != 0) {
+					if ($history_diff > 0) {
+						$change = '+';
+					}
+	
+					// The change must be calculated as uptime for the 'unixtime'.
+					$change .= convertUnits([
+						'value' => $history_diff,
+						'units' => ($item['units'] === 'unixtime') ? 'uptime' : $item['units']
+					]);
 				}
-
-				// The change must be calculated as uptime for the 'unixtime'.
-				$change .= convertUnits([
-					'value' => $history_diff,
-					'units' => ($item['units'] === 'unixtime') ? 'uptime' : $item['units']
-				]);
 			}
+	} else if (isset($item['error']) && $item['state'] == ITEM_STATE_NOTSUPPORTED ) {
+			$last_value = $last_value = (new CSpan('UNSUPPORTED'))
+				->addClass(ZBX_STYLE_RED)
+				->addClass(ZBX_STYLE_LINK_ACTION)
+				->setHint($item['error'], 'hintbox-wrap');
+			if ($item['lastdata'] > 0 ) 
+				$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_history['clock']);
+			else 
+				$last_check ='';
+			$change = '';
+	} else {
+			$last_check = '';
+			$last_value = '';
+			$change = '';
 		}
-	}
-	else {
-		$last_check = '';
-		$last_value = '';
-		$change = '';
-	}
+	
+	if ( isset($item['nextcheck']) && $item['nextcheck'] > 0 )
+		$last_check = (new CSpan($last_check))
+				->addClass(ZBX_STYLE_LINK_ACTION)
+				->setHint("Next: ". zbx_date2str(DATE_TIME_FORMAT_SECONDS, $item['nextcheck']), 'hintbox-wrap');
+
 
 	// Other row data preparation.
 	if ($data['config']['hk_history_global']) {

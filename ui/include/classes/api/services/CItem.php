@@ -323,11 +323,13 @@ class CItem extends CItemGeneral {
 				$options['filter']['trends'] = getTimeUnitFilters($options['filter']['trends']);
 			}
 
-			if (array_key_exists('state', $options['filter']) && $options['filter']['state'] !== null) {
-				$this->dbFilter('item_rtdata ir', ['filter' => ['state' => $options['filter']['state']]] + $options,
-					$sqlParts
-				);
-			}
+			//if (array_key_exists('state', $options['filter']) && $options['filter']['state'] !== null) {
+			//	show_error_message("Extracting item's states");
+				//$this->dbFilter('item_rtdata ir', ['filter' => ['state' => $options['filter']['state']]] + $options,
+				//	$sqlParts
+				//);
+
+			//}
 
 			$this->dbFilter('items i', $options, $sqlParts);
 
@@ -412,7 +414,29 @@ class CItem extends CItemGeneral {
 			return $result;
 		}
 
+
 		if ($result) {
+			if (!$options['countOutput'] && ($this->outputIsRequested('state', $options['output']))) {
+
+				global $ZBX_SERVER, $ZBX_SERVER_PORT;
+				$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			  		timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
+				
+				$items_state = $server->getItemsState(CSessionHelper::getId(),array_keys($result)); 
+				
+				foreach ($items_state as $state) {
+					$result[$state['itemid']] += $state;
+					
+				}
+
+				foreach ($result as $key=>$value) {
+					if (!isset($result[$key]['state'])) 
+						$result[$key]['state'] = ITEM_STATE_UNKNOWN;
+					if (!isset($result[$key]['error'])) 
+						$result[$key]['error'] = "";
+				} 
+			}
 			if (self::dbDistinct($sqlParts)) {
 				$result = $this->addNclobFieldValues($options, $result);
 			}
@@ -1242,25 +1266,27 @@ class CItem extends CItemGeneral {
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ((!$options['countOutput'] && ($this->outputIsRequested('state', $options['output'])
-				|| $this->outputIsRequested('error', $options['output'])))
-				|| (is_array($options['search']) && array_key_exists('error', $options['search']))
-				|| (is_array($options['filter']) && array_key_exists('state', $options['filter']))) {
-			$sqlParts['left_join'][] = ['alias' => 'ir', 'table' => 'item_rtdata', 'using' => 'itemid'];
-			$sqlParts['left_table'] = ['alias' => $this->tableAlias, 'table' => $this->tableName];
-		}
+	//	if ((!$options['countOutput'] && ($this->outputIsRequested('state', $options['output'])
+	//			|| $this->outputIsRequested('error', $options['output'])))
+	//			|| (is_array($options['search']) && array_key_exists('error', $options['search']))
+	//			|| (is_array($options['filter']) && array_key_exists('state', $options['filter']))) {
+
+	//		show_error_message("Extracting item's states123");		
+	//		$sqlParts['left_join'][] = ['alias' => 'ir', 'table' => 'item_rtdata', 'using' => 'itemid'];
+	//		$sqlParts['left_table'] = ['alias' => $this->tableAlias, 'table' => $this->tableName];
+	//	}
 
 		if (!$options['countOutput']) {
-			if ($this->outputIsRequested('state', $options['output'])) {
-				$sqlParts = $this->addQuerySelect('ir.state', $sqlParts);
-			}
-			if ($this->outputIsRequested('error', $options['output'])) {
+		//	if ($this->outputIsRequested('state', $options['output'])) {
+		//		$sqlParts = $this->addQuerySelect('ir.state', $sqlParts);
+		//	}
+		//	if ($this->outputIsRequested('error', $options['output'])) {
 				/*
 				 * SQL func COALESCE use for template items because they don't have record
 				 * in item_rtdata table and DBFetch convert null to '0'
 				 */
-				$sqlParts = $this->addQuerySelect(dbConditionCoalesce('ir.error', '', 'error'), $sqlParts);
-			}
+		//		$sqlParts = $this->addQuerySelect(dbConditionCoalesce('ir.error', '', 'error'), $sqlParts);
+		//	}
 
 			if ($options['selectHosts'] !== null) {
 				$sqlParts = $this->addQuerySelect('i.hostid', $sqlParts);

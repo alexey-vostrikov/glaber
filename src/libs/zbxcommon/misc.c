@@ -2317,7 +2317,7 @@ int	calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int simple_interv
 		if (0 != scheduled_check && scheduled_check < nextcheck)
 			nextcheck = (int)scheduled_check;
 	}
-
+	
 	return nextcheck;
 }
 /******************************************************************************

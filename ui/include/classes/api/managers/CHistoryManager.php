@@ -70,28 +70,19 @@ class CHistoryManager {
 	    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
 	  $last_values = $server->getLastValues(CSessionHelper::getId(),array_column($items,'itemid'),$limit, $period); 
 	
-	
-
 	  if (!is_array($last_values)) {
 			return [];
 	  }
 
-	  $i=0;
-
-	 // $result[$value['itemid']] = [];
-
 	  foreach ($last_values as $value) 
 	  {
-			if (!isset($result[$value['itemid']])) 
-				$result[$value['itemid']]=[];
+		
+		if (!isset($result[$value['itemid']])) 
+			$result[$value['itemid']]=[];
 			
-			array_push($result[$value['itemid']], $value);
-			//$result[$value['itemid']][$i]=$value;
-			 //error_log(print_r($result,true));
-			 //$result[$value['itemid']][0]=$value;
-
+		$result[$value['itemid']]  +=  $value['values'];
 	  }
-			
+	
 	  return $result;
 	}
 	

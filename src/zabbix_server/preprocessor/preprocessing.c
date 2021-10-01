@@ -27,6 +27,7 @@
 #include "preproc.h"
 #include "preprocessing.h"
 #include "preproc_history.h"
+#include "../../libs/zbxdbcache/glb_cache.h"
 
 #define PACKED_FIELD_RAW	0
 #define PACKED_FIELD_STRING	1
@@ -1117,6 +1118,8 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
 					.error = error, .item_flags = item_flags, .state = state, .ts = ts};
 	zbx_result_ptr_t		result_ptr = {.result = result};
 	size_t				value_len = 0, len;
+	
+	glb_cache_item_meta_t meta = {0};
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -1146,7 +1149,17 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
 			value.state = ITEM_STATE_NOTSUPPORTED;
 			value.error = "Value is too large.";
 		}
+	} else {
+		
 	}
+	
+	if (NULL != value.error && ITEM_STATE_NORMAL != state ) 
+			meta.error = error;
+	meta.lastdata = time(NULL);
+	meta.state = value.state;
+
+	glb_cache_update_item_meta(itemid, &meta, 
+			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	 GLB_CACHE_ITEM_UPDATE_ERRORMSG  );
 
 	value.result_ptr = &result_ptr;
 

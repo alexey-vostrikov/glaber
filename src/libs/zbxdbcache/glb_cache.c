@@ -20,8 +20,6 @@ extern char	*CONFIG_VCDUMP_LOCATION;
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
 
-#define GLB_CACHE_MIN_COUNT     4
-#define GLB_CACHE_MAX_COUNT     1024*1024 
 #define GLB_CACHE_MAX_DURATION  86400 
 
 #define GLB_CACHE_ITEMS_INIT_SIZE   8192
@@ -31,6 +29,8 @@ extern char	*CONFIG_VCDUMP_LOCATION;
 #define GLB_CACHE_MIN_DURATION 2 //duration up to this is ignored and considered set to 0
 #define GLB_CACHE_DEFAULT_DURATION 2 * 86400 //by default we downloading two days worth of data
                                             //however if duration is set, this might be bigger
+
+#define	REFCOUNT_FIELD_SIZE	sizeof(zbx_uint32_t)
 
 extern u_int64_t CONFIG_VALUE_CACHE_SIZE;
 
@@ -56,10 +56,12 @@ typedef struct {
     int lastdata; //last time a data for the element appeared (it's not required that that data would be cached)
                    //this is needed to fix data appearance on submit stage
                    //the actual data might be filtered and not appear in the cache
+    
     int state;  //element's type specific values here 
     int last_accessed; //housekeeper will delete items that haven't been accessed for a while
     int nextcheck; //next expected check of the item (perhaps, useless for triggers, maybe it's better to create an element-spceific struct)
-    
+    const char *error; 
+
     int req_count;   
     int req_duration;
     
@@ -88,8 +90,13 @@ typedef struct
 
 typedef struct {
     glb_cache_elems_t items;
+    
     pthread_mutex_t mem_lock;
+    
     glb_cache_stats_t stats;
+    
+    zbx_hashset_t strpool;
+    pthread_rwlock_t strpool_lock;
 
 } glb_cache_t;
 
@@ -97,12 +104,99 @@ static  zbx_mem_info_t	*cache_mem;
 
 static glb_cache_t *glb_cache;
 
+//i'll include string pool (strings interning) copy from db cache
+//the reason - to be able to use local proces's string and data interning and 
+//keep it in the heap, not in the shared memory which requires locks
+
+static zbx_hash_t	__strpool_hash(const void *data)
+{
+	return ZBX_DEFAULT_STRING_HASH_FUNC((char *)data + REFCOUNT_FIELD_SIZE);
+}
+
+static int	__strpool_compare(const void *d1, const void *d2)
+{
+	return strcmp((char *)d1 + REFCOUNT_FIELD_SIZE, (char *)d2 + REFCOUNT_FIELD_SIZE);
+}
+
+
+
+
+
+const char	*glb_cache_strpool_intern(const char *str)
+{
+	void		*record;
+	zbx_uint32_t	*refcount;
+
+	if (NULL == str) 
+		return NULL;
+
+    glb_rwlock_rdlock(&glb_cache->strpool_lock);
+	record = zbx_hashset_search(&glb_cache->strpool, str - REFCOUNT_FIELD_SIZE);
+
+	if (NULL == record)
+	{
+		glb_rwlock_unlock(&glb_cache->strpool_lock);
+        glb_rwlock_wrlock(&glb_cache->strpool_lock);
+
+        record = zbx_hashset_insert_ext(&glb_cache->strpool, str - REFCOUNT_FIELD_SIZE,
+				REFCOUNT_FIELD_SIZE + strlen(str) + 1, REFCOUNT_FIELD_SIZE);
+		*(zbx_uint32_t *)record = 0;
+	}
+
+	refcount = (zbx_uint32_t *)record;
+	(*refcount)++;
+    glb_rwlock_unlock(&glb_cache->strpool_lock);
+	return (char *)record + REFCOUNT_FIELD_SIZE;
+}
+
+
+void	glb_cache_strpool_release(const char *str)
+{
+	zbx_uint32_t	*refcount;
+
+	if ( NULL == str ) return;
+	
+	refcount = (zbx_uint32_t *)(str - REFCOUNT_FIELD_SIZE);
+    glb_rwlock_wrlock(&glb_cache->strpool_lock);
+	
+    if (0 == --(*refcount))
+		zbx_hashset_remove(&glb_cache->strpool, str - REFCOUNT_FIELD_SIZE);
+    
+    glb_rwlock_unlock(&glb_cache->strpool_lock);
+
+}
+
+const char *glb_cache_strpool_set_str(const char *old, const char *new) {
+    
+    glb_cache_strpool_release(old);
+    
+    return glb_cache_strpool_intern(new);
+}
+/**********************************************************
+ * fetches current item state                             *
+ * ********************************************************/
+int glb_cache_get_item_state(u_int64_t itemid) {
+    
+    int ret = ITEM_STATE_UNKNOWN;
+    glb_cache_elem_t *elem;
+    glb_rwlock_rdlock(&glb_cache->items.meta_lock);
+    if (NULL != (elem=zbx_hashset_search(&glb_cache->items.hset,&itemid))) {
+        glb_lock_block(&elem->lock);
+        ret = elem->state;
+        glb_lock_unlock(&elem->lock);
+    } 
+    glb_rwlock_unlock(&glb_cache->items.meta_lock);
+    return ret;
+}
 
 
 int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats) {
+    
     memset(&mem_stats, 0, sizeof(zbx_mem_stats_t));
 	glb_lock_block(&glb_cache->mem_lock);
+    
     zbx_mem_get_stats(cache_mem, mem_stats);
+    
     glb_lock_unlock(&glb_cache->mem_lock);		
 }
 
@@ -170,25 +264,31 @@ void	glb_cache_get_item_stats(zbx_vector_ptr_t *stats)
  * **********************************************************/
 int  glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags) {
     glb_cache_elem_t *elem;
+    
     glb_rwlock_rdlock(&glb_cache->items.meta_lock);
+
     if (NULL != (elem = (glb_cache_elem_t *)zbx_hashset_search(&glb_cache->items.hset,&itemid))) {
         glb_lock_block(&elem->lock);
         
-            if (flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) {
-                if (elem->lastdata < meta->lastdata) {
-                    elem->lastdata = meta->lastdata;
-                }
-            }
-            if (flags & GLB_CACHE_ITEM_UPDATE_NEXTCHECK) 
-                elem->nextcheck = meta->nextcheck;
+        if (flags & GLB_CACHE_ITEM_UPDATE_LASTDATA && 
+            elem->lastdata < meta->lastdata) 
+                elem->lastdata = meta->lastdata;
             
-            if (flags & GLB_CACHE_ITEM_UPDATE_STATE) 
-                elem->state = meta->state;
 
+        if (flags & GLB_CACHE_ITEM_UPDATE_NEXTCHECK) 
+            elem->nextcheck = meta->nextcheck;
             
+        if (flags & GLB_CACHE_ITEM_UPDATE_STATE) 
+            elem->state = meta->state;
+
+        if (flags & GLB_CACHE_ITEM_UPDATE_ERRORMSG) {
+            elem->error = glb_cache_strpool_set_str(elem->error, meta->error);
+            zabbix_log(LOG_LEVEL_INFORMATION, "in %s: item %ld, set error: %s",__func__,elem->itemid,meta->error);
+        }
         glb_lock_unlock(&elem->lock);
     }
     glb_rwlock_unlock(&glb_cache->items.meta_lock);
+    
     if (NULL != elem) 
         return SUCCEED;
     return FAIL;
@@ -442,8 +542,6 @@ static int glb_cache_find_time_idx(glb_cache_elem_t *elem, unsigned int tm_sec) 
 
         zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld: selected quess idx is %d, first is %d, last is %d",
                 elem->itemid, guess_idx,first_idx, last_idx);
-        
-       
 
         if (tm_sec == c_val2->sec) {
             zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld: requested time mathces items at guess idx is %d",elem->itemid,guess_idx );
@@ -451,8 +549,6 @@ static int glb_cache_find_time_idx(glb_cache_elem_t *elem, unsigned int tm_sec) 
         }
         c_val1 = glb_cache_get_value_ptr(elem->values, first_idx %  elem->values->elem_num);
        
-        //zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld: asdfvaefe",elem->itemid);
-
         if (tm_sec == c_val1->sec) {
             return first_idx % elem->values->elem_num ;
             zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld: requested time mathces items at first_idx is %d",elem->itemid,first_idx );
@@ -477,145 +573,10 @@ static int glb_cache_find_time_idx(glb_cache_elem_t *elem, unsigned int tm_sec) 
     }
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_dc_get_lastvalues_json                                       *
- *                                                                            *
- * Purpose: generates json object holding two last values from the requested  *
- * 			itemids															  *
- * 		data[{"itemid":1234,"clock":2342343,"value":234, "nextcheck":2342342},*
- * 			 {"itemid":1234,"clock":2342300,"value":200, "nextcheck":2342342},*
- * 			{....}, ]														  *
- *  //TODO: this should go from config cache to the state cache               *
- ******************************************************************************/
-int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) {
-	
-	glb_cache_elem_t *elem;
-	int i,j;
-	history_value_t *val;
-	u_int64_t clock;
-	ZBX_DC_HISTORY	hr;
-
-	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
-    
-    glb_rwlock_rdlock(&glb_cache->items.meta_lock);
-	
-    if (count <1 ) 
-        count = GLB_CACHE_MIN_COUNT;
-
-    for (i=0; i<itemids->values_num; i++) {
-		if ( NULL != (elem= (glb_cache_elem_t*)zbx_hashset_search(&glb_cache->items.hset,&itemids->values[i])) ) {
-			glb_lock_block(&elem->lock);
-			        
-            zbx_json_addobject(json,NULL);
-
-			zbx_json_adduint64(json,"itemid",elem->itemid);
-
-            //iterating over the data found, will return the data in the same history
-            //format, the difference is only the data is fetched from the cache
-			zbx_json_adduint64(json,"lastdata", elem->lastdata);
-            zbx_json_adduint64(json,"nextcheck", elem->nextcheck);
-            zbx_json_adduint64(json,"state", elem->state);
-			
-            //now adding the data 
-            zbx_json_addarray(json,"data");
-
-            //iterating over existing values (if there are less in the cache, returning 
-            // any that present)
-            int last_idx = elem->values->last_idx;
-            
-            if (count > elem->values->elem_count) 
-                count = elem->values->elem_count;
-
-            int i = ( elem->values->last_idx - count + elem->values->elem_num) % elem->values->elem_num;
-            while ( i != last_idx +1 ) {
-                glb_cache_value_t *c_val;
-                c_val = glb_cache_get_value_ptr(elem->values,i);
-                
-                zbx_json_addobject(json,NULL);
-                zbx_json_adduint64(json,"time_sec", c_val->sec);
-
-			    switch (elem->value_type) {
-			
-				    case ITEM_VALUE_TYPE_TEXT:
-				    case ITEM_VALUE_TYPE_STR:
-					    zbx_json_addstring(json,"value",c_val->value.data.str, ZBX_JSON_TYPE_STRING);
-					    break;
-
-				    case ITEM_VALUE_TYPE_LOG:
-					    zbx_json_addstring(json,"value",c_val->value.data.str, ZBX_JSON_TYPE_STRING);
-					    break;
-
-				    case ITEM_VALUE_TYPE_FLOAT: 
-					    zbx_json_addfloat(json,"value",c_val->value.data.dbl);
-					    break;
-
-				    case ITEM_VALUE_TYPE_UINT64:
-					    zbx_json_adduint64(json,"value",c_val->value.data.ui64);
-					    break;
-
-				    default:
-					    THIS_SHOULD_NEVER_HAPPEN;
-					    exit(-1);
-                    }
-                    i = (i+i ) % elem->values->elem_num;
-                }
-                zbx_json_close(json); //closing one value    
-			}
-			zbx_json_close(json); //closing the item
-            glb_lock_unlock(&elem->lock);
-	   
-	}	
-	zbx_json_close(json); //closing the response
-    
-    glb_rwlock_unlock(&glb_cache->items.meta_lock);
-	
-
-	return SUCCEED;
-}
-
-/******************************************************************************
- * gets data from the value cache
- * id  - object id to get the data
- * type - type of object GLB_CACHE_TYPE_*
- * count - number of values to fetch
- * offset_time - fetch values starting from offset_time 
- * 
- * even if cache is written tщ high efficiency file, sometimes cache db reads might be required
- * this might happen on introducing a new trigger with with long period check
- * so need to implement it, but in a way to reduce history backend usage ASAP
- * 
- * however: at least should do proper notification and debugging that a trigger
- * couldn't be _temporarily_ calculated due to failure of getting a data
- * and this should be distingushed from data absence 
- * 
- * ****************************************************************************/
-
-//fetches data from the history backend to the elem, reallocates the elem data
-//sets the metadata: db upload 
-//this also quite an expensive call, so history backend protection might cause fails of it
-//so need to deal with the fail 
 
 
-/********************************************************************
- * combines existing cache data with the database data to fill 
- * cache and be able to calc triggers and calc items,
- * updates the demand: if request is done by by count with delayed
- * start then demand is set by time either:
- * the oldest value's time plus some safety margin is used to set 
- * the new items demand
- * count demands are still used, but only for items requested 
- * as of current time (end time should be set to 0)
- * ******************************************************************/
-
-
-//so the rules of getting the data from the cache:
-//if count is set to 0 - fetching all items by time range
-//otherwize - count items
-//ts sets the end of the timeperiod for fetching the data
-
-
-static int glb_cache_value_to_hist_copy(zbx_history_record_t *record, glb_cache_value_t *c_val, unsigned char value_type) {
+static int glb_cache_value_to_hist_copy(zbx_history_record_t *record, 
+                        glb_cache_value_t *c_val, unsigned char value_type) {
     zabbix_log(LOG_LEVEL_INFORMATION,"copy to hist val");
 
     switch (value_type) {
@@ -653,10 +614,9 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record, glb_cache_
     record->timestamp.sec = c_val->sec;
     zabbix_log(LOG_LEVEL_INFORMATION,"Finished");
 }
-//if demand exceeds the current one, demand is updated and remembered demand is reset
-//if demand exceeds the remembered demand, it's updated
-//in case is rememebered demand last apply time was too long ago, the current demand updated and remembered 
-//demand is reset
+
+
+
 int glb_cache_update_demand(glb_cache_elem_t *elem, unsigned int new_count, unsigned int new_duration, unsigned int now) {
     //unsigned int now=time(NULL);
     unsigned char need_hk=0;
@@ -817,10 +777,8 @@ static glb_cache_value_t *glb_cache_rbuff_add_value(glb_cache_elem_t *elem)  {
 }
 
 int glb_cache_hist_to_value(glb_cache_value_t *cache_val, history_value_t *hist_v, int time_sec, unsigned char value_type) {
-   // zabbix_log(LOG_LEVEL_INFORMATION, "Cleaning hist hist addr is %ld", hist_v);   
-    glb_cache_variant_clear(&cache_val->value);
     
-   // zabbix_log(LOG_LEVEL_INFORMATION, "Setting the val, val type is %d",value_type);
+    glb_cache_variant_clear(&cache_val->value);
     
     switch (value_type) {
         case ITEM_VALUE_TYPE_FLOAT:
@@ -847,12 +805,15 @@ int glb_cache_hist_to_value(glb_cache_value_t *cache_val, history_value_t *hist_
             break;
         }
         case ITEM_VALUE_TYPE_LOG: {
-            if ( NULL != hist_v->log) {
+            if ( NULL != hist_v->log) { 
+                zabbix_log(LOG_LEVEL_INFORMATION, "Setting log value");
                 int len = strlen(hist_v->log->value)+1;
                 char *str = glb_cache_malloc(NULL, len);
-                memcpy(str,hist_v->log, len);
-                //there is no log type in variant ... at least yet
+
+                memcpy(str, hist_v->log->value, len);
+                zabbix_log(LOG_LEVEL_INFORMATION, "Setting log str  %s",str);
                 zbx_variant_set_str(&cache_val->value, str);
+
             } else {
                 zbx_variant_set_str(&cache_val->value, "");
             }
@@ -1051,6 +1012,7 @@ static glb_cache_elem_t *glb_cache_init_item_elem(u_int64_t itemid, unsigned cha
     new_item.last_accessed = time(NULL);
     new_item.db_fetched_time = ZBX_JAN_2038;
     new_item.value_type = value_type;
+    new_item.state = ITEM_STATE_UNKNOWN;
 
     glb_lock_init(&new_item.lock);
 
@@ -1309,7 +1271,11 @@ int glb_cache_init() {
     zbx_hashset_create_ext(&glb_cache->items.hset, GLB_CACHE_ITEMS_INIT_SIZE,
 			ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC, NULL,
 			glb_cache_malloc, glb_cache_realloc, glb_cache_free);
-	
+
+    zbx_hashset_create_ext(&glb_cache->strpool, 128,
+			__strpool_hash, __strpool_compare, NULL,
+			glb_cache_malloc, glb_cache_realloc, glb_cache_free);
+
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s:finished", __func__);
 	return SUCCEED;
 }
@@ -1645,5 +1611,125 @@ int glb_cache_housekeep() {
 
     glb_rwlock_unlock(&glb_cache->items.meta_lock); 
 
+}
+
+
+int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) {
+	
+	glb_cache_elem_t *elem;
+	int i,j,rcount;
+	
+    if (count < 1 ) 
+        count = GLB_CACHE_MIN_COUNT;
+
+    zabbix_log(LOG_LEVEL_DEBUG, "%s: starting, requested %d items count %d", __func__,itemids->values_num, count);
+	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
+    
+    glb_rwlock_rdlock(&glb_cache->items.meta_lock);
+	
+    for (i=0; i<itemids->values_num; i++) {
+     		
+        if ( NULL != (elem= (glb_cache_elem_t*) zbx_hashset_search(&glb_cache->items.hset,&itemids->values[i])) ) {
+			
+            glb_lock_block(&elem->lock);
+
+            zbx_json_addobject(json,NULL);
+			zbx_json_adduint64(json,"itemid",elem->itemid);
+            zbx_json_addarray(json,"values");
+
+            if (count > elem->values->elem_count) 
+                rcount = elem->values->elem_count;
+            else 
+                rcount = count;
+            
+            int last_idx = elem->values->last_idx;
+            int first_idx = ( elem->values->last_idx - rcount + 1 + elem->values->elem_num) % elem->values->elem_num;
+            
+            zabbix_log(LOG_LEVEL_DEBUG, "%s: first idx is %d, count is %d, last idx is %d, cached items %d, total items %d",__func__, 
+                first_idx,count, last_idx, elem->values->elem_count, elem->values->elem_num);
+            
+            while ( -1 != last_idx  //check if data exists at all
+                 &&  last_idx != (first_idx - 1 + elem->values->elem_num ) % elem->values->elem_num ) {
+                glb_cache_value_t *c_val;
+                // zabbix_log(LOG_LEVEL_INFORMATION, "%s: first adding value for index %d",__func__, k);
+                c_val = glb_cache_get_value_ptr(elem->values,last_idx);
+                
+                zbx_json_addobject(json,NULL);
+                zbx_json_adduint64(json,"clock", c_val->sec);
+
+			    switch (elem->value_type) {
+			
+				    case ITEM_VALUE_TYPE_TEXT:
+				    case ITEM_VALUE_TYPE_STR:
+					    zbx_json_addstring(json,"value",c_val->value.data.str, ZBX_JSON_TYPE_STRING);
+					    break;
+
+				    case ITEM_VALUE_TYPE_LOG:
+					    zbx_json_addstring(json,"value",c_val->value.data.str, ZBX_JSON_TYPE_STRING);
+					    break;
+
+				    case ITEM_VALUE_TYPE_FLOAT: 
+					    zbx_json_addfloat(json,"value",c_val->value.data.dbl);
+					    break;
+
+				    case ITEM_VALUE_TYPE_UINT64:
+					    zbx_json_adduint64(json,"value",c_val->value.data.ui64);
+					    break;
+
+				    default:
+					    THIS_SHOULD_NEVER_HAPPEN;
+					    exit(-1);
+                    }
+                last_idx = (last_idx - 1 + elem->values->elem_num) % elem->values->elem_num;
+                zbx_json_close(json); //closing one value  
+            } 
+            glb_lock_unlock(&elem->lock);            
+            zbx_json_close(json); //closing the values array of an item       
+            zbx_json_close(json); //closing the item object       
+        }
+	}
+
+    glb_rwlock_unlock(&glb_cache->items.meta_lock);
+	zbx_json_close(json); //closing the items array
+        
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s: finished, response is %s", __func__,json->buffer);
+}
+int glb_cache_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json) {
+    
+    int i;
+
+    glb_cache_elem_t *elem;
+    zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
+  
+    glb_rwlock_rdlock(&glb_cache->items.meta_lock);
+    for (i=0; i<itemids->values_num; i++) {
+        zabbix_log(LOG_LEVEL_INFORMATION, "%s: processing item %ld", __func__,&itemids->values[i]);
+
+        if ( NULL != (elem= (glb_cache_elem_t*) zbx_hashset_search(&glb_cache->items.hset,&itemids->values[i])) ) {
+			
+            zabbix_log(LOG_LEVEL_INFORMATION, "%s: processing item %d : found in the cache", __func__,&itemids->values[i]);
+            
+            glb_lock_block(&elem->lock);
+
+            zbx_json_addobject(json,NULL);
+
+			zbx_json_adduint64(json,"itemid",elem->itemid);
+            zbx_json_adduint64(json,"lastdata", elem->lastdata);
+            zbx_json_adduint64(json,"nextcheck", elem->nextcheck);
+            zbx_json_adduint64(json,"state", elem->state);
+            
+            if (NULL != elem->error)
+                zbx_json_addstring(json,"error",elem->error,ZBX_JSON_TYPE_STRING );
+
+            zbx_json_close(json);
+            
+            glb_lock_unlock(&elem->lock);
+
+        }
+    }
+    glb_rwlock_unlock(&glb_cache->items.meta_lock);
+	zbx_json_close(json); 
+    
+    zabbix_log(LOG_LEVEL_INFORMATION, "%s: finished, response is %s", __func__,json->buffer);
 }
 #endif
