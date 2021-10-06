@@ -179,8 +179,8 @@ typedef struct
 	char			key_orig[ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *key;
 	char			*units;
 	char			*delay;
-	int			history_sec;
-	int			trends_sec;
+//	int			history_sec;
+//	int			trends_sec;
 	int			mtime;
 	char			trapper_hosts[ITEM_TRAPPER_HOSTS_LEN_MAX];
 	char			logtimefmt[ITEM_LOGTIMEFMT_LEN_MAX];

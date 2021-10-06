@@ -433,7 +433,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
  *              history - [IN] the history data vector (may have mixed value types) *
  *                                                                                  *
  ************************************************************************************/
-static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
+static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 {
 	char *response=NULL;
     char *req_buffer=NULL;
@@ -443,26 +443,29 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
     int ret=FAIL;
 	char buffer [MAX_STRING_LEN*20];
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "Started %s()", __func__);	
+	zabbix_log(LOG_LEVEL_DEBUG, "Started %s(), %d values", __func__,history_num);	
 		
 	zbx_worker_data_t	*conf = (zbx_worker_data_t *)data;
 	
-	if (0 == history->values_num) 
+	if (0 == history_num) 
 		return SUCCEED;
 	
 	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_history\", \"metrics\":[");
     //converitng the data to string
-	for (i = 0; i < history->values_num; i++)
+	for (i = 0; i < history_num; i++)
 	{
-		h = (ZBX_DC_HISTORY *)history->values[i];
+		h = (ZBX_DC_HISTORY *)&hist[i];
 	
 		if (0 == conf->write_types[h->value_type]) 
 			continue;
-		
-		
-		
+		//TODO: instead of ignoringg unsupported (error or empty) items, either write them!
+		//but first, need history backend support for that
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Value %d: state: %d flags: %d", i, h->state, h->flags);
+		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
+			continue;
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Will write data %d values", i);
 		if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
-		
+		//TODO: fix to use normal JSON generation here!!!!!!
 		glb_escape_worker_string(h->host_name,buffer);
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
 		buffer[0]='\0';
@@ -524,7 +527,7 @@ static int	worker_add_history(void *data, const zbx_vector_ptr_t *history)
   	//adding empty line to the request's end to signal end of request;
 	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"]}\n");
 
-    zabbix_log(LOG_LEVEL_DEBUG,"sending to the worker: %s",req_buffer);
+   	zabbix_log(LOG_LEVEL_DEBUG,"sending to the worker: %s",req_buffer);
 	if (num > 0)
 		ret=glb_process_worker_request(conf->worker, req_buffer, &response);
 	

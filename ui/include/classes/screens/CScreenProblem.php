@@ -1282,15 +1282,14 @@ class CScreenProblem extends CScreenBase {
 		}
 
 		foreach ($items as $itemid => $item) {
-			if (array_key_exists($itemid, $history_values) && isset($history_values[$itemid])) {
+			if (array_key_exists($itemid, $history_values) && isset($history_values[$itemid][0] )) {
 				$last_value = array();
 				$last_value = $history_values[$itemid][0];
 				
 				$last_value['value'] = formatHistoryValue(str_replace(["\r\n", "\n"], [" "], $last_value['value']),
 					$item);
-				if ( isset($last_value['error']) && strlen($last_value['error']) >0 ) {
-					#$last_value['value'] = ;
-					$last_value['value'] = (new CSpan(UNRESOLVED_MACRO_STRING))
+				if ( isset($item['error']) && strlen($item['error']) >0 ) {
+					 $last_value['value'] = (new CSpan(UNRESOLVED_MACRO_STRING))
 							->addClass(ZBX_STYLE_RED);
 							
 				} else 

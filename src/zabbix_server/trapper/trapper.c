@@ -1077,8 +1077,8 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	           
 	
 out:
-	if (ITEM_VALUE_TYPE_LOG == value_type) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"%s: History responce is response is %s",__func__,json.buffer);
+	
+	zabbix_log(LOG_LEVEL_DEBUG,"%s:Finished, history responce is response is %s",__func__,json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);

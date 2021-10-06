@@ -179,12 +179,13 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 		
 		if (CONFIG_DEBUG_ITEM == glb_item->itemid) 
 			zabbix_log(LOG_LEVEL_INFORMATION, "In %s - Added item %ld poll event in %ld sec", __func__, glb_item->itemid, nextcheck - now);
+		
 		glb_cache_item_meta_t meta;
 		meta.lastdata = now;
 		meta.nextcheck = nextcheck;
 		
 		glb_cache_update_item_meta( glb_item->itemid, &meta, 
-					GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_NEXTCHECK);
+					GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_NEXTCHECK, glb_item->value_type);
 		add_event(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck);
 	} else {
 		zabbix_log(LOG_LEVEL_INFORMATION, "No host has been fount for itemid %ld", glb_item->itemid);
@@ -411,8 +412,18 @@ void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now) {
 
 	if ( NULL != (glb_host = (GLB_POLLER_HOST*)zbx_hashset_search(hosts,&hostid)) &&
 		( ++glb_host->fails > GLB_MAX_FAILS) ) {
+		
 		glb_host->fails = 0;
 		glb_host->disabled_till = now + CONFIG_UNREACHABLE_DELAY;		
+	}
+}
+
+void add_host_succeed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now) {
+	GLB_POLLER_HOST *glb_host;
+
+	if ( NULL != (glb_host = (GLB_POLLER_HOST*)zbx_hashset_search(hosts,&hostid)) ) {
+		glb_host->fails = 0;
+		glb_host->disabled_till = 0;		
 	}
 }
 
@@ -441,6 +452,7 @@ static void glb_poller_handle_async_io(void *engine, unsigned char item_type ) {
 	case ITEM_TYPE_SIMPLE:
 		glb_pinger_handle_async_io(engine);
 		break;
+
 	case ITEM_TYPE_EXTERNAL:
 		glb_worker_handle_async_io(engine);
 		break;

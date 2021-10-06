@@ -842,9 +842,9 @@ class CMacrosResolverGeneral {
 							CSettingsHelper::get(CSettingsHelper::HISTORY_PERIOD)
 						));
 
-						if (array_key_exists($function['itemid'], $history)) {
-							$clock = $history[$function['itemid']]['clock'];
-							$value = $history[$function['itemid']]['value'];
+						if (array_key_exists($function['itemid'], $history) && count($history[$function['itemid']]) > 0) {
+							$clock = $history[$function['itemid']][0]['clock'];
+							$value = $history[$function['itemid']][0]['value'];
 						}
 						break;
 				}

@@ -56,26 +56,16 @@ int 	glb_history_json2val(struct zbx_json_parse *jp, char value_type, zbx_histor
 #define zbx_history_record_vector_create(vector)	zbx_vector_history_record_create(vector)
 
 
-int	zbx_history_init(char **error);
-void	zbx_history_destroy(void);
 
-int	zbx_history_add_values(const zbx_vector_ptr_t *history);
-int	zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start, int count, int end,
-		zbx_vector_history_record_t *values);
 
-int	zbx_history_requires_trends(int value_type);
-void	zbx_history_check_version(struct zbx_json *json);
-
-void zbx_history_destroy(void);
-
-//TODO: figure if preload function is still actual
 int glb_history_init(char **history_modules, char **error);
-int glb_history_preload(); 
-int glb_history_add(const zbx_vector_ptr_t *values);
+
+int glb_history_add(ZBX_DC_HISTORY *history, int history_num);
 int glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
+
 int glb_history_get_agg_buff(zbx_uint64_t itemid, int value_type, int start, int end, int count, char **buffer);
-int glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, char **buffer);
+
 int glb_history_add_trends(ZBX_DC_TREND *trend, int trends_num);
-int glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int count, char **buffer);
+int glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, char **buffer);
 
 #endif

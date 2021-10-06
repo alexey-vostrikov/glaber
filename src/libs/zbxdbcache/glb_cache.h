@@ -33,7 +33,7 @@ typedef struct {
     int state;
     int lastdata;
     int nextcheck;
-    char *error;
+    const char *error;
     int errcode;
 } glb_cache_item_meta_t;
 
@@ -87,7 +87,7 @@ int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, 
 		int count, const zbx_timespec_t *ts);
 int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value);
         
-int  glb_cache_add_values(zbx_vector_ptr_t *hist_values);
+int glb_cache_add_values(ZBX_DC_HISTORY *history, int history_num);
 int glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
 		int count, int ts_end);
 int glb_cache_get_statistics(glb_cache_stats_t *stats);
@@ -98,7 +98,7 @@ int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *m
 void glb_cache_get_item_stats(zbx_vector_ptr_t *stats);
 int glb_cache_get_item_state(u_int64_t itemid);
 
-int glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags);
+void glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
 
 
 int glb_cache_housekeep();

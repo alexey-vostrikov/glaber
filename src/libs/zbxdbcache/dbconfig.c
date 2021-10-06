@@ -228,7 +228,7 @@ clean:
 }
 /*************************************************************
  * returns SUCCEED if the item can be async polled and 
- * doesn't have to be put in any zabbix standard queues
+ * doesn't have to be put in any of zabbix standard queues
  * **********************************************************/
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
 
@@ -476,7 +476,7 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *in
 	zbx_custom_interval_t	*custom_intervals;
 	int			disable_until;
 
-	if (0 == (flags & ZBX_ITEM_COLLECTED) && 0 != item->nextcheck &&
+	if (0 == (flags & ZBX_ITEM_COLLECTED) &&
 			0 == (flags & ZBX_ITEM_KEY_CHANGED) && 0 == (flags & ZBX_ITEM_TYPE_CHANGED) &&
 			0 == (flags & ZBX_ITEM_DELAY_CHANGED))
 	{
@@ -493,13 +493,9 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *in
 		/* and such changes will be detected during configuration synchronization. DCsync_items()  */
 		/* detects item configuration changes affecting check scheduling and passes them in flags. */
 
-		item->nextcheck = ZBX_JAN_2038;
+	//	item->nextcheck = ZBX_JAN_2038;
 		item->schedulable = 0;
 
-		if (CONFIG_DEBUG_ITEM == item->itemid || CONFIG_DEBUG_HOST == item->hostid) 
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: nextcheck is set to %d (+%ld sec)",
-								item->itemid,__func__, item->nextcheck, item->nextcheck-time(NULL));
-			
 		return FAIL;
 	}
 
@@ -753,14 +749,13 @@ static void	DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 	if (item->poller_type == ZBX_NO_POLLER)
 		return;
 
-	if (ZBX_LOC_QUEUE == item->location && old_nextcheck == item->nextcheck)
+	if (ZBX_LOC_QUEUE == item->location )//&& old_nextcheck == item->nextcheck)
 		return;
 
 	//do not put to queue items that might be processed in a glaber specifig pollers
-	
 	zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts,&item->hostid);
 	
-	if (NULL != zbx_dc_host && SUCCEED == glb_might_be_async_polled(item,zbx_dc_host)) {
+	if (NULL != zbx_dc_host && SUCCEED == glb_might_be_async_polled(item, zbx_dc_host)) {
 		item->poller_type = ZBX_NO_POLLER;
 		return;
 	}
@@ -3064,13 +3059,13 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		item->flags = (unsigned char)atoi(row[18]);
 		ZBX_DBROW2UINT64(interfaceid, row[19]);
 
-		if (SUCCEED != is_time_suffix(row[22], &item->history_sec, ZBX_LENGTH_UNLIMITED))
-			item->history_sec = ZBX_HK_PERIOD_MAX;
+	//	if (SUCCEED != is_time_suffix(row[22], &item->history_sec, ZBX_LENGTH_UNLIMITED))
+	//		item->history_sec = ZBX_HK_PERIOD_MAX;
 
-		if (0 != item->history_sec && ZBX_HK_OPTION_ENABLED == config->config->hk.history_global)
-			item->history_sec = config->config->hk.history;
+	//	if (0 != item->history_sec && ZBX_HK_OPTION_ENABLED == config->config->hk.history_global)
+	//		item->history_sec = config->config->hk.history;
 
-		item->history = (0 != item->history_sec);
+		item->history = (0 != config->config->hk.history_global);
 
 		ZBX_STR2UCHAR(item->inventory_link, row[24]);
 		ZBX_DBROW2UINT64(item->valuemapid, row[25]);
@@ -3087,7 +3082,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		{
 			item->triggers = NULL;
 			item->update_triggers = 0;
-			item->nextcheck = 0;
+			//item->nextcheck = 0;
 			ZBX_STR2UINT64(item->lastlogsize, row[20]);
 			item->mtime = atoi(row[21]);
 			DCstrpool_replace(found, &item->error, row[27]);
@@ -3096,34 +3091,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->poller_type = ZBX_NO_POLLER;
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->schedulable = 1;
-/*
-			switch (value_type) {
-				case ITEM_VALUE_TYPE_STR:
-				case ITEM_VALUE_TYPE_TEXT:
-					DCstrpool_replace(found, (const char **)&item->lastvalue.str, "");
-					break;
-				case ITEM_VALUE_TYPE_FLOAT:
-					item->lastvalue.dbl = 0.0;
-					item->prevvalue.dbl = 0.0;
-					break;
-				case ITEM_VALUE_TYPE_UINT64:
-					item->lastvalue.ui64 = 0;
-					item->prevvalue.ui64 = 0;
-					break;
-				case ITEM_VALUE_TYPE_LOG:
-					item->lastvalue.log = __config_mem_malloc_func(NULL, sizeof(zbx_log_value_t));
-					bzero(item->lastvalue.log, sizeof(zbx_log_value_t));
-					DCstrpool_replace(found, (const char **)&item->lastvalue.log->value, "");
-					break;
-				default:
-					THIS_SHOULD_NEVER_HAPPEN;
-					exit(-1);
 
-			}
-			
-			item->lastclock=0;
-			item->prevclock=0;
-*/
 			zbx_vector_ptr_create_ext(&item->tags, __config_mem_malloc_func, __config_mem_realloc_func,
 					__config_mem_free_func);
 		}
@@ -7957,7 +7925,7 @@ static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned 
 	dst_item->valuemapid = src_item->valuemapid;
 	dst_item->status = src_item->status;
 
-	dst_item->history_sec = src_item->history_sec;
+	//dst_item->history_sec = src_item->history_sec;
 	strscpy(dst_item->key_orig, src_item->key);
 
 	if (ZBX_ITEM_GET_MISC & mode)
@@ -7982,7 +7950,7 @@ static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned 
 				numitem = (ZBX_DC_NUMITEM *)zbx_hashset_search(&config->numitems, &src_item->itemid);
 
 				dst_item->trends = numitem->trends;
-				dst_item->trends_sec = numitem->trends_sec;
+				//dst_item->trends_sec = numitem->trends_sec>0:1:0;
 
 				/* allocate after lock */
 				if (0 != (ZBX_ITEM_GET_EMPTY_UNITS & mode) || '\0' != *numitem->units)
@@ -9809,8 +9777,8 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items)
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
-		if (dc_item->nextcheck > now)
-			break;
+	//	if (dc_item->nextcheck > now)
+	//		break;
 
 		if (0 != num)
 		{

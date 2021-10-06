@@ -2384,8 +2384,6 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 	
 	zbx_snprintf(error_str,MAX_STRING_LEN, "Timed out, no responce for %d seconds %d retries", CONFIG_TIMEOUT, 2 );
 	
-
-	zabbix_log(LOG_LEVEL_DEBUG, "host %ld item %ld timed out %s", glb_item->hostid,  glb_item->itemid, error_str);
 	zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags ,
 									NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str );
 	
@@ -2469,6 +2467,9 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 			
 					DEBUG_ITEM(glb_item->itemid,"Async SNMP SUCCEED RESULT processing for the item");
 					zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , &result ,&timespec, ITEM_STATE_NORMAL, NULL);
+					add_host_succeed(conf->hosts,glb_item->hostid,timespec.sec);
+					
+
 				} else {
 					DEBUG_ITEM(glb_item->itemid,"Async SNMP FAILED RESULT processing for the item");
 					DEBUG_ITEM(glb_item->itemid,result.msg);

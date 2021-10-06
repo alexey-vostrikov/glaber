@@ -1146,14 +1146,6 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
-
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: doing history preloading",__func__);
-	glb_history_preload();
-	glb_cache_get_statistics(&stats);
-	 
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: finished history preloading, free:%ld% ( %ld MB free out %ld MB total )  ",__func__,(stats.free_size*100)/stats.total_size,
-	stats.free_size/ZBX_MEBIBYTE,stats.total_size/ZBX_MEBIBYTE);
-
 	if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 	{
 		zbx_setproctitle("%s [waiting for user command]", get_process_type_string(process_type));

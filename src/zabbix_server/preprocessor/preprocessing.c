@@ -1159,7 +1159,8 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
 	meta.state = value.state;
 
 	glb_cache_update_item_meta(itemid, &meta, 
-			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	 GLB_CACHE_ITEM_UPDATE_ERRORMSG  );
+			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	 GLB_CACHE_ITEM_UPDATE_ERRORMSG ,
+			item_value_type );
 
 	value.result_ptr = &result_ptr;
 

@@ -843,8 +843,7 @@ static void	DCadd_trend(const ZBX_DC_HISTORY *history, ZBX_DC_TREND **trends, in
 
 	trend = DCget_trend(history->itemid);
 
-	if (trend->num > 0 && (trend->clock != hour || trend->value_type != history->value_type) &&
-			SUCCEED == zbx_history_requires_trends(trend->value_type))
+	if (trend->num > 0 && (trend->clock != hour || trend->value_type != history->value_type))
 	{
 		DCflush_trend(trend, trends, trends_alloc, trends_num);
 	}
@@ -1588,8 +1587,7 @@ static void	DCsync_trends(void)
 
 	while (NULL != (trend = (ZBX_DC_TREND *)zbx_hashset_iter_next(&iter)))
 	{
-		if (SUCCEED == zbx_history_requires_trends(trend->value_type) && trend->clock >= compression_age)
-			DCflush_trend(trend, &trends, &trends_alloc, &trends_num);
+		DCflush_trend(trend, &trends, &trends_alloc, &trends_num);
 	}
 
 	UNLOCK_TRENDS;
@@ -2087,6 +2085,7 @@ static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
  *             history_num - number of history structures                     *
  *                                                                            *
  ******************************************************************************/
+/*
 static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 {
 	int			i, ret = SUCCEED;
@@ -2102,9 +2101,6 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 	for (i = 0; i < history_num; i++)
 	{
 		ZBX_DC_HISTORY	*h = &history[i];
-		
-		//TODO: remove when the value cache operations will be fixed
-		h->hostid = 0;
 
 		if (0 != (ZBX_DC_FLAGS_NOT_FOR_HISTORY & h->flags))
 			continue;
@@ -2121,7 +2117,7 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 
 	return ret;
 }
-
+*/
 /******************************************************************************
  *                                                                            *
  * Function: dc_add_proxy_history                                             *
@@ -2858,13 +2854,16 @@ static void	sync_proxy_history(int *total_num, int *more)
  ******************************************************************************/
 static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 {
-	static ZBX_HISTORY_FLOAT	*history_float;
-	static ZBX_HISTORY_INTEGER	*history_integer;
-	static ZBX_HISTORY_STRING	*history_string;
-	static ZBX_HISTORY_TEXT		*history_text;
-	static ZBX_HISTORY_LOG		*history_log;
-	int				i, history_num, history_float_num, history_integer_num, history_string_num,
-					history_text_num, history_log_num, txn_error, compression_age;
+//	static ZBX_HISTORY_FLOAT	*history_float;
+//	static ZBX_HISTORY_INTEGER	*history_integer;
+//	static ZBX_HISTORY_STRING	*history_string;
+//	static ZBX_HISTORY_TEXT		*history_text;
+//	static ZBX_HISTORY_LOG		*history_log;
+	int				i, history_num, 
+//					history_float_num, history_integer_num, history_string_num,
+//					history_text_num, history_log_num, 
+					txn_error, compression_age;
+
 	unsigned int			item_retrieve_mode;
 	time_t				sync_start;
 	zbx_vector_uint64_t		triggerids ;
@@ -2873,7 +2872,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	ZBX_DC_HISTORY			history[ZBX_HC_SYNC_MAX];
 
 	item_retrieve_mode = NULL == CONFIG_EXPORT_DIR ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
-
+/*
 	if (NULL == history_float && NULL != history_float_cbs)
 	{
 		history_float = (ZBX_HISTORY_FLOAT *)zbx_malloc(history_float,
@@ -2903,7 +2902,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		history_log = (ZBX_HISTORY_LOG *)zbx_malloc(history_log,
 				ZBX_HC_SYNC_MAX * sizeof(ZBX_HISTORY_LOG));
 	}
-
+*/
 	compression_age = hc_get_history_compression_age();
 
 	zbx_vector_ptr_create(&inventory_values);
@@ -2977,52 +2976,51 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			
 			//at this call history will be added to the history storage
 			//and state cache
-			if (FAIL != (ret = DBmass_add_history(history, history_num)))
+			
+			
+			
+			//if (FAIL != (ret = DBmass_add_history(history, history_num)))
+			//{
+			glb_cache_add_values(history, history_num);
+			glb_history_add(history,history_num);
+			
+
+
+			DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
+			
+			DC_get_trends_items_keys(trends,trends_num);
+			glb_history_add_trends(trends,trends_num);
+				
+			//doing keys and item names cleanup
+			for ( i=0; i<trends_num; i++) {
+				zbx_free(trends[i].item_key);
+				zbx_free(trends[i].host_name);
+			}
+				
+			//TODO: figure wtf is the function
+			if (0 != trends_num)
+				zbx_tfc_invalidate_trends(trends, trends_num);
+
+			do
 			{
-		
-				//DCconfig_items_apply_changes(history, history_num);
-				
-				//MAKE SURE ITEM'S meta is updated in the state cache
-				//THIS_SHOULD_NEVER_HAPPEN;
-				//exit(-1);
-
-				//trends has to use glaber specific trends state cache
-				DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
-				DC_get_trends_items_keys(trends,trends_num);
-				glb_history_add_trends(trends,trends_num);
-				
-				//doing keys and item names cleanup
-				for ( i=0; i<trends_num; i++) {
-					zbx_free(trends[i].item_key);
-					zbx_free(trends[i].host_name);
-				}
-				
-				//TODO: figure wtf is the function
-				if (0 != trends_num)
-					zbx_tfc_invalidate_trends(trends, trends_num);
-
-				do
-				{
-					DBbegin();
+				DBbegin();
 
 				//	DBmass_update_items(&item_diff, &inventory_values);
 				//	DBmass_update_trends(trends, trends_num, &trends_diff);
 
 					/* process internal events generated by DCmass_prepare_history() */
-					zbx_process_events(NULL, NULL);
+				zbx_process_events(NULL, NULL);
 
-					if (ZBX_DB_OK == (txn_error = DBcommit()))
-						DCupdate_trends(&trends_diff);
-					else
-						zbx_reset_event_recovery();
+				if (ZBX_DB_OK == (txn_error = DBcommit()))
+					DCupdate_trends(&trends_diff);
+				else
+					zbx_reset_event_recovery();
 
-					zbx_vector_uint64_pair_clear(&trends_diff);
-				}
-				while (ZBX_DB_DOWN == txn_error);
+				zbx_vector_uint64_pair_clear(&trends_diff);
 			}
-
+				while (ZBX_DB_DOWN == txn_error);
+			
 			zbx_clean_events();
-
 			zbx_vector_ptr_clear_ext(&inventory_values, (zbx_clean_func_t)DCinventory_value_free);
 		
 		}
@@ -3128,6 +3126,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 		if (FAIL != ret)
 		{
+			/*
 			if (0 != history_num)
 			{
 				DCmodule_prepare_history(history, history_num, history_float, &history_float_num,
@@ -3139,7 +3138,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 						history_text_num, history_log_num, history_float, history_integer,
 						history_string, history_text, history_log);
 			}
-
+			*/
 			if (0 != history_num)
 			{
 				const ZBX_DC_HISTORY	*phistory = NULL;
@@ -4271,7 +4270,6 @@ static void	hc_pop_items(zbx_vector_ptr_t *history_items)
 		}
 		
 		zbx_binary_heap_remove_min(&cache->history_queue);
-		//zabbix_log(LOG_LEVEL_INFORMATION,"Got %d hsitory items zbx_bin_heap_empty is %d elems is %d %d",history_items->values_num,zbx_binary_heap_empty(&cache->history_queue), cache->history_queue.elems_num,cache->history_num); 
 	}
 }
 
