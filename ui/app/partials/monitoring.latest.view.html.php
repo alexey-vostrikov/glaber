@@ -85,8 +85,7 @@ foreach ($data['items'] as $itemid => $item) {
 		($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null
 	]))->addClass('action-container');
 
-
-	$history = $data['history'];
+	$item_hist = [];
 
 	$last_history = array_key_exists($itemid, $data['history'])
 		? ((count($data['history'][$itemid]) > 0) ? $data['history'][$itemid][0] : null)
@@ -94,12 +93,10 @@ foreach ($data['items'] as $itemid => $item) {
 
 	
 	if ($last_history) {
-		
+			$item_hist = $data['history'][$itemid];
 			$prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
 			$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_history['clock']);
-			
-			
-
+	
 			$last_value = formatHistoryValue($last_history['value'], $item, false);
 			if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
 					 ITEM_VALUE_TYPE_LOG == $item['value_type'] ) && 
@@ -140,7 +137,7 @@ foreach ($data['items'] as $itemid => $item) {
 			$last_value = '';
 			$change = '';
 		}
-	
+		
 	if ( isset($item['nextcheck']) && $item['nextcheck'] > 0 )
 		$last_check = (new CSpan($last_check))
 				->addClass(ZBX_STYLE_LINK_ACTION)
@@ -195,6 +192,8 @@ foreach ($data['items'] as $itemid => $item) {
 		->addClass($host['status'] == HOST_STATUS_NOT_MONITORED ? ZBX_STYLE_RED : null)
 		->setMenuPopup(CMenuPopupHelper::getHost($item['hostid']));
 
+
+		
 	if ($data['filter']['show_details']) {
 
 		$item_config_url = (new CUrl('items.php'))
@@ -228,6 +227,8 @@ foreach ($data['items'] as $itemid => $item) {
 			$item_icons[] = makeErrorIcon($item['error']);
 		}
 
+		$points=[[0,1],[10,3],[100,250]];
+
 		$table_row = new CRow([
 			$checkbox,
 			$host_name,
@@ -237,7 +238,9 @@ foreach ($data['items'] as $itemid => $item) {
 			(new CCol($item_trends))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
 			(new CCol($last_check))->addClass($state_css),
-			(new CCol($last_value))->addClass($state_css),
+			(new CCol())->addClass($state_css)
+				->addItem(new CDiv($last_value))
+				->addItem(new CSVGSmallGraph($item_hist,50,200)),
 			(new CCol($change))->addClass($state_css),
 			$data['tags'][$itemid],
 			$actions,

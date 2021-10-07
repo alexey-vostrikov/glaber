@@ -26,7 +26,7 @@ extern size_t CONFIG_VALUE_CACHE_SIZE;
 #define  GLB_CACHE_ITEM_UPDATE_ERRORMSG     0x08
 #define  GLB_CACHE_ITEM_UPDATE_ERRORCODE    0x10
 
-#define GLB_CACHE_MIN_COUNT     4
+#define GLB_CACHE_MIN_COUNT     10
 #define GLB_CACHE_MAX_COUNT     1024*1024 
 
 typedef struct {

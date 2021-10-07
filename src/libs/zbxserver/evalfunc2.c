@@ -1718,25 +1718,25 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	}
 	else
 		period = arg1;
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from CACHE",__func__,item->itemid);
+	//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from CACHE",__func__,item->itemid);
 	if (SUCCEED != (ret = glb_cache_get_item_values(item->itemid, item->value_type, &values, 0 , 1, ts.sec))) {
 		//there was a problem fetching the data
 		*error = zbx_strdup(*error, "Couldn't fetch item, DB backend returned FAIL");
-		zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from the CACHE has failed", __func__, item->itemid);
+		//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from the CACHE has failed", __func__, item->itemid);
 		goto out;
 	} 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from the CACHE has succeeded , %d values", __func__, item->itemid, values.values_num );
+	//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from the CACHE has succeeded , %d values", __func__, item->itemid, values.values_num );
 
 	//there was no problem in fetching the data, check if the latest item is withing the period
-	if (1 == values.values_num) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld timestamp is %d period is %d time is %d", __func__, item->itemid, 
-			values.values[0].timestamp.sec, period, time(NULL) );
-	}
+	//if (1 == values.values_num) {
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld timestamp is %d period is %d time is %d", __func__, item->itemid, 
+	//		values.values[0].timestamp.sec, period, time(NULL) );
+	//}
 
 	if (1 == values.values_num && 
 			time(NULL) - values.values[0].timestamp.sec <=period  )
 	{
-		zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld setting 0 as a result (which means that THERE IS THE DATA)",__func__, item->itemid);
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld setting 0 as a result (which means that THERE IS THE DATA)",__func__, item->itemid);
 		zbx_variant_set_dbl(value, 0);
 	}
 	else
@@ -1749,21 +1749,21 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 			goto out;
 		}
 
-//		zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: %ld checking startup timing",__func__,item->itemid);
-//		if (seconds + arg1 > ts.sec)
-//		{
-//			*error = zbx_strdup(*error,
-//					"item does not have enough data after server start or item creation");
-//			zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: %ld retruning error due to startup time",__func__,item->itemid);
-//			goto out;
-//		}
+		//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: %ld checking startup timing",__func__,item->itemid);
+		if (seconds + arg1 > ts.sec)
+		{
+			*error = zbx_strdup(*error,
+					"item does not have enough data after server start or item creation");
+		//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: %ld retruning error due to startup time",__func__,item->itemid);
+			goto out;
+		}
 
-//		if (0 != (nodata_win.flags & ZBX_PROXY_SUPPRESS_ACTIVE))
-//		{
-//			*error = zbx_strdup(*error, "historical data transfer from proxy is still in progress");
-//			goto out;
-//		}
-		zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld setting 1 as a result",__func__, item->itemid);
+		if (0 != (nodata_win.flags & ZBX_PROXY_SUPPRESS_ACTIVE))
+		{
+			*error = zbx_strdup(*error, "historical data transfer from proxy is still in progress");
+			goto out;
+		}
+	//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld setting 1 as a result",__func__, item->itemid);
 		zbx_variant_set_dbl(value, 1);
 
 		if (0 != item->host.proxy_hostid && 0 != lazy)
@@ -1778,7 +1778,7 @@ out:
 	zbx_history_record_vector_destroy(&values, item->value_type);
 	zbx_free(arg2);
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "End of %s():%s", __func__, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
