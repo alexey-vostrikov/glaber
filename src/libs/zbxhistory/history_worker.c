@@ -636,15 +636,6 @@ int	glb_history_worker_init(char *params)
 {
 	zbx_worker_data_t	*conf;
 
-	//for worker there are following params are parsed:
-	//url : by default http://localhost:8123
-	//write_types: (str, text, ui64, double)
-	//read_types: (str, text, ui64, double)
-	//preload_types: (str, text, ui64, double)
-	//preload_values: 10
-	//read_aggregate_types: (str, text, ui64, double) 
-	//disable_reads: 0 sec by default (how long not to do readings)
-
 	 //history mode expects old good JSON as a config, let's parse it
     struct zbx_json_parse jp, jp_config;
 	char  cmd[MAX_STRING_LEN],tmp_str[MAX_STRING_LEN];

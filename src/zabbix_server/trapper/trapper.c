@@ -1067,14 +1067,11 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 			}
 			zabbix_log(LOG_LEVEL_DEBUG,"Finished trends request");
 		}
-
-
-		
+	
 	} else  {
 		zabbix_log(LOG_LEVEL_WARNING,"%s: cannot process history request on of (itemid, start, end, count) params is missing", __func__);
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
 	}
-	           
 	
 out:
 	

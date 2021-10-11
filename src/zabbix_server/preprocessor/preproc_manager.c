@@ -675,17 +675,20 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 		zbx_variant_set_dbl(&value, preproc_value->result_ptr->result->dbl);
 //		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to DBL", __func__);
 	} else if (ISSET_STR(preproc_value->result_ptr->result)) {
+//		
 		zbx_variant_set_str(&value, zbx_strdup(NULL, preproc_value->result_ptr->result->text));
+//		zbx_variant_set_str(&value, preproc_value->result_ptr->result->text);
 //		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to STR", __func__);
 	} else if (ISSET_TEXT(preproc_value->result_ptr->result)) {
 		zbx_variant_set_str(&value, zbx_strdup(NULL, preproc_value->result_ptr->result->text));
+		
 //		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Set to TXT: '%ld' len is %d",
 			 //__func__,preproc_value->result_ptr->result->text,strlen(preproc_value->result_ptr->result->text));
 	}
 	else
 		THIS_SHOULD_NEVER_HAPPEN;
 	
-	
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:coverted", __func__);
 //	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: After convert: variant type is '%s', value is '%s'", __func__,
 	//	zbx_variant_type_desc(&value),zbx_variant_value_desc(&value));
 	
@@ -701,7 +704,7 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 		//
 		history_in = &history_static;
 	}
-	
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start 3", __func__);
 	//3. preparing the history out vector to store the results
 	zbx_vector_ptr_create(&history_out);
 	
@@ -713,6 +716,7 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 //	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Executing preprocessing", __func__);
 	
 	//5. doing the preprocessing
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start 4", __func__);
 	if (FAIL == (ret = worker_item_preproc_execute(preproc_value->item_value_type, &value ,preproc_value->ts,
 			item->preproc_ops, item->preproc_ops_num, history_in,
 			&history_out, results, &results_num, &errmsg)) && 0 != results_num) {
@@ -726,7 +730,7 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 			error = errmsg;
 //		zabbix_log(LOG_LEVEL_INFORMATION, "In %s: preprocessing failed with message: '%s'",error);
 	}
-
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start 5", __func__);
 //	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: After preproc execute: variant type is %s, value is %s", __func__,
 //		zbx_variant_type_desc(&value),zbx_variant_value_desc(&value));
 	//item is preprocessed now
@@ -740,7 +744,7 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 	if (NULL != item_preproc_history) 	{
 		zbx_vector_ptr_clear_ext(&item_preproc_history->history, (zbx_clean_func_t)zbx_preproc_op_history_free);
 	}
-
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start 6", __func__);
 	if (0 != history_out.values_num) {
 		if (NULL == item_preproc_history) {
 			zbx_preproc_history_t	history_local;
@@ -765,12 +769,13 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 //		zbx_variant_type_desc(&value),zbx_variant_value_desc(&value));
 	//8. cleanup
 //	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Cleanup", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start 7", __func__);
 	zbx_vector_ptr_destroy(&history_out);
 //	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Cleanup 1", __func__);
 	zbx_vector_ptr_destroy(&history_static);
 //	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Cleanup 3", __func__);
 	zbx_free(results);
-//	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Finished", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 	//manager->preproc_num--;
 }
 
@@ -851,19 +856,20 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 
 	if (REQUEST_STATE_QUEUED == state && 0 <= notsupp_shift)
 	{
-		request->value_type = item->value_type;
-		if (NULL != item && 1 == item->fast_preprocess 
+	
+	//	request->value_type = item->value_type;
+	//	if (NULL != item && 1 == item->fast_preprocess 
 			//&& ITEM_STATE_NOTSUPPORTED != value->state 
-			) {
+	//		) {
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld will be fast-preprocessed",item->itemid);
 			//fast preproccessing will do immediate preproc without consuming an extra memory and sending data to worker
 			//flag ->fast_preprocess is set for all realtively fast items - for now for all except javascript ones
-			glb_fast_preprocess_item(manager, request, item);
+	//		glb_fast_preprocess_item(manager, request, item);
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld finished fast-preprocessing",item->itemid);
-			request->state = REQUEST_STATE_DONE;
-			manager->processed_num++;
+	//		request->state = REQUEST_STATE_DONE;
+	//		manager->processed_num++;
 		
-		} else {
+	//	} else {
 		
 			request->steps = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) *
 					(item->preproc_ops_num - notsupp_shift));
@@ -878,7 +884,7 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 						item->preproc_ops[i + notsupp_shift].error_handler_params);
 			}
 			manager->preproc_num++;
-		}
+	//	}
 		
 	}
 
