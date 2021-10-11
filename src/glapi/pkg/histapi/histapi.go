@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"time"
+	"strings"
 )
 
 const ITEM_VALUE_TYPE_FLOAT = 0
@@ -229,10 +230,14 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 
 //history engine is expected to return itemid, time, nanosecond time, and value
 //worker module will treat the value according to it's value type
+
+var jq = strings.NewReplacer("\b","\\b","\f", "\\f", "\n", "\\n","\\","\\\\", "\"","\\\"", "\t","\\t", "\r", "\\r" )
 func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
+
 	if num > 0 {
 		fmt.Fprintln(wr,",")
 	}
+
 	fmt.Fprint(wr,"{\"time_sec\":",metric.Sec,", \"time_ns\":",metric.Ns, ", \"value_type\":",metric.Value_type)
 	switch metric.Value_type {
 		case ITEM_VALUE_TYPE_FLOAT:
@@ -240,12 +245,13 @@ func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
 		case ITEM_VALUE_TYPE_UINT64:	
 			fmt.Fprint(wr,", \"value_int\":",metric.Value_int)
 		case ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_TEXT:	
-			fmt.Fprint(wr,", \"value_str\":\"",metric.Value_str,"\"")
+			fmt.Fprint(wr,", \"value_str\":\"",jq.Replace(metric.Value_str),"\"")
 		case ITEM_VALUE_TYPE_LOG:
-			fmt.Fprint(wr,", \"value_str\":\"",metric.Value_str,"\" , \"logeventid\":",metric.Logeventid, 
+			fmt.Fprint(wr,", \"value_str\":\"",jq.Replace(metric.Value_str),"\" , \"logeventid\":",metric.Logeventid, 
 				", \"source\":\"",metric.Source,"\", \"severity\":",metric.Severity)
 	}
 	fmt.Fprint(wr,"}")
+	
 }
 
 func dumpAggMetric(agg_metric *AggMetric,wr *bufio.Writer, num int) {

@@ -33,9 +33,9 @@ type ClickHouseHist struct {
 	sql_buffer 	[histApi.ITEM_VALUE_TYPE_MAX]*bytebufferpool.ByteBuffer
 	agg_sql_buf [histApi.ITEM_VALUE_TYPE_MAX]*bytebufferpool.ByteBuffer
 	parser *fastjson.Parser
-	quotter *strings.Replacer
-}
+	sqlquotter *strings.Replacer
 
+}
 
 var trend_tables = []string {"trends_dbl", "", "", "trends_uint",""};
 var hist_tables = []string {"history_dbl", "history_str", "history_log", "history_uint", "history_str"};
@@ -59,8 +59,8 @@ func Init(he *ClickHouseHist, url string,dbname string , batch int ,flush int ,d
 	he.parser = new(fastjson.Parser)
 	he.cluster_suffix = cluster_suffix
 	he.buf = bytebufferpool.Get()
-	he.SQLquotter = strings.NewReplacer("\n","\\n","\"","\\\"","'","\\'", "\\","\\\\")
-	he.JSONquotter = strings.NewReplacer("\n","\\n","\"","\\\"", "\\","\\\\")
+	he.sqlquotter = strings.NewReplacer("\n","\\n","\"","\\\"","'","\\'", "\\","\\\\")
+    
 	for i := 0; i < histApi.ITEM_VALUE_TYPE_MAX; i++ {
 		he.sql_buffer[i]=bytebufferpool.Get()
 		he.agg_sql_buf[i]=bytebufferpool.Get()
@@ -103,15 +103,15 @@ func (he ClickHouseHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) 
 			fmt.Fprintf(buf,",%f",metric.Value_dbl)
 
 		case histApi.ITEM_VALUE_TYPE_STR: 
-			fmt.Fprintf(buf,",'%s'",he.quotter.Replace(string(metric.Value_str)))
+			fmt.Fprintf(buf,",'%s'",he.sqlquotter.Replace(string(metric.Value_str)))
 				
 		case histApi.ITEM_VALUE_TYPE_TEXT:
-			fmt.Fprintf(buf,",'%s'",he.quotter.Replace(string(metric.Value_str)))
+			fmt.Fprintf(buf,",'%s'",he.sqlquotter.Replace(string(metric.Value_str)))
 	
 		case histApi.ITEM_VALUE_TYPE_LOG:
-			fmt.Fprintf(buf,", '%s', %d, %d, '%s'",he.quotter.Replace(string(metric.Value_str)),
+			fmt.Fprintf(buf,", '%s', %d, %d, '%s'",he.sqlquotter.Replace(string(metric.Value_str)),
 						metric.Logeventid, metric.Severity, 
-						he.quotter.Replace(metric.Source))
+						he.sqlquotter.Replace(metric.Source))
 
 		default:
 			log.Panic("Unsupported value type: ", metric.Value_type)
@@ -122,8 +122,8 @@ func (he ClickHouseHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) 
 	}
 		
 	if he.save_names {
-		fmt.Fprintf(buf,",'%s','%s'",he.quotter.Replace(metric.Host), 
-									he.quotter.Replace(metric.Item_key))
+		fmt.Fprintf(buf,",'%s','%s'",he.sqlquotter.Replace(metric.Host), 
+									he.sqlquotter.Replace(metric.Item_key))
 	}
 	
 	fmt.Fprintf(buf,")")
@@ -158,7 +158,7 @@ func (he ClickHouseHist) WriteTrends(agg_metric *histApi.AggMetric, log *log.Log
 	}
 
 			
-	fmt.Fprintf(buf,",%d,'%s','%s'",agg_metric.Count, he.quotter.Replace(agg_metric.Host), he.quotter.Replace(agg_metric.Item_key))
+	fmt.Fprintf(buf,",%d,'%s','%s'",agg_metric.Count, he.sqlquotter.Replace(agg_metric.Host), he.sqlquotter.Replace(agg_metric.Item_key))
 	
 
 	fmt.Fprintf(buf,")")
@@ -417,10 +417,10 @@ func (he ClickHouseHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*his
 					case histApi.ITEM_VALUE_TYPE_FLOAT:
 						m.Value_dbl = float64(metric.GetFloat64("value"))
 					case histApi.ITEM_VALUE_TYPE_STR, histApi.ITEM_VALUE_TYPE_TEXT:
-						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value")))
+						m.Value_str =string(metric.GetStringBytes("value"))
 					case histApi.ITEM_VALUE_TYPE_LOG:
 						m.Source = string(metric.GetStringBytes("source"))
-						m.Value_str = he.quotter.Replace(string(metric.GetStringBytes("value")))
+						m.Value_str = string(metric.GetStringBytes("value"))
 						m.Logeventid = uint64(metric.GetInt("logeventid"))
 						m.Severity =  uint8(metric.GetInt("severity"))
 				}
