@@ -57,7 +57,6 @@ if ($data['filter']['show_details']) {
 		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
 		(new CColHeader())->addStyle('width: 100px'),
-	//	(new CColHeader(_('Info')))->addStyle('width: 100px')
 	]);
 }
 else {
@@ -95,7 +94,6 @@ foreach ($data['items'] as $itemid => $item) {
 	if ($last_history) {
 			$item_hist = $data['history'][$itemid];
 			$prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
-			//$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_history['clock']);
 			$last_check = zbx_date2age($last_history['clock']);
 			
 			$last_value = formatHistoryValue($last_history['value'], $item, false);
@@ -129,7 +127,6 @@ foreach ($data['items'] as $itemid => $item) {
 				->addClass(ZBX_STYLE_LINK_ACTION)
 				->setHint($item['error'], 'hintbox-wrap');
 			if ($item['lastdata'] > 0 ) 
-				//$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_history['clock']);
 				$last_check = zbx_date2age(time() - $last_history['clock']);
 			else 
 				$last_check ='';
@@ -143,7 +140,7 @@ foreach ($data['items'] as $itemid => $item) {
 	if ( isset($item['nextcheck']) && $item['nextcheck'] > 0 )
 		$last_check = (new CSpan($last_check))
 				->addClass(ZBX_STYLE_LINK_ACTION)
-				->setHint("Next: ". zbx_date2age( 2* time() - $item['nextcheck'] ), 'hintbox-wrap');
+				->setHint("Next in: ". zbx_date2age( 2* time() - $item['nextcheck'] ), 'hintbox-wrap');
 
 
 	// Other row data preparation.
@@ -178,16 +175,6 @@ foreach ($data['items'] as $itemid => $item) {
 		$keep_trends = 0;
 		$item_trends = '';
 	}
-
-//	if ($keep_history != 0 || $keep_trends != 0) {
-//		$actions = new CLink($is_graph ? _('Graph') : _('History'), (new CUrl('history.php'))
-//			->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
-//			->setArgument('itemids[]', $item['itemid'])
-//		);
-//	}
-//	else {
-//		$actions = '';
-//	}
 
 	$host = $data['hosts'][$item['hostid']];
 	$host_name = (new CLinkAction($host['name']))
@@ -224,14 +211,6 @@ foreach ($data['items'] as $itemid => $item) {
 			$item_delay = (new CSpan($item['delay']))->addClass(ZBX_STYLE_RED);
 		}
 
-//		$item_icons = [];
-//		if ($item['status'] == ITEM_STATUS_ACTIVE && $item['error'] !== '') {
-//			$item_icons[] = makeErrorIcon($item['error']);
-//		}
-		
-	//	$graph_item = null;
-	//	if (
-		
 
 		$table_row = new CRow([
 			$checkbox,
@@ -265,8 +244,6 @@ foreach ($data['items'] as $itemid => $item) {
 					(new CUrl('history.php'))
 			  			->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
 			  			->setArgument('itemids[]', $item['itemid'])))
-	//		$actions,
-	//		makeInformationList($item_icons)
 		]);
 	}
 	else {
