@@ -1112,13 +1112,15 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
       //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld HIT!!! ", elem->itemid);
     }
 
-
-    start_fit_idx = glb_cache_find_time_idx(elem, ts_end - ts_start);
-    
     zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld finished timerange fetch, ret is %d, start_idx is %d",elem->itemid, db_ret, start_fit_idx);
     
+    if (-1 == (start_fit_idx = glb_cache_find_time_idx(elem, ts_end - ts_start))) {
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld still not enought data, db fetch FAIL",elem->itemid);
+        return FAIL;
+    };
+    
+    
     glb_cache_fill_values(elem, start_fit_idx, last_fit_idx, values);
-        
     glb_lock_unlock(&elem->lock);
     //zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: %s finished, item %ld, returning %d values ", __func__, elem->itemid, values->values_num);
     
