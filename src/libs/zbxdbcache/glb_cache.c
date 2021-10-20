@@ -537,8 +537,6 @@ static int glb_cache_find_time_idx(glb_cache_elem_t *elem, unsigned int tm_sec) 
     }
 }
 
-
-
 static int glb_cache_value_to_hist_copy(zbx_history_record_t *record, 
                         glb_cache_value_t *c_val, unsigned char value_type) {
     
@@ -568,7 +566,7 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
         break;
      
     default:
-        zabbix_log(LOG_LEVEL_WARNING,"Unknown value type %d", value.type);
+        zabbix_log(LOG_LEVEL_WARNING,"Unknown value type %d", value_type);
         THIS_SHOULD_NEVER_HAPPEN;
         exit(-1);
 
@@ -1114,7 +1112,7 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
       //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld HIT!!! ", elem->itemid);
     }
 
-    
+
     start_fit_idx = glb_cache_find_time_idx(elem, ts_end - ts_start);
     
     zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld finished timerange fetch, ret is %d, start_idx is %d",elem->itemid, db_ret, start_fit_idx);
