@@ -29,7 +29,7 @@
 #include "zbxhistory.h"
 #include "history_compress.h"
 #include "housekeeper.h"
-#include "../../libs/zbxdbcache/valuecache.h"
+#include "../../libs/zbxdbcache/glb_cache.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
@@ -1135,7 +1135,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		records, next_vc_dump_time;
 	double	sec, time_slept, time_now;
 	char	sleeptext[25];
-	zbx_vc_stats_t stats;
+	glb_cache_stats_t stats;
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
@@ -1145,14 +1145,6 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 			server_num, get_process_type_string(process_type), process_num);
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
-
-
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: doing history preloading",__func__);
-	glb_history_preload();
-	zbx_vc_get_statistics(&stats);
-	 
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: finished history preloading, free:%ld% ( %ld MB free out %ld MB total )  ",__func__,(stats.free_size*100)/stats.total_size,
-	stats.free_size/ZBX_MEBIBYTE,stats.total_size/ZBX_MEBIBYTE);
 
 	if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 	{
@@ -1189,17 +1181,17 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 				//dumping value cache
 				next_vc_dump_time = now + CONFIG_VCDUMP_FREQUENCY;
 
-				zbx_vc_stats_t stats;
+				glb_cache_stats_t stats;
 				static u_int64_t old_hits=0, old_misses=0;
-				zbx_vc_get_statistics(&stats);
+				glb_cache_get_statistics(&stats);
 				zabbix_log(LOG_LEVEL_INFORMATION,"Valuecache stats: hits: %ld, misses: %ld, efficiency %ld%%", stats.hits-old_hits, stats.misses-old_misses,  	
 						((stats.hits-old_hits)*100)/(stats.hits-old_hits + stats.misses-old_misses +1 ));
 				old_misses = stats.misses;
 				old_hits = stats.hits;
 
-				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
-				glb_vc_dump_cache();
-				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
+				//zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
+				//glb_vc_dump_cache();
+				//zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
 				
 			}
 			//stats->hits = vc_cache->hits;
@@ -1277,7 +1269,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		DBclose();
 
 		zbx_dc_cleanup_data_sessions();
-		zbx_vc_housekeeping_value_cache();
+		glb_cache_housekeep();
 
 		zbx_setproctitle("%s [deleted %d hist/trends, %d items/triggers, %d events, %d sessions, %d alarms,"
 				" %d audit items, %d records in " ZBX_FS_DBL " sec, %s]",

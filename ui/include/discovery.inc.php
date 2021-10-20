@@ -53,11 +53,11 @@ function discovery_check_type2str($type = null) {
 		SVC_NNTP => _('NNTP'),
 		SVC_IMAP => _('IMAP'),
 		SVC_TCP => _('TCP'),
-		SVC_AGENT => _('Zabbix agent'),
-		SVC_SNMPv1 => _('SNMPv1 agent'),
-		SVC_SNMPv2c => _('SNMPv2 agent'),
-		SVC_SNMPv3 => _('SNMPv3 agent'),
-		SVC_ICMPPING => _('ICMP ping'),
+		SVC_AGENT => _('Agent'),
+		SVC_SNMPv1 => _('SNMPv1'),
+		SVC_SNMPv2c => _('SNMPv2'),
+		SVC_SNMPv3 => _('SNMPv3'),
+		SVC_ICMPPING => _('ICMP'),
 		SVC_TELNET => _('Telnet'),
 		SVC_HTTPS => _('HTTPS')
 	];

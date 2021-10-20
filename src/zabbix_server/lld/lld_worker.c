@@ -139,7 +139,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		hist.flags |= ZBX_DC_FLAG_META;
 	}
 
-	DCconfig_items_apply_changes(&hist,1);
+//	DCconfig_items_apply_changes(&hist,1);
 	DCconfig_clean_items(&item, &errcode, 1);
 out:
 	zbx_free(value);

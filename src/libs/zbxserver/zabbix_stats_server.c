@@ -20,7 +20,7 @@
 #include "common.h"
 #include "zbxjson.h"
 #include "dbcache.h"
-#include "valuecache.h"
+#include "glb_cache.h"
 #include "preproc.h"
 #include "zbxlld.h"
 #include "log.h"
@@ -41,7 +41,7 @@
  ******************************************************************************/
 void	zbx_get_zabbix_stats_ext(struct zbx_json *json)
 {
-	zbx_vc_stats_t	vc_stats;
+	glb_cache_stats_t	vc_stats;
 	zbx_uint64_t	queue_size;
 	char		*error = NULL;
 
@@ -60,7 +60,7 @@ void	zbx_get_zabbix_stats_ext(struct zbx_json *json)
 	zbx_json_adduint64(json, "triggers", DCget_trigger_count());
 
 	/* zabbix[vcache,...] */
-	if (SUCCEED == zbx_vc_get_statistics(&vc_stats))
+	if (SUCCEED == glb_cache_get_statistics(&vc_stats))
 	{
 		zbx_json_addobject(json, "vcache");
 
@@ -77,7 +77,6 @@ void	zbx_get_zabbix_stats_ext(struct zbx_json *json)
 		zbx_json_adduint64(json, "requests", vc_stats.hits + vc_stats.misses);
 		zbx_json_adduint64(json, "hits", vc_stats.hits);
 		zbx_json_adduint64(json, "misses", vc_stats.misses);
-		zbx_json_adduint64(json, "mode", vc_stats.mode);
 		zbx_json_close(json);
 
 		zbx_json_close(json);

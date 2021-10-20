@@ -18,7 +18,7 @@
 **/
 
 #include "common.h"
-#include "valuecache.h"
+#include "glb_cache.h"
 #include "preproc.h"
 #include "zbxlld.h"
 #include "checks_internal.h"
@@ -129,9 +129,9 @@ int	zbx_get_value_internal_ext(const char *param1, const AGENT_REQUEST *request,
 	}
 	else if (0 == strcmp(param1, "vcache"))
 	{
-		zbx_vc_stats_t	stats;
+		glb_cache_stats_t	stats;
 
-		if (FAIL == zbx_vc_get_statistics(&stats))
+		if (FAIL == glb_cache_get_statistics(&stats))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Value cache is disabled."));
 			goto out;
@@ -174,8 +174,8 @@ int	zbx_get_value_internal_ext(const char *param1, const AGENT_REQUEST *request,
 				SET_UI64_RESULT(result, stats.hits + stats.misses);
 			else if (0 == strcmp(param3, "misses"))
 				SET_UI64_RESULT(result, stats.misses);
-			else if (0 == strcmp(param3, "mode"))
-				SET_UI64_RESULT(result, stats.mode);
+	//		else if (0 == strcmp(param3, "mode"))
+	//			SET_UI64_RESULT(result, stats.mode);
 			else
 			{
 				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));

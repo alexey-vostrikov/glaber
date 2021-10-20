@@ -70,28 +70,19 @@ class CHistoryManager {
 	    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
 	  $last_values = $server->getLastValues(CSessionHelper::getId(),array_column($items,'itemid'),$limit, $period); 
 	
-	
-
 	  if (!is_array($last_values)) {
 			return [];
 	  }
 
-	  $i=0;
-
-	 // $result[$value['itemid']] = [];
-
 	  foreach ($last_values as $value) 
 	  {
-			if (!isset($result[$value['itemid']])) 
-				$result[$value['itemid']]=[];
+		
+		if (!isset($result[$value['itemid']])) 
+			$result[$value['itemid']]=[];
 			
-			array_push($result[$value['itemid']], $value);
-			//$result[$value['itemid']][$i]=$value;
-			 //error_log(print_r($result,true));
-			 //$result[$value['itemid']][0]=$value;
-
+		$result[$value['itemid']]  +=  $value['values'];
 	  }
-			
+	
 	  return $result;
 	}
 	
@@ -109,8 +100,8 @@ class CHistoryManager {
 	 *
 	 * @return array|null  Item data at specified time of first data before specified time. null if data is not found.
 	 */
-	public function getValueAt(array $item, $clock, $ns) {
-		return $this->getValueAtFromServer($item, $clock, $ns);
+	public function getValueAt(array $items, $clock, $ns) {
+		return $this->getGraphAggregationByWidthFromServer($items, $clock, $clock+1, 1, 'history');
 	}
 /** interval function calculation is implemented via server's getHistory and applying the proper function */
 private function getGraphAggregationByIntervalFromServer(array $items, $time_from, $time_to, $function, $interval) {
@@ -129,14 +120,12 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 
 	//let's do a bit of calculation and data adoption
 	foreach ($results as $itemid => $itemdata ) {
-		//error_log("Convering data $itemid");
 		foreach ($itemdata['data'] as $value) {
-			//error_log(print_r($value,true));
 			$row=[];
 			$row['itemid'] = $value['itemid'];
 			$row['tick'] = (int)($value['clock'] - (int)$value['clock'] % $interval);
 			$row['clock'] = $value['clock'];
-		
+			
 			switch ($function) {
 				case GRAPH_AGGREGATE_MIN:
 					$row['value'] = $value['min'];
@@ -148,7 +137,7 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 					$row['value'] = $value['avg'];
 					break;
 				case GRAPH_AGGREGATE_COUNT:
-					$row['value'] = $value['count'];
+					$row['count'] = $value['count'];
 					break;
 				case GRAPH_AGGREGATE_SUM:
 					$row['value'] = $value['count']*$value['avg'];
@@ -207,7 +196,6 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 		$agg_results = [];
 		
 		$agg_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"history_agg");
-		
 
 		foreach ($items as $item) {
 		
@@ -219,10 +207,7 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 			
 			if (isset($agg_results[$item['itemid']]['data']) && is_array($agg_results[$item['itemid']]['data'])) {
 			
-				
 				$results[$item['itemid']]['data'] += $agg_results[$item['itemid']]['data'];
-
-
 
 				foreach ( $agg_results[$item['itemid']]['data'] as $value) {
 					if ( $value['clock'] < $history_start ) 
@@ -254,9 +239,8 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 					}
 				}
 			} 
-
-		
 		}
+	//	error_log("getGraphAggregationByWidth:". print_r($results,true));
 		return $results;
 	}
 	
@@ -269,7 +253,7 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), ZBX_SOCKET_BYTES_LIMIT);  
 			$results[$item['itemid']]['data'] = $server->getHistoryData(CSessionHelper::getId(), $item['itemid'], $time_from, $time_to, $aggregates, $source); 
-			
+		
 		}
 		return $results;
 	}

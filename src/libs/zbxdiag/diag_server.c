@@ -20,11 +20,10 @@
 #include "common.h"
 #include "zbxalgo.h"
 #include "memalloc.h"
-#include "../../libs/zbxdbcache/valuecache.h"
+#include "../../libs/zbxdbcache/glb_cache.h"
 #include "zbxlld.h"
 #include "zbxalert.h"
 #include "zbxdiag.h"
-
 #include "diag.h"
 
 /******************************************************************************
@@ -36,8 +35,8 @@
  ******************************************************************************/
 static int	diag_valuecache_item_compare_values(const void *d1, const void *d2)
 {
-	zbx_vc_item_stats_t	*i1 = *(zbx_vc_item_stats_t **)d1;
-	zbx_vc_item_stats_t	*i2 = *(zbx_vc_item_stats_t **)d2;
+	glb_cache_item_stats_t	*i1 = *(glb_cache_item_stats_t **)d1;
+	glb_cache_item_stats_t	*i2 = *(glb_cache_item_stats_t **)d2;
 
 	return i2->values_num - i1->values_num;
 }
@@ -49,13 +48,13 @@ static int	diag_valuecache_item_compare_values(const void *d1, const void *d2)
  * Purpose: sort itemid,values_num pair by hourly_num in descending order     *
  *                                                                            *
  ******************************************************************************/
-static int	diag_valuecache_item_compare_hourly(const void *d1, const void *d2)
-{
-	zbx_vc_item_stats_t	*i1 = *(zbx_vc_item_stats_t **)d1;
-	zbx_vc_item_stats_t	*i2 = *(zbx_vc_item_stats_t **)d2;
+//static int	diag_valuecache_item_compare_hourly(const void *d1, const void *d2)
+//{
+//	zbx_vc_item_stats_t	*i1 = *(zbx_vc_item_stats_t **)d1;
+//	zbx_vc_item_stats_t	*i2 = *(zbx_vc_item_stats_t **)d2;
 
-	return i2->hourly_num - i1->hourly_num;
-}
+//	return i2->hourly_num - i1->hourly_num;
+//}
 
 /******************************************************************************
  *                                                                            *
@@ -64,7 +63,7 @@ static int	diag_valuecache_item_compare_hourly(const void *d1, const void *d2)
  * Purpose: add valuecache items diagnostic statistics to json                *
  *                                                                            *
  ******************************************************************************/
-static void	diag_valuecache_add_items(struct zbx_json *json, const char *field, zbx_vc_item_stats_t **items,
+static void	diag_valuecache_add_items(struct zbx_json *json, const char *field, glb_cache_item_stats_t **items,
 		int items_num)
 {
 	int	i;
@@ -76,7 +75,6 @@ static void	diag_valuecache_add_items(struct zbx_json *json, const char *field, 
 		zbx_json_addobject(json, NULL);
 		zbx_json_addint64(json, "itemid", items[i]->itemid);
 		zbx_json_addint64(json, "values", items[i]->values_num);
-		zbx_json_addint64(json, "request.values", items[i]->hourly_num);
 		zbx_json_close(json);
 	}
 	zbx_json_close(json);
@@ -123,7 +121,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			int		mode;
 
 			time1 = zbx_time();
-			zbx_vc_get_diag_stats(&items_num, &values_num, &mode);
+			glb_cache_get_diag_stats(&items_num, &values_num, &mode);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -131,8 +129,8 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 				zbx_json_addint64(json, "items", items_num);
 			if (0 != (fields & ZBX_DIAG_VALUECACHE_VALUES))
 				zbx_json_addint64(json, "values", values_num);
-			if (0 != (fields & ZBX_DIAG_VALUECACHE_MODE))
-				zbx_json_addint64(json, "mode", mode);
+		//	if (0 != (fields & ZBX_DIAG_VALUECACHE_MODE))
+		//		zbx_json_addint64(json, "mode", mode);
 		}
 
 		if (0 != (fields & ZBX_DIAG_VALUECACHE_MEMORY))
@@ -140,7 +138,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			zbx_mem_stats_t	mem;
 
 			time1 = zbx_time();
-			zbx_vc_get_mem_stats(&mem);
+			glb_cache_get_mem_stats(&mem);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -155,7 +153,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			zbx_vector_ptr_create(&items);
 
 			time1 = zbx_time();
-			zbx_vc_get_item_stats(&items);
+			glb_cache_get_item_stats(&items);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -170,10 +168,10 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 				{
 					zbx_vector_ptr_sort(&items, diag_valuecache_item_compare_values);
 				}
-				else if (0 == strcmp(map->name, "request.values"))
-				{
-					zbx_vector_ptr_sort(&items, diag_valuecache_item_compare_hourly);
-				}
+		//		else if (0 == strcmp(map->name, "request.values"))
+		//		{
+		//			zbx_vector_ptr_sort(&items, diag_valuecache_item_compare_hourly);
+		//		}
 				else
 				{
 					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
@@ -182,7 +180,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 				}
 
 				limit = MIN((int)map->value, items.values_num);
-				diag_valuecache_add_items(json, map->name, (zbx_vc_item_stats_t **)items.values, limit);
+				diag_valuecache_add_items(json, map->name, (glb_cache_item_stats_t **)items.values, limit);
 			}
 			zbx_json_close(json);
 

@@ -211,6 +211,7 @@ typedef enum
 	ITEM_TYPE_SCRIPT	/* 21 */
 }
 zbx_item_type_t;
+
 //this looks much more informative
 #define ITEM_TYPE_AGENT ITEM_TYPE_ZABBIX
 

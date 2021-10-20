@@ -203,7 +203,7 @@
 #define ZBX_PROTO_VALUE_GET_QUEUE		"queue.get"
 #define ZBX_PROTO_VALUE_GET_STATUS		"status.get"
 #define ZBX_PROTO_VALUE_GET_HISTORY		"history.get"
-#define ZBX_PROTO_VALUE_GET_LASTVALUES	"lastvalues.get"
+//#define ZBX_PROTO_VALUE_GET_LASTVALUES	"lastvalues.get"
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"
 #define ZBX_PROTO_VALUE_CLUSTER_TOPOLGY		"cluster_topology"

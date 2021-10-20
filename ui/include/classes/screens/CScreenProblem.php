@@ -1269,11 +1269,11 @@ class CScreenProblem extends CScreenBase {
 	 *
 	 * @return array|string
 	 */
-	public static function getLatestValues(array $items, bool $html = true) {
+	public static function getLatestValues(array $items, bool $html = true, int $count = -1 ) {
 		$latest_values = [];
 
 		$items = zbx_toHash($items, 'itemid');
-		$history_values = Manager::History()->getLastValues($items, 1, timeUnitToSeconds(CSettingsHelper::get(
+		$history_values = Manager::History()->getLastValues($items, $count , timeUnitToSeconds(CSettingsHelper::get(
 			CSettingsHelper::HISTORY_PERIOD
 		)));
 
@@ -1282,15 +1282,14 @@ class CScreenProblem extends CScreenBase {
 		}
 
 		foreach ($items as $itemid => $item) {
-			if (array_key_exists($itemid, $history_values) && isset($history_values[$itemid])) {
+			if (array_key_exists($itemid, $history_values) && isset($history_values[$itemid][0] )) {
 				$last_value = array();
 				$last_value = $history_values[$itemid][0];
 				
 				$last_value['value'] = formatHistoryValue(str_replace(["\r\n", "\n"], [" "], $last_value['value']),
 					$item);
-				if ( isset($last_value['error']) && strlen($last_value['error']) >0 ) {
-					#$last_value['value'] = ;
-					$last_value['value'] = (new CSpan(UNRESOLVED_MACRO_STRING))
+				if ( isset($item['error']) && strlen($item['error']) >0 ) {
+					 $last_value['value'] = (new CSpan(UNRESOLVED_MACRO_STRING))
 							->addClass(ZBX_STYLE_RED);
 							
 				} else 
@@ -1333,7 +1332,12 @@ class CScreenProblem extends CScreenBase {
 									->getUrl()
 								)
 								: _('History'))
-					)
+					),
+//					new CCol(new CObject('<svg height="200" width="500" viewBox="0 0 200 50" preserveAspectRatio="none">
+//					<polyline points="20,20 40,25 60,40 80,120 120,140 200,50" style="fill:none;stroke:black;stroke-width:3" />
+//					Sorry, your browser does not support inline SVG.
+//				  </svg>')
+//				  )
 				]);
 
 				$latest_values[] = (new CLinkAction($last_value['value']))
@@ -1352,6 +1356,7 @@ class CScreenProblem extends CScreenBase {
 				->addClass('main-hint')
 				->setHint($hint_table)
 			);
+			
 
 			return $latest_values;
 		}

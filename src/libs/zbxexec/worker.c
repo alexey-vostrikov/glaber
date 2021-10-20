@@ -364,6 +364,8 @@ static void worker_cleanup(GLB_EXT_WORKER *worker)
 
     //restore the flags
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
+    zabbix_log(LOG_LEVEL_DEBUG, "%s, finished", __func__);
+
 }
 
 GLB_EXT_WORKER *glb_get_worker_script(char *cmd)
@@ -508,7 +510,7 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
     
     while (1) { //we might need to repeat data 
     
-        //logic is following - if have any complete data redy in the buffer, send it right away
+        //if have any complete data redy in the buffer, send it right away
         if ( datapresent ) {
             //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() there are data buffered ", __func__);
             if ( NULL != (request_end = strstr(circle_buffer + start, delim) )) {
@@ -725,11 +727,7 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
 
         if (in_string[in] == '\"')
         {
-
-       //     if (0 < in && in_string[in - 1] != '\\')
-         //   {
             out_buffer[out++] = '\\';
-           // }
             out_buffer[out++] = in_string[in++];
         }
         else if (in_string[in] == 10)

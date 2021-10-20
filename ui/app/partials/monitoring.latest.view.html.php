@@ -52,12 +52,11 @@ if ($data['filter']['show_details']) {
 		(new CColHeader(_('History')))->addStyle('width: 5%'),
 		(new CColHeader(_('Trends')))->addStyle('width: 5%'),
 		(new CColHeader(_('Type')))->addStyle('width: 8%'),
-		(new CColHeader(_('Last check')))->addStyle('width: 14%'),
+		(new CColHeader(_('Last response')))->addStyle('width: 14%'),
 		(new CColHeader(_('Last value')))->addStyle('width: 14%'),
 		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
-		(new CColHeader())->addStyle('width: 6%'),
-		(new CColHeader(_('Info')))->addStyle('width: 35px')
+		(new CColHeader())->addStyle('width: 100px'),
 	]);
 }
 else {
@@ -65,11 +64,11 @@ else {
 		$col_check_all->addStyle('width: 15px'),
 		$col_host->addStyle('width: 17%'),
 		$col_name->addStyle('width: 40%'),
-		(new CColHeader(_('Last check')))->addStyle('width: 14%'),
+		(new CColHeader(_('Last response')))->addStyle('width: 20%'),
 		(new CColHeader(_('Last value')))->addStyle('width: 14%'),
 		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
-		(new CColHeader())->addStyle('width: 6%')
+		(new CColHeader())->addStyle('width: 100px')
 	]);
 }
 
@@ -85,74 +84,64 @@ foreach ($data['items'] as $itemid => $item) {
 		($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null
 	]))->addClass('action-container');
 
-	$history = $data['history'];
-	//show_error_message("Last history:'".print_r($history,true)."'");
+	$item_hist = [];
 
-	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
-	$prevHistory = [];//isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
+	$last_history = array_key_exists($itemid, $data['history'])
+		? ((count($data['history'][$itemid]) > 0) ? $data['history'][$itemid][0] : null)
+		: null;
 
-	if (isset($lastHistory['prevvalue']) && isset($lastHistory['prevclock']) && $lastHistory['prevclock'] > 0 ) {
-		$prevHistory['value'] = $lastHistory['prevvalue'];
-		$prevHistory['clock'] = $lastHistory['prevclock'];
-		//show_error_message("Last history:'".print_r($prevHistory,true)."'");
-	}
 	
-	//show_error_message("Prev history:'".print_r($history,true)."'");
-	
-	if ($lastHistory) {
-			$last_check = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $lastHistory['clock']);
-		
-		if ( isset($lastHistory['nextcheck']) && $lastHistory['nextcheck'] > 0 )
-				$last_check = (new CSpan($last_check))
-						->addClass(ZBX_STYLE_LINK_ACTION)
-						->setHint("Next: ". zbx_date2str(DATE_TIME_FORMAT_SECONDS,$lastHistory['nextcheck']), 'hintbox-wrap');
-
-		if ($lastHistory['clock'] > 0 ) {
-			if (isset($lastHistory['error']) &&  strlen($lastHistory['error'])>0 ) {
-				$last_value = (new CSpan('UNSUPPORTED'))
-					->addClass(ZBX_STYLE_RED)
-					->addClass(ZBX_STYLE_LINK_ACTION)
-					->setHint($lastHistory['error'], 'hintbox-wrap');
-			} else {
-				$last_value = formatHistoryValue($lastHistory['value'], $item, false);
-				if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
+	if ($last_history) {
+			$item_hist = $data['history'][$itemid];
+			$prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
+			$last_check = zbx_date2age($last_history['clock']);
+			
+			$last_value = formatHistoryValue($last_history['value'], $item, false);
+			if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
 					 ITEM_VALUE_TYPE_LOG == $item['value_type'] ) && 
 					 mb_strlen($last_value) > 20 ) {
 						$last_value = (new CSpan($last_value))
 							->addClass(ZBX_STYLE_LINK_ACTION)
-							->setHint($lastHistory['value'], 'hintbox-wrap');
+							->setHint($last_history['value'], 'hintbox-wrap');
 					 }
-
-			}
-			
-		} else $last_value='';
-
-		$change = '';
-
-		if ( $lastHistory['clock'] > 0 &&
-			(!isset($lastHistory['error']) || strlen($lastHistory['error']) <1 ) && 
-		    isset($prevHistory) && isset($prevHistory['value']) &&
-			in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]) ) {
-			$history_diff = $lastHistory['value'] - $prevHistory['value'];
-
-			if ($history_diff != 0) {
-				if ($history_diff > 0) {
-					$change = '+';
+			$change = '';
+	
+			if ($prev_history && in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64])) {
+				$history_diff = $last_history['value'] - $prev_history['value'];
+	
+				if ($history_diff != 0) {
+					if ($history_diff > 0) {
+						$change = '+';
+					}
+	
+					// The change must be calculated as uptime for the 'unixtime'.
+					$change .= convertUnits([
+						'value' => $history_diff,
+						'units' => ($item['units'] === 'unixtime') ? 'uptime' : $item['units']
+					]);
 				}
-
-				// The change must be calculated as uptime for the 'unixtime'.
-				$change .= convertUnits([
-					'value' => $history_diff,
-					'units' => ($item['units'] === 'unixtime') ? 'uptime' : $item['units']
-				]);
 			}
+	} else if (isset($item['error']) && $item['state'] == ITEM_STATE_NOTSUPPORTED ) {
+			$last_value = $last_value = (new CSpan('UNSUPPORTED'))
+				->addClass(ZBX_STYLE_RED)
+				->addClass(ZBX_STYLE_LINK_ACTION)
+				->setHint($item['error'], 'hintbox-wrap');
+			if ($item['lastdata'] > 0 ) 
+				$last_check = zbx_date2age($item['lastdata']);
+			else 
+				$last_check ='';
+			$change = '';
+	} else {
+			$last_check = '';
+			$last_value = '';
+			$change = '';
 		}
-	}
-	else {
-		$last_check = '';
-		$last_value = '';
-		$change = '';
-	}
+		
+	if ( isset($item['nextcheck']) && $item['nextcheck'] > 0 )
+		$last_check = (new CSpan($last_check))
+				->addClass(ZBX_STYLE_LINK_ACTION)
+				->setHint("Next request in: ". zbx_date2age( 2 * time() - $item['nextcheck'] ), 'hintbox-wrap');
+
 
 	// Other row data preparation.
 	if ($data['config']['hk_history_global']) {
@@ -187,21 +176,13 @@ foreach ($data['items'] as $itemid => $item) {
 		$item_trends = '';
 	}
 
-	if ($keep_history != 0 || $keep_trends != 0) {
-		$actions = new CLink($is_graph ? _('Graph') : _('History'), (new CUrl('history.php'))
-			->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
-			->setArgument('itemids[]', $item['itemid'])
-		);
-	}
-	else {
-		$actions = '';
-	}
-
 	$host = $data['hosts'][$item['hostid']];
 	$host_name = (new CLinkAction($host['name']))
 		->addClass($host['status'] == HOST_STATUS_NOT_MONITORED ? ZBX_STYLE_RED : null)
 		->setMenuPopup(CMenuPopupHelper::getHost($item['hostid']));
 
+
+		
 	if ($data['filter']['show_details']) {
 
 		$item_config_url = (new CUrl('items.php'))
@@ -230,25 +211,39 @@ foreach ($data['items'] as $itemid => $item) {
 			$item_delay = (new CSpan($item['delay']))->addClass(ZBX_STYLE_RED);
 		}
 
-		$item_icons = [];
-		if ($item['status'] == ITEM_STATUS_ACTIVE && $item['error'] !== '') {
-			$item_icons[] = makeErrorIcon($item['error']);
-		}
 
 		$table_row = new CRow([
 			$checkbox,
 			$host_name,
 			(new CCol([$item_name, $item_key]))->addClass($state_css),
 			(new CCol($item_delay))->addClass($state_css),
-			(new CCol($item_history))->addClass($state_css),
-			(new CCol($item_trends))->addClass($state_css),
+			(new CCol( $keep_history > 0 ?
+				 (new CSpan(""))
+					->setAttribute("data-indicator","mark")
+					->setAttribute("data-indicator-value",1)
+				: null
+				))->addClass($state_css),
+			(new CCol(
+				$keep_trends > 0 ?
+				(new CSpan(""))
+				   ->setAttribute("data-indicator","mark")
+				   ->setAttribute("data-indicator-value",1)
+			   : null
+			   
+			))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
 			(new CCol($last_check))->addClass($state_css),
-			(new CCol($last_value))->addClass($state_css),
+			(new CCol())->addClass($state_css)
+				->addItem(new CDiv($last_value)),
+
 			(new CCol($change))->addClass($state_css),
 			$data['tags'][$itemid],
-			$actions,
-			makeInformationList($item_icons)
+			(new CCol())
+				->addClass(ZBX_STYLE_CENTER)
+				->addItem( new CLink(($is_graph && count($item_hist) > 0) ? (new CSVGSmallGraph($item_hist,50,200)) : _('History'),
+					(new CUrl('history.php'))
+			  			->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
+			  			->setArgument('itemids[]', $item['itemid'])))
 		]);
 	}
 	else {
@@ -260,7 +255,14 @@ foreach ($data['items'] as $itemid => $item) {
 			(new CCol($last_value))->addClass($state_css),
 			(new CCol($change))->addClass($state_css),
 			$data['tags'][$itemid],
-			$actions
+			(new CCol())
+				->addClass(ZBX_STYLE_CENTER)
+				->addItem( new CLink(($is_graph && count($item_hist) > 0) ? (new CSVGSmallGraph($item_hist,50,200)) : _('History'),
+					(new CUrl('history.php'))
+						->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
+			  			->setArgument('itemids[]', $item['itemid'])) )
+			
+			
 		]);
 	}
 

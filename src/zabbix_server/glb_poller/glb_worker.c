@@ -100,6 +100,7 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
     int ret = FAIL, i;
     zabbix_log(LOG_LEVEL_DEBUG,"Staring %s",__func__);
     zabbix_log(LOG_LEVEL_DEBUG,"Item key is %s",dc_item->key_orig);
+    
     init_request(&request);
 
     cmd = (char *)zbx_malloc(cmd, cmd_alloc);
@@ -120,7 +121,10 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
     
     //itemid is always needed in dynamic params, generating new list only having dynamic data
     zbx_snprintf_alloc(&cmd,&cmd_alloc,&cmd_offset,"%s/%s", CONFIG_WORKERS_DIR, get_rkey(&request));
+    
+    zbx_heap_strpool_release(worker_item->full_cmd);
     worker_item->full_cmd = zbx_heap_strpool_intern(cmd);
+    
     worker_item->workerid = (u_int64_t)worker_item->full_cmd;
     
     zbx_snprintf_alloc(&key_dyn, &dyn_alloc, &dyn_offset, "'%ld'", dc_item->itemid);
@@ -139,6 +143,10 @@ unsigned int glb_worker_init_item(DC_ITEM *dc_item, GLB_WORKER_ITEM *worker_item
     
     zbx_snprintf_alloc(&key_dyn, &dyn_alloc, &dyn_offset, "\n");
     zabbix_log(LOG_LEVEL_DEBUG,"Parsed params: %s", key_dyn);
+    
+    if (NULL != worker_item->params_dyn) 
+        zbx_free(key_dyn);
+    
     worker_item->params_dyn = key_dyn;
        
     free_request(&request);

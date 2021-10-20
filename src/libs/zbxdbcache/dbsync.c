@@ -1514,8 +1514,8 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	if (item->history != (0 != history_sec))
 		return FAIL;
 
-	if (history_sec != item->history_sec)
-		return FAIL;
+	//if (history_sec != item->history_sec)
+	//	return FAIL;
 
 	if (FAIL == dbsync_compare_uchar(dbrow[24], item->inventory_link))
 		return FAIL;

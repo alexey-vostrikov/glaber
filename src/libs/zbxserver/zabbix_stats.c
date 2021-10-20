@@ -21,7 +21,7 @@
 #include "zbxjson.h"
 #include "dbcache.h"
 #include "zbxself.h"
-#include "valuecache.h"
+#include "glb_cache.h"
 #include "../../zabbix_server/vmware/vmware.h"
 #include "preproc.h"
 #include "zbxtrends.h"

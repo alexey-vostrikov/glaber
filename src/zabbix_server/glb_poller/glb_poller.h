@@ -45,6 +45,7 @@ typedef struct
 	unsigned int poll_items;
 	unsigned int items;
 	unsigned char fails;
+	unsigned int first_fail;
 	time_t disabled_till;
 
 } GLB_POLLER_HOST;
@@ -92,6 +93,8 @@ typedef struct {
 
 int event_elem_compare(const void *d1, const void *d2);
 void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
+void add_host_succeed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
+
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, DC_ITEM *dc_item, void *poll_engine);
 

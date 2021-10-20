@@ -23,7 +23,6 @@
 #include "zbxhistory.h"
 #include "history.h"
 #include "module.h"
-#include "../zbxdbcache/valuecache.h"
 #include "../zbxalgo/vectorimpl.h"
 
 
@@ -158,7 +157,7 @@ void glb_history_destroy(void)
  * Comments: add history values to the configured storage backends                  *
  *                                                                                  *
  ************************************************************************************/
-int	glb_history_add(const zbx_vector_ptr_t *history)
+int	glb_history_add(ZBX_DC_HISTORY *history, int history_num)
 {
 	int	j,  ret = SUCCEED;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -169,7 +168,7 @@ int	glb_history_add(const zbx_vector_ptr_t *history)
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values[j];
 		glb_history_add_func_t write_values = callback->callback;
 		
-		write_values(callback->callbackData, history);
+		write_values(callback->callbackData, history, history_num);
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -249,9 +248,9 @@ int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, i
 
 	}
 
-	if ( !enabled_gets && GLB_HISTORY_GET_NON_INTERACTIVE == interactive   ) 
-		return SUCCEED;
-
+	if ( !enabled_gets && GLB_HISTORY_GET_NON_INTERACTIVE == interactive   ) {
+		return FAIL;
+	}
 	//whoever first gets the data, it's rusult is used 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
 

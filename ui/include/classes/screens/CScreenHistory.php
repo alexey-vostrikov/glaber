@@ -205,6 +205,7 @@ class CScreenHistory extends CScreenBase {
 			} else {
 				$this->dataId = 'text';
 			}
+
 			/**
 			 * View type: As plain text.
 			 * Item type: numeric (unsigned, char), float, text, log.
@@ -231,12 +232,14 @@ class CScreenHistory extends CScreenBase {
 					$options['itemids'] = $itemids;
 					
 					$item_data = API::History()->get($options);
+			
 
 					if ($item_data) {
 						$history_data = array_merge($history_data, $item_data);
 					}
 				}
-								
+					
+				
 				CArrayHelper::sort($history_data, [
 					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
 					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
@@ -318,6 +321,7 @@ class CScreenHistory extends CScreenBase {
 					$options['history'] = $value_type;
 					$options['itemids'] = $itemids;
 					$item_data = API::History()->get($options);
+					$this->filterDataArray($item_data);
 
 					if ($item_data) {
 						$history_data = array_merge($history_data, $item_data);
@@ -343,40 +347,11 @@ class CScreenHistory extends CScreenBase {
 
 					$item = $items[$data['itemid']];
 					$host = reset($item['hosts']);
-					$color = null;
-
-					if ($this->filter !== '') {
-						$haystack = mb_strtolower($data['value']);
-						$needle = mb_strtolower($this->filter);
-						$pos = mb_strpos($haystack, $needle);
-
-						if ($pos !== false && $this->filterTask == FILTER_TASK_MARK) {
-							$color = $this->markColor;
-						}
-						elseif ($pos === false && $this->filterTask == FILTER_TASK_INVERT_MARK) {
-							$color = $this->markColor;
-						} 
-
-						if ($pos !== false && $this->filterTask == FILTER_TASK_HIDE) {
-							continue;
-						}
-						if ($pos == false && $this->filterTask == FILTER_TASK_SHOW ) {
-							continue;
-						}
-
-						switch ($color) {
-							case MARK_COLOR_RED:
-								$color = ZBX_STYLE_RED;
-								break;
-							case MARK_COLOR_GREEN:
-								$color = ZBX_STYLE_GREEN;
-								break;
-							case MARK_COLOR_BLUE:
-								$color = ZBX_STYLE_BLUE;
-								break;
-						}
-					}
-
+					
+					isset($data['color'] )
+						? $color = $data['color']
+						: $color = null;
+					
 					$row = [];
 
 					$row[] = (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock'])))
@@ -442,6 +417,7 @@ class CScreenHistory extends CScreenBase {
 					$options['history'] = $value_type;
 					$options['itemids'] = $itemids;
 					$item_data = API::History()->get($options);
+					$this->filterDataArray($item_data);
 
 					if ($item_data) {
 						$history_data = array_merge($history_data, $item_data);
@@ -489,7 +465,9 @@ class CScreenHistory extends CScreenBase {
 					$options['itemids'] = [$item['itemid']];
 					$options['history'] = $item['value_type'];
 					$item_data = API::History()->get($options);
-
+			
+					$this->filterDataArray($item_data);
+					
 					CArrayHelper::sort($item_data, [
 						['field' => 'clock', 'order' => ZBX_SORT_DOWN],
 						['field' => 'ns', 'order' => ZBX_SORT_DOWN]
@@ -618,6 +596,65 @@ class CScreenHistory extends CScreenBase {
 		}
 
 		return $output;
+	}
+
+	/**
+	 * Does filtering of the data is filter is set
+	 *
+	 * @param array $history_data
+	 * @param array $filter
+	 * @param int $filterTask
+	 *
+	 * 
+	 */
+	
+ 	protected function filterDataArray(array &$history_data = null) {
+
+		if ( $this->filterTask != FILTER_TASK_HIDE &&
+			 $this->filterTask != FILTER_TASK_HIDE &&  
+			 $this->filterTask != FILTER_TASK_INVERT_MARK &&
+			 $this->filterTask != FILTER_TASK_MARK)
+				return;
+		
+			 if ($this->filter == '')
+			return;
+
+		if (null == $history_data)
+			return;
+
+		$needle = mb_strtolower($this->filter);
+		
+		foreach ($history_data as $key => $data) {
+
+			$haystack = mb_strtolower($data['value']);
+			$pos = mb_strpos($haystack, $needle);
+			$color = null;
+
+			if ($pos !== false && $this->filterTask == FILTER_TASK_MARK) {
+				$color = $this->markColor;
+			} elseif ($pos === false && $this->filterTask == FILTER_TASK_INVERT_MARK) {
+				$color = $this->markColor;
+			} elseif ($pos !== false && $this->filterTask == FILTER_TASK_HIDE) {
+				unset($history_data[$key]);
+				continue;
+			}
+			if ($pos == false && $this->filterTask == FILTER_TASK_SHOW ) {
+				unset($history_data[$key]);
+				continue;
+			}
+
+			switch ($color) {
+				case MARK_COLOR_RED:
+					$history_data[$key]['color'] = ZBX_STYLE_RED;
+					break;
+				case MARK_COLOR_GREEN:
+					$history_data[$key]['color'] = ZBX_STYLE_GREEN;
+					break;
+				case MARK_COLOR_BLUE:
+					$history_data[$key]['color'] = ZBX_STYLE_BLUE;
+					break;
+			}
+		}
 	}
 
 	/**

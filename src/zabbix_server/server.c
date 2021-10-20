@@ -69,7 +69,6 @@
 #include "reporter/report_manager.h"
 #include "reporter/report_writer.h"
 #include "events.h"
-#include "../libs/zbxdbcache/valuecache.h"
 #include "setproctitle.h"
 #include "zbxcrypto.h"
 #include "zbxipcservice.h"
@@ -80,6 +79,8 @@
 #include "zbxdiag.h"
 #include "zbxtrends.h"
 #include "../libs/zbxexec/worker.h"
+#include "../libs/zbxipcservice/glb_ipc.h"
+#include "../libs/zbxdbcache/glb_cache.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -251,9 +252,11 @@ zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TREND_FUNC_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
-zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 512 * ZBX_MEBIBYTE;
+u_int64_t			CONFIG_VALUE_CACHE_SIZE		= 512 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_EXPORT_FILE_SIZE		= ZBX_GIBIBYTE;
+u_int64_t 		CONFIG_IPC_BUFFER_SIZE		= 512 * ZBX_MEBIBYTE; 
+
 
 int	CONFIG_UNREACHABLE_PERIOD	= 45;
 int	CONFIG_UNREACHABLE_DELAY	= 15;
@@ -837,7 +840,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"StartPingers",		&CONFIG_PINGER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},	
 		{"StartGlbSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
-			PARM_OPT,	0,			10},
+			PARM_OPT,	0,			32},
 		{"SNMPMaxContention",		&CONFIG_GLB_SNMP_CONTENTION,			TYPE_INT,
 			PARM_OPT,	1,			32},
 		{"StartGlbAgentPollers",		&CONFIG_GLB_AGENT_FORKS,			TYPE_INT,
@@ -888,6 +891,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
+		{"IPCBufferSize",		&CONFIG_IPC_BUFFER_SIZE,		TYPE_UINT64,
+			PARM_OPT,	1024*1024,			__UINT64_C(64) * ZBX_GIBIBYTE},	
 		{"CacheUpdateFrequency",	&CONFIG_CONFSYNCER_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	1,			SEC_PER_HOUR},
 		{"QueuesUpdateFrequency",	&CONFIG_GLB_REQUEUE_TIME,		TYPE_INT,
@@ -1398,15 +1403,32 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	if (SUCCEED != zbx_vc_init(&error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history value cache: %s", error);
-		zbx_free(error);
-		exit(EXIT_FAILURE);
-	}
+//	if (SUCCEED != zbx_vc_init(&error))
+//	{
+//		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history value cache: %s", error);
+//		zbx_free(error);
+//		exit(EXIT_FAILURE);
+//	}
 
 	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_vc_load_cache()) {
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
+		exit(EXIT_FAILURE);
+	}
+
+	//IPC init, //TODO: when ipc mechanics is ready, make number of
+	//IPC queues configurable by the config file
+	glb_ipc_type_cfg_t comm_types[] = {
+		{ GLB_IPC_PROCESSING, 1024*1024, CONFIG_PREPROCMAN_FORKS },
+		{ GLB_IPC_NONE, 0 } //last should be none
+	};
+
+	if (FAIL == glb_ipc_init((glb_ipc_type_cfg_t *)&comm_types)) {
+		zbx_error("Cannot initialize Glaber IPC services");
+		exit(EXIT_FAILURE);
+	}
+
+	if (FAIL == glb_cache_init()) {
+		zbx_error("Cannot initialize Glaber CACHE");
 		exit(EXIT_FAILURE);
 	}
 
@@ -1538,7 +1560,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 				DBclose();
 
-				zbx_vc_enable();
+//				zbx_vc_enable();
 				break;
 			case ZBX_PROCESS_TYPE_POLLER:
 				poller_type = ZBX_POLLER_TYPE_NORMAL;
@@ -1732,7 +1754,10 @@ void	zbx_on_exit(int ret)
 	free_configuration_cache();
 
 	/* free history value cache */
-	zbx_vc_destroy();
+//	zbx_vc_destroy();
+	
+	glb_cache_destroy();
+	glb_ipc_destroy();
 
 	zbx_destroy_itservices_lock();
 

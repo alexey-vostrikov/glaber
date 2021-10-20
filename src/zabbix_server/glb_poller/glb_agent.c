@@ -393,6 +393,8 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 	
 					zbx_preprocess_item_value(glb_poller_item->hostid, glb_poller_item->itemid, glb_poller_item->value_type, 
                                                 glb_poller_item->flags , &result , &timespec, ITEM_STATE_NORMAL, NULL);
+					add_host_succeed(conf->hosts,glb_poller_item->hostid,timespec.sec);
+					
     				free_result(&result);
 
 					zabbix_log(LOG_LEVEL_DEBUG, "Agent item %ld data parsed, type os set, resp is: %s", glb_poller_item->itemid, tmp_s.buffer);
@@ -433,6 +435,9 @@ unsigned int glb_agent_init_item(DC_ITEM *dc_item, GLB_AGENT_ITEM *glb_agent_ite
 	unsigned int interface_port;
 	const char *key; //item key value (strpooled)
 
+	zbx_heap_strpool_release(glb_agent_item->interface_addr);
+	zbx_heap_strpool_release(glb_agent_item->key);
+	
 	glb_agent_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
 	glb_agent_item->key = zbx_heap_strpool_intern(dc_item->key);
 	glb_agent_item->interface_port = dc_item->interface.port;

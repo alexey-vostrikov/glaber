@@ -99,16 +99,21 @@ typedef struct
 	const char		*error;
 	const char		*delay;
 	ZBX_DC_TRIGGER		**triggers;
+	
+	//this 3 fields are state fields and should 
+	//be moved to cache rather than to the config
+	//however getting rid of the nextcheck will require to all the items
+	//queueing to be refactored (probably, the individual queues should be used)
 	int			nextcheck;
-	int			mtime;
 	int			data_expected_from;
-	int			history_sec;
+	//int			history_sec;
+
+	int			mtime;
 	unsigned char		history;
 	unsigned char		type;
 	unsigned char		value_type;
 	unsigned char		poller_type;
-	unsigned char		state;
-	unsigned char		db_state;
+	//unsigned char		db_state;
 	unsigned char		inventory_link;
 	unsigned char		location;
 	unsigned char		flags;
@@ -119,12 +124,6 @@ typedef struct
 	zbx_uint64_t		templateid;
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
 	
-	//TODO: move to global state or consider thinking of arch when it's kept here
-	history_value_t		lastvalue;	//yea, i know there is a value cache, but this to have a faster access
-	history_value_t		prevvalue;
-	u_int64_t			lastclock;
-	u_int64_t			prevclock;
-
 	zbx_vector_ptr_t	tags;
 }
 ZBX_DC_ITEM;
