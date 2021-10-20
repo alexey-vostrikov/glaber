@@ -934,11 +934,19 @@ int glb_cache_fill_values(glb_cache_elem_t *elem, int count, int end_idx, zbx_ve
     glb_cache_value_t *c_val;
     zbx_history_record_t	record;
 
- //   zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld: filling %d items, oldest idx is %d", elem->itemid, count, end_idx);
+    zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld: filling %d items, oldest idx is %d", elem->itemid, count, end_idx);
     int start_idx =(end_idx - count + 1 + elem->values->elem_num) % elem->values->elem_num;
     
+    if (0 > end_idx) {
+        zabbix_log(LOG_LEVEL_WARNING,"%s: improper start index, FAILing, this is a programming bug ");
+        
+        THIS_SHOULD_NEVER_HAPPEN;
+        exit(-1);
+
+    }
+
     //selfcheck
-    if (elem->values->first_idx  )
+    //if (elem->values->first_idx  )
 
     zbx_vector_history_record_clear(values);
 
@@ -1106,21 +1114,39 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
              glb_lock_unlock(&elem->lock);
              return FAIL;
         }
-    
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld finished timerange fetch, ret is %d",elem->itemid, db_ret);
+        //checking again if we've got enough data
+        last_fit_idx = glb_cache_find_time_idx(elem,ts_end);
+        start_fit_idx =  glb_cache_find_time_idx(elem,ts_end - ts_start);
+        //an interesting question -if requested data is say for 1hour,
+        //but we only have 30 minutes and DB succeeded - what shall we do?
+
+        //for now - we consider that OK situation
+        if (-1 == last_fit_idx || -1 == start_fit_idx) {
+             glb_lock_unlock(&elem->lock);
+             return FAIL;
+        }
+
+        glb_cache_fill_values(elem, (last_fit_idx - start_fit_idx + elem->values->elem_num) % elem->values->elem_num, last_fit_idx, values);
+        glb_lock_unlock(&elem->lock);
+        //zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: %s finished, item %ld, returning %d values ", __func__, elem->itemid, values->values_num);
+        return SUCCEED;
+
     } else {
         glb_cache->stats.hits++;
       //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld HIT!!! ", elem->itemid);
     }
 
-    zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld finished timerange fetch, ret is %d, start_idx is %d",elem->itemid, db_ret, start_fit_idx);
+    
     
     if (-1 == (start_fit_idx = glb_cache_find_time_idx(elem, ts_end - ts_start))) {
-        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld still not enought data, db fetch FAIL",elem->itemid);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld still not enough data, db fetch FAIL",elem->itemid);
+        glb_lock_unlock(&elem->lock);
         return FAIL;
     };
+
     
-    
-    glb_cache_fill_values(elem, start_fit_idx, last_fit_idx, values);
+    glb_cache_fill_values(elem, (last_fit_idx - start_fit_idx + elem->values->elem_num) % elem->values->elem_num, last_fit_idx, values);
     glb_lock_unlock(&elem->lock);
     //zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: %s finished, item %ld, returning %d values ", __func__, elem->itemid, values->values_num);
     
