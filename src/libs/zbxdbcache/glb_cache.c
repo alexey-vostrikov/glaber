@@ -565,11 +565,10 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
             record->value.err = zbx_strdup(NULL,c_val->value.data.err);
          else 
             record->value.err = NULL;
-    
         break;
      
     default:
-        zabbix_log(LOG_LEVEL_WARNING,"Unknown value type %d",c_val->value.type);
+        zabbix_log(LOG_LEVEL_WARNING,"Unknown value type %d", value.type);
         THIS_SHOULD_NEVER_HAPPEN;
         exit(-1);
 
@@ -1096,8 +1095,8 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
 
     } 
     //time range mode 
-  //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld Fetching in TIMERANGE mode cache start is %d",
-  //             elem->itemid, cache_start_time);
+    zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld Fetching in TIMERANGE mode cache start is %d",
+               elem->itemid, cache_start_time);
         //note: in timerange mode ts_start is relative to ts_end
     if (cache_start_time == -1 || cache_start_time > ts_end - ts_start ) { //cache either empty or has not enough data 
         glb_cache->stats.misses++;
@@ -1115,10 +1114,11 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
       //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld HIT!!! ", elem->itemid);
     }
 
-
+    
     start_fit_idx = glb_cache_find_time_idx(elem, ts_end - ts_start);
     
-    //zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld finished timerange fetch, ret is %d, start_idx is %d",elem->itemid, db_ret, start_fit_idx);
+    zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld finished timerange fetch, ret is %d, start_idx is %d",elem->itemid, db_ret, start_fit_idx);
+    
     glb_cache_fill_values(elem, start_fit_idx, last_fit_idx, values);
         
     glb_lock_unlock(&elem->lock);
