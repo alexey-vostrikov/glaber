@@ -88,25 +88,28 @@ int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, 
 int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value);
         
 int glb_cache_add_values(ZBX_DC_HISTORY *history, int history_num);
-int glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
-		int count, int ts_end);
+
+
 int glb_cache_get_statistics(glb_cache_stats_t *stats);
 int glb_vc_load_cache();
 int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats);
 int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
 
-void glb_cache_get_item_stats(zbx_vector_ptr_t *stats);
-int glb_cache_get_item_state(u_int64_t itemid);
 
-void glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
 
 
 int glb_cache_housekeep();
 int glb_cache_init();
 void glb_cache_destroy(void);
 
-int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
-int glb_cache_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
+int     glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
+int     glb_cache_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
+void    glb_cache_get_item_stats(zbx_vector_ptr_t *stats);
+int     glb_cache_get_item_state(u_int64_t itemid);
+void    glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
+int     glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
+		    int count, int ts_end);
+glb_cache_item_meta_t* glb_cache_get_item_meta(u_int64_t itemid);
 
 
 #endif

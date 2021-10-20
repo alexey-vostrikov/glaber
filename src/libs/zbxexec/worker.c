@@ -364,6 +364,8 @@ static void worker_cleanup(GLB_EXT_WORKER *worker)
 
     //restore the flags
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
+    zabbix_log(LOG_LEVEL_DEBUG, "%s, finished", __func__);
+
 }
 
 GLB_EXT_WORKER *glb_get_worker_script(char *cmd)

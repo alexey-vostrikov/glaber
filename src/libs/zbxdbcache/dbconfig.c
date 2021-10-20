@@ -40,6 +40,7 @@
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/glb_poller/glb_pinger.h"
+#include "glb_cache.h"
 
 #define ZBX_DBCONFIG_IMPL
 #include "dbconfig.h"
@@ -475,6 +476,7 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *in
 	int			simple_interval;
 	zbx_custom_interval_t	*custom_intervals;
 	int			disable_until;
+	glb_cache_item_meta_t meta={0};
 
 	if (0 == (flags & ZBX_ITEM_COLLECTED) &&
 			0 == (flags & ZBX_ITEM_KEY_CHANGED) && 0 == (flags & ZBX_ITEM_TYPE_CHANGED) &&
@@ -493,7 +495,11 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *in
 		/* and such changes will be detected during configuration synchronization. DCsync_items()  */
 		/* detects item configuration changes affecting check scheduling and passes them in flags. */
 
-	//	item->nextcheck = ZBX_JAN_2038;
+		item->nextcheck = ZBX_JAN_2038;
+		
+		meta.nextcheck = ZBX_JAN_2038;
+		glb_cache_item_update_meta(item->itemid, &meta, GLB_CACHE_ITEM_UPDATE_NEXTCHECK,item->value_type);	
+	
 		item->schedulable = 0;
 
 		return FAIL;
@@ -512,6 +518,9 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *in
 		item->nextcheck = calculate_item_nextcheck(seed, item->type, simple_interval,
 				custom_intervals, now);
 	}
+	
+	meta.nextcheck = item->nextcheck;
+	glb_cache_item_update_meta(item->itemid, &meta, GLB_CACHE_ITEM_UPDATE_NEXTCHECK,item->value_type);	
 
 	zbx_custom_interval_free(custom_intervals);
 
@@ -9777,8 +9786,8 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items)
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
-	//	if (dc_item->nextcheck > now)
-	//		break;
+		if (dc_item->nextcheck > now)
+			break;
 
 		if (0 != num)
 		{
@@ -9842,7 +9851,7 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items)
 		}
 		
 		/***** Glaber fix: do not poll items that might be polled by async methods */
-		//UPDATE: glaber items will should not get to queues at all 
+		//UPDATE: glaber items should not get to queues at all 
 		//if (SUCCEED == glb_might_be_async_polled(dc_item,dc_host)) {
 		//	dc_requeue_item(dc_item, dc_host, ZBX_ITEM_COLLECTED, now);
 		//	continue;			
@@ -11778,6 +11787,7 @@ int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 	const ZBX_DC_ITEM	*dc_item;
 	int			now, nitems = 0, data_expected_from, delay;
 	zbx_queue_item_t	*queue_item;
+	glb_cache_item_meta_t *meta;
 
 	now = time(NULL);
 
@@ -11831,7 +11841,9 @@ int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 
 		}
 
-		if (now - dc_item->nextcheck < from || (ZBX_QUEUE_TO_INFINITY != to && now - dc_item->nextcheck >= to))
+		meta = glb_cache_get_item_meta(dc_item->itemid);
+
+		if (now - meta->nextcheck < from || (ZBX_QUEUE_TO_INFINITY != to && now - meta->nextcheck >= to))
 			continue;
 
 		if (NULL != queue)

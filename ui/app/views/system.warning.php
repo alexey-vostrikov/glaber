@@ -23,7 +23,7 @@
  * @var CView $this
  */
 
-$pageHeader = (new CPageHeader(_('Fatal error, please report to the Zabbix team')))
+$pageHeader = (new CPageHeader(_('Fatal error, please report to the Glaber team')))
 	->addCssFile('assets/styles/'.CHtml::encode($data['theme']).'.css')
 	->display();
 
@@ -35,7 +35,7 @@ $buttons = [
 echo '<body lang="'.CWebUser::getLang().'">';
 
 (new CDiv((new CTag('main', true,
-	new CWarning(_('Fatal error, please report to the Zabbix team'), $data['messages'], $buttons)
+	new CWarning(_('Fatal error, please report to the Glaber issues'), $data['messages'], $buttons)
 ))))
 	->addClass(ZBX_STYLE_LAYOUT_WRAPPER)
 	->show();

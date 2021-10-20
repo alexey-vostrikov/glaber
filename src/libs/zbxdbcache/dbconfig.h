@@ -99,10 +99,16 @@ typedef struct
 	const char		*error;
 	const char		*delay;
 	ZBX_DC_TRIGGER		**triggers;
+	
+	//this 3 fields are state fields and should 
+	//be moved to cache rather than to the config
+	//however getting rid of the nextcheck will require to all the items
+	//queueing to be refactored (probably, the individual queues should be used)
 	int			nextcheck;
-	int			mtime;
 	int			data_expected_from;
 	//int			history_sec;
+
+	int			mtime;
 	unsigned char		history;
 	unsigned char		type;
 	unsigned char		value_type;

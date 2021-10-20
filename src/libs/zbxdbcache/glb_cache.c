@@ -272,14 +272,14 @@ static  glb_cache_value_t *glb_cache_get_value_ptr(glb_cache_ring_buffer_t *rbuf
         //start is higher then end - buffer is "circuled", actually any idx is valid
         //withing the buffer size (buffer as full)
         if (idx >= rbuf->elem_num ) {
-            zabbix_log(LOG_LEVEL_INFORMATION,"Wrong requested idx:%d, first is %d last id %d", idx, rbuf->first_idx, rbuf->last_idx);
+            zabbix_log(LOG_LEVEL_WARNING,"%s: Wrong requested idx:%d, first is %d last id %d",__func__, idx, rbuf->first_idx, rbuf->last_idx);
             THIS_SHOULD_NEVER_HAPPEN;
             exit(-1);
         }
     } else {
         //the idx should be lower or equal to last_idx, in this case first idx is always 0
         if ( idx > rbuf->last_idx  ) {
-            zabbix_log(LOG_LEVEL_INFORMATION,"Wrong requested idx:%d, first is %d last id %d", idx, rbuf->first_idx, rbuf->last_idx);
+            zabbix_log(LOG_LEVEL_WARNING,"Wrong requested idx:%d, first is %d last id %d", idx, rbuf->first_idx, rbuf->last_idx);
             THIS_SHOULD_NEVER_HAPPEN;
             exit(-1);
         }
@@ -569,7 +569,7 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
         break;
      
     default:
-        zabbix_log(LOG_LEVEL_INFORMATION,"Unknown value type %d",c_val->value.type);
+        zabbix_log(LOG_LEVEL_WARNING,"Unknown value type %d",c_val->value.type);
         THIS_SHOULD_NEVER_HAPPEN;
         exit(-1);
 
@@ -584,14 +584,14 @@ int glb_cache_update_demand(glb_cache_elem_t *elem, unsigned int new_count, unsi
     unsigned char need_hk=0;
     
     if (elem->req_count < new_count ) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld demand by count updated: %d -> %d", 
+        zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld demand by count updated: %d -> %d", 
             elem->itemid, elem->req_count, new_count);
         elem->req_count = new_count;
         elem->new_req_count = 0;
         elem->count_change = now;
         need_hk = 1;
     } else if (elem->new_req_count < new_count) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld new demand by count updated: %d -> %d", 
+        zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld new demand by count updated: %d -> %d", 
             elem->itemid, elem->new_req_count, new_count);
         elem->new_req_count = new_count;
     }
@@ -605,14 +605,14 @@ int glb_cache_update_demand(glb_cache_elem_t *elem, unsigned int new_count, unsi
     
     //checking and updating the time limits
     if (elem->req_duration < new_duration ) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld demand by time updated: %d -> %d", 
+        zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld demand by time updated: %d -> %d", 
             elem->itemid, elem->req_duration, new_duration);
         elem->req_duration = new_duration;
         elem->new_req_duration = 0;
         elem->duration_change = now;
         need_hk = 1;
     } else if (elem->new_req_duration < new_duration) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld new demand by time updated: %d -> %d", 
+        zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld new demand by time updated: %d -> %d", 
             elem->itemid, elem->new_req_duration, new_duration);
         elem->new_req_duration = new_duration;
     }
@@ -821,58 +821,66 @@ void glb_cache_add_value(glb_cache_elem_t *elem, history_value_t *hist_v, int ti
 }
 
 
-static int glb_cache_fetch_from_db(glb_cache_elem_t *elem, int count, int req_time, unsigned int now) {
+static int glb_cache_fetch_from_db(glb_cache_elem_t *elem, int count, int req_time, int now) {
     
     int ret = FAIL;
     zbx_vector_history_record_t	values;
     
-    //zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: DB item %ld, will be fetching item the DB, elem's db_fetched_time is %d", elem->itemid,elem->db_fetched_time);
+    zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: DB item %ld, will be fetching item the DB, elem's db_fetched_time is %d", elem->itemid,elem->db_fetched_time);
 
     if ( elem->db_fetched_time < req_time ) {
-      //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CAHCE: DB item %ld, no reason to fetch data from the history storage at %d, has already requested from %d",
-      //          elem->itemid, req_time, elem->db_fetched_time);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CAHCE: DB item %ld, no reason to fetch data from the history storage at %d, has already requested from %d",
+                elem->itemid, req_time, elem->db_fetched_time);
             return SUCCEED;
     }
     
-  //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CAHCE: DB item %ld, updating demand to %d seconds", MAX(0, now - req_time));
+    zabbix_log(LOG_LEVEL_DEBUG, "GLB_CAHCE: DB item %ld, updating demand to %d seconds", MAX(0, now - req_time));
 
     zbx_history_record_vector_create(&values);
     
+    int fetched_time = elem->db_fetched_time;
+    
+    if (fetched_time > now) 
+        fetched_time = now;
+       
     if (count > 0) {
         //count mode
-        int fetched_time = elem->db_fetched_time;
-        if (fetched_time > now) 
-                fetched_time = now;
+       
         
-   //     zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: requesting in the DB item %ld, value_type %d, start time %d, count %d, end_time %d ",
-   //             elem->itemid,elem->value_type,fetched_time - GLB_CACHE_DEFAULT_DURATION, count, fetched_time);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: requesting in the DB item %ld, value_type %d, start time %d, count %d, end_time %d ",
+                elem->itemid,elem->value_type,fetched_time - GLB_CACHE_DEFAULT_DURATION, count, fetched_time);
+   
         if (SUCCEED == ( ret = glb_history_get(elem->itemid, elem->value_type, 
                         fetched_time - GLB_CACHE_DEFAULT_DURATION, count, 
                         fetched_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values)) ) {    
             //succesifully fetched, updating the fetched time
            
-       //     zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: DB item %ld, fetching from DB SUCCEED, %d values",elem->itemid,values.values_num);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: DB item %ld, fetching from DB SUCCEED, %d values",elem->itemid,values.values_num);
+            
             if (values.values_num > 0 ) {
                 elem->db_fetched_time = MIN(elem->db_fetched_time, values.values[0].timestamp.sec);
             } else //this isn't precise, but will prevent consequitive calls
                 elem->db_fetched_time = fetched_time - 1; //we don't want requests with the same to be repeated anymore, so shifting one second to past
         } 
         else {
-        //    zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: DB item %ld, fetching from DB FAILED",elem->itemid);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: DB item %ld, fetching from DB FAILED",elem->itemid);
         }
     } else {
         //timerange mode
-       // zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CAHCE: DB item %ld, fetching in timerange mode: %d -> %d",
-       //             elem->itemid, req_time, elem->db_fetched_time);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CAHCE: DB item %ld, fetching in timerange mode: %d -> %d",
+                    elem->itemid, req_time, elem->db_fetched_time);
          
-       // glb_cache->items.stats.hits++;
         if (SUCCEED == ( ret = glb_history_get(elem->itemid, elem->value_type, req_time, 0, 
-                elem->db_fetched_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values))) {
-       //    zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: DB item %ld, fetching from DB SUCCEED, %d values",elem->itemid,values.values_num);
-      //      elem->db_fetched_time = req_time;
-        }
-         else {
-       //     zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: DB item %ld, fetching from DB FAILED",elem->itemid);
+               fetched_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values))) {
+            
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: DB item %ld, fetching from DB SUCCEED, %d values",elem->itemid,values.values_num);
+     
+            if (values.values_num > 0 ) {
+                elem->db_fetched_time = MIN(elem->db_fetched_time, values.values[0].timestamp.sec);
+            } else //this isn't precise, but will prevent consequitive calls
+                elem->db_fetched_time = req_time - 1; //we don't want requests with the same to be repeated anymore, so shifting one second to past
+        } else {
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: DB item %ld, fetching from DB FAILED",elem->itemid);
         }
 
     }
@@ -994,14 +1002,14 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
     int now = time(NULL);
     int time_demand;
 
-    //zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: In %s: started: itemid: %ld, value_type: %d, ts_start: %d, count: %d, ts_end: %d",
-    //                __func__, itemid, value_type, ts_start, count, ts_end);
+    zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: In %s: started: itemid: %ld, value_type: %d, ts_start: %d, count: %d, ts_end: %d",
+                    __func__, itemid, value_type, ts_start, count, ts_end);
   
 
     glb_cache_elem_t *elem = glb_cache_get_elem(&glb_cache->items, itemid);
     
     if (NULL == elem) {
-      //  zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: no element exist for item %ld, creating a new one", itemid);
+        zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: no element exist for item %ld, creating a new one", itemid);
         
         glb_rwlock_wrlock(&glb_cache->items.meta_lock);
         elem = glb_cache_init_item_elem(itemid,value_type);
@@ -1023,35 +1031,35 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
     
     if (count > 0 ) { 
         
-     //   zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: itemid %ld Fetching in COUNT mode, last_fit_idx is %d, have items %d, first_idx is %d, last_idx is %d",
-     //       elem->itemid, last_fit_idx, 
-     //       elem->values->elem_count,
-     //       elem->values->first_idx,
-     //       elem->values->last_idx);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: itemid %ld Fetching in COUNT mode, last_fit_idx is %d, have items %d, first_idx is %d, last_idx is %d",
+            elem->itemid, last_fit_idx, 
+            elem->values->elem_count,
+            elem->values->first_idx,
+            elem->values->last_idx);
         int need_count;
       
         //checking if there are enough items to respond from the cache
         if (SUCCEED == check_cache_has_enough_data(elem,count,last_fit_idx))  {
             
             //this is HIT situation, the data in the cache, filling and exiting
-          //  zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: HIT!!!: itemid %ld requested %d elems with offset %d, elems in the cache %d, cache size is %d", 
-           //         elem->itemid, count, time(NULL) - ts_end, elem->values->elem_count, elem->values->elem_num );
+            zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: HIT!!!: itemid %ld requested %d elems with offset %d, elems in the cache %d, cache size is %d", 
+                   elem->itemid, count, time(NULL) - ts_end, elem->values->elem_count, elem->values->elem_num );
            
             glb_cache->stats.hits++;
 
             glb_cache_fill_values(elem, count, last_fit_idx, values);
             glb_lock_unlock(&elem->lock);
-      //      zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld hit finished",elem->itemid);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld hit finished",elem->itemid);
                 
             return SUCCEED;
         }
 
-     //   zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld MISS!!! Cache start time is %d", elem->itemid, cache_start_time);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld MISS!!! Cache start time is %d", elem->itemid, cache_start_time);
         glb_cache->stats.misses++;
 
         //all cache's data is newer then requested    
         if ((cache_start_time == -1 || cache_start_time > ts_end ) && ts_end < (now - 1) ) {
-      //      zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld fetching by timerange %d -> %d ", elem->itemid, ts_end, now);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld fetching by timerange %d -> %d ", elem->itemid, ts_end, now);
             db_ret = glb_cache_fetch_from_db(elem, 0, ts_end, now);
         } 
 
@@ -1061,27 +1069,27 @@ int	glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_hi
         else //excluding data that fits from the count
             need_count = count - (last_fit_idx - elem->values->first_idx + elem->values->elem_num) % elem->values->elem_num;
 
-       // zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld need to fetch %d more values starting at %d", elem->itemid, need_count, ts_end);
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld need to fetch %d more values starting at %d", elem->itemid, need_count, ts_end);
 
         if ( need_count > 0) {
-         //   zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld requesting  %d elements in the database", elem->itemid, need_count);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld requesting  %d elements in the database", elem->itemid, need_count);
             
             db_ret = glb_cache_fetch_from_db(elem, need_count, ts_end, now);
 
-          //  zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld requesting  %d elements in the database, now cache has %d values, size is %d, db call returned %d", 
-           //     elem->itemid,  need_count, elem->values->elem_count, elem->values->elem_num, db_ret);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld requesting  %d elements in the database, now cache has %d values, size is %d, db call returned %d", 
+               elem->itemid,  need_count, elem->values->elem_count, elem->values->elem_num, db_ret);
         
             if (-1 == last_fit_idx) //if there was no data before, pointing to the latest element after fetch (which still might be -1)
                 last_fit_idx = elem->values->last_idx;
         }            
         
         if (SUCCEED == check_cache_has_enough_data(elem, count, last_fit_idx))  {
-//            zabbix_log(LOG_LEVEL_INFORMATION, "GLB_CACHE: item %ld has enough data in the cache", elem->itemid);
+            zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld has enough data in the cache", elem->itemid);
             glb_cache_fill_values(elem, count, last_fit_idx, values);
             glb_lock_unlock(&elem->lock);
             return SUCCEED;
         } 
-               
+        zabbix_log(LOG_LEVEL_DEBUG, "GLB_CACHE: item %ld finished fetching", elem->itemid);
         glb_lock_unlock(&elem->lock);
         return db_ret; //it might be cache couldn't fullfill the request due to no data either in DB and CACHE - the 
                        //request will be succesifull, but no data will be returned
@@ -1319,7 +1327,7 @@ int glb_vc_load_cache() {
 	zbx_json_type_t j_type;
 	char type_str[MAX_ID_LEN];
 	
-	zabbix_log(LOG_LEVEL_INFORMATION, "Reading valuecache from %s",CONFIG_VCDUMP_LOCATION);
+	zabbix_log(LOG_LEVEL_DEBUG, "Reading valuecache from %s",CONFIG_VCDUMP_LOCATION);
 	/*
     //sleep(1);
 	//return SUCCEED;
@@ -1427,7 +1435,7 @@ int glb_vc_load_cache() {
     }
 	gzclose(gzfile);
 */	
-	zabbix_log(LOG_LEVEL_INFORMATION,"Finished loading valuecache data, loaded %d items; %d values",items,vals);
+	zabbix_log(LOG_LEVEL_DEBUG,"Finished loading valuecache data, loaded %d items; %d values",items,vals);
 	return SUCCEED;
 }
 
@@ -1455,12 +1463,12 @@ int glb_vc_dump_cache() {
 	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN], tmp_val[MAX_STRING_LEN], tmp_val2[MAX_STRING_LEN*2];
 	size_t len;
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: starting", __func__);
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
 	
     if (NULL == CONFIG_VCDUMP_LOCATION )
 	 		return FAIL;
 	
-	zabbix_log(LOG_LEVEL_INFORMATION, "Will dump value cache to %s",CONFIG_VCDUMP_LOCATION);
+	//zabbix_log(LOG_LEVEL_INFORMATION, "Will dump value cache to %s",CONFIG_VCDUMP_LOCATION);
 	//old cache file is renamed to *.old postfix due to possibility of corrupting or not completing the dump
 	//of something is wrong, this way will have a bit outdated but functional copy of the cache
 	zbx_snprintf(new_file,MAX_STRING_LEN,"%s%s",CONFIG_VCDUMP_LOCATION,".new");
@@ -1547,7 +1555,7 @@ int glb_vc_dump_cache() {
 		return FAIL;
 	}
 */
-	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: finished, total %d items, %d values dumped", __func__,items,vals);
+	zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished, total %d items, %d values dumped", __func__,items,vals);
 	return SUCCEED;
 }
 
@@ -1615,13 +1623,8 @@ int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json 
             int last_idx = elem->values->last_idx;
             if (  -1 < last_idx) {
                 int first_idx = ( elem->values->last_idx - rcount + 1 + elem->values->elem_num) % elem->values->elem_num;
-            
-      //          zabbix_log(LOG_LEVEL_INFORMATION, "%s: first idx is %d, count is %d, last idx is %d, cached items %d, total items %d",__func__, 
-        //            first_idx,count, last_idx, elem->values->elem_count, elem->values->elem_num);
-            
         
                 do {
-          //          zabbix_log(LOG_LEVEL_INFORMATION, "%s: adding value for index %d",__func__, last_idx);
                     glb_cache_value_t *c_val;
                     c_val = glb_cache_get_value_ptr(elem->values,last_idx);
                 
@@ -1667,7 +1670,7 @@ int glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json 
     glb_rwlock_unlock(&glb_cache->items.meta_lock);
 	zbx_json_close(json); //closing the items array
         
-	//zabbix_log(LOG_LEVEL_INFORMATION, "%s: finished, response is %s", __func__,json->buffer);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s: finished: response is: %s", __func__,json->buffer);
 }
 glb_cache_item_meta_t *glb_cache_get_item_meta(u_int64_t itemid) {
     
@@ -1721,19 +1724,24 @@ int glb_cache_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_jso
 
             zbx_json_close(json);
             
+            if (CONFIG_DEBUG_ITEM == elem->itemid)
+                zabbix_log(LOG_LEVEL_INFORMATION, "%s: finished, response is %s", __func__,json->buffer);    
+            
             glb_lock_unlock(&elem->lock);
 
         }
     }
     glb_rwlock_unlock(&glb_cache->items.meta_lock);
+
 	zbx_json_close(json); 
     
-    zabbix_log(LOG_LEVEL_INFORMATION, "%s: finished, response is %s", __func__,json->buffer);
+   
+     
 }
 /************************************************************
  * updated item's metadata 
  * **********************************************************/
-void  glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type) {
+void  glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type) {
     glb_cache_elem_t *elem;
        
     glb_rwlock_rdlock(&glb_cache->items.meta_lock);
@@ -1745,19 +1753,24 @@ void  glb_cache_update_item_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, 
         DEBUG_ITEM(itemid, "Cache entry init for item");
     }
     
-    DEBUG_ITEM(itemid, "Updated metadata");
-
-    if ((flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) && elem->lastdata < meta->lastdata) 
-                elem->lastdata = meta->lastdata;
+    
+    if ((flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) && elem->lastdata < meta->lastdata) {
+        elem->lastdata = meta->lastdata;
+        DEBUG_ITEM(itemid, "Updated metadata: lastdata");
+    }
             
-    if (flags & GLB_CACHE_ITEM_UPDATE_NEXTCHECK) 
-            elem->nextcheck = meta->nextcheck;         
-
-    if (flags & GLB_CACHE_ITEM_UPDATE_STATE) 
+    if (flags & GLB_CACHE_ITEM_UPDATE_NEXTCHECK) {
+        elem->nextcheck = meta->nextcheck;    
+        DEBUG_ITEM(itemid, "Updated metadata: nextcheck");     
+    }
+    if (flags & GLB_CACHE_ITEM_UPDATE_STATE) {
          elem->state = meta->state;
-        
-    if (flags & GLB_CACHE_ITEM_UPDATE_ERRORMSG) 
+        DEBUG_ITEM(itemid, "Updated metadata: state");     
+    }
+    if (flags & GLB_CACHE_ITEM_UPDATE_ERRORMSG) {
         elem->error = glb_cache_strpool_set_str(elem->error, meta->error);
+        DEBUG_ITEM(itemid, "Updated metadata: errmsg");     
+    }
         
     glb_rwlock_unlock(&glb_cache->items.meta_lock);
     

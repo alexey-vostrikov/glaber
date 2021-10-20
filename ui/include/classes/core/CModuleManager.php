@@ -200,7 +200,7 @@ final class CModuleManager {
 				$module_class = implode('\\', ['Modules', $manifest['namespace'], 'Module']);
 
 				if (!class_exists($module_class, true)) {
-					$this->errors[] = _s('Wrong Module.php class name for module located at %1$s.', $relative_path);
+					$this->errors[] = _s("Wrong Module.php class name ($module_class) for module located at $relative_path" );
 
 					continue;
 				}

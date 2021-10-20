@@ -52,7 +52,7 @@ if ($data['filter']['show_details']) {
 		(new CColHeader(_('History')))->addStyle('width: 5%'),
 		(new CColHeader(_('Trends')))->addStyle('width: 5%'),
 		(new CColHeader(_('Type')))->addStyle('width: 8%'),
-		(new CColHeader(_('Last check')))->addStyle('width: 14%'),
+		(new CColHeader(_('Last response')))->addStyle('width: 14%'),
 		(new CColHeader(_('Last value')))->addStyle('width: 14%'),
 		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
@@ -64,7 +64,7 @@ else {
 		$col_check_all->addStyle('width: 15px'),
 		$col_host->addStyle('width: 17%'),
 		$col_name->addStyle('width: 40%'),
-		(new CColHeader(_('Last check')))->addStyle('width: 20%'),
+		(new CColHeader(_('Last response')))->addStyle('width: 20%'),
 		(new CColHeader(_('Last value')))->addStyle('width: 14%'),
 		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
@@ -127,7 +127,7 @@ foreach ($data['items'] as $itemid => $item) {
 				->addClass(ZBX_STYLE_LINK_ACTION)
 				->setHint($item['error'], 'hintbox-wrap');
 			if ($item['lastdata'] > 0 ) 
-				$last_check = zbx_date2age(time() - $last_history['clock']);
+				$last_check = zbx_date2age($item['lastdata']);
 			else 
 				$last_check ='';
 			$change = '';
@@ -140,7 +140,7 @@ foreach ($data['items'] as $itemid => $item) {
 	if ( isset($item['nextcheck']) && $item['nextcheck'] > 0 )
 		$last_check = (new CSpan($last_check))
 				->addClass(ZBX_STYLE_LINK_ACTION)
-				->setHint("Next in: ". zbx_date2age( 2* time() - $item['nextcheck'] ), 'hintbox-wrap');
+				->setHint("Next request in: ". zbx_date2age( 2 * time() - $item['nextcheck'] ), 'hintbox-wrap');
 
 
 	// Other row data preparation.

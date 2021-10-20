@@ -181,11 +181,9 @@ int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts, GLB_PO
 			zabbix_log(LOG_LEVEL_INFORMATION, "In %s - Added item %ld poll event in %ld sec", __func__, glb_item->itemid, nextcheck - now);
 		
 		glb_cache_item_meta_t meta;
-		meta.lastdata = now;
 		meta.nextcheck = nextcheck;
 		
-		glb_cache_update_item_meta( glb_item->itemid, &meta, 
-					GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_NEXTCHECK, glb_item->value_type);
+		glb_cache_item_update_meta( glb_item->itemid, &meta,  GLB_CACHE_ITEM_UPDATE_NEXTCHECK, glb_item->value_type);
 		add_event(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck);
 	} else {
 		zabbix_log(LOG_LEVEL_INFORMATION, "No host has been fount for itemid %ld", glb_item->itemid);

@@ -68,7 +68,6 @@ func Init(he *ClickHouseHist, url string,dbname string , batch int ,flush int ,d
 	
 }
 
-
 func (he ClickHouseHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) {
 	var buf = he.sql_buffer[metric.Value_type]
 
@@ -381,7 +380,7 @@ func (he ClickHouseHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*his
 
     fmt.Fprintf(buf, " format JSON SETTINGS output_format_json_quote_64bit_integers='0'");
 	
-//	log.Print("Will do query:",buf.String())
+	//log.Print("Will do query:",buf.String())
 	resp, err := http.Post(he.url, "text/html",strings.NewReader(buf.String()))
 
 	if err != nil {

@@ -883,8 +883,6 @@ static int json_ids_to_vector(struct zbx_json_parse *jp, zbx_vector_uint64_t *id
 				num_start_pos = id_ptr;
 	
 			zbx_uint64_t itemid=strtol(num_start_pos,NULL,10);
-			
-			zabbix_log(LOG_LEVEL_INFORMATION,"%s: appending item %ld",__func__, itemid);
 			zbx_vector_uint64_append(ids,itemid);
 		}
 	} 
@@ -908,7 +906,7 @@ static void get_items_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_destroy(&itemids);
 	zbx_json_close(&response_json);
 	
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: Response is %s",__func__, response_json.buffer);
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: Response is %s",__func__, response_json.buffer);
 	(void)zbx_tcp_send(sock, response_json.buffer);
 
 	zbx_json_free(&response_json);
@@ -926,7 +924,7 @@ static void get_items_lastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) 
 
 	int count = -1;
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: start",__func__);
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: start",__func__);
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
 	zbx_vector_uint64_create(&itemids);
@@ -945,7 +943,7 @@ static void get_items_lastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) 
 	zbx_json_close(&json);
 	zbx_vector_uint64_destroy(&itemids);
 		
-	zabbix_log(LOG_LEVEL_INFORMATION,"%s: Response is %s",__func__, json.buffer);
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: Response is %s",__func__, json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);
@@ -1075,7 +1073,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	
 out:
 	
-	zabbix_log(LOG_LEVEL_DEBUG,"%s:Finished, history responce is response is %s",__func__,json.buffer);
+	zabbix_log(LOG_LEVEL_INFORMATION, " %s:Finished, history responce is response is %s",__func__,json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);
