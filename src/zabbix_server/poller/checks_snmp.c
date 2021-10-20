@@ -2274,6 +2274,7 @@ static struct snmp_session * glb_snmp_open_conn(GLB_POLLER_ITEM *glb_item){
 	dc_item.snmpv3_authprotocol = snmp_item->snmpv3_authprotocol;
 	dc_item.snmpv3_authpassphrase =(char *)snmp_item->snmpv3_authpassphrase;
 	dc_item.snmpv3_privprotocol = snmp_item->snmpv3_privprotocol;
+	dc_item.snmpv3_privpassphrase = (char *)snmp_item->snmpv3_privpassphrase;
 
 	
 	if (NULL == (sess = zbx_snmp_open_session(&dc_item, error, sizeof(error)))) {
