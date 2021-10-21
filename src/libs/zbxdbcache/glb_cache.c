@@ -552,12 +552,26 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
     
     case ITEM_VALUE_TYPE_STR:
     case ITEM_VALUE_TYPE_TEXT: //TODO: get rid of the allocation!!!! we can just use the copy from the cache
-          if ( NULL != c_val->value.data.str ) 
+        if ( NULL != c_val->value.data.str ) 
             record->value.str = zbx_strdup(NULL,c_val->value.data.str);
         else 
             record->value.str = zbx_strdup(NULL,"");
         break;
     
+    case ITEM_VALUE_TYPE_LOG: 
+            
+            zabbix_log(LOG_LEVEL_INFORMATION,"Doing log fetch and processigng");
+            
+            record->value.log = zbx_malloc(NULL, sizeof (zbx_log_t));
+            bzero(record->value.log,sizeof (zbx_log_t));
+            
+            if ( NULL != c_val->value.data.str ) 
+                record->value.log->value = zbx_strdup(NULL,c_val->value.data.str);
+            else 
+                record->value.log->value = zbx_strdup(NULL,"");
+            break;
+    
+                
     case ITEM_VALUE_TYPE_NONE: //TODO: get rid of the allocation!!!! we can just use the copy from the cache
         if ( NULL != c_val->value.data.err) 
             record->value.err = zbx_strdup(NULL,c_val->value.data.err);
@@ -945,20 +959,17 @@ int glb_cache_fill_values(glb_cache_elem_t *elem, int count, int end_idx, zbx_ve
 
     }
 
-    //selfcheck
-    //if (elem->values->first_idx  )
-
     zbx_vector_history_record_clear(values);
-
+    zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld: filling values %d -> %d", elem->itemid, i);
     for (i=start_idx; i<=end_idx; i++) {
-        c_val = glb_cache_get_value_ptr(elem->values, i); 
-                    
-	    glb_cache_value_to_hist_copy(&record, c_val, elem->value_type);
+        zabbix_log(LOG_LEVEL_DEBUG,"GLB_CACHE: item %ld: copy item idx %d", elem->itemid, i);          
+	    c_val = glb_cache_get_value_ptr(elem->values, i); 
+
+        glb_cache_value_to_hist_copy(&record, c_val, elem->value_type);
 	    zbx_vector_history_record_append_ptr(values, &record);
-       // zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld: copy item %d", elem->itemid, i);
     }
 
-  //  zabbix_log(LOG_LEVEL_INFORMATION,"GLB_CACHE: item %ld: added %d items to the cache response",values->values_num);
+  
     return i;
 }
 static glb_cache_elem_t *glb_cache_init_item_elem(u_int64_t itemid, unsigned char value_type) {
