@@ -151,7 +151,7 @@ abstract class CControllerLatest extends CController {
 		$items = CMacrosResolverHelper::resolveItemDescriptions($items);
 		$items = CMacrosResolverHelper::resolveTimeUnitMacros($items, ['delay', 'history', 'trends']);
 
-		$history = Manager::History()->getLastValues($items, 4,
+		$history = Manager::History()->getLastValues($items, 10,
 			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::HISTORY_PERIOD))
 		);
 
