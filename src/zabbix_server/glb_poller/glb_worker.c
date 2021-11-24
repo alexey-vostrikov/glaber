@@ -210,7 +210,7 @@ int glb_worker_send_request(void *engine, GLB_POLLER_ITEM *glb_item) {
     }
     
     zabbix_log(LOG_LEVEL_DEBUG, "Will do request: %s to worker %s",glb_worker_item->params_dyn, glb_worker_item->full_cmd);
-    if (SUCCEED != glb_worker_request(&worker->worker, glb_worker_item->params_dyn) ) {
+    if (NULL == glb_worker_item->params_dyn ||  SUCCEED != glb_worker_request(&worker->worker, glb_worker_item->params_dyn) ) {
         //sending config error status for the item
         zbx_timespec(&ts);
         zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request %s",request);
@@ -261,7 +261,7 @@ static void glb_worker_handle_timeouts(GLB_WORKER_CONF *conf) {
     if (last_check + 1000 > glb_time ) return;
      last_check = glb_time;
     
-    zabbix_log(LOG_LEVEL_DEBUG, "In %s() starting worker timouts check", __func__);
+    zabbix_log(LOG_LEVEL_DEBUG, "In %s() starting worker timeouts check", __func__);
 
     zbx_hashset_iter_reset(conf->items,&iter);
     while (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_iter_next(&iter))) {

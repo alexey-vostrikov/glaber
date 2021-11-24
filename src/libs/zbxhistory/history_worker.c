@@ -310,8 +310,9 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	zbx_json_type_t type;
 	
 	if (0 == conf->read_types[value_type])	{
-		LOG_INF("Unknown value type %d", value_type);
-			return SUCCEED;
+		if (ITEM_VALUE_TYPE_NONE!=value_type)
+			 LOG_DBG("Unknown value type %d", value_type);
+		return SUCCEED;
 	}
 	//this isn't really nice idea since we might be getting some get_values from the zabbix frontend
 	if ( GLB_HISTORY_GET_NON_INTERACTIVE == interactive && 

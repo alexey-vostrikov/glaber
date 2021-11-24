@@ -386,11 +386,11 @@ static int glb_cache_fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, 
     if (elm->db_fetched_time > now) 
         elm->db_fetched_time = now;
 
-    LOG_INF("GLB_CACHE: will be fetching by count from the DB, elem's db_fetched_time is %d, head time is %d, count is %d", elm->db_fetched_time,head_time, count);
+    DEBUG_ITEM(itemid, "GLB_CACHE: will be fetching by count from the DB, elem's db_fetched_time is %d, head time is %d, count is %d", elm->db_fetched_time,head_time, count);
 
    
     if ( elm->db_fetched_time < head_time-1 ) {
-        LOG_INF("fetched time: %d, requested head time: %d",elm->db_fetched_time, head_time);
+        DEBUG_ITEM(itemid, "fetched time: %d, requested head time: %d",elm->db_fetched_time, head_time);
         head_time = elm->db_fetched_time-1;
         //return SUCCEED;
     }
@@ -398,7 +398,7 @@ static int glb_cache_fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, 
     zbx_history_record_vector_create(&values);
      
     if (SUCCEED == ( ret = glb_history_get(itemid, elm->value_type, 0, count, head_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values))) {
-        LOG_INF("GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values",itemid, values.values_num);
+        DEBUG_ITEM(itemid, "GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values",itemid, values.values_num);
   
         if (values.values_num > 0 ) {
             elm->db_fetched_time = MIN(elm->db_fetched_time, values.values[0].timestamp.sec);
@@ -419,7 +419,7 @@ static int glb_cache_fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, 
 
     } 
     
-    LOG_INF("GLB_CACHE: DB item %ld, fetching from DB FAILED",itemid);
+    DEBUG_ITEM(itemid, "GLB_CACHE: DB item %ld, fetching from DB FAILED",itemid);
     zbx_history_record_vector_destroy(&values, elm->value_type);    
     return FAIL;
 }
@@ -476,16 +476,15 @@ static int glb_cache_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
     glb_cache_item_value_t *c_val;
     zbx_vector_history_record_t	values;
 
-    LOG_INF("GLB_CACHE: will be fetching item the DB, elem's db_fetched_time is %d", elm->db_fetched_time);
-
     if ( elm->db_fetched_time < (now - seconds) ) {
-        LOG_INF("GLB_CACHE: no reason to fetch data from the history storage at %d, has already requested from %d",
+        
+        DEBUG_ITEM(itemid, "CACHE: no reason to fetch data from the history storage at %d, has already requested from %d",
                  now - seconds, elm->db_fetched_time);
         return SUCCEED;
     }
     
     zbx_history_record_vector_create(&values);
-    LOG_INF("GLB_CACHE: updating demand to %d seconds", MAX(0, seconds));
+    DEBUG_ITEM(itemid, "GLB_CACHE: updating demand to %d seconds", MAX(0, seconds));
  
      
     if (elm->db_fetched_time > now) 
@@ -494,7 +493,7 @@ static int glb_cache_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
     if (SUCCEED == ( ret = glb_history_get(itemid, elm->value_type, head_time - seconds , 0, 
                elm->db_fetched_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values))) {
     
-        LOG_INF("GLB_CACHE: DB item %ld, fetching from DB SUCCEED, %d values",itemid, values.values_num);
+        DEBUG_ITEM(itemid, "GLB_CACHE: DB item %ld, fetching from DB SUCCEED, %d values",itemid, values.values_num);
 
         if (values.values_num > 0 ) {
             elm->db_fetched_time = MIN(elm->db_fetched_time, values.values[0].timestamp.sec);
@@ -521,7 +520,7 @@ static int glb_cache_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
         return SUCCEED;
     } 
     
-    LOG_INF("GLB_CACHE: DB item %ld, fetching from DB FAILED",itemid);
+    DEBUG_ITEM(itemid, "GLB_CACHE: DB item %ld, fetching from DB FAILED",itemid);
     zbx_history_record_vector_destroy(&values, elm->value_type);    
     return FAIL;
 } 
@@ -858,13 +857,14 @@ int  glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_
     items_cb_params_t cb_params = { .i_cfg = cfg};
     int i, ret = SUCCEED;
     
-    LOG_INF("In %s: starting adding new history %d values", __func__, history_num);
+    LOG_DBG("In %s: starting adding new history %d values", __func__, history_num);
 
     for (i = 0; i < history_num; i++)
 	{
 		ZBX_DC_HISTORY	*h;
 		h = (ZBX_DC_HISTORY *)&history[i];
-        LOG_INF("Adding value to cache id %ld, value %d out of %d, timestamp is %d",h->itemid,i,history_num, h->ts.sec);
+        
+        LOG_DBG("Adding value to cache id %ld, value %d out of %d, timestamp is %d",h->itemid,i,history_num, h->ts.sec);
 
         if (0 != ((ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF ) & h->flags) || ITEM_STATE_NOTSUPPORTED == h->state ) {
             LOG_DBG("GLB_CACHE: not adding item %ld to cache: no_hist flag is set %d", h->itemid, h->flags);
@@ -967,7 +967,7 @@ int glb_cache_item_values_json_cb(glb_cache_elem_t *elem, void *cb_data)
     if (-1 < head_idx)
     {
         int tail_idx = (elm->tsbuff.head - rcount + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
-        LOG_INF("Processing item %d: rcount is %d requst count is %d, %d->%d", elem->id, rcount, req->count, tail_idx, head_idx);
+        LOG_DBG("Processing item %d: rcount is %d requst count is %d, %d->%d", elem->id, rcount, req->count, tail_idx, head_idx);
         
         do
         {

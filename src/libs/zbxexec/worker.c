@@ -284,7 +284,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         
         
         //execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *)NULL);
-        zabbix_log(LOG_LEVEL_INFORMATION,"Starting worker %s", worker->path);
+        LOG_DBG("Starting worker %s", worker->path);
 
         for (i=0; NULL != worker->args[i]; i++) {
             zabbix_log(LOG_LEVEL_DEBUG,"Starting with arg[%d]=%s",i,worker->args[i]);
@@ -402,7 +402,8 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         request_len = strlen(request);
     else
     {
-        zabbix_log(LOG_LEVEL_WARNING, "%s: Request must not be NULL", __func__);
+        LOG_WRN("%s: Request must not be NULL", __func__);
+        THIS_SHOULD_NEVER_HAPPEN;
         return FAIL;
     };
 

@@ -463,7 +463,7 @@ int glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
 	item_last_values_req_t req = {.count = count, .json = json};
     
 	
-    LOG_INF("%s: starting, requested %d items count %d", __func__,itemids->values_num, count);
+    LOG_DBG("%s: starting, requested %d items count %d", __func__,itemids->values_num, count);
 	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
     
     for (i=0; i<itemids->values_num; i++) {
@@ -472,7 +472,7 @@ int glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
 	}	
  
   	zbx_json_close(json); //closing the items array
-	LOG_INF("Result is %s: ",json->buffer);
+	LOG_DBG("Result is %s: ",json->buffer);
   	zabbix_log(LOG_LEVEL_DEBUG, "%s: finished: response is: %s", __func__,json->buffer);
 }
 

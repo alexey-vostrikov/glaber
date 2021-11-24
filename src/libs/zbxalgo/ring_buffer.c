@@ -161,7 +161,7 @@ void*   glb_tsbuff_add_to_tail(glb_tsbuff_t *tsbuff, int time) {
        // LOG_INF("Got old time %d new time is %d", old_time, time);
         
         if (old_time > 0 && old_time < time) {
-            LOG_INF("Cannot add new item item to the tail: time is higher the the oldest value");
+            //LOG_INF("Cannot add new item item to the tail: time is higher the the oldest value");
             return NULL; 
         }
     }
@@ -248,8 +248,7 @@ int glb_tsbuff_get_time_head(glb_tsbuff_t *tsbuff) {
 int glb_tsbuff_find_time_idx(glb_tsbuff_t *tsbuff, int tm_sec) {
     
     int head_time, tail_time, tail_idx, head_idx, guess_idx;
-    LOG_INF("Looking for time %d", tm_sec);
-    
+   
     head_time = glb_tsbuff_get_time_head(tsbuff);
     tail_time = glb_tsbuff_get_time_tail(tsbuff);
     
@@ -267,7 +266,7 @@ int glb_tsbuff_find_time_idx(glb_tsbuff_t *tsbuff, int tm_sec) {
             guess_idx = (tail_idx + head_idx + tsbuff->size ) / 2 ; 
         else 
             guess_idx = BUFF_IDX(tsbuff, (tail_idx + head_idx) / 2 + tsbuff->size); 
-        LOG_INF("Tail idx %d, head idx %d, guess idx %d", tail_idx, head_idx, guess_idx);
+        //LOG_INF("Tail idx %d, head idx %d, guess idx %d", tail_idx, head_idx, guess_idx);
         
         guess_val = glb_tsbuff_get_value_ptr(tsbuff, BUFF_IDX(tsbuff,guess_idx));
         head_val = glb_tsbuff_get_value_ptr(tsbuff, head_idx);
@@ -279,7 +278,7 @@ int glb_tsbuff_find_time_idx(glb_tsbuff_t *tsbuff, int tm_sec) {
             return head_idx;
  
         if ( BUFF_IDX(tsbuff,guess_idx) == tail_idx) { //two numbers left, use older time one
-            LOG_INF("Only two numbers left, selecting one from the tail");
+          //  LOG_INF("Only two numbers left, selecting one from the tail");
             return tail_idx;
         }
         
@@ -390,7 +389,7 @@ int glb_tsbuff_resize(glb_tsbuff_t *tsbuff, int new_size, zbx_mem_malloc_func_t 
 
 int glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need_count, int head_idx) {
     
-    LOG_INF("Checking if there are enough data: %d items starting at idx %d", need_count, head_idx);
+    //LOG_INF("Checking if there are enough data: %d items starting at idx %d", need_count, head_idx);
     if (need_count == 0)
         return FAIL;
 
@@ -401,7 +400,7 @@ int glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need_co
             return FAIL;
     }
     
-    LOG_INF("idx is %d; need count is %d, tail is %d", head_idx, need_count,tsbuff->tail );
+   // LOG_INF("idx is %d; need count is %d, tail is %d", head_idx, need_count,tsbuff->tail );
     if (head_idx - need_count + 1 >=tsbuff->tail) 
             return SUCCEED;
         else 

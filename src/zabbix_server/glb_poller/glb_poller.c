@@ -310,13 +310,13 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 			res = glb_agent_init_item(dc_item, glb_item->itemdata );
 			break;
 		default:
-			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsuported glb_poller item_type %d, this is a BUG", dc_item->type);
+			zabbix_log(LOG_LEVEL_WARNING, "Cannot create glaber item, unsupported glb_poller item_type %d, this is a BUG", dc_item->type);
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit (-1);
 		}
 
 		if (FAIL == res ) {
-			zabbix_log(LOG_LEVEL_WARNING, "Coudln't init worker item %ld, not placing to the poll queue", glb_item->itemid);
+			LOG_DBG("Couldn't init worker item %ld, not placing to the poll queue", glb_item->itemid);
 			//removing the item from the hashset
 			zbx_free(glb_item->itemdata);
 			zbx_heap_strpool_release(glb_item->delay);

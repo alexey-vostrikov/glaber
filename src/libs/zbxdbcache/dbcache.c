@@ -3395,7 +3395,7 @@ static void	dc_local_add_history_uint(zbx_uint64_t itemid, unsigned char item_va
 	if (0 == (item_value->flags & ZBX_DC_FLAG_NOVALUE))
 		item_value->value.value_uint = value_orig;
 
-	DEBUG_ITEM(itemid,"Added to locacl cache as uint");
+	DEBUG_ITEM(itemid,"Added to local cache as uint");
 }
 
 static void	dc_local_add_history_text(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
@@ -3429,8 +3429,7 @@ static void	dc_local_add_history_text(zbx_uint64_t itemid, unsigned char item_va
 	else
 		item_value->value.value_str.len = 0;
 	
-	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as text", itemid );
+	DEBUG_ITEM(itemid, "Added to local cache as text");
 }
 
 static void	dc_local_add_history_log(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
@@ -3491,8 +3490,7 @@ static void	dc_local_add_history_log(zbx_uint64_t itemid, unsigned char item_val
 			string_values_offset += item_value->source.len;
 		}
 	}
-	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as log",itemid );
+	DEBUG_ITEM(itemid, "added to local cache as log");
 }
 
 static void	dc_local_add_history_notsupported(zbx_uint64_t itemid, const zbx_timespec_t *ts, const char *error,
@@ -3507,9 +3505,8 @@ static void	dc_local_add_history_notsupported(zbx_uint64_t itemid, const zbx_tim
 	item_value->state = ITEM_STATE_NOTSUPPORTED;
 	item_value->flags = flags;
 
-	if (CONFIG_DEBUG_ITEM == itemid) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local not supported history cache", itemid);
-	}
+	DEBUG_ITEM(itemid, "Added to local non-supported history cache");
+	
 	if (0 != (item_value->flags & ZBX_DC_FLAG_META))
 	{
 		item_value->lastlogsize = lastlogsize;
@@ -3540,8 +3537,7 @@ static void	dc_local_add_history_lld(zbx_uint64_t itemid, const zbx_timespec_t *
 	memcpy(&string_values[string_values_offset], value_orig, item_value->value.value_str.len);
 	string_values_offset += item_value->value.value_str.len;
 	
-	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as LLD", itemid );
+	DEBUG_ITEM(itemid, "Added to local cache as LLD data");
 }
 
 static void	dc_local_add_history_empty(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
@@ -3558,8 +3554,7 @@ static void	dc_local_add_history_empty(zbx_uint64_t itemid, unsigned char item_v
 	item_value->state = ITEM_STATE_NORMAL;
 	item_value->flags = flags;
 	
-	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as empty", itemid );
+	DEBUG_ITEM(itemid,"Added to local cache as empty");
 }
 
 /******************************************************************************
@@ -3584,10 +3579,6 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 {
 	unsigned char	value_flags;
 
-	if (CONFIG_DEBUG_ITEM == itemid) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d",itemid,state);
-	}
-
 	if (ITEM_STATE_NOTSUPPORTED == state)
 	{
 		zbx_uint64_t	lastlogsize;
@@ -3611,18 +3602,13 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 		return;
 	}
 
-	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d step 13, prog type is %d isset(val) is %d isset(meta) is %d",
-					itemid,state,program_type, ISSET_VALUE(result), ISSET_META(result) );
+	DEBUG_ITEM(itemid, "Adding result to local hist cache is state %d isset(val) is %d isset(meta) is %d",
+					state, ISSET_VALUE(result), ISSET_META(result) );
 
 	/* allow proxy to send timestamps of empty (throttled etc) values to update nextchecks for queue */
 	if (!ISSET_VALUE(result) && !ISSET_META(result) && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		return;
 	
-	if (CONFIG_DEBUG_ITEM == itemid) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d step2 ",itemid,state);
-	}
-
 	value_flags = 0;
 
 	if (!ISSET_VALUE(result))
@@ -3639,27 +3625,20 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 	{
 		if (0 != (ZBX_FLAG_DISCOVERY_RULE & item_flags))
 		{
-			if (CONFIG_DEBUG_ITEM == itemid) 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d step21` ",itemid,state);
-
 			if (NULL == GET_TEXT_RESULT(result))
 				return;
 
-			if (CONFIG_DEBUG_ITEM == itemid) 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d step3` ",itemid,state);
+			
+			DEBUG_ITEM(itemid,"Adding result to local LLD cache ");
 	
 			/* proxy stores low-level discovery (lld) values in db */
 			if (0 == (ZBX_PROGRAM_TYPE_SERVER & program_type))
 				dc_local_add_history_lld(itemid, ts, result->text);
 
-			if (CONFIG_DEBUG_ITEM == itemid) 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d step4` ",itemid,state);
-
 			return;
 		}
 		
-		if (CONFIG_DEBUG_ITEM == itemid) 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to local hist cache is state %d step5` ",itemid,state);
+		DEBUG_ITEM(itemid, "Adding result to local hist cache in NORMAL state");
 
 		if (ISSET_LOG(result))
 		{	
@@ -4222,9 +4201,7 @@ static void	hc_pop_items(zbx_vector_ptr_t *history_items)
 		item = (zbx_hc_item_t *)elem->data;
 		zbx_vector_ptr_append(history_items, item);
 		
-		if (CONFIG_DEBUG_ITEM == item->itemid) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld popped from the hist",item->itemid);
-		}
+		DEBUG_ITEM(item->itemid,"%ld: popped from the hist",item->itemid);
 		
 		zbx_binary_heap_remove_min(&cache->history_queue);
 	}
