@@ -91,16 +91,18 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 #	define ZBX_FALLTHROUGH
 #endif
 
+#define DEBUG_MESSAGE_HOST 
+
 #ifndef DEBUG_HOST
 extern zbx_uint64_t CONFIG_DEBUG_HOST;
-#	define DEBUG_HOST(host, message) if ( CONFIG_DEBUG_HOST == host )\
-		zabbix_log(LOG_LEVEL_INFORMATION, "In %s:%d, debug host %ld: %s", __func__, __LINE__, host, message);
+#	define DEBUG_HOST(host, message,...) if ( CONFIG_DEBUG_HOST == host )\
+		zabbix_log(LOG_LEVEL_INFORMATION, "In %s:%d, debug_host:%ld, " message, __FILE__, __LINE__, host, ##__VA_ARGS__);
 #endif
 
 #ifndef DEBUG_ITEM
 extern zbx_uint64_t CONFIG_DEBUG_ITEM;
-#	define DEBUG_ITEM(item, message) if ( CONFIG_DEBUG_ITEM == item && item > 0 )\
-		zabbix_log(LOG_LEVEL_INFORMATION, "In %s:%d, debug item %ld: %s", __func__, __LINE__, item, message);
+#	define DEBUG_ITEM(item, message,...) if ( CONFIG_DEBUG_ITEM == item && item > 0 )\
+		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_item:%ld, " message, __FILE__, __LINE__, item, ##__VA_ARGS__);
 #endif
 
 #define	SUCCEED		0

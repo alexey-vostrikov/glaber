@@ -23,4 +23,5 @@ libzbxalgo_a_SOURCES = \
 	vector.c \
 	strpool.c \
 	vectorimpl.h \
-	serialize.c
+	serialize.c \
+	ring_buffer.c 

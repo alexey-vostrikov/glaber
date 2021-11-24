@@ -901,7 +901,7 @@ static void get_items_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_create(&itemids);
 	
 	if (0 < json_ids_to_vector(jp, &itemids, "itemids") ) 
-		glb_cache_get_items_status_json(&itemids, &response_json);
+		glb_cache_items_get_state_json(&itemids, &response_json);
 		
 	zbx_vector_uint64_destroy(&itemids);
 	zbx_json_close(&response_json);
@@ -938,7 +938,7 @@ static void get_items_lastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) 
 	}
 
 	if (0 < json_ids_to_vector(jp, &itemids, "itemids") )  
-		glb_cache_get_lastvalues_json(&itemids, &json, count); 
+		glb_cache_get_items_lastvalues_json(&itemids, &json, count); 
 
 	zbx_json_close(&json);
 	zbx_vector_uint64_destroy(&itemids);
@@ -1073,7 +1073,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	
 out:
 	
-	zabbix_log(LOG_LEVEL_INFORMATION, " %s:Finished, history responce is response is %s",__func__,json.buffer);
+	zabbix_log(LOG_LEVEL_DEBUG, " %s:Finished, history responce is response is %s",__func__,json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);

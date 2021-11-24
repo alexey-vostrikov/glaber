@@ -1,0 +1,16 @@
+{
+    "manifest_version": 1.0,
+    "id": "glaber",
+    "name": "Host overview module for Glaber",
+    "version": "1.0.0",
+    "namespace": "HostOverview",
+    "author": "Mikhail Makurov",
+    "url": "https://gitlbab.com/mikler/glaber",
+    "description": "Show host state on one page to provide constant overview of the host and it's items state for Glaber.",
+    "actions": {
+        "host.overview": {
+            "class": "CHostOverview",
+            "view": "host.overview"
+        }
+     }
+}

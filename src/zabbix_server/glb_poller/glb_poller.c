@@ -15,6 +15,7 @@
 #include "glb_server.h"
 #include "glb_agent.h"
 #include "glb_cache.h"
+#include "glb_cache_items.h"
 #include "../poller/poller.h"
 #include "../poller/checks_snmp.h"
 #include "../../libs/zbxexec/worker.h"

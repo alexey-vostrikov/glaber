@@ -41,6 +41,7 @@
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/glb_poller/glb_pinger.h"
 #include "glb_cache.h"
+#include "glb_cache_items.h"
 
 #define ZBX_DBCONFIG_IMPL
 #include "dbconfig.h"
@@ -253,8 +254,8 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 
 			//avoiding dynamic and discovery items from being processed by async glb pollers
 			if  ( NULL != snmpitem &&  (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags || ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type) )  {
-					zabbix_log(LOG_LEVEL_DEBUG, "Item %ld host %s oid %s type %d might not be async poled, will do normal poll",
-				   			zbx_dc_item->itemid, zbx_dc_host->host, snmpitem->snmp_oid, snmpitem->snmp_oid_type);
+				//	zabbix_log(LOG_LEVEL_DEBUG, "Item %ld host %s oid %s type %d might not be async poled, will do normal poll",
+				//   			zbx_dc_item->itemid, zbx_dc_host->host, snmpitem->snmp_oid, snmpitem->snmp_oid_type);
 		  	  	return FAIL;
 			}
 			
@@ -7924,7 +7925,7 @@ static void	DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned 
 	dst_item->type = src_item->type;
 	dst_item->value_type = src_item->value_type;
 
-	dst_item->state = glb_cache_get_item_state(src_item->itemid);
+	dst_item->state = glb_cache_item_get_state(src_item->itemid);
 	dst_item->lastlogsize = src_item->lastlogsize;
 	dst_item->mtime = src_item->mtime;
 
@@ -8876,6 +8877,8 @@ int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx
 				continue;
 
 			dc_trigger->locked = 1;
+			
+			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing");
 			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
 		}
 next:;
@@ -11787,6 +11790,7 @@ int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 	const ZBX_DC_ITEM	*dc_item;
 	int			now, nitems = 0, data_expected_from, delay;
 	zbx_queue_item_t	*queue_item;
+	
 	glb_cache_item_meta_t *meta;
 
 	now = time(NULL);
@@ -11841,9 +11845,9 @@ int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 
 		}
 
-		meta = glb_cache_get_item_meta(dc_item->itemid);
+		int nextcheck = glb_cache_item_get_nextcheck(dc_item->itemid);
 
-		if (now - meta->nextcheck < from || (ZBX_QUEUE_TO_INFINITY != to && now - meta->nextcheck >= to))
+		if (now - nextcheck < from || (ZBX_QUEUE_TO_INFINITY != to && now - nextcheck >= to))
 			continue;
 
 		if (NULL != queue)
@@ -12052,7 +12056,7 @@ static void	dc_status_update(void)
 						if (NULL != dc_proxy)
 							dc_proxy->required_performance += 1.0 / delay;
 					}
-					int state = glb_cache_get_item_state(dc_item->itemid);
+					int state = glb_cache_item_get_state(dc_item->itemid);
 					switch (state)
 					{
 						case ITEM_STATE_NORMAL:
@@ -16125,3 +16129,36 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 unsigned int DCconfig_get_item_sync_ts(void) {
 	return config->item_sync_ts;
 }
+
+void DCget_unknown_triggers(int *unknown_triggers, int *total_triggers) {
+	zbx_hashset_iter_t iter;
+	ZBX_DC_TRIGGER *trg;
+	RDLOCK_CACHE;
+	
+	*total_triggers = 0;
+	*unknown_triggers = 0;
+
+	zbx_hashset_iter_reset(&config->triggers,&iter);
+	while (NULL != (trg = (ZBX_DC_TRIGGER*) zbx_hashset_iter_next(&iter))) {
+		
+		if (trg->state == TRIGGER_STATE_UNKNOWN) {
+			*unknown_triggers += 1;
+		}
+
+		*total_triggers += 1;
+	}
+	UNLOCK_CACHE;
+}
+/*
+int glb_dc_get_item_value_type (uint64_t itemid) {
+	int value_type= ITEM_VALUE_TYPE_NONE;
+	ZBX_DC_ITEM * dc_item; 
+	
+	RDLOCK_CACHE;
+	if (NULL != (dc_item=(ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemid))) 
+		value_type = dc_item->value_type;
+	UNLOCK_CACHE;
+	
+	return value_type;
+}
+*/

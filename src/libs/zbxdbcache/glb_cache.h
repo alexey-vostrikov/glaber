@@ -9,6 +9,8 @@
 #include "zbxalgo.h"
 #include "zbxhistory.h"
 #include "log.h"
+//#include "glb_cache_items.h"
+//#include "glb_cache_items.h"
 
 
 //there are two type of data - cache (several records related to an object)
@@ -29,39 +31,27 @@ extern size_t CONFIG_VALUE_CACHE_SIZE;
 #define GLB_CACHE_MIN_COUNT     10
 #define GLB_CACHE_MAX_COUNT     1024*1024 
 
-typedef struct {
-    int state;
-    int lastdata;
-    int nextcheck;
-    const char *error;
-    int errcode;
-} glb_cache_item_meta_t;
+#define GLB_CACHE_ELEM_NOT_FOUND		-2
+#define GLB_CACHE_CANNOT_CREATE			-3
 
 typedef struct {
-    int data_size; //data element size
-    int data_num; //currently allocated 
-    void *data; //actual link to data buffer
-    int start; //data is circular buffer, so start and end point  (indexes) at the places where data 
-    int end;   //is in the buffer 
-} glb_cache_cbuf_t;
+    u_int64_t id;
+    pthread_mutex_t lock;
+    void *data;
+} glb_cache_elem_t; 
 
-typedef struct {
-    unsigned int ts_sec;
-    zbx_variant_t value;
+typedef int	(*elem_update_func_t)(glb_cache_elem_t *elem, void *params);
 
-} glb_cache_item_value_t;
+typedef struct 
+{
+    zbx_hashset_t hset;
+    pthread_rwlock_t meta_lock; 
+	
+	elem_update_func_t elem_create_func;
+	void *config;
+} glb_cache_elems_t; 
 
-//for types of data requiring 
-//typedef struct {  
-//    u_int64_t id;
- 
-//    void *metadata; //item-specific settings (item state,mtime,lastcheck,nextcheck for items, trigger state for triggers)
-//    glb_cache_cbuf_t* cache; //hold time-based cache of object's states    
-    
-// } glb_cache_element_t; //this is one element holding cashed timeseries in circular buffer for 
-                   //one item
 
-/* the cache statistics  - taken from valucache.h for compatibility*/
 typedef struct
 {
 	/* in glaber cache hits/misses are measured by requests (in Zabbix it's by metrics)
@@ -83,33 +73,87 @@ typedef struct
 }
 glb_cache_item_stats_t;
 
+typedef struct {
+    int state;
+    int lastdata;
+    int nextcheck;
+    const char *error;
+    int errcode;
+} glb_cache_item_meta_t;
+
+typedef struct {
+    glb_cache_item_meta_t *meta;
+    u_int64_t flags;
+    unsigned char value_type;
+} glb_cache_meta_udpate_req_t; 
+
+
+typedef struct {
+    int count;
+    struct zbx_json *json;
+} item_last_values_req_t;
+
+
+int glb_cache_init();
+
+int glb_ic_add_values( ZBX_DC_HISTORY *history, int history_num);
+int	glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_record_t *values, int ts_start, int count, int ts_end);
+
+
+int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_func_t process_func, void *data);
+int	glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id);
+int	glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
+int glb_cache_item_get_nextcheck(u_int64_t itemid);
+int glb_cache_item_get_state(u_int64_t itemid);
+
+int glb_cache_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
+
+const char	*glb_cache_strpool_intern(const char *str);
+const char	*glb_cache_strpool_set_str(const char *old, const char *new);
+const char	*glb_cache_strpool_acquire(const char *str);
+void		glb_cache_strpool_release(const char *str);
+
+/************************************
+************************************
+Untested below
+*/
+
+
+
+
+
+
 int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
 		int count, const zbx_timespec_t *ts);
 int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value);
         
-int glb_cache_add_values(ZBX_DC_HISTORY *history, int history_num);
-
+//int glb_cache_add_values(ZBX_DC_HISTORY *history, int history_num);
+int glb_cache_update_elem(glb_cache_elems_t elems, u_int64_t id, elem_update_func_t func, void *request);
 
 int glb_cache_get_statistics(glb_cache_stats_t *stats);
-int glb_vc_load_cache();
+//int glb_vc_load_cache();
 int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats);
 int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
 
-
+void *glb_cache_malloc(void *old, size_t size);
+void glb_cache_free(void *ptr);
 
 
 int glb_cache_housekeep();
-int glb_cache_init();
+
 void glb_cache_destroy(void);
 
-int     glb_cache_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
+int     glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) ;
 int     glb_cache_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
 void    glb_cache_get_item_stats(zbx_vector_ptr_t *stats);
 int     glb_cache_get_item_state(u_int64_t itemid);
-void    glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
-int     glb_cache_get_item_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
-		    int count, int ts_end);
-glb_cache_item_meta_t* glb_cache_get_item_meta(u_int64_t itemid);
 
 
+int     glb_cache_get_values_by_count(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int count, int ts_end);
+
+int     glb_cache_get_values_by_time(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds, int ts_end);
+
+//int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value);
+//int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
+//		int count, const zbx_timespec_t *ts);
 #endif

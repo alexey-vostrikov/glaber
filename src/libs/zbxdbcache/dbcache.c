@@ -842,10 +842,13 @@ static void	DCadd_trend(const ZBX_DC_HISTORY *history, ZBX_DC_TREND **trends, in
 	hour = history->ts.sec - history->ts.sec % SEC_PER_HOUR;
 
 	trend = DCget_trend(history->itemid);
+	
+	DEBUG_ITEM(history->itemid, "Accounting data in trends");
 
 	if (trend->num > 0 && (trend->clock != hour || trend->value_type != history->value_type))
 	{
 		DCflush_trend(trend, trends, trends_alloc, trends_num);
+		DEBUG_ITEM(history->itemid, "Trend is flushed to DB");
 	}
 
 	trend->value_type = history->value_type;
@@ -2854,14 +2857,7 @@ static void	sync_proxy_history(int *total_num, int *more)
  ******************************************************************************/
 static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 {
-//	static ZBX_HISTORY_FLOAT	*history_float;
-//	static ZBX_HISTORY_INTEGER	*history_integer;
-//	static ZBX_HISTORY_STRING	*history_string;
-//	static ZBX_HISTORY_TEXT		*history_text;
-//	static ZBX_HISTORY_LOG		*history_log;
 	int				i, history_num, 
-//					history_float_num, history_integer_num, history_string_num,
-//					history_text_num, history_log_num, 
 					txn_error, compression_age;
 
 	unsigned int			item_retrieve_mode;
@@ -2872,37 +2868,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	ZBX_DC_HISTORY			history[ZBX_HC_SYNC_MAX];
 
 	item_retrieve_mode = NULL == CONFIG_EXPORT_DIR ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
-/*
-	if (NULL == history_float && NULL != history_float_cbs)
-	{
-		history_float = (ZBX_HISTORY_FLOAT *)zbx_malloc(history_float,
-				ZBX_HC_SYNC_MAX * sizeof(ZBX_HISTORY_FLOAT));
-	}
 
-	if (NULL == history_integer && NULL != history_integer_cbs)
-	{
-		history_integer = (ZBX_HISTORY_INTEGER *)zbx_malloc(history_integer,
-				ZBX_HC_SYNC_MAX * sizeof(ZBX_HISTORY_INTEGER));
-	}
-
-	if (NULL == history_string && NULL != history_string_cbs)
-	{
-		history_string = (ZBX_HISTORY_STRING *)zbx_malloc(history_string,
-				ZBX_HC_SYNC_MAX * sizeof(ZBX_HISTORY_STRING));
-	}
-
-	if (NULL == history_text && NULL != history_text_cbs)
-	{
-		history_text = (ZBX_HISTORY_TEXT *)zbx_malloc(history_text,
-				ZBX_HC_SYNC_MAX * sizeof(ZBX_HISTORY_TEXT));
-	}
-
-	if (NULL == history_log && NULL != history_log_cbs)
-	{
-		history_log = (ZBX_HISTORY_LOG *)zbx_malloc(history_log,
-				ZBX_HC_SYNC_MAX * sizeof(ZBX_HISTORY_LOG));
-	}
-*/
 	compression_age = hc_get_history_compression_age();
 
 	zbx_vector_ptr_create(&inventory_values);
@@ -2961,10 +2927,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 			for (i = 0; i < history_num; i++) {
 				zbx_vector_uint64_append(&itemids, history[i].itemid);
-				
-				if (CONFIG_DEBUG_ITEM == history[i].itemid) {
-					zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld - processing in history sync", history[i].itemid);
-				}
+				DEBUG_ITEM( history[i].itemid, "processing in history sync");
 			}
 			zbx_vector_uint64_sort(&itemids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
@@ -2976,16 +2939,10 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			
 			//at this call history will be added to the history storage
 			//and state cache
-			
-			
-			
-			//if (FAIL != (ret = DBmass_add_history(history, history_num)))
-			//{
-			glb_cache_add_values(history, history_num);
+					
+			glb_ic_add_values(history, history_num);
 			glb_history_add(history,history_num);
 			
-
-
 			DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
 			
 			DC_get_trends_items_keys(trends,trends_num);
@@ -4296,8 +4253,9 @@ static void	hc_get_item_values(ZBX_DC_HISTORY *history, zbx_vector_ptr_t *histor
 
 		if (ZBX_HC_ITEM_STATUS_BUSY == item->status)
 			continue;
-
+		
 		hc_copy_history_data(&history[history_num++], item->itemid, item->tail);
+		DEBUG_ITEM(item->itemid, "History data is copied from the cache");
 	}
 }
 

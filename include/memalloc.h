@@ -47,6 +47,8 @@ typedef struct
 
 	const char	*mem_descr;
 	const char	*mem_param;
+
+	pthread_mutex_t lock;
 }
 zbx_mem_info_t;
 

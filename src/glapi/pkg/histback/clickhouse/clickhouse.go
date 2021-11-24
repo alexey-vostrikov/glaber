@@ -126,6 +126,7 @@ func (he ClickHouseHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) 
 	}
 	
 	fmt.Fprintf(buf,")")
+//	log.Printf(buf.String())
 	(*he.metrics)[metric.Value_type]++
 	
 }

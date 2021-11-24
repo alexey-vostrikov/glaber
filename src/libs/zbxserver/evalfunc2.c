@@ -1677,7 +1677,7 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	char				*arg2 = NULL;
 	zbx_proxy_suppress_t		nodata_win;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	LOG_DBG("In %s()", __func__);
 
 	zbx_history_record_vector_create(&values);
 
@@ -1686,14 +1686,14 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 		*error = zbx_strdup(*error, "invalid number of parameters");
 		goto out;
 	}
-
+	
 	if (SUCCEED != get_function_parameter_int(parameters, 1, ZBX_PARAM_MANDATORY, &arg1, &arg1_type) ||
 			ZBX_VALUE_SECONDS != arg1_type || 0 >= arg1)
 	{
 		*error = zbx_strdup(*error, "invalid second parameter");
 		goto out;
 	}
-
+	
 	if (1 < num && (SUCCEED != get_function_parameter_str(parameters, 2, &arg2) ||
 			('\0' != *arg2 && 0 != (lazy = strcmp("strict", arg2)))))
 	{
@@ -1718,14 +1718,13 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	}
 	else
 		period = arg1;
-	//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from CACHE",__func__,item->itemid);
-	if (SUCCEED != (ret = glb_cache_get_item_values(item->itemid, item->value_type, &values, 0 , 1, ts.sec))) {
+
+	if (SUCCEED != (ret = glb_ic_get_values(item->itemid, item->value_type, &values, 0, 1, ts.sec))) {
 		//there was a problem fetching the data
 		*error = zbx_strdup(*error, "Couldn't fetch item, DB backend returned FAIL");
-		//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from the CACHE has failed", __func__, item->itemid);
+		LOG_DBG("%s: NODATA: item %ld fetching from the CACHE has failed", __func__, item->itemid);
 		goto out;
 	} 
-	//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld fetching from the CACHE has succeeded , %d values", __func__, item->itemid, values.values_num );
 
 	//there was no problem in fetching the data, check if the latest item is withing the period
 	//if (1 == values.values_num) {
@@ -1736,7 +1735,6 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	if (1 == values.values_num && 
 			time(NULL) - values.values[0].timestamp.sec <=period  )
 	{
-	//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld setting 0 as a result (which means that THERE IS THE DATA)",__func__, item->itemid);
 		zbx_variant_set_dbl(value, 0);
 	}
 	else
@@ -1749,12 +1747,10 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 			goto out;
 		}
 
-		//zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: %ld checking startup timing",__func__,item->itemid);
 		if (seconds + arg1 > ts.sec)
 		{
 			*error = zbx_strdup(*error,
 					"item does not have enough data after server start or item creation");
-		//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: %ld retruning error due to startup time",__func__,item->itemid);
 			goto out;
 		}
 
@@ -1763,7 +1759,7 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 			*error = zbx_strdup(*error, "historical data transfer from proxy is still in progress");
 			goto out;
 		}
-	//	zabbix_log(LOG_LEVEL_INFORMATION, "%s: NODATA: item %ld setting 1 as a result",__func__, item->itemid);
+
 		zbx_variant_set_dbl(value, 1);
 
 		if (0 != item->host.proxy_hostid && 0 != lazy)

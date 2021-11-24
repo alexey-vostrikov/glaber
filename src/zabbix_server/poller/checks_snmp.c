@@ -2472,8 +2472,8 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 					
 
 				} else {
-					DEBUG_ITEM(glb_item->itemid,"Async SNMP FAILED RESULT processing for the item");
-					DEBUG_ITEM(glb_item->itemid,result.msg);
+					DEBUG_ITEM(glb_item->itemid, "Async SNMP FAILED RESULT processing for the item");
+					DEBUG_ITEM(glb_item->itemid, "%s", result.msg );
 
 					zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , NULL,
 					&timespec,ITEM_STATE_NOTSUPPORTED, result.msg);

@@ -118,7 +118,7 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
 	
 	
 	if (SUCCEED != glb_process_worker_request(conf->worker, request, &response)) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Failed to get info from worker");
+		LOG_DBG("Failed to get info from worker");
 		return FAIL;
 	}	
 	
@@ -130,7 +130,7 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
 		return FAIL;
 	}
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "aggmetrics", &jp_data)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find data sesction in the worker %s  responce %s:",conf->worker->path, response);
+		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find data section in the worker %s  responce %s:",conf->worker->path, response);
 		return FAIL;
 	};
     
@@ -229,7 +229,7 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 		return FAIL;
 	}
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "aggmetrics", &jp_data)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find data sesction in the worker %s  responce %s:",conf->worker->path, response);
+		LOG_DBG("Couldn't find data section in the worker %s  responce %s:",conf->worker->path, response);
 		return FAIL;
 	};
     
@@ -309,22 +309,26 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	zbx_history_record_t	hr;
 	zbx_json_type_t type;
 	
-	if (0 == conf->read_types[value_type])	
+	if (0 == conf->read_types[value_type])	{
+		LOG_INF("Unknown value type %d", value_type);
 			return SUCCEED;
-	
+	}
 	//this isn't really nice idea since we might be getting some get_values from the zabbix frontend
 	if ( GLB_HISTORY_GET_NON_INTERACTIVE == interactive && 
 		 time(NULL)- conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
-		zabbix_log(LOG_LEVEL_DEBUG, "waiting for cache load, exiting");
+		LOG_INF("waiting for cache load, exiting");
       	return SUCCEED;
 	}
 	
 	//creating the request
 	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_history\", \"itemid\":%ld, \"start\": %d, \"count\":%d, \"end\":%d, \"value_type\":%d }\n",
 				itemid,start,count,end,value_type);
-	
+
+	DEBUG_ITEM(itemid, "Requested from the history via history worker, start:%d, count:%d, end:%d ",start, count, end);
+//	LOG_INF("Sending request to history worker: %s",request);
 	glb_process_worker_request(conf->worker, request, &response);
 	
+	//LOG_INF("Got response: %s",response);	
 	if (NULL == response)
 			return SUCCEED;
 	if (ITEM_VALUE_TYPE_LOG == value_type)
@@ -344,7 +348,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 
     while (NULL != (p = zbx_json_next(&jp_data, p)))
 	{
-        char *itemid=NULL,*source=NULL;
+        char *source=NULL;
         char clck[MAX_ID_LEN], ns[MAX_ID_LEN],value[MAX_STRING_LEN], logeventid[MAX_ID_LEN],severity[MAX_ID_LEN];
 		
         
@@ -357,8 +361,10 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 				hr.timestamp.sec = atoi(clck);
 				hr.timestamp.ns = atoi(ns);
 				zabbix_log(LOG_LEVEL_DEBUG,"read: Clock: %s, ns: %s, value: %s, ",clck,ns,value);
-
-                switch (value_type)
+				
+				DEBUG_ITEM(itemid, "Got history response: %s -> %s", clck, value );
+                
+				switch (value_type)
 				{
 					case ITEM_VALUE_TYPE_UINT64:
 						zabbix_log(LOG_LEVEL_DEBUG, "Parsed as UINT64 %s",value);
@@ -411,12 +417,11 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 				
 				valuecount++;
 			} 
-            
+          
         } else {
             zabbix_log(LOG_LEVEL_DEBUG,"Couldn't parse JSON row: %s",p);
         };
 	}
-
 	zbx_free(response);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -451,14 +456,14 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		return SUCCEED;
 	
 	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_history\", \"metrics\":[");
-    //converitng the data to string
+    //converting the data to string
 	for (i = 0; i < history_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)&hist[i];
 	
 		if (0 == conf->write_types[h->value_type]) 
 			continue;
-		//TODO: instead of ignoringg unsupported (error or empty) items, either write them!
+		//TODO: instead of ignoring unsupported (error or empty) items, either write them!
 		//but first, need history backend support for that
 		//zabbix_log(LOG_LEVEL_INFORMATION, "Value %d: state: %d flags: %d", i, h->state, h->flags);
 		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
@@ -520,14 +525,14 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		}
 		
 		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
-		//zabbix_log(LOG_LEVEL_INFORMATION,"Will send %s",req_buffer);
+//		zabbix_log(LOG_LEVEL_INFORMATION,"Will send %s",req_buffer);
 		num++;
 	}
   
   	//adding empty line to the request's end to signal end of request;
 	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"]}\n");
 
-   	zabbix_log(LOG_LEVEL_DEBUG,"sending to the worker: %s",req_buffer);
+  // 	LOG_INF("sending to the worker: %s",req_buffer);
 	if (num > 0)
 		ret=glb_process_worker_request(conf->worker, req_buffer, &response);
 	

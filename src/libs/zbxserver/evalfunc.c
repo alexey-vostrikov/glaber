@@ -1704,12 +1704,13 @@ static int	evaluate_NODATA(char **value, DC_ITEM *item, const char *parameters, 
 	else
 		period = arg1;
 
-	if (SUCCEED != (ret = glb_cache_get_item_values(item->itemid, item->value_type, &values, 0 , 1, ts.sec))) {
+	if (SUCCEED != (ret = glb_ic_get_values(item->itemid, item->value_type, &values, 0, 1, ts.sec))) {
 		//there was a problem fetching the data
+
 		*error = zbx_strdup(*error, "Couldn't fetch item, DB backend returned FAIL");
 		goto out;
 	} 
-
+	
 	//there was no problem in fetching the data, check if the latest item is withing the period
 	if (1 == values.values_num && 
 		time(NULL) - values.values[0].timestamp.sec <=period  )

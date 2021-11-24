@@ -1,13 +1,21 @@
-/***************************************
-* This is a good place for a copyright - here it is. The copyright.
-*
-* An external worker is a long - running script 
-* which is capable of processing simple and 
-* similar tasks lots of times
-* Runners are solution to have functionality added
-* to server wihtout digging into the sources
-* and having good performance at the same time
-***************************************************/
+/*
+** Copyright Glaber
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+
 #include "../../../include/common.h"
 #include "worker.h"
 #include "log.h"
@@ -28,7 +36,7 @@ extern int CONFIG_TIMEOUT;
 //as they'll be more universal (perhaps, will use unix domains or tcp addr for
 //communitcation, then they could be global
 //int zbx_dc_add_ext_worker(char *path, char *params, int max_calls, int timeout, int mode_to_writer, int mode_from_writer);
-static zbx_hashset_t *workers = NULL;
+//static zbx_hashset_t *workers = NULL;
 
 static int get_worker_mode(char *mode)
 {
@@ -334,9 +342,6 @@ int worker_is_alive(GLB_EXT_WORKER *worker)
     return SUCCEED;
 }
 
-//makes sure worker is ready to answer requests
-//starts the script if needed, restarts after max_calls
-//kills on timeout
 static void worker_cleanup(GLB_EXT_WORKER *worker)
 {
 
@@ -345,10 +350,8 @@ static void worker_cleanup(GLB_EXT_WORKER *worker)
     int bytes = 0;
     zabbix_log(LOG_LEVEL_DEBUG, "%s, Doing worker %s cleanup ", __func__, worker->path);
 
-    //will set fd from the script to non-blicking and will read till there is a data
-
-    /* Save the current flags */
     int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
+    
     if (flags == -1)
         return;
 
@@ -362,15 +365,9 @@ static void worker_cleanup(GLB_EXT_WORKER *worker)
     if (bytes > 0)
         zabbix_log(LOG_LEVEL_INFORMATION, "GARBAGE DETECTED  %d bytes of garbage from %s: %s", bytes, worker->path, *buffer);
 
-    //restore the flags
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
     zabbix_log(LOG_LEVEL_DEBUG, "%s, finished", __func__);
 
-}
-
-GLB_EXT_WORKER *glb_get_worker_script(char *cmd)
-{
-    return zbx_hashset_search(workers, cmd);
 }
 
 int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
@@ -714,9 +711,7 @@ int glb_process_worker_request(GLB_EXT_WORKER *worker, const char *request, char
     return SUCCEED;
 }
 
-//this is supposed to be used to escape data before sending to workers
-//it does two things: escapes single unscaped quotes to make the string JSON valid
-//and replaces newlines with \n to make them worker - valid for line by line processing
+
 int glb_escape_worker_string(char *in_string, char *out_buffer)
 {
     
@@ -753,7 +748,6 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
 void glb_destroy_worker(GLB_EXT_WORKER *worker)
 {
 
-    //let's kill the worker first
     if (worker_is_alive(worker))
         kill(worker->pid, SIGINT);
 
@@ -761,47 +755,3 @@ void glb_destroy_worker(GLB_EXT_WORKER *worker)
     zbx_free(worker->args[0]);
     zbx_free(worker);
 }
-//ok, now the logic how we work with the worker modules:
-//1. Generally it's interactive mode, when a worker
-//finishes processing, it should give us empty new line
-//1.1. It might be feasible to run a module in a "consuming" mode when
-//it just accept data and we don't expect any output to happen from it
-//it's much easier for things like history uploading - we just send info, and when we cannot, we fail
-
-//then, it might be a good idea to implement a worker back-off timer - whenever worker has failed,
-//the module will fail quickly without doing an expencive job like restarting a caller all the time
-
-//2. we must write to a pipe in async mode: have to be sure nothing will block us
-//3. then the module keeps waiting for a new line till timeout exceeds, and this process
-//must be quite efficient (perhaps a poll with timeout or something), just banging each 1ms
-//into a pipe might be either not fast enough or non efficicent in terms of CPU usage
-
-//4. new lines logic: it might be many approaches. It's definetly very easy to do a line by line processing
-//for both scripts and output from a script.
-//however it might be usefull and convinient for scripts to produce multiline output.
-//so generally it's three modes - single line, multiline and silent. Its all applies to input data and
-//output data.
-//however if "silent" input mode is seleted, then to signal a runnur to feed us a data, we'll send one empty line to it
-
-//for example: a history syncer which writes data might be silent for output, which means we don't expect
-//anything on his stdout pipe, we will clean (and complain) whatever happens there  (actually perhaps it's a good idea to
-// handle sterr separatly - perhaps, translate it to the log)
-
-//a history syncer working in the reader mode is a good example of multiline output (we probably be getting)
-//JSON data or some preformatted CSV out of it
-
-//it might be a history syncer which works in value cache prefill mode, this one might get all
-//the params it needs through the configuration
-
-//so, it's three modes, GLB_MODULE_SILENT, GLB_MODULE_SINGLELINE GLB_MODULE_MULTILINE
-//and the defaults: to module: GLB_MODULE_SINGLELINE
-//                  from module: GLB_MODULE_MULTILINE
-
-//so we treat sending and recieving data from and to the module differently according to the mode
-//in single line operations we don't expect newline characters to appear in the request
-//as well as emptylines in the multiple mode
-//we send nothing in silent mode
-//and whatever output happens in the silent mode we ignore it, but complain in the logs
-//when processing output, we wait till timeout for getting a newline character and ignore whatever data
-//fillows new line
-//in multiline we wait for an empty string to show up

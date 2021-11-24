@@ -460,4 +460,54 @@ int	zbx_list_iterator_equal(const zbx_list_iterator_t *iterator1, const zbx_list
 int	zbx_list_iterator_isset(const zbx_list_iterator_t *iterator);
 void	zbx_list_iterator_update(zbx_list_iterator_t *iterator);
 
+/*circular (ring) buffer  */
+/* implementation is specific to time-series */
+typedef struct {
+    int size;
+    int count;
+	int item_size;
+	void *data;
+    int head;
+	int tail;
+} glb_tsbuff_t;
+
+typedef struct {
+    unsigned int sec;
+    u_int64_t value; 
+} glb_tsbuff_value_t;
+
+typedef struct {
+    int direction;
+    int current_idx;
+    glb_tsbuff_t *tsbuff;
+} glb_tsbuff_iter_t;
+
+
+typedef void (*glb_tsbuff_val_free_func_t)(zbx_mem_malloc_func_t alloc_func, zbx_mem_free_func_t free_func, void* value);
+int 	glb_tsbuff_index(glb_tsbuff_t *tsbuff, int index);
+int		glb_tsbuff_init(glb_tsbuff_t *rbuff, unsigned int elem_num, size_t elem_size, zbx_mem_malloc_func_t malloc_func);
+void	glb_tsbuff_destroy(glb_tsbuff_t *tsbuff, zbx_mem_free_func_t malloc_func);
+int 	glb_tsbuff_resize(glb_tsbuff_t *tsbuff, int new_size, zbx_mem_malloc_func_t alloc_func, zbx_mem_free_func_t free_func, glb_tsbuff_val_free_func_t val_free_func);
+
+int		glb_tsbuff_get_size(glb_tsbuff_t *tsbuff);
+void*	glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time);
+void*	glb_tsbuff_add_to_tail(glb_tsbuff_t *tsbuff, int time);
+void*	glb_tsbuff_get_value_head(glb_tsbuff_t *tsbuff);
+void*	glb_tsbuff_get_value_tail(glb_tsbuff_t *tsbuff);
+int		glb_tsbuff_get_count(glb_tsbuff_t *tsbuff);
+void*	glb_tsbuff_get_value_ptr(glb_tsbuff_t *tsbuf, int idx);
+int 	glb_tsbuff_get_time_head(glb_tsbuff_t *tsbuff);
+int		glb_tsbuff_get_time_tail(glb_tsbuff_t *tsbuff);
+int 	glb_tsbuff_free_tail(glb_tsbuff_t *tsbuff);
+int		glb_tsbuff_is_full(glb_tsbuff_t *tsbuff);
+
+int		glb_tsbuff_find_time_idx(glb_tsbuff_t *tsbuf, int tm_sec);
+void	glb_tsbuff_dump(glb_tsbuff_t *tsbuff);
+
+int    glb_tsbuff_check_has_enough_count_data_time(glb_tsbuff_t *tsbuff, int need_count, int time);
+int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need_count, int head_idx);
+
+void  glb_tsbuff_init_ext(glb_tsbuff_t *rbuff, unsigned int elem_num, size_t elem_size);
+//void  glb_tsbuff_iter_init_ext(glb_tsbuff_iter_t *iter, glb_tsbuff_t *tsbuff, int direction, int start_idx);
+//glb_tsbuff_value_t *glb_tsbuff_iter_next(glb_tsbuff_iter_t *iter);
 #endif

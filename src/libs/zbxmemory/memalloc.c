@@ -20,7 +20,7 @@
 #include "common.h"
 #include "mutexs.h"
 #include "log.h"
-
+#include "../zbxsys/glb_lock.c"
 #include "memalloc.h"
 
 /******************************************************************************
@@ -615,10 +615,12 @@ int	zbx_mem_create(zbx_mem_info_t **info, zbx_uint64_t size, const char *descr, 
 	mem_set_chunk_size((*info)->buckets[index], (*info)->total_size);
 	mem_set_prev_chunk((*info)->buckets[index], NULL);
 	mem_set_next_chunk((*info)->buckets[index], NULL);
-
+	
 	(*info)->used_size = 0;
 	(*info)->free_size = (*info)->total_size;
-
+	
+	glb_lock_init(&(*info)->lock);
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "valid user addresses: [%p, %p] total size: " ZBX_FS_SIZE_T,
 			(void *)((char *)(*info)->lo_bound + MEM_SIZE_FIELD),
 			(void *)((char *)(*info)->hi_bound - MEM_SIZE_FIELD),
@@ -646,13 +648,19 @@ void	*__zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const v
 				")", file, line, __func__, (zbx_fs_size_t)size);
 		exit(EXIT_FAILURE);
 	}
+	
+	glb_lock_block(&info->lock);
 
 	chunk = __mem_malloc(info, size);
 
+	glb_lock_unlock(&info->lock);
+	
 	if (NULL == chunk)
 	{
-		if (1 == info->allow_oom)
+		if (1 == info->allow_oom) {
+	
 			return NULL;
+		}
 
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): out of memory (requested " ZBX_FS_SIZE_T " bytes)",
 				file, line, __func__, (zbx_fs_size_t)size);
@@ -662,7 +670,7 @@ void	*__zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const v
 		zbx_backtrace();
 		exit(EXIT_FAILURE);
 	}
-
+	
 	return (void *)((char *)chunk + MEM_SIZE_FIELD);
 }
 
@@ -676,11 +684,15 @@ void	*__zbx_mem_realloc(const char *file, int line, zbx_mem_info_t *info, void *
 				")", file, line, __func__, (zbx_fs_size_t)size);
 		exit(EXIT_FAILURE);
 	}
-
+	
+	glb_lock_block(&info->lock);
+	
 	if (NULL == old)
 		chunk = __mem_malloc(info, size);
 	else
 		chunk = __mem_realloc(info, old, size);
+	
+	glb_lock_unlock(&info->lock);
 
 	if (NULL == chunk)
 	{
@@ -706,8 +718,13 @@ void	__zbx_mem_free(const char *file, int line, zbx_mem_info_t *info, void *ptr)
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): freeing a NULL pointer", file, line, __func__);
 		exit(EXIT_FAILURE);
 	}
-
+	
+	glb_lock_block(&info->lock);
+	
 	__mem_free(info, ptr);
+	
+	glb_lock_unlock(&info->lock);
+
 }
 
 void	zbx_mem_clear(zbx_mem_info_t *info)
@@ -715,6 +732,8 @@ void	zbx_mem_clear(zbx_mem_info_t *info)
 	int	index;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	
+	glb_lock_block(&info->lock);
 
 	memset(info->buckets, 0, MEM_BUCKET_COUNT * ZBX_PTR_SIZE);
 	index = mem_bucket_by_size(info->total_size);
@@ -724,6 +743,8 @@ void	zbx_mem_clear(zbx_mem_info_t *info)
 	mem_set_next_chunk(info->buckets[index], NULL);
 	info->used_size = 0;
 	info->free_size = info->total_size;
+	
+	glb_lock_unlock(&info->lock);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -737,6 +758,8 @@ void	zbx_mem_get_stats(const zbx_mem_info_t *info, zbx_mem_stats_t *stats)
 	stats->free_chunks = 0;
 	stats->max_chunk_size = __UINT64_C(0);
 	stats->min_chunk_size = __UINT64_C(0xffffffffffffffff);
+
+	glb_lock_block((pthread_mutex_t*)&info->lock);
 
 	for (i = 0; i < MEM_BUCKET_COUNT; i++)
 	{
@@ -754,6 +777,8 @@ void	zbx_mem_get_stats(const zbx_mem_info_t *info, zbx_mem_stats_t *stats)
 		stats->free_chunks += counter;
 		stats->chunks_num[i] = counter;
 	}
+	
+	glb_lock_unlock((pthread_mutex_t*)&info->lock);
 
 	stats->overhead = info->total_size - info->used_size - info->free_size;
 	stats->used_chunks = stats->overhead / (2 * MEM_SIZE_FIELD) + 1 - stats->free_chunks;
@@ -765,9 +790,9 @@ void	zbx_mem_dump_stats(int level, zbx_mem_info_t *info)
 {
 	zbx_mem_stats_t	stats;
 	int		i;
-
+	
 	zbx_mem_get_stats(info, &stats);
-
+	
 	zabbix_log(level, "=== memory statistics for %s ===", info->mem_descr);
 
 	for (i = 0; i < MEM_BUCKET_COUNT; i++)
