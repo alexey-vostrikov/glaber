@@ -240,10 +240,13 @@ class CScreenHistory extends CScreenBase {
 				}
 					
 				
+				$sort_order = $has_logs? ZBX_SORT_UP : ZBX_SORT_DOWN;
+				
 				CArrayHelper::sort($history_data, [
-					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
-					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
+					['field' => 'clock', 'order' => $sort_order],
+					['field' => 'ns', 'order' => $sort_order]
 				]);
+
 
 				$history_data = array_slice($history_data, 0, $options['limit']);
 

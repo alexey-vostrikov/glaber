@@ -76,7 +76,7 @@ else {
 foreach ($data['items'] as $itemid => $item) {
 	$is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
 
-	$checkbox = (new CCheckBox('itemids['.$itemid.']', $itemid))->setEnabled($is_graph);
+	$checkbox = (new CCheckBox('itemids['.$itemid.']', $itemid));//->setEnabled($is_graph);
 	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
 
 	$item_name = (new CDiv([

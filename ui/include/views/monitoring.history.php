@@ -193,31 +193,73 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 	}
 }
 
+
+
 // create history screen
 if ($data['itemids']) {
-	$screen = CScreenBuilder::getScreen([
-		'resourcetype' => SCREEN_RESOURCE_HISTORY,
-		'action' => $data['action'],
+
+	//splitting items into 2 groups - numerical and tex/log ones
+	$items = API::Item()->get([
+		'output' => ['itemid', 'value_type'],
 		'itemids' => $data['itemids'],
-		'pageFile' => (new CUrl('history.php'))
-			->setArgument('action', $data['action'])
-			->setArgument('itemids', $data['itemids'])
-			->setArgument('filter', $data['filter'])
-			->setArgument('filter_task', $data['filter_task'])
-			->setArgument('mark_color', $data['mark_color'])
-			->getUrl(),
-		'profileIdx' => $data['profileIdx'],
-		'profileIdx2' => $data['profileIdx2'],
-		'from' => $data['from'],
-		'to' => $data['to'],
-		'page' => $data['page'],
-		'filter' => $data['filter'],
-		'filter_task' => $data['filter_task'],
-		'mark_color' => $data['mark_color'],
-		'plaintext' => $data['plaintext'],
-		'graphtype' => $data['graphtype']
+		'webitems' => true,
+		'preservekeys' => true
 	]);
+
+	$items_by_type = [];
+
+
+	$iv_string = [
+		ITEM_VALUE_TYPE_LOG => 1,
+		ITEM_VALUE_TYPE_TEXT => 1,
+		ITEM_VALUE_TYPE_STR => 1
+	];
+
+
+	foreach ($items as $itemid => $item) {
+		if (array_key_exists($item['value_type'], $iv_string)) {
+			$items_by_type['text'][$itemid] = $itemid;
+		} else {
+			$items_by_type['numeric'][$itemid] = $itemid;
+		}
+	}
+
+	$screens = [];
+
+	foreach ($items_by_type as $typename => $type_items) {
+		if (count($type_items) == 0)
+			continue;
+
+		if ('text' == $typename)
+			$action = HISTORY_VALUES;
+		else
+			$action = $data['action'];
+
+		$screens[$typename] = CScreenBuilder::getScreen([
+			'resourcetype' => SCREEN_RESOURCE_HISTORY,
+			'action' => $action,
+			'itemids' => $type_items,
+			'pageFile' => (new CUrl('history.php'))
+				->setArgument('action', $action)
+				->setArgument('itemids', $type_items)
+				->getUrl(),
+			'profileIdx' => $data['profileIdx'],
+			'profileIdx2' => $data['profileIdx2'],
+			'from' => $data['from'],
+			'to' => $data['to'],
+			'page' => $data['page'],
+			'filter' => $data['filter'],
+			'filter_task' => $data['filter_task'],
+			'mark_color' => getRequest('mark_color'),
+			'plaintext' => $data['plaintext'],
+			'graphtype' => $data['graphtype'],
+			'screenid' => $typename
+		]);
+	}
 }
+
+
+
 
 // append plaintext to widget
 if ($data['plaintext']) {
@@ -226,11 +268,15 @@ if ($data['plaintext']) {
 	}
 
 	if ($data['itemids']) {
-		$screen = $screen->get();
+		//$screen = $screen->get();
 		$pre = new CPre();
-		foreach ($screen as $text) {
-			$pre->addItem([$text, BR()]);
+
+		foreach($screens as $screen_type => $screen) {
+			foreach ($screen as $text) {
+				$pre->addItem([$text, BR()]);
+			}
 		}
+
 		$historyWidget->addItem($pre);
 	}
 }
@@ -240,8 +286,11 @@ else {
 		->setControls((new CTag('nav', true, $header['right']))->setAttribute('aria-label', _('Content controls')));
 
 	if ($data['itemids'] && $data['action'] !== HISTORY_LATEST) {
-		$filter_form->addTimeSelector($screen->timeline['from'], $screen->timeline['to'],
+		
+		$filter_form->addTimeSelector(reset($screens)->timeline['from'], reset($screens)->timeline['to'],
 			$web_layout_mode != ZBX_LAYOUT_KIOSKMODE);
+	
+
 	}
 
 	if ($data['action'] == HISTORY_BATCH_GRAPH) {
@@ -274,10 +323,17 @@ else {
 			$historyWidget->addItem($filter_form);
 		}
 
-		$historyWidget->addItem($screen->get());
-
-		if ($data['action'] !== HISTORY_LATEST) {
-			CScreenBuilder::insertScreenStandardJs($screen->timeline);
+		//need to create a separate screen for each group of data
+		foreach (array('numeric','text') as $idx => $typename) {
+			if (!isset($screens[$typename])) 
+				continue;
+		
+			$historyWidget->addItem($screens[$typename]->get());
+	
+			if ($data['action'] !== HISTORY_LATEST ) {
+				CScreenBuilder::insertScreenStandardJs($screens[$typename]->timeline);
+	
+			}
 		}
 	}
 	else {
