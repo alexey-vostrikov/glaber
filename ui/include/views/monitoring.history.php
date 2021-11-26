@@ -259,8 +259,6 @@ if ($data['itemids']) {
 }
 
 
-
-
 // append plaintext to widget
 if ($data['plaintext']) {
 	foreach ($header_row as $text) {
@@ -268,11 +266,11 @@ if ($data['plaintext']) {
 	}
 
 	if ($data['itemids']) {
-		//$screen = $screen->get();
+//		$screen = $screen->get();
 		$pre = new CPre();
 
 		foreach($screens as $screen_type => $screen) {
-			foreach ($screen as $text) {
+			foreach ($screen->get() as $text) {
 				$pre->addItem([$text, BR()]);
 			}
 		}

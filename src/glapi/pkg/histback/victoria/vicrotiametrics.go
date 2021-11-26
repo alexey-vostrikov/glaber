@@ -133,8 +133,8 @@ func (he VictoriaHist) ReadTrends (hr histApi.HistoryRequest, dumpf func(*histAp
 		step =  (hr.End - hr.Start ) / hr.Count
 	}
 
-	fmt.Fprintf(&buf, "%s/api/v1/query_range?query=(trend_%d_avg{dbname=\"%s\"},trend_%d_min{dbname=\"%s\"},trend_%d_max{dbname=\"%s\"})&start=%d&end=%d&step=%ds",
-		he.baseurl, hr.Itemid, he.dbname,hr.Itemid, he.dbname,hr.Itemid, he.dbname, hr.Start, hr.End, step)
+	fmt.Fprintf(&buf, "%s/api/v1/query_range?query=(trend_%d_avg{dbname=\"%s\"},trend_%d_min{dbname=\"%s\"},trend_%d_max{dbname=\"%s\"})&start=%d&end=%d&step=%dms",
+		he.baseurl, hr.Itemid, he.dbname,hr.Itemid, he.dbname,hr.Itemid, he.dbname, hr.Start, hr.End, step*1000)
 
 	//log.Print("Sending trends query: ", buf.String());
 
@@ -233,7 +233,7 @@ func (he VictoriaHist) ReadTrends (hr histApi.HistoryRequest, dumpf func(*histAp
 		}
 		
 		dumpf(&m,wr,i)			 
-	} // for....
+	} 
 		
 	return nil
 }
@@ -263,10 +263,10 @@ func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.A
 		step = (hr.End - hr.Start) / MAX_VMETRICS_VALUES
 	}
 	
-	fmt.Fprintf(&url, "%s/api/v1/query_range?query=(rollup(item_%d_value))&start=%d&end=%d&step=%ds",
-		he.baseurl, hr.Itemid, hr.Start, hr.End, step)
+	fmt.Fprintf(&url, "%s/api/v1/query_range?query=(rollup(item_%d_value))&start=%d&end=%d&step=%dms",
+		he.baseurl, hr.Itemid, hr.Start, hr.End, step*1000)
 	
-	log.Print("Sending agg query", url.String());
+	//log.Print("Sending agg query", url.String());
 	resp, err := http.Get(url.String() )
 
 	if err != nil {
@@ -274,10 +274,11 @@ func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.A
 		return nil
   	} 
 		
-	
 	body, _ := ioutil.ReadAll(resp.Body)
 	v,err := he.parser.Parse(string(body))
-		
+	
+//log.Print("Got result ",hr.Itemid, ":", string(body))
+
 	if ( nil !=err ) {
 		log.Print(err)
 		return nil
@@ -347,33 +348,41 @@ func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.A
 	
 	return nil
 }
-
+//curl  http://localhost:8428/api/v1/export -d 'match[]={__name__="item_230817717_value"}'
+//curl  http://localhost:8428/api/v1/export -d 'match[]={__name__="item_230817717_value"}' -d start=2021-11-25T05:02:07Z -d end=2021-11-26T05:02:07Z
 func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histApi.Metric, *bufio.Writer, int), wr *bufio.Writer, log *log.Logger)  {
 
-	var buf strings.Builder
-	//log.Print("Reading history metrics")
+	var buf *bytebufferpool.ByteBuffer = he.buf
+	var fetch_count uint64 
+
+	buf.Reset();
+	var now int64 =  time.Now().Unix();
+	//log.Print("VMetrics: Reading VM history metrics")
+	if (0 == hr.End || hr.End >uint64(now)) {
+		hr.End = uint64(now)
+		//log.Print("End time is set to", hr.End)
+	}
 
 	if (0 == hr.Start ) {
 		//if start isn't stated, assume 24hours
-		hr.Start = hr.End - 86400 
+		//it will not be set on count fetches
+		hr.Start = hr.End - 2 * 86400 
 	}
-
-	if (0 == hr.Count) {
-		hr.Count = 1024
-	}
-
-	if (0 == hr.End ) {
-		//if start isn't stated, assume 24hours
-		hr.End = hr.Start + 86400 
-	}
-	step := int32( (hr.End - hr.Start ) / hr.Count)
-
-	//log.Print("Start:",hr.Start, ", end:",hr.End," count:",hr.Count)
 	
-	fmt.Fprintf(&buf,"%s/api/v1/query_range?query=item_%d{dbname=\"%s\"}&start=%d&end=%d&step=%ds",
-	he.baseurl, hr.Itemid, he.dbname, hr.Start, hr.End, step)
 
-	//log.Print("Sending items query: ", buf.String());
+	//if end is unset, assuming it's now
+	
+	//step := int32( (hr.End - hr.Start ) / hr.Count)
+	
+	//log.Print("Start:",hr.Start, ", end:",hr.End," count:",hr.Count)
+
+	start := time.Unix(int64(hr.Start), 0).Format("2006-01-02T15:04:05Z")
+	end := time.Unix(int64(hr.End), 0).Format("2006-01-02T15:04:05Z")
+
+	fmt.Fprintf(buf,"%s?match[]={__name__=\"item_%d_value\"}&start=%s&end=%s",
+	he.readurl, hr.Itemid, start, end)
+	//log.Printf("Vmetrics url is %q",he.readurl)
+	//log.Print("Vmetrics: Sending items query: ",he.readurl,  buf.String());
 
 	resp, err := http.Get(buf.String() )
 
@@ -381,7 +390,6 @@ func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histA
 		log.Print(err)
   	} else {
 		
-		//log.Print("Got responce")
 		body, _ := ioutil.ReadAll(resp.Body)
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -390,18 +398,56 @@ func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histA
 			log.Println(resp)   
 	  	} else {
 			
-			//log.Print(string(body)) 
+			//log.Print("VMetrics response:", hr.Itemid, string(body)) 
 			//log.Print("Parsing responce");
 			
 			//todo - as soon as we have some data, create parsing here and returning it as metrics
 			v,err := he.parser.Parse(string(body))
 			
 			if ( nil !=err ) {
-				log.Panic(err)
-			}
-			//responce to query range is matrix, so using the first metric
-			for i,metric := range v.GetArray("data","result","values") {
-				log.Print("Parsing metric ", i, metric)
+				if (len(body) > 0 )	{
+					log.Print(err)
+				}
+			} else {
+				//responce to query range is matrix, so using the first metric
+				//log.Print("Vmetrics: parsing the response");
+				
+				m := histApi.Metric {
+					Itemid: hr.Itemid,
+					Value_type :hr.Value_type,
+				}
+
+				vals := v.GetArray("values")
+				timestamps := v.GetArray("timestamps")
+				
+				for i, _ := range vals {
+					m.Sec = uint64(timestamps[i].GetInt64()/1000)	
+					//log.Print("Parsing metric, value type is", hr.Value_type)
+				
+					switch hr.Value_type {
+						
+					case  histApi.ITEM_VALUE_TYPE_FLOAT:
+						float_v := vals[i].GetFloat64();
+						
+						m.Value_dbl = float_v
+						//log.Print("Timestamp:", m.Sec, ", value:", m.Value_dbl);
+
+					case  histApi.ITEM_VALUE_TYPE_UINT64:
+						uint_val := vals[i].GetInt64();
+						
+						m.Value_int = int64(uint_val)
+						//log.Print("Timestamp:", m.Sec, ", value:", m.Value_int);
+					default: 
+						continue
+					}
+					fetch_count++
+					dumpf(&m,wr,i)
+					
+					if (hr.Count > 0 && fetch_count > hr.Count) {
+						//prevention of extra data retrun in count mode
+						return;
+					}
+				}
 			}
 			
 		}
@@ -409,7 +455,6 @@ func (he VictoriaHist) ReadMetrics (hr histApi.HistoryRequest, dumpf func(*histA
   	}
 
 	return
-
 }
 
 func (he VictoriaHist) Flush () int {
