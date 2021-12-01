@@ -265,6 +265,41 @@ int  glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_rec
 	return glb_cache_get_item_values_by_time(glb_cache->items.config, &glb_cache->items, itemid, value_type, values, ts_start, ts_end);
 };
 
+static int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
+	int ret;
+	glb_cache_elem_t *elem, new_elem ={0};
+	elem_update_func_t elem_create_func = elems->elem_create_func;
+	
+	if (NULL == elem_create_func)
+		return FAIL;
+    LOG_DBG("Doing wrlock for id %ld", id);
+	glb_rwlock_wrlock(&elems->meta_lock);
+	LOG_DBG("Wr locked for id %ld", id);
+	
+	if (NULL != zbx_hashset_search(&elems->hset, &id)) {
+		LOG_DBG("Element id %ld exists, unlocking, exiting", id);
+		glb_rwlock_unlock(&glb_cache->items.meta_lock);
+		return FAIL;	
+	}
+
+	new_elem.id = id;
+	
+	if (NULL != (elem = zbx_hashset_insert(&elems->hset, &new_elem, sizeof(new_elem)))) {
+		
+		LOG_DBG("Calling for create function for id %ld",id);
+		ret = elem_create_func(elem,elems->config);
+		LOG_DBG("Create function for id %ld finished",id);	
+
+		if (ret == FAIL) 
+			zbx_hashset_remove(&elems->hset,&id);
+
+	} else 
+		ret = FAIL;
+	LOG_DBG("Unlocking id %ld", id);
+	glb_rwlock_unlock(&elems->meta_lock);
+	
+	return ret;
+}
 
 int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_func_t process_func, void *data) {
 	int ret = FAIL;
@@ -281,62 +316,35 @@ int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_fu
 	if (NULL == (elem = zbx_hashset_search(&elems->hset,&id))) {
 		glb_rwlock_unlock(&elems->meta_lock);
 
-		LOG_DBG("In %s:Elem not found doing add elem %ld", __func__,id);
+		LOG_DBG("In %s:rd Unlocked, elem not found doing add elem %ld", __func__,id);
 
 		if (FAIL == glb_cache_add_elem(elems,id)) {
 			return FAIL;
 		}
 
-		LOG_DBG("In %s:Elem added elem %ld", __func__,id);
+		LOG_DBG("In %s:Elem added elem, rdlocking %ld", __func__,id);
 		glb_rwlock_rdlock(&elems->meta_lock);
 		
 		if (NULL == (elem = zbx_hashset_search(&elems->hset,&id))) {
+			THIS_SHOULD_NEVER_HAPPEN;
+			LOG_DBG("In %s:Elem %ld not found, exiting", __func__,id);
 			glb_rwlock_unlock(&elems->meta_lock);
 			return FAIL;
 		}
 	} 
     
+	LOG_DBG("In %s:Elem blocking element %ld", __func__,id);
     glb_lock_block(&elem->lock);
+	LOG_DBG("In %s:Elem blocked, calling callback", __func__);
 	ret = process_func(elem,data);
+	LOG_DBG("In %s:Elem callback finished, unblocking elment %ld" , __func__, id);
     glb_lock_unlock(&elem->lock);
-		
+	LOG_DBG("In %s:Elem callback finished, unblocking elmen %ld" , __func__, id);	
 	glb_rwlock_unlock(&elems->meta_lock);
 	return ret;
 } 
 	
 
-int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
-	int ret;
-	glb_cache_elem_t *elem, new_elem ={0};
-	elem_update_func_t elem_create_func = elems->elem_create_func;
-	
-	if (NULL == elem_create_func)
-		return FAIL;
-
-	glb_rwlock_wrlock(&elems->meta_lock);
-
-	
-	if (NULL != zbx_hashset_search(&elems->hset, &id)) {
-		glb_rwlock_unlock(&glb_cache->items.meta_lock);
-		return FAIL;	
-	}
-
-	new_elem.id = id;
-	
-	if (NULL != (elem = zbx_hashset_insert(&elems->hset, &new_elem, sizeof(new_elem)))) {
-	
-		ret = elem_create_func(elem,elems->config);
-			
-		if (ret == FAIL) 
-			zbx_hashset_remove(&elems->hset,&id);
-
-	} else 
-		ret = FAIL;
-	
-	glb_rwlock_unlock(&elems->meta_lock);
-	
-	return ret;
-}
 
 /**********************************************************
  * fetches element in the locked state                    *
