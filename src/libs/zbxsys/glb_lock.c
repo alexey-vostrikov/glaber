@@ -13,7 +13,7 @@ here either*/
 #include "common.h"
 #include "log.h"
 
-#define GLB_LOCK_SLEEP_US 100 //how much milliseconds to sleep waiting for spinlock
+#define GLB_LOCK_SLEEP_US 10000 //how much nanoseconds to sleep waiting for spinlock
 
 int glb_lock_init(pthread_mutex_t *lock) {
 	pthread_mutexattr_t	mta;
@@ -77,6 +77,7 @@ int  glb_rwlock_free(pthread_rwlock_t *rwlock) {
 void glb_rwlock_wrlock(pthread_rwlock_t *rwlock) {
     if ( NULL == rwlock)
 		return;
+
 	while ( pthread_rwlock_trywrlock(rwlock)) {
 		usleep(GLB_LOCK_SLEEP_US);
 	};

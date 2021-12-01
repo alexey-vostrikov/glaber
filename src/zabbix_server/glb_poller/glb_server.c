@@ -21,20 +21,12 @@ typedef struct {
     zbx_hashset_t workers;
     zbx_hashset_t items_idx; //index to quickly locate itemids for arrived data
     zbx_hashset_t lld_items_reg; //index of already registered lld items
-   // zbx_hashset_t lld_reg_data; //lld items registration data
     zbx_hashset_t autoreg_hosts;
  } GLB_SERVER_CONF;
 
 extern char  *CONFIG_WORKERS_DIR;
 extern char  **CONFIG_EXT_SERVERS;
 extern int	 CONFIG_CONFSYNCER_FREQUENCY;
-/*
-typedef struct {
-    u_int64_t id;
-    u_int64_t itemid;
-    u_int64_t created;
-} LLD_ITEM_CACHE;
-*/
 
 typedef struct {
     u_int64_t id;
@@ -141,7 +133,6 @@ static int glb_server_submit_result(GLB_SERVER_CONF *conf, char *response, GLB_S
         itemid_s[MAX_ID_LEN], tmp[MAX_STRING_LEN];
     u_int64_t hash;
     int now = time(NULL);
-
 
     GLB_SERVER_IDX_T *item_idx = NULL;
 
@@ -389,20 +380,17 @@ int  glb_server_create_worker(GLB_SERVER_CONF *conf, char *worker_cfg) {
         zabbix_log(LOG_LEVEL_WARNING,"Cannot init worker, with params %s",worker_cfg);
         exit(-1);
     }
-    //worker path has to be interned
-    //char *tmp = worker.worker->path;
-    //worker.worker->path = (char *)zbx_heap_strpool_intern(tmp);
-    //zbx_free(tmp);
-
-    //fine-tuning some params
+   
+    
     worker.worker->async_mode = 1;
     worker.worker->max_calls = GLB_SERVER_MAXCALLS;
     worker.worker->mode_from_worker=GLB_WORKER_MODE_NEWLINE;
     worker.worker->timeout = CONFIG_TIMEOUT;
+    worker.workerid = ZBX_DEFAULT_STRING_HASH_FUNC(worker.worker->path);
       
     retworker = (GLB_SERVER_T*)zbx_hashset_insert(&conf->workers,&worker,sizeof(GLB_SERVER_T));
-
     glb_start_worker(retworker->worker);
+
     return SUCCEED;
 }
 
@@ -445,7 +433,8 @@ static void glb_server_process_results(GLB_SERVER_CONF *conf) {
     zbx_hashset_iter_reset(&conf->workers,&iter);
     while (NULL != (worker = zbx_hashset_iter_next(&iter))) {
         //we only query alive workers
-        zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s pid is %d", worker->worker->path,worker->worker->pid);
+        //LOG_INF("Will read data from server worker %s pid is %d, total workers %d", worker->worker->path,worker->worker->pid, conf->workers.num_data);
+
         if (SUCCEED == worker_is_alive(worker->worker)) { //only read from alive workers
 
             zabbix_log(LOG_LEVEL_DEBUG,"Calling async read");
@@ -461,7 +450,7 @@ static void glb_server_process_results(GLB_SERVER_CONF *conf) {
             }
 
         } else {
-            zabbix_log(LOG_LEVEL_DEBUG,"Worker %s is not alive, skipping", worker->worker->path);
+            LOG_INF("Server worker %s is not alive, skipping", worker->worker->path);
         }
     }
 
@@ -621,8 +610,8 @@ void* glb_server_init( int *requests, int *responses ) {
         if (SUCCEED != (ret = glb_server_create_worker(conf, *worker_cfg)))
 			exit(-1);
 	}
-  
-  	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+    
+  	LOG_INF("In %s: Ended, %d workers in the config", __func__,conf->workers.num_data);
 	return (void *)conf;
 }
 

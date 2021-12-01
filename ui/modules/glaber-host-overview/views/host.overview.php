@@ -67,8 +67,8 @@ if (isset($data['items']) && count($data['items']) > 0) {
 
 	$widget->addItem((new CDiv())
 				->addClass("values-table-block")
-			->addItem(((new CSpan ("Host-specific items"))
-			->addClass('values-table-caption')))
+			->addItem(((new CDiv ("Host-specific items"))
+			->addClass('block-header')))
 			->addItem($specific_table));
 }
 
@@ -93,8 +93,8 @@ foreach ($data['entities'] as $entity) {
 		
 		$widget->addItem((new CDiv())
 				->addClass('values-table-block')
-				->addItem(((new CSpan ($entity['name']))
-					->addClass('values-table-caption')))
+				->addItem(((new CDiv ( (new CTag('h3', true, $entity['name']))->addClass("block-title") ))
+					->addClass('block-header')))
 				->addItem($entity_tabble));
 	} 
 }
@@ -104,7 +104,7 @@ foreach ($data['templates'] as $template) {
 	if (isset($template) && isset($template['items']) && count ($template['items'])>0 ) {
 	
 		$template_table = (new CTable())
-				->addClass('values-table row-border')
+				->addClass('values-table display row-border')
 				->setHeader( array_merge( [_('Item name'), _('value')]));
 	
 		foreach ($template['items'] as $key => $item ) {
@@ -114,8 +114,8 @@ foreach ($data['templates'] as $template) {
 
 		$widget->addItem((new CDiv())
 					->addClass("values-table-block")
-				->addItem(((new CSpan ( $template['name']))
-					->addClass('values-table-caption')))
+				->addItem(((new CDiv ( $template['name']))
+					->addClass('block-header')))
 				->addItem($template_table));
 	}
 }

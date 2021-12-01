@@ -67,6 +67,9 @@ class CJsonRpc {
 		}
 
 		foreach (zbx_toArray($this->_jsonDecoded) as $call) {
+			error_log("Executing call to rpc");
+			error_log(print_r($call,true));
+			
 			if (!$this->validate($call)) {
 				continue;
 			}
@@ -84,9 +87,11 @@ class CJsonRpc {
 		if (is_array($this->_jsonDecoded)
 				&& array_keys($this->_jsonDecoded) === range(0, count($this->_jsonDecoded) - 1)) {
 			// Return response as encoded batch if $this->_jsonDecoded is associative array.
+			//error_log(print_r($this->_response,true));
+			
 			return json_encode(array_values(array_filter($this->_response)), JSON_UNESCAPED_SLASHES);
 		}
-
+		//error_log(print_r($this->_response,true));
 		return ($this->_response[0] !== null) ? json_encode($this->_response[0], JSON_UNESCAPED_SLASHES) : '';
 	}
 

@@ -540,12 +540,12 @@ static int fill_items_values_by_index(item_elem_t *elm, int tail_idx, int head_i
     
     for (i=tail_idx; iter == 0 || i != glb_tsbuff_index(&elm->tsbuff, head_idx +1 ); i = glb_tsbuff_index(&elm->tsbuff, i + 1 )) {
         iter++;
-//        LOG_INF("GLB_CACHE: copy item idx %d", i);          
+    
 	    item_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, i); 
         glb_cache_value_to_hist_copy(&record, item_val, elm->value_type);
-//        LOG_INF("GLB_CACHE: copy item idx %d completed", i);          
+         
         zbx_vector_history_record_append_ptr(values, &record);
-//        LOG_INF("GLB_CACHE: add record ptr completed");   
+  
     }
   
     return i;
