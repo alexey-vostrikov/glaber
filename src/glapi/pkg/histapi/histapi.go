@@ -231,7 +231,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 //history engine is expected to return itemid, time, nanosecond time, and value
 //worker module will treat the value according to it's value type
 
-var jq = strings.NewReplacer("\b","\\b","\f", "\\f", "\n", "\\n","\\","\\\\", "\"","\\\"", "\t","\\t", "\r", "\\r", "\e", "\\e" )
+var jq = strings.NewReplacer("\b","\\b","\f", "\\f", "\n", "\\n","\\","\\\\", "\"","\\\"", "\t","\\t", "\r", "\\r")
 
 func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
 
