@@ -267,14 +267,20 @@ int  glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_rec
 
 static int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 	int ret;
+	int lock_time;
+
 	glb_cache_elem_t *elem, new_elem ={0};
 	elem_update_func_t elem_create_func = elems->elem_create_func;
+	zbx_timespec_t ts_start;
 	
+	
+
 	if (NULL == elem_create_func)
 		return FAIL;
     LOG_DBG("Doing wrlock for id %ld", id);
 	glb_rwlock_wrlock(&elems->meta_lock);
 	LOG_DBG("Wr locked for id %ld", id);
+	zbx_timespec(&ts_start);
 	
 	if (NULL != zbx_hashset_search(&elems->hset, &id)) {
 		LOG_DBG("Element id %ld exists, unlocking, exiting", id);
@@ -297,7 +303,13 @@ static int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 		ret = FAIL;
 	LOG_DBG("Unlocking id %ld", id);
 	glb_rwlock_unlock(&elems->meta_lock);
+
+	if (100 < (lock_time =zbx_get_duration_ms(&ts_start))) {
+		LOG_INF("LOCK: A wr lock has took too much time: %d msec", lock_time);
+		THIS_SHOULD_NEVER_HAPPEN;
+	}
 	
+
 	return ret;
 }
 
