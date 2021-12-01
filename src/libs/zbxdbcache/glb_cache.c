@@ -272,8 +272,6 @@ static int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 	glb_cache_elem_t *elem, new_elem ={0};
 	elem_update_func_t elem_create_func = elems->elem_create_func;
 	zbx_timespec_t ts_start;
-	
-	
 
 	if (NULL == elem_create_func)
 		return FAIL;
@@ -304,12 +302,11 @@ static int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 	LOG_DBG("Unlocking id %ld", id);
 	glb_rwlock_unlock(&elems->meta_lock);
 
-	if (100 < (lock_time =zbx_get_duration_ms(&ts_start))) {
+	if (10 < (lock_time = zbx_get_duration_ms(&ts_start))) {
 		LOG_INF("LOCK: A wr lock has took too much time: %d msec", lock_time);
 		THIS_SHOULD_NEVER_HAPPEN;
 	}
 	
-
 	return ret;
 }
 

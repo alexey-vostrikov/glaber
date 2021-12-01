@@ -602,7 +602,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_WORKER	37
 #define GLB_PROCESS_TYPE_SERVER	38
 #define GLB_PROCESS_TYPE_AGENT	39
-#define ZBX_PROCESS_TYPE_COUNT		40	/* number of process types */
+#define GLB_PROCESS_TYPE_API_TRAPPER	40
+#define ZBX_PROCESS_TYPE_COUNT		41	/* number of process types */
 
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char proc_type);

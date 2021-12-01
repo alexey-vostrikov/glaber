@@ -205,6 +205,7 @@ int	CONFIG_HTTPPOLLER_FORKS		= 1;
 int	CONFIG_IPMIPOLLER_FORKS		= 0;
 int	CONFIG_TIMER_FORKS		= 1;
 int	CONFIG_TRAPPER_FORKS		= 5;
+int	CONFIG_API_TRAPPER_FORKS	= 5;
 int	CONFIG_SNMPTRAPPER_FORKS	= 0;
 int	CONFIG_JAVAPOLLER_FORKS		= 0;
 int	CONFIG_ESCALATOR_FORKS		= 1;
@@ -228,6 +229,8 @@ int	CONFIG_REPORTMANAGER_FORKS	= 0;
 int	CONFIG_REPORTWRITER_FORKS	= 0;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
+int	CONFIG_API_LISTEN_PORT		= GLB_DEFAULT_API_PORT;
+
 char	*CONFIG_LISTEN_IP		= NULL;
 char	*CONFIG_SOURCE_IP		= NULL;
 int	CONFIG_TRAPPER_TIMEOUT		= 300;
@@ -500,6 +503,11 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_TRAPPER;
 		*local_process_num = local_server_num - server_count + CONFIG_TRAPPER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_API_TRAPPER_FORKS))
+	{
+		*local_process_type =GLB_PROCESS_TYPE_API_TRAPPER;
+		*local_process_num = local_server_num - server_count + CONFIG_API_TRAPPER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_PINGER_FORKS))
 	{
@@ -867,6 +875,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			1000},
 		{"StartTrappers",		&CONFIG_TRAPPER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			1000},
+		{"StartTrappers",		&CONFIG_API_TRAPPER_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			1000},
 		{"StartJavaPollers",		&CONFIG_JAVAPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
 		{"StartEscalators",		&CONFIG_ESCALATOR_FORKS,		TYPE_INT,
@@ -924,6 +934,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"ListenIP",			&CONFIG_LISTEN_IP,			TYPE_STRING_LIST,
 			PARM_OPT,	0,			0},
 		{"ListenPort",			&CONFIG_LISTEN_PORT,			TYPE_INT,
+			PARM_OPT,	1024,			32767},
+		{"APIListenPort",		&CONFIG_API_LISTEN_PORT,			TYPE_INT,
 			PARM_OPT,	1024,			32767},
 		{"SourceIP",			&CONFIG_SOURCE_IP,			TYPE_STRING,
 			PARM_OPT,	0,			0},
@@ -1260,7 +1272,7 @@ static void	zbx_check_db(void)
 
 int	MAIN_ZABBIX_ENTRY(int flags)
 {
-	zbx_socket_t	listen_sock;
+	zbx_socket_t	listen_sock, api_listen_sock;
 	char		*error = NULL;
 	int		i, db_type;
 
@@ -1496,7 +1508,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	threads_num = CONFIG_CONFSYNCER_FORKS + CONFIG_POLLER_FORKS
 			+ CONFIG_UNREACHABLE_POLLER_FORKS + CONFIG_TRAPPER_FORKS + CONFIG_PINGER_FORKS
-			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_AGENT_FORKS 
+			+ CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_AGENT_FORKS + CONFIG_API_TRAPPER_FORKS
 			+ CONFIG_GLB_PINGER_FORKS + CONFIG_GLB_WORKER_FORKS +  CONFIG_EXT_SERVER_FORKS
 			+ CONFIG_ALERTER_FORKS + CONFIG_HOUSEKEEPER_FORKS + CONFIG_TIMER_FORKS
 			+ CONFIG_HTTPPOLLER_FORKS + CONFIG_DISCOVERER_FORKS + CONFIG_HISTSYNCER_FORKS
@@ -1519,6 +1531,14 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		}
 	}
 
+	if (0 != CONFIG_API_TRAPPER_FORKS)
+	{
+		if (FAIL == zbx_tcp_listen(&api_listen_sock, CONFIG_LISTEN_IP, (unsigned short)CONFIG_API_LISTEN_PORT))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "API listener failed: %s", zbx_socket_strerror());
+			exit(EXIT_FAILURE);
+		}
+	}
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_init_parent();
 #endif
@@ -1596,6 +1616,10 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				poller_type = ZBX_POLLER_TYPE_UNREACHABLE;
 				thread_args.args = &poller_type;
 				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
+				break;
+			case GLB_PROCESS_TYPE_API_TRAPPER:
+				thread_args.args = &api_listen_sock;
+				zbx_thread_start(trapper_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_TRAPPER:
 				thread_args.args = &listen_sock;

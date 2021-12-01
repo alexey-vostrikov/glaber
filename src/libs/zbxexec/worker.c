@@ -617,7 +617,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                     //while waitng for some new data to appear
                 
                     if (wait_count++ > 1 && worker->async_mode == 0) {
-                        usleep(10000);
+                        usleep(1000000);
                         zabbix_log(LOG_LEVEL_DEBUG, "Waiting for new data for SYNC responce from the worker");
                     } else {
                         zabbix_log(LOG_LEVEL_DEBUG, "Not waiting for new data from the worker due to ASYNC mode");
@@ -638,7 +638,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                     continue_read = 0;
                     worker_fail = 1;
                 } else
-                    usleep(10000); //whatever else is is it's good to time to take a nap to save some CPU heat
+                    usleep(1000000); //whatever else is is it's good to time to take a nap to save some CPU heat
                 break;
             
             default: //succesifull read

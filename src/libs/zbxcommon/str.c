@@ -1368,6 +1368,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "http poller";
 		case ZBX_PROCESS_TYPE_TRAPPER:
 			return "trapper";
+		case GLB_PROCESS_TYPE_API_TRAPPER:
+			return "api_trapper";	
 		case ZBX_PROCESS_TYPE_SNMPTRAPPER:
 			return "snmp trapper";
 		case ZBX_PROCESS_TYPE_PROXYPOLLER:
