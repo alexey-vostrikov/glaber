@@ -818,7 +818,7 @@ int glb_cache_get_item_values_by_count(void *cfg, glb_cache_elems_t *items, uint
 int glb_cache_item_create_cb(glb_cache_elem_t *elem, void *items_cfg)
 {
 
-    items_cfg_t *i_cfg = (items_cfg_t *)items_cfg;
+   // items_cfg_t *i_cfg = (items_cfg_t *)items_cfg;
     
     if (NULL == (elem->data = glb_cache_malloc(NULL, sizeof(item_elem_t))))
           return FAIL;
@@ -1121,7 +1121,7 @@ int glb_cache_items_marshall_item(glb_cache_elem_t *elem, struct zbx_json* json)
 
 // converts item from text to binary structures in the cache
 // for items cache recovery
-int glb_cache_items_umarshall_item(glb_cache_elem_t *elem, char *)
+int glb_cache_items_umarshall_item(glb_cache_elem_t *elem, char *buffer)
 {
 
 }
