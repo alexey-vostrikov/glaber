@@ -1186,7 +1186,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
  ******************************************************************************/
 void	zbx_preprocessor_flush(void)
 {	int i;
-
+	if(!cached_messages) return ;
 	for ( i = 0; i < CONFIG_PREPROCMAN_FORKS; i++ ) {
 		if (0 < cached_messages[i].size)
 		{
