@@ -101,7 +101,7 @@ int	glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_reco
 
 
 int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_func_t process_func, void *data);
-//int	glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id);
+
 int	glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
 int glb_cache_item_get_nextcheck(u_int64_t itemid);
 int glb_cache_item_get_state(u_int64_t itemid);
@@ -112,14 +112,7 @@ const char	*glb_cache_strpool_intern(const char *str);
 const char	*glb_cache_strpool_set_str(const char *old, const char *new);
 const char	*glb_cache_strpool_acquire(const char *str);
 void		glb_cache_strpool_release(const char *str);
-
-/************************************
-************************************
-Untested below
-*/
-
-
-
+int     glb_vc_dump_cache();
 
 
 

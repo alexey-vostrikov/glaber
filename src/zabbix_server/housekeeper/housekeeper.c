@@ -1193,9 +1193,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 				old_misses = stats.misses;
 				old_hits = stats.hits;
 				zabbix_log(LOG_LEVEL_INFORMATION, "Triggers stats: %d unknowns, %d total", unknown_triggers, total_triggers);
-				//zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
-				//glb_vc_dump_cache();
-				//zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
+				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
+				glb_vc_dump_cache();
+				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
 				
 			}
 			//stats->hits = vc_cache->hits;

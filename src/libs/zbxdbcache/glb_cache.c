@@ -193,7 +193,7 @@ int glb_cache_init() {
 			__strpool_hash, __strpool_compare, NULL,
 			glb_cache_malloc, glb_cache_realloc, glb_cache_free);
 	
-	glb_cache->items.config = glb_cache_items_init(glb_cache_malloc, glb_cache_free);
+	glb_cache->items.config = glb_cache_items_init();
 	glb_cache->items.elem_create_func = glb_cache_item_create_cb;
 
 
@@ -691,107 +691,59 @@ int glb_vc_dump_cache() {
 
 	zbx_hashset_iter_t iter;
 	glb_cache_elem_t *elem;
-	int items = 0, vals = 0, buff_items = 0, i;
-	
-	size_t buff_alloc, buff_offset;
-	char *buffer = NULL;
-
-	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN], tmp_val[MAX_STRING_LEN], tmp_val2[MAX_STRING_LEN*2];
-	size_t len;
+	struct zbx_json	json;
+	int items=0, vals=0;
+	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN];
 
 	zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
 	
     if (NULL == CONFIG_VCDUMP_LOCATION )
 	 		return FAIL;
 	
-	//zabbix_log(LOG_LEVEL_INFORMATION, "Will dump value cache to %s",CONFIG_VCDUMP_LOCATION);
-	//old cache file is renamed to *.old postfix due to possibility of corrupting or not completing the dump
-	//of something is wrong, this way will have a bit outdated but functional copy of the cache
 	zbx_snprintf(new_file,MAX_STRING_LEN,"%s%s",CONFIG_VCDUMP_LOCATION,".new");
-	//zbx_snprintf_alloc(buffer,alloc_len,offset,)
-/*	
+	
 	gzFile gzfile = gzopen(new_file,"wb");
-
 	zabbix_log(LOG_LEVEL_INFORMATION, "Cache file has been opened");
 
 	if (Z_NULL == gzfile) {
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s, value cache will not be dumped",new_file);
 		return FAIL;
 	}
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
     glb_rwlock_rdlock(&glb_cache->items.meta_lock);
     zbx_hashset_iter_reset(&glb_cache->items.hset,&iter);
-	
+		 
 	while (NULL != (elem=(glb_cache_elem_t*)zbx_hashset_iter_next(&iter))) {
+		zbx_json_clean(&json);
 		
-        zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset, 
-				"{\"type\":%d,\"itemid\":%ld,\"value_type\":%d,\"state\":%d,\"r\":%d,\"req_count\":%d,\"req_duration\":%d,\"last_accessed\":%d}\n", 
-		    			GLB_VCDUMP_RECORD_TYPE_ITEM, elem->itemid, elem->value_type, elem->state, elem->req_count, elem->req_duration, 
-                        elem->last_accessed, elem->db_fetched_time);
-		
-        buff_items++;
-		
-        i = elem->values->first_idx;
-        if ( -1 == i ) 
-            continue;
-
-        do {
-            char buff[MAX_STRING_LEN * 4];
-
-            glb_cache_value_t *c_val = glb_cache_get_value_ptr(elem->values,i);
-            zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,
-                "{\"type\":%d,\"itemid\":%ld,\"ts\":%d,\"value\":",
-                elem->value_type, elem->itemid, c_val->sec);
-            
-            char *val = zbx_variant_value_desc(*c_val->value);
-            glb_escape_worker_string(val,buff);
-               
-
-            zabbix_log(LOG_LEVEL_INFORMATION,"  %d,  sec:%d, type:%d, val:%s",i, c_val->sec, c_val->value.type," ");
-                i = (i + 1 ) % elem->values->elem_num;
-        
-        } while(i !=  ((elem->values->last_idx +1 ) % elem->values->elem_num)) ;
-
-
-		zabbix_log(LOG_LEVEL_DEBUG, "In %s: dumping data value %d ts is %d",__func__, i , curr_chunk->slots[i].timestamp.sec);
-			
-		zbx_history_value2str(tmp_val,MAX_STRING_LEN,&curr_chunk->slots[i].value,item->value_type);
-		
-        glb_escape_worker_string(tmp_val,tmp_val2);
-		
-        
-        
-        zbx_snprintf_alloc(&buffer, &buff_alloc, &buff_offset,"{\"type\":%d,\"itemid\":%ld,\"hostid\":%ld,\"ts\":%d,\"value\":\"%s\"}\n",
-			GLB_VCDUMP_RECORD_TYPE_VALUE,item->itemid, item->hostid, curr_chunk->slots[i].timestamp.sec,tmp_val2);
-		
-        	vals++;	
-        }  
-		
-		if (buff_items > BUFFER_ITEMS) {
-		   	if ( 0 >= gzwrite(gzfile,buffer,buff_offset))	{
+		glb_lock_block(&elem->lock);
+		int ret = glb_cache_items_marshall_item(elem, &json);
+		glb_lock_unlock(&elem->lock);
+	   
+		if (0 < ret) {
+        	if ( 0 >= gzwrite(gzfile, json.buffer, json.buffer_offset + 1))	{
 				zabbix_log(LOG_LEVEL_WARNING,"Cannot write to cache %s, errno is %d",new_file,errno);
 				break;
-			}
-			buff_offset=0;
-			
+			}	
+			gzwrite(gzfile,"\n",1);
 		}
+		
+		items++;
+		vals+=ret;
+
 	}
 	glb_rwlock_unlock(&glb_cache->items.meta_lock);
 	
-    //dumping remainings in the buffer
-	if ( 0 >= gzwrite(gzfile,buffer,buff_offset)) {
-		zabbix_log(LOG_LEVEL_WARNING,"Cannot write to %s, errno is %d",new_file, errno);
-	}
-
-	zbx_free(buffer);
+	zbx_json_free(&json);
 	gzclose(gzfile);
 
 	if (0 != rename(new_file, CONFIG_VCDUMP_LOCATION)) {
 		zabbix_log(LOG_LEVEL_WARNING,"Couldn't rename %s -> %s (%s)", new_file, CONFIG_VCDUMP_LOCATION,strerror(errno));
 		return FAIL;
 	}
-*/
-	zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished, total %d items, %d values dumped", __func__,items,vals);
+	
+	LOG_INF("In %s: finished, total %d items, %d values dumped", __func__,items,vals);
 	return SUCCEED;
 }
 

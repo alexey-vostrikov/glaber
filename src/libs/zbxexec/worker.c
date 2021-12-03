@@ -52,8 +52,7 @@ static int get_worker_mode(char *mode)
 GLB_EXT_WORKER *glb_init_worker(char *config_line)
 {
     char path[MAX_STRING_LEN],
-      //  params[MAX_STRING_LEN],
-        buff[MAX_STRING_LEN];
+         buff[MAX_STRING_LEN];
 
     int i = 0;
     zbx_json_type_t type;
@@ -66,7 +65,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     GLB_EXT_WORKER *worker = NULL;
 
     path[0] = 0;
-    //params[0] = 0;
+ 
     buff[0] = 0;
 
     struct zbx_json_parse jp, jp_config;
@@ -79,7 +78,6 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     bzero(worker, sizeof(GLB_EXT_WORKER));
 
-    //we expect JSON as a config, let's parse it
     if (SUCCEED != zbx_json_open(config_line, &jp_config))
     {
         zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: '%s', most likely not a valid JSON", config_line);
@@ -123,9 +121,6 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
         }
         worker->args[args_num]=NULL;
         
-        //for (i=0; i<args_num; i++) {
-        //    zabbix_log(LOG_LEVEL_INFORMATION, "Param %d: %s",i,worker->args[i]);
-        //}
     }
     else {
         worker->args[0] = worker->path;
@@ -188,44 +183,29 @@ static int restart_worker(GLB_EXT_WORKER *worker)
 
     zabbix_log(LOG_LEVEL_DEBUG, "Restarting worker %s pid %d", worker->path, worker->pid);
     
-    //closing pipework
     if (worker->pipe_from_worker)
         close(worker->pipe_from_worker);
     if (worker->pipe_to_worker)
         close(worker->pipe_to_worker);
 
-    //first of all, killing the old one if exists
     if ( worker->pid > 0  && !kill(worker->pid, 0))
     {
         int exitstatus;
         zabbix_log(LOG_LEVEL_INFORMATION, "Killing old worker instance pid %d", worker->pid);
-        //bye the process, you (probably) served us well
         kill(worker->pid, SIGINT);
-        
-        //this is mandatory, to get red if zombies
         waitpid(worker->pid, &exitstatus,WNOHANG);
         zabbix_log(LOG_LEVEL_INFORMATION, "Waitpid returned %d", exitstatus);
         
-        //that's enough for shutdown
-        //usleep(10000);
-        //if (!kill(worker->pid, 0))
-       // {
-            //worker must be unable to process sigterm, lets do a sigkill
-       //     zabbix_log(LOG_LEVEL_INFORMATION, "Stil alive, killing old worker instance pid with SIGKILL %d", worker->pid);
-       //     kill(worker->pid, SIGKILL);
-       // }
     }
     
-    //the new worker's live starts here
     int from_child[2];
     int to_child[2];
 
-    //making piping
     if (0 != pipe(from_child))
     {
         return -1;
     }
-    //checking
+ 
     if (0 != pipe(to_child))
     {
         close((from_child)[0]);
@@ -233,7 +213,6 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         return FAIL;
     }
     
-    //ok, it;s a fork(born) time
     worker->pid = fork();
 
     if (0 > worker->pid)
@@ -256,7 +235,6 @@ static int restart_worker(GLB_EXT_WORKER *worker)
             _Exit(127);
         }
 
-        //don't need pipe's fds anymore, stdin and stdout already connected to them
         close((from_child)[0]);
         close((from_child)[1]);
         close((to_child)[0]);
@@ -294,7 +272,6 @@ static int restart_worker(GLB_EXT_WORKER *worker)
             zabbix_log(LOG_LEVEL_WARNING,"Couldn't start %s command: errno is %d",worker->path,errno);
         }
 
-        //if we are here, then execl has failed.
         //There is nothing to do, the child is useless by now, goodbye
         _Exit(127);
     }
