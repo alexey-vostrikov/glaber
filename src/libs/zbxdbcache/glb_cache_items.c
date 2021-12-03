@@ -1121,7 +1121,7 @@ int glb_cache_items_marshall_item(glb_cache_elem_t *elem, struct zbx_json* json)
 
 // converts item from text to binary structures in the cache
 // for items cache recovery
-int glb_cache_items_umarshall_item(glb_cache_elem_t *elem, char *buffer)
+int glb_cache_items_unmarshall_item(glb_cache_elem_t *elem, char *buffer)
 {
 
 }
