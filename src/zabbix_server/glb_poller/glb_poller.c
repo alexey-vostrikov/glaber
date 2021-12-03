@@ -207,6 +207,9 @@ int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset
 	
 	unsigned int now = time(NULL);
 	int i;
+
+	if (dc_item->host.proxy_hostid) return SUCCEED;
+
 	zabbix_log(LOG_LEVEL_DEBUG,"In %s: Started for item %ld", __func__, dc_item->itemid);
 	
 	DEBUG_ITEM(dc_item->itemid,"Creating/updating glb item");
