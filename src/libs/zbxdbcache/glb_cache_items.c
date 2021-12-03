@@ -1049,16 +1049,16 @@ int glb_cache_item_values_json_cb(glb_cache_elem_t *elem, void *cb_data)
 
     if (-1 < head_idx)
     {
-        int tail_idx = (elm->tsbuff.head - rcount + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
-        LOG_DBG("Processing item %d: rcount is %d requst count is %d, %d->%d", elem->id, rcount, req->count, tail_idx, head_idx);
+       // int tail_idx = (elm->tsbuff.head - rcount + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
+       // LOG_DBG("Processing item %d: rcount is %d requst count is %d, %d->%d", elem->id, rcount, req->count, tail_idx, head_idx);
 
         do
         {
-            glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, tail_idx);
+            glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, head_idx);
           
             add_json_item_value(elm->value_type, req->json, c_val);
        
-            tail_idx = (tail_idx + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
+            head_idx = (head_idx - 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
             rcount--;
     
         } while (rcount > 0);
@@ -1109,7 +1109,7 @@ int glb_cache_items_marshall_item(glb_cache_elem_t *elem, struct zbx_json* json)
             glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, tail_idx);
           
             add_json_item_value(elm->value_type, json, c_val);
-            head_idx = (head_idx - 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
+            tail_idx = (tail_idx + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
             rcount--;
     
         } while (rcount > 0);
@@ -1121,7 +1121,7 @@ int glb_cache_items_marshall_item(glb_cache_elem_t *elem, struct zbx_json* json)
 
 // converts item from text to binary structures in the cache
 // for items cache recovery
-int glb_cache_items_unmarshall_item(glb_cache_elem_t *elem, char *buffer)
+int glb_cache_items_umarshall_item(glb_cache_elem_t *elem, char *buffer)
 {
 
 }
