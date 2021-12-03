@@ -7,6 +7,7 @@
 #include "zbxserver.h"
 
 extern int CONFIG_SERVER_STARTUP_TIME;
+int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id );
 
 void init_cache(glb_cache_t * cache) {
     ZBX_DC_HISTORY hist[]= { {.ts.sec = 10, .itemid = 10, .value_type = ITEM_VALUE_TYPE_UINT64, .value.ui64 = 10},

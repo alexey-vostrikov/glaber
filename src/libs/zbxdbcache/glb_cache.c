@@ -265,7 +265,7 @@ int  glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_rec
 	return glb_cache_get_item_values_by_time(glb_cache->items.config, &glb_cache->items, itemid, value_type, values, ts_start, ts_end);
 };
 
-static int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
+int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 	int ret;
 	int lock_time;
 

@@ -1054,11 +1054,11 @@ int glb_cache_item_values_json_cb(glb_cache_elem_t *elem, void *cb_data)
 
         do
         {
-            glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, head_idx);
+            glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, tail_idx);
           
             add_json_item_value(elm->value_type, req->json, c_val);
        
-            head_idx = (head_idx - 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
+            tail_idx = (tail_idx + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
             rcount--;
     
         } while (rcount > 0);

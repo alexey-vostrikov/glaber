@@ -317,7 +317,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	//this isn't really nice idea since we might be getting some get_values from the zabbix frontend
 	if ( GLB_HISTORY_GET_NON_INTERACTIVE == interactive && 
 		 time(NULL)- conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
-		LOG_INF("waiting for cache load, exiting");
+		LOG_DBG("waiting for cache load, exiting");
       	return SUCCEED;
 	}
 	

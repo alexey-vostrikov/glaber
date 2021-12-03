@@ -661,8 +661,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		glb_poller_handle_async_io(poll_engine, item_type);
 		
 		if ( old_activity == requests + responses ) {
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Nothing to do, sleeping");
-			usleep(100000);
+			usleep(1000000);
 		}
 		old_activity = requests + responses;
 
