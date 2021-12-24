@@ -134,6 +134,10 @@ zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_DB_MONITOR, 'label_pa
 zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_CALCULATED, 'label_formula');
 zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_SSH, 'params_script');
 zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_SSH, 'row_params');
+
+zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_WORKER_SERVER, 'path');
+zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_WORKER_SERVER, 'row_path');
+
 zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_TELNET, 'params_script');
 zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_TELNET, 'row_params');
 zbx_subarray_push($this->data['typeVisibility'], ITEM_TYPE_DB_MONITOR, 'params_dbmonitor');
@@ -152,7 +156,10 @@ $ui_rows = [
 	],
 	ITEM_TYPE_SCRIPT => [
 		'parameters_row', 'script_row', 'timeout_row'
-	]
+	],
+	ITEM_TYPE_WORKER_SERVER => [
+		'params_row', 'timeout_row'
+	],
 ];
 foreach ($ui_rows as $type => $rows) {
 	foreach ($rows as $row) {
@@ -185,14 +192,14 @@ foreach ($this->data['types'] as $type => $label) {
 	}
 }
 foreach ($this->data['types'] as $type => $label) {
-	if ($type == ITEM_TYPE_TRAPPER || $type == ITEM_TYPE_SNMPTRAP || $type == ITEM_TYPE_DEPENDENT) {
+	if ($type == ITEM_TYPE_TRAPPER || $type == ITEM_TYPE_SNMPTRAP || $type == ITEM_TYPE_DEPENDENT || $type == ITEM_TYPE_WORKER_SERVER) {
 		continue;
 	}
 
 	zbx_subarray_push($this->data['typeVisibility'], $type, 'row_flex_intervals');
 }
 foreach ($this->data['types'] as $type => $label) {
-	if ($type == ITEM_TYPE_TRAPPER || $type == ITEM_TYPE_SNMPTRAP || $type == ITEM_TYPE_DEPENDENT) {
+	if ($type == ITEM_TYPE_TRAPPER || $type == ITEM_TYPE_SNMPTRAP || $type == ITEM_TYPE_DEPENDENT || $type == ITEM_TYPE_WORKER_SERVER) {
 		continue;
 	}
 	zbx_subarray_push($this->data['typeVisibility'], $type, 'delay');

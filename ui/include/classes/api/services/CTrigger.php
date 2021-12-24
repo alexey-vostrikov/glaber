@@ -199,8 +199,10 @@ class CTrigger extends CTriggerGeneral {
 
 			$sqlParts['where']['triggerid'] = dbConditionInt('t.triggerid', $options['triggerids']);
 		}
-
-		// itemids
+		// hiding deleted
+		$sqlParts['where'][] = 't.status != '.TRIGGER_STATUS_DELETED;
+		
+			// itemids
 		if ($options['itemids'] !== null) {
 			zbx_value2array($options['itemids']);
 
@@ -614,8 +616,17 @@ class CTrigger extends CTriggerGeneral {
 	 */
 	public function delete(array $triggerids) {
 		$this->validateDelete($triggerids, $db_triggers);
-
+		
+		$triggers = [];
+		
+		foreach ($triggerids as $triggerid) {
+			$triggers[] = ['triggerid'=>$triggerid];
+		}
+		
 		CTriggerManager::delete($triggerids);
+		
+		$this->updateTriggersRtdata($triggers);
+		CZabbixServer::notifyConfigChanges();	
 
 		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_TRIGGER, $db_triggers);
 

@@ -38,9 +38,54 @@
 #define GLB_PROTO_ERRCODE "errcode"
 #define GLB_PROTO_ERROR "error"
 
+typedef struct glb_poll_module_t glb_poll_module_t;
+
 typedef struct
 {
+	zbx_uint64_t itemid;
+	zbx_uint64_t hostid;
+	char state;
+	unsigned char value_type;
+	//unsigned int ttl;
+	const char *delay;
+	unsigned char item_type;
+	unsigned char flags;
+	unsigned int lastpolltime;
+	void *itemdata;		 //item type specific data
+	int change_time; //rules if the item should be updated or it's the same config
+} GLB_POLLER_ITEM;
 
+struct glb_poll_module_t  {
+	void		(*init_item)(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item);
+	void		(*delete_item)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item);
+	
+	void	(*handle_async_io)(glb_poll_module_t *poll_mod);
+	void		(*start_poll)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item);
+	
+	void 	(*shutdown)(glb_poll_module_t *poll_mod);
+	int 	(*forks_count)(glb_poll_module_t *poll_mod);
+
+	void *poller_data;
+	
+	int requests;
+	int responses;
+} ;
+
+typedef struct {
+	glb_poll_module_t poller;
+
+	unsigned char item_type;
+
+	zbx_binary_heap_t events; 
+	zbx_hashset_t items;	  
+	zbx_hashset_t hosts;	  
+	
+	int next_stat_time;
+	int old_activity;
+} glb_poll_engine_t;
+
+typedef struct
+{
 	zbx_uint64_t hostid;
 	unsigned int poll_items;
 	unsigned int items;
@@ -50,59 +95,18 @@ typedef struct
 
 } GLB_POLLER_HOST;
 
-typedef struct
-{
-
-	unsigned int time;
-	char type;
-	zbx_uint64_t id; //using weak linking assuming events might be outdated
-
-} GLB_POLLER_EVENT;
-
-typedef struct
-{
-	zbx_uint64_t itemid;
-	zbx_uint64_t hostid;
-	char state;
-	unsigned char value_type;
-	unsigned int ttl;
-	const char *delay;
-	unsigned char item_type;
-	unsigned char flags;
-	unsigned int lastpolltime;
-	void *itemdata;		 //item type specific data
-} GLB_POLLER_ITEM;
-
-typedef struct {
-	const char *oid;
-	unsigned char snmp_version;
-	const char		*interface_addr;
-	unsigned char	useip;
-	unsigned short	interface_port;
-	unsigned char	snmpv3_securitylevel;
-	unsigned char	snmpv3_authprotocol;
-	unsigned char	snmpv3_privprotocol;
-	const char *community;
-	const char *snmpv3_securityname;
-	const char *snmpv3_contextname;
-	const char *snmpv3_authpassphrase;
-	const char *snmpv3_privpassphrase;
-	char state;
-} GLB_SNMP_ITEM;
-
-
 int event_elem_compare(const void *d1, const void *d2);
 void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 void add_host_succeed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
-int glb_create_item(zbx_binary_heap_t *events, zbx_hashset_t *hosts, zbx_hashset_t *items, DC_ITEM *dc_item, void *poll_engine);
+int glb_poller_create_item(void *poller_data, DC_ITEM *dc_item);
+int glb_poller_delete_item(void *poller_data, u_int64_t itemid);
+int glb_poller_get_forks(void *poller_data);
 
 u_int64_t glb_ms_time(); //retruns time in millisecodns
 
-
 ZBX_THREAD_ENTRY(glbpoller_thread, args);
-
 GLB_POLLER_ITEM *glb_get_poller_item(zbx_uint64_t itemid);
 
 #endif

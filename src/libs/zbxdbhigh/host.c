@@ -1355,6 +1355,7 @@ void	DBdelete_items(zbx_vector_uint64_t *itemids)
 	DBexecute("%s", sql);
 
 	zbx_vector_uint64_destroy(&profileids);
+	DC_add_changed_items(itemids->values, itemids->values_num, ITEM_STATUS_DELETED);
 
 	zbx_free(sql);
 out:

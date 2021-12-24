@@ -64,7 +64,6 @@ extern unsigned char	program_type;
 extern int		CONFIG_DOUBLE_PRECISION;
 extern char		*CONFIG_EXPORT_DIR;
 extern int CONFIG_CLUSTER_SERVER_ID;
-extern u_int64_t CONFIG_DEBUG_HOST;
 extern u_int64_t CONFIG_DEBUG_ITEM;
 
 #define ZBX_IDS_SIZE	10

@@ -8,13 +8,15 @@
 
 void *glb_cache_items_init();
 
-int glb_cache_item_create_cb(glb_cache_elem_t *elem, void *items_cfg);
+int glb_cache_item_create_cb(glb_cache_elem_t *elem, void *param);
 int glb_cache_item_update_meta_cb(glb_cache_elem_t *elem, void *cb_data);
 int glb_cache_item_get_meta_cb(glb_cache_elem_t *elem, void *cb_data);
 int glb_cache_item_get_state_cb(glb_cache_elem_t *elem, void *cb_data);
 int glb_cache_item_get_nextcheck_cb(glb_cache_elem_t *elem, void *cb_data);
-int glb_cache_item_values_json_cb(glb_cache_elem_t *elem, void *cb_data);
-int glb_cache_items_marshall_item(glb_cache_elem_t *elem, struct zbx_json* json);
+int glb_cache_item_values_json_cb(glb_cache_elem_t *elem, void *data);
+int glb_cache_items_marshall_item_cb(glb_cache_elem_t *elem, void *data);
+
+int glb_cache_items_umarshall_item_cb(glb_cache_elem_t *elem, void *data);
 
 int  glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_HISTORY *history, int history_num);
 

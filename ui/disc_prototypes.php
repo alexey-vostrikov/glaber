@@ -69,7 +69,7 @@ $fields = [
 											ITEM_TYPE_INTERNAL, ITEM_TYPE_ZABBIX_ACTIVE,
 											ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, ITEM_TYPE_SSH,
 											ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_CALCULATED, ITEM_TYPE_SNMPTRAP,
-											ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
+											ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT, ITEM_TYPE_WORKER_SERVER
 										]),
 										'isset({add}) || isset({update})'
 									],
@@ -98,7 +98,7 @@ $fields = [
 	$paramsFieldName =>				[T_ZBX_STR, O_OPT, null,	NOT_EMPTY,
 										'(isset({add}) || isset({update})) && isset({type})'.
 											' && '.IN(ITEM_TYPE_SSH.','.ITEM_TYPE_DB_MONITOR.','.ITEM_TYPE_TELNET.','.
-												ITEM_TYPE_CALCULATED.','.ITEM_TYPE_SCRIPT, 'type'
+												ITEM_TYPE_CALCULATED.','.ITEM_TYPE_SCRIPT.','.ITEM_TYPE_WORKER_SERVER, 'type'
 											),
 										getParamFieldLabelByType(getRequest('type', 0))
 									],
@@ -145,7 +145,7 @@ $fields = [
 									],
 	'timeout' =>	 				[T_ZBX_TU, O_OPT, P_ALLOW_USER_MACRO|P_ALLOW_LLD_MACRO,	null,
 										'(isset({add}) || isset({update})) && isset({type})'.
-											' && '.IN(ITEM_TYPE_HTTPAGENT.','.ITEM_TYPE_SCRIPT, 'type'),
+											' && '.IN(ITEM_TYPE_HTTPAGENT.','.ITEM_TYPE_SCRIPT.','.ITEM_TYPE_WORKER_SERVER , 'type'),
 										_('Timeout')
 									],
 	'url' =>						[T_ZBX_STR, O_OPT, null,	NOT_EMPTY,

@@ -476,11 +476,6 @@ typedef struct {
     u_int64_t value; 
 } glb_tsbuff_value_t;
 
-typedef struct {
-    int direction;
-    int current_idx;
-    glb_tsbuff_t *tsbuff;
-} glb_tsbuff_iter_t;
 
 
 typedef void (*glb_tsbuff_val_free_func_t)(zbx_mem_malloc_func_t alloc_func, zbx_mem_free_func_t free_func, void* value);
@@ -507,7 +502,5 @@ void	glb_tsbuff_dump(glb_tsbuff_t *tsbuff);
 int    glb_tsbuff_check_has_enough_count_data_time(glb_tsbuff_t *tsbuff, int need_count, int time);
 int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need_count, int head_idx);
 
-void  glb_tsbuff_init_ext(glb_tsbuff_t *rbuff, unsigned int elem_num, size_t elem_size);
-//void  glb_tsbuff_iter_init_ext(glb_tsbuff_iter_t *iter, glb_tsbuff_t *tsbuff, int direction, int start_idx);
-//glb_tsbuff_value_t *glb_tsbuff_iter_next(glb_tsbuff_iter_t *iter);
+
 #endif

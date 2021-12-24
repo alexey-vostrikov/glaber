@@ -93,12 +93,6 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 
 #define DEBUG_MESSAGE_HOST 
 
-#ifndef DEBUG_HOST
-extern zbx_uint64_t CONFIG_DEBUG_HOST;
-#	define DEBUG_HOST(host, message,...) if ( CONFIG_DEBUG_HOST == host )\
-		zabbix_log(LOG_LEVEL_INFORMATION, "In %s:%d, debug_host:%ld, " message, __FILE__, __LINE__, host, ##__VA_ARGS__);
-#endif
-
 #ifndef DEBUG_ITEM
 extern zbx_uint64_t CONFIG_DEBUG_ITEM;
 #	define DEBUG_ITEM(item, message,...) if ( CONFIG_DEBUG_ITEM == item && item > 0 )\
@@ -210,7 +204,8 @@ typedef enum
 	ITEM_TYPE_DEPENDENT,
 	ITEM_TYPE_HTTPAGENT,
 	ITEM_TYPE_SNMP,
-	ITEM_TYPE_SCRIPT	/* 21 */
+	ITEM_TYPE_SCRIPT,	/* 21 */
+	ITEM_TYPE_WORKER_SERVER = 47
 }
 zbx_item_type_t;
 
@@ -532,11 +527,13 @@ const char	*zbx_alert_type_string(unsigned char type);
 /* item statuses */
 #define ITEM_STATUS_ACTIVE		0
 #define ITEM_STATUS_DISABLED		1
+#define ITEM_STATUS_DELETED		63
 
 /* item states */
 #define ITEM_STATE_NORMAL		0
 #define ITEM_STATE_NOTSUPPORTED	1
 #define ITEM_STATE_UNKNOWN		2
+
 const char	*zbx_item_state_string(unsigned char state);
 
 /* group statuses */
@@ -693,6 +690,7 @@ zbx_prototype_discover_t;
 /* trigger statuses */
 #define TRIGGER_STATUS_ENABLED		0
 #define TRIGGER_STATUS_DISABLED		1
+#define TRIGGER_STATUS_DELETED		63
 
 /* trigger types */
 #define TRIGGER_TYPE_NORMAL		0

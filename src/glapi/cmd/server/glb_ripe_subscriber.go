@@ -2,7 +2,7 @@
 package main
 
 import (
-	"glaber.io/glapi/pkg/serverapi"
+//	"glaber.io/glapi/pkg/serverapi"
 	"net/http"
 	"bufio"
 	"log"
@@ -15,29 +15,22 @@ import (
 
 func main () {
 	var live_url,as string
-	var response ServerApi.ServerResponse
 
 	flag.StringVar(&live_url,"url", "https://ris-live.ripe.net/v1/stream/?format=json","Ripe live event feed URL")
 	flag.StringVar(&as, "as", "6666","AS NUMBER for feed name and filtering")
-	flag.StringVar(&response.Host, "host", "test", "Hostname in the Glaber configuration")
-	flag.StringVar(&response.Key, "key", "test_key", "Item key in the Glaber configuration")
 	flag.Parse()
 
 	filter :=fmt.Sprintf("{\"path\": %s}",as)
 	url := fmt.Sprintf("%s&client=as%s-test",live_url, as);
 	
 	client := http.Client{}
-	req , err := http.NewRequest("GET", url, nil)
-	
-	if err != nil {
-		log.Print("Cannot create new request, exiting")	
-	}
+	req , _ := http.NewRequest("GET", url, nil)
 	
 	req.Header.Set("X-RIS-Subscribe", filter);
 	resp , err := client.Do(req)
 	
 	if err != nil {
-		log.Print("Couldn't send new request, exiting")	
+		log.Fatal("Couldn't send new request, exiting")	
 	}
 
 	reader := bufio.NewReader(resp.Body)
@@ -48,8 +41,8 @@ func main () {
 		if (nil != err) {
 			log.Fatal(err)
 		}
-		response.Value = string(line);
-				
-		ServerApi.SendMetricToServer(&response, writer)		
+
+		fmt.Fprint(writer, string(line));
+		writer.Flush()	
 	}
 }

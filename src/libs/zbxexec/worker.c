@@ -49,10 +49,39 @@ static int get_worker_mode(char *mode)
     return FAIL;
 }
 
+int glb_process_worker_params(GLB_EXT_WORKER *worker, char *params_buf) {
+    
+    LOG_INF("%s: parsing params: '%s'", __func__, params_buf);
+    
+    if ( NULL!= params_buf && strlen(params_buf) >0 )   {
+
+        char prevchar = 0, *params=NULL;
+        int i=0, args_num=2;
+        
+        worker->args[0]=worker->path;
+        worker->args[1]=zbx_strdup(NULL, params_buf);
+
+        params = worker->args[1];
+
+        while (  0 != params[i] && args_num < GLB_WORKER_ARGS_MAX) {
+            if ( ' ' == params[i] && '\\' != prevchar ) {
+                params[i]=0;
+                worker->args[args_num++]=params+i+1;
+            }
+        
+            prevchar = params[i];
+            i++;
+        }
+        worker->args[args_num]=NULL;
+    } else {
+        worker->args[0] = worker->path;
+        worker->args[1] = NULL;
+    }
+}
+
 GLB_EXT_WORKER *glb_init_worker(char *config_line)
 {
-    char path[MAX_STRING_LEN],
-         buff[MAX_STRING_LEN];
+    char path[MAX_STRING_LEN], buff[MAX_STRING_LEN];
 
     int i = 0;
     zbx_json_type_t type;
@@ -80,7 +109,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     if (SUCCEED != zbx_json_open(config_line, &jp_config))
     {
-        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: '%s', most likely not a valid JSON", config_line);
+        zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration: '%s', not a valid JSON", config_line);
         zbx_free(worker);
         return NULL;
     }
@@ -99,34 +128,8 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "params", buff, MAX_STRING_LEN, &type))
     {
-        zabbix_log(LOG_LEVEL_DEBUG, "%s: parsed params: '%s'", __func__, buff);
-        
-        char prevchar = 0, *params=NULL;
-        int i=0, args_num=2;
-        
-        worker->args[0]=worker->path;
-        worker->args[1]=zbx_strdup(NULL, buff);
-
-        params = worker->args[1];
-
-        while (  0 != params[i] && args_num < GLB_WORKER_ARGS_MAX) {
-            
-            if ( ' ' == params[i] && '\\' != prevchar ) {
-                params[i]=0;
-                worker->args[args_num++]=params+i+1;
-            }
-        
-            prevchar = params[i];
-            i++;
-        }
-        worker->args[args_num]=NULL;
-        
-    }
-    else {
-        worker->args[0] = worker->path;
-        worker->args[1] = NULL;
-    }
-    
+        glb_process_worker_params(worker, buff);    
+    }    
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "timeout", buff, MAX_STRING_LEN, &type))
     {
         worker->timeout = strtol(buff, NULL, 10);
@@ -170,6 +173,10 @@ static int restart_worker(GLB_EXT_WORKER *worker)
     static unsigned int count_rst_time=0, restarts=0;
     unsigned int now=time(NULL);
 
+    if (now < worker->last_fail + CONFIG_TIMEOUT) {
+        LOG_DBG("Not restarting, waiting for %d seconds till restart", CONFIG_TIMEOUT);
+        return FAIL;
+    }
     if (now > count_rst_time) {
         zabbix_log(LOG_LEVEL_DEBUG,"Zeroing restart limit");
         count_rst_time=now + RST_ACCOUNT_PERIOD;
@@ -290,11 +297,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
     //zabbix_log(LOG_LEVEL_INFORMATION,"Set worker pid to %d", worker->pid);
     //resetting run count
     worker->calls = 0;
-    if (worker->async_mode) {
-        //to prevent bombing with other async requests in the same process in async mode
-        //having a nap
-        sleep(2);
-    }
+   
     zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     return SUCCEED;
@@ -308,7 +311,8 @@ int worker_is_alive(GLB_EXT_WORKER *worker)
 {
     if (!worker->pid)
     {
-        zabbix_log(LOG_LEVEL_INFORMATION, "Worker hasn't been running before");
+        if ( 0 != worker->last_fail) 
+            LOG_DBG("Worker hasn't been running before");
         return FAIL;
     }
     if (kill(worker->pid, 0))
@@ -564,11 +568,9 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
     wait_start = zbx_time();
 
     if (0 != worker->async_mode) {
-        //zabbix_log(LOG_LEVEL_INFORMATION,"Set operation to non blocking mode");
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
         fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
     }
-    
    
     while (FAIL == zbx_alarm_timed_out() && continue_read)
     {
@@ -577,9 +579,9 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
 
         //doing non-blocking read. Checking if we eneded up with new line or
         //just a line to understand that all the data has been recieved
-        //zabbix_log(LOG_LEVEL_INFORMATION,"Calling read");
+        LOG_DBG("Calling read");
         read_len = read(worker->pipe_from_worker, buffer, MAX_STRING_LEN*10);
-        //zabbix_log(LOG_LEVEL_INFORMATION,"finished read");
+        LOG_DBG("finished read");
         
         switch (read_len) {
             case -1: 
@@ -654,7 +656,12 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
         zabbix_log(LOG_LEVEL_INFORMATION,"Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
-        sleep(1);
+        if (worker->pid != 0) {
+            worker->last_fail = time(NULL);
+            worker->pid = 0;
+        }
+        
+        //sleep(1);
         int resp_len = strlen(resp_buffer);
     
         restart_worker(worker);
@@ -724,12 +731,15 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
 }
 
 void glb_destroy_worker(GLB_EXT_WORKER *worker)
-{
-
-    if (worker_is_alive(worker))
+{   
+    int exitstatus;
+    
+    if (SUCCEED == worker_is_alive(worker)) {
         kill(worker->pid, SIGINT);
-
+        sleep(1);
+        waitpid(worker->pid, &exitstatus,WNOHANG);
+    }
     zbx_free(worker->path);
-    zbx_free(worker->args[0]);
-    zbx_free(worker);
+       
+    LOG_INF("Worker destroy completed");
 }

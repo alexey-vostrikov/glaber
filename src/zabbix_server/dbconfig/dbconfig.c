@@ -31,6 +31,7 @@ extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
 
 static volatile sig_atomic_t	secrets_reload;
+static volatile sig_atomic_t	nextcheck;
 
 static void	zbx_dbconfig_sigusr_handler(int flags)
 {
@@ -42,7 +43,8 @@ static void	zbx_dbconfig_sigusr_handler(int flags)
 		if (0 < zbx_sleep_get_remainder())
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "forced reloading of the configuration cache");
-			zbx_wakeup();
+			nextcheck = time(NULL);
+			//zbx_wakeup();
 		}
 		else
 			zabbix_log(LOG_LEVEL_WARNING, "configuration cache reloading is already in progress");
@@ -53,12 +55,16 @@ static void	zbx_dbconfig_sigusr_handler(int flags)
 		{
 			secrets_reload = 1;
 			zabbix_log(LOG_LEVEL_WARNING, "forced reloading of the secrets");
-			zbx_wakeup();
+			//zbx_wakeup();
 		}
 		else
 			zabbix_log(LOG_LEVEL_WARNING, "configuration cache reloading is already in progress");
 	}
 }
+
+
+int DC_ConfigNeedsSync(); 
+void DC_CleanOutdatedChangedItems();
 
 /******************************************************************************
  *                                                                            *
@@ -77,9 +83,8 @@ static void	zbx_dbconfig_sigusr_handler(int flags)
  ******************************************************************************/
 ZBX_THREAD_ENTRY(dbconfig_thread, args)
 {
-	double	sec = 0.0;
-	int	nextcheck = 0;
-
+	int sec = time(NULL);
+	
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
@@ -95,21 +100,29 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	sec = zbx_time();
-	zbx_setproctitle("%s [syncing configuration]", get_process_type_string(process_type));
+	zbx_setproctitle("%s [init: syncing configuration]", get_process_type_string(process_type));
 	DCsync_configuration(ZBX_DBSYNC_INIT, NULL);
-	zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
-			get_process_type_string(process_type), (sec = zbx_time() - sec), CONFIG_CONFSYNCER_FREQUENCY);
-	zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
-
+	nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
+	
 	while (ZBX_IS_RUNNING())
 	{
-		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, syncing configuration]",
-				get_process_type_string(process_type), sec);
-
-		sec = zbx_time();
+		sec = time(NULL) - sec;
 		zbx_update_env(sec);
+	
+		while (nextcheck > time(NULL) &&  FAIL == DC_ConfigNeedsSync() &&  0 == secrets_reload) 
+		{
 
+			zbx_setproctitle("%s [synced configuration in %d sec; next sync in %d sec]",
+				get_process_type_string(process_type), sec, nextcheck - time(NULL) );
+			
+			DC_CleanOutdatedChangedItems();
+
+			zbx_sleep_loop(1);
+		}
+		
+		zbx_setproctitle("%s [update: syncing configuration; last sync in %d sec]", get_process_type_string(process_type), sec);
+
+		sec = time(NULL);
 		if (1 == secrets_reload)
 		{
 			DCsync_configuration(ZBX_SYNC_SECRETS, NULL);
@@ -122,12 +135,6 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 		}
 
-		sec = zbx_time() - sec;
-
-		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
-				get_process_type_string(process_type), sec, CONFIG_CONFSYNCER_FREQUENCY);
-
-		zbx_sleep_loop(nextcheck - time(NULL));
 	}
 
 	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);

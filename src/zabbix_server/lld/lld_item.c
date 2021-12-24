@@ -3102,7 +3102,7 @@ static void	lld_item_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 		zbx_db_insert_add_values(db_insert_idiscovery, (*itemdiscoveryid)++, item->itemid,
 				item->parent_itemid, item_prototype->key);
 
-		zbx_db_insert_add_values(db_insert_irtdata, item->itemid);
+		zbx_db_insert_add_values(db_insert_irtdata, item->itemid, time(NULL));
 	}
 
 	for (index = 0; index < item->dependent_items.values_num; index++)
@@ -3414,6 +3414,10 @@ static void	lld_item_prepare_update(const zbx_lld_item_prototype_t *item_prototy
 	}
 
 	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, " where itemid=" ZBX_FS_UI64 ";\n", item->itemid);
+	
+	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "update item_rtdata set mtime = %d where itemid=" ZBX_FS_UI64 ";\n", 
+				time(NULL), item->itemid );
+
 
 	DBexecute_overflowed_sql(sql, sql_alloc, sql_offset);
 }
@@ -3580,7 +3584,7 @@ static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 		zbx_db_insert_prepare(&db_insert_idiscovery, "item_discovery", "itemdiscoveryid", "itemid",
 				"parent_itemid", "key_", NULL);
 
-		zbx_db_insert_prepare(&db_insert_irtdata, "item_rtdata", "itemid", NULL);
+		zbx_db_insert_prepare(&db_insert_irtdata, "item_rtdata", "itemid", "mtime", NULL);
 	}
 
 	for (i = 0; i < items->values_num; i++)

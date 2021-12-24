@@ -10,31 +10,36 @@
 #include "../lld/lld_protocol.c"
 #include "../trapper/active.h"
 #include "glb_server.h"
+#include "glb_poller.h"
 #include "module.h"
 #include "preproc.h"
 #include "zbxjson.h"
 
+extern int CONFIG_EXT_SERVER_FORKS;
+
+#define WORKER_RESTART_HOLD 10 
+
 typedef struct {
-  //  zbx_hashset_t *items;
-  	int *requests;
-	int *responses;
-    zbx_hashset_t workers;
-    zbx_hashset_t items_idx; //index to quickly locate itemids for arrived data
-    zbx_hashset_t lld_items_reg; //index of already registered lld items
-    zbx_hashset_t autoreg_hosts;
- } GLB_SERVER_CONF;
+    zbx_hashset_t *items;
+} worker_server_conf_t;
+
+typedef struct {
+    int last_restart;
+    GLB_EXT_WORKER worker;
+} worker_t;
 
 extern char  *CONFIG_WORKERS_DIR;
-extern char  **CONFIG_EXT_SERVERS;
 extern int	 CONFIG_CONFSYNCER_FREQUENCY;
 
+/*
 typedef struct {
     u_int64_t id;
     const char *host;
     const char *meta;
     const char *interface;
 } HOST_AUTOREG;
-
+*/
+/*
 typedef struct {
     u_int64_t id;
     const char *host;
@@ -42,6 +47,7 @@ typedef struct {
     const char *lld_key;
     const char *lld_macro;
 } LLD_ITEM_REG;
+*/
 
 typedef struct {
     u_int64_t hash;
@@ -50,15 +56,15 @@ typedef struct {
 	unsigned int expire;
     unsigned char flags;
     unsigned char value_type;
-
 } GLB_SERVER_IDX_T;
-
 
 
 /*******************************************************************
  * saves unique hostname-meta pairs to upload them as a host autoreg
  * *****************************************************************/
-static void add_host_regdata(GLB_SERVER_CONF *conf, char *host, const char *interface, const char *meta1, const char *meta2) {
+
+/*
+static void add_host_regdata( worker_server_conf_t *conf, char *host, const char *interface, const char *meta1, const char *meta2) {
     HOST_AUTOREG host_autoreg;
     char tmp[MAX_ID_LEN * 2];
     const char *meta = NULL;
@@ -91,11 +97,12 @@ static void add_host_regdata(GLB_SERVER_CONF *conf, char *host, const char *inte
 
     zbx_hashset_insert(&conf->autoreg_hosts,&host_autoreg,sizeof(host_autoreg));
 }
-
+*/
 /*******************************************************************
  * saves unique hostname-keys pairs to upload them as a LLD
  * *****************************************************************/
-static void add_host_key_regdata(GLB_SERVER_CONF *conf, const char *host, const char *key, const char *lld_key, const char *lld_macro ) {
+/*
+static void add_host_key_regdata( worker_server_conf_t *conf, const char *host, const char *key, const char *lld_key, const char *lld_macro ) {
     //adding unique host,key to the lld hash
     char tmp[MAX_STRING_LEN];
     LLD_ITEM_REG lld_item_reg;
@@ -119,177 +126,127 @@ static void add_host_key_regdata(GLB_SERVER_CONF *conf, const char *host, const 
     zbx_hashset_insert(&conf->lld_items_reg,&lld_item_reg,sizeof(lld_item_reg));
 }
 
-/************************************************************************
- * submits result to the preprocessor                                   *
- * **********************************************************************/
-static int glb_server_submit_result(GLB_SERVER_CONF *conf, char *response, GLB_SERVER_T *worker) {
+*/
+
+static void glb_server_submit_fail_result(GLB_POLLER_ITEM *glb_item, char *error) {
     
-    //parsing responce
-    struct zbx_json_parse jp_resp;
-    zbx_json_type_t type;
+    worker_t *worker = (worker_t*)glb_item->itemdata;
     zbx_timespec_t ts;
-    char host[HOST_HOST_LEN_MAX],json_key[ITEM_KEY_LEN], full_key[ITEM_KEY_LEN], value[MAX_STRING_LEN], 
-        *val = NULL, *log_meta = NULL, *interface = NULL, *key = NULL,
-        itemid_s[MAX_ID_LEN], tmp[MAX_STRING_LEN];
-    u_int64_t hash;
-    int now = time(NULL);
 
-    GLB_SERVER_IDX_T *item_idx = NULL;
-
-    //parsing responce, it should arrive as a json:
     zbx_timespec(&ts);
-      
-    if (SUCCEED != zbx_json_open(response, &jp_resp)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response '%s' from worker", response);
-		return FAIL;
-    }
-
-    //mandatory fields that has to present in the response
-    if (SUCCEED != zbx_json_value_by_name(&jp_resp, "host", host, MAX_ID_LEN, &type) ||
-        SUCCEED != zbx_json_value_by_name(&jp_resp, "key", json_key, MAX_STRING_LEN, &type) ) {
-       zabbix_log(LOG_LEVEL_DEBUG,"Cannot parse response from the worker: %s, missing either host,key or value fields",response);
-       return FAIL;
-    }
+    zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 
+                                             glb_item->flags , NULL , &ts, ITEM_STATE_NOTSUPPORTED, error);
     
-    //if there is no dedicated value, then the whole response is a value
-    if (SUCCEED != zbx_json_value_by_name(&jp_resp, "value", value, MAX_STRING_LEN, &type) ) {
-        val = response;
-    } else 
-        val = value;
- 
-    //additional field that might be in the response, but not mandatory
-    if (SUCCEED == zbx_json_value_by_name(&jp_resp, "time", tmp, MAX_ID_LEN, &type) ) {
-        ts.sec = strtol(tmp,NULL,10);
-    }
-
-    if (SUCCEED == zbx_json_value_by_name(&jp_resp, "time_ns", tmp, MAX_ID_LEN, &type) ) 
-        ts.ns = strtol(tmp,NULL,10);
-
-    //looking for the itemid for the host,key
-    if (NULL != worker->item_key) {
-        //means the key should be prefixed with key name 
-        //and the key value will be the param
-        zbx_snprintf(full_key,ITEM_KEY_LEN,"%s[%s]",worker->item_key,json_key);
-        key = full_key;
-    } else key = json_key;
-
     
-    zbx_snprintf(tmp,MAX_STRING_LEN,"%s,%s",host,key);
-    
-    hash = (u_int64_t) zbx_heap_strpool_intern(tmp);
-    
-    item_idx = (GLB_SERVER_IDX_T*)zbx_hashset_search(&conf->items_idx,(void *)&hash);
-    
-    //checking if it's outdated
-    if ( NULL != item_idx && item_idx->expire < now ) {
-        zbx_hashset_remove_direct(&conf->items_idx, item_idx);
-        item_idx = NULL;
-    }
-    
-    if ( NULL == item_idx ) {
-        zabbix_log(LOG_LEVEL_DEBUG,"Item %s,%s is not in index, doing CC lookup",host,key);
-
-        zbx_host_key_t host_key = { .host=(char *) host, .key = (char*) key};
-        int errcode;
-        DC_ITEM dc_item;
-        GLB_SERVER_IDX_T item_idx2;
-
-        DCconfig_get_items_by_keys(&dc_item, &host_key, &errcode, 1);
-        
-        zabbix_log(LOG_LEVEL_DEBUG,"Finished lookup in CC for item %s,%s, id is %ld",host,key,dc_item.itemid);
-        
-        if (SUCCEED == errcode ) {
-            item_idx2.itemid = dc_item.itemid;
-            item_idx2.hostid = dc_item.host.hostid;
-            item_idx2.value_type = dc_item.value_type;
-            item_idx2.flags = dc_item.flags;
-
-        } else {
-            //this will serve as a sort of negative record to not to kill CC under heavy
-            //income data rates             
-            item_idx2.itemid = 0;
-        }
-
-        item_idx2.hash = hash;
-        item_idx2.expire = time(NULL) + GLB_SERVER_ITEMID_CACHE_TTL;
-        item_idx = zbx_hashset_insert(&conf->items_idx,&item_idx2,sizeof(GLB_SERVER_IDX_T));
-
-        DCconfig_clean_items(&dc_item, &errcode, 1);
-    }  
-    else
-    {
-        zabbix_log(LOG_LEVEL_DEBUG,"Item has been found in the index with itemid %ld",&item_idx->itemid);
-    }
-       
-    if ( NULL != item_idx && 0 != item_idx->itemid ) {
-        //looking for the glb_item
-        // GLB_POLLER_ITEM *glb_item = (GLB_POLLER_ITEM*)zbx_hashset_search(conf->items,&item_idx->itemid);
-        
-        //if (NULL != glb_item) {
-        AGENT_RESULT	result;
-        init_result(&result);
-        zbx_rtrim(val, ZBX_WHITESPACE);
-        set_result_type(&result, ITEM_VALUE_TYPE_TEXT, val);
-        zbx_preprocess_item_value(item_idx->hostid, item_idx->itemid, item_idx->value_type, 
-                                                item_idx->flags , &result , &ts, ITEM_STATE_NORMAL, NULL);
-    
-        free_result(&result);
-    } 
-
-    //the negative result might mean host doesn't exists in the config, adding the host to reg data
-    if (worker->auto_reg_hosts)  {
-        char iface[MAX_STRING_LEN];
-   
-        if (SUCCEED == zbx_json_value_by_name(&jp_resp, "metadata", tmp, MAX_ID_LEN, &type) ) 
-            log_meta = tmp;
-
-        if (  NULL != worker->interface_param &&  
-              SUCCEED == zbx_json_value_by_name(&jp_resp, worker->interface_param, iface, MAX_STRING_LEN, &type) ) 
-            interface = iface;
-
-        zabbix_log(LOG_LEVEL_DEBUG,"Autoregistration is enabled, adding host %s with metadata %s,%s , interface %s to autoreg data",
-            host, log_meta, worker->auto_reg_metadata, interface);
-        
-        add_host_regdata(conf, host, interface, log_meta, worker->auto_reg_metadata);
-    }
-    
-    if ( NULL != worker->lld_key_name ) {
-        add_host_key_regdata(conf, host, json_key, worker->lld_key_name, worker->lld_macro_name);
-    }
-
-    //autoregistration data is checked and submitted during checking all the worker responses once 
-    //each 1/2 time interval of config cache reload 
-
-    
-    //TODO: here we should match incoming host name and incoming itemid to
-    // existing items and found the itemid belonging to them to submit to
-    // the preprocessing
-    // also we should form a list of host->keys to periodicaly feed lld data
-    // to the preprocessing to automatically create the new items
-
-    //actually, there are two steps 
-    //1. if host isn't registered yet and autoregistration is on for the worker - register it!
-    //2. if lld is on for the worker , add the item to the registration data, which should be 
-    // submitted requlary
-    //3. It's very logical to have this options to be on or off based by worker or server
-    //so in config it should look like:
-    //WorkerServer={"path":"path_to_the_worker","add_hosts":"yes","lld_key":"discovery","metadata":"listener"}
-    //DC_HOST dd;
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 }
 
 
 
+/************************************************************************
+ * submits result to the preprocessor                                   *
+ * **********************************************************************/
+static int glb_server_submit_result(GLB_POLLER_ITEM *glb_item, char *response) {
+    
+    struct zbx_json_parse jp_resp;
+    zbx_json_type_t type;
+    zbx_timespec_t ts;
+    worker_t *worker = (worker_t*)glb_item->itemdata;
+    
+//    char json_key[ITEM_KEY_LEN], full_key[ITEM_KEY_LEN], value[MAX_STRING_LEN], 
+//        *val = NULL, *log_meta = NULL, *interface = NULL, *key = NULL,
+//        itemid_s[MAX_ID_LEN], tmp[MAX_STRING_LEN];
+ 
+    u_int64_t hash;
+    int now = time(NULL);
+
+    GLB_SERVER_IDX_T *item_idx = NULL;
+
+    zbx_timespec(&ts);
+      
+    if (SUCCEED != zbx_json_open(response, &jp_resp)) {
+		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response '%s' from worker %s", response, worker->worker.path);
+		return FAIL;
+    }
+
+    //mandatory fields that has to present in the response
+    //if (SUCCEED != zbx_json_value_by_name(&jp_resp, "host", host, MAX_ID_LEN, &type) ||
+    //    SUCCEED != zbx_json_value_by_name(&jp_resp, "key", json_key, MAX_STRING_LEN, &type) ) {
+    //    LOG_WRN("Cannot parse response from the worker: %s, missing either host,key or value fields",response);
+    //   return FAIL;
+    //}
+    
+    //if there is no dedicated value, then the whole response is a value
+    //if (SUCCEED != zbx_json_value_by_name(&jp_resp, "value", value, MAX_STRING_LEN, &type) ) {
+    //    val = response;
+    //} else 
+    //    val = value;
+ 
+    //additional field that might be in the response, but not mandatory
+    //if (SUCCEED == zbx_json_value_by_name(&jp_resp, "time", tmp, MAX_ID_LEN, &type) ) {
+    //    ts.sec = strtol(tmp,NULL,10);
+    //}
+
+    //if (SUCCEED == zbx_json_value_by_name(&jp_resp, "time_ns", tmp, MAX_ID_LEN, &type) ) 
+    //    ts.ns = strtol(tmp,NULL,10);
+    /*   
+    if (  worker->next_resolve < now ) {
+        LOG_INF("Resolving itemid to send data to for server %s", worker->worker->path);
+
+        zbx_host_key_t host_key = { .host = worker->host, .key = worker->key};
+        int errcode;
+        DC_ITEM dc_item;
+        
+
+        
+        DCconfig_get_items_by_keys(&dc_item, &host_key, &errcode, 1);
+     
+        if (SUCCEED == errcode) {
+            worker->itemid = dc_item.itemid;
+            LOG_INF("Finished lookup in CC for item %s,%s, id is %ld",host,key,dc_item.itemid);
+        } else {
+            worker->itemid = 0;
+            LOG_INF("Failed to find the itemid for worker %s",worker->worker->path);
+        }
+        
+        DCconfig_clean_items(&dc_item, &errcode, 1);
+        worker->next_resolve = now + CONFIG_CONFSYNCER_FREQUENCY /2;
+    }  
+    /*
+    else
+    {
+        zabbix_log(LOG_LEVEL_DEBUG,"Item has been found in the index with itemid %ld",&item_idx->itemid);
+    }
+    */ 
+    //if ( 0 != worker->itemid  ) {
+    
+    AGENT_RESULT	result;
+       
+    init_result(&result);
+    zbx_rtrim(response, ZBX_WHITESPACE);
+    set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
+    zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 
+                                             glb_item->flags , &result , &ts, ITEM_STATE_NORMAL, NULL);
+    
+    free_result(&result);
+    
+    zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
+}
+
+
 /******************************************************************************
  * item init - from the general dc_item to compact local item        		  * 
  * ***************************************************************************/
-unsigned int glb_server_init_item(void *engine, DC_ITEM *dc_item, GLB_SERVER_ITEM *server_item) {
-    
+
+//int glb_server_init_item(DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
+//    LOG_INF("Trying to create worker for itm %ld, host %s, key %s, params %s", dc_item->itemid, 
+//			    dc_item->host.host, dc_item->key_orig, dc_item->params);    
     //item and host will be automatically placed to the items hash
     //however to find items arriving from the server workers really quickly
     //we need to keep the reverse index (host,key)->(itemid)
     //and also clean this index upon item removal (this may be done periodicaly)
-    GLB_SERVER_CONF *conf = (GLB_SERVER_CONF*)engine;
+    /*
+     worker_server_conf_t *conf = ( worker_server_conf_t*)engine;
     char tmp[MAX_STRING_LEN];
     GLB_SERVER_IDX_T idx;
 
@@ -305,101 +262,25 @@ unsigned int glb_server_init_item(void *engine, DC_ITEM *dc_item, GLB_SERVER_ITE
     zbx_hashset_insert(&conf->items_idx,&idx,sizeof(GLB_SERVER_IDX_T));
     
     return SUCCEED;
-}
+*/
+//  return FAIL;
+//}
 
 /*****************************************************************
  * creates a new worker structure
 *****************************************************************/
-int  glb_server_create_worker(GLB_SERVER_CONF *conf, char *worker_cfg) {
-
-    GLB_SERVER_T worker, *retworker;
-    struct zbx_json_parse jp;
-    char full_path[MAX_STRING_LEN], path[MAX_STRING_LEN], params[MAX_STRING_LEN], tmp_str[MAX_STRING_LEN];
-    zbx_json_type_t type;
-
-    zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
-   
-    bzero(&worker, sizeof(GLB_SERVER_T));
-     
-    if (SUCCEED != zbx_json_open(worker_cfg, &jp)) {
-		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse worker configuration not a valid JSON: '%s' from worker", worker_cfg);
-		exit(-1);
-    }
-
-    //path is mandatory
-    if (SUCCEED != zbx_json_value_by_name(&jp, "path", path, MAX_STRING_LEN, &type)) {
-        zabbix_log(LOG_LEVEL_WARNING,"Couldn't parse 'path' field in the worker configuration: %s", worker_cfg);
-        exit(-1);
-    }
-
-    if (NULL == CONFIG_WORKERS_DIR) {
-        zabbix_log(LOG_LEVEL_WARNING,"To run worker as a server, set WorkerScripts dir location in the configuration file");
-        exit(-1);
-    }
-    zbx_snprintf(full_path,MAX_STRING_LEN,"%s/%s",CONFIG_WORKERS_DIR,path);
 /*
-    if (-1 != access(full_path, X_OK)) {
-		zabbix_log(LOG_LEVEL_DEBUG ,"Found command '%s' - ok for adding to glb_worker",full_path);
-	} else {
-		zabbix_log(LOG_LEVEL_WARNING ,"Couldn't find command '%s' or it's not executable, stopping",full_path);
-        exit(-1);
-	}
-  */  
-    
-    //theese are addtional, off by default
-    if ( SUCCEED == zbx_json_value_by_name(&jp, "hosts_autoreg",tmp_str , MAX_ID_LEN, &type) &&
-         0 == strcmp(tmp_str,"yes")) 
-        worker.auto_reg_hosts = 1;
-        
-    if (SUCCEED == zbx_json_value_by_name(&jp, "metadata", tmp_str, MAX_ID_LEN, &type)) 
-        worker.auto_reg_metadata = zbx_heap_strpool_intern(tmp_str);
-    
-    if (SUCCEED == zbx_json_value_by_name(&jp, "item_name", tmp_str, MAX_ID_LEN, &type)) 
-        worker.item_key = zbx_heap_strpool_intern(tmp_str);
-    
-    if (SUCCEED == zbx_json_value_by_name(&jp, "interface_param", tmp_str, MAX_ID_LEN, &type)) 
-        worker.interface_param = zbx_heap_strpool_intern(tmp_str);
-    else 
-        worker.interface_param = zbx_heap_strpool_intern("interface");
+int  glb_server_create_worker( worker_server_conf_t *conf, char *worker_cfg) {
 
-    if (SUCCEED == zbx_json_value_by_name(&jp, "lld_key", tmp_str, MAX_STRING_LEN, &type) )
-        worker.lld_key_name = (char *)zbx_heap_strpool_intern(tmp_str);
     
-    if ( SUCCEED == zbx_json_value_by_name(&jp, "lld_macro", tmp_str, MAX_STRING_LEN, &type)) 
-        worker.lld_macro_name = (char *)zbx_heap_strpool_intern(tmp_str);
-    else 
-        worker.lld_macro_name = (char *)zbx_heap_strpool_intern(GLB_DEFAULT_SERVER_MACRO_NAME);
-    
-    zabbix_log(LOG_LEVEL_INFORMATION, "creating a server worker for cmd %s ",full_path);
-     
-    
-    //doing worker json init to parse arguments correcly.
-    worker.worker = glb_init_worker(worker_cfg);
-    
-    if (NULL == worker.worker) {
-        zabbix_log(LOG_LEVEL_WARNING,"Cannot init worker, with params %s",worker_cfg);
-        exit(-1);
-    }
-   
-    
-    worker.worker->async_mode = 1;
-    worker.worker->max_calls = GLB_SERVER_MAXCALLS;
-    worker.worker->mode_from_worker=GLB_WORKER_MODE_NEWLINE;
-    worker.worker->timeout = CONFIG_TIMEOUT;
-    worker.workerid = ZBX_DEFAULT_STRING_HASH_FUNC(worker.worker->path);
-      
-    retworker = (GLB_SERVER_T*)zbx_hashset_insert(&conf->workers,&worker,sizeof(GLB_SERVER_T));
-    glb_start_worker(retworker->worker);
-
-    return SUCCEED;
-}
-
+*/
 /******************************************************************************
  * item deinit - freeing all interned string								  * 
  * ***************************************************************************/
+/*
 void glb_server_free_item(void *engine, GLB_POLLER_ITEM *glb_poller_item ) {
     
-    GLB_SERVER_CONF *conf = (GLB_SERVER_CONF*)engine;
+     worker_server_conf_t *conf = ( worker_server_conf_t*)engine;
     GLB_SERVER_ITEM *glb_server_item = (GLB_SERVER_ITEM *)glb_poller_item->itemdata;
 
     char tmp[MAX_STRING_LEN];
@@ -414,10 +295,10 @@ void glb_server_free_item(void *engine, GLB_POLLER_ITEM *glb_poller_item ) {
     zbx_heap_strpool_release(glb_server_item->key);
     zbx_heap_strpool_release(glb_server_item->hostname);
 }
+*/
 
-
-static void glb_server_process_results(GLB_SERVER_CONF *conf) {
-    
+//static void glb_server_process_results( worker_server_conf_t *conf) {
+    /*
     char *worker_response = NULL;
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
            
@@ -443,25 +324,21 @@ static void glb_server_process_results(GLB_SERVER_CONF *conf) {
                 zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s from worker %s", worker_response, worker->worker->path);
                 glb_server_submit_result(conf, worker_response, worker);
             }
-            //checking if registration data could be send by now
-            if (time(NULL) - last_reg_send > CONFIG_CONFSYNCER_FREQUENCY/2 ) {
-                //glb_submit_hostreg_data(worker);
-                //glb_preprocess_lld_data(worker);
-            }
-
+  
         } else {
-            LOG_INF("Server worker %s is not alive, skipping", worker->worker->path);
+            LOG_INF("Server worker %s is not alive, restarting", worker->worker->path);
         }
     }
-
-    zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
-}
+*/
+    //zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
+//}
 
 
 /*************************************************************
  * autoregisters collected hosts 
  * **********************************************************/
-int sync_hosts_autoreg(GLB_SERVER_CONF *conf) {
+/*
+int sync_hosts_autoreg( worker_server_conf_t *conf) {
     zbx_hashset_iter_t iter;
     HOST_AUTOREG *h_reg;
 
@@ -480,10 +357,12 @@ int sync_hosts_autoreg(GLB_SERVER_CONF *conf) {
     }
 
 }
+*/
 /*************************************************************
  * uploads discovered lld items         
  * ***********************************************************/
-int sync_lld_data(GLB_SERVER_CONF *conf) {
+/*
+int sync_lld_data( worker_server_conf_t *conf) {
     zbx_hashset_iter_t iter;
     LLD_ITEM_REG *lld_reg;
     zbx_host_key_t host_key;
@@ -504,8 +383,9 @@ int sync_lld_data(GLB_SERVER_CONF *conf) {
             zbx_timespec_t ts;
             char lld_val[MAX_STRING_LEN], error[MAX_STRING_LEN];
             //now generating the LLD data 
+  */
             /* [{"{#SITENAME}":"/"}] */
-            
+    /*        
             zbx_timespec(&ts);
 
             init_result(&result);
@@ -534,29 +414,8 @@ int sync_lld_data(GLB_SERVER_CONF *conf) {
         zbx_hashset_iter_remove(&iter);
     }
 }
+*/
 
-/******************************************************************************
- * handles i/o - calls selects/snmp_recieve, 								  * 
- * note: doesn't care about the timeouts - it's done by the poller globbaly   *
- * ***************************************************************************/
-void  glb_server_handle_async_io(void *engine) {
-    static unsigned int last_sync_time = 0;
-
-	GLB_SERVER_CONF *conf = (GLB_SERVER_CONF*)engine;
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
-    
-    glb_server_process_results(conf);
-      
-    //TODO: add periodical worker's check and restart if needed  
-    if (time(NULL) - last_sync_time > CONFIG_CONFSYNCER_FREQUENCY/2) {
-        zabbix_log(LOG_LEVEL_DEBUG,"It's time to sync autodiscovery hosts and lld data");
-        sync_hosts_autoreg(conf);
-        sync_lld_data(conf);
-        zabbix_log(LOG_LEVEL_DEBUG,"Finished sync");
-        last_sync_time = time(NULL);
-    }
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
-}
 
 /*************************************************************
  * compare function for index hash
@@ -571,70 +430,157 @@ static int	server_idx_cmp_func(const void *d1, const void *d2)
 	return 0;
 }
 
-/******************************************************************************
- * init
- * ***************************************************************************/
-void* glb_server_init( int *requests, int *responses ) {
-	int i, ret;
-	static GLB_SERVER_CONF *conf;
-    char **worker_cfg;
-	
-    zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+static void init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_ITEM *glb_poller_item) {
 
-	if (NULL == (conf = zbx_malloc(NULL,sizeof(GLB_SERVER_CONF))) )  {
-			zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for async snmp connections data, exititing");
-			exit(-1);
-		}
-        
-    conf->requests = requests;
-	conf->responses = responses;
+    worker_server_conf_t *conf = (worker_server_conf_t *)poll_mod->poller_data;
+    worker_t *worker;
+    char *args;
+    struct zbx_json_parse jp;
+    char full_path[MAX_STRING_LEN],  params[MAX_STRING_LEN], tmp_str[MAX_STRING_LEN];
+    zbx_json_type_t type;
 
+    LOG_DBG( "In %s() Started", __func__);
 
-    if (NULL == CONFIG_WORKERS_DIR ) {
-        zabbix_log(LOG_LEVEL_WARNING, "Warning: trying to run glb_server without 'WorkersScript' set in the config file, not starting");
+    if (NULL == (worker = (worker_t*)zbx_calloc(NULL,0,sizeof(worker_t)))) {
+        LOG_WRN("Couldn't allocate heap mem to create a worker, exiting");
         exit(-1);
     }
-        
-    zbx_hashset_create(&conf->workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-    zbx_hashset_create(&conf->autoreg_hosts, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-    zbx_hashset_create(&conf->lld_items_reg, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-    zbx_hashset_create(&conf->items_idx, 1000, ZBX_DEFAULT_UINT64_HASH_FUNC,server_idx_cmp_func);
-    
-    if ( NULL == *CONFIG_EXT_SERVERS) {
-        THIS_SHOULD_NEVER_HAPPEN;
+
+    if (NULL == CONFIG_WORKERS_DIR) {
+        zabbix_log(LOG_LEVEL_WARNING,"To run worker as a server, set WorkerScripts dir location in the configuration file");
         exit(-1);
     }
+
+    if (NULL == dcitem->params ) {
+        LOG_DBG("Cannot run a server worker with an empty path");
+        DEBUG_ITEM(dcitem->itemid,"Cannot run a server worker with empty path");
+        return;
+    }
+       
+    if ( NULL != dcitem->params) {
+        char *path;
+        
+        if ('/' != dcitem->params[0] ) {
+            zbx_snprintf(full_path,MAX_STRING_LEN,"%s/%s",CONFIG_WORKERS_DIR,dcitem->params);
+            path = full_path;
+        } else 
+            path = dcitem->params;
+        
+        worker->worker.path = zbx_strdup(NULL, path); 
+
+        if (NULL != (args = strchr(worker->worker.path,' '))) {
+            args[0] = 0;
+            args++;
+        } else 
+            args = NULL;
+        
+        glb_process_worker_params(&worker->worker, args);
+        
+       
+    }
     
-    for (worker_cfg = CONFIG_EXT_SERVERS; NULL != *worker_cfg; worker_cfg++)
-	{
-        if (SUCCEED != (ret = glb_server_create_worker(conf, *worker_cfg)))
-			exit(-1);
-	}
+    worker->worker.async_mode = 1;
+    worker->worker.max_calls = GLB_SERVER_MAXCALLS;
+    worker->worker.mode_from_worker=GLB_WORKER_MODE_NEWLINE;
     
-  	LOG_INF("In %s: Ended, %d workers in the config", __func__,conf->workers.num_data);
-	return (void *)conf;
+    glb_poller_item->itemdata = worker;
+    
+    glb_start_worker(&worker->worker);
+
+    LOG_DBG("Finished init of server item %ld, worker %s",glb_poller_item->itemid, worker->worker.path);
+};
+
+
+static void delete_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item) {
+    LOG_INF("Deleting server worker item %ld", glb_item->itemid);
+    
+    worker_t *worker = (worker_t*)glb_item->itemdata;
+
+    glb_destroy_worker(&worker->worker);
+    LOG_INF("freening he item");
+    zbx_free(worker);
+    LOG_INF("Finished deleting the item");
+
 }
 
-/******************************************************************************
- * does snmp connections cleanup, not related to snmp shutdown 				  * 
- * ***************************************************************************/
-void    glb_server_shutdown(void *engine) {
-	
-    zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);	
-	//need to deallocate time hashset 
-    //stop the glbmap exec
-    //dealocate 
-	GLB_SERVER_CONF *conf = (GLB_SERVER_CONF*)engine;
-    zbx_hashset_destroy(&conf->autoreg_hosts);
-    zbx_hashset_destroy(&conf->items_idx);
-    zbx_hashset_destroy(&conf->lld_items_reg);
+static void	handle_async_io(glb_poll_module_t *poll_mod) {
+    zbx_hashset_iter_t iter;
+    GLB_POLLER_ITEM *glb_item;
+    char *worker_response = NULL;
+    //polling all pollers in cycle if they've got some input
+    LOG_DBG("In: %s", __func__);
+    worker_server_conf_t *conf = (worker_server_conf_t*)poll_mod->poller_data;
     
-    //TODO: shutdown workers and deallocate them
-    //this should be copied to pinger, worker either
-    //also cleanup items idx
-    THIS_SHOULD_NEVER_HAPPEN;
-    exit(-1);
+    zbx_hashset_iter_reset(conf->items,&iter);
+    
+    while (NULL != (glb_item =(GLB_POLLER_ITEM *) zbx_hashset_iter_next(&iter))) {
+        worker_t *worker = (worker_t*)glb_item->itemdata;
+        if (SUCCEED == worker_is_alive(&worker->worker)) { 
+            int last_status;
+            
+            while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_response))) {
+              
+                LOG_DBG("Parsing line %s from worker %s", worker_response, &worker->worker.path);
+                glb_server_submit_result(glb_item, worker_response);
+            }
+  
+            if (FAIL == last_status ) {
+                glb_server_submit_fail_result(glb_item,"Couldn't read from the worker - either filename is wrong or temporary fail");
+            }
 
+        } else {
+            int now = time(NULL);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+            if (worker->last_restart + WORKER_RESTART_HOLD < now ) {
+                LOG_DBG("Server worker %s is not alive, restarting", worker->worker.path);
+                worker->last_restart = now;
+                glb_start_worker(&worker->worker);
+            }
+        }   
+    }
+    LOG_DBG("Finished: %s", __func__);
+}
+
+static void ws_shutdown(glb_poll_module_t *poll_mod) {
+
+}
+static int forks_count(glb_poll_module_t *poll_mod) {
+	return CONFIG_EXT_SERVER_FORKS;
+}
+static void start_poll(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item)
+{
+
+}
+
+int  glb_worker_server_init(glb_poll_engine_t *poll ) {
+	int i, ret;
+	worker_server_conf_t *conf;
+    char **worker_cfg;
+	
+    LOG_DBG("In %s: starting", __func__);
+
+    if (NULL == CONFIG_WORKERS_DIR ) {
+        zabbix_log(LOG_LEVEL_WARNING, "Warning: trying to run glb_worker server without 'WorkersScript' set in the config file, not starting");
+        exit(-1);
+    }
+    
+    if (NULL == (conf = (worker_server_conf_t *)zbx_malloc(NULL,sizeof(worker_server_conf_t))) )  {
+		LOG_WRN("Couldn't allocate memory for server workers module, exiting");
+		return FAIL;
+	}
+
+    poll->poller.poller_data = conf;
+    bzero(conf, sizeof(worker_server_conf_t));   
+
+   // zbx_hashset_create(&conf->workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+    conf->items = &poll->items; 
+
+    poll->poller.init_item = init_item;
+    poll->poller.delete_item = delete_item;
+    poll->poller.handle_async_io = handle_async_io;
+    poll->poller.start_poll = start_poll;
+    poll->poller.shutdown = ws_shutdown;
+    poll->poller.forks_count = forks_count;
+	
+	return SUCCEED;
 }

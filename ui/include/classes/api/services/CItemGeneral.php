@@ -396,7 +396,7 @@ abstract class CItemGeneral extends CApiService {
 			$host = $dbHosts[$fullItem['hostid']];
 
 			// Validate update interval.
-			if (!in_array($fullItem['type'], [ITEM_TYPE_TRAPPER, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_DEPENDENT])
+			if (!in_array($fullItem['type'], [ITEM_TYPE_TRAPPER, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_DEPENDENT, ITEM_TYPE_WORKER_SERVER])
 					&& ($fullItem['type'] != ITEM_TYPE_ZABBIX_ACTIVE || strncmp($fullItem['key_'], 'mqtt.get', 8) !== 0)
 					&& !validateDelay($update_interval_parser, 'delay', $fullItem['delay'], $error)) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, $error);
@@ -711,7 +711,17 @@ abstract class CItemGeneral extends CApiService {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Item with key "%1$s" already exists on "%2$s" as unknown item element.', $key, $host));
 		}
 	}
+	public static function updateRtdata(array $items) {
+		
+		$upd_rtdata = ['mtime' => time()];
+		$update_rtdata = [];
 
+		foreach ($items as $item) {
+			$update_rtdata[] = ['values' => $upd_rtdata, 'where' => ['itemid' => $items]];
+		}
+
+		DB::update('item_rtdata', $update_rtdata);
+	}
 	/**
 	 * Returns the interface that best matches the given item.
 	 *

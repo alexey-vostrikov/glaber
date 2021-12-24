@@ -103,9 +103,9 @@ int	glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_reco
 int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_func_t process_func, void *data);
 
 int	glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type);
+
 int glb_cache_item_get_nextcheck(u_int64_t itemid);
 int glb_cache_item_get_state(u_int64_t itemid);
-
 int glb_cache_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
 
 const char	*glb_cache_strpool_intern(const char *str);
@@ -113,8 +113,6 @@ const char	*glb_cache_strpool_set_str(const char *old, const char *new);
 const char	*glb_cache_strpool_acquire(const char *str);
 void		glb_cache_strpool_release(const char *str);
 int     glb_vc_dump_cache();
-
-
 
 int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
 		int count, const zbx_timespec_t *ts);
@@ -124,16 +122,14 @@ int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, cons
 int glb_cache_update_elem(glb_cache_elems_t elems, u_int64_t id, elem_update_func_t func, void *request);
 
 int glb_cache_get_statistics(glb_cache_stats_t *stats);
-//int glb_vc_load_cache();
+int glb_vc_load_items_cache();
 int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats);
 int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
 
 void *glb_cache_malloc(void *old, size_t size);
 void glb_cache_free(void *ptr);
 
-
 int glb_cache_housekeep();
-
 void glb_cache_destroy(void);
 
 int     glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) ;
@@ -143,10 +139,7 @@ int     glb_cache_get_item_state(u_int64_t itemid);
 
 
 int     glb_cache_get_values_by_count(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int count, int ts_end);
-
 int     glb_cache_get_values_by_time(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds, int ts_end);
 
-//int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value);
-//int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
-//		int count, const zbx_timespec_t *ts);
+
 #endif

@@ -70,6 +70,7 @@ static void	worker_destroy(void *data)
 	zbx_worker_data_t	*conf = (zbx_worker_data_t *)data;
 		
 	glb_destroy_worker(conf->worker);
+	zbx_free(conf->worker);
 	zbx_free(data);
 }
 /************************************************************************************
@@ -310,15 +311,17 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	zbx_json_type_t type;
 	
 	if (0 == conf->read_types[value_type])	{
-		if (ITEM_VALUE_TYPE_NONE!=value_type)
-			 LOG_DBG("Unknown value type %d", value_type);
-		return SUCCEED;
+	
+		LOG_DBG("Value type %d isn't handled by this worker",value_type);
+		DEBUG_ITEM(itemid, "Value type %d isn't handled by this worker",value_type);
+
+		return FAIL;
 	}
-	//this isn't really nice idea since we might be getting some get_values from the zabbix frontend
+	
 	if ( GLB_HISTORY_GET_NON_INTERACTIVE == interactive && 
-		 time(NULL)- conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
+		 time(NULL) - conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
 		LOG_DBG("waiting for cache load, exiting");
-      	return SUCCEED;
+      	return FAIL;
 	}
 	
 	//creating the request
@@ -329,9 +332,12 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 //	LOG_INF("Sending request to history worker: %s",request);
 	glb_process_worker_request(conf->worker, request, &response);
 	
+	DEBUG_ITEM(itemid, "Got response:%s ",response);
+
 	//LOG_INF("Got response: %s",response);	
 	if (NULL == response)
 			return SUCCEED;
+			
 	if (ITEM_VALUE_TYPE_LOG == value_type)
 		 zabbix_log(LOG_LEVEL_DEBUG, "Got the LOG response: '%s'", response);
 	
@@ -457,19 +463,17 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		return SUCCEED;
 	
 	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_history\", \"metrics\":[");
-    //converting the data to string
+ 
 	for (i = 0; i < history_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)&hist[i];
 	
 		if (0 == conf->write_types[h->value_type]) 
 			continue;
-		//TODO: instead of ignoring unsupported (error or empty) items, either write them!
-		//but first, need history backend support for that
-		//zabbix_log(LOG_LEVEL_INFORMATION, "Value %d: state: %d flags: %d", i, h->state, h->flags);
+		
 		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
 			continue;
-		//zabbix_log(LOG_LEVEL_INFORMATION, "Will write data %d values", i);
+	
 		if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
 		//TODO: fix to use normal JSON generation here!!!!!!
 		glb_escape_worker_string(h->host_name,buffer);
@@ -522,6 +526,10 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 				
 				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_str\":\"%s\"", buffer);
 				break;
+			default:
+				LOG_WRN("Wrong value type supplied");
+				THIS_SHOULD_NEVER_HAPPEN;
+				exit(-1);
 
 		}
 		

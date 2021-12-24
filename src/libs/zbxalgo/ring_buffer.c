@@ -33,25 +33,7 @@ typedef struct {
 
 #define BUFF_IDX(tsbuff, new_idx) ((new_idx + tsbuff->size) % tsbuff->size)
 
-/*
-void glb_tsbuff_iter_init_ext(glb_tsbuff_iter_t *iter, glb_tsbuff_t *tsbuff, int direction, int start_idx) {
-    
-    if (0 == iter->direction ) 
-            iter->direction =  GLB_TSBUFF_ASCENDING;
-    else iter->direction = direction;
 
-    if (-1 == start_idx)  
-        iter->current_idx = tsbuff->tail;
-    else 
-        iter->current_idx = start_idx;
-
-    iter->tsbuff = tsbuff;
-}
-
-glb_tsbuff_value_t *glb_tsbuff_iter_next(glb_tsbuff_iter_t *iter) {
-    tsbuff_value_t *ret = NULL;
-}
-*/
 
 int glb_tsbuff_index(glb_tsbuff_t *tsbuff, int index) {
     
@@ -113,7 +95,7 @@ void *glb_tsbuff_get_value_tail(glb_tsbuff_t* tsbuff) {
     return glb_tsbuff_get_value_ptr(tsbuff, tsbuff->tail);
 }
 
-void*   glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
+void*  glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
     
     tsbuff_value_t *val;
     int old_time, new_head;
@@ -123,17 +105,15 @@ void*   glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
 
 
         if (old_time != ZBX_JAN_2038 && old_time > time)  {
-            LOG_WRN("Old time is %d, not adding item to the head due to lower time: $d", old_time, time);
+            LOG_WRN("Old time is %d, not adding item to the head due to lower time: %d", old_time, time);
             return NULL;     
         }
 
        new_head = BUFF_IDX( tsbuff, tsbuff->head + 1);
     } else {
         new_head = 0;
-      //  LOG_WRN("Total count is %d", glb_tsbuff_get_count(tsbuff));
     }
-   
-  
+     
     if (new_head == tsbuff->tail) {
         LOG_WRN("New head reached the tail, not enough buffer space");
         return NULL;
@@ -161,7 +141,7 @@ void*   glb_tsbuff_add_to_tail(glb_tsbuff_t *tsbuff, int time) {
        // LOG_INF("Got old time %d new time is %d", old_time, time);
         
         if (old_time > 0 && old_time < time) {
-            //LOG_INF("Cannot add new item item to the tail: time is higher the the oldest value");
+           // LOG_INF("Cannot add new item with time %d to the tail: the item time is higher the the oldest value time %d",time, old_time);
             return NULL; 
         }
     }
@@ -221,9 +201,10 @@ int glb_tsbuff_get_time_tail(glb_tsbuff_t *tsbuff) {
 
     tsbuff_value_t *val;
     
-    if ( 0 == glb_tsbuff_get_count(tsbuff)) 
-        return -1;
-
+    if ( 0 == glb_tsbuff_get_count(tsbuff)) {
+        THIS_SHOULD_NEVER_HAPPEN;
+        exit(-1);
+    }
     if (NULL != (val = glb_tsbuff_get_value_ptr(tsbuff,tsbuff->tail))) {
         return val->time;
     }
@@ -249,6 +230,9 @@ int glb_tsbuff_find_time_idx(glb_tsbuff_t *tsbuff, int tm_sec) {
     
     int head_time, tail_time, tail_idx, head_idx, guess_idx;
    
+    if (glb_tsbuff_get_count(tsbuff) == 0) 
+        return FAIL;
+        
     head_time = glb_tsbuff_get_time_head(tsbuff);
     tail_time = glb_tsbuff_get_time_tail(tsbuff);
     

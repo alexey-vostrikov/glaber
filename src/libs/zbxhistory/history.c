@@ -162,7 +162,6 @@ int	glb_history_add(ZBX_DC_HISTORY *history, int history_num)
 	int	j,  ret = SUCCEED;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	//sending everyone the agregated data 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values[j];
@@ -237,20 +236,18 @@ int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, i
 		//resetting counters
 		enabled_gets = 1;
 		get_runtime = 0.0;
-		
 		next_account_time = time(NULL) + GET_ACCOUNT_INTERVAL;
-	
 	} 
 
 	if (enabled_gets && ( get_runtime > GET_ACCOUNT_INTERVAL * 0.5 )) {
 		enabled_gets = 0;
-		zabbix_log(LOG_LEVEL_WARNING,"Suppressing getting history for %ld sec due to too long get time", next_account_time - time(NULL));
-
+		LOG_WRN("Suppressing getting history for %ld sec due to too long get time", next_account_time - time(NULL));
 	}
 
 	if ( !enabled_gets && GLB_HISTORY_GET_NON_INTERACTIVE == interactive   ) {
 		return FAIL;
 	}
+
 	//whoever first gets the data, it's rusult is used 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
 

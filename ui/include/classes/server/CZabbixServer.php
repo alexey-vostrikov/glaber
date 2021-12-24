@@ -168,7 +168,22 @@ class CZabbixServer {
 
 		return $this->request($params);
 	}
+	
+	public static function notifyConfigChanges() {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+		);
+		
+		$zabbix_server->syncConfiguration();
+	}
 
+	public function syncConfiguration() {
+		return $this->request(['request' => 'config.sync']);
+	}
+	
 	public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
 		return $this->request([
 			'request' => 'history.get',

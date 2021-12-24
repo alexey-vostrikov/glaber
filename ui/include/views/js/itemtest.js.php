@@ -233,6 +233,13 @@
 					timeout: form_data['timeout']
 				};
 				break;
+			case <?= ITEM_TYPE_WORKER_SERVER ?>:
+				properties = {
+					key: form_data['key'].trim(),
+					path: form_data['path'],
+					timeout: form_data['timeout']
+				};
+				break;
 		}
 
 		// Common properties.

@@ -111,7 +111,7 @@ static zbx_hk_cleanup_table_t	hk_cleanup_tables[] = {
 #define HK_UPDATE_CACHE_OFFSET_TREND_UINT	(HK_UPDATE_CACHE_OFFSET_TREND_FLOAT + 1)
 #define HK_UPDATE_CACHE_TREND_COUNT		2
 
-void DCget_unknown_triggers(int *unknown_triggers, int *total_triggers);
+void DCget_unknown_triggers(int *unknown_triggers, int *not_calculated, int *total_triggers);
 /* the oldest record timestamp cache for items in history tables */
 typedef struct
 {
@@ -1180,19 +1180,19 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 			now = time(NULL);
 			if (next_vc_dump_time < now ) {
 				//dumping value cache
-				int unknown_triggers = 0, total_triggers =0;
+				int unknown_triggers = 0, total_triggers =0, not_calculated =0;;
 				next_vc_dump_time = now + CONFIG_VCDUMP_FREQUENCY;
 
 				glb_cache_stats_t stats;
 				static u_int64_t old_hits=0, old_misses=0;
 				glb_cache_get_statistics(&stats);
-				DCget_unknown_triggers(&unknown_triggers,&total_triggers);
+				DCget_unknown_triggers(&unknown_triggers,&not_calculated, &total_triggers);
 
 				zabbix_log(LOG_LEVEL_INFORMATION,"Valuecache stats: hits: %ld, misses: %ld, efficiency %ld%%", stats.hits-old_hits, stats.misses-old_misses,  	
 						((stats.hits-old_hits)*100)/(stats.hits-old_hits + stats.misses-old_misses +1 ));
 				old_misses = stats.misses;
 				old_hits = stats.hits;
-				zabbix_log(LOG_LEVEL_INFORMATION, "Triggers stats: %d unknowns, %d total", unknown_triggers, total_triggers);
+				zabbix_log(LOG_LEVEL_INFORMATION, "Triggers stats: %d not calculated yet, %d unknowns, %d total", not_calculated, unknown_triggers, total_triggers);
 				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
 				glb_vc_dump_cache();
 				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");

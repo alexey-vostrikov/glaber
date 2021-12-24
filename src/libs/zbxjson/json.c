@@ -1082,6 +1082,51 @@ const char	*zbx_json_next_value_dyn(const struct zbx_json_parse *jp, const char 
 	return zbx_json_decodevalue_dyn(p, string, string_alloc, type);
 }
 
+
+/**********************************************************
+ * returns long int from json by name of the attribute
+ * if error hapens, sets errflag to 1, otherwise it's untouched
+ * ****************************************************************/
+long int glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag) {
+    char temp_str[MAX_ID_LEN];
+    zbx_json_type_t type;	
+
+    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) {
+        *errflag = 1;
+        return FAIL;
+    }
+    
+    long int value = strtol(temp_str, NULL, 10);
+    
+    if (EINVAL == errno)  {
+        *errflag = 1;
+        return FAIL;
+    }
+
+    return value;   
+}
+/**********************************************************
+ * returns long int from json by name of the attribute
+ * if error hapens, sets errflag to 1, otherwise it's untouched
+ * ****************************************************************/
+double  glb_json_get_dbl_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag) {
+    char temp_str[MAX_ID_LEN];
+    zbx_json_type_t type;	
+
+    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) {
+        *errflag = 1;
+        return FAIL;
+    }
+    
+    double value = strtof(temp_str, NULL);
+    
+    if (EINVAL == errno)  {
+        *errflag = 1;
+        return FAIL;
+    }
+
+    return value;   
+}
 /******************************************************************************
  *                                                                            *
  * Function: zbx_json_value_by_name                                           *

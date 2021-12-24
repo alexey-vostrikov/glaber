@@ -2419,7 +2419,7 @@ int	is_ip4(const char *ip)
 	int		digits = 0, dots = 0, res = FAIL, octet = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __func__, ip);
-
+	
 	while ('\0' != *p)
 	{
 		if (0 != isdigit(*p))
@@ -3633,6 +3633,7 @@ unsigned char	get_interface_type_by_item_type(unsigned char type)
 			return INTERFACE_TYPE_JMX;
 		case ITEM_TYPE_SIMPLE:
 		case ITEM_TYPE_EXTERNAL:
+		case ITEM_TYPE_WORKER_SERVER:
 		case ITEM_TYPE_SSH:
 		case ITEM_TYPE_TELNET:
 		case ITEM_TYPE_HTTPAGENT:

@@ -348,7 +348,7 @@ class CControllerPopupMassupdateItem extends CController {
 						unset($update_item['jmx_endpoint']);
 					}
 
-					if ($type != ITEM_TYPE_HTTPAGENT && $type != ITEM_TYPE_SCRIPT) {
+					if ($type != ITEM_TYPE_HTTPAGENT && $type != ITEM_TYPE_SCRIPT && $type != ITEM_TYPE_WORKER_SERVER) {
 						unset($update_item['timeout']);
 					}
 				}

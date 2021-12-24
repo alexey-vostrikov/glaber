@@ -21,7 +21,7 @@
 define('ZABBIX_VERSION',		'5.4.2');
 define('ZABBIX_API_VERSION',	'5.4.2');
 define('ZABBIX_EXPORT_VERSION',	'5.4');
-define('GLABER_VERSION','2.6.14');
+define('GLABER_VERSION','2.7.0');
 
 define('ZABBIX_DB_VERSION',		5040000);
 
@@ -540,6 +540,7 @@ define('ITEM_TYPE_DEPENDENT',		18);
 define('ITEM_TYPE_HTTPAGENT',		19);
 define('ITEM_TYPE_SNMP',			20);
 define('ITEM_TYPE_SCRIPT',			21);
+define('ITEM_TYPE_WORKER_SERVER', 	47);
 
 define('SNMP_V1', 1);
 define('SNMP_V2C', 2);
@@ -574,6 +575,7 @@ define('ZBX_ICON_PREVIEW_WIDTH',	24);
 
 define('ITEM_STATUS_ACTIVE',		0);
 define('ITEM_STATUS_DISABLED',		1);
+define('ITEM_STATUS_DELETED',	63);
 define('ITEM_DISCOVER',	0);
 define('ITEM_NO_DISCOVER',	1);
 
@@ -714,6 +716,8 @@ define('ZBX_RECOVERY_MODE_NONE',				2);
 
 define('TRIGGER_STATUS_ENABLED',	0);
 define('TRIGGER_STATUS_DISABLED',	1);
+define('TRIGGER_STATUS_DELETED',	63);
+
 define('TRIGGER_DISCOVER',		0);
 define('TRIGGER_NO_DISCOVER',	1);
 

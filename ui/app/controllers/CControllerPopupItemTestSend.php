@@ -275,6 +275,7 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 				'params_es' => 'params',
 				'params_f' => 'params',
 				'script' => 'params',
+				'path'	=> 'params',
 				'http_username' => 'username',
 				'http_password' => 'password',
 				'http_authtype' => 'authtype',

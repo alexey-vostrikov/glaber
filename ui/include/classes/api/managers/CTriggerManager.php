@@ -141,7 +141,11 @@ class CTriggerManager {
 		DB::delete('trigger_depends', ['triggerid_down' => $del_triggerids]);
 		DB::delete('trigger_depends', ['triggerid_up' => $del_triggerids]);
 		DB::delete('trigger_tag', ['triggerid' => $del_triggerids]);
-		DB::delete('triggers', ['triggerid' => $del_triggerids]);
+
+		//marking triggers as deleted instead of deleting them
+		DB::update('triggers', ['values' => ['status' => TRIGGER_STATUS_DELETED], 
+							     'where' => ['triggerid' => $del_triggerids]]);
+		//DB::delete('triggers', ['triggerid' => $del_triggerids]);
 	}
 
 	/**

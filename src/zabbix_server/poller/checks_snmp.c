@@ -33,6 +33,26 @@
 #include "preproc.h"
 
 extern int CONFIG_GLB_SNMP_CONTENTION;
+extern int CONFIG_GLB_SNMP_FORKS;
+
+typedef struct {
+	const char *oid;
+	unsigned char snmp_version;
+	const char		*interface_addr;
+	unsigned char	useip;
+	unsigned short	interface_port;
+	unsigned char	snmpv3_securitylevel;
+	unsigned char	snmpv3_authprotocol;
+	unsigned char	snmpv3_privprotocol;
+	const char *community;
+	const char *snmpv3_securityname;
+	const char *snmpv3_contextname;
+	const char *snmpv3_authpassphrase;
+	const char *snmpv3_privpassphrase;
+	char state;
+} snmp_item_t;
+
+
 
 /*
  * SNMP Dynamic Index Cache
@@ -2238,16 +2258,16 @@ typedef struct
 	zbx_list_t items_list;    /* list of itemids assigned to the session */
 	void* conf; 
 	int idx;
-}  GLB_ASYNC_SNMP_CONNECTION;
+}  snmp_connection_t;
 
 typedef struct {
 	zbx_hashset_t *items;  //hashsets of items and hosts to change their state
 	zbx_hashset_t *hosts;  
 	zbx_hashset_t lists_idx; //items that are being polled right now
-	GLB_ASYNC_SNMP_CONNECTION *connections; //allocated dynamicaly, quite big to fit in the stack
+	snmp_connection_t *connections; //allocated dynamicaly, quite big to fit in the stack
 	int *requests;
 	int *responses;
-} GLB_ASYNC_SNMP_CONF;
+} async_snmp_conf_t;
 
 
 
@@ -2256,7 +2276,7 @@ typedef struct {
  * ***************************************************************************/
 static struct snmp_session * glb_snmp_open_conn(GLB_POLLER_ITEM *glb_item){
 	DC_ITEM dc_item;
-	GLB_SNMP_ITEM *snmp_item = (GLB_SNMP_ITEM *)glb_item->itemdata;
+	snmp_item_t *snmp_item = (snmp_item_t *)glb_item->itemdata;
 	char error[MAX_STRING_LEN];
 	struct snmp_session *sess;
 	
@@ -2289,12 +2309,21 @@ static struct snmp_session * glb_snmp_open_conn(GLB_POLLER_ITEM *glb_item){
 /******************************************************************************
  * item init - from the general dc_item to compact and specific snmp		  * 
  * ***************************************************************************/
-unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item) {
+static void snmp_init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
 	
 	char translated_oid[4*MAX_OID_LEN];
 	zbx_timespec_t timespec;
+	snmp_item_t *snmp_item;
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+	LOG_DBG("In %s: starting", __func__);
+	
+	if (NULL == (snmp_item = zbx_calloc(NULL, 0, sizeof(snmp_item_t))))  {
+		LOG_WRN("Cannot allocate mem for polling snmp item, exiting");
+		exit(-1);
+	}
+
+	bzero(snmp_item, sizeof(snmp_item_t));
+	poller_item->itemdata = snmp_item;
 	
 	if (NULL != dc_item->snmp_oid && dc_item->snmp_oid[0] != '\0')
 	{
@@ -2306,7 +2335,7 @@ unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item) {
 				   translated_oid, dc_item->itemid);
 		zbx_preprocess_item_value(dc_item->host.hostid, dc_item->itemid, dc_item->value_type, dc_item->flags , NULL,
 					&timespec,ITEM_STATE_NOTSUPPORTED, "Error: empty OID");
-		return FAIL;
+		return ;
 	}
 
 	snmp_item->snmp_version = dc_item->snmp_version;
@@ -2316,7 +2345,7 @@ unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item) {
  	snmp_item->snmpv3_authprotocol = dc_item->snmpv3_authprotocol;
  	snmp_item->snmpv3_privprotocol = dc_item->snmpv3_privprotocol;
 	snmp_item->state = POLL_QUEUED;
-	
+
 	zbx_heap_strpool_release(snmp_item->interface_addr);
 	zbx_heap_strpool_release(snmp_item->community);
 	zbx_heap_strpool_release(snmp_item->snmpv3_securityname);
@@ -2332,16 +2361,13 @@ unsigned int glb_snmp_init_item(DC_ITEM *dc_item, GLB_SNMP_ITEM *snmp_item) {
 	snmp_item->snmpv3_authpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_authpassphrase);
 	snmp_item->snmpv3_privpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_privpassphrase);
 	snmp_item->oid = zbx_heap_strpool_intern(translated_oid);
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
-	return SUCCEED;
+
+	LOG_DBG("In %s() Ended", __func__);
 }
 
-/******************************************************************************
- * item deinit - freeing all interned string								  * 
- * ***************************************************************************/
-void glb_snmp_free_item(GLB_SNMP_ITEM *snmp_item ) {
+static void snmp_free_item(glb_poll_module_t *poll_mod,  GLB_POLLER_ITEM *poller_item ) {
 	
+	snmp_item_t *snmp_item = (snmp_item_t *)poller_item->itemdata;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	
 	zbx_heap_strpool_release(snmp_item->interface_addr);
@@ -2352,19 +2378,20 @@ void glb_snmp_free_item(GLB_SNMP_ITEM *snmp_item ) {
 	zbx_heap_strpool_release(snmp_item->snmpv3_privpassphrase);
 	zbx_heap_strpool_release(snmp_item->oid);
 
+	zbx_free(poller_item->itemdata);
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
 }
 
 /******************************************************************************
  * timeout - connection - cleanup 			   								  * 
  * ***************************************************************************/
-static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
+static int glb_snmp_handle_timeout(snmp_connection_t *conn) {
 	int i;
 	zbx_uint64_t item_idx;
 	char error_str[MAX_STRING_LEN];
 	GLB_POLLER_HOST *glb_host;
 	GLB_POLLER_ITEM *glb_item,*glb_next_item;
-	GLB_ASYNC_SNMP_CONF *conf = ( GLB_ASYNC_SNMP_CONF*)conn->conf;
+	async_snmp_conf_t *conf = ( async_snmp_conf_t*)conn->conf;
 	zbx_timespec_t timespec;
 	unsigned int now = time(NULL);
 	
@@ -2379,8 +2406,8 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 
 	if (NULL == (glb_item = zbx_hashset_search(conf->items,&conn->current_item))) 
 	 	return FAIL; 
-	
-	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
+
+	snmp_item_t *snmp_item = (snmp_item_t*)glb_item->itemdata;
 	add_host_fail(conf->hosts, glb_item->hostid, now);
 	
 	zbx_snprintf(error_str,MAX_STRING_LEN, "Timed out, no responce for %d seconds %d retries", CONFIG_TIMEOUT, 2 );
@@ -2390,7 +2417,7 @@ static int glb_snmp_handle_timeout(GLB_ASYNC_SNMP_CONNECTION *conn) {
 	
 	zbx_hashset_remove(&conf->lists_idx,&glb_item->itemid);		
 	glb_item->state= POLL_QUEUED;
-	glb_snmp_item->state = POLL_QUEUED;	
+	snmp_item->state = POLL_QUEUED;	
 	
 
 	if ( SUCCEED == host_is_failed(conf->hosts,glb_item->hostid, now) ) {
@@ -2427,8 +2454,8 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 	AGENT_RESULT result;
 	GLB_POLLER_ITEM *glb_item;
 
-	GLB_ASYNC_SNMP_CONNECTION *conn = (GLB_ASYNC_SNMP_CONNECTION *)magic;
-	GLB_ASYNC_SNMP_CONF *conf = ( GLB_ASYNC_SNMP_CONF*)conn->conf;
+	snmp_connection_t *conn = (snmp_connection_t *)magic;
+	async_snmp_conf_t *conf = ( async_snmp_conf_t*)conn->conf;
 
 	struct snmp_pdu *req;
 
@@ -2448,11 +2475,11 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 		zabbix_log(LOG_LEVEL_DEBUG, "Responce for aged item has arrived, ignoring");
 		return SUCCEED;
 	};
-	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
+	snmp_item_t *snmp_item = (snmp_item_t*)glb_item->itemdata;
 
 	*conf->responses += 1;
 	glb_item->state = POLL_QUEUED;
-	glb_snmp_item->state = POLL_QUEUED;
+	snmp_item->state = POLL_QUEUED;
 
 	if (operation == NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
 		
@@ -2504,12 +2531,12 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 /******************************************************************************
  * starts a connection for the session 										  * 
  * ***************************************************************************/
-static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
+static int glb_snmp_start_connection(snmp_connection_t *conn)
 {
 	zbx_uint64_t itemid = 0;
 	struct snmp_pdu *pdu;
 	unsigned char reuse_old_sess = 0;
-	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)conn->conf;
+	async_snmp_conf_t *conf = (async_snmp_conf_t*)conn->conf;
 	GLB_POLLER_ITEM *glb_item, *prev_glb_item;
 	zbx_timespec_t timespec;
 	oid parsed_oid[MAX_OID_LEN];
@@ -2550,11 +2577,11 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 	zbx_list_pop(&conn->items_list, (void **)&itemid);
 	zbx_hashset_remove(&conf->lists_idx,&glb_item->itemid);
 
-	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM *)glb_item->itemdata;	
+	snmp_item_t *snmp_item = (snmp_item_t *)glb_item->itemdata;	
 	
-	if (NULL == snmp_parse_oid(glb_snmp_item->oid, parsed_oid, &parsed_oid_len)) {
+	if (NULL == snmp_parse_oid(snmp_item->oid, parsed_oid, &parsed_oid_len)) {
 		
-		zbx_snprintf(error_str,MAX_STRING_LEN, "snmp_parse_oid(): cannot parse OID \"%s\".", glb_snmp_item->oid);
+		zbx_snprintf(error_str,MAX_STRING_LEN, "snmp_parse_oid(): cannot parse OID \"%s\".", snmp_item->oid);
 		zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str);
 			return FAIL;
 	}
@@ -2601,62 +2628,26 @@ static int glb_snmp_start_connection(GLB_ASYNC_SNMP_CONNECTION *conn)
 									NULL, &timespec, ITEM_STATE_NOTSUPPORTED,  "Couldn't send snmp packet");
 		zbx_snmp_close_session(conn->sess);
 		conn->state = POLL_FREE;
-		glb_snmp_item->state = POLL_QUEUED;
+		snmp_item->state = POLL_QUEUED;
 		return FAIL;
 	}
 	*conf->requests += 1;
-	//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d SENT REQUEST to host %s",conn->idx, glb_snmp_item->interface_addr);
+
 	conn->state = POLL_POLLING;
-	glb_snmp_item->state = POLL_POLLING;
+	snmp_item->state = POLL_POLLING;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 	return SUCCEED;
 }
 
-/******************************************************************************
- * inits async structures - static connection pool							  *
- * ***************************************************************************/
-void* glb_snmp_init(zbx_hashset_t *hosts, zbx_hashset_t *items, int *requests, int *responses ) {
-	int i;
-	static GLB_ASYNC_SNMP_CONF *conf;
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
-	
-	zbx_init_snmp();
-	
-	if (NULL == (conf = zbx_malloc(NULL,sizeof(GLB_ASYNC_SNMP_CONF))) ||
-		NULL == ( conf->connections = zbx_malloc(NULL, sizeof(GLB_ASYNC_SNMP_CONNECTION)* GLB_MAX_SNMP_CONNS)) )  {
-			zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for async snmp connections data, exititing");
-			exit(-1);
-		}
-
-	conf->items = items;
-	conf->hosts = hosts;
-	conf->requests = requests;
-	conf->responses = responses;
-
-	for (i = 0; i < GLB_MAX_SNMP_CONNS; i++)
-	{
-		conf->connections[i].state = POLL_FREE;
-		conf->connections[i].current_item=-1;
-		conf->connections[i].conf = (void*)conf;
-		conf->connections[i].idx=i;
-
-		zbx_list_create(&conf->connections[i].items_list);
-	}
-	
-	zbx_hashset_create(&conf->lists_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
-	return (void *)conf;
-}
 
 /******************************************************************************
  * starts finished connections or a new one that have a data to poll		  * 
  * ***************************************************************************/
-static void  glb_snmp_start_new_connections(void *engine) {
+static void  snmp_start_new_connections(async_snmp_conf_t *conf) {
 	
 	int i, item_idx;
-	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
+
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 	int now=time(NULL);
 
@@ -2688,9 +2679,9 @@ static void  glb_snmp_start_new_connections(void *engine) {
 /******************************************************************************
  * adds item to the polling list of a conenction							  * 
  * ***************************************************************************/
-void   glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
-	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
-	GLB_SNMP_ITEM *glb_snmp_item = (GLB_SNMP_ITEM*)glb_item->itemdata;
+static void   snmp_add_poll_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item) {
+	async_snmp_conf_t *conf = (async_snmp_conf_t*)poll_mod->poller_data;
+	snmp_item_t *snmp_item = (snmp_item_t*)glb_item->itemdata;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
@@ -2725,10 +2716,10 @@ void   glb_snmp_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_item) {
  * Once in a wile reinits the snmp to do the mem cleaunup					  * 
  * ***************************************************************************/
 
-void glb_snmp_reset_snmp(void *engine){
+static void snmp_reset_snmp(async_snmp_conf_t *conf){
 	static int roll=0;
 	GLB_POLLER_ITEM *glb_item;
-	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
+
 	//periodical total netsnmp cleanup
 	if (roll++ > GLB_ASYNC_POLLING_MAX_ITERATIONS)
 	{
@@ -2763,9 +2754,9 @@ void glb_snmp_reset_snmp(void *engine){
 /******************************************************************************
  * handles i/o - calls selects/snmp_recieve, 								  * 
  * ***************************************************************************/
-void  glb_snmp_handle_async_io(void *engine) {
+static void  snmp_handle_async_io(glb_poll_module_t *poll_mod) {
 
-	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
+	async_snmp_conf_t *conf = (async_snmp_conf_t*)poll_mod->poller_data;
 	int block = 0, fds = 0, hosts = 0;
 	netsnmp_large_fd_set fdset;
 	static int last_timeout_time = 0; 
@@ -2802,20 +2793,19 @@ void  glb_snmp_handle_async_io(void *engine) {
 
 	netsnmp_large_fd_set_cleanup(&fdset);
 	
-	glb_snmp_reset_snmp(engine);
-	
-	glb_snmp_start_new_connections(engine); //some connections might fail due to temporarry errors, like network fails, restart them once in a while
+	snmp_reset_snmp(conf);
+	snmp_start_new_connections(conf); //some connections might fail due to temporarry errors, like network fails, restart them once in a while
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 /******************************************************************************
  * does snmp connections cleanup, not related to snmp shutdown 				  * 
  * ***************************************************************************/
-void    glb_snmp_shutdown(void *engine) {
+static void	snmp_async_shutdown(glb_poll_module_t *poll_mod) {
 	
 	int i;
 	struct list_item *litem, *tmp_litem;
-	GLB_ASYNC_SNMP_CONF *conf = (GLB_ASYNC_SNMP_CONF*)engine;
+	async_snmp_conf_t *conf = (async_snmp_conf_t*)poll_mod->poller_data;
 	GLB_POLLER_ITEM *glb_item;
 	zbx_timespec_t timespec;
 	
@@ -2843,5 +2833,56 @@ void    glb_snmp_shutdown(void *engine) {
 	zbx_shutdown_snmp();
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
+
+
+
+static int forks_count(glb_poll_module_t *poll_mod) {
+	return CONFIG_GLB_SNMP_FORKS;
+}
+/******************************************************************************
+ * inits async structures - static connection pool							  *
+ * ***************************************************************************/
+void glb_snmp_init(glb_poll_engine_t *poll) {
+	int i;
+	static async_snmp_conf_t *conf;
+	
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+	
+	zbx_init_snmp();
+	
+	if (NULL == (conf = zbx_malloc(NULL,sizeof(async_snmp_conf_t))) ||
+		NULL == ( conf->connections = zbx_malloc(NULL, sizeof(snmp_connection_t)* GLB_MAX_SNMP_CONNS)) )  {
+			zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for async snmp connections data, exititing");
+			exit(-1);
+		}
+	poll->poller.poller_data = conf;
+
+	conf->items = &poll->items;
+	conf->hosts = &poll->hosts;
+	conf->requests = &poll->poller.requests;
+	conf->responses = &poll->poller.responses;
+
+	poll->poller.delete_item = snmp_free_item;
+	poll->poller.handle_async_io = snmp_handle_async_io;
+	poll->poller.init_item = snmp_init_item;
+	poll->poller.shutdown = snmp_async_shutdown;
+	poll->poller.start_poll = snmp_add_poll_item;
+	poll->poller.forks_count = forks_count;
+//	poll->poller.update_item = glb_snmp_update_item;
+
+	for (i = 0; i < GLB_MAX_SNMP_CONNS; i++)
+	{
+		conf->connections[i].state = POLL_FREE;
+		conf->connections[i].current_item=-1;
+		conf->connections[i].conf = (void*)conf;
+		conf->connections[i].idx=i;
+
+		zbx_list_create(&conf->connections[i].items_list);
+	}
+	
+	zbx_hashset_create(&conf->lists_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+}
+
 
 #endif	/* HAVE_NETSNMP */

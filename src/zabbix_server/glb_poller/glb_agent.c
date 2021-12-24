@@ -13,6 +13,36 @@
 
 extern char *CONFIG_SOURCE_IP;
 
+typedef struct
+{
+	struct agent_session *sess;/* SNMP session data */
+	zbx_int64_t current_item;  /* itemid of currently processing item */
+	int state;				   /* state of the connection */
+	int finish_time;		   /* unix time till we wait for data to come */
+	zbx_list_t items_list;     /* list of itemids assigned to the session */
+	int socket; 	  
+	void* conf; 
+	int idx;
+}  agent_connection_t;
+
+typedef struct {
+	zbx_hashset_t *items;  //hashsets of items and hosts to change their state
+	zbx_hashset_t *hosts;  
+	zbx_hashset_t lists_idx;
+	agent_connection_t conns[GLB_MAX_AGENT_CONNS]; 
+	int *requests;
+	int *responses;
+} agent_conf_t;
+
+typedef struct {
+	//const char *hostname; //item's hostname value (strpooled)
+	const char *interface_addr;
+	unsigned int interface_port;
+	const char *key; //item key value (strpooled)
+} agent_item_t;
+
+extern int CONFIG_GLB_AGENT_FORKS;
+
 /******************************************************************************
  * initiates async tcp connection    										  * 
  * ***************************************************************************/
@@ -148,7 +178,7 @@ int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsi
 /******************************************************************************
  * starts a connection for the session 										  * 
  * ***************************************************************************/
-static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGENT_CONNECTION *conn)
+static int glb_agent_start_connection(agent_conf_t *conf,  agent_connection_t *conn)
 {
 	GLB_POLLER_ITEM *glb_poller_item;
 
@@ -191,7 +221,7 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 	zbx_list_pop(&conn->items_list, NULL);
 	zbx_hashset_remove(&conf->lists_idx,&glb_poller_item->itemid);
 
-	GLB_AGENT_ITEM *glb_agent_item = (GLB_AGENT_ITEM *)glb_poller_item->itemdata;	
+	agent_item_t *agent_item = (agent_item_t *)glb_poller_item->itemdata;	
 	
 	//starting the new connection
 	conn->finish_time = time(NULL) + CONFIG_TIMEOUT + 1; 
@@ -201,11 +231,11 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 
 	//cheick if the item is agent type
 	zabbix_log(LOG_LEVEL_TRACE, "In %s()  addr:'%s' key:'%s'", __func__,
-			   glb_agent_item->interface_addr, glb_agent_item->key);
+			   agent_item->interface_addr, agent_item->key);
 
 	//zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld connecting ",conf.items[itemid].itemid);
 	
-	if (SUCCEED != (ret = glb_async_tcp_connect(&conn->socket, CONFIG_SOURCE_IP, glb_agent_item->interface_addr, glb_agent_item->interface_port)))
+	if (SUCCEED != (ret = glb_async_tcp_connect(&conn->socket, CONFIG_SOURCE_IP, agent_item->interface_addr, agent_item->interface_port)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "Failed to send syn for item %ld, coudn't connect or create socket",glb_poller_item->itemid);
 		close(conn->socket);
@@ -228,7 +258,7 @@ static int glb_agent_start_connection(GLB_ASYNC_AGENT_CONF *conf,  GLB_ASYNC_AGE
 
 
 
-void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNECTION *conn) {
+void static glb_agent_handle_timeout(agent_conf_t *conf, agent_connection_t *conn) {
 	
 		GLB_POLLER_ITEM *glb_poller_item, *glb_next_item;
 		zbx_timespec_t timespec;
@@ -252,6 +282,7 @@ void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT
 		conn->state = POLL_FREE; //this will make it possible to reuse the connection
 		close(conn->socket);
 		glb_poller_item->state = POLL_QUEUED;
+		
 		zbx_hashset_remove(&conf->lists_idx,&glb_poller_item->itemid);
 		
 		DEBUG_ITEM(glb_poller_item->itemid, "Agent connection timeout");
@@ -286,7 +317,7 @@ void static glb_agent_handle_timeout(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT
  * handles working with socket - waiting for ack, sending request, *
  * waiting for the response										   *
  * *****************************************************************/
-void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNECTION *conn)
+void handle_socket_operations(agent_conf_t *conf, agent_connection_t *conn)
 {
     //u_int64_t itemid = conn->current_item;
 	int ret, result, count, received_len = 0;
@@ -296,11 +327,11 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 	zbx_socket_t tmp_s;
 
 	GLB_POLLER_ITEM *glb_poller_item;
-	GLB_AGENT_ITEM *glb_agent_item;
+	agent_item_t *agent_item;
 
 	if (NULL == (glb_poller_item =(GLB_POLLER_ITEM *)zbx_hashset_search(conf->items, &conn->current_item)))
 		return;
-	glb_agent_item = (GLB_AGENT_ITEM*)glb_poller_item->itemdata;
+	agent_item = (agent_item_t*)glb_poller_item->itemdata;
 
 	zbx_timespec(&timespec);
 	
@@ -330,9 +361,9 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 		//by this moment we can send the tcp request
 		
 		zabbix_log(LOG_LEVEL_DEBUG,"Agent item %ld sending request key %s:",
-				glb_poller_item->itemid, glb_agent_item->key);
+				glb_poller_item->itemid, agent_item->key);
 		
-		if (SUCCEED == zbx_tcp_send(&tmp_s, glb_agent_item->key)) {
+		if (SUCCEED == zbx_tcp_send(&tmp_s, agent_item->key)) {
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Agent item %ld sending request completed ",conf.items[itemid].itemid);
 			conn->state = POLL_REQ_SENT;
 			return;	
@@ -424,44 +455,48 @@ void handle_socket_operations(GLB_ASYNC_AGENT_CONF *conf, GLB_ASYNC_AGENT_CONNEC
 		
 }
 
-/*********************************************************
- * init and free item, key and interface addr strpooled  *
-**********************************************************/
-unsigned int glb_agent_init_item(DC_ITEM *dc_item, GLB_AGENT_ITEM *glb_agent_item) {
-  	zbx_timespec_t timespec;
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+static void agent_init_item(glb_poll_module_t *poll_agent, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item) {
+	zbx_timespec_t timespec;
 	const char *interface_addr;
 	unsigned int interface_port;
-	const char *key; //item key value (strpooled)
-
-	zbx_heap_strpool_release(glb_agent_item->interface_addr);
-	zbx_heap_strpool_release(glb_agent_item->key);
+	const char *key; 
+	agent_item_t *agent_item;
 	
-	glb_agent_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
-	glb_agent_item->key = zbx_heap_strpool_intern(dc_item->key);
-	glb_agent_item->interface_port = dc_item->interface.port;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
+	
+	if (NULL == (agent_item = zbx_calloc(NULL,0,sizeof(agent_item_t)))) {
+		LOG_WRN("Cannot allocate mem to poll agent item, exiting");
+		exit(-1);
+	}
+	glb_poller_item->itemdata = agent_item;
+
+	zbx_heap_strpool_release(agent_item->interface_addr);
+	zbx_heap_strpool_release(agent_item->key);
+	
+	agent_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
+	agent_item->key = zbx_heap_strpool_intern(dc_item->key);
+	agent_item->interface_port = dc_item->interface.port;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
-	return SUCCEED;
 }
 
-void    glb_agent_free_item(GLB_AGENT_ITEM *glb_agent_item ) {
+static void agent_free_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_poller_item ) {
 	
-	zbx_heap_strpool_release(glb_agent_item->interface_addr);
-	zbx_heap_strpool_release(glb_agent_item->key);
+	agent_item_t *agent_item = (agent_item_t *)glb_poller_item->itemdata;
+	zbx_heap_strpool_release(agent_item->interface_addr);
+	zbx_heap_strpool_release(agent_item->key);
+	zbx_free(agent_item);
 
 }
 
 /*************************************************************
  * config, connections and lists cleanup		             *
  * ***********************************************************/
-void    glb_agent_shutdown(void *engine) {
+static void agent_shutdown(glb_poll_module_t *agent_mod) {
 	
 	int i;
 	struct list_item *litem, *tmp_litem;
-	GLB_ASYNC_AGENT_CONF *conf = (GLB_ASYNC_AGENT_CONF*)engine;
-	GLB_POLLER_ITEM *glb_poller_item;
+	agent_conf_t *conf = (agent_conf_t*)agent_mod->poller_data;
 	zbx_timespec_t timespec;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
@@ -483,10 +518,10 @@ void    glb_agent_shutdown(void *engine) {
 /******************************************************************************
  * adds item to the polling list of a conenction							  * 
  * ***************************************************************************/
-void   glb_agent_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_poller_item) {
+static void   agent_add_poll_item(glb_poll_module_t *mod_data, GLB_POLLER_ITEM *glb_poller_item) {
 	
-	GLB_ASYNC_AGENT_CONF *conf = (GLB_ASYNC_AGENT_CONF*) engine;
-	GLB_AGENT_ITEM *glb_agent_item = (GLB_AGENT_ITEM*) glb_poller_item->itemdata;
+	agent_conf_t *conf = (agent_conf_t*) mod_data->poller_data;
+	agent_item_t *agent_item = (agent_item_t*) glb_poller_item->itemdata;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
@@ -508,27 +543,62 @@ void   glb_agent_add_poll_item(void *engine, GLB_POLLER_ITEM *glb_poller_item) {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 
+
+/********************************************************
+ * general func to handle states, starts, terminates on *
+ * timeout or pass control to the socket state handling *
+ * ******************************************************/
+static void agent_handle_async_io(glb_poll_module_t *poll_mod) {
+	int i;
+	agent_conf_t *conf = (agent_conf_t *)poll_mod->poller_data;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
+	for (i = 0; i < GLB_MAX_AGENT_CONNS; i++)
+	{
+		agent_connection_t *conn = &conf->conns[i];
+				
+		glb_agent_start_connection(conf,conn);
+		handle_socket_operations(conf, conn);
+		glb_agent_handle_timeout(conf, conn);
+	}
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+
+}
+static void agent_update_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_poller_item, DC_ITEM* dc_item) {
+
+}
+
+static int forks_count(glb_poll_module_t *poll_mod) {
+	return CONFIG_GLB_AGENT_FORKS;
+}
 /******************************************
  * config, connections, poll lists init   *
  * ****************************************/
-void    *glb_agent_init(zbx_hashset_t *items, zbx_hashset_t *hosts, int *requests, int *responses ) {
+int  glb_agent_init(glb_poll_engine_t *poll) {
 		
 	int i;
-	static GLB_ASYNC_AGENT_CONF *engine;
+	static agent_conf_t *engine;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	
-	if (NULL == (engine = zbx_malloc(NULL,sizeof(GLB_ASYNC_AGENT_CONF))))  {
-			zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for async snmp connections data, exititing");
+	if (NULL == (engine = zbx_malloc(NULL,sizeof(agent_conf_t))))  {
+			zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for async snmp connections data, exiting");
 			exit(-1);
-		}
+	}
 	
-	memset(engine, 0, sizeof(GLB_ASYNC_AGENT_CONF));
+	memset(engine, 0, sizeof(agent_conf_t));
+	poll->poller.poller_data = engine;
+	poll->poller.handle_async_io = agent_handle_async_io;
+	poll->poller.delete_item = 	agent_free_item;
+	poll->poller.start_poll = agent_add_poll_item;
+	poll->poller.shutdown = agent_shutdown;
+	poll->poller.init_item = agent_init_item;
+	poll->poller.forks_count = forks_count;
 
-	engine->items = items;
-	engine->hosts = hosts;
-	engine->requests = requests;
-	engine->responses = responses;
+	engine->items = &poll->items;
+	engine->hosts = &poll->hosts;
+	engine->requests = &poll->poller.requests;
+	engine->responses = &poll->poller.responses;
 	
 	zbx_hashset_create(&engine->lists_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
@@ -542,27 +612,6 @@ void    *glb_agent_init(zbx_hashset_t *items, zbx_hashset_t *hosts, int *request
 	}
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
-	return (void *)engine;
-}
-
-/********************************************************
- * general func to handle states, starts, terminates on *
- * timeout or pass control to the socket state handling *
- * ******************************************************/
-void    glb_agent_handle_async_io(void *engine) {
-	int i;
-	GLB_ASYNC_AGENT_CONF *conf = (GLB_ASYNC_AGENT_CONF *)engine;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
-	for (i = 0; i < GLB_MAX_AGENT_CONNS; i++)
-	{
-		GLB_ASYNC_AGENT_CONNECTION *conn = &conf->conns[i];
-				
-		glb_agent_start_connection(conf,conn);
-		handle_socket_operations(conf, conn);
-		glb_agent_handle_timeout(conf, conn);
-	}
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
-
+	return SUCCEED;
 }
 

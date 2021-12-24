@@ -159,7 +159,6 @@ unsigned char	process_type		= ZBX_PROCESS_TYPE_UNKNOWN;
 int		process_num		= 0;
 int		server_num		= 0;
 u_int64_t CONFIG_DEBUG_ITEM = 0;
-u_int64_t CONFIG_DEBUG_HOST = 0;
 
 int		CONFIG_SNMP_RETRIES		=	2;
 
@@ -824,8 +823,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"SnmpRetries",			&CONFIG_SNMP_RETRIES,			TYPE_INT,
 			PARM_OPT,	1,			100},
 		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
-			PARM_OPT,	0,			0},
-		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
 			PARM_OPT,	0,			0},
 		{"StartGlbSNMPPollers",		&CONFIG_GLB_SNMP_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			10},	

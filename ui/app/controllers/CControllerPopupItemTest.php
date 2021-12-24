@@ -91,7 +91,7 @@ abstract class CControllerPopupItemTest extends CController {
 	 */
 	protected $items_support_proxy = [ITEM_TYPE_ZABBIX, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL, ITEM_TYPE_EXTERNAL,
 		ITEM_TYPE_DB_MONITOR, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_IPMI, ITEM_TYPE_SSH, ITEM_TYPE_TELNET, ITEM_TYPE_JMX,
-		ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
+		ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT, ITEM_TYPE_WORKER_SERVER
 	];
 
 	/**
@@ -101,7 +101,7 @@ abstract class CControllerPopupItemTest extends CController {
 	 */
 	protected $item_types_has_key_mandatory = [ITEM_TYPE_ZABBIX, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL,
 		ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_IPMI,
-		ITEM_TYPE_SSH, ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_CALCULATED
+		ITEM_TYPE_SSH, ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_CALCULATED, ITEM_TYPE_WORKER_SERVER
 	];
 
 	/**
@@ -547,6 +547,15 @@ abstract class CControllerPopupItemTest extends CController {
 				$data += [
 					'key' => $input['key']
 				];
+				break;
+			
+			case ITEM_TYPE_WORKER_SERVER:
+					$data += [
+					
+					'key' => $input['key'],
+					'path' => array_key_exists('path', $input) ? $input['path'] : null,
+
+					];
 				break;
 
 			case ITEM_TYPE_DB_MONITOR:

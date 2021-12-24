@@ -1166,6 +1166,8 @@ abstract class CTriggerGeneral extends CApiService {
 		$new_functions = [];
 		$triggers_functions = [];
 		$new_tags = [];
+		$itemids = [];
+
 		$this->implode_expressions($new_triggers, null, $triggers_functions, $inherited);
 
 		$triggerid = DB::reserveIds('triggers', count($new_triggers));
@@ -1177,6 +1179,10 @@ abstract class CTriggerGeneral extends CApiService {
 			foreach ($triggers_functions[$tnum] as $trigger_function) {
 				$trigger_function['triggerid'] = $triggerid;
 				$new_functions[] = $trigger_function;
+				
+				error_log(print_r($trigger_function,true));
+
+				$itemids[] = $trigger_function['itemid'];
 			}
 
 			if ($class === 'CTriggerPrototype') {
@@ -1197,6 +1203,9 @@ abstract class CTriggerGeneral extends CApiService {
 		DB::insert('triggers', $new_triggers, false);
 		DB::insertBatch('functions', $new_functions, false);
 
+		CItemGeneral::updateRtdata($itemids);
+		CZabbixServer::notifyConfigChanges();
+
 		if ($new_tags) {
 			DB::insert('trigger_tag', $new_tags);
 		}
@@ -1204,6 +1213,32 @@ abstract class CTriggerGeneral extends CApiService {
 		if (!$inherited) {
 			$this->addAuditBulk(AUDIT_ACTION_ADD, $resource, $triggers);
 		}
+
+		$this->updateTriggersRtdata($triggers);
+		CZabbixServer::notifyConfigChanges();	
+	}
+
+	protected function updateTriggersRtdata(array $triggers) {
+		
+		$triggerids = array_column($triggers, 'triggerid');
+		
+		DB::update('triggers',  ['values' => ['lastchange' => time()], 
+									'where' => ['triggerid' => $triggerids]]);
+		/*
+		$trigger_info = API::Trigger()->get([
+			'triggerids' => $triggerids,
+			'selectItems' => API_OUTPUT_EXTEND,
+		]);
+
+		foreach ($trigger_info as $trigger) {
+			foreach ($trigger['items'] as $iteminfo)
+				$itemids[]=$iteminfo['itemid'];
+			//
+
+		}
+
+		$itemids = array_unique($itemids); */
+		//CItemGeneral::updateRtdata($itemids);
 	}
 
 	/**
@@ -1266,7 +1301,7 @@ abstract class CTriggerGeneral extends CApiService {
 			default:
 				self::exception(ZBX_API_ERROR_INTERNAL, _('Internal error.'));
 		}
-
+				
 		$upd_triggers = [];
 		$new_functions = [];
 		$del_functions_triggerids = [];
@@ -1405,6 +1440,10 @@ abstract class CTriggerGeneral extends CApiService {
 		if (!$inherited) {
 			$this->addAuditBulk(AUDIT_ACTION_UPDATE, $resource, $save_triggers, zbx_toHash($db_triggers, 'triggerid'));
 		}
+		
+		$this->updateTriggersRtdata($triggers);
+		CZabbixServer::notifyConfigChanges();		
+		
 	}
 
 	/**

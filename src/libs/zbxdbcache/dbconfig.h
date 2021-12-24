@@ -108,12 +108,11 @@ typedef struct
 	int			data_expected_from;
 	//int			history_sec;
 
-	int			mtime;
+	int					mtime;
 	unsigned char		history;
 	unsigned char		type;
 	unsigned char		value_type;
 	unsigned char		poller_type;
-	//unsigned char		db_state;
 	unsigned char		inventory_link;
 	unsigned char		location;
 	unsigned char		flags;
@@ -123,7 +122,7 @@ typedef struct
 	unsigned char		update_triggers;
 	zbx_uint64_t		templateid;
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
-	
+	const char 			*params;
 	zbx_vector_ptr_t	tags;
 }
 ZBX_DC_ITEM;
@@ -817,6 +816,7 @@ typedef struct
 	int			sync_ts;
 	int			item_sync_ts;
 	int			sync_start_ts;
+	int 		sync_requested;
 
 	unsigned int		internal_actions;		/* number of enabled internal actions */
 
@@ -890,6 +890,10 @@ typedef struct
 	zbx_hashset_t		maintenances;
 	zbx_hashset_t		maintenance_periods;
 	zbx_hashset_t		maintenance_tags;
+	zbx_hashset_t		changed_items; /*changed items since config reload for the pollers with own queues */
+
+	int last_items_change; // when changed_items has been added last time
+
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_hashset_t		psks;			/* for keeping PSK-identity and PSK pairs and for searching */
 							/* by PSK identity */
@@ -915,6 +919,7 @@ typedef struct
 	/* preproc statistics */
 	u_int64_t no_preproc;
 	u_int64_t local_preproc;
+	
 }
 
 ZBX_DC_CONFIG;
@@ -980,18 +985,13 @@ void	DCsync_maintenance_groups(zbx_dbsync_t *sync);
 void	DCsync_maintenance_hosts(zbx_dbsync_t *sync);
 
  
-/* trapper problems reporting */
-//void zbx_dump_problems_to_json(struct zbx_json *json);
-//void zbx_register_problem(zbx_uint64_t id, char *problem_text);
-/*proxy domains retrieval */
-//char *zbx_dc_get_active_proxy_domains();
-//void zbx_dc_cluster_get_servers_list();
-
 int zbx_dc_create_hello_json(struct zbx_json* j);
 int zbx_dc_parce_hello_json(DC_PROXY *proxy,struct zbx_json_parse	*jp, int timediff);
 zbx_uint64_t zbx_dc_recalc_topology(void);
 int zbx_dc_set_topology_recalc(void);
 
+int DC_CheckNeedsSync(); 
+void DC_RequestSync();
 
 /* maintenance support */
 

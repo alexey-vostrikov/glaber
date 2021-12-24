@@ -303,6 +303,9 @@ const char	*zbx_json_decodevalue(const char *p, char *string, size_t size, zbx_j
 const char	*zbx_json_decodevalue_dyn(const char *p, char **string, size_t *string_alloc, zbx_json_type_t *type);
 void		zbx_json_escape(char **string);
 int		zbx_json_open_path(const struct zbx_json_parse *jp, const char *path, struct zbx_json_parse *out);
+long int glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag);
+double  glb_json_get_dbl_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag);
+
 zbx_json_type_t	zbx_json_valuetype(const char *p);
 
 /* jsonpath support */

@@ -52,7 +52,7 @@ class CItem extends CItemGeneral {
 	const SUPPORTED_ITEM_TYPES = [ITEM_TYPE_ZABBIX, ITEM_TYPE_TRAPPER, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL,
 		ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, ITEM_TYPE_SSH,
 		ITEM_TYPE_TELNET, ITEM_TYPE_CALCULATED, ITEM_TYPE_JMX, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_DEPENDENT,
-		ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
+		ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT, ITEM_TYPE_WORKER_SERVER
 	];
 
 	public function __construct() {
@@ -362,6 +362,8 @@ class CItem extends CItemGeneral {
 			$sqlParts['where']['hi'] = 'h.hostid=i.hostid';
 			$sqlParts['where'][] = ' h.host='.zbx_dbstr($options['host']);
 		}
+		// do not retrun deleted items
+		$sqlParts['where'][] = 'i.status != '.ITEM_STATUS_DELETED;
 
 		// with_triggers
 		if (!is_null($options['with_triggers'])) {
@@ -425,9 +427,10 @@ class CItem extends CItemGeneral {
 				
 				$items_state = $server->getItemsState(CSessionHelper::getId(),array_keys($result)); 
 				
-				foreach ($items_state as $state) {
-					$result[$state['itemid']] += $state;
-					
+				if (isset($items_state) && is_array($items_state)) {
+					foreach ($items_state as $state) {
+						 $result[$state['itemid']] += $state;
+					}
 				}
 
 				foreach ($result as $key=>$value) {
@@ -549,6 +552,7 @@ class CItem extends CItemGeneral {
 		return ['itemids' => zbx_objectValues($items, 'itemid')];
 	}
 
+
 	/**
 	 * Create host item.
 	 *
@@ -573,6 +577,7 @@ class CItem extends CItemGeneral {
 
 		foreach ($items_rtdata as $key => &$value) {
 			$value['itemid'] = $itemids[$key];
+			$value['mtime'] = time();
 		}
 		unset($value);
 
@@ -585,6 +590,8 @@ class CItem extends CItemGeneral {
 		$this->createItemParameters($items, $itemids);
 		$this->createItemPreprocessing($items);
 		$this->createItemTags($items, $itemids);
+		
+		CZabbixServer::notifyConfigChanges();
 	}
 
 	/**
@@ -594,19 +601,28 @@ class CItem extends CItemGeneral {
 	 */
 	protected function updateReal(array $items) {
 		CArrayHelper::sort($items, ['itemid']);
-
+		
+		$update_rtdata = [];
 		$data = [];
+		$upd_rtdata = ['mtime' => time()];
+
 		foreach ($items as $item) {
 			unset($item['flags']); // flags cannot be changed
 			$data[] = ['values' => $item, 'where' => ['itemid' => $item['itemid']]];
+
+			$update_rtdata[] = ['values' => $upd_rtdata, 'where' => ['itemid' => $item['itemid']]];
+				
 		}
 		DB::update('items', $data);
+		DB::update('item_rtdata', $update_rtdata);
 
 		$this->updateItemParameters($items);
 		$this->updateItemPreprocessing($items);
 		$this->updateItemTags($items);
+		
+		CZabbixServer::notifyConfigChanges();
+		
 	}
-
 	/**
 	 * Update item.
 	 *
@@ -1216,6 +1232,7 @@ class CItem extends CItemGeneral {
 			)));
 			foreach ($result as &$item) {
 				$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
+				
 				$prevHistory = isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
 				$no_value = in_array($item['value_type'],
 						[ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_TEXT]) ? '' : '0';
@@ -1223,8 +1240,9 @@ class CItem extends CItemGeneral {
 				if (isset($requestedOutput['lastclock'])) {
 					$item['lastclock'] = $lastHistory ? $lastHistory['clock'] : '0';
 				}
+
 				if (isset($requestedOutput['lastns'])) {
-					$item['lastns'] = $lastHistory ? $lastHistory['ns'] : '0';
+					$item['lastns'] = $lastHistory ? (isset($lastHistory['ns']) ? $lastHistory['ns']: '0') : '0';
 				}
 				if (isset($requestedOutput['lastvalue'])) {
 					$item['lastvalue'] = $lastHistory ? $lastHistory['value'] : $no_value;

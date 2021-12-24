@@ -1401,7 +1401,12 @@ class CHttpTestManager {
 					];
 				}
 
-				$itemHistory = $history[$httpItem['itemid']][0];
+				if (isset($history[$httpItem['itemid']][0])) {
+					$itemHistory = $history[$httpItem['itemid']][0];
+				} else {
+					$itemHistory['clock'] = null;
+					$itemHistory['value'] = null;
+				}
 
 				if ($httpItem['type'] == HTTPSTEP_ITEM_TYPE_LASTSTEP) {
 					$data[$httpItem['httptestid']]['lastcheck'] = $itemHistory['clock'];

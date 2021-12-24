@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"bufio"
 	"fmt"
-//	"log"
 )
 
 type ServerResponse struct {
@@ -21,9 +20,6 @@ func SendMetricToServer(resp *ServerResponse, writer *bufio.Writer ) {
 		return;
 	}
 	fmt.Fprintln(writer, string(res));
-	//fmt.Fprintln(writer);
-	//fmt.Fprintln(writer, "Hello world");
-	//log.Println(string(res))
 	writer.Flush()
 
 }

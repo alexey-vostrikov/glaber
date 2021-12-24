@@ -302,7 +302,7 @@ int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 	LOG_DBG("Unlocking id %ld", id);
 	glb_rwlock_unlock(&elems->meta_lock);
 
-	if (10 < (lock_time = zbx_get_duration_ms(&ts_start))) {
+	if (1000 < (lock_time = zbx_get_duration_ms(&ts_start))) {
 		LOG_INF("LOCK: A wr lock has took too much time: %d msec", lock_time);
 		THIS_SHOULD_NEVER_HAPPEN;
 	}
@@ -503,70 +503,29 @@ void	glb_cache_destroy(void)
 }
 
 
-/*****************************************************************
- * parses json to item metadata
-   ****************************************************************/
-  /*
-static int  glb_parse_item_metadata(struct zbx_json_parse  *jp, glb_cache_elem_t *item)  {
-	//jp pints to the json containing the metadata
-	char  itemid_str[MAX_ID_LEN], hostid_str[MAX_ID_LEN], value_type_str[MAX_ID_LEN], state_str[MAX_ID_LEN],
-		status_str[MAX_ID_LEN],range_sync_hour_str[MAX_ID_LEN], values_total_str[MAX_ID_LEN],
-		last_accessed_str[MAX_ID_LEN], active_range_str[MAX_ID_LEN], db_cached_from_str[MAX_ID_LEN];
-	zbx_json_type_t type;	
 
-	if (SUCCEED != zbx_json_value_by_name(jp,"itemid",itemid_str,MAX_ID_LEN, &type) ||
-		SUCCEED != zbx_json_value_by_name(jp,"hostid",hostid_str,MAX_ID_LEN, &type) || 
-	    SUCCEED != zbx_json_value_by_name(jp,"value_type",value_type_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"status",status_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"range_sync_hour",range_sync_hour_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"values_total",values_total_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"last_accessed",last_accessed_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"active_range",active_range_str,MAX_ID_LEN, &type) || 
-		SUCCEED != zbx_json_value_by_name(jp,"db_cached_from",db_cached_from_str,MAX_ID_LEN, &type) 
-	) return FAIL;
+//TODO: this must be a universal function
+//which accepts cache table, filename, parsing and cration callbacks
+int glb_vc_load_items_cache() {
 
-	item->itemid = strtol(itemid_str,NULL,10);
-	item->value_type = strtol(value_type_str,NULL,10);
-	item->status = strtol(status_str,NULL,10);
-	item->range_sync_hour = strtol(range_sync_hour_str,NULL,10);
-	item->active_range = strtol(active_range_str,NULL,10);
-	item->last_accessed = strtol(last_accessed_str,NULL,10);
-	
-	//theese might not need to be in the dump as they will be recalced on adding a new data
-	item->values_total = 0;//strtol(values_total_str,NULL,10);
-	item->db_cached_from = strtol(db_cached_from_str,NULL,10);
-	
-	zabbix_log(LOG_LEVEL_DEBUG,"Parsed item metadata: hostid: %d, itemid: %ld, value_type:%d, status:%d, range_sync_hour: %d, values_total:%d, last_accessed: %d, active_range: %d, db_cached_from:%d", 
-					item->hostid, item->itemid, item->value_type, item->status, item->range_sync_hour,
-					 item->values_total, item->last_accessed, item->active_range, item->db_cached_from);
-
-	return SUCCEED;
-
-}
-
-*/
-/*****************************************************************
- * loads valuecache from the  file stated in the configuration 
- * file is read line by line and either items are parsed and
- * created or data is loaded
- ****************************************************************/
-
-int glb_vc_load_cache() {
 	FILE *fp;
 	gzFile gzfile;
 
-	size_t read, len =0;
-	char line[MAX_STRING_LEN];
-	int req_type=0, items = 0, vals = 0;
+	//size_t read, len =0;
+	char buffer[MAX_STRING_LEN];
+	size_t alloc_len =0, alloc_offset = 0;
+
+	char *json_buffer = NULL;
+	int items = 0, vals = 0;
+	int lcnt = 0;
+	
 	struct zbx_json_parse jp;
+
 	zbx_json_type_t j_type;
-	char type_str[MAX_ID_LEN];
+	char id_str[MAX_ID_LEN];
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Reading valuecache from %s",CONFIG_VCDUMP_LOCATION);
-	/*
-    //sleep(1);
-	//return SUCCEED;
-
+	
 	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "a"))) {
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for access check, exiting",CONFIG_VCDUMP_LOCATION);
 		//checking if we have the permissions on creating and writing the file
@@ -581,96 +540,48 @@ int glb_vc_load_cache() {
 		return FAIL;
 	}
 
-	while (Z_NULL != gzgets(gzfile, line, MAX_STRING_LEN) ) {
-		int vc_idx;
+	while (Z_NULL != gzgets(gzfile, buffer, MAX_STRING_LEN) ) {
+
+		zbx_snprintf_alloc(&json_buffer,&alloc_len,&alloc_offset,"%s",buffer);
 		
-		//ok, detecting the type of record
-		//zabbix_log(LOG_LEVEL_INFORMATION,"Retrieved line of length %zu:", read);
-        //zabbix_log(LOG_LEVEL_INFORMATION,"%s", line);
-		
-		if (SUCCEED != zbx_json_open(line, &jp)) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Cannot parse line '%s', incorrect JSON", line);
+		if (SUCCEED != zbx_json_open(json_buffer, &jp)) {
+			if ( (lcnt > 0 &&  0 == strncmp(buffer,"{\"itemid\":",10)) || 
+				  (lcnt == 0 && json_buffer[0] != '{') )
+			 {
+				LOG_WRN("Garbage in the dump detected, line count %d dropping data, starting from new line: %s", lcnt, json_buffer);
+				lcnt = 0;
+				alloc_offset =0;
+				continue;
+			}
+			lcnt++;
 			continue;
 		}
 
-		//reading type of the record
-		if (SUCCEED != zbx_json_value_by_name(&jp, "type", type_str, MAX_ID_LEN, &j_type)) {
-        	zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse line '%s': no 'type' parameter",line);
+		
+		if (SUCCEED != zbx_json_value_by_name(&jp, "itemid", id_str, MAX_ID_LEN, &j_type)) {
+        	LOG_INF("Couldn't find id in the JSON '%s':",json_buffer);
         	continue;
     	}
-		req_type = strtol(type_str,NULL,10);
+		u_int64_t id = strtol(id_str,NULL,10);
 
-		switch (req_type) {
-			case GLB_VCDUMP_RECORD_TYPE_ITEM: {
-				glb_cache_elem_t   new_elem, *elem;
-				
-				bzero(&new_elem, sizeof(glb_cache_elem_t));
-				
-				if (SUCCEED == glb_parse_item_metadata(&jp,&new_elem) ) {
-					//let's see if the item is there already
-					if (NULL == (elem = (glb_cache_elem_t *)zbx_hashset_insert(&glb_cache->items.hset, &new_elem, sizeof(glb_cache_elem_t)))) {
-						zabbix_log(LOG_LEVEL_INFORMATION, "Couldnt add item %ld to Glaber Cache, it's already there, skipping", new_elem.itemid);
-					};
+		if (id == 0)
+			LOG_INF("Couldn't find id in the JSON");
 
-					items++;
-				} else {
-					zabbix_log(LOG_LEVEL_INFORMATION, "Failed to parse an item metadata: %s", jp.start);
-				}
-				break;
-			}
-			case GLB_VCDUMP_RECORD_TYPE_VALUE: {
-					glb_cache_value_t c_value;
-                    glb_cache_elem_t *elem;
-					u_int64_t itemid, hostid;
-					time_t expire_timestamp;
-					char tmp_str[MAX_ID_LEN];
-					zbx_json_type_t type;
+		alloc_offset = 0;
+		lcnt = 0;
+		items++;
+		//creating the new element
 
-					expire_timestamp = time(NULL) - GLB_CACHE_DEFAULT_DURATION;
+		//and calling unmarshall callback for it
+		glb_cache_process_elem(&glb_cache->items, id, glb_cache_items_umarshall_item_cb, &jp);
 
-					bzero(&c_value, sizeof(c_value));
-
-					if (FAIL == zbx_json_value_by_name(&jp,"itemid",tmp_str,MAX_ID_LEN, &type) ) {
-						zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't find itemid in the value record: %s",jp.start);
-						continue;
-					}
-					
-					itemid = strtol(tmp_str,NULL,10);
-	
-					if (NULL == (elem = (glb_cache_elem_t *)zbx_hashset_search(&glb_cache->items,&itemid ))) {
-						zabbix_log(LOG_LEVEL_WARNING,"Couldn't find itemid in the items cache %ld",itemid);
-						continue;
-					}
-					
-					if (SUCCEED == glb_history_json2val(&jp, elem->value_type, &c_value) ) {
-						if ( c_value.sec < expire_timestamp ) {
-							zabbix_log(LOG_LEVEL_DEBUG,"Item %ld value timestamp %d is too old (%d second in the past) not adding to VC",
-									elem->itemid, c_value.sec, time(NULL) - c_value.sec );
-							zbx_history_record_clear(&c_value,elem->value_type);
-							continue;
-						}
-						 
-                        
-						glb_cache_add_value(elem, &c_value.value, c_value.sec );
-						
-                        vals++;
-						zbx_history_record_clear(&c_value,item->value_type);
-						
-					} else {
-						zabbix_log(LOG_LEVEL_INFORMATION,"Couldn't parse value json: %s",jp.start);
-					}
-				
-				break;
-			}
-			default: 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Unknown type of record '%s', ignoring line",type_str);
-				break;
-			
-		}
     }
 	gzclose(gzfile);
-*/	
-	zabbix_log(LOG_LEVEL_DEBUG,"Finished loading valuecache data, loaded %d items; %d values",items,vals);
+	zbx_free(json_buffer);
+
+	LOG_INF("Finished loading valuecache data, loaded %d items; %d values",items,vals);
+//	sleep(2);
+
 	return SUCCEED;
 }
 
@@ -718,7 +629,7 @@ int glb_vc_dump_cache() {
 		zbx_json_clean(&json);
 		
 		glb_lock_block(&elem->lock);
-		int ret = glb_cache_items_marshall_item(elem, &json);
+		int ret = glb_cache_items_marshall_item_cb(elem, &json);
 		glb_lock_unlock(&elem->lock);
 	   
 		if (0 < ret) {

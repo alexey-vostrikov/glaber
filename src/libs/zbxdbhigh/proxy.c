@@ -556,7 +556,7 @@ static int	get_proxyconfig_table_items(zbx_uint64_t proxy_hostid, struct zbx_jso
 				" and r.proxy_hostid=" ZBX_FS_UI64
 				" and r.status in (%d,%d)"
 				" and t.flags<>%d"
-				" and t.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)"
+				" and t.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)"
 			" order by t.%s",
 			proxy_hostid,
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
@@ -564,7 +564,7 @@ static int	get_proxyconfig_table_items(zbx_uint64_t proxy_hostid, struct zbx_jso
 			ITEM_TYPE_ZABBIX, ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_SNMP, ITEM_TYPE_IPMI, ITEM_TYPE_TRAPPER,
 			ITEM_TYPE_SIMPLE, ITEM_TYPE_HTTPTEST, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_SSH,
 			ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_INTERNAL,
-			ITEM_TYPE_HTTPAGENT, ITEM_TYPE_DEPENDENT, ITEM_TYPE_SCRIPT,
+			ITEM_TYPE_HTTPAGENT, ITEM_TYPE_DEPENDENT, ITEM_TYPE_SCRIPT, ITEM_TYPE_WORKER_SERVER,
 			table->recid);
 	//to do: fix this multiple host id functionality if i ever return to HA idea		
 	//DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "r.hostid", hosts->values, hosts->values_num);

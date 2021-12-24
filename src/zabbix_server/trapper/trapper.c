@@ -39,6 +39,7 @@
 #include "../../libs/zbxdbcache/glb_cache.h"
 #include "preproc.h"
 
+
 extern int CONFIG_CLUSTER_SERVER_ID;
 
 int zbx_dc_create_hello_json(struct zbx_json* j);
@@ -47,6 +48,7 @@ int zbx_dc_parce_rerouted_data(DC_PROXY *server, struct zbx_json_parse *jp);
 int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type);
 char *zbx_dc_get_topology();
 void zbx_dc_register_proxy_availability(u_int64_t hostid);
+void DC_RequestConfigSync();
 
  
 
@@ -871,7 +873,7 @@ static int json_ids_to_vector(struct zbx_json_parse *jp, zbx_vector_uint64_t *id
 	
 	const char *id_ptr = NULL, *num_start_pos = NULL;
 	struct zbx_json_parse jp_ids;
-
+	
 	if (SUCCEED == zbx_json_brackets_by_name(jp, tag, &jp_ids)) {
 		while (NULL != (id_ptr = zbx_json_next(&jp_ids, id_ptr))) {
 			
@@ -887,6 +889,16 @@ static int json_ids_to_vector(struct zbx_json_parse *jp, zbx_vector_uint64_t *id
 		}
 	} 
 	return ids->values_num;
+}
+static void request_config_sync(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	struct zbx_json json;
+
+	DC_RequestConfigSync();
+	zbx_json_init(&json, 5 * ZBX_KIBIBYTE);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	(void)zbx_tcp_send(sock, json.buffer);
+	zbx_json_free(&json);
+	
 }
 
 static void get_items_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
@@ -1607,6 +1619,10 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 			else if (0 == strcmp(value, "itemsstate.get"))
 				get_items_state(sock,&jp);
 			
+			else if (0 == strcmp(value, "config.sync")) {
+				LOG_INF("CONFIG RELOAD trapper command recieved");
+				request_config_sync(sock,&jp);
+			}
 			else if (0 == strcmp(value, ZBX_PROTO_VALUE_CLUSTER_HELLO))
 			{
 				ret = recv_server_hello(sock, &jp);

@@ -291,6 +291,13 @@ $form_list
 			]))
 			->setReadonly($readonly),
 		'request_method_row'
+	) ->addRow(
+		(new CLabel(_('Worker path'), 'path'))->setAsteriskMark(),
+		(new CTextBox('path', $data['params']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
+			->setReadonly($discovered_item),
+			'row_path'
 	)
 	// Append ITEM_TYPE_HTTPAGENT and ITEM_TYPE_SCRIPT timeout field to form list.
 	->addRow(
@@ -641,7 +648,7 @@ $form_list
 			->setAriaRequired()
 			->setReadonly($discovered_item),
 		'label_formula'
-	);
+	) ;
 
 $form_list
 	->addRow(new CLabel(_('Type of information'), 'label-value-type'),
@@ -758,14 +765,15 @@ $form_list->addRow((new CLabel(_('History storage period'), 'history'))->setAste
 	(new CDiv([
 		(new CRadioButtonList('history_mode', (int) $data['history_mode']))
 			->addValue(_('Do not keep history'), ITEM_STORAGE_OFF)
-			->addValue(_('Storage period'), ITEM_STORAGE_CUSTOM)
+			->addValue(_('Keep history'), ITEM_STORAGE_CUSTOM)
 			->setReadonly($discovered_item)
 			->setModern(true),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-		(new CTextBox('history', $data['history'], $discovered_item))
-			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-			->setAriaRequired(),
-		$keep_history_hint
+			(new CInput('hidden', 'history', $data['history'])),
+	//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+	//	(new CTextBox('history', $data['history'], $discovered_item))
+	//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+	//		->setAriaRequired(),
+	//	   $keep_history_hint
 	]))->addClass('wrap-multiple-controls')
 );
 
@@ -795,14 +803,16 @@ $form_list
 		(new CDiv([
 			(new CRadioButtonList('trends_mode', (int) $data['trends_mode']))
 				->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
-				->addValue(_('Storage period'), ITEM_STORAGE_CUSTOM)
+				->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
 				->setReadonly($discovered_item)
 				->setModern(true),
-			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			(new CTextBox('trends', $data['trends'], $discovered_item))
-				->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-				->setAriaRequired(),
-			$keep_trend_hint
+			(new CInput('hidden', 'trends', $data['trends']))
+
+//			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+//			(new CTextBox('trends', $data['trends'], $discovered_item))
+//				->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+//				->setAriaRequired(),
+//			$keep_trend_hint
 		]))->addClass('wrap-multiple-controls'),
 		'row_trends'
 	)
@@ -935,7 +945,7 @@ if ($data['itemid'] != 0) {
 	}
 
 	$buttons[] = (new CSimpleButton(_('Test')))->setId('test_item');
-
+/*
 	if ($host['status'] == HOST_STATUS_MONITORED || $host['status'] == HOST_STATUS_NOT_MONITORED) {
 		$buttons[] = ($data['config']['compression_status'])
 			? new CSubmit('del_history', _('Clear history and trends'))
@@ -945,7 +955,7 @@ if ($data['itemid'] != 0) {
 				_('History clearing can take a long time. Continue?')
 			);
 	}
-
+*/
 	$buttons[] = (new CButtonDelete(_('Delete item?'), url_params(['form', 'itemid', 'hostid', 'context']), 'context'))
 		->setEnabled(!$data['limited']);
 	$buttons[] = new CButtonCancel(url_params(['hostid', 'context']));

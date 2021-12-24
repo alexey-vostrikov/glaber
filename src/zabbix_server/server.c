@@ -179,10 +179,7 @@ int		process_num		= 0;
 int		server_num		= 0;
 
 u_int64_t CONFIG_DEBUG_ITEM = 0;
-u_int64_t CONFIG_DEBUG_HOST = 0;
 
-
-//int CONFIG_DISABLE_INPOLLER_PREPROC = 0;
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
@@ -829,8 +826,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			100},
 		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
 			PARM_OPT,	0,			0},
-		{"DebugHost",			&CONFIG_DEBUG_HOST,			TYPE_INT,
-			PARM_OPT,	0,			0},
 	//	{"DisableInPollerPreproc",			&CONFIG_DISABLE_INPOLLER_PREPROC,			TYPE_INT,
 	//		PARM_OPT,	0,			0},
 		{"EnableHostDeactivation",			&CONFIG_ENABLE_HOST_DEACTIVATION,			TYPE_INT,
@@ -1415,17 +1410,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-//	if (SUCCEED != zbx_vc_init(&error))
-//	{
-//		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize history value cache: %s", error);
-//		zbx_free(error);
-//		exit(EXIT_FAILURE);
-//	}
 
-//	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_vc_load_cache()) {
-//		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
-//		exit(EXIT_FAILURE);
-//	}
+
 
 	//IPC init, //TODO: when ipc mechanics is ready, make number of
 	//IPC queues configurable by the config file
@@ -1443,6 +1429,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_error("Cannot initialize Glaber CACHE");
 		exit(EXIT_FAILURE);
 	}
+
+	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_vc_load_items_cache()) {
+		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
+		exit(EXIT_FAILURE);
+	}
+
 
 	if (SUCCEED != zbx_create_itservices_lock(&error))
 	{
@@ -1603,7 +1595,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	
 			case GLB_PROCESS_TYPE_SERVER:
-				poller_type = ITEM_TYPE_TRAPPER;
+				poller_type = ITEM_TYPE_WORKER_SERVER;
 				thread_args.args = &poller_type;
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	

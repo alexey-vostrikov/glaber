@@ -100,7 +100,8 @@ function item_type2str($type = null) {
 		ITEM_TYPE_CALCULATED => _('Calculated'),
 		ITEM_TYPE_HTTPTEST => _('Web monitoring'),
 		ITEM_TYPE_DEPENDENT => _('Dependent item'),
-		ITEM_TYPE_SCRIPT => _('Script')
+		ITEM_TYPE_SCRIPT => _('Script'),
+		ITEM_TYPE_WORKER_SERVER => _('Server worker'),
 	];
 
 	if ($type === null) {
@@ -361,6 +362,7 @@ function itemTypeInterface($type = null) {
 		ITEM_TYPE_ZABBIX => INTERFACE_TYPE_AGENT,
 		ITEM_TYPE_SIMPLE => INTERFACE_TYPE_ANY,
 		ITEM_TYPE_EXTERNAL => INTERFACE_TYPE_ANY,
+		ITEM_TYPE_WORKER_SERVER => INTERFACE_TYPE_ANY,
 		ITEM_TYPE_SSH => INTERFACE_TYPE_ANY,
 		ITEM_TYPE_TELNET => INTERFACE_TYPE_ANY,
 		ITEM_TYPE_JMX => INTERFACE_TYPE_JMX,
@@ -1088,7 +1090,7 @@ function getDataOverviewCellData(array $db_items, array $data, int $show_suppres
 				}
 
 				$item += [
-					'value' => array_key_exists($itemid, $history) ? $history[$itemid][0]['value'] : null,
+					'value' => array_key_exists($itemid, $history) && isset($history[$itemid][0]) ? $history[$itemid][0]['value'] : null,
 					'trigger' => $trigger
 				];
 			}
@@ -1745,6 +1747,8 @@ function getParamFieldNameByType($itemType) {
 	switch ($itemType) {
 		case ITEM_TYPE_SCRIPT:
 			return 'script';
+		case ITEM_TYPE_WORKER_SERVER:
+			return 'path';
 		case ITEM_TYPE_SSH:
 		case ITEM_TYPE_TELNET:
 		case ITEM_TYPE_JMX:
@@ -1760,6 +1764,8 @@ function getParamFieldNameByType($itemType) {
 
 function getParamFieldLabelByType($itemType) {
 	switch ($itemType) {
+		case ITEM_TYPE_WORKER_SERVER:
+			return 'Worker path';
 		case ITEM_TYPE_SCRIPT:
 			return _('Script');
 		case ITEM_TYPE_SSH:

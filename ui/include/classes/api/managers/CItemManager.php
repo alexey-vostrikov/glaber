@@ -223,7 +223,15 @@ class CItemManager {
 		if ($ins_housekeeper) {
 			DB::insertBatch('housekeeper', $ins_housekeeper);
 		}
+		
+		//DB::delete('items', ['itemid' => $del_itemids]);
+		//in glaber items are only marked as deleted so the server can 
+		DB::update('items', ['values' => ['status' => ITEM_STATUS_DELETED], 
+							'where' => ['itemid' => $del_itemids]]);
 
-		DB::delete('items', ['itemid' => $del_itemids]);
+		DB::update('item_rtdata',  ['values' => ['mtime' => time()], 
+									'where' => ['itemid' => $del_itemids]]);
+
+		CZabbixServer::notifyConfigChanges();	
 	}
 }
