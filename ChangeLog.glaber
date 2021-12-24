@@ -1,0 +1,6 @@
+ver 2.7.0: 
+    - introduced prototype of faster config cache reload
+    - sever workers are created as a separate type and configured from the ui only, no server restart required any more
+    - glaber pollers now reload items very fast (2 seconds delay) after they are changed in the config
+    - UI notifies server on configruaration change and server does config reload, due to fast reloading it can reload the config quite fast
+    
