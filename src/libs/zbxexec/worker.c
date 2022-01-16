@@ -51,7 +51,7 @@ static int get_worker_mode(char *mode)
 
 int glb_process_worker_params(GLB_EXT_WORKER *worker, char *params_buf) {
     
-    LOG_INF("%s: parsing params: '%s'", __func__, params_buf);
+    LOG_DBG("%s: parsing params: '%s'", __func__, params_buf);
     
     if ( NULL!= params_buf && strlen(params_buf) >0 )   {
 
@@ -85,12 +85,6 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
 
     int i = 0;
     zbx_json_type_t type;
-
-    int timeout = GLB_DEFAULT_WORKER_TIMEOUT;
-    int max_calls = GLB_DEFAULT_WORKER_MAX_CALLS;
-    int mode_to_worker = GLB_WORKER_MODE_NEWLINE;
-    int mode_from_worker = GLB_WORKER_MODE_EMPTYLINE;
-
     GLB_EXT_WORKER *worker = NULL;
 
     path[0] = 0;
@@ -168,7 +162,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
     #define RST_MAX_RESTARTS    5
     int i;
     
-    zabbix_log(LOG_LEVEL_INFORMATION, "In %s()", __func__);
+    LOG_DBG("In %s()", __func__);
 
     static unsigned int count_rst_time=0, restarts=0;
     unsigned int now=time(NULL);
@@ -655,7 +649,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         zabbix_log(LOG_LEVEL_WARNING,
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
-        zabbix_log(LOG_LEVEL_INFORMATION,"Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
+        LOG_DBG("Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
         if (worker->pid != 0) {
             worker->last_fail = time(NULL);
             worker->pid = 0;

@@ -1562,57 +1562,6 @@ static void	DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
 	zabbix_log(LOG_LEVEL_WARNING, "exporting trend data done");
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: DCsync_trends                                                    *
- *                                                                            *
- * Purpose: flush all trends to the database                                  *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
- *                                                                            *
- ******************************************************************************/
-static void	DCsync_trends(void)
-{
-	zbx_hashset_iter_t	iter;
-	ZBX_DC_TREND		*trends = NULL, *trend;
-	int			trends_alloc = 0, trends_num = 0, compression_age;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trends_num:%d", __func__, cache->trends_num);
-
-	compression_age = hc_get_history_compression_age();
-
-	zabbix_log(LOG_LEVEL_WARNING, "syncing trend data...");
-
-	LOCK_TRENDS;
-
-	zbx_hashset_iter_reset(&cache->trends, &iter);
-
-	while (NULL != (trend = (ZBX_DC_TREND *)zbx_hashset_iter_next(&iter)))
-	{
-		DCflush_trend(trend, &trends, &trends_alloc, &trends_num);
-	}
-
-	UNLOCK_TRENDS;
-
-	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_TRENDS) && 0 != trends_num)
-		DCexport_all_trends(trends, trends_num);
-
-	if (0 < trends_num)
-		qsort(trends, trends_num, sizeof(ZBX_DC_TREND), zbx_trend_compare);
-
-	DBbegin();
-
-	while (trends_num > 0)
-		DBflush_trends(trends, &trends_num, NULL);
-
-	DBcommit();
-
-	zbx_free(trends);
-
-	zabbix_log(LOG_LEVEL_WARNING, "syncing trend data done");
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
 
 /******************************************************************************
  *                                                                            *
@@ -4451,8 +4400,6 @@ static void	DCsync_all(void)
 	zabbix_log(LOG_LEVEL_DEBUG, "In DCsync_all()");
 
 	sync_history_cache_full();
-	if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
-		DCsync_trends();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of DCsync_all()");
 }
@@ -4521,7 +4468,7 @@ zbx_uint64_t	DCget_nextid(const char *table_name, int num)
 			//so the next id is calculated the fillowing way:
 			//looking for closest exceeding id 
 			nextid=( (id->lastid/ZBX_CLUSTER_MAX_SERVERS)+1) * ZBX_CLUSTER_MAX_SERVERS+CONFIG_CLUSTER_SERVER_ID;
-			id->lastid += num*ZBX_CLUSTER_MAX_SERVERS;
+			id->lastid += num * ZBX_CLUSTER_MAX_SERVERS;
 			lastid = id->lastid;
 
 			UNLOCK_CACHE_IDS;

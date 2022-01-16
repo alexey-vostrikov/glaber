@@ -22,6 +22,7 @@
 #include "log.h"
 #include "zbxalgo.h"
 #include "zbxserver.h"
+#include "../../libs/zbxdbcache/changeset.h"
 
 typedef struct
 {
@@ -2504,9 +2505,10 @@ static void	lld_hosts_save(zbx_uint64_t parent_hostid, zbx_vector_ptr_t *hosts, 
 	zbx_db_insert_t		db_insert, db_insert_hdiscovery, db_insert_hinventory, db_insert_hgroups,
 				db_insert_hmacro, db_insert_interface, db_insert_idiscovery, db_insert_snmp,
 				db_insert_tag;
+	glb_changeset_t cset;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
+	changeset_prepare(&cset);
 	zbx_vector_uint64_create(&upd_manual_host_inventory_hostids);
 	zbx_vector_uint64_create(&upd_auto_host_inventory_hostids);
 	zbx_vector_uint64_create(&del_host_inventory_hostids);
@@ -2702,7 +2704,8 @@ static void	lld_hosts_save(zbx_uint64_t parent_hostid, zbx_vector_ptr_t *hosts, 
 					(int)host->status, (int)ZBX_FLAG_DISCOVERY_CREATED, (int)tls_connect,
 					(int)tls_accept, tls_issuer, tls_subject, tls_psk_identity, tls_psk,
 					host->custom_interfaces);
-
+			changeset_add_to_cache(&cset, OBJ_HOSTS, &host->hostid, DB_CREATE, 1);
+			
 			zbx_db_insert_add_values(&db_insert_hdiscovery, host->hostid, parent_hostid, host_proto);
 
 			if (HOST_INVENTORY_DISABLED != host->inventory_mode)
@@ -2831,6 +2834,7 @@ static void	lld_hosts_save(zbx_uint64_t parent_hostid, zbx_vector_ptr_t *hosts, 
 				}
 				zbx_snprintf_alloc(&sql1, &sql1_alloc, &sql1_offset, " where hostid=" ZBX_FS_UI64 ";\n",
 						host->hostid);
+					changeset_add_to_cache(&cset, OBJ_HOSTS, &host->hostid, DB_UPDATE, 1);
 			}
 
 			if (host->inventory_mode_orig != host->inventory_mode &&
@@ -3165,6 +3169,7 @@ static void	lld_hosts_save(zbx_uint64_t parent_hostid, zbx_vector_ptr_t *hosts, 
 		DBexecute("%s", sql2);
 		zbx_free(sql2);
 	}
+	changeset_flush(&cset);
 
 	DBcommit();
 out:

@@ -1034,6 +1034,7 @@ static int	lld_rows_get(const char *value, lld_filter_t *filter, zbx_vector_ptr_
 	p = NULL;
 	while (NULL != (p = zbx_json_next(&jp_array, p)))
 	{
+		
 		if (FAIL == zbx_json_brackets_open(p, &jp_row))
 			continue;
 
@@ -1129,7 +1130,7 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	DC_ITEM			item;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64, __func__, lld_ruleid);
-
+	LOG_DBG("Processing lld rule(itemid) %ld, LLD value: %s", lld_ruleid, value);
 	zbx_vector_ptr_create(&lld_rows);
 	zbx_vector_ptr_create(&lld_macro_paths);
 	zbx_vector_ptr_create(&overrides);

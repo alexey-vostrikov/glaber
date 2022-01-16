@@ -455,7 +455,7 @@ void handle_socket_operations(agent_conf_t *conf, agent_connection_t *conn)
 		
 }
 
-static void agent_init_item(glb_poll_module_t *poll_agent, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item) {
+static int agent_init_item(glb_poll_module_t *poll_agent, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item) {
 	zbx_timespec_t timespec;
 	const char *interface_addr;
 	unsigned int interface_port;
@@ -466,7 +466,7 @@ static void agent_init_item(glb_poll_module_t *poll_agent, DC_ITEM *dc_item, GLB
 	
 	if (NULL == (agent_item = zbx_calloc(NULL,0,sizeof(agent_item_t)))) {
 		LOG_WRN("Cannot allocate mem to poll agent item, exiting");
-		exit(-1);
+		return FAIL;
 	}
 	glb_poller_item->itemdata = agent_item;
 
@@ -478,6 +478,7 @@ static void agent_init_item(glb_poll_module_t *poll_agent, DC_ITEM *dc_item, GLB
 	agent_item->interface_port = dc_item->interface.port;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
+	return SUCCEED;
 }
 
 static void agent_free_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_poller_item ) {

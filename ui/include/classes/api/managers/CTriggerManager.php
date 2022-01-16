@@ -53,6 +53,18 @@ class CTriggerManager {
 
 		$del_triggerids = array_keys($del_triggerids);
 
+		//list of functions to delete
+		$out_triggers = API::Trigger()->get([
+			'output' => ['triggerid','functionid'],
+			'triggerids' => $del_triggerids,
+			'selectFunctions' => ['functionid']
+		]);
+		
+		$del_func_ids = [];
+	
+		foreach ($out_triggers as $trigger) {
+			$del_func_ids = array_merge($del_func_ids, array_column($trigger['functions'],'functionid'));
+		}
 		// Disable actions.
 		$actionids = [];
 		$conditionids = [];
@@ -134,18 +146,31 @@ class CTriggerManager {
 				'value' => $del_triggerid
 			];
 		}
+		
 
 		DB::insertBatch('housekeeper', $ins_housekeeper);
-
-		DB::delete('trigger_discovery', ['triggerid' => $del_triggerids]);
+		//before deleting deps, put them to the changeset to remove from the server cfg
+		
+		$removed_deps = DBselect(
+				'SELECT *'.
+				' FROM trigger_depends'.
+				' WHERE '.dbConditionInt('triggerid_down', $del_triggerids).
+				'    OR '.dbConditionInt('triggerid_up', $del_triggerids)
+			);
+		
+		
 		DB::delete('trigger_depends', ['triggerid_down' => $del_triggerids]);
 		DB::delete('trigger_depends', ['triggerid_up' => $del_triggerids]);
+		
+		DB::delete('trigger_discovery', ['triggerid' => $del_triggerids]);
 		DB::delete('trigger_tag', ['triggerid' => $del_triggerids]);
 
-		//marking triggers as deleted instead of deleting them
-		DB::update('triggers', ['values' => ['status' => TRIGGER_STATUS_DELETED], 
-							     'where' => ['triggerid' => $del_triggerids]]);
-		//DB::delete('triggers', ['triggerid' => $del_triggerids]);
+		DB::delete('triggers', ['triggerid' => $del_triggerids]);
+		
+		CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS,CChangeset::DB_DELETE, $del_func_ids); 
+		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS,CChangeset::DB_DELETE, $del_triggerids);
+						
+		CZabbixServer::notifyConfigChanges();
 	}
 
 	/**

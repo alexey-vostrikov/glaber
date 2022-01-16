@@ -129,7 +129,7 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_template_items(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_prototype_items(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync);
-int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync);
+int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync, mem_funcs_t *memf, obj_index_t *idx_ptr);
 int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_expressions(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_actions(zbx_dbsync_t *sync);

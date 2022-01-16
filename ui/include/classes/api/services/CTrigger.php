@@ -199,10 +199,8 @@ class CTrigger extends CTriggerGeneral {
 
 			$sqlParts['where']['triggerid'] = dbConditionInt('t.triggerid', $options['triggerids']);
 		}
-		// hiding deleted
-		$sqlParts['where'][] = 't.status != '.TRIGGER_STATUS_DELETED;
 		
-			// itemids
+		//itemids
 		if ($options['itemids'] !== null) {
 			zbx_value2array($options['itemids']);
 
@@ -625,7 +623,8 @@ class CTrigger extends CTriggerGeneral {
 		
 		CTriggerManager::delete($triggerids);
 		
-		$this->updateTriggersRtdata($triggers);
+		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS, CChangeset::DB_DELETE, 
+				array_column($triggers, 'triggerid') );
 		CZabbixServer::notifyConfigChanges();	
 
 		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_TRIGGER, $db_triggers);
@@ -855,11 +854,13 @@ class CTrigger extends CTriggerGeneral {
 	 * @return array
 	 */
 	public function deleteDependencies(array $triggers, $inherited = false) {
+
 		$triggers = zbx_toArray($triggers);
 
 		$this->validateDeleteDependencies($triggers, $inherited);
 
 		$triggerids = zbx_objectValues($triggers, 'triggerid');
+		$depids = [];
 
 		try {
 			// delete the dependencies from the child triggers
@@ -869,6 +870,17 @@ class CTrigger extends CTriggerGeneral {
 					'templateid' => $triggerids
 				]
 			]);
+
+			$depids = DB::select("trigger_depends", [
+					'output' => ['triggerdepid'],
+					'filter'=> [
+						'triggerid_down' => $triggerids,
+						'triggerid_up' => $triggerids
+					]
+			]);
+
+			error_log("Got depids for deletion". print_r($depids, true));
+
 			if ($childTriggers) {
 				$this->deleteDependencies($childTriggers, true);
 			}

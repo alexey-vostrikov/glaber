@@ -46,7 +46,6 @@ typedef struct
 {
     zbx_hashset_t hset;
     pthread_rwlock_t meta_lock; 
-	
 	elem_update_func_t elem_create_func;
 	void *config;
 } glb_cache_elems_t; 

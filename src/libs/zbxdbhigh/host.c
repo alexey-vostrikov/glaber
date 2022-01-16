@@ -25,6 +25,7 @@
 #include "zbxserver.h"
 #include "template.h"
 #include "../../libs/zbxalgo/vectorimpl.h"
+#include "../../libs/zbxdbcache/changeset.h"
 
 static char	*get_template_names(const zbx_vector_uint64_t *templateids)
 {
@@ -1010,7 +1011,10 @@ void	DBdelete_triggers(zbx_vector_uint64_t *triggerids)
 	int			i;
 	zbx_vector_uint64_t	selementids;
 	const char		*event_tables[] = {"events"};
+	glb_changeset_t cset;
 
+	changeset_prepare(&cset);
+	
 	if (0 == triggerids->values_num)
 		return;
 
@@ -1049,6 +1053,7 @@ void	DBdelete_triggers(zbx_vector_uint64_t *triggerids)
 	DBadd_to_housekeeper(triggerids, "triggerid", event_tables, ARRSIZE(event_tables));
 
 	zbx_vector_uint64_destroy(&selementids);
+	changeset_add_to_cache(&cset, OBJ_TRIGGERS, triggerids->values, DB_DELETE, triggerids->values_num );
 
 	zbx_free(sql);
 }
@@ -1355,7 +1360,8 @@ void	DBdelete_items(zbx_vector_uint64_t *itemids)
 	DBexecute("%s", sql);
 
 	zbx_vector_uint64_destroy(&profileids);
-	DC_add_changed_items(itemids->values, itemids->values_num, ITEM_STATUS_DELETED);
+
+	DC_add_changed_items(itemids->values,  itemids->values_num, ITEM_STATUS_DELETED);
 
 	zbx_free(sql);
 out:
@@ -5627,9 +5633,10 @@ void	DBdelete_hosts(zbx_vector_uint64_t *hostids)
 	char			*sql = NULL;
 	size_t			sql_alloc = 0, sql_offset;
 	int			i;
-
+	glb_changeset_t cset;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
+	
+	changeset_prepare(&cset);
 	if (SUCCEED != DBlock_hostids(hostids))
 		goto out;
 
@@ -5697,6 +5704,8 @@ void	DBdelete_hosts(zbx_vector_uint64_t *hostids)
 	zbx_free(sql);
 
 	zbx_vector_uint64_destroy(&selementids);
+	changeset_add_to_cache(&cset, OBJ_HOSTS, hostids->values, DB_DELETE, hostids->values_num);
+
 out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

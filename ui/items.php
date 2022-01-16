@@ -959,8 +959,12 @@ elseif (hasRequest('check_now') && hasRequest('itemid')) {
 			'itemid' => getRequest('itemid')
 		]
 	]);
-
+	
+	CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_UPDATE, [$_REQUEST['itemid']]);	
+	CZabbixServer::notifyConfigChanges();
+	
 	show_messages($result, _('Request sent successfully'), _('Cannot send request'));
+
 }
 // cleaning history for one item
 elseif (hasRequest('del_history') && hasRequest('itemid')) {

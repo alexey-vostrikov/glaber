@@ -172,21 +172,21 @@ static  int	zbx_getipv4_by_host(const char *host, char *ip, size_t iplen)
     static unsigned int last_resolve_reset, resolve_fail_count;
 
 
-    //if resolving takes significant time, we'll fail
-    //to not to interrupt normal polling flow
-    if (resolve_time > MAX_RESOLVE_TIME * 1000 ) {
-        resolve_fail_count++;
-        return FAIL;
-    }
-
-    if (last_resolve_reset < time(NULL) + RESOLVE_ACCOUNT_TIME) {
-        if (resolve_fail_count > 0) {
-            zabbix_log(LOG_LEVEL_INFORMATION, "glb_icmp: limiting DNS due to slow response: there was %d resolve fails during %d seconds",
-                    resolve_fail_count, RESOLVE_ACCOUNT_TIME);
-        }
+    if (last_resolve_reset < time(NULL) - RESOLVE_ACCOUNT_TIME) {
         resolve_time = 0;
         resolve_fail_count = 0;
         last_resolve_reset = time(NULL);
+    }
+    
+    //if resolving takes significant time, we'll fail
+    //to not to interrupt normal polling flow, some items will go to unresolved state
+    if (resolve_time > MAX_RESOLVE_TIME * 1000 ) {
+        if (resolve_fail_count > 0) {
+            zabbix_log(LOG_LEVEL_INFORMATION, "glb_icmp: not resolving %s : limiting DNS due to slow response: there was %d resolve fails during %d seconds",
+                    host, resolve_fail_count, RESOLVE_ACCOUNT_TIME);
+        }
+        resolve_fail_count++;
+        return FAIL;
     }
 
     time_start = glb_ms_time();
@@ -217,6 +217,7 @@ out:
 		freeaddrinfo(ai);
     
     resolve_time += glb_ms_time() - time_start;
+    LOG_DBG("Resolving of %s took %d msec", host, glb_ms_time() - time_start);
 
     return rc;
 }
@@ -224,7 +225,7 @@ out:
 /******************************************************************************
  * item init - from the general dc_item to compactly init and store a specific pinger		  * 
  * ***************************************************************************/
-static void init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
+static int init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
 	
     int	num, count, interval, size, timeout, rc;
     char ip_addr[MAX_ID_LEN], *ip=NULL;
@@ -239,7 +240,7 @@ static void init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_
     
     if (NULL == (pinger_item = (pinger_item_t *) zbx_calloc(NULL, 0, sizeof(pinger_item_t)))) {
         LOG_WRN("Cannot allocate mem for pinger item, exiting");
-        exit(-1);
+        return FAIL;
     }
     
     poller_item->itemdata = pinger_item;
@@ -248,11 +249,11 @@ static void init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_
     
 	if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
 				sizeof(error)))
-        return;
+        return FAIL;
 	
     if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
 					&interval, &size, &timeout, &type, error, sizeof(error)))
-	    return;
+	    return FAIL;
     
     pinger_item->ip = NULL;
     pinger_item->addr = addr;
@@ -284,7 +285,7 @@ static void init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_
 	
     zbx_free(parsed_key);
     LOG_DBG( "In %s() Ended", __func__);
-    //return SUCCEED;
+    return SUCCEED;
 }
 
 /******************************************************************
@@ -321,7 +322,9 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
             if (SUCCEED == zbx_getipv4_by_host( pinger_item->addr, ip_addr, MAX_ID_LEN)) {
                 ip = ip_addr;
             } else {
-                 glb_pinger_submit_result(glb_item,CONFIG_ERROR,"Cannot resolve item to IPv4 addr, check hostname or use fping to IPv6",&ts);
+                DEBUG_ITEM(glb_item->itemid, "Cannot resolve item addr '%s' to IPv4 addr, check hostname or use fping to IPv6", pinger_item->addr);
+                glb_pinger_submit_result(glb_item,CONFIG_ERROR,"Cannot resolve item to IPv4 addr, check hostname or use fping to IPv6",&ts);
+                
                 return FAIL;
             }
         }
@@ -329,7 +332,7 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
         pinger_item->ip=zbx_strdup(pinger_item->ip,ip);
         pinger_item->lastresolve = now;
         
-        zabbix_log(LOG_LEVEL_DEBUG, "Host %s resolved to %s will cache it for %d seconds",pinger_item->addr, ip, GLB_DNS_CACHE_TIME);
+        DEBUG_ITEM(glb_item->itemid, "Host %s resolved to %s will cache it for %d seconds",pinger_item->addr, ip, GLB_DNS_CACHE_TIME);
     }
     
     zbx_snprintf(request,MAX_STRING_LEN,"%s %d %ld\n",pinger_item->ip, pinger_item->size,glb_item->itemid);
@@ -355,15 +358,17 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
  * ***************************************************************************/
 static void free_item(glb_poll_module_t *poll_mod,  GLB_POLLER_ITEM *glb_poller_item ) {
     
-    LOG_DBG( "In %s() started", __func__);
+    //LOG_DBG( "In %s() started", __func__);
     pinger_item_t *pinger_item = (pinger_item_t*)glb_poller_item->itemdata;
-	zbx_free(pinger_item->ip);
+	
+    zbx_free(pinger_item->ip);
     zbx_free(pinger_item->addr);
-    pinger_item->ip = NULL;
     
+    pinger_item->ip = NULL;
     zbx_free(pinger_item);
-    LOG_DBG( "In %s() Ended", __func__);
-//	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
+    
+    DEBUG_ITEM(glb_poller_item->itemid, "Has been removed from the pinger poller");
+  //  LOG_INF( "In %s() Ended", __func__);
 }
 
 
@@ -458,7 +463,7 @@ static void start_ping(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item)
     
     u_int64_t send_time = glb_time;
     
-    zabbix_log(LOG_LEVEL_DEBUG, "Planing %d pings for item %ld to host %s interval is %d, timeout is %d",
+    DEBUG_ITEM(glb_item->itemid, "Planing %d pings for item %ld to host %s interval is %d, timeout is %d",
                 pinger_item->count-1, glb_item->itemid, pinger_item->addr,pinger_item->interval, pinger_item->timeout);
     
     for (i=0; i< pinger_item->count-1; i++) {

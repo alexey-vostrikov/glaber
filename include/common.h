@@ -114,18 +114,18 @@ extern zbx_uint64_t CONFIG_DEBUG_ITEM;
 #define GLB_NO_PREPROC	2
 
 //for efficient polling in async mode
-#define	POLL_FREE			-8
-#define POLL_CC_FETCHED		-9
-#define POLL_PREPARED		-10
-#define	POLL_POLLING		-11
-#define POLL_SKIPPED		-12
-#define POLL_PREPROCESSED	-13
-#define POLL_FINISHED		-14
-#define	POLL_QUEUED			-15
-#define	POLL_CONNECT_SENT	-16	
-#define	POLL_REQ_SENT		-17
-#define POLL_REQUEUED		-18
-#define POLL_NODATA			-19
+#define	POLL_FREE			108
+#define POLL_CC_FETCHED		109
+#define POLL_PREPARED		110
+#define	POLL_POLLING		111
+#define POLL_SKIPPED		112
+#define POLL_PREPROCESSED	113
+#define POLL_FINISHED		114
+#define	POLL_QUEUED			115
+#define	POLL_CONNECT_SENT	116	
+#define	POLL_REQ_SENT		117
+#define POLL_REQUEUED		118
+#define POLL_NODATA			119
 
 #define SUCCEED_OR_FAIL(result) (FAIL != (result) ? SUCCEED : FAIL)
 const char	*zbx_sysinfo_ret_string(int ret);
@@ -156,6 +156,11 @@ const char	*zbx_result_string(int result);
  *                                                                            *
  ******************************************************************************/
 #define ZBX_UNUSED(var) (void)(var)
+
+typedef struct {
+	size_t size;
+	unsigned long data[1];
+} binpool_data_t;
 
 typedef struct
 {
@@ -690,7 +695,7 @@ zbx_prototype_discover_t;
 /* trigger statuses */
 #define TRIGGER_STATUS_ENABLED		0
 #define TRIGGER_STATUS_DISABLED		1
-#define TRIGGER_STATUS_DELETED		63
+#define TRIGGER_STATUS_UNKNOWN		63
 
 /* trigger types */
 #define TRIGGER_TYPE_NORMAL		0
@@ -1071,6 +1076,9 @@ int	is_hex_n_range(const char *str, size_t n, void *value, size_t size, zbx_uint
 
 #define ZBX_SIZE_T_MAX	(~(size_t)0)
 
+#define is_pid(str, value) \
+	is_uint_n_range(str, ZBX_SIZE_T_MAX, value, 4, 0x0, 4194304)
+
 #define is_ushort(str, value) \
 	is_uint_n_range(str, ZBX_SIZE_T_MAX, value, sizeof(unsigned short), 0x0, 0xFFFF)
 
@@ -1117,6 +1125,12 @@ void zbx_heap_strpool_destroy();
 const char	*zbx_heap_strpool_intern(const char *str);
 void	zbx_heap_strpool_release(const char *str);
 const char	*zbx_heap_strpool_acquire(const char *str);
+
+void glb_heap_binpool_init();
+void glb_heap_binpool_destroy();
+const binpool_data_t	*glb_heap_binpool_intern(binpool_data_t *bdata);
+void	glb_heap_binpool_release(const binpool_data_t *bdata);
+const binpool_data_t	*glb_heap_binpool_acquire(binpool_data_t *bdata);
 
 /******************************************************************************
  *                                                                            *

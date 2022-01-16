@@ -36,7 +36,9 @@ extern int CONFIG_GLB_SNMP_CONTENTION;
 extern int CONFIG_GLB_SNMP_FORKS;
 
 typedef struct {
-	const char *oid;
+	//const oid *parsed_oid;
+	const binpool_data_t *oid_data;
+	unsigned char parsed_oid_len;
 	unsigned char snmp_version;
 	const char		*interface_addr;
 	unsigned char	useip;
@@ -52,7 +54,11 @@ typedef struct {
 	char state;
 } snmp_item_t;
 
-
+typedef struct {
+		size_t size;
+		oid parsed_oid[MAX_OID_LEN];
+} p_oid_t;
+	
 
 /*
  * SNMP Dynamic Index Cache
@@ -2306,23 +2312,40 @@ static struct snmp_session * glb_snmp_open_conn(GLB_POLLER_ITEM *glb_item){
 	return sess;
 }
 
+
+//static int sumtime(u_int64_t *sum, zbx_timespec_t start) {
+//	zbx_timespec_t ts;
+//	zbx_timespec(&ts);
+//	*sum = *sum + (ts.sec - start.sec) * 1000000000 + ts.ns - start.ns;
+//}
+
 /******************************************************************************
  * item init - from the general dc_item to compact and specific snmp		  * 
  * ***************************************************************************/
-static void snmp_init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
+static int snmp_init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
 	
 	char translated_oid[4*MAX_OID_LEN];
 	zbx_timespec_t timespec;
 	snmp_item_t *snmp_item;
 	
+	p_oid_t p_oid = {0};
+	
+	size_t parsed_oid_len = MAX_OID_LEN;
+
+	char error_str[1024];
+
+//	zbx_timespec_t ts_snmp_parse, ts_bin_pool, ts_total, ts_translate;
+//	static u_int64_t time_snmp_parse =0, time_bin_pool =0, total_time = 0, translate_total = 0;
+	
+//	zbx_timespec(&ts_total);
+
 	LOG_DBG("In %s: starting", __func__);
 	
 	if (NULL == (snmp_item = zbx_calloc(NULL, 0, sizeof(snmp_item_t))))  {
 		LOG_WRN("Cannot allocate mem for polling snmp item, exiting");
-		exit(-1);
+		return FAIL;
 	}
 
-	bzero(snmp_item, sizeof(snmp_item_t));
 	poller_item->itemdata = snmp_item;
 	
 	if (NULL != dc_item->snmp_oid && dc_item->snmp_oid[0] != '\0')
@@ -2334,10 +2357,18 @@ static void snmp_init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_PO
 		zabbix_log(LOG_LEVEL_DEBUG, "In %s() cannot translate empty oid %s for item %ld", __func__,
 				   translated_oid, dc_item->itemid);
 		zbx_preprocess_item_value(dc_item->host.hostid, dc_item->itemid, dc_item->value_type, dc_item->flags , NULL,
-					&timespec,ITEM_STATE_NOTSUPPORTED, "Error: empty OID");
-		return ;
+					&timespec,ITEM_STATE_NOTSUPPORTED, "Error: empty OID, item will not be polled until updated, fix config to start poll");
+		return FAIL;
 	}
 
+	if (NULL == snmp_parse_oid(translated_oid, p_oid.parsed_oid, &parsed_oid_len)) {
+		zbx_snprintf(error_str,MAX_STRING_LEN, "snmp_parse_oid(): cannot parse OID \"%s\".", translated_oid);
+		zbx_preprocess_item_value(dc_item->host.hostid, dc_item->itemid, dc_item->value_type, dc_item->flags , NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str);
+		return FAIL;
+	}
+	
+	p_oid.size = parsed_oid_len * sizeof(size_t);
+	snmp_item->parsed_oid_len = parsed_oid_len;
 	snmp_item->snmp_version = dc_item->snmp_version;
 	snmp_item->interface_port = dc_item->interface.port;
 	snmp_item->useip = dc_item->interface.useip;
@@ -2346,40 +2377,34 @@ static void snmp_init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_PO
  	snmp_item->snmpv3_privprotocol = dc_item->snmpv3_privprotocol;
 	snmp_item->state = POLL_QUEUED;
 
-	zbx_heap_strpool_release(snmp_item->interface_addr);
-	zbx_heap_strpool_release(snmp_item->community);
-	zbx_heap_strpool_release(snmp_item->snmpv3_securityname);
-	zbx_heap_strpool_release(snmp_item->snmpv3_contextname);
-	zbx_heap_strpool_release(snmp_item->snmpv3_authpassphrase);
-	zbx_heap_strpool_release(snmp_item->snmpv3_privpassphrase);
-	zbx_heap_strpool_release(snmp_item->oid);
-
 	snmp_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
 	snmp_item->community = zbx_heap_strpool_intern(dc_item->snmp_community);
 	snmp_item->snmpv3_securityname = zbx_heap_strpool_intern(dc_item->snmpv3_securityname);
-    snmp_item->snmpv3_contextname = zbx_heap_strpool_intern(dc_item->snmpv3_contextname);
+	snmp_item->snmpv3_contextname = zbx_heap_strpool_intern(dc_item->snmpv3_contextname);
 	snmp_item->snmpv3_authpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_authpassphrase);
 	snmp_item->snmpv3_privpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_privpassphrase);
-	snmp_item->oid = zbx_heap_strpool_intern(translated_oid);
+	snmp_item->oid_data = glb_heap_binpool_intern((binpool_data_t*)&p_oid);
 
 	LOG_DBG("In %s() Ended", __func__);
+	return SUCCEED;
 }
 
 static void snmp_free_item(glb_poll_module_t *poll_mod,  GLB_POLLER_ITEM *poller_item ) {
 	
 	snmp_item_t *snmp_item = (snmp_item_t *)poller_item->itemdata;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
-	
+
 	zbx_heap_strpool_release(snmp_item->interface_addr);
 	zbx_heap_strpool_release(snmp_item->community);
 	zbx_heap_strpool_release(snmp_item->snmpv3_securityname);
     zbx_heap_strpool_release(snmp_item->snmpv3_contextname);
  	zbx_heap_strpool_release(snmp_item->snmpv3_authpassphrase);
 	zbx_heap_strpool_release(snmp_item->snmpv3_privpassphrase);
-	zbx_heap_strpool_release(snmp_item->oid);
-
+	glb_heap_binpool_release(snmp_item->oid_data);
 	zbx_free(poller_item->itemdata);
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
+	poller_item->itemdata = NULL;
+	
+	LOG_DBG( "In %s() Ended", __func__);
 }
 
 /******************************************************************************
@@ -2399,10 +2424,7 @@ static int glb_snmp_handle_timeout(snmp_connection_t *conn) {
 
 	zbx_timespec(&timespec);
 
-	
 	conn->state = POLL_FINISHED;
-
-	//zabbix_log(LOG_LEVEL_INFORMATION,"Connection sconn%d timed out",conn->idx);
 
 	if (NULL == (glb_item = zbx_hashset_search(conf->items,&conn->current_item))) 
 	 	return FAIL; 
@@ -2539,9 +2561,8 @@ static int glb_snmp_start_connection(snmp_connection_t *conn)
 	async_snmp_conf_t *conf = (async_snmp_conf_t*)conn->conf;
 	GLB_POLLER_ITEM *glb_item, *prev_glb_item;
 	zbx_timespec_t timespec;
-	oid parsed_oid[MAX_OID_LEN];
-	size_t parsed_oid_len = MAX_OID_LEN;
 	char error_str[MAX_STRING_LEN];
+	p_oid_t *p_oid;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 
@@ -2579,13 +2600,13 @@ static int glb_snmp_start_connection(snmp_connection_t *conn)
 
 	snmp_item_t *snmp_item = (snmp_item_t *)glb_item->itemdata;	
 	
-	if (NULL == snmp_parse_oid(snmp_item->oid, parsed_oid, &parsed_oid_len)) {
-		
-		zbx_snprintf(error_str,MAX_STRING_LEN, "snmp_parse_oid(): cannot parse OID \"%s\".", snmp_item->oid);
-		zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags , NULL, &timespec, ITEM_STATE_NOTSUPPORTED, error_str);
-			return FAIL;
+	if (NULL == snmp_item) {
+		LOG_INF("Got empty snmp item");
+		THIS_SHOULD_NEVER_HAPPEN;
+		return FAIL;
 	}
-
+	
+	p_oid =(p_oid_t*) snmp_item->oid_data;
 	if (NULL == (pdu = snmp_pdu_create(SNMP_MSG_GET)))
 	{
 		zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type,  glb_item->flags, NULL, &timespec, 
@@ -2593,7 +2614,7 @@ static int glb_snmp_start_connection(snmp_connection_t *conn)
 		return FAIL;
 	}
 	
-	if (NULL == snmp_add_null_var(pdu, parsed_oid, parsed_oid_len))
+	if (NULL == snmp_add_null_var(pdu, p_oid->parsed_oid, snmp_item->parsed_oid_len))
 	{
 		zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags,  NULL ,&timespec, 
 				ITEM_STATE_NOTSUPPORTED, "snmp_add_null_var(): cannot add null variable.");

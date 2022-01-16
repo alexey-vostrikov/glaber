@@ -25,11 +25,10 @@
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 #define GLB_EVENT_ITEM_POLL 1
 #define GLB_EVENT_NEW_ITEMS_CHECK 2
-#define GLB_EVENT_AGING 3
 
-#define GLB_DNS_CACHE_TIME 300 //for how long name to ip resolvings have to be remembered
+#define GLB_DNS_CACHE_TIME 900 //for how long name to ip resolvings have to be remembered
 
-#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
+//#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
 
 #define GLB_MAX_FAILS 6 //how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
@@ -44,9 +43,8 @@ typedef struct
 {
 	zbx_uint64_t itemid;
 	zbx_uint64_t hostid;
-	char state;
+	unsigned char state;
 	unsigned char value_type;
-	//unsigned int ttl;
 	const char *delay;
 	unsigned char item_type;
 	unsigned char flags;
@@ -56,7 +54,7 @@ typedef struct
 } GLB_POLLER_ITEM;
 
 struct glb_poll_module_t  {
-	void		(*init_item)(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item);
+	int 		(*init_item)(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item);
 	void		(*delete_item)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item);
 	
 	void	(*handle_async_io)(glb_poll_module_t *poll_mod);
@@ -89,7 +87,7 @@ typedef struct
 	zbx_uint64_t hostid;
 	unsigned int poll_items;
 	unsigned int items;
-	unsigned char fails;
+	unsigned int fails;
 	unsigned int first_fail;
 	time_t disabled_till;
 

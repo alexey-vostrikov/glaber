@@ -419,7 +419,8 @@ class CTemplate extends CHostGeneral {
 		}
 
 		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_TEMPLATE, $templates);
-
+		CChangeset::add_objects(CChangeset::OBJ_TEMPLATES, CChangeset::DB_CREATE,  array_column($templates, 'templateid'));
+		CZabbixServer::notifyConfigChanges();
 		return ['templateids' => array_column($templates, 'templateid')];
 	}
 
@@ -627,6 +628,8 @@ class CTemplate extends CHostGeneral {
 		}
 
 		$this->updateTags(array_column($templates, 'tags', 'templateid'));
+		CChangeset::add_objects(CChangeset::OBJ_TEMPLATES, CChangeset::DB_UPDATE, zbx_objectValues($templates, 'templateid'));
+		CZabbixServer::notifyConfigChanges();
 
 		return ['templateids' => zbx_objectValues($templates, 'templateid')];
 	}
@@ -716,7 +719,7 @@ class CTemplate extends CHostGeneral {
 		if ($del_items) {
 			CItemManager::delete(array_keys($del_items));
 		}
-
+		CChangeset::add_objects(CChangeset::OBJ_PROTOTYPES, CChangeset::DB_DELETE, array_keys($del_items));
 		// delete host from maps
 		if (!empty($templateids)) {
 			DB::delete('sysmaps_elements', ['elementtype' => SYSMAP_ELEMENT_TYPE_HOST, 'elementid' => $templateids]);
@@ -864,6 +867,9 @@ class CTemplate extends CHostGeneral {
 		}
 
 		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_TEMPLATE, $db_templates);
+		
+		CChangeset::add_objects(CChangeset::OBJ_TEMPLATES, CChangeset::DB_DELETE, $templateids);
+		CZabbixServer::notifyConfigChanges();
 
 		return ['templateids' => $templateids];
 	}

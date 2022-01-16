@@ -130,7 +130,7 @@ static void add_host_key_regdata( worker_server_conf_t *conf, const char *host, 
 
 static void glb_server_submit_fail_result(GLB_POLLER_ITEM *glb_item, char *error) {
     
-    worker_t *worker = (worker_t*)glb_item->itemdata;
+//    worker_t *worker = (worker_t*)glb_item->itemdata;
     zbx_timespec_t ts;
 
     zbx_timespec(&ts);
@@ -152,13 +152,7 @@ static int glb_server_submit_result(GLB_POLLER_ITEM *glb_item, char *response) {
     zbx_json_type_t type;
     zbx_timespec_t ts;
     worker_t *worker = (worker_t*)glb_item->itemdata;
-    
-//    char json_key[ITEM_KEY_LEN], full_key[ITEM_KEY_LEN], value[MAX_STRING_LEN], 
-//        *val = NULL, *log_meta = NULL, *interface = NULL, *key = NULL,
-//        itemid_s[MAX_ID_LEN], tmp[MAX_STRING_LEN];
- 
     u_int64_t hash;
-    int now = time(NULL);
 
     GLB_SERVER_IDX_T *item_idx = NULL;
 
@@ -168,57 +162,6 @@ static int glb_server_submit_result(GLB_POLLER_ITEM *glb_item, char *response) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response '%s' from worker %s", response, worker->worker.path);
 		return FAIL;
     }
-
-    //mandatory fields that has to present in the response
-    //if (SUCCEED != zbx_json_value_by_name(&jp_resp, "host", host, MAX_ID_LEN, &type) ||
-    //    SUCCEED != zbx_json_value_by_name(&jp_resp, "key", json_key, MAX_STRING_LEN, &type) ) {
-    //    LOG_WRN("Cannot parse response from the worker: %s, missing either host,key or value fields",response);
-    //   return FAIL;
-    //}
-    
-    //if there is no dedicated value, then the whole response is a value
-    //if (SUCCEED != zbx_json_value_by_name(&jp_resp, "value", value, MAX_STRING_LEN, &type) ) {
-    //    val = response;
-    //} else 
-    //    val = value;
- 
-    //additional field that might be in the response, but not mandatory
-    //if (SUCCEED == zbx_json_value_by_name(&jp_resp, "time", tmp, MAX_ID_LEN, &type) ) {
-    //    ts.sec = strtol(tmp,NULL,10);
-    //}
-
-    //if (SUCCEED == zbx_json_value_by_name(&jp_resp, "time_ns", tmp, MAX_ID_LEN, &type) ) 
-    //    ts.ns = strtol(tmp,NULL,10);
-    /*   
-    if (  worker->next_resolve < now ) {
-        LOG_INF("Resolving itemid to send data to for server %s", worker->worker->path);
-
-        zbx_host_key_t host_key = { .host = worker->host, .key = worker->key};
-        int errcode;
-        DC_ITEM dc_item;
-        
-
-        
-        DCconfig_get_items_by_keys(&dc_item, &host_key, &errcode, 1);
-     
-        if (SUCCEED == errcode) {
-            worker->itemid = dc_item.itemid;
-            LOG_INF("Finished lookup in CC for item %s,%s, id is %ld",host,key,dc_item.itemid);
-        } else {
-            worker->itemid = 0;
-            LOG_INF("Failed to find the itemid for worker %s",worker->worker->path);
-        }
-        
-        DCconfig_clean_items(&dc_item, &errcode, 1);
-        worker->next_resolve = now + CONFIG_CONFSYNCER_FREQUENCY /2;
-    }  
-    /*
-    else
-    {
-        zabbix_log(LOG_LEVEL_DEBUG,"Item has been found in the index with itemid %ld",&item_idx->itemid);
-    }
-    */ 
-    //if ( 0 != worker->itemid  ) {
     
     AGENT_RESULT	result;
        
@@ -430,9 +373,9 @@ static int	server_idx_cmp_func(const void *d1, const void *d2)
 	return 0;
 }
 
-static void init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_ITEM *glb_poller_item) {
+static int init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_ITEM *glb_poller_item) {
 
-    worker_server_conf_t *conf = (worker_server_conf_t *)poll_mod->poller_data;
+   // worker_server_conf_t *conf = (worker_server_conf_t *)poll_mod->poller_data;
     worker_t *worker;
     char *args;
     struct zbx_json_parse jp;
@@ -443,18 +386,20 @@ static void init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_I
 
     if (NULL == (worker = (worker_t*)zbx_calloc(NULL,0,sizeof(worker_t)))) {
         LOG_WRN("Couldn't allocate heap mem to create a worker, exiting");
-        exit(-1);
+        return FAIL;
     }
 
     if (NULL == CONFIG_WORKERS_DIR) {
         zabbix_log(LOG_LEVEL_WARNING,"To run worker as a server, set WorkerScripts dir location in the configuration file");
-        exit(-1);
+        //TODO: submit item in the error state here
+        return FAIL;
     }
 
     if (NULL == dcitem->params ) {
         LOG_DBG("Cannot run a server worker with an empty path");
         DEBUG_ITEM(dcitem->itemid,"Cannot run a server worker with empty path");
-        return;
+        //todo: submit error here
+        return FAIL;
     }
        
     if ( NULL != dcitem->params) {
@@ -488,6 +433,7 @@ static void init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_I
     glb_start_worker(&worker->worker);
 
     LOG_DBG("Finished init of server item %ld, worker %s",glb_poller_item->itemid, worker->worker.path);
+    return SUCCEED;
 };
 
 

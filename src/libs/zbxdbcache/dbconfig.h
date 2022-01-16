@@ -30,7 +30,7 @@
 
 typedef struct
 {
-	zbx_uint64_t		triggerid;
+	zbx_uint64_t	triggerid;
 	const char		*description;
 	const char		*expression;
 	const char		*recovery_expression;
@@ -326,6 +326,7 @@ typedef struct
 							/* by a particular proxy. */
 							/* NOTE: On disabled hosts all items are counted as disabled. */
 	zbx_uint64_t	maintenanceid;
+	zbx_hashset_t itemids; //id refs to items of this host
 
 	const char	*host;
 	const char	*name;
@@ -355,6 +356,8 @@ typedef struct
 	zbx_uint64_t cluster_server_host_id; //hostid of the server responsible for processing the host
 										 //we need this for fast rerouting of data
 }
+
+
 ZBX_DC_HOST;
 
 typedef struct
@@ -850,7 +853,7 @@ typedef struct
 	zbx_hashset_t		scriptitems;
 	zbx_hashset_t		functions;
 	zbx_hashset_t		triggers;
-	zbx_hashset_t		trigdeps;
+	//zbx_hashset_t		trigdeps;
 	zbx_hashset_t		hosts;
 	zbx_hashset_t		hosts_h;		/* for searching hosts by 'host' name */
 	zbx_hashset_t		hosts_p;		/* for searching proxies by 'host' name */
@@ -924,6 +927,12 @@ typedef struct
 
 ZBX_DC_CONFIG;
 
+typedef struct {
+	obj_index_t host_to_template_idx;
+	obj_index_t trigger_deps;
+
+} GLB_CONFIG;
+
  typedef struct
 {
 	zbx_uint64_t 	eventid;
@@ -949,6 +958,8 @@ ZBX_DC_PROBLEM;
 
 extern int	sync_in_progress;
 extern ZBX_DC_CONFIG	*config;
+extern GLB_CONFIG *glb_config;
+
 extern zbx_rwlock_t	config_lock;
 
 #define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock)

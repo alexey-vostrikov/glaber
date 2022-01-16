@@ -103,7 +103,7 @@ static int	item_preproc_convert_value(zbx_variant_t *value, unsigned char type, 
 int	zbx_item_preproc_convert_value_to_numeric(zbx_variant_t *value_num, const zbx_variant_t *value,
 		unsigned char value_type, char **errmsg)
 {
-	int	ret = FAIL, type_hint;
+	int	ret, type_hint;
 
 	switch (value->type)
 	{

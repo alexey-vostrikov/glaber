@@ -1202,8 +1202,11 @@ abstract class CTriggerGeneral extends CApiService {
 
 		DB::insert('triggers', $new_triggers, false);
 		DB::insertBatch('functions', $new_functions, false);
-
-		CItemGeneral::updateRtdata($itemids);
+		
+		CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_CREATE,
+		array_column($new_functions,'functionid'));
+		
+		CChangeset::add_items(CChangeset::DB_UPDATE, $itemids);
 		CZabbixServer::notifyConfigChanges();
 
 		if ($new_tags) {
@@ -1214,32 +1217,13 @@ abstract class CTriggerGeneral extends CApiService {
 			$this->addAuditBulk(AUDIT_ACTION_ADD, $resource, $triggers);
 		}
 
-		$this->updateTriggersRtdata($triggers);
+		
+		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS, CChangeset::DB_CREATE, 
+				array_column($triggers, 'triggerid') );
+		
 		CZabbixServer::notifyConfigChanges();	
 	}
 
-	protected function updateTriggersRtdata(array $triggers) {
-		
-		$triggerids = array_column($triggers, 'triggerid');
-		
-		DB::update('triggers',  ['values' => ['lastchange' => time()], 
-									'where' => ['triggerid' => $triggerids]]);
-		/*
-		$trigger_info = API::Trigger()->get([
-			'triggerids' => $triggerids,
-			'selectItems' => API_OUTPUT_EXTEND,
-		]);
-
-		foreach ($trigger_info as $trigger) {
-			foreach ($trigger['items'] as $iteminfo)
-				$itemids[]=$iteminfo['itemid'];
-			//
-
-		}
-
-		$itemids = array_unique($itemids); */
-		//CItemGeneral::updateRtdata($itemids);
-	}
 
 	/**
 	 * Update trigger or trigger prototypes records in the database.
@@ -1315,8 +1299,26 @@ abstract class CTriggerGeneral extends CApiService {
 			// The list of the triggers with changed priority.
 			$changed_priority_triggerids = [];
 		}
+		
+		//list of functions to delete
+		$out_triggers = API::Trigger()->get([
+			'output' => ['triggerid','functionid'],
+			'triggerids' => array_column($triggers, 'triggerid'),
+			'selectFunctions' => ['functionid']
+		]);
+		
+		$del_func_ids = [];
+
+		foreach ($out_triggers as $trigger) {
+			$del_func_ids = array_merge($del_func_ids, array_column($trigger['functions'],'functionid'));
+		}
+
+		//error_log("finctions dump". print_r($del_func_ids,true));
 
 		foreach ($triggers as $tnum => $trigger) {
+			
+			//error_log("Trigger dump". print_r($trigger,true));
+
 			$db_trigger = $db_triggers[$tnum];
 			$upd_trigger = ['values' => [], 'where' => ['triggerid' => $trigger['triggerid']]];
 
@@ -1419,11 +1421,18 @@ abstract class CTriggerGeneral extends CApiService {
 		if ($upd_triggers) {
 			DB::update('triggers', $upd_triggers);
 		}
+		
 		if ($del_functions_triggerids) {
 			DB::delete('functions', ['triggerid' => $del_functions_triggerids]);
+			error_log("del funcs".print_r($del_functions_triggerids,true));
 		}
 		if ($new_functions) {
 			DB::insertBatch('functions', $new_functions, false);
+			
+			CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_CREATE,
+				array_column($new_functions,'functionid'));
+
+			error_log("new funcs".print_r($new_functions,true));
 		}
 		if ($del_triggertagids) {
 			DB::delete('trigger_tag', ['triggertagid' => $del_triggertagids]);
@@ -1441,7 +1450,13 @@ abstract class CTriggerGeneral extends CApiService {
 			$this->addAuditBulk(AUDIT_ACTION_UPDATE, $resource, $save_triggers, zbx_toHash($db_triggers, 'triggerid'));
 		}
 		
-		$this->updateTriggersRtdata($triggers);
+		if (count($del_func_ids) > 0) {
+			CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_DELETE, $del_func_ids);
+		}
+		
+		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS, CChangeset::DB_UPDATE, 
+				array_column($triggers, 'triggerid') );
+		
 		CZabbixServer::notifyConfigChanges();		
 		
 	}

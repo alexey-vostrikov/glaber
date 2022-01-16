@@ -66,12 +66,12 @@ int	glb_history_preload()
  ************************************************************************************/
 int glb_load_history_module(char *history_module) {
 	
-	char *params="";
+	char *params;
 	void *data;
 
 	
-	if (NULL!=(params = strchr(history_module, ';'))) {
-			*params++ = '\0';
+	if (NULL != ( params = strchr(history_module, ';'))) {
+		*params++ = '\0';
 	} else {
 		params="";
 	}
@@ -225,7 +225,7 @@ int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
 #define GET_ACCOUNT_INTERVAL 5
 int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive,  zbx_vector_history_record_t *values)
 {
-	int			j, ret;
+	int			j;
 	double last_run;
 	static int next_account_time=0;
 	static double get_runtime = 0.0;
@@ -264,7 +264,7 @@ int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, i
 		get_runtime += zbx_time() - last_run;	
 	}
 
-	return ret;
+	return SUCCEED;
 }
 
 /************************************************************************************

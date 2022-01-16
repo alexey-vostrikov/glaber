@@ -25,6 +25,7 @@
 #include "log.h"
 #include "dbconfig.h"
 #include "dbcache.h"
+#include "../../libs/zbxdbcache/changeset.h"
 
 extern int		CONFIG_CONFSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
@@ -32,6 +33,10 @@ extern int		server_num, process_num;
 
 static volatile sig_atomic_t	secrets_reload;
 static volatile sig_atomic_t	nextcheck;
+
+int 	DC_ConfigNeedsSync(); 
+void	DC_RequestConfigSync();
+void	DC_CleanOutdatedChangedItems();
 
 static void	zbx_dbconfig_sigusr_handler(int flags)
 {
@@ -62,10 +67,6 @@ static void	zbx_dbconfig_sigusr_handler(int flags)
 	}
 }
 
-
-int DC_ConfigNeedsSync(); 
-void DC_CleanOutdatedChangedItems();
-
 /******************************************************************************
  *                                                                            *
  * Function: main_dbconfig_loop                                               *
@@ -84,7 +85,8 @@ void DC_CleanOutdatedChangedItems();
 ZBX_THREAD_ENTRY(dbconfig_thread, args)
 {
 	int sec = time(NULL);
-	
+	int cset_time = 0;
+
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
@@ -101,6 +103,9 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
 	zbx_setproctitle("%s [init: syncing configuration]", get_process_type_string(process_type));
+	
+	changeset_flush_tables();
+	
 	DCsync_configuration(ZBX_DBSYNC_INIT, NULL);
 	nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 	
@@ -116,7 +121,14 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 				get_process_type_string(process_type), sec, nextcheck - time(NULL) );
 			
 			DC_CleanOutdatedChangedItems();
-
+						
+			cset_time = changeset_get_recent_time();
+			 
+			 if ( cset_time > 0 && (time(NULL) - cset_time > CHANGESET_AUTOLOAD_TIME )) {
+				LOG_INF("auto load chnageset data");
+				DC_RequestConfigSync();
+			}
+			
 			zbx_sleep_loop(1);
 		}
 		
@@ -129,8 +141,12 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			secrets_reload = 0;
 		}
 		else
-		{
-			DCsync_configuration(ZBX_DBSYNC_UPDATE, NULL);
+		{	int sync_type= GLB_DBSYNC_CHANGESET;
+			
+			if (SUCCEED != DC_ConfigNeedsSync()) 
+				sync_type = ZBX_DBSYNC_UPDATE;
+
+			DCsync_configuration(sync_type, NULL);
 			DCupdate_interfaces_availability();
 			nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 		}

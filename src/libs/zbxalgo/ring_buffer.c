@@ -103,7 +103,6 @@ void*  glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
     if (glb_tsbuff_get_count(tsbuff) > 0) {
         old_time = glb_tsbuff_get_time_head(tsbuff);
 
-
         if (old_time != ZBX_JAN_2038 && old_time > time)  {
             LOG_WRN("Old time is %d, not adding item to the head due to lower time: %d", old_time, time);
             return NULL;     

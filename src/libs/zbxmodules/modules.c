@@ -317,7 +317,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 	void			(*func_timeout)(int);
 	ZBX_HISTORY_WRITE_CBS	(*func_history_write_cbs)(void);
 	zbx_module_t		*module, module_tmp;
-	char *params="";
+	char *params;
 
 	//looking if name also has params (after ;)
 	if (NULL!=(params = strchr(name, ';'))) {

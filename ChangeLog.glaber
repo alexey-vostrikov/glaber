@@ -3,4 +3,14 @@ ver 2.7.0:
     - sever workers are created as a separate type and configured from the ui only, no server restart required any more
     - glaber pollers now reload items very fast (2 seconds delay) after they are changed in the config
     - UI notifies server on configruaration change and server does config reload, due to fast reloading it can reload the config quite fast
-    
+var 2.7.1
+    - binary pools introduced for binary data interning
+    - instant configuration reloading via changesets and server notifications introduced
+    - algo: elems hash with per elements locks introduces as a general algo
+    - algo: objects dual many to many list on top of elems hash created
+    - removed rtdata updates for items
+    - pre-parsing snmp oids for minor speed improvements
+    - dns cache issues in pinger module fixes, dns resolve suppression on slow dns introduced
+    - glb_server type of check introduces: simplified worker config, now done only in UI/API without server config, UI server worker type is added
+    - trigger topolgu indexing functions removed
+    - bugfix: flushing history to trends SQL table removed 

@@ -164,29 +164,17 @@ static int add_item_to_host(glb_poll_engine_t *poll, u_int64_t hostid) {
 
 static void delete_item_from_host( glb_poll_engine_t *poll, u_int64_t hostid) {
 	GLB_POLLER_HOST *glb_host;
-	
+
+	//LOG_INF("Deleting item from host %ld",hostid);
 	if (NULL != (glb_host=zbx_hashset_search(&poll->hosts, &hostid))) {
 		glb_host->items--;
 
 		if (0 == glb_host->items)  {
+	//		LOG_INF("Deleting host %ld, no items left",hostid);
 			zbx_hashset_remove_direct(&poll->hosts, glb_host);
 		}
 	}
-}
-
-static void free_poller_item_data(glb_poll_engine_t *poll, GLB_POLLER_ITEM *glb_item) {
-	void (*item_free_func)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *item);	
-	
-	item_free_func = poll->poller.delete_item;
-	item_free_func(&poll->poller, glb_item);
-	
-	delete_item_from_host(poll, glb_item->hostid);
-	zbx_heap_strpool_release(glb_item->delay);
-}
-
-static void delete_poller_item(glb_poll_engine_t *poll, GLB_POLLER_ITEM *glb_item) {
-	free_poller_item_data(poll,glb_item);
-	zbx_hashset_remove_direct(&poll->items, glb_item);
+	//LOG_INF("Finished delete");
 }
 
 int glb_poller_get_forks(void *poller_data) {
@@ -197,13 +185,27 @@ int glb_poller_get_forks(void *poller_data) {
 }
 
 int glb_poller_delete_item(void *poller_data, u_int64_t itemid) {
+	
 	GLB_POLLER_ITEM *glb_item;
 	glb_poll_engine_t *poll = (glb_poll_engine_t *)poller_data;
+	void (*item_free_func)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *item);	
+	item_free_func = poll->poller.delete_item;
 	
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(&poll->items, &itemid))){
 		DEBUG_ITEM(itemid,"Item has been deleted, removing from the poller config");		
-		delete_poller_item(poll, glb_item);
+		
+		LOG_INF("Calling item delete");
+		item_free_func(&poll->poller, glb_item);
+
+		//zbx_heap_strpool_release(glb_item->delay);
+		zbx_hashset_remove_direct(&poll->items, glb_item);
+		LOG_INF("in: %s: ended",__func__);
+		return SUCCEED;
 	} 
+	else {
+		//LOG_INF("Item %ld hasn't been found in the local queue", itemid);
+		return FAIL;
+	}
 
 }
 
@@ -218,70 +220,53 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 {
 	glb_poll_engine_t *poll = (glb_poll_engine_t *)poll_data;
 		
-	void (*item_create_func)(glb_poll_module_t *poll_mod, DC_ITEM * dc_item, GLB_POLLER_ITEM* glb_item);
+	int (*item_create_func)(glb_poll_module_t *poll_mod, DC_ITEM * dc_item, GLB_POLLER_ITEM* glb_item);
 	item_create_func = poll->poller.init_item;
 
-	GLB_POLLER_ITEM *glb_item;
-	GLB_POLLER_ITEM new_glb_item;
+	GLB_POLLER_ITEM *glb_item, local_glb_item;
 	GLB_POLLER_HOST *glb_host;
-	
 	unsigned int now = time(NULL);
 	int i;
-
-	//note: this most likely break the domain logic, so the check should be moved 
-	//to DC_get_poller_items proc
-	//zabbix_log(LOG_LEVEL_DEBUG,"In %s: Started for item %ld", __func__, dc_item->itemid);
-	//if ( 0 != dc_item->host.proxy_hostid && 
-	//	 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER)) {
-	//	DEBUG_ITEM(dc_item->itemid, "Item not polled on the server as it belongs to the proxy");
-	//	return SUCCEED;
-	//}
-		
+	
 	DEBUG_ITEM(dc_item->itemid,"Creating/updating item");
 	
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(&poll->items, &dc_item->itemid)))
 	{	
-		if ( glb_item->change_time == dc_item->mtime) {
-			//item's configuration isn't changed, doing nothing
-			//LOG_INF("Got item %ld from the config cache, but item isn't changed, mtime is %d",dc_item->itemid, dc_item->mtime);
-			return SUCCEED;	
-		} 
-
-		LOG_INF("Item %ld has changed, creating new configuration", glb_item->itemid);
+		LOG_DBG("Item %ld has changed, creating new configuration", glb_item->itemid);
 		
-		DEBUG_ITEM(dc_item->itemid,"Item has changed: item's time is %d, config time is %d, creating new config",glb_item->change_time, dc_item->mtime);		
-		delete_poller_item(poll, glb_item);
-	
-		if (ITEM_STATUS_DELETED == dc_item->status) {
-			DEBUG_ITEM(glb_item->itemid, "Item is marked as deleted, not creating");
-			return SUCCEED;
-		}
+		DEBUG_ITEM(dc_item->itemid,"Item has changed: re-creating new config");		
+		glb_poller_delete_item(poll, glb_item->itemid);
 	}
 
 	DEBUG_ITEM(dc_item->itemid,"Adding new item to poller");
+	
+	bzero(&local_glb_item, sizeof(GLB_POLLER_ITEM));
 
-	glb_item = &new_glb_item;
-	bzero(glb_item, sizeof(GLB_POLLER_ITEM));
-		
-	glb_item->itemid = dc_item->itemid;
-	glb_item = zbx_hashset_insert(&poll->items, glb_item, sizeof(GLB_POLLER_ITEM));
+	local_glb_item.itemid = dc_item->itemid;
+
+	if (NULL == (glb_item =(GLB_POLLER_ITEM*) zbx_hashset_insert(&poll->items, &local_glb_item, sizeof(GLB_POLLER_ITEM)))) 
+		return FAIL;
 
 	glb_item->state = POLL_QUEUED;
 	glb_item->hostid = dc_item->host.hostid;
 	glb_item->delay = zbx_heap_strpool_intern(dc_item->delay);
 	glb_item->value_type = dc_item->value_type;
-	//glb_item->ttl = now + CONFIG_CONFSYNCER_FREQUENCY * 1.5; //updating item's aging
 	glb_item->flags = dc_item->flags;
 	glb_item->item_type = dc_item->type;
-	glb_item->change_time = dc_item->mtime;
-	
+	glb_item->change_time = now;
 	add_item_to_host(poll, glb_item->hostid);
-	item_create_func(&poll->poller, dc_item, glb_item);
-	
+
+	if (FAIL == item_create_func(&poll->poller, dc_item, glb_item)) {
+		LOG_DBG("Item creation func failed, not adding item %ld", glb_item->itemid);
+		zbx_heap_strpool_release(glb_item->delay);
+		delete_item_from_host(poll,glb_item->hostid);
+		zbx_hashset_remove(&poll->items,&glb_item);
+		return FAIL;
+	};
+
 	//newly added items are planned to be polled immediately
 	add_event_ext(&poll->events, GLB_EVENT_ITEM_POLL, glb_item->itemid, now, glb_item->change_time);
-	//add_item_check_event(&poll->events, &poll->hosts, glb_item, now);
-
+	
 	return SUCCEED;
 }
 
@@ -370,6 +355,8 @@ static int poll_module_init(glb_poll_engine_t *poll) {
 static int poll_init(glb_poll_engine_t *poll, zbx_thread_args_t *args) {
 	
 	zbx_heap_strpool_init();
+	glb_heap_binpool_init();
+
 	glb_preprocessing_init();
 	poll->item_type = *(unsigned char *)((zbx_thread_args_t *)args)->args;
 
@@ -392,10 +379,25 @@ void poll_shutdown(glb_poll_engine_t *poll) {
 	zbx_hashset_destroy(&poll->items);
 	zbx_binary_heap_destroy(&poll->events);
 	zbx_heap_strpool_destroy();
+	glb_heap_binpool_destroy();
 
 }
+
+
+static int sumtime(u_int64_t *sum, zbx_timespec_t start) {
+	zbx_timespec_t ts;
+	zbx_timespec(&ts);
+	*sum = *sum + (ts.sec - start.sec) * 1000000000 + ts.ns - start.ns;
+}
+
+
+
 ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
+
+	//static u_int64_t total_time, get_items_time;
+	//zbx_timespec_t ts_total, ts_get_items;
+
 	int old_activity=0, next_stat_time=0;
 	glb_poll_engine_t poll ={0};
 	GLB_POLLER_ITEM *glb_item;
@@ -408,14 +410,15 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	if (SUCCEED != poll_init(&poll, (zbx_thread_args_t *)args) )
 		exit(-1);
 	
-	add_event(&poll.events, GLB_EVENT_AGING, 0, time(NULL) + 1);
+	//add_event(&poll.events, GLB_EVENT_AGING, 0, time(NULL) + 1);
 	add_event(&poll.events, GLB_EVENT_NEW_ITEMS_CHECK, 0, time(NULL) + process_num);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 		server_num, get_process_type_string(process_type), process_num);
 	
 #define STAT_INTERVAL 5
-	LOG_INF("In %s() starting main loop", __func__);		
+	LOG_DBG("In %s() starting main loop", __func__);		
+	
 	while (ZBX_IS_RUNNING())
 	{
 		unsigned int now = time(NULL);
@@ -442,11 +445,15 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					NULL != (glb_host = zbx_hashset_search(&poll.hosts, &glb_item->hostid))) {
 						
 					DEBUG_ITEM(glb_item->itemid,"Item poll event");
-					
+					LOG_DBG("Item %ld poll event", glb_item->itemid);
+
 					if (glb_item->change_time > event->change_time) { 
 						//this means the item has been changed since last scheduling and current event is outdated (a new event has already been planned)
 						DEBUG_ITEM(glb_item->itemid,"Outdated event has been found in the event queue, skipping")
+						LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", event->change_time, glb_item->change_time);
+
 						break;
+					
 					}
 
 					//checking if host is disabled
@@ -481,42 +488,15 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 			
 			break;
 
-			case GLB_EVENT_AGING: /*{
-			
-				
-				//removing outdated items, that hasn't been updated for 1,5 server sync times
-				//zabbix_log(LOG_LEVEL_DEBUG, "Aging processing CONFIG_GLB_REQUEUE_TIME is %d", CONFIG_GLB_REQUEUE_TIME);
-				GLB_POLLER_ITEM *glb_item;
-				zbx_hashset_iter_t iter;
-				//zbx_vector_uint64_t deleted_items;
-				int cnt = 0, i;
-
-				zbx_hashset_iter_reset(&poll.items, &iter);
-				//zbx_vector_uint64_create(&deleted_items);
-				//items are cleaned out in a bit conservatively  as this prevents creating extra events
-				while (glb_item = zbx_hashset_iter_next(&iter)) {
-					if (glb_item->ttl < now ) {
-					
-						DEBUG_ITEM(glb_item->itemid,"Item aged");
-						zabbix_log(LOG_LEVEL_INFORMATION, "Marking aged item %ld for deletion, ttl is %d",glb_item->itemid, glb_item->ttl);	
-			
-						cnt++;
-						free_poller_item_data(&poll,glb_item);
-						zbx_hashset_iter_remove(&iter);
-					}
-				}
-
-				add_event(&poll.events, GLB_EVENT_AGING, 0, now + GLB_AGING_PERIOD);
-				LOG_DBG("Finished aging, %d items",cnt);
-			}*/
-			break;
-
 			case GLB_EVENT_NEW_ITEMS_CHECK: {
 				int num;
-				add_event(&poll.events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + 2); 
-				num = DCconfig_get_glb_poller_items(&poll, poll.item_type, process_num);
-				LOG_DBG("Event: got %d new items from the config cache", num);
+
 				
+			//	zbx_timespec(&ts_get_items);
+				num = DCconfig_get_glb_poller_items(&poll, poll.item_type, process_num);
+				//sumtime(&get_items_time, ts_get_items);
+				LOG_DBG("Event: got %d new items from the config cache", num);
+				add_event(&poll.events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now+1); 
 				zbx_hashset_iter_t iter;
 				zbx_hashset_iter_reset(&poll.items, &iter );
 				while ( NULL != (glb_item=zbx_hashset_iter_next(&iter))) {
@@ -528,15 +508,14 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 						DEBUG_ITEM(glb_item->itemid, "Item has timeout in the poller, resetting the sate")
 						glb_item->state = POLL_QUEUED;
 					}
-				}
+				}	
 			}
 			break;
 				
 			default:
 				zabbix_log(LOG_LEVEL_WARNING, "Event: unknown event %d in the message queue", event->type);
 				THIS_SHOULD_NEVER_HAPPEN;
-				exit(-1);
-				
+				exit(-1);	
 			}
 			zbx_free(event);
 		}

@@ -230,7 +230,7 @@ int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
     char *error = NULL;
 	
 	
-	zabbix_log(LOG_LEVEL_INFORMATION,"Allocating shared memory for IPC size %d",CONFIG_IPC_BUFFER_SIZE);
+	LOG_DBG("Allocating shared memory for IPC size %d",CONFIG_IPC_BUFFER_SIZE);
 
 	//SHM
 	if (SUCCEED != zbx_mem_create(&ipc_mem, CONFIG_IPC_BUFFER_SIZE, "IPC cache size", "IPCsize", 1, &error))
@@ -256,7 +256,7 @@ int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
 		
 		glb_ipc_type_cfg_t *cfg = &comm_types[ipc_type];
 
-		zabbix_log(LOG_LEVEL_INFORMATION, "Creating IPC mem and structures for IPC type %d, elements: %d", 
+		LOG_DBG("Creating IPC mem and structures for IPC type %d, elements: %d", 
 				cfg->type, cfg->elems_count);
 
 		glb_ipc->ipc[ipc_type].conf.consumers = comm_types[ipc_type].consumers;
@@ -295,7 +295,7 @@ int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
 		glb_ipc->ipc[ipc_type].free.last = prev_elem;
 
 	}
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s:finished", __func__);
+	LOG_DBG("%s:finished", __func__);
 	return SUCCEED;
 }
 

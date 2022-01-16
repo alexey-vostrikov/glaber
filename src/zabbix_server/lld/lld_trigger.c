@@ -22,6 +22,7 @@
 #include "log.h"
 #include "zbxalgo.h"
 #include "zbxserver.h"
+#include "../../libs/zbxdbcache/changeset.h"
 
 typedef struct
 {
@@ -2591,8 +2592,10 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 	size_t					sql_alloc = 8 * ZBX_KIBIBYTE, sql_offset = 0;
 	zbx_db_insert_t				db_insert, db_insert_tdiscovery, db_insert_tfunctions, db_insert_tdepends,
 						db_insert_ttags;
+	glb_changeset_t cset;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	changeset_prepare(&cset);
 
 	zbx_vector_ptr_create(&upd_functions);
 	zbx_vector_uint64_create(&del_functionids);
@@ -2769,6 +2772,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 						function->function, function->parameter);
 
 				function->functionid = functionid++;
+				changeset_add_to_cache(&cset, OBJ_FUNCTIONS, &function->functionid, DB_CREATE, 1);
 			}
 		}
 
@@ -2808,6 +2812,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 			zbx_db_insert_add_values(&db_insert_tdiscovery, triggerid, trigger->parent_triggerid);
 
 			trigger->triggerid = triggerid++;
+			changeset_add_to_cache(&cset,OBJ_TRIGGERS, &trigger->triggerid, DB_CREATE, 1);
 		}
 		else if (0 != (trigger->flags & ZBX_FLAG_LLD_TRIGGER_UPDATE))
 		{
@@ -2919,6 +2924,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 					" where triggerid=" ZBX_FS_UI64 ";\n", trigger->triggerid);
+			changeset_add_to_cache(&cset, OBJ_TRIGGERS, &trigger->triggerid, DB_UPDATE, 1);
 		}
 	}
 
@@ -2977,6 +2983,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 				tag->triggertagid = triggertagid++;
 				zbx_db_insert_add_values(&db_insert_ttags, tag->triggertagid, trigger->triggerid,
 						tag->tag, tag->value);
+				changeset_add_to_cache(&cset, OBJ_TRIGGERTAGS, &tag->triggertagid, DB_CREATE, 1);		
 			}
 			else if (0 != (tag->flags & ZBX_FLAG_LLD_TAG_UPDATE))
 			{
@@ -3001,6 +3008,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 
 				zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 						" where triggertagid=" ZBX_FS_UI64 ";\n", tag->triggertagid);
+				changeset_add_to_cache(&cset, OBJ_TRIGGERTAGS, &tag->triggertagid, DB_UPDATE, 1);
 			}
 		}
 	}
@@ -3041,6 +3049,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 				" where functionid=" ZBX_FS_UI64 ";\n", function->functionid);
+		changeset_add_to_cache(&cset, OBJ_FUNCTIONS, &function->functionid, DB_UPDATE, 1);
 	}
 
 	if (0 != del_functionids.values_num)
@@ -3051,6 +3060,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "functionid",
 				del_functionids.values, del_functionids.values_num);
 		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, ";\n");
+		changeset_add_to_cache(&cset, OBJ_FUNCTIONS, del_functionids.values, DB_UPDATE, del_functionids.values_num);
 	}
 
 	if (0 != del_triggerdepids.values_num)
@@ -3071,6 +3081,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "triggertagid",
 				del_triggertagids.values, del_triggertagids.values_num);
 		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, ";\n");
+		changeset_add_to_cache(&cset, OBJ_TRIGGERTAGS, del_triggertagids.values, DB_DELETE,del_triggertagids.values_num);
 	}
 
 	if (0 != upd_triggers || 0 != upd_functions.values_num || 0 != del_functionids.values_num ||
@@ -3108,6 +3119,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 		zbx_db_insert_clean(&db_insert_ttags);
 	}
 
+	changeset_flush(&cset);
 	DBcommit();
 out:
 
@@ -3753,7 +3765,6 @@ int	lld_update_triggers(zbx_uint64_t hostid, zbx_uint64_t lld_ruleid, const zbx_
 	zbx_lld_trigger_t		*trigger;
 	zbx_lld_trigger_prototype_t	*trigger_prototype;
 	int				ret = SUCCEED, i;
-
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_ptr_create(&trigger_prototypes);

@@ -740,6 +740,9 @@ class CHost extends CHostGeneral {
 		}
 
 		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_HOST, $hosts);
+		
+		CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_CREATE, $hostids);
+		CZabbixServer::notifyConfigChanges();
 
 		return ['hostids' => array_column($hosts, 'hostid')];
 	}
@@ -870,9 +873,13 @@ class CHost extends CHostGeneral {
 			if (!$result) {
 				self::exception(ZBX_API_ERROR_INTERNAL, _('Host update failed.'));
 			}
+	
 		}
 
 		$this->updateTags(array_column($hosts, 'tags', 'hostid'));
+
+		CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_UPDATE, $hostids);
+		CZabbixServer::notifyConfigChanges();
 
 		return ['hostids' => $hostids];
 	}
@@ -955,7 +962,7 @@ class CHost extends CHostGeneral {
 			],
 			'hostids' => $hostids,
 			'editable' => true,
-			'preservekeys' => true
+			'preservekeys' => true,
 		]);
 
 		foreach ($hosts as $host) {
@@ -1545,6 +1552,9 @@ class CHost extends CHostGeneral {
 		}
 
 		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_HOST, $db_hosts);
+		
+		CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_DELETE, $hostIds);
+		CZabbixServer::notifyConfigChanges();
 
 		return ['hostids' => $hostIds];
 	}

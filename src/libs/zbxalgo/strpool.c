@@ -1,5 +1,6 @@
 
 #include "zbxalgo.h"
+#include "log.h"
 
 //i'll include string pool (strings interning) copy from db cache
 //the reason - to be able to use local proces's string and data interning and 
@@ -49,7 +50,7 @@ const char	*zbx_heap_strpool_intern(const char *str)
 	refcount = (zbx_uint32_t *)record;
 	(*refcount)++;
 
-	return (char *)record + REFCOUNT_FIELD_SIZE;
+	return (void *)record + REFCOUNT_FIELD_SIZE;
 }
 
 void	zbx_heap_strpool_release(const char *str)
@@ -57,10 +58,16 @@ void	zbx_heap_strpool_release(const char *str)
 	zbx_uint32_t	*refcount;
 
 	if ( NULL == str ) return;
-	
-	refcount = (zbx_uint32_t *)(str - REFCOUNT_FIELD_SIZE);
-	if (0 == --(*refcount))
-		zbx_hashset_remove(&strpool, str - REFCOUNT_FIELD_SIZE);
+	//LOG_INF("in heap_strpool_release");
+	refcount = (zbx_uint32_t *)((void *)str - REFCOUNT_FIELD_SIZE);
+	if ( 0 == refcount) {
+	//	LOG_INF("Requested removal of string which has refcount set to 0 already");
+		THIS_SHOULD_NEVER_HAPPEN;
+	}
+	if (0 == --(*refcount)) {
+	//	LOG_INF("%s: removing from the strpool", str);
+		zbx_hashset_remove(&strpool, (void *)str - REFCOUNT_FIELD_SIZE);
+	}
 }
 
 const char	*zbx_heap_strpool_acquire(const char *str)

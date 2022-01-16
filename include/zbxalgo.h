@@ -71,6 +71,12 @@ typedef void *(*zbx_mem_malloc_func_t)(void *old, size_t size);
 typedef void *(*zbx_mem_realloc_func_t)(void *old, size_t size);
 typedef void (*zbx_mem_free_func_t)(void *ptr);
 
+typedef struct {
+	zbx_mem_malloc_func_t malloc_func;
+	zbx_mem_realloc_func_t realloc_func;
+	zbx_mem_free_func_t free_func;
+} mem_funcs_t;
+
 void	*zbx_default_mem_malloc_func(void *old, size_t size);
 void	*zbx_default_mem_realloc_func(void *old, size_t size);
 void	zbx_default_mem_free_func(void *ptr);
@@ -502,5 +508,57 @@ void	glb_tsbuff_dump(glb_tsbuff_t *tsbuff);
 int    glb_tsbuff_check_has_enough_count_data_time(glb_tsbuff_t *tsbuff, int need_count, int time);
 int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need_count, int head_idx);
 
+/*elements hash for fast and lockless access */
+#define ELEM_FLAG_DO_NOT_CREATE  1
+#define ELEM_FLAG_DELETE	2
+#define ELEM_FLAG_ITER_WRLOCK	4
+
+
+typedef struct {
+    u_int64_t id;
+    pthread_mutex_t lock;
+    u_int8_t flags;
+	void *data;
+} elems_hash_elem_t; 
+
+typedef int	(*elems_hash_create_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
+typedef int	(*elems_hash_free_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
+typedef int	(*elems_hash_process_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params);
+
+typedef struct  {
+    zbx_hashset_t elems;
+	mem_funcs_t memf;
+    pthread_rwlock_t meta_lock; 
+	elems_hash_create_cb_t elem_create_func;
+	elems_hash_free_cb_t elem_free_func;
+} elems_hash_t;
+
+elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t elem_free_func );
+int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data, u_int64_t flags);
+int		elems_hash_delete(elems_hash_t *elems, u_int64_t id);
+void	elems_hash_destroy(elems_hash_t *elems);
+void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
+int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params);
+
+typedef struct {
+    elems_hash_t *from_to;
+    elems_hash_t *to_from;
+    mem_funcs_t memf;
+} obj_index_t;
+
+
+int	obj_index_init(obj_index_t* idx, mem_funcs_t *memf);
+
+void	obj_index_destroy(obj_index_t *idx);
+int		obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
+int		obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
+int		obj_index_del_id(obj_index_t* idx, u_int64_t id);
+int		obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs);
+int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
+//int 	obj_index_check_if_refs(obj_index_t *idx, u_int64_t id_to);
+//int		obj_index_check_if_refers(obj_index_t *idx, u_int64_t id_from, u_int64_t id_to);
+//int		obj_index_check_if_referedby(obj_index_t *idx, u_int64_t id_to, u_int64_t id_from);
+int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
+void 	obj_index_dump(obj_index_t *idx);
 
 #endif

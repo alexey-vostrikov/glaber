@@ -274,27 +274,7 @@ static void	DCdump_htmpls(void)
 	int			i, j;
 
 	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __func__);
-
-	zbx_vector_ptr_create(&index);
-	zbx_hashset_iter_reset(&config->htmpls, &iter);
-
-	while (NULL != (htmpl = (ZBX_DC_HTMPL *)zbx_hashset_iter_next(&iter)))
-		zbx_vector_ptr_append(&index, htmpl);
-
-	zbx_vector_ptr_sort(&index, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
-	for (i = 0; i < index.values_num; i++)
-	{
-		htmpl = (ZBX_DC_HTMPL *)index.values[i];
-
-		zabbix_log(LOG_LEVEL_TRACE, "hostid:" ZBX_FS_UI64, htmpl->hostid);
-
-		for (j = 0; j < htmpl->templateids.values_num; j++)
-			zabbix_log(LOG_LEVEL_TRACE, "  templateid:" ZBX_FS_UI64, htmpl->templateids.values[j]);
-	}
-
-	zbx_vector_ptr_destroy(&index);
-
+	obj_index_dump(&glb_config->host_to_template_idx);
 	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
@@ -898,42 +878,6 @@ static void	DCdump_triggers(void)
 	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
-static void	DCdump_trigdeps(void)
-{
-	ZBX_DC_TRIGGER_DEPLIST	*trigdep;
-	zbx_hashset_iter_t	iter;
-	int			i, j;
-	zbx_vector_ptr_t	index;
-
-	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __func__);
-
-	zbx_vector_ptr_create(&index);
-	zbx_hashset_iter_reset(&config->trigdeps, &iter);
-
-	while (NULL != (trigdep = (ZBX_DC_TRIGGER_DEPLIST *)zbx_hashset_iter_next(&iter)))
-		zbx_vector_ptr_append(&index, trigdep);
-
-	zbx_vector_ptr_sort(&index, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
-	for (i = 0; i < index.values_num; i++)
-	{
-		trigdep = (ZBX_DC_TRIGGER_DEPLIST *)index.values[i];
-		zabbix_log(LOG_LEVEL_TRACE, "triggerid:" ZBX_FS_UI64 " refcount:%d", trigdep->triggerid,
-				trigdep->refcount);
-
-		for (j = 0; j < trigdep->dependencies.values_num; j++)
-		{
-			const ZBX_DC_TRIGGER_DEPLIST	*trigdep_up = (ZBX_DC_TRIGGER_DEPLIST *)trigdep->dependencies.values[j];
-
-			zabbix_log(LOG_LEVEL_TRACE, "  triggerid:" ZBX_FS_UI64, trigdep_up->triggerid);
-		}
-	}
-
-	zbx_vector_ptr_destroy(&index);
-
-	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
-}
-
 static void	DCdump_expressions(void)
 {
 	ZBX_DC_EXPRESSION	*expression;
@@ -1338,7 +1282,8 @@ void	DCdump_configuration(void)
 	DCdump_master_items();
 	DCdump_prototype_items();
 	DCdump_triggers();
-	DCdump_trigdeps();
+	//DCdump_trigdeps();
+	obj_index_dump(&glb_config->trigger_deps);
 	DCdump_functions();
 	DCdump_expressions();
 	DCdump_actions();

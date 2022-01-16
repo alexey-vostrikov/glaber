@@ -25,6 +25,7 @@
 #include "zbxregexp.h"
 #include "zbxprometheus.h"
 #include "zbxvariant.h"
+#include "../../libs/zbxdbcache/changeset.h"
 
 typedef struct
 {
@@ -3065,6 +3066,9 @@ static void	lld_item_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 		zbx_db_insert_t *db_insert_idiscovery, zbx_db_insert_t *db_insert_irtdata)
 {
 	int	index;
+	glb_changeset_t cset;
+	
+	changeset_prepare(&cset);
 
 	if (0 == (item->flags & ZBX_FLAG_LLD_ITEM_DISCOVERED))
 		return;
@@ -3082,7 +3086,7 @@ static void	lld_item_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 
 		item_prototype = (zbx_lld_item_prototype_t *)item_prototypes->values[index];
 		item->itemid = (*itemid)++;
-
+		
 		zbx_db_insert_add_values(db_insert_items, item->itemid, item->name, item->key, hostid,
 				(int)item_prototype->type, (int)item_prototype->value_type,
 				item->delay, item->history, item->trends,
@@ -3103,7 +3107,9 @@ static void	lld_item_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 				item->parent_itemid, item_prototype->key);
 
 		zbx_db_insert_add_values(db_insert_irtdata, item->itemid, time(NULL));
+		changeset_add_to_cache(&cset, OBJ_ITEMS, &item->itemid, DB_CREATE, 1);
 	}
+	changeset_flush(&cset);
 
 	for (index = 0; index < item->dependent_items.values_num; index++)
 	{
@@ -3485,12 +3491,14 @@ static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 	char				*sql = NULL;
 	size_t				sql_alloc = 8 * ZBX_KIBIBYTE, sql_offset = 0;
 	zbx_lld_item_prototype_t	*item_prototype;
+	glb_changeset_t cset;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_uint64_create(&upd_keys);
 	zbx_vector_uint64_create(&item_protoids);
-
+	changeset_prepare(&cset);
+	
 	if (0 == items->values_num)
 		goto out;
 
@@ -3563,7 +3571,8 @@ static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 			ret = FAIL;
 			goto out;
 		}
-
+		changeset_add_to_cache(&cset, OBJ_ITEMS, upd_keys.values, DB_UPDATE, upd_keys.values_num);	
+		changeset_flush(&cset);
 	}
 
 	if (0 != new_items)
@@ -3691,6 +3700,9 @@ static int	lld_items_preproc_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, 
 	zbx_db_insert_t		db_insert;
 	char			*sql = NULL;
 	size_t			sql_alloc = 0, sql_offset = 0;
+	glb_changeset_t cset;
+	
+	changeset_prepare(&cset);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -3710,6 +3722,7 @@ static int	lld_items_preproc_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, 
 			if (0 == (preproc_op->flags & ZBX_FLAG_LLD_ITEM_PREPROC_DISCOVERED))
 			{
 				zbx_vector_uint64_append(&deleteids, preproc_op->item_preprocid);
+				changeset_add_to_cache(&cset, OBJ_PREPROCS, &preproc_op->item_preprocid, DB_DELETE, 1);
 				continue;
 			}
 
@@ -3818,10 +3831,12 @@ static int	lld_items_preproc_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, 
 
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " where item_preprocid=" ZBX_FS_UI64 ";\n",
 					preproc_op->item_preprocid);
+			changeset_add_to_cache(&cset, OBJ_PREPROCS, &preproc_op->item_preprocid, DB_UPDATE, 1);
 
 			DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
 		}
 	}
+	changeset_flush(&cset);
 
 	if (0 != update_preproc_num)
 	{
@@ -3835,7 +3850,14 @@ static int	lld_items_preproc_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, 
 	{
 		zbx_db_insert_autoincrement(&db_insert, "item_preprocid");
 		zbx_db_insert_execute(&db_insert);
+		
+		for (i = 0; i < db_insert.rows.values_num; i++)
+		{
+			zbx_db_value_t	*values = (zbx_db_value_t *)db_insert.rows.values[i];
+			changeset_add_to_cache(&cset, OBJ_PREPROCS, &values[db_insert.autoincrement].ui64, DB_CREATE, 1); 
+		}
 		zbx_db_insert_clean(&db_insert);
+		changeset_flush(&cset);
 	}
 
 	if (0 != deleteids.values_num)
@@ -3845,7 +3867,10 @@ static int	lld_items_preproc_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, 
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "item_preprocid", deleteids.values,
 				deleteids.values_num);
 		DBexecute("%s", sql);
-
+		
+		changeset_add_to_cache(&cset, OBJ_PREPROCS, deleteids.values, DB_DELETE, deleteids.values_num);
+		changeset_flush(&cset);
+		
 		delete_preproc_num = deleteids.values_num;
 	}
 out:
@@ -4044,9 +4069,11 @@ static int	lld_items_tags_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, int
 	zbx_db_insert_t		db_insert;
 	char			*sql = NULL;
 	size_t			sql_alloc = 0, sql_offset = 0;
-
+	glb_changeset_t cset;
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
+	changeset_prepare(&cset);
 	zbx_vector_uint64_create(&deleteids);
 
 	for (i = 0; i < items->values_num; i++)
@@ -4150,23 +4177,32 @@ static int	lld_items_tags_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, int
 
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " where itemtagid=" ZBX_FS_UI64 ";\n",
 					item_tag->item_tagid);
-
+			changeset_add_to_cache(&cset, OBJ_ITEMTAGS, &item_tag->item_tagid, DB_UPDATE, 1);
 			DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
 		}
 	}
-
+	
 	if (0 != update_tag_num)
 	{
 		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 		if (16 < sql_offset)	/* in ORACLE always present begin..end; */
 			DBexecute("%s", sql);
+		
+		changeset_flush(&cset);
 	}
 
 	if (0 != new_tag_num)
 	{
 		zbx_db_insert_autoincrement(&db_insert, "itemtagid");
 		zbx_db_insert_execute(&db_insert);
+		
+		for (i = 0; i < db_insert.rows.values_num; i++)
+		{
+			zbx_db_value_t	*values = (zbx_db_value_t *)db_insert.rows.values[i];
+			changeset_add_to_cache(&cset, OBJ_ITEMTAGS, &values[db_insert.autoincrement].ui64, DB_CREATE, 1); 
+		}
+		
 		zbx_db_insert_clean(&db_insert);
 	}
 
@@ -4177,7 +4213,8 @@ static int	lld_items_tags_save(zbx_uint64_t hostid, zbx_vector_ptr_t *items, int
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "itemtagid", deleteids.values,
 				deleteids.values_num);
 		DBexecute("%s", sql);
-
+		changeset_add_to_cache(&cset, OBJ_ITEMTAGS, deleteids.values, DB_DELETE, deleteids.values_num);
+		
 		delete_tag_num = deleteids.values_num;
 	}
 out:
@@ -4529,8 +4566,20 @@ int	lld_update_items(zbx_uint64_t hostid, zbx_uint64_t lld_ruleid, zbx_vector_pt
 	zbx_vector_ptr_create(&items);
 	zbx_hashset_create(&items_index, item_prototypes.values_num * lld_rows->values_num, lld_item_index_hash_func,
 			lld_item_index_compare_func);
+	//this will load from the database all the items related to the discovery rule, all, fucking _ALL_ items
+	//this is done to mark unupdated items (set ts_delete)
+	//however, setting ts_delete might be done right at the time when item is saved
+	//and then it should be done periodically (say, once in an hour)
+	//then we would be able to use the following logic: 
+	//for any arrived string updating the LLD Cache ( remebering the arrived row as well as id of the objects - we can find the objects in the existing config cache)
+	//if object hasn't been found - save it immediately
+	//if it was found - update LLD cache for the object (ts_delete info)
+	//housekeeper will delete items from the cache as well as from the database
+	//in case of frequent LLD updates we'll mostly exec a couple of searches in the config memory
+	//actually it's just finding the discovery info having ts_delete marked. 
 
 	lld_items_get(&item_prototypes, &items);
+
 	lld_items_make(&item_prototypes, lld_rows, lld_macro_paths, &items, &items_index, error);
 	lld_items_preproc_make(&item_prototypes, lld_macro_paths, &items);
 	lld_items_param_make(&item_prototypes, lld_macro_paths, &items);

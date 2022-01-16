@@ -899,7 +899,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"IPCBufferSize",		&CONFIG_IPC_BUFFER_SIZE,		TYPE_UINT64,
 			PARM_OPT,	1024*1024,			__UINT64_C(64) * ZBX_GIBIBYTE},	
 		{"CacheUpdateFrequency",	&CONFIG_CONFSYNCER_FREQUENCY,		TYPE_INT,
-			PARM_OPT,	1,			SEC_PER_HOUR},
+			PARM_OPT,	1,			24 * SEC_PER_HOUR},
 		{"QueuesUpdateFrequency",	&CONFIG_GLB_REQUEUE_TIME,		TYPE_INT,
 			PARM_OPT,	1,			SEC_PER_HOUR},
 		{"HousekeepingFrequency",	&CONFIG_HOUSEKEEPING_FREQUENCY,		TYPE_INT,

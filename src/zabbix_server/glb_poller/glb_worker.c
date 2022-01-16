@@ -115,22 +115,21 @@ static int glb_worker_submit_result(worker_conf_t *conf, char *response) {
 /******************************************************************************
  * item init - from the general dc_item to compact local item        		  * 
  * ***************************************************************************/
-static void init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
+static int init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
     
     char error[MAX_STRING_LEN];
 	AGENT_REQUEST	request;
     char *parsed_key = NULL, *cmd = NULL, *params_dyn = NULL, *key_dyn = NULL, *params_stat = NULL;
     size_t		dyn_alloc = 0, stat_alloc = 0, dyn_offset = 0, stat_offset = 0, cmd_alloc = ZBX_KIBIBYTE, cmd_offset = 0;
-    int ret = FAIL, i;
+    int ret, i;
     zabbix_log(LOG_LEVEL_DEBUG,"Staring %s",__func__);
     zabbix_log(LOG_LEVEL_DEBUG,"Item key is %s",dc_item->key_orig);
-    
-    
+   
     worker_item_t *worker_item;
     
     if (NULL == (worker_item = (worker_item_t*)zbx_calloc(NULL, 0, sizeof(worker_item_t)))) {
         LOG_WRN("Cannot allocate mem for worker processing, exiting");
-        exit(-1);
+        return FAIL;
     }
     
     poller_item->itemdata = worker_item;
@@ -144,11 +143,13 @@ static void init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_
     if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
 				sizeof(error))) {
         zabbix_log(LOG_LEVEL_INFORMATION,"Failed to apply macroses to dynamic params %s",parsed_key);
+        ret = FAIL;
         goto out;
     }
     
     if (SUCCEED != parse_item_key(parsed_key, &request)) {
 	    zabbix_log(LOG_LEVEL_INFORMATION,"Failed to parse item key %s",parsed_key);
+        ret = FAIL;
         goto out;
     }
     
@@ -188,6 +189,7 @@ out:
     zbx_free(params_stat);
     zbx_free(cmd);
     free_request(&request);
+    return ret;
 }
 /*****************************************************************
  * creates a new worker structure
@@ -224,7 +226,6 @@ static void send_request(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *poller_it
     zbx_timespec_t ts;
 
     char request[MAX_STRING_LEN];
-    unsigned int now = time(NULL);
     
     zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
     worker_item_t *glb_worker_item = (worker_item_t*)poller_item->itemdata;

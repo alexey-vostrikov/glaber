@@ -1188,11 +1188,11 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 				glb_cache_get_statistics(&stats);
 				DCget_unknown_triggers(&unknown_triggers,&not_calculated, &total_triggers);
 
-				zabbix_log(LOG_LEVEL_INFORMATION,"Valuecache stats: hits: %ld, misses: %ld, efficiency %ld%%", stats.hits-old_hits, stats.misses-old_misses,  	
-						((stats.hits-old_hits)*100)/(stats.hits-old_hits + stats.misses-old_misses +1 ));
+			//	zabbix_log(LOG_LEVEL_INFORMATION,"Valuecache stats: hits: %ld, misses: %ld, efficiency %ld%%", stats.hits-old_hits, stats.misses-old_misses,  	
+			//			((stats.hits-old_hits)*100)/(stats.hits-old_hits + stats.misses-old_misses +1 ));
 				old_misses = stats.misses;
 				old_hits = stats.hits;
-				zabbix_log(LOG_LEVEL_INFORMATION, "Triggers stats: %d not calculated yet, %d unknowns, %d total", not_calculated, unknown_triggers, total_triggers);
+			//	zabbix_log(LOG_LEVEL_INFORMATION, "Triggers stats: %d not calculated yet, %d unknowns, %d total", not_calculated, unknown_triggers, total_triggers);
 				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
 				glb_vc_dump_cache();
 				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");

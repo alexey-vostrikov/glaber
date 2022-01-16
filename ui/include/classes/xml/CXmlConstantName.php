@@ -227,6 +227,7 @@ class CXmlConstantName {
 	const ZABBIX_ACTIVE = 'ZABBIX_ACTIVE';
 	const AGGREGATE = 'AGGREGATE';
 	const EXTERNAL = 'EXTERNAL';
+	const WORKER_SERVER = 'WORKER_SERVER';
 	const ODBC = 'ODBC';
 	// const IPMI = 'IPMI'; // Duplicate.
 	const SSH = 'SSH';

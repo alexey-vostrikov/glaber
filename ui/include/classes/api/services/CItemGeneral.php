@@ -711,17 +711,7 @@ abstract class CItemGeneral extends CApiService {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Item with key "%1$s" already exists on "%2$s" as unknown item element.', $key, $host));
 		}
 	}
-	public static function updateRtdata(array $items) {
-		
-		$upd_rtdata = ['mtime' => time()];
-		$update_rtdata = [];
-
-		foreach ($items as $item) {
-			$update_rtdata[] = ['values' => $upd_rtdata, 'where' => ['itemid' => $items]];
-		}
-
-		DB::update('item_rtdata', $update_rtdata);
-	}
+	
 	/**
 	 * Returns the interface that best matches the given item.
 	 *
@@ -1802,7 +1792,8 @@ abstract class CItemGeneral extends CApiService {
 		}
 
 		if ($item_preproc) {
-			DB::insertBatch('item_preproc', $item_preproc);
+			$ins_ids = DB::insertBatch('item_preproc', $item_preproc);
+			CChangeset::add_objects(CChangeset::OBJ_PREPROCS, CChangeset::DB_CREATE,$ins_ids);
 		}
 	}
 
@@ -1843,6 +1834,7 @@ abstract class CItemGeneral extends CApiService {
 
 		$ins_item_preprocs = [];
 		$upd_item_preprocs = [];
+		$upd_preproc_ids = [];
 		$del_item_preprocids = [];
 
 		$options = [
@@ -1874,6 +1866,7 @@ abstract class CItemGeneral extends CApiService {
 						'values' => $upd_item_preproc,
 						'where' => ['item_preprocid' => $db_item_preproc['item_preprocid']]
 					];
+					$upd_preproc_ids[] = $db_item_preproc['item_preprocid'];
 				}
 				unset($item_preprocs[$db_item_preproc['itemid']][$db_item_preproc['step']]);
 			}
@@ -1893,14 +1886,20 @@ abstract class CItemGeneral extends CApiService {
 
 		if ($del_item_preprocids) {
 			DB::delete('item_preproc', ['item_preprocid' => $del_item_preprocids]);
+			CChangeset::add_objects(CChangeset::OBJ_PREPROCS, CChangeset::DB_DELETE,$del_item_preprocids);
 		}
 
 		if ($upd_item_preprocs) {
 			DB::update('item_preproc', $upd_item_preprocs);
 		}
 
+		if ($upd_preproc_ids) {
+			CChangeset::add_objects(CChangeset::OBJ_PREPROCS, CChangeset::DB_UPDATE,$upd_preproc_ids);
+		}
+
 		if ($ins_item_preprocs) {
-			DB::insertBatch('item_preproc', $ins_item_preprocs);
+			$ins_ids = DB::insertBatch('item_preproc', $ins_item_preprocs);
+			CChangeset::add_objects(CChangeset::OBJ_PREPROCS, CChangeset::DB_CREATE,$ins_ids);
 		}
 	}
 

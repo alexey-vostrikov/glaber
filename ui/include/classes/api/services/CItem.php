@@ -362,8 +362,6 @@ class CItem extends CItemGeneral {
 			$sqlParts['where']['hi'] = 'h.hostid=i.hostid';
 			$sqlParts['where'][] = ' h.host='.zbx_dbstr($options['host']);
 		}
-		// do not retrun deleted items
-		$sqlParts['where'][] = 'i.status != '.ITEM_STATUS_DELETED;
 
 		// with_triggers
 		if (!is_null($options['with_triggers'])) {
@@ -591,6 +589,7 @@ class CItem extends CItemGeneral {
 		$this->createItemPreprocessing($items);
 		$this->createItemTags($items, $itemids);
 		
+		CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_CREATE, $itemids);
 		CZabbixServer::notifyConfigChanges();
 	}
 
@@ -602,26 +601,22 @@ class CItem extends CItemGeneral {
 	protected function updateReal(array $items) {
 		CArrayHelper::sort($items, ['itemid']);
 		
-		$update_rtdata = [];
+	
 		$data = [];
-		$upd_rtdata = ['mtime' => time()];
-
+	
 		foreach ($items as $item) {
 			unset($item['flags']); // flags cannot be changed
 			$data[] = ['values' => $item, 'where' => ['itemid' => $item['itemid']]];
-
-			$update_rtdata[] = ['values' => $upd_rtdata, 'where' => ['itemid' => $item['itemid']]];
-				
+						
 		}
 		DB::update('items', $data);
-		DB::update('item_rtdata', $update_rtdata);
-
+	
 		$this->updateItemParameters($items);
 		$this->updateItemPreprocessing($items);
 		$this->updateItemTags($items);
 		
+		CChangeset::add_items(CChangeset::DB_UPDATE, array_column($items,'itemid'));
 		CZabbixServer::notifyConfigChanges();
-		
 	}
 	/**
 	 * Update item.

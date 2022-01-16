@@ -890,8 +890,11 @@ int glb_cache_item_create_cb(glb_cache_elem_t *elem, void *param)
 int add_value_cb(glb_cache_elem_t *elem, void *data)
 {
     glb_cache_item_value_t *c_val;
-    item_elem_t *elm = (item_elem_t *)elem->data;
+    item_elem_t *elm;
+    
+    elm = (item_elem_t *)elem->data;
     ZBX_DC_HISTORY *h = (ZBX_DC_HISTORY *)data;
+    int now = time(NULL);
 
     if (elm->value_type == ITEM_VALUE_TYPE_NONE)
         elm->value_type = h->value_type;
@@ -911,6 +914,11 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     else
     {
         ensure_tsbuff_has_space(elm);
+    }
+
+    if (h->ts.sec > now + 300) {
+        LOG_INF("Warn: item's %ld timestamp %d is too much ahead of the real time %d, not adding to the cache", elem->id, h->ts.sec, now);
+        return FAIL;
     }
 
     if (NULL != (c_val = (glb_cache_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))

@@ -83,7 +83,6 @@ void *glb_cache_realloc(void *old, size_t size) {
     void *buff = NULL;
     buff = zbx_mem_realloc(cache_mem,old,size);
     return buff;
-
 }
 
 void glb_cache_free(void *ptr) {
@@ -91,7 +90,6 @@ void glb_cache_free(void *ptr) {
         return;
 	zbx_mem_free(cache_mem, ptr);  
 }
-
 
 static zbx_hash_t	__strpool_hash(const void *data)
 {
@@ -171,13 +169,12 @@ const char	*glb_cache_strpool_acquire(const char *str)
 int glb_cache_init() {
    
     char *error = NULL;
-	//zabbix_log(LOG_LEVEL_INFORMATION,"Allocating shared memory for glb cache size %ld",CONFIG_VALUE_CACHE_SIZE);
-	//SHM
+
 	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "Cache cache size", "GLBCachesize", 1, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Zbx mem create failed");
     	return FAIL;
     }
-	//cache struct 
+ 
 	if (NULL == (glb_cache = (glb_cache_t *)zbx_mem_malloc(cache_mem, NULL, sizeof(glb_cache_t)))) {	
 		zabbix_log(LOG_LEVEL_CRIT,"Cannot allocate Cache structures, exiting");
 		return FAIL;
@@ -195,8 +192,8 @@ int glb_cache_init() {
 	
 	glb_cache->items.config = glb_cache_items_init();
 	glb_cache->items.elem_create_func = glb_cache_item_create_cb;
-
-
+	glb_rwlock_init(&glb_cache->items.meta_lock);
+	
 #ifdef GLB_CACHE_TESTS
 	LOG_INF("WILL RUN GLB CACHE TESTS");
 	glb_run_cache_tests(glb_cache);
@@ -215,14 +212,14 @@ int  glb_ic_add_values( ZBX_DC_HISTORY *history, int history_num) {
 
 int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
 		int count, const zbx_timespec_t *ts) {
-	int now = time(NULL);
+//	int now = time(NULL);
 	
 	return glb_ic_get_values(itemid, value_type,values, seconds, count, ts->sec);
 }
 
 int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value) {
 	zbx_vector_history_record_t	values;
-	int				ret = FAIL;
+	//int				ret = FAIL;
 
 	zbx_history_record_vector_create(&values);
 	DEBUG_ITEM(itemid, "Cache request: single value at %d",ts->sec);
@@ -311,7 +308,7 @@ int glb_cache_add_elem(glb_cache_elems_t *elems, uint64_t id ) {
 }
 
 int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_func_t process_func, void *data) {
-	int ret = FAIL;
+	int ret;
     
 	LOG_DBG("In %s:starting", __func__);
     glb_cache_elem_t *elem;
@@ -352,26 +349,7 @@ int glb_cache_process_elem(glb_cache_elems_t *elems, uint64_t id, elem_update_fu
 	glb_rwlock_unlock(&elems->meta_lock);
 	return ret;
 } 
-	
 
-
-/**********************************************************
- * fetches element in the locked state                    *
- * ********************************************************/
-glb_cache_elem_t *glb_cache_get_elem(glb_cache_elems_t* elems,  u_int64_t id) {
-    
-    void *ret = NULL;
-    
-    glb_cache_elem_t *elem;
-    glb_rwlock_rdlock(&elems->meta_lock);
-    
-    if (NULL != (elem=zbx_hashset_search(&elems->hset,&id))) {
-        glb_lock_block(&elem->lock);
-        ret = elem;
-    } 
-    glb_rwlock_unlock(&glb_cache->items.meta_lock);
-    return ret;
-}
 
 
 int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats) {
@@ -614,7 +592,6 @@ int glb_vc_dump_cache() {
 	zbx_snprintf(new_file,MAX_STRING_LEN,"%s%s",CONFIG_VCDUMP_LOCATION,".new");
 	
 	gzFile gzfile = gzopen(new_file,"wb");
-	zabbix_log(LOG_LEVEL_INFORMATION, "Cache file has been opened");
 
 	if (Z_NULL == gzfile) {
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s, value cache will not be dumped",new_file);
