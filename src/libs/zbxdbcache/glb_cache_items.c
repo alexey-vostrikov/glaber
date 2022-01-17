@@ -947,11 +947,14 @@ int glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_H
     {
         ZBX_DC_HISTORY *h;
         h = (ZBX_DC_HISTORY *)&history[i];
+        
+        DEBUG_ITEM(h->itemid,"Adding to value cache");
 
         LOG_DBG("Adding value to cache id %ld, value %d out of %d, timestamp is %d", h->itemid, i, history_num, h->ts.sec);
 
         if (0 != ((ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF) & h->flags) || ITEM_STATE_NOTSUPPORTED == h->state)
         {
+            DEBUG_ITEM(h->itemid,"Not adding to value cache, no_hist flag is set");
             LOG_DBG("GLB_CACHE: not adding item %ld to cache: no_hist flag is set %d", h->itemid, h->flags);
             continue;
         }
@@ -960,7 +963,7 @@ int glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_H
         {
             ret = FAIL;
         };
-        DEBUG_ITEM(h->itemid, "Adding value timestamp %d to the cache", h->ts.sec);
+        DEBUG_ITEM(h->itemid, "Adding value with timestamp %d to the cache", h->ts.sec);
     }
 
     return ret;

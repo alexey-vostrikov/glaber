@@ -8973,7 +8973,7 @@ int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx
 
 			dc_trigger->locked = 1;
 			
-			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing");
+			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
 			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
 		}
 next:;
@@ -10208,7 +10208,6 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 			continue;
 		}
 
-		LOG_DBG("Item %ld host check passed");
 		if ( HOST_STATUS_MONITORED != zbx_dc_host->status ||
 			 SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item) || 
 			 ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0 ||

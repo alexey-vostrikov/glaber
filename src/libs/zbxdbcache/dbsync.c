@@ -300,7 +300,7 @@ char * glb_where_condition(unsigned char mode, int obj_type) {
 	if (GLB_DBSYNC_CHANGESET == mode)
 		zbx_snprintf(sql, 1024, " and cs.obj_type = %d and cs.change_type in (%d,%d)", obj_type, DB_CREATE, DB_UPDATE);
 	else 
-		zbx_snprintf(sql,1024,"");
+		zbx_snprintf(sql,1024," ");
 	return sql;
 }
 
