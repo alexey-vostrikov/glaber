@@ -425,7 +425,7 @@ class CItem extends CItemGeneral {
 				
 				$items_state = $server->getItemsState(CSessionHelper::getId(),array_keys($result)); 
 				
-				if (isset($items_state) && is_array($items_state)) {
+				if ( !empty($items_state) && (is_array($items_state) || is_object($items_state))) {
 					foreach ($items_state as $state) {
 						 $result[$state['itemid']] += $state;
 					}

@@ -171,7 +171,7 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
     zbx_snprintf_alloc(&str,&alloc, &offset,"Key: %ld -> [", elem->id);
 
     for (i=0; i<vals->values_num; i++) {
-        zbx_snprintf_alloc(&str,&alloc, &offset,"%d, ", vals->values[i]);
+        zbx_snprintf_alloc(&str,&alloc, &offset,"%ld, ", vals->values[i]);
     }
     
     if (vals->values_num > 0)  //removing trailing comma and space
