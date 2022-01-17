@@ -217,7 +217,7 @@ out:
 		freeaddrinfo(ai);
     
     resolve_time += glb_ms_time() - time_start;
-    LOG_DBG("Resolving of %s took %d msec", host, glb_ms_time() - time_start);
+    LOG_DBG("Resolving of %s took %ld msec", host, glb_ms_time() - time_start);
 
     return rc;
 }
@@ -504,7 +504,7 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
             
             if (glb_ms_time() - etime > 10 * 1000 ) {
                 zabbix_log(LOG_LEVEL_WARNING,"Internal pinging queue size is %d",conf->packet_events.elems_num);
-                zabbix_log(LOG_LEVEL_WARNING,"Pinging is late %d milliseconds", glb_ms_time() - etime); 
+                zabbix_log(LOG_LEVEL_WARNING,"Pinging is late %ld milliseconds", glb_ms_time() - etime); 
             }
             tmp_time=time(NULL);
         }

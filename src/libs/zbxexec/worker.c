@@ -502,7 +502,7 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
                 //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() datapresent is set to %d ", __func__,datapresent);
                 return SUCCEED;
             } else { //there is an incomplete data sitting in the buffer which starts as start marker
-                zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found incomplete data: %s at %d", __func__, circle_buffer + start, start);
+                zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found incomplete data: %s at %ld", __func__, circle_buffer + start, start);
                 char *tmp_buff = zbx_malloc(NULL, MAX_STRING_LEN);
                 size_t offset = 0, allocated = MAX_STRING_LEN;
                 zbx_strcpy_alloc(&tmp_buff,&allocated, &offset, circle_buffer+start);

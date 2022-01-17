@@ -450,7 +450,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					if (glb_item->change_time > event->change_time) { 
 						//this means the item has been changed since last scheduling and current event is outdated (a new event has already been planned)
 						DEBUG_ITEM(glb_item->itemid,"Outdated event has been found in the event queue, skipping")
-						LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", event->change_time, glb_item->change_time);
+						LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", glb_item->itemid, event->change_time, glb_item->change_time);
 
 						break;
 					

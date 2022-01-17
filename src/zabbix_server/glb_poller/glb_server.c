@@ -466,7 +466,7 @@ static void	handle_async_io(glb_poll_module_t *poll_mod) {
             
             while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_response))) {
               
-                LOG_DBG("Parsing line %s from worker %s", worker_response, &worker->worker.path);
+                LOG_DBG("Parsing line %s from worker %s", worker_response, worker->worker.path);
                 glb_server_submit_result(glb_item, worker_response);
             }
   

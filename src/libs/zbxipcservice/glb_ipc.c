@@ -230,7 +230,7 @@ int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
     char *error = NULL;
 	
 	
-	LOG_DBG("Allocating shared memory for IPC size %d",CONFIG_IPC_BUFFER_SIZE);
+	LOG_DBG("Allocating shared memory for IPC size %ld",CONFIG_IPC_BUFFER_SIZE);
 
 	//SHM
 	if (SUCCEED != zbx_mem_create(&ipc_mem, CONFIG_IPC_BUFFER_SIZE, "IPC cache size", "IPCsize", 1, &error))
@@ -483,7 +483,7 @@ static unsigned int glb_ipc_calc_buf_idx(size_t data_size) {
 	
 	if (buf_idx >= GLB_IPC_BUFFERS) {
 		zabbix_log(LOG_LEVEL_INFORMATION,
-				"Requested buffer of %ld size, thats exceeding maximum IPC size %d, this is bug",
+				"Requested buffer of %ld size, thats exceeding maximum IPC size %d, this is bug", data_size,
 				GLB_IPC_GRANULAR_SIZE  + LO_RES_GRAN * (GLB_IPC_BUFFERS - GLB_IPC_GRANULAR_SIZE /HI_RES_GRAN ) );
 		
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -506,7 +506,7 @@ static unsigned int glb_ipc_calc_buf_idx(size_t data_size) {
 	unsigned int buf_idx = glb_ipc_calc_buf_idx(total_size);
 
 		
-	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: allocating %d bytes, index is %d", __func__, total_size, buf_idx);
+	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: allocating %ld bytes, index is %d", __func__, total_size, buf_idx);
 	
 	//do minimal length of GLB_IPC_MIN_BUFF_SIZE
 	
@@ -524,7 +524,7 @@ static unsigned int glb_ipc_calc_buf_idx(size_t data_size) {
 	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocated from buffer queue %d", __func__, buf_idx);
 
 	if (NULL == buffer )  {
-		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocating via zbx_mem_alloc %d", __func__, total_size);
+		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocating via zbx_mem_alloc %ld", __func__, total_size);
 		buffer = (glb_ipc_buffer_t *)glb_ipc_malloc(total_size);
 		buffer->magic = 89234234;
 		
@@ -609,7 +609,8 @@ void glb_ipc_free(void *ptr) {
 	glb_ipc_buffer_t *buffer = (void*) ptr - offsetof(glb_ipc_buffer_t, data);
 	
 	if (buffer->magic != 89234234 ) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Magic is wrong (got %ld,%ld,%ld,%ld, %ld), wrong buffer pointer has been retruned", buffer->magic, buffer->buf_idx, buffer->lastuse, buffer->next, buffer->data);
+		zabbix_log(LOG_LEVEL_INFORMATION, "Magic is wrong (got %u, %u, %u, %p, %p), wrong buffer pointer has been retruned",
+			 buffer->magic, buffer->buf_idx, buffer->lastuse, buffer->next, buffer->data);
 		exit(-1);
 	}
 	//now we have the buffer, we can retrun it
@@ -618,7 +619,7 @@ void glb_ipc_free(void *ptr) {
 
 
 void glb_ipc_dump_metric( GLB_METRIC *metric) {
-	zabbix_log(LOG_LEVEL_INFORMATION,"Metric dump: \n	addr:%ld,\n	itemid:%ld,\n	hostid:%ld,\n	vector_id_ptr:%ld,\n	host_ptr:%ld", 
+	zabbix_log(LOG_LEVEL_INFORMATION,"Metric dump: \n	addr:%p,\n	itemid:%ld,\n	hostid:%ld,\n	vector_id_ptr:%p,\n	host_ptr:%p", 
 						metric, metric->itemid, metric->hostid, metric->vector_id, metric->hostname);
 }
 
@@ -643,7 +644,7 @@ int  glb_ipc_init_sender(int consumers, int ipc_type) {
 void glb_ipc_add_data(int ipc_type, int q_num,  void* buffer) {
 	
 	glb_ipc_queue_item_t *q_item;
-	zabbix_log(LOG_LEVEL_INFORMATION, "IPC:Put local Getting new SHM queue item for type %d");
+	LOG_INF("IPC:Put local Getting new SHM queue item for type %d", ipc_type);
 
 	while (NULL ==(q_item = glb_ipc_get_item(&glb_ipc->ipc[ipc_type].free))) {
 		sleep(1);
@@ -747,8 +748,10 @@ void glb_ipc_flush(int ipc_type) {
 			continue;
 		
 		q_to = &glb_ipc[ipc_type].ipc->queued[i];
-		zabbix_log(LOG_LEVEL_INFORMATION, "Adding to %d metrics to IPC_type %d queue num %d , ipc_type addr is %ld  queue addr is %ld",
+		
+		zabbix_log(LOG_LEVEL_INFORMATION, "Adding to %d metrics to IPC_type %d queue num %d , ipc_type addr is %p  queue addr is %p",
 							q_from->count, ipc_type, i, &glb_ipc[ipc_type].ipc, &glb_ipc[ipc_type].ipc->queued[i]);
+		
 		glb_ipc_put_items(q_to, q_from->first, q_from->last, q_from->count);
 		zabbix_log(LOG_LEVEL_INFORMATION, "Added  %d metrics to IPC_type %d queue num %d",q_from->count, ipc_type, i);
 
@@ -807,7 +810,7 @@ int glb_ipc_dump_queue_stats() {
 	zabbix_log(LOG_LEVEL_INFORMATION,"* IPC queues dump                               *");
 	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");
 	zabbix_log(LOG_LEVEL_INFORMATION,"Global data:");
-	zabbix_log(LOG_LEVEL_INFORMATION,"	Buffers: total: %d, free queue items: %d\n",glb_ipc->buffers_count,glb_ipc->free_buffers);
+	zabbix_log(LOG_LEVEL_INFORMATION,"	Buffers: total: %d, free queue items: %d\n", glb_ipc->buffers_count, glb_ipc->buffers_count);
 	zabbix_log(LOG_LEVEL_INFORMATION,"	Buffers stat:");
 	
 	//for (i =0 ; i < GLB_IPC_BUFFERS; i++) {
@@ -818,7 +821,7 @@ int glb_ipc_dump_queue_stats() {
 	for (i = 0; i < GLB_IPC_TYPE_COUNT; i++) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "		Queue: %d, free item buffers: %d, queues: %d", i, glb_ipc->ipc[i].free.count,glb_ipc->ipc[j].conf.consumers);
 		for ( j = 0; j < glb_ipc->ipc[i].conf.consumers; j++ ) {
-			zabbix_log(LOG_LEVEL_INFORMATION, "				Queue: %d, items: %d", glb_ipc->ipc[i].queued[j].count);
+			zabbix_log(LOG_LEVEL_INFORMATION, "				Queue: %d, items: %d", j, glb_ipc->ipc[i].queued[j].count);
 		}
 	}
 	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");

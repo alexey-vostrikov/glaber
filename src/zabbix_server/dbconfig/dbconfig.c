@@ -117,7 +117,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		while (nextcheck > time(NULL) &&  FAIL == DC_ConfigNeedsSync() &&  0 == secrets_reload) 
 		{
 
-			zbx_setproctitle("%s [synced configuration in %d sec; next sync in %d sec]",
+			zbx_setproctitle("%s [synced configuration in %d sec; next sync in %ld sec]",
 				get_process_type_string(process_type), sec, nextcheck - time(NULL) );
 			
 			DC_CleanOutdatedChangedItems();

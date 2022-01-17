@@ -503,7 +503,7 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 					
 					if ( NULL != h->value.log->source) {
 						glb_escape_worker_string(h->value.log->source,buffer);  
-						zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"source\":\"%s\"",h->value.log->source, buffer);
+						zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"source\":\"%s\"",h->value.log->source);
 					}	
 				
 					//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 3"); 

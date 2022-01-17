@@ -24,7 +24,11 @@
 #include "changeset.h"
 #include "../../libs/zbxdbupgrade/dbupgrade.h"
 
+
+#ifndef HAVE_SQLITE3
+
 #define CHANGESET_TABLE "changeset"
+
 
 void changeset_delete_work_table() {
 	DBdrop_table(CHANGESET_WORK_TABLE);	
@@ -143,3 +147,4 @@ int changeset_get_recent_time() {
 
 #undef CHANGESET_TABLE_INDEX
 #undef CHANGESET_TABLE
+#endif

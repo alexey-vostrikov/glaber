@@ -285,7 +285,7 @@ char * glb_inner_join_subquery(unsigned char mode, char *field){
 	if (GLB_DBSYNC_CHANGESET == mode)
 		zbx_snprintf(sql, 1024, " inner join changeset_work cs on %s = cs.obj_id", field);
 	else 
-		zbx_snprintf(sql,1024,"");
+		zbx_snprintf(sql,1024," ");
 	return sql;
 }
 

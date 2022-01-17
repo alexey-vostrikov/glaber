@@ -3421,10 +3421,6 @@ static void	lld_item_prepare_update(const zbx_lld_item_prototype_t *item_prototy
 
 	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, " where itemid=" ZBX_FS_UI64 ";\n", item->itemid);
 	
-	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "update item_rtdata set mtime = %d where itemid=" ZBX_FS_UI64 ";\n", 
-				time(NULL), item->itemid );
-
-
 	DBexecute_overflowed_sql(sql, sql_alloc, sql_offset);
 }
 

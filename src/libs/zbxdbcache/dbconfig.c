@@ -6294,10 +6294,12 @@ void	DCsync_configuration(unsigned char mode, const struct zbx_json_parse *jp_kv
 		dc_load_trigger_queue(&trend_queue);
 	}
 
+	#ifndef HAVE_SQLITE3
 	if (GLB_DBSYNC_CHANGESET == mode ) 
 	{
 		changeset_prepare_work_table();
 	}
+	#endif
 
 	/* global configuration must be synchronized directly with database */
 	zbx_dbsync_init(&config_sync, ZBX_DBSYNC_INIT);
@@ -6963,8 +6965,10 @@ skip:
 		DCdump_configuration();
 	
 //	zbx_cluster_set_hosts_recalc();
+	#ifndef HAVE_SQLITE3
 	if (GLB_DBSYNC_CHANGESET == mode)
 		changeset_delete_work_table();
+	#endif
 	LOG_INF("CONFIG RELOAD completed");
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -10197,7 +10201,7 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 		
 		//check for the process number
 		if (zbx_dc_item->hostid % forks != (process_num - 1) ) {
-			DEBUG_ITEM(zbx_dc_item->itemid,"Skipping item, it belongs to other process %ld %d forks ",zbx_dc_host->hostid % forks, process_num-1, forks);
+			DEBUG_ITEM(zbx_dc_item->itemid,"Skipping item, it belongs to other process");
 			continue;
 		}
 		LOG_DBG("Item %ld found for addition to the internal queue", zbx_dc_item->itemid);				
@@ -10220,8 +10224,7 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 			zbx_hashset_iter_remove(&iter);	
 			continue;
 		}
-		LOG_DBG("Item %ld pollable check passed");		
-
+		
 		DEBUG_ITEM(zbx_dc_item->itemid,"Item create or change notification fetched");
 		zbx_vector_uint64_append(&itemids,zbx_dc_item->itemid);
 		zbx_hashset_iter_remove(&iter);	
