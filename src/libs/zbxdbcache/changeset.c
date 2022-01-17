@@ -18,10 +18,11 @@
 **/
 #include "common.h"
 #include "dbschema.h"
-#include "../zbxdbupgrade/dbupgrade.h"
+//#include "../zbxdbupgrade/dbupgrade.h"
 #include "db.h"
 #include "log.h"
 #include "changeset.h"
+#include "../../libs/zbxdbupgrade/dbupgrade.h"
 
 #define CHANGESET_TABLE "changeset"
 

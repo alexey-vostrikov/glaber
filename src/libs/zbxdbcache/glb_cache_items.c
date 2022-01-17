@@ -948,7 +948,7 @@ int glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_H
         ZBX_DC_HISTORY *h;
         h = (ZBX_DC_HISTORY *)&history[i];
         
-        DEBUG_ITEM(h->itemid,"Adding to value cache");
+        DEBUG_ITEM(h->itemid,"Adding to value cache, flags is %d", h->flags);
 
         LOG_DBG("Adding value to cache id %ld, value %d out of %d, timestamp is %d", h->itemid, i, history_num, h->ts.sec);
 
