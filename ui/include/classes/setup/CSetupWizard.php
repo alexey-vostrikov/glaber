@@ -54,7 +54,7 @@ class CSetupWizard extends CForm {
 				'fnc' => 'stage2'
 			],
 			3 => [
-				'title' => _('Zabbix server details'),
+				'title' => _('Server details'),
 				'fnc' => 'stage3'
 			],
 			4 => [
@@ -178,7 +178,7 @@ class CSetupWizard extends CForm {
 
 	private function stage0(): array {
 		preg_match('/^\d+\.\d+/', ZABBIX_VERSION, $version);
-		$setup_title = (new CDiv([new CSpan(_('Welcome to')), 'Zabbix '.$version[0]]))->addClass(ZBX_STYLE_SETUP_TITLE);
+		$setup_title = (new CDiv([new CSpan(_('Welcome to')), 'Glaber '.GLABER_VERSION]))->addClass(ZBX_STYLE_SETUP_TITLE);
 
 		$default_lang = $this->getConfig('default_lang');
 		$lang_select = (new CSelect('default_lang'))

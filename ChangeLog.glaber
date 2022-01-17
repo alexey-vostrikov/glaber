@@ -12,5 +12,5 @@ var 2.7.1
     - pre-parsing snmp oids for minor speed improvements
     - dns cache issues in pinger module fixes, dns resolve suppression on slow dns introduced
     - glb_server type of check introduces: simplified worker config, now done only in UI/API without server config, UI server worker type is added
-    - trigger topolgu indexing functions removed
+    - trigger topology indexing functions removed
     - bugfix: flushing history to trends SQL table removed 
