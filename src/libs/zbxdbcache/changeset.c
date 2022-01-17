@@ -111,7 +111,7 @@ void changeset_add_to_cache(glb_changeset_t *cset, int obj_type, u_int64_t *obj_
 void changeset_flush(glb_changeset_t *cset) {
 	if (cset->alloc == 0 ) 
 		return;
-	DBexecute(cset->sql);
+	DBexecute("%s", cset->sql);
 	zbx_free(cset->sql);
 	cset->alloc = 0;
 	cset->offset = 0;
