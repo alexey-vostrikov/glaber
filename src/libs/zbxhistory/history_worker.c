@@ -477,7 +477,9 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			continue;
 	
 		zbx_json_addobject(&json, NULL);
+		zbx_json_addstring(&json,"hostname",h->host_name,ZBX_JSON_TYPE_STRING);
 		zbx_json_addstring(&json,"item_key",h->item_key,ZBX_JSON_TYPE_STRING);
+		
 		zbx_json_adduint64(&json,"itemid",h->itemid);
 		zbx_json_adduint64(&json,"time_sec",h->ts.sec);
 		zbx_json_adduint64(&json,"time_ns",h->ts.ns);
@@ -550,63 +552,89 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
     int ret=FAIL;
 	char buffer [MAX_STRING_LEN*2];
 	char *precision="%0.6f,";
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "Started %s()", __func__);	
+	struct zbx_json json;
+
+	LOG_DBG("Started %s()", __func__);	
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 		
 	zbx_worker_data_t	*conf = (zbx_worker_data_t *)data;
 	
 	if (0 == trends_num) 
 		return SUCCEED;
+
+	zbx_json_addstring(&json,"request","put_history",ZBX_JSON_TYPE_STRING);
+	zbx_json_addarray(&json,"aggmetrics");
 	
-	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_trends\", \"aggmetrics\":[");
+	//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_trends\", \"aggmetrics\":[");
     
     for (i = 0; i < trends_num; i++)
 	{
 		if (0 == conf->write_trend_types[trends[i].value_type]) 
 			continue;
 		
-		glb_escape_worker_string(trends[i].host_name,buffer);
+	//	glb_escape_worker_string(trends[i].host_name,buffer);
+	//	
+	//	if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
+	//	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
+		zbx_json_addobject(&json, NULL);
+		zbx_json_addstring(&json,"hostname",trends[i].host_name,ZBX_JSON_TYPE_STRING);
+		zbx_json_addstring(&json,"item_key",trends[i].item_key,ZBX_JSON_TYPE_STRING);
 		
-		if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
+	
+//		buffer[0]='\0';
+//		glb_escape_worker_string(trends[i].item_key,buffer);
+//		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
 		
-		buffer[0]='\0';
-		glb_escape_worker_string(trends[i].item_key,buffer);
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
-		
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time\":%d, \"value_type\":%d, ", trends[i].itemid,trends[i].clock, trends[i].value_type);
+		zbx_json_adduint64(&json,"itemid",trends[i].itemid);
+		zbx_json_adduint64(&json,"time",trends[i].clock);
+		zbx_json_adduint64(&json,"value_type", trends[i].value_type);
+
+
+//		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time\":%d, \"value_type\":%d, ", 
+//				trends[i].itemid,trends[i].clock, trends[i].value_type);
     	
 		switch (trends[i].value_type) {
 			case ITEM_VALUE_TYPE_FLOAT:
-				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"min\":%0.4f, \"max\":%0.4f,\"avg\":%0.4f,",
-					trends[i].value_min.dbl,
-					trends[i].value_max.dbl,
-					trends[i].value_avg.dbl);
+				zbx_json_addfloat(&json,"min",trends[i].value_min.dbl);
+				zbx_json_addfloat(&json,"max",trends[i].value_max.dbl);
+				zbx_json_addfloat(&json,"avg",trends[i].value_avg.dbl);
+//				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"min\":%0.4f, \"max\":%0.4f,\"avg\":%0.4f,",
+//					trends[i].value_min.dbl,
+//					trends[i].value_max.dbl,
+//					trends[i].value_avg.dbl);
 				break;
 			case ITEM_VALUE_TYPE_UINT64:
-				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"minint\":%ld,\"maxint\":%ld,\"avgint\":%ld,",
-			   		trends[i].value_min.ui64,
-					trends[i].value_max.ui64,
-					(trends[i].value_avg.ui64.lo / trends[i].num) );
+				zbx_json_adduint64(&json,"minint",trends[i].value_min.ui64);
+				zbx_json_adduint64(&json,"maxint",trends[i].value_max.ui64);
+				zbx_json_adduint64(&json,"avgint", (trends[i].value_avg.ui64.lo /  trends[i].num) );
+//				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"minint\":%ld,\"maxint\":%ld,\"avgint\":%ld,",
+//			   		trends[i].value_min.ui64,
+//					trends[i].value_max.ui64,
+//					(trends[i].value_avg.ui64.lo / trends[i].num) );
 				break;
 		}
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"count\":%d", trends[i].num);
-
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
+		zbx_json_adduint64(&json, "count",trends[i].num );
+		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"count\":%d", trends[i].num);
+		zbx_json_close(&json);
+		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
 		num++;
 	}
-    zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"]}\n");
+	zbx_json_close(&json);
 
-    //zabbix_log(LOG_LEVEL_INFORMATION,"TRENDS DATA %s",req_buffer);
-	if (num > 0)
-		ret=glb_process_worker_request(conf->worker, req_buffer, &response);
+    zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset,"}\n");
+
+    LOG_DBG("Sending trends data %s", json.buffer);
 	
-    zbx_free(req_buffer);
+	if (num > 0)
+		ret=glb_process_worker_request(conf->worker, json.buffer, &response);
+	
+    
+	zbx_json_free(&json);
     zbx_free(response);
 
 	return ret;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	LOG_DBG("End of %s()", __func__);
 	return SUCCEED;
 }
 
