@@ -545,13 +545,12 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 {
 	char *response=NULL;
-    char *req_buffer=NULL;
-    size_t	req_alloc = 0, req_offset = 0;
+    //char *req_buffer=NULL;
+//    size_t	req_alloc = 0, req_offset = 0;
        
-	int i,j,num=0;
-    int ret=FAIL;
-	char buffer [MAX_STRING_LEN*2];
-	char *precision="%0.6f,";
+	int i,num=0;
+	//char buffer [MAX_STRING_LEN*2];
+	//char *precision="%0.6f,";
 	struct zbx_json json;
 
 	LOG_DBG("Started %s()", __func__);	
@@ -572,68 +571,44 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 		if (0 == conf->write_trend_types[trends[i].value_type]) 
 			continue;
 		
-	//	glb_escape_worker_string(trends[i].host_name,buffer);
-	//	
-	//	if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
-	//	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
 		zbx_json_addobject(&json, NULL);
 		zbx_json_addstring(&json,"hostname",trends[i].host_name,ZBX_JSON_TYPE_STRING);
 		zbx_json_addstring(&json,"item_key",trends[i].item_key,ZBX_JSON_TYPE_STRING);
 		
 	
-//		buffer[0]='\0';
-//		glb_escape_worker_string(trends[i].item_key,buffer);
-//		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
-		
 		zbx_json_adduint64(&json,"itemid",trends[i].itemid);
 		zbx_json_adduint64(&json,"time",trends[i].clock);
 		zbx_json_adduint64(&json,"value_type", trends[i].value_type);
 
-
-//		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time\":%d, \"value_type\":%d, ", 
-//				trends[i].itemid,trends[i].clock, trends[i].value_type);
-    	
 		switch (trends[i].value_type) {
 			case ITEM_VALUE_TYPE_FLOAT:
 				zbx_json_addfloat(&json,"min",trends[i].value_min.dbl);
 				zbx_json_addfloat(&json,"max",trends[i].value_max.dbl);
 				zbx_json_addfloat(&json,"avg",trends[i].value_avg.dbl);
-//				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"min\":%0.4f, \"max\":%0.4f,\"avg\":%0.4f,",
-//					trends[i].value_min.dbl,
-//					trends[i].value_max.dbl,
-//					trends[i].value_avg.dbl);
 				break;
+
 			case ITEM_VALUE_TYPE_UINT64:
 				zbx_json_adduint64(&json,"minint",trends[i].value_min.ui64);
 				zbx_json_adduint64(&json,"maxint",trends[i].value_max.ui64);
 				zbx_json_adduint64(&json,"avgint", (trends[i].value_avg.ui64.lo /  trends[i].num) );
-//				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"minint\":%ld,\"maxint\":%ld,\"avgint\":%ld,",
-//			   		trends[i].value_min.ui64,
-//					trends[i].value_max.ui64,
-//					(trends[i].value_avg.ui64.lo / trends[i].num) );
 				break;
+
 		}
 		zbx_json_adduint64(&json, "count",trends[i].num );
-		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"count\":%d", trends[i].num);
 		zbx_json_close(&json);
-		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
 		num++;
 	}
 	zbx_json_close(&json);
-
     zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset,"}\n");
 
     LOG_DBG("Sending trends data %s", json.buffer);
 	
 	if (num > 0)
-		ret=glb_process_worker_request(conf->worker, json.buffer, &response);
-	
+		glb_process_worker_request(conf->worker, json.buffer, &response);
     
 	zbx_json_free(&json);
     zbx_free(response);
-
-	return ret;
-
+	
 	LOG_DBG("End of %s()", __func__);
 	return SUCCEED;
 }
