@@ -194,12 +194,12 @@ int glb_poller_delete_item(void *poller_data, u_int64_t itemid) {
 	if (NULL != (glb_item = (GLB_POLLER_ITEM *)zbx_hashset_search(&poll->items, &itemid))){
 		DEBUG_ITEM(itemid,"Item has been deleted, removing from the poller config");		
 		
-		LOG_INF("Calling item delete");
+		LOG_DBG("Calling item delete");
 		item_free_func(&poll->poller, glb_item);
 
 		//zbx_heap_strpool_release(glb_item->delay);
 		zbx_hashset_remove_direct(&poll->items, glb_item);
-		LOG_INF("in: %s: ended",__func__);
+		LOG_DBG("in: %s: ended",__func__);
 		return SUCCEED;
 	} 
 	else {
