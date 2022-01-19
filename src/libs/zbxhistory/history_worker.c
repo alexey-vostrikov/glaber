@@ -448,12 +448,15 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 {
 	char *response=NULL;
-    char *req_buffer=NULL;
-    size_t	req_alloc = 0, req_offset = 0;
+  //  char *req_buffer=NULL;
+ //   size_t	req_alloc = 0, req_offset = 0;
     ZBX_DC_HISTORY		*h;
     int i,j,num=0;
     int ret=FAIL;
-	char buffer [MAX_STRING_LEN*20];
+	//char buffer [MAX_STRING_LEN*20];
+	struct zbx_json json;
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Started %s(), %d values", __func__,history_num);	
 		
@@ -461,8 +464,10 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 	
 	if (0 == history_num) 
 		return SUCCEED;
+	zbx_json_addstring(&json,"request","put_history",ZBX_JSON_TYPE_STRING);
+	zbx_json_addarray(&json,"metrics");
 	
-	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_history\", \"metrics\":[");
+	//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_history\", \"metrics\":[");
  
 	for (i = 0; i < history_num; i++)
 	{
@@ -474,57 +479,71 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
 			continue;
 	
-		if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
+	//	if (num) zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",");
 		//TODO: fix to use normal JSON generation here!!!!!!
-		glb_escape_worker_string(h->host_name,buffer);
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
-		buffer[0]='\0';
+	//	glb_escape_worker_string(h->host_name,buffer);
+		zbx_json_addobject(&json, NULL);
 		
-		glb_escape_worker_string(h->item_key,buffer);
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
+		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"hostname\":\"%s\",", buffer);
+		//buffer[0]='\0';
 		
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time_sec\":%d, \"time_ns\":%d, \"value_type\":%d, ", 
-				h->itemid,h->ts.sec,h->ts.ns, h->value_type);
+		//glb_escape_worker_string(h->item_key,buffer);
+		zbx_json_addstring(&json,"item_key",h->item_key,ZBX_JSON_TYPE_STRING);
+		zbx_json_adduint64(&json,"itemid",h->itemid);
+		zbx_json_adduint64(&json,"time_sec",h->ts.sec);
+		zbx_json_adduint64(&json,"time_ns",h->ts.ns);
+		zbx_json_addint64(&json,"value_type", h->value_type);
+
+		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset," \"item_key\":\"%s\",", buffer);
+		//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"itemid\":%ld, \"time_sec\":%d, \"time_ns\":%d, \"value_type\":%d, ", 
+		//		h->itemid,h->ts.sec,h->ts.ns, h->value_type);
     		
 		//type-dependent part
 		switch (h->value_type) {
 			case ITEM_VALUE_TYPE_UINT64:
-	    		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_int\":%ld" ,h->value.ui64);
+	    		zbx_json_addint64(&json, "value_int", h->value.ui64);
+				//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_int\":%ld" ,h->value.ui64);
 				break;
 			case ITEM_VALUE_TYPE_FLOAT: 
-		   		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_dbl\":%f",h->value.dbl);
+		   		zbx_json_addfloat(&json, "value_dbl", h->value.dbl);
+				//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_dbl\":%f",h->value.dbl);
 				break;
 			case ITEM_VALUE_TYPE_LOG:
 				//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data: %s",h->value.log->value);
 				if (h->value.log) {
-					buffer[0]=0;
+					//buffer[0]=0;
+					zbx_json_adduint64(&json,"logeventid",h->value.log->logeventid);
+					zbx_json_adduint64(&json,"severity",h->value.log->severity);
 
-					zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"logeventid\":%d, \"severity\":%d",h->value.log->logeventid,h->value.log->severity);
+					//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"logeventid\":%d, \"severity\":%d",h->value.log->logeventid,h->value.log->severity);
 					
 					if ( NULL != h->value.log->source) {
-						glb_escape_worker_string(h->value.log->source,buffer);  
-						zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"source\":\"%s\"",h->value.log->source);
+						//glb_escape_worker_string(h->value.log->source,buffer);  
+						//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"source\":\"%s\"",h->value.log->source);
+						zbx_json_addstring(&json,"source",h->value.log->source,ZBX_JSON_TYPE_STRING);
 					}	
 				
 					//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 3"); 
 					if ( NULL != h->value.log->value) {
-						glb_escape_worker_string(h->value.log->value,buffer);  
+					//	glb_escape_worker_string(h->value.log->value,buffer);  
 					//	zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 4"); 
-						zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"value_str\":\"%s\"", buffer);
+					//	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,",\"value_str\":\"%s\"", buffer);
+						zbx_json_addstring(&json, "value_str", h->value.log->value, ZBX_JSON_TYPE_STRING);
 					}
 				}
+				
 				//zabbix_log(LOG_LEVEL_INFORMATION,"Writing log data 5"); 
 				//zabbix_log(LOG_LEVEL_INFORMATION,"Will send %s",req_buffer);
 				break;
 				
 			case ITEM_VALUE_TYPE_STR:
 			case ITEM_VALUE_TYPE_TEXT:
-				buffer[0]=0;
+				//buffer[0]=0;
 		
-				glb_escape_worker_string(h->value.str,buffer);  
+				//glb_escape_worker_string(h->value.str,buffer);  
 				//zabbix_log(LOG_LEVEL_INFORMATION,"Transform: %s -> %s",h->value.str,buffer);
-				
-				zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_str\":\"%s\"", buffer);
+				zbx_json_addstring(&json, "value_str", h->value.str, ZBX_JSON_TYPE_STRING);
+				//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"\"value_str\":\"%s\"", buffer);
 				break;
 			default:
 				LOG_WRN("Wrong value type supplied");
@@ -532,22 +551,23 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 				exit(-1);
 
 		}
-		
-		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
+		zbx_json_close(&json);
+//		zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"}");
 //		zabbix_log(LOG_LEVEL_INFORMATION,"Will send %s",req_buffer);
 		num++;
 	}
-  
+  	zbx_json_close(&json);
   	//adding empty line to the request's end to signal end of request;
-	zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"]}\n");
+	zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset,"}\n");
+	
 
   // 	LOG_INF("sending to the worker: %s",req_buffer);
 	if (num > 0)
-		ret=glb_process_worker_request(conf->worker, req_buffer, &response);
+		ret=glb_process_worker_request(conf->worker, json.buffer, &response);
 	
-    zbx_free(req_buffer);
+   //zbx_free(req_buffer);
     zbx_free(response);
-
+	zbx_json_free(&json);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 	return ret;
 }

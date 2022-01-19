@@ -21,7 +21,7 @@
 define('ZABBIX_VERSION',		'5.4.2');
 define('ZABBIX_API_VERSION',	'5.4.2');
 define('ZABBIX_EXPORT_VERSION',	'5.4');
-define('GLABER_VERSION','2.7.3');
+define('GLABER_VERSION','2.7.5');
 
 define('ZABBIX_DB_VERSION',		5040000);
 
@@ -1843,6 +1843,7 @@ define('ZBX_STYLE_LINK_ACTION', 'link-action');
 define('ZBX_STYLE_LINK_ALT', 'link-alt');
 define('ZBX_STYLE_LIST_CHECK_RADIO', 'list-check-radio');
 define('ZBX_STYLE_LIST_TABLE', 'list-table');
+define('GLB_STYLE_DATA_TABLE', 'data-table');
 define('ZBX_STYLE_LIST_TABLE_FOOTER', 'list-table-footer');
 define('ZBX_STYLE_LIST_VERTICAL_ACCORDION', 'list-vertical-accordion');
 define('ZBX_STYLE_LIST_ACCORDION_FOOT', 'list-accordion-foot');
