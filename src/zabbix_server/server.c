@@ -368,8 +368,6 @@ zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 
-int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_ENABLED;
-
 char	*CONFIG_WEBSERVICE_URL	= NULL;
 
 volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
@@ -1487,13 +1485,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zbx_check_db();
 
 	DBcheck_character_set();
-
-	if (SUCCEED != DBcheck_double_type())
-	{
-		CONFIG_DOUBLE_PRECISION = ZBX_DB_DBL_PRECISION_DISABLED;
-		ZBX_DOUBLE_EPSILON = 0.000001;
-		zabbix_log(LOG_LEVEL_WARNING, "database is not upgraded to use double precision values");
-	}
 
 	if (SUCCEED != zbx_db_check_instanceid())
 		exit(EXIT_FAILURE);

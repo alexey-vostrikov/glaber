@@ -1695,7 +1695,7 @@ char	*zbx_expression_extract_constant(const char *src, const zbx_strloc_t *loc);
 
 zbx_log_value_t	*zbx_log_value_dup(const zbx_log_value_t *src);
 
-int	zbx_validate_value_dbl(double value, int dbl_precision);
+int	zbx_validate_value_dbl(double value);
 
 void	zbx_update_env(double time_now);
 int	zbx_get_agent_item_nextcheck(zbx_uint64_t itemid, const char *delay, int now,

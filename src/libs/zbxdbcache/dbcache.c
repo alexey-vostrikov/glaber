@@ -61,7 +61,6 @@ static char		*sql = NULL;
 static size_t		sql_alloc = 4 * ZBX_KIBIBYTE;
 
 extern unsigned char	program_type;
-extern int		CONFIG_DOUBLE_PRECISION;
 extern char		*CONFIG_EXPORT_DIR;
 extern int CONFIG_CLUSTER_SERVER_ID;
 extern u_int64_t CONFIG_DEBUG_ITEM;
@@ -1828,9 +1827,10 @@ static void	dc_history_set_value(ZBX_DC_HISTORY *hdata, unsigned char value_type
 {
 	char	*errmsg = NULL;
 
-	if (FAIL == zbx_variant_to_value_type(value, value_type, CONFIG_DOUBLE_PRECISION, &errmsg))
+	if (FAIL == zbx_variant_to_value_type(value, value_type, &errmsg))
 	{
 		dc_history_set_error(hdata, errmsg);
+		DEBUG_ITEM(hdata->itemid,"Item type coversion error: %s", errmsg);
 		return;
 	}
 
@@ -1893,7 +1893,8 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 
 	//if (0 == (hdata->flags & ZBX_DC_FLAG_NOHISTORY))
 	//	hdata->ttl = item->history_sec;
-
+	DEBUG_ITEM(hdata->itemid,"in Normalizing item, state is %d", hdata->state);
+	
 	if (item->value_type == hdata->value_type)
 	{
 		/* truncate text based values if necessary */
@@ -1910,19 +1911,23 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 				logvalue[zbx_db_strlen_n(logvalue, HISTORY_LOG_VALUE_LEN)] = '\0';
 				break;
 			case ITEM_VALUE_TYPE_FLOAT:
-				if (FAIL == zbx_validate_value_dbl(hdata->value.dbl, CONFIG_DOUBLE_PRECISION))
+				if (FAIL == zbx_validate_value_dbl(hdata->value.dbl))
 				{
-					char	buffer[ZBX_MAX_DOUBLE_LEN + 1];
-
-					dc_history_set_error(hdata, zbx_dsprintf(NULL,
-							"Value %s is too small or too large.",
-							zbx_print_double(buffer, sizeof(buffer), hdata->value.dbl)));
+					char	buffer[ZBX_MAX_DOUBLE_LEN + 1], buff_str[MAX_STRING_LEN];
+					glb_cache_item_meta_t meta = {0};
+					
+					DEBUG_ITEM(hdata->itemid,"Value is detected to bee too small or too large");
+					zbx_snprintf(buff_str, MAX_STRING_LEN, "Value %s is too small or too large.", zbx_print_double(buffer, sizeof(buffer), hdata->value.dbl));
+					//todo: insert proper setting of item status here
+					meta.error = buff_str;
+					glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG, hdata->value_type);
 				}
+				DEBUG_ITEM(hdata->itemid,"Item validated as float");
 				break;
 		}
 		return;
 	}
-
+	DEBUG_ITEM(hdata->itemid,"in Normalizing item, will convert type, state is %d", hdata->state);
 	switch (hdata->value_type)
 	{
 		case ITEM_VALUE_TYPE_FLOAT:
@@ -1941,9 +1946,11 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 			hdata->value.log->value = NULL;
 			break;
 	}
-
+	DEBUG_ITEM(hdata->itemid,"in Normalizing item, after 1st convert type, state is %d", hdata->state);
 	dc_history_set_value(hdata, item->value_type, &value_var);
+	DEBUG_ITEM(hdata->itemid,"in Normalizing item, after dc_hist set val, state is %d", hdata->state);
 	zbx_variant_clear(&value_var);
+
 }
 
 
@@ -2409,10 +2416,13 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 
 	for (i = 0; i < history_num; i++)
 	{
+	
 		ZBX_DC_HISTORY	*h = &history[i];
 		const DC_ITEM	*item;
 		zbx_item_diff_t	*diff;
 		int		index;
+		
+		DEBUG_ITEM(h->itemid,"In prepare history, state is %d", h->state);
 
 		if (FAIL == (index = zbx_vector_uint64_bsearch(itemids, h->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
 		{
@@ -2423,6 +2433,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 
 		if (SUCCEED != errcodes[index])
 		{
+			DEBUG_ITEM(h->itemid,"Setting undefined value flag, due to errcode");
 			h->flags |= ZBX_DC_FLAG_UNDEF;
 			continue;
 		}
@@ -2431,6 +2442,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 
 		if (ITEM_STATUS_ACTIVE != item->status || HOST_STATUS_MONITORED != item->host.status)
 		{
+			DEBUG_ITEM(h->itemid,"Setting undefined value flag, due to item status");
 			h->flags |= ZBX_DC_FLAG_UNDEF;
 			continue;
 		}
@@ -2450,8 +2462,9 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		h->host_name = (char *)item->host.host;
 		h->item_key = (char *)item->key_orig;
 		h->hostid = item->host.hostid;
-
+		DEBUG_ITEM(h->itemid,"Normalizing item, state is %d", h->state);
 		normalize_item_value(item, h);
+		DEBUG_ITEM(h->itemid,"Finished normalizing item, state is %d", h->state);
 		DCinventory_value_add(inventory_values, item, h);
 
 		if (0 != item->host.proxy_hostid && FAIL == is_item_processed_by_server(item->type, item->key_orig))
@@ -2460,8 +2473,10 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 
 			zbx_vector_uint64_pair_append(proxy_subscribtions, p);
 		}
+		DEBUG_ITEM(h->itemid,"finished processing, state is %d", h->state);
 	}
-
+	
+	
 	zbx_vector_ptr_sort(inventory_values, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -3374,10 +3389,11 @@ static void	dc_local_add_history_text(zbx_uint64_t itemid, unsigned char item_va
 		memcpy(&string_values[string_values_offset], value_orig, item_value->value.value_str.len);
 		string_values_offset += item_value->value.value_str.len;
 	}
-	else
+	else {
 		item_value->value.value_str.len = 0;
-	
-	DEBUG_ITEM(itemid, "Added to local cache as text");
+		DEBUG_ITEM(itemid, "NO VALUE FLAG IS SET");
+	}
+	DEBUG_ITEM(itemid, "Added to local cache as text '%s'",value_orig);
 }
 
 static void	dc_local_add_history_log(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,
