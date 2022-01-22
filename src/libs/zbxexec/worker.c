@@ -31,13 +31,6 @@
 
 extern int CONFIG_TIMEOUT;
 
-//todo: look if there is proc in the dbconfig.c
-//workers are yet process-specific since they use FD , as soom
-//as they'll be more universal (perhaps, will use unix domains or tcp addr for
-//communitcation, then they could be global
-//int zbx_dc_add_ext_worker(char *path, char *params, int max_calls, int timeout, int mode_to_writer, int mode_from_writer);
-//static zbx_hashset_t *workers = NULL;
-
 static int get_worker_mode(char *mode)
 {
     if (!strcmp(mode, "new_line"))
@@ -241,28 +234,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         close((to_child)[0]);
         close((to_child)[1]);
 
-        /* set the child as the process group leader, otherwise orphans may be left after timeout */
-        //this is from original zabbix code, was trying to find defunct processes with it
-        //but it's somenthing else, for a while, i don't see really much use for it here
-
-        //if (-1 == setpgid(0, 0))
-        // {
-        //   zabbix_log(LOG_LEVEL_ERR, "%s(): failed to create a process group: %s", __func__, zbx_strerror(errno));
-        //   exit(EXIT_FAILURE);
-        // }
-
-        //it might be a good idea to conform a security considerations here
-        //like close unnecessary file handles before we'll get replaced with the worker
-        //but..... hey, would you run an untrusted worker on your monitoring system?
-        //i don't think so... Even if someone will, than the real problem is the
-        // person's stupidity and not lack of security in the first place...
-        //And it's not something i can fix here in the code... (sure i mean the stupidity)
-
-        //ok, let the worker go
-        //this params processing code must be moved to the worker init 
-        
-        
-        //execl("/bin/sh", "sh", "-c", worker->path, worker->params, (char *)NULL);
+      
         LOG_DBG("Starting worker %s", worker->path);
 
         for (i=0; NULL != worker->args[i]; i++) {
@@ -280,16 +252,10 @@ static int restart_worker(GLB_EXT_WORKER *worker)
     //only the parent gets here, let's close unnecessary fds
     close(to_child[0]);
     close(from_child[1]);
-
-    //setting to ignore sigchild which in trun let kernel know that
-    //it's ok to shutdown childs completely
-    //signal(SIGCHLD, SIG_IGN);
-
-    //and make file handles to the ends we need
+    
     worker->pipe_to_worker = to_child[1];
     worker->pipe_from_worker = from_child[0];
-    //zabbix_log(LOG_LEVEL_INFORMATION,"Set worker pid to %d", worker->pid);
-    //resetting run count
+   
     worker->calls = 0;
    
     zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
@@ -351,6 +317,8 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     int request_len = 0;
     int write_fail = 0;
     int i;
+    int wr_len = 0, eol_len;
+    char *eol = "\n";
 
     if (worker->calls++ >= worker->max_calls)
     {
@@ -388,52 +356,37 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         return FAIL;
     }
 
-    // zabbix_log(LOG_LEVEL_INFORMATION,"Communicating to script, to_script:%d, from script:%d",worker->mode_to_worker,worker->mode_from_worker);
-    //checking of there are no impoper end of line chars
-    switch (worker->mode_to_worker)
-    {
-    case GLB_WORKER_MODE_NEWLINE:
-        zabbix_log(LOG_LEVEL_DEBUG, "Single line request processing");
-        //checking that the only place we see a new line is the end of request, that's probably internal code fail
-        //as this request might only come from glaber code
-        if (strstr(request, "\n") != request + request_len - 1)
-        {
-            THIS_SHOULD_NEVER_HAPPEN;
-            zabbix_log(LOG_LEVEL_INFORMATION, "No new line characer or it is inside the request %s", request);
-            return FAIL;
-        }
-        break;
-
-    case GLB_WORKER_MODE_EMPTYLINE:
-        zabbix_log(LOG_LEVEL_INFORMATION, "Empty line request processing");
-        //make sure that all the request is just an empty line or end of line is in the end of request
-        if (!strcmp(request, "\n") || strstr(request, "\n\n") != request + request_len - 2)
-        {
-            zabbix_log(LOG_LEVEL_WARNING, "Request FAIL: no empty line or it's inside the request: '%s'", request);
-         
-            for (i = request_len - 10; i < request_len; i++)
-            {
-                zabbix_log(LOG_LEVEL_DEBUG, "%d %d %d", request_len, i, request[i]);
-            }
-
-            return FAIL;
-        }
-        break;
+    if (GLB_WORKER_MODE_EMPTYLINE ==  worker->mode_to_worker) {
+        eol="\n\n";
+        eol_len = strlen(eol);
     }
-    
+
+    if (NULL != strstr(request, eol)) {
+        THIS_SHOULD_NEVER_HAPPEN;
+         zabbix_log(LOG_LEVEL_INFORMATION, "New line marker inside the request %s, shouldn't be, this is a bug", request);
+         exit(-1);
+         return FAIL;
+    }
+       
     zbx_alarm_on(worker->timeout);
     
     //so, lets write to the worker's pipe
-    int wr_len = write(worker->pipe_to_worker, request, strlen(request));
+    wr_len = write(worker->pipe_to_worker, request, strlen(request));
 
     if (0 > wr_len)
     {
         zabbix_log(LOG_LEVEL_WARNING, "Couldn't write to the script's stdin: %d", errno);
         write_fail = 1;
-    };
+    }
+    
+    if (!write_fail) 
+        if (0 >(eol_len = write(worker->pipe_to_worker, eol, strlen(eol)))) {
+            zabbix_log(LOG_LEVEL_WARNING, "Couldn't write eol marker to the script's stdin: %d", errno);
+            write_fail = 1;
+        }
+    
 
-    if (!write_fail)
-        zbx_alarm_off();
+    zbx_alarm_off();
 
     if (wr_len != strlen(request))
     {
@@ -442,7 +395,6 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
         return FAIL;
     }
 
-    //now, let's see if we completed the write in time
     if (SUCCEED == zbx_alarm_timed_out() || 1 == write_fail)
     {
         zabbix_log(LOG_LEVEL_WARNING, "%s: FAIL: script %s took too long to read input data, it will be restarted", __func__, worker->path);
@@ -488,18 +440,16 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
             //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() there are data buffered ", __func__);
             if ( NULL != (request_end = strstr(circle_buffer + start, delim) )) {
                 //ok, there is complete request data in the buffer, returning it
-                //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found some data ready to send ", __func__);
                 *response = circle_buffer + start;
                 request_end[0]=0; //setting 0 at the end of responce 
                 zabbix_log(LOG_LEVEL_DEBUG, "In %s() will respond with: %s", __func__, *response);
          
                 start = request_end - circle_buffer + strlen(delim); //setting start to the begining of the new responce
-                //zabbix_log(LOG_LEVEL_INFORMATION, "In %s(): buffer remainings '%s' strlen is %d", __func__, circle_buffer + start, strlen(circle_buffer + start));
+                
                 if (0 == circle_buffer[start] ) { //reaching 0 means evth has been sent from the buffer
                         datapresent = 0;
                         start = 0;
                 }
-                //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() datapresent is set to %d ", __func__,datapresent);
                 return SUCCEED;
             } else { //there is an incomplete data sitting in the buffer which starts as start marker
                 zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found incomplete data: %s at %ld", __func__, circle_buffer + start, start);

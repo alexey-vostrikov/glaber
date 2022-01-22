@@ -108,13 +108,13 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
 	zbx_history_record_t	hr;
 	zbx_json_type_t type;
 	size_t allocd=0,offset=0;
-	//creating the request
+
 	*buffer=NULL;
 
 	if (0 == conf->read_trend_types[value_type])	
 			return FAIL;
 	
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_trends\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }\n",
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_trends\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }",
 				itemid,value_type,start,aggregates,end);
 	
 	
@@ -207,13 +207,13 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 	zbx_history_record_t	hr;
 	zbx_json_type_t type;
 	size_t allocd=0,offset=0;
-	//creating the request
+
 	*buffer=NULL;
 	
 	if (0 == conf->read_agg_types[value_type])	
 			return FAIL;
 	
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_agg\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }\n",
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_agg\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }",
 				itemid,value_type,start,aggregates,end);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Sending request %s",request);
@@ -325,11 +325,11 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 	}
 	
 	//creating the request
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_history\", \"itemid\":%ld, \"start\": %d, \"count\":%d, \"end\":%d, \"value_type\":%d }\n",
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_history\", \"itemid\":%ld, \"start\": %d, \"count\":%d, \"end\":%d, \"value_type\":%d }",
 				itemid,start,count,end,value_type);
 
 	DEBUG_ITEM(itemid, "Requested from the history via history worker, start:%d, count:%d, end:%d ",start, count, end);
-//	LOG_INF("Sending request to history worker: %s",request);
+
 	glb_process_worker_request(conf->worker, request, &response);
 	
 	DEBUG_ITEM(itemid, "Got response:%s ",response);
@@ -518,8 +518,7 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		num++;
 	}
   	zbx_json_close(&json);
-	zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset,"}\n");
-	
+
   	LOG_DBG("sending to the worker: %s", json.buffer);
 
 	if (num > 0)
@@ -545,12 +544,8 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 {
 	char *response=NULL;
-    //char *req_buffer=NULL;
-//    size_t	req_alloc = 0, req_offset = 0;
-       
 	int i,num=0;
-	//char buffer [MAX_STRING_LEN*2];
-	//char *precision="%0.6f,";
+
 	struct zbx_json json;
 
 	LOG_DBG("Started %s()", __func__);	
@@ -564,8 +559,6 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 	zbx_json_addstring(&json,"request","put_history",ZBX_JSON_TYPE_STRING);
 	zbx_json_addarray(&json,"aggmetrics");
 	
-	//zbx_snprintf_alloc(&req_buffer,&req_alloc,&req_offset,"{\"request\":\"put_trends\", \"aggmetrics\":[");
-    
     for (i = 0; i < trends_num; i++)
 	{
 		if (0 == conf->write_trend_types[trends[i].value_type]) 
@@ -599,7 +592,10 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 		num++;
 	}
 	zbx_json_close(&json);
-    zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset,"}\n");
+	
+	LOG_DBG("Syncing %d trend values", num);
+   // zbx_json_addraw(&json,NULL,"\n");
+	//zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset + 1,"\n");
 
     LOG_DBG("Sending trends data %s", json.buffer);
 	

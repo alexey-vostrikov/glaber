@@ -281,7 +281,7 @@ void	zbx_json_adduint64(struct zbx_json *j, const char *name, zbx_uint64_t value
 void	zbx_json_addint64(struct zbx_json *j, const char *name, zbx_int64_t value);
 void	zbx_json_addraw(struct zbx_json *j, const char *name, const char *data);
 void	zbx_json_addfloat(struct zbx_json *j, const char *name, double value);
-int	zbx_json_close(struct zbx_json *j);
+int		zbx_json_close(struct zbx_json *j);
 
 int		zbx_json_open(const char *buffer, struct zbx_json_parse *jp);
 const char	*zbx_json_next(const struct zbx_json_parse *jp, const char *p);

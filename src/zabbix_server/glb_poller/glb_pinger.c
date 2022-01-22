@@ -335,7 +335,7 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
         DEBUG_ITEM(glb_item->itemid, "Host %s resolved to %s will cache it for %d seconds",pinger_item->addr, ip, GLB_DNS_CACHE_TIME);
     }
     
-    zbx_snprintf(request,MAX_STRING_LEN,"%s %d %ld\n",pinger_item->ip, pinger_item->size,glb_item->itemid);
+    zbx_snprintf(request,MAX_STRING_LEN,"%s %d %ld",pinger_item->ip, pinger_item->size,glb_item->itemid);
     zabbix_log(LOG_LEVEL_DEBUG, "Sending request for ping: %s",request);
     
     
