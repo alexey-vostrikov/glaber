@@ -918,6 +918,7 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
 
     if (h->ts.sec > now + 300) {
         LOG_INF("Warn: item's %ld timestamp %d is too much ahead of the real time %d, not adding to the cache", elem->id, h->ts.sec, now);
+        THIS_SHOULD_NEVER_HAPPEN;
         return FAIL;
     }
 
@@ -948,7 +949,7 @@ int glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_H
         ZBX_DC_HISTORY *h;
         h = (ZBX_DC_HISTORY *)&history[i];
         
-        DEBUG_ITEM(h->itemid,"Adding to value cache, flags is %d", h->flags);
+        DEBUG_ITEM(h->itemid,"Adding to value cache, flags is %d state is %d", h->flags, h->state);
 
         LOG_DBG("Adding value to cache id %ld, value %d out of %d, timestamp is %d", h->itemid, i, history_num, h->ts.sec);
 
@@ -1105,8 +1106,7 @@ int glb_cache_items_marshall_item_cb(glb_cache_elem_t *elem, void *data)
 
     item_elem_t *elm = (item_elem_t *)elem->data;
     int head_idx;
-    //zbx_json_addobject(json,NULL);        
-
+   
     zbx_json_addint64(json,"itemid", elem->id);
     zbx_json_addint64(json,"value_type", elm->value_type);
     zbx_json_addint64(json,"db_fetched_time", elm->db_fetched_time); 
@@ -1117,6 +1117,7 @@ int glb_cache_items_marshall_item_cb(glb_cache_elem_t *elem, void *data)
     zbx_json_addint64(json,"state", elm->meta.state);
     zbx_json_addint64(json,"lastdata", elm->meta.lastdata);
     zbx_json_addint64(json,"nextcheck", elm->meta.nextcheck);
+
     if (NULL!= elm->meta.error)
         zbx_json_addstring(json,"error", elm->meta.error,ZBX_JSON_TYPE_STRING);
     
@@ -1149,7 +1150,7 @@ int glb_cache_items_marshall_item_cb(glb_cache_elem_t *elem, void *data)
         zbx_json_close(json);
     }
     
-    return(glb_tsbuff_get_count(&elm->tsbuff));
+    return (glb_tsbuff_get_count(&elm->tsbuff));
   }
 
 static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm) {
@@ -1238,6 +1239,7 @@ static int parse_json_item_values(struct zbx_json_parse *jp, glb_cache_elem_t *e
     int i=0;
     item_elem_t *elm = (item_elem_t*) elem->data;
     zbx_history_record_t h = {0};
+
     while (NULL != (value_ptr = zbx_json_next(jp, value_ptr))) {
         
         if (SUCCEED == zbx_json_brackets_open(value_ptr,&jp_value) &&
