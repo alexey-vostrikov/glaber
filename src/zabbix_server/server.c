@@ -164,6 +164,9 @@ static struct zbx_option	longopts[] =
 	{NULL}
 };
 
+void DC_set_debug_item(u_int64_t);
+void DC_set_debug_trigger(u_int64_t);
+
 /* short options */
 static char	shortopts[] = "c:hVR:f";
 
@@ -179,6 +182,7 @@ int		process_num		= 0;
 int		server_num		= 0;
 
 u_int64_t CONFIG_DEBUG_ITEM = 0;
+u_int64_t CONFIG_DEBUG_TRIGGER = 0;
 
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
@@ -824,6 +828,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			100},
 		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
 			PARM_OPT,	0,			0},
+		{"DebugTrigger",			&CONFIG_DEBUG_TRIGGER,			TYPE_INT,
+			PARM_OPT,	0,			0},
 	//	{"DisableInPollerPreproc",			&CONFIG_DISABLE_INPOLLER_PREPROC,			TYPE_INT,
 	//		PARM_OPT,	0,			0},
 		{"EnableHostDeactivation",			&CONFIG_ENABLE_HOST_DEACTIVATION,			TYPE_INT,
@@ -1394,6 +1400,9 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
+	DC_set_debug_item(CONFIG_DEBUG_ITEM);
+	DC_set_debug_trigger(CONFIG_DEBUG_TRIGGER);
+	
 	if (SUCCEED != init_selfmon_collector(&error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize self-monitoring: %s", error);

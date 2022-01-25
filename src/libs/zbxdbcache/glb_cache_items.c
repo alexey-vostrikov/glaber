@@ -212,7 +212,7 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
     record->timestamp.sec = c_val->time_sec;
 }
 
-int glb_cache_hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_val, unsigned char value_type, items_cfg_t *i_cfg)
+int glb_cache_hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_val, int time_sec, unsigned char value_type, items_cfg_t *i_cfg)
 {
 
     glb_cache_item_variant_clear(&cache_val->value);
@@ -273,6 +273,7 @@ int glb_cache_hist_val_to_value(glb_cache_item_value_t *cache_val, history_value
         THIS_SHOULD_NEVER_HAPPEN;
         exit(-1);
     }
+     cache_val->time_sec = time_sec;
 }
 
 int glb_cache_dc_hist_to_value(glb_cache_item_value_t *cache_val, ZBX_DC_HISTORY *hist_v)
@@ -398,7 +399,11 @@ static int glb_cache_fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, 
     if (elm->db_fetched_time > now)
         elm->db_fetched_time = now;
 
-   
+  // LOG_INF("GLB_CACHE: will be fetching itme %ld by count from the DB, elem's db_fetched_time is %d, db_fetched_count is %d, head time is %d, count is %d", 
+   //             itemid, elm->db_fetched_time, elm->db_fetched_count, head_time, count);
+    
+   // glb_tsbuff_dump(&elm->tsbuff);
+    
     DEBUG_ITEM(itemid, "GLB_CACHE: will be fetching by count from the DB, elem's db_fetched_time is %d, db_fetched_count is %d, head time is %d, count is %d", 
                 elm->db_fetched_time, elm->db_fetched_count, head_time, count);
 
@@ -412,9 +417,10 @@ static int glb_cache_fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, 
 
     zbx_history_record_vector_create(&values);
        
-    //LOG_INF("CACHE DB COUNT GET: itemid:%ld, head_time: %d, duration: %d", itemid, head_time, count);
+   // LOG_INF("CACHE DB COUNT GET: itemid:%ld, head_time: %d, duration: %d", itemid, head_time, count);
     if (SUCCEED == (ret = glb_history_get(itemid, elm->value_type, 0, count, head_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values)))
     {
+        //LOG_INF("GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values", itemid, values.values_num);
         DEBUG_ITEM(itemid, "GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values", itemid, values.values_num);
         elm->db_fetched_count = MAX(elm->db_fetched_count, count);
         
@@ -424,11 +430,11 @@ static int glb_cache_fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, 
 
             zbx_vector_history_record_sort(&values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
             history_value_t hist_v;
-
+            
             for (i = 0; i < values.values_num; i++)
             {
                 if (NULL != (c_val = glb_tsbuff_add_to_tail(&elm->tsbuff, values.values[i].timestamp.sec)))
-                    glb_cache_hist_val_to_value(c_val, &values.values[i].value, elm->value_type, i_cfg);
+                    glb_cache_hist_val_to_value(c_val, &values.values[i].value, values.values[i].timestamp.sec, elm->value_type, i_cfg);
             }
         }
         else                                  
@@ -538,7 +544,7 @@ static int glb_cache_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
                 if (NULL != (c_val = glb_tsbuff_add_to_tail(&elm->tsbuff, values.values[i].timestamp.sec)))
                 {
                     DEBUG_ITEM(itemid, "Added value from the history to the cache with timestamp %d", values.values[i].timestamp.sec);
-                    glb_cache_hist_val_to_value(c_val, &values.values[i].value, elm->value_type, i_cfg);
+                    glb_cache_hist_val_to_value(c_val, &values.values[i].value, values.values[i].timestamp.sec, elm->value_type, i_cfg);
                 }
                 else
                 {
@@ -642,26 +648,27 @@ static int cache_fetch_count_cb(glb_cache_elem_t *elem, void *req_data)
 
     fetch_req_t *req = (fetch_req_t *)req_data;
     item_elem_t *elm = (item_elem_t *)elem->data;
+
     int head_idx = -1, need_count = 0;
 
     if (req->value_type != elm->value_type) {
-
+       // LOG_INF("Free item %ld: type change", req->itemid);
         free_item(elm);
         glb_cache_item_create_cb(elem, NULL);
 
         elm = (item_elem_t *)elem->data;
         elm->value_type = req->value_type;
-
+        
     }
   
     int cache_start = glb_tsbuff_get_time_head(&elm->tsbuff);
     int now = time(NULL);
-
+    
     if (cache_start < req->ts_head)
         head_idx = elm->tsbuff.head;
     else
         head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head);
-
+  
     if (-1 < head_idx && SUCCEED == glb_tsbuff_check_has_enough_count_data_idx(&elm->tsbuff, req->count, head_idx))
     {
         count_hit(req->i_cfg);
@@ -669,13 +676,13 @@ static int cache_fetch_count_cb(glb_cache_elem_t *elem, void *req_data)
         DEBUG_ITEM(elem->id, "filled %d values from the cache", req->values->values_num);
         return SUCCEED;
     }
-
+    
     count_miss(req->i_cfg);
 
     if (-1 == head_idx)
     {
         count_db_requests(req->i_cfg);
-
+        //LOG_INF("%ld: Requesting item from the DB by time %d->%d", req->ts_head, now);
         DEBUG_ITEM(elem->id, "Requesting item from the DB by time %d->%d", req->ts_head, now);
         
         if (FAIL == glb_cache_fetch_from_db_by_time(req->itemid, elm, now - req->ts_head, now, now, req->i_cfg))
@@ -687,7 +694,7 @@ static int cache_fetch_count_cb(glb_cache_elem_t *elem, void *req_data)
 
         update_db_fetch(elm, req->ts_head);
     }
-
+    
     head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head);
 
     if (-1 == head_idx)
@@ -696,7 +703,7 @@ static int cache_fetch_count_cb(glb_cache_elem_t *elem, void *req_data)
     }
     else // excluding data that fits from the count
         need_count = req->count - (head_idx - elm->tsbuff.tail + elm->tsbuff.size) % elm->tsbuff.size;
-
+    
     if (need_count > 0)
     {
         count_db_requests(req->i_cfg);
@@ -709,11 +716,11 @@ static int cache_fetch_count_cb(glb_cache_elem_t *elem, void *req_data)
         }
         update_db_fetch(elm, req->ts_head);
     }
-
+    
     if (-1 == (head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head)))
     {
         count_fails(req->i_cfg);
-        DEBUG_ITEM(elem->id, "Fetch from db hasn't retrun any data, cache + db request FAILed");
+        DEBUG_ITEM(elem->id, "Fetch from db hasn't retrun the data we need, cache + db request FAILed");
 
         return FAIL;
     }
@@ -725,6 +732,7 @@ static int cache_fetch_count_cb(glb_cache_elem_t *elem, void *req_data)
 
         return FAIL;
     }
+    
     fill_items_values_by_count(elm, req->count, head_idx, req->values);
 
     DEBUG_ITEM(elem->id, "Fetch from db successful, filled %d values", req->count);
@@ -919,6 +927,7 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     if (h->ts.sec > now + 300) {
         LOG_INF("Warn: item's %ld timestamp %d is too much ahead of the real time %d, not adding to the cache", elem->id, h->ts.sec, now);
         THIS_SHOULD_NEVER_HAPPEN;
+        exit(-1);
         return FAIL;
     }
 
@@ -926,6 +935,12 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     {
         glb_cache_dc_hist_to_value(c_val, h);
         DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %d", glb_tsbuff_get_time_tail(&elm->tsbuff));
+    //    LOG_INF("Added value to cache %ld -> %ld", elem->id, h->ts.sec);
+    //    if (time(NULL) - 1000000 >  h->ts.sec || time(NULL) + 1000000 <  h->ts.sec) {
+    //       LOG_INF("Bad clock %ld, now is %ld, diff is %ld ", h->ts.sec, time(NULL), h->ts.sec - time(NULL));
+    //        THIS_SHOULD_NEVER_HAPPEN;
+    //        exit(-1);
+    //    }
     }
     else
     {
@@ -1036,7 +1051,7 @@ int glb_cache_item_get_nextcheck_cb(glb_cache_elem_t *elem, void *cb_data)
 #define ZBX_DC_FLAGS_NOT_FOR_HISTORY (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOHISTORY)
 int add_json_item_value(int value_type, struct zbx_json* json,  glb_cache_item_value_t *c_val) {
             zbx_json_addobject(json, NULL);
-            zbx_json_adduint64(json, "clock", c_val->time_sec);
+            zbx_json_addint64(json, "clock", c_val->time_sec);
 
             switch (value_type)
             {
@@ -1194,17 +1209,18 @@ static int parse_json_item_demand(struct zbx_json_parse *jp, item_demand_t *dema
     return FAIL;
 }
 
-int json_to_hist_record(struct zbx_json_parse *jp, int value_type, zbx_history_record_t *hist) {
+int json_to_hist_record(struct zbx_json_parse *jp, int value_type, ZBX_DC_HISTORY *hist) {
     int errflag = 0;
     size_t alloc=0;
 
     char *str_value = NULL;
     zbx_json_type_t type;
+    bzero(hist,sizeof(ZBX_DC_HISTORY));
 
-    if ( FAIL == (hist->timestamp.sec = glb_json_get_int_value_by_name(jp, "clock", &errflag)) ) 
+    if ( FAIL == (hist->ts.sec = glb_json_get_int_value_by_name(jp, "clock", &errflag)) ) 
         return FAIL;
-        
-    hist->timestamp.ns = 0;
+    
+    hist->ts.ns = 0;
 
     switch (value_type) {
         case ITEM_VALUE_TYPE_UINT64:
@@ -1238,18 +1254,19 @@ static int parse_json_item_values(struct zbx_json_parse *jp, glb_cache_elem_t *e
     int errflag = 0;
     int i=0;
     item_elem_t *elm = (item_elem_t*) elem->data;
-    zbx_history_record_t h = {0};
+    ZBX_DC_HISTORY h = {0};
 
     while (NULL != (value_ptr = zbx_json_next(jp, value_ptr))) {
         
         if (SUCCEED == zbx_json_brackets_open(value_ptr,&jp_value) &&
-            SUCCEED == json_to_hist_record(&jp_value, elm->value_type, &h)) 
-                
+            SUCCEED == json_to_hist_record(&jp_value, elm->value_type, &h)) {
+           
             add_value_cb(elem, &h);
-        i++;
+            i++;
+        }
     }
 
-    return SUCCEED;
+    return i;
 }
 
 
@@ -1285,10 +1302,10 @@ int glb_cache_items_umarshall_item_cb(glb_cache_elem_t *elem, void *data)
     	return FAIL;
     }
     
-    if (SUCCEED != parse_json_item_values(&jp_values, elem)) {
-        LOG_INF("Couldn't parse item demand %s", jp->start);
-    	return FAIL;
-    }
+    return  parse_json_item_values(&jp_values, elem);
+        //LOG_INF("Couldn't parse item demand %s", jp->start);
+    	//return FAIL;
+    //}
     
-    return SUCCEED;
+    //return SUCCEED;
 }

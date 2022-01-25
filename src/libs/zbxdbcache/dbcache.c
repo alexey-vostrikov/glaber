@@ -63,7 +63,6 @@ static size_t		sql_alloc = 4 * ZBX_KIBIBYTE;
 extern unsigned char	program_type;
 extern char		*CONFIG_EXPORT_DIR;
 extern int CONFIG_CLUSTER_SERVER_ID;
-extern u_int64_t CONFIG_DEBUG_ITEM;
 
 #define ZBX_IDS_SIZE	10
 
@@ -1448,9 +1447,7 @@ static void	DCexport_history_and_trends(const ZBX_DC_HISTORY *history, int histo
 		zbx_vector_item_tag_create(&item_info.item_tags);
 		zbx_hashset_insert(&items_info, &item_info, sizeof(item_info));
 
-		if (CONFIG_DEBUG_ITEM == item_info.itemid ) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld adding to history storage db",item_info.itemid);
-		}
+		DEBUG_ITEM(item_info.itemid,"%ld adding to history storage db",item_info.itemid);
 	}
 
 	if (0 == history_num)
@@ -3331,8 +3328,7 @@ static void	dc_local_add_history_dbl(zbx_uint64_t itemid, unsigned char item_val
 	if (0 == (item_value->flags & ZBX_DC_FLAG_NOVALUE))
 		item_value->value.value_dbl = value_orig;
 	
-	if (CONFIG_DEBUG_ITEM == itemid) 
-		zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld added to local cache as dbl",itemid );
+	DEBUG_ITEM(itemid,"%ld added to local cache as dbl",itemid );
 }
 
 static void	dc_local_add_history_uint(zbx_uint64_t itemid, unsigned char item_value_type, const zbx_timespec_t *ts,

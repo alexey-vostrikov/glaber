@@ -903,7 +903,6 @@ typedef struct
 #endif
 	zbx_hashset_t		data_sessions;
 	zbx_binary_heap_t	queues[ZBX_POLLER_TYPE_COUNT];
-	//zbx_binary_heap_t	*queues[ZBX_POLLER_TYPE_COUNT];
 	zbx_binary_heap_t	pqueue;
 	zbx_binary_heap_t	trigger_queue;
 	ZBX_DC_CONFIG_TABLE	*config;
@@ -923,8 +922,10 @@ typedef struct
 	u_int64_t no_preproc;
 	u_int64_t local_preproc;
 	
-}
+	u_int64_t debug_trigger;
+	u_int64_t debug_item;
 
+}
 ZBX_DC_CONFIG;
 
 typedef struct {

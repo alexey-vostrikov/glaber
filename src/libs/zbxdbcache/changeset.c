@@ -57,6 +57,10 @@ void changeset_prepare_work_table() {
 	if (SUCCEED ==  DBtable_exists(CHANGESET_WORK_TABLE)) {
 		DBdrop_table(CHANGESET_WORK_TABLE);
 	}
+
+	if (SUCCEED !=  DBtable_exists(CHANGESET_TABLE)) {
+		changeset_create_table();
+	}
 	
 	DBbegin();
 	DBrename_table(CHANGESET_TABLE, CHANGESET_WORK_TABLE);

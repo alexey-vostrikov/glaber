@@ -543,10 +543,8 @@ static void	preprocessing_flush_queue(zbx_preprocessing_manager_t *manager)
 		if (REQUEST_STATE_DONE != request->state)
 			break;
 
-		if (CONFIG_DEBUG_ITEM == request->value.itemid) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld sending to hist cache or LLD manager", request->value.itemid);
-		}
-
+		DEBUG_ITEM(request->value.itemid, "Debug item: %ld sending to hist cache or LLD manager", request->value.itemid);
+		
 		preprocessor_flush_value(&request->value);
 		preprocessor_free_request(request);
 
@@ -806,9 +804,11 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 
 	item_local.itemid = value->itemid;
 	item = (zbx_preproc_item_t *)zbx_hashset_search(&manager->item_config, &item_local);
-	if (NULL != item && CONFIG_DEBUG_ITEM == item->itemid) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Recieved item %ld for preprocessing",item->itemid);
+	
+	if (NULL != item) {
+		DEBUG_ITEM(item->itemid,"Recieved item %ld for preprocessing",item->itemid);
 	}
+
 	/* override priority based on item type */
 	if (NULL != item && ITEM_TYPE_INTERNAL == item->type)
 		priority = ZBX_PREPROC_PRIORITY_FIRST;

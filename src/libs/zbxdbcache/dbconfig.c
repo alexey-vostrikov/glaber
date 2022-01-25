@@ -117,7 +117,6 @@ extern int CONFIG_JAVAPOLLER_FORKS;
 extern int CONFIG_PINGER_FORKS;
 //extern int CONFIG_DISABLE_INPOLLER_PREPROC;
 extern int CONFIG_CLUSTER_SERVER_ID;
-extern u_int64_t CONFIG_DEBUG_ITEM;
 extern char * CONFIG_HOSTNAME;
 extern int CONFIG_PREPROCMAN_FORKS;
 extern int  CONFIG_GLB_REQUEUE_TIME;
@@ -548,8 +547,8 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 	if (0 != dc_host->proxy_hostid && SUCCEED != is_item_processed_by_server(dc_item->type, dc_item->key))
 	{
 		dc_item->poller_type = ZBX_NO_POLLER;
-		if (CONFIG_DEBUG_ITEM == dc_item->itemid) 
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: set poller type to %d",dc_item->itemid,__func__,ZBX_NO_POLLER);
+		DEBUG_ITEM(dc_item->itemid,"%ld at %s: set poller type to %d",dc_item->itemid,__func__,ZBX_NO_POLLER);
+		
 		return;
 	}
 	poller_type = poller_by_item(dc_item->type, dc_item->key);
@@ -559,16 +558,14 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type)
 			poller_type = ZBX_POLLER_TYPE_UNREACHABLE;
 
-		if (CONFIG_DEBUG_ITEM == dc_item->itemid) 
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
+		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
 		dc_item->poller_type = poller_type;
 		return;
 	}
 
 	if (0 != (flags & ZBX_ITEM_COLLECTED))
 	{
-		if (CONFIG_DEBUG_ITEM == dc_item->itemid) 
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
+		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
 		dc_item->poller_type = poller_type;
 		return;
 	}
@@ -577,8 +574,7 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 			(ZBX_POLLER_TYPE_NORMAL != poller_type && ZBX_POLLER_TYPE_JAVA != poller_type))
 	{
 		dc_item->poller_type = poller_type;
-		if (CONFIG_DEBUG_ITEM == dc_item->itemid) 
-			zabbix_log(LOG_LEVEL_INFORMATION,"Debug item: %ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
+		DEBUG_ITEM(dc_item->itemid,"%ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
 	}
 }
 
@@ -6295,10 +6291,10 @@ void	DCsync_configuration(unsigned char mode, const struct zbx_json_parse *jp_kv
 	}
 
 	#ifndef HAVE_SQLITE3
-	if (GLB_DBSYNC_CHANGESET == mode ) 
-	{
+//	if (GLB_DBSYNC_CHANGESET == mode ) 
+//	{
 		changeset_prepare_work_table();
-	}
+//	}
 	#endif
 
 	/* global configuration must be synchronized directly with database */
@@ -8976,7 +8972,7 @@ int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx
 				continue;
 
 			dc_trigger->locked = 1;
-			
+			DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
 			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
 			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
 		}
@@ -9018,6 +9014,8 @@ void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zb
 			continue;
 
 		dc_trigger->locked = 1;
+		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
+
 		zbx_vector_uint64_append(triggerids_out, dc_trigger->triggerid);
 	}
 
@@ -9045,6 +9043,7 @@ void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids)
 			continue;
 
 		dc_trigger->locked = 0;
+		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is unlocked");
 	}
 
 	UNLOCK_CACHE;
@@ -9067,8 +9066,10 @@ void	DCconfig_unlock_all_triggers(void)
 
 	zbx_hashset_iter_reset(&config->triggers, &iter);
 
-	while (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
+	while (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter))) {
 		dc_trigger->locked = 0;
+		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
+	}
 
 	UNLOCK_CACHE;
 }
@@ -16395,6 +16396,32 @@ void DCget_unknown_triggers(int *unknown_triggers, int *not_calculated, int *tot
 	}
 	UNLOCK_CACHE;
 }
+
+//note: allthow it's possible that a grbage might be returned
+//this isn't likely on modern archs so not using locks on 
+//read ops
+u_int64_t DC_get_debug_item() {
+	return config->debug_item;
+}
+u_int64_t DC_get_debug_trigger() {
+	return config->debug_trigger;
+}
+
+void DC_set_debug_item(uint64_t id) {
+	WRLOCK_CACHE;
+	config->debug_item = id;
+	UNLOCK_CACHE;
+	DEBUG_ITEM(id, "STARTED DEBUG");
+}
+
+void DC_set_debug_trigger(uint64_t id) {
+	WRLOCK_CACHE;
+	config->debug_trigger = id;
+	UNLOCK_CACHE;
+	DEBUG_TRIGGER(id, "STARTED DEBUG");
+}
+
+
 /*
 int glb_dc_get_item_value_type (uint64_t itemid) {
 	int value_type= ITEM_VALUE_TYPE_NONE;

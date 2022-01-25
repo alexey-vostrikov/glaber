@@ -253,8 +253,8 @@ int glb_cache_item_get_nextcheck(u_int64_t itemid) {
 
 
 int  glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_record_t *values, int ts_start, int count, int ts_end) {
-	LOG_DBG("In %s:starting itemid: %ld, count: %d", __func__,itemid, count );
-
+	
+//	LOG_INF("In %s:starting itemid: %ld, count: %d", __func__,itemid, count );
 	if (count > 0)  {
 		return glb_cache_get_item_values_by_count(glb_cache->items.config, &glb_cache->items, itemid, value_type, values, count, ts_end);
 	}
@@ -534,12 +534,14 @@ int glb_vc_load_items_cache() {
 			lcnt++;
 			continue;
 		}
-
+//		if (lcnt > 0)
+//			LOG_DBG("Complete value is %s",json_buffer);
 		
 		if (SUCCEED != zbx_json_value_by_name(&jp, "itemid", id_str, MAX_ID_LEN, &j_type)) {
         	LOG_INF("Couldn't find id in the JSON '%s':",json_buffer);
         	continue;
     	}
+		
 		u_int64_t id = strtol(id_str,NULL,10);
 
 		if (id == 0)
@@ -551,15 +553,13 @@ int glb_vc_load_items_cache() {
 		//creating the new element
 
 		//and calling unmarshall callback for it
-		glb_cache_process_elem(&glb_cache->items, id, glb_cache_items_umarshall_item_cb, &jp);
+		vals += glb_cache_process_elem(&glb_cache->items, id, glb_cache_items_umarshall_item_cb, &jp);
 
     }
 	gzclose(gzfile);
 	zbx_free(json_buffer);
 
 	LOG_INF("Finished loading valuecache data, loaded %d items; %d values",items,vals);
-//	sleep(2);
-
 	return SUCCEED;
 }
 
@@ -608,7 +608,9 @@ int glb_vc_dump_cache() {
 		glb_lock_block(&elem->lock);
 		int ret = glb_cache_items_marshall_item_cb(elem, &json);
 		glb_lock_unlock(&elem->lock);
-	   
+	   	
+		DEBUG_ITEM(elem->id, "Item dump: %s",json.buffer);
+
 		if (0 < ret) {
         	if ( 0 >= gzwrite(gzfile, json.buffer, json.buffer_offset + 1))	{
 				zabbix_log(LOG_LEVEL_WARNING,"Cannot write to cache %s, errno is %d",new_file,errno);

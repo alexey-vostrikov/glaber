@@ -49,8 +49,11 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type);
 char *zbx_dc_get_topology();
 void zbx_dc_register_proxy_availability(u_int64_t hostid);
 void DC_RequestConfigSync();
+void DC_set_debug_trigger(uint64_t id);
+void DC_set_debug_item(uint64_t id);
+u_int64_t DC_get_debug_trigger();
+uint64_t DC_get_debug_item();
 
- 
 
 
 #include "trapper_auth.h"
@@ -901,6 +904,46 @@ static void request_config_sync(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	
 }
 
+static void glb_trapper_get_debug(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	struct zbx_json	json;
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	zbx_json_addobject(&json, "data");
+	zbx_json_adduint64(&json, "itemid", DC_get_debug_item());
+	zbx_json_adduint64(&json, "triggerid", DC_get_debug_trigger());
+	zbx_json_close(&json);
+
+	LOG_INF("%s: Response is %s",__func__, json.buffer);
+
+	(void)zbx_tcp_send(sock, json.buffer);
+	zbx_json_free(&json);
+
+}
+
+static void glb_trapper_set_debug(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	struct zbx_json		json;
+	zbx_json_type_t type;
+	u_int64_t id;
+	char tmp_str[MAX_ID_LEN];
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+
+	if (SUCCEED == zbx_json_value_by_name(jp, "triggerid", tmp_str, MAX_ID_LEN, &type) ) {
+			id = strtol(tmp_str, NULL, 10);
+			DC_set_debug_trigger(id);
+	}
+
+	if (SUCCEED == zbx_json_value_by_name(jp, "itemid", tmp_str, MAX_ID_LEN, &type) ) {
+			id = strtol(tmp_str, NULL, 10);
+			DC_set_debug_item(id);
+	}
+
+	(void)zbx_tcp_send(sock, json.buffer);
+	zbx_json_free(&json);
+}
+
 static void get_items_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_t itemids;
 	struct zbx_json		response_json;
@@ -1643,7 +1686,17 @@ static int	process_trap(zbx_socket_t *sock, char *s, zbx_timespec_t *ts)
 			{
 				if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 					zbx_trapper_item_test(sock, &jp);
+			} else if (0 == strcmp(value, "debug.set"))
+			{
+				if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
+					glb_trapper_set_debug(sock, &jp);
+			} else if (0 == strcmp(value, "debug.get"))
+			{
+				if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
+					glb_trapper_get_debug(sock, &jp);
 			}
+
+
 			else if (SUCCEED != trapper_process_request(value, sock, &jp))
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "unknown request received from \"%s\": [%s]", sock->peer,
