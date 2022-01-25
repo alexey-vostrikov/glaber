@@ -303,8 +303,8 @@ static void worker_cleanup(GLB_EXT_WORKER *worker)
         bytes += read_num;
     }
 
-    if (bytes > 0)
-        zabbix_log(LOG_LEVEL_INFORMATION, "GARBAGE DETECTED  %d bytes of garbage from %s: %s", bytes, worker->path, *buffer);
+    //if (bytes > 0)
+    //    zabbix_log(LOG_LEVEL_INFORMATION, "GARBAGE DETECTED  %d bytes of garbage from %s: %s", bytes, worker->path, *buffer);
 
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
     zabbix_log(LOG_LEVEL_DEBUG, "%s, finished", __func__);
