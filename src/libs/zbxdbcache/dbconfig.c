@@ -547,7 +547,7 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 	if (0 != dc_host->proxy_hostid && SUCCEED != is_item_processed_by_server(dc_item->type, dc_item->key))
 	{
 		dc_item->poller_type = ZBX_NO_POLLER;
-		DEBUG_ITEM(dc_item->itemid,"%ld at %s: set poller type to %d",dc_item->itemid,__func__,ZBX_NO_POLLER);
+		DEBUG_ITEM(dc_item->itemid,"%ld at %s: set poller type to %d", dc_item->itemid, __func__, ZBX_NO_POLLER);
 		
 		return;
 	}
@@ -558,14 +558,14 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type)
 			poller_type = ZBX_POLLER_TYPE_UNREACHABLE;
 
-		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
+		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d", dc_item->itemid, __func__, poller_type);
 		dc_item->poller_type = poller_type;
 		return;
 	}
 
 	if (0 != (flags & ZBX_ITEM_COLLECTED))
 	{
-		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d",dc_item->itemid,__func__,poller_type);
+		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d", dc_item->itemid, __func__, poller_type);
 		dc_item->poller_type = poller_type;
 		return;
 	}
@@ -3279,7 +3279,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 
 	zbx_vector_ptr_create(&dep_items);
 
-	LOG_INF("In %s()", __func__);
+	LOG_DBG("In %s()", __func__);
 
 	now = time(NULL);
 	int row_count = 0;
@@ -3289,19 +3289,17 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		row_count++;
 				
 		if (ZBX_DBSYNC_ROW_REMOVE == tag) {
-			LOG_INF("Added deleted item to the changeset");
-		
-			LOG_INF("Removing item %ld", rowid);
+			//LOG_INF("Removing item %ld", rowid);
 			
-			LOG_INF("Removing item from the host's itemids list");
+			//LOG_INF("Removing item from the host's itemids list");
 			if (NULL != (item = (ZBX_DC_ITEM*)zbx_hashset_search(&config->items,&rowid))) {
-				LOG_INF("Found item object, host id is %ld",item->hostid);
+				//LOG_INF("Found item object, host id is %ld",item->hostid);
 				DC_add_changed_item(rowid, ITEM_STATUS_DELETED);
 				if (NULL != (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &hostid))) {
-					LOG_INF("Found host, removing item");
+				//	LOG_INF("Found host, removing item");
 
 					if (NULL != zbx_hashset_search(&host->itemids, &rowid)) {
-						LOG_INF("The item ref has been removed from the host's ref");
+				//		LOG_INF("The item ref has been removed from the host's ref");
 						zbx_hashset_remove(&host->itemids, &rowid);
 					}
 				}

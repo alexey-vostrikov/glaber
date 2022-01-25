@@ -633,7 +633,7 @@ int glb_vc_dump_cache() {
 		return FAIL;
 	}
 	
-	LOG_INF("In %s: finished, total %d items, %d values dumped", __func__,items,vals);
+	LOG_INF("In %s: finished, total %d items, %d values dumped", __func__, items, vals);
 	return SUCCEED;
 }
 

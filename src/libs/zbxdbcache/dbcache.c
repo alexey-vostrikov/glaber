@@ -1943,9 +1943,8 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 			hdata->value.log->value = NULL;
 			break;
 	}
-	DEBUG_ITEM(hdata->itemid,"in Normalizing item, after 1st convert type, state is %d", hdata->state);
+
 	dc_history_set_value(hdata, item->value_type, &value_var);
-	DEBUG_ITEM(hdata->itemid,"in Normalizing item, after dc_hist set val, state is %d", hdata->state);
 	zbx_variant_clear(&value_var);
 
 }

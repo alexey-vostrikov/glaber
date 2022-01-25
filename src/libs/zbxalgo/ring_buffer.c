@@ -352,7 +352,7 @@ void glb_tsbuff_dump(glb_tsbuff_t *tsbuff) {
     
     for (c = 0 ; c < tsbuff->count; c++ ) {
         glb_tsbuff_value_t *val=glb_tsbuff_get_value_ptr(tsbuff,i);
-        LOG_INF("DUMP: %i -> %d",i, val->sec);
+        LOG_INF("DUMP: %i -> %d", i, val->sec);
         i = BUFF_IDX(tsbuff, i+1);
     }
     LOG_INF("DUMP END");

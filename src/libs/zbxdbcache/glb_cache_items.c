@@ -925,7 +925,7 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     }
 
     if (h->ts.sec > now + 300) {
-        LOG_INF("Warn: item's %ld timestamp %d is too much ahead of the real time %d, not adding to the cache", elem->id, h->ts.sec, now);
+        LOG_INF("Warn: item's %ld timestamp %ld is too much ahead of the real time %ld, not adding to the cache", elem->id, h->ts.sec, now);
         THIS_SHOULD_NEVER_HAPPEN;
         exit(-1);
         return FAIL;
@@ -934,7 +934,7 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     if (NULL != (c_val = (glb_cache_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
     {
         glb_cache_dc_hist_to_value(c_val, h);
-        DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %d", glb_tsbuff_get_time_tail(&elm->tsbuff));
+        DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %ld", glb_tsbuff_get_time_tail(&elm->tsbuff));
     //    LOG_INF("Added value to cache %ld -> %ld", elem->id, h->ts.sec);
     //    if (time(NULL) - 1000000 >  h->ts.sec || time(NULL) + 1000000 <  h->ts.sec) {
     //       LOG_INF("Bad clock %ld, now is %ld, diff is %ld ", h->ts.sec, time(NULL), h->ts.sec - time(NULL));

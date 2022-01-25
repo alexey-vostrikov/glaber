@@ -322,6 +322,7 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
             if (SUCCEED == zbx_getipv4_by_host( pinger_item->addr, ip_addr, MAX_ID_LEN)) {
                 ip = ip_addr;
             } else {
+                DEBUG_ITEM(glb_item->itemid, "Cannot resolve");
                 DEBUG_ITEM(glb_item->itemid, "Cannot resolve item addr '%s' to IPv4 addr, check hostname or use fping to IPv6", pinger_item->addr);
                 glb_pinger_submit_result(glb_item,CONFIG_ERROR,"Cannot resolve item to IPv4 addr, check hostname or use fping to IPv6",&ts);
                 
@@ -332,6 +333,7 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
         pinger_item->ip=zbx_strdup(pinger_item->ip,ip);
         pinger_item->lastresolve = now;
         
+        DEBUG_ITEM(glb_item->itemid, "Host resolved ");
         DEBUG_ITEM(glb_item->itemid, "Host %s resolved to %s will cache it for %d seconds",pinger_item->addr, ip, GLB_DNS_CACHE_TIME);
     }
     

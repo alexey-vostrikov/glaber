@@ -178,7 +178,7 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
         offset = offset - 2;
     
     zbx_snprintf_alloc(&str,&alloc, &offset,"]");
-    LOG_INF("%s", str);
+    //LOG_INF("%s", str);
     zbx_free(str);
 }
 

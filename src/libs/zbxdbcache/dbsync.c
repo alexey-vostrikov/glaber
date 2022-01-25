@@ -474,7 +474,7 @@ static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_fu
 		obj_index_replace(idx_ptr, idx);
 	}
 	
-	LOG_INF("Index sync for sync type '%s' completed: updated %d items, deleted %d ",sync_name, i, d);
+	LOG_INF("Index sync for sync type '%s' completed: updated %d items, deleted %d ", sync_name, i, d);
 	return SUCCEED;
 }
 

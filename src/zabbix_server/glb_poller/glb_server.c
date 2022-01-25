@@ -443,7 +443,7 @@ static void delete_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item) 
     worker_t *worker = (worker_t*)glb_item->itemdata;
 
     glb_destroy_worker(&worker->worker);
-    LOG_INF("freening he item");
+    LOG_INF("freening the item");
     zbx_free(worker);
     LOG_INF("Finished deleting the item");
 

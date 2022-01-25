@@ -332,7 +332,8 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 
 	glb_process_worker_request(conf->worker, request, &response);
 	
-	DEBUG_ITEM(itemid, "Got response:%s ",response);
+	if (NULL != response)
+		DEBUG_ITEM(itemid, "Got response:%s ",response);
 
 	//LOG_INF("Got response: %s",response);	
 	if (NULL == response)
@@ -369,7 +370,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 				hr.timestamp.ns = atoi(ns);
 				zabbix_log(LOG_LEVEL_DEBUG,"read: Clock: %s, ns: %s, value: %s, ",clck,ns,value);
 				
-				DEBUG_ITEM(itemid, "Got history response: %s -> %s", clck, value );
+				//DEBUG_ITEM(itemid, "Got history response: %s -> %s", clck, value );
                 
 				switch (value_type)
 				{
