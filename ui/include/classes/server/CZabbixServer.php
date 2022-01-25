@@ -180,6 +180,32 @@ class CZabbixServer {
 		$zabbix_server->syncConfiguration();
 	}
 
+	public static function  setDebugObjects($itemid, $triggerid) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+		);
+		
+		$zabbix_server->request(['request' => 'debug.set', 
+								 'itemid' => $itemid, 
+								 'triggerid' => $triggerid]);
+	}
+	
+	public static function  getDebugObjects() {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+		);
+		
+		return $zabbix_server->request(['request' => 'debug.get']);
+	}
+
+
+
 	public function syncConfiguration() {
 		return $this->request(['request' => 'config.sync']);
 	}

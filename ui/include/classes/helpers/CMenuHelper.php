@@ -302,7 +302,12 @@ class CMenuHelper {
 						(new CMenuItem(_('Queue details')))
 							->setAction('queue.details')
 					]))
-				: null
+				: null,
+			CWebUser::checkAccess(CRoleHelper::UI_ADMINISTRATION_USER_ROLES)
+				? (new CMenuItem(_('Debug')))
+					->setAction('debug.list')
+					->setAliases(['debug.edit'])
+				: null,
 		];
 		$submenu_administration = array_filter($submenu_administration);
 
