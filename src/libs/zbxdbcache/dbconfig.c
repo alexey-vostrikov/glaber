@@ -7511,8 +7511,12 @@ out:
 	
 	glb_config = (GLB_CONFIG *) __config_mem_malloc_func(NULL, sizeof(GLB_CONFIG));
 		
-	if (FAIL== obj_index_init(&glb_config->host_to_template_idx, &memf) ) ret = FAIL;
-	if (FAIL== obj_index_init(&glb_config->trigger_deps, &memf) ) ret = FAIL;
+	if (FAIL == obj_index_init(&glb_config->host_to_template_idx, &memf) ||
+	    FAIL == obj_index_init(&glb_config->trigger_deps, &memf) 
+//		||
+//	    FAIL == glb_discovery_init(&glb_config->discovery, &memf) 
+	) 
+		ret = FAIL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
@@ -11091,7 +11095,9 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 	int  i, ret, t_status, t_functional, t_value;
 	zbx_vector_uint64_t next_dep_list;
 	u_int64_t next_triggerid;
-
+	
+	return SUCCEED;
+	
 	if (ZBX_TRIGGER_DEPENDENCY_LEVELS_MAX < level)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "recursive trigger dependency is too deep (triggerid:" ZBX_FS_UI64 ")", triggerid);
@@ -11122,7 +11128,9 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 
 			ret == DCconfig_check_trigger_dependencies_rec(next_triggerid, &next_dep_list, level + 1, triggerids,
 					master_triggerids);
-	
+			//TODO: FIX
+			//ret = SUCCEED;
+
 			zbx_vector_uint64_destroy(&next_dep_list);		
 		
 			if (FAIL == ret)	
