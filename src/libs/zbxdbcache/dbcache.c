@@ -3040,49 +3040,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			*values_num += history_num;
 		}
 
-		if (FAIL != ret)
-		{
-			/*
-			if (0 != history_num)
-			{
-				DCmodule_prepare_history(history, history_num, history_float, &history_float_num,
-						history_integer, &history_integer_num, history_string,
-						&history_string_num, history_text, &history_text_num, history_log,
-						&history_log_num);
-
-				DCmodule_sync_history(history_float_num, history_integer_num, history_string_num,
-						history_text_num, history_log_num, history_float, history_integer,
-						history_string, history_text, history_log);
-			}
-			*/
-			if (0 != history_num)
-			{
-				const ZBX_DC_HISTORY	*phistory = NULL;
-				const ZBX_DC_TREND	*ptrends = NULL;
-				int			history_num_loc = 0, trends_num_loc = 0;
-
-				if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_HISTORY))
-				{
-					phistory = history;
-					history_num_loc = history_num;
-				}
-
-				if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_TRENDS))
-				{
-					ptrends = trends;
-					trends_num_loc = trends_num;
-				}
-
-				if (NULL != phistory || NULL != ptrends)
-				{
-					DCexport_history_and_trends(phistory, history_num_loc, &itemids, items,
-							errcodes, ptrends, trends_num_loc);
-				}
-			}
-
-			if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
-				zbx_export_events();
-		}
 
 		if (0 != history_num || 0 != timers_num)
 			zbx_clean_events();

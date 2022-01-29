@@ -9114,12 +9114,13 @@ void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 
 			if (0 == found)
 			{
+				DEBUG_TRIGGER(trigger->triggerid,"Getting trigger from the cfg cache");
 				DCget_trigger(trigger, dc_trigger);
 				zbx_vector_ptr_append(trigger_order, trigger);
 			}
 
 			/* copy latest change timestamp */
-
+			
 			if (trigger->timespec.sec < timespecs[i].sec ||
 					(trigger->timespec.sec == timespecs[i].sec &&
 					trigger->timespec.ns < timespecs[i].ns))
@@ -9127,6 +9128,7 @@ void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 				/* DCconfig_get_triggers_by_itemids() function is called during trigger processing */
 				/* when syncing history cache. A trigger cannot be processed by two syncers at the */
 				/* same time, so its safe to update trigger timespec within read lock.             */
+				DEBUG_TRIGGER(trigger->triggerid,"Updating timespecs");
 				trigger->timespec = timespecs[i];
 			}
 		}
@@ -11146,10 +11148,9 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
  *                                                                            *
  * Purpose: check whether any of trigger dependencies have value PROBLEM      *
  *                                                                            *
- * Return value: SUCCEED - trigger can change its value                       *
- *               FAIL - otherwise                                             *
- *                                                                            *
- * Author: Alexei Vladishev, Aleksandrs Saveljevs                             *
+ * Return value: SUCCEED - trigger has no FAILED dependant triggers           *
+ *               FAIL - trigger has FAILD dep triggers 	                      *
+ * 												(no actions should stat)      *
  *                                                                            *
  ******************************************************************************/
 int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
@@ -11159,14 +11160,19 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 	zbx_vector_uint64_t dep_list;
 	zbx_vector_uint64_create(&dep_list);
 	
+	
 
 	obj_index_get_refs_from(&glb_config->trigger_deps, triggerid, &dep_list);
+	DEBUG_TRIGGER(triggerid, "Checking trigger dependancies, has %d deps", dep_list.values_num);
 	
+
 	if (0 == dep_list.values_num) {
 		zbx_vector_uint64_destroy(&dep_list);
-		return FAIL;
+		return SUCCEED;
 	}
-
+	
+	DEBUG_TRIGGER(triggerid,"checking the trigger dependancies");
+	
 	RDLOCK_CACHE;
 	
 	ret = DCconfig_check_trigger_dependencies_rec(triggerid, &dep_list,  0, NULL, NULL);
@@ -11176,91 +11182,8 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 	return ret;
 }
 
-/******************************************************************************
- *                                                                            *
- * Comments: helper function for DCconfig_sort_triggers_topologically()       *
- *                                                                            *
- ******************************************************************************/
-static unsigned char	DCconfig_sort_triggers_topologically_rec(const ZBX_DC_TRIGGER_DEPLIST *trigdep, int level)
-{
-	int				i;
-	unsigned char			topoindex = 2, next_topoindex;
-	const ZBX_DC_TRIGGER_DEPLIST	*next_trigdep;
 
-	if (32 < level)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "recursive trigger dependency is too deep (triggerid:" ZBX_FS_UI64 ")",
-				trigdep->triggerid);
-		goto exit;
-	}
 
-	if (0 == trigdep->trigger->topoindex)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "trigger dependencies contain a cycle (triggerid:" ZBX_FS_UI64 ")",
-				trigdep->triggerid);
-		goto exit;
-	}
-
-	trigdep->trigger->topoindex = 0;
-
-	for (i = 0; i < trigdep->dependencies.values_num; i++)
-	{
-		next_trigdep = (const ZBX_DC_TRIGGER_DEPLIST *)trigdep->dependencies.values[i];
-
-		if (1 < (next_topoindex = next_trigdep->trigger->topoindex))
-			goto next;
-
-		if (0 == next_trigdep->dependencies.values_num)
-			continue;
-
-		next_topoindex = DCconfig_sort_triggers_topologically_rec(next_trigdep, level + 1);
-next:
-		if (topoindex < next_topoindex + 1)
-			topoindex = next_topoindex + 1;
-	}
-
-	trigdep->trigger->topoindex = topoindex;
-exit:
-	return topoindex;
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: DCconfig_sort_triggers_topologically                             *
- *                                                                            *
- * Purpose: assign each trigger an index based on trigger dependency topology *
- *                                                                            *
- * Author: Aleksandrs Saveljevs                                               *
- *                                                                            *
- ******************************************************************************/
-/*
-static void	DCconfig_sort_triggers_topologically(void)
-{
-	zbx_hashset_iter_t		iter;
-	ZBX_DC_TRIGGER			*trigger;
-	const ZBX_DC_TRIGGER_DEPLIST	*trigdep;
-
-	zbx_hashset_iter_reset(&config->trigdeps, &iter);
-
-	while (NULL != (trigdep = (ZBX_DC_TRIGGER_DEPLIST *)zbx_hashset_iter_next(&iter)))
-	{
-		trigger = trigdep->trigger;
-
-		if (NULL == trigger || 1 < trigger->topoindex || 0 == trigdep->dependencies.values_num)
-			continue;
-
-		DCconfig_sort_triggers_topologically_rec(trigdep, 0);
-	}
-}
-*/
-/******************************************************************************
- *                                                                            *
- * Function: DCconfig_triggers_apply_changes                                  *
- *                                                                            *
- * Purpose: apply trigger value,state,lastchange or error changes to          *
- *          configuration cache after committed to database                   *
- *                                                                            *
- ******************************************************************************/
 void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
 {
 	int			i;
@@ -14215,11 +14138,6 @@ void	zbx_dc_get_trigger_dependencies(const zbx_vector_uint64_t *triggerids, zbx_
 		if ( 0 == dep_list.values_num)  //no deps
 			continue;
 
-//		if (NULL == (trigdep = (ZBX_DC_TRIGGER_DEPLIST *)zbx_hashset_search(&config->trigdeps, &triggerids->values[i])))
-//			continue;
-
-		//here we should gt deplist of trigger's master items
-
 		if (FAIL == (ret = DCconfig_check_trigger_dependencies_rec(triggerids->values[i], &dep_list, 0, triggerids, &masterids)) ||
 				0 != masterids.values_num)
 		{
@@ -14229,13 +14147,19 @@ void	zbx_dc_get_trigger_dependencies(const zbx_vector_uint64_t *triggerids, zbx_
 
 			if (SUCCEED == ret)
 			{
+				DEBUG_TRIGGER(dep->triggerid, "Trigger dependancy is unresolved");
 				dep->status = ZBX_TRIGGER_DEPENDENCY_UNRESOLVED;
 				zbx_vector_uint64_append_array(&dep->masterids, masterids.values, masterids.values_num);
 			}
-			else
+			else {
+				DEBUG_TRIGGER(dep->triggerid, "Trigger dependancy failed");
 				dep->status = ZBX_TRIGGER_DEPENDENCY_FAIL;
+			
+			}
 
 			zbx_vector_ptr_append(deps, dep);
+		} else {
+			DEBUG_TRIGGER(dep->triggerid, "Trigger dependancy isn't failed");
 		}
 
 		zbx_vector_uint64_clear(&masterids);

@@ -21,15 +21,11 @@ static int ref_free_callback(elems_hash_elem_t *elem, mem_funcs_t *memf) {
 }
 
 static int ref_create_callback(elems_hash_elem_t *elem, mem_funcs_t *memf) {
-    //LOG_INF("In callback create func func addr is %ld", memf->malloc_func);
-    
+   
     ref_id_t *ref = (ref_id_t *)(*memf->malloc_func)(NULL,sizeof(ref_id_t));
-    //LOG_INF("Mem allocated");
     elem->data = ref;
-
-    //LOG_INF("Creting vector");
     zbx_vector_uint64_create_ext(&ref->refs, memf->malloc_func, memf->realloc_func, memf->free_func);
-    //LOG_INF("finished");
+ 
     return SUCCEED;
 }
 
@@ -55,14 +51,11 @@ void obj_index_destroy(obj_index_t *idx) {
 
 static int add_ref_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *param) {
     
-   // LOG_INF("In %s",__func__);
     ref_id_t *ref = (ref_id_t *)elem->data;
     u_int64_t *id_to = (u_int64_t *)param;
-    //LOG_INF("Appending to vector %s",__func__);    
+  
     zbx_vector_uint64_append(&ref->refs, *id_to);
-    //LOG_INF("Sorting vector %s",__func__);    
     zbx_vector_uint64_sort(&ref->refs, ZBX_DEFAULT_UINT64_COMPARE_FUNC);    
-    //LOG_INF("Finished");
 
 }
 
@@ -71,12 +64,9 @@ static int del_ref_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *pa
     u_int64_t id_to = *(u_int64_t *)param;
     ref_id_t *ref = (ref_id_t *)elem->data;
 
-  //  LOG_INF("In %s", __func__);  
-  //  LOG_INF("Vector size is %d, id to is %ld", ref->refs.values_num, id_to);      
-
     if (FAIL == (i = zbx_vector_uint64_bsearch(&ref->refs, id_to, ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
         return SUCCEED;
-   // LOG_INF("In %s bsearch completed", __func__);        
+    
     zbx_vector_uint64_remove(&ref->refs, i);
     
     if (0 == ref->refs.values_num) 
@@ -87,7 +77,6 @@ static int get_refs_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *p
     zbx_vector_uint64_t *out_refs = (zbx_vector_uint64_t*) params;
     ref_id_t *ref = (ref_id_t *) elem->data;
     
- //   zbx_vector_uint64_clear(out_refs);
     zbx_vector_uint64_reserve(out_refs, ref->refs.values_num);
     zbx_vector_uint64_append_array(out_refs, ref->refs.values, ref->refs.values_num);
     
@@ -97,36 +86,25 @@ static int get_refs_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *p
 int obj_index_del_id(obj_index_t* idx, u_int64_t id) {
     int i;
     zbx_vector_uint64_t ids;
-  //  LOG_INF("Deleting id %ld",id);
+  
     zbx_vector_uint64_create(&ids);
     
-    //there is a potential problem here: if ids will change after they has been copied
-    //there might be some chance of inconsistency (probably it will be mem "leakage" as we will delete the id)
-    //to avoid this, we'll need the lockings to be implemented
- //   LOG_INF("Calling process %ld",id);
     elems_hash_process(idx->from_to, id, get_refs_callback, &ids, ELEM_FLAG_DO_NOT_CREATE);
- //   LOG_INF("Ret from the process, values num is  %ld %d",id, ids.values_num);
-    
+     
     for (i = 0; i< ids.values_num; i++) {
-     //   LOG_INF("Iter %d %ld",i, id);
         elems_hash_process(idx->to_from, ids.values[i], del_ref_callback, &id, ELEM_FLAG_DO_NOT_CREATE);
-     //   LOG_INF("Iter %d finished  %ld",i, id);
     }
- //   LOG_INF("Destroy ids %ld",id);
+ 
     zbx_vector_uint64_destroy(&ids);
-  //  LOG_INF("Delete idx %ld",id);
     elems_hash_delete(idx->from_to, id);
-   // LOG_INF("finished");
+   
     return SUCCEED;
 }
 
 int obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
     
-    //LOG_INF("Added ref id %ld -> %ld", id_from, id_to);
     elems_hash_process(idx->from_to, id_from, add_ref_callback, &id_to, 0);
-    //LOG_INF("Doing back ref");
     elems_hash_process(idx->to_from, id_to, add_ref_callback, &id_from, 0);
-    //LOG_INF("Finished back ref");
     
     return SUCCEED;    
 }
@@ -178,7 +156,7 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
         offset = offset - 2;
     
     zbx_snprintf_alloc(&str,&alloc, &offset,"]");
-    //LOG_INF("%s", str);
+ 
     zbx_free(str);
 }
 

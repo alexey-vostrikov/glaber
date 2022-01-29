@@ -1636,6 +1636,7 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 	for (i = 0; i < events.values_num; i++)
 	{
 		DB_EVENT	*event = (DB_EVENT *)events.values[i];
+		DEBUG_TRIGGER(event->objectid,"Updating changed trigger")
 
 		if (EVENT_SOURCE_TRIGGERS != event->source || EVENT_OBJECT_TRIGGER != event->object)
 			continue;
@@ -2855,7 +2856,7 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 		zbx_timespec(&ts);
 
 		DBbegin();
-
+		DEBUG_TRIGGER(triggerid, "Adding problem closing event");
 		r_event = close_trigger_event(eventid, triggerid, &ts, userid, 0, 0, trigger.description,
 				trigger.expression, trigger.recovery_expression, trigger.priority,
 				trigger.type, trigger.opdata, trigger.event_name);

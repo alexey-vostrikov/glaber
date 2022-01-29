@@ -73,6 +73,8 @@ static void	add_condition_match(const zbx_vector_ptr_t *esc_events, zbx_conditio
 	{
 		const DB_EVENT	*event = (DB_EVENT *)esc_events->values[index];
 		int		i;
+		
+		DEBUG_TRIGGER(event->trigger.triggerid, "Condition has matched");
 
 		zbx_vector_uint64_append(&condition->eventids, event->eventid);
 
@@ -561,7 +563,7 @@ static int	check_trigger_id_condition(const zbx_vector_ptr_t *esc_events, zbx_co
 	for (i = 0; i < esc_events->values_num; i++)
 	{
 		const DB_EVENT	*event = (DB_EVENT *)esc_events->values[i];
-
+		DEBUG_TRIGGER(event->trigger.triggerid, "Processing in %s, obj id is %ld, i is %d", __func__, event->objectid,i);
 		if (event->objectid == condition_value)
 		{
 			if (CONDITION_OPERATOR_EQUAL == condition->op)
@@ -2962,16 +2964,25 @@ static int	is_recovery_event(const DB_EVENT *event)
  ******************************************************************************/
 static int	is_escalation_event(const DB_EVENT *event)
 {
+	
 	/* OK events can't start escalations - skip them */
-	if (SUCCEED == is_recovery_event(event))
+	if (SUCCEED == is_recovery_event(event)) {
+		DEBUG_TRIGGER(event->trigger.triggerid, "is_escalation check: FAIL (this is recovery");
 		return FAIL;
-
-	if (0 != (event->flags & ZBX_FLAGS_DB_EVENT_NO_ACTION))
+	}
+	
+	if (0 != (event->flags & ZBX_FLAGS_DB_EVENT_NO_ACTION)) {
+		DEBUG_TRIGGER(event->trigger.triggerid, "is_escalation check: FAIL, NO_ACTION is set");
 		return FAIL;
+	
+	}
 
-	if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
+	if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE)) {
+		DEBUG_TRIGGER(event->trigger.triggerid, "is_escalation check: FAIL, DB_EVENT is unset");
 		return FAIL;
-
+	}
+	
+	DEBUG_TRIGGER(event->trigger.triggerid, "is_escalation check: SUCCEED");
 	return SUCCEED;
 }
 
@@ -3050,6 +3061,7 @@ static void	get_escalation_events(const zbx_vector_ptr_t *events, zbx_vector_ptr
 	for (i = 0; i < events->values_num; i++)
 	{
 		event = (DB_EVENT *)events->values[i];
+		DEBUG_TRIGGER(event->trigger.triggerid,"Checking if this is escalation event %d", i)
 		if (SUCCEED == is_escalation_event(event) && EVENT_SOURCE_COUNT > (size_t)event->source)
 			zbx_vector_ptr_append(&esc_events[event->source], (void*)event);
 	}
@@ -3250,7 +3262,6 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 			if (SUCCEED == check_action_conditions(event->eventid, action))
 			{
 				zbx_escalation_new_t	*new_escalation;
-
 				/* command and message operations handled by escalators even for    */
 				/* EVENT_SOURCE_DISCOVERY and EVENT_SOURCE_AUTOREGISTRATION events  */
 				new_escalation = (zbx_escalation_new_t *)zbx_malloc(NULL, sizeof(zbx_escalation_new_t));
@@ -3277,6 +3288,7 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 	zbx_vector_ptr_clear_ext(&actions, (zbx_clean_func_t)zbx_action_eval_free);
 	zbx_vector_ptr_destroy(&actions);
 
+	
 	/* 3. Find recovered escalations and store escalationids in 'rec_escalation' by OK eventids. */
 	if (0 != closed_events->values_num)
 	{
@@ -3328,10 +3340,11 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 		zbx_free(sql);
 		zbx_vector_uint64_destroy(&eventids);
 	}
-
+	
 	/* 4. Create new escalations in DB. */
 	if (0 != new_escalations.values_num)
 	{
+	
 		zbx_db_insert_t	db_insert;
 		int		j;
 
@@ -3349,6 +3362,7 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 			{
 				case EVENT_OBJECT_TRIGGER:
 					triggerid = new_escalation->event->objectid;
+					DEBUG_TRIGGER(triggerid, "Adding new escalation")
 					break;
 				case EVENT_OBJECT_ITEM:
 				case EVENT_OBJECT_LLDRULE:
@@ -3367,7 +3381,7 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 		zbx_db_insert_execute(&db_insert);
 		zbx_db_insert_clean(&db_insert);
 	}
-
+	
 	/* 5. Modify recovered escalations in DB. */
 	if (0 != rec_escalations.values_num)
 	{

@@ -74,7 +74,9 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() triggerid:" ZBX_FS_UI64 " value:%d(%d) new_value:%d",
 			__func__, trigger->triggerid, trigger->value, trigger->state, trigger->new_value);
-
+	
+	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger");
+	
 	if (TRIGGER_VALUE_UNKNOWN == trigger->new_value)
 	{
 		new_state = TRIGGER_STATE_UNKNOWN;
@@ -116,6 +118,7 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 
 	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT))
 	{
+		DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger");
 		zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
 				&trigger->timespec, new_value, trigger->description,
 				trigger->expression, trigger->recovery_expression,

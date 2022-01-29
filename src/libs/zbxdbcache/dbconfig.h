@@ -931,6 +931,7 @@ ZBX_DC_CONFIG;
 typedef struct {
 	obj_index_t host_to_template_idx;
 	obj_index_t trigger_deps;
+	elems_hash_t discovery;
 
 } GLB_CONFIG;
 
