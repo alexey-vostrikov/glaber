@@ -120,8 +120,9 @@ static int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts,
 		return FAIL;
 	}
 	
+
 	if ( NULL == (glb_host = zbx_hashset_search(hosts, &glb_item->hostid)))  {
-		LOG_WRN("No host has been fount for itemid %ld", glb_item->itemid);
+		LOG_WRN("No host has been found for itemid %ld", glb_item->itemid);
 		return FAIL;
 	}
 	
@@ -135,6 +136,7 @@ static int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts,
 	}
 	
 	zbx_custom_interval_free(custom_intervals);
+
 	DEBUG_ITEM(glb_item->itemid,"Added item %ld poll event in %ld sec", glb_item->itemid, nextcheck - now);
 		
 	glb_cache_item_meta_t meta;
@@ -209,6 +211,17 @@ int glb_poller_delete_item(void *poller_data, u_int64_t itemid) {
 
 }
 
+static int get_simple_interval(const char *delay) {
+	int interval;
+	char *delim;
+	
+	if (SUCCEED != is_time_suffix(delay, &interval, (int)(NULL == (delim = strchr(delay, ';')) ? ZBX_LENGTH_UNLIMITED : delim - delay)))
+		return 0;
+	
+	return interval;
+}
+
+
 /******************************************************************
 * Creates new item for polling, calls appropriate conversion func  *
 * for the type, and fills the new glb_item with key vals          *
@@ -264,9 +277,11 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 		return FAIL;
 	};
 
-	//newly added items are planned to be polled immediately
-	add_event_ext(&poll->events, GLB_EVENT_ITEM_POLL, glb_item->itemid, now, glb_item->change_time);
-	
+	if (get_simple_interval(glb_item->delay) > 0) 
+		add_event_ext(&poll->events, GLB_EVENT_ITEM_POLL, glb_item->itemid, now, glb_item->change_time);
+	 else 
+		add_item_check_event(&poll->events, &poll->hosts, glb_item, now);
+		
 	return SUCCEED;
 }
 

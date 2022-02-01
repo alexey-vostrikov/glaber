@@ -2614,7 +2614,7 @@ static int glb_snmp_start_connection(snmp_connection_t *conn)
 	if (NULL == snmp_parse_oid(snmp_item->oid, p_oid, &oid_len))
 		{
 			char oid_err[256];
-			LOG_INF("Cannot parse oid %s",snmp_item->oid);
+			LOG_DBG("Cannot parse oid %s",snmp_item->oid);
 			zbx_snprintf(oid_err,256, "snmp_parse_oid(): cannot parse OID \"%s\"",snmp_item->oid );
 			zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, glb_item->flags,  NULL ,&timespec, 
 				ITEM_STATE_NOTSUPPORTED, oid_err);
