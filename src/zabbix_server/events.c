@@ -26,6 +26,7 @@
 #include "zbxserver.h"
 #include "export.h"
 #include "zbxhistory.h"
+#include "../../libs/glb_objects/glb_trigger.h"
 
 /* event recovery data */
 typedef struct

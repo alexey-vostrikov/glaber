@@ -552,12 +552,10 @@ int	obj_index_init(obj_index_t* idx, mem_funcs_t *memf);
 void	obj_index_destroy(obj_index_t *idx);
 int		obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
 int		obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
-int		obj_index_del_id(obj_index_t* idx, u_int64_t id);
+int		obj_index_del_id_from(obj_index_t* idx, u_int64_t id);
+int		obj_index_del_id_to(obj_index_t* idx, u_int64_t id);
 int		obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs);
 int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
-//int 	obj_index_check_if_refs(obj_index_t *idx, u_int64_t id_to);
-//int		obj_index_check_if_refers(obj_index_t *idx, u_int64_t id_from, u_int64_t id_to);
-//int		obj_index_check_if_referedby(obj_index_t *idx, u_int64_t id_to, u_int64_t id_from);
 int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
 void 	obj_index_dump(obj_index_t *idx);
 

@@ -423,7 +423,7 @@ static int glb_inc_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int colu
 }
 
 /********************************************************
- * function to update and keep indexes					*
+ * function to update and keep index-relations			*
  * which typiclay are object relation tables
  * ******************************************************/
 static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_funcs_t *memf, 
@@ -453,9 +453,15 @@ static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_fu
 		ZBX_STR2UINT64(id_ref, dbrow[1]);
 			
 		//note: to work correctly rows must be id-ordered in SQL
-		if (old_id != id) 
-			obj_index_del_id(idx,id);
-	
+		//TODO: this may delete extra indexes - fugure
+		if (old_id != id) {
+			obj_index_del_id_from(idx,id);
+			obj_index_del_id_to(idx,id);
+
+		}
+		DEBUG_TRIGGER(id, "Adding dependency ref %ld -> %ld", id, id_ref);
+		DEBUG_TRIGGER(id_ref, "Adding dependency ref %ld -> %ld", id, id_ref);
+
 		obj_index_add_ref(idx, id, id_ref);
 	}
 	DBfree_result(result);
@@ -466,7 +472,8 @@ static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_fu
 
 		while (NULL != (dbrow = DBfetch(result))) {
 			ZBX_STR2UINT64(id, dbrow[0]);
-			obj_index_del_id(idx,id);
+			obj_index_del_id_from(idx,id);
+			obj_index_del_id_to(idx,id);
 			d++;	
 		}
 		DBfree_result(result);	
@@ -1099,42 +1106,6 @@ int	zbx_dbsync_compare_host_inventory(zbx_dbsync_t *sync)
 
 	return glb_update_dbsync_compare(sync, result, 72, &dbsync_env.cache->host_inventories,
 		(cmp_func_t)dbsync_compare_host_inventory, NULL );
-}
-
-static int glb_process_onj_index_update(zbx_dbsync_t *sync,mem_funcs_t *memf, obj_index_t *idx_ptr, DB_RESULT result ) {
-	obj_index_t *idx;
-	int full_sync = 0;
-	u_int64_t old_id = 0,id, id_ref;
-	DB_ROW			dbrow;
-	
-	dbsync_prepare(sync, 2, NULL);
-
-	if (ZBX_DBSYNC_INIT == sync->mode || ZBX_DBSYNC_UPDATE == sync->mode)
-	{	
-		if ( NULL == (idx =(obj_index_t *)(*memf->malloc_func)(NULL,sizeof(obj_index_t)))) 
-			return FAIL;
-
-		obj_index_init(idx, memf);
-		full_sync = 1;
-	} else  
-		idx = idx_ptr;
-
-	while (NULL != (dbrow = DBfetch(result))) {
-		ZBX_STR2UINT64(id, dbrow[0]);
-		ZBX_STR2UINT64(id_ref, dbrow[1]);
-			
-		//note: to work correctly rows must be id-ordered in SQL
-		if (old_id != id) 
-			obj_index_del_id(idx,id);
-	
-		obj_index_add_ref(idx, id, id_ref);
-	}
-	
-	if (full_sync) 
-		obj_index_replace(idx_ptr, idx);
-	
-	DBfree_result(result);
-	return SUCCEED;
 }
 
 /******************************************************************************

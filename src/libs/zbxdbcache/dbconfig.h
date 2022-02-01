@@ -49,7 +49,7 @@ typedef struct
 	unsigned char		value;
 	unsigned char		state;
 	unsigned char		locked;
-	unsigned char		status;
+	unsigned char		status; //ENABLED OR DISABLED
 	unsigned char		functional;		/* see TRIGGER_FUNCTIONAL_* defines      */
 	unsigned char		recovery_mode;		/* see TRIGGER_RECOVERY_MODE_* defines   */
 	unsigned char		correlation_mode;	/* see ZBX_TRIGGER_CORRELATION_* defines */
@@ -930,7 +930,8 @@ ZBX_DC_CONFIG;
 
 typedef struct {
 	obj_index_t host_to_template_idx;
-	obj_index_t trigger_deps;
+	//obj_index_t item_to_trigger_idx;
+	obj_index_t deptrigger_to_trigger_idx;
 	elems_hash_t discovery;
 
 } GLB_CONFIG;

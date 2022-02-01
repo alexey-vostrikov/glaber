@@ -26,6 +26,7 @@
 
 #include "glb_cache.h"
 #include "macrofunc.h"
+#include "../glb_objects/glb_trigger.h"
 #ifdef HAVE_LIBXML2
 #	include <libxml/parser.h>
 #	include <libxml/xpath.h>

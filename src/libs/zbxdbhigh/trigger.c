@@ -25,6 +25,7 @@
 #include "zbxserver.h"
 #include "template.h"
 #include "events.h"
+#include "../glb_objects/glb_trigger.h"
 
 #define ZBX_FLAGS_TRIGGER_CREATE_NOTHING		0x00
 #define ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT		0x01
@@ -76,7 +77,7 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 			__func__, trigger->triggerid, trigger->value, trigger->state, trigger->new_value);
 	
 	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger");
-	
+
 	if (TRIGGER_VALUE_UNKNOWN == trigger->new_value)
 	{
 		new_state = TRIGGER_STATE_UNKNOWN;

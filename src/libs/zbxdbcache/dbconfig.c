@@ -41,6 +41,7 @@
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/glb_poller/glb_pinger.h"
+#include "../glb_objects/glb_trigger.h"
 #include "glb_cache.h"
 #include "glb_cache_items.h"
 
@@ -67,10 +68,6 @@ int	sync_in_progress = 0;
 #define ZBX_SNMP_OID_TYPE_NORMAL	0
 #define ZBX_SNMP_OID_TYPE_DYNAMIC	1
 #define ZBX_SNMP_OID_TYPE_MACRO		2
-
-/* trigger is functional unless its expression contains disabled or not monitored items */
-#define TRIGGER_FUNCTIONAL_TRUE		0
-#define TRIGGER_FUNCTIONAL_FALSE	1
 
 /* trigger contains time functions and is also scheduled by timer queue */
 #define ZBX_TRIGGER_TIMER_UNKNOWN	0
@@ -3990,10 +3987,10 @@ static void	DCsync_triggers(zbx_dbsync_t *sync)
 
 		if (0 == found)
 		{
-			DCstrpool_replace(found, &trigger->error, row[3]);
+			DCstrpool_replace(found, &trigger->error, "");
 			ZBX_STR2UCHAR(trigger->value, row[6]);
-			//ZBX_STR2UCHAR(trigger->state, TRIGGER_STATE_UNKNOWN); //row[7]);
-			trigger->state = TRIGGER_STATE_UNKNOWN;
+			ZBX_STR2UCHAR(trigger->state, row[7]);
+			//trigger->state = TRIGGER_STATE_UNKNOWN;
 			trigger->lastchange = 0;//atoi(row[8]);
 			trigger->locked = 0;
 			trigger->timer_revision = 0;
@@ -4137,87 +4134,7 @@ static void	dc_trigger_deplist_reset(ZBX_DC_TRIGGER_DEPLIST *trigdep)
 	zbx_vector_ptr_create_ext(&trigdep->dependencies, __config_mem_malloc_func, __config_mem_realloc_func,
 			__config_mem_free_func);
 }
-/*
-static void	DCsync_trigdeps(zbx_dbsync_t *sync)
-{
-	char			**row;
-	zbx_uint64_t		rowid;
-	unsigned char		tag;
 
-	ZBX_DC_TRIGGER_DEPLIST	*trigdep_down, *trigdep_up;
-
-	int			found, index, ret;
-	zbx_uint64_t		triggerid_down, triggerid_up;
-	ZBX_DC_TRIGGER		*trigger_up, *trigger_down;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
-	{
-		/* removed rows will be always added at the end */
-//		if (ZBX_DBSYNC_ROW_REMOVE == tag)
-//			break;
-
-		/* find trigdep_down pointer */
-
-/*		ZBX_STR2UINT64(triggerid_down, row[0]);
-		if (NULL == (trigger_down = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerid_down)))
-			continue;
-
-		ZBX_STR2UINT64(triggerid_up, row[1]);
-		if (NULL == (trigger_up = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerid_up)))
-			continue;
-
-		trigdep_down = (ZBX_DC_TRIGGER_DEPLIST *)DCfind_id(&config->trigdeps, triggerid_down, sizeof(ZBX_DC_TRIGGER_DEPLIST), &found);
-		if (0 == found)
-			dc_trigger_deplist_init(trigdep_down, trigger_down);
-		else
-			trigdep_down->refcount++;
-
-		trigdep_up = (ZBX_DC_TRIGGER_DEPLIST *)DCfind_id(&config->trigdeps, triggerid_up, sizeof(ZBX_DC_TRIGGER_DEPLIST), &found);
-		if (0 == found)
-			dc_trigger_deplist_init(trigdep_up, trigger_up);
-		else
-			trigdep_up->refcount++;
-
-		zbx_vector_ptr_append(&trigdep_down->dependencies, trigdep_up);
-	}
-*/
-	/* remove deleted trigger dependencies from buffer */
-/*	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
-	{
-		ZBX_STR2UINT64(triggerid_down, row[0]);
-		if (NULL == (trigdep_down = (ZBX_DC_TRIGGER_DEPLIST *)zbx_hashset_search(&config->trigdeps,
-				&triggerid_down)))
-		{
-			continue;
-		}
-
-		ZBX_STR2UINT64(triggerid_up, row[1]);
-		if (NULL != (trigdep_up = (ZBX_DC_TRIGGER_DEPLIST *)zbx_hashset_search(&config->trigdeps,
-				&triggerid_up)))
-		{
-			dc_trigger_deplist_release(trigdep_up);
-		}
-
-		if (SUCCEED != dc_trigger_deplist_release(trigdep_down))
-		{
-			if (FAIL == (index = zbx_vector_ptr_search(&trigdep_down->dependencies, &triggerid_up,
-					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
-			{
-				continue;
-			}
-
-			if (1 == trigdep_down->dependencies.values_num)
-				dc_trigger_deplist_reset(trigdep_down);
-			else
-				zbx_vector_ptr_remove_noorder(&trigdep_down->dependencies, index);
-		}
-	}
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
-*/
 #define ZBX_TIMER_DELAY		30
 
 static int	dc_function_calculate_trends_nextcheck(time_t from, const char *period_shift, zbx_time_unit_t base,
@@ -4589,8 +4506,8 @@ static void	DCsync_functions(zbx_dbsync_t *sync)
 		function->revision = config->sync_start_ts;
 
 		item->update_triggers = 1;
-		if (NULL != item->triggers)
-			item->triggers[0] = NULL;
+//		if (NULL != item->triggers)
+//			item->triggers[0] = NULL;
 	}
 
 	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
@@ -6079,6 +5996,15 @@ static int	zbx_default_ptr_pair_ptr_compare_func(const void *d1, const void *d2)
  *                 items/hosts)                                               *
  *              3) list of triggers each item is used by                      *
  *                                                                            *
+ * 
+ * //note - all this thing does - 2 and 3, no 1 code at all
+ * // and this might be easily replaced by item<->trigger index
+ * // this index must be done for items objects
+ * 
+ * //and it's much mor logical to keep the proper state all the time 
+ * //instead of periocally updating it
+ * //TODO: replace with the relation object and keep it incrementiallty updated
+ * 
  ******************************************************************************/
 static void	dc_trigger_update_cache(void)
 {
@@ -6526,7 +6452,7 @@ void	DCsync_configuration(unsigned char mode, const struct zbx_json_parse *jp_kv
 	tsec = zbx_time() - sec;
 
 	sec = zbx_time();
-	if (FAIL == zbx_dbsync_compare_trigger_dependency(&tdep_sync, &memf, &glb_config->trigger_deps))
+	if (FAIL == zbx_dbsync_compare_trigger_dependency(&tdep_sync, &memf, &glb_config->deptrigger_to_trigger_idx))
 		goto out;
 	dsec = zbx_time() - sec;
 
@@ -6629,10 +6555,6 @@ void	DCsync_configuration(unsigned char mode, const struct zbx_json_parse *jp_kv
 
 	if (0 != tdep_sync.add_num + tdep_sync.update_num + tdep_sync.remove_num)
 		update_flags |= ZBX_DBSYNC_UPDATE_TRIGGER_DEPENDENCY;
-
-	/* update trigger topology if trigger dependency was changed */
-//	if (0 != (update_flags & ZBX_DBSYNC_UPDATE_TRIGGER_DEPENDENCY))
-//		dc_trigger_update_topology();
 
 	/* update various trigger related links in cache */
 	if (0 != (update_flags & (ZBX_DBSYNC_UPDATE_HOSTS | ZBX_DBSYNC_UPDATE_ITEMS | ZBX_DBSYNC_UPDATE_FUNCTIONS |
@@ -6855,7 +6777,7 @@ void	DCsync_configuration(unsigned char mode, const struct zbx_json_parse *jp_kv
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() triggers   : %d (%d slots)", __func__,
 				config->triggers.num_data, config->triggers.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() trigdeps   : %d (%d slots)", __func__,
-				glb_config->trigger_deps.from_to->elems.num_data, glb_config->trigger_deps.from_to->elems.num_slots);
+				glb_config->deptrigger_to_trigger_idx.from_to->elems.num_data, glb_config->deptrigger_to_trigger_idx.from_to->elems.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() trig. tags : %d (%d slots)", __func__,
 				config->trigger_tags.num_data, config->trigger_tags.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() expressions: %d (%d slots)", __func__,
@@ -7512,7 +7434,7 @@ out:
 	glb_config = (GLB_CONFIG *) __config_mem_malloc_func(NULL, sizeof(GLB_CONFIG));
 		
 	if (FAIL == obj_index_init(&glb_config->host_to_template_idx, &memf) ||
-	    FAIL == obj_index_init(&glb_config->trigger_deps, &memf) 
+	    FAIL == obj_index_init(&glb_config->deptrigger_to_trigger_idx, &memf) 
 //		||
 //	    FAIL == glb_discovery_init(&glb_config->discovery, &memf) 
 	) 
@@ -8814,6 +8736,7 @@ void	DCconfig_get_triggers_by_triggerids(DC_TRIGGER *triggers, const zbx_uint64_
 
 	for (i = 0; i < num; i++)
 	{
+
 		if (NULL == (dc_trigger = (const ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerids[i])))
 		{
 			errcode[i] = FAIL;
@@ -11049,12 +10972,13 @@ int	DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities)
 	return ret;
 }
 
+
 static int glb_get_trigger_status(u_int64_t triggerid, int *status, int* functional, int *value) {
 	ZBX_DC_TRIGGER *trigger;
 	
 	if (NULL == (trigger = (ZBX_DC_TRIGGER*)zbx_hashset_search(&config->triggers, &triggerid))) {
 		*value = TRIGGER_VALUE_UNKNOWN;
-		*status = TRIGGER_STATUS_UNKNOWN;
+		*status = TRIGGER_STATUS_DISABLED;
 		*functional = TRIGGER_FUNCTIONAL_FALSE;
 		return FAIL;
 	}
@@ -11065,7 +10989,27 @@ static int glb_get_trigger_status(u_int64_t triggerid, int *status, int* functio
 	
 	return SUCCEED;
 }
+/*
+char * glb_vector_uint64_dump(const zbx_vector_uint64_t *v) {
+	//LOG_INF("Called dump");
+	int i;
+	static char str[10240];
+	str[0] = '\0';
+	zbx_snprintf(str, 1024,"[");
+	//LOG_INF("Called dump1, v is %p",v);
 
+	for (i = 0; v != NULL && i < v->values_num; i++) {
+
+		if (i>0)
+			zbx_snprintf(str + strlen(str), 1024 - strlen(str),",");
+		zbx_snprintf(str + strlen(str),1024 - strlen(str),"%d", v->values[i]);
+	}
+
+	zbx_snprintf(str + strlen(str),1024 - strlen(str),"]");
+	//LOG_INF("finished dump, strlen is %d", strlen(str));
+	return str;
+}
+*/
 /******************************************************************************
  *                                                                            *
  * Comments: helper function for trigger dependency checking                  *
@@ -11091,6 +11035,7 @@ static int glb_get_trigger_status(u_int64_t triggerid, int *status, int* functio
  *           master trigger value has been calculated.                        *
  *                                                                            *
  ******************************************************************************/
+
 static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vector_uint64_t *dep_list, int level,
 		const zbx_vector_uint64_t *triggerids, zbx_vector_uint64_t *master_triggerids)
 {
@@ -11098,8 +11043,9 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 	zbx_vector_uint64_t next_dep_list;
 	u_int64_t next_triggerid;
 	
-	return SUCCEED;
-	
+	DEBUG_TRIGGER(triggerid, "Doing recursive check of dependand triggers");
+//	DEBUG_TRIGGER(triggerid, "Doing recursive check of dependand triggers, number is %d, ids are: %s",dep_list->values_num, glb_vector_uint64_dump(dep_list));
+
 	if (ZBX_TRIGGER_DEPENDENCY_LEVELS_MAX < level)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "recursive trigger dependency is too deep (triggerid:" ZBX_FS_UI64 ")", triggerid);
@@ -11109,30 +11055,34 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 	if (0 != dep_list->values_num)
 	{
 		for (i = 0; i < dep_list->values_num; i++)
-		{
-			
+		{	
 			next_triggerid = dep_list->values[i];
+			DEBUG_TRIGGER(triggerid, "Checking dependand trigger %ld", next_triggerid);		
 			//checking if trigger has failed
 			glb_get_trigger_status(next_triggerid, &t_status, &t_functional, &t_value);
 			
 			if (TRIGGER_STATUS_ENABLED == t_status &&
 				TRIGGER_FUNCTIONAL_TRUE == t_functional &&
-				TRIGGER_VALUE_PROBLEM == t_value)
+				TRIGGER_VALUE_PROBLEM == t_value) {
+				
+				DEBUG_TRIGGER(triggerid, "Dependand trigger %ld has PROBLEM status, check FAILED ", next_triggerid);		
 				return FAIL;
-		
+			}
+			
 			if (NULL != master_triggerids)
 				zbx_vector_uint64_append(master_triggerids, next_triggerid);
 		
 
 			zbx_vector_uint64_create(&next_dep_list);
 			zbx_vector_uint64_clear(&next_dep_list);
-			obj_index_get_refs_from(&glb_config->trigger_deps, dep_list->values[i], &next_dep_list);
-
+			obj_index_get_refs_from(&glb_config->deptrigger_to_trigger_idx, dep_list->values[i], &next_dep_list);
+			
+			DEBUG_TRIGGER(triggerid, "Checking recursevly trigger %ld dependancies", next_triggerid);
 			ret == DCconfig_check_trigger_dependencies_rec(next_triggerid, &next_dep_list, level + 1, triggerids,
 					master_triggerids);
-			//TODO: FIX
-			//ret = SUCCEED;
-
+			
+			DEBUG_TRIGGER(triggerid, "Depandand ttrigger %ld dependancies check returned %d", next_triggerid, ret);
+			
 			zbx_vector_uint64_destroy(&next_dep_list);		
 		
 			if (FAIL == ret)	
@@ -11159,13 +11109,11 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 	const ZBX_DC_TRIGGER_DEPLIST	*trigdep;
 	zbx_vector_uint64_t dep_list;
 	zbx_vector_uint64_create(&dep_list);
+		
+	obj_index_get_refs_to(&glb_config->deptrigger_to_trigger_idx, triggerid, &dep_list);
 	
-	
-
-	obj_index_get_refs_from(&glb_config->trigger_deps, triggerid, &dep_list);
 	DEBUG_TRIGGER(triggerid, "Checking trigger dependancies, has %d deps", dep_list.values_num);
 	
-
 	if (0 == dep_list.values_num) {
 		zbx_vector_uint64_destroy(&dep_list);
 		return SUCCEED;
@@ -11181,8 +11129,6 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 
 	return ret;
 }
-
-
 
 void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
 {
@@ -14133,7 +14079,7 @@ void	zbx_dc_get_trigger_dependencies(const zbx_vector_uint64_t *triggerids, zbx_
 	{
 		zbx_vector_uint64_clear(&dep_list);
 
-		obj_index_get_refs_from(&glb_config->trigger_deps, triggerids->values[i], &dep_list);
+		obj_index_get_refs_to(&glb_config->deptrigger_to_trigger_idx, triggerids->values[i], &dep_list);
 		
 		if ( 0 == dep_list.values_num)  //no deps
 			continue;
@@ -16246,6 +16192,7 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) {
  * 			{....}, ]														  *
  *                                                                            *
  ******************************************************************************/
+/*
 int glb_dc_get_triggers_status_json(zbx_vector_uint64_t *triggerids, struct zbx_json *json) {
 	
 	ZBX_DC_TRIGGER *trigger;
@@ -16270,7 +16217,7 @@ int glb_dc_get_triggers_status_json(zbx_vector_uint64_t *triggerids, struct zbx_
 	return SUCCEED;
 }
 
-
+*/
 
 /************************************************
 * fetches items host names and keys to send to 	*
@@ -16304,7 +16251,7 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 unsigned int DCconfig_get_item_sync_ts(void) {
 	return config->item_sync_ts;
 }
-
+/*
 void DCget_unknown_triggers(int *unknown_triggers, int *not_calculated, int *total_triggers) {
 	zbx_hashset_iter_t iter;
 	ZBX_DC_TRIGGER *trg;
@@ -16326,7 +16273,7 @@ void DCget_unknown_triggers(int *unknown_triggers, int *not_calculated, int *tot
 	}
 	UNLOCK_CACHE;
 }
-
+*/
 //note: allthow it's possible that a grbage might be returned
 //this isn't likely on modern archs so not using locks on 
 //read ops

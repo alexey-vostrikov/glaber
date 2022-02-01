@@ -83,22 +83,47 @@ static int get_refs_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *p
     return SUCCEED;
 }
 
-int obj_index_del_id(obj_index_t* idx, u_int64_t id) {
+int obj_index_del_id_from(obj_index_t* idx, u_int64_t id) {
     int i;
     zbx_vector_uint64_t ids;
   
     zbx_vector_uint64_create(&ids);
     
+    //finding 'to' ids which will have references to the 'from' in to_from hash
     elems_hash_process(idx->from_to, id, get_refs_callback, &ids, ELEM_FLAG_DO_NOT_CREATE);
      
+    //deleting back reference from all the ids collected
     for (i = 0; i< ids.values_num; i++) {
         elems_hash_process(idx->to_from, ids.values[i], del_ref_callback, &id, ELEM_FLAG_DO_NOT_CREATE);
     }
  
     zbx_vector_uint64_destroy(&ids);
+    //removing the id
     elems_hash_delete(idx->from_to, id);
    
     return SUCCEED;
+}
+
+int obj_index_del_id_to(obj_index_t* idx, u_int64_t id) {
+    int i;
+    zbx_vector_uint64_t ids;
+  
+    zbx_vector_uint64_create(&ids);
+    
+    //finding 'from' ids which will have references to the 'to' in from_to hash
+    elems_hash_process(idx->to_from, id, get_refs_callback, &ids, ELEM_FLAG_DO_NOT_CREATE);
+     
+    //deleting back reference from all the ids collected
+    for (i = 0; i< ids.values_num; i++) {
+        elems_hash_process(idx->from_to, ids.values[i], del_ref_callback, &id, ELEM_FLAG_DO_NOT_CREATE);
+    }
+ 
+    zbx_vector_uint64_destroy(&ids);
+    //removing the id
+    elems_hash_delete(idx->to_from, id);
+   
+    return SUCCEED;
+
 }
 
 int obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {

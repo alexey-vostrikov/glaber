@@ -702,7 +702,6 @@ zbx_prototype_discover_t;
 /* trigger statuses */
 #define TRIGGER_STATUS_ENABLED		0
 #define TRIGGER_STATUS_DISABLED		1
-#define TRIGGER_STATUS_UNKNOWN		63
 
 /* trigger types */
 #define TRIGGER_TYPE_NORMAL		0

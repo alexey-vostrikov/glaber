@@ -1283,7 +1283,7 @@ void	DCdump_configuration(void)
 	DCdump_prototype_items();
 	DCdump_triggers();
 	//DCdump_trigdeps();
-	obj_index_dump(&glb_config->trigger_deps);
+	obj_index_dump(&glb_config->deptrigger_to_trigger_idx);
 	DCdump_functions();
 	DCdump_expressions();
 	DCdump_actions();
