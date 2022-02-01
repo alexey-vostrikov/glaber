@@ -1067,7 +1067,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		
 		
 		if ( 0 == strcmp(req_type,"history")) {
-			zabbix_log(LOG_LEVEL_INFORMATION,"History request");
+	
 			zbx_history_record_vector_create(&values);
 			glb_history_get(itemid,value_type,start,count,end,GLB_HISTORY_GET_INTERACTIVE, &values);
 			zbx_json_addarray(&json,ZBX_PROTO_TAG_DATA);

@@ -150,6 +150,17 @@ const char	*get_program_name(const char *path)
 	return filename;
 }
 
+u_int64_t glb_ms_time() {
+	u_int64_t sec;
+
+	zbx_timespec_t	ts;
+	zbx_timespec(&ts);
+
+	sec = ts.sec;
+	return sec * 1000 + ts.ns/1000000;
+}
+
+
 /******************************************************************************
  *                                                                            *
  * Function: zbx_timespec                                                     *

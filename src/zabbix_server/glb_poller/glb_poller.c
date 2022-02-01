@@ -32,19 +32,6 @@ typedef struct
 	int  change_time;
 } poller_event_t;
 
-
-
-u_int64_t glb_ms_time() {
-	u_int64_t sec;
-
-	zbx_timespec_t	ts;
-	zbx_timespec(&ts);
-
-	sec = ts.sec;
-	return sec * 1000 + ts.ns/1000000;
-}
-
-
 int event_elem_compare(const void *d1, const void *d2)
 {
 	const zbx_binary_heap_elem_t *e1 = (const zbx_binary_heap_elem_t *)d1;

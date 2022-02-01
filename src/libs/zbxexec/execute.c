@@ -349,7 +349,7 @@ int	zbx_execute(const char *command, char **output, char *error, size_t max_erro
 	pid_t			pid;
 	int			fd;
 #endif
-
+	u_int64_t t_start;
 	*error = '\0';
 
 	if (NULL != output)
@@ -483,7 +483,7 @@ close:
 	zbx_free(wdir);
 
 #else	/* not _WINDOWS */
-
+	t_start = glb_ms_time();
 	zbx_alarm_on(timeout);
 
 	if (-1 != (fd = zbx_popen(&pid, command, dir)))
@@ -547,8 +547,9 @@ close:
 
 #endif	/* _WINDOWS */
 
-	if (TIMEOUT_ERROR == ret)
-		zbx_strlcpy(error, "Timeout while executing a shell script.", max_error_len);
+	if (TIMEOUT_ERROR == ret) 
+		zbx_snprintf(error, max_error_len, "Timeout while executing a shell script :%ld msec", glb_ms_time() - t_start);
+		//zbx_strlcpy(error, "Timeout while executing a shell script.", max_error_len);
 
 	if ('\0' != *error)
 		zabbix_log(LOG_LEVEL_WARNING, "Failed to execute command \"%s\": %s", command, error);
