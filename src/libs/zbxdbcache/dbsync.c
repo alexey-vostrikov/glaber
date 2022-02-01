@@ -417,8 +417,8 @@ static int glb_inc_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int colu
 		d++;	
 	}
 	DBfree_result(result);	
-
-	LOG_INF("Finished: %s, %d rows add/chandged, %d rows deleted in sync of '%s'", __func__, i, d, sync_name);
+	if ( i+d > 0)
+		LOG_INF("Finished: %s, %d rows add/chandged, %d rows deleted in sync of '%s'", __func__, i, d, sync_name);
 	return SUCCEED;
 }
 
