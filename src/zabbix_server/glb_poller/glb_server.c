@@ -464,13 +464,14 @@ static void	handle_async_io(glb_poll_module_t *poll_mod) {
         if (SUCCEED == worker_is_alive(&worker->worker)) { 
             int last_status;
             
-            while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_response))) {
+            while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_response)) && (NULL != worker_response)) {
               
                 LOG_DBG("Parsing line %s from worker %s", worker_response, worker->worker.path);
                 glb_server_submit_result(glb_item, worker_response);
             }
   
             if (FAIL == last_status ) {
+                DEBUG_ITEM(glb_item->itemid,"Submitting data in non supported state (last_status is FAIL)");
                 glb_server_submit_fail_result(glb_item,"Couldn't read from the worker - either filename is wrong or temporary fail");
             }
 

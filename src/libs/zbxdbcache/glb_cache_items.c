@@ -927,7 +927,7 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     if (h->ts.sec > now + 300) {
         LOG_INF("Warn: item's %ld timestamp %ld is too much ahead of the real time %ld, not adding to the cache", elem->id, h->ts.sec, now);
         THIS_SHOULD_NEVER_HAPPEN;
-        exit(-1);
+      //  exit(-1);
         return FAIL;
     }
 
@@ -1009,8 +1009,11 @@ int glb_cache_item_update_meta_cb(glb_cache_elem_t *elem, void *cb_data)
     }
     if (req->flags & GLB_CACHE_ITEM_UPDATE_ERRORMSG)
     {
+        DEBUG_ITEM(elem->id, "Updating metadata: errmsg");
+        DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", req->meta->error);
+        DEBUG_ITEM(elem->id, "Updating metadata: errmsg old %s", elm->meta.error);
         elm->meta.error = glb_cache_strpool_set_str(elm->meta.error, req->meta->error);
-        DEBUG_ITEM(elem->id, "Updated metadata: errmsg");
+        
     }
 
     return SUCCEED;

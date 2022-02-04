@@ -480,7 +480,7 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
             zbx_free(wresp); 
         } else { //nothing retruned yet, exiting, no reason to burn CPU here
             *response = NULL;
-            return FAIL;
+            return SUCCEED;
         }
     } 
     zabbix_log(LOG_LEVEL_INFORMATION, "End of %s()", __func__);

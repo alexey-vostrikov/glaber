@@ -1823,13 +1823,23 @@ static void	dc_history_set_error(ZBX_DC_HISTORY *hdata, char *errmsg)
 static void	dc_history_set_value(ZBX_DC_HISTORY *hdata, unsigned char value_type, zbx_variant_t *value)
 {
 	char	*errmsg = NULL;
+	glb_cache_item_meta_t meta = {0};
 
 	if (FAIL == zbx_variant_to_value_type(value, value_type, &errmsg))
 	{
+		glb_cache_item_meta_t meta;
 		dc_history_set_error(hdata, errmsg);
 		DEBUG_ITEM(hdata->itemid,"Item type coversion error: %s", errmsg);
+		meta.error = errmsg;
+		meta.state = ITEM_STATE_NOTSUPPORTED;
+		glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG | GLB_CACHE_ITEM_UPDATE_STATE, hdata->value_type);
+		
 		return;
 	}
+	
+	meta.error = NULL;
+	meta.state = ITEM_STATE_NORMAL;
+	glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG | GLB_CACHE_ITEM_UPDATE_STATE, hdata->value_type);
 
 	switch (value_type)
 	{
@@ -1917,6 +1927,7 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 					zbx_snprintf(buff_str, MAX_STRING_LEN, "Value %s is too small or too large.", zbx_print_double(buffer, sizeof(buffer), hdata->value.dbl));
 					//todo: insert proper setting of item status here
 					meta.error = buff_str;
+					DEBUG_ITEM(hdata->itemid,"Updating meta with error: %s",buff_str);
 					glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG, hdata->value_type);
 				}
 				DEBUG_ITEM(hdata->itemid,"Item validated as float");

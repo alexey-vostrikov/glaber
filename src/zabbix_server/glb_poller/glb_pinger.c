@@ -594,6 +594,9 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
     //reading all the responses we have so far from the worker
     while (SUCCEED == async_buffered_responce(conf->worker, &worker_response)) {
         
+        if ( NULL == worker_response) //read succesifull, no data yet
+            break;
+        
         zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s", worker_response);
         
         if (SUCCEED != zbx_json_open(worker_response, &jp_resp)) {
