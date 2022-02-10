@@ -296,14 +296,21 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 			'hosts.php?form=update&hostid='.$db_host['hostid']
 		));
 
+		$latest_link = (new CLink(_('Latest data'),
+					(new CUrl('zabbix.php'))
+						->setArgument('action', 'latest.view')
+						->setArgument('filter_set', '1')
+						->setArgument('filter_hostids', [$db_host['hostid']]) ));
+		
 		if ($current_element === '') {
 			$host->addClass(ZBX_STYLE_SELECTED);
 		}
 
 		$list
-			->addItem(new CBreadcrumbs([new CSpan(new CLink(_('All hosts'), new CUrl('hosts.php'))), $host]))
+			->addItem(new CBreadcrumbs([new CSpan($host)]))
 			->addItem($status)
-			->addItem(getHostAvailabilityTable($db_host['interfaces']));
+			->addItem(getHostAvailabilityTable($db_host['interfaces']))
+			->addItem($latest_link);
 
 		if ($db_host['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $db_host['hostDiscovery']['ts_delete'] != 0) {
 			$info_icons = [getHostLifetimeIndicator(time(), $db_host['hostDiscovery']['ts_delete'])];

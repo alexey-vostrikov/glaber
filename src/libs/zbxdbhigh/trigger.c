@@ -130,6 +130,7 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 
 	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT))
 	{
+		DEBUG_TRIGGER(trigger->triggerid,"Creating internal event for the trigger");
 		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
 				&trigger->timespec, new_state, NULL, trigger->expression,
 				trigger->recovery_expression, 0, 0, &trigger->tags, 0, NULL, 0, NULL, NULL,
@@ -169,8 +170,10 @@ void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)
 
 	for (i = 0; i < trigger_diff->values_num; i++)
 	{
+		
 		char	delim = ' ';
 		diff = (const zbx_trigger_diff_t *)trigger_diff->values[i];
+		DEBUG_TRIGGER(diff->triggerid,"Saving trigger diff to the database");
 
 		if (0 == (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE))
 			continue;
@@ -181,18 +184,21 @@ void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)
 		{
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%clastchange=%d", delim, diff->lastchange);
 			delim = ',';
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger lastchange: %ld", diff->lastchange);
 		}
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
 		{
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%cvalue=%d", delim, diff->value);
 			delim = ',';
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger value = %d",diff->value);
 		}
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE))
 		{
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%cstate=%d", delim, diff->state);
 			delim = ',';
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger state = %d", diff->state);	
 		}
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
@@ -201,6 +207,8 @@ void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)
 
 			error_esc = DBdyn_escape_field("triggers", "error", diff->error);
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%cerror='%s'", delim, error_esc);
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger error ");
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger error '%s'",error_esc);
 			zbx_free(error_esc);
 		}
 

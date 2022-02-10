@@ -22,13 +22,18 @@
 /**
  * @var CPartial $this
  */
+$context_host = 0;
+ if (1 == count( $data['hosts']) ) {
+	$context_host = 1;
+	error_log("Host context: ".print_r($data['hosts'],true)); 
+} 
 
 $form = (new CForm('GET', 'history.php'))
 	->cleanItems()
 	->setName('items')
 	->addItem(new CVar('action', HISTORY_BATCH_GRAPH));
 
-$table = (new CTableInfo())->addClass(ZBX_STYLE_OVERFLOW_ELLIPSIS);
+$table = (new CDataTable('latest',['advanced_search' => true]))->addClass(ZBX_STYLE_OVERFLOW_ELLIPSIS);
 
 // Latest data header.
 $col_check_all = new CColHeader(
@@ -37,53 +42,59 @@ $col_check_all = new CColHeader(
 
 $view_url = $data['view_curl']->getUrl();
 
-$col_host = make_sorting_header(_('Host'), 'host', $data['sort_field'], $data['sort_order'], $view_url);
-$col_name = make_sorting_header(_('Name'), 'name', $data['sort_field'], $data['sort_order'], $view_url);
-
 $simple_interval_parser = new CSimpleIntervalParser();
 $update_interval_parser = new CUpdateIntervalParser(['usermacros' => true]);
 
 if ($data['filter']['show_details']) {
 	$table->setHeader([
-		$col_check_all->addStyle('width: 15px;'),
-		$col_host->addStyle('width: 13%'),
-		$col_name->addStyle('width: 21%'),
-		(new CColHeader(_('Interval')))->addStyle('width: 5%'),
+		$col_check_all
+			->addStyle('width: 15px;')
+			->addClass('no-sort'),
+		0 == $context_host ? (new CColHeader(_('Host')))
+			->addStyle('width: 13%')->addClass('search') : NULL,
+		(new CColHeader(_('Name')))->addStyle('width: 21%')->addClass('search'),
+		(new CColHeader(_('Interval')))->addStyle('width: 5%')->addClass('search'),
 		(new CColHeader(_('History')))->addStyle('width: 5%'),
 		(new CColHeader(_('Trends')))->addStyle('width: 5%'),
-		(new CColHeader(_('Type')))->addStyle('width: 8%'),
-		(new CColHeader(_('Last response')))->addStyle('width: 14%'),
-		(new CColHeader(_('Last value')))->addStyle('width: 14%'),
-		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
-		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
+		(new CColHeader(_('Type')))->addStyle('width: 8%')->addClass('search'),
+		(new CColHeader(_('Last response')))->addStyle('width: 14%')->addClass('search'),
+		(new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search'),
+		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search'),
+		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3)->addClass('search'),
 		(new CColHeader())->addStyle('width: 100px'),
 	]);
 }
 else {
 	$table->setHeader([
-		$col_check_all->addStyle('width: 15px'),
-		$col_host->addStyle('width: 17%'),
-		$col_name->addStyle('width: 40%'),
-		(new CColHeader(_('Last response')))->addStyle('width: 20%'),
-		(new CColHeader(_('Last value')))->addStyle('width: 14%'),
-		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%'),
-		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3),
+		$col_check_all->addStyle('width: 15px')->addClass('no-sort'),
+		0 == $context_host ? (new CColHeader(_('Host')))->addStyle('width: 13%')->addClass('search') : NULL,
+		(new CColHeader(_('Name')))->addStyle('width: 40%')->addClass('search'),
+		(new CColHeader(_('Last response')))->addStyle('width: 20%')->addClass('search'),
+		(new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search'),
+		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search'),
+		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3)->addClass('search'),
 		(new CColHeader())->addStyle('width: 100px')
 	]);
 }
 
 //Latest data rows.
 foreach ($data['items'] as $itemid => $item) {
+	$change_raw = '';
 	$is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
 
-	$checkbox = (new CCheckBox('itemids['.$itemid.']', $itemid));//->setEnabled($is_graph);
+	$checkbox = (new CCheckBox('itemids['.$itemid.']', $itemid))->addClass('no-sort');//->setEnabled($is_graph);
 	$state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
 
 	$item_name = (new CDiv([
 		(new CSpan($item['name_expanded']))->addClass('label'),
 		($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null
 	]))->addClass('action-container');
-
+	
+	$item_config_url = (new CUrl('items.php'))
+		->setArgument('form', 'update')
+		->setArgument('itemid', $itemid)
+		->setArgument('context', 'host');
+	
 	$item_hist = [];
 
 	$last_history = array_key_exists($itemid, $data['history'])
@@ -95,6 +106,7 @@ foreach ($data['items'] as $itemid => $item) {
 			$item_hist = $data['history'][$itemid];
 			$prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
 			$last_check = zbx_date2age($last_history['clock']);
+			$last_check_raw = $last_history['clock'];
 			
 			$last_value = formatHistoryValue($last_history['value'], $item, false);
 			if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] || 
@@ -105,6 +117,7 @@ foreach ($data['items'] as $itemid => $item) {
 							->setHint($last_history['value'], 'hintbox-wrap');
 					 }
 			$change = '';
+			$last_value_raw = $last_history['value'];
 	
 			if ($prev_history && in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64])) {
 				$history_diff = $last_history['value'] - $prev_history['value'];
@@ -113,7 +126,7 @@ foreach ($data['items'] as $itemid => $item) {
 					if ($history_diff > 0) {
 						$change = '+';
 					}
-	
+					$change_raw = $history_diff;
 					// The change must be calculated as uptime for the 'unixtime'.
 					$change .= convertUnits([
 						'value' => $history_diff,
@@ -121,22 +134,43 @@ foreach ($data['items'] as $itemid => $item) {
 					]);
 				}
 			}
-	} else if (isset($item['error']) && $item['state'] == ITEM_STATE_NOTSUPPORTED ) {
-			$last_value = $last_value = (new CSpan('UNSUPPORTED'))
-				->addClass(ZBX_STYLE_RED)
-				->addClass(ZBX_STYLE_LINK_ACTION)
-				->setHint($item['error'], 'hintbox-wrap');
-			if ($item['lastdata'] > 0 ) 
-				$last_check = zbx_date2age($item['lastdata']);
-			else 
-				$last_check ='';
-			$change = '';
 	} else {
-			$last_check = '';
-			$last_value = '';
-			$change = '';
-		}
+		$last_check = '';
+		$last_value = '';
+		$change = '';
+
+		$last_check_raw = '';
+		$last_value_raw = '';
+	}
+
 		
+	if (isset($item['error']) && $item['state'] == ITEM_STATE_NOTSUPPORTED ) {
+			if (strlen($last_value) < 1) 
+				$last_value = 'UNSUPPORTED';	
+			
+			if ($item['lastdata'] > 0 ) {
+				$last_check = zbx_date2age($item['lastdata']);
+				$last_check_raw = $item['lastdata'];
+			}
+			else {
+				$last_check = '<UNKNOWN>';
+				$last_check_raw = '<UNKNOWN>';
+			}
+
+			$last_check = (new CSpan($last_check))
+					->addClass(ZBX_STYLE_RED)
+					->addClass(ZBX_STYLE_LINK_ACTION)
+					->setHint($item['error'], 'hintbox-wrap');
+			
+			$last_value = (new CSpan($item['error']))
+					->addClass(ZBX_STYLE_RED)
+					->addClass(ZBX_STYLE_LINK_ACTION)
+					->setHint($item['error'], 'hintbox-wrap');
+
+			$last_value_raw = $item['error'];
+			$change = '';
+			$change_raw = '';
+	} 	
 	if ( isset($item['nextcheck']) && $item['nextcheck'] > 0 )
 		$last_check = (new CSpan($last_check))
 				->addClass(ZBX_STYLE_LINK_ACTION)
@@ -185,11 +219,6 @@ foreach ($data['items'] as $itemid => $item) {
 		
 	if ($data['filter']['show_details']) {
 
-		$item_config_url = (new CUrl('items.php'))
-			->setArgument('form', 'update')
-			->setArgument('itemid', $itemid)
-			->setArgument('context', 'host');
-
 		$item_key = ($item['type'] == ITEM_TYPE_HTTPTEST)
 			? (new CSpan($item['key_expanded']))->addClass(ZBX_STYLE_GREEN)
 			: (new CLink($item['key_expanded'], $item_config_url))
@@ -214,7 +243,7 @@ foreach ($data['items'] as $itemid => $item) {
 
 		$table_row = new CRow([
 			$checkbox,
-			$host_name,
+			0 == $context_host ? $host_name : NULL,
 			(new CCol([$item_name, $item_key]))->addClass($state_css),
 			(new CCol($item_delay))->addClass($state_css),
 			(new CCol( $keep_history > 0 ?
@@ -232,11 +261,15 @@ foreach ($data['items'] as $itemid => $item) {
 			   
 			))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
-			(new CCol($last_check))->addClass($state_css),
-			(new CCol())->addClass($state_css)
+			(new CCol($last_check))->setAttribute('data-order', $last_check_raw)->addClass($state_css),
+			(new CCol())
+				->setAttribute('data-order', $last_value_raw)
+				->addClass($state_css)
 				->addItem(new CDiv($last_value)),
 
-			(new CCol($change))->addClass($state_css),
+			(new CCol($change))
+				->setAttribute('data-order', $change_raw)
+				->addClass($state_css),
 			$data['tags'][$itemid],
 			(new CCol())
 				->addClass(ZBX_STYLE_CENTER)
@@ -249,11 +282,14 @@ foreach ($data['items'] as $itemid => $item) {
 	else {
 		$table_row = new CRow([
 			$checkbox,
-			$host_name,
-			(new CCol($item_name))->addClass($state_css),
-			(new CCol($last_check))->addClass($state_css),
-			(new CCol($last_value))->addClass($state_css),
-			(new CCol($change))->addClass($state_css),
+			0 == $context_host ? $host_name : NULL,
+			(new CCol(
+				(new CLink($item_name, $item_config_url))
+					->addClass(ZBX_STYLE_LINK_ALT)))
+					->addClass($state_css),
+			(new CCol($last_check))->setAttribute('data-order', $last_check_raw)->addClass($state_css),
+			(new CCol($last_value))->setAttribute('data-order', $last_value_raw)->addClass($state_css),
+			(new CCol($change))->setAttribute('data-order', $change_raw)->addClass($state_css),
 			$data['tags'][$itemid],
 			(new CCol())
 				->addClass(ZBX_STYLE_CENTER)
@@ -271,7 +307,7 @@ foreach ($data['items'] as $itemid => $item) {
 
 $form->addItem([
 	$table,
-	$data['paging'],
+	NULL,
 	new CActionButtonList('graphtype', 'itemids', [
 		GRAPH_TYPE_STACKED => ['name' => _('Display stacked graph')],
 		GRAPH_TYPE_NORMAL => ['name' => _('Display graph')]

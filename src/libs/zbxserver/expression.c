@@ -5004,7 +5004,9 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 	{
 		int		errcode;
 		const DC_ITEM	*item;
-
+		
+		DEBUG_ITEM(func->itemid,"Doing function calculation");
+		
 		/* avoid double copying from configuration cache if already retrieved when saving history */
 		if (FAIL != (i = zbx_vector_uint64_bsearch(history_itemids, func->itemid,
 				ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
@@ -5034,6 +5036,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 			zbx_free(func->error);
 			func->error = zbx_eval_format_function_error(func->function, item->host.host,
 					item->key_orig, func->parameter, "item is disabled");
+			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is inactive");
 			continue;
 		}
 
@@ -5042,6 +5045,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 			zbx_free(func->error);
 			func->error = zbx_eval_format_function_error(func->function, item->host.host,
 					item->key_orig, func->parameter, "item belongs to a disabled host");
+			DEBUG_ITEM(func->itemid, "Skipping func eval to due to host is inactive");					
 			continue;
 		}
 
@@ -5052,6 +5056,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 			zbx_variant_set_error(&func->value,
 					zbx_eval_format_function_error(func->function, item->host.host,
 							item->key_orig, func->parameter, "item is not supported"));
+			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is not supported");
 			continue;
 		}
 
@@ -5063,6 +5068,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 					zbx_eval_format_function_error(func->function, item->host.host,
 							item->key_orig, func->parameter, error));
 			zbx_free(error);
+			DEBUG_ITEM(func->itemid,"There was an error in func calc: %s",error);
 			continue;
 		}
 	}
@@ -5259,11 +5265,12 @@ void	prepare_triggers(DC_TRIGGER **triggers, int triggers_num)
 		DC_TRIGGER	*tr = triggers[i];
 
 		tr->eval_ctx = zbx_eval_deserialize_dyn(tr->expression_bin, tr->expression, ZBX_EVAL_EXCTRACT_ALL);
-
+		DEBUG_TRIGGER(tr->triggerid,"Extracted trigger expression to binary");
 		if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode)
 		{
 			tr->eval_ctx_r = zbx_eval_deserialize_dyn(tr->recovery_expression_bin, tr->recovery_expression,
 					ZBX_EVAL_EXCTRACT_ALL);
+			DEBUG_TRIGGER(tr->triggerid,"Extracted trigger recovery expression to binary");
 		}
 	}
 }
@@ -5327,13 +5334,15 @@ void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t 
 	for (i = 0; i < triggers->values_num; i++)
 	{
 		tr = (DC_TRIGGER *)triggers->values[i];
-
+		
+		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
 		event.value = tr->value;
 
 		if (SUCCEED != expand_trigger_macros(tr->eval_ctx, &event, err, sizeof(err)))
 		{
 			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
+			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value")
 		}
 
 		if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode &&

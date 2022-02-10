@@ -89,7 +89,8 @@ class CItem extends CItemGeneral {
 		$sqlParts = [
 			'select'	=> ['items' => 'i.itemid'],
 			'from'		=> ['items' => 'items i'],
-			'where'		=> ['webtype' => 'i.type<>'.ITEM_TYPE_HTTPTEST, 'flags' => 'i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'],
+			'where'		=> ['webtype' => 'i.type<>'.ITEM_TYPE_HTTPTEST, 'flags' => 'i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','
+							.ZBX_FLAG_DISCOVERY_CREATED.','.ZBX_FLAG_DISCOVERY_RULE.')'],
 			'group'		=> [],
 			'order'		=> [],
 			'limit'		=> null
@@ -418,12 +419,7 @@ class CItem extends CItemGeneral {
 		if ($result) {
 			if (!$options['countOutput'] && ($this->outputIsRequested('state', $options['output']))) {
 
-				global $ZBX_SERVER, $ZBX_SERVER_PORT;
-				$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
-					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
-			  		timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
-				
-				$items_state = $server->getItemsState(CSessionHelper::getId(),array_keys($result)); 
+				$items_state = CZabbixServer::getItemsState(array_keys($result)); 
 				
 				if ( !empty($items_state) && (is_array($items_state) || is_object($items_state))) {
 					foreach ($items_state as $state) {

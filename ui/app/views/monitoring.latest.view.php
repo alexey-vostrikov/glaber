@@ -40,11 +40,11 @@ $widget = (new CWidget())
 			->setAttribute('aria-label', _('Content controls'))
 	);
 
+if (1 == count( $data['hosts']) ) {
+	$widget->setNavigation(getHostNavigation('latest data', array_keys($data['hosts'])[0]));
+}
+
 if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
-	$filter_tags_table = CTagFilterFieldHelper::getTagFilterField([
-		'evaltype' => $data['filter']['evaltype'],
-		'tags' => $data['filter']['tags']
-	]);
 
 	$widget->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'latest.view')))
 		->setProfile('web.latest.filter')
@@ -87,23 +87,18 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 						]
 					]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 				)
-				->addRow(_('Name'),
-					(new CTextBox('filter_select', $data['filter']['select']))
-						->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-				),
+				,
 			(new CFormList())
-				->addRow(_('Tags'), $filter_tags_table)
-				->addRow(_('Show details'), [
-					(new CCheckBox('filter_show_details'))->setChecked($data['filter']['show_details'] == 1),
-					(new CDiv([
-						(new CLabel(_('Show items without data'), 'filter_show_without_data'))
+				->addRow(_('Show details'), 
+					(new CCheckBox('filter_show_details'))->setChecked($data['filter']['show_details'] == 1))
+				->addRow((new CLabel(_('Show items without data'), 'filter_show_without_data'))
 							->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
 						(new CCheckBox('filter_show_without_data'))
 							->setChecked($data['filter']['show_without_data'] == 1)
 							->setAttribute('disabled', $data['filter']['hostids'] ? null : 'disabled')
 							->setUncheckedValue(0)
-					]))->addClass(ZBX_STYLE_TABLE_FORMS_SECOND_COLUMN)
-				])
+				)->addClass(ZBX_STYLE_TABLE_FORMS_SECOND_COLUMN)
+				
 		])
 	);
 }
@@ -115,8 +110,3 @@ $widget->addItem(new CPartial('monitoring.latest.view.html', array_intersect_key
 )));
 
 $widget->show();
-
-// Initialize page refresh.
-(new CScriptTag('latest_page.start();'))
-	->setOnDocumentReady()
-	->show();

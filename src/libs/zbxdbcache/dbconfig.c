@@ -8440,14 +8440,18 @@ void	DCconfig_get_items_by_keys(DC_ITEM *items, zbx_host_key_t *keys, int *errco
 
 	for (i = 0; i < num; i++)
 	{
-	//	zabbix_log(LOG_LEVEL_DEBUG,"Getting host %s item %s", keys[i].host, keys[i].key);
-
-		if (NULL == (dc_host = DCfind_host(keys[i].host)) ||
-				NULL == (dc_item = DCfind_item(dc_host->hostid, keys[i].key)))
+		if (NULL == (dc_host = DCfind_host(keys[i].host)))
 		{
+			LOG_INF("Couldn't find host id for name %s", keys[i].host);
+		} else  {
 			
-			errcodes[i] = FAIL;
-			continue;
+			if (NULL == (dc_item = DCfind_item(dc_host->hostid, keys[i].key)))
+			{
+				LOG_INF("Couldn't find itemd id for key '%s'->'%s'", keys[i].host, keys[i].key );
+				
+				errcodes[i] = FAIL;
+				continue;
+			}
 		}
 
 		DCget_host(&items[i].host, dc_host, ZBX_ITEM_GET_ALL);
@@ -8528,26 +8532,33 @@ void	DCconfig_get_items_by_itemids_partial(DC_ITEM *items, const zbx_uint64_t *i
 	memset(errcodes, 0, sizeof(int) * (size_t)num);
 
 	RDLOCK_CACHE;
-
+	
 	for (i = 0; i < num; i++)
 	{
+		
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])))
 		{
+			DEBUG_ITEM(itemids[i], "Failed to retrieve item config for history sync");
 			errcodes[i] = FAIL;
 			continue;
 		}
 
+		DEBUG_ITEM(itemids[i], "Retrieved dc_item config for history sync");
+		
 		if (NULL == dc_host || dc_host->hostid != dc_item->hostid)
 		{
 			if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			{
+				DEBUG_ITEM(itemids[i], "Host not found for the item, value will FAIL");
 				errcodes[i] = FAIL;
 				continue;
 			}
+			DEBUG_ITEM(itemids[i], "Retrieved dc_host config for history sync");
 		}
 
 		DCget_host(&items[i].host, dc_host, mode);
 		DCget_item(&items[i], dc_item, mode);
+		DEBUG_ITEM(itemids[i], "Retrieved host and item data copied to heap from shm for local history sync processing");
 	}
 
 	UNLOCK_CACHE;
@@ -9024,14 +9035,19 @@ void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])) || NULL == dc_item->triggers)
 			continue;
-
+		DEBUG_ITEM(dc_item->itemid, "Retrieving trigger list for the item");
 		/* process all triggers for the specified item */
 
 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
 		{
+			
 			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
 				continue;
-
+			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld to the trigger list",dc_trigger->triggerid);
+		
+			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item calc");
+			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item %ld calc",dc_item->itemid);
+		
 			/* find trigger by id or create a new record in hashset if not found */
 			trigger = (DC_TRIGGER *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(DC_TRIGGER), &found);
 
@@ -9307,7 +9323,7 @@ void	zbx_dc_get_trigger_timers(zbx_vector_ptr_t *timers, int now, int soft_limit
 			dc_trigger_timer_free(timer);
 			continue;
 		}
-
+		DEBUG_TRIGGER(timer->triggerid, "Got trigger form timer queue");
 		zbx_vector_ptr_append(timers, timer);
 
 		/* Trigger expression must be calculated using function evaluation time. If a trigger is locked   */
@@ -9408,6 +9424,7 @@ void	zbx_dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers, int now)
 		{
 			if (0 != (timer->exec_ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
 				timer->eval_ts = timer->exec_ts;
+			DEBUG_TRIGGER(timer->triggerid, "Recalculated timer trigger next check to %ld", timer->exec_ts);
 		}
 	}
 
@@ -11057,6 +11074,7 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 		for (i = 0; i < dep_list->values_num; i++)
 		{	
 			next_triggerid = dep_list->values[i];
+			DEBUG_TRIGGER(triggerid, "Checking dependand trigger");
 			DEBUG_TRIGGER(triggerid, "Checking dependand trigger %ld", next_triggerid);		
 			//checking if trigger has failed
 			glb_get_trigger_status(next_triggerid, &t_status, &t_functional, &t_value);
@@ -11081,7 +11099,7 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 			ret == DCconfig_check_trigger_dependencies_rec(next_triggerid, &next_dep_list, level + 1, triggerids,
 					master_triggerids);
 			
-			DEBUG_TRIGGER(triggerid, "Depandand ttrigger %ld dependancies check returned %d", next_triggerid, ret);
+			DEBUG_TRIGGER(triggerid, "Dependend trigger %ld dependancies check returned %d", next_triggerid, ret);
 			
 			zbx_vector_uint64_destroy(&next_dep_list);		
 		
@@ -11147,18 +11165,28 @@ void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
 
 		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &diff->triggerid)))
 			continue;
+		
+		DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE))
+		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE)) {
 			dc_trigger->lastchange = diff->lastchange;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: lastchange = %ld", diff->lastchange);
+		}
+		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE)) {
 			dc_trigger->value = diff->value;
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: value = %d", diff->value);
+		}
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE))
+		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE)) {
 			dc_trigger->state = diff->state;
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: state = %d", diff->state);
+		}
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
+		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR)) {
 			DCstrpool_replace(1, &dc_trigger->error, diff->error);
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: error = '%s'", diff->error);
+		}
 	}
 
 	UNLOCK_CACHE;
@@ -16235,6 +16263,7 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 	RDLOCK_CACHE;
 
 	for (i =0 ; i < trends_num; i++) {
+		
 		if ( (NULL!=(item=zbx_hashset_search(&config->items,&trends[i].itemid))) && 
 			(NULL!=(host=zbx_hashset_search(&config->hosts,&item->hostid)))) {
 				trends[i].host_name=zbx_strdup(NULL,host->host);
@@ -16243,6 +16272,7 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 				trends[i].host_name=zbx_strdup(NULL,"");
 				trends[i].item_key=zbx_strdup(NULL,"");
 		}
+		DEBUG_ITEM(trends[i].itemid, "Retrieved trend's host and key: '%s':'%s'",trends[i].host_name,trends[i].item_key);
 	}
 
 	UNLOCK_CACHE;

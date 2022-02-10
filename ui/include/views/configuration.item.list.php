@@ -24,6 +24,7 @@
  */
 
 require_once dirname(__FILE__).'/js/configuration.item.list.js.php';
+//$this->includeJsFile('datatables.js.php');
 
 $widget = (new CWidget())
 	->setTitle(_('Items'))
@@ -49,10 +50,10 @@ $widget = (new CWidget())
 if ($data['hostid'] != 0) {
 	$widget->setNavigation(getHostNavigation('items', $data['hostid']));
 }
-
+//
 $widget->addItem(new CPartial('configuration.filter.items', [
 	'filter_data' => $data['filter_data'],
-	'subfilter' => $data['subfilter'],
+	'subfilter' => '', //$data['subfilter'],
 	'context' => $data['context']
 ]));
 
@@ -69,29 +70,31 @@ $itemForm = (new CForm('post', $url))
 if (!empty($data['hostid'])) {
 	$itemForm->addVar('hostid', $data['hostid']);
 }
-
+//this must be fixed with another class
 // create table
-$itemTable = (new CTableInfo())
+$itemTable = (
+	new CDataTable('items_table',['advanced_search' => true]))
 	->setHeader([
 		(new CColHeader(
-			(new CCheckBox('all_items'))->onClick("checkAll('".$itemForm->getName()."', 'all_items', 'group_itemid');")
-		))->addClass(ZBX_STYLE_CELL_WIDTH),
-		_('Wizard'),
+			(new CCheckBox('all_items'))
+				->onClick("checkAll('".$itemForm->getName()."', 'all_items', 'group_itemid');")
+		))->addClass('no-sort'),
+		(new CColHeader(_('Wizard')))->addClass('no-sort'),
 		($data['hostid'] == 0)
 			? ($data['context'] === 'host')
-				? _('Host')
-				: _('Template')
+				? (new CColHeader(_('Host')))->addClass('search')
+				: (new CColHeader(_('Template')))->addClass('search')
 			: null,
-		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder'], $url),
-		_('Triggers'),
-		make_sorting_header(_('Key'), 'key_', $data['sort'], $data['sortorder'], $url),
-		make_sorting_header(_('Interval'), 'delay', $data['sort'], $data['sortorder'], $url),
-		make_sorting_header(_('History'), 'history', $data['sort'], $data['sortorder'], $url),
-		make_sorting_header(_('Trends'), 'trends', $data['sort'], $data['sortorder'], $url),
-		make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder'], $url),
-		make_sorting_header(_('Status'), 'status', $data['sort'], $data['sortorder'], $url),
-		_('Tags'),
-		($data['context'] === 'host') ? _('Info') : null
+		(new CColHeader(_('Name')))->addClass('search'),
+		(new CColHeader(_('Triggers')))->addClass('search'),
+		(new CColHeader(_('Key')))->addClass('search'),
+		(new CColHeader(_('Interval')))->addClass('search'),
+		_('History'), 
+		_('Trends'), 
+		(new CColHeader(_('Type')))->addClass('search'), 
+		(new CColHeader(_('Status')))->addClass('search'), 
+		(new CColHeader(_('Tags')))->addClass('search'),
+		($data['context'] === 'host') ? (new CColHeader(_('Info'))) : null
 	]);
 
 $current_time = time();
@@ -168,8 +171,10 @@ foreach ($data['items'] as $item) {
 	);
 
 	// triggers info
-	$triggerHintTable = (new CTableInfo())->setHeader([_('Severity'), _('Name'), _('Expression'), _('Status')]);
-
+	$triggerHintTable = (new CTableInfo('trigger'.$item['itemid']))
+			->setHeader([_('Severity'), _('Name'), _('Expression'), _('Status')])
+			->addClass('nowrap');
+			
 	foreach ($item['triggers'] as $num => &$trigger) {
 		$trigger = $data['itemTriggers'][$trigger['triggerid']];
 
@@ -222,11 +227,12 @@ foreach ($data['items'] as $item) {
 		$triggerInfo = (new CLinkAction(_('Triggers')))->setHint($triggerHintTable);
 		$triggerInfo = [$triggerInfo];
 		$triggerInfo[] = CViewHelper::showNum($triggerHintTable->getNumRows());
-
+		$triggercount = $triggerHintTable->getNumRows();
 		$triggerHintTable = [];
 	}
 	else {
 		$triggerInfo = '';
+		$triggercount = 0;
 	}
 
 	$wizard = (new CSpan(
@@ -244,7 +250,8 @@ foreach ($data['items'] as $item) {
 
 	// Hide zeros for trapper, SNMP trap and dependent items.
 	if ($item['type'] == ITEM_TYPE_TRAPPER || $item['type'] == ITEM_TYPE_SNMPTRAP
-			|| $item['type'] == ITEM_TYPE_DEPENDENT
+			|| $item['type'] == ITEM_TYPE_DEPENDENT 
+			|| $item['type'] == ITEM_TYPE_WORKER_SERVER
 			|| ($item['type'] == ITEM_TYPE_ZABBIX_ACTIVE && strncmp($item['key_'], 'mqtt.get', 8) === 0)) {
 		$item['delay'] = '';
 	}
@@ -271,11 +278,23 @@ foreach ($data['items'] as $item) {
 		$wizard,
 		($data['hostid'] == 0) ? $item['host'] : null,
 		$description,
-		$triggerInfo,
+		(new CCol($triggerInfo))
+			->setAttribute('data-order',$triggercount),
 		(new CDiv(CHtml::encode($item['key_'])))->addClass(ZBX_STYLE_WORDWRAP),
 		$item['delay'],
-		$item['history'],
-		$item['trends'],
+
+		$item['history'] > 0 ?
+				(new CSpan(""))
+				   ->setAttribute("data-indicator","mark")
+				   ->setAttribute("data-indicator-value",1)
+			   : " "
+		,
+		$item['trends'] > 0 ? 
+			(new CSpan(""))
+				   ->setAttribute("data-indicator","mark")
+				   ->setAttribute("data-indicator-value",1)
+			   : " "
+		,
 		item_type2str($item['type']),
 		$status,
 		$data['tags'][$item['itemid']],
@@ -301,7 +320,7 @@ if ($data['context'] === 'host') {
 
 	$button_list += [
 		'item.masscheck_now' => ['name' => _('Execute now'), 'disabled' => $data['is_template']],
-		'item.massclearhistory' => $massclearhistory
+	//	'item.massclearhistory' => $massclearhistory
 	];
 }
 
@@ -317,7 +336,7 @@ $button_list += [
 ];
 
 // Append table to form.
-$itemForm->addItem([$itemTable, $data['paging'], new CActionButtonList('action', 'group_itemid', $button_list,
+$itemForm->addItem([$itemTable, NULL, new CActionButtonList('action', 'group_itemid', $button_list,
 	$data['checkbox_hash']
 )]);
 

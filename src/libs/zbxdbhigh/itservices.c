@@ -727,7 +727,7 @@ int	DBupdate_itservices(const zbx_vector_ptr_t *trigger_diff)
 
 		if (0 == (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
 			continue;
-
+		DEBUG_TRIGGER(diff->triggerid,"Updating it services for the trigger");
 		its_updates_append(&updates, diff->triggerid, TRIGGER_VALUE_PROBLEM == diff->value ?
 				diff->priority : 0, diff->lastchange);
 	}

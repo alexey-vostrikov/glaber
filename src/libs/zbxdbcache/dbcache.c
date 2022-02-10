@@ -909,7 +909,7 @@ static void	DCmass_update_trends(const ZBX_DC_HISTORY *history, int history_num,
 
 		if (0 != (ZBX_DC_FLAGS_NOT_FOR_TRENDS & h->flags))
 			continue;
-
+		DEBUG_ITEM(h->itemid, "Adding value to the trends cache");
 		DCadd_trend(h, trends, &trends_alloc, trends_num);
 	}
 
@@ -924,19 +924,21 @@ static void	DCmass_update_trends(const ZBX_DC_HISTORY *history, int history_num,
 		{
 			if (trend->clock == hour)
 				continue;
+			DEBUG_ITEM(trend->itemid, "Exporting trend due to hour end");
 
 			/* discard trend items that are older than compression age */
-			if (0 != compression_age && trend->clock < compression_age)
-			{
-				if (SEC_PER_HOUR < (ts.sec - last_trend_discard)) /* log once per hour */
-				{
-					zabbix_log(LOG_LEVEL_TRACE, "discarding trends that are pointing to"
-							" compressed history period");
-					last_trend_discard = ts.sec;
-				}
-			}
-			else //if (SUCCEED == zbx_history_requires_trends(trend->value_type))
-				DCflush_trend(trend, trends, &trends_alloc, trends_num);
+//			if (0 != compression_age && trend->clock < compression_age)
+//			{
+//				if (SEC_PER_HOUR < (ts.sec - last_trend_discard)) /* log once per hour */
+//				{
+//					zabbix_log(LOG_LEVEL_TRACE, "discarding trends that are pointing to"
+//							" compressed history period");
+//					last_trend_discard = ts.sec;
+//				}
+//			}
+//			else //if (SUCCEED == zbx_history_requires_trends(trend->value_type))
+			//note: it's up to history syncer to decide about trend or compression age
+			DCflush_trend(trend, trends, &trends_alloc, trends_num);
 
 			zbx_hashset_iter_remove(&iter);
 		}
@@ -1784,8 +1786,9 @@ static void	hc_free_item_values(ZBX_DC_HISTORY *history, int history_num)
 {
 	int	i;
 
-	for (i = 0; i < history_num; i++)
+	for (i = 0; i < history_num; i++) {
 		dc_history_clean_value(&history[i]);
+	}
 }
 
 /******************************************************************************
@@ -2429,7 +2432,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		zbx_item_diff_t	*diff;
 		int		index;
 		
-		DEBUG_ITEM(h->itemid,"In prepare history, state is %d", h->state);
+		DEBUG_ITEM(h->itemid,"Will do prepare history, state is %d", h->state);
 
 		if (FAIL == (index = zbx_vector_uint64_bsearch(itemids, h->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
 		{
@@ -2480,7 +2483,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 
 			zbx_vector_uint64_pair_append(proxy_subscribtions, p);
 		}
-		DEBUG_ITEM(h->itemid,"finished processing, state is %d", h->state);
+		DEBUG_ITEM(h->itemid,"Finished prepare processing, state is %d", h->state);
 	}
 	
 	
@@ -2873,6 +2876,12 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		hc_pop_items(&history_items);		/* select and take items out of history cache */
 		UNLOCK_CACHE;
 
+		//Glaber: do no trigger locking
+		//sure it's possible a trigger will be recalculated in two syncers at the same time
+		//so what? It's always race condition process, since data might come any time
+		//however it's not likely, the data will be coming based by hostid so same hosts and same triggers 
+		//will hit the same poller
+
 		if (0 != history_items.values_num)
 		{
 			if (0 == (history_num = DCconfig_lock_triggers_by_history_items(&history_items, &triggerids)))
@@ -2885,6 +2894,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		}
 		else
 			history_num = 0;
+		//history_num = history_items.values_num;
 
 		if (0 != history_num)
 		{
@@ -2897,7 +2907,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 			for (i = 0; i < history_num; i++) {
 				zbx_vector_uint64_append(&itemids, history[i].itemid);
-				DEBUG_ITEM( history[i].itemid, "processing in history sync");
+				DEBUG_ITEM( history[i].itemid, "Processing in history sync");
 			}
 			zbx_vector_uint64_sort(&itemids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
@@ -2909,12 +2919,11 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			
 			//at this call history will be added to the history storage
 			//and state cache
-					
 			glb_ic_add_values(history, history_num);
 			glb_history_add(history,history_num);
-			
 			DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
-			
+			//need fix here - we've already have items, so there is no need to extra seraches
+			//however it's better to do different kind of processing
 			DC_get_trends_items_keys(trends,trends_num);
 			glb_history_add_trends(trends,trends_num);
 				
@@ -2923,8 +2932,8 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 				zbx_free(trends[i].item_key);
 				zbx_free(trends[i].host_name);
 			}
-				
 			//TODO: figure wtf is the function
+			//this is trends functions cache! 
 			if (0 != trends_num)
 				zbx_tfc_invalidate_trends(trends, trends_num);
 
@@ -2932,10 +2941,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			{
 				DBbegin();
 
-				//	DBmass_update_items(&item_diff, &inventory_values);
-				//	DBmass_update_trends(trends, trends_num, &trends_diff);
-
-					/* process internal events generated by DCmass_prepare_history() */
 				zbx_process_events(NULL, NULL);
 
 				if (ZBX_DB_OK == (txn_error = DBcommit()))
@@ -2988,6 +2993,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 					
 					//this must be eliminated with setting the trigger value in the state cache
 					//and when direct API is ready
+					//this must be removed at all!!!!
 					if (0 != trigger_diff.values_num)
 						zbx_db_save_trigger_changes(&trigger_diff);
 
@@ -3061,7 +3067,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			DCconfig_clean_items(items, errcodes, history_num);
 			zbx_free(errcodes);
 			zbx_free(items);
-
 			zbx_vector_ptr_clear(&history_items);
 			hc_free_item_values(history, history_num);
 			//zabbix_log(LOG_LEVEL_INFORMATION,"Synced %d history itemds", history_num);
@@ -3073,7 +3078,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		/* This is done to allow syncer process to update its statistics. */
 	}
 	while (ZBX_SYNC_MORE == *more && ZBX_HC_SYNC_TIME_MAX >= time(NULL) - sync_start);
-
 	zbx_vector_ptr_destroy(&history_items);
 	zbx_vector_ptr_destroy(&inventory_values);
 	zbx_vector_ptr_destroy(&trigger_diff);
@@ -4159,7 +4163,7 @@ static void	hc_get_item_values(ZBX_DC_HISTORY *history, zbx_vector_ptr_t *histor
 			continue;
 		
 		hc_copy_history_data(&history[history_num++], item->itemid, item->tail);
-		DEBUG_ITEM(item->itemid, "History data is copied from the cache");
+		DEBUG_ITEM(item->itemid, "History data is copied to history sync proc from the cache");
 	}
 }
 

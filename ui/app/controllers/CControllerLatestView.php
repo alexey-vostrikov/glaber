@@ -152,11 +152,8 @@ class CControllerLatestView extends CControllerLatest {
 		// data sort and pager
 		$prepared_data = $this->prepareData($filter, $sort_field, $sort_order);
 
-		$paging = CPagerHelper::paginate($this->getInput('page', 1), $prepared_data['items'], ZBX_SORT_UP, $view_curl);
-
 		$this->extendData($prepared_data);
 
-		// display
 		$data = [
 			'filter' => $filter,
 			'sort_field' => $sort_field,
@@ -165,7 +162,6 @@ class CControllerLatestView extends CControllerLatest {
 			'refresh_url' => $refresh_curl->getUrl(),
 			'refresh_interval' => CWebUser::getRefresh() * 1000,
 			'active_tab' => CProfile::get('web.latest.filter.active', 1),
-			'paging' => $paging,
 			'config' => [
 				'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS),
 				'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),

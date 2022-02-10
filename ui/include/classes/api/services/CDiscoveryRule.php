@@ -253,11 +253,11 @@ class CDiscoveryRule extends CItemGeneral {
 				$options['filter']['lifetime'] = getTimeUnitFilters($options['filter']['lifetime']);
 			}
 
-			if (array_key_exists('state', $options['filter']) && $options['filter']['state'] !== null) {
-				$this->dbFilter('item_rtdata ir', ['filter' => ['state' => $options['filter']['state']]] + $options,
-					$sqlParts
-				);
-			}
+//			if (array_key_exists('state', $options['filter']) && $options['filter']['state'] !== null) {
+//				$this->dbFilter('item_rtdata ir', ['filter' => ['state' => $options['filter']['state']]] + $options,
+//					$sqlParts
+//				);
+//			}
 
 			$this->dbFilter('items i', $options, $sqlParts);
 
@@ -295,6 +295,29 @@ class CDiscoveryRule extends CItemGeneral {
 		if ($options['countOutput']) {
 			return $result;
 		}
+
+		if (!$options['countOutput'] && ($this->outputIsRequested('state', $options['output']))) {
+
+			
+			$items_state = CZabbixServer::getItemsState(array_keys($result)); 
+			
+			error_log(print_r($items_state,true));
+			
+			if ( !empty($items_state) && (is_array($items_state) || is_object($items_state))) {
+				foreach ($items_state as $state) {
+					 $result[$state['itemid']] += $state;
+				}
+			}
+
+			foreach ($result as $key=>$value) {
+				if (!isset($result[$key]['state'])) 
+					$result[$key]['state'] = ITEM_STATE_UNKNOWN;
+				if (!isset($result[$key]['error'])) 
+					$result[$key]['error'] = "";
+			} 
+		}
+
+	//	show_error_message(print_r($result,true));
 
 		if ($result) {
 			if (self::dbDistinct($sqlParts)) {
@@ -2573,25 +2596,25 @@ class CDiscoveryRule extends CItemGeneral {
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ((!$options['countOutput'] && ($this->outputIsRequested('state', $options['output'])
-				|| $this->outputIsRequested('error', $options['output'])))
-				|| (is_array($options['search']) && array_key_exists('error', $options['search']))
-				|| (is_array($options['filter']) && array_key_exists('state', $options['filter']))) {
-			$sqlParts['left_join'][] = ['alias' => 'ir', 'table' => 'item_rtdata', 'using' => 'itemid'];
-			$sqlParts['left_table'] = ['alias' => $this->tableAlias, 'table' => $this->tableName];
-		}
+	//	if ((!$options['countOutput'] && ($this->outputIsRequested('state', $options['output'])
+	//			|| $this->outputIsRequested('error', $options['output'])))
+	//			|| (is_array($options['search']) && array_key_exists('error', $options['search']))
+	//			|| (is_array($options['filter']) && array_key_exists('state', $options['filter']))) {
+	//		$sqlParts['left_join'][] = ['alias' => 'ir', 'table' => 'item_rtdata', 'using' => 'itemid'];
+	//		$sqlParts['left_table'] = ['alias' => $this->tableAlias, 'table' => $this->tableName];
+	//	}
 
 		if (!$options['countOutput']) {
-			if ($this->outputIsRequested('state', $options['output'])) {
-				$sqlParts = $this->addQuerySelect('ir.state', $sqlParts);
-			}
-			if ($this->outputIsRequested('error', $options['output'])) {
+	//		if ($this->outputIsRequested('state', $options['output'])) {
+	//			$sqlParts = $this->addQuerySelect('ir.state', $sqlParts);
+	//		}
+	//		if ($this->outputIsRequested('error', $options['output'])) {
 				/*
 				 * SQL func COALESCE use for template items because they don't have record
 				 * in item_rtdata table and DBFetch convert null to '0'
 				 */
-				$sqlParts = $this->addQuerySelect(dbConditionCoalesce('ir.error', '', 'error'), $sqlParts);
-			}
+	//			$sqlParts = $this->addQuerySelect(dbConditionCoalesce('ir.error', '', 'error'), $sqlParts);
+	//		}
 
 			// add filter fields
 			if ($this->outputIsRequested('formula', $options['selectFilter'])

@@ -2976,7 +2976,9 @@ static void	process_item_value(const DC_ITEM *item, AGENT_RESULT *result, zbx_ti
  ******************************************************************************/
 static int	process_history_data_value(DC_ITEM *item, zbx_agent_value_t *value, int *h_num)
 {
-	if (ITEM_STATUS_ACTIVE != item->status)
+	DEBUG_ITEM(item->itemid,"Processing incoming metric for the item");
+
+	if (ITEM_STATUS_ACTIVE != item->status) 
 		return FAIL;
 
 	if (HOST_STATUS_MONITORED != item->host.status)
@@ -3813,8 +3815,9 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 		{
 			if (SUCCEED != errcodes[i])
 			{
-				zabbix_log(LOG_LEVEL_DEBUG, "cannot retrieve key \"%s\" on host \"%s\" from "
+				zabbix_log(LOG_LEVEL_INFORMATION, "cannot retrieve key \"%s\" on host \"%s\" from "
 						"configuration cache", hostkeys[i].key, hostkeys[i].host);
+				
 				continue;
 			}
 
@@ -3854,7 +3857,7 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 			if (NULL != session)
 				session->last_valueid = values[i].id;
 		}
-
+		LOG_INF("Calling process_history_data");
 		processed_num += process_history_data(items, values, errcodes, values_num, NULL);
 		total_num += read_num;
 
@@ -3908,6 +3911,8 @@ static int	process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse
 	int			version;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	
+	LOG_INF("Processing incoming data");
 
 	log_client_timediff(LOG_LEVEL_DEBUG, jp, ts);
 
@@ -3952,15 +3957,17 @@ static int	process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse
 			session = NULL;
 		else
 			session = zbx_dc_get_or_create_data_session(hostid, token);
-
+		LOG_INF("Calling process history by itemids");
 		if (SUCCEED != (ret = process_history_data_by_itemids(sock, validator_func, validator_args, &jp_data,
 				session, NULL, info, ZBX_ITEM_GET_ALL)))
 		{
 			goto out;
 		}
 	}
-	else
+	else {
+		LOG_INF("Calling process history by keys");
 		process_history_data_by_keys(sock, validator_func, validator_args, info, &jp_data, token);
+	}
 out:
 	zbx_free(token);
 

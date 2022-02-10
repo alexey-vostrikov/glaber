@@ -204,6 +204,20 @@ class CZabbixServer {
 		return $zabbix_server->request(['request' => 'debug.get']);
 	}
 
+	public static function  getItemsState(array $itemids) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+		);
+		
+		return $zabbix_server->request([
+			'request' => 'itemsstate.get',
+			'itemids' => $itemids
+		]);
+			
+	}
 
 
 	public function syncConfiguration() {
@@ -232,13 +246,13 @@ class CZabbixServer {
 		]);
 	}
 
-	public function getItemsState($sid, array $itemids) {
-		return $this->request([
-			'request' => 'itemsstate.get',
-			'sid' => $sid,
-			'itemids' => $itemids,
-		]);
-	}
+//	public function getItemsState($sid, array $itemids) {
+//		return $this->request([
+//			'request' => 'itemsstate.get',
+//			'sid' => $sid,
+//			'itemids' => $itemids,
+//		]);
+//	}
 
 	/**
 	 * Request server to test item preprocessing steps.

@@ -625,8 +625,8 @@ elseif (hasRequest('add') || hasRequest('update')) {
 			uncheckTableRows();
 		}
 		show_messages($result, $msgOk, $msgFail);
-
-		unset($_REQUEST['form'], $_REQUEST['hostid']);
+	
+	//	unset($_REQUEST['form'], $_REQUEST['hostid']);
 	}
 	catch (Exception $e) {
 		DBend(false);

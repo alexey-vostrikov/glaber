@@ -28,6 +28,7 @@ $page['title'] = _('Configuration of items');
 $page['file'] = 'items.php';
 $page['scripts'] = ['class.cviewswitcher.js', 'multilineinput.js', 'multiselect.js', 'items.js', 'textareaflexible.js',
 	'class.tab-indicators.js', 'class.tagfilteritem.js'
+	, 'jquery.dataTables.min.js'
 ];
 
 require_once dirname(__FILE__).'/include/page_header.php';
@@ -276,19 +277,19 @@ $fields = [
 	'filter_tags' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	'filter_valuemapids' =>			[T_ZBX_INT, O_OPT, null,	DB_ID,		null],
 	// subfilters
-	'subfilter_set' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
-	'subfilter_types' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_value_types' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_status' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_state' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_inherited' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_with_triggers' =>	[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_discovered' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_hosts' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-	'subfilter_interval' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-	'subfilter_history' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-	'subfilter_trends' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-	'subfilter_tags' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
+//	'subfilter_set' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
+//	'subfilter_types' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_value_types' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_status' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_state' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_inherited' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_with_triggers' =>	[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_discovered' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_hosts' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
+//	'subfilter_interval' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
+//	'subfilter_history' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
+//	'subfilter_trends' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
+//	'subfilter_tags' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	'checkbox_hash' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	// sort and sortorder
 	'sort' =>						[T_ZBX_STR, O_OPT, P_SYS,
@@ -1672,7 +1673,7 @@ else {
 			: [];
 	}
 
-	$data['subfilter'] = makeItemSubfilter($data['filter_data'], $data['items'], $data['context']);
+	//$data['subfilter'] = makeItemSubfilter($data['filter_data'], $data['items'], $data['context']);
 
 	if (!$data['filter_data']['filter_tags']) {
 		$data['filter_data']['filter_tags'] = [[
@@ -1747,11 +1748,11 @@ else {
 		}
 	}
 
-	CPagerHelper::savePage($page['file'], $page_num);
+//	CPagerHelper::savePage($page['file'], $page_num);
 
-	$data['paging'] = CPagerHelper::paginate($page_num, $data['items'], $sortOrder,
-		(new CUrl('items.php'))->setArgument('context', $data['context'])
-	);
+//	$data['paging'] = CPagerHelper::paginate($page_num, $data['items'], $sortOrder,
+//		(new CUrl('items.php'))->setArgument('context', $data['context'])
+//	);
 
 	$data['parent_templates'] = getItemParentTemplates($data['items'], ZBX_FLAG_DISCOVERY_NORMAL);
 

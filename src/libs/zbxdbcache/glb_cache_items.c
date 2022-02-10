@@ -935,12 +935,6 @@ int add_value_cb(glb_cache_elem_t *elem, void *data)
     {
         glb_cache_dc_hist_to_value(c_val, h);
         DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %ld", glb_tsbuff_get_time_tail(&elm->tsbuff));
-    //    LOG_INF("Added value to cache %ld -> %ld", elem->id, h->ts.sec);
-    //    if (time(NULL) - 1000000 >  h->ts.sec || time(NULL) + 1000000 <  h->ts.sec) {
-    //       LOG_INF("Bad clock %ld, now is %ld, diff is %ld ", h->ts.sec, time(NULL), h->ts.sec - time(NULL));
-    //        THIS_SHOULD_NEVER_HAPPEN;
-    //        exit(-1);
-    //    }
     }
     else
     {
