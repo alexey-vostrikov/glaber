@@ -287,20 +287,20 @@ class CScreenHistory extends CScreenBase {
 				foreach ($items as $item) {
 					$items_by_type[$item['value_type']][] = $item['itemid'];
 
-					if ($item['value_type'] == ITEM_VALUE_TYPE_LOG) {
-						$use_log_item = true;
-					}
+				//	if ($item['value_type'] == ITEM_VALUE_TYPE_LOG) {
+				//		$use_log_item = true;
+				//	}
 
 					if (strpos($item['key_'], 'eventlog[') === 0) {
 						$use_eventlog_item = true;
 					}
 				}
 
-				$history_table = (new CTableInfo())
+				$history_table = (new CDataTable('logview'))
 					->setHeader([
-						(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH),
+						(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)->addClass('search'),
 						$is_many_items ? _('Item') : null,
-						$use_log_item ? (new CColHeader(_('Local time')))->addClass(ZBX_STYLE_CELL_WIDTH) : null,
+						$use_log_item ? (new CColHeader(_('Local time')))->addClass(ZBX_STYLE_CELL_WIDTH)->addClass('search') : null,
 						($use_eventlog_item && $use_log_item)
 							? (new CColHeader(_('Source')))->addClass(ZBX_STYLE_CELL_WIDTH)
 							: null,
@@ -310,7 +310,7 @@ class CScreenHistory extends CScreenBase {
 						($use_eventlog_item && $use_log_item)
 							? (new CColHeader(_('Event ID')))->addClass(ZBX_STYLE_CELL_WIDTH)
 							: null,
-						_('Value')
+						(new CColHeader(_('Value')))->addClass('search')
 					]);
 
 				if ($this->filter !== '' && in_array($this->filterTask, [FILTER_TASK_SHOW, FILTER_TASK_HIDE])) {
@@ -340,9 +340,9 @@ class CScreenHistory extends CScreenBase {
 				]);
 				
 				// Array $history_data will be modified according page and rows on page.
-				$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
-					new CUrl($this->page_file)
-				);
+			//	$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
+			//		new CUrl($this->page_file)
+			//	);
 				
 
 				foreach ($history_data as $data) {
@@ -398,7 +398,7 @@ class CScreenHistory extends CScreenBase {
 					$history_table->addRow($row);
 				}
 
-				$output[] = [$history_table, $pagination];
+				$output[] = [$history_table];
 			}
 			/**
 			 * View type: 500 latest values.
@@ -509,9 +509,9 @@ class CScreenHistory extends CScreenBase {
 				}
 
 				// Array $history_data will be modified according page and rows on page.
-				$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
-					new CUrl($this->page_file)
-				);
+				//$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
+				//	new CUrl($this->page_file)
+				//);
 
 				$history_table = (new CTableInfo())->makeVerticalRotation()->setHeader($table_header);
 

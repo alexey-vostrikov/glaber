@@ -62,8 +62,7 @@ class CDataTable extends CTable {
 			jQuery(document).ready(function() {
 			$('#<?=$tableid ?>').DataTable({
 			order: [],
-			columnDefs: [{ targets  : 'no-sort', orderable: false },
-						 { targets  : 'no-search', searchable: false } ],
+			columnDefs: [{ targets  : 'no-sort', orderable: false }],
 
 			lengthMenu: [[<?=$this->rows_per_page?>], ['Todos']],
 			pageLength: <?=$this->rows_per_page?>,
@@ -72,7 +71,7 @@ class CDataTable extends CTable {
                     depthLimit: 2,
 					columns: (".search"),
 
-                }}, 'copy', 'csv', 'excel', 'pdf'],
+                }}, 'copy', 'csv', 'excel'],
 			info:     true,
 			stateSave : true,
 			dom: '<?=$this->dom ?>',

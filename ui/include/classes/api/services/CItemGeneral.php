@@ -841,6 +841,11 @@ abstract class CItemGeneral extends CApiService {
 			$tpl_itemids[$db_item['itemid']] = true;
 		}
 
+		//error_log("Created new items by the template assignemet:". print_r(array_column($new_items,'itemid'), true));
+		
+		CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_UPDATE, array_column($new_items,'itemid'));
+		CZabbixServer::notifyConfigChanges();
+
 		foreach ($new_items as $index => $new_item) {
 			if (!array_key_exists($new_item['itemid'], $tpl_itemids)) {
 				unset($new_items[$index]);
