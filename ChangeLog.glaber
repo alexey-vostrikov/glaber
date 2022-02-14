@@ -1,3 +1,8 @@
+ver 2.8.2
+    - Item API fixed to not return discovery items by default
+    - Added ITEM LLD processing debug
+ver 2.8.0:
+    - databales.net for table views introduced
 ver 2.7.0: 
     - introduced prototype of faster config cache reload
     - sever workers are created as a separate type and configured from the ui only, no server restart required any more
