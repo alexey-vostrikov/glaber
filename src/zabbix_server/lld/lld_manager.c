@@ -329,6 +329,7 @@ static void	lld_queue_request(zbx_lld_manager_t *manager, const zbx_ipc_message_
 
 	zbx_lld_deserialize_item_value(message->data, &data->itemid, &hostid, &data->value, &data->ts, &data->meta,
 			&data->lastlogsize, &data->mtime, &data->error);
+	DEBUG_ITEM(data->itemid,"Recieved LLD data in LLD manager");
 
 	if (NULL == (rule = zbx_hashset_search(&manager->rule_index, &hostid)))
 	{
@@ -357,7 +358,7 @@ static void	lld_queue_request(zbx_lld_manager_t *manager, const zbx_ipc_message_
 			{
 				zabbix_log(LOG_LEVEL_DEBUG, "skip repeating values for discovery rule:" ZBX_FS_UI64,
 						data->itemid);
-
+				DEBUG_ITEM(data->itemid,"Skipped discovery rule due to repeating values");
 				lld_data_free(data);
 				goto out;
 			}
@@ -369,7 +370,7 @@ static void	lld_queue_request(zbx_lld_manager_t *manager, const zbx_ipc_message_
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "queuing discovery rule:" ZBX_FS_UI64, data->itemid);
-
+	DEBUG_ITEM(data->itemid, "LLD data Queued in LLD manager");
 	rule->values_num++;
 	manager->queued_num++;
 out:
@@ -400,6 +401,7 @@ static void	lld_process_next_request(zbx_lld_manager_t *manager, zbx_lld_worker_
 	data = worker->rule->head;
 	buf_len = zbx_lld_serialize_item_value(&buf, data->itemid, 0, data->value, &data->ts, data->meta,
 			data->lastlogsize, data->mtime, data->error);
+	DEBUG_ITEM(data->itemid,"Sending LLD request to the LLD worker");
 	zbx_ipc_client_send(worker->client, ZBX_IPC_LLD_TASK, buf, buf_len);
 	zbx_free(buf);
 }
@@ -447,6 +449,7 @@ static void	lld_process_result(zbx_lld_manager_t *manager, zbx_ipc_client_t *cli
 	worker = lld_get_worker_by_client(manager, client);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "discovery rule:" ZBX_FS_UI64 " has been processed", worker->rule->head->itemid);
+	DEBUG_ITEM(worker->rule->head->itemid,"Discovery rule data has been processed");
 
 	rule = worker->rule;
 	worker->rule = NULL;

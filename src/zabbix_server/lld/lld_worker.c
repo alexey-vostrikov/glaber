@@ -85,6 +85,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		goto out;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "processing discovery rule:" ZBX_FS_UI64, itemid);
+	DEBUG_ITEM(itemid, "Processing LLD rule in the worker");
 
 	if (NULL != error || NULL != value)
 	{

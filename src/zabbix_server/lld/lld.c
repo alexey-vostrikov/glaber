@@ -1130,7 +1130,9 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	DC_ITEM			item;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64, __func__, lld_ruleid);
-	LOG_DBG("Processing lld rule(itemid) %ld, LLD value: %s", lld_ruleid, value);
+	
+	DEBUG_ITEM(lld_ruleid,"Processing discovery rule: %s",value);
+	
 	zbx_vector_ptr_create(&lld_rows);
 	zbx_vector_ptr_create(&lld_macro_paths);
 	zbx_vector_ptr_create(&overrides);
@@ -1179,27 +1181,33 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	if (NULL == row)
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "invalid discovery rule ID [" ZBX_FS_UI64 "]", lld_ruleid);
+		DEBUG_ITEM(lld_ruleid,"Invalid discovery rule ID, rule will not be processed");
 		goto out;
 	}
 
 	if (SUCCEED != lld_filter_load(&filter, lld_ruleid, &item, error))
 	{
 		ret = FAIL;
+		DEBUG_ITEM(lld_ruleid,"Filtrer load failed: %s", error);
 		goto out;
 	}
 
 	if (SUCCEED != zbx_lld_macro_paths_get(lld_ruleid, &lld_macro_paths, error))
 	{
 		ret = FAIL;
+		DEBUG_ITEM(lld_ruleid,"Macro paths get failed: %s", error);
 		goto out;
 	}
 
-	if (SUCCEED != (ret = lld_overrides_load(&overrides, lld_ruleid, &item, error)))
+	if (SUCCEED != (ret = lld_overrides_load(&overrides, lld_ruleid, &item, error))) {
+		DEBUG_ITEM(lld_ruleid,"Overrides get failed: %s", error);
 		goto out;
+	}
 
 	if (SUCCEED != lld_rows_get(value, &filter, &lld_rows, &lld_macro_paths, &overrides, &info, error))
 	{
 		ret = FAIL;
+		DEBUG_ITEM(lld_ruleid,"Rows get failed: %s", error);
 		goto out;
 	}
 
@@ -1211,6 +1219,8 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot update/add items because parent host was removed while"
 				" processing lld rule");
+		DEBUG_ITEM(lld_ruleid,"cannot update/add items because parent host was removed while"
+				" processing lld rule");
 		goto out;
 	}
 
@@ -1220,12 +1230,16 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot update/add triggers because parent host was removed while"
 				" processing lld rule");
+		DEBUG_ITEM(lld_ruleid,"cannot update/add items because parent host was removed while"
+				" processing lld rule");
 		goto out;
 	}
 
 	if (SUCCEED != lld_update_graphs(hostid, lld_ruleid, &lld_rows, &lld_macro_paths, error, lifetime, now))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot update/add graphs because parent host was removed while"
+				" processing lld rule");
+		DEBUG_ITEM(lld_ruleid,"cannot update/add items because parent host was removed while"
 				" processing lld rule");
 		goto out;
 	}

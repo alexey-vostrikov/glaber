@@ -89,8 +89,8 @@ class CItem extends CItemGeneral {
 		$sqlParts = [
 			'select'	=> ['items' => 'i.itemid'],
 			'from'		=> ['items' => 'items i'],
-			'where'		=> ['webtype' => 'i.type<>'.ITEM_TYPE_HTTPTEST, 'flags' => 'i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','
-							.ZBX_FLAG_DISCOVERY_CREATED.','.ZBX_FLAG_DISCOVERY_RULE.')'],
+			'where'		=> ['webtype' => 'i.type<>'.ITEM_TYPE_HTTPTEST, 
+							'flags' => 'i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'],
 			'group'		=> [],
 			'order'		=> [],
 			'limit'		=> null
@@ -140,8 +140,10 @@ class CItem extends CItemGeneral {
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null,
-			'limitSelects'				=> null
+			'limitSelects'				=> null,
+			'discovery_items'			=> null
 		];
+
 		$options = zbx_array_merge($defOptions, $options);
 		$this->validateGet($options);
 
@@ -161,6 +163,11 @@ class CItem extends CItemGeneral {
 					' HAVING MIN(r.permission)>'.PERM_DENY.
 						' AND MAX(r.permission)>='.zbx_dbstr($permission).
 					')';
+		}
+
+		//discovery items flag
+		if (!is_null($options['discovery_items'])) {
+			$sqlParts['where']['flags'] = 'i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.','.ZBX_FLAG_DISCOVERY_RULE.')';
 		}
 
 		// itemids

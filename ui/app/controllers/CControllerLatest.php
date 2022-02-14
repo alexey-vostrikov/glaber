@@ -79,7 +79,8 @@ abstract class CControllerLatest extends CController {
 				'search' => ($filter['select'] === '') ? null : [
 					'name' => $filter['select']
 				],
-				'preservekeys' => true
+				'preservekeys' => true,
+				'discovery_items' => true
 			]);
 
 			$select_items += $filter['show_without_data']
@@ -98,7 +99,8 @@ abstract class CControllerLatest extends CController {
 				'selectValueMap' => ['mappings'],
 				'itemids' => array_keys($select_items),
 				'webitems' => true,
-				'preservekeys' => true
+				'preservekeys' => true,
+				'discovery_items' => true
 			]);
 
 			if ($sort_field === 'host') {

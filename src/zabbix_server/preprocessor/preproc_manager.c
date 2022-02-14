@@ -515,9 +515,11 @@ void	preprocessor_flush_value(const zbx_preproc_item_value_t *value)
 		dc_add_history(value->itemid, value->item_value_type, value->item_flags, value->result_ptr->result,
 				value->ts, value->state, value->error);
 	}
-	else
+	else {
+		DEBUG_ITEM(value->itemid,"Sending to LLD manager");
 		zbx_lld_process_agent_result(value->itemid, value->hostid, value->result_ptr->result, value->ts,
 				value->error);
+	}
 }
 
 /******************************************************************************

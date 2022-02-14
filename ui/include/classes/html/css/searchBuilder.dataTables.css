@@ -78,7 +78,6 @@ div.dtsb-searchBuilder div.dtsb-group div.dtsb-criteria input.dtsb-input {
   padding: 0.4em;
   margin-right: 0.8em;
   max-width: 20em;
-  background-color: rgba(200, 200, 200, 0.3);
 }
 div.dtsb-searchBuilder div.dtsb-group div.dtsb-criteria select.dtsb-dropDown option.dtsb-notItalic,
 div.dtsb-searchBuilder div.dtsb-group div.dtsb-criteria input.dtsb-input option.dtsb-notItalic {
@@ -128,10 +127,7 @@ div.dtsb-searchBuilder div.dtsb-logicContainer {
   border: 1px solid rgba(0, 0, 0, 0.3);
   
 }
-div.dtsb-searchBuilder div.dtsb-logicContainer button {
-  border: 1px solid transparent;
-  background: transparent;
-}
+
 div.dtsb-searchBuilder button.dtsb-clearGroup {
   min-width: 2em;
   padding: 0;

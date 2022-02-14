@@ -1128,7 +1128,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	
 out:
 	
-	zabbix_log(LOG_LEVEL_DEBUG, " %s:Finished, history responce is response is %s",__func__,json.buffer);
+	DEBUG_ITEM(itemid," %s:Finished, history responce is response is %s",__func__,json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);

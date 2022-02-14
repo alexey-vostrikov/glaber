@@ -25,7 +25,7 @@
 $context_host = 0;
  if (1 == count( $data['hosts']) ) {
 	$context_host = 1;
-	error_log("Host context: ".print_r($data['hosts'],true)); 
+//	error_log("Host context: ".print_r($data['hosts'],true)); 
 } 
 
 $form = (new CForm('GET', 'history.php'))

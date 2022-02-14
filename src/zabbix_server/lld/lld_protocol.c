@@ -250,7 +250,7 @@ void	zbx_lld_process_value(zbx_uint64_t itemid, zbx_uint64_t hostid, const char 
 		zabbix_log(LOG_LEVEL_CRIT, "cannot send data to LLD manager service");
 		exit(EXIT_FAILURE);
 	}
-
+	DEBUG_ITEM(itemid, "Sent to LLD manager");
 	zbx_free(data);
 }
 
