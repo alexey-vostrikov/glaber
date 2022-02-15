@@ -304,7 +304,6 @@ int	CONFIG_SERVER_STARTUP_TIME	= 0;
 
 char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
-char	**CONFIG_EXT_SERVERS	= NULL;
 
 char	*CONFIG_USER			= NULL;
 
@@ -349,7 +348,7 @@ char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 T_ZBX_SERVER SERVER_LIST[ZBX_CLUSTER_MAX_SERVERS];
 int SERVERS = 0;
 
-int CONFIG_EXT_SERVER_FORKS = 0;
+int CONFIG_EXT_SERVER_FORKS = 1;
 char	*CONFIG_WORKERS_DIR		= NULL;
 char	*CONFIG_SERVERS			= NULL;
 
@@ -793,10 +792,6 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		exit(EXIT_FAILURE);
 	}
 
-	if (NULL != *CONFIG_EXT_SERVERS) {
-		zabbix_log(LOG_LEVEL_WARNING,"Enabling worker server process");
-		CONFIG_EXT_SERVER_FORKS = 1;
-	}
 
 	if (0 != err)
 		exit(EXIT_FAILURE);
@@ -835,10 +830,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"GlbmapOptions",		&CONFIG_GLBMAP_OPTIONS,			TYPE_STRING,
 			PARM_OPT,	0,			0},	
-		{"WorkerServer",			&CONFIG_EXT_SERVERS,			TYPE_MULTISTRING,
+		{"StartWorkerServers",			&CONFIG_EXT_SERVER_FORKS,			TYPE_INT,
 			PARM_OPT,	0,			0},	
 		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
-			PARM_OPT,	0,			0},	
+			PARM_OPT,	0,			8},	
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,
 			PARM_OPT,	ZBX_PROXYMODE_ACTIVE,	ZBX_PROXYMODE_PASSIVE},
 		{"Servers",			&CONFIG_SERVERS,				TYPE_STRING,
@@ -1047,8 +1042,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
-	zbx_strarr_init(&CONFIG_EXT_SERVERS);
-
+	
 	parse_cfg_file(CONFIG_FILE, cfg, ZBX_CFG_FILE_REQUIRED, ZBX_CFG_STRICT);
 
 	zbx_set_defaults();

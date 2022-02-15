@@ -244,7 +244,7 @@ int	CONFIG_HISTSYNCER_FREQUENCY	= 1;
 int	CONFIG_CONFSYNCER_FORKS		= 1;
 int	CONFIG_CONFSYNCER_FREQUENCY	= 60;
 int CONFIG_GLB_REQUEUE_TIME =  60; //syncs the async queue once a minute
-int CONFIG_EXT_SERVER_FORKS = 0;
+int CONFIG_EXT_SERVER_FORKS = 1;
 
 int	CONFIG_VMWARE_FORKS		= 0;
 int	CONFIG_VMWARE_FREQUENCY		= 60;
@@ -322,7 +322,7 @@ char	**CONFIG_LOAD_MODULE		= NULL;
 char 	**CONFIG_HISTORY_MODULE		= NULL;
 int		CONFIG_SNMP_RETRIES		=	3;
 
-char	**CONFIG_EXT_SERVERS	= NULL;
+//char	**CONFIG_EXT_SERVERS	= NULL;
 
 char	*CONFIG_USER			= NULL;
 
@@ -794,10 +794,10 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		exit(EXIT_FAILURE);
 	}
 
-	if (NULL != *CONFIG_EXT_SERVERS) {
-		zabbix_log(LOG_LEVEL_WARNING,"Enabling worker server process");
-		CONFIG_EXT_SERVER_FORKS = 1;
-	}
+	//if (NULL != *CONFIG_EXT_SERVERS) {
+	//	zabbix_log(LOG_LEVEL_WARNING,"Enabling worker server process");
+	//	CONFIG_EXT_SERVER_FORKS = 1;
+	//}
 
 	if (0 != err)
 		exit(EXIT_FAILURE);
@@ -836,8 +836,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 //		{"ExternalWorker",			&CONFIG_EXT_WORKERS,			TYPE_MULTISTRING,
 //			PARM_OPT,	0,			0},
-		{"WorkerServer",			&CONFIG_EXT_SERVERS,			TYPE_MULTISTRING,
-			PARM_OPT,	0,			0},
+		{"StartWorkerServers",		&CONFIG_EXT_SERVER_FORKS,			TYPE_INT,
+			PARM_OPT,	0,			8},
 		{"StartDBSyncers",		&CONFIG_HISTSYNCER_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			32},
 		{"StartDiscoverers",		&CONFIG_DISCOVERER_FORKS,		TYPE_INT,
@@ -1078,7 +1078,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
-	zbx_strarr_init(&CONFIG_EXT_SERVERS);
 	zbx_strarr_init(&CONFIG_HISTORY_MODULE);
 
 	parse_cfg_file(CONFIG_FILE, cfg, ZBX_CFG_FILE_REQUIRED, ZBX_CFG_STRICT);
