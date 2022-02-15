@@ -1,3 +1,7 @@
+ver 2.8.4
+    - fix of DCconfig_get_items_by_keys getting segv 
+ver 2.8.3
+    - removed experimental code server worker support (now workers configured in )
 ver 2.8.2
     - Item API fixed to not return discovery items by default
     - Added ITEM LLD processing debug
