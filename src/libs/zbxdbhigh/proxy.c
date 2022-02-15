@@ -3857,7 +3857,7 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 			if (NULL != session)
 				session->last_valueid = values[i].id;
 		}
-		LOG_INF("Calling process_history_data");
+		
 		processed_num += process_history_data(items, values, errcodes, values_num, NULL);
 		total_num += read_num;
 
@@ -3912,8 +3912,6 @@ static int	process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 	
-	LOG_INF("Processing incoming data");
-
 	log_client_timediff(LOG_LEVEL_DEBUG, jp, ts);
 
 	if (SUCCEED != (ret = zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_DATA, &jp_data)))
@@ -3965,7 +3963,6 @@ static int	process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse
 		}
 	}
 	else {
-		LOG_INF("Calling process history by keys");
 		process_history_data_by_keys(sock, validator_func, validator_args, info, &jp_data, token);
 	}
 out:
