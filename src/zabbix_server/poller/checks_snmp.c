@@ -36,8 +36,6 @@ extern int CONFIG_GLB_SNMP_CONTENTION;
 extern int CONFIG_GLB_SNMP_FORKS;
 
 typedef struct {
-	//const oid *parsed_oid;
-	//const binpool_data_t *oid_data;
 	const char *oid;
 	unsigned char parsed_oid_len;
 	unsigned char snmp_version;
@@ -55,11 +53,6 @@ typedef struct {
 	char state;
 } snmp_item_t;
 
-//typedef struct {
-//		size_t size;
-//		oid parsed_oid[MAX_OID_LEN];
-//} p_oid_t;
-	
 
 /*
  * SNMP Dynamic Index Cache

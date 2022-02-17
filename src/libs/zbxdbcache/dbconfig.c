@@ -11561,13 +11561,15 @@ static void	dc_get_host_macro(const zbx_uint64_t *hostids, int host_num, const c
 
 	for (i = 0; i < host_num; i++)
 	{
-		obj_index_get_refs_from(&glb_config->host_to_template_idx, hostids[i], &templateids );
-
-//		if (NULL != (htmpl = (const ZBX_DC_HTMPL *)zbx_hashset_search(&config->htmpls, &hostids[i])))
-//		{
-//			for (j = 0; j < htmpl->templateids.values_num; j++)
-//				zbx_vector_uint64_append(&templateids, htmpl->templateids.values[j]);
-//		}
+	//	obj_index_get_refs_from(&glb_config->host_to_template_idx, hostids[i], &templateids );
+	//	if (hostids[i] == 160006) {
+	//		LOG_DBG("debug_item: host 160006, got %d templates", templateids.values_num);
+	//	}
+		if (NULL != (htmpl = (const ZBX_DC_HTMPL *)zbx_hashset_search(&config->htmpls, &hostids[i])))
+		{
+			for (j = 0; j < htmpl->templateids.values_num; j++)
+				zbx_vector_uint64_append(&templateids, htmpl->templateids.values[j]);
+		}
 	}
 
 	if (0 != templateids.values_num)

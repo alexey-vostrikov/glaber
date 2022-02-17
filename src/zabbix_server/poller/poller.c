@@ -445,6 +445,7 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 		if (MACRO_EXPAND_YES == expand_macros)
 		{
 			ZBX_STRDUP(items[i].key, items[i].key_orig);
+			DEBUG_ITEM(items[i].itemid,"Calling substitute_key_macros_unmasked ");
 			if (SUCCEED != substitute_key_macros_unmasked(&items[i].key, NULL, &items[i], NULL, NULL,
 					MACRO_TYPE_ITEM_KEY, error, sizeof(error)))
 			{

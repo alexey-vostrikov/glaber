@@ -31,23 +31,7 @@ typedef struct {
 extern char  *CONFIG_WORKERS_DIR;
 extern int	 CONFIG_CONFSYNCER_FREQUENCY;
 
-/*
-typedef struct {
-    u_int64_t id;
-    const char *host;
-    const char *meta;
-    const char *interface;
-} HOST_AUTOREG;
-*/
-/*
-typedef struct {
-    u_int64_t id;
-    const char *host;
-    const char *key;
-    const char *lld_key;
-    const char *lld_macro;
-} LLD_ITEM_REG;
-*/
+
 
 typedef struct {
     u_int64_t hash;
