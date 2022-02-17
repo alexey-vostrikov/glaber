@@ -276,20 +276,7 @@ $fields = [
 	'filter_evaltype' =>			[T_ZBX_INT, O_OPT, null,	IN([TAG_EVAL_TYPE_AND_OR, TAG_EVAL_TYPE_OR]), null],
 	'filter_tags' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	'filter_valuemapids' =>			[T_ZBX_INT, O_OPT, null,	DB_ID,		null],
-	// subfilters
-//	'subfilter_set' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
-//	'subfilter_types' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_value_types' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_status' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_state' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_inherited' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_with_triggers' =>	[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_discovered' =>		[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_hosts' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
-//	'subfilter_interval' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-//	'subfilter_history' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-//	'subfilter_trends' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-//	'subfilter_tags' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
+
 	'checkbox_hash' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	// sort and sortorder
 	'sort' =>						[T_ZBX_STR, O_OPT, P_SYS,
@@ -303,11 +290,6 @@ $valid_input = check_fields($fields);
 
 $_REQUEST['params'] = getRequest($paramsFieldName, '');
 unset($_REQUEST[$paramsFieldName]);
-
-$subfiltersList = ['subfilter_types', 'subfilter_value_types', 'subfilter_status', 'subfilter_state',
-	'subfilter_inherited', 'subfilter_with_triggers', 'subfilter_hosts', 'subfilter_interval', 'subfilter_history',
-	'subfilter_trends', 'subfilter_discovered'
-];
 
 /*
  * Permissions
@@ -385,15 +367,6 @@ if (hasRequest('filter_set')) {
 	CProfile::updateArray($prefix.'items.filter.tags.operator', $filter_tags['operators'], PROFILE_TYPE_INT);
 	unset($filter_tags);
 
-	// subfilters
-	foreach ($subfiltersList as $name) {
-		$_REQUEST[$name] = [];
-		CProfile::update($prefix.'items.'.$name, '', PROFILE_TYPE_STR);
-	}
-
-	// Subfilter tags.
-	CProfile::updateArray($prefix.'items.subfilter_tags.tag', [], PROFILE_TYPE_STR);
-	CProfile::updateArray($prefix.'items.subfilter_tags.value', [], PROFILE_TYPE_STR);
 }
 elseif (hasRequest('filter_rst')) {
 	DBStart();
@@ -439,37 +412,6 @@ $_REQUEST['filter_discovered'] = CProfile::get($prefix.'items.filter_discovered'
 $_REQUEST['filter_with_triggers'] = CProfile::get($prefix.'items.filter_with_triggers', -1);
 $_REQUEST['filter_valuemapids'] = CProfile::getArray($prefix.'items.filter_valuemapids', []);
 
-// subfilters
-if (hasRequest('subfilter_set')) {
-	foreach ($subfiltersList as $name) {
-		$_REQUEST[$name] = getRequest($name, []);
-		CProfile::update($prefix.'items.'.$name, implode(';', $_REQUEST[$name]), PROFILE_TYPE_STR);
-	}
-
-	$subf_tags = [];
-	if (hasRequest('subfilter_tags')) {
-		foreach (getRequest('subfilter_tags', []) as $tag) {
-			if ($tag['tag'] !== null) {
-				$subf_tags[json_encode([$tag['tag'], $tag['value']])] = [
-					'tag' => $tag['tag'],
-					'value' => $tag['value'] ? $tag['value'] : ''
-				];
-			}
-		}
-	}
-	CProfile::updateArray($prefix.'items.subfilter_tags.tag', array_column($subf_tags, 'tag'), PROFILE_TYPE_STR);
-	CProfile::updateArray($prefix.'items.subfilter_tags.value', array_column($subf_tags, 'value'), PROFILE_TYPE_STR);
-}
-else {
-	foreach ($subfiltersList as $name) {
-		$_REQUEST[$name] = [];
-		$subfilters_value = CProfile::get($prefix.'items.'.$name);
-		if (!zbx_empty($subfilters_value)) {
-			$_REQUEST[$name] = explode(';', $subfilters_value);
-			$_REQUEST[$name] = array_combine($_REQUEST[$name], $_REQUEST[$name]);
-		}
-	}
-}
 
 $filter_groupids = getSubGroups(getRequest('filter_groupids', []));
 $filter_hostids = getRequest('filter_hostids');
@@ -1578,29 +1520,6 @@ else {
 		}
 		unset($item);
 
-		// disable subfilters if list is empty
-		foreach ($data['items'] as $item) {
-			$atLeastOne = true;
-			foreach ($item['subfilters'] as $value) {
-				if (!$value) {
-					$atLeastOne = false;
-					break;
-				}
-			}
-			if ($atLeastOne) {
-				break;
-			}
-		}
-		if (!$atLeastOne) {
-			foreach ($subfiltersList as $name) {
-				$_REQUEST[$name] = [];
-				CProfile::update($prefix.'items.'.$name, '', PROFILE_TYPE_STR);
-				foreach ($data['items'] as &$item) {
-					$item['subfilters'][$name] = true;
-				}
-				unset($item);
-			}
-		}
 	}
 
 	if ($data['context'] === 'host') {

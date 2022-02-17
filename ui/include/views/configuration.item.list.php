@@ -108,11 +108,23 @@ $data['itemTriggers'] = CMacrosResolverHelper::resolveTriggerExpressions($data['
 $update_interval_parser = new CUpdateIntervalParser(['usermacros' => true]);
 
 foreach ($data['items'] as $item) {
+	//fix: db doesn't filter state in Glaber, doing on the backend
+	if (-1 != $data['filter_data']['filter_state']) {
+
+		if ( $item['state'] != $data['filter_data']['filter_state'] ) {
+			if (!( (ITEM_STATE_UNKNOWN == $item['state']) && 
+				 ($data['filter_data']['filter_state'] == ITEM_STATE_NORMAL)))
+			continue;
+		} 
+	};
+
+
 	// description
 	$description = [];
 	$description[] = makeItemTemplatePrefix($item['itemid'], $data['parent_templates'], ZBX_FLAG_DISCOVERY_NORMAL,
 		$data['allowed_ui_conf_templates']
 	);
+	
 
 	if (!empty($item['discoveryRule'])) {
 		$description[] = (new CLink(CHtml::encode($item['discoveryRule']['name']),
