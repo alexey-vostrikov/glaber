@@ -192,6 +192,8 @@ static int restart_worker(GLB_EXT_WORKER *worker)
         
     }
     
+    worker->pid = 0;
+
     int from_child[2];
     int to_child[2];
 
@@ -600,9 +602,10 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
         LOG_DBG("Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
+        
         if (worker->pid != 0) {
             worker->last_fail = time(NULL);
-            worker->pid = 0;
+            //worker->pid = 0;
         }
         
         //sleep(1);

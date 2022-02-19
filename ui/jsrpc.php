@@ -79,7 +79,7 @@ switch ($data['method']) {
 			'result' => (bool) CSessionHelper::get('serverCheckResult'),
 			'message' => CSessionHelper::get('serverCheckResult')
 				? ''
-				: _('Zabbix server is not running: the information displayed may not be current.')
+				: _('Glaber server is not running: the information displayed may not be current.')
 		];
 		break;
 

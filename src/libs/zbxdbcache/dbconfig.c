@@ -9936,15 +9936,11 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items)
 
 typedef struct {
 	u_int64_t itemid;
-	
-//	u_int64_t hostid; //filled on item deletion to send to correct poller
-//	unsigned char item_type;//need host id and type to find which async poller items belongs to
-
 	int time;
 	unsigned char status;
+	char is_async_polled;
 	
 } glb_changed_item_t;
-
 
 int DC_add_changed_item(u_int64_t itemid, unsigned char status) {
 	glb_changed_item_t *c_item;
@@ -9954,6 +9950,7 @@ int DC_add_changed_item(u_int64_t itemid, unsigned char status) {
 	c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemid, sizeof(glb_changed_item_t), &found);	
 	c_item->status = status;
 	c_item->time = time(NULL);
+	c_item->is_async_polled = UNKNOWN;
 	UNLOCK_CACHE;
 }
 
@@ -9969,6 +9966,7 @@ int DC_add_changed_items(u_int64_t *itemids, int num, unsigned char status) {
 			c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemids[i], sizeof(glb_changed_item_t), &found);	
 			c_item->status = status;
 			c_item->time = time(NULL);
+			c_item->is_async_polled = UNKNOWN;
 		}
 	}
 
@@ -9989,7 +9987,8 @@ void DC_CleanOutdatedChangedItems() {
 	
 	int i = 0, j = 0;
 	int now = time(NULL);
-	int outdate_time = now - 60;
+
+	int outdate_time = now - 300;
 	
 	if (last_clean_time > now - 5 ) 
 		return;
@@ -9998,9 +9997,40 @@ void DC_CleanOutdatedChangedItems() {
 	zbx_hashset_iter_reset(&config->changed_items, &iter);
 
 	while (NULL != (c_item = zbx_hashset_iter_next(&iter))) {
-		if (c_item->time < outdate_time ) {
-			i++;
-			zbx_hashset_iter_remove(&iter);
+		if (c_item->time < outdate_time && SUCCEED != c_item->is_async_polled) {
+			//after timeout checking if item is async polled
+			//and if not, removing from the notification queue
+			//this is done to support heavy configs when loading 
+			//as load speed and cleanup time pose race condition
+			ZBX_DC_ITEM *dc_item;
+			ZBX_DC_HOST *dc_host;
+			//if item doesn't exist or it's host doesn exists
+			if (NULL != (dc_item = zbx_hashset_search(&config->items,&c_item->itemid)) &&
+			   (NULL != (dc_host = zbx_hashset_search(&config->hosts, &dc_item->hostid)))) {
+			
+				//item exists, checking if the item is not for async poll
+				if (SUCCEED == glb_might_be_async_polled(dc_item,dc_host)) {
+					LOG_INF("Item %ld is async polled, leaving in the notify queue", c_item->itemid);
+					//marking item as async polled, not touching it anymore
+					c_item->is_async_polled = SUCCEED;
+				} else {
+					LOG_INF("Cleaning item %ld from the notify queue, it's not async polled", c_item->itemid);
+					//this item isn't for async polling, removing from notify list 
+					//normal pollers doesn't need it
+					i++;
+					zbx_hashset_iter_remove(&iter);
+				}
+			} else {
+				//item in the notify list, but there are no objects in the config
+				//item still might appear in the config a bit later. If system under
+				//really heavy load, then it might not get loaded in 300 sec
+				//but so far, let's log it and remove from the notification queue
+				if (ITEM_STATUS_DELETED != c_item->status) {
+					//item is deleted already in the config, removing the notification
+					LOG_WRN("Item %ld in cahnge notify list, but still no config cache data", c_item->itemid);
+				}
+				zbx_hashset_iter_remove(&iter);
+			}
 		}
 		j++;
 	}
@@ -10104,7 +10134,6 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 	zbx_vector_uint64_create(&itemids);
 	zbx_vector_uint64_reserve(&itemids,1024);
 	
-	
 	WRLOCK_CACHE;
 	last_processed_time = config->last_items_change;
 			
@@ -10125,7 +10154,7 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 			LOG_DBG("Item %ld has been deleted or disabled, trying to remove from the polling", c_item->itemid);
 			
 			if (SUCCEED == glb_poller_delete_item(poll_data, c_item->itemid)) {
-				LOG_DBG("Remove succesifull");
+				LOG_DBG("Remove successfull");
 				zbx_hashset_iter_remove(&iter);
 				continue;
 			}

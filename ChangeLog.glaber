@@ -1,4 +1,13 @@
-var 2.8.5
+var 2.8.8
+    - added Glaber server not running message to not confise with Zabbix
+    - fixed race condition on heavy configs when async pollers might not get notificaton about 
+    the new items
+    - fixed <defunct> worker processes 
+ver 2.8.7
+    - fixed not supported filter in items view
+ver 2.8.6
+    - fixed template macro not applying due to fast config reload change
+ver 2.8.5
     - removed some excessive logging
 ver 2.8.4
     - fix of DCconfig_get_items_by_keys getting segv 

@@ -108,6 +108,8 @@ u_int64_t DC_get_debug_trigger();
 
 #define	SUCCEED		0
 #define	FAIL		-1
+#define UNKNOWN		-2
+
 #define	NOTSUPPORTED	-2
 #define	NETWORK_ERROR	-3
 #define	TIMEOUT_ERROR	-4
