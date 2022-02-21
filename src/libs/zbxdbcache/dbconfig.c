@@ -9950,7 +9950,7 @@ int DC_add_changed_item(u_int64_t itemid, unsigned char status) {
 	c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemid, sizeof(glb_changed_item_t), &found);	
 	c_item->status = status;
 	c_item->time = time(NULL);
-	c_item->is_async_polled = UNKNOWN;
+	c_item->is_async_polled = FAIL;
 	UNLOCK_CACHE;
 }
 
@@ -9966,7 +9966,7 @@ int DC_add_changed_items(u_int64_t *itemids, int num, unsigned char status) {
 			c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemids[i], sizeof(glb_changed_item_t), &found);	
 			c_item->status = status;
 			c_item->time = time(NULL);
-			c_item->is_async_polled = UNKNOWN;
+			c_item->is_async_polled = FAIL;
 		}
 	}
 

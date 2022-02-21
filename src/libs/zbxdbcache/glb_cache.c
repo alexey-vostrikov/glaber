@@ -526,7 +526,7 @@ int glb_vc_load_items_cache() {
 			if ( (lcnt > 0 &&  0 == strncmp(buffer,"{\"itemid\":",10)) || 
 				  (lcnt == 0 && json_buffer[0] != '{') )
 			 {
-				LOG_WRN("Garbage in the dump detected, line count %d dropping data, starting from new line: %s", lcnt, json_buffer);
+				LOG_WRN("Garbage in the dump detected, line count %d dropping data, starting from new line", lcnt);
 				lcnt = 0;
 				alloc_offset =0;
 				continue;
