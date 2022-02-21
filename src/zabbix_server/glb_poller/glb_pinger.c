@@ -112,6 +112,9 @@ static void glb_pinger_submit_result(GLB_POLLER_ITEM *glb_item, int status, char
 							value_dbl = (0 != pinger_item->rcv ? pinger_item->sum / pinger_item->rcv : 0);
 							break;
 					}
+                    //glbmap returns value in milliseconds
+                    //but zabbix expects seconds
+                    value_dbl = value_dbl/1000;
 
 					if (0 < value_dbl && ZBX_FLOAT_PRECISION > value_dbl)
 						value_dbl = ZBX_FLOAT_PRECISION;
