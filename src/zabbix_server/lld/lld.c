@@ -1188,26 +1188,26 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	if (SUCCEED != lld_filter_load(&filter, lld_ruleid, &item, error))
 	{
 		ret = FAIL;
-		DEBUG_ITEM(lld_ruleid,"Filtrer load failed: %s", error);
+		DEBUG_ITEM(lld_ruleid,"Filtrer load failed: %s", *error);
 		goto out;
 	}
 
 	if (SUCCEED != zbx_lld_macro_paths_get(lld_ruleid, &lld_macro_paths, error))
 	{
 		ret = FAIL;
-		DEBUG_ITEM(lld_ruleid,"Macro paths get failed: %s", error);
+		DEBUG_ITEM(lld_ruleid,"Macro paths get failed: %s", *error);
 		goto out;
 	}
 
 	if (SUCCEED != (ret = lld_overrides_load(&overrides, lld_ruleid, &item, error))) {
-		DEBUG_ITEM(lld_ruleid,"Overrides get failed: %s", error);
+		DEBUG_ITEM(lld_ruleid,"Overrides get failed: %s", *error);
 		goto out;
 	}
 
 	if (SUCCEED != lld_rows_get(value, &filter, &lld_rows, &lld_macro_paths, &overrides, &info, error))
 	{
 		ret = FAIL;
-		DEBUG_ITEM(lld_ruleid,"Rows get failed: %s", error);
+		DEBUG_ITEM(lld_ruleid,"Rows get failed: %s", *error);
 		goto out;
 	}
 

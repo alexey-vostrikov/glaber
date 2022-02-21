@@ -109,7 +109,7 @@ $update_interval_parser = new CUpdateIntervalParser(['usermacros' => true]);
 
 foreach ($data['items'] as $item) {
 	//fix: db doesn't filter state in Glaber, doing on the backend
-	if (-1 != $data['filter_data']['filter_state']) {
+	if (isset($data['filter_data']['filter_state']) && -1 != $data['filter_data']['filter_state']) {
 
 		if ( $item['state'] != $data['filter_data']['filter_state'] ) {
 			if (!( (ITEM_STATE_UNKNOWN == $item['state']) && 

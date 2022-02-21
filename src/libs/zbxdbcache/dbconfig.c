@@ -9427,7 +9427,7 @@ void	zbx_dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers, int now)
 		{
 			if (0 != (timer->exec_ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
 				timer->eval_ts = timer->exec_ts;
-			DEBUG_TRIGGER(timer->triggerid, "Recalculated timer trigger next check to %ld", timer->exec_ts);
+			DEBUG_TRIGGER(timer->triggerid, "Recalculated timer trigger next check to %d", timer->exec_ts.sec);
 		}
 	}
 
@@ -10206,6 +10206,7 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 		zbx_vector_uint64_append(&itemids,zbx_dc_item->itemid);
 		zbx_hashset_iter_remove(&iter);	
 	}
+
 	UNLOCK_CACHE;
 
 	if (itemids.values_num > 0 ) {
@@ -11202,7 +11203,7 @@ void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE)) {
 			dc_trigger->lastchange = diff->lastchange;
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: lastchange = %ld", diff->lastchange);
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: lastchange = %d", diff->lastchange);
 		}
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE)) {
 			dc_trigger->value = diff->value;
