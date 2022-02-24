@@ -201,9 +201,6 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 		
 			$results[$item['itemid']]['data'] = [];
 			$history_start = $time_to;
-			//error_log(print_r($agg_results,1));
-			//error_log(print_r($trend_results,1));
-			//error_log(print_r($results,1));
 			
 			if (isset($agg_results[$item['itemid']]['data']) && is_array($agg_results[$item['itemid']]['data'])) {
 			
@@ -213,15 +210,6 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 					if ( $value['clock'] < $history_start ) 
 						$history_start = $value['clock'];
 				}
-				
-
-				//fix: remove after testing - this test's 
-				//$history_start += 3 * 86000;
-				//foreach ($results[$item['itemid']]['data'] as $idx => $value) {
-				//	if ($value["clock"] < $history_start) {
-				//		unset($results[$item['itemid']]['data'][$idx]);
-				//	}
-				//}
 				
 			}
 						
@@ -240,7 +228,7 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 				}
 			} 
 		}
-	//	error_log("getGraphAggregationByWidth:". print_r($results,true));
+
 		return $results;
 	}
 	

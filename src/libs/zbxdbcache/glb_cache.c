@@ -76,6 +76,12 @@ static glb_cache_t *glb_cache;
 void *glb_cache_malloc(void *old, size_t size) {
     void *buff = NULL;
 	buff = zbx_mem_malloc(cache_mem,old,size);
+	if (NULL == buff) {
+		LOG_WRN("Couldn't allocate mem in the state cache, requested %d bytes, exiting", size);
+		THIS_SHOULD_NEVER_HAPPEN;
+		//TODO: cache clean-up should be running here
+		exit(-1);
+	}
 	return buff;
 }
 
@@ -148,7 +154,6 @@ void	glb_cache_strpool_release(const char *str)
 const char *glb_cache_strpool_set_str(const char *old, const char *new) {
     
     glb_cache_strpool_release(old);
-    
     return glb_cache_strpool_intern(new);
 }
 
@@ -170,7 +175,7 @@ int glb_cache_init() {
    
     char *error = NULL;
 
-	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "Cache cache size", "GLBCachesize", 1, &error)) {
+	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "State cache size", "GLBCachesize", 1, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Zbx mem create failed");
     	return FAIL;
     }
@@ -194,12 +199,6 @@ int glb_cache_init() {
 	glb_cache->items.elem_create_func = glb_cache_item_create_cb;
 	glb_rwlock_init(&glb_cache->items.meta_lock);
 	
-#ifdef GLB_CACHE_TESTS
-	LOG_INF("WILL RUN GLB CACHE TESTS");
-	glb_run_cache_tests(glb_cache);
-	//TEST_FAIL("Intentional stop");
-#endif
-
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);
 	return SUCCEED;
 }

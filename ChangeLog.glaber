@@ -1,3 +1,11 @@
+ver 2.8.12
+    - added logging and exiting when there is not enough State Cache memory
+ver 2.8.11
+    - fixed icmppingsec time to measured in seconds, not in milliseconds
+ver 2.8.10
+    - minor compile warn fixes, UNKNOW constant fix
+ver 2.8.9
+    - logging fix, item view errors fix
 var 2.8.8
     - added Glaber server not running message to not confise with Zabbix
     - fixed race condition on heavy configs when async pollers might not get notificaton about 

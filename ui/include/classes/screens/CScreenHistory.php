@@ -508,12 +508,7 @@ class CScreenHistory extends CScreenBase {
 					}
 				}
 
-				// Array $history_data will be modified according page and rows on page.
-				//$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
-				//	new CUrl($this->page_file)
-				//);
-
-				$history_table = (new CTableInfo())->makeVerticalRotation()->setHeader($table_header);
+					$history_table = (new CTableInfo())->makeVerticalRotation()->setHeader($table_header);
 
 				foreach ($history_data as $history_data_row) {
 					$row = [(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_data_row['clock'])))
@@ -536,7 +531,7 @@ class CScreenHistory extends CScreenBase {
 					$history_table->addRow($row);
 				}
 
-				$output[] = [$history_table, $pagination];
+				$output[] = [$history_table, NULL];
 			}
 		}
 

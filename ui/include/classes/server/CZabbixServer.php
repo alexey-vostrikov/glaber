@@ -219,7 +219,6 @@ class CZabbixServer {
 			
 	}
 
-
 	public function syncConfiguration() {
 		return $this->request(['request' => 'config.sync']);
 	}
