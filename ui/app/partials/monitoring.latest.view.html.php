@@ -58,8 +58,8 @@ if ($data['filter']['show_details']) {
 		(new CColHeader(_('Trends')))->addStyle('width: 5%'),
 		(new CColHeader(_('Type')))->addStyle('width: 8%')->addClass('search'),
 		(new CColHeader(_('Last response')))->addStyle('width: 14%')->addClass('search'),
-		(new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search'),
-		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search'),
+		(new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search')->addClass('type-num'),
+		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search')->addClass('type-num'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3)->addClass('search'),
 		(new CColHeader())->addStyle('width: 100px'),
 	]);
@@ -70,8 +70,8 @@ else {
 		0 == $context_host ? (new CColHeader(_('Host')))->addStyle('width: 13%')->addClass('search') : NULL,
 		(new CColHeader(_('Name')))->addStyle('width: 40%')->addClass('search'),
 		(new CColHeader(_('Last response')))->addStyle('width: 20%')->addClass('search'),
-		(new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search'),
-		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search'),
+		(new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search')->addClass('type-num'),
+		(new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search')->addClass('type-num'),
 		(new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3)->addClass('search'),
 		(new CColHeader())->addStyle('width: 100px')
 	]);

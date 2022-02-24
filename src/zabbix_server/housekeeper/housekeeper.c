@@ -27,7 +27,7 @@
 #include "zbxserver.h"
 
 #include "zbxhistory.h"
-#include "history_compress.h"
+//#include "history_compress.h"
 #include "housekeeper.h"
 #include "../../libs/zbxdbcache/glb_cache.h"
 
@@ -1162,7 +1162,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 	next_vc_dump_time = time(NULL) + CONFIG_VCDUMP_FREQUENCY;
 	
-	hk_history_compression_init();
+	//hk_history_compression_init();
 
 	zbx_set_sigusr_handler(zbx_housekeeper_sigusr_handler);
 
@@ -1170,9 +1170,6 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 	{
 		sec = zbx_time();
 		
-		//doing history storage data preloading
-		//TODO: make a task queue, as housekeeper will be used for bunch of
-		//different things	
 		
 		while ( (0 == CONFIG_HOUSEKEEPING_FREQUENCY && zbx_sleep_get_remainder()) || 
 				( 0 < CONFIG_HOUSEKEEPING_FREQUENCY && sleeptime > 0) ) {
@@ -1186,19 +1183,15 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 				glb_cache_stats_t stats;
 				static u_int64_t old_hits=0, old_misses=0;
 				glb_cache_get_statistics(&stats);
-			//	DCget_unknown_triggers(&unknown_triggers,&not_calculated, &total_triggers);
 
-			//	zabbix_log(LOG_LEVEL_INFORMATION,"Valuecache stats: hits: %ld, misses: %ld, efficiency %ld%%", stats.hits-old_hits, stats.misses-old_misses,  	
-			//			((stats.hits-old_hits)*100)/(stats.hits-old_hits + stats.misses-old_misses +1 ));
 				old_misses = stats.misses;
 				old_hits = stats.hits;
-			//	zabbix_log(LOG_LEVEL_INFORMATION, "Triggers stats: %d not calculated yet, %d unknowns, %d total", not_calculated, unknown_triggers, total_triggers);
+
 				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
 				glb_vc_dump_cache();
 				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
 				
 			}
-			//stats->hits = vc_cache->hits;
 			
 			sleep(1);
 			sleeptime--;
@@ -1224,17 +1217,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 		zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_HOUSEKEEPER | ZBX_CONFIG_FLAGS_DB_EXTENSION);
 
-		if (0 == strcmp(cfg.db.extension, ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
-		{
-			zbx_setproctitle("%s [synchronizing history and trends compression settings]",
-					get_process_type_string(process_type));
-			hk_history_compression_update(&cfg.db);
-		}
-
 		zbx_setproctitle("%s [removing old history and trends]",
 				get_process_type_string(process_type));
 		sec = zbx_time();
-		d_history_and_trends = housekeeping_history_and_trends(now);
 
 		zbx_setproctitle("%s [removing old problems]", get_process_type_string(process_type));
 		d_problems = housekeeping_problems(now);

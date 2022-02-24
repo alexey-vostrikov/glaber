@@ -966,9 +966,15 @@ extern GLB_CONFIG *glb_config;
 extern zbx_rwlock_t	config_lock;
 
 #define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock)
-#define	WRLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_wrlock(config_lock)
+#define	WRLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_wrlock(config_lock); 
 #define TRY_WRLOCK_CACHE	0 == sync_in_progress ||  SUCCEED == zbx_rwlock_try_wrlock(config_lock)  
-#define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock)
+#define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock);
+
+/*#define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock)
+#define	WRLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("CC wrlock at %s:%d",__FILE__, __LINE__); zbx_rwlock_wrlock(config_lock); }
+#define TRY_WRLOCK_CACHE	0 == sync_in_progress ||  SUCCEED == zbx_rwlock_try_wrlock(config_lock)  
+#define	UNLOCK_CACHE	if (0 == sync_in_progress) {  LOG_INF("CC unlock at %s:%d",__FILE__, __LINE__); zbx_rwlock_unlock(config_lock); }
+*/
 
 #define ZBX_IPMI_DEFAULT_AUTHTYPE	-1
 #define ZBX_IPMI_DEFAULT_PRIVILEGE	2

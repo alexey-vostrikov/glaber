@@ -62,7 +62,7 @@ class CDataTable extends CTable {
 			jQuery(document).ready(function() {
 			$('#<?=$tableid ?>').DataTable({
 			order: [],
-			columnDefs: [{ targets  : 'no-sort', orderable: false }],
+			columnDefs: [{ targets  : 'no-sort', orderable: false }, {type: "num", targets: 'type-num'}],
 
 			lengthMenu: [[<?=$this->rows_per_page?>], ['Todos']],
 			pageLength: <?=$this->rows_per_page?>,
