@@ -512,7 +512,7 @@ int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need
 #define ELEM_FLAG_DO_NOT_CREATE  1
 #define ELEM_FLAG_DELETE	2
 #define ELEM_FLAG_ITER_WRLOCK	4
-
+//#define ELEM_FLAG_REMAIN_LOCKED  8
 
 typedef struct {
     u_int64_t id;
@@ -538,7 +538,7 @@ int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_
 int		elems_hash_delete(elems_hash_t *elems, u_int64_t id);
 void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
-int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params);
+int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
 
 typedef struct {
     elems_hash_t *from_to;
@@ -558,5 +558,19 @@ int		obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint6
 int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
 int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
 void 	obj_index_dump(obj_index_t *idx);
+
+//memfunction based strpool funcs with lockings to avoid contention segvs
+typedef struct {
+	zbx_hashset_t strs;
+	pthread_mutex_t lock;
+} strpool_t;
+
+int 		strpool_init(strpool_t *strpool, mem_funcs_t *memf);
+int 		strpool_destroy(strpool_t *strpool);
+
+const char *strpool_add(strpool_t *strpool, const char *str);
+void 		strpool_free(strpool_t *strpool, const char *str);
+
+const char *strpool_copy(char *str);
 
 #endif

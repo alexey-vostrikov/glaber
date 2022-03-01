@@ -156,6 +156,7 @@ typedef struct
 	zbx_uint64_t		itemid;
 	zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
+	//u_int64_t			master_itemid;
 	unsigned char		type;
 	unsigned char		snmp_version;
 	unsigned char		value_type;
@@ -180,9 +181,8 @@ typedef struct
 	char			key_orig[ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *key;
 	char			*units;
 	char			*delay;
-//	int			history_sec;
-//	int			trends_sec;
-//	int				mtime;
+	char 			*name;
+	char			*description;
 	char			trapper_hosts[ITEM_TRAPPER_HOSTS_LEN_MAX];
 	char			logtimefmt[ITEM_LOGTIMEFMT_LEN_MAX];
 	char			snmp_community_orig[ITEM_SNMP_COMMUNITY_LEN_MAX], *snmp_community;

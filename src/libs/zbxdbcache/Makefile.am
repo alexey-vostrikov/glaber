@@ -15,7 +15,10 @@ libzbxdbcache_a_SOURCES = \
 	glb_cache_items.h \
 	glb_cache_items.c \
 	changeset.h \
-	changeset.c
+	changeset.c 
+#	\
+#	../glb_objects/glb_discovery.h \
+#	../glb_objects/glb_discovery.c
 
 libzbxdbcache_a_CFLAGS = \
 	-I$(top_srcdir)/src/zabbix_server/ \

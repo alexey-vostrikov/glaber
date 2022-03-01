@@ -67,26 +67,20 @@ void elems_hash_destroy(elems_hash_t *elems) {
 //this will not allow others to read inconsistent object
 elems_hash_elem_t *create_element(elems_hash_t *elems,  uint64_t id ) {
     elems_hash_elem_t *elem, elem_local = {0};
-    
-  //  LOG_INF("In_dd %s", __func__);
- //   glb_rwlock_wrlock(&elems->meta_lock);
 
-    //doing search once again, maybe another process is already creating the element
-//    LOG_INF("In_dd searcjing %s", __func__);
     if (NULL == (elem = zbx_hashset_search(&elems->elems, &id))) {  
 
         elem_local.id = id;
         glb_lock_init(&elem_local.lock);
         glb_lock_block(&elem_local.lock);
-      //  LOG_INF("In_dd inserting %s", __func__);
+
         elem = zbx_hashset_insert(&elems->elems,&elem_local,sizeof(elems_hash_elem_t) );
-  //      LOG_INF("Calling create func %s", __func__);
+
         (*elems->elem_create_func)(elem, &elems->memf);
-//        LOG_INF("return from create func");
+
     } else {
         elem = NULL;
     }
- //   glb_rwlock_unlock(&elems->meta_lock);
 
     return elem;
 }
@@ -98,11 +92,11 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
     
 	if (NULL == process_func)
 		return FAIL;
-//    LOG_INF("Locking");
+   // LOG_INF("Locking");
 	glb_rwlock_rdlock(&elems->meta_lock);
-//    LOG_INF("searhing");
+    //LOG_INF("searhing");
     if (NULL == (elem = zbx_hashset_search(&elems->elems, &id))) {
-  //      LOG_INF("relock in write mode");
+      //LOG_INF("relock in write mode");
         glb_rwlock_unlock(&elems->meta_lock); //need to relock in write mode 
 		
         if ( 1 == (flags & ELEM_FLAG_DO_NOT_CREATE))
@@ -111,19 +105,19 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
         
         //note: create_elem will leave element in blocked state as it needs to be initialized by the user proc first
         //before becoming accessible to other threads
-	//	LOG_INF("Creating element");
+		//LOG_INF("Creating element");
         if (NULL ==(elem = create_element( elems, id  ))) {
             glb_rwlock_unlock(&elems->meta_lock);
         	return FAIL;
         }
-	//	LOG_INF("Created, rdlocking");
 
-      //  glb_rwlock_rdlock(&elems->meta_lock);
+		//LOG_INF("Created, re - rdlocking elems");
+        glb_rwlock_unlock(&elems->meta_lock);
+        glb_rwlock_rdlock(&elems->meta_lock);
 	}  else  {
-      //  LOG_INF("blocking elem");
         glb_lock_block(&elem->lock);
     }
-    //LOG_INF("Calling proc func");
+
 	ret = process_func(elem, &elems->memf, params);
         
     if ( 1 == (elem->flags & ELEM_FLAG_DELETE)) {
@@ -137,8 +131,10 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
     
         return ret;
     }
-	
+    //this is pretty wrong thing, but for long processing and the processing
+    //if (0 == (flags & ELEM_FLAG_REMAIN_LOCKED))
     glb_lock_unlock(&elem->lock);
+
     glb_rwlock_unlock(&elems->meta_lock);
 
 	return ret;
@@ -190,9 +186,10 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
 }   
 
 //iterator will continue till all data or till proc_func returns SUCCEED
-//so far there has been no reasons to implement it
+//TODO: implement readlocked version
+//this one might be quite expensive
 
-int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params) {
+int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags) {
    
     elems_hash_elem_t *elem;
     int last_ret = SUCCEED;

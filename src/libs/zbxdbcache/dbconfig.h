@@ -94,6 +94,8 @@ typedef struct
 	zbx_uint64_t		interfaceid;
 	zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
+//	const char		*name;
+//	const char		*description;
 	const char		*key;
 	const char		*port;
 	const char		*error;
@@ -106,8 +108,6 @@ typedef struct
 	//queueing to be refactored (probably, the individual queues should be used)
 	int			nextcheck;
 	int			data_expected_from;
-	//int			history_sec;
-
 	int					mtime;
 	unsigned char		history;
 	unsigned char		type;
@@ -124,7 +124,8 @@ typedef struct
 	zbx_uint64_t		parent_itemid; /* from joined item_discovery table */
 	const char 			*params;
 	zbx_vector_ptr_t	tags;
-}
+	u_int64_t			master_itemid;
+}						
 ZBX_DC_ITEM;
 
 typedef struct
@@ -932,8 +933,8 @@ typedef struct {
 	obj_index_t host_to_template_idx;
 	//obj_index_t item_to_trigger_idx;
 	obj_index_t deptrigger_to_trigger_idx;
-	elems_hash_t discovery;
-
+	//elems_hash_t discovery;
+	strpool_t strpool;
 } GLB_CONFIG;
 
  typedef struct

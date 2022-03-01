@@ -1560,9 +1560,6 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	if (item->history != (0 != history_sec))
 		return FAIL;
 
-	//if (history_sec != item->history_sec)
-	//	return FAIL;
-
 	if (FAIL == dbsync_compare_uchar(dbrow[24], item->inventory_link))
 		return FAIL;
 
@@ -1984,7 +1981,8 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 				"i.master_itemid,i.timeout,i.url,i.query_fields,i.posts,i.status_codes,"
 				"i.follow_redirects,i.post_type,i.http_proxy,i.headers,i.retrieve_mode,"
 				"i.request_method,i.output_format,i.ssl_cert_file,i.ssl_key_file,i.ssl_key_password,"
-				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,id.parent_itemid,null"
+				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,id.parent_itemid,null "
+				//" i.name, i.description,i.formula,i.evaltype,i.lifetime"
 			" from items i"
 			" inner join hosts h on i.hostid=h.hostid"
 			" %s"
@@ -1999,7 +1997,8 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 		return FAIL;
 	}
 
-	return glb_dbsync_compare(sync,result, 51, &dbsync_env.cache->items, (cmp_func_t) dbsync_compare_item,
+	return glb_dbsync_compare(sync,result, 51 //56
+	, &dbsync_env.cache->items, (cmp_func_t) dbsync_compare_item,
 		  dbsync_item_preproc_row, OBJ_ITEMS, "items");
 
 }

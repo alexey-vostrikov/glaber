@@ -959,13 +959,9 @@ int glb_cache_add_item_values(void *cfg_data, glb_cache_elems_t *elems, ZBX_DC_H
         h = (ZBX_DC_HISTORY *)&history[i];
         
         DEBUG_ITEM(h->itemid,"Adding to value cache, flags is %d state is %d", h->flags, h->state);
-
-        LOG_DBG("Adding value to cache id %ld, value %d out of %d, timestamp is %d", h->itemid, i, history_num, h->ts.sec);
-
         if (0 != ((ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF) & h->flags) || ITEM_STATE_NOTSUPPORTED == h->state)
         {
             DEBUG_ITEM(h->itemid,"Not adding to value cache, no_hist flag is set");
-            LOG_DBG("GLB_CACHE: not adding item %ld to cache: no_hist flag is set %d", h->itemid, h->flags);
             continue;
         }
 
@@ -1041,7 +1037,6 @@ int glb_cache_item_get_state_cb(glb_cache_elem_t *elem, void *cb_data)
 int glb_cache_item_get_nextcheck_cb(glb_cache_elem_t *elem, void *cb_data)
 {
     item_elem_t *elm = (item_elem_t *)elem->data;
-
     return elm->meta.nextcheck;
 }
 
