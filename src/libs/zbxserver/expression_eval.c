@@ -19,7 +19,7 @@
 
 #include "zbxserver.h"
 #include "log.h"
-#include "glb_cache.h"
+#include "glb_cache_items.h"
 #include "evalfunc.h"
 #include "zbxeval.h"
 #include "expression.h"

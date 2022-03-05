@@ -126,7 +126,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		glb_cache_item_update_meta(itemid, &cache_state, 
 				GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG , ITEM_VALUE_TYPE_STR );	
 		/* with successful LLD processing LLD error will be set to empty string */
-		if (NULL != error && 0 != strcmp(error, item.error))
+		if (NULL != error)
 		{
 			hist.value.err = error;
 		}

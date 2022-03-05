@@ -48,7 +48,6 @@ void  glb_tsbuff_destroy(glb_tsbuff_t *tsbuff, zbx_mem_free_func_t free_func) {
     }
 
     free_func(tsbuff->data);
-
 }
 
 

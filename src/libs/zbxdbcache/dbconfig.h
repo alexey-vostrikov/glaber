@@ -94,21 +94,11 @@ typedef struct
 	zbx_uint64_t		interfaceid;
 	zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
-//	const char		*name;
-//	const char		*description;
 	const char		*key;
 	const char		*port;
-	const char		*error;
 	const char		*delay;
 	ZBX_DC_TRIGGER		**triggers;
-	
-	//this 3 fields are state fields and should 
-	//be moved to cache rather than to the config
-	//however getting rid of the nextcheck will require to all the items
-	//queueing to be refactored (probably, the individual queues should be used)
-	int			nextcheck;
 	int			data_expected_from;
-	int					mtime;
 	unsigned char		history;
 	unsigned char		type;
 	unsigned char		value_type;
@@ -854,7 +844,6 @@ typedef struct
 	zbx_hashset_t		scriptitems;
 	zbx_hashset_t		functions;
 	zbx_hashset_t		triggers;
-	//zbx_hashset_t		trigdeps;
 	zbx_hashset_t		hosts;
 	zbx_hashset_t		hosts_h;		/* for searching hosts by 'host' name */
 	zbx_hashset_t		hosts_p;		/* for searching proxies by 'host' name */
@@ -913,6 +902,7 @@ typedef struct
 	char			autoreg_psk[HOST_TLS_PSK_LEN_MAX];
 
 	/* cluster related fields */
+	/* they should better moved to the state */
 	zbx_uint64_t cluster_topology_version;
 	int 	cluster_topology_last_update; /* time when local topology was calculated last */
 	char 	*cluster_topology; /* buffer with current active topology */

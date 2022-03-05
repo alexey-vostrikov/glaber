@@ -30,7 +30,7 @@
 #include "db.h"
 #include "log.h"
 #include "zbxserver.h"
-#include "glb_cache.h"
+#include "glb_cache_items.h"
 #include "evalfunc.h"
 #include "zbxregexp.h"
 #include "zbxtrends.h"

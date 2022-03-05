@@ -46,7 +46,6 @@ int event_elem_compare(const void *d1, const void *d2)
 
 #define add_event(events , type, id, time_sec) add_event_ext((events), (type), (id), (time_sec), 0)
 
-/* this is a good candidate for macro */
 static void add_event_ext(zbx_binary_heap_t *events, char type, zbx_uint64_t id, unsigned int time, int change_time)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
@@ -396,10 +395,6 @@ static int sumtime(u_int64_t *sum, zbx_timespec_t start) {
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
-
-	//static u_int64_t total_time, get_items_time;
-	//zbx_timespec_t ts_total, ts_get_items;
-
 	int old_activity=0, next_stat_time=0;
 	glb_poll_engine_t poll ={0};
 	GLB_POLLER_ITEM *glb_item;
@@ -411,8 +406,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	
 	if (SUCCEED != poll_init(&poll, (zbx_thread_args_t *)args) )
 		exit(-1);
-	
-	//add_event(&poll.events, GLB_EVENT_AGING, 0, time(NULL) + 1);
+
 	add_event(&poll.events, GLB_EVENT_NEW_ITEMS_CHECK, 0, time(NULL) + process_num);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),

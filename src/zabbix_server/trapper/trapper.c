@@ -36,7 +36,7 @@
 #include "../../libs/zbxserver/zabbix_stats.h"
 #include "zbxipcservice.h"
 #include "../poller/checks_snmp.h"
-#include "../../libs/zbxdbcache/glb_cache.h"
+#include "../../libs/zbxdbcache/glb_cache_items.h"
 #include "preproc.h"
 
 

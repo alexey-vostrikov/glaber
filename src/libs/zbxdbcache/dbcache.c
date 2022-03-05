@@ -40,7 +40,7 @@
 #include "zbxtrends.h"
 #include "zbxalgo.h"
 #include "../zbxalgo/vectorimpl.h"
-#include "glb_cache.h"
+#include "glb_cache_items.h"
 
 static zbx_mem_info_t	*hc_index_mem = NULL;
 static zbx_mem_info_t	*hc_mem = NULL;

@@ -29,7 +29,7 @@
 #include "zbxhistory.h"
 //#include "history_compress.h"
 #include "housekeeper.h"
-#include "../../libs/zbxdbcache/glb_cache.h"
+#include "../../libs/zbxdbcache/glb_cache_items.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;

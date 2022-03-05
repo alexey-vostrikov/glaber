@@ -81,6 +81,7 @@
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/zbxdbcache/glb_cache.h"
+#include "../libs/zbxdbcache/glb_cache_items.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"

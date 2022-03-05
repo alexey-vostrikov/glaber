@@ -559,7 +559,7 @@ int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint6
 int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
 void 	obj_index_dump(obj_index_t *idx);
 
-//memfunction based strpool funcs with lockings to avoid contention segvs
+//memfunction based strpool funcs with lockings to avoid contention
 typedef struct {
 	zbx_hashset_t strs;
 	pthread_mutex_t lock;
@@ -570,6 +570,7 @@ int 		strpool_destroy(strpool_t *strpool);
 
 const char *strpool_add(strpool_t *strpool, const char *str);
 void 		strpool_free(strpool_t *strpool, const char *str);
+const char *strpool_replace(strpool_t *strpool, const char *old_str, const char *new_str);
 
 const char *strpool_copy(char *str);
 

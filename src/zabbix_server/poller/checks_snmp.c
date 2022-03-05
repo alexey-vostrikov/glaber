@@ -2598,12 +2598,12 @@ static int glb_snmp_start_connection(snmp_connection_t *conn)
 
 	snmp_item_t *snmp_item = (snmp_item_t *)glb_item->itemdata;	
 	
-	if (NULL == snmp_item) {
-		LOG_INF("Got empty snmp item");
+	if (NULL == snmp_item || NULL == snmp_item->oid) {
+		LOG_INF("Got empty snmp item, itemid %ld", glb_item->itemid);
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
-	
+
 	if (NULL == snmp_parse_oid(snmp_item->oid, p_oid, &oid_len))
 		{
 			char oid_err[256];

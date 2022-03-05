@@ -161,11 +161,11 @@ typedef struct
 	unsigned char		snmp_version;
 	unsigned char		value_type;
 	unsigned char		state;
-	unsigned char		snmpv3_securitylevel;
 	unsigned char		authtype;
 	unsigned char		flags;
 	unsigned char		snmpv3_authprotocol;
 	unsigned char		snmpv3_privprotocol;
+	unsigned char		snmpv3_securitylevel;
 	unsigned char		inventory_link;
 	unsigned char		status;
 	unsigned char		history;
@@ -209,7 +209,7 @@ typedef struct
 	char			ssl_key_file_orig[ITEM_SSL_KEY_FILE_LEN_MAX], *ssl_key_file;
 	char			ssl_key_password_orig[ITEM_SSL_KEY_PASSWORD_LEN_MAX], *ssl_key_password;
 	char			*script_params;
-	char			*error;
+	//char			*error;
 	unsigned char		*formula_bin;
 }
 DC_ITEM;

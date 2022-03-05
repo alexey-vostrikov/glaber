@@ -995,14 +995,15 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 				"tls_psk_identity,tls_psk,proxy_address,auto_compress,maintenanceid"
 			" from hosts"
 			" %s"
-			" where status in (%d,%d,%d,%d,%d,%d)"
-				" and flags<>%d"
+			" where 1=1 "
+//			"status in (%d,%d,%d,%d,%d,%d)"
+//				" and flags<>%d"
 				" %s",
 			glb_inner_join_subquery (sync->mode, " hostid"),
-			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
-			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
-			HOST_STATUS_DOMAIN, HOST_STATUS_SERVER,
-			ZBX_FLAG_DISCOVERY_PROTOTYPE,
+//			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+//			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
+//			HOST_STATUS_DOMAIN, HOST_STATUS_SERVER,
+//			ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			glb_where_condition(sync->mode, OBJ_HOSTS))))
 	{
 		return FAIL;
@@ -1017,14 +1018,15 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 				"proxy_address,auto_compress,maintenanceid"
 			" from hosts"
 			" %s"
-			" where status in (%d,%d,%d,%d,%d,%d)"
-				" and flags<>%d" 
+			" where 1=1 "
+//			    " status in (%d,%d,%d,%d,%d,%d)"
+//				" and flags<>%d" 
 				" %s",
 			glb_inner_join_subquery (sync->mode, " hostid"),
-			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
-			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
-			HOST_STATUS_DOMAIN,HOST_STATUS_SERVER,
-			ZBX_FLAG_DISCOVERY_PROTOTYPE,
+//			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+//			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
+//			HOST_STATUS_DOMAIN,HOST_STATUS_SERVER, H
+//			ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			glb_where_condition(sync->mode, OBJ_HOSTS))))
 	{
 		return FAIL;
@@ -1341,7 +1343,8 @@ int	zbx_dbsync_compare_host_macros(zbx_dbsync_t *sync)
 			"select m.hostmacroid,m.hostid,m.macro,m.value,m.type"
 			" from hostmacro m"
 			" inner join hosts h on m.hostid=h.hostid"
-			" where h.flags<>%d", ZBX_FLAG_DISCOVERY_PROTOTYPE)))
+			//" where h.flags<>%d", ZBX_FLAG_DISCOVERY_PROTOTYPE
+			)))
 	{
 		return FAIL;
 	}
@@ -1523,8 +1526,8 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	if (FAIL == dbsync_compare_uint64(dbrow[1], item->hostid))
 		return FAIL;
 
-	if (FAIL == dbsync_compare_uint64(dbrow[21], item->mtime))
-		return FAIL;
+//	if (FAIL == dbsync_compare_uint64(dbrow[21], item->mtime))
+//		return FAIL;
 
 	if (FAIL == dbsync_compare_uint64(dbrow[48], item->templateid))
 		return FAIL;
@@ -1975,22 +1978,23 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 
 	if (NULL == (result = DBselect(
 			"select i.itemid,i.hostid,i.status,i.type,i.value_type,i.key_,i.snmp_oid,i.ipmi_sensor,i.delay,"
-				"i.trapper_hosts,i.logtimefmt,i.params,ir.state,i.authtype,i.username,i.password,"
-				"i.publickey,i.privatekey,i.flags,i.interfaceid,ir.lastlogsize,ir.mtime,"
-				"i.history,i.trends,i.inventory_link,i.valuemapid,i.units,ir.error,i.jmx_endpoint,"
+				"i.trapper_hosts,i.logtimefmt,i.params, null ,i.authtype,i.username,i.password,"
+				"i.publickey,i.privatekey,i.flags,i.interfaceid,null , null,"
+				"i.history,i.trends,i.inventory_link,i.valuemapid,i.units,null ,i.jmx_endpoint,"
 				"i.master_itemid,i.timeout,i.url,i.query_fields,i.posts,i.status_codes,"
 				"i.follow_redirects,i.post_type,i.http_proxy,i.headers,i.retrieve_mode,"
 				"i.request_method,i.output_format,i.ssl_cert_file,i.ssl_key_file,i.ssl_key_password,"
 				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,id.parent_itemid,null "
 				//" i.name, i.description,i.formula,i.evaltype,i.lifetime"
 			" from items i"
-			" inner join hosts h on i.hostid=h.hostid"
+		//	" inner join hosts h on i.hostid=h.hostid"
 			" %s"
 			" left join item_discovery id on i.itemid=id.itemid"
-			" join item_rtdata ir on i.itemid=ir.itemid"
-			" where h.status in (%d,%d) and i.flags<>%d"
-			" %s", glb_inner_join_subquery(sync->mode, "i.itemid"),	HOST_STATUS_MONITORED, 
-			HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE, 
+			" where 1=1 "
+			//" h.status in (%d,%d,%d) and i.flags<>%d"
+			" %s", glb_inner_join_subquery(sync->mode, "i.itemid"),	
+			//HOST_STATUS_MONITORED, 
+			//HOST_STATUS_NOT_MONITORED, HOST_STATUS_TEMPLATE, ZBX_FLAG_DISCOVERY_PROTOTYPE, 
 			glb_where_condition(sync->mode, OBJ_ITEMS))))
 
 	{
@@ -2318,16 +2322,18 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
 			"select distinct t.triggerid,t.description,t.expression,t.error,t.priority,t.type,t.value,"
 				"t.state,t.lastchange,t.status,t.recovery_mode,t.recovery_expression,"
 				"t.correlation_mode,t.correlation_tag,t.opdata,t.event_name,null,null,null"
-			" from hosts h, functions f, items i, triggers t"
+			" from triggers t"
 			" %s"
-			" where h.hostid=i.hostid"
-				" and i.itemid=f.itemid"
-				" and f.triggerid=t.triggerid"
-				" and h.status in (%d,%d)"
-				" and t.flags<>%d" 
+			" where 1=1 "
+		//		" h.hostid=i.hostid and"
+		//		" i.itemid=f.itemid"
+		//		" and f.triggerid=t.triggerid"
+		//		" and h.status in (%d,%d)"
+		//		" and t.flags<>%d" 
 				" %s",
-			glb_inner_join_subquery(sync->mode, "t.triggerid"), HOST_STATUS_MONITORED, 
-			HOST_STATUS_NOT_MONITORED,ZBX_FLAG_DISCOVERY_PROTOTYPE, 
+			glb_inner_join_subquery(sync->mode, "t.triggerid"),
+//			 HOST_STATUS_MONITORED, 
+//			HOST_STATUS_NOT_MONITORED,ZBX_FLAG_DISCOVERY_PROTOTYPE, 
 			glb_where_condition(sync->mode,OBJ_TRIGGERS))))
 	{
 		return FAIL;
@@ -2364,19 +2370,19 @@ int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync, mem_funcs_t *memf,
 	//we do full dep sync on changed triggers
 	if (NULL == (result = DBselect(
 			"select distinct d.triggerid_down,d.triggerid_up"
-			" from triggers t,hosts h,items i,functions f,  trigger_depends d"
+			" from triggers t,items i,functions f,  trigger_depends d"
 			" %s"
 			" where t.triggerid=d.triggerid_down"
-				" and t.flags<>%d"
-				" and h.hostid=i.hostid"
+			//	" and t.flags<>%d"
+			//	" and h.hostid=i.hostid"
 				" and i.itemid=f.itemid"
 				" and f.triggerid=d.triggerid_down"
-				" and h.status in (%d,%d)"
+			//	" and h.status in (%d,%d)"
 				" %s"
 				" ORDER BY d.triggerid_down",
 				glb_inner_join_subquery(sync->mode, "d.triggerid_down"),
-				ZBX_FLAG_DISCOVERY_PROTOTYPE, HOST_STATUS_MONITORED, 
-				HOST_STATUS_NOT_MONITORED,
+			//	ZBX_FLAG_DISCOVERY_PROTOTYPE, HOST_STATUS_MONITORED, 
+			//	HOST_STATUS_NOT_MONITORED,
 			    glb_where_condition(sync->mode, OBJ_TRIGGERS))))
 	{
 		return FAIL;
@@ -2477,11 +2483,12 @@ int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync)
 			" where h.hostid=i.hostid"
 				" and i.itemid=f.itemid"
 				" and f.triggerid=t.triggerid"
-				" and h.status in (%d,%d)"
-				" and t.flags<>%d"
+			//	" and h.status in (%d,%d)"
+			//	" and t.flags<>%d"
 				" %s",
-			glb_inner_join_subquery(sync->mode, "f.functionid"), HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
-			ZBX_FLAG_DISCOVERY_PROTOTYPE,
+			glb_inner_join_subquery(sync->mode, "f.functionid"), 
+	//		HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+	//		ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			glb_where_condition(sync->mode, OBJ_FUNCTIONS))))
 	{
 		return FAIL;
@@ -2826,17 +2833,18 @@ int	zbx_dbsync_compare_trigger_tags(zbx_dbsync_t *sync)
 
 	if (NULL == (result = DBselect(
 			"select distinct tt.triggertagid,tt.triggerid,tt.tag,tt.value"
-			" from triggers t,hosts h,items i,functions f, trigger_tag tt"
+			" from trigger_tag tt"
 			" %s"
-			" where t.triggerid=tt.triggerid"
-				" and t.flags<>%d"
-				" and h.hostid=i.hostid"
-				" and i.itemid=f.itemid"
-				" and f.triggerid=tt.triggerid"
-				" and h.status in (%d,%d)"
+			" where 1=1 "
+	//		    " t.triggerid=tt.triggerid"
+	//			" and t.flags<>%d"
+	//			" and h.hostid=i.hostid"
+	//			" and i.itemid=f.itemid"
+	//			" and f.triggerid=tt.triggerid"
+	//			" and h.status in (%d,%d)"
 				" %s",
 				glb_inner_join_subquery(sync->mode, "tt.triggertagid"),
-				ZBX_FLAG_DISCOVERY_PROTOTYPE, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+	//			ZBX_FLAG_DISCOVERY_PROTOTYPE, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 				glb_where_condition(sync->mode, OBJ_TRIGGERTAGS))))
 	{
 		return FAIL;
@@ -2892,16 +2900,16 @@ int	zbx_dbsync_compare_item_tags(zbx_dbsync_t *sync)
 
 	if (NULL == (result = DBselect(
 			"select distinct it.itemtagid,it.itemid,it.tag,it.value"
-			" from hosts h, items i, item_tag it"
+			" from item_tag it"
 			" %s"
-			" where i.itemid=it.itemid"
-				" and i.flags in (%d,%d)"
-				" and h.hostid=i.hostid"
-				" and h.status in (%d,%d)"
+			" where 1=1 "
+				//" and i.flags in (%d,%d)"
+			//	" and h.hostid=i.hostid"
+			//	" and h.status in (%d,%d)"
 				" %s",
 				glb_inner_join_subquery(sync->mode, "it.itemtagid"),
-				ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED,
-				HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+			//	ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED,
+			//	HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 				glb_where_condition(sync->mode, OBJ_ITEMTAGS)
 				)))
 	{
@@ -3321,20 +3329,20 @@ int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync)
 	if (NULL == (result = DBselect(
 			"select pp.item_preprocid,pp.itemid,pp.type,pp.params,pp.step,i.hostid,pp.error_handler,"
 			"pp.error_handler_params,i.type,i.key_,h.proxy_hostid"
-			" from hosts h, items i,  item_preproc pp"
+			" from hosts h, items i, item_preproc pp"
 			" %s"
 			" where pp.itemid=i.itemid"
 				" and i.hostid=h.hostid"
-				" and (h.proxy_hostid is null"
-					" or i.type in (%d,%d,%d))"
-				" and h.status in (%d,%d)"
-				" and i.flags<>%d"
+		//		" and (h.proxy_hostid is null"
+		//			" or i.type in (%d,%d,%d))"
+		//		" and h.status in (%d,%d)"
+		//		" and i.flags<>%d"
 				" %s"
 			" order by pp.itemid",
 			glb_inner_join_subquery(sync->mode, "pp.item_preprocid"),
-			ITEM_TYPE_INTERNAL, ITEM_TYPE_CALCULATED, ITEM_TYPE_DEPENDENT,
-			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
-			ZBX_FLAG_DISCOVERY_PROTOTYPE,
+		//	ITEM_TYPE_INTERNAL, ITEM_TYPE_CALCULATED, ITEM_TYPE_DEPENDENT,
+		//	HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+		//	ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			glb_where_condition(sync->mode, OBJ_PREPROCS))))
 	{
 		return FAIL;
@@ -3422,12 +3430,13 @@ int	zbx_dbsync_compare_item_script_param(zbx_dbsync_t *sync)
 			"select p.item_parameterid,p.itemid,p.name,p.value,i.hostid"
 			" from item_parameter p,items i,hosts h"
 			" where p.itemid=i.itemid"
-				" and i.hostid=h.hostid"
-				" and h.status in (%d,%d)"
-				" and i.flags<>%d"
-			" order by p.itemid",
-			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
-			ZBX_FLAG_DISCOVERY_PROTOTYPE)))
+			//	" and i.hostid=h.hostid"
+			//	" and h.status in (%d,%d)"
+			//	" and i.flags<>%d"
+			" order by p.itemid"
+		//	HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
+		//	ZBX_FLAG_DISCOVERY_PROTOTYPE
+		)))
 	{
 		return FAIL;
 	}
@@ -3765,12 +3774,13 @@ int	zbx_dbsync_compare_host_group_hosts(zbx_dbsync_t *sync)
 
 	if (NULL == (result = DBselect(
 			"select hg.groupid,hg.hostid"
-			" from hosts_groups hg,hosts h"
-			" where hg.hostid=h.hostid"
-			" and h.status in (%d,%d)"
-			" and h.flags<>%d"
-			" order by hg.groupid",
-			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE)))
+			" from hosts_groups hg"
+		//	" where hg.hostid=h.hostid"
+		//	" and h.status in (%d,%d)"
+		//	" and h.flags<>%d"
+			" order by hg.groupid"
+		//	HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, 
+			)))
 	{
 		return FAIL;
 	}

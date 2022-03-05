@@ -1302,8 +1302,8 @@ void	DBdelete_items(zbx_vector_uint64_t *itemids)
 	size_t			sql_alloc = 256, sql_offset;
 	zbx_vector_uint64_t	profileids;
 	int			num;
-	const char		*history_tables[] = {"history", "history_str", "history_uint", "history_log",
-				"history_text", "trends", "trends_uint"};
+//	const char		*history_tables[] = {"history", "history_str", "history_uint", "history_log",
+//				"history_text", "trends", "trends_uint"};
 	const char		*event_tables[] = {"events"};
 	const char		*profile_idx = "web.favorite.graphids";
 
@@ -1331,7 +1331,7 @@ void	DBdelete_items(zbx_vector_uint64_t *itemids)
 	DBdelete_graphs_by_itemids(itemids);
 	DBdelete_triggers_by_itemids(itemids);
 
-	DBadd_to_housekeeper(itemids, "itemid", history_tables, ARRSIZE(history_tables));
+//	DBadd_to_housekeeper(itemids, "itemid", history_tables, ARRSIZE(history_tables));
 
 	/* add housekeeper task to delete problems associated with item, this allows old events to be deleted */
 	DBadd_to_housekeeper(itemids, "itemid", event_tables, ARRSIZE(event_tables));
