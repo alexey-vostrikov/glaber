@@ -91,8 +91,12 @@ class CControllerSearch extends CController {
 		if ($this->search !== '') {
 			list($data['hosts'], $data['total_hosts_cnt']) = $this->getHostsData();
 			list($data['groups'], $data['total_groups_cnt']) = $this->getHostGroupsData();
-			list($data['maps'], $data['total_maps_cnt']) = $this->getHostMapsData();
-
+			
+			if ($data['total_hosts_cnt'] >= 1) {
+				$data['host_maps']= $this->getHostMapData(reset($data['hosts']));
+				$data['total_maps_cnt'] = sizeof($data['host_maps']);
+            }
+			
 			if ($this->admin) {
 				list($data['templates'], $data['total_templates_cnt'])  = $this->getTemplatesData();
 			}
@@ -264,6 +268,10 @@ class CControllerSearch extends CController {
       *
       * @return array  Returns host maps and maps count all together.
       */
+	  protected function getHostMapData(array $host)
+	  {
+		  return DBfetchArray(DBselect("SELECT m.sysmapid, m.name, se.selementid FROM sysmaps m INNER JOIN sysmaps_elements se ON se.sysmapid = m.sysmapid WHERE se.elementid = {$host['hostid']}"));
+	  } 
    	protected function getHostMapsData() {
 	
 	       $maps = DbFetchArray(DBselect(

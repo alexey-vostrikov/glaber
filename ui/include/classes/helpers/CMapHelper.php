@@ -104,6 +104,21 @@ class CMapHelper {
 			$map['selements'] = CMacrosResolverHelper::resolveMacrosInMapElements($map['selements'], $resolve_opt);
 
 			self::resolveMapState($map, $areas, $options);
+
+			if (isset($_REQUEST['search_selementid'])) {
+				foreach ($map['selements'] as &$selement) {
+					if ($selement['selementid'] == $_REQUEST['search_selementid']) {
+						$selement['highlight'] = [
+							'st' => 'FF0000',
+							'hl' => null,
+							'ack' => true
+						];
+					} else {
+						continue;
+					}
+				}
+			}
+	
 		}
 
 		return [

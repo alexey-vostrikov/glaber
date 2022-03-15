@@ -366,31 +366,38 @@ if ($data['admin']) {
 		->setFooter(new CList([
 			_s('Displaying %1$s of %2$s found', count($data['templates']), $data['total_templates_cnt'])
 		]));
-		//    WIDGET_SEARCH_MAP
-	 $table = (new CTableInfo())
-       ->setHeader([
-               _('Map')
-       ]);
+		
+	//    WIDGET_SEARCH_MAP
+	if (isset($data['host_maps']) && is_array($data['host_maps']) && count($data['host_maps']) > 0) {
+   		$table = (new CTableInfo())
+       		->setHeader([
+           		_('Map')
+       		]);
 
- 	foreach ($data['maps'] as $sysmapid => $maps) {
+			//    $searchHostId = reset($data['hosts'])['hostid'];
 
-       $caption = make_decoration($maps['name'], $data['search']);
-       $link = 'sysmapid='.$maps['sysmapid'];
+   		foreach ($data['host_maps'] as $sysmapid => $maps) {
+			
+        //http://zbx.ellcom.ru/zabbix.php?action=map.view&sysmapid=276
+        //https://zabbix.ellcom.ru/zabbix.php?action=map.view&sysmapid=177&search_elementid=42644
 
-       $table->addRow([
-               new CLink($caption, 'zabbix.php?action=map.view&'.$link),
-       ]);
- 	}
+			//$caption = make_decoration($maps['name'], $data['search']);
+      	 	$link = 'sysmapid=' . $maps['sysmapid'] . '&search_selementid=' . $maps['selementid'];
+      	 	$table->addRow([
+           	new CLink($maps['name'], 'zabbix.php?action=map.view&' . $link),
+       		]);
+    	}
 
- 	$widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_MAPS, $table))
-       ->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
-       ->setExpanded((bool) CProfile::get('web.search.hats.'.WIDGET_SEARCH_MAPS.'.state', true))
-       ->setHeader(_('Maps'), [], false, 'web.search.hats.'.WIDGET_SEARCH_MAPS.'.state')
-       ->setFooter(new CList([
-               _s('Displaying %1$s of %2$s found', count($data['maps']), $data['total_maps_cnt'])
-       ]));
+    	$widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_MAPS, $table))
+        ->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
+        ->setExpanded((bool)CProfile::get('web.search.hats.' . WIDGET_SEARCH_MAPS . '.state', true))
+        ->setHeader(_('Maps'), [], false, 'web.search.hats.' . WIDGET_SEARCH_MAPS . '.state')
+        ->setFooter(new CList([
+            _s('Displaying %1$s of %2$s found', count($data['host_maps']), $data['total_maps_cnt'])
+        ]));
+	   
+	}	
 }
-
 (new CWidget())
 	->setTitle(_('Search').': '.$data['search'])
 	->addItem(new CDiv($widgets))
