@@ -21,7 +21,7 @@
 define('ZABBIX_VERSION',		'5.4.2');
 define('ZABBIX_API_VERSION',	'5.4.2');
 define('ZABBIX_EXPORT_VERSION',	'5.4');
-define('GLABER_VERSION','2.8.14');
+define('GLABER_VERSION','2.8.15');
 
 define('ZABBIX_DB_VERSION',		5040000);
 
@@ -1539,6 +1539,7 @@ define('WIDGET_HAT_EVENTLIST',			'hat_eventlist');
 define('WIDGET_SEARCH_HOSTS',			'search_hosts');
 define('WIDGET_SEARCH_HOSTGROUP',		'search_hostgroup');
 define('WIDGET_SEARCH_TEMPLATES',		'search_templates');
+define('WIDGET_SEARCH_MAPS',            'search_maps');
 
 // dashboard widget dynamic state
 define('WIDGET_SIMPLE_ITEM',	0);

@@ -366,6 +366,29 @@ if ($data['admin']) {
 		->setFooter(new CList([
 			_s('Displaying %1$s of %2$s found', count($data['templates']), $data['total_templates_cnt'])
 		]));
+		//    WIDGET_SEARCH_MAP
+	 $table = (new CTableInfo())
+       ->setHeader([
+               _('Map')
+       ]);
+
+ 	foreach ($data['maps'] as $sysmapid => $maps) {
+
+       $caption = make_decoration($maps['name'], $data['search']);
+       $link = 'sysmapid='.$maps['sysmapid'];
+
+       $table->addRow([
+               new CLink($caption, 'zabbix.php?action=map.view&'.$link),
+       ]);
+ 	}
+
+ 	$widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_MAPS, $table))
+       ->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
+       ->setExpanded((bool) CProfile::get('web.search.hats.'.WIDGET_SEARCH_MAPS.'.state', true))
+       ->setHeader(_('Maps'), [], false, 'web.search.hats.'.WIDGET_SEARCH_MAPS.'.state')
+       ->setFooter(new CList([
+               _s('Displaying %1$s of %2$s found', count($data['maps']), $data['total_maps_cnt'])
+       ]));
 }
 
 (new CWidget())

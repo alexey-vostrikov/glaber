@@ -78,6 +78,8 @@ class CControllerSearch extends CController {
 			'total_groups_cnt' => 0,
 			'total_hosts_cnt' => 0,
 			'total_templates_cnt' => 0,
+			'maps' => [],
+			'total_maps_cnt' => 0,
 			'allowed_ui_hosts' => $this->checkAccess(CRoleHelper::UI_MONITORING_HOSTS),
 			'allowed_ui_conf_hosts' => $this->checkAccess(CRoleHelper::UI_CONFIGURATION_HOSTS),
 			'allowed_ui_latest_data' => $this->checkAccess(CRoleHelper::UI_MONITORING_LATEST_DATA),
@@ -89,6 +91,7 @@ class CControllerSearch extends CController {
 		if ($this->search !== '') {
 			list($data['hosts'], $data['total_hosts_cnt']) = $this->getHostsData();
 			list($data['groups'], $data['total_groups_cnt']) = $this->getHostGroupsData();
+			list($data['maps'], $data['total_maps_cnt']) = $this->getHostMapsData();
 
 			if ($this->admin) {
 				list($data['templates'], $data['total_templates_cnt'])  = $this->getTemplatesData();
@@ -256,4 +259,37 @@ class CControllerSearch extends CController {
 
 		return [$hosts, $total_count];
 	}
+	/**
+      * Gathers host map data, sorts according to search pattern and sets editable flag if necessary.
+      *
+      * @return array  Returns host maps and maps count all together.
+      */
+   	protected function getHostMapsData() {
+	
+	       $maps = DbFetchArray(DBselect(
+	               'SELECT DISTINCT m.sysmapid, m.name'.
+	               ' FROM sysmaps m'.
+	                       ' INNER JOIN sysmaps_elements se ON se.sysmapid = m.sysmapid'.
+	                       ' INNER JOIN hosts h ON se.elementid = h.hostid'.
+	                       ' WHERE upper(h.name) like upper(\'%'.$this->search.'%\') or upper(h.host) like upper(\'%'.$this->search.'%\') '
+	       ));
+	
+	       if (!$maps) {
+	               return [[], 0];
+	       }
+	
+	       CArrayHelper::sort($maps, ['name']);
+	       $maps = CArrayHelper::sortByPattern($maps, 'name', $this->search, $this->limit);
+	
+	       $total_maps_cnt  = sizeof($maps);
+		  // =  DBfetch(DBselect(
+	      //         'SELECT DISTINCT count(DISTINCT m.sysmapid) as cnt_total'.
+	      //         ' FROM sysmaps m'.
+	      //                 ' INNER JOIN sysmaps_elements se ON se.sysmapid = m.sysmapid'.
+	      //                 ' INNER JOIN hosts h ON se.elementid = h.hostid'.
+	      //                 ' WHERE upper(h.name) like upper(\'%'.$this->search.'%\') or upper(h.host) like upper(\'%'.$this->search.'%\') '
+	      // ));
+	
+	       return [$maps, $total_maps_cnt];
+	 }
 }
