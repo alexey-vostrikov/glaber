@@ -321,6 +321,8 @@ SVGMap.isChanged = function (source, target) {
 		return true;
 	}
 
+	return true;
+	
 	var keys = Object.keys(target);
 
 	for (var i = 0; i < keys.length; i++) {
