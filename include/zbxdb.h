@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -157,7 +157,7 @@ int		zbx_db_strlen_n(const char *text_loc, size_t maxlen);
 #define ZBX_MARIA_MAX_VERSION			100599
 #define ZBX_MARIA_MAX_VERSION_FRIENDLY		"10.05.x"
 
-#define ZBX_POSTGRESQL_MIN_VERSION		100900
+#define ZBX_POSTGRESQL_MIN_VERSION		100009
 #define ZBX_POSTGRESQL_MIN_VERSION_FRIENDLY	"10.9"
 #define ZBX_POSTGRESQL_MAX_VERSION		139999
 #define ZBX_POSTGRESQL_MAX_VERSION_FRIENDLY	"13.x"

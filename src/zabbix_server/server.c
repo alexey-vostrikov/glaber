@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -80,8 +80,8 @@
 #include "zbxtrends.h"
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
-#include "../libs/zbxdbcache/glb_cache.h"
-#include "../libs/zbxdbcache/glb_cache_items.h"
+#include "../libs/glb_state/glb_state.h"
+#include "../libs/glb_state/glb_state_items.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -360,18 +360,21 @@ char	*CONFIG_TLS_PSK_FILE		= NULL;
 #endif
 
 static char	*CONFIG_SOCKET_PATH	= NULL;
-
-//char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
-char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
-int		CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
-char	CONFIG_HOSTNAME[MAX_ZBX_HOSTNAME_LEN];
-//char	CONFIG_CLUSTER_DOMAINS[MAX_ZBX_HOSTNAME_LEN];
+char	CONFIG_CLUSTER_DOMAINS[MAX_ZBX_HOSTNAME_LEN];
 int 	CONFIG_CLUSTER_SERVER_ID =0;
 int		CONFIG_CLUSTER_REROUTE_DATA	= 1;
-
 zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 
+//char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
+//char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
+//int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
+
+char	CONFIG_HOSTNAME[MAX_ZBX_HOSTNAME_LEN];
+
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
+int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
+
+int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_ENABLED;
 
 char	*CONFIG_WEBSERVICE_URL	= NULL;
 
@@ -393,6 +396,37 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		/* make initial configuration sync before worker processes are forked */
 		*local_process_type = ZBX_PROCESS_TYPE_CONFSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_CONFSYNCER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_ALERTMANAGER_FORKS))
+	{
+		/* data collection processes might utilize CPU fully, start manager and worker processes beforehand */
+		*local_process_type = ZBX_PROCESS_TYPE_ALERTMANAGER;
+		*local_process_num = local_server_num - server_count + CONFIG_ALERTMANAGER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_ALERTER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_ALERTER;
+		*local_process_num = local_server_num - server_count + CONFIG_ALERTER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_PREPROCMAN_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
+		*local_process_num = local_server_num - server_count + CONFIG_PREPROCMAN_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_PREPROCESSOR_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
+		*local_process_num = local_server_num - server_count + CONFIG_PREPROCESSOR_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_LLDMANAGER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_LLDMANAGER;
+		*local_process_num = local_server_num - server_count + CONFIG_LLDMANAGER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_LLDWORKER_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_LLDWORKER;
+		*local_process_num = local_server_num - server_count + CONFIG_LLDWORKER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_IPMIMANAGER_FORKS))
 	{
@@ -513,36 +547,6 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_PINGER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_ALERTMANAGER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_ALERTMANAGER;
-		*local_process_num = local_server_num - server_count + CONFIG_ALERTMANAGER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_ALERTER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_ALERTER;
-		*local_process_num = local_server_num - server_count + CONFIG_ALERTER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_PREPROCMAN_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_PREPROCMAN_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_PREPROCESSOR_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
-		*local_process_num = local_server_num - server_count + CONFIG_PREPROCESSOR_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_LLDMANAGER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_LLDMANAGER;
-		*local_process_num = local_server_num - server_count + CONFIG_LLDMANAGER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_LLDWORKER_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_LLDWORKER;
-		*local_process_num = local_server_num - server_count + CONFIG_LLDWORKER_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_ALERTDB_FORKS))
 	{
@@ -1049,8 +1053,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			100},
 		{"StartPreprocessorsPerManager",		&CONFIG_PREPROCESSOR_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			1000},
-		{"HistoryStorageDateIndex",	&CONFIG_HISTORY_STORAGE_PIPELINES,	TYPE_INT,
-			PARM_OPT,	0,			1},
 		{"ExportDir",			&CONFIG_EXPORT_DIR,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"ExportType",			&CONFIG_EXPORT_TYPE,			TYPE_STRING_LIST,
@@ -1072,7 +1074,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"ServerID",		&CONFIG_CLUSTER_SERVER_ID,			TYPE_INT,
 			PARM_OPT,	0,			ZBX_CLUSTER_MAX_SERVERS-1},
 		{"RerouteItems",		&CONFIG_CLUSTER_REROUTE_DATA,			TYPE_INT,
-			PARM_OPT,	0,			1},
+			PARM_OPT,	0,			1},	
+		{"ListenBacklog",		&CONFIG_TCP_MAX_BACKLOG_SIZE,		TYPE_INT,
+			PARM_OPT,	0,			INT_MAX},
 		{NULL}
 	};
 
@@ -1203,12 +1207,6 @@ int	main(int argc, char **argv)
 
 	zbx_initialize_events();
 
-	if (FAIL == zbx_ipc_service_init_env(CONFIG_SOCKET_PATH, &error))
-	{
-		zbx_error("Cannot initialize IPC services: %s", error);
-		zbx_free(error);
-		exit(EXIT_FAILURE);
-	}
 	//for async version we need lots of sockets 
 	//to be opened. Checking for that limit
 	getrlimit(RLIMIT_NOFILE,&limits);
@@ -1231,6 +1229,11 @@ int	main(int argc, char **argv)
 	    }
 	}
 
+	if (ZBX_TASK_RUNTIME_CONTROL == t.task)
+		exit(SUCCEED == zbx_sigusr_send(t.data) ? EXIT_SUCCESS : EXIT_FAILURE);
+
+	zbx_initialize_events();
+
 	return daemon_start(CONFIG_ALLOW_ROOT, CONFIG_USER, t.flags);
 }
 
@@ -1249,7 +1252,7 @@ static void	zbx_main_sigusr_handler(int flags)
 		else
 			zbx_diaginfo_scope = 1 << scope;
 	}
-
+	
 }
 
 static void	zbx_check_db(void)
@@ -1264,7 +1267,6 @@ static void	zbx_check_db(void)
 		exit(EXIT_FAILURE);
 	}
 
-	//zbx_history_check_version(&db_ver);
 	DBflush_version_requirements(db_ver.buffer);
 	zbx_json_free(&db_ver);
 }
@@ -1278,13 +1280,20 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	if (0 != (flags & ZBX_TASK_FLAG_FOREGROUND))
 	{
 		printf("Starting Glaber Server. Version %s, based on Zabbix %s (revision %s).\nPress Ctrl+C to exit.\n\n", GLABER_VERSION,
-				ZABBIX_VERSION, ZABBIX_REVISION);
-	}
-
+ 				ZABBIX_VERSION, ZABBIX_REVISION);
+ 	}
+ 
 	if ( !CONFIG_CLUSTER_SERVER_ID) 
 		printf("Staring in STANDALONE mode");
 	else
 		printf("Starting in CLUSTER mode");
+
+	if (FAIL == zbx_ipc_service_init_env(CONFIG_SOCKET_PATH, &error))
+	{
+		zbx_error("Cannot initialize IPC services: %s", error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
 
 	if (SUCCEED != zbx_locks_create(&error))
 	{
@@ -1432,12 +1441,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == glb_cache_init()) {
+	if (FAIL == glb_state_init()) {
 		zbx_error("Cannot initialize Glaber CACHE");
 		exit(EXIT_FAILURE);
 	}
 
-	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_vc_load_items_cache()) {
+	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_items_load()) {
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
 		exit(EXIT_FAILURE);
 	}
@@ -1772,7 +1781,7 @@ void	zbx_on_exit(int ret)
 	/* free history value cache */
 //	zbx_vc_destroy();
 	
-	glb_cache_destroy();
+	glb_state_destroy();
 	glb_ipc_destroy();
 
 	zbx_destroy_itservices_lock();

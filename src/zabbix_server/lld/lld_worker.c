@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 #include "dbcache.h"
 #include "proxy.h"
 #include "../events.h"
-#include "../../libs/zbxdbcache/glb_cache_items.h"
+#include "../../libs/glb_state/glb_state_items.h"
 
 #include "lld_worker.h"
 #include "lld_protocol.h"
@@ -73,7 +73,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 	DC_ITEM			item;
 	int			errcode, mtime;
 	unsigned char		state, meta;
-	glb_cache_item_meta_t cache_state = {0};
+	glb_state_item_meta_t cache_state = {0};
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -99,7 +99,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			hist.state = state;
 			if (ITEM_STATE_NORMAL == state)
 			{
-				zabbix_log(LOG_LEVEL_INFORMATION, "discovery rule \"%s:%s\" became supported",
+				LOG_DBG("discovery rule \"%s:%s\" became supported",
 						item.host.host, item.key_orig);
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
@@ -108,7 +108,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			}
 			else
 			{
-				zabbix_log(LOG_LEVEL_INFORMATION, "discovery rule \"%s:%s\" became not supported: %s",
+				LOG_DBG("discovery rule \"%s:%s\" became not supported: %s",
 						item.host.host, item.key_orig, error);
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NOTSUPPORTED, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0,
@@ -123,7 +123,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		cache_state.lastdata = time(NULL);
 		cache_state.error = error;
 
-		glb_cache_item_update_meta(itemid, &cache_state, 
+		glb_state_item_update_meta(itemid, &cache_state, 
 				GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG , ITEM_VALUE_TYPE_STR );	
 		/* with successful LLD processing LLD error will be set to empty string */
 		if (NULL != error)
@@ -139,7 +139,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		hist.ts = ts;
 		hist.itemid = itemid;
 
-		glb_ic_add_values(&hist,1);
+		glb_state_item_add_values(&hist,1);
 	}
 out:
 	zbx_free(value);

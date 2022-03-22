@@ -1,7 +1,7 @@
 <?php declare(strict_types = 1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -377,7 +377,7 @@ class CTemplateImporter extends CImporter {
 			// If we update template, existing macros should have hostmacroid.
 			if (array_key_exists('macros', $template)) {
 				foreach ($template['macros'] as &$macro) {
-					$hostmacroid = $this->referencer->findMacroid($templateid, $macro['macro']);
+					$hostmacroid = $this->referencer->findTemplateMacroid($templateid, $macro['macro']);
 
 					if ($hostmacroid !== null) {
 						$macro['hostmacroid'] = $hostmacroid;

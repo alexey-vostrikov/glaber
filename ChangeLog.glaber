@@ -1,3 +1,7 @@
+var 2.9.0
+    - Zabbix sources are upgraded to v 5.4.11
+    - Check now fixed for async pollers
+    - items state refactored to use common elems_hash library
 ver 2.8.12
     - added logging and exiting when there is not enough State Cache memory
 ver 2.8.11

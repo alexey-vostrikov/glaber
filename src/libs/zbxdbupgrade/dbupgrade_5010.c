@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -603,8 +603,12 @@ static void	DBpatch_get_preferred_widget_size(zbx_db_screen_item_t *item, int *w
 		*h += 215;	/* SCREEN_LEGEND_HEIGHT */
 	}
 
+	if (SCREEN_RESOURCE_PLAIN_TEXT == item->resourcetype)
+		*h = 2 + 2 * MIN(25, item->elements) / 5;
+	else
+		*h = (int)round((double)*h / 70);			/* WIDGET_ROW_HEIGHT */
+
 	*w = (int)round((double)*w / 1920 * DASHBOARD_MAX_COLS);	/* DISPLAY_WIDTH */
-	*h = (int)round((double)*h / 70);				/* WIDGET_ROW_HEIGHT */
 
 	*w = MIN(DASHBOARD_MAX_COLS, MAX(1, *w));
 	*h = MIN(DASHBOARD_WIDGET_MAX_ROWS, MAX(DASHBOARD_WIDGET_MIN_ROWS, *h));

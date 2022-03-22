@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -394,7 +394,11 @@ class CToken extends CApiService {
 			return;
 		}
 
-		$api_input_rules = ['type' => API_OBJECTS, 'uniq' => [['userid', 'name']]];
+		$api_input_rules = ['type' => API_OBJECTS, 'uniq' => [['userid', 'name']], 'fields' => [
+			'userid' =>	['type' => API_ID],
+			'name' =>	['type' => API_STRING_UTF8]
+		]];
+
 		if (!CApiInputValidator::validateUniqueness($api_input_rules, $test_tokens, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}

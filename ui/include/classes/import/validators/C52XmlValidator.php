@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -364,6 +364,13 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 		CXmlConstantValue::DASHBOARD_WIDGET_FIELD_TYPE_ITEM_PROTOTYPE => CXmlConstantName::DASHBOARD_WIDGET_FIELD_TYPE_ITEM_PROTOTYPE,
 		CXmlConstantValue::DASHBOARD_WIDGET_FIELD_TYPE_GRAPH => CXmlConstantName::DASHBOARD_WIDGET_FIELD_TYPE_GRAPH,
 		CXmlConstantValue::DASHBOARD_WIDGET_FIELD_TYPE_GRAPH_PROTOTYPE => CXmlConstantName::DASHBOARD_WIDGET_FIELD_TYPE_GRAPH_PROTOTYPE
+	];
+
+	private $HTTP_TEST_AUTHENTICATION = [
+		CXmlConstantValue::NONE => CXmlConstantName::NONE,
+		CXmlConstantValue::BASIC => CXmlConstantName::BASIC,
+		CXmlConstantValue::NTLM => CXmlConstantName::NTLM,
+		CXmlConstantValue::KERBEROS => CXmlConstantName::KERBEROS
 	];
 
 	/**
@@ -957,7 +964,7 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 								]]
 							]],
 							'status' =>					['type' => XML_STRING, 'default' => CXmlConstantValue::ENABLED, 'in' => [CXmlConstantValue::ENABLED => CXmlConstantName::ENABLED, CXmlConstantValue::DISABLED => CXmlConstantName::DISABLED]],
-							'authentication' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::NONE, 'in' => [CXmlConstantValue::NONE => CXmlConstantName::NONE, CXmlConstantValue::BASIC => CXmlConstantName::BASIC, CXmlConstantValue::NTLM => CXmlConstantName::NTLM]],
+							'authentication' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::NONE, 'in' => $this->HTTP_TEST_AUTHENTICATION],
 							'http_user' =>				['type' => XML_STRING, 'default' => ''],
 							'http_password' =>			['type' => XML_STRING, 'default' => ''],
 							'verify_peer' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::NO, 'in' => [CXmlConstantValue::NO => CXmlConstantName::NO, CXmlConstantValue::YES => CXmlConstantName::YES]],
@@ -1495,7 +1502,8 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 												'bulk' =>					['type' => XML_STRING, 'default' => CXmlConstantValue::YES, 'in' => [CXmlConstantValue::NO => CXmlConstantName::NO, CXmlConstantValue::YES => CXmlConstantName::YES]]
 											]]
 										]]
-									]]
+									]],
+									'inventory_mode' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::INV_MODE_DISABLED, 'in' => $this->INVENTORY_MODE]
 								]]
 							]],
 							'jmx_endpoint' =>			['type' => XML_STRING, 'default' => ''],
@@ -1620,7 +1628,7 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 								]]
 							]],
 							'status' =>					['type' => XML_STRING, 'default' => CXmlConstantValue::ENABLED, 'in' => [CXmlConstantValue::ENABLED => CXmlConstantName::ENABLED, CXmlConstantValue::DISABLED => CXmlConstantName::DISABLED]],
-							'authentication' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::NONE, 'in' => [CXmlConstantValue::NONE => CXmlConstantName::NONE, CXmlConstantValue::BASIC => CXmlConstantName::BASIC, CXmlConstantValue::NTLM => CXmlConstantName::NTLM]],
+							'authentication' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::NONE, 'in' => $this->HTTP_TEST_AUTHENTICATION],
 							'http_user' =>				['type' => XML_STRING, 'default' => ''],
 							'http_password' =>			['type' => XML_STRING, 'default' => ''],
 							'verify_peer' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::NO, 'in' => [CXmlConstantValue::NO => CXmlConstantName::NO, CXmlConstantValue::YES => CXmlConstantName::YES]],
@@ -1696,8 +1704,7 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 								]]
 							]]
 						]]
-					]],
-					'inventory_mode' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::INV_MODE_MANUAL, 'in' => $this->INVENTORY_MODE]
+					]]
 				]]
 			]],
 			'triggers' =>				['type' => XML_INDEXED_ARRAY, 'prefix' => 'trigger', 'rules' => [
@@ -1922,7 +1929,7 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 					'password' =>				['type' => XML_STRING, 'default' => ''],
 					'content_type' =>			['type' => XML_STRING, 'default' => CXmlConstantValue::CONTENT_TYPE_HTML, 'in' => [CXmlConstantValue::CONTENT_TYPE_TEXT => CXmlConstantName::CONTENT_TYPE_TEXT, CXmlConstantValue::CONTENT_TYPE_HTML => CXmlConstantName::CONTENT_TYPE_HTML]],
 					'script_name' =>			['type' => XML_STRING, 'default' => ''],
-					'parameters' =>				['type' => 0, 'default' => '', 'ex_validate' => [$this, 'validateMediaTypeParameters'], 'ex_rules' => [$this, 'getMediaTypeParametersExtendedRules'], 'export' => [$this, 'mediaTypeParametersExport']],
+					'parameters' =>				['type' => 0, 'ex_validate' => [$this, 'validateMediaTypeParameters'], 'ex_rules' => [$this, 'getMediaTypeParametersExtendedRules'], 'export' => [$this, 'mediaTypeParametersExport']],
 					'gsm_modem' =>				['type' => XML_STRING, 'default' => ''],
 					'status' =>					['type' => XML_STRING, 'default' => CXmlConstantValue::ENABLED, 'in' => [CXmlConstantValue::ENABLED => CXmlConstantName::ENABLED, CXmlConstantValue::DISABLED => CXmlConstantName::DISABLED]],
 					'max_sessions' =>			['type' => XML_STRING, 'default' => '1'],
@@ -2337,7 +2344,9 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 		switch ($data['type']) {
 			case CXmlConstantName::SCRIPT:
 			case CXmlConstantValue::MEDIA_TYPE_SCRIPT:
-				return ['type' => XML_STRING, 'flags' => CImportDataNormalizer::EOL_LF, 'default' => '', 'preprocessor' => [$this, 'scriptParameterPreprocessor'], 'export' => [$this, 'scriptParameterExport']];
+				return ['type' => XML_INDEXED_ARRAY, 'prefix' => 'parameter', 'rules' => [
+					'parameter' => ['type' => XML_STRING]
+				]];
 
 			case CXmlConstantName::WEBHOOK:
 			case CXmlConstantValue::MEDIA_TYPE_WEBHOOK:
@@ -2349,7 +2358,7 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 				]];
 
 			default:
-				return ['type' => XML_STRING, 'default' => ''];
+				return ['type' => XML_ARRAY, 'rules' => []];
 		}
 	}
 
@@ -2536,23 +2545,6 @@ class C52XmlValidator extends CXmlValidatorGeneral {
 		}
 
 		return $data['filter'];
-	}
-
-	/**
-	 * Converts script parameters to a string.
-	 *
-	 * @param array|string $data  Import data.
-	 *
-	 * @throws Exception if input is invalid.
-	 *
-	 * @return string
-	 */
-	public function scriptParameterPreprocessor($data) {
-		if (is_string($data) && $data !== '') {
-			throw new Exception(_s('Invalid tag "%1$s": %2$s.', 'parameters', _('an array is expected')));
-		}
-
-		return is_array($data) ? implode("\n", $data)."\n" : '';
 	}
 
 	/**

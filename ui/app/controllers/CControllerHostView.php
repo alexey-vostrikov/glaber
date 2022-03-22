@@ -2,7 +2,7 @@
 
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -55,7 +55,8 @@ class CControllerHostView extends CControllerHost {
 		// Validate tags filter.
 		if ($ret && $this->hasInput('tags')) {
 			foreach ($this->getInput('tags') as $filter_tag) {
-				if (count($filter_tag) != 3
+				if (!is_array($filter_tag)
+						|| count($filter_tag) != 3
 						|| !array_key_exists('tag', $filter_tag) || !is_string($filter_tag['tag'])
 						|| !array_key_exists('value', $filter_tag) || !is_string($filter_tag['value'])
 						|| !array_key_exists('operator', $filter_tag) || !is_string($filter_tag['operator'])) {

@@ -16,10 +16,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "glb_cache.h"
-#include "glb_cache_items.h"
+#include "common.h"
+
+#include "zbxalgo.h"
+#include "glb_state.h"
+#include "glb_state_items.h"
 #include <zlib.h>
 #include "glb_lock.h"
+#include "load_dump.h"
 
 extern char	*CONFIG_VCDUMP_LOCATION;
 
@@ -37,7 +41,7 @@ typedef struct
 
 typedef struct
 {
-    glb_cache_item_meta_t meta;
+    glb_state_item_meta_t meta;
     glb_tsbuff_t tsbuff;
     item_demand_t demand;
 
@@ -55,18 +59,13 @@ typedef struct
     int db_requests;
     int db_fails;
     int fails;
-} items_stats_t;
-
-typedef struct
-{
-    items_stats_t stats;
-} items_cfg_t;
+} stats_t;
 
 typedef struct
 {
     int time_sec;
     zbx_variant_t value;
-} glb_cache_item_value_t;
+} glb_state_item_value_t;
 
 typedef struct
 {
@@ -76,27 +75,27 @@ typedef struct
     int ts_head;
     int seconds;
     zbx_vector_history_record_t *values;
-    items_cfg_t *i_cfg;
-
 } fetch_req_t;
 
 typedef struct {
     elems_hash_t *items;
     strpool_t strpool;
     mem_funcs_t memf;
-} items_config_t;
+    stats_t stats;
+} items_state_t;
+
+static items_state_t *state = NULL; 
 
 typedef struct {
-    glb_cache_item_meta_t *meta;
+    glb_state_item_meta_t *meta;
     u_int64_t flags;
     unsigned char value_type;
-} glb_cache_meta_udpate_req_t; 
+} glb_state_meta_udpate_req_t; 
 
 typedef struct {
     int count;
     struct zbx_json *json;
 } item_last_values_req_t;
-
 
 #define GLB_CACHE_ITEMS_MAX_DURATION  86400 
 #define GLB_CACHE_ITEMS_INIT_SIZE   8192
@@ -108,7 +107,7 @@ typedef struct {
                                             //however if duration is set, this might be bigger
 #define GLB_CACHE_ITEM_DEMAND_UPDATE 86400
 
-static int item_create_cb(elems_hash_elem_t *elem, mem_funcs_t *memf)
+ELEMS_CREATE(item_create_cb)
 {
     if (NULL == (elem->data = memf->malloc_func(NULL, sizeof(item_elem_t))))
         return FAIL;
@@ -122,12 +121,12 @@ static int item_create_cb(elems_hash_elem_t *elem, mem_funcs_t *memf)
     i_data->value_type = ITEM_VALUE_TYPE_NONE;
     i_data->meta.state = ITEM_STATE_UNKNOWN;
 
-    glb_tsbuff_init(&i_data->tsbuff, GLB_CACHE_ITEM_MIN_VALUES, sizeof(glb_cache_item_value_t), memf->malloc_func);
+    glb_tsbuff_init(&i_data->tsbuff, GLB_CACHE_ITEM_MIN_VALUES, sizeof(glb_state_item_value_t), memf->malloc_func);
 
     return SUCCEED;
 }
 
-static int item_free_cb(elems_hash_elem_t *elem, mem_funcs_t *memf) {
+ELEMS_FREE(item_free_cb) {
     item_elem_t *elm = elem->data;
     THIS_SHOULD_NEVER_HAPPEN;
     exit(-1);
@@ -136,18 +135,16 @@ static int item_free_cb(elems_hash_elem_t *elem, mem_funcs_t *memf) {
 }
 
 
-static items_config_t *cache = NULL; 
-
-int glb_cache_items_init(mem_funcs_t *memf)
+int glb_state_items_init(mem_funcs_t *memf)
 {
-    if (NULL == (cache = memf->malloc_func(NULL, sizeof(items_config_t)))) {
+    if (NULL == (state = memf->malloc_func(NULL, sizeof(items_state_t)))) {
         LOG_WRN("Cannot allocate memory for cache struct");
         exit(-1);
     };
     
-    cache->items = elems_hash_init(memf,item_create_cb, item_free_cb );
-    cache->memf = *memf;
-    strpool_init(&cache->strpool, memf);
+    state->items = elems_hash_init(memf,item_create_cb, item_free_cb );
+    state->memf = *memf;
+    strpool_init(&state->strpool, memf);
     
   return SUCCEED;
 }
@@ -158,17 +155,17 @@ static void item_variant_clear(zbx_variant_t *value)
     switch (value->type)
     {
     case ZBX_VARIANT_STR:
-        cache->memf.free_func(value->data.str);
+        state->memf.free_func(value->data.str);
         break;
     case ZBX_VARIANT_BIN:
-        cache->memf.free_func(value->data.bin);
+        state->memf.free_func(value->data.bin);
         break;
     case ZBX_VARIANT_ERR:
-        cache->memf.free_func(value->data.err);
+        state->memf.free_func(value->data.err);
         break;
     case ZBX_VARIANT_DBL_VECTOR:
         zbx_vector_dbl_destroy(value->data.dbl_vector);
-        cache->memf.free_func(value->data.dbl_vector);
+        state->memf.free_func(value->data.dbl_vector);
         break;
     }
     value->type = ZBX_VARIANT_NONE;
@@ -184,8 +181,8 @@ static void housekeep_item_values(item_elem_t *item_elem)
 /******************************************************
  * Cache value (variant + time) to history converter  *
  * ***************************************************/
-static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
-                                        glb_cache_item_value_t *c_val, unsigned char value_type)
+static int glb_state_value_to_hist_copy(zbx_history_record_t *record,
+                                        glb_state_item_value_t *c_val, unsigned char value_type)
 {
 
     switch (value_type)
@@ -234,7 +231,7 @@ static int glb_cache_value_to_hist_copy(zbx_history_record_t *record,
     record->timestamp.sec = c_val->time_sec;
 }
 
-int hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_val, int time_sec, unsigned char value_type)
+int hist_val_to_value(glb_state_item_value_t *cache_val, history_value_t *hist_val, int time_sec, unsigned char value_type)
 {
 
     item_variant_clear(&cache_val->value);
@@ -257,7 +254,7 @@ int hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_v
             tmp_str = "";
 
         int len = strlen(hist_val->str) + 1;
-        char *str = cache->memf.malloc_func(NULL, len);
+        char *str = state->memf.malloc_func(NULL, len);
 
         memcpy(str, tmp_str, len);
         zbx_variant_set_str(&cache_val->value, str);
@@ -269,7 +266,7 @@ int hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_v
         {
 
             int len = strlen(hist_val->log->value) + 1;
-            char *str = cache->memf.malloc_func(NULL, len);
+            char *str = state->memf.malloc_func(NULL, len);
 
             memcpy(str, hist_val->log->value, len);
             zbx_variant_set_str(&cache_val->value, str);
@@ -285,7 +282,7 @@ int hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_v
         if (NULL != hist_val->err)
         {
             int len = strlen(hist_val->err) + 1;
-            char *str = cache->memf.malloc_func(NULL, len);
+            char *str = state->memf.malloc_func(NULL, len);
             memcpy(str, hist_val->err, len);
             zbx_variant_set_error(&cache_val->value, str);
         }
@@ -298,7 +295,7 @@ int hist_val_to_value(glb_cache_item_value_t *cache_val, history_value_t *hist_v
     cache_val->time_sec = time_sec;
 }
 
-static int dc_hist_to_value(glb_cache_item_value_t *cache_val, ZBX_DC_HISTORY *hist_v)
+static int dc_hist_to_value(glb_state_item_value_t *cache_val, ZBX_DC_HISTORY *hist_v)
 {
 
     item_variant_clear(&cache_val->value);
@@ -321,7 +318,7 @@ static int dc_hist_to_value(glb_cache_item_value_t *cache_val, ZBX_DC_HISTORY *h
             tmp_str = "";
 
         int len = strlen(hist_v->value.str) + 1;
-        char *str = cache->memf.malloc_func(NULL, len);
+        char *str = state->memf.malloc_func(NULL, len);
 
         memcpy(str, tmp_str, len);
         zbx_variant_set_str(&cache_val->value, str);
@@ -333,7 +330,7 @@ static int dc_hist_to_value(glb_cache_item_value_t *cache_val, ZBX_DC_HISTORY *h
         {
 
             int len = strlen(hist_v->value.log->value) + 1;
-            char *str = cache->memf.malloc_func(NULL, len);
+            char *str = state->memf.malloc_func(NULL, len);
 
             memcpy(str, hist_v->value.log->value, len);
             zbx_variant_set_str(&cache_val->value, str);
@@ -349,7 +346,7 @@ static int dc_hist_to_value(glb_cache_item_value_t *cache_val, ZBX_DC_HISTORY *h
         if (NULL != hist_v->value.err)
         {
             int len = strlen(hist_v->value.err) + 1;
-            char *str = cache->memf.malloc_func(NULL, len);
+            char *str = state->memf.malloc_func(NULL, len);
             memcpy(str, hist_v->value.err, len);
             zbx_variant_set_error(&cache_val->value, str);
         }
@@ -407,7 +404,7 @@ int item_update_demand(item_elem_t *elm, unsigned int new_count, unsigned int ne
     }
 
     //  if (need_hk)
-    //      glb_cache_housekeep_values(elm);
+    //      glb_state_housekeep_values(elm);
 
     return SUCCEED;
 }
@@ -415,7 +412,7 @@ int item_update_demand(item_elem_t *elm, unsigned int new_count, unsigned int ne
 static int fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, int count, int head_time, int now )
 {
     int ret = FAIL, i;
-    glb_cache_item_value_t *c_val;
+    glb_state_item_value_t *c_val;
     zbx_vector_history_record_t values;
 
     if (elm->db_fetched_time > now)
@@ -499,7 +496,7 @@ static int ensure_cache_demand_time_met(item_elem_t *elm, int c_time)
 
 static int ensure_tsbuff_has_space(item_elem_t *elm)
 {
-    glb_cache_item_value_t *c_val;
+    glb_state_item_value_t *c_val;
 
     if (SUCCEED == glb_tsbuff_is_full(&elm->tsbuff))
     {
@@ -518,16 +515,16 @@ static int ensure_tsbuff_has_space(item_elem_t *elm)
         else
         {
             int new_size = calc_grow_buffer_size(glb_tsbuff_get_size(&elm->tsbuff));
-            return glb_tsbuff_resize(&elm->tsbuff, new_size, cache->memf.malloc_func, cache->memf.free_func, NULL);
+            return glb_tsbuff_resize(&elm->tsbuff, new_size, state->memf.malloc_func, state->memf.free_func, NULL);
         }
     }
     return SUCCEED;
 }
 
-static int glb_cache_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, int seconds, int head_time, int now, items_cfg_t *i_cfg)
+static int glb_state_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, int seconds, int head_time, int now)
 {
     int ret = FAIL, i;
-    glb_cache_item_value_t *c_val;
+    glb_state_item_value_t *c_val;
     zbx_vector_history_record_t values;
 
     if (elm->db_fetched_time <= (head_time - seconds))
@@ -593,7 +590,7 @@ static int glb_cache_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
 static int fill_items_values_by_index(item_elem_t *elm, int tail_idx, int head_idx, zbx_vector_history_record_t *values)
 {
     int i, iter = 0;
-    glb_cache_item_value_t *item_val;
+    glb_state_item_value_t *item_val;
     zbx_history_record_t record;
 
     if (0 > head_idx || 0 > tail_idx)
@@ -610,7 +607,7 @@ static int fill_items_values_by_index(item_elem_t *elm, int tail_idx, int head_i
         iter++;
 
         item_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, i);
-        glb_cache_value_to_hist_copy(&record, item_val, elm->value_type);
+        glb_state_value_to_hist_copy(&record, item_val, elm->value_type);
 
         zbx_vector_history_record_append_ptr(values, &record);
     }
@@ -625,25 +622,25 @@ static int fill_items_values_by_count(item_elem_t *elm, int count, int head_idx,
     return fill_items_values_by_index(elm, tail_idx, head_idx, values);
 }
 
-static int count_hit(items_cfg_t *i_cfg)
+static int count_hit()
 {
-    i_cfg->stats.hits++;
+    state->stats.hits++;
 }
-static int count_miss(items_cfg_t *i_cfg)
+static int count_miss()
 {
-    i_cfg->stats.misses++;
+    state->stats.misses++;
 }
-static int count_db_requests(items_cfg_t *i_cfg)
+static int count_db_requests()
 {
-    i_cfg->stats.db_requests++;
+    state->stats.db_requests++;
 }
-static int count_db_fails(items_cfg_t *i_cfg)
+static int count_db_fails()
 {
-    i_cfg->stats.db_fails++;
+    state->stats.db_fails++;
 }
-static int count_fails(items_cfg_t *i_cfg)
+static int count_fails()
 {
-    i_cfg->stats.fails++;
+    state->stats.fails++;
 }
 
 static int update_db_fetch(item_elem_t *elm, int fetch_time)
@@ -654,33 +651,41 @@ static int update_db_fetch(item_elem_t *elm, int fetch_time)
 
 static void free_item(item_elem_t *elm)
 {
-    glb_cache_item_value_t *cache_val;
+    glb_state_item_value_t *cache_val;
 
-    while (NULL != (cache_val = (glb_cache_item_value_t *)glb_tsbuff_get_value_tail(&elm->tsbuff)))
+    while (NULL != (cache_val = (glb_state_item_value_t *)glb_tsbuff_get_value_tail(&elm->tsbuff)))
     {
         item_variant_clear(&cache_val->value);
         glb_tsbuff_free_tail(&elm->tsbuff);
     }
 
-    glb_tsbuff_destroy(&elm->tsbuff, cache->memf.free_func);
-    cache->memf.free_func(elm);
+    glb_tsbuff_destroy(&elm->tsbuff, state->memf.free_func);
+    state->memf.free_func(elm);
 }
 
-static int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_data)
+int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_data)
 {
     LOG_DBG("In %s:starting ", __func__);
-
+       
     fetch_req_t *req = (fetch_req_t *)req_data;
     item_elem_t *elm = (item_elem_t *)elem->data;
+      
+    int count;
+    int value_type;
+    int ts_head;
+    int seconds;
 
+    DEBUG_ITEM(elem->id, "Fetching from the cache, item %ld has %d values, oldest(tail) value ts: %d, newest(head) value ts: %d, Request: head ts: %d, count %d, second: %d", 
+            elem->id,  glb_tsbuff_get_count(&elm->tsbuff), glb_tsbuff_get_time_tail(&elm->tsbuff), glb_tsbuff_get_size(&elm->tsbuff),
+            req->ts_head, req->count, req->seconds  );
+    
     int head_idx = -1, need_count = 0;
 
     if (req->value_type != elm->value_type)
     {
-        // LOG_INF("Free item %ld: type change", req->itemid);
         free_item(elm);
-        item_create_cb(elem, NULL);
-
+        item_create_cb(elem, memf);
+      
         elm = (item_elem_t *)elem->data;
         elm->value_type = req->value_type;
     }
@@ -695,30 +700,31 @@ static int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  voi
 
     if (-1 < head_idx && SUCCEED == glb_tsbuff_check_has_enough_count_data_idx(&elm->tsbuff, req->count, head_idx))
     {
-        count_hit(req->i_cfg);
+        count_hit();
         fill_items_values_by_count(elm, req->count, head_idx, req->values);
         DEBUG_ITEM(elem->id, "filled %d values from the cache", req->values->values_num);
+        
         return SUCCEED;
     }
-
-    count_miss(req->i_cfg);
-
+    
+    count_miss();
+ 
     if (-1 == head_idx)
     {
-        count_db_requests(req->i_cfg);
+        count_db_requests();
         // LOG_INF("%ld: Requesting item from the DB by time %d->%d", req->ts_head, now);
         DEBUG_ITEM(elem->id, "Requesting item from the DB by time %d->%d", req->ts_head, now);
-
-        if (FAIL == glb_cache_fetch_from_db_by_time(req->itemid, elm, now - req->ts_head, now, now, req->i_cfg))
+                
+        if (FAIL == glb_state_fetch_from_db_by_time(req->itemid, elm, now - req->ts_head, now, now))
         {
-            count_db_fails(req->i_cfg);
-            count_fails(req->i_cfg);
+            count_db_fails();
+            count_fails();
             return FAIL;
         }
 
         update_db_fetch(elm, req->ts_head);
     }
-
+   
     head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head);
 
     if (-1 == head_idx)
@@ -730,12 +736,12 @@ static int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  voi
 
     if (need_count > 0)
     {
-        count_db_requests(req->i_cfg);
+        count_db_requests();
         DEBUG_ITEM(elem->id, "Requesting item from the DB by count starting at %d,  %d items", req->ts_head, need_count);
         if (SUCCEED != fetch_from_db_by_count(req->itemid, elm, need_count, req->ts_head, now))
         {
-            count_db_fails(req->i_cfg);
-            count_fails(req->i_cfg);
+            count_db_fails();
+            count_fails();
             return FAIL;
         }
         update_db_fetch(elm, req->ts_head);
@@ -743,7 +749,7 @@ static int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  voi
 
     if (-1 == (head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head)))
     {
-        count_fails(req->i_cfg);
+        count_fails();
         DEBUG_ITEM(elem->id, "Fetch from db hasn't retrun the data we need, cache + db request FAILed");
 
         return FAIL;
@@ -751,12 +757,12 @@ static int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  voi
 
     if (FAIL == glb_tsbuff_check_has_enough_count_data_idx(&elm->tsbuff, req->count, head_idx))
     {
-        count_fails(req->i_cfg);
+        count_fails();
         DEBUG_ITEM(elem->id, "Fetch from db hasn't retrun enough data, cache+db request will fail");
 
         return FAIL;
     }
-
+    
     fill_items_values_by_count(elm, req->count, head_idx, req->values);
 
     DEBUG_ITEM(elem->id, "Fetch from db successful, filled %d values", req->count);
@@ -776,7 +782,7 @@ static int calc_time_data_overhead(int fetch_seconds)
 static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *req_data)
 {
     LOG_DBG("%s: started", __func__);
-
+   
     fetch_req_t *req = (fetch_req_t *)req_data;
     item_elem_t *elm = (item_elem_t *)elem->data;
 
@@ -787,7 +793,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
         DEBUG_ITEM(elem->id, "Resetting value type %d -> %d ", elm->value_type, req->value_type);
 
         free_item(elm);
-        item_create_cb(elem, NULL);
+        item_create_cb(elem, memf);
 
         elm = (item_elem_t *)elem->data;
         elm->value_type = req->value_type;
@@ -817,7 +823,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
     if (-1 != head_idx && -1 != tail_idx)
     {
         DEBUG_ITEM(elem->id, "Filling from the cache");
-        count_hit(req->i_cfg);
+        count_hit();
         fill_items_values_by_index(elm, tail_idx, head_idx, req->values);
         DEBUG_ITEM(elem->id, "Filled from the cache %d items", req->values->values_num);
         return SUCCEED;
@@ -825,7 +831,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
 
     DEBUG_ITEM(elem->id, "NO/NOT ENOUGH data in the cache, requesting from the db");
 
-    count_miss(req->i_cfg);
+    count_miss();
 
     if (glb_tsbuff_get_count(&elm->tsbuff) > 0 &&
         req->ts_head >= glb_tsbuff_get_time_tail(&elm->tsbuff))
@@ -840,13 +846,13 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
     else
         fetch_head_time = now;
 
-    count_db_requests(req->i_cfg);
+    count_db_requests();
 
-    if (SUCCEED != glb_cache_fetch_from_db_by_time(req->itemid, elm, fetch_seconds, fetch_head_time, now, req->i_cfg))
+    if (SUCCEED != glb_state_fetch_from_db_by_time(req->itemid, elm, fetch_seconds, fetch_head_time, now))
     {
         DEBUG_ITEM(elem->id, "DB FAILED to return data required, cache request will FAIL");
-        count_fails(req->i_cfg);
-        count_db_fails(req->i_cfg);
+        count_fails();
+        count_db_fails();
         return FAIL;
     }
     update_db_fetch(elm, req->ts_head);
@@ -886,25 +892,24 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
 
 int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
 {
-    glb_cache_item_value_t *c_val;
+    glb_state_item_value_t *c_val;
     item_elem_t *elm;
 
     elm = (item_elem_t *)elem->data;
     ZBX_DC_HISTORY *h = (ZBX_DC_HISTORY *)data;
     int now = time(NULL);
 
-    if (elm->value_type == ITEM_VALUE_TYPE_NONE)
-        elm->value_type = h->value_type;
+    DEBUG_ITEM(elem->id, "Adding item to the items value cache");
 
+    if (elm->value_type == ITEM_VALUE_TYPE_NONE) {
+        elm->value_type = h->value_type;
+    }
     else if (elm->value_type != h->value_type)
     {
         DEBUG_ITEM(elem->id, "Resetting cache value type to %d", h->value_type);
-
         LOG_DBG("Resetting value type %d -> %d ", elm->value_type, h->value_type);
-
         free_item(elm);
-        item_create_cb(elem, NULL);
-
+        item_create_cb(elem, memf);
         elm = (item_elem_t *)elem->data;
         elm->value_type = h->value_type;
     }
@@ -921,14 +926,14 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
         return FAIL;
     }
 
-    if (NULL != (c_val = (glb_cache_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
+    if (NULL != (c_val = (glb_state_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
     {
         dc_hist_to_value(c_val, h);
         DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %ld", glb_tsbuff_get_time_tail(&elm->tsbuff));
     }
     else
     {
-        LOG_WRN("Cannot add value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
+        LOG_DBG("Cannot add value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
         return FAIL;
     }
 
@@ -946,7 +951,7 @@ static int item_update_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void
 {
 
     item_elem_t *elm = (item_elem_t *)elem->data;
-    glb_cache_meta_udpate_req_t *req = (glb_cache_meta_udpate_req_t *)cb_data;
+    glb_state_meta_udpate_req_t *req = (glb_state_meta_udpate_req_t *)cb_data;
 
     if ((req->flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) && elm->meta.lastdata < req->meta->lastdata)
     {
@@ -969,7 +974,7 @@ static int item_update_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void
         DEBUG_ITEM(elem->id, "Updating metadata: errmsg");
         DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", req->meta->error);
         DEBUG_ITEM(elem->id, "Updating metadata: errmsg old %s", elm->meta.error);
-        elm->meta.error = strpool_replace(&cache->strpool, elm->meta.error, req->meta->error);
+        elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, req->meta->error);
     }
 
     return SUCCEED;
@@ -979,13 +984,13 @@ static int item_get_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *c
 {
 
     item_elem_t *elm = (item_elem_t *)elem->data;
-    glb_cache_meta_udpate_req_t *req = (glb_cache_meta_udpate_req_t *)cb_data;
-    static glb_cache_item_meta_t meta = {0};
+    glb_state_meta_udpate_req_t *req = (glb_state_meta_udpate_req_t *)cb_data;
+    static glb_state_item_meta_t meta = {0};
 
     meta.lastdata = elm->meta.lastdata;
     meta.nextcheck = elm->meta.nextcheck;
     meta.state = elm->meta.state;
-    meta.error = strpool_replace(&cache->strpool, meta.error, elm->meta.error);
+    meta.error = strpool_replace(&state->strpool, meta.error, elm->meta.error);
 
     req->meta = &meta;
     return SUCCEED;
@@ -1005,7 +1010,7 @@ int item_get_nextcheck_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *cb_d
 }
 
 #define ZBX_DC_FLAGS_NOT_FOR_HISTORY (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOHISTORY)
-int add_json_item_value(int value_type, struct zbx_json *json, glb_cache_item_value_t *c_val)
+int add_json_item_value(int value_type, struct zbx_json *json, glb_state_item_value_t *c_val)
 {
     zbx_json_addobject(json, NULL);
     zbx_json_addint64(json, "clock", c_val->time_sec);
@@ -1059,7 +1064,7 @@ int item_get_values_json_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *c
     {
         do
         {
-            glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, head_idx);
+            glb_state_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, head_idx);
 
             add_json_item_value(elm->value_type, req->json, c_val);
 
@@ -1072,58 +1077,6 @@ int item_get_values_json_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *c
     zbx_json_close(req->json); // closing the item object
 }
 
-int marshall_item_cb(elems_hash_elem_t *elem, void *data)
-{
-    struct zbx_json *json = (struct zbx_json *)data;
-
-    item_elem_t *elm = (item_elem_t *)elem->data;
-    int head_idx;
-
-    zbx_json_addint64(json, "itemid", elem->id);
-    zbx_json_addint64(json, "value_type", elm->value_type);
-    zbx_json_addint64(json, "db_fetched_time", elm->db_fetched_time);
-    zbx_json_addint64(json, "last_accessed", elm->last_accessed);
-
-    // meta
-    zbx_json_addobject(json, "item_metadata");
-    zbx_json_addint64(json, "state", elm->meta.state);
-    zbx_json_addint64(json, "lastdata", elm->meta.lastdata);
-    zbx_json_addint64(json, "nextcheck", elm->meta.nextcheck);
-
-    if (NULL != elm->meta.error)
-        zbx_json_addstring(json, "error", elm->meta.error, ZBX_JSON_TYPE_STRING);
-
-    zbx_json_close(json);
-
-    // demand
-    zbx_json_addobject(json, "demand");
-    zbx_json_addint64(json, "count", elm->demand.count);
-    zbx_json_addint64(json, "period", elm->demand.period);
-    zbx_json_addint64(json, "count_change", elm->demand.count_change);
-    zbx_json_addint64(json, "period_change", elm->demand.period_change);
-    zbx_json_close(json);
-
-    // data
-    int tail_idx = elm->tsbuff.tail;
-    if (-1 < tail_idx)
-    {
-        zbx_json_addarray(json, "values");
-        int head_idx = elm->tsbuff.head;
-        int rcount = glb_tsbuff_get_count(&elm->tsbuff);
-        do
-        {
-            glb_cache_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, tail_idx);
-
-            add_json_item_value(elm->value_type, json, c_val);
-            tail_idx = (tail_idx + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
-            rcount--;
-
-        } while (rcount > 0);
-        zbx_json_close(json);
-    }
-
-    return (glb_tsbuff_get_count(&elm->tsbuff));
-}
 
 static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 {
@@ -1139,7 +1092,7 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
     return SUCCEED;
 }
 
-static int parse_json_item_state(struct zbx_json_parse *jp, glb_cache_item_meta_t *meta)
+static int parse_json_item_state(struct zbx_json_parse *jp, glb_state_item_meta_t *meta)
 {
     int errflag = 0;
 
@@ -1230,8 +1183,8 @@ static int parse_json_item_values(struct zbx_json_parse *jp, elems_hash_elem_t *
             add_value_cb(elem, memf,  &h);
             i++;
         }
-    }
 
+    }
     return i;
 }
 
@@ -1248,6 +1201,7 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         LOG_INF("Couldn't parse item fields %s", jp->start);
         return FAIL;
     }
+
 
     if (SUCCEED != zbx_json_brackets_by_name(jp, "item_metadata", &jp_state) ||
         SUCCEED != zbx_json_brackets_by_name(jp, "demand", &jp_demand) ||
@@ -1274,7 +1228,7 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
     
 }
 
-int  glb_ic_add_values( ZBX_DC_HISTORY *history, int history_num) {
+int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
     int i, ret = SUCCEED;
 
     LOG_DBG("In %s: starting adding new history %d values", __func__, history_num);
@@ -1291,7 +1245,7 @@ int  glb_ic_add_values( ZBX_DC_HISTORY *history, int history_num) {
             continue;
         }
 
-        if (FAIL == elems_hash_process(cache->items, h->itemid, add_value_cb, h, ELEM_FLAG_DO_NOT_CREATE))
+        if (FAIL == elems_hash_process(state->items, h->itemid, add_value_cb, h, 0))
         {
             ret = FAIL;
         };
@@ -1304,19 +1258,19 @@ int  glb_ic_add_values( ZBX_DC_HISTORY *history, int history_num) {
 
 int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
 		int count, const zbx_timespec_t *ts) {
-//	int now = time(NULL);
-	
-	return glb_ic_get_values(itemid, value_type,values, seconds, count, ts->sec);
+     
+    DEBUG_ITEM(itemid, "Cache request: multiple items reqeuest: secodns:%d, count:%d, start:%d ", seconds, count, ts->sec);
+	return glb_state_item_get_values(itemid, value_type, values, seconds, count, ts->sec);
 }
 
 int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value) {
 	zbx_vector_history_record_t	values;
-	//int				ret = FAIL;
 
 	zbx_history_record_vector_create(&values);
 	DEBUG_ITEM(itemid, "Cache request: single value at %d",ts->sec);
 
-	if (SUCCEED != glb_ic_get_values(itemid, value_type, &values, 0, 1, ts->sec)) {
+
+	if (SUCCEED != glb_state_item_get_values(itemid, value_type, &values, 0, 1, ts->sec)) {
 		zbx_history_record_vector_destroy(&values, value_type);
 		return FAIL;
 	}
@@ -1329,50 +1283,55 @@ int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, cons
 	return SUCCEED;
 }
 
-int glb_cache_item_update_nextcheck(u_int64_t itemid, int nextcheck) {
-		return elems_hash_process(cache->items, itemid, item_update_nextcheck_cb, &nextcheck, ELEM_FLAG_DO_NOT_CREATE);	
+int glb_state_item_update_nextcheck(u_int64_t itemid, int nextcheck) {
+		return elems_hash_process(state->items, itemid, item_update_nextcheck_cb, &nextcheck, ELEM_FLAG_DO_NOT_CREATE);	
 }
 
-int  glb_cache_item_update_meta(u_int64_t itemid, glb_cache_item_meta_t *meta, unsigned int flags, int value_type) {
-	glb_cache_meta_udpate_req_t req = { .meta = meta, .flags = flags, .value_type = value_type};
+int  glb_state_item_update_meta(u_int64_t itemid, glb_state_item_meta_t *meta, unsigned int flags, int value_type) {
+	glb_state_meta_udpate_req_t req = { .meta = meta, .flags = flags, .value_type = value_type};
 
-	return elems_hash_process(cache->items, itemid, item_update_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
+	return elems_hash_process(state->items, itemid, item_update_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-int glb_cache_item_get_state(u_int64_t itemid) {
-	return elems_hash_process(cache->items, itemid, item_get_state_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+int glb_state_item_get_state(u_int64_t itemid) {
+	int st;
+    if (FAIL == (st = elems_hash_process(state->items, itemid, item_get_state_cb, NULL, ELEM_FLAG_DO_NOT_CREATE))) {
+        return ITEM_STATE_UNKNOWN;
+    }
+    return st;
 }
-int glb_cache_item_get_nextcheck(u_int64_t itemid) {
-	return elems_hash_process(cache->items, itemid, item_get_nextcheck_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+int glb_state_item_get_nextcheck(u_int64_t itemid) {
+	return elems_hash_process(state->items, itemid, item_get_nextcheck_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
 }
 
 
-int  glb_ic_get_values( u_int64_t itemid, int value_type, zbx_vector_history_record_t *values, int ts_start, int count, int ts_end) {
+int  glb_state_item_get_values( u_int64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds, int count, int ts_head) {
 	
-//	LOG_INF("In %s:starting itemid: %ld, count: %d", __func__,itemid, count );
+    DEBUG_ITEM(itemid,"In %s:starting itemid: %ld, count: %d", __func__,itemid, count );
+
 	if (count > 0)  {
-        fetch_req_t req = {.itemid = itemid, .count = count, .value_type = value_type, .values = values, .ts_head = ts_start};
+        fetch_req_t req = {.itemid = itemid, .count = count, .value_type = value_type, .values = values, .ts_head = ts_head};
     	
-        return elems_hash_process(cache->items, itemid, cache_fetch_count_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
+        return elems_hash_process(state->items, itemid, cache_fetch_count_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
 	}
 
-    fetch_req_t req = {.itemid = itemid, .value_type = value_type, .values = values, .seconds = ts_start, .ts_head = ts_start };
+    fetch_req_t req = {.itemid = itemid, .value_type = value_type, .values = values, .seconds = seconds, .ts_head = ts_head };
     
-    return elems_hash_process(cache->items, itemid, cache_fetch_time_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
+    return elems_hash_process(state->items, itemid, cache_fetch_time_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
 };
 
 /******************************************************************************
  *                                                                            *
- * Function: glb_cache_get_item_stats                                         *
+ * Function: glb_state_get_item_stats                                         *
  *                                                                            *
  * Purpose: get statistics of cached items                                    *
  *                                                                            *
  ******************************************************************************/
-void	glb_cache_get_item_stats(zbx_vector_ptr_t *stats)
+void	glb_state_get_item_stats(zbx_vector_ptr_t *stats)
 {
 	zbx_hashset_iter_t	iter;
 	elems_hash_elem_t		*elem;
-	glb_cache_item_stats_t	*item_stats;
+	glb_state_item_stats_t	*item_stats;
 	int i;
 
 
@@ -1382,7 +1341,7 @@ void	glb_cache_get_item_stats(zbx_vector_ptr_t *stats)
 	
   //  while (NULL != (elem = (elems_hash_elem_t *)zbx_hashset_iter_next(&iter))) {
 //		
-//        item_stats = (glb_cache_item_stats_t *)zbx_malloc(NULL, sizeof(glb_cache_item_stats_t));
+//        item_stats = (glb_state_item_stats_t *)zbx_malloc(NULL, sizeof(glb_state_item_stats_t));
 //		item_stats->itemid = elem->id;
 //		zbx_vector_ptr_append(stats, item_stats);
 //	}
@@ -1390,16 +1349,16 @@ void	glb_cache_get_item_stats(zbx_vector_ptr_t *stats)
 }
 
 
-int glb_cache_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json) {
+int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json) {
     
     int i;
     zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
-    glb_cache_meta_udpate_req_t req;
+    glb_state_meta_udpate_req_t req;
 
     for (i=0; i < itemids->values_num; i++) {
 
       //  zabbix_log(LOG_LEVEL_INFORMATION, "%s: processing item %ld", __func__,itemids->values[i]);
-        if ( FAIL != elems_hash_process(cache->items, itemids->values[i], item_get_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE) ) {
+        if ( FAIL != elems_hash_process(state->items, itemids->values[i], item_get_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE) ) {
 
             zbx_json_addobject(json,NULL);
 			zbx_json_adduint64(json,"itemid",itemids->values[i]);
@@ -1419,7 +1378,7 @@ int glb_cache_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
 }
 
 
-int glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) {
+int glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) {
 	elems_hash_elem_t *elem;
 	int i, j, rcount;
 
@@ -1434,7 +1393,7 @@ int glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
     
     for (i=0; i<itemids->values_num; i++) {
 		DEBUG_ITEM(itemids->values[i], "Item is requested from the value cache, count %d", count);
-		elems_hash_process(cache->items,itemids->values[i], item_get_values_json_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
+		elems_hash_process(state->items,itemids->values[i], item_get_values_json_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
 	}	
  
   	zbx_json_close(json); //closing the items array
@@ -1445,16 +1404,9 @@ int glb_cache_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
 
 //TODO: this must be a universal function
 //which accepts cache table, filename, parsing and cration callbacks
-int glb_vc_load_items_cache() {
+int glb_state_items_load() {
 
-	FILE *fp;
-	gzFile gzfile;
-
-	//size_t read, len =0;
-	char buffer[MAX_STRING_LEN];
-	size_t alloc_len =0, alloc_offset = 0;
-
-	char *json_buffer = NULL;
+	//char *json_buffer = NULL;
 	int items = 0, vals = 0;
 	int lcnt = 0;
 	
@@ -1462,66 +1414,42 @@ int glb_vc_load_items_cache() {
 
 	zbx_json_type_t j_type;
 	char id_str[MAX_ID_LEN];
+    
+    state_loader_t ldr;
+    char *buffer;
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "Reading valuecache from %s",CONFIG_VCDUMP_LOCATION);
-	
-	if ( NULL == (fp = fopen(CONFIG_VCDUMP_LOCATION, "a"))) {
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s for access check, exiting",CONFIG_VCDUMP_LOCATION);
-		//checking if we have the permissions on creating and writing the file
-		return FAIL;
-	}
-	fclose(fp);
+    if (FAIL == state_loader_create(&ldr,"items") ) 
+        return FAIL;
+    
+    while (NULL != (buffer = state_loader_get_line(&ldr))) {
 
-	//reopening the file in the read mode as gzipped file
-	if ( Z_NULL == (gzfile = gzopen(CONFIG_VCDUMP_LOCATION, "r"))) {
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot open gzipped file %s for reading",CONFIG_VCDUMP_LOCATION);
-		//checking if we have the permissions on creating and writing the file
-		return FAIL;
-	}
+        lcnt++;
+        if (SUCCEED != zbx_json_open(buffer, &jp)) {
+            LOG_INF("Warning: reading items cache: broken line on line %d", lcnt);
+        }
 
-	while (Z_NULL != gzgets(gzfile, buffer, MAX_STRING_LEN) ) {
-
-		zbx_snprintf_alloc(&json_buffer,&alloc_len,&alloc_offset,"%s",buffer);
-		
-		if (SUCCEED != zbx_json_open(json_buffer, &jp)) {
-			if ( (lcnt > 0 &&  0 == strncmp(buffer,"{\"itemid\":",10)) || 
-				  (lcnt == 0 && json_buffer[0] != '{') )
-			 {
-				LOG_WRN("Garbage in the dump detected, line count %d dropping data, starting from new line", lcnt);
-				lcnt = 0;
-				alloc_offset =0;
-				continue;
-			}
-			lcnt++;
-			continue;
-		}
-//		if (lcnt > 0)
-//			LOG_DBG("Complete value is %s",json_buffer);
-		
 		if (SUCCEED != zbx_json_value_by_name(&jp, "itemid", id_str, MAX_ID_LEN, &j_type)) {
-        	LOG_INF("Couldn't find id in the JSON '%s':",json_buffer);
+        	LOG_INF("Couldn't parse line %d: cannot find id in the JSON '%s':", lcnt, buffer);
         	continue;
     	}
-		
+	
 		u_int64_t id = strtol(id_str,NULL,10);
 
-		if (id == 0)
-			LOG_INF("Couldn't find id in the JSON");
-
-		alloc_offset = 0;
-		lcnt = 0;
-		items++;
-		//creating the new element
-
+		if (id == 0) {
+			LOG_INF("Couldn't convert itemid or 0 in line %d find id in the JSON", lcnt);
+        }
+        items++;
 		//and calling unmarshall callback for it
-		vals += elems_hash_process(cache->items, id, items_umarshall_item_cb, &jp, ELEM_FLAG_DO_NOT_CREATE);
+		vals += elems_hash_process(state->items, id, items_umarshall_item_cb, &jp, 0);
+
 
     }
-	gzclose(gzfile);
-	zbx_free(json_buffer);
 
-	LOG_INF("Finished loading valuecache data, loaded %d items; %d values",items,vals);
-	return SUCCEED;
+	state_loader_destroy(&ldr);
+
+	LOG_INF("STATE: finished loading item data, loaded %d items; %d values",items,vals);
+    return SUCCEED;
+ 
 }
 
 
@@ -1537,63 +1465,103 @@ int glb_vc_load_items_cache() {
 *****************************************************************/
 #define BUFFER_ITEMS 1024*1024
 
-int glb_vc_dump_cache() {
+int item_to_json(u_int64_t id, item_elem_t *elm, struct zbx_json *json)
+{   int head_idx;
+
+    zbx_json_addint64(json, "itemid", id);
+    zbx_json_addint64(json, "value_type", elm->value_type);
+    zbx_json_addint64(json, "db_fetched_time", elm->db_fetched_time);
+    zbx_json_addint64(json, "last_accessed", elm->last_accessed);
+
+    // meta
+    zbx_json_addobject(json, "item_metadata");
+    zbx_json_addint64(json, "state", elm->meta.state);
+    zbx_json_addint64(json, "lastdata", elm->meta.lastdata);
+    zbx_json_addint64(json, "nextcheck", elm->meta.nextcheck);
+
+    if (NULL != elm->meta.error)
+        zbx_json_addstring(json, "error", elm->meta.error, ZBX_JSON_TYPE_STRING);
+
+    zbx_json_close(json);
+
+    // demand
+    zbx_json_addobject(json, "demand");
+    zbx_json_addint64(json, "count", elm->demand.count);
+    zbx_json_addint64(json, "period", elm->demand.period);
+    zbx_json_addint64(json, "count_change", elm->demand.count_change);
+    zbx_json_addint64(json, "period_change", elm->demand.period_change);
+    zbx_json_close(json);
+
+    // data
+    int tail_idx = elm->tsbuff.tail;
+    if (-1 < tail_idx)
+    {
+        zbx_json_addarray(json, "values");
+        int head_idx = elm->tsbuff.head;
+        int rcount = glb_tsbuff_get_count(&elm->tsbuff);
+        do
+        {
+            glb_state_item_value_t *c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, tail_idx);
+
+            add_json_item_value(elm->value_type, json, c_val);
+            tail_idx = (tail_idx + 1 + glb_tsbuff_get_size(&elm->tsbuff)) % glb_tsbuff_get_size(&elm->tsbuff);
+            rcount--;
+
+        } while (rcount > 0);
+        zbx_json_close(json);
+    }
+
+    return (glb_tsbuff_get_count(&elm->tsbuff));
+}
+
+typedef struct {
+    struct zbx_json *json;
+    int records;
+    int items;
+    state_dumper_t *dumper;
+} marshall_data_t;
+
+
+int marshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t* memf, void *data) {
+    marshall_data_t *req = data;
+    
+    zbx_json_clean(req->json);
+    req->records += item_to_json(elem->id, (item_elem_t*)elem->data, req->json);
+    req->items++;
+    state_dumper_write_line(req->dumper, req->json->buffer, req->json->buffer_offset + 1);
+
+}
+
+
+
+int glb_state_items_dump() {
 
 	zbx_hashset_iter_t iter;
 	elems_hash_elem_t *elem;
 	struct zbx_json	json;
 	int items=0, vals=0;
 	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN];
+    state_dumper_t dumper;
 
 	zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
-	
-    if (NULL == CONFIG_VCDUMP_LOCATION )
-	 		return FAIL;
-	
-	zbx_snprintf(new_file,MAX_STRING_LEN,"%s%s",CONFIG_VCDUMP_LOCATION,".new");
-	
-	gzFile gzfile = gzopen(new_file,"wb");
+    zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+    marshall_data_t mdata = {.dumper = &dumper, .json = &json, .records = 0, .items = 0};
 
-	if (Z_NULL == gzfile) {
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot open file %s, value cache will not be dumped",new_file);
-		return FAIL;
-	}
-	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+    state_dumper_create(&dumper, "items");
+    elems_hash_iterate(state->items, marshall_item_cb, &mdata, 0);
+    state_dumper_destroy(&dumper);
 
-   // elems_hash_iterate(cache->items, marshall_item_cb, &json, 0);
-
-    zbx_hashset_iter_reset(&cache->items->elems,&iter);
-
-	while (NULL != (elem=(elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) {
-		zbx_json_clean(&json);
-		
-		glb_lock_block(&elem->lock);
-		int ret = marshall_item_cb(elem, &json);
-		glb_lock_unlock(&elem->lock);
-	   	
-		DEBUG_ITEM(elem->id, "Item dump: %s",json.buffer);
-
-		if (0 < ret) {
-        	if ( 0 >= gzwrite(gzfile, json.buffer, json.buffer_offset + 1))	{
-				zabbix_log(LOG_LEVEL_WARNING,"Cannot write to cache %s, errno is %d",new_file,errno);
-				break;
-			}	
-			gzwrite(gzfile,"\n",1);
-		}
-		
-		items++;
-		vals+=ret;
-
-	}
-		
 	zbx_json_free(&json);
-	gzclose(gzfile);
 
-	if (0 != rename(new_file, CONFIG_VCDUMP_LOCATION)) {
-		zabbix_log(LOG_LEVEL_WARNING,"Couldn't rename %s -> %s (%s)", new_file, CONFIG_VCDUMP_LOCATION,strerror(errno));
-		return FAIL;
-	}
-	
 	LOG_INF("In %s: finished, total %d items, %d values dumped", __func__, items, vals);
 	return SUCCEED;
+}
+
+ELEMS_CALLBACK(get_valuetype_cb) {
+     item_elem_t* item  = elem->data;    
+     return item->value_type;
+}
+
+int  glb_state_get_item_valuetype(u_int64_t itemid) {
+    return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }

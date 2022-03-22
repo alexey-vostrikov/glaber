@@ -392,7 +392,7 @@ void handle_socket_operations(agent_conf_t *conf, agent_connection_t *conn)
 			if (0 == count)
 				return;
 		
-			if (FAIL != (received_len = zbx_tcp_recv_ext(&tmp_s, 0))) {
+			if (FAIL != (received_len = zbx_tcp_recv_ext(&tmp_s, 0, 0))) {
 			
 				//zabbix_log(LOG_LEVEL_INFORMATION, "get value from agent result: '%s'", conn->socket->buffer);
 

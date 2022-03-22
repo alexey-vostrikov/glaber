@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -1032,6 +1032,11 @@ function getItemFormData(array $item = [], array $options = []) {
 	$data['interfaces'] = API::HostInterface()->get([
 		'hostids' => $data['hostid'],
 		'output' => API_OUTPUT_EXTEND
+	]);
+	// Sort interfaces to be listed starting with one selected as 'main'.
+	CArrayHelper::sort($data['interfaces'], [
+		['field' => 'main', 'order' => ZBX_SORT_DOWN],
+		['field' => 'interfaceid','order' => ZBX_SORT_UP]
 	]);
 
 	if (!$data['is_discovery_rule'] && $data['form'] === 'clone') {

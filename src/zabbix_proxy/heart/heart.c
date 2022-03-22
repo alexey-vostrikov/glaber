@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,19 +26,60 @@
 #include "heart.h"
 #include "../servercomms.h"
 #include "zbxcrypto.h"
+#include "zbxcompress.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
 
+static int	send_heartbeat(void)
+{
+	zbx_socket_t	sock;
+	struct zbx_json	j;
+	int		ret = SUCCEED;
+	char		*error = NULL, *buffer = NULL;
+	size_t		buffer_size, reserved;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In send_heartbeat()");
+
+	zbx_json_init(&j, 128);
+	zbx_json_addstring(&j, "request", ZBX_PROTO_VALUE_PROXY_HEARTBEAT, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&j, "host", CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&j, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
+
+	if (SUCCEED != zbx_compress(j.buffer, j.buffer_size, &buffer, &buffer_size))
+	{
+		zabbix_log(LOG_LEVEL_ERR,"cannot compress data: %s", zbx_compress_strerror());
+		goto clean;
+	}
+
+	reserved = j.buffer_size;
+
+	if (FAIL == (ret = connect_to_server(&sock, CONFIG_HEARTBEAT_FREQUENCY, 0))) /* do not retry */
+		goto clean;
+
+	if (SUCCEED != (ret = put_data_to_server(&sock, &buffer, buffer_size, reserved, &error)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "cannot send heartbeat message to server at \"%s\": %s", sock.peer,
+				error);
+	}
+
+	disconnect_server(&sock);
+	zbx_free(error);
+clean:
+	zbx_free(buffer);
+	zbx_json_free(&j);
+
+	return ret;
+}
 /******************************************************************************
  *                                                                            *
  * Function: send_heartbeat                                                   *
  *                                                                            *
  ******************************************************************************/
-static int	send_heartbeat(void)
+static int	glb_send_heartbeat(void)
 {
 	zbx_socket_t	sock;
-	struct zbx_json	j;
+	struct zbx_json	js;
 	int		ret = SUCCEED, i;
 	
 	int current_time=time(NULL);
@@ -46,32 +87,34 @@ static int	send_heartbeat(void)
 	char		*error = NULL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In send_heartbeat()");
-	//todo: domains 
-	zbx_json_init(&j, 128+4096);
-	zbx_json_addstring(&j, "request", ZBX_PROTO_VALUE_PROXY_HEARTBEAT, ZBX_JSON_TYPE_STRING);
-	zbx_json_addstring(&j, "host", CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
-	zbx_json_addstring(&j, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"Sending trial heartbeat:%s",j.buffer);
+	zbx_json_init(&js, 128+4096);
+	zbx_json_addstring(&js, "request", ZBX_PROTO_VALUE_PROXY_HEARTBEAT, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&js, "host", CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&js, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
+
+	LOG_INF("Sending trial heartbeat1:%s",js.buffer);
 
 	//sending heartbeats to all the servers we have
 	for(i = 0; i < SERVERS; i++) {
 	
-		//zabbix_log(LOG_LEVEL_INFORMATION,"Sending heartbeat to %s",SERVER_LIST[i].addr);
-
+		LOG_INF("Sending heartbeat to %s",SERVER_LIST[i].addr);
+		LOG_INF("Sending trial heartbeat2:%s",js.buffer);
 		if (FAIL == SERVER_LIST[i].status ) {
 			//failed host
 			if ( SERVER_LIST[i].last_activity + ZBX_HEART_RETRY_TIMEOUT < current_time ) {
+				LOG_INF("Server status is FAILED, hold timeout expired, retrying");	
 				//timeout expired, need to send hb again
-				zabbix_log(LOG_LEVEL_INFORMATION,"Timout expired,retrying heartbeat to  %s",SERVER_LIST[i].addr);
+				//LOG_INF("Trying heartbeat to  %s",SERVER_LIST[i].addr);
 				if ( SUCCEED == connect_to_a_server(&sock, SERVER_LIST[i].addr,ZBX_HEARTBEAT_TRIAL_TIMEOUT , 0) &&
-				     SUCCEED == put_data_to_server(&sock, &j, &error)) {
-				
+				     SUCCEED == put_data_to_server(&sock, &js.buffer, js.buffer_size, js.buffer_allocated, &error)) {
+					LOG_INF("Sending trial heartbeat4:%s",js.buffer);
 					zabbix_log(LOG_LEVEL_INFORMATION,"Server %s become accessible",SERVER_LIST[i].addr);
 					SERVER_LIST[i].status=SUCCEED;
 					SERVER_LIST[i].last_activity=current_time;
 
 				} else {
+					LOG_INF("Sending trial heartbeat5:%s",js.buffer);
 					zabbix_log(LOG_LEVEL_INFORMATION, "Still cannot send heartbeat message to server at \"%s\": %s", sock.peer, error);
 					SERVER_LIST[i].last_activity=current_time;			
 				}
@@ -79,14 +122,16 @@ static int	send_heartbeat(void)
 				disconnect_server(&sock);
 			} else {
 				//still on timeout, sending nothing, updating nothing
-				zabbix_log(LOG_LEVEL_WARNING, "Not sending heartbeat message to server at \"%s\": wait %ld seconds", 
+				LOG_INF("Sending trial heartbeat3:%s",js.buffer);
+				LOG_INF("Not sending heartbeat message to server at \"%s\": wait %ld seconds", 
 								SERVER_LIST[i].addr, (SERVER_LIST[i].last_activity+ZBX_HEART_RETRY_TIMEOUT)-current_time);
 
 			}
 		} else {
 			//host was OK (SUCCEED) last time, sending hb again
+			LOG_INF("Sending HB to alive server");
 			if ( SUCCEED == connect_to_a_server(&sock, SERVER_LIST[i].addr,ZBX_HEARTBEAT_TRIAL_TIMEOUT, 0) &&
-				 SUCCEED == put_data_to_server(&sock, &j, &error)) {
+				 SUCCEED == put_data_to_server(&sock, &js.buffer, js.buffer_size, js.buffer_allocated, &error)) {
 					zabbix_log(LOG_LEVEL_INFORMATION,"Server %s still accessible",SERVER_LIST[i].addr);
 			} else {
 					//we've lost the server
@@ -116,35 +161,37 @@ static int	send_heartbeat(void)
 				&& SERVER_LIST[i].addr != CONFIG_SERVER)  {
 			   
 			zabbix_log(LOG_LEVEL_INFORMATION,"Changing active server %s -> %s", CONFIG_SERVER, SERVER_LIST[i].addr);
-			//todo: this is potentialy unsafe, consider doing it in a safe manner
-			CONFIG_SERVER=SERVER_LIST[i].addr;
+			
+			CONFIG_SERVER = SERVER_LIST[i].addr;
 			break;
 		}
 	}
-
+	LOG_INF("Config server is %s, json is %s, allocated %ld, offset %ld", CONFIG_SERVER,js.buffer, js.buffer_allocated, js.buffer_offset);
 	//for alive server announcing the domains
-	
-	zbx_json_addstring(&j, "domains", CONFIG_CLUSTER_DOMAINS, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&js, "domains", CONFIG_CLUSTER_DOMAINS, ZBX_JSON_TYPE_STRING);
 	//zbx_json_addstring(&j, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"Sending version/domain announce heartbeat:%s",j.buffer);
+	LOG_INF("Sending version/domain announce heartbeat:%s",js.buffer);
 
 	if (FAIL == connect_to_server(&sock, CONFIG_HEARTBEAT_FREQUENCY, 0)) /* do not retry */
 		return FAIL;
 
-	if (SUCCEED != put_data_to_server(&sock, &j, &error))
+	LOG_INF("Connected, sending data: %s", js.buffer);
+	if (SUCCEED != put_data_to_server(&sock, &js.buffer, js.buffer_size, js.buffer_allocated, &error))
 	{
 		
 		zabbix_log(LOG_LEVEL_WARNING, "cannot send heartbeat message to server at \"%s\": %s",
 				sock.peer, error);
 		ret = FAIL;
 	}
-
+	LOG_INF("Finished sending data, disconnecting");
 	zbx_free(error);
+	zbx_json_free(&js);
 	disconnect_server(&sock);
 
 	return ret;
 }
+
 
 /******************************************************************************
  *                                                                            *

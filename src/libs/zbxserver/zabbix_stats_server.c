@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include "common.h"
 #include "zbxjson.h"
 #include "dbcache.h"
-#include "glb_cache.h"
+#include "../glb_state/glb_state.h"
 #include "preproc.h"
 #include "zbxlld.h"
 #include "log.h"
@@ -41,7 +41,7 @@
  ******************************************************************************/
 void	zbx_get_zabbix_stats_ext(struct zbx_json *json)
 {
-	glb_cache_stats_t	vc_stats;
+	glb_state_stats_t	vc_stats;
 	zbx_uint64_t	queue_size;
 	char		*error = NULL;
 
@@ -60,7 +60,7 @@ void	zbx_get_zabbix_stats_ext(struct zbx_json *json)
 	zbx_json_adduint64(json, "triggers", DCget_trigger_count());
 
 	/* zabbix[vcache,...] */
-	if (SUCCEED == glb_cache_get_statistics(&vc_stats))
+	if (SUCCEED == glb_state_get_statistics(&vc_stats))
 	{
 		zbx_json_addobject(json, "vcache");
 

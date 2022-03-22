@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,8 +27,8 @@
 #include "preproc.h"
 #include "preprocessing.h"
 #include "preproc_history.h"
-#include "../../libs/zbxdbcache/glb_cache_items.h"
-//#include "../../libs/zbxdbcache/glb_cache_items.h"
+#include "../../libs/glb_state/glb_state_items.h"
+//#include "../../libs/zbxdbcache/glb_state_items.h"
 
 #define PACKED_FIELD_RAW	0
 #define PACKED_FIELD_STRING	1
@@ -97,7 +97,9 @@ static zbx_uint32_t	message_pack_data(zbx_ipc_message_t *message, zbx_packed_fie
 			/* data packing */
 			if (PACKED_FIELD_STRING == fields[i].type)
 			{
-				memcpy(offset, (zbx_uint32_t *)&field_size, sizeof(zbx_uint32_t));
+				zbx_uint32_t	field_size_uint32 = (zbx_uint32_t)field_size;
+
+				memcpy(offset, &field_size_uint32, sizeof(zbx_uint32_t));
 				if (0 != field_size && NULL != fields[i].value)
 					memcpy(offset + sizeof(zbx_uint32_t), fields[i].value, field_size);
 				field_size += sizeof(zbx_uint32_t);
@@ -1120,7 +1122,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
 	zbx_result_ptr_t		result_ptr = {.result = result};
 	size_t				value_len = 0, len;
 	
-	glb_cache_item_meta_t meta = {0};
+	glb_state_item_meta_t meta = {0};
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -1159,7 +1161,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
 	meta.lastdata = time(NULL);
 	meta.state = value.state;
 
-	glb_cache_item_update_meta(itemid, &meta, 
+	glb_state_item_update_meta(itemid, &meta, 
 			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG ,
 			item_value_type );
 

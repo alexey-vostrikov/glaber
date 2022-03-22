@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -67,6 +67,10 @@ class CHelpItems {
 				[
 					'key' => 'agent.ping',
 					'description' => _('Agent availability check. Returns nothing - unavailable; 1 - available')
+				],
+				[
+					'key' => 'agent.variant',
+					'description' => _('Agent variant check. Returns 1 - for Zabbix agent; 2 - for Zabbix agent 2')
 				],
 				[
 					'key' => 'agent.version',
@@ -217,7 +221,7 @@ class CHelpItems {
 					'description' => _('CPU utilisation percentage. Returns float')
 				],
 				[
-					'key' => 'system.hostname[<type>]',
+					'key' => 'system.hostname[<type>,<transform>]',
 					'description' => _('System host name. Returns string')
 				],
 				[
@@ -399,6 +403,10 @@ class CHelpItems {
 					'description' => _('Agent availability check. Returns nothing - unavailable; 1 - available')
 				],
 				[
+					'key' => 'agent.variant',
+					'description' => _('Agent variant check. Returns 1 - for Zabbix agent; 2 - for Zabbix agent 2')
+				],
+				[
 					'key' => 'agent.version',
 					'description' => _('Version of Zabbix agent. Returns string')
 				],
@@ -415,19 +423,19 @@ class CHelpItems {
 					'description' => _('Maximum number of processes supported by OS. Returns integer')
 				],
 				[
-					'key' => 'log[file,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>,<options>]',
+					'key' => 'log[file,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>,<options>,<persistent_dir>]',
 					'description' => _('Log file monitoring. Returns log')
 				],
 				[
-					'key' => 'log.count[file,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>,<options>]',
+					'key' => 'log.count[file,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>,<options>,<persistent_dir>]',
 					'description' => _('Count of matched lines in log file monitoring. Returns integer')
 				],
 				[
-					'key' => 'logrt[file_regexp,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>,<options>]',
+					'key' => 'logrt[file_regexp,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>,<options>,<persistent_dir>]',
 					'description' => _('Log file monitoring with log rotation support. Returns log')
 				],
 				[
-					'key' => 'logrt.count[file_regexp,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>,<options>]',
+					'key' => 'logrt.count[file_regexp,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>,<options>,<persistent_dir>]',
 					'description' => _('Count of matched lines in log file monitoring with log rotation support. Returns integer')
 				],
 				[
@@ -571,7 +579,7 @@ class CHelpItems {
 					'description' => _('CPU utilisation percentage. Returns float')
 				],
 				[
-					'key' => 'system.hostname[<type>]',
+					'key' => 'system.hostname[<type>,<transform>]',
 					'description' => _('System host name. Returns string')
 				],
 				[
@@ -897,6 +905,10 @@ class CHelpItems {
 					'description' => _('VMware hypervisor vendor name, <url> - VMware service URL, <uuid> - VMware hypervisor host name')
 				],
 				[
+					'key' => ' vmware.hv.maintenance[<url>,<uuid>]',
+					'description' => _('VMware hypervisor maintenance status, <url> - VMware service URL, <uuid> - VMware hypervisor host name')
+				],
+				[
 					'key' => 'vmware.hv.memory.size.ballooned[<url>,<uuid>]',
 					'description' => _('VMware hypervisor ballooned memory size, <url> - VMware service URL, <uuid> - VMware hypervisor host name')
 				],
@@ -919,6 +931,10 @@ class CHelpItems {
 				[
 					'key' => 'vmware.hv.power[<url>,<uuid>,<max>]',
 					'description' => _('Power usage , <url> - VMware service URL, <uuid> - VMware hypervisor host name, <max> - Maximum allowed power usage')
+				],
+				[
+					'key' => 'vmware.hv.sensors.get[<url>,<uuid>]',
+					'description' => _('VMware hypervisor HW vendor state sensors, <url> - VMware service URL, <uuid> - VMware hypervisor host name. Returns JSON')
 				],
 				[
 					'key' => 'vmware.hv.sensor.health.state[<url>,<uuid>]',

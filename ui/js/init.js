@@ -1,6 +1,6 @@
 /*
  ** Zabbix
- ** Copyright (C) 2001-2021 Zabbix SIA
+ ** Copyright (C) 2001-2022 Zabbix SIA
  **
  ** This program is free software; you can redistribute it and/or modify
  ** it under the terms of the GNU General Public License as published by
@@ -255,6 +255,7 @@ jQuery(function($) {
 							? document.querySelector('.wrapper').clientWidth
 							: document.querySelector('.wrapper').clientWidth - data.element.width;
 
+						pos.top = Math.max(0, pos.top);
 						pos.left = Math.max(0, Math.min(max_left, pos.left));
 
 						data.element.element[0].style.top = `${pos.top}px`;
@@ -371,10 +372,10 @@ jQuery(function($) {
 	// redirect buttons
 	$('button[data-url]').click(function() {
 		var button = $(this);
-		var confirmation = button.data('confirmation');
+		var confirmation = button.attr('data-confirmation');
 
 		if (typeof confirmation === 'undefined' || (typeof confirmation !== 'undefined' && confirm(confirmation))) {
-			window.location = button.data('url');
+			window.location = button.attr('data-url');
 		}
 	});
 

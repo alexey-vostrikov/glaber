@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -268,35 +268,20 @@ $widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_HOSTGROUP, $table))
 		_s('Displaying %1$s of %2$s found', count($data['groups']), $data['total_groups_cnt'])
 	]));
 
-	if (isset($data['host_maps']) && is_array($data['host_maps']) && count($data['host_maps']) > 0) {
-   		$table = (new CTableInfo())
-       		->setHeader([
-           		_('Map')
-       		]);
+if (isset($data['host_maps']) && is_array($data['host_maps']) && count($data['host_maps']) > 0) {
+  		$table = (new CTableInfo())->setHeader([_('Map')]);
+	
+	foreach ($data['host_maps'] as $sysmapid => $maps) {
+		$link = 'sysmapid=' . $maps['sysmapid'] . '&search_selementid=' . $maps['selementid'];
+     	$table->addRow([new CLink($maps['name'], 'zabbix.php?action=map.view&' . $link),]);
+    }
 
-			//    $searchHostId = reset($data['hosts'])['hostid'];
-
-   		foreach ($data['host_maps'] as $sysmapid => $maps) {
-			
-        //http://zbx.ellcom.ru/zabbix.php?action=map.view&sysmapid=276
-        //https://zabbix.ellcom.ru/zabbix.php?action=map.view&sysmapid=177&search_elementid=42644
-
-			//$caption = make_decoration($maps['name'], $data['search']);
-      	 	$link = 'sysmapid=' . $maps['sysmapid'] . '&search_selementid=' . $maps['selementid'];
-      	 	$table->addRow([
-           	new CLink($maps['name'], 'zabbix.php?action=map.view&' . $link),
-       		]);
-    	}
-
-    	$widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_MAPS, $table))
+    $widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_MAPS, $table))
         ->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
         ->setExpanded((bool)CProfile::get('web.search.hats.' . WIDGET_SEARCH_MAPS . '.state', true))
         ->setHeader(_('Maps'), [], false, 'web.search.hats.' . WIDGET_SEARCH_MAPS . '.state')
-        ->setFooter(new CList([
-            _s('Displaying %1$s of %2$s found', count($data['host_maps']), $data['total_maps_cnt'])
-        ]));
-	   
-	}	
+        ->setFooter(new CList([_s('Displaying %1$s of %2$s found', count($data['host_maps']), $data['total_maps_cnt'])]));
+}	
 
 if ($data['admin']) {
 	$table = (new CTableInfo())
@@ -397,38 +382,6 @@ if ($data['admin']) {
 			_s('Displaying %1$s of %2$s found', count($data['templates']), $data['total_templates_cnt'])
 		]));
 		
-//	show_error_message("Maps test");
-
-	//    WIDGET_SEARCH_MAP
-	if (isset($data['host_maps']) && is_array($data['host_maps']) && count($data['host_maps']) > 0) {
-   		$table = (new CTableInfo())
-       		->setHeader([
-           		_('Map')
-       		]);
-
-			//    $searchHostId = reset($data['hosts'])['hostid'];
-
-   		foreach ($data['host_maps'] as $sysmapid => $maps) {
-			
-        //http://zbx.ellcom.ru/zabbix.php?action=map.view&sysmapid=276
-        //https://zabbix.ellcom.ru/zabbix.php?action=map.view&sysmapid=177&search_elementid=42644
-
-			//$caption = make_decoration($maps['name'], $data['search']);
-      	 	$link = 'sysmapid=' . $maps['sysmapid'] . '&search_selementid=' . $maps['selementid'];
-      	 	$table->addRow([
-           	new CLink($maps['name'], 'zabbix.php?action=map.view&' . $link),
-       		]);
-    	}
-
-    	$widgets[] = (new CCollapsibleUiWidget(WIDGET_SEARCH_MAPS, $table))
-        ->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
-        ->setExpanded((bool)CProfile::get('web.search.hats.' . WIDGET_SEARCH_MAPS . '.state', true))
-        ->setHeader(_('Maps'), [], false, 'web.search.hats.' . WIDGET_SEARCH_MAPS . '.state')
-        ->setFooter(new CList([
-            _s('Displaying %1$s of %2$s found', count($data['host_maps']), $data['total_maps_cnt'])
-        ]));
-	   
-	}	
 }
 
 (new CWidget())

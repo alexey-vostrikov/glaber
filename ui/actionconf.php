@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ $fields = [
 	'name' =>							[T_ZBX_STR, O_OPT, null,	NOT_EMPTY,	'isset({add}) || isset({update})',
 											_('Name')
 										],
-	'eventsource' =>					[T_ZBX_INT, O_OPT, null,
+	'eventsource' =>					[T_ZBX_INT, O_OPT, P_SYS,
 											IN([EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_DISCOVERY,
 												EVENT_SOURCE_AUTOREGISTRATION, EVENT_SOURCE_INTERNAL
 											]),
@@ -563,7 +563,7 @@ else {
 	];
 
 	$data = [
-		'eventsource' => getRequest('eventsource', EVENT_SOURCE_TRIGGERS),
+		'eventsource' => $eventsource,
 		'sort' => $sortField,
 		'sortorder' => $sortOrder,
 		'filter' => $filter,

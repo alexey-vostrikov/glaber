@@ -10,10 +10,6 @@ libzbxdbcache_a_SOURCES = \
 	dbconfig_maintenance.c \
 	dbsync.c \
 	dbsync.h \
-	glb_cache.c \
-	glb_cache.h	\
-	glb_cache_items.h \
-	glb_cache_items.c \
 	changeset.h \
 	changeset.c 
 #	\

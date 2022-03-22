@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -952,11 +952,6 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 	scriptitem_es_engine_init();
-	glb_preprocessing_init();
-#ifdef HAVE_NETSNMP
-	if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type)
-		zbx_init_snmp();
-#endif
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_init_child();
@@ -971,6 +966,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	last_stat_time = time(NULL);
 
 	zbx_set_sigusr_handler(zbx_poller_sigusr_handler);
+	glb_preprocessing_init();
 
 	while (ZBX_IS_RUNNING())
 	{

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -57,6 +57,7 @@ int	zbx_default_int_compare_func(const void *d1, const void *d2);
 int	zbx_default_uint64_compare_func(const void *d1, const void *d2);
 int	zbx_default_uint64_ptr_compare_func(const void *d1, const void *d2);
 int	zbx_default_str_compare_func(const void *d1, const void *d2);
+int	zbx_natural_str_compare_func(const void *d1, const void *d2);
 int	zbx_default_ptr_compare_func(const void *d1, const void *d2);
 int	zbx_default_uint64_pair_compare_func(const void *d1, const void *d2);
 
@@ -507,6 +508,18 @@ void	glb_tsbuff_dump(glb_tsbuff_t *tsbuff);
 
 int    glb_tsbuff_check_has_enough_count_data_time(glb_tsbuff_t *tsbuff, int need_count, int time);
 int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need_count, int head_idx);
+
+
+
+#define ELEMS_CALLBACK(name) \
+        static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
+
+#define ELEMS_CREATE(name) \
+        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
+			
+#define ELEMS_FREE(name) \
+        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
+
 
 /*elements hash for fast and lockless access */
 #define ELEM_FLAG_DO_NOT_CREATE  1

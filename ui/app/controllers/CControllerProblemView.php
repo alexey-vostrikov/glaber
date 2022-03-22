@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -119,9 +119,6 @@ class CControllerProblemView extends CControllerProblem {
 		}
 
 		$filter = $filter_tabs[$profile->selected];
-		$refresh_curl = (new CUrl('zabbix.php'));
-		$filter['action'] = 'problem.view.refresh';
-		array_map([$refresh_curl, 'setArgument'], array_keys($filter), $filter);
 
 		$data = [
 			'action' => $this->getAction(),
@@ -142,7 +139,6 @@ class CControllerProblemView extends CControllerProblem {
 				] + getTimeselectorActions($profile->from, $profile->to)
 			],
 			'filter_tabs' => $filter_tabs,
-			'refresh_url' => $refresh_curl->getUrl(),
 			'refresh_interval' => CWebUser::getRefresh() * 1000,
 			'inventories' => array_column(getHostInventories(), 'title', 'db_field'),
 			'sort' => $filter['sort'],

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -294,21 +294,24 @@ static int	eval_execute_op_binary(const zbx_eval_context_t *ctx, const zbx_eval_
 
 	/* check logical equal, not equal operators */
 
-	if (ZBX_VARIANT_DBL_VECTOR == left->type || ZBX_VARIANT_DBL_VECTOR == right->type)
+	if (ZBX_EVAL_TOKEN_OP_EQ == token->type || ZBX_EVAL_TOKEN_OP_NE == token->type)
 	{
-		*error = zbx_dsprintf(*error, "vector cannot be used with comparison operator at \"%s\"",
-				ctx->expression + token->loc.l);
-		return FAIL;
-	}
+		if (ZBX_VARIANT_DBL_VECTOR == left->type || ZBX_VARIANT_DBL_VECTOR == right->type)
+		{
+			*error = zbx_dsprintf(*error, "vector cannot be used with comparison operator at \"%s\"",
+					ctx->expression + token->loc.l);
+			return FAIL;
+		}
 
-	switch (token->type)
-	{
-		case ZBX_EVAL_TOKEN_OP_EQ:
-			value = (0 == eval_variant_compare(left, right) ? 1 : 0);
-			goto finish;
-		case ZBX_EVAL_TOKEN_OP_NE:
-			value = (0 == eval_variant_compare(left, right) ? 0 : 1);
-			goto finish;
+		switch (token->type)
+		{
+			case ZBX_EVAL_TOKEN_OP_EQ:
+				value = (0 == eval_variant_compare(left, right) ? 1 : 0);
+				goto finish;
+			case ZBX_EVAL_TOKEN_OP_NE:
+				value = (0 == eval_variant_compare(left, right) ? 0 : 1);
+				goto finish;
+		}
 	}
 
 	/* check arithmetic operators */
@@ -1663,13 +1666,15 @@ static int	eval_execute_function_trim(const zbx_eval_context_t *ctx, const zbx_e
 	switch (type)
 	{
 		case FUNCTION_OPTYPE_TRIM_ALL:
-			zbx_lrtrim(arg->data.str, sym->data.str);
+			zbx_ltrim_utf8(arg->data.str, sym->data.str);
+			zbx_rtrim_utf8(arg->data.str, sym->data.str);
 			break;
 		case FUNCTION_OPTYPE_TRIM_RIGHT:
-			zbx_rtrim(arg->data.str, sym->data.str);
+			zbx_rtrim_utf8(arg->data.str, sym->data.str);
 			break;
 		case FUNCTION_OPTYPE_TRIM_LEFT:
-			zbx_ltrim(arg->data.str, sym->data.str);
+			zbx_ltrim_utf8(arg->data.str, sym->data.str);
+			break;
 	}
 
 	if (2 != token->opt)
@@ -2811,7 +2816,7 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 	zbx_vector_var_t	output;
 	int			i, ret = FAIL;
 	char			*errmsg = NULL;
-
+	
 	zbx_vector_var_create(&output);
 
 	for (i = 0; i < ctx->stack.values_num; i++)
@@ -2820,13 +2825,17 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 
 		if (0 != (token->type & ZBX_EVAL_CLASS_OPERATOR1))
 		{
-			if (SUCCEED != eval_execute_op_unary(ctx, token, &output, &errmsg))
+			if (SUCCEED != eval_execute_op_unary(ctx, token, &output, &errmsg)) {
+				LOG_INF("eval_execute_op_unary(ctx, token FAIL");
 				goto out;
+			}
 		}
 		else if (0 != (token->type & ZBX_EVAL_CLASS_OPERATOR2))
 		{
-			if (SUCCEED != eval_execute_op_binary(ctx, token, &output, &errmsg))
+			if (SUCCEED != eval_execute_op_binary(ctx, token, &output, &errmsg)) {
+				LOG_INF("eval_execute_op_binary(ctx, token");
 				goto out;
+			}
 		}
 		else
 		{
@@ -2838,8 +2847,10 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 				case ZBX_EVAL_TOKEN_VAR_STR:
 				case ZBX_EVAL_TOKEN_VAR_MACRO:
 				case ZBX_EVAL_TOKEN_VAR_USERMACRO:
-					if (SUCCEED != eval_execute_push_value(ctx, token, &output, &errmsg))
+					if (SUCCEED != eval_execute_push_value(ctx, token, &output, &errmsg)) {
+						LOG_INF("eval_execute_push_value(ctx, token, &output,");
 						goto out;
+					}
 					break;
 				case ZBX_EVAL_TOKEN_ARG_QUERY:
 				case ZBX_EVAL_TOKEN_ARG_PERIOD:
@@ -2910,7 +2921,7 @@ out:
 		zbx_variant_clear(&output.values[i]);
 
 	zbx_vector_var_destroy(&output);
-
+	
 	return ret;
 }
 

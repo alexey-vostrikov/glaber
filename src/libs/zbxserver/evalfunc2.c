@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 #include "db.h"
 #include "log.h"
 #include "zbxserver.h"
-#include "glb_cache_items.h"
+#include "../glb_state/glb_state_items.h"
 #include "evalfunc.h"
 #include "zbxregexp.h"
 #include "zbxtrends.h"
@@ -268,12 +268,6 @@ static int	get_function_parameter_hist_range(int from, const char *parameters, i
 		if (-1 == (end = mktime(&tm)))
 		{
 			zabbix_log(LOG_LEVEL_DEBUG, "%s() invalid timeshift value:%s", __func__, zbx_strerror(errno));
-			goto out;
-		}
-
-		if (end >= from)
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "%s() timeshift produced time in future", __func__);
 			goto out;
 		}
 
@@ -1719,7 +1713,7 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	else
 		period = arg1;
 
-	if (SUCCEED != (ret = glb_ic_get_values(item->itemid, item->value_type, &values, 0, 1, ts.sec))) {
+	if (SUCCEED != (ret = glb_state_item_get_values(item->itemid, item->value_type, &values, 0, 1, ts.sec))) {
 		//there was a problem fetching the data
 		*error = zbx_strdup(*error, "Couldn't fetch item, DB backend returned FAIL");
 		LOG_DBG("%s: NODATA: item %ld fetching from the CACHE has failed", __func__, item->itemid);

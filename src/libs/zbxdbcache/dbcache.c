@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 #include "zbxtrends.h"
 #include "zbxalgo.h"
 #include "../zbxalgo/vectorimpl.h"
-#include "glb_cache_items.h"
+#include "../glb_state/glb_state_items.h"
 
 static zbx_mem_info_t	*hc_index_mem = NULL;
 static zbx_mem_info_t	*hc_mem = NULL;
@@ -1588,7 +1588,7 @@ static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
 	zbx_vector_ptr_t	trigger_order;
 	zbx_vector_ptr_t	trigger_items;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	LOG_DBG("In %s()", __func__);
 
 	if (0 != history_num)
 	{
@@ -1826,23 +1826,23 @@ static void	dc_history_set_error(ZBX_DC_HISTORY *hdata, char *errmsg)
 static void	dc_history_set_value(ZBX_DC_HISTORY *hdata, unsigned char value_type, zbx_variant_t *value)
 {
 	char	*errmsg = NULL;
-	glb_cache_item_meta_t meta = {0};
+	glb_state_item_meta_t meta = {0};
 
 	if (FAIL == zbx_variant_to_value_type(value, value_type, &errmsg))
 	{
-		glb_cache_item_meta_t meta;
+		glb_state_item_meta_t meta;
 		dc_history_set_error(hdata, errmsg);
 		DEBUG_ITEM(hdata->itemid,"Item type coversion error: %s", errmsg);
 		meta.error = errmsg;
 		meta.state = ITEM_STATE_NOTSUPPORTED;
-		glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG | GLB_CACHE_ITEM_UPDATE_STATE, hdata->value_type);
+		glb_state_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG | GLB_CACHE_ITEM_UPDATE_STATE, hdata->value_type);
 		
 		return;
 	}
 	
 	meta.error = NULL;
 	meta.state = ITEM_STATE_NORMAL;
-	glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG | GLB_CACHE_ITEM_UPDATE_STATE, hdata->value_type);
+	glb_state_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG | GLB_CACHE_ITEM_UPDATE_STATE, hdata->value_type);
 
 	switch (value_type)
 	{
@@ -1924,14 +1924,14 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 				if (FAIL == zbx_validate_value_dbl(hdata->value.dbl))
 				{
 					char	buffer[ZBX_MAX_DOUBLE_LEN + 1], buff_str[MAX_STRING_LEN];
-					glb_cache_item_meta_t meta = {0};
+					glb_state_item_meta_t meta = {0};
 					
 					DEBUG_ITEM(hdata->itemid,"Value is detected to bee too small or too large");
 					zbx_snprintf(buff_str, MAX_STRING_LEN, "Value %s is too small or too large.", zbx_print_double(buffer, sizeof(buffer), hdata->value.dbl));
 					//todo: insert proper setting of item status here
 					meta.error = buff_str;
 					DEBUG_ITEM(hdata->itemid,"Updating meta with error: %s",buff_str);
-					glb_cache_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG, hdata->value_type);
+					glb_state_item_update_meta(hdata->itemid, &meta, GLB_CACHE_ITEM_UPDATE_ERRORMSG, hdata->value_type);
 				}
 				DEBUG_ITEM(hdata->itemid,"Item validated as float");
 				break;
@@ -1960,55 +1960,45 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 
 	dc_history_set_value(hdata, item->value_type, &value_var);
 	zbx_variant_clear(&value_var);
-
 }
+
 
 
 /******************************************************************************
  *                                                                            *
- * Function: DBmass_update_items                                              *
+ * Function: DCmass_proxy_prepare_itemdiff                                    *
  *                                                                            *
- * Purpose: update item data and inventory in database                        *
+ * Purpose: prepare itemdiff after receiving new values                       *
  *                                                                            *
- * Parameters: item_diff        - item changes                                *
- *             inventory_values - inventory values                            *
+ * Parameters: history     - array of history data                            *
+ *             history_num - number of history structures                     *
+ *             item_diff   - vector to store prepared diff                    *
  *                                                                            *
  ******************************************************************************/
-static void	DBmass_update_items(const zbx_vector_ptr_t *item_diff, const zbx_vector_ptr_t *inventory_values)
+static void	DCmass_proxy_prepare_itemdiff(ZBX_DC_HISTORY *history, int history_num, zbx_vector_ptr_t *item_diff)
 {
-	size_t	sql_offset = 0;
 	int	i;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	for (i = 0; i < item_diff->values_num; i++)
+	zbx_vector_ptr_reserve(item_diff, history_num);
+
+	for (i = 0; i < history_num; i++)
 	{
-		zbx_item_diff_t	*diff;
+		zbx_item_diff_t	*diff = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t));
 
-		diff = (zbx_item_diff_t *)item_diff->values[i];
-		if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_DB & diff->flags))
-			break;
-	}
+		diff->itemid = history[i].itemid;
+		diff->state = history[i].state;
+		diff->flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE;
 
-	if (i != item_diff->values_num || 0 != inventory_values->values_num)
-	{
-		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-		if (i != item_diff->values_num)
+		if (0 != (ZBX_DC_FLAG_META & history[i].flags))
 		{
-			zbx_db_save_item_changes(&sql, &sql_alloc, &sql_offset, item_diff,
-					ZBX_FLAGS_ITEM_DIFF_UPDATE_DB);
+			diff->lastlogsize = history[i].lastlogsize;
+			diff->mtime = history[i].mtime;
+			diff->flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME;
 		}
 
-		if (0 != inventory_values->values_num)
-			DCadd_update_inventory_sql(&sql_offset, inventory_values);
-
-		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-		if (sql_offset > 16)	/* In ORACLE always present begin..end; */
-			DBexecute("%s", sql);
-
-		DCconfig_update_inventory_values(inventory_values);
+		zbx_vector_ptr_append(item_diff, diff);
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -2020,29 +2010,35 @@ static void	DBmass_update_items(const zbx_vector_ptr_t *item_diff, const zbx_vec
  *                                                                            *
  * Purpose: update items info after new value is received                     *
  *                                                                            *
- * Parameters: history     - array of history data                            *
- *             history_num - number of history structures                     *
+ * Parameters: item_diff - diff of items to be updated                        *
  *                                                                            *
  * Author: Alexei Vladishev, Eugene Grigorjev, Alexander Vladishev            *
  *                                                                            *
  ******************************************************************************/
-static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
+static void	DBmass_proxy_update_items(zbx_vector_ptr_t *item_diff)
 {
-	int			i;
-	zbx_vector_ptr_t	item_diff;
-	zbx_item_diff_t		*diffs;
-
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-	//all item updates are happening in preprocessing 
-	//just before putting the item to the queue of preprocessing 
-	//so it's not necessary to do it here
 
-	//DCconfig_items_apply_changes(history,history_num);
-	//THIS_SHOULD_NEVER_HAPPEN;
-	//exit(-1);
+	if (0 != item_diff->values_num)
+	{
+		size_t	sql_offset = 0;
+
+		zbx_vector_ptr_sort(item_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
+
+		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+		zbx_db_save_item_changes(&sql, &sql_alloc, &sql_offset, item_diff,
+				ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME);
+
+		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+		if (sql_offset > 16)	/* In ORACLE always present begin..end; */
+			DBexecute("%s", sql);
+	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
+
 /******************************************************************************
  *                                                                            *
  * Function: DBmass_add_history                                               *
@@ -2077,7 +2073,7 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 	}
 
 	if (0 != history_values.values_num)
-		ret = glb_cache_add_values(&history_values);
+		ret = glb_state_add_values(&history_values);
 
 	zbx_vector_ptr_destroy(&history_values);
 
@@ -2339,7 +2335,7 @@ static void	dc_add_proxy_history_notsupported(ZBX_DC_HISTORY *history, int histo
  * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
-static void	DCmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
+static void	DBmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
 {
 	int	i, h_num = 0, h_meta_num = 0, hlog_num = 0, notsupported_num = 0;
 
@@ -2391,6 +2387,8 @@ static void	DCmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
+
+
 
 /******************************************************************************
  *                                                                            *
@@ -2744,13 +2742,15 @@ static void	proxy_prepare_history(ZBX_DC_HISTORY *history, int history_num)
 
 static void	sync_proxy_history(int *total_num, int *more)
 {
-	int			history_num;
+	int			history_num, txn_rc;
 	time_t			sync_start;
 	zbx_vector_ptr_t	history_items;
+	zbx_vector_ptr_t	item_diff;
 	ZBX_DC_HISTORY		history[ZBX_HC_SYNC_MAX];
 
 	zbx_vector_ptr_create(&history_items);
 	zbx_vector_ptr_reserve(&history_items, ZBX_HC_SYNC_MAX);
+	zbx_vector_ptr_create(&item_diff);
 
 	sync_start = time(NULL);
 
@@ -2775,14 +2775,15 @@ static void	sync_proxy_history(int *total_num, int *more)
 		{
 			DBbegin();
 
-			DCmass_proxy_add_history(history, history_num);
-			DCmass_proxy_update_items(history, history_num);
+			DBmass_proxy_add_history(history, history_num);
+			DBmass_proxy_update_items(&item_diff);
 		}
-		while (ZBX_DB_DOWN == DBcommit());
+		while (ZBX_DB_DOWN == (txn_rc = DBcommit()));
 
 		LOCK_CACHE;
 
 		hc_push_items(&history_items);	/* return items to history cache */
+
 		cache->history_num -= history_num;
 
 		if (0 != hc_queue_get_size())
@@ -2792,8 +2793,9 @@ static void	sync_proxy_history(int *total_num, int *more)
 
 		*total_num += history_num;
 
-		zbx_vector_ptr_clear(&history_items);
 		hc_free_item_values(history, history_num);
+		zbx_vector_ptr_clear(&history_items);
+		zbx_vector_ptr_clear_ext(&item_diff, zbx_default_mem_free_func);
 
 		/* Exit from sync loop if we have spent too much time here */
 		/* unless we are doing full sync. This is done to allow    */
@@ -2801,6 +2803,7 @@ static void	sync_proxy_history(int *total_num, int *more)
 	}
 	while (ZBX_SYNC_MORE == *more && ZBX_HC_SYNC_TIME_MAX >= time(NULL) - sync_start);
 
+	zbx_vector_ptr_destroy(&item_diff);
 	zbx_vector_ptr_destroy(&history_items);
 }
 
@@ -2919,7 +2922,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			
 			//at this call history will be added to the history storage
 			//and state cache
-			glb_ic_add_values(history, history_num);
+			glb_state_item_add_values(history, history_num);
 			glb_history_add(history,history_num);
 			DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
 			//need fix here - we've already have items, so there is no need to extra seraches
@@ -2984,7 +2987,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 				do
 				{
 					DBbegin();
-
 					recalculate_triggers(history, history_num, &itemids, items, errcodes,
 							&trigger_timers, &trigger_diff);
 
@@ -3053,10 +3055,15 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			}
 
 			UNLOCK_CACHE;
-		//	zabbix_log(LOG_LEVEL_INFORMATION, "Unlocked: Retrurning items to the history cache");
+
 			*values_num += history_num;
 		}
 
+		if (FAIL != ret)
+		{
+			if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
+				zbx_export_events();
+		}
 
 		if (0 != history_num || 0 != timers_num)
 			zbx_clean_events();

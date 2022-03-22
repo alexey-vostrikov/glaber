@@ -1,7 +1,7 @@
 <?php declare(strict_types = 1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -134,7 +134,8 @@ class CControllerPopupScheduledReportCreate extends CController {
 			}
 		}
 		else {
-			$output['errors'] = makeMessageBox(false, filter_messages(), CMessageHelper::getTitle())->toString();
+			$output['errors'] = makeMessageBox(ZBX_STYLE_MSG_BAD, filter_messages(), CMessageHelper::getTitle())
+				->toString();
 		}
 
 		$this->setResponse((new CControllerResponseData(['main_block' => json_encode($output)]))->disableView());

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -1218,7 +1218,12 @@ void	zbx_setproctitle(const char *fmt, ...) __zbx_attr_format_printf(1, 2);
 #define ZBX_JAN_2038		2145916800
 #define ZBX_JAN_1970_IN_SEC	2208988800.0	/* 1970 - 1900 in seconds */
 
-#define ZBX_MAX_RECV_DATA_SIZE	(1 * ZBX_GIBIBYTE)
+#define ZBX_MAX_RECV_DATA_SIZE		(1 * ZBX_GIBIBYTE)
+#if defined(_WINDOWS)
+#define ZBX_MAX_RECV_LARGE_DATA_SIZE	(1 * ZBX_GIBIBYTE)
+#else
+#define ZBX_MAX_RECV_LARGE_DATA_SIZE	(__UINT64_C(16) * ZBX_GIBIBYTE)
+#endif
 
 /* max length of base64 data */
 #define ZBX_MAX_B64_LEN		(16 * ZBX_KIBIBYTE)
@@ -1406,6 +1411,7 @@ int	zbx_get_file_time(const char *path, zbx_file_time_t *time);
 void	find_cr_lf_szbyte(const char *encoding, const char **cr, const char **lf, size_t *szbyte);
 int	zbx_read(int fd, char *buf, size_t count, const char *encoding);
 int	zbx_is_regular_file(const char *path);
+char	*zbx_fgets(char *buffer, int size, FILE *fp);
 
 int	MAIN_ZABBIX_ENTRY(int flags);
 
@@ -1456,7 +1462,7 @@ int	zbx_user_macro_parse(const char *macro, int *macro_r, int *context_l, int *c
 int	zbx_user_macro_parse_dyn(const char *macro, char **name, char **context, int *length,
 		unsigned char *context_op);
 char	*zbx_user_macro_unquote_context_dyn(const char *context, int len);
-char	*zbx_user_macro_quote_context_dyn(const char *context, int force_quote);
+char	*zbx_user_macro_quote_context_dyn(const char *context, int force_quote, char **error);
 
 #define ZBX_SESSION_ACTIVE		0
 #define ZBX_SESSION_PASSIVE		1
@@ -1522,7 +1528,6 @@ int	zbx_strcmp_natural(const char *s1, const char *s2);
 
 /* additional token flags */
 #define ZBX_TOKEN_JSON		0x0010000
-#define ZBX_TOKEN_XML		0x0020000
 #define ZBX_TOKEN_REGEXP	0x0040000
 #define ZBX_TOKEN_XPATH		0x0080000
 #define ZBX_TOKEN_REGEXP_OUTPUT	0x0100000
@@ -1763,6 +1768,7 @@ zbx_function_type_t;
 
 zbx_function_type_t	zbx_get_function_type(const char *func);
 int	zbx_query_xpath(zbx_variant_t *value, const char *params, char **errmsg);
+int	zbx_xmlnode_to_json(void *xml_node, char **jstr);
 int	zbx_xml_to_json(char *xml_data, char **jstr, char **errmsg);
 int	zbx_json_to_xml(char *json_data, char **xstr, char **errmsg);
 #ifdef HAVE_LIBXML2
@@ -1793,6 +1799,7 @@ char	*zbx_substr_unquote(const char *src, size_t left, size_t right);
 #define ZBX_CLUSTER_MAX_FAIL_HELLOS 3 //how many hellos to fail to consider server dead
 #define	ZBX_CLUSTER_TOPOLOGY_RECALC_INTERVAL 40 // topology will not be calculated more often then this
 #define	ZBX_CLUSTER_SERVER_HOLD_TIME	10 //hold time for newly appeared servers
+
 //cluster server states
 #define ZBX_CLUSTER_SERVER_STATE_DOWN 0
 #define ZBX_CLUSTER_SERVER_STATE_ALIVE 1
@@ -1803,6 +1810,15 @@ char	*zbx_substr_unquote(const char *src, size_t left, size_t right);
 #define	ZBX_CLUSTER_HOST_STATE_DISABLED 0
 #define	ZBX_CLUSTER_HOST_STATE_ACTIVE 1
 #define	ZBX_CLUSTER_HOST_STATE_ACTIVE_PROXY 2
+
+
+/* UTF-8 trimming */
+void	zbx_ltrim_utf8(char *str, const char *charlist);
+void	zbx_rtrim_utf8(char *str, const char *charlist);
+
+void	zbx_md5buf2str(const md5_byte_t *md5, char *str);
+int	zbx_hex2bin(const unsigned char *p_hex, unsigned char *buf, int buf_len);
+
 
 
 

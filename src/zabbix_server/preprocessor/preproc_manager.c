@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -858,21 +858,9 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 
 	if (REQUEST_STATE_QUEUED == state && 0 <= notsupp_shift)
 	{
-	
-	//	request->value_type = item->value_type;
-	//	if (NULL != item && 1 == item->fast_preprocess 
-			//&& ITEM_STATE_NOTSUPPORTED != value->state 
-	//		) {
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld will be fast-preprocessed",item->itemid);
-			//fast preproccessing will do immediate preproc without consuming an extra memory and sending data to worker
-			//flag ->fast_preprocess is set for all realtively fast items - for now for all except javascript ones
-	//		glb_fast_preprocess_item(manager, request, item);
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Item %ld finished fast-preprocessing",item->itemid);
-	//		request->state = REQUEST_STATE_DONE;
-	//		manager->processed_num++;
-		
-	//	} else {
-		
+		request->value_type = item->value_type;
+		if (0 < item->preproc_ops_num - notsupp_shift)
+		{
 			request->steps = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) *
 					(item->preproc_ops_num - notsupp_shift));
 			request->steps_num = item->preproc_ops_num - notsupp_shift;
@@ -885,9 +873,11 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager,const zbx_
 				request->steps[i].error_handler_params = zbx_strdup(NULL,
 						item->preproc_ops[i + notsupp_shift].error_handler_params);
 			}
+
 			manager->preproc_num++;
-	//	}
-		
+		}
+		else
+			request->state = REQUEST_STATE_DONE;
 	}
 
 	/* priority items are enqueued at the beginning of the line */
@@ -1718,6 +1708,7 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 			ret = zbx_ipc_service_recv(&service_results,0, &client, &message);
 			preprocessor_assign_tasks(&manager);
 			preprocessing_flush_queue(&manager);
+			
 		 } else
 		{
 			ret = zbx_ipc_service_recv(&service_results, 0, &client, &message);

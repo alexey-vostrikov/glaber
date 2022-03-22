@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -319,14 +319,12 @@ elseif (hasRequest('hostid') && (hasRequest('clone') || hasRequest('full_clone')
 				: $value;
 		}, $macros);
 
-		$msg = [
-			'type' => 'error',
-			'message' => _('The cloned host contains user defined macros with type "Secret text". The value and type of these macros were reset.'),
-			'source' => ''
-		];
-
-		echo makeMessageBox(false, [$msg], null, true, false)->addClass(ZBX_STYLE_MSG_WARNING);
+		warning(_('The cloned host contains user defined macros with type "Secret text". The value and type of these macros were reset.'));
 	}
+
+	$macros = array_map(function($macro) {
+		return array_diff_key($macro, array_flip(['hostmacroid']));
+	}, $macros);
 
 	unset($_REQUEST['hostid'], $_REQUEST['flags']);
 }

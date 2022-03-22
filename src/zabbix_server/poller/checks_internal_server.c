@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 **/
 
 #include "common.h"
-#include "glb_cache.h"
+#include "../../libs/glb_state/glb_state.h"
 #include "preproc.h"
 #include "zbxlld.h"
 #include "checks_internal.h"
@@ -129,9 +129,9 @@ int	zbx_get_value_internal_ext(const char *param1, const AGENT_REQUEST *request,
 	}
 	else if (0 == strcmp(param1, "vcache"))
 	{
-		glb_cache_stats_t	stats;
+		glb_state_stats_t	stats;
 
-		if (FAIL == glb_cache_get_statistics(&stats))
+		if (FAIL == glb_state_get_statistics(&stats))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Value cache is disabled."));
 			goto out;

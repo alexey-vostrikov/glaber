@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -1153,6 +1153,7 @@ static void	lld_item_dependencies_get(const zbx_vector_ptr_t *item_prototypes, z
 
 		while (NULL != (row = DBfetch(result)))
 		{
+			int			dependence_found = 0;
 			zbx_item_dependence_t	*dependence = NULL;
 			zbx_uint64_t		itemid, master_itemid;
 			unsigned int		item_flags;
@@ -1164,11 +1165,15 @@ static void	lld_item_dependencies_get(const zbx_vector_ptr_t *item_prototypes, z
 			for (i = 0; i < item_dependencies->values_num; i++)
 			{
 				dependence = (zbx_item_dependence_t *)item_dependencies->values[i];
+
 				if (dependence->itemid == itemid && dependence->master_itemid == master_itemid)
+				{
+					dependence_found = 1;
 					break;
+				}
 			}
 
-			if (i == item_dependencies->values_num)
+			if (0 == dependence_found)
 			{
 				dependence = lld_item_dependence_add(item_dependencies, itemid, master_itemid,
 						item_flags);
@@ -2565,7 +2570,7 @@ static void	lld_items_make(const zbx_vector_ptr_t *item_prototypes, zbx_vector_p
 
 			if (0 == strcmp(item->key, buffer) &&
 					SUCCEED == lld_validate_item_override_no_discover(&lld_row->overrides,
-					item->name))
+					item->name, item_prototype->discover))
 			{
 				item_index_local.parent_itemid = item->parent_itemid;
 				item_index_local.lld_row = lld_row;

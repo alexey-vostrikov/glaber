@@ -16,6 +16,7 @@ OBJS = \
 	$(OUTPUTDIR)\threads.o \
 	$(OUTPUTDIR)\str.o \
 	$(OUTPUTDIR)\misc.o \
+	$(OUTPUTDIR)\time.o \
 	$(OUTPUTDIR)\fatal.o \
 	$(OUTPUTDIR)\disk.o \
 	$(OUTPUTDIR)\iprange.o \
@@ -23,6 +24,7 @@ OBJS = \
 	$(OUTPUTDIR)\sysinfo.o \
 	$(OUTPUTDIR)\vector.o \
 	$(OUTPUTDIR)\zbxregexp.o \
+	$(OUTPUTDIR)\persistent_state.o \
 	$(OUTPUTDIR)\logfiles.o \
 	$(OUTPUTDIR)\file.o \
 	$(OUTPUTDIR)\alias.o \
@@ -77,10 +79,10 @@ CGO_LDFLAGS += $(LDFLAGS)
 
 PKG=zabbix.com/pkg/version
 
-GOLDFLAGS = -X $(PKG).titleMessage=zabbix_agent2
-GOLDFLAGS += -X $(PKG).compileOs=windows
+GOLDFLAGS = -X $(PKG).compileOs=windows
 GOLDFLAGS += -X $(PKG).compileArch=$(GOARCH)
 GOLDFLAGS += -X main.confDefault=zabbix_agent2.win.conf
+GOLDFLAGS += -X main.applicationName=zabbix_agent2
 
 all: $(TARGETBIN)
 
@@ -97,6 +99,9 @@ $(OUTPUTDIR)\file.o: $(TOPDIR)\src\libs\zbxcommon\file.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\alias.o: $(TOPDIR)\src\libs\zbxcommon\alias.c
+	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
+
+$(OUTPUTDIR)\time.o: $(TOPDIR)\src\libs\zbxcommon\time.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\tls_version.o: $(TOPDIR)\src\libs\zbxcrypto\tls_version.c
@@ -134,6 +139,9 @@ $(OUTPUTDIR)\algodefs.o: $(TOPDIR)\src\libs\zbxalgo\algodefs.c
 
 $(OUTPUTDIR)\zbxregexp.o: $(TOPDIR)\src\libs\zbxregexp\zbxregexp.c
 	$(CC) $(CFLAGS) -DUNICODE -DPCRE_STATIC -c $^ -o $@
+
+$(OUTPUTDIR)\persistent_state.o: $(TOPDIR)\src\zabbix_agent\logfiles\persistent_state.c
+	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\logfiles.o: $(TOPDIR)\src\zabbix_agent\logfiles\logfiles.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@

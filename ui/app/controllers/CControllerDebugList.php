@@ -26,7 +26,7 @@ class CControllerDebugList extends CController {
 	}
 
 	protected function checkInput() {
-		error_log("Checking input");
+		//error_log("Checking input");
 
 		$fields = [
 			'triggerid' =>			'string',

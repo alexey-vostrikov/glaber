@@ -1455,6 +1455,7 @@ int	zbx_ipc_service_init_env(const char *path, char **error)
 	{
 		*error = zbx_dsprintf(*error, "The IPC service environment has been already initialized with"
 				" root directory at \"%s\".", ipc_get_path());
+		THIS_SHOULD_NEVER_HAPPEN;
 		goto out;
 	}
 

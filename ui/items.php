@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -1093,7 +1093,10 @@ elseif (hasRequest('action') && getRequest('action') === 'item.masscheck_now' &&
 				'itemid' => $itemid
 			]
 		];
+		CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_UPDATE, $itemid);	
 	}
+	
+	CZabbixServer::notifyConfigChanges();
 
 	$result = (bool) API::Task()->create($tasks);
 
@@ -1228,11 +1231,6 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 
 	$data['display_interfaces'] = ($data['host']['status'] == HOST_STATUS_MONITORED
 			|| $data['host']['status'] == HOST_STATUS_NOT_MONITORED);
-
-	// Sort interfaces to be listed starting with one selected as 'main'.
-	CArrayHelper::sort($data['interfaces'], [
-		['field' => 'main', 'order' => ZBX_SORT_DOWN]
-	]);
 
 	if (hasRequest('itemid') && !getRequest('form_refresh')) {
 		$data['inventory_link'] = $item['inventory_link'];

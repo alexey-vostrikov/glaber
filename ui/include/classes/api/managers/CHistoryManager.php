@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -32,16 +32,16 @@ class CHistoryManager {
 	 *
 	 * @return array  An array with items IDs as keys and the original item data as values.
 	 */
-	public function getItemsHavingValues(array $items, $period = null) {
-		$items = zbx_toHash($items, 'itemid');
+//	public function getItemsHavingValues(array $items, $period = null) {
+//		$items = zbx_toHash($items, 'itemid');
+//
+//		$results = [];
+//		//$grouped_items = $this->getItemsGroupedByStorage($items);
 
-		$results = [];
-		//$grouped_items = $this->getItemsGroupedByStorage($items);
-
-		$results +=  $this->getLastValuesFromServer($items, 2, $period);
+//		$results +=  $this->getLastValuesFromServer($items, 2, $period);
 		
-		return array_intersect_key($items, $results);
-	}
+//		return array_intersect_key($items, $results);
+//	}
 
 	/**
 	 * Returns the last $limit history objects for the given items.
@@ -56,7 +56,7 @@ class CHistoryManager {
 		//there is two possibilites for getlastvalues
 		//most recent 2 values are kept int the server memory, so we requesting them
 		//if we need less then 2 values
-
+		//
 		return $this->getLastValuesFromServer($items, $limit, $period);
 	}
 	
@@ -68,6 +68,7 @@ class CHistoryManager {
 	  $server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 	  	timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 	    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
+		//error_log("Getting last values from the server for items: ".print_r(array_column($items,'itemid'),true));
 	  $last_values = $server->getLastValues(CSessionHelper::getId(),array_column($items,'itemid'),$limit, $period); 
 	
 	  if (!is_array($last_values)) {

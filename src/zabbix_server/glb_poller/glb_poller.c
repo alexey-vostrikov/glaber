@@ -13,8 +13,8 @@
 #include "glb_worker.h"
 #include "glb_server.h"
 #include "glb_agent.h"
-#include "glb_cache.h"
-#include "glb_cache_items.h"
+#include "../../libs/glb_state/glb_state.h"
+#include "../../libs/glb_state/glb_state_items.h"
 #include "../poller/poller.h"
 #include "../poller/checks_snmp.h"
 #include "../../libs/zbxexec/worker.h"
@@ -125,9 +125,7 @@ static int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts,
 
 	DEBUG_ITEM(glb_item->itemid,"Added item %ld poll event in %ld sec", glb_item->itemid, nextcheck - now);
 		
-	glb_cache_item_meta_t meta;
-	meta.nextcheck = nextcheck;
-	glb_cache_item_update_meta( glb_item->itemid, &meta,  GLB_CACHE_ITEM_UPDATE_NEXTCHECK, glb_item->value_type);
+	glb_state_item_update_nextcheck (glb_item->itemid, nextcheck);
 	
 	add_event_ext(events, GLB_EVENT_ITEM_POLL, glb_item->itemid, nextcheck, glb_item->change_time);
 

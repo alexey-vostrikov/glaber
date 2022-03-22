@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -83,9 +83,13 @@ abstract class CControllerLatest extends CController {
 				'discovery_items' => true
 			]);
 
-			$select_items += $filter['show_without_data']
-				? $host_items
-				: Manager::History()->getItemsHavingValues($host_items, $history_period);
+			//error_log("Gettind items in prepare data");
+
+			$select_items += $host_items;
+		
+		//	$select_items += $filter['show_without_data']
+		//		? $host_items
+		//		: Manager::History()->getItemsHavingValues($host_items, $history_period);
 
 			$select_items_cnt = count($select_items);
 		}
@@ -153,6 +157,8 @@ abstract class CControllerLatest extends CController {
 		$items = CMacrosResolverHelper::resolveItemDescriptions($items);
 		$items = CMacrosResolverHelper::resolveTimeUnitMacros($items, ['delay', 'history', 'trends']);
 
+		//error_log("Gettind items".print_r($items,true));
+		
 		$history = Manager::History()->getLastValues($items, 10,
 			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::HISTORY_PERIOD))
 		);

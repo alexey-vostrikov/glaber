@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -62,6 +62,9 @@
 #include "../zabbix_server/availability/avail_manager.h"
 #include "zbxvault.h"
 #include "zbxdiag.h"
+#include "../libs/zbxipcservice/glb_ipc.h"
+#include "../libs/glb_state/glb_state.h"
+#include "../libs/glb_state/glb_state_items.h"
 
 
 #ifdef HAVE_OPENIPMI
@@ -129,6 +132,7 @@ const char	*help_message[] = {
 	NULL	/* end of text */
 };
 
+void DC_set_debug_item(uint64_t CONFIG_DEBUG_ITEM);
 /* COMMAND LINE OPTIONS */
 
 /* long options */
@@ -190,12 +194,13 @@ int	CONFIG_DISCOVERER_FORKS		= 1;
 int	CONFIG_HOUSEKEEPER_FORKS	= 1;
 int CONFIG_CLUSTER_REROUTE_DATA =0;
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
-char *CONFIG_CLUSTER_DOMAINS=NULL;
+char *CONFIG_CLUSTER_DOMAINS = "";
 int CONFIG_JAVAPOLLER_FORKS = 0;
 
 //to avoid compile time dependencies problem
 int CONFIG_CLUSTER_SERVER_ID	=0;
 int CONFIG_CLUSTERMAN_FORKS	= 1;
+u_int64_t 		CONFIG_IPC_BUFFER_SIZE		= 512 * ZBX_MEBIBYTE; 
 
 
 int	CONFIG_HTTPPOLLER_FORKS		= 1;
@@ -337,20 +342,20 @@ char	*CONFIG_TLS_CIPHER_CMD		= NULL;	/* not used in proxy, defined for linking w
 
 static char	*CONFIG_SOCKET_PATH	= NULL;
 
-char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
-char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
-char	*CONFIG_HISTORY_STORAGE_TYPE		= NULL;
-char	*CONFIG_HISTORY_STORAGE_DB_NAME		= NULL;
-
-int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
-
-char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 T_ZBX_SERVER SERVER_LIST[ZBX_CLUSTER_MAX_SERVERS];
 int SERVERS = 0;
-
 int CONFIG_EXT_SERVER_FORKS = 1;
 char	*CONFIG_WORKERS_DIR		= NULL;
 char	*CONFIG_SERVERS			= NULL;
+
+//char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
+//char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
+//int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
+
+char	*CONFIG_STATS_ALLOWED_IP	= NULL;
+int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
+
+int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_ENABLED;
 
 volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 
@@ -376,6 +381,17 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		/* make initial configuration sync before worker processes are forked on passive Zabbix proxy */
 		*local_process_type = ZBX_PROCESS_TYPE_TRAPPER;
 		*local_process_num = local_server_num - server_count + CONFIG_TRAPPER_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_PREPROCMAN_FORKS))
+	{
+		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
+		*local_process_num = local_server_num - server_count + CONFIG_PREPROCMAN_FORKS;
+	}
+	else if (local_server_num <= (server_count += CONFIG_PREPROCESSOR_FORKS))
+	{
+		/* data collection processes might utilize CPU fully, start manager and worker processes beforehand */
+		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
+		*local_process_num = local_server_num - server_count + CONFIG_PREPROCESSOR_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_HEARTBEAT_FORKS))
 	{
@@ -456,16 +472,6 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_PINGER_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_PREPROCMAN_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_PREPROCMAN_FORKS;
-	}
-	else if (local_server_num <= (server_count += CONFIG_PREPROCESSOR_FORKS))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
-		*local_process_num = local_server_num - server_count + CONFIG_PREPROCESSOR_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_HISTORYPOLLER_FORKS))
 	{
@@ -592,7 +598,7 @@ static void	zbx_set_defaults(void)
 
 	if (ZBX_PROXYMODE_PASSIVE == CONFIG_PROXYMODE)
 	{
-		CONFIG_CONFSYNCER_FORKS = CONFIG_DATASENDER_FORKS = 0;
+		CONFIG_DATASENDER_FORKS = 0;
 		program_type = ZBX_PROGRAM_TYPE_PROXY_PASSIVE;
 	}
 
@@ -976,6 +982,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	256 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"VMwareTimeout",		&CONFIG_VMWARE_TIMEOUT,			TYPE_INT,
 			PARM_OPT,	1,			300},
+		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
+			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"AllowRoot",			&CONFIG_ALLOW_ROOT,			TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"User",			&CONFIG_USER,				TYPE_STRING,
@@ -1030,6 +1038,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			1000},
 		{"StartHistoryPollers",		&CONFIG_HISTORYPOLLER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1000},
+		{"IPCBufferSize",		&CONFIG_IPC_BUFFER_SIZE,		TYPE_UINT64,
+			PARM_OPT,	1024*1024,			__UINT64_C(64) * ZBX_GIBIBYTE},	
+		{"ListenBacklog",		&CONFIG_TCP_MAX_BACKLOG_SIZE,		TYPE_INT,
+			PARM_OPT,	0,			INT_MAX},
 		{NULL}
 	};
 
@@ -1084,7 +1096,6 @@ int	main(int argc, char **argv)
 	ZBX_TASK_EX	t = {ZBX_TASK_START};
 	char		ch;
 	int		opt_c = 0, opt_r = 0;
-	char		*error = NULL;
 
 #if defined(PS_OVERWRITE_ARGV) || defined(PS_PSTAT_ARGV)
 	argv = setproctitle_save_env(argc, argv);
@@ -1160,13 +1171,6 @@ int	main(int argc, char **argv)
 	if (ZBX_TASK_RUNTIME_CONTROL == t.task)
 		exit(SUCCEED == zbx_sigusr_send(t.data) ? EXIT_SUCCESS : EXIT_FAILURE);
 
-	if (FAIL == zbx_ipc_service_init_env(CONFIG_SOCKET_PATH, &error))
-	{
-		zbx_error("Cannot initialize IPC services: %s", error);
-		zbx_free(error);
-		exit(EXIT_FAILURE);
-	}
-
 	return daemon_start(CONFIG_ALLOW_ROOT, CONFIG_USER, t.flags);
 }
 
@@ -1195,6 +1199,13 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		printf("Starting Zabbix Proxy (%s) [%s]. Zabbix %s (revision %s).\nPress Ctrl+C to exit.\n\n",
 				ZBX_PROXYMODE_PASSIVE == CONFIG_PROXYMODE ? "passive" : "active",
 				CONFIG_HOSTNAME, ZABBIX_VERSION, ZABBIX_REVISION);
+	}
+
+	if (FAIL == zbx_ipc_service_init_env(CONFIG_SOCKET_PATH, &error))
+	{
+		zbx_error("Cannot initialize IPC services: %s", error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
 	}
 
 	if (SUCCEED != zbx_locks_create(&error))
@@ -1306,6 +1317,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
+	
+	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 
 	if (SUCCEED != init_selfmon_collector(&error))
 	{
@@ -1318,6 +1331,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize VMware cache: %s", error);
 		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
+
+	if (FAIL == glb_state_init()) {
+		zbx_error("Cannot initialize Glaber CACHE");
 		exit(EXIT_FAILURE);
 	}
 
@@ -1422,7 +1440,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	
 			case GLB_PROCESS_TYPE_SERVER:
-				poller_type = ITEM_TYPE_TRAPPER;
+				poller_type = ITEM_TYPE_WORKER_SERVER;
 				thread_args.args = &poller_type;
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;	
@@ -1438,8 +1456,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_TRAPPER:
 				thread_args.args = &listen_sock;
 				zbx_thread_start(trapper_thread, &thread_args, &threads[i]);
-				if (0 == CONFIG_CONFSYNCER_FORKS)
-					DCconfig_wait_sync();
 				break;
 			case ZBX_PROCESS_TYPE_HEARTBEAT:
 				zbx_thread_start(heart_thread, &thread_args, &threads[i]);

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -182,7 +182,9 @@ func TestMetric_EvalParams(t *testing.T) {
 					"Session1": {URI: "localhost", User: "user", Password: "password"},
 				},
 			},
-			want:      map[string]string{"URI": "localhost", "User": "user", "Password": "password", "Param1": "15"},
+			want: map[string]string{
+				"URI": "localhost", "User": "user", "Password": "password", "Param1": "15", "sessionName": "Session1",
+			},
 			wantErr:   false,
 			wantPanic: false,
 		},

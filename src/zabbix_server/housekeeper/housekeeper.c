@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "zbxhistory.h"
 //#include "history_compress.h"
 #include "housekeeper.h"
-#include "../../libs/zbxdbcache/glb_cache_items.h"
+#include "../../libs/glb_state/glb_state_items.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
@@ -719,7 +719,7 @@ static int	housekeeping_process_rule(int now, zbx_hk_rule_t *rule)
 	{
 		char			buffer[MAX_STRING_LEN];
 		char			*sql = NULL;
-		size_t			sql_alloc = 0, sql_offset = 0;
+		size_t			sql_alloc = 0, sql_offset;
 		zbx_vector_uint64_t	ids;
 		int			ret;
 
@@ -1136,7 +1136,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		records, next_vc_dump_time;
 	double	sec, time_slept, time_now;
 	char	sleeptext[25];
-	glb_cache_stats_t stats;
+	glb_state_stats_t stats;
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
@@ -1180,15 +1180,15 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 				int unknown_triggers = 0, total_triggers =0, not_calculated =0;;
 				next_vc_dump_time = now + CONFIG_VCDUMP_FREQUENCY;
 
-				glb_cache_stats_t stats;
+				glb_state_stats_t stats;
 				static u_int64_t old_hits=0, old_misses=0;
-				glb_cache_get_statistics(&stats);
+				glb_state_get_statistics(&stats);
 
 				old_misses = stats.misses;
 				old_hits = stats.hits;
 
 				zabbix_log(LOG_LEVEL_WARNING, "Dumping ValueCache");
-				glb_vc_dump_cache();
+				glb_state_items_dump();
 				zabbix_log(LOG_LEVEL_WARNING, "Finished dumping ValueCache");
 				
 			}
@@ -1253,7 +1253,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		DBclose();
 
 		zbx_dc_cleanup_data_sessions();
-		glb_cache_housekeep();
+		glb_state_housekeep();
 
 		zbx_setproctitle("%s [deleted %d hist/trends, %d items/triggers, %d events, %d sessions, %d alarms,"
 				" %d audit items, %d records in " ZBX_FS_DBL " sec, %s]",

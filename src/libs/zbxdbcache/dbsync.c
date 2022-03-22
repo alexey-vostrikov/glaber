@@ -1,6 +1,5 @@
 /*
-** Glaber && Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Zabbix
 ** Copyright (C) 2021-2038 GLaber JSC
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -371,8 +370,7 @@ static int glb_update_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int c
  * incremental (using changeset logic)
  * ***********************************************************************/
 static int glb_inc_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int columns, zbx_hashset_t *hash, 
-							cmp_func_t cmp_func, zbx_dbsync_preproc_row_func_t preproc_func, 
-							int obj_type, char *sync_name) {
+					 zbx_dbsync_preproc_row_func_t preproc_func, int obj_type, char *sync_name) {
 
 	DB_ROW			dbrow;
 	zbx_uint64_t	rowid;
@@ -396,11 +394,8 @@ static int glb_inc_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int colu
 			dbsync_add_row(sync, rowid, ZBX_DBSYNC_ROW_ADD, dbrow);	
 			continue;
 		}
-						
-		if (FAIL == (cmp_func)(data, dbrow)) {
-			dbsync_add_row(sync, rowid, ZBX_DBSYNC_ROW_UPDATE, dbrow);
-		}
-		
+
+		dbsync_add_row(sync, rowid, ZBX_DBSYNC_ROW_UPDATE, dbrow);
 	}
 	
 	DBfree_result(result);
@@ -495,7 +490,7 @@ static int glb_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int columns,
 		return glb_update_dbsync_compare(sync,result, columns, hash, cmp_func, preproc_func);
 		
 	if (GLB_DBSYNC_CHANGESET == sync->mode) 
-		return glb_inc_dbsync_compare(sync,result,columns,hash, cmp_func, preproc_func, obj_type, sync_name);
+		return glb_inc_dbsync_compare(sync, result, columns, hash, preproc_func, obj_type, sync_name);
 
 	LOG_WRN("Unsupported items sync type: %d", sync->mode);
 	THIS_SHOULD_NEVER_HAPPEN;
@@ -848,7 +843,7 @@ int	zbx_dbsync_compare_autoreg_psk(zbx_dbsync_t *sync)
 	else if ('\0' != dbsync_env.cache->autoreg_psk_identity[0])
 			dbsync_add_row(sync, 0, ZBX_DBSYNC_ROW_REMOVE, NULL);
 
-	if (1 == num_records && NULL != (dbrow = DBfetch(result)))
+	if (1 == num_records && NULL != DBfetch(result))
 		zabbix_log(LOG_LEVEL_ERR, "table 'config_autoreg_tls' has multiple records");
 
 	DBfree_result(result);

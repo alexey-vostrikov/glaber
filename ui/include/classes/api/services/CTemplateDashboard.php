@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -381,7 +381,11 @@ class CTemplateDashboard extends CDashboardGeneral {
 		// Copy original dashboard names and templateids when not specified (for validation and error reporting).
 		$dashboards = $this->extendObjectsByKey($dashboards, $db_dashboards, 'dashboardid', ['name', 'templateid']);
 
-		$api_input_rules = ['type' => API_OBJECTS, 'uniq' => [['name', 'templateid']]];
+		$api_input_rules = ['type' => API_OBJECTS, 'uniq' => [['name', 'templateid']], 'fields' => [
+			'name' =>		['type' => API_STRING_UTF8],
+			'templateid' =>	['type' => API_ID]
+		]];
+
 		if (!CApiInputValidator::validateUniqueness($api_input_rules, $dashboards, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}

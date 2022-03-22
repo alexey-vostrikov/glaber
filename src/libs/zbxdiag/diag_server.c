@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include "common.h"
 #include "zbxalgo.h"
 #include "memalloc.h"
-#include "../../libs/zbxdbcache/glb_cache.h"
+#include "../glb_state/glb_state_items.h"
 #include "zbxlld.h"
 #include "zbxalert.h"
 #include "zbxdiag.h"
@@ -35,8 +35,8 @@
  ******************************************************************************/
 static int	diag_valuecache_item_compare_values(const void *d1, const void *d2)
 {
-	glb_cache_item_stats_t	*i1 = *(glb_cache_item_stats_t **)d1;
-	glb_cache_item_stats_t	*i2 = *(glb_cache_item_stats_t **)d2;
+	glb_state_item_stats_t	*i1 = *(glb_state_item_stats_t **)d1;
+	glb_state_item_stats_t	*i2 = *(glb_state_item_stats_t **)d2;
 
 	return i2->values_num - i1->values_num;
 }
@@ -63,7 +63,7 @@ static int	diag_valuecache_item_compare_values(const void *d1, const void *d2)
  * Purpose: add valuecache items diagnostic statistics to json                *
  *                                                                            *
  ******************************************************************************/
-static void	diag_valuecache_add_items(struct zbx_json *json, const char *field, glb_cache_item_stats_t **items,
+static void	diag_valuecache_add_items(struct zbx_json *json, const char *field, glb_state_item_stats_t **items,
 		int items_num)
 {
 	int	i;
@@ -121,7 +121,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			int		mode;
 
 			time1 = zbx_time();
-			glb_cache_get_diag_stats(&items_num, &values_num, &mode);
+			glb_state_get_diag_stats(&items_num, &values_num, &mode);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -138,7 +138,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			zbx_mem_stats_t	mem;
 
 			time1 = zbx_time();
-			glb_cache_get_mem_stats(&mem);
+			glb_state_get_mem_stats(&mem);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -153,7 +153,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 			zbx_vector_ptr_create(&items);
 
 			time1 = zbx_time();
-			glb_cache_get_item_stats(&items);
+			glb_state_get_item_stats(&items);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -180,7 +180,7 @@ static int	diag_add_valuecache_info(const struct zbx_json_parse *jp, struct zbx_
 				}
 
 				limit = MIN((int)map->value, items.values_num);
-				diag_valuecache_add_items(json, map->name, (glb_cache_item_stats_t **)items.values, limit);
+				diag_valuecache_add_items(json, map->name, (glb_state_item_stats_t **)items.values, limit);
 			}
 			zbx_json_close(json);
 

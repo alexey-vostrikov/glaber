@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval);
 int	connect_to_a_server(zbx_socket_t *sock, char *SERVER_NAME, int timeout, int retry_interval);
 void	disconnect_server(zbx_socket_t *sock);
 
-int	get_data_from_server(zbx_socket_t *sock, const char *request, char **error);
-int	put_data_to_server(zbx_socket_t *sock, struct zbx_json *j, char **error);
+int	get_data_from_server(zbx_socket_t *sock, char **buffer, size_t buffer_size, size_t reserved, char **error);
+int	put_data_to_server(zbx_socket_t *sock, char **buffer, size_t buffer_size, size_t reserved, char **error);
 
 #endif

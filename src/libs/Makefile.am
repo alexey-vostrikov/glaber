@@ -35,7 +35,9 @@ DIST_SUBDIRS = \
 	zbxdiag \
 	zbxtrends \
 	zbxavailability \
-	zbxeval
+	zbxeval \
+	glb_state \
+	zbxxml
 
 if SERVER
 SERVER_SUBDIRS = \
@@ -53,12 +55,14 @@ SERVER_SUBDIRS = \
 	zbxtasks \
 	zbxhistory \
 	zbxcompress \
+	zbxxml \
 	zbxembed \
 	zbxprometheus \
 	zbxvault \
 	zbxdiag \
 	zbxtrends \
 	zbxavailability \
+	glb_state \
 	zbxeval
 else
 if PROXY
@@ -76,12 +80,14 @@ PROXY_SUBDIRS = \
 	zbxtasks \
 	zbxhistory \
 	zbxcompress \
+	zbxxml \
 	zbxembed \
 	zbxprometheus \
 	zbxvault \
 	zbxdiag \
 	zbxtrends \
 	zbxavailability \
+	glb_state \
 	zbxeval
 endif
 endif

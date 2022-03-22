@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -75,7 +75,7 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() triggerid:" ZBX_FS_UI64 " value:%d(%d) new_value:%d",
 			__func__, trigger->triggerid, trigger->value, trigger->state, trigger->new_value);
-	
+	//LOG_INF("Processing trigger %ld value: %ld -> %ld ", trigger->triggerid, trigger->value, trigger->new_value );
 	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger");
 
 	if (TRIGGER_VALUE_UNKNOWN == trigger->new_value)
@@ -275,7 +275,7 @@ void	zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_
 {
 	int	i;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() values_num:%d", __func__, triggers->values_num);
+	LOG_DBG("In %s() values_num:%d", __func__, triggers->values_num);
 
 	if (0 == triggers->values_num)
 		goto out;

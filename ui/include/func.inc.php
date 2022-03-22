@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -1577,8 +1577,21 @@ function detect_page_type($default = PAGE_TYPE_HTML) {
 	return $default;
 }
 
-function makeMessageBox($good, array $messages, $title = null, $show_close_box = true, $show_details = false) {
-	$class = $good ? ZBX_STYLE_MSG_GOOD : ZBX_STYLE_MSG_BAD;
+/**
+ * Create a message box.
+ *
+ * @param string      $class                  CSS class of the message box. Possible values:
+ *                                            ZBX_STYLE_MSG_GOOD, ZBX_STYLE_MSG_BAD, ZBX_STYLE_MSG_WARNING.
+ * @param array       $messages               An array of messages.
+ * @param string      $messages[]['message']  Message text.
+ * @param string|null $title                  (optional) Message box title.
+ * @param bool        $show_close_box         (optional) Show or hide close button in error message box.
+ * @param bool        $show_details           (optional) Show or hide message details.
+ *
+ * @return CTag
+ */
+function makeMessageBox(string $class, array $messages, string $title = null, bool $show_close_box = true,
+		bool $show_details = false): CTag {
 	$msg_details = null;
 	$link_details = null;
 
@@ -1624,11 +1637,17 @@ function makeMessageBox($good, array $messages, $title = null, $show_close_box =
 		$title = new CSpan($title);
 	}
 
+	$aria_labels = [
+		ZBX_STYLE_MSG_GOOD => _('Success message'),
+		ZBX_STYLE_MSG_BAD => _('Error message'),
+		ZBX_STYLE_MSG_WARNING => _('Warning message')
+	];
+
 	// Details link should be in front of title.
 	$msg_box = (new CTag('output', true, [$link_details, $title, $msg_details]))
 		->addClass($class)
 		->setAttribute('role', 'contentinfo')
-		->setAttribute('aria-label', $good ? _('Success message') : _('Error message'));
+		->setAttribute('aria-label', $aria_labels[$class]);
 
 	if ($show_close_box) {
 		$msg_box->addItem((new CSimpleButton())
@@ -1661,7 +1680,7 @@ function filter_messages(): array {
 				}
 			}
 			else {
-				CMessageHelper::addSuccess($message['message']);
+				CMessageHelper::addMessage($message);
 			}
 		}
 	}
@@ -1670,7 +1689,7 @@ function filter_messages(): array {
 }
 
 /**
- * Returns the message box when messages are present; null otherwise
+ * Returns a message box if there are messages. Otherwise, null.
  *
  * @param  bool    $good            Parameter passed to makeMessageBox to specify message box style.
  * @param  string  $title           Message box title.
@@ -1682,21 +1701,48 @@ function getMessages(bool $good = false, string $title = null, bool $show_close_
 	$messages = get_and_clear_messages();
 
 	$message_box = ($title || $messages)
-		? makeMessageBox($good, $messages, $title, $show_close_box, !$good)
+		? makeMessageBox($good ? ZBX_STYLE_MSG_GOOD : ZBX_STYLE_MSG_BAD, $messages, $title, $show_close_box, !$good)
 		: null;
 
 	return $message_box;
 }
 
-function show_messages($good = false, $okmsg = null, $errmsg = null) {
+function show_messages($good = null, $okmsg = null, $errmsg = null) {
 	global $page, $ZBX_MESSAGES_PREPARED;
 
 	if (defined('ZBX_API_REQUEST')) {
 		return null;
 	}
 
-	$title = $good ? $okmsg : $errmsg;
 	$messages = get_and_clear_messages();
+
+	if ($good === null) {
+		$has_errors = false;
+		$has_warnings = false;
+
+		foreach ($messages as $message) {
+			$has_errors = ($has_errors || ($message['type'] === 'error'));
+			$has_warnings = ($has_warnings || ($message['type'] === 'warning'));
+		}
+
+		if ($has_errors) {
+			$class = ZBX_STYLE_MSG_BAD;
+			$good = false;
+		}
+		elseif ($has_warnings) {
+			$class = ZBX_STYLE_MSG_WARNING;
+			$good = true;
+		}
+		else {
+			$class = ZBX_STYLE_MSG_GOOD;
+			$good = true;
+		}
+	}
+	else {
+		$class = $good ? ZBX_STYLE_MSG_GOOD : ZBX_STYLE_MSG_BAD;
+	}
+
+	$title = $good ? $okmsg : $errmsg;
 
 	if ($title === null && !$messages) {
 		return;
@@ -1718,7 +1764,7 @@ function show_messages($good = false, $okmsg = null, $errmsg = null) {
 			foreach ($messages as $message) {
 				$image_messages[] = [
 					'text' => $message['message'],
-					'color' => $message['type'] == 'error'
+					'color' => ($message['type'] === 'error')
 						? ['R' => 255, 'G' => 55, 'B' => 55]
 						: ['R' => 155, 'G' => 155, 'B' => 55]
 				];
@@ -1770,11 +1816,11 @@ function show_messages($good = false, $okmsg = null, $errmsg = null) {
 
 			// Prepare messages for inclusion within the layout engine.
 			$ZBX_MESSAGES_PREPARED[] = [
-				'is_good' => $good,
+				'class' => $class,
 				'messages' => $messages,
 				'title' => $title,
 				'show_close_box' => true,
-				'show_details' => !$good
+				'show_details' => ($class === ZBX_STYLE_MSG_BAD)
 			];
 
 			break;
@@ -1807,7 +1853,7 @@ function get_prepared_messages(array $options = []): ?string {
 
 	if ($options['with_current_messages']) {
 		show_messages(
-			CMessageHelper::getType() === CMessageHelper::MESSAGE_TYPE_SUCCESS,
+			null,
 			CMessageHelper::getTitle(),
 			CMessageHelper::getTitle()
 		);
@@ -1870,7 +1916,7 @@ function get_prepared_messages(array $options = []): ?string {
 
 	$html = '';
 	foreach (array_merge($messages_authentication, $messages_session, $messages_current) as $box) {
-		$html .= makeMessageBox($box['is_good'], $box['messages'], $box['title'], $box['show_close_box'],
+		$html .= makeMessageBox($box['class'], $box['messages'], $box['title'], $box['show_close_box'],
 			$box['show_details']
 		)->toString();
 	}
@@ -1897,6 +1943,19 @@ function info($msgs): void {
 
 	foreach ($msgs as $msg) {
 		CMessageHelper::addSuccess($msg);
+	}
+}
+
+/**
+ * Add warning messages to the global message array.
+ *
+ * @param array|string $messages
+ */
+function warning($messages): void {
+	zbx_value2array($messages);
+
+	foreach ($messages as $message) {
+		CMessageHelper::addWarning($message);
 	}
 }
 
@@ -2186,10 +2245,10 @@ function uncheckTableRows($parentid = null, $keepids = []) {
 		// If $keepids will not have same key as value, it will create mess, when new checkbox will be checked.
 		$keepids = array_combine($keepids, $keepids);
 
-		insert_js('sessionStorage.setItem("'.$key.'", JSON.stringify('.json_encode($keepids).'))');
+		insert_js('sessionStorage.setItem('.json_encode($key).', JSON.stringify('.json_encode($keepids).'));');
 	}
 	else {
-		insert_js('sessionStorage.removeItem("'.$key.'")');
+		insert_js('sessionStorage.removeItem('.json_encode($key).');');
 	}
 }
 

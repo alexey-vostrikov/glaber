@@ -1,7 +1,7 @@
 <?php declare(strict_types = 1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -493,7 +493,7 @@ class CRoleHelper {
 
 		$labels += [
 			self::ACTIONS_ADD_PROBLEM_COMMENTS => _('Add problem comments'),
-			self::ACTIONS_CHANGE_SEVERITY => ('Change severity'),
+			self::ACTIONS_CHANGE_SEVERITY => _('Change severity'),
 			self::ACTIONS_ACKNOWLEDGE_PROBLEMS => _('Acknowledge problems'),
 			self::ACTIONS_CLOSE_PROBLEMS => _('Close problems'),
 			self::ACTIONS_EXECUTE_SCRIPTS => _('Execute scripts'),

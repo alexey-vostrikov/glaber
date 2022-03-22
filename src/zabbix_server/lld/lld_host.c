@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -712,11 +712,14 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 		char **info, unsigned char custom_iface)
 {
 	char			*buffer = NULL;
-	int			i;
+	int			i, host_found = 0;
 	zbx_lld_host_t		*host;
 	zbx_vector_db_tag_ptr_t	tmp_tags;
+	zbx_vector_uint64_t	lnk_templateids;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_vector_uint64_create(&lnk_templateids);
 
 	for (i = 0; i < hosts->values_num; i++)
 	{
@@ -730,12 +733,15 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 		zbx_lrtrim(buffer, ZBX_WHITESPACE);
 
 		if (0 == strcmp(host->host, buffer))
+		{
+			host_found = 1;
 			break;
+		}
 	}
 
 	zbx_vector_db_tag_ptr_create(&tmp_tags);
 
-	if (i == hosts->values_num)	/* no host found */
+	if (0 == host_found)
 	{
 		host = (zbx_lld_host_t *)zbx_malloc(NULL, sizeof(zbx_lld_host_t));
 
@@ -754,7 +760,7 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 
 		zbx_vector_uint64_create(&host->lnk_templateids);
 
-		lld_override_host(&lld_row->overrides, host->host, &host->lnk_templateids, &host->inventory_mode,
+		lld_override_host(&lld_row->overrides, host->host, &lnk_templateids, &host->inventory_mode,
 				&tmp_tags, &host->status, &discover_proto);
 
 		if (ZBX_PROTOTYPE_NO_DISCOVER == discover_proto)
@@ -782,13 +788,29 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 	}
 	else
 	{
+		zbx_free(buffer);
 		/* host technical name */
 		if (0 != strcmp(host->host_proto, host_proto))	/* the new host prototype differs */
 		{
+			buffer = zbx_strdup(buffer, host_proto);
+			substitute_lld_macros(&buffer, &lld_row->jp_row, lld_macros, ZBX_MACRO_ANY, NULL, 0);
+			zbx_lrtrim(buffer, ZBX_WHITESPACE);
+		}
+
+		lld_override_host(&lld_row->overrides, NULL != buffer ? buffer : host->host, &lnk_templateids,
+				&inventory_mode_proto, &tmp_tags, NULL, &discover_proto);
+
+		if (ZBX_PROTOTYPE_NO_DISCOVER == discover_proto)
+		{
+			host = NULL;
+			goto out;
+		}
+
+		if (NULL != buffer)
+		{
 			host->host_orig = host->host;
-			host->host = zbx_strdup(NULL, host_proto);
-			substitute_lld_macros(&host->host, &lld_row->jp_row, lld_macros, ZBX_MACRO_ANY, NULL, 0);
-			zbx_lrtrim(host->host, ZBX_WHITESPACE);
+			host->host = buffer;
+			buffer = NULL;
 			host->flags |= ZBX_FLAG_LLD_HOST_UPDATE_HOST;
 		}
 
@@ -799,9 +821,6 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 			host->custom_interfaces = custom_iface;
 			host->flags |= ZBX_FLAG_LLD_HOST_UPDATE_CUSTOM_INTERFACES;
 		}
-
-		lld_override_host(&lld_row->overrides, host->host, &host->lnk_templateids, &host->inventory_mode, &tmp_tags,
-				NULL, &discover_proto);
 
 		/* host visible name */
 		buffer = zbx_strdup(buffer, name_proto);
@@ -815,8 +834,7 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 			host->flags |= ZBX_FLAG_LLD_HOST_UPDATE_NAME;
 		}
 
-		if (ZBX_PROTOTYPE_NO_DISCOVER != discover_proto)
-			host->flags |= ZBX_FLAG_LLD_HOST_DISCOVERED;
+		host->flags |= ZBX_FLAG_LLD_HOST_DISCOVERED;
 	}
 
 	host->jp_row = &lld_row->jp_row;
@@ -825,9 +843,16 @@ static zbx_lld_host_t	*lld_host_make(zbx_vector_ptr_t *hosts, const char *host_p
 	{
 		zbx_vector_db_tag_ptr_append_array(&tmp_tags, tags->values, tags->values_num);
 		lld_host_update_tags(host, &tmp_tags, lld_macros, info);
+
+		if (0 != lnk_templateids.values_num)
+		{
+			zbx_vector_uint64_append_array(&host->lnk_templateids, lnk_templateids.values,
+					lnk_templateids.values_num);
+		}
 	}
 out:
 	zbx_vector_db_tag_ptr_destroy(&tmp_tags);
+	zbx_vector_uint64_destroy(&lnk_templateids);
 
 	zbx_free(buffer);
 
@@ -1086,7 +1111,7 @@ static zbx_lld_group_t	*lld_group_make(zbx_vector_ptr_t *groups, zbx_uint64_t gr
 		const char *name_proto, const struct zbx_json_parse *jp_row, const zbx_vector_ptr_t *lld_macros)
 {
 	char		*buffer = NULL;
-	int		i;
+	int		i, group_found = 0;
 	zbx_lld_group_t	*group = NULL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -1106,10 +1131,13 @@ static zbx_lld_group_t	*lld_group_make(zbx_vector_ptr_t *groups, zbx_uint64_t gr
 		zbx_lrtrim(buffer, ZBX_WHITESPACE);
 
 		if (0 == strcmp(group->name, buffer))
+		{
+			group_found = 1;
 			break;
+		}
 	}
 
-	if (i == groups->values_num)	/* no group found */
+	if (0 == group_found)
 	{
 		/* trying to find an already existing group */
 
@@ -3529,7 +3557,7 @@ static void	lld_interface_make(zbx_vector_ptr_t *interfaces, zbx_uint64_t parent
 		const char *contextname)
 {
 	zbx_lld_interface_t	*interface = NULL;
-	int			i;
+	int			i, interface_found = 0;
 
 	for (i = 0; i < interfaces->values_num; i++)
 	{
@@ -3539,12 +3567,15 @@ static void	lld_interface_make(zbx_vector_ptr_t *interfaces, zbx_uint64_t parent
 			continue;
 
 		if (interface->parent_interfaceid == parent_interfaceid)
+		{
+			interface_found = 1;
 			break;
+		}
 	}
 
-	if (i == interfaces->values_num)
+	if (0 == interface_found)
 	{
-		/* interface which should be deleted */
+		/* interface should be deleted */
 		interface = (zbx_lld_interface_t *)zbx_malloc(NULL, sizeof(zbx_lld_interface_t));
 
 		interface->interfaceid = interfaceid;
@@ -3562,7 +3593,7 @@ static void	lld_interface_make(zbx_vector_ptr_t *interfaces, zbx_uint64_t parent
 	}
 	else
 	{
-		/* interface which are already added */
+		/* interface already has been added */
 		if (interface->type != type)
 		{
 			interface->type_orig = type;

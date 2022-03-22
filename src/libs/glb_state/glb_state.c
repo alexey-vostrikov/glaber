@@ -15,16 +15,14 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-
-//#define GLB_CACHE_TESTS
 #ifndef GLB_CACHE_C
 #define GLB_CACHE_C
 
 #include "zbxvariant.h"
 #include "log.h"
 #include "memalloc.h"
-#include "glb_cache.h"
-#include "glb_cache_items.h"
+#include "glb_state.h"
+#include "glb_state_items.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
@@ -38,17 +36,17 @@ extern u_int64_t CONFIG_VALUE_CACHE_SIZE;
 static  zbx_mem_info_t	*cache_mem;
 
 typedef struct {
-    glb_cache_stats_t stats;
+    glb_state_stats_t stats;
 	mem_funcs_t memf;
-} glb_cache_t;
+} glb_state_t;
 
-static glb_cache_t *glb_cache;
+static glb_state_t *glb_cache;
 
 
 ZBX_MEM_FUNC_IMPL(__cache, cache_mem);
 
 
-int glb_cache_init() {
+int glb_state_init() {
    
     char *error = NULL;
 	
@@ -57,18 +55,18 @@ int glb_cache_init() {
     	return FAIL;
     }
  
-	if (NULL == (glb_cache = (glb_cache_t *)zbx_mem_malloc(cache_mem, NULL, sizeof(glb_cache_t)))) {	
+	if (NULL == (glb_cache = (glb_state_t *)zbx_mem_malloc(cache_mem, NULL, sizeof(glb_state_t)))) {	
 		zabbix_log(LOG_LEVEL_CRIT,"Cannot allocate Cache structures, exiting");
 		return FAIL;
 	}
     
-    memset((void *)glb_cache, 0, sizeof(glb_cache_t));
+    memset((void *)glb_cache, 0, sizeof(glb_state_t));
 	
 	glb_cache->memf.free_func = __cache_mem_free_func;
 	glb_cache->memf.malloc_func = __cache_mem_malloc_func;
 	glb_cache->memf.realloc_func = __cache_mem_realloc_func;
 
-	if (SUCCEED != glb_cache_items_init(&glb_cache->memf) )
+	if (SUCCEED != glb_state_items_init(&glb_cache->memf) )
 		return FAIL;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);
@@ -77,18 +75,18 @@ int glb_cache_init() {
 
 
 
-int glb_cache_get_mem_stats(zbx_mem_stats_t *mem_stats) {
+int glb_state_get_mem_stats(zbx_mem_stats_t *mem_stats) {
     
     memset(&mem_stats, 0, sizeof(zbx_mem_stats_t));
 	zbx_mem_get_stats(cache_mem, mem_stats);
   
 }
 
-int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode) {
+int glb_state_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode) {
 }
 /*
 	zbx_hashset_iter_t	iter;
-	glb_cache_elem_t	*elem;
+	glb_state_elem_t	*elem;
 	
 	*values_num = 0;
 
@@ -97,7 +95,7 @@ int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *m
 	*items_num = glb_cache->items.hset.num_data;
 	
 	zbx_hashset_iter_reset(&glb_cache->items.hset, &iter);
-	while (NULL != (elem = (glb_cache_elem_t *)zbx_hashset_iter_next(&iter)))
+	while (NULL != (elem = (glb_state_elem_t *)zbx_hashset_iter_next(&iter)))
 			*values_num += elem->values->elem_num;
 
     glb_rwlock_unlock(&glb_cache->items.meta_lock);
@@ -105,7 +103,7 @@ int glb_cache_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *m
 }
 */
 
-int glb_cache_get_statistics(glb_cache_stats_t *stats) {
+int glb_state_get_statistics(glb_state_stats_t *stats) {
     stats->hits = glb_cache->stats.hits;
 	stats->misses = glb_cache->stats.misses;
 	stats->total_size = cache_mem->total_size;
@@ -115,14 +113,14 @@ int glb_cache_get_statistics(glb_cache_stats_t *stats) {
 
 //that's pretty strange destroy proc yet written, the cache is in the SHM which will be destroyed
 //just after the process dies
-void	glb_cache_destroy(void)
+void	glb_state_destroy(void)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
    
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-int glb_cache_housekeep() {
+int glb_state_housekeep() {
 
 } 
 

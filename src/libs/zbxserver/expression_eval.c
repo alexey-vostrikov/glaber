@@ -1,6 +1,6 @@
 /*
  ** Zabbix
- ** Copyright (C) 2001-2021 Zabbix SIA
+ ** Copyright (C) 2001-2022 Zabbix SIA
  **
  ** This program is free software; you can redistribute it and/or modify
  ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 
 #include "zbxserver.h"
 #include "log.h"
-#include "glb_cache_items.h"
+#include "../glb_state/glb_state_items.h"
 #include "evalfunc.h"
 #include "zbxeval.h"
 #include "expression.h"
@@ -323,7 +323,6 @@ static void	expression_init_query_one(zbx_expression_eval_t *eval, zbx_expressio
 static int	replace_key_param_wildcard_cb(const char *data, int key_type, int level, int num, int quoted, void *cb_data,
 		char **param)
 {
-	int	ret;
 	char	*tmp;
 
 	ZBX_UNUSED(key_type);
@@ -348,7 +347,7 @@ static int	replace_key_param_wildcard_cb(const char *data, int key_type, int lev
 	zbx_free(tmp);
 
 	/* escaping cannot result in unquotable parameter */
-	if (FAIL == (ret = quote_key_param(param, quoted)))
+	if (FAIL == quote_key_param(param, quoted))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
 		zbx_free(*param);
@@ -1706,13 +1705,35 @@ void	zbx_expression_eval_resolve_item_hosts(zbx_expression_eval_t *eval, const D
 	}
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_expression_eval_resolve_filter_macros                        *
+ *                                                                            *
+ * Purpose: resolve calculated item formula macros in filter                  *
+ *                                                                            *
+ * Parameters: eval - [IN] the evaluation data                                *
+ *             item - [IN] the calculated item                                *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_expression_eval_resolve_filter_macros(zbx_expression_eval_t *eval, const DC_ITEM *item)
+{
+	int	i;
+
+	for (i = 0; i < eval->queries.values_num; i++)
+	{
+		zbx_expression_query_t	*query = (zbx_expression_query_t *)eval->queries.values[i];
+
+		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, item, NULL, NULL, NULL, &query->ref.filter,
+				MACRO_TYPE_QUERY_FILTER, NULL, 0);
+	}
+}
+
 typedef struct
 {
 	int	num;
 	char	*host;
 }
 zbx_host_index_t;
-
 
 static int	host_index_compare(const void *d1, const void *d2)
 {

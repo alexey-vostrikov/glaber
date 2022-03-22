@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -286,9 +286,7 @@ foreach ($data['data']['problems'] as $eventid => $problem) {
 				))
 		))->addClass(ZBX_STYLE_NOWRAP),
 		$problem_update_link,
-		makeEventActionsIcons($problem['eventid'], $data['data']['actions'], $data['data']['mediatypes'],
-			$data['data']['users']
-		),
+		makeEventActionsIcons($problem['eventid'], $data['data']['actions'], $data['data']['users']),
 		$data['fields']['show_tags'] ? $data['data']['tags'][$problem['eventid']] : null
 	]));
 }

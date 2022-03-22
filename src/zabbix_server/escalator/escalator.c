@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -712,15 +712,18 @@ static void	add_sentusers_msg_esc_cancel(ZBX_USER_MSG **user_msg, zbx_uint64_t a
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select distinct userid,mediatypeid,subject,message,esc_step"
+			"select userid,mediatypeid,subject,message,esc_step"
 			" from alerts"
-			" where actionid=" ZBX_FS_UI64
-				" and mediatypeid is not null"
-				" and alerttype=%d"
-				" and acknowledgeid is null"
-				" and eventid=" ZBX_FS_UI64
-				" order by userid,mediatypeid,esc_step desc",
-				actionid, ALERT_TYPE_MESSAGE, event->eventid);
+			" where alertid in (select max(alertid)"
+				" from alerts"
+				" where actionid=" ZBX_FS_UI64
+					" and mediatypeid is not null"
+					" and alerttype=%d"
+					" and acknowledgeid is null"
+					" and eventid=" ZBX_FS_UI64
+					" group by userid,mediatypeid,esc_step)"
+			" order by userid,mediatypeid,esc_step desc",
+			actionid, ALERT_TYPE_MESSAGE, event->eventid);
 
 	result = DBselect("%s", sql);
 
@@ -951,7 +954,7 @@ static void	execute_commands(const DB_EVENT *event, const DB_EVENT *r_event, con
 	{
 		zbx_strcpy_alloc(&buffer, &buffer_alloc, &buffer_offset,
 				/* the 1st 'select' works if remote command target is "Host group" */
-				"select distinct h.hostid,h.proxy_hostid,h.host,s.type,s.scriptid,s.execute_on,s.port"
+				"select h.hostid,h.proxy_hostid,h.host,s.type,s.scriptid,s.execute_on,s.port"
 					",s.authtype,s.username,s.password,s.publickey,s.privatekey,s.command,s.groupid"
 					",s.scope,s.timeout,s.name,h.tls_connect"
 #ifdef HAVE_OPENIPMI
@@ -975,14 +978,14 @@ static void	execute_commands(const DB_EVENT *event, const DB_EVENT *r_event, con
 		DBadd_condition_alloc(&buffer, &buffer_alloc, &buffer_offset, "hg.groupid", groupids.values,
 				groupids.values_num);
 
-		zbx_snprintf_alloc(&buffer, &buffer_alloc, &buffer_offset, " union ");
+		zbx_snprintf_alloc(&buffer, &buffer_alloc, &buffer_offset, " union all ");
 	}
 
 	zbx_vector_uint64_destroy(&groupids);
 
 	zbx_strcpy_alloc(&buffer, &buffer_alloc, &buffer_offset,
 			/* the 2nd 'select' works if remote command target is "Host" */
-			"select distinct h.hostid,h.proxy_hostid,h.host,s.type,s.scriptid,s.execute_on,s.port"
+			"select h.hostid,h.proxy_hostid,h.host,s.type,s.scriptid,s.execute_on,s.port"
 				",s.authtype,s.username,s.password,s.publickey,s.privatekey,s.command,s.groupid"
 				",s.scope,s.timeout,s.name,h.tls_connect"
 #ifdef HAVE_OPENIPMI
@@ -999,9 +1002,9 @@ static void	execute_commands(const DB_EVENT *event, const DB_EVENT *r_event, con
 				" and oh.hostid=h.hostid"
 				" and o.operationid=" ZBX_FS_UI64
 				" and h.status=%d"
-			" union "
+			" union all "
 			/* the 3rd 'select' works if remote command target is "Current host" */
-			"select distinct 0,0,null,s.type,s.scriptid,s.execute_on,s.port"
+			"select 0,0,null,s.type,s.scriptid,s.execute_on,s.port"
 				",s.authtype,s.username,s.password,s.publickey,s.privatekey,s.command,s.groupid"
 				",s.scope,s.timeout,s.name,%d",
 			operationid, HOST_STATUS_MONITORED, ZBX_TCP_SEC_UNENCRYPTED);
@@ -1093,6 +1096,23 @@ static void	execute_commands(const DB_EVENT *event, const DB_EVENT *r_event, con
 			goto fail;
 		}
 
+		/* get host details */
+
+		if (0 == host.hostid)
+		{
+			/* target is "Current host" */
+			if (SUCCEED != (rc = get_host_from_event((NULL != r_event ? r_event : event), &host, error,
+					sizeof(error))))
+			{
+				goto fail;
+			}
+		}
+
+		if (FAIL != zbx_vector_uint64_search(&executed_on_hosts, host.hostid, ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+			goto skip;
+
+		zbx_vector_uint64_append(&executed_on_hosts, host.hostid);
+
 		if (0 < groupid && SUCCEED != zbx_check_script_permissions(groupid, host.hostid))
 		{
 			zbx_strlcpy(error, "Script does not have permission to be executed on the host.",
@@ -1101,17 +1121,10 @@ static void	execute_commands(const DB_EVENT *event, const DB_EVENT *r_event, con
 			goto fail;
 		}
 
-		/* get host details */
-
-		if (0 != host.hostid)	/* target is from "Host" list or "Host group" list */
+		if ('\0' == *host.host)
 		{
-			if (FAIL != zbx_vector_uint64_search(&executed_on_hosts, host.hostid,
-					ZBX_DEFAULT_UINT64_COMPARE_FUNC))
-			{
-				goto skip;
-			}
+			/* target is from "Host" list or "Host group" list */
 
-			zbx_vector_uint64_append(&executed_on_hosts, host.hostid);
 			strscpy(host.host, row[2]);
 			host.tls_connect = (unsigned char)atoi(row[17]);
 #ifdef HAVE_OPENIPMI
@@ -1126,17 +1139,6 @@ static void	execute_commands(const DB_EVENT *event, const DB_EVENT *r_event, con
 			strscpy(host.tls_psk_identity, row[20 + ZBX_IPMI_FIELDS_NUM]);
 			strscpy(host.tls_psk, row[21 + ZBX_IPMI_FIELDS_NUM]);
 #endif
-		}
-		else if (SUCCEED == (rc = get_host_from_event((NULL != r_event ? r_event : event), &host, error,
-				sizeof(error))))	/* target is "Current host" */
-		{
-			if (FAIL != zbx_vector_uint64_search(&executed_on_hosts, host.hostid,
-					ZBX_DEFAULT_UINT64_COMPARE_FUNC))
-			{
-				goto skip;
-			}
-
-			zbx_vector_uint64_append(&executed_on_hosts, host.hostid);
 		}
 
 		/* substitute macros in script body and webhook parameters */
@@ -1921,12 +1923,14 @@ static const char	*check_escalation_result_string(int result)
 	}
 }
 
-static	int	postpone_escalation(const DB_ESCALATION *escalation)
+static int	check_unfinished_alerts(const DB_ESCALATION *escalation)
 {
 	int		ret;
 	char		*sql;
 	DB_RESULT	result;
-	DB_ROW		row;
+
+	if (0 == escalation->r_eventid)
+		return SUCCEED;
 
 	sql = zbx_dsprintf(NULL, "select eventid from alerts where eventid=" ZBX_FS_UI64 " and actionid=" ZBX_FS_UI64
 			" and status in (0,3)", escalation->eventid, escalation->actionid);
@@ -1934,10 +1938,10 @@ static	int	postpone_escalation(const DB_ESCALATION *escalation)
 	result = DBselectN(sql, 1);
 	zbx_free(sql);
 
-	if (NULL != (row = DBfetch(result)))
-		ret = ZBX_ESCALATION_SKIP;
+	if (NULL != DBfetch(result))
+		ret = FAIL;
 	else
-		ret = ZBX_ESCALATION_PROCESS;
+		ret = SUCCEED;
 
 	DBfree_result(result);
 
@@ -1985,22 +1989,13 @@ static int	check_escalation(const DB_ESCALATION *escalation, const DB_ACTION *ac
 		maintenance = (ZBX_PROBLEM_SUPPRESSED_TRUE == event->suppressed ? HOST_MAINTENANCE_STATUS_ON :
 				HOST_MAINTENANCE_STATUS_OFF);
 
-		if (0 != escalation->r_eventid)
-		{
-			ret = postpone_escalation(escalation);
-			goto out;
-		}
+		if (0 == skip && SUCCEED != check_unfinished_alerts(escalation))
+			skip = 1;
 	}
 	else if (EVENT_SOURCE_INTERNAL == event->source)
 	{
 		if (EVENT_OBJECT_ITEM == event->object || EVENT_OBJECT_LLDRULE == event->object)
 		{
-			if (0 != escalation->r_eventid)
-			{
-				ret = postpone_escalation(escalation);
-				goto out;
-			}
-
 			/* item disabled or deleted? */
 			DCconfig_get_items_by_itemids(&item, &escalation->itemid, &errcode, 1);
 
@@ -2027,6 +2022,9 @@ static int	check_escalation(const DB_ESCALATION *escalation, const DB_ACTION *ac
 
 			if (NULL != *error)
 				goto out;
+
+			if (SUCCEED != check_unfinished_alerts(escalation))
+				skip = 1;
 		}
 	}
 
