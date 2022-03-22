@@ -5,7 +5,7 @@ noinst_LIBRARIES = libglbstate.a
 libglbstate_a_SOURCES = \
 	load_dump.c \
 	load_dump.h \
-    glb_state.c \
+	glb_state.c \
 	glb_state.h	\
 	glb_state_items.h \
 	glb_state_items.c 
