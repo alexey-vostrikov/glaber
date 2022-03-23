@@ -45,8 +45,6 @@ class CDataTable extends CTable {
 		$this->includeJSFile('js/elements/jquery.dataTables.min.js');
 		$this->includeJSFile('js/elements/dataTables.buttons.min.js');
 		$this->includeJSFile('js/elements/jszip.min.js');
-		//$this->includeJSFile('js/elements/pdfmake.min.js');
-		//$this->includeJSFile('js/elements/vfs_fonts.js');
 		$this->includeJSFile('js/elements/buttons.html5.min.js');
 		$this->includeJSFile('js/elements/dataTables.searchBuilder.min.js');
 		$this->includeTableJS($tableid);
