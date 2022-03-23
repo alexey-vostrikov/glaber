@@ -64,10 +64,12 @@ char* state_loader_get_line(state_loader_t *ldr) {
     
     ldr->alloc_offset =0;
 
-   	while (Z_NULL != (ret = gzgets(ldr->gzfile, buffer, MAX_STRING_LEN)) && 0 == got_new_line  ) {
+   	while (0 == got_new_line && Z_NULL != (ret = gzgets(ldr->gzfile, buffer, MAX_STRING_LEN))   ) {
     	zbx_snprintf_alloc(&ldr->buf,&ldr->alloc_len,&ldr->alloc_offset,"%s",buffer);
-        if (NULL != strchr(ldr->buf + ldr->alloc_offset-1, '\n') ) 
+      
+        if (NULL != strchr(ldr->buf + ldr->alloc_offset-1, '\n') ) {
             got_new_line = 1;
+        }
     }
 	       
     if (Z_NULL == ret) return NULL;

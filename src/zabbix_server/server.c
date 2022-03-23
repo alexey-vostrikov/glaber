@@ -1261,11 +1261,11 @@ static void	zbx_check_db(void)
 
 	zbx_json_initarray(&db_ver, ZBX_JSON_STAT_BUF_LEN);
 
-	if (SUCCEED != DBcheck_capabilities(DBextract_version(&db_ver)) || SUCCEED != DBcheck_version())
-	{
-		zbx_json_free(&db_ver);
-		exit(EXIT_FAILURE);
-	}
+//	if (SUCCEED != DBcheck_capabilities(DBextract_version(&db_ver)) || SUCCEED != DBcheck_version())
+//	{
+//		zbx_json_free(&db_ver);
+//		exit(EXIT_FAILURE);
+//	}
 
 	DBflush_version_requirements(db_ver.buffer);
 	zbx_json_free(&db_ver);

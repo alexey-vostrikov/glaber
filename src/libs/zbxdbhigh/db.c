@@ -906,66 +906,66 @@ void	DBflush_version_requirements(const char *version)
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-int	DBcheck_capabilities(zbx_uint32_t db_version)
-{
-	int	ret = SUCCEED;
-#ifdef HAVE_POSTGRESQL
+//int	DBcheck_capabilities(zbx_uint32_t db_version)
+//{
+//	int	ret = SUCCEED;
+//#ifdef HAVE_POSTGRESQL
 
-#define MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB	100002
-#define MIN_TIMESCALEDB_VERSION			10500
-	int		timescaledb_version;
-	DB_RESULT	result;
-	DB_ROW		row;
+//#define MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB	100002
+//#define MIN_TIMESCALEDB_VERSION			10500
+//	int		timescaledb_version;
+//	DB_RESULT	result;
+//	DB_ROW		row;
 
-	DBconnect(ZBX_DB_CONNECT_NORMAL);
+//	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	if (FAIL == DBfield_exists("config", "db_extension"))
-		goto out;
+//	if (FAIL == DBfield_exists("config", "db_extension"))
+//		goto out;
 
-	if (NULL == (result = DBselect("select db_extension from config")))
-		goto out;
+//	if (NULL == (result = DBselect("select db_extension from config")))
+//		goto out;
+///
+//	if (NULL == (row = DBfetch(result)))
+//		goto clean;
 
-	if (NULL == (row = DBfetch(result)))
-		goto clean;
+//	if (0 != zbx_strcmp_null(row[0], ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
+//		goto clean;
 
-	if (0 != zbx_strcmp_null(row[0], ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
-		goto clean;
-
-	ret = FAIL;	/* In case of major upgrade, db_extension may be missing */
+	//ret = FAIL;	/* In case of major upgrade, db_extension may be missing */
 
 	/* Timescale compression feature is available in PostgreSQL 10.2 and TimescaleDB 1.5.0 */
-	if (MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB > db_version)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "PostgreSQL version %lu is not supported with TimescaleDB, minimum is %d",
-				(unsigned long)db_version, MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB);
-		goto clean;
-	}
+//	if (MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB > db_version)
+//	{
+//		zabbix_log(LOG_LEVEL_CRIT, "PostgreSQL version %lu is not supported with TimescaleDB, minimum is %d",
+//				(unsigned long)db_version, MIN_POSTGRESQL_VERSION_WITH_TIMESCALEDB);
+//		goto clean;
+//	}
 
-	if (0 == (timescaledb_version = zbx_tsdb_get_version()))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "Cannot determine TimescaleDB version");
-		goto clean;
-	}
+//	if (0 == (timescaledb_version = zbx_tsdb_get_version()))
+//	{
+//		zabbix_log(LOG_LEVEL_CRIT, "Cannot determine TimescaleDB version");
+//		goto clean;
+//	}
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "TimescaleDB version: %d", timescaledb_version);
+//	zabbix_log(LOG_LEVEL_INFORMATION, "TimescaleDB version: %d", timescaledb_version);
 
-	if (MIN_TIMESCALEDB_VERSION > timescaledb_version)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "TimescaleDB version %d is not supported, minimum is %d",
-				timescaledb_version, MIN_TIMESCALEDB_VERSION);
-		goto clean;
-	}
+//	if (MIN_TIMESCALEDB_VERSION > timescaledb_version)
+//	{
+//		zabbix_log(LOG_LEVEL_CRIT, "TimescaleDB version %d is not supported, minimum is %d",
+//				timescaledb_version, MIN_TIMESCALEDB_VERSION);
+//		goto clean;
+//	}
 
-	ret = SUCCEED;
-clean:
-	DBfree_result(result);
-out:
-	DBclose();
-#else
-	ZBX_UNUSED(db_version);
-#endif
-	return ret;
-}
+//	ret = SUCCEED;
+//clean:
+//	DBfree_result(result);
+//out:
+//	DBclose();
+//#else
+//	ZBX_UNUSED(db_version);
+//#endif
+//	return ret;
+//}
 
 #define MAX_EXPRESSIONS	950
 

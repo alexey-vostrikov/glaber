@@ -1284,13 +1284,13 @@ int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, cons
 }
 
 int glb_state_item_update_nextcheck(u_int64_t itemid, int nextcheck) {
-		return elems_hash_process(state->items, itemid, item_update_nextcheck_cb, &nextcheck, ELEM_FLAG_DO_NOT_CREATE);	
+		return elems_hash_process(state->items, itemid, item_update_nextcheck_cb, &nextcheck, 0);	
 }
 
 int  glb_state_item_update_meta(u_int64_t itemid, glb_state_item_meta_t *meta, unsigned int flags, int value_type) {
 	glb_state_meta_udpate_req_t req = { .meta = meta, .flags = flags, .value_type = value_type};
 
-	return elems_hash_process(state->items, itemid, item_update_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
+	return elems_hash_process(state->items, itemid, item_update_meta_cb, &req, 0);
 }
 
 int glb_state_item_get_state(u_int64_t itemid) {
@@ -1493,10 +1493,10 @@ int item_to_json(u_int64_t id, item_elem_t *elm, struct zbx_json *json)
     zbx_json_close(json);
 
     // data
+    zbx_json_addarray(json, "values");
     int tail_idx = elm->tsbuff.tail;
     if (-1 < tail_idx)
     {
-        zbx_json_addarray(json, "values");
         int head_idx = elm->tsbuff.head;
         int rcount = glb_tsbuff_get_count(&elm->tsbuff);
         do
@@ -1508,8 +1508,8 @@ int item_to_json(u_int64_t id, item_elem_t *elm, struct zbx_json *json)
             rcount--;
 
         } while (rcount > 0);
-        zbx_json_close(json);
     }
+    zbx_json_close(json);
 
     return (glb_tsbuff_get_count(&elm->tsbuff));
 }

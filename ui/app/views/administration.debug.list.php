@@ -24,20 +24,20 @@
  */
 
 $widget = (new CWidget())
-	->setTitle(_('Set Debug objects'))
+	->setTitle(('Set Debug objects'))
 	->addItem( (new CForm('get'))
-		->addItem((new CFormList())->addRow(_('Item ID'),
+		->addItem((new CFormList())->addRow(('Item ID'),
 				(new CTextBox('itemid', isset($data['itemid'])?$data['itemid']:'0'))
 					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 					->setAttribute('autofocus', 'autofocus')
 			))
-		->addItem((new CFormList())->addRow(_('Trigger ID'),
+		->addItem((new CFormList())->addRow(('Trigger ID'),
 				(new CTextBox('triggerid', isset($data['triggerid'])?$data['triggerid']:'0'))
 					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 		))
 		->addVar('action', 'debug.list')
 		->addVar('apply_new','1')
-		->addItem((new CFormList())->addRow(_(''), (new CSubmitButton('Apply'))))
+		->addItem((new CFormList())->addRow((''), (new CSubmitButton('Apply'))))
 	);
 
 $widget->show();
