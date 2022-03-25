@@ -10261,27 +10261,35 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 	
 		int errcode=SUCCEED;
 		AGENT_RESULT result;
+		DEBUG_ITEM(itemids->values[i], "Regenerating config");
 		
 		if (NULL != ( zbx_dc_item = zbx_hashset_search(&config->items, &itemids->values[i])) &&
 			NULL != (zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &zbx_dc_item->hostid))) {
 			
-			if (dc_item.host.proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
+			DEBUG_ITEM(itemids->values[i],"Found item and host data");
+
+			if (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
 				LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
+				DEBUG_ITEM(itemids->values[i],"Item didn't get processed due to proxy condition: proxy id %ld progtype is %d",dc_item.host.proxy_hostid, (program_type & ZBX_PROGRAM_TYPE_SERVER)  );
+				i++;
 				continue;
 			}
 
 			DCget_item(&dc_item, zbx_dc_item,ZBX_ITEM_GET_ALL);
 			DCget_host(&dc_item.host, zbx_dc_host, ZBX_ITEM_GET_ALL);
 
-			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
+			DEBUG_ITEM(itemids->values[i],"Calling create item func");
+		
 
+			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
 			glb_poller_create_item(poll_data, &dc_item);
 			init_result(&result);
 
 			zbx_clean_items(&dc_item, 1, &result);
 			DCconfig_clean_items(&dc_item, &errcode, 1);
 				
-		}
+		} else 
+			DEBUG_ITEM(itemids->values[i],"NOT found item and host data");
 
 		num++;
 		i++;

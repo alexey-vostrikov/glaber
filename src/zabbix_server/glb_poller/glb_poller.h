@@ -26,7 +26,7 @@
 #define GLB_EVENT_ITEM_POLL 1
 #define GLB_EVENT_NEW_ITEMS_CHECK 2
 
-#define GLB_DNS_CACHE_TIME 900 //for how long name to ip resolvings have to be remembered
+#define GLB_DNS_CACHE_TIME 120 //for how long name to ip resolvings have to be remembered
 
 //#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
 

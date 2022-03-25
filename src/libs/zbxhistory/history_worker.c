@@ -93,7 +93,7 @@ static void	worker_destroy(void *data)
  *           all values from the specified interval if count is zero.               *
  *                                                                                  *
  ************************************************************************************/
-static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, int start, int end, int aggregates, char **buffer)
+static int	worker_get_trends_json(void *data, int value_type, zbx_uint64_t itemid, int start, int end, struct zbx_json *json)
 {
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Start %s()", __func__);
@@ -109,13 +109,11 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
 	zbx_json_type_t type;
 	size_t allocd=0,offset=0;
 
-	*buffer=NULL;
-
 	if (0 == conf->read_trend_types[value_type])	
 			return FAIL;
 	
-	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_trends\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }",
-				itemid,value_type,start,aggregates,end);
+	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_trends\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"end\":%d }",
+				itemid, value_type, start, end);
 	
 	
 	if (SUCCEED != glb_process_worker_request(conf->worker, request, &response)) {
@@ -135,38 +133,32 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
 		return FAIL;
 	};
     
-	zbx_snprintf_alloc(buffer,&allocd,&offset,"[");
     while (NULL != (p = zbx_json_next(&jp_data, p)))
 	{
-        char *itemid=NULL;
         char clck[MAX_ID_LEN], ns[MAX_ID_LEN],value[MAX_STRING_LEN];
         
         struct zbx_json_parse	jp_row;
 		
-        if (SUCCEED == zbx_json_brackets_open(p, &jp_row)) {
-							
-            if (SUCCEED == zbx_json_value_by_name(&jp_row, "clock", clck,MAX_ID_LEN, &type) &&
-               	SUCCEED == zbx_json_value_by_name(&jp_row, "count", count, MAX_ID_LEN,&type) &&
-				SUCCEED == zbx_json_value_by_name(&jp_row, "max", max_value, MAX_ID_LEN,&type) && 
-				SUCCEED == zbx_json_value_by_name(&jp_row, "avg", avg_value, MAX_ID_LEN,&type) && 
-				SUCCEED == zbx_json_value_by_name(&jp_row, "min", min_value, MAX_ID_LEN,&type) && 
-				SUCCEED == zbx_json_value_by_name(&jp_row, "i", i, MAX_ID_LEN,&type)
-			  )
-			{
-				//all attributes are here, so we know that jp_row holds the values, we just add jp_row 
-				//to the output buffer (or we might be generating own )
-				size_t buf_size=jp_row.end-jp_row.start+1;
-				if (valuecount > 0) zbx_snprintf_alloc(buffer,&allocd,&offset,",");
-				zbx_strncpy_alloc(buffer,&allocd,&offset,jp_row.start,buf_size);
-		
-				valuecount++;
-			} 
-            
-        } else {
-            zabbix_log(LOG_LEVEL_DEBUG,"Couldn't parse JSON row: %s",p);
+        if (SUCCEED == zbx_json_brackets_open(p, &jp_row) &&
+			SUCCEED == zbx_json_value_by_name(&jp_row, "clock", clck,MAX_ID_LEN, &type) &&
+            SUCCEED == zbx_json_value_by_name(&jp_row, "count", count, MAX_ID_LEN,&type) &&
+			SUCCEED == zbx_json_value_by_name(&jp_row, "max", max_value, MAX_ID_LEN,&type) && 
+			SUCCEED == zbx_json_value_by_name(&jp_row, "avg", avg_value, MAX_ID_LEN,&type) && 
+			SUCCEED == zbx_json_value_by_name(&jp_row, "min", min_value, MAX_ID_LEN,&type)
+		)
+		{
+			zbx_json_addobject(json,NULL);
+			zbx_json_adduint64 (json, "itemid", itemid);
+			zbx_json_addstring( json, "clock", clck, ZBX_JSON_TYPE_INT);
+			zbx_json_addstring( json, "value_max", max_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "value_min", min_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "value_avg", avg_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "num", count, ZBX_JSON_TYPE_INT);
+			zbx_json_close(json);
+		} else {
+            LOG_INF( "Couldn't parse JSON row: %s",jp_row.start);
         };
 	}
-	zbx_snprintf_alloc (buffer,&allocd,&offset,"]");
 	zbx_free(response);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -192,7 +184,7 @@ static int	worker_get_trends(void *data, int value_type, zbx_uint64_t itemid, in
  *           all values from the specified interval if count is zero.               *
  *                                                                                  *
  ************************************************************************************/
-static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int start, int end, int aggregates, char **buffer)
+static int	worker_get_agg_json(void *data, int value_type, zbx_uint64_t itemid, int start, int end, int aggregates, struct zbx_json *json)
 {
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Start %s()", __func__);
@@ -208,8 +200,6 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 	zbx_json_type_t type;
 	size_t allocd=0,offset=0;
 
-	*buffer=NULL;
-	
 	if (0 == conf->read_agg_types[value_type])	
 			return FAIL;
 	
@@ -224,7 +214,6 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "Got aggregation responce :%s",response);
 
-
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:",conf->worker->path, response);
 		return FAIL;
@@ -234,10 +223,8 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 		return FAIL;
 	};
     
-	zbx_snprintf_alloc(buffer,&allocd,&offset,"[");
     while (NULL != (p = zbx_json_next(&jp_data, p)))
 	{
-        char *itemid=NULL;
         char clck[MAX_ID_LEN], ns[MAX_ID_LEN],value[MAX_STRING_LEN];
         
         struct zbx_json_parse	jp_row;
@@ -252,22 +239,20 @@ static int	worker_get_agg(void *data, int value_type, zbx_uint64_t itemid, int s
 				SUCCEED == zbx_json_value_by_name(&jp_row, "i", i, MAX_ID_LEN,&type)
 			  )
 			{
-				//all attributes are here, so we know that jp_row holds the values, we just add jp_row 
-				//to the output buffer (or we might be generating own )
-				size_t buf_size=jp_row.end-jp_row.start+1;
-				if (valuecount > 0) 
-					zbx_snprintf_alloc(buffer,&allocd,&offset,",");
-				
-				zbx_strncpy_alloc(buffer,&allocd,&offset,jp_row.start,buf_size);
-		
-				valuecount++;
+				zbx_json_addobject(json,NULL);
+				zbx_json_adduint64 (json, "itemid", itemid);
+				zbx_json_addstring( json, "clock", clck, ZBX_JSON_TYPE_INT);
+				zbx_json_addstring( json, "value_max", max_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "value_min", min_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "value_avg", avg_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "i", i, ZBX_JSON_TYPE_INT);
+				zbx_json_close(json);
 			} 
             
         } else {
             zabbix_log(LOG_LEVEL_DEBUG,"Couldn't parse JSON row: %s",p);
         };
 	}
-	zbx_snprintf_alloc (buffer,&allocd,&offset,"]");
 	zbx_free(response);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -676,7 +661,7 @@ int	glb_history_worker_init(char *params)
 	
 	if (glb_types_array_sum(conf->read_trend_types) > 0) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Init worker module: read TREND types '%s'",tmp_str);
-		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS,(void (*)(void))worker_get_trends,conf);
+		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS_JSON,(void (*)(void))worker_get_trends_json,conf);
 	}
 	
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_WORKER_TREND_TYPES,MAX_ID_LEN);
@@ -694,7 +679,7 @@ int	glb_history_worker_init(char *params)
 	
 	if (glb_types_array_sum(conf->read_agg_types) > 0) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Init worker module: read agg types '%s'",tmp_str);
-		glb_register_callback(GLB_MODULE_API_HISTORY_READ_AGG,(void (*)(void))worker_get_agg,conf);
+		glb_register_callback(GLB_MODULE_API_HISTORY_READ_AGG_JSON,(void (*)(void))worker_get_agg_json,conf);
 	}
 
 	conf->preload_values=GLB_DEFAULT_WORKER_PRELOAD_VALUES;

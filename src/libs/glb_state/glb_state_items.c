@@ -437,7 +437,7 @@ static int fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, int count,
     zbx_history_record_vector_create(&values);
 
     // LOG_INF("CACHE DB COUNT GET: itemid:%ld, head_time: %d, duration: %d", itemid, head_time, count);
-    if (SUCCEED == (ret = glb_history_get(itemid, elm->value_type, 0, count, head_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values)))
+    if (SUCCEED == (ret = glb_history_get_history(itemid, elm->value_type, 0, count, head_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values)))
     {
         // LOG_INF("GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values", itemid, values.values_num);
         DEBUG_ITEM(itemid, "GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values", itemid, values.values_num);
@@ -545,7 +545,7 @@ static int glb_state_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
     if (elm->db_fetched_time > now)
         elm->db_fetched_time = now;
     // LOG_INF("CACHE DB TIME GET: itemid:%ld, head_time: %d, duration: %d", itemid, head_time, seconds );
-    if (SUCCEED == (ret = glb_history_get(itemid, elm->value_type, head_time - seconds, 0,
+    if (SUCCEED == (ret = glb_history_get_history(itemid, elm->value_type, head_time - seconds, 0,
                                           elm->db_fetched_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values)))
     {
 

@@ -241,9 +241,9 @@ typedef enum {
 	GLB_MODULE_API_HISTORY_WRITE =	0,
 	GLB_MODULE_API_HISTORY_WRITE_TRENDS ,
 	GLB_MODULE_API_HISTORY_READ, //general history read 
-	GLB_MODULE_API_HISTORY_READ_AGG, //read aggregated history
-	GLB_MODULE_API_HISTORY_READ_TRENDS,  //history read aggreagated to n points, rets max min avf, usefull for stats and graph processing 
-	GLB_MODULE_API_HISTORY_VC_PRELOAD,
+	GLB_MODULE_API_HISTORY_READ_AGG_JSON, //read aggregated history
+	GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON, //read aggregated trends
+	GLB_MODULE_API_HISTORY_READ_TRENDS_JSON,  //history read aggreagated to n points, rets max min avf, usefull for stats and graph processing 
 	GLB_MODULE_API_DESTROY, //all modules who needs deinit should register in this callback
 	 //total number of callbacks == last callback id +1 , theese two should always go last
 	GLB_MODULE_API_TOTAL_CALLBACKS,
@@ -254,13 +254,13 @@ typedef enum {
 
 static struct API_HOOKS APIcfg[]=
 {
-	/* FUNC NAME,			FUNC_ID */
-	{"History_Write",			GLB_MODULE_API_HISTORY_WRITE },		
+	/* FUNC NAME,						FUNC_ID */
+	{"History_Write",					GLB_MODULE_API_HISTORY_WRITE },		
 	{"History_Write_Trends",			GLB_MODULE_API_HISTORY_WRITE_TRENDS },		
-	{"History_Read",			GLB_MODULE_API_HISTORY_READ },			//read proc, one is ok for all the types
-	{"History_Read_Aggregated",	GLB_MODULE_API_HISTORY_READ_TRENDS },		
-	{"History_Read_Trends",			GLB_MODULE_API_HISTORY_READ_TRENDS },			
-	{"History_Read_VC_Preload" , GLB_MODULE_API_HISTORY_VC_PRELOAD }, //for preloading the value cache
+	{"History_Read",					GLB_MODULE_API_HISTORY_READ },			//read proc, one is ok for all the types
+	{"History_Read_Aggregated_JSON",	GLB_MODULE_API_HISTORY_READ_AGG_JSON },		
+	{"History_Read_Trends_JSON",		GLB_MODULE_API_HISTORY_READ_TRENDS_JSON },	
+	{"History_Read_Aggregated_Trends_JSON",		GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON },		
 	{"ModuleDestroy" , GLB_MODULE_API_DESTROY },
 	{NULL}
 };

@@ -25,25 +25,6 @@
 class CHistoryManager {
 
 	/**
-	 * Returns a subset of $items having history data within the $period of time.
-	 *
-	 * @param array $items   An array of items with the 'itemid' and 'value_type' properties.
-	 * @param int   $period  The maximum period of time to search for history values within.
-	 *
-	 * @return array  An array with items IDs as keys and the original item data as values.
-	 */
-//	public function getItemsHavingValues(array $items, $period = null) {
-//		$items = zbx_toHash($items, 'itemid');
-//
-//		$results = [];
-//		//$grouped_items = $this->getItemsGroupedByStorage($items);
-
-//		$results +=  $this->getLastValuesFromServer($items, 2, $period);
-		
-//		return array_intersect_key($items, $results);
-//	}
-
-	/**
 	 * Returns the last $limit history objects for the given items.
 	 *
 	 * @param array $items   An array of items with the 'itemid' and 'value_type' properties.
@@ -68,7 +49,7 @@ class CHistoryManager {
 	  $server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 	  	timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 	    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
-		//error_log("Getting last values from the server for items: ".print_r(array_column($items,'itemid'),true));
+	
 	  $last_values = $server->getLastValues(CSessionHelper::getId(),array_column($items,'itemid'),$limit, $period); 
 	
 	  if (!is_array($last_values)) {
@@ -104,7 +85,9 @@ class CHistoryManager {
 	public function getValueAt(array $items, $clock, $ns) {
 		return $this->getGraphAggregationByWidthFromServer($items, $clock, $clock+1, 1, 'history');
 	}
-/** interval function calculation is implemented via server's getHistory and applying the proper function */
+
+
+	/** interval function calculation is implemented via server's getHistory and applying the proper function */
 private function getGraphAggregationByIntervalFromServer(array $items, $time_from, $time_to, $function, $interval) {
 	$results = [];
 	$items_by_table = [];
@@ -192,11 +175,11 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 	 *
 	 * @return array  History value aggregation for graphs.
 	 */
-	public function getGraphAggregationByWidth(array $items, $time_from, $time_to, $width = null) {
+	public function getGraphAggregationByWidth(array $items, $time_from, $time_to, $aggregates) {
 		$results = [];
 		$agg_results = [];
 		
-		$agg_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"history_agg");
+		$agg_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $aggregates, "history" );
 
 		foreach ($items as $item) {
 		
@@ -217,7 +200,7 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 			if ($history_start - $time_from > 3600 ) {
 			
 				$trend_results = [];
-				$trend_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"trends");		
+				$trend_results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $aggregates, "trends");		
 				
 				//now using only points that has timestamps prior to the history start
 				if (isset($trend_results[$item['itemid']]['data']) && is_array($trend_results[$item['itemid']]['data'])) 
@@ -235,13 +218,10 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 	
 	private function getGraphAggregationByWidthFromServer(array $items, $time_from, $time_to, $aggregates, $source) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-			
+
 		foreach ($items as $item) {
-			//for some strange reason same object dosn't do request for the same time, so init once per itemid here
-			$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, 
-					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
-					timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), ZBX_SOCKET_BYTES_LIMIT);  
-			$results[$item['itemid']]['data'] = $server->getHistoryData(CSessionHelper::getId(), $item['itemid'], $time_from, $time_to, $aggregates, $source); 
+			$results[$item['itemid']]['data'] = 
+				CZabbixServer::getHistoryAggregatedData(CSessionHelper::getId(), $item['itemid'], $time_from, $time_to, $aggregates, $source); 
 		
 		}
 		return $results;

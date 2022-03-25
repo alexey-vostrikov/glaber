@@ -48,7 +48,6 @@ void	zbx_history_value2str(char *buffer, size_t size, const history_value_t *val
 char	*zbx_history_value2str_dyn(const history_value_t *value, int value_type);
 void	zbx_history_value_print(char *buffer, size_t size, const history_value_t *value, int value_type);
 void	zbx_history_value2variant(const history_value_t *value, unsigned char value_type, zbx_variant_t *var);
-int 	glb_history_json2val(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
 
 /* In most cases zbx_history_record_vector_destroy() function should be used to free the  */
 /* value vector filled by zbx_vc_get_value* functions. This define simply better          */
@@ -56,16 +55,18 @@ int 	glb_history_json2val(struct zbx_json_parse *jp, char value_type, zbx_histor
 #define zbx_history_record_vector_create(vector)	zbx_vector_history_record_create(vector)
 
 
-
-
 int glb_history_init(char **history_modules, char **error);
 
-int glb_history_add(ZBX_DC_HISTORY *history, int history_num);
-int glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
-
-int glb_history_get_agg_buff(zbx_uint64_t itemid, int value_type, int start, int end, int count, char **buffer);
-
+int glb_history_add_history(ZBX_DC_HISTORY *history, int history_num);
+int glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
 int glb_history_add_trends(ZBX_DC_TREND *trend, int trends_num);
-int glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, char **buffer);
+
+int glb_history_get_trends_json(zbx_uint64_t itemid, int value_type, int start, int end, struct zbx_json *json);
+
+int glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, struct zbx_json *json);
+int glb_history_get_history_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, struct zbx_json *json);
+
+int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_history_record_t *record, struct zbx_json *json);
+int	glb_history_json_to_history_record(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
 
 #endif

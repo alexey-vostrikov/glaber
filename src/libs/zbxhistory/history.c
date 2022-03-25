@@ -32,29 +32,6 @@ extern int CONFIG_VALUECACHE_FILL_TIME;
 extern int CONFIG_SERVER_STARTUP_TIME;
 extern zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 const char	*value_type_names[] = {"dbl", "str", "log", "uint", "text"};
-
-/************************************************************************************
- *                                                                                  *
- * Function: zbx_history_preload                                                  	*
- *                                                                                  *
- * preloads history into the value cache 											*
- * returns number of values preloaded												*
-  ************************************************************************************/
-int	glb_history_preload()
-{
-	int j;
-
-	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_VC_PRELOAD]->values_num; j++) {
-
-		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_VC_PRELOAD]->values[j];
-		glb_history_preload_values_func_t preload_values = callback->callback;
-		
-		preload_values(callback->callbackData);
-	}
-
-	return SUCCEED;
-}
-
 /************************************************************************************
  *                                                                                  *
  * Function: glb_load_history_module                                                *
@@ -76,10 +53,13 @@ int glb_load_history_module(char *history_module) {
 		params="";
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "loading history module \"%s\", module params \"%s\"", history_module, params);
+	LOG_INF("loading history module \"%s\", module params \"%s\"", history_module, params);
 
 	if (NULL != strstr(history_module,"worker")) 
 		return glb_history_worker_init(params);
+	
+	if (NULL != strstr(history_module,"clickhouse")) 
+		return glb_history_clickhouse_init(params);
 		
 	zabbix_log(LOG_LEVEL_WARNING,"Unknown history module type: '%s', exiting",history_module);
 	return FAIL;
@@ -157,7 +137,7 @@ void glb_history_destroy(void)
  * Comments: add history values to the configured storage backends                  *
  *                                                                                  *
  ************************************************************************************/
-int	glb_history_add(ZBX_DC_HISTORY *history, int history_num)
+int	glb_history_add_history(ZBX_DC_HISTORY *history, int history_num)
 {
 	int	j,  ret = SUCCEED;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -223,7 +203,7 @@ int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
  *                                                                                  *
  ************************************************************************************/
 #define GET_ACCOUNT_INTERVAL 5
-int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive,  zbx_vector_history_record_t *values)
+int	glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive,  zbx_vector_history_record_t *values)
 {
 	int			j;
 	double last_run;
@@ -287,23 +267,61 @@ int	glb_history_get(zbx_uint64_t itemid, int value_type, int start, int count, i
  *           all values from the specified interval if count is zero.               *
  *                                                                                  *
  ************************************************************************************/
-int	glb_history_get_agg_buff(zbx_uint64_t itemid, int value_type, int start, int count, int end, char **buffer)
+int	glb_history_get_history_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int aggregates, int end, struct zbx_json* json)
 {
 	int			j, ret=FAIL;
 	
 	//zabbix_log(LOG_LEVEL_INFORMATION,"Starting %s",__func__);
 	
-	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGG]->values_num; j++) {
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGG_JSON]->values_num; j++) {
 
-		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGG]->values[j];
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGG_JSON]->values[j];
 		glb_history_get_agg_buff_func_t get_values = callback->callback;
 		
-		if (SUCCEED == get_values(callback->callbackData , value_type, itemid,start,count,end,buffer)) 
+		if (SUCCEED == get_values(callback->callbackData , value_type, itemid, start, aggregates ,end, json)) 
 			return SUCCEED;
 	}
 
 	return ret;
 }
+/************************************************************************************
+ *                                                                                  *
+ * Function: zbx_history_get_agg_buff                                               *
+ *                                                                                  *
+ * Purpose: gets aggregated item values from history 				                *
+ *                                                                                  *
+ * Parameters:  itemid     - [IN] the itemid                                        *
+ *              value_type - [IN] the item value type                               *
+ *              start      - [IN] the period start timestamp                        *
+ *              count      - [IN] the number of values to read                      *
+ *              end        - [IN] the period end timestamp                          *
+ *              buffer     - [OUT] buffer that hold all the aggregated metrics		*
+ *                                                                                  *
+ * Return value: SUCCEED - the history data were read successfully                  *
+ *               FAIL - otherwise                                                   *
+ *                                                                                  *
+ * Comments: This function reads <count> values from ]<start>,<end>] interval or    *
+ *           all values from the specified interval if count is zero.               *
+ *                                                                                  *
+ ************************************************************************************/
+int	glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int steps, int end, struct zbx_json *json)
+{
+	int			j, ret=FAIL;
+	
+	//zabbix_log(LOG_LEVEL_INFORMATION,"Starting %s",__func__);
+	
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON]->values_num; j++) {
+
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON]->values[j];
+		glb_history_get_agg_buff_func_t get_values = callback->callback;
+		
+		if (SUCCEED == get_values(callback->callbackData, value_type, itemid, start, steps, end, json)) 
+			return SUCCEED;
+	}
+
+	return ret;
+}
+
 
 /************************************************************************************
  *                                                                                  *
@@ -321,47 +339,23 @@ int	glb_history_get_agg_buff(zbx_uint64_t itemid, int value_type, int start, int
  *               FAIL - otherwise                                                   *
  *                                                                                  *
   ************************************************************************************/
-int	glb_history_get_trends(zbx_uint64_t itemid, int value_type, int start, int end, int count, char **buffer)
+int	glb_history_get_trends_json(zbx_uint64_t itemid, int value_type, int start, int end, struct zbx_json* json)
 {
 	int			j, ret=FAIL;
 
 	//we'll ask dor data for every registered module
-	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS]->values_num; j++) {
+	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS_JSON]->values_num; j++) {
 
-		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS]->values[j];
-		glb_history_get_trends_func_t get_trends = callback->callback;
+		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS_JSON]->values[j];
+		glb_history_get_trends_json_func_t get_trends = callback->callback;
 		
-		if (SUCCEED == get_trends(callback->callbackData,value_type,itemid,start,end, count,  buffer)) 
+		if (SUCCEED == get_trends(callback->callbackData,value_type,itemid,start,end, json)) 
 			ret = SUCCEED;
 	}
 
 	return ret;
 }
 
-/************************************************************************************
- *                                                                                  *
- * Function: zbx_history_requires_trends                                            *
- *                                                                                  *
- * Purpose: checks if the value type requires trends data calculations              *
- *                                                                                  *
- * Parameters: value_type - [IN] the value type                                     *
- *                                                                                  *
- * Return value: SUCCEED - trends must be calculated for this value type            *
- *               FAIL - otherwise                                                   *
- *                                                                                  *
- * Comments: This function is used to check if the trends must be calculated for    *
- *           the specified value type based on the history storage used.            *
- *                                                                                  *
- ************************************************************************************/
-int	zbx_history_requires_trends(int value_type)
-{
-	//if at least one history module was registered for writing trends, allow trends calculation
-	if (0 < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values_num) 
-		return SUCCEED;
-	
-	zabbix_log(LOG_LEVEL_INFORMATION,"There is no callbacks for trends");
-	return FAIL;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -739,4 +733,30 @@ history_value_t	history_str2value(char *str, unsigned char value_type)
 	}
 
 	return value;
+}
+
+
+int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_history_record_t *record, struct zbx_json *json) {
+			
+	zbx_json_addobject(json,NULL);
+	zbx_json_addint64 (json, "itemid", itemid);
+	zbx_json_addint64 (json,"clock", record->timestamp.sec);
+	zbx_json_addint64 (json,"ns", record->timestamp.ns);
+	
+	switch (value_type) {
+		case ITEM_VALUE_TYPE_FLOAT:
+			zbx_json_addfloat(json,"value", record->value.dbl);
+		 	break;
+		case ITEM_VALUE_TYPE_UINT64:
+			zbx_json_adduint64(json,"value", record->value.ui64);
+			break;
+		case ITEM_VALUE_TYPE_STR:
+		case ITEM_VALUE_TYPE_TEXT:
+			zbx_json_addstring(json,"value", record->value.str,ZBX_JSON_TYPE_STRING);
+			break;
+		case ITEM_VALUE_TYPE_LOG:
+			zbx_json_addstring(json,"value", record->value.log->value, ZBX_JSON_TYPE_STRING);
+			break;
+	}
+	zbx_json_close(json);
 }

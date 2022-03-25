@@ -222,7 +222,26 @@ class CZabbixServer {
 	public function syncConfiguration() {
 		return $this->request(['request' => 'config.sync']);
 	}
+
+	public static  function getHistoryAggregatedData($sid, $itemid, $start, $end, $aggregates, $type) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 	
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+		);
+		
+		return $zabbix_server->request([
+			'request' => 'history.get',
+			'sid' => $sid,
+			'itemid' => $itemid,
+			'start'	=> $start,
+			'end' => $end,
+			'aggregates' => $aggregates,
+			'type' => $type
+		]);
+	}
+
 	public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
 		return $this->request([
 			'request' => 'history.get',

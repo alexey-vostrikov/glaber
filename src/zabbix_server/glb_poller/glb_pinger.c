@@ -305,11 +305,12 @@ static int glb_pinger_send_ping(GLB_PINGER_CONF *conf, GLB_POLLER_ITEM *glb_item
   
     pinger_item->lastpacket_sent = glb_ms_time();
     zbx_timespec(&ts);
-    
+    DEBUG_ITEM(glb_item->itemid,"Sending pings to addr %s, %d seconds to resolve ", pinger_item->addr, pinger_item->lastresolve + GLB_DNS_CACHE_TIME - time(NULL) );
+
     if (pinger_item->lastresolve < time(NULL) - GLB_DNS_CACHE_TIME) {
         //doing resolving 
         //now additionally we'll resolve the host's address, this is a sort of dns cache
-      
+        DEBUG_ITEM(glb_item->itemid,"Doing resolve");
         if (NULL == pinger_item->addr) {
            
             glb_pinger_submit_result(glb_item,CONFIG_ERROR,"Cannot resolve item to IPv4 addr, hostname is not set",&ts);

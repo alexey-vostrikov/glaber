@@ -1,4 +1,10 @@
-var 2.9.0
+ver 2.9.2
+    - clickhouse native support is returned and refactored, internal (server) API support for aggregated
+        data for both history and trends introduced, go clickhouse module is considered deprecated now and 
+        will be removed since 3.0
+ver 2.9.1
+    - fixed to correctly work with proxy
+ver 2.9.0
     - Zabbix sources are upgraded to v 5.4.11
     - Check now fixed for async pollers
     - items state refactored to use common elems_hash library

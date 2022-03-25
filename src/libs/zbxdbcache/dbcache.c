@@ -926,18 +926,6 @@ static void	DCmass_update_trends(const ZBX_DC_HISTORY *history, int history_num,
 				continue;
 			DEBUG_ITEM(trend->itemid, "Exporting trend due to hour end");
 
-			/* discard trend items that are older than compression age */
-//			if (0 != compression_age && trend->clock < compression_age)
-//			{
-//				if (SEC_PER_HOUR < (ts.sec - last_trend_discard)) /* log once per hour */
-//				{
-//					zabbix_log(LOG_LEVEL_TRACE, "discarding trends that are pointing to"
-//							" compressed history period");
-//					last_trend_discard = ts.sec;
-//				}
-//			}
-//			else //if (SUCCEED == zbx_history_requires_trends(trend->value_type))
-			//note: it's up to history syncer to decide about trend or compression age
 			DCflush_trend(trend, trends, &trends_alloc, trends_num);
 
 			zbx_hashset_iter_remove(&iter);
@@ -2923,7 +2911,8 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			//at this call history will be added to the history storage
 			//and state cache
 			glb_state_item_add_values(history, history_num);
-			glb_history_add(history,history_num);
+			glb_history_add_history(history,history_num);
+			
 			DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
 			//need fix here - we've already have items, so there is no need to extra seraches
 			//however it's better to do different kind of processing
