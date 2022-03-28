@@ -630,7 +630,13 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		
 		if ( 0 == conf->disable_host_item_names ) {
 			
+			char *host_name = zbx_dyn_escape_string(h->host_name, ESCAPE_CHARS);   
+			char *item_key = zbx_dyn_escape_string(h->item_key, ESCAPE_CHARS);   
+			
 			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s'", h->host_name, h->item_key);
+			
+			zbx_free(host_name);
+			zbx_free(item_key);
 		}
 
 		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,")");
