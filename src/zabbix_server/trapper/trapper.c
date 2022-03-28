@@ -1101,7 +1101,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	(void)zbx_tcp_send(sock, json.buffer);
 	zbx_json_free(&json);
 	
-	LOG_INF("End of %s()", __func__);
+	LOG_DBG("End of %s()", __func__);
 	return SUCCEED;
 }
 

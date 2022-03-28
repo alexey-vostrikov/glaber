@@ -1402,8 +1402,6 @@ int glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
 }
 
 
-//TODO: this must be a universal function
-//which accepts cache table, filename, parsing and cration callbacks
 int glb_state_items_load() {
 
 	//char *json_buffer = NULL;

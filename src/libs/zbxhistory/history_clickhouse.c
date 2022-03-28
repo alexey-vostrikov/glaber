@@ -77,12 +77,12 @@ static void	clickhouse_log_error(CURL *handle, CURLcode error, const char *errbu
 	{
 		curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &http_code);
 		if (0 != page_r->offset)
-			LOG_INF("cannot get values from clickhouse, HTTP error: %ld, message: %s",http_code, page_r->data);
+			LOG_WRN("cannot get values from clickhouse, HTTP error: %ld, message: %s",http_code, page_r->data);
 		else
-			LOG_INF("cannot get values from clickhouse, HTTP error: %ld", http_code);
+			LOG_WRN("cannot get values from clickhouse, HTTP error: %ld", http_code);
 	}
 	else
-		LOG_INF("cannot get values from clickhousesearch: %s",'\0' != *errbuf ? errbuf : curl_easy_strerror(error));
+		LOG_WRN("cannot get values from clickhousesearch: %s",'\0' != *errbuf ? errbuf : curl_easy_strerror(error));
 }
 
 /************************************************************************************
@@ -161,19 +161,17 @@ static int parse_aggregate_responce(u_int64_t itemid, char *responce, struct zbx
 		return FAIL;
 
 	if (SUCCEED != zbx_json_open(responce, &jp)) {
-		LOG_INF("Couldn't parse json response %s", responce);
+		LOG_WRN("Couldn't parse json response %s", responce);
 		return FAIL;
 	}
 	
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "data", &jp_data)) {
-		LOG_INF("Couldn't find data section in the responce %s:", responce);
+		LOG_WRN("Couldn't find data section in the responce %s:", responce);
 		return FAIL;
 	};
     
-	LOG_INF("Responce is %s", responce);
-
-
-	LOG_INF("Looping");
+	LOG_DBG("Responce is %s", responce);
+	
     while (NULL != (p = zbx_json_next(&jp_data, p)))
 	{
         char clck[MAX_ID_LEN], value[MAX_STRING_LEN];
@@ -218,18 +216,17 @@ static int parse_trends_responce(char *responce, struct zbx_json *json) {
 		return FAIL;
 	
 	if (SUCCEED != zbx_json_open(responce, &jp)) {
-		LOG_INF("Couldn't parse json response %s", responce);
+		LOG_WRN("Couldn't parse json response %s", responce);
 		return FAIL;
 	}
 	
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "data", &jp_data)) {
-		LOG_INF("Couldn't find data section in the responce %s:", responce);
+		LOG_WRN("Couldn't find data section in the responce %s:", responce);
 		return FAIL;
 	};
     
-	LOG_INF("Responce is %s", responce);
+	LOG_DBG("Responce is %s", responce);
 
-	LOG_INF("Looping");
     while (NULL != (p = zbx_json_next(&jp_data, p)))
 	{
         char itemid[MAX_ID_LEN], clck[MAX_ID_LEN], ns[MAX_ID_LEN],value[MAX_STRING_LEN];
@@ -273,7 +270,7 @@ static int	get_trend_values_json(void *data, int value_type, zbx_uint64_t itemid
 
 	buf_offset = 0;
 	
-	LOG_INF("In %s() trends request for item %ld", __func__,itemid);
+	LOG_DBG("In %s() trends request for item %ld", __func__,itemid);
 
 	if (end < start ) {
 		zabbix_log(LOG_LEVEL_WARNING,"%s: wrong params requested: start:%d, end:%d, steps:%d",__func__, start, end);
@@ -294,7 +291,7 @@ static int	get_trend_values_json(void *data, int value_type, zbx_uint64_t itemid
 		FORMAT JSON",  conf->dbname, trend_tables[value_type], start, end, itemid); 
 
 	LOG_INF("Sending query to '%s' post data: '%s'", conf->url, sql_buffer);
-	LOG_INF("Here!");
+
 	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
 		return FAIL;
 	
@@ -317,7 +314,7 @@ static int	get_trend_aggregates_json(void *data, int value_type, zbx_uint64_t it
 
 	buf_offset = 0;
 	
-	LOG_INF("In %s() trends request for item %ld", __func__,itemid);
+	LOG_DBG("In %s() trends request for item %ld", __func__,itemid);
 
 	if (0 == conf->read_aggregate_types[value_type])	
 			return SUCCEED;
@@ -342,13 +339,12 @@ static int	get_trend_aggregates_json(void *data, int value_type, zbx_uint64_t it
 		ORDER BY i \
 		FORMAT JSON",  start, steps, end-start, conf->dbname, trend_tables[value_type], start, end, itemid); 
 	
-	LOG_INF("Sending query to '%s' post data: '%s'", conf->url, sql_buffer);
-	LOG_INF("Here!");
-	
+	LOG_DBG("Sending query to '%s' post data: '%s'", conf->url, sql_buffer);
+		
 	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
 		return FAIL;
 	
-	LOG_INF("Recieved from clickhouse: %s", responce);
+	LOG_DBG("Recieved from clickhouse: %s", responce);
 	
 	if (SUCCEED != parse_aggregate_responce(itemid, responce, json)) 
 			return FAIL;
@@ -378,22 +374,17 @@ static int parse_history_get_values(glb_clickhouse_data_t *conf, char *responce,
 			LOG_DBG("Cannot parse row of data (might be ok, but empty): %s", p);
 			continue;
 		}
-		//LOG_INF("Parsing data row : clock is %s, value is %s", clck, value);
+		
 	   	if ( 0 == conf->disable_nanoseconds &&
 			 SUCCEED == zbx_json_value_by_name(&jp_row, "ns", ns, MAX_ID_LEN, &type) ) 
 		{
 			hr.timestamp.ns = atoi(ns); 
 		} else 
 			hr.timestamp.ns = 0;
-		//LOG_INF("Converting value");
-        hr.timestamp.sec = atoi(clck);
-		//LOG_INF("Timestamp is %d", hr.timestamp.sec);
+	    hr.timestamp.sec = atoi(clck);
 		hr.value = history_str2value(value, value_type);
-		//LOG_INF("Adding history record, ptr is %p", values);
 		zbx_vector_history_record_append_ptr(values, &hr);
-		//LOG_INF("Finished row processing");
-		/*note - there is NO need to clean the record - it will be cleaned later on releasing the vector */
-		//zbx_history_record_clear(&hr, value_type);
+
 	}
 	return FAIL;
 }
@@ -465,17 +456,14 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 
     zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, "format JSON ");
 
-	//LOG_INF("Will do query: %s", sql_buffer);	
 	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
 	 	return FAIL;
 
-	//LOG_INF("Recieved from clickhouse: %s", responce);
-	//LOG_INF("History vector ptr is %p",values);
     if (SUCCEED != parse_history_get_values(conf, responce, value_type, values)) 
 		return FAIL;
 
 	zbx_vector_history_record_sort(values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
-	LOG_INF( "End of %s()", __func__);
+	LOG_DBG( "End of %s()", __func__);
 
 	return SUCCEED;
 }
@@ -565,7 +553,6 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 	static glb_clickhouse_buffer_t tbuffer[ITEM_VALUE_TYPE_MAX] = {0};	
 
 	LOG_DBG("In %s()", __func__);
-	//LOG_INF("History vector is %p, num is %d", hist, history_num);
 
 	for (i = 0; i < history_num; i++)
 	{
@@ -580,9 +567,7 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			LOG_INF("Wrong value type: %d, internal programming bug", value_type);
 			THIS_SHOULD_NEVER_HAPPEN;
 		}
-
-	//	LOG_INF("Adding value %d of %d, value type is %d", i , history_num, value_type);		
-		
+	
 		if (0 == conf->write_types[h->value_type])	{
 			zabbix_log(LOG_LEVEL_INFORMATION,"Skipping unsupported value type %d",h->value_type);
 			continue;
@@ -634,7 +619,7 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 
 			break;
 		default:
-			LOG_INF("Unknown value type %d", h->value_type);
+			LOG_WRN("Unknown value type %d", h->value_type);
 			THIS_SHOULD_NEVER_HAPPEN;
 	//		exit(-1);
 			break;
@@ -660,7 +645,7 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		{ 
 			
 			if (SUCCEED != curl_post_request(conf->url, tbuffer[i].buffer, &responce)) 
-				LOG_INF("FAILED to flush %d values of type %d to clickhouse", tbuffer[i].num, i);
+			LOG_WRN("FAILED to flush %d values of type %d to clickhouse", tbuffer[i].num, i);
 
 			tbuffer[i].offset=0;
 			tbuffer[i].num=0;
@@ -709,7 +694,7 @@ static int	add_trend_values(void *data, ZBX_DC_TREND *trends, int trends_num)
 	{  
 		value_type=trends[i].value_type;
 		
-		LOG_INF("Got trend data: itemid %ld %s:%s", trends[i].itemid, trends[i].host_name, trends[i].item_key);
+		LOG_DBG("Got trend data: itemid %ld %s:%s", trends[i].itemid, trends[i].host_name, trends[i].item_key);
 		if ( 0 == trends[i].num ) 
 		 	continue;
 
@@ -765,7 +750,7 @@ static int	add_trend_values(void *data, ZBX_DC_TREND *trends, int trends_num)
 			 tbuffer[value_type].num > 0 )
 		{ 
 			if (SUCCEED != curl_post_request(conf->url,tbuffer[value_type].buffer, &responce))
-				LOG_INF("FAILED to flush %d trends of type %d to clickhouse", tbuffer[value_type].num, value_type);
+				LOG_DBG("FAILED to flush %d trends of type %d to clickhouse", tbuffer[value_type].num, value_type);
 				
 			tbuffer[value_type].offset=0;
 			tbuffer[value_type].num=0;
@@ -820,7 +805,7 @@ int	glb_history_clickhouse_init(char *params)
 	zbx_strlcpy(tmp_str,"http://localhost:8123",MAX_STRING_LEN);
 
 	if ( SUCCEED != zbx_json_value_by_name(&jp_config,"url", tmp_str, MAX_STRING_LEN,&type))  
-    	LOG_INF("%s: Couldn't find url param, using default '%s'",__func__,tmp_str);
+    	LOG_WRN("%s: Couldn't find url param, using default '%s'",__func__,tmp_str);
 	
 	zbx_rtrim(tmp_str, "/");
 	zbx_snprintf_alloc(&conf->url,&alloc,&offset,"%s",tmp_str);
@@ -865,7 +850,7 @@ int	glb_history_clickhouse_init(char *params)
 	
 	if ( (SUCCEED == zbx_json_value_by_name(&jp_config,"enable_trends", tmp_str, MAX_ID_LEN,&type))  &&
 		 ( strcmp(tmp_str,"0") == 0 || strcmp(tmp_str,"false") ==0 )) {
-			LOG_INF("Trends are disabled");
+			LOG_WRN("Trends are disabled");
 	} else {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Trends are enabled");
 		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE_TRENDS,(void (*)(void))add_trend_values, conf);
