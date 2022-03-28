@@ -615,7 +615,7 @@ class CLineGraphDraw extends CGraphDraw {
 				$history = Manager::History()->getLastValues([$item]);
 			
 				if (isset($history[$item['itemid']])) {
-					return $history[$item['itemid']]['value'];
+					return end($history[$item['itemid']])['value'];
 				}
 			}
 		}

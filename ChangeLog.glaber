@@ -1,3 +1,5 @@
+ver 2.9.5
+    - #removed some logging, #102 fix
 ver 2.9.3
     - #127 fix
 ver 2.9.2
