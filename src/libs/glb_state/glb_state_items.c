@@ -45,7 +45,7 @@ typedef struct
     glb_tsbuff_t tsbuff;
     item_demand_t demand;
 
-    unsigned value_type;
+    unsigned char value_type;
     int last_accessed;
     int db_fetched_time;
     int db_fetched_count;
@@ -1080,13 +1080,16 @@ int item_get_values_json_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *c
 
 static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 {
-    char value_type_str[MAX_ID_LEN];
+    int errflag = 0;
     zbx_json_type_t type;
 
-    if (SUCCEED != zbx_json_value_by_name(jp, "value_type", value_type_str, MAX_ID_LEN, &type))
+    if ( FAIL ==( elm->value_type = glb_json_get_int_value_by_name(jp, "value_type", &errflag) ))
         return FAIL;
 
-    elm->value_type = strtol(value_type_str, NULL, 10);
+    if ((elm->value_type >= ITEM_VALUE_TYPE_MAX || elm->value_type < 0) && elm->value_type != ITEM_VALUE_TYPE_NONE) {
+        LOG_WRN("Imporeper value type is set in the file: %d: '%s'", elm->value_type, jp->start);
+        return FAIL;
+    }
     elm->last_accessed = time(NULL);
 
     return SUCCEED;
@@ -1121,7 +1124,7 @@ static int parse_json_item_demand(struct zbx_json_parse *jp, item_demand_t *dema
     return FAIL;
 }
 
-int json_to_hist_record(struct zbx_json_parse *jp, int value_type, ZBX_DC_HISTORY *hist)
+int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX_DC_HISTORY *hist)
 {
     int errflag = 0;
     size_t alloc = 0;
@@ -1157,14 +1160,14 @@ int json_to_hist_record(struct zbx_json_parse *jp, int value_type, ZBX_DC_HISTOR
     case ITEM_VALUE_TYPE_NONE:
         return FAIL;
     default:
-        LOG_WRN("Unknow value type %d", value_type);
+        LOG_WRN("Unknow value type %d: %s", value_type, jp->start);
         THIS_SHOULD_NEVER_HAPPEN;
         return FAIL;
     }
     return SUCCEED;
 }
 
-static int parse_json_item_values(struct zbx_json_parse *jp, elems_hash_elem_t *elem, mem_funcs_t *memf, int value_type)
+static int parse_json_item_values(struct zbx_json_parse *jp, elems_hash_elem_t *elem, mem_funcs_t *memf)
 {
     const char *value_ptr = NULL;
     struct zbx_json_parse jp_value;
@@ -1224,7 +1227,7 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         return FAIL;
     }
     
-    return parse_json_item_values(&jp_values, elem, memf, elm->value_type);
+    return parse_json_item_values(&jp_values, elem, memf);
     
 }
 
