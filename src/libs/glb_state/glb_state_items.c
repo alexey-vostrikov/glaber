@@ -933,7 +933,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
-        LOG_DBG("Cannot add value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
+        LOG_WRN("Cannot add value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
         return FAIL;
     }
 
@@ -1164,7 +1164,7 @@ int json_to_hist_record(struct zbx_json_parse *jp, int value_type, ZBX_DC_HISTOR
     return SUCCEED;
 }
 
-static int parse_json_item_values(struct zbx_json_parse *jp, elems_hash_elem_t *elem, mem_funcs_t *memf)
+static int parse_json_item_values(struct zbx_json_parse *jp, elems_hash_elem_t *elem, mem_funcs_t *memf, int value_type)
 {
     const char *value_ptr = NULL;
     struct zbx_json_parse jp_value;
@@ -1195,7 +1195,7 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
                           jp_state, jp_demand, jp_values;
 
     item_elem_t *elm = (item_elem_t *)elem->data;
-
+    
     if (SUCCEED != parse_json_item_fields(jp, elm))
     {
         LOG_INF("Couldn't parse item fields %s", jp->start);
@@ -1223,8 +1223,8 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         LOG_INF("Couldn't parse item demand %s", jp->start);
         return FAIL;
     }
-
-    return parse_json_item_values(&jp_values, elem, memf);
+    
+    return parse_json_item_values(&jp_values, elem, memf, elm->value_type);
     
 }
 
