@@ -684,7 +684,7 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
     if (req->value_type != elm->value_type)
     {
         free_item(elm);
-        item_create_cb(elem, memf);
+        item_create_cb(elem, memf, NULL);
       
         elm = (item_elem_t *)elem->data;
         elm->value_type = req->value_type;
@@ -793,7 +793,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
         DEBUG_ITEM(elem->id, "Resetting value type %d -> %d ", elm->value_type, req->value_type);
 
         free_item(elm);
-        item_create_cb(elem, memf);
+        item_create_cb(elem, memf, NULL);
 
         elm = (item_elem_t *)elem->data;
         elm->value_type = req->value_type;
@@ -909,7 +909,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
         DEBUG_ITEM(elem->id, "Resetting cache value type to %d", h->value_type);
         LOG_DBG("Resetting value type %d -> %d ", elm->value_type, h->value_type);
         free_item(elm);
-        item_create_cb(elem, memf);
+        item_create_cb(elem, memf, NULL);
         elm = (item_elem_t *)elem->data;
         elm->value_type = h->value_type;
     }
@@ -1393,7 +1393,7 @@ int glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
     
     for (i=0; i<itemids->values_num; i++) {
 		DEBUG_ITEM(itemids->values[i], "Item is requested from the value cache, count %d", count);
-		elems_hash_process(state->items,itemids->values[i], item_get_values_json_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
+		elems_hash_process(state->items, itemids->values[i], item_get_values_json_cb, &req, ELEM_FLAG_DO_NOT_CREATE);
 	}	
  
   	zbx_json_close(json); //closing the items array

@@ -15,22 +15,40 @@
 //add,update,delete call-back based functions
 //and iterator to process all the elements
 
+
+//elems_hash_t *elems_hash_init_ext(mem_funcs_t *memf, 
+//                    elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func,
+//                    zbx_compare_func_t compare_func, zbx_hash_func_t hash_func) {
+    
+//    elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
+    
+//    zbx_hashset_create_ext(&e_hash->elems, 10, hash_func, compare_func, NULL, 
+//                            memf->malloc_func, memf->realloc_func, memf->free_func); 
+    
+//    e_hash->elem_create_func = create_func;
+//    e_hash->elem_free_func = free_func;
+    
+//    glb_rwlock_init(&e_hash->meta_lock);
+//    e_hash->memf = *memf;
+  
+//    return e_hash;
+//}
+
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
+       elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
     
-    elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
-    
-    zbx_hashset_create_ext(&e_hash->elems,10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC, NULL, 
-                        memf->malloc_func, memf->realloc_func, memf->free_func); 
+    zbx_hashset_create_ext(&e_hash->elems, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC, NULL, 
+                            memf->malloc_func, memf->realloc_func, memf->free_func); 
     
     e_hash->elem_create_func = create_func;
     e_hash->elem_free_func = free_func;
     
     glb_rwlock_init(&e_hash->meta_lock);
     e_hash->memf = *memf;
-  //  LOG_INF("e_hash init memf free is %ld", e_hash->memf.free_func);
-
+ 
     return e_hash;
 }
+
 
 static int delete_element(elems_hash_t *elems, elems_hash_elem_t *elem) {
     
@@ -65,19 +83,24 @@ void elems_hash_destroy(elems_hash_t *elems) {
 //elements are created in and inserted in write lock mode
 //then the element remains blocked, but overall locked mode is switched to read mode
 //this will not allow others to read inconsistent object
-elems_hash_elem_t *create_element(elems_hash_t *elems,  uint64_t id ) {
-    elems_hash_elem_t *elem, elem_local = {0};
-
-    if (NULL == (elem = zbx_hashset_search(&elems->elems, &id))) {  
-
-        elem_local.id = id;
+elems_hash_elem_t *create_element(elems_hash_t *elems,  uint64_t id, void *data ) {
+    elems_hash_elem_t *elem, elem_local = {.id = id, .data = data };
+    
+    if (NULL == (elem = zbx_hashset_search(&elems->elems, &elem_local))) {  
+        //note - for id - based objects elems' id will hold the meaningfull id
+        //however for other items it will hold first eight bytes of the object 
+        //intrepreted as id, also  such an objects might redefine the element's id
+        //however it will not be searchable by elems_process,  if search by id 
+        //is required, then the id shoudl be pregenerated and put into the first 
+        //eight bytes or pointer to it should be passed directly
+        //elem_local.id = *(u_int64_t*)id;
         glb_lock_init(&elem_local.lock);
         glb_lock_block(&elem_local.lock);
-
+   //     LOG_INF("Calling callback");
+        (*elems->elem_create_func)(&elem_local, &elems->memf, data);
+    //    LOG_INF("Return from create callback");
         elem = zbx_hashset_insert(&elems->elems,&elem_local,sizeof(elems_hash_elem_t) );
-
-        (*elems->elem_create_func)(elem, &elems->memf);
-
+    
     } else {
         elem = NULL;
     }
@@ -105,13 +128,13 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
         
         //note: create_elem will leave element in blocked state as it needs to be initialized by the user proc first
         //before becoming accessible to other threads
-		//LOG_INF("Creating element");
-        if (NULL ==(elem = create_element( elems, id  ))) {
+	//	LOG_INF("Creating element");
+        if (NULL ==(elem = create_element( elems, id, params ))) {
             glb_rwlock_unlock(&elems->meta_lock);
         	return FAIL;
         }
 
-		//LOG_INF("Created, re - rdlocking elems");
+	//	LOG_INF("Created, re - rdlocking elems");
         glb_rwlock_unlock(&elems->meta_lock);
         glb_rwlock_rdlock(&elems->meta_lock);
 	}  else  {
@@ -141,7 +164,7 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
 }
 
 
-int elems_hash_delete(elems_hash_t *elems, u_int64_t id) {
+int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
     elems_hash_elem_t *elem;
     int ret = SUCCEED;
 
@@ -151,7 +174,7 @@ int elems_hash_delete(elems_hash_t *elems, u_int64_t id) {
     if (NULL != elem) {
       ret = delete_element(elems, elem);
     } else {
-        ret = FAIL;
+      ret = FAIL;
     }
     
     glb_rwlock_unlock(&elems->meta_lock);

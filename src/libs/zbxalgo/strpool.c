@@ -31,7 +31,7 @@ void zbx_heap_strpool_destroy()
 	zbx_hashset_destroy(&strpool_local);
 }
 
-static const char *__strpool_intern(zbx_hashset_t *strpool, const char *str)
+static const char *__strpool_intern_n(zbx_hashset_t *strpool, const char *str, size_t len)
 {
 	void *record;
 	zbx_uint32_t *refcount;
@@ -44,7 +44,7 @@ static const char *__strpool_intern(zbx_hashset_t *strpool, const char *str)
 	if (NULL == record)
 	{
 		record = zbx_hashset_insert_ext(strpool, str - REFCOUNT_FIELD_SIZE,
-										REFCOUNT_FIELD_SIZE + strlen(str) + 1, REFCOUNT_FIELD_SIZE);
+										REFCOUNT_FIELD_SIZE + len + 1, REFCOUNT_FIELD_SIZE);
 		*(zbx_uint32_t *)record = 0;
 	}
 
@@ -52,6 +52,20 @@ static const char *__strpool_intern(zbx_hashset_t *strpool, const char *str)
 	(*refcount)++;
 
 	return (void *)record + REFCOUNT_FIELD_SIZE;
+}
+
+static const char *__strpool_intern(zbx_hashset_t *strpool, const char *str)
+{
+	void *record;
+	size_t len;
+	zbx_uint32_t *refcount;
+
+	if (NULL == str)
+		return NULL;
+
+	len = strlen(str);
+	
+	return __strpool_intern_n(strpool, str, len);
 }
 
 const char *zbx_heap_strpool_intern(const char *str)
@@ -127,6 +141,17 @@ const char *strpool_add(strpool_t *strpool, const char *str)
 	return ret;
 }
 
+const char *strpool_add_n(strpool_t *strpool, const char *str, size_t len)
+{
+	const char *ret;
+	glb_lock_block(&strpool->lock);
+	ret = __strpool_intern_n(&strpool->strs, str, len);
+	glb_lock_unlock(&strpool->lock);
+
+	return ret;
+}
+
+
 void strpool_free(strpool_t *strpool, const char *str)
 {
 	glb_lock_block(&strpool->lock);
@@ -147,7 +172,7 @@ const char *strpool_replace(strpool_t *strpool, const char *old_str, const char 
 	return ret;
 }
 
-const char *strpool_copy(char *str)
+const char *strpool_copy(const char *str)
 {
 	return __strpool_acquire(str);
 }

@@ -741,8 +741,10 @@ class CTemplate extends CHostGeneral {
 		if ($del_items) {
 			CItemManager::delete(array_keys($del_items));
 		}
-		CChangeset::add_objects(CChangeset::OBJ_PROTOTYPES, CChangeset::DB_DELETE, array_keys($del_items));
-		// delete host from maps
+		if (is_array($del_iems) && sizeof($del_items) > 0 )
+			CChangeset::add_objects(CChangeset::OBJ_PROTOTYPES, CChangeset::DB_DELETE, array_keys($del_items));
+		
+			// delete host from maps
 		if (!empty($templateids)) {
 			DB::delete('sysmaps_elements', ['elementtype' => SYSMAP_ELEMENT_TYPE_HOST, 'elementid' => $templateids]);
 		}

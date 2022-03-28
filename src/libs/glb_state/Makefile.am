@@ -8,7 +8,9 @@ libglbstate_a_SOURCES = \
 	glb_state.c \
 	glb_state.h	\
 	glb_state_items.h \
-	glb_state_items.c 
+	glb_state_items.c \
+	discovery.h \
+	discovery.c
 
 libglbstate_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxalgo

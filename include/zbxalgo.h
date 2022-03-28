@@ -515,7 +515,7 @@ int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need
         static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
 
 #define ELEMS_CREATE(name) \
-        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
+        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
 			
 #define ELEMS_FREE(name) \
         	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
@@ -534,7 +534,7 @@ typedef struct {
 	void *data;
 } elems_hash_elem_t; 
 
-typedef int	(*elems_hash_create_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
+typedef int	(*elems_hash_create_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
 typedef int	(*elems_hash_free_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
 typedef int	(*elems_hash_process_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params);
 
@@ -547,8 +547,11 @@ typedef struct  {
 } elems_hash_t;
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t elem_free_func );
+//elems_hash_t *elems_hash_init_ext(mem_funcs_t *memf, 
+//                    elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func,
+//                    zbx_compare_func_t compare_func, zbx_hash_func_t hash_func);
 int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data, u_int64_t flags);
-int		elems_hash_delete(elems_hash_t *elems, u_int64_t id);
+int		elems_hash_delete(elems_hash_t *elems,  uint64_t id);
 void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
 int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
@@ -582,9 +585,11 @@ int 		strpool_init(strpool_t *strpool, mem_funcs_t *memf);
 int 		strpool_destroy(strpool_t *strpool);
 
 const char *strpool_add(strpool_t *strpool, const char *str);
+const char *strpool_add_n(strpool_t *strpool, const char *str, size_t len);
+
 void 		strpool_free(strpool_t *strpool, const char *str);
 const char *strpool_replace(strpool_t *strpool, const char *old_str, const char *new_str);
 
-const char *strpool_copy(char *str);
+const char *strpool_copy(const char *str);
 
 #endif

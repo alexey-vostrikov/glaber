@@ -25,6 +25,7 @@
 #include "zbxserver.h"
 #include "zbxregexp.h"
 #include "proxy.h"
+#include "../../libs/glb_state/discovery.h"
 
 #define OVERRIDE_STOP_TRUE	1
 
@@ -1005,7 +1006,7 @@ int	lld_validate_item_override_no_discover(const zbx_vector_ptr_t *overrides, co
 	return ZBX_PROTOTYPE_NO_DISCOVER == override_default ? FAIL : SUCCEED;
 }
 
-static int	lld_rows_get(const char *value, lld_filter_t *filter, zbx_vector_ptr_t *lld_rows,
+static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, lld_filter_t *filter, zbx_vector_ptr_t *lld_rows,
 		const zbx_vector_ptr_t *lld_macro_paths, const zbx_vector_ptr_t	*overrides, char **info, char **error)
 {
 	struct zbx_json_parse	jp, jp_array, jp_row;
@@ -1040,6 +1041,9 @@ static int	lld_rows_get(const char *value, lld_filter_t *filter, zbx_vector_ptr_
 			continue;
 
 		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info))
+			continue;
+		
+		if (SUCCEED != glb_state_discovery_if_row_needs_processing(discoveryid, &jp_row, lifetime))
 			continue;
 
 		lld_row = (zbx_lld_row_t *)zbx_malloc(NULL, sizeof(zbx_lld_row_t));
@@ -1205,7 +1209,7 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		goto out;
 	}
 
-	if (SUCCEED != lld_rows_get(value, &filter, &lld_rows, &lld_macro_paths, &overrides, &info, error))
+	if (SUCCEED != lld_rows_get(lld_ruleid, lifetime, value, &filter, &lld_rows, &lld_macro_paths, &overrides, &info, error))
 	{
 		ret = FAIL;
 		DEBUG_ITEM(lld_ruleid,"Rows get failed: %s", *error);

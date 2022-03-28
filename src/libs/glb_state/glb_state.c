@@ -22,6 +22,7 @@
 #include "log.h"
 #include "memalloc.h"
 #include "glb_state.h"
+#include "discovery.h"
 #include "glb_state_items.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
@@ -67,6 +68,9 @@ int glb_state_init() {
 	glb_cache->memf.realloc_func = __cache_mem_realloc_func;
 
 	if (SUCCEED != glb_state_items_init(&glb_cache->memf) )
+		return FAIL;
+	
+	if (SUCCEED != discovery_init(&glb_cache->memf) )
 		return FAIL;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);

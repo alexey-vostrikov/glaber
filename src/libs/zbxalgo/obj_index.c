@@ -20,7 +20,7 @@ static int ref_free_callback(elems_hash_elem_t *elem, mem_funcs_t *memf) {
     return SUCCEED;
 }
 
-static int ref_create_callback(elems_hash_elem_t *elem, mem_funcs_t *memf) {
+ELEMS_CREATE(ref_create_callback) {
    
     ref_id_t *ref = (ref_id_t *)(*memf->malloc_func)(NULL,sizeof(ref_id_t));
     elem->data = ref;
