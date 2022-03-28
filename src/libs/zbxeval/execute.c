@@ -2826,14 +2826,12 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 		if (0 != (token->type & ZBX_EVAL_CLASS_OPERATOR1))
 		{
 			if (SUCCEED != eval_execute_op_unary(ctx, token, &output, &errmsg)) {
-				LOG_INF("eval_execute_op_unary(ctx, token FAIL");
 				goto out;
 			}
 		}
 		else if (0 != (token->type & ZBX_EVAL_CLASS_OPERATOR2))
 		{
 			if (SUCCEED != eval_execute_op_binary(ctx, token, &output, &errmsg)) {
-				LOG_INF("eval_execute_op_binary(ctx, token");
 				goto out;
 			}
 		}

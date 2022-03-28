@@ -23,7 +23,7 @@ extern int CONFIG_SERVER_STARTUP_TIME;
 #define GLB_CLICKHOUSE_FLUSH_TIMEOUT 3
 
 #define MAX_REASONABLE_BUFFER_SIZE 10000000
-#define ESCAPE_CHARS "\n\\'"
+#define ESCAPE_CHARS "'\\"
 
 typedef struct
 {
@@ -82,7 +82,7 @@ static void	clickhouse_log_error(CURL *handle, CURLcode error, const char *errbu
 			LOG_WRN("cannot get values from clickhouse, HTTP error: %ld", http_code);
 	}
 	else
-		LOG_WRN("cannot get values from clickhousesearch: %s",'\0' != *errbuf ? errbuf : curl_easy_strerror(error));
+		LOG_WRN("cannot get values from clickhouse: %s",'\0' != *errbuf ? errbuf : curl_easy_strerror(error));
 }
 
 /************************************************************************************
@@ -138,7 +138,6 @@ static int curl_post_request(char *url, char *postdata, char **responce) {
 
 		clickhouse_log_error(handle, err, errbuf,&page_r);
         LOG_WRN("Failed url '%s' postdata '%s' ",url, postdata);
-		LOG_WRN("Recieved from clickhouse: %s", page_r.data);	
 	} 
 	//LOG_DBG("Recieved from clickhouse: %s", page_r.data);	
 
@@ -605,8 +604,8 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			break;
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:
-			escaped_value=zbx_dyn_escape_string(h->value.str, ESCAPE_CHARS);
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s'",escaped_value);
+			escaped_value = zbx_dyn_escape_string(h->value.str, ESCAPE_CHARS);
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,", '%s'", escaped_value);
 			zbx_free(escaped_value);
 			break;
 		case ITEM_VALUE_TYPE_LOG:

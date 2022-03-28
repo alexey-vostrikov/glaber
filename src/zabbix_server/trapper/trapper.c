@@ -914,7 +914,7 @@ static void glb_trapper_get_debug(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	zbx_json_adduint64(&json, "triggerid", DC_get_debug_trigger());
 	zbx_json_close(&json);
 
-	LOG_INF("%s: Response is %s",__func__, json.buffer);
+	LOG_DBG("%s: Response is %s",__func__, json.buffer);
 
 	(void)zbx_tcp_send(sock, json.buffer);
 	zbx_json_free(&json);
@@ -998,7 +998,7 @@ static void get_items_lastvalues(zbx_socket_t *sock, struct zbx_json_parse *jp) 
 	zbx_json_close(&json);
 	zbx_vector_uint64_destroy(&itemids);
 		
-	LOG_INF("%s: Response is %s",__func__, json.buffer);
+	LOG_DBG("%s: Response is %s",__func__, json.buffer);
 	(void)zbx_tcp_send(sock, json.buffer);
 
 	zbx_json_free(&json);
