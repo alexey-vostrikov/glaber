@@ -1,3 +1,5 @@
+ver 2.9.3
+    - #127 fix
 ver 2.9.2
     - clickhouse native support is returned and refactored, internal (server) API support for aggregated
         data for both history and trends introduced, go clickhouse module is considered deprecated now and 
