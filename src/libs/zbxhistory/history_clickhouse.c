@@ -233,7 +233,7 @@ static int parse_trends_responce(char *responce, struct zbx_json *json) {
 		zbx_json_type_t type;
         
         struct zbx_json_parse	jp_row;
-		
+
         if (SUCCEED == zbx_json_brackets_open(p, &jp_row) &&
 			SUCCEED == zbx_json_value_by_name(&jp_row, "clcck", clck,MAX_ID_LEN, &type) &&
             SUCCEED == zbx_json_value_by_name(&jp_row, "num", count, MAX_ID_LEN,&type) &&
@@ -252,7 +252,7 @@ static int parse_trends_responce(char *responce, struct zbx_json *json) {
 			zbx_json_addstring( json, "num", count, ZBX_JSON_TYPE_INT);
 			zbx_json_close(json);
 		} else {
-            zabbix_log(LOG_LEVEL_DEBUG,"Couldn't parse JSON row: %s",p);
+           LOG_INF("Couldn't parse JSON row: %s",p);
         };
 	}
 	return SUCCEED;
@@ -289,15 +289,17 @@ static int	get_trend_values_json(void *data, int value_type, zbx_uint64_t itemid
 		ORDER BY clock \
 		FORMAT JSON",  conf->dbname, trend_tables[value_type], start, end, itemid); 
 
-	LOG_INF("Sending query to '%s' post data: '%s'", conf->url, sql_buffer);
+	LOG_DBG("Sending query to '%s' post data: '%s'", conf->url, sql_buffer);
 
 	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
 		return FAIL;
 	
-	LOG_INF("Recieved from clickhouse: %s", responce);
+	LOG_DBG("Recieved from clickhouse: %s", responce);
 	
 	if (SUCCEED != parse_trends_responce(responce, json)) 
 			return FAIL;
+	
+	LOG_DBG("Resulting trends JSON is %s", json->buffer);
 
 	return SUCCEED;
 }
