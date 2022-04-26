@@ -28,6 +28,7 @@
 #include "dbconfig.h"
 #include "dbsync.h"
 #include "changeset.h"
+#include "../glb_conf/conf_index.h"
 
 typedef struct
 {
@@ -450,9 +451,8 @@ static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_fu
 		//note: to work correctly rows must be id-ordered in SQL
 		//TODO: this may delete extra indexes - fugure
 		if (old_id != id) {
-			obj_index_del_id_from(idx,id);
-			obj_index_del_id_to(idx,id);
-
+			obj_index_del_id(idx,id);
+			obj_index_del_reverse_id(idx,id);
 		}
 		DEBUG_TRIGGER(id, "Adding dependency ref %ld -> %ld", id, id_ref);
 		DEBUG_TRIGGER(id_ref, "Adding dependency ref %ld -> %ld", id, id_ref);
@@ -467,8 +467,8 @@ static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_fu
 
 		while (NULL != (dbrow = DBfetch(result))) {
 			ZBX_STR2UINT64(id, dbrow[0]);
-			obj_index_del_id_from(idx,id);
-			obj_index_del_id_to(idx,id);
+			obj_index_del_id(idx,id);
+			obj_index_del_reverse_id(idx,id);
 			d++;	
 		}
 		DBfree_result(result);	
@@ -2350,7 +2350,7 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync, mem_funcs_t *memf, obj_index_t *idx_ptr)
+int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync)
 {
 	DB_ROW			dbrow;
 	DB_RESULT		result;
@@ -2383,7 +2383,8 @@ int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync, mem_funcs_t *memf,
 		return FAIL;
 	}
 	
-	return glb_process_index_update(sync, result ,memf, idx_ptr, OBJ_TRIGGERS,"trigger depends");
+	return conf_index_deptrigger_sync_from_db(sync->mode,result);
+	//return glb_process_index_update(sync, result ,memf, idx_ptr, OBJ_TRIGGERS,"trigger depends");
 }
 
 /******************************************************************************

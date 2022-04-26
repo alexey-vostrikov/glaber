@@ -23,7 +23,7 @@
 #include "log.h"
 #include "zbxserver.h"
 #include "postinit.h"
-#include "../../libs/glb_state/glb_state.h"
+#include "../../libs/glb_state/state.h"
 
 #define ZBX_HIST_MACRO_NONE		(-1)
 #define ZBX_HIST_MACRO_ITEM_VALUE	0

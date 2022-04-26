@@ -80,8 +80,9 @@
 #include "zbxtrends.h"
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
-#include "../libs/glb_state/glb_state.h"
-#include "../libs/glb_state/glb_state_items.h"
+#include "../libs/glb_state/state.h"
+#include "../libs/glb_state/state_items.h"
+#include "../libs/glb_process/process.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -185,6 +186,8 @@ int		server_num		= 0;
 u_int64_t CONFIG_DEBUG_ITEM = 0;
 u_int64_t CONFIG_DEBUG_TRIGGER = 0;
 
+size_t CONFIG_PROCESSING_IPC_SIZE = 1024 * 1024 * 256; //TODO: configurable IPC size
+
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
 int	CONFIG_DISCOVERER_FORKS		= 1;
@@ -253,9 +256,9 @@ int	CONFIG_VMWARE_PERF_FREQUENCY	= 60;
 int	CONFIG_VMWARE_TIMEOUT		= 10;
 
 zbx_uint64_t	CONFIG_CONF_CACHE_SIZE		= 8 * ZBX_MEBIBYTE;
-zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
-zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
-zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
+//zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
+//zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
+//zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TREND_FUNC_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 u_int64_t			CONFIG_VALUE_CACHE_SIZE		= 512 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
@@ -377,6 +380,12 @@ int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
 int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_ENABLED;
 
 char	*CONFIG_WEBSERVICE_URL	= NULL;
+
+void *ipc_processing = NULL;
+void *ipc_processing_notify = NULL;
+
+void *IPC_DISCOVERY_PROCESSING = NULL;
+void *IPC_PREPROCESSING = NULL;
 
 volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 
@@ -895,12 +904,12 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"CacheSize",			&CONFIG_CONF_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(64) * ZBX_GIBIBYTE},
-		{"HistoryCacheSize",		&CONFIG_HISTORY_CACHE_SIZE,		TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
-		{"HistoryIndexCacheSize",	&CONFIG_HISTORY_INDEX_CACHE_SIZE,	TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
-		{"TrendCacheSize",		&CONFIG_TRENDS_CACHE_SIZE,		TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
+//		{"HistoryCacheSize",		&CONFIG_HISTORY_CACHE_SIZE,		TYPE_UINT64,
+//			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
+//		{"HistoryIndexCacheSize",	&CONFIG_HISTORY_INDEX_CACHE_SIZE,	TYPE_UINT64,
+//			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
+//		{"TrendCacheSize",		&CONFIG_TRENDS_CACHE_SIZE,		TYPE_UINT64,
+//			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"TrendFunctionCacheSize",	&CONFIG_TREND_FUNC_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	0,			__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
@@ -1426,20 +1435,18 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
+	//if (NULL == (IPC_PRE_PROCESSING = glb_ipc_init(GLB_IPC_PRE_PROCESSING, 1024 * 1024 * 256, "Preprocessing IPC", 1000000, 64, CONFIG_PREPROCMAN_FORKS, 
+	//	 )     {
+	//	zbx_error("Cannot initialize Glaber IPC services");
+	//	exit(EXIT_FAILURE);
+	//}
 
-
-
-	//IPC init, //TODO: when ipc mechanics is ready, make number of
-	//IPC queues configurable by the config file
-	glb_ipc_type_cfg_t comm_types[] = {
-		{ GLB_IPC_PROCESSING, 1024*1024, CONFIG_PREPROCMAN_FORKS },
-		{ GLB_IPC_NONE, 0 } //last should be none
-	};
-
-	if (FAIL == glb_ipc_init((glb_ipc_type_cfg_t *)&comm_types)) {
-		zbx_error("Cannot initialize Glaber IPC services");
-		exit(EXIT_FAILURE);
+	if (FAIL == glb_processing_ipc_init(CONFIG_HISTSYNCER_FORKS, 100000, 800000)) {
+		zbx_error("Cannot init processing IPC queues");
+		exit(-1);
 	}
+
+	glb_ipc_init_sender(IPC_PROCESSING_NOTIFY, CONFIG_HISTSYNCER_FORKS);
 
 	if (FAIL == glb_state_init()) {
 		zbx_error("Cannot initialize Glaber CACHE");

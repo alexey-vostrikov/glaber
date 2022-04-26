@@ -1,7 +1,5 @@
-/****** the copyright ***************/
-/* read carefully
-** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+/*
+** Copyright Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,7 +16,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-
 #ifndef GLB_IPC_SERVICE_H
 #define GLB_IPC_SERVICE_H
 
@@ -30,823 +27,498 @@
 #include "glb_lock.h"
 #include <pthread.h>
 
-#define GLB_IPC_UNLOCKED 		0
-#define GLB_IPC_LOCKED 			1
+//for debugging only to have metric 
+#include "../glb_process/process.h"
 
-#define GLB_IPC_MODE_STRICT 	1
-#define GLB_IPC_MODE_NONSTRICT	2
-#define GLB_IPC_MODE_ALL 		3
+typedef struct ipc_element_t ipc_element_t;
 
-//local buffer options - timeout and maximum number of items
-#define GLB_IPC_MAX_CACHE_LOCAL 16384
-#define GLB_IPC_MAX_CACHE_TIMEOUT 1
+struct ipc_element_t {
+	ipc_element_t *next;
+	u_int64_t data;
+} ;
 
-#define GLB_IPC_BUFFERS 65536
-#define GLB_IPC_MAX_DATA_SZIE 2*1024*1024 //1Meg is enough for any data
-
-extern size_t CONFIG_IPC_BUFFER_SIZE;
-			  
-
-static  zbx_mem_info_t	*ipc_mem;
-ZBX_MEM_FUNC_IMPL(__ipc, ipc_mem)
-
-//limiting number of each ipc elements by it's queue elems
-typedef struct glb_ipc_queue_item_t glb_ipc_queue_item_t;
-struct glb_ipc_queue_item_t{
-	 glb_ipc_buffer_t *buffer;
-     glb_ipc_queue_item_t *next;
-}; 
-
-typedef struct {
-	glb_ipc_queue_item_t *first;
-	glb_ipc_queue_item_t *last;
-	unsigned int count;
-	pthread_mutex_t p_lock;
-} glb_ipc_queue_t;
-
-typedef struct {
-	glb_ipc_buffer_t *first;
-	pthread_mutex_t q_lock;
-	unsigned int count;
-} glb_ipc_buffer_queue_t;
-
-
-/* ipc per-type data, need one buffer for the each communication type */
-#define GLB_IPC_MAX_CONSUMERS 64
-
-//ipc type to handle all IPC work
 typedef struct
 {
-	/* the number of transfered items per IPC type, used for statistics */
-	zbx_uint64_t		sent;
-	glb_ipc_queue_t		free;   //queue of free queue_items
-    glb_ipc_queue_t		queued[GLB_IPC_MAX_CONSUMERS]; //array of queues for items ready for processing, should be allocated in shm
- 	glb_ipc_type_cfg_t	conf;
-} glb_ipc_type_t;
+	ipc_element_t *first;
+	ipc_element_t *last;
+	int count;
+	pthread_mutex_t lock;
+	u_int64_t sent;
+} ipc_queue_t;
 
-//finally, IPC struct that describes all the IPC
 typedef struct {
-	glb_ipc_type_t ipc[GLB_IPC_TYPE_COUNT];
-	glb_ipc_buffer_queue_t free_buffers; //this queue will hold free queue_items to handle buffers
-	glb_ipc_buffer_queue_t buffers[GLB_IPC_BUFFERS];
-	pthread_mutex_t mem_lock;
-	char test_string[MAX_BUFFER_LEN];
-	unsigned int  buffers_count;
-} glb_ipc_t;
-
-//has to be allocated in shm
-glb_ipc_t *glb_ipc;
-
-//for IPC clients, holds internal queues
-static glb_ipc_type_t local_ipc[GLB_IPC_TYPE_COUNT];
-/**********************************************************
- * fetches one item from the queue. Ineficcient
- * //TODO: mass fetch
-***********************************************************/
-glb_ipc_queue_item_t *glb_ipc_get_item(glb_ipc_queue_t *queue) {
-	glb_ipc_queue_item_t *elem = NULL;
+	zbx_mem_info_t shm;
+	unsigned char   type;
+	unsigned int    elems_count; //per consumer
+	size_t 			elem_size;
+	unsigned int    consumers; 	
+	mem_funcs_t 	memf;
 	
-	glb_lock_block(&queue->p_lock);
+	ipc_data_create_cb_t create_cb; //functions to properly place and free
+//	glb_ipc_release_cb release_cb; //ipc data to the ipc queue and ipc mem
+	ipc_data_free_cb_t free_cb;
 
-	if (NULL == queue->first) {
-		glb_lock_unlock(&queue->p_lock);
-		return NULL;
-	} 
+	ipc_queue_t free_queue; //init in the SHM
+	ipc_queue_t *queues; //init in the SHM
 
-	elem = queue->first;
-	queue->first = elem->next;
+} ipc_conf_t;
 
-	if (NULL == elem) {
-		queue->last = NULL;
+typedef struct 
+{
+	ipc_queue_t *send_queues; //queue for buffering messages before they being send 
+	ipc_queue_t rcv_queue; //queue for local buffering of messages before they get processed
+	ipc_queue_t free_rcv_queue; //for buffering elements after they got free on recieve side
+	ipc_queue_t free_snd_queue; //for buffering free elements on the sender side
+} ipc_local_queues_t;
+
+static ipc_local_queues_t *local_queues = NULL;
+
+#define MOVE_ALL_ELEMENTS 0
+
+static int alloc_local_queues() {
+	if (NULL != local_queues)
+		return SUCCEED;
+
+	if(NULL == (local_queues = zbx_malloc(NULL, sizeof(ipc_local_queues_t) * GLB_IPC_TYPE_COUNT))) {
+		LOG_WRN("Cannot allocate heap memory for local ipc structures");
+		return FAIL;
 	}
-	
-	queue->count--;
 
-	glb_lock_unlock(&queue->p_lock);
-	return elem;
-}
-/*****************************************************************
-* adds a queue of items to the existing queue
-* ***************************************************************/
-unsigned int glb_ipc_put_items(glb_ipc_queue_t *queue,  glb_ipc_queue_item_t *item,  glb_ipc_queue_item_t *new_last, unsigned int count) {
-
-	glb_ipc_queue_item_t *old_last = NULL;
-	
-	glb_lock_block(&queue->p_lock);
-	
-	if (NULL == new_last ) 
-		new_last = item;
-	
-	new_last->next = NULL;
-
-	if ( NULL == queue->first) {
-		queue->last = new_last;
-		queue->count = count;
-		queue->first = item;
-	} else {
-		if (NULL == queue->last) {
-			THIS_SHOULD_NEVER_HAPPEN;
-			exit(-1);
-		}
-		queue->last->next = item;
-		queue->last = new_last;
-		queue->count += count;
-	}
-	
-	glb_lock_unlock(&queue->p_lock);
-
+	memset(local_queues, 0 , sizeof(ipc_local_queues_t) * GLB_IPC_TYPE_COUNT);
 	return SUCCEED;
 }
 
-
-/*************************************************************
- * Fetches one item from the end of the queue 
- * unless it's the last item, doesn't locks, uses CAS
- * to fetch. Allthow it seems safe, i only recommend to 
- * use it with one consumer and use locked version 
- * when there are many consumers
-**************************************************************/
-/*
-static  glb_ipc_queue_item_t *glb_ipc_get_item_nolock1( glb_ipc_queue_t *queue) {
-	int i=0;
-	 glb_ipc_queue_item_t *old_head = queue->first, *new_head = NULL;
-	
-	do {
-		if (i++ > 10) usleep(1);
-
-		//no data or locked - go away
-	//	if (queue->p_lock > 0)  {
-	//		zabbix_log(LOG_LEVEL_INFORMATION, "Queue is locked, cannot fetch");
-	//		return NULL;
-	//	}
-		
-		if (NULL == queue->first || NULL == queue->last)  {
-			//zabbix_log(LOG_LEVEL_INFORMATION, "Queue is emtpy, nothing to fetch");
-			return NULL;
-		}
-		//leave 1 space element, this way we don't deal with last element change
-		//which a) doubles the work and so b) increases chances 
-		//TODO: get rid of this, at least, by locking,  or make sure that each newly created queue holds an element
-		
-		//we stop requiring that there was a spacer, BUT 
-		//while we updating the first element, it's possible that another thread will add something to 
-		//the element... so after successufull first->null change we check if last has a new value now,
-		//and if so, setting first 
-		old_head = queue->first;
-
-		if (NULL != old_head) 
-			new_head = old_head->next;
-		else 
-			return NULL; //no way to get the item - head has become null (someone has changed it)
-
-		if (queue->first == queue->last) {
-			//the special case: there is only one element 
-			//CAS last first and only after - first to prevent adding new data to the removed element 
-			if (__sync_bool_compare_and_swap(&queue->last, old_head, NULL)) {
-				//we succeed, so no items will be added after the current item, they'll get an empty last and reset last and first
-				//but before we continue, lets try to sawp first to null, but only if it's still the old value
-				__sync_bool_compare_and_swap(&queue->first, old_head, NULL);
-				//event if we failed, this means writer has altered first already due to knowning last is null, which is fine
-				return old_head;
-
-			} else 	//last has changed before us, probably, addition of new data completed or someone succeded on retrieving the item
-					//on it's way, we have to repeat all over again, starting from resetting varaibles
-				continue;
-		}
-	} while (!__sync_bool_compare_and_swap(&queue->first, old_head, new_head));
-	
-	return old_head;
-}
-*/
-
-
-/************************************************
- * Global init, should be called before forks	*
-************************************************/
-int glb_ipc_init(glb_ipc_type_cfg_t *comm_types) {
-    
-	int ipc_type = 0;
+int  glb_ipc_init_sender(unsigned char ipc_type, int consumers) {
 	int i;
-    char *error = NULL;
-	
-	
-	LOG_DBG("Allocating shared memory for IPC size %ld",CONFIG_IPC_BUFFER_SIZE);
 
-	//SHM
-	if (SUCCEED != zbx_mem_create(&ipc_mem, CONFIG_IPC_BUFFER_SIZE, "IPC cache size", "IPCsize", 1, &error))
+	if (SUCCEED != alloc_local_queues())
 		return FAIL;
 
-	//IPC struct 
-	if (NULL == (glb_ipc = (glb_ipc_t *)__ipc_mem_malloc_func(NULL, sizeof(glb_ipc_t)))) {	
-		zabbix_log(LOG_LEVEL_CRIT,"Cannot allocate IPC structures, exiting");
-		return FAIL;
-	}
+	LOG_INF("Doing init of %d local queues for type %d", consumers, ipc_type);
+	local_queues[ipc_type].send_queues = zbx_malloc(NULL, sizeof(ipc_queue_t) * consumers);
 
-	memset((void *)glb_ipc, 0, sizeof(glb_ipc_t));
+	LOG_INF("local snd queue 0 addr is %p", local_queues[ipc_type].send_queues);
+	memset(local_queues[ipc_type].send_queues, 0 , sizeof(ipc_queue_t) * consumers);
 	
-	//locks
-	for (i=0; i<GLB_IPC_BUFFERS; i++) {
-		glb_lock_init(&glb_ipc->buffers[i].q_lock);	
+	for (i = 0; i < consumers; i++ ) {
+		glb_lock_init(&local_queues[ipc_type].send_queues[i].lock);
 	}
-
-	glb_lock_init(&glb_ipc->mem_lock);
 	
-	for ( ipc_type = 0; GLB_IPC_NONE != comm_types[ipc_type].type; ipc_type++ ) {
-		void *data;
-		
-		glb_ipc_type_cfg_t *cfg = &comm_types[ipc_type];
+	glb_lock_init(&local_queues[ipc_type].free_snd_queue.lock);
 
-		LOG_DBG("Creating IPC mem and structures for IPC type %d, elements: %d", 
-				cfg->type, cfg->elems_count);
-
-		glb_ipc->ipc[ipc_type].conf.consumers = comm_types[ipc_type].consumers;
-		glb_ipc->ipc[ipc_type].conf.elems_count = comm_types[ipc_type].elems_count;
-
-		for (i = 0; i < GLB_IPC_MAX_CONSUMERS; i++ ) {
-
-			glb_ipc->ipc[ipc_type].queued[i].count = 0;
-			glb_ipc->ipc[ipc_type].queued[i].first = NULL;
-			glb_ipc->ipc[ipc_type].queued[i].last = NULL;
-			glb_lock_init(&glb_ipc->ipc[ipc_type].queued[i].p_lock);
-		}	
-		
-		glb_lock_init(&glb_ipc->ipc[ipc_type].free.p_lock);
-			
-		glb_ipc_queue_item_t *prev_elem = NULL;
-		//TODO: return mass addition of queue elements - they aren't expected to be free at all
-		for ( i = 0 ; i < cfg->elems_count; i++ ) {
-			glb_ipc_queue_item_t *q_elem;
-			
-			if (NULL == (q_elem = __ipc_mem_malloc_func(NULL,sizeof(glb_ipc_queue_item_t)))) {
-				zabbix_log(LOG_LEVEL_WARNING, "Cannot do init for type %d, element %d, exiting", ipc_type, i);
-				exit(-1);
-			}
-
-			q_elem->buffer = NULL;
-
-			if (0 == i) {
-				glb_ipc->ipc[ipc_type].free.first = q_elem;
-			} else {
-				prev_elem->next = q_elem;
-			}
-			prev_elem = q_elem;
-		}
-		prev_elem->next = NULL;
-		glb_ipc->ipc[ipc_type].free.last = prev_elem;
-
-	}
-	LOG_DBG("%s:finished", __func__);
 	return SUCCEED;
 }
 
-
-/*************************************************************
- * Fetches all items from the queue 
- **************************************************************/
- /*
- glb_ipc_queue_item_t *glb_ipc_get_items_nolock( glb_ipc_queue_t *queue) {
-
-	int i=0;
-	 glb_ipc_queue_item_t *old_head = queue->first, *old_last, *new_head = NULL;
-
-	do {
-		if (i++ > 10) usleep(1);
-
-		//no data or locked - go away
-		//if (queue->lock > 0 || NULL == queue->first || NULL == queue->last) 
-		//	return NULL;
-		//leave 1 space element, this way we don't deal with last element change
-		//which a) doubles the work and so b) increases chances 
-		//TODO: get rid of this, at least, by locking,  or make sure that each newly created queue holds an element
-		
-		//we stop requiring that there was a spacer, BUT 
-		//while we updating the first element, it's possible that another thread will add something to 
-		//the element... so after successufull first->null change we check if last has a new value now,
-		//and if so, setting first 
-		old_head = queue->first;
-		old_last = queue->last;
-
-		if (NULL != old_head) 
-			new_head = NULL;
-		else 
-			return NULL; //no way to fetch any item - head has become null (someone has changed it)
-
-		if (old_head == old_last) {
-			//the special case: there is only one element 
-			//CAS last and only after it - first to prevent adding new data to the removed element 
-			if (__sync_bool_compare_and_swap(&queue->last, old_head, NULL)) {
-				//we succeed, so no items will be added after the current item, they'll get an empty last and reset last and first
-				//but before we continue, lets try to sawp first to null, but only if it's still the old value
-				__sync_bool_compare_and_swap(&queue->first, old_head, NULL);
-				//event if we failed, this means writer has altered first already due to knowning last is null, which is fine
-				return old_head;
-
-			} else 	//last has changed before us, probably, addition of new data completed or someone succeded on retrieving the item
-					//on it's way, we have to repeat all over again, starting from resetting varaibles
-				continue;
-		}
-	} while (!__sync_bool_compare_and_swap(&queue->first, old_head, NULL));
+int glb_ipc_init_reciever(unsigned char ipc_type) {
 	
-	//when first point to NULL, no one will read our data anymore
-	//but someone might be adding new data to the tail right now
-	//it's not a big problem, we just get some more data and will 
-	//get new queue->last. 
-	do {
-		old_last = queue->last;
-	 } while (!__sync_bool_compare_and_swap(&queue->last, old_last, NULL));
-
-	//by this moment we've got a new last item, the old one is pointing to the our end
-	//closing the list
-	if (old_last) 
-		old_last->next = NULL;
+	if (SUCCEED != alloc_local_queues())
+		return FAIL;
 	
-	return old_head;
+	glb_lock_init(&local_queues[ipc_type].free_rcv_queue.lock);
+	glb_lock_init(&local_queues[ipc_type].rcv_queue.lock);
 }
-*/
-/*************************************************************
- * Adds the item or items to the queue's tail 
- * if Item has been added, returns SUCCEED, after that
- * added items should only be processed in any way only atfer 
- * fetching from the queue. new_last must point to the end of queue
- * it might be NULL, so only one item will be added
-**************************************************************/
-/*
-static unsigned int glb_ipc_put_items_nolock1( glb_ipc_queue_t *queue,  glb_ipc_queue_item_t *item,  glb_ipc_queue_item_t *new_last, unsigned int count) {
-	 glb_ipc_queue_item_t *old_last = NULL;
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "ipc mem address is %ld",ipc_mem);
+void glb_ipc_client_destroy() {
+	int i;
+	for (i = 0; i < GLB_IPC_TYPE_COUNT; i++) {
+		if (NULL != local_queues[i].send_queues)
+			zbx_free(local_queues[i].send_queues);
+	}
 
-	if (NULL == new_last ) 
-		new_last = item;
-	
-	//if (queue->lock > 0 )  
-	//	return FAIL;
+	zbx_free(local_queues);
+}
 
-	//wait till the queue in the consistent state
-	while ( (NULL != queue->last && NULL == queue->first) || 
-			(NULL == queue->last && NULL != queue->first) ) {
-		usleep(1);
+static int move_all_elements(ipc_queue_t *src, ipc_queue_t *dst) {
+
+	glb_lock_block(&src->lock);
+
+	if (src->count == 0) {
+		glb_lock_unlock(&src->lock);
+		return FAIL;	
 	}
 	
-	//just for safety
+	glb_lock_block(&dst->lock);	
+
+	if (dst->first == NULL) {
+
+		dst->first = src->first;
+		dst->last = src->last;
+		dst->count = src->count;
+		
+	} else {
+
+		dst->last->next = src->first;
+		dst->last = src->last;
+		dst->count += src->count;
+
+	}
+
+	src->first = src->last = NULL;
+	src->count = 0;
+
+	glb_lock_unlock(&dst->lock);
+	glb_lock_unlock(&src->lock);
+
+	return SUCCEED;
+}
+static void dump_queue(ipc_queue_t *q, char *name) {
+//	LOG_INF("Queue '%s' size %d, start: %p, end: %p", name, q->count, q->first, q->last);
+
+	if (0 == q->count && (NULL != q->first || NULL != q->last)) {
+		LOG_INF("FAIL: count is 0 but start/end isn't null");
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(-1);
+	}
+
+	if (0 < q->count && (NULL == q->first || NULL == q->last)) {
+		LOG_INF("FAIL: count is not 0 but start/end is Null");
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(-1);
+	}
+
+	if (NULL != q->last && NULL != q->last->next) {
+		LOG_INF("FAIL: last element doesn't points to 0, exiting");
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(-1);
+	}
+	int i=0;
+	ipc_element_t *elem = q->first;
+}
+
+
+static int move_one_element(ipc_queue_t *src, ipc_queue_t *dst, char *move_name) {
+	int ret = SUCCEED;
+
+	glb_lock_block(&src->lock);
+
+	if (src->count == 0) {
+		glb_lock_unlock(&src->lock);
+		return FAIL;	
+	}
+
+	glb_lock_block(&dst->lock);
+//	LOG_INF("Unlocked, dumping before move (%s):",move_name);
+//	dump_queue(src, "Src");
+//	dump_queue(dst, "Dst");
+
+	ipc_element_t *elem = src->first;
+//	LOG_INF("Moving elemem's address is %p", elem);
+
+	if (NULL == dst->first) {
+		//LOG_INF("Dst queue is empty, init from first");
+		dst->first = elem;
+		dst->last = elem;
+	} else {
+//		LOG_INF("Dst queue is non empty, has %d items moving elems to tail", dst->count);
+		dst->last->next = elem;
+		dst->last = elem;
+	}
+		
+	src->first = elem->next;
+	elem->next = NULL;
+
+	if (NULL == src->first)  {
+		src->last = NULL;
+		src->count = 0;
+	} else {
+		src->count --;
+	}
+
+	dst->count += 1;	
+		
+//	LOG_INF("Unlocking, dump after move (%s):", move_name);
+//	dump_queue(src, "Src");
+//	dump_queue(dst, "Dst");
+	glb_lock_unlock(&dst->lock);
+	glb_lock_unlock(&src->lock);
+//	LOG_INF("Finished");
+	return SUCCEED;
+}
+//note: maybe it's worth to disble extra locking on local queues
+//to save a few CPU ticks
+
+static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *move_name) {
+	int ret = SUCCEED;
+
+	if (0 == count ) {
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(-1);
+	}
+
+	glb_lock_block(&src->lock);
+
+	if (src->count == 0) {
+		glb_lock_unlock(&src->lock);
+		return FAIL;	
+	}
+//	Moving adll elements from local queue LOG_INF("Locking destination queue");
+	glb_lock_block(&dst->lock);
+
+	ipc_element_t *new_last = src->first;
+	int i = 1;
+		
+//	LOG_INF("Moving %d items", count);
+		
+	while (count  > i  && NULL != new_last->next ) {
+//		LOG_INF("I is %d, new last is %p", i, new_last);
+		new_last = new_last->next;
+		i++;
+	}
+
+	if (NULL == dst->first) {
+		dst->first = src->first;
+	} else {
+		dst->last->next = src->first;
+	}
+
+	dst->last = new_last;
+	src->first = new_last->next;
+			
+	if (NULL == src->first)  {
+		src->last = NULL;
+		src->count = 0;
+	} else {
+		src->count -= i;
+	}
+
+	dst->count += i;	
 	new_last->next = NULL;
 
-	do {
-		old_last = queue->last;
-	} while (!__sync_bool_compare_and_swap(&queue->last, old_last, new_last));
-	//now, if we happened to change last from NULL to an addr (we where the first to succeed data add)
-	//we have to set first to the first item
-	if (NULL == old_last) 
-		queue->first = item;
-	else 
-		old_last->next = item;
-
-	queue->count += count;
-	//ok now there is no problem to set the last item from the queue
-	//pointing to our new head - the item will remain in the queue until we do that
+//	LOG_INF("new src->last is %p", src->last);
+//	LOG_INF("After move  src queue has %d items, dst queue has %d items", src->count, dst->count);
 	
+//	LOG_INF("Unlocking, dump after move (%s):", move_name);
+//	dump_queue(dst, "Dst");
+//	dump_queue(src, "Src");
+
+	glb_lock_unlock(&dst->lock);
+	glb_lock_unlock(&src->lock);
+//	LOG_INF("Finished");
 	return SUCCEED;
 }
-*/
 
-/********************************************************
- *  Using atomics for lock/unlock						*
- *******************************************************/
-//static void glb_ipc_lock(pthread_mutex_t *lock) {
-//	zabbix_log(LOG_LEVEL_INFORMATION, "In %s: started", __func__);
-//	zabbix_log(LOG_LEVEL_INFORMATION, "In %s: started, lock addr is %ld, lock val is %d", __func__, lock, *lock);
-//	while(1) {
-//		zabbix_log(LOG_LEVEL_INFORMATION, "In %s: lock went to 0, trying to lock ", __func__);
-	//	usleep(50);
-//		if( __sync_bool_compare_and_swap(lock, GLB_IPC_UNLOCKED, GLB_IPC_LOCKED)) {
-//			zabbix_log(LOG_LEVEL_INFORMATION, "In %s: finished", __func__);
-//			return;
-//		}
-//		usleep(50);
-//	}
-//	pthread_mutex_lock(lock);	
+static void flush_queues(ipc_conf_t *ipc) {
+	int i;
+	static int last_flush = 0;
+	int now = time(NULL);
 	
-	
-	//return;
-//}
-
-//static void glb_ipc_unlock(pthread_mutex_t *lock) {
-	
-//	pthread_mutex_unlock(lock);
-	//*lock = GLB_IPC_UNLOCKED;
-//	zabbix_log(LOG_LEVEL_INFORMATION, "In %s: finished", __func__);
-//}
-
-
-
-/******************************************************
- * allocates a buffer in the shm 					  *
- * ****************************************************/
-void *glb_ipc_malloc(size_t size) {
-	void *ret;
-	int num;
-	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: locking memory");
-	
-	glb_lock_block(&glb_ipc->mem_lock);
-	
-//	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: locked mem, calling zbx_mem_malloc");
-//	zabbix_log(LOG_LEVEL_INFORMATION,"Memory stats: total %ld, used %ld, free %ld%%", ipc_mem->total_size, ipc_mem->used_size, (ipc_mem->free_size*100)/ipc_mem->total_size);
-
-	ret = zbx_mem_malloc(ipc_mem, NULL,size);
-	
-
-	glb_lock_unlock(&glb_ipc->mem_lock);
-	
-	zabbix_log(LOG_LEVEL_INFORMATION,"IPC: unlocked memory");
-	return ret;
-}
-
-//TODO: add calc of either size, not only index to fully utilize the buffers
-#define GLB_IPC_BUFFER_MIN_SIZE 24
-#define GLB_IPC_GRANULAR_SIZE 32768
-#define HI_RES_GRAN 8
-#define LO_RES_GRAN 256
-
-static unsigned int glb_ipc_calc_buf_idx(size_t data_size) {
-	unsigned int buf_idx;
-	if (data_size < GLB_IPC_BUFFER_MIN_SIZE)
-	 	data_size = GLB_IPC_BUFFER_MIN_SIZE;
-
-	data_size +=sizeof(glb_ipc_buffer_t);
-	
-	if (data_size <  GLB_IPC_GRANULAR_SIZE) { 
-		buf_idx = (data_size - GLB_IPC_BUFFER_MIN_SIZE) / HI_RES_GRAN;
-		data_size = (buf_idx + 1) * HI_RES_GRAN + GLB_IPC_BUFFER_MIN_SIZE;
-	} else {
-		buf_idx = ( GLB_IPC_GRANULAR_SIZE - GLB_IPC_BUFFER_MIN_SIZE) / HI_RES_GRAN + (data_size - GLB_IPC_GRANULAR_SIZE ) / LO_RES_GRAN;
-	}
-	
-	if (buf_idx >= GLB_IPC_BUFFERS) {
-		zabbix_log(LOG_LEVEL_INFORMATION,
-				"Requested buffer of %ld size, thats exceeding maximum IPC size %d, this is bug", data_size,
-				GLB_IPC_GRANULAR_SIZE  + LO_RES_GRAN * (GLB_IPC_BUFFERS - GLB_IPC_GRANULAR_SIZE /HI_RES_GRAN ) );
-		
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit(-1);
-	}
-  	return buf_idx;
-}
-
-
-
-/****************************************************************
- * buffer allocation - if exists,  retrieved from the cache
- * if not, then new buffer is allocated from the free IPC memory
-****************************************************************/
- glb_ipc_buffer_t *glb_ipc_get_buffer(size_t raw_size) {
-	glb_ipc_buffer_t *buffer = NULL;
-	size_t total_size = raw_size - 1 + sizeof (glb_ipc_buffer_t);
-
-
-	unsigned int buf_idx = glb_ipc_calc_buf_idx(total_size);
-
-		
-	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: allocating %ld bytes, index is %d", __func__, total_size, buf_idx);
-	
-	//do minimal length of GLB_IPC_MIN_BUFF_SIZE
-	
-	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: buffer index is %d", __func__, buf_idx);
-	//try to fetch an item from the buffers
-	glb_lock_block(&glb_ipc->buffers[buf_idx].q_lock);
-	
-	if ( NULL != glb_ipc->buffers[buf_idx].first ) {
-		buffer = glb_ipc->buffers[buf_idx].first;
-		glb_ipc->buffers[buf_idx].first = buffer->next;
-		 
-	}
-	glb_lock_unlock(&glb_ipc->buffers[buf_idx].q_lock);	
-	
-	zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocated from buffer queue %d", __func__, buf_idx);
-
-	if (NULL == buffer )  {
-		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocating via zbx_mem_alloc %ld", __func__, total_size);
-		buffer = (glb_ipc_buffer_t *)glb_ipc_malloc(total_size);
-		buffer->magic = 89234234;
-		
-		buffer->buf_idx = buf_idx;
-		zabbix_log(LOG_LEVEL_INFORMATION,"In %s: Allocated from malloc", __func__);
-	}
-
-	return buffer;
-}
-
-//buffer allocation to be called from the external 
-//places 
-void *glb_ipc_alloc(size_t size) {
-	glb_ipc_buffer_t *buffer = glb_ipc_get_buffer(size);		
-
-	return (void *)buffer->data;
-}
-
-/******************************************************
- * allocates buffer and retruns data part for it in 
- * IPC shm, respect NULLS
- * ****************************************************/
-char *glb_ipc_alloc_str(char *string) {
-	glb_ipc_buffer_t *buffer;
-	
-	if (NULL == string)
-		return NULL;
-
-	//strlen doesn't retrun 0 terminator, but we need it
-	size_t len = strlen(string)+1;
-	
-	buffer = glb_ipc_get_buffer(len);		
-	if (buffer->magic != 89234234 ) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Non magical buffer retruned in string allocation, bad times");
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit(-1);
-	}
-	zbx_strlcpy(buffer->data,string,len);
-
-	return buffer->data;
-}
-/***********************************************************
- * Places buffer back to buffers queue
-************************************************************/
-//TODO: make a single call to safely allocate or fetch from buffers
-void glb_ipc_release_buffer(glb_ipc_buffer_t *buffer) {
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s: started", __func__);
-	
-	if (buffer->magic != 89234234 ) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Magic is wrong, wrong buffer pointer has been retruned!");
-		exit(-1);
-	}
-
-	buffer->lastuse = time(NULL);
-	zabbix_log(LOG_LEVEL_INFORMATION, " %s IPC:clean Putting  buffer item back to free buffers", __func__);
-
-	glb_lock_block(&glb_ipc->buffers[buffer->buf_idx].q_lock);
-
-	buffer->next = glb_ipc->buffers[buffer->buf_idx].first;
-	glb_ipc->buffers[buffer->buf_idx].first = buffer;
-	
-	glb_lock_unlock(&glb_ipc->buffers[buffer->buf_idx].q_lock);
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "In %s: finished", __func__);
-	}
-
-
-/*******************************************************
- * deallocates the buffer referenced by data ptr
- *  it's expected that 
- * the address is part of the buffer structure
- * if glb_ipc_buffer_t changes, this should be reflected 
- * here
- * *****************************************************/
-void glb_ipc_free(void *ptr) {
-	//the trick is thar ptr point to the buffer part wich is prepended by
-	//size_t and unsigned long 
-	if (NULL == ptr) 
+	if (now == last_flush) 
 		return;
 	
-	glb_ipc_buffer_t *buffer = (void*) ptr - offsetof(glb_ipc_buffer_t, data);
-	
-	if (buffer->magic != 89234234 ) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Magic is wrong (got %u, %u, %u, %p, %p), wrong buffer pointer has been retruned",
-			 buffer->magic, buffer->buf_idx, buffer->lastuse, buffer->next, buffer->data);
-		exit(-1);
+	last_flush = now;
+
+	for (i =0 ; i < ipc->consumers; i ++ ) {
+//		LOG_INF("Moving all elements from local queue [%d, %d] to ipc type %d, queue %d", ipc->type, i, ipc->type, i);
+		move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
 	}
-	//now we have the buffer, we can retrun it
-	glb_ipc_release_buffer(buffer);
+	
+}
+int glb_ipc_flush_all(void *ipc_conf) {
+	ipc_conf_t *ipc = ipc_conf;
+	int i = 0;
+
+	for (i = 0 ; i < ipc->consumers; i ++ ) {
+		move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
+	}
 }
 
+int glb_ipc_send(void *ipc_conf, int queue_num, void* send_data ) {
+	ipc_conf_t *ipc = ipc_conf;
 
-void glb_ipc_dump_metric( GLB_METRIC *metric) {
-	zabbix_log(LOG_LEVEL_INFORMATION,"Metric dump: \n	addr:%p,\n	itemid:%ld,\n	hostid:%ld,\n	vector_id_ptr:%p,\n	host_ptr:%p", 
-						metric, metric->itemid, metric->hostid, metric->vector_id, metric->hostname);
-}
+	ipc_queue_t *local_free_queue = &local_queues[ipc->type].free_snd_queue,
+				*local_send_queue = &local_queues[ipc->type].send_queues[queue_num];
 
-/*********************************************************
-* inits local heap structures for being able to buffer and
-* send messages
-* for proc_type. If several types is used, them should
-* be called several time - once per type
-*********************************************************/
+	ipc_element_t  *element = NULL;
 
-int  glb_ipc_init_sender(int consumers, int ipc_type) {
+	//LOG_INF("There are %d items in the local free queue", local_free_queue->count);
+
+	if (local_free_queue->count == 0) {
+		//LOG_INF("Requesting 16 items from the global free queue");
+		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, 16, "ipc_free -> local free")) {
+			return FAIL;
+		};
+	}
 	
-	memset( (void *)local_ipc[ipc_type].queued, 0,  sizeof(glb_ipc_queue_t)*consumers);
-	local_ipc[ipc_type].sent = 0 ;
-	local_ipc[ipc_type].conf.consumers = consumers;
+	//LOG_INF("Moving element from the local free queue to local send queue, queue num is %d, addr is %p", queue_num, local_send_queue);
 	
+	if (FAIL == move_one_element(local_free_queue, local_send_queue, "local_free -> local_send")) 
+		return FAIL;
+//LOG_INF("Getting ptr to the item to send");
+	element = local_send_queue->last;
+	//LOG_INF("Calling callback");
+	ipc->create_cb(&ipc->memf, (void *)(&element->data), send_data);
+	
+	//LOG_INF("Flushing local send queues to global queues");
+	flush_queues(ipc);
+	//LOG_INF("Finished");
 	return SUCCEED;
-} 
-
-#define GLB_IPC_MAX_LOCAL_COUNT 128
-
-void glb_ipc_add_data(int ipc_type, int q_num,  void* buffer) {
-	
-	glb_ipc_queue_item_t *q_item;
-	LOG_INF("IPC:Put local Getting new SHM queue item for type %d", ipc_type);
-
-	while (NULL ==(q_item = glb_ipc_get_item(&glb_ipc->ipc[ipc_type].free))) {
-		sleep(1);
-		zabbix_log(LOG_LEVEL_INFORMATION, "Failed to got a new SHM queue item, either increase  elements or check for slowdowns");
-	}
-	
-	q_item->buffer = buffer;
-	q_item->next = NULL;
-
-	glb_ipc_put_items(&glb_ipc->ipc[ipc_type].queued[q_num],q_item,q_item,1);
-
 }
-/*
-void glb_ipc_buffer_localy(int ipc_type, int q_num, ) {
-	//fetch or create queue item to hold the data
-	 glb_ipc_queue_item_t *q_item;
-	//TODO: a safe and debuggable way of repetitive calls	
-	zabbix_log(LOG_LEVEL_INFORMATION, "IPC:Put local Getting new SHM queue item for type %d");
-	while (NULL ==(q_item = glb_ipc_get_item(&glb_ipc->ipc[ipc_type].free))) {
-		sleep(1);
-		zabbix_log(LOG_LEVEL_INFORMATION, "Failed to got a new SHM queue item, either increase  elements or check for slowdowns");
+
+
+// int glb_ipc_recieve(void *ipc_conf, int consumerid, void *buffer) {
+	
+// 	ipc_element_t *element;
+// 	ipc_conf_t *ipc = ipc_conf;
+
+// 	ipc_queue_t *local_rcv_queue = &local_queues[ipc->type].rcv_queue,
+// 				*rcv_queue = &ipc->queues[consumerid],
+// 				*local_free_queue = &local_queues[ipc->type].free_rcv_queue;
+	
+// //	LOG_INF("IPC_RECIEVE: ");
+// //	dump_queue(rcv_queue, "Rcv global queue");
+// //	dump_queue(local_rcv_queue, "Rcv local queue");
+
+// 	if (local_rcv_queue->count == 0 &&
+// 		FAIL == move_all_elements(rcv_queue, local_rcv_queue)) {
+// 		LOG_INF("No data arrived yet, local and global rcv queue is empty");
+// 		return NO_DATA;
+// 	}
+
+// 	//LOG_INF("Got %d elements in the rcv queue", local_rcv_queue->count);
+// 	element = local_rcv_queue->first;
+// 	//LOG_INF("Filling the buffer/releasing IPC mem, element addr is %p", element);
+// 	ipc->release_cb(&ipc->memf, (void *)(&element->data), buffer);	
+
+// 	//LOG_INF("Returning to the local free queue, queue size is %d", local_free_queue->count);
+// 	move_one_element(local_rcv_queue, local_free_queue, "local_recieve -> local_free");
+// //	LOG_INF("Moved one element to the free buffer");
+// 	if (local_free_queue->count >= 16 ) {
+// //		LOG_INF("Returning to the global free queue");
+// 		move_all_elements(local_free_queue, &ipc->free_queue);
+// 	}
+// 	return SUCCEED;
+// }
+
+/* callback based interface to process incoming data without need 
+to pop or copy data, returns number of the processed messages */
+int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
+	int i = 0;
+	ipc_element_t *element;
+	ipc_conf_t *ipc = ipc_conf;
+
+	ipc_queue_t *local_rcv_queue = &local_queues[ipc->type].rcv_queue,
+				*rcv_queue = &ipc->queues[consumerid],
+				*local_free_queue = &local_queues[ipc->type].free_rcv_queue;
+	
+
+	while (i < max_count ) {
+//	LOG_INF("IPC_RECIEVE: ");
+//	dump_queue(rcv_queue, "Rcv global queue");
+//	dump_queue(local_rcv_queue, "Rcv local queue");
+
+		if (local_rcv_queue->count == 0 &&
+			FAIL == move_all_elements(rcv_queue, local_rcv_queue)) {
+			LOG_INF("No data arrived yet, local and global rcv queue is empty");
+			break;
+		}
+
+		//LOG_INF("Got %d elements in the rcv queue", local_rcv_queue->count);
+		element = local_rcv_queue->first;
+		
+		//LOG_INF("Filling the buffer/releasing IPC mem, element addr is %p", element);
+		
+		cb_func(&ipc->memf, i, (void *)(&element->data), cb_data);
+		
+		if (NULL != ipc->free_cb)
+			ipc->free_cb(&ipc->memf, (void *)(&element->data));	
+
+		//LOG_INF("Returning to the local free queue, queue size is %d", local_free_queue->count);
+		move_one_element(local_rcv_queue, local_free_queue, "local_recieve -> local_free");
+		
+		//	LOG_INF("Moved one element to the free buffer");
+		if (local_free_queue->count >= 16 ) {
+			//LOG_INF("Returning to the global free queue");
+			move_all_elements(local_free_queue, &ipc->free_queue);
+		}
+		i++;
 	}
 	
-	q_item->buffer= buffer;
-	q_item->next = NULL;
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "Got new SHM queue item");
-
-	glb_ipc_queue_t *queue = &local_ipc[ipc_type].queued[q_num];
-
-	//sanity check
-	 glb_ipc_buffer_t *buff =(glb_ipc_buffer_t*) data - sizeof(glb_ipc_buffer_t);
-	if (buff->magic != 89234234) {
-		zabbix_log(LOG_LEVEL_INFORMATION,"Magic is screwed on sending, fall off");
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit(-1);
-	}
-
-	if (NULL == queue->first )  {
-		queue->first =  q_item;
-		queue->last =  q_item;
-
-	} else {
-		queue->last->next = q_item;
-		queue->last = q_item;
-	}
-	
-	queue->count++;
-	zabbix_log(LOG_LEVEL_INFORMATION,"Metric added, total %d metrics in the local queue %d, ipc addr is %ld, queue addr is %ld", 
-	     queue->count, q_num, glb_ipc, &glb_ipc->ipc[GLB_IPC_PROCESSING].queued);
-	//caller shouldn't forget to flush data periodically
-	//it's quite inexpensive - any amount is sent without locks
-	//glb_ipc_flush(ipc_type);
-	//return;
+	return i;
 }
-*/
-/*********************************************************
- * buffers the data localy by hash calculated based on 
- * number of consimers (same idx will go to same consumer)
- * ******************************************************/
-/*
-void *glb_ipc_save_localy_hashed(int ipc_type, u_int64_t idx,  void* data) {
-	static unsigned long lastflush = 0;
 
-	unsigned int hash = idx % local_ipc[ipc_type].conf.consumers;
-	zabbix_log(LOG_LEVEL_INFORMATION,"IPC:Put Queueing item %ld (hash %d) to queue %d", idx, hash, ipc_type );
-
-	glb_ipc_buffer_localy(ipc_type, hash, data);
-	
-	if (lastflush != time(NULL)) {
-		glb_ipc_flush(ipc_type);
-		lastflush = time(NULL);
-	}
-
-}
-*/	
-/******************************************************
- * flushes data to IPC memory from the "local" buffer *
- * actually, it's expected that "local" data is in the*
- * IPC either 										  *
- * ****************************************************/
-void glb_ipc_flush(int ipc_type) {
+void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb) {
+    
+	ipc_conf_t *conf;
 	int i;
-	 glb_ipc_queue_t *q_to;
-	 glb_ipc_queue_t *q_from;
-	 glb_ipc_queue_item_t *tmp_i = NULL;
-
-
-	for ( i=0; i<local_ipc[ipc_type].conf.consumers ; i++) {
-		q_from = &local_ipc[ipc_type].queued[i];
-		
-		zabbix_log(LOG_LEVEL_INFORMATION, "Dumping metrics before attaching to the SHM");
-		tmp_i = q_from->first;
-		while (tmp_i) {
-			glb_ipc_dump_metric((GLB_METRIC *)tmp_i->buffer->data);
-			tmp_i=tmp_i->next;
-		}
-		zabbix_log(LOG_LEVEL_INFORMATION, "Finished dumping metrics");
-
-		if (NULL == q_from->first)
-			continue;
-		
-		q_to = &glb_ipc[ipc_type].ipc->queued[i];
-		
-		zabbix_log(LOG_LEVEL_INFORMATION, "Adding to %d metrics to IPC_type %d queue num %d , ipc_type addr is %p  queue addr is %p",
-							q_from->count, ipc_type, i, &glb_ipc[ipc_type].ipc, &glb_ipc[ipc_type].ipc->queued[i]);
-		
-		glb_ipc_put_items(q_to, q_from->first, q_from->last, q_from->count);
-		zabbix_log(LOG_LEVEL_INFORMATION, "Added  %d metrics to IPC_type %d queue num %d",q_from->count, ipc_type, i);
-
-		memset((void *)q_from, 0, sizeof(glb_ipc_queue_t));
-	}
-}
-
-
-/**************************************************
- * Reciever API                           		  *
- * ************************************************/
-
-
-
-/********************************************************
- * Gets single data items, queue item retruned to 
- * the buffer, if possible better use mass version
- * ******************************************************/
-void* glb_ipc_get_data(int ipc_type, int q_num) {
+    char *error = NULL;
+	ipc_element_t *elements;
 	
-	//zabbix_log(LOG_LEVELINFORMATION, "ipc mem address is %ld",ipc_mem);
-	 void *buffer = NULL;
-	 glb_ipc_queue_item_t *q_item = NULL;
-	 
-
-	//zabbix_log(LOG_LEVEL_INFORMATION, "IPC:Read data from IPC type %d queue num %d, ipc addr is %ld, ipc type addr is %ld, queue addr is %ld",
-	 //		 ipc_type, q_num, glb_ipc, &glb_ipc->ipc[ipc_type], &glb_ipc->ipc[ipc_type].queued);
-	
-	q_item = glb_ipc_get_item(&glb_ipc->ipc[ipc_type].queued[q_num]);
-		
-	if (NULL != q_item ) {
-//		zabbix_log(LOG_LEVEL_INFORMATION, "IPC:Read got data from IPC type %d queue num %d ptr is %ld", ipc_type, q_num, q_item);
-		buffer = q_item->buffer;
-		q_item->buffer = NULL;
-		glb_ipc_put_items(&glb_ipc->ipc[ipc_type].free,q_item,q_item,1);
-	} else {
-		buffer = NULL;
+	//LOG_INF("Allocating memory for ipc config, func addr is %p, need to allocate %ld bytes ", memf->malloc_func, sizeof(ipc_conf_t));
+	if (NULL == (conf = memf->malloc_func(NULL, sizeof(ipc_conf_t)))) {	
+		LOG_WRN("Cannot allocate IPC structures for IPC %s, exiting", name);
+		return NULL;
 	}
 	
-	return buffer;
-}
-/*************************************************************
- * mass version of the data retrieval 
- * puts all the data to the vector, returns 
- * number of items fetched
- * ***********************************************************/
-/*
-//TODO: after succesifull payload test, do this version, 
-int glb_ipc_get_mass_data(int ipc_type, int q_num, zbx_vector_ptr_t *data) {
+	memset((void *)conf, 0, sizeof(ipc_conf_t));
 
-}
-*/
-int glb_ipc_dump_queue_stats() {
-	int i,j;
-	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");
-	zabbix_log(LOG_LEVEL_INFORMATION,"* IPC queues dump                               *");
-	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");
-	zabbix_log(LOG_LEVEL_INFORMATION,"Global data:");
-	zabbix_log(LOG_LEVEL_INFORMATION,"	Buffers: total: %d, free queue items: %d\n", glb_ipc->buffers_count, glb_ipc->buffers_count);
-	zabbix_log(LOG_LEVEL_INFORMATION,"	Buffers stat:");
+	conf->consumers = consumers;
+	conf->type = ipc_type;
+	conf->memf = *memf;
+	//LOG_INF("Allocating memory for queues %d", consumers);
+	//queues init
+
+	if (NULL == (conf->queues = memf->malloc_func(NULL, sizeof(ipc_queue_t) * consumers)))
+		return NULL;
 	
-	//for (i =0 ; i < GLB_IPC_BUFFERS; i++) {
-	//	zabbix_log(LOG_LEVEL_INFORMATION, "		Buffer[%d]: %d items",i, glb_ipc->buffers[i].count);
-	//}
-	zabbix_log(LOG_LEVEL_INFORMATION, "\n");
-	zabbix_log(LOG_LEVEL_INFORMATION, "	Statistics by IPC TYPE:");
-	for (i = 0; i < GLB_IPC_TYPE_COUNT; i++) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "		Queue: %d, free item buffers: %d, queues: %d", i, glb_ipc->ipc[i].free.count,glb_ipc->ipc[j].conf.consumers);
-		for ( j = 0; j < glb_ipc->ipc[i].conf.consumers; j++ ) {
-			zabbix_log(LOG_LEVEL_INFORMATION, "				Queue: %d, items: %d", j, glb_ipc->ipc[i].queued[j].count);
-		}
+	memset( (void *)conf->queues, 0, sizeof(ipc_queue_t) * consumers);
+	
+	for (i=0; i< consumers; i++) {
+		glb_lock_init(&conf->queues[i].lock);
 	}
-	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");
-	zabbix_log(LOG_LEVEL_INFORMATION,"* end of IPC queues dump                        *");
-	zabbix_log(LOG_LEVEL_INFORMATION,"*************************************************");
-};
+	
+	glb_lock_init(&conf->free_queue.lock);
 
-//that's pretty strange destroy proc yet
-void	glb_ipc_destroy(void)
-{
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-    //there is no reason to go and waste time on 
-    //destroying all the objects, on existing
-    //shared mem will get freed immediately
+	size_t full_elem_size = elem_size + sizeof (ipc_element_t *);
+	if (NULL == (elements = memf->malloc_func(NULL, full_elem_size * elems_count) ) ) 
+		return NULL;
+	
+	//making queue out of elements
+	void * ptr = elements;
+	ipc_element_t *elem;
+	for (i = 0; i < elems_count-1; i++) {
+	 	elem = ptr;
+		elem->next = ptr + full_elem_size;
+		ptr = ptr + full_elem_size;
+	}
 
-    //however to make things right, this proc is here
-    //TODO:implement full objects destroy sequence
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	elem = (void *) elements + full_elem_size * (elems_count-1);
+	elem->next = NULL;
+
+	
+	conf->free_queue.first = elements;
+	conf->free_queue.last =  elem;
+	conf->free_queue.count = elems_count;
+	
+	conf->create_cb = create_cb;
+	conf->free_cb = free_cb;
+	
+	LOG_DBG("%s:finished", __func__);
+	return (void *)conf;
 }
 
+//since all the data is in shm, the best way to destrow - release the shm
+void glb_ipc_destroy() {
 
-//p.s. my intention was to do a simple IPC handling in less then 500 lines. 
-//However i failed this, too many comments by now, so far 730 lines 
-//(but this also actually includes simple memory management)
-//update - by now, even with moving part of structures and code to the header file, have 847 lines....
+}
 
+void 	glb_ipc_dump_sender_queues(void *ipc_data, char *name) {
+	ipc_conf_t *ipc = ipc_data;
+	LOG_INF("QUEUES dump at %s: local_free_queue: %d, global_free_queue: %d, local_send_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
+		name, local_queues[ipc->type].free_snd_queue.count, ipc->free_queue.count, local_queues[ipc->type].send_queues[0].count, 
+			ipc->queues[0].count, local_queues[ipc->type].rcv_queue.count);
+//	dump_queue(&ipc->queues[0],"IPC send queue");
+}
 
+void 	glb_ipc_dump_reciever_queues(void *ipc_data, char *name, int proc_num) {
+	ipc_conf_t *ipc = ipc_data;
+	LOG_INF("QUEUES dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
+		name, local_queues[ipc->type].free_rcv_queue.count, ipc->free_queue.count, ipc->queues[proc_num-1].count, local_queues[ipc->type].rcv_queue.count);
+//	dump_queue(&ipc->queues[0],"IPC send queue");
+}
+
+mem_funcs_t *glb_ipc_get_memf_funcs(void *ipc_data) {
+	ipc_conf_t *ipc = ipc_data;
+	return &ipc->memf;
+}
 #endif

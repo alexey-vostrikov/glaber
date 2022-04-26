@@ -20,7 +20,7 @@
 #include "common.h"
 #include "zbxalgo.h"
 #include "memalloc.h"
-#include "../glb_state/glb_state_items.h"
+#include "../glb_state/state_items.h"
 #include "zbxlld.h"
 #include "zbxalert.h"
 #include "zbxdiag.h"

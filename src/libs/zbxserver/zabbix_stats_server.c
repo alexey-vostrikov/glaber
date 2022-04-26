@@ -20,7 +20,7 @@
 #include "common.h"
 #include "zbxjson.h"
 #include "dbcache.h"
-#include "../glb_state/glb_state.h"
+#include "../glb_state/state.h"
 #include "preproc.h"
 #include "zbxlld.h"
 #include "log.h"

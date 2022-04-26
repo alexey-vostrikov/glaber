@@ -463,8 +463,8 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			continue;
 	
 		zbx_json_addobject(&json, NULL);
-		zbx_json_addstring(&json,"hostname",h->host_name,ZBX_JSON_TYPE_STRING);
-		zbx_json_addstring(&json,"item_key",h->item_key,ZBX_JSON_TYPE_STRING);
+//		zbx_json_addstring(&json,"hostname",h->host_name,ZBX_JSON_TYPE_STRING);
+//		zbx_json_addstring(&json,"item_key",h->item_key,ZBX_JSON_TYPE_STRING);
 		
 		zbx_json_adduint64(&json,"itemid",h->itemid);
 		zbx_json_adduint64(&json,"time_sec",h->ts.sec);

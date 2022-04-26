@@ -38,19 +38,21 @@ static const char *__strpool_intern_n(zbx_hashset_t *strpool, const char *str, s
 
 	if (NULL == str)
 		return NULL;
+//	LOG_INF("Searching for the record, strpool_addr is %p", strpool);
 
-	record = zbx_hashset_search(strpool, str - REFCOUNT_FIELD_SIZE);
+	record = zbx_hashset_search(strpool, (void *)str - REFCOUNT_FIELD_SIZE);
 
 	if (NULL == record)
 	{
 		record = zbx_hashset_insert_ext(strpool, str - REFCOUNT_FIELD_SIZE,
-										REFCOUNT_FIELD_SIZE + len + 1, REFCOUNT_FIELD_SIZE);
+										REFCOUNT_FIELD_SIZE + len + 8 , REFCOUNT_FIELD_SIZE);
 		*(zbx_uint32_t *)record = 0;
 	}
 
 	refcount = (zbx_uint32_t *)record;
 	(*refcount)++;
-
+//	LOG_INF("Refcount for '%s' is '%u'", str, *refcount);
+//	LOG_INF("Created new strpool record addr %p", record);
 	return (void *)record + REFCOUNT_FIELD_SIZE;
 }
 
@@ -62,7 +64,7 @@ static const char *__strpool_intern(zbx_hashset_t *strpool, const char *str)
 
 	if (NULL == str)
 		return NULL;
-
+ 
 	len = strlen(str);
 	
 	return __strpool_intern_n(strpool, str, len);
@@ -76,11 +78,14 @@ const char *zbx_heap_strpool_intern(const char *str)
 static void __strpool_release(zbx_hashset_t *strpool, const char *str)
 {
 	zbx_uint32_t *refcount;
-
+	//LOG_INF("Will release (%p) '%s' ", str,str);
 	if (NULL == str)
 		return;
 
 	refcount = (zbx_uint32_t *)((void *)str - REFCOUNT_FIELD_SIZE);
+	
+	//LOG_INF("Freeing (%p) '%s' :Refcount is %d",str, str, *refcount);
+	
 	if (0 == refcount)
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -88,6 +93,8 @@ static void __strpool_release(zbx_hashset_t *strpool, const char *str)
 
 	if (0 == --(*refcount))
 	{
+	//	LOG_INF("Removing old string from the hash, was the last record, record addr is %p",
+		//		(void *)str - REFCOUNT_FIELD_SIZE);
 		zbx_hashset_remove(strpool, (void *)str - REFCOUNT_FIELD_SIZE);
 	}
 }
@@ -100,6 +107,8 @@ void zbx_heap_strpool_release(const char *str)
 static const char *__strpool_acquire(const char *str)
 {
 	zbx_uint32_t *refcount;
+	if (NULL == str ) 
+		return NULL;
 
 	refcount = (zbx_uint32_t *)(str - REFCOUNT_FIELD_SIZE);
 	(*refcount)++;
@@ -134,9 +143,11 @@ int strpool_destroy(strpool_t *strpool)
 const char *strpool_add(strpool_t *strpool, const char *str)
 {
 	const char *ret;
+//	LOG_INF("Locking strpool");
 	glb_lock_block(&strpool->lock);
 	ret = __strpool_intern(&strpool->strs, str);
 	glb_lock_unlock(&strpool->lock);
+//	LOG_INF("UnLocking strpool");
 
 	return ret;
 }
@@ -144,9 +155,11 @@ const char *strpool_add(strpool_t *strpool, const char *str)
 const char *strpool_add_n(strpool_t *strpool, const char *str, size_t len)
 {
 	const char *ret;
+//	LOG_INF("Locking strpool");
 	glb_lock_block(&strpool->lock);
 	ret = __strpool_intern_n(&strpool->strs, str, len);
 	glb_lock_unlock(&strpool->lock);
+//	LOG_INF("UnLocking strpool");
 
 	return ret;
 }
@@ -154,22 +167,27 @@ const char *strpool_add_n(strpool_t *strpool, const char *str, size_t len)
 
 void strpool_free(strpool_t *strpool, const char *str)
 {
+//	LOG_INF("Locking strpool");
 	glb_lock_block(&strpool->lock);
 	__strpool_release(&strpool->strs, str);
 	glb_lock_unlock(&strpool->lock);
+	//LOG_INF("UnLocking strpool");
 }
 
-const char *strpool_replace(strpool_t *strpool, const char *old_str, const char *new_str)
+void strpool_replace(strpool_t *strpool, const char **old_str, const char *new_str)
 {
 	const char *ret;
-
+	//it's cheaper and faster to check if the string is the same
+	//before locks and hash operations
+	if ( NULL != *old_str &&  NULL != new_str &&  0 == strcmp(*old_str,  new_str) )
+		return;
+//	LOG_INF("Locking strpool");
 	glb_lock_block(&strpool->lock);
-	__strpool_release(&strpool->strs, old_str);
-	ret = __strpool_intern(&strpool->strs, new_str);
+	__strpool_release(&strpool->strs, *old_str);
+	*old_str = __strpool_intern(&strpool->strs, new_str);
 
 	glb_lock_unlock(&strpool->lock);
-
-	return ret;
+//	LOG_INF("UnLocking strpool");
 }
 
 const char *strpool_copy(const char *str)

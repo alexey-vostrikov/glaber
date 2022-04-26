@@ -2080,6 +2080,8 @@ AC_OUTPUT([
 	src/libs/zbxtrends/Makefile
 	src/libs/zbxavailability/Makefile
 	src/libs/glb_state/Makefile
+	src/libs/glb_conf/Makefile
+	src/libs/glb_process/Makefile
 	src/libs/zbxxml/Makefile
 	src/zabbix_agent/Makefile
 	src/zabbix_agent/logfiles/Makefile

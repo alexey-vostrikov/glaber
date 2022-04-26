@@ -27,4 +27,5 @@ libzbxalgo_a_SOURCES = \
 	ring_buffer.c \
 	binarypool.c \
 	obj_index.c \
-	elems_hash.c
+	elems_hash.c \
+	event_queue.c

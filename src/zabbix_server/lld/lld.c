@@ -25,7 +25,7 @@
 #include "zbxserver.h"
 #include "zbxregexp.h"
 #include "proxy.h"
-#include "../../libs/glb_state/discovery.h"
+#include "../../libs/glb_state/state_discovery.h"
 
 #define OVERRIDE_STOP_TRUE	1
 

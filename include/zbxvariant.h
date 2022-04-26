@@ -41,11 +41,16 @@ typedef union
 }
 zbx_variant_data_t;
 
+//i just cannot resist to remove all this zbx_ prefixes 
+typedef zbx_variant_data_t variant_data_t;
+
 struct zbx_variant
 {
 	unsigned char		type;
 	zbx_variant_data_t	data;
 };
+
+
 
 #define ZBX_VARIANT_NONE	0
 #define ZBX_VARIANT_STR		1
@@ -54,6 +59,23 @@ struct zbx_variant
 #define ZBX_VARIANT_BIN		4
 #define ZBX_VARIANT_DBL_VECTOR	5
 #define ZBX_VARIANT_ERR	6
+
+typedef enum {
+	VARIANT_NONE = 0, //mark that there is no data
+	VARIANT_STR	= 1,  // 
+	VARIANT_DBL	= 2,  //
+	VARIANT_UI64 = 3, // theese are actually only real datatypes yet
+	VARIANT_BIN	= 4,
+	VARIANT_DBL_VECTOR = 5, //never seen 4 and 5 in real life 
+	VARIANT_ERR	= 6, // this is an error inidcation
+	VARIANT_MAX = 7 // this should go last
+} variant_type_t;
+
+
+typedef struct {
+	variant_type_t type;
+	variant_data_t data;
+} variant_t;
 
 void	zbx_variant_clear(zbx_variant_t *value);
 void	zbx_variant_set_none(zbx_variant_t *value);

@@ -197,7 +197,7 @@ static int glb_agent_start_connection(agent_conf_t *conf,  agent_connection_t *c
 	if ( POLL_FREE != conn->state )  return FAIL;
 
 	if (SUCCEED != zbx_list_peek(&conn->items_list, (void **)&itemid)) {
-		 DEBUG_ITEM(itemid,"Not starting the connection right now, busy with another item");
+		 //DEBUG_ITEM(itemid,"Not starting the connection right now, busy with another item");
 		 return FAIL;
 	}
 
@@ -429,7 +429,7 @@ void handle_socket_operations(agent_conf_t *conf, agent_connection_t *conn)
     				free_result(&result);
 
 					zabbix_log(LOG_LEVEL_DEBUG, "Agent item %ld data parsed, type os set, resp is: %s", glb_poller_item->itemid, tmp_s.buffer);
-					DEBUG_ITEM(glb_poller_item->itemid,"Arrived agent response");
+					DEBUG_ITEM(glb_poller_item->itemid,"Arrived agent response: ts: %d, val: %s", timespec.sec, tmp_s.buffer);
 				}
 			} else {
 				//	zabbix_log(LOG_LEVEL_DEBUG, "Get value from agent failed: %s", zbx_socket_strerror());

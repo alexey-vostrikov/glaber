@@ -26,7 +26,9 @@
 #include "zbxserver.h"
 #include "export.h"
 #include "zbxhistory.h"
-#include "../../libs/glb_objects/glb_trigger.h"
+#include "../../libs/glb_state/state_triggers.h"
+#include "../../libs/glb_conf/conf_triggers.h"
+//#include "../../libs/glb_objects/glb_trigger.h"
 
 /* event recovery data */
 typedef struct
@@ -40,6 +42,8 @@ typedef struct
 	zbx_timespec_t	ts;
 }
 zbx_event_recovery_t;
+
+typedef zbx_event_recovery_t recovery_event_t;
 
 /* problem event, used to cache open problems for recovery attempts */
 typedef struct
@@ -165,6 +169,167 @@ static void	get_item_tags_by_expression(const DB_TRIGGER *trigger, zbx_vector_pt
 	zbx_db_trigger_get_functionids(trigger, &functionids);
 	zbx_dc_get_item_tags_by_functionids(functionids.values, functionids.values_num, item_tags);
 	zbx_vector_uint64_destroy(&functionids);
+}
+
+static void	clean_event(DB_EVENT *event)
+{
+	LOG_INF("Event name is %p", event->name);
+	if (NULL != event->name) 
+		zbx_free(event->name);
+	LOG_INF("Named is cleaned");
+	if (EVENT_OBJECT_TRIGGER == event->object)
+	{
+		//zbx_db_trigger_clean(&event->trigger);
+		if (NULL != event->trigger.correlation_tag) 
+			zbx_free(event->trigger.correlation_tag);
+	}
+
+	if (EVENT_SOURCE_TRIGGERS == event->source || EVENT_SOURCE_INTERNAL == event->source)
+	{
+		zbx_vector_ptr_clear_ext(&event->tags, (zbx_clean_func_t)zbx_free_tag);
+		zbx_vector_ptr_destroy(&event->tags);
+	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: create_event                                                     *
+ *                                                                            *
+ * Purpose: creates an event and returns pointer to it                        *
+ *  note:																	  *
+ *  this version doesn't add the event to the global event list				  *	
+ *  like zbx_add_event 														  *
+ *                                                                            *
+ * Parameters: source   - [IN] event source (EVENT_SOURCE_*)                  *
+ *             object   - [IN] event object (EVENT_OBJECT_*)                  *
+ *             objectid - [IN] trigger, item ... identificator from database, *
+ *                             depends on source and object                   *
+ *             timespec - [IN] event time                                     *
+ *             value    - [IN] event value (TRIGGER_VALUE_*,                  *
+ *                             TRIGGER_STATE_*, ITEM_STATE_* ... depends on   *
+ *                             source and object)                             *
+ *             trigger_description         - [IN] trigger description         *
+ *             trigger_expression          - [IN] trigger short expression    *
+ *             trigger_recovery_expression - [IN] trigger recovery expression *
+ *             trigger_priority            - [IN] trigger priority            *
+ *             trigger_type                - [IN] TRIGGER_TYPE_* defines      *
+ *             trigger_tags                - [IN] trigger tags                *
+ *             trigger_correlation_mode    - [IN] trigger correlation mode    *
+ *             trigger_correlation_tag     - [IN] trigger correlation tag     *
+ *             trigger_value               - [IN] trigger value               *
+ *             trigger_opdata              - [IN] trigger operational data    *
+ *             event_name                  - [IN] event name, can be NULL     *
+ *             error                       - [IN] error for internal events   *
+ *                                                                            *
+ * Return value: The added event.                                             *
+ *                                                                            *
+ ******************************************************************************/
+int create_event(DB_EVENT *event, unsigned char source, unsigned char object, zbx_uint64_t objectid,
+		const zbx_timespec_t *timespec, int value, const char *trigger_description,
+		const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
+		unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
+		unsigned char trigger_correlation_mode, const char *trigger_correlation_tag,
+		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error)
+{
+	zbx_vector_ptr_t	item_tags;
+	int			i;
+	
+	event->eventid = DBget_maxid_num("events", 1);
+	event->source = source;
+	event->object = object;
+	event->objectid = objectid;
+	event->name = NULL;
+	event->clock = timespec->sec;
+	event->ns = timespec->ns;
+	event->value = value;
+	event->acknowledged = EVENT_NOT_ACKNOWLEDGED;
+	event->flags = ZBX_FLAGS_DB_EVENT_CREATE;
+	event->severity = TRIGGER_SEVERITY_NOT_CLASSIFIED;
+	event->suppressed = ZBX_PROBLEM_SUPPRESSED_FALSE;
+
+	if (EVENT_SOURCE_TRIGGERS == source)
+	{
+		char	err[256];
+
+		if (TRIGGER_VALUE_PROBLEM == value)
+			event->severity = trigger_priority;
+
+		event->trigger.triggerid = objectid;
+		event->trigger.description = zbx_strdup(NULL, trigger_description);
+		event->trigger.expression = zbx_strdup(NULL, trigger_expression);
+		event->trigger.recovery_expression = zbx_strdup(NULL, trigger_recovery_expression);
+		event->trigger.priority = trigger_priority;
+		event->trigger.type = trigger_type;
+		event->trigger.correlation_mode = trigger_correlation_mode;
+		event->trigger.correlation_tag = zbx_strdup(NULL, trigger_correlation_tag);
+		event->trigger.value = trigger_value;
+		event->trigger.opdata = zbx_strdup(NULL, trigger_opdata);
+		event->trigger.event_name = (NULL != event_name ? zbx_strdup(NULL, event_name) : NULL);
+		event->name = zbx_strdup(NULL, (NULL != event_name ? event_name : trigger_description));
+		event->trigger.cache = NULL;
+		event->trigger.url = NULL;
+		event->trigger.comments = NULL;
+
+		substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+				&event->trigger.correlation_tag, MACRO_TYPE_TRIGGER_TAG, err, sizeof(err));
+
+		substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+				&event->name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+
+		zbx_vector_ptr_create(&event->tags);
+
+		if (NULL != trigger_tags)
+		{
+			for (i = 0; i < trigger_tags->values_num; i++)
+				process_trigger_tag(event, (const zbx_tag_t *)trigger_tags->values[i]);
+		}
+
+		zbx_vector_ptr_create(&item_tags);
+		get_item_tags_by_expression(&event->trigger, &item_tags);
+
+		for (i = 0; i < item_tags.values_num; i++)
+		{
+			process_item_tag(event, (const zbx_item_tag_t *)item_tags.values[i]);
+			zbx_free_item_tag(item_tags.values[i]);
+		}
+
+		zbx_vector_ptr_destroy(&item_tags);
+	}
+	else if (EVENT_SOURCE_INTERNAL == source)
+	{
+		if (NULL != error)
+			event->name = zbx_strdup(NULL, error);
+
+		zbx_vector_ptr_create(&event->tags);
+		zbx_vector_ptr_create(&item_tags);
+
+		switch (object)
+		{
+			case EVENT_OBJECT_TRIGGER:
+				memset(&event->trigger, 0, sizeof(DB_TRIGGER));
+
+				event->trigger.expression = zbx_strdup(NULL, trigger_expression);
+				event->trigger.recovery_expression = zbx_strdup(NULL, trigger_recovery_expression);
+
+				for (i = 0; i < trigger_tags->values_num; i++)
+					process_trigger_tag(event, (const zbx_tag_t *)trigger_tags->values[i]);
+
+				get_item_tags_by_expression(&event->trigger, &item_tags);
+				break;
+			case EVENT_OBJECT_ITEM:
+				zbx_dc_get_item_tags(objectid, &item_tags);
+		}
+
+		for (i = 0; i < item_tags.values_num; i++)
+		{
+			process_item_tag(event, (const zbx_item_tag_t *)item_tags.values[i]);
+			zbx_free_item_tag(item_tags.values[i]);
+		}
+
+		zbx_vector_ptr_destroy(&item_tags);
+	}
+
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -362,6 +527,61 @@ static DB_EVENT	*close_trigger_event(zbx_uint64_t eventid, zbx_uint64_t objectid
 
 /******************************************************************************
  *                                                                            *
+ * Function: save_event                                                      *
+ *                                                                            *
+ * Purpose: flushes an event into a database                                *
+ *                                                                            *
+ ******************************************************************************/
+static int	save_event_to_db(DB_EVENT *event)
+{
+	int			i;
+	zbx_db_insert_t		db_insert, db_insert_tags;
+	int			j,  insert_tags = 0;
+	zbx_uint64_t		eventid;
+	
+
+	/* note: if flushing all the events fails, uncomment this! */
+	//if (0 != (event->flags & ZBX_FLAGS_DB_EVENT_CREATE) && 0 == event->eventid)
+	//	num++;
+
+	//TODO:
+	//NOTE: save to the history here, not DB! 
+	zbx_db_insert_prepare(&db_insert, "events", "eventid", "source", "object", "objectid", "clock", "ns", "value",
+			"name", "severity", NULL);
+
+	zbx_db_insert_add_values(&db_insert, event->eventid, event->source, event->object,
+		event->objectid, event->clock, event->ns, event->value,
+		ZBX_NULL2EMPTY_STR(event->name), event->severity);
+
+	if (0 != event->tags.values_num) {
+		zbx_db_insert_prepare(&db_insert_tags, "event_tag", "eventtagid", "eventid", "tag", "value", NULL);
+		insert_tags = 1;
+	
+		for (j = 0; j < event->tags.values_num; j++)
+		{
+			zbx_tag_t	*tag = (zbx_tag_t *)event->tags.values[j];
+
+			zbx_db_insert_add_values(&db_insert_tags, __UINT64_C(0), event->eventid, tag->tag, tag->value);
+		}
+	}
+
+	zbx_db_insert_execute(&db_insert);
+	zbx_db_insert_clean(&db_insert);
+
+	if (0 != insert_tags)
+	{
+		zbx_db_insert_autoincrement(&db_insert_tags, "eventtagid");
+		zbx_db_insert_execute(&db_insert_tags);
+		zbx_db_insert_clean(&db_insert_tags);
+	}
+
+	return SUCCEED;
+}
+
+
+
+/******************************************************************************
+ *                                                                            *
  * Function: save_events                                                      *
  *                                                                            *
  * Purpose: flushes the events into a database                                *
@@ -440,6 +660,94 @@ static int	save_events(void)
 
 	return num;
 }
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: save_problems                                                    *
+ *                                                                            *
+ * Purpose: generates problems from problem events (trigger and internal      *
+ *          event sources)                                                    *
+ *                                                                            *
+ ******************************************************************************/
+static void	problems_account_new_event(DB_EVENT *event)
+{
+//	int			i;
+//	zbx_vector_ptr_t	problems;
+	int			j, tags_num = 0;
+
+	//NOTE: uncomment if the will be unneeded problems
+	//if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
+	//	continue;
+
+	//NOTE2: problems should be placed in-memory, not in-the-DB
+	//		due to .... speed and  screwing DB on disaster time
+
+	if (EVENT_SOURCE_TRIGGERS == event->source)
+	{
+		if (EVENT_OBJECT_TRIGGER != event->object || TRIGGER_VALUE_PROBLEM != event->value)
+			return;
+
+		tags_num += event->tags.values_num;
+	}
+	else if (EVENT_SOURCE_INTERNAL == event->source)
+	{
+		switch (event->object)
+		{
+			case EVENT_OBJECT_TRIGGER:
+				if (TRIGGER_STATE_UNKNOWN != event->value)
+						return;
+
+				tags_num += event->tags.values_num;
+				break;
+			case EVENT_OBJECT_ITEM:
+				if (ITEM_STATE_NOTSUPPORTED != event->value)
+						return;
+
+				tags_num += event->tags.values_num;
+				break;
+			case EVENT_OBJECT_LLDRULE:
+				if (ITEM_STATE_NOTSUPPORTED != event->value)
+					return;
+				break;
+			default:
+				return;
+		}
+	} else
+		return;
+
+	zbx_db_insert_t	db_insert;
+
+	zbx_db_insert_prepare(&db_insert, "problem", "eventid", "source", "object", "objectid", "clock", "ns",
+		"name", "severity", NULL);
+
+	zbx_db_insert_add_values(&db_insert, event->eventid, event->source, event->object,
+			event->objectid, event->clock, event->ns, ZBX_NULL2EMPTY_STR(event->name),
+			event->severity);
+	
+	zbx_db_insert_execute(&db_insert);
+	zbx_db_insert_clean(&db_insert);
+
+	if (0 != tags_num)
+	{
+		int	k;
+
+		zbx_db_insert_prepare(&db_insert, "problem_tag", "problemtagid", "eventid", "tag", "value",	NULL);
+
+		for (k = 0; k < event->tags.values_num; k++)
+		{
+			zbx_tag_t	*tag = (zbx_tag_t *)event->tags.values[k];
+
+			zbx_db_insert_add_values(&db_insert, __UINT64_C(0), event->eventid, tag->tag,
+				tag->value);
+		}
+	
+		zbx_db_insert_autoincrement(&db_insert, "problemtagid");
+		zbx_db_insert_execute(&db_insert);
+		zbx_db_insert_clean(&db_insert);
+	}
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -551,6 +859,62 @@ static void	save_problems(void)
 
 	zbx_vector_ptr_destroy(&problems);
 }
+
+static void	save_trigger_recovery_events_to_db(trigger_conf_t *conf, zbx_vector_ptr_t *recovery_events)
+{
+	int i;
+	zbx_db_insert_t		db_insert;
+//	zbx_event_recovery_t	*recovery;
+	char			*sql = NULL;
+	size_t			sql_alloc = 0, sql_offset = 0;
+
+	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	DEBUG_TRIGGER(conf->triggerid, "Processing %d recovery events for the trigger", recovery_events->values_num);
+
+	zbx_db_insert_prepare(&db_insert, "event_recovery", "eventid", "r_eventid", "correlationid", "c_eventid",
+			"userid", NULL);
+	for (i = 0; i < recovery_events->values_num; i ++) {
+		zbx_event_recovery_t *recovery = recovery_events->values[i];
+	
+
+		zbx_db_insert_add_values(&db_insert, recovery->eventid, recovery->r_event->eventid,
+					recovery->correlationid, recovery->c_eventid, recovery->userid);
+
+		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
+				"update problem set"
+				" r_eventid=" ZBX_FS_UI64
+				",r_clock=%d"
+				",r_ns=%d"
+				",userid=" ZBX_FS_UI64,
+				recovery->r_event->eventid,
+				recovery->r_event->clock,
+				recovery->r_event->ns,
+				recovery->userid);
+
+		if (0 != recovery->correlationid)
+		{
+			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, ",correlationid=" ZBX_FS_UI64,
+				recovery->correlationid);
+		}
+
+		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " where eventid=" ZBX_FS_UI64 ";\n",
+			recovery->eventid);
+
+	}
+	zbx_db_insert_execute(&db_insert);
+	zbx_db_insert_clean(&db_insert);
+
+	DEBUG_TRIGGER(conf->triggerid, "Will execute query: %s", sql);
+	DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
+
+	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
+		DBexecute("%s", sql);
+	zbx_free(sql);
+
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -1325,6 +1689,8 @@ static void	correlate_event_by_global_rules(DB_EVENT *event, zbx_problem_state_t
 	zbx_vector_ptr_destroy(&corr_old);
 }
 
+
+
 /******************************************************************************
  *                                                                            *
  * Function: correlate_events_by_global_rules                                 *
@@ -1422,7 +1788,7 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 		zbx_vector_uint64_sort(&lockids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 		zbx_vector_uint64_uniq(&lockids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-		DCconfig_lock_triggers_by_triggerids(&lockids, triggerids_lock);
+//		DCconfig_lock_triggers_by_triggerids(&lockids, triggerids_lock);
 
 		/* append the locked trigger ids to already locked trigger ids */
 		for (i = num; i < triggerids_lock->values_num; i++)
@@ -1538,6 +1904,125 @@ out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() closed:%d", __func__, closed_num);
 }
 
+static void	flush_trigger_correlation_queue(trigger_conf_t *conf)
+{
+	zbx_vector_uint64_t	 eventids;
+	zbx_hashset_iter_t	iter;
+	zbx_event_recovery_t	*recovery;
+	int			i, closed_num = 0;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() events:%d", __func__, correlation_cache.num_data);
+
+	if (0 == correlation_cache.num_data)
+		return;
+
+	zbx_vector_uint64_create(&eventids);
+
+//		DC_TRIGGER		*triggers, *trigger;
+//	int			*errcodes, index;
+	char			*sql = NULL;
+	size_t			sql_alloc = 0, sql_offset = 0;
+//	zbx_trigger_diff_t	*diff;
+
+	zbx_hashset_iter_reset(&correlation_cache, &iter);
+	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
+	{
+		/* close event only if its source trigger has been locked */
+		if (conf->triggerid != recovery->objectid)
+			continue;
+	
+		zbx_vector_uint64_append(&eventids, recovery->eventid);
+	}
+
+	//TODO: instead of saving problems to the DB, keep them in mem!
+	zbx_vector_uint64_sort(&eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "select eventid from problem"
+								" where r_eventid is null and");
+	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids.values, eventids.values_num);
+	zbx_vector_uint64_clear(&eventids);
+	DBselect_uint64(sql, &eventids);
+	zbx_free(sql);
+
+	/* generate OK events and add event_recovery data for closed events */
+	zbx_hashset_iter_reset(&correlation_cache, &iter);
+
+	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
+	{
+		if (conf->triggerid != recovery->objectid ) 
+			continue;
+
+		/* close the old problem only if it's still open and trigger is not removed */
+		if (FAIL != zbx_vector_uint64_bsearch(&eventids, recovery->eventid,
+				ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+		{
+			close_trigger_event(recovery->eventid, recovery->objectid, &recovery->ts, 0,
+				recovery->correlationid, recovery->c_eventid, conf->description,
+				conf->expression, conf->recovery_expression,
+				conf->priority, conf->type, conf->opdata, conf->event_name);
+
+			closed_num++;
+		}
+
+		zbx_hashset_iter_remove(&iter);
+	}
+	zbx_vector_uint64_destroy(&eventids);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() closed:%d", __func__, closed_num);
+}
+
+// static void	update_trigger_problem_count_by_trigger(trigger_conf_t *conf, trigger_state_t *state)
+// {
+// 	DB_RESULT		result;
+// 	DB_ROW			row;
+// 	//zbx_vector_uint64_t	triggerids;
+// 	//zbx_trigger_diff_t	*diff;
+	
+// 	int			i, index;
+// 	char			*sql = NULL;
+// 	size_t			sql_alloc = 0, sql_offset = 0;
+// 	zbx_uint64_t		triggerid;
+
+// 	//zbx_vector_uint64_create(&triggerids);
+	
+// 	//TODO: move problems to state... this will f#$ck database too much
+// 	if (0 == (conf->flags & ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT))
+// 		return;
+	
+// 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
+// 			"select objectid,count(objectid) from problem"
+// 			" where r_eventid is null"
+// 				" and source=%d"
+// 				" and object=%d"
+// 				" and objectid=%ld",
+// 			EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, conf->triggerid);
+
+// //	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "objectid", triggerids.values, triggerids.values_num);
+// 	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, " group by objectid");
+
+// 	result = DBselect("%s", sql);
+
+// 	while (NULL != (row = DBfetch(result)))
+// 	{
+// 		ZBX_STR2UINT64(triggerid, row[0]);
+
+// 		if (triggerid != conf->triggerid)
+// 		{
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 			continue;
+// 		}
+
+// //		diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
+// 		//trigger->problem_count = atoi(row[1]);
+// 		//state_trigger_set_problem_count(state, atoi(row[1]));
+// 		//TODO: check if this is still required
+// 		conf->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_PROBLEM_COUNT;
+// 	}
+// 	DBfree_result(result);
+// 	zbx_free(sql);
+
+// }
+
+
+
 /******************************************************************************
  *                                                                            *
  * Function: update_trigger_problem_count                                     *
@@ -1617,6 +2102,59 @@ out:
 	zbx_vector_uint64_destroy(&triggerids);
 }
 
+
+// static void	update_trigger_changes_by_trigger(trigger_conf_t *tr_conf, trigger_state_t *state)
+// {
+// 	int			i;
+// 	int			index, j, new_value;
+// 	//zbx_trigger_diff_t	*diff;
+
+// 	update_trigger_problem_count_by_trigger(tr_conf, state);
+
+// 	/* update trigger problem_count for new problem events */
+// 	for (i = 0; i < events.values_num; i++)
+// 	{
+// 		DB_EVENT	*event = (DB_EVENT *)events.values[i];
+// 		DEBUG_TRIGGER(event->objectid,"Updating changed trigger")
+
+// 		if (EVENT_SOURCE_TRIGGERS != event->source || EVENT_OBJECT_TRIGGER != event->object)
+// 			continue;
+
+// 	//	if (tr_conf->triggerid !=event->objectid)
+// 	//	{
+// 	//		LOG_INF("Trying to update trigger %ld but it's not in the diff set", event->objectid);
+// 	//		THIS_SHOULD_NEVER_HAPPEN;
+// 	//		exit(-1);
+// 	//		continue;
+// 	//	}
+
+// 	//	diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
+
+// 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
+// 		{
+// 			tr_conf->flags &= ~(zbx_uint64_t)(ZBX_FLAGS_TRIGGER_DIFF_UPDATE_PROBLEM_COUNT |
+// 					ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE);
+// 			continue;
+// 		}
+
+// 		/* always update trigger last change whenever a trigger event has been created */
+		
+// 		state->lastchange = event->clock;
+// 		//glb_state_trigger_set_lastchange(trigger->triggerid, event->clock);
+// 		tr_conf->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE;
+// 	}
+
+// 	/* recalculate trigger value from problem_count and mark for updating if necessary */
+// 	new_value = (0 == state->problem_count ? TRIGGER_VALUE_OK : TRIGGER_VALUE_PROBLEM);
+
+// 	if (new_value != state->value)
+// 	{
+// 			state->value = new_value;
+// 			tr_conf->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
+// 	}
+// }
+
+
 /******************************************************************************
  *                                                                            *
  * Function: update_trigger_changes                                           *
@@ -1645,7 +2183,9 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 		if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &event->objectid,
 				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		{
+			LOG_INF("Trying to update trigger %ld but it's not in the diff set", event->objectid);
 			THIS_SHOULD_NEVER_HAPPEN;
+			exit(-1);
 			continue;
 		}
 
@@ -2051,6 +2591,321 @@ out:
 	zbx_vector_uint64_destroy(&maintenanceids);
 }
 
+
+/******************************************************************************
+ *                                                                            *
+ * Function: get_open_problems                                                *
+ *                                                                            *
+ * Purpose: gets open problems created by the specified triggers              *
+ *                                                                            *
+ * Parameters: triggerids - [IN] the trigger identifiers (sorted)             *
+ *             problems   - [OUT] the problems                                *
+ *                                                                            *
+ ******************************************************************************/
+static void	get_open_problems_by_trigger(u_int64_t triggerid, zbx_vector_ptr_t *problems)
+{
+	DB_RESULT		result;
+	DB_ROW			row;
+	char			*sql = NULL;
+	size_t			sql_alloc = 0, sql_offset = 0;
+	zbx_event_problem_t	*problem;
+	zbx_tag_t		*tag;
+	zbx_uint64_t		eventid;
+	int			index;
+	zbx_vector_uint64_t	eventids;
+
+	zbx_vector_uint64_create(&eventids);
+
+	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
+			"select eventid,objectid from problem where source=%d and object=%d and",
+			EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
+	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " objectid = %ld", triggerid);
+	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, " and r_eventid is null");
+
+	result = DBselect("%s", sql);
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		problem = (zbx_event_problem_t *)zbx_malloc(NULL, sizeof(zbx_event_problem_t));
+
+		ZBX_STR2UINT64(problem->eventid, row[0]);
+		ZBX_STR2UINT64(problem->triggerid, row[1]);
+		zbx_vector_ptr_create(&problem->tags);
+		zbx_vector_ptr_append(problems, problem);
+
+		zbx_vector_uint64_append(&eventids, problem->eventid);
+	}
+	DBfree_result(result);
+
+	if (0 != problems->values_num)
+	{
+		zbx_vector_ptr_sort(problems, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
+		zbx_vector_uint64_sort(&eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+		sql_offset = 0;
+		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "select eventid,tag,value from problem_tag where");
+		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids.values, eventids.values_num);
+
+		result = DBselect("%s", sql);
+
+		while (NULL != (row = DBfetch(result)))
+		{
+			ZBX_STR2UINT64(eventid, row[0]);
+			if (FAIL == (index = zbx_vector_ptr_bsearch(problems, &eventid,
+					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+			{
+				THIS_SHOULD_NEVER_HAPPEN;
+				continue;
+			}
+
+			problem = (zbx_event_problem_t *)problems->values[index];
+
+			tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
+			tag->tag = zbx_strdup(NULL, row[1]);
+			tag->value = zbx_strdup(NULL, row[2]);
+			zbx_vector_ptr_append(&problem->tags, tag);
+		}
+		DBfree_result(result);
+	}
+
+	zbx_free(sql);
+
+	zbx_vector_uint64_destroy(&eventids);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: match_tag                                                        *
+ *                                                                            *
+ * Purpose: checks if the two tag sets have matching tag                      *
+ *                                                                            *
+ * Parameters: name  - [IN] the name of tag to match                          *
+ *             tags1 - [IN] the first tag vector                              *
+ *             tags2 - [IN] the second tag vector                             *
+ *                                                                            *
+ * Return value: SUCCEED - both tag sets contains a tag with the specified    *
+ *                         name and the same value                            *
+ *               FAIL    - otherwise.                                         *
+ *                                                                            *
+ ******************************************************************************/
+static int	match_tag(const char *name, const zbx_vector_ptr_t *tags1, const zbx_vector_ptr_t *tags2)
+{
+	int		i, j;
+	zbx_tag_t	*tag1, *tag2;
+
+	for (i = 0; i < tags1->values_num; i++)
+	{
+		tag1 = (zbx_tag_t *)tags1->values[i];
+
+		if (0 != strcmp(tag1->tag, name))
+			continue;
+
+		for (j = 0; j < tags2->values_num; j++)
+		{
+			tag2 = (zbx_tag_t *)tags2->values[j];
+
+			if (0 == strcmp(tag2->tag, name) && 0 == strcmp(tag1->value, tag2->value))
+				return SUCCEED;
+		}
+	}
+
+	return FAIL;
+}
+
+
+/* closes events my matching the trigger and return vector of ptrs to the
+	recovery events. vector is static and handled inside the func, 
+	so it's not to bee changed of freed outside of the func 
+	in future should go to the problems module	
+*/
+zbx_event_recovery_t *create_recovery_event(DB_EVENT *event, trigger_conf_t *conf, zbx_event_problem_t *problem, zbx_timespec_t *ts) {
+	zbx_event_recovery_t *rec = zbx_calloc(NULL, 0, sizeof(zbx_event_recovery_t));
+
+	rec->eventid = problem->eventid;
+	rec->objectid = conf->triggerid;
+	rec->r_event = event;
+	rec->ts = *ts;
+	rec->userid = 0;
+	
+	return rec;
+}
+
+void problems_close_by_matching_trigger(trigger_conf_t *conf, trigger_state_t *state, DB_EVENT *event, zbx_vector_ptr_t *recovery_events, 
+			zbx_timespec_t *ts) {
+	
+	static zbx_vector_ptr_t closing_problems;
+
+	zbx_event_problem_t *problem;
+	int i, unmatched_flag = 0;
+
+	zbx_vector_ptr_create(&closing_problems);
+	
+	LOG_INF("Recieving list of closing problems");
+	//need to fix it to trigger processing only and to return vector of recovery events
+	get_open_problems_by_trigger(conf->triggerid, &closing_problems);
+	
+	LOG_INF("Recieved list of closing problems");
+	
+	//now should consider tag match mode	
+	DEBUG_TRIGGER(conf->triggerid, "Processing recovery for the trigger");
+
+	/* checking for tags in correlation mode */
+	if (ZBX_TRIGGER_CORRELATION_NONE != conf->correlation_mode) {
+
+		/* With trigger correlation enabled the recovery event recovers    */
+		/* all problem events generated by the same trigger and matching   */
+		/* recovery event tags. The trigger value is set to OK only if all */
+		/* problem events were recovered.                                  */
+
+		for (i = 0; i < closing_problems.values_num; i++)
+		{
+			problem = (zbx_event_problem_t *)closing_problems.values[i];
+
+			if (SUCCEED == match_tag(conf->correlation_tag, &problem->tags, &event->tags)) {
+				DEBUG_TRIGGER(conf->triggerid,"Recovering event %ld matched by correlation rule", problem->eventid);
+			} else {
+				DEBUG_TRIGGER(conf->triggerid,"Not recovering event %ld: tag not matched by correlation rule", problem->eventid);
+				problem->eventid = 0; //marking this problem as unmatched
+				state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
+			}
+		}
+	} else {
+		DEBUG_TRIGGER(conf->triggerid,"Processing trrigger's events recovery, no correlation is set");
+	}
+	for (i = 0; i < closing_problems.values_num; i++) {
+			problem = (zbx_event_problem_t *)closing_problems.values[i];
+			if (0 == problem->eventid)
+				continue;
+
+			zbx_event_recovery_t *rec_event = create_recovery_event(event, conf, problem, ts);
+			zbx_vector_ptr_append(recovery_events, rec_event);
+	}
+	LOG_INF("Destroying problems");
+	zbx_vector_ptr_destroy(&closing_problems);
+	LOG_INF("Saving recovery events to the db");
+	save_trigger_recovery_events_to_db(conf, recovery_events);
+}
+
+
+static int is_recovery_change(trigger_state_t *state) {
+	if ( TRIGGER_VALUE_OK == state_trigger_get_value(state) )
+		return SUCCEED;
+	return FAIL;
+}
+
+/* adaptor for single event recovery actions call */
+void process_event_actions(DB_EVENT *event) {
+	zbx_vector_ptr_t events;
+	zbx_vector_uint64_pair_t empty;
+
+	zbx_vector_ptr_create(&events);
+	zbx_vector_uint64_pair_create(&empty);
+	zbx_vector_ptr_append(&events,event);
+
+	process_actions(&events,&empty);
+
+	zbx_vector_ptr_destroy(&events);
+	zbx_vector_uint64_pair_destroy(&empty);
+}
+
+/* adaptor for single event actions call */
+static void process_recovery_actions(zbx_vector_ptr_t *closing_problems) {
+	zbx_vector_ptr_t empty;
+	zbx_vector_uint64_pair_t recovery_events;
+	int i;
+
+	if (0 == closing_problems->values_num)
+		return;
+
+	zbx_vector_ptr_create(&empty);
+	zbx_vector_uint64_pair_create(&recovery_events);
+
+	for (int i = 0; i < closing_problems->values_num; i ++) {
+		recovery_event_t *recovery = closing_problems->values[i];
+		zbx_uint64_pair_t pair = {recovery->eventid, recovery->r_event->eventid};
+		
+		zbx_vector_uint64_pair_append_ptr(&recovery_events, &pair);
+	}
+
+	process_actions(&empty,&recovery_events);
+
+	zbx_vector_ptr_destroy(&empty);
+	zbx_vector_uint64_pair_destroy(&recovery_events);
+}
+
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: process_event 													  *
+ *  note: this is replacement of the flush_event							  *
+ * 		but only hanles specific event generated by a trigger                 *
+ * Purpose: flushes local event cache to database                             *
+ *                                                                            *
+ ******************************************************************************/
+int	process_trigger_change(trigger_conf_t *conf, trigger_state_t *state, unsigned char old_value, zbx_timespec_t *ts)
+{
+	zbx_event_recovery_t		*recovery;
+	DB_EVENT event = {0};
+	
+	zbx_hashset_iter_t		iter;
+	
+	//if (SUCCEED == is_event_supressed(event))
+	//	return SUCCEED;
+	
+	trigger_event_create(&event, conf, state, old_value, ts);
+	save_event_to_db(&event);
+	DEBUG_TRIGGER(conf->triggerid,"Created new event %ld", event.eventid);
+
+	if ( SUCCEED == is_recovery_change(state)) { 
+		zbx_vector_ptr_t	recovery_events;
+		zbx_vector_ptr_create(&recovery_events);
+		
+		LOG_INF("In recovery change");
+		DEBUG_TRIGGER(conf->triggerid, "Saving recovery data (if any)");
+		
+		LOG_INF("Getting list of recovery events");
+		problems_close_by_matching_trigger(conf, state, &event, &recovery_events, ts);
+
+		DEBUG_TRIGGER(conf->triggerid, "Got %d problems to close", recovery_events.values_num);
+		
+		LOG_INF("Processing actions");
+		process_recovery_actions(&recovery_events);
+		zbx_vector_ptr_clear_ext(&recovery_events, ZBX_DEFAULT_MEM_FREE_FUNC);
+
+		zbx_vector_ptr_destroy(&recovery_events);
+	} else {
+		
+		problems_account_new_event(&event);
+		process_event_actions(&event);
+		
+	}
+	
+	clean_event(&event);
+	return SUCCEED;
+	
+	//LOG_INF("Updating suppresed events");
+	//update_event_suppress_data();
+	
+	//NOTE: actions to be refactored yet
+	// zbx_vector_uint64_pair_create(&closed_events);
+
+	// zbx_hashset_iter_reset(&event_recovery, &iter);
+	// while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
+	// {
+	// 	zbx_uint64_pair_t	pair = {recovery->eventid, recovery->r_event->eventid};
+
+	// 	zbx_vector_uint64_pair_append_ptr(&closed_events, &pair);
+	// }
+
+	// zbx_vector_uint64_pair_sort(&closed_events, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	// LOG_INF("Processing actions");
+	// process_actions(&events, &closed_events);
+		
+	// zbx_vector_uint64_pair_destroy(&closed_events);
+	LOG_INF("Finished");
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: flush_events                                                     *
@@ -2065,9 +2920,17 @@ static int	flush_events(void)
 	zbx_vector_uint64_pair_t	closed_events;
 	zbx_hashset_iter_t		iter;
 
+	LOG_INF("Flushing events, there are %d in the list", events.values_num);
 	ret = save_events();
+	LOG_INF("Flushing events: %d saved", ret);
+
+	LOG_INF("Saving problems");
 	save_problems();
+	
+	LOG_INF("Saving recovery data");
 	save_event_recovery();
+	
+	LOG_INF("Updating suppresed events");
 	update_event_suppress_data();
 
 	zbx_vector_uint64_pair_create(&closed_events);
@@ -2081,10 +2944,10 @@ static int	flush_events(void)
 	}
 
 	zbx_vector_uint64_pair_sort(&closed_events, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-
+	LOG_INF("Processing actions");
 	process_actions(&events, &closed_events);
 	zbx_vector_uint64_pair_destroy(&closed_events);
-
+	LOG_INF("Finished");
 	return ret;
 }
 
@@ -2252,7 +3115,9 @@ static void	process_internal_events_without_actions(zbx_vector_ptr_t *internal_p
 {
 	DB_EVENT	*event;
 	int		i;
-
+	
+	LOG_INF("Getting action count, locking");
+	
 	if (0 != DCget_internal_action_count())
 		return;
 
@@ -2266,7 +3131,11 @@ static void	process_internal_events_without_actions(zbx_vector_ptr_t *internal_p
 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_RECOVER))
 			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 	}
+	LOG_INF("Getting action count, unlocking");
 }
+
+
+
 
 /******************************************************************************
  *                                                                            *
@@ -2378,6 +3247,45 @@ static void	trigger_dep_free(zbx_trigger_dep_t *dep)
 	zbx_free(dep);
 }
 
+
+static int	event_check_trigger_dependency(const DB_EVENT *event, const zbx_vector_ptr_t *deps,
+		trigger_conf_t *tr_conf, trigger_state_t *state)
+{
+	int			i, index;
+	zbx_trigger_dep_t	*dep;
+	zbx_trigger_diff_t	*diff;
+
+	if (FAIL == (index = zbx_vector_ptr_bsearch(deps, &event->objectid, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+		return SUCCEED;
+
+	dep = (zbx_trigger_dep_t *)deps->values[index];
+
+	if (ZBX_TRIGGER_DEPENDENCY_FAIL == dep->status)
+		return FAIL;
+
+	/* check the trigger dependency based on actual (currently being processed) trigger values */
+	for (i = 0; i < dep->masterids.values_num; i++)
+	{
+//		if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &dep->masterids.values[i],
+//				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+//		{
+//			THIS_SHOULD_NEVER_HAPPEN;
+//			continue;
+//		}
+
+	//	diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
+
+		if (0 == (ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE & tr_conf->flags))
+			continue;
+
+		if (TRIGGER_VALUE_PROBLEM == state_trigger_get_value(state))
+			return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+
 /******************************************************************************
  *                                                                            *
  * Function: event_check_dependency                                           *
@@ -2426,45 +3334,6 @@ static int	event_check_dependency(const DB_EVENT *event, const zbx_vector_ptr_t 
 	}
 
 	return SUCCEED;
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: match_tag                                                        *
- *                                                                            *
- * Purpose: checks if the two tag sets have matching tag                      *
- *                                                                            *
- * Parameters: name  - [IN] the name of tag to match                          *
- *             tags1 - [IN] the first tag vector                              *
- *             tags2 - [IN] the second tag vector                             *
- *                                                                            *
- * Return value: SUCCEED - both tag sets contains a tag with the specified    *
- *                         name and the same value                            *
- *               FAIL    - otherwise.                                         *
- *                                                                            *
- ******************************************************************************/
-static int	match_tag(const char *name, const zbx_vector_ptr_t *tags1, const zbx_vector_ptr_t *tags2)
-{
-	int		i, j;
-	zbx_tag_t	*tag1, *tag2;
-
-	for (i = 0; i < tags1->values_num; i++)
-	{
-		tag1 = (zbx_tag_t *)tags1->values[i];
-
-		if (0 != strcmp(tag1->tag, name))
-			continue;
-
-		for (j = 0; j < tags2->values_num; j++)
-		{
-			tag2 = (zbx_tag_t *)tags2->values[j];
-
-			if (0 == strcmp(tag2->tag, name) && 0 == strcmp(tag1->value, tag2->value))
-				return SUCCEED;
-		}
-	}
-
-	return FAIL;
 }
 
 /******************************************************************************
@@ -2535,6 +3404,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
+			exit(-1);
 			continue;
 		}
 
@@ -2632,6 +3502,82 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 	zbx_vector_uint64_destroy(&triggerids);
 }
 
+
+
+/******************************************************************************
+ *                                                                            *
+ * Function: process_internal_events_dependency                               *
+ *                                                                            *
+ * Purpose: process internal trigger events                                   *
+ *          to avoid trigger dependency                                       *
+ *                                                                            *
+ * Parameters: internal_events - [IN] the internal events to process          *
+ *             trigger_events  - [IN] the trigger events used for dependency  *
+ *             trigger_diff   -  [IN] the trigger changeset                   *
+ *                                                                            *
+ ******************************************************************************/
+static void	process_internal_trigger_events_dependency(zbx_vector_ptr_t *internal_events, zbx_vector_ptr_t *trigger_events,
+		trigger_conf_t *tr_conf, trigger_state_t *state)
+{
+	int			i, index;
+	DB_EVENT		*event;
+	zbx_vector_uint64_t	triggerids;
+	zbx_vector_ptr_t	deps;
+	zbx_trigger_diff_t	*diff;
+
+	zbx_vector_uint64_create(&triggerids);
+	zbx_vector_uint64_reserve(&triggerids, internal_events->values_num + trigger_events->values_num);
+
+	zbx_vector_ptr_create(&deps);
+	zbx_vector_ptr_reserve(&deps, internal_events->values_num + trigger_events->values_num);
+
+	for (i = 0; i < internal_events->values_num; i++)
+	{
+		event = (DB_EVENT *)internal_events->values[i];
+		zbx_vector_uint64_append(&triggerids, event->objectid);
+	}
+
+	for (i = 0; i < trigger_events->values_num; i++)
+	{
+		event = (DB_EVENT *)trigger_events->values[i];
+		zbx_vector_uint64_append(&triggerids, event->objectid);
+	}
+
+	zbx_vector_uint64_sort(&triggerids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	zbx_vector_uint64_uniq(&triggerids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	LOG_INF("Getting dependancies");
+	zbx_dc_get_trigger_dependencies(&triggerids, &deps);
+	LOG_INF("Got dependancies");
+	for (i = 0; i < internal_events->values_num; i++)
+	{
+		event = (DB_EVENT *)internal_events->values[i];
+
+//		if (tr_conf->triggerid != event->objectid)
+//		{
+//			THIS_SHOULD_NEVER_HAPPEN;
+//			continue;
+//		}
+
+		//diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
+		LOG_INF("Checking deps");
+		if (FAIL == (event_check_trigger_dependency(event, &deps, tr_conf, state)))
+		{
+			/* reset event data/trigger changeset if dependency check failed */
+			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
+			tr_conf->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
+			continue;
+		}
+		LOG_INF("Checked deps");
+	}
+
+	zbx_vector_ptr_clear_ext(&deps, (zbx_clean_func_t)trigger_dep_free);
+	zbx_vector_ptr_destroy(&deps);
+
+	zbx_vector_uint64_destroy(&triggerids);
+}
+
+
+
 /******************************************************************************
  *                                                                            *
  * Function: process_internal_events_dependency                               *
@@ -2702,6 +3648,34 @@ static void	process_internal_events_dependency(zbx_vector_ptr_t *internal_events
 
 	zbx_vector_uint64_destroy(&triggerids);
 }
+
+// int process_trigger_event(DB_EVENT *event, trigger_conf_t *conf, trigger_state_t *state) {
+// 		int			i, processed_num = 0;
+// 	zbx_uint64_t		eventid;
+// 	zbx_vector_ptr_t	trigger_events, internal_events;
+	
+// 	//LOG_INF("Heresdwf1");
+// 	//zabbix_log(LOG_LEVEL_DEBUG, "In %s() events_num:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)events.values_num);
+
+// 	//if (NULL != trigger_diff && 0 != correlation_cache.num_data)
+// 	//flush_correlation_queue(trigger_diff, triggerids_lock);
+// 	//DEBUG_TRIGGER(conf->triggerid, "Flushing correlation queue");
+// 	//flush_trigger_correlation_queue(conf);
+
+// 	event->eventid = DBget_maxid_num("events", 1);
+// 	DEBUG_TRIGGER(conf->triggerid,"Generated new event's id: %ld", event->eventid)
+	
+// //	DEBUG_TRIGGER(conf->triggerid, "Flushing correlation queue");
+// //	flush_trigger_correlation_queue(conf);
+	
+// 	DEBUG_TRIGGER(conf->triggerid, "Flushing events");
+// 	processed_num = process_event(event, conf, state);
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() processed:%d", __func__, (int)processed_num);
+
+// 	return processed_num;
+// }
+
 
 /******************************************************************************
  *                                                                            *
@@ -2877,7 +3851,7 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 
 		DBcommit();
 
-		DCconfig_triggers_apply_changes(&trigger_diff);
+//		DCconfig_triggers_apply_changes(&trigger_diff);
 		DBupdate_itservices(&trigger_diff);
 
 		if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))

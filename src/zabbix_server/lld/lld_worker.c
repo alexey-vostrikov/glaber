@@ -26,7 +26,7 @@
 #include "dbcache.h"
 #include "proxy.h"
 #include "../events.h"
-#include "../../libs/glb_state/glb_state_items.h"
+#include "../../libs/glb_state/state_items.h"
 
 #include "lld_worker.h"
 #include "lld_protocol.h"
@@ -69,7 +69,8 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 	zbx_timespec_t		ts;
 	
 	
-	ZBX_DC_HISTORY hist = {0};
+	metric_t metric ={0};
+	
 	DC_ITEM			item;
 	int			errcode, mtime;
 	unsigned char		state, meta;
@@ -96,7 +97,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		
 		if (state != item.state)
 		{
-			hist.state = state;
+			metric.state = state;
 			if (ITEM_STATE_NORMAL == state)
 			{
 				LOG_DBG("discovery rule \"%s:%s\" became supported",
@@ -128,18 +129,18 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		/* with successful LLD processing LLD error will be set to empty string */
 		if (NULL != error)
 		{
-			hist.value.err = error;
+			metric.value.data.err = error;
 		}
 	}
 	DCconfig_clean_items(&item, &errcode, 1);
 	
 	if (NULL != value )	 {
-		hist.value_type = ITEM_VALUE_TYPE_TEXT;
-		hist.value.str = value;
-		hist.ts = ts;
-		hist.itemid = itemid;
+		metric.value.type = VARIANT_STR;
+		metric.value.data.str = value;
+		metric.sec = ts.sec;
+		metric.itemid = itemid;
 
-		glb_state_item_add_values(&hist,1);
+		glb_state_item_add_value(&metric, ITEM_VALUE_TYPE_TEXT);
 	}
 out:
 	zbx_free(value);

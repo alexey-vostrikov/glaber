@@ -21,7 +21,7 @@
 #include "db.h"
 #include "log.h"
 #include "zbxserver.h"
-#include "../../libs/glb_state/glb_state_items.h"
+#include "../../libs/glb_state/state_items.h"
 #include "evalfunc.h"
 #include "zbxregexp.h"
 #include "zbxtrends.h"

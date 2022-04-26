@@ -23,6 +23,8 @@
 #include "zbxvariant.h"
 #include "zbxjson.h"
 #include "dbcache.h"
+#include "../src/libs/glb_process/process.h"
+#include "../src/libs/glb_process/proc_trends.h"
 
 #define GLB_HISTORY_GET_NON_INTERACTIVE 2
 #define GLB_HISTORY_GET_INTERACTIVE 3
@@ -57,9 +59,9 @@ void	zbx_history_value2variant(const history_value_t *value, unsigned char value
 
 int glb_history_init(char **history_modules, char **error);
 
-int glb_history_add_history(ZBX_DC_HISTORY *history, int history_num);
+int glb_history_add_metric(metric_t *metric, metric_processing_data_t *proc_data);
 int glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
-int glb_history_add_trends(ZBX_DC_TREND *trend, int trends_num);
+int glb_history_add_trend(trend_t *trend, metric_processing_data_t *proc_data);
 
 int glb_history_get_trends_json(zbx_uint64_t itemid, int value_type, int start, int end, struct zbx_json *json);
 

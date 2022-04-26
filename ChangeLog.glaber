@@ -1,3 +1,8 @@
+ver 2.10
+    History cache removed, shm ipc introduced, trigger calculation refactored
+ver 2.9.10
+    - fix API trends generation: reverted to standard trends extraction. However, if aggregation steps is requested, trends 
+    will be returned in the aggregated format, removed some extra logging
 ver 2.9.8
     - fixes: clickhouse item name quotation, fix value type parsing in item's value cache preload
 ver 2.9.5

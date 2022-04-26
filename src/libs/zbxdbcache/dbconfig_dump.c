@@ -21,6 +21,7 @@
 #include "zbxalgo.h"
 #include "dbcache.h"
 #include "mutexs.h"
+#include "../glb_conf/conf_index.h"
 
 #define ZBX_DBCONFIG_IMPL
 #include "dbconfig.h"
@@ -274,7 +275,7 @@ static void	DCdump_htmpls(void)
 	int			i, j;
 
 	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __func__);
-	obj_index_dump(&glb_config->host_to_template_idx);
+	//obj_index_dump(&glb_config->host_to_template_idx);
 	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
@@ -641,15 +642,15 @@ static void	DCdump_items(void)
 		if (0 != item->tags.values_num)
 			DCdump_item_tags(item);
 
-		if (NULL != item->triggers)
-		{
-			ZBX_DC_TRIGGER	*trigger;
+		// if (NULL != item->triggers)
+		// {
+		// 	ZBX_DC_TRIGGER	*trigger;
 
-			zabbix_log(LOG_LEVEL_TRACE, "  triggers:");
+		// 	zabbix_log(LOG_LEVEL_TRACE, "  triggers:");
 
-			for (j = 0; NULL != (trigger = item->triggers[j]); j++)
-				zabbix_log(LOG_LEVEL_TRACE, "    triggerid:" ZBX_FS_UI64, trigger->triggerid);
-		}
+		// 	for (j = 0; NULL != (trigger = item->triggers[j]); j++)
+		// 		zabbix_log(LOG_LEVEL_TRACE, "    triggerid:" ZBX_FS_UI64, trigger->triggerid);
+		// }
 	}
 
 	zbx_vector_ptr_destroy(&index);
@@ -858,26 +859,26 @@ static void	DCdump_triggers(void)
 
 		trigger = (ZBX_DC_TRIGGER *)index.values[i];
 
-		zabbix_log(LOG_LEVEL_TRACE, "triggerid:" ZBX_FS_UI64 " description:'%s' event_name:'%s' type:%u"
-				" status:%u priority:%u", trigger->triggerid, trigger->description, trigger->event_name,
-				trigger->type, trigger->status, trigger->priority);
+//		zabbix_log(LOG_LEVEL_TRACE, "triggerid:" ZBX_FS_UI64 " description:'%s' event_name:'%s' type:%u"
+//				" status:%u priority:%u", trigger->triggerid, trigger->description, trigger->event_name,
+//				trigger->type, trigger->status, trigger->priority);
 		zabbix_log(LOG_LEVEL_TRACE, "  expression:'%s' recovery_expression:'%s'", trigger->expression,
 				trigger->recovery_expression);
-		zabbix_log(LOG_LEVEL_TRACE, "  value:%u state:%u error:'%s' lastchange:%d", trigger->value,
-				trigger->state, ZBX_NULL2EMPTY_STR(trigger->error), trigger->lastchange);
+//		zabbix_log(LOG_LEVEL_TRACE, "  value:%u state:%u error:'%s' lastchange:%d", trigger->value,
+//				trigger->state, ZBX_NULL2EMPTY_STR(trigger->error), trigger->lastchange);
 		zabbix_log(LOG_LEVEL_TRACE, "  correlation_tag:'%s' recovery_mode:'%u' correlation_mode:'%u'",
 				trigger->correlation_tag, trigger->recovery_mode, trigger->correlation_mode);
-		zabbix_log(LOG_LEVEL_TRACE, "  topoindex:%u functional:%u locked:%u", trigger->topoindex,
-				trigger->functional, trigger->locked);
+//		zabbix_log(LOG_LEVEL_TRACE, "  topoindex:%u functional:%u locked:%u", trigger->topoindex,
+//				trigger->functional, trigger->locked);
 		zabbix_log(LOG_LEVEL_TRACE, "  opdata:'%s'", trigger->opdata);
 
-		if (NULL != trigger->itemids)
-		{
-			zabbix_log(LOG_LEVEL_TRACE, "  itemids:");
+		// if (NULL != trigger->itemids)
+		// {
+		// 	zabbix_log(LOG_LEVEL_TRACE, "  itemids:");
 
-			for (itemid = trigger->itemids; 0 != *itemid; itemid++)
-				zabbix_log(LOG_LEVEL_TRACE, "    " ZBX_FS_UI64, *itemid);
-		}
+		// 	for (itemid = trigger->itemids; 0 != *itemid; itemid++)
+		// 		zabbix_log(LOG_LEVEL_TRACE, "    " ZBX_FS_UI64, *itemid);
+		// }
 
 		if (0 != trigger->tags.values_num)
 			DCdump_trigger_tags(trigger);
@@ -1293,7 +1294,8 @@ void	DCdump_configuration(void)
 	DCdump_prototype_items();
 	DCdump_triggers();
 	//DCdump_trigdeps();
-	obj_index_dump(&glb_config->deptrigger_to_trigger_idx);
+	conf_index_trigger_to_deptrigger_dump();
+	//obj_index_dump(&glb_config->deptrigger_to_trigger_idx);
 	DCdump_functions();
 	DCdump_expressions();
 	DCdump_actions();

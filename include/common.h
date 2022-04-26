@@ -103,6 +103,7 @@ u_int64_t DC_get_debug_item();
 u_int64_t DC_get_debug_trigger();
 #define DEBUG_TRIGGER(id, message,...) if ( DC_get_debug_trigger() == id && id > 0 )\
 		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_trigger:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__);
+#define IF_DEBUG_TRIGGER(id) if ( DC_get_debug_trigger() == id && id > 0 )		
 #endif
 
 
@@ -1820,6 +1821,26 @@ void	zbx_md5buf2str(const md5_byte_t *md5, char *str);
 int	zbx_hex2bin(const unsigned char *p_hex, unsigned char *buf, int buf_len);
 
 
+typedef struct
+{
+	zbx_uint64_t	itemid;
+	zbx_uint64_t	hostid;
+	
+	unsigned char	value_type;
+		
+	zbx_timespec_t	ts;
+	history_value_t	value;
+	
+	int		mtime;
+	zbx_uint64_t	lastlogsize;
+		
+	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
+	unsigned char	state;
+
+//	char *host_name; /*hostname to log to history */
+//	char *item_key; /* name of metric*/
+}
+ZBX_DC_HISTORY;
 
 
 #endif

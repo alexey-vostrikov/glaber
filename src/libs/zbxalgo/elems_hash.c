@@ -1,38 +1,30 @@
-
-/****************** GNU GPL2 copyright goes here ***********************/
-#include "zbxalgo.h"
+/*
+** Glaber
+** Copyright (C) 2001-2100
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
 #include "glb_lock.h"
 #include "log.h"
+#include "zbxalgo.h"
 
 //this implementation of low locking hashes for string cached data
 //it allows simultanios items change
 //items add/removal are still required locking, so the algo should be used only
 //for slow-changing structure (however elemnt's data might change really fast)
 
-//it works on top of zabbix hashes with per-element locks
-//provides several primitives:
-
-//add,update,delete call-back based functions
-//and iterator to process all the elements
-
-
-//elems_hash_t *elems_hash_init_ext(mem_funcs_t *memf, 
-//                    elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func,
-//                    zbx_compare_func_t compare_func, zbx_hash_func_t hash_func) {
-    
-//    elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
-    
-//    zbx_hashset_create_ext(&e_hash->elems, 10, hash_func, compare_func, NULL, 
-//                            memf->malloc_func, memf->realloc_func, memf->free_func); 
-    
-//    e_hash->elem_create_func = create_func;
-//    e_hash->elem_free_func = free_func;
-    
-//    glb_rwlock_init(&e_hash->meta_lock);
-//    e_hash->memf = *memf;
-  
-//    return e_hash;
-//}
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
        elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
@@ -101,11 +93,33 @@ elems_hash_elem_t *create_element(elems_hash_t *elems,  uint64_t id, void *data 
     //    LOG_INF("Return from create callback");
         elem = zbx_hashset_insert(&elems->elems,&elem_local,sizeof(elems_hash_elem_t) );
     
-    } else {
-        elem = NULL;
-    }
+    }// else {
+    //    elem = NULL;
+    //}
 
     return elem;
+}
+/*very unlikely, but might return garbage*/
+int elems_hash_process_nb_unsafe(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *params) {
+    
+    int ret;
+    elems_hash_elem_t *elem;
+    
+	if (NULL == process_func)
+		return FAIL;
+   // LOG_INF("Locking");
+	glb_rwlock_rdlock(&elems->meta_lock);
+    //LOG_INF("searhing");
+    
+    if (NULL == (elem = zbx_hashset_search(&elems->elems, &id))) {
+        glb_rwlock_unlock(&elems->meta_lock);
+        return FAIL;
+    }
+
+	ret = process_func(elem, &elems->memf, params);
+        
+    glb_rwlock_unlock(&elems->meta_lock);
+	return ret;
 }
 
 int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *params, u_int64_t flags) {
@@ -154,15 +168,12 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
     
         return ret;
     }
-    //this is pretty wrong thing, but for long processing and the processing
-    //if (0 == (flags & ELEM_FLAG_REMAIN_LOCKED))
-    glb_lock_unlock(&elem->lock);
 
+    glb_lock_unlock(&elem->lock);
     glb_rwlock_unlock(&elems->meta_lock);
 
 	return ret;
 }
-
 
 int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
     elems_hash_elem_t *elem;
@@ -231,4 +242,22 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
     
     glb_rwlock_unlock(&elems->meta_lock);
     
+}
+
+int elems_hash_get_ids(elems_hash_t *elems, zbx_vector_uint64_t *ids) {
+    zbx_hashset_iter_t iter;
+    elems_hash_elem_t *elem;
+    
+    glb_rwlock_rdlock(&elems->meta_lock);
+    zbx_vector_uint64_reserve(ids, elems->elems.num_data);
+    
+    zbx_hashset_iter_reset(&elems->elems, &iter);
+    
+    while  (NULL !=(elem = (elems_hash_elem_t*) zbx_hashset_iter_next(&iter))) {
+            zbx_vector_uint64_append(ids, elem->id);
+    }
+    
+    glb_rwlock_unlock(&elems->meta_lock);
+    
+    return SUCCEED;    
 }

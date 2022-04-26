@@ -541,116 +541,107 @@ static int	get_history_aggregates_json(void *data, int value_type, zbx_uint64_t 
  *              history - [IN] the history data vector (may have mixed value types) *
  *                                                                                  *
  ************************************************************************************/
-static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
+static int	add_history_values(void *data, metric_t *metric, metric_processing_data_t *proc_data)
 {
 	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
-	int			i,j;
-	
+	int i;
+	char host_name[MAX_STRING_LEN], item_key[MAX_STRING_LEN];
 	char *escaped_value=NULL;
 	char *responce;
 
-	ZBX_DC_HISTORY		*h;
-	
 	static glb_clickhouse_buffer_t tbuffer[ITEM_VALUE_TYPE_MAX] = {0};	
 
 	LOG_DBG("In %s()", __func__);
-
-	for (i = 0; i < history_num; i++)
-	{
-		h = (ZBX_DC_HISTORY *)&hist[i];
-				
-		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
-			continue;
-
-		int value_type = h->value_type;
 		
-		if (value_type < 0 || value_type >= ITEM_VALUE_TYPE_MAX) {
-			LOG_INF("Wrong value type: %d, internal programming bug", value_type);
-			THIS_SHOULD_NEVER_HAPPEN;
-		}
-	
-		if (0 == conf->write_types[h->value_type])	{
-			zabbix_log(LOG_LEVEL_INFORMATION,"Skipping unsupported value type %d",h->value_type);
-			continue;
-		}
-	
-		if (tbuffer[value_type].num == 0) {
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"INSERT INTO %s.%s (day,itemid,clock,value", conf->dbname,hist_tables[value_type]); 
-			
-			if (ITEM_VALUE_TYPE_LOG == value_type) {
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",source,severity" ); 
-			}
+	if (ITEM_STATE_NORMAL != metric->state || 0 != (metric->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
+		return SUCCEED;
 
-			if ( 0 == conf->disable_nanoseconds ) {
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",ns");
-			}
-	
-			if ( 0 == conf->disable_host_item_names ) {
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",hostname, itemname");
-			}
-
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,") VALUES ");
-		} else  zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",");
+	int value_type = proc_data->value_type;
 		
-		//common part
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"(CAST(%d as date) ,%ld,%d",
-				h->ts.sec,h->itemid,h->ts.sec);
-    	
-		switch (h->value_type)
-		{
-		case ITEM_VALUE_TYPE_UINT64:
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",%ld",h->value.ui64);
-    		break;
-		case ITEM_VALUE_TYPE_FLOAT:
-		    zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",%f",h->value.dbl);
-			break;
-		case ITEM_VALUE_TYPE_STR:
-		case ITEM_VALUE_TYPE_TEXT:
-			escaped_value = zbx_dyn_escape_string(h->value.str, ESCAPE_CHARS);
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,", '%s'", escaped_value);
-			zbx_free(escaped_value);
-			break;
-		case ITEM_VALUE_TYPE_LOG:
-			
-			escaped_value=zbx_dyn_escape_string(h->value.log->value,ESCAPE_CHARS);
-		
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d",
-					escaped_value, h->value.log->source, h->value.log->severity);
-			zbx_free(escaped_value);
-
-			break;
-		default:
-			LOG_WRN("Unknown value type %d", h->value_type);
-			THIS_SHOULD_NEVER_HAPPEN;
-	//		exit(-1);
-			break;
-		}
-
-		if ( 0 == conf->disable_nanoseconds) {
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",%d", h->ts.ns);
-		}
-		
-		if ( 0 == conf->disable_host_item_names ) {
-			
-			char *host_name = zbx_dyn_escape_string(h->host_name, ESCAPE_CHARS);   
-			char *item_key = zbx_dyn_escape_string(h->item_key, ESCAPE_CHARS);   
-			
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s'", host_name, item_key);
-			
-			zbx_free(host_name);
-			zbx_free(item_key);
-		}
-
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,")");
-
-		tbuffer[value_type].num++;
+	if (value_type < 0 || value_type >= ITEM_VALUE_TYPE_MAX) {
+		LOG_INF("Wrong value type: %d, internal programming bug", value_type);
+		THIS_SHOULD_NEVER_HAPPEN;
 	}
+	
+	if (0 == conf->write_types[value_type])	
+		return SUCCEED;
+
+	DEBUG_ITEM(metric->itemid, "Adding metric to the Clickhouse export buffer");
+	
+	if (tbuffer[value_type].num == 0) {
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
+			"INSERT INTO %s.%s (day,itemid,clock,value", conf->dbname, hist_tables[value_type]); 
+			
+		if (ITEM_VALUE_TYPE_LOG == value_type) {
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",source,severity" ); 
+		}
+
+		if ( 0 == conf->disable_nanoseconds ) {
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",ns");
+		}
+	
+		if ( 0 == conf->disable_host_item_names ) {
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",hostname, itemname");
+		}
+
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,") VALUES ");
+	} else  
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",");
+		
+	//common part
+	metric->sec;
+	
+	zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"(CAST(%d as date) ,%ld,%d",
+				metric->sec, metric->itemid, metric->sec);
+    	
+	switch (value_type)
+	{
+	case ITEM_VALUE_TYPE_UINT64:
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",%ld", metric->value.data.ui64);
+    	break;
+	case ITEM_VALUE_TYPE_FLOAT:
+	    zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",%f", metric->value.data.dbl);
+		break;
+	case ITEM_VALUE_TYPE_STR:
+	case ITEM_VALUE_TYPE_TEXT:
+		escaped_value = zbx_dyn_escape_string(metric->value.data.str, ESCAPE_CHARS);
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,", '%s'", escaped_value);
+		zbx_free(escaped_value);
+		break;
+	case ITEM_VALUE_TYPE_LOG:	
+		escaped_value=zbx_dyn_escape_string(metric->value.data.str,ESCAPE_CHARS);
+		
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d",
+				escaped_value, "", "");
+		zbx_free(escaped_value);
+
+		break;
+	default:
+		LOG_WRN("Unknown value type %d", value_type);
+		THIS_SHOULD_NEVER_HAPPEN;
+	//		exit(-1);
+		break;
+	}
+
+	if ( 0 == conf->disable_nanoseconds) {
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",%d", metric->sec );
+	}
+		
+	if ( 0 == conf->disable_host_item_names ) {
+			
+		zbx_escape_string(host_name, MAX_STRING_LEN, proc_data->hostname , ESCAPE_CHARS);   
+		zbx_escape_string(item_key, MAX_STRING_LEN, proc_data->key, ESCAPE_CHARS);   
+		
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s'", host_name, item_key);
+	}
+
+	zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,")");
+	tbuffer[value_type].num++;
 	
 	for ( i=0 ; i < ITEM_VALUE_TYPE_MAX; i++ ) {
 		if ( (tbuffer[i].num > GLB_CLICKHOUSE_WRITE_BATCH) || 
 	    	 (tbuffer[i].lastflush + GLB_CLICKHOUSE_FLUSH_TIMEOUT < time(NULL) && tbuffer[i].num > 0 ) )
-		{ 
-			
+		{ 		
 			if (SUCCEED != curl_post_request(conf->url, tbuffer[i].buffer, &responce)) 
 			LOG_WRN("FAILED to flush %d values of type %d to clickhouse", tbuffer[i].num, i);
 
@@ -682,75 +673,64 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
  *              history - [IN] the history data vector (may have mixed value types) *
  *                                                                                  *
  ************************************************************************************/
-static int	add_trend_values(void *data, ZBX_DC_TREND *trends, int trends_num)
+static int	add_trend_value(void *data, trend_t *trend, metric_processing_data_t *proc_data)
 {
 	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
 	int			i,j, value_type, num = 0;
 	
-	ZBX_DC_TREND *tr;
 	static glb_clickhouse_buffer_t tbuffer[ITEM_VALUE_TYPE_MAX] = {0};	
 	char *responce;
 
-	char *host_name, *item_key;	
+	char host_name[MAX_STRING_LEN], item_key[MAX_STRING_LEN];	
 	char *precision="%0.4f,";
 
-	if (0 == trends_num ) 
-		return SUCCEED;
-    
-	for (i = 0; i < trends_num; i++)
-	{  
-		value_type=trends[i].value_type;
-		
-		LOG_DBG("Got trend data: itemid %ld %s:%s", trends[i].itemid, trends[i].host_name, trends[i].item_key);
-		if ( 0 == trends[i].num ) 
-		 	continue;
-
-		tr=&trends[i];
-
-		if (0 == tbuffer[value_type].num) {
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
-				"INSERT INTO %s.%s (day, itemid, clock, value_min, value_max, value_avg, count, hostname, itemname) VALUES", 
-				conf->dbname, trend_tables[value_type]);
-		} else {
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",");
-		}
-
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
-			"(CAST(%d as date) ,%ld,%d,", trends[i].clock,trends[i].itemid,trends[i].clock);
-    	
-		switch (tr->value_type) {
-		
-			case ITEM_VALUE_TYPE_FLOAT:
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc,
-								&tbuffer[value_type].offset,precision,trends[i].value_min.dbl);
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,
-								&tbuffer[value_type].offset,precision,trends[i].value_max.dbl);
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,
-								&tbuffer[value_type].offset,precision,trends[i].value_avg.dbl);
-				break;
-			case ITEM_VALUE_TYPE_UINT64:
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"%ld,%ld,%ld,",
-			   			trends[i].value_min.ui64,
-						trends[i].value_max.ui64,
-						(trends[i].value_avg.ui64.lo / trends[i].num) );
-				break;
-			default:
-				THIS_SHOULD_NEVER_HAPPEN;
-				break;
-		}
+	value_type = proc_data->value_type;
 	
-		host_name = zbx_dyn_escape_string(trends[i].host_name, ESCAPE_CHARS);   
-		item_key = zbx_dyn_escape_string(trends[i].item_key, ESCAPE_CHARS);   
-
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,
-				"%d, '%s','%s')", trends[i].num, host_name, item_key);
-		
-		zbx_free(host_name);
-		zbx_free(item_key);
-
-        tbuffer[value_type].num++;
+	LOG_DBG("Got trend data: itemid %ld %s:%s", trend->itemid, proc_data->hostname, proc_data->key);
+	
+	if (0 == tbuffer[value_type].num) {
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
+			"INSERT INTO %s.%s (day, itemid, clock, value_min, value_max, value_avg, count, hostname, itemname) VALUES", 
+			conf->dbname, trend_tables[value_type]);
+	} else {
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",");
 	}
 
+	zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,
+		"(CAST(%d as date) ,%ld,%d,", trend->account_hour, trend->itemid, trend->account_hour);
+    	
+	switch (value_type) {
+		
+		case ITEM_VALUE_TYPE_FLOAT:
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc,	&tbuffer[value_type].offset,
+						precision, trend->value_min.dbl);
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc, &tbuffer[value_type].offset,
+						precision,trend->value_max.dbl);
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc, &tbuffer[value_type].offset,
+						precision,trend->value_avg.dbl );
+			break;
+
+		case ITEM_VALUE_TYPE_UINT64:
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"%ld,%ld,%ld,",
+		   			trend->value_min.ui64,
+					trend->value_max.ui64,
+					trend->value_avg.ui64 );
+			break;
+		default:
+			LOG_INF("Type %d is not supported by trends, this is BUG", value_type);
+			THIS_SHOULD_NEVER_HAPPEN;
+			exit(-1);
+			break;
+	}
+
+	zbx_escape_string(host_name, MAX_STRING_LEN, proc_data->hostname, ESCAPE_CHARS);   
+	zbx_escape_string(item_key, MAX_STRING_LEN, proc_data->key, ESCAPE_CHARS);   
+
+	zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,
+			"%d, '%s','%s')", trend->num, host_name, item_key);
+		
+    tbuffer[value_type].num++;
+	
     for (value_type=0; value_type <ITEM_VALUE_TYPE_MAX; value_type ++ ) {
 		if ((tbuffer[value_type].num > GLB_CLICKHOUSE_WRITE_BATCH || 
 			 tbuffer[value_type].lastflush + GLB_CLICKHOUSE_FLUSH_TIMEOUT < time(NULL)) && 
@@ -860,7 +840,7 @@ int	glb_history_clickhouse_init(char *params)
 			LOG_WRN("Trends are disabled");
 	} else {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Trends are enabled");
-		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE_TRENDS,(void (*)(void))add_trend_values, conf);
+		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE_TRENDS,(void (*)(void))add_trend_value, conf);
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON,(void (*)(void))get_trend_aggregates_json, conf);
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS_JSON,(void (*)(void))get_trend_values_json, conf);
 	}

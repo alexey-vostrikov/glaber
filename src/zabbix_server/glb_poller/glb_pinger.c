@@ -414,7 +414,7 @@ void glb_pinger_handle_timeouts(GLB_PINGER_CONF *conf) {
                     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Item %ld set to queued state in the timeout handler",
                             __func__, glb_item->itemid );
                     *conf->responses += 1;
-                    //this is timout but overall operation has succeeded
+                    //this is timeout but overall operation has succeeded
                     glb_pinger_submit_result( glb_item, SUCCEED, NULL, &ts);
                 } else {
                     zabbix_log(LOG_LEVEL_DEBUG, "Not marking item %ld as timed out: sent %d, recv %d, count %d, glb_time-lastpacket: %ld, state: %d q_delay: %ld",

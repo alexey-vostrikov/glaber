@@ -34,6 +34,7 @@
 #include "events.h"
 #include "zbxvault.h"
 #include "zbxavailability.h"
+#include "../glb_process/process.h"
 
 extern char	*CONFIG_SERVER;
 extern char	*CONFIG_VAULTDBPATH;
@@ -2950,8 +2951,12 @@ static void	process_item_value(const DC_ITEM *item, AGENT_RESULT *result, zbx_ti
 			*h_num = 0;
 		}
 		else
-		{
-			dc_add_history(item->itemid, item->value_type, item->flags, result, ts, item->state, error);
+		{	
+			metric_t metric = {0};
+			
+			create_metric_from_agent_result(item->host.hostid, item->itemid, ts->sec, item->state, result, &metric, error);
+			send_metric_to_processing(&metric);
+		//	dc_add_history(item->itemid, item->value_type, item->flags, result, ts, item->state, error);
 			*h_num = 1;
 		}
 	}
@@ -3084,6 +3089,7 @@ int	process_history_data(DC_ITEM *items, zbx_agent_value_t *values, int *errcode
 	int	processed_num = 0, history_num;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	LOG_INF("Proxy history syncing need significant overwork to start working, disabled by now");
 
 	for (i = 0; i < values_num; i++)
 	{
@@ -3138,7 +3144,6 @@ int	process_history_data(DC_ITEM *items, zbx_agent_value_t *values, int *errcode
 		zbx_dc_items_update_nextcheck(items, values, errcodes, values_num);
 
 	zbx_preprocessor_flush();
-	dc_flush_history();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() processed:%d", __func__, processed_num);
 

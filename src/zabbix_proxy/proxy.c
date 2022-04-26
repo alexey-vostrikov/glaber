@@ -63,8 +63,8 @@
 #include "zbxvault.h"
 #include "zbxdiag.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
-#include "../libs/glb_state/glb_state.h"
-#include "../libs/glb_state/glb_state_items.h"
+#include "../libs/glb_state/state.h"
+#include "../libs/glb_state/state_items.h"
 
 
 #ifdef HAVE_OPENIPMI
@@ -172,8 +172,10 @@ int CONFIG_VALUECACHE_FILL_TIME=0;
 int *CONFIG_HISTORY_PRELOAD_VALUES = 0;
 char *CONFIG_VCDUMP_LOCATION = NULL;
 
-
-int	CONFIG_POLLER_FORKS		= 5;
+u_int64_t CONFIG_PROCESSING_IPC_SIZE = 256 * 1024 * 1024;
+void *ipc_processing = NULL;
+void *ipc_processing_notify = NULL;
+int CONFIG_POLLER_FORKS		= 5;
 int	CONFIG_UNREACHABLE_POLLER_FORKS	= 1;
 int	CONFIG_PINGER_FORKS		= 5;
 int CONFIG_GLB_SNMP_FORKS = 1;
@@ -1297,12 +1299,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	zbx_free_config();
 
-	if (SUCCEED != init_database_cache(&error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize database cache: %s", error);
-		zbx_free(error);
-		exit(EXIT_FAILURE);
-	}
+//	if (SUCCEED != init_database_cache(&error))
+//	{
+//		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize database cache: %s", error);
+//		zbx_free(error);
+//		exit(EXIT_FAILURE);
+//	}
 
 	if (SUCCEED != init_proxy_history_lock(&error))
 	{

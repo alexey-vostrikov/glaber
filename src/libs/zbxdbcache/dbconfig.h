@@ -28,38 +28,38 @@
 #	error This header must be used by configuration cache implementation
 #endif
 
-typedef struct
-{
-	zbx_uint64_t	triggerid;
-	const char		*description;
-	const char		*expression;
-	const char		*recovery_expression;
-	const char		*error;
-	const char		*correlation_tag;
-	const char		*opdata;
-	const char		*event_name;
-	const unsigned char	*expression_bin;
-	const unsigned char	*recovery_expression_bin;
-	int			lastchange;
-	int			revision;
-	int			timer_revision;
-	unsigned char		topoindex;
-	unsigned char		priority;
-	unsigned char		type;
-	unsigned char		value;
-	unsigned char		state;
-	unsigned char		locked;
-	unsigned char		status; //ENABLED OR DISABLED
-	unsigned char		functional;		/* see TRIGGER_FUNCTIONAL_* defines      */
-	unsigned char		recovery_mode;		/* see TRIGGER_RECOVERY_MODE_* defines   */
-	unsigned char		correlation_mode;	/* see ZBX_TRIGGER_CORRELATION_* defines */
-	unsigned char		timer;
+// typedef struct
+// {
+// 	zbx_uint64_t	triggerid;
+// 	const char		*description;
+// 	const char		*expression;
+// 	const char		*recovery_expression;
+// //	const char		*error;
+// 	const char		*correlation_tag;
+// 	const char		*opdata;
+// 	const char		*event_name;
+// 	const unsigned char	*expression_bin;
+// 	const unsigned char	*recovery_expression_bin;
+// //	int			lastchange;
+// 	int			revision;
+// //	int			timer_revision;
+// 	unsigned char		topoindex;
+// 	unsigned char		priority;
+// 	unsigned char		type;
+// //	unsigned char		value;
+// //	unsigned char		state;
+// //	unsigned char		locked;
+// //	unsigned char		status; //ENABLED OR DISABLED
+// //	unsigned char		functional;		/* see TRIGGER_FUNCTIONAL_* defines      */
+// 	unsigned char		recovery_mode;		/* see TRIGGER_RECOVERY_MODE_* defines   */
+// 	unsigned char		correlation_mode;	/* see ZBX_TRIGGER_CORRELATION_* defines */
+// 	unsigned char		timer;
 
-	zbx_uint64_t		*itemids;
+// 	zbx_uint64_t		*itemids;
 
-	zbx_vector_ptr_t	tags;
-}
-ZBX_DC_TRIGGER;
+// 	zbx_vector_ptr_t	tags;
+// }
+// ZBX_DC_TRIGGER;
 
 /* specifies if trigger expression/recovery expression has timer functions */
 /* (date, time, now, dayofweek or dayofmonth)                              */
@@ -76,18 +76,18 @@ typedef struct zbx_dc_trigger_deplist
 }
 ZBX_DC_TRIGGER_DEPLIST;
 
-typedef struct
-{
-	zbx_uint64_t	functionid;
-	zbx_uint64_t	triggerid;
-	zbx_uint64_t	itemid;
-	const char	*function;
-	const char	*parameter;
-	int		revision;
-	int		timer_revision;
-	unsigned char	type;
-}
-ZBX_DC_FUNCTION;
+// typedef struct
+// {
+// 	zbx_uint64_t	functionid;
+// 	zbx_uint64_t	triggerid;
+// 	zbx_uint64_t	itemid;
+// 	const char	*function;
+// 	const char	*parameter;
+// 	int		revision;
+// 	int		timer_revision;
+// 	unsigned char	type;
+// }
+// ZBX_DC_FUNCTION;
 
 typedef struct
 {
@@ -99,7 +99,7 @@ typedef struct
 	const char		*key;
 	const char		*port;
 	const char		*delay;
-	ZBX_DC_TRIGGER		**triggers;
+//	ZBX_DC_TRIGGER		**triggers;
 	int			data_expected_from;
 	unsigned char		history;
 	unsigned char		type;
@@ -963,10 +963,12 @@ extern zbx_rwlock_t	config_lock;
 #define TRY_WRLOCK_CACHE	0 == sync_in_progress ||  SUCCEED == zbx_rwlock_try_wrlock(config_lock)  
 #define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock);
 
-/*#define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock)
-#define	WRLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("CC wrlock at %s:%d",__FILE__, __LINE__); zbx_rwlock_wrlock(config_lock); }
+
+/*
+#define	RDLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("RLOCKING  in %s:%d", __func__, __LINE__); zbx_rwlock_rdlock(config_lock); LOG_INF("RLOCKED  in %s", __func__); }
+#define	WRLOCK_CACHE	if (0 == sync_in_progress) {  LOG_INF("WRLOCKING in %s:%d", __func__, __LINE__); zbx_rwlock_wrlock(config_lock);LOG_INF("WRLOCKED in %s", __func__);  }
 #define TRY_WRLOCK_CACHE	0 == sync_in_progress ||  SUCCEED == zbx_rwlock_try_wrlock(config_lock)  
-#define	UNLOCK_CACHE	if (0 == sync_in_progress) {  LOG_INF("CC unlock at %s:%d",__FILE__, __LINE__); zbx_rwlock_unlock(config_lock); }
+#define	UNLOCK_CACHE	if (0 == sync_in_progress) { zbx_rwlock_unlock(config_lock);  LOG_INF("UNLOCKED in %s:%d", __func__, __LINE__);}
 */
 
 #define ZBX_IPMI_DEFAULT_AUTHTYPE	-1
@@ -1020,10 +1022,10 @@ char	*dc_expand_user_macros(const char *text, zbx_uint64_t *hostids, int hostids
 int	dc_expand_user_macros_len(const char *text, size_t text_len, zbx_uint64_t *hostids, int hostids_num,
 		char **value, char **error);
 
-#define ZBX_TRIGGER_TIMER_NONE			0x0000
-#define ZBX_TRIGGER_TIMER_TRIGGER		0x0001
-#define ZBX_TRIGGER_TIMER_FUNCTION_TIME		0x0002
-#define ZBX_TRIGGER_TIMER_FUNCTION_TREND	0x0004
-#define ZBX_TRIGGER_TIMER_FUNCTION		(ZBX_TRIGGER_TIMER_FUNCTION_TIME | ZBX_TRIGGER_TIMER_FUNCTION_TREND)
+// #define ZBX_TRIGGER_TIMER_NONE			0x0000
+// #define ZBX_TRIGGER_TIMER_TRIGGER		0x0001
+// #define ZBX_TRIGGER_TIMER_FUNCTION_TIME		0x0002
+// #define ZBX_TRIGGER_TIMER_FUNCTION_TREND	0x0004
+// #define ZBX_TRIGGER_TIMER_FUNCTION		(ZBX_TRIGGER_TIMER_FUNCTION_TIME | ZBX_TRIGGER_TIMER_FUNCTION_TREND)
 
 #endif

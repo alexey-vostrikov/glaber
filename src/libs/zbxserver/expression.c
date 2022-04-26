@@ -24,9 +24,15 @@
 #include "zbxvariant.h"
 #include "zbxeval.h"
 
-#include "../glb_state/glb_state_items.h"
+#include "../glb_state/state_items.h"
+#include "../glb_conf/conf_items.h"
+
+#include "../glb_conf/conf_triggers.h"
+#include "../glb_state/state_triggers.h"
+#include "../glb_process/proc_triggers.h"
+
 #include "macrofunc.h"
-#include "../glb_objects/glb_trigger.h"
+
 #ifdef HAVE_LIBXML2
 #	include <libxml/parser.h>
 #	include <libxml/xpath.h>
@@ -4762,6 +4768,9 @@ static void	zbx_link_triggers_with_functions(zbx_vector_ptr_t *triggers_func_pos
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() triggers_func_pos_num:%d", __func__, triggers_func_pos->values_num);
 }
 
+
+
+
 /******************************************************************************
  *                                                                            *
  * Function: zbx_determine_items_in_expressions                               *
@@ -4893,6 +4902,59 @@ static void	func_clean(void *ptr)
 	zbx_variant_clear(&func->value);
 }
 
+
+// static void	get_functions_items(const zbx_vector_uint64_t *functionids, zbx_hashset_t *funcs,
+// 		zbx_hashset_t *ifuncs, const trigger_conf_t *conf)
+// {
+// 	int		i, j;
+// 	DC_FUNCTION	*functions = NULL;
+// 	int		*errcodes = NULL;
+// 	zbx_ifunc_t	ifunc_local;
+// 	zbx_func_t	*func, func_local;
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() functionids_num:%d", __func__, functionids->values_num);
+
+// 	zbx_variant_set_none(&func_local.value);
+// 	func_local.error = NULL;
+
+// 	functions = (DC_FUNCTION *)zbx_malloc(functions, sizeof(DC_FUNCTION) * functionids->values_num);
+// 	errcodes = (int *)zbx_malloc(errcodes, sizeof(int) * functionids->values_num);
+
+// 	DCconfig_get_functions_by_functionids(functions, functionids->values, errcodes, functionids->values_num);
+
+// 	for (i = 0; i < functionids->values_num; i++)
+// 	{
+// 		if (SUCCEED != errcodes[i])
+// 			continue;
+
+// 		func_local.itemid = functions[i].itemid;
+
+// 		func_local.timespec = tr->timespec;
+// 		func_local.function = functions[i].function;
+// 		func_local.parameter = functions[i].parameter;
+
+// 		if (NULL == (func = (zbx_func_t *)zbx_hashset_search(funcs, &func_local)))
+// 		{
+// 			func = (zbx_func_t *)zbx_hashset_insert(funcs, &func_local, sizeof(func_local));
+// 			func->function = zbx_strdup(NULL, func_local.function);
+// 			func->parameter = zbx_strdup(NULL, func_local.parameter);
+// 			zbx_variant_set_none(&func->value);
+// 		}
+
+// 		ifunc_local.functionid = functions[i].functionid;
+// 		ifunc_local.func = func;
+// 		zbx_hashset_insert(ifuncs, &ifunc_local, sizeof(ifunc_local));
+// 	}
+
+// 	DCconfig_clean_functions(functions, errcodes, functionids->values_num);
+
+// 	zbx_free(errcodes);
+// 	zbx_free(functions);
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() ifuncs_num:%d", __func__, ifuncs->num_data);
+// }
+
+
 /******************************************************************************
  *                                                                            *
  * Function: zbx_populate_function_items                                      *
@@ -4969,131 +5031,223 @@ static void	zbx_populate_function_items(const zbx_vector_uint64_t *functionids, 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() ifuncs_num:%d", __func__, ifuncs->num_data);
 }
 
-static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_uint64_t *history_itemids,
-		const DC_ITEM *history_items, const int *history_errcodes)
+static void	get_functions_conf(const zbx_vector_uint64_t *functionids, zbx_hashset_t *funcs,
+		zbx_hashset_t *ifuncs)
 {
-	DC_ITEM			*items = NULL;
+	int		i, j;
+	DC_FUNCTION	*functions = NULL;
+	int		*errcodes = NULL;
+	zbx_ifunc_t	ifunc_local;
+	zbx_func_t	*func, func_local = {0};
+
+	LOG_INF("In %s() functionids_num:%d", __func__, functionids->values_num);
+
+	zbx_variant_set_none(&func_local.value);
+	func_local.error = NULL;
+
+	functions = (DC_FUNCTION *)zbx_malloc(functions, sizeof(DC_FUNCTION) * functionids->values_num);
+	errcodes = (int *)zbx_malloc(errcodes, sizeof(int) * functionids->values_num);
+
+	DCconfig_get_functions_by_functionids(functions, functionids->values, errcodes, functionids->values_num);
+
+	for (i = 0; i < functionids->values_num; i++)
+	{
+		if (SUCCEED != errcodes[i])
+			continue;
+
+		func_local.itemid = functions[i].itemid;
+		func_local.timespec.sec = time(NULL);
+		func_local.function = functions[i].function;
+		func_local.parameter = functions[i].parameter;
+
+		if (NULL == (func = (zbx_func_t *)zbx_hashset_search(funcs, &func_local)))
+		{
+			func = (zbx_func_t *)zbx_hashset_insert(funcs, &func_local, sizeof(func_local));
+			func->function = zbx_strdup(NULL, func_local.function);
+			func->parameter = zbx_strdup(NULL, func_local.parameter);
+			zbx_variant_set_none(&func->value);
+		}
+
+		ifunc_local.functionid = functions[i].functionid;
+		ifunc_local.func = func;
+		zbx_hashset_insert(ifuncs, &ifunc_local, sizeof(ifunc_local));
+	}
+
+	DCconfig_clean_functions(functions, errcodes, functionids->values_num);
+
+	zbx_free(errcodes);
+	zbx_free(functions);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() ifuncs_num:%d", __func__, ifuncs->num_data);
+}
+
+
+// static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_uint64_t *history_itemids,
+// 		const DC_ITEM *history_items, const int *history_errcodes)
+// {
+// 	DC_ITEM			*items = NULL;
+// 	char			*error = NULL;
+// 	int			i;
+// 	zbx_func_t		*func;
+// 	zbx_vector_uint64_t	itemids;
+// 	int			*errcodes = NULL;
+// 	zbx_hashset_iter_t	iter;
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() funcs_num:%d", __func__, funcs->num_data);
+
+// 	zbx_vector_uint64_create(&itemids);
+
+// 	zbx_hashset_iter_reset(funcs, &iter);
+// 	while (NULL != (func = (zbx_func_t *)zbx_hashset_iter_next(&iter)))
+// 	{
+// 		if (FAIL == zbx_vector_uint64_bsearch(history_itemids, func->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+// 			zbx_vector_uint64_append(&itemids, func->itemid);
+// 	}
+
+// 	if (0 != itemids.values_num)
+// 	{
+// 		zbx_vector_uint64_sort(&itemids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+// 		zbx_vector_uint64_uniq(&itemids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+// 		items = (DC_ITEM *)zbx_malloc(items, sizeof(DC_ITEM) * (size_t)itemids.values_num);
+// 		errcodes = (int *)zbx_malloc(errcodes, sizeof(int) * (size_t)itemids.values_num);
+
+// 		DCconfig_get_items_by_itemids_partial(items, itemids.values, errcodes, itemids.values_num,
+// 				ZBX_ITEM_GET_SYNC);
+// 	}
+
+// 	zbx_hashset_iter_reset(funcs, &iter);
+// 	while (NULL != (func = (zbx_func_t *)zbx_hashset_iter_next(&iter)))
+// 	{
+// 		int		errcode;
+// 		const DC_ITEM	*item;
+		
+// 		DEBUG_ITEM(func->itemid,"Doing function calculation");
+		
+// 		/* avoid double copying from configuration cache if already retrieved when saving history */
+// 		if (FAIL != (i = zbx_vector_uint64_bsearch(history_itemids, func->itemid,
+// 				ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
+// 		{
+// 			item = history_items + i;
+// 			errcode = history_errcodes[i];
+// 		}
+// 		else
+// 		{
+// 			i = zbx_vector_uint64_bsearch(&itemids, func->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+// 			item = items + i;
+// 			errcode = errcodes[i];
+// 		}
+
+// 		if (SUCCEED != errcode)
+// 		{
+// 			zbx_free(func->error);
+// 			func->error = zbx_eval_format_function_error(func->function, NULL, NULL, func->parameter,
+// 					"item does not exist");
+// 			continue;
+// 		}
+
+// 		/* do not evaluate if the item is disabled or belongs to a disabled host */
+
+// 		if (ITEM_STATUS_ACTIVE != item->status)
+// 		{
+// 			zbx_free(func->error);
+// 			func->error = zbx_eval_format_function_error(func->function, item->host.host,
+// 					item->key_orig, func->parameter, "item is disabled");
+// 			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is inactive");
+// 			continue;
+// 		}
+
+// 		if (HOST_STATUS_MONITORED != item->host.status)
+// 		{
+// 			zbx_free(func->error);
+// 			func->error = zbx_eval_format_function_error(func->function, item->host.host,
+// 					item->key_orig, func->parameter, "item belongs to a disabled host");
+// 			DEBUG_ITEM(func->itemid, "Skipping func eval to due to host is inactive");					
+// 			continue;
+// 		}
+
+// 		if (ITEM_STATE_NOTSUPPORTED == item->state &&
+// 				FAIL == zbx_evaluatable_for_notsupported(func->function))
+// 		{
+// 			/* set 'unknown' error value */
+// 			zbx_variant_set_error(&func->value,
+// 					zbx_eval_format_function_error(func->function, item->host.host,
+// 							item->key_orig, func->parameter, "item is not supported"));
+// 			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is not supported");
+// 			continue;
+// 		}
+		
+// 		item_func_eval_conf_t item_conf = {.hostid = item->host.hostid, .itemid = item->itemid, .value_type = item->value_type};
+
+
+// 		if (SUCCEED != evaluate_function2(&func->value, (DC_ITEM *)item, func->function, func->parameter,
+// 				&func->timespec, &error))
+// 		{
+// 			/* compose and store error message for future use */
+// 			zbx_variant_set_error(&func->value,
+// 					zbx_eval_format_function_error(func->function, item->host.host,
+// 							item->key_orig, func->parameter, error));
+// 			zbx_free(error);
+// 			DEBUG_ITEM(func->itemid,"There was an error in func calc: %s",error);
+// 			continue;
+// 		}
+// 	}
+
+// //	zbx_vc_flush_stats();
+
+// 	DCconfig_clean_items(items, errcodes, itemids.values_num);
+// 	zbx_vector_uint64_destroy(&itemids);
+
+// 	zbx_free(errcodes);
+// 	zbx_free(items);
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
+
+
+static void	evaluate_functions(u_int64_t triggerid, zbx_hashset_t *funcs) {
 	char			*error = NULL;
 	int			i;
 	zbx_func_t		*func;
-	zbx_vector_uint64_t	itemids;
-	int			*errcodes = NULL;
 	zbx_hashset_iter_t	iter;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() funcs_num:%d", __func__, funcs->num_data);
 
-	zbx_vector_uint64_create(&itemids);
-
 	zbx_hashset_iter_reset(funcs, &iter);
 	while (NULL != (func = (zbx_func_t *)zbx_hashset_iter_next(&iter)))
 	{
-		if (FAIL == zbx_vector_uint64_bsearch(history_itemids, func->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC))
-			zbx_vector_uint64_append(&itemids, func->itemid);
-	}
-
-	if (0 != itemids.values_num)
-	{
-		zbx_vector_uint64_sort(&itemids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-		zbx_vector_uint64_uniq(&itemids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-
-		items = (DC_ITEM *)zbx_malloc(items, sizeof(DC_ITEM) * (size_t)itemids.values_num);
-		errcodes = (int *)zbx_malloc(errcodes, sizeof(int) * (size_t)itemids.values_num);
-
-		DCconfig_get_items_by_itemids_partial(items, itemids.values, errcodes, itemids.values_num,
-				ZBX_ITEM_GET_SYNC);
-	}
-
-	zbx_hashset_iter_reset(funcs, &iter);
-	while (NULL != (func = (zbx_func_t *)zbx_hashset_iter_next(&iter)))
-	{
-		int		errcode;
-		const DC_ITEM	*item;
+		item_func_eval_conf_t item_conf;
 		
-		DEBUG_ITEM(func->itemid,"Doing function calculation");
-		
-		/* avoid double copying from configuration cache if already retrieved when saving history */
-		if (FAIL != (i = zbx_vector_uint64_bsearch(history_itemids, func->itemid,
-				ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
-		{
-			item = history_items + i;
-			errcode = history_errcodes[i];
-		}
-		else
-		{
-			i = zbx_vector_uint64_bsearch(&itemids, func->itemid, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-			item = items + i;
-			errcode = errcodes[i];
-		}
-
-		if (SUCCEED != errcode)
-		{
-			zbx_free(func->error);
-			func->error = zbx_eval_format_function_error(func->function, NULL, NULL, func->parameter,
-					"item does not exist");
-			continue;
-		}
-
-		/* do not evaluate if the item is disabled or belongs to a disabled host */
-
-		if (ITEM_STATUS_ACTIVE != item->status)
-		{
-			zbx_free(func->error);
-			func->error = zbx_eval_format_function_error(func->function, item->host.host,
-					item->key_orig, func->parameter, "item is disabled");
-			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is inactive");
-			continue;
-		}
-
-		if (HOST_STATUS_MONITORED != item->host.status)
-		{
-			zbx_free(func->error);
-			func->error = zbx_eval_format_function_error(func->function, item->host.host,
-					item->key_orig, func->parameter, "item belongs to a disabled host");
-			DEBUG_ITEM(func->itemid, "Skipping func eval to due to host is inactive");					
-			continue;
-		}
-
-		if (ITEM_STATE_NOTSUPPORTED == item->state &&
-				FAIL == zbx_evaluatable_for_notsupported(func->function))
-		{
-			/* set 'unknown' error value */
-			zbx_variant_set_error(&func->value,
-					zbx_eval_format_function_error(func->function, item->host.host,
-							item->key_orig, func->parameter, "item is not supported"));
-			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is not supported");
-			continue;
-		}
-
-		if (SUCCEED != evaluate_function2(&func->value, (DC_ITEM *)item, func->function, func->parameter,
+		if (SUCCEED != conf_items_get_func_eval_conf(func->itemid, &item_conf, &error) ||	
+			SUCCEED != evaluate_function2(&func->value, &item_conf, func->function, func->parameter,
 				&func->timespec, &error))
 		{
 			/* compose and store error message for future use */
+			metric_processing_data_t proc_data;
+			fetch_metric_processing_data(func->itemid, &proc_data);
+
 			zbx_variant_set_error(&func->value,
-					zbx_eval_format_function_error(func->function, item->host.host,
-							item->key_orig, func->parameter, error));
+					zbx_eval_format_function_error(func->function, proc_data.hostname,
+							proc_data.key, func->parameter, error));
 			zbx_free(error);
 			DEBUG_ITEM(func->itemid,"There was an error in func calc: %s",error);
 			continue;
 		}
+		DEBUG_TRIGGER(triggerid,"Calculated function %s (%s) with result type %s, value %s", func->function, func->parameter, 
+			zbx_variant_type_desc(&func->value), zbx_variant_value_desc(&func->value));
 	}
-
-//	zbx_vc_flush_stats();
-
-	DCconfig_clean_items(items, errcodes, itemids.values_num);
-	zbx_vector_uint64_destroy(&itemids);
-
-	zbx_free(errcodes);
-	zbx_free(items);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_eval_context_t *ctx, char **error)
+
+static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_eval_context_t *ctx, trigger_state_t *state)
 {
 	zbx_uint64_t		functionid;
 	zbx_func_t		*func;
 	zbx_ifunc_t		*ifunc;
 	int			i;
+	char buf[MAX_STRING_LEN];
 
 	for (i = 0; i < ctx->stack.values_num; i++)
 	{
@@ -5106,30 +5260,34 @@ static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_ev
 		{
 			/* functionids should be already extracted into uint64 vars */
 			THIS_SHOULD_NEVER_HAPPEN;
-			*error = zbx_dsprintf(*error, "Cannot parse function at: \"%s\"",
+			
+			zbx_snprintf(buf,MAX_STRING_LEN,"Cannot parse function at: \"%s\"",
 					ctx->expression + token->loc.l);
+			
+			state_trigger_set_error(state, buf);
 			return FAIL;
 		}
 
 		functionid = token->value.data.ui64;
 		if (NULL == (ifunc = (zbx_ifunc_t *)zbx_hashset_search(ifuncs, &functionid)))
 		{
-			*error = zbx_dsprintf(*error, "Cannot obtain function"
+			zbx_snprintf(buf,MAX_STRING_LEN, "Cannot obtain function"
 					" and item for functionid: " ZBX_FS_UI64, functionid);
+			state_trigger_set_error(state, buf);
 			return FAIL;
 		}
 
 		func = ifunc->func;
 
-		if (NULL != func->error)
-		{
-			*error = zbx_strdup(*error, func->error);
-			return FAIL;
-		}
+//		if (NULL != func->error)
+//		{
+//			*error = zbx_strdup(*error, func->error);
+//			return FAIL;
+//		}
 
 		if (ZBX_VARIANT_NONE == func->value.type)
 		{
-			*error = zbx_strdup(*error, "Unexpected error while processing a trigger expression");
+			state_trigger_set_error(state, "Unexpected error while processing a trigger expression");
 			return FAIL;
 		}
 
@@ -5152,52 +5310,70 @@ static void	log_expression(const char *prefix, int index, const zbx_eval_context
 	}
 }
 
-static void	zbx_substitute_functions_results(zbx_hashset_t *ifuncs, zbx_vector_ptr_t *triggers)
+
+
+static int	substitute_functions_results(zbx_hashset_t *ifuncs, trigger_conf_t *conf, trigger_state_t *state)
 {
-	DC_TRIGGER	*tr;
-	int		i;
+	char *error;
+	
+	if( SUCCEED != substitute_expression_functions_results(ifuncs, conf->eval_ctx, state))
+		return FAIL;
+	
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ifuncs_num:%d tr_num:%d",
-			__func__, ifuncs->num_data, triggers->values_num);
+	log_expression(__func__, 1, conf->eval_ctx);
 
-	for (i = 0; i < triggers->values_num; i++)
+	if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == conf->recovery_mode)
 	{
-		tr = (DC_TRIGGER *)triggers->values[i];
-
-		if (NULL != tr->new_error)
-			continue;
-
-		if( SUCCEED != substitute_expression_functions_results(ifuncs, tr->eval_ctx, &tr->new_error))
-		{
-			tr->new_value = TRIGGER_VALUE_UNKNOWN;
-			continue;
-		}
-
-	//	if (ZBX_CLUSTER_HOST_STATE_ACTIVE != items[i].host.cluster_state)
-	//	{
-	//		func->error = zbx_dsprintf(func->error, "Cannot evaluate function \"%s:%s.%s(%s)\":"
-	//				" item belongs to a host processed on other cluster node.",
-	//				items[i].host.host, items[i].key_orig, func->function, func->parameter);
-	//		continue;
-	//	}
-
-		log_expression(__func__, i, tr->eval_ctx);
-
-		if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode)
-		{
-			if (SUCCEED != substitute_expression_functions_results(ifuncs, tr->eval_ctx_r, &tr->new_error))
-			{
-				tr->new_value = TRIGGER_VALUE_UNKNOWN;
-				continue;
-			}
-
-			log_expression(__func__, i, tr->eval_ctx_r);
-		}
+		if (SUCCEED != substitute_expression_functions_results(ifuncs, conf->eval_ctx_r, state))
+			return FAIL;
+		
+		log_expression(__func__, 1, conf->eval_ctx_r);
 	}
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	return SUCCEED;
 }
 
+
+static int 	substitute_trigger_functions(trigger_conf_t *conf, trigger_state_t *state)
+{
+	zbx_vector_uint64_t	functionids;
+	zbx_hashset_t		ifuncs, funcs;
+	int ret;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_vector_uint64_create(&functionids);
+	conf_trigger_get_functionids(&functionids, conf);
+	DEBUG_TRIGGER(conf->triggerid, "Extracted %d functions", functionids.values_num);
+
+	if (0 == functionids.values_num) {
+		zbx_vector_uint64_destroy(&functionids);
+		return SUCCEED;
+	}
+
+	zbx_hashset_create(&ifuncs, 1, ZBX_DEFAULT_UINT64_HASH_FUNC,
+			ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+	zbx_hashset_create_ext(&funcs, 1, func_hash_func, func_compare_func, func_clean,
+				ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
+	LOG_INF("Calling get functions conf");
+	get_functions_conf(&functionids, &funcs, &ifuncs);
+
+	if (0 != ifuncs.num_data)
+	{
+		//zbx_evaluate_item_functions(&funcs, history_itemids, history_items, history_errcodes);
+		DEBUG_TRIGGER(conf->triggerid,"Evaluating functions");
+		evaluate_functions(conf->triggerid, &funcs);
+		LOG_INF("Calling substitute_res");
+		ret = substitute_functions_results(&ifuncs, conf, state);
+	}
+
+	zbx_hashset_destroy(&ifuncs);
+	zbx_hashset_destroy(&funcs);
+	zbx_vector_uint64_destroy(&functionids);
+
+	LOG_INF("End of %s()", __func__);
+	return ret;
+}
 /******************************************************************************
  *                                                                            *
  * Function: substitute_functions                                             *
@@ -5214,41 +5390,41 @@ static void	zbx_substitute_functions_results(zbx_hashset_t *ifuncs, zbx_vector_p
  * Comments: example: "({15}>10) or ({123}=1)" => "(26.416>10) or (0=1)"      *
  *                                                                            *
  ******************************************************************************/
-static void	substitute_functions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
-		const DC_ITEM *history_items, const int *history_errcodes)
-{
-	zbx_vector_uint64_t	functionids;
-	zbx_hashset_t		ifuncs, funcs;
+// static void	substitute_functions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
+// 		const DC_ITEM *history_items, const int *history_errcodes)
+// {
+// 	zbx_vector_uint64_t	functionids;
+// 	zbx_hashset_t		ifuncs, funcs;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_uint64_create(&functionids);
-	zbx_extract_functionids(&functionids, triggers);
+// 	zbx_vector_uint64_create(&functionids);
+// 	zbx_extract_functionids(&functionids, triggers);
 
-	if (0 == functionids.values_num)
-		goto empty;
+// 	if (0 == functionids.values_num)
+// 		goto empty;
 
-	zbx_hashset_create(&ifuncs, triggers->values_num, ZBX_DEFAULT_UINT64_HASH_FUNC,
-			ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+// 	zbx_hashset_create(&ifuncs, triggers->values_num, ZBX_DEFAULT_UINT64_HASH_FUNC,
+// 			ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-	zbx_hashset_create_ext(&funcs, triggers->values_num, func_hash_func, func_compare_func, func_clean,
-				ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
+// 	zbx_hashset_create_ext(&funcs, triggers->values_num, func_hash_func, func_compare_func, func_clean,
+// 				ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
 
-	zbx_populate_function_items(&functionids, &funcs, &ifuncs, triggers);
+// 	zbx_populate_function_items(&functionids, &funcs, &ifuncs, triggers);
 
-	if (0 != ifuncs.num_data)
-	{
-		zbx_evaluate_item_functions(&funcs, history_itemids, history_items, history_errcodes);
-		zbx_substitute_functions_results(&ifuncs, triggers);
-	}
+// 	if (0 != ifuncs.num_data)
+// 	{
+// 		zbx_evaluate_item_functions(&funcs, history_itemids, history_items, history_errcodes);
+// 		zbx_substitute_functions_results(&ifuncs, triggers);
+// 	}
 
-	zbx_hashset_destroy(&ifuncs);
-	zbx_hashset_destroy(&funcs);
-empty:
-	zbx_vector_uint64_destroy(&functionids);
+// 	zbx_hashset_destroy(&ifuncs);
+// 	zbx_hashset_destroy(&funcs);
+// empty:
+// 	zbx_vector_uint64_destroy(&functionids);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -5280,36 +5456,158 @@ void	prepare_triggers(DC_TRIGGER **triggers, int triggers_num)
 }
 
 static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts, double *result,
-		char **error)
+		char *error, u_int64_t triggerid)
 {
 	zbx_variant_t	 value;
+	char *err = NULL;
 
-	if (SUCCEED != zbx_eval_execute(ctx, ts, &value, error)) {
+	if (SUCCEED != zbx_eval_execute(ctx, ts, &value, &err)) {
+		if ( NULL != err ) {
+			zbx_strlcpy(error, err, strlen(err));
+			zbx_free(err);
+		}
 		return FAIL;
 	}
-
-	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
+	
+	IF_DEBUG_TRIGGER(triggerid)
 	{
 		char	*expression = NULL;
-
 		zbx_eval_compose_expression(ctx, &expression);
-		zabbix_log(LOG_LEVEL_DEBUG, "%s(): %s => %s", __func__, expression, zbx_variant_value_desc(&value));
+		DEBUG_TRIGGER(triggerid, "%s(): %s => %s", __func__, expression, zbx_variant_value_desc(&value));
 		zbx_free(expression);
 	}
-
+	
 	if (SUCCEED != zbx_variant_convert(&value, ZBX_VARIANT_DBL))
 	{
-		*error = zbx_dsprintf(*error, "Cannot convert expression result of type \"%s\" to"
+		zbx_snprintf(error,MAX_STRING_LEN,"Cannot convert expression result of type \"%s\" to"
 				" floating point value", zbx_variant_type_desc(&value));
 		zbx_variant_clear(&value);
-
 		return FAIL;
 	}
-
+	
 	*result = value.data.dbl;
 
 	return SUCCEED;
 }
+
+
+int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, zbx_timespec_t *ts)
+{
+	DB_EVENT		event;
+	double			expr_result;
+	char			err[MAX_STRING_LEN], buf[MAX_STRING_LEN];
+
+
+	LOG_DBG("In %s() ", __func__);
+
+	event.object = EVENT_OBJECT_TRIGGER;
+
+	DEBUG_TRIGGER(conf->triggerid,"Evaluating trigger expressions");
+	event.value =  state_trigger_get_value(state);
+
+	LOG_INF("Trigger %ld: expanding macros", conf->triggerid);
+	if (SUCCEED != expand_trigger_macros(conf->eval_ctx, &event, err, sizeof(err)))
+	{
+		
+		zbx_snprintf(buf, MAX_STRING_LEN,"Cannot evaluate expression: %s", err );
+		DEBUG_TRIGGER(conf->triggerid, "Couldn't expand trigger macro: %s, set to UNKNOWN value", buf);		
+		state_trigger_set_error(state, buf);
+		LOG_INF("Couldn't expand trigger %ld macro: %s", conf->triggerid, buf);
+		return FAIL;
+	}
+
+	if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == conf->recovery_mode &&
+			SUCCEED != expand_trigger_macros(conf->eval_ctx_r, &event, err, sizeof(err)))
+	{
+		
+		zbx_snprintf(buf, MAX_STRING_LEN,"Cannot evaluate expression: %s", err);
+		state_trigger_set_error(state, buf);
+		DEBUG_TRIGGER(conf->triggerid, "Couldn't expand recovery trigger macro: %s, set to UNKNOWN value", buf);	
+		LOG_INF("Couldn't expand trigger %ld macro: err %s",conf->triggerid,err);
+		return FAIL;
+	}	
+	
+	LOG_INF("Trigger %ld: calling substitute functions", conf->triggerid);
+	if ( FAIL == substitute_trigger_functions(conf, state)) {
+		LOG_INF("Trigger %ld: substitute functions failed", conf->triggerid);
+		return FAIL;
+	}
+	
+	LOG_INF("Trigger %ld: evluating expressions", conf->triggerid);
+	if (SUCCEED != evaluate_expression(conf->eval_ctx, ts, &expr_result, err, conf->triggerid)) {
+		LOG_INF("Trigger %ld: evluating expressions failed: %s", conf->triggerid, err);
+		state_trigger_set_error(state, err);
+		
+		LOG_DBG("Failed to eval %ld trigger expression", conf->triggerid);
+		DEBUG_TRIGGER(conf->triggerid, "Failed to eval trigger expression");
+		
+		return FAIL;
+	}
+	
+	LOG_INF("Trigger %ld: processing expression result (%f)", conf->triggerid, expr_result);
+
+	//HERE WE'VE CALCULATED TRIGGER CALC RESULT, BUT SEEMS THAT STATE MACHINE 
+	//DOESNT WORK WELL!!!
+
+	/* trigger expression evaluates to true, set PROBLEM value */
+	if (SUCCEED != zbx_double_compare(expr_result, 0.0))
+	{ //expression is in the problem state
+		
+	//	if (0 == (conf->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION))
+	//	{
+			/* trigger value should remain unchanged and no PROBLEM events should be generated if */
+			/* problem expression evaluates to true, but trigger recalculation was initiated by a */
+			/* time-based function or a new value of an item in recovery expression */
+	//		state_trigger_set_value(state, TRIGGER_VALUE_NONE);
+	//	}
+	//	else
+		state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
+		LOG_INF("Trigger %ld has PROBLEM value", conf->triggerid);
+		return SUCCEED;
+	} else {
+		LOG_INF("Processing OK value");
+		//expression is in the OK state
+		switch (conf->recovery_mode) {
+		
+		case TRIGGER_RECOVERY_MODE_EXPRESSION:
+			LOG_INF("Trigger %ld has NO recovery expression, setting  OK value", conf->triggerid);
+			//no recovery expression - set OK state to the trigger
+			state_trigger_set_value(state, TRIGGER_VALUE_OK);
+			LOG_INF("Set OK value");
+			return SUCCEED;
+			break;
+		case TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION:
+			if ( SUCCEED != evaluate_expression(conf->eval_ctx_r, ts, &expr_result, buf, conf->triggerid))
+			{ //calc failed - trigger is in the unknow state
+ 			 	state_trigger_set_value(state, TRIGGER_VALUE_UNKNOWN);
+				LOG_INF("Trigger %ld has UNKNOWN value due to recovery expression eval fail", conf->triggerid);
+				return SUCCEED;
+			}
+
+			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
+			{	//recovery expression evaluates to true
+				state_trigger_set_value(state, TRIGGER_VALUE_OK);
+				LOG_INF("Trigger %ld has OK value", conf->triggerid);
+				return SUCCEED;
+			} else {
+				//setting problem state in case is it wasn't problem before
+				state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
+				LOG_INF("Trigger %ld has PROBLEM value", conf->triggerid);
+				return SUCCEED;
+			}
+			break;
+		case TRIGGER_RECOVERY_MODE_NONE:
+			LOG_INF("Trigger %ld has non recovery mode", conf->triggerid);
+			break;
+
+		}
+	LOG_INF("Processing OK value3");
+
+	}
+
+	return SUCCEED;
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -5323,116 +5621,116 @@ static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts
  * Author: Alexei Vladishev                                                   *
  *                                                                            *
  ******************************************************************************/
-void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
-		const DC_ITEM *history_items, const int *history_errcodes)
-{
-	DB_EVENT		event;
-	DC_TRIGGER		*tr;
-	int			i;
-	double			expr_result;
-	char			err[MAX_STRING_LEN];
+// void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
+// 		const DC_ITEM *history_items, const int *history_errcodes)
+// {
+// 	DB_EVENT		event;
+// 	DC_TRIGGER		*tr;
+// 	int			i;
+// 	double			expr_result;
+// 	char			err[MAX_STRING_LEN];
 
-	LOG_DBG("In %s() tr_num:%d", __func__, triggers->values_num);
+// 	LOG_DBG("In %s() tr_num:%d", __func__, triggers->values_num);
 
-	event.object = EVENT_OBJECT_TRIGGER;
+// 	event.object = EVENT_OBJECT_TRIGGER;
 
-	for (i = 0; i < triggers->values_num; i++)
-	{
-		tr = (DC_TRIGGER *)triggers->values[i];
+// 	for (i = 0; i < triggers->values_num; i++)
+// 	{
+// 		tr = (DC_TRIGGER *)triggers->values[i];
 		
-		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
-		event.value = tr->value;
+// 		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
+// 		event.value = tr->value;
 
-		if (SUCCEED != expand_trigger_macros(tr->eval_ctx, &event, err, sizeof(err)))
-		{
-			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
-			tr->new_value = TRIGGER_VALUE_UNKNOWN;
-			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value");
-			LOG_INF("Couldn't expand trigger %ld macro",tr->triggerid);
-		}
+// 		if (SUCCEED != expand_trigger_macros(tr->eval_ctx, &event, err, sizeof(err)))
+// 		{
+// 			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
+// 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
+// 			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value");
+// 			LOG_INF("Couldn't expand trigger %ld macro",tr->triggerid);
+// 		}
 
-		if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode &&
-				SUCCEED != expand_trigger_macros(tr->eval_ctx_r, &event, err, sizeof(err)))
-		{
-			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
-			LOG_INF("Couldn't expand trigger %ld macro: err %s",tr->triggerid,err);
-			tr->new_value = TRIGGER_VALUE_UNKNOWN;
-		}
-	}
+// 		if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode &&
+// 				SUCCEED != expand_trigger_macros(tr->eval_ctx_r, &event, err, sizeof(err)))
+// 		{
+// 			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
+// 			LOG_INF("Couldn't expand trigger %ld macro: err %s",tr->triggerid,err);
+// 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
+// 		}
+// 	}
 
-	substitute_functions(triggers, history_itemids, history_items, history_errcodes);
+// 	substitute_functions(triggers, history_itemids, history_items, history_errcodes);
 
-	/* calculate new trigger values based on their recovery modes and expression evaluations */
-	for (i = 0; i < triggers->values_num; i++)
-	{
-		tr = (DC_TRIGGER *)triggers->values[i];
+// 	/* calculate new trigger values based on their recovery modes and expression evaluations */
+// 	for (i = 0; i < triggers->values_num; i++)
+// 	{
+// 		tr = (DC_TRIGGER *)triggers->values[i];
 
-		if (NULL != tr->new_error)
-			continue;
+// 		if (NULL != tr->new_error)
+// 			continue;
 
-		if (SUCCEED != evaluate_expression(tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
-			LOG_DBG("Failed to eval %ld trigger expression",tr->triggerid);
-			continue;
-		}
-		/* trigger expression evaluates to true, set PROBLEM value */
-		if (SUCCEED != zbx_double_compare(expr_result, 0.0))
-		{
-			if (0 == (tr->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION))
-			{
-				/* trigger value should remain unchanged and no PROBLEM events should be generated if */
-				/* problem expression evaluates to true, but trigger recalculation was initiated by a */
-				/* time-based function or a new value of an item in recovery expression */
-				tr->new_value = TRIGGER_VALUE_NONE;
-			}
-			else
-				tr->new_value = TRIGGER_VALUE_PROBLEM;
+// 		if (SUCCEED != evaluate_expression(tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
+// 			LOG_DBG("Failed to eval %ld trigger expression",tr->triggerid);
+// 			continue;
+// 		}
+// 		/* trigger expression evaluates to true, set PROBLEM value */
+// 		if (SUCCEED != zbx_double_compare(expr_result, 0.0))
+// 		{
+// 			if (0 == (tr->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION))
+// 			{
+// 				/* trigger value should remain unchanged and no PROBLEM events should be generated if */
+// 				/* problem expression evaluates to true, but trigger recalculation was initiated by a */
+// 				/* time-based function or a new value of an item in recovery expression */
+// 				tr->new_value = TRIGGER_VALUE_NONE;
+// 			}
+// 			else
+// 				tr->new_value = TRIGGER_VALUE_PROBLEM;
 
-			continue;
-		}
+// 			continue;
+// 		}
 
-		/* otherwise try to recover trigger by setting OK value */
-		if (TRIGGER_VALUE_PROBLEM == tr->value && TRIGGER_RECOVERY_MODE_NONE != tr->recovery_mode)
-		{
-			if (TRIGGER_RECOVERY_MODE_EXPRESSION == tr->recovery_mode)
-			{
-				tr->new_value = TRIGGER_VALUE_OK;
-				continue;
-			}
+// 		/* otherwise try to recover trigger by setting OK value */
+// 		if (TRIGGER_VALUE_PROBLEM == tr->value && TRIGGER_RECOVERY_MODE_NONE != tr->recovery_mode)
+// 		{
+// 			if (TRIGGER_RECOVERY_MODE_EXPRESSION == tr->recovery_mode)
+// 			{
+// 				tr->new_value = TRIGGER_VALUE_OK;
+// 				continue;
+// 			}
 
-			/* processing recovery expression mode */
-			if (SUCCEED != evaluate_expression(tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
-			{
-				tr->new_value = TRIGGER_VALUE_UNKNOWN;
-				continue;
-			}
+// 			/* processing recovery expression mode */
+// 			if (SUCCEED != evaluate_expression(tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
+// 			{
+// 				tr->new_value = TRIGGER_VALUE_UNKNOWN;
+// 				continue;
+// 			}
 
-			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
-			{
-				tr->new_value = TRIGGER_VALUE_OK;
-				continue;
-			}
-		}
+// 			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
+// 			{
+// 				tr->new_value = TRIGGER_VALUE_OK;
+// 				continue;
+// 			}
+// 		}
 
-		/* no changes, keep the old value */
-		tr->new_value = TRIGGER_VALUE_NONE;
-	}
+// 		/* no changes, keep the old value */
+// 		tr->new_value = TRIGGER_VALUE_NONE;
+// 	}
 
-	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
-	{
-		for (i = 0; i < triggers->values_num; i++)
-		{
-			tr = (DC_TRIGGER *)triggers->values[i];
+// 	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
+// 	{
+// 		for (i = 0; i < triggers->values_num; i++)
+// 		{
+// 			tr = (DC_TRIGGER *)triggers->values[i];
 
-			if (NULL != tr->new_error)
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "%s():expression [%s] cannot be evaluated: %s",
-						__func__, tr->expression, tr->new_error);
-			}
-		}
+// 			if (NULL != tr->new_error)
+// 			{
+// 				zabbix_log(LOG_LEVEL_DEBUG, "%s():expression [%s] cannot be evaluated: %s",
+// 						__func__, tr->expression, tr->new_error);
+// 			}
+// 		}
 
-		zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-	}
-}
+// 		zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// 	}
+// }
 
 /******************************************************************************
  *                                                                            *

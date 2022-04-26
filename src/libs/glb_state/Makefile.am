@@ -3,14 +3,16 @@
 noinst_LIBRARIES = libglbstate.a
 
 libglbstate_a_SOURCES = \
-	load_dump.c \
-	load_dump.h \
-	glb_state.c \
-	glb_state.h	\
-	glb_state_items.h \
-	glb_state_items.c \
-	discovery.h \
-	discovery.c
+	state_load_dump.c \
+	state_load_dump.h \
+	state.c \
+	state.h	\
+	state_items.h \
+	state_items.c \
+	state_discovery.h \
+	state_discovery.c \
+	state_triggers.h \
+	state_triggers.c
 
 libglbstate_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxalgo

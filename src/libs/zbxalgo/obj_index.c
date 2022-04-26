@@ -56,7 +56,7 @@ static int add_ref_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *pa
   
     zbx_vector_uint64_append(&ref->refs, *id_to);
     zbx_vector_uint64_sort(&ref->refs, ZBX_DEFAULT_UINT64_COMPARE_FUNC);    
-
+    zbx_vector_uint64_uniq(&ref->refs,ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 }
 
 static int del_ref_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *param) {
@@ -83,7 +83,7 @@ static int get_refs_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *p
     return SUCCEED;
 }
 
-int obj_index_del_id_from(obj_index_t* idx, u_int64_t id) {
+int obj_index_del_reverse_id(obj_index_t* idx, u_int64_t id) {
     int i;
     zbx_vector_uint64_t ids;
   
@@ -104,7 +104,7 @@ int obj_index_del_id_from(obj_index_t* idx, u_int64_t id) {
     return SUCCEED;
 }
 
-int obj_index_del_id_to(obj_index_t* idx, u_int64_t id) {
+int obj_index_del_id(obj_index_t* idx, u_int64_t id) {
     int i;
     zbx_vector_uint64_t ids;
   
@@ -134,6 +134,17 @@ int obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
     return SUCCEED;    
 }
 
+int obj_index_add_refs(obj_index_t* idx, u_int64_t id_from, zbx_vector_uint64_t *ids_to) {
+    int i;
+    
+    for (i = 0; i < ids_to->values_num; i++ ) {
+        elems_hash_process(idx->from_to, id_from, add_ref_callback, &ids_to->values[i], 0);
+        elems_hash_process(idx->to_from, ids_to->values[i], add_ref_callback, &id_from, 0);
+    }
+    
+    return SUCCEED;    
+}
+
 int obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
     
     elems_hash_process(idx->from_to, id_from, del_ref_callback, &id_to, ELEM_FLAG_DO_NOT_CREATE );
@@ -143,25 +154,35 @@ int obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
 }
 
 
-int obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs) {
+int obj_index_get_refs(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs) {
     return  elems_hash_process(idx->from_to, id_from, get_refs_callback, out_refs, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-int obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs) {
+int obj_index_get_reverse_refs(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs) {
     return  elems_hash_process(idx->to_from, id_to, get_refs_callback, out_refs, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-int obj_index_clear_index(obj_index_t *idx) {
 
+
+//this is a bit non transaction-stable, and it's fully possible that during index updating 
+//something will read wrong data (absent dependancie), but it only might be when configuration 
+//changes
+int obj_index_replace_idx(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *new_refs) {
+    int i;
+
+    obj_index_del_id(idx, id_from);
+    //removing the id to clean up all the references:
+    obj_index_add_refs(idx, id_from, new_refs);   
 }
 
+
+
 int obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx) {
-   // LOG_INF("Replacing old_idx from to, the new idx memf is %ld", new_idx->memf.free_func);
     elems_hash_replace(old_idx->from_to, new_idx->from_to);
-  //  LOG_INF("Replacing old_idx to from");
     elems_hash_replace(old_idx->to_from, new_idx->to_from);
-    //after replacenent idx of new will be freed, so we just have to free the struct
+    
     (*new_idx->memf.free_func)(new_idx);
+    return SUCCEED;
 }
 
 static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params) {
@@ -172,7 +193,7 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
     zbx_vector_uint64_t *vals = (zbx_vector_uint64_t*)elem->data;
     
     zbx_snprintf_alloc(&str,&alloc, &offset,"Key: %ld -> [", elem->id);
-
+    
     for (i=0; i<vals->values_num; i++) {
         zbx_snprintf_alloc(&str,&alloc, &offset,"%ld, ", vals->values[i]);
     }
@@ -181,14 +202,16 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
         offset = offset - 2;
     
     zbx_snprintf_alloc(&str,&alloc, &offset,"]");
- 
+    LOG_INF(str);
+    
     zbx_free(str);
 }
 
 void obj_index_dump(obj_index_t *idx) {
-    LOG_INF("From -> to dump:");
+    LOG_INF("From (%d) -> to dump:", idx->from_to->elems.num_data);
     elems_hash_iterate(idx->from_to, id_to_vector_dump_cb, NULL, 0);
-    LOG_INF("To -> from dump:");
+    
+    LOG_INF("To (%d)-> from dump:", idx->to_from->elems.num_data);
     elems_hash_iterate(idx->to_from, id_to_vector_dump_cb, NULL, 0);
 }
 

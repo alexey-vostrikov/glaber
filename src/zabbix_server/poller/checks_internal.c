@@ -24,6 +24,7 @@
 #include "zbxself.h"
 #include "proxy.h"
 #include "zbxtrends.h"
+#include "log.h"
 
 #include "../vmware/vmware.h"
 #include "../../libs/zbxserver/zabbix_stats.h"
@@ -546,88 +547,89 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result)
 
 		tmp = get_rparam(&request, 1);
 		tmp1 = get_rparam(&request, 2);
-
+		//LOG_INF("Wcache reques tmp %s tmp1 %s", tmp, tmp1);
+		
 		if (0 == strcmp(tmp, "values"))
 		{
-			if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "all"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_COUNTER));
-			else if (0 == strcmp(tmp1, "float"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_FLOAT_COUNTER));
-			else if (0 == strcmp(tmp1, "uint"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_UINT_COUNTER));
-			else if (0 == strcmp(tmp1, "str"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_STR_COUNTER));
-			else if (0 == strcmp(tmp1, "log"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_LOG_COUNTER));
-			else if (0 == strcmp(tmp1, "text"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_TEXT_COUNTER));
-			else if (0 == strcmp(tmp1, "not supported"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_NOTSUPPORTED_COUNTER));
-			else
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
+			// if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "all"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_COUNTER));
+			// else if (0 == strcmp(tmp1, "float"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_FLOAT_COUNTER));
+			// else if (0 == strcmp(tmp1, "uint"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_UINT_COUNTER));
+			// else if (0 == strcmp(tmp1, "str"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_STR_COUNTER));
+			// else if (0 == strcmp(tmp1, "log"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_LOG_COUNTER));
+			// else if (0 == strcmp(tmp1, "text"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_TEXT_COUNTER));
+			// else if (0 == strcmp(tmp1, "not supported"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_NOTSUPPORTED_COUNTER));
+			// else
+			// {
+				SET_MSG_RESULT(result, zbx_strdup(NULL, "Not supported in Glaber"));
 				goto out;
-			}
+			//}
 		}
 		else if (0 == strcmp(tmp, "history"))
 		{
-			if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "pfree"))
-				SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_PFREE));
-			else if (0 == strcmp(tmp1, "total"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_TOTAL));
-			else if (0 == strcmp(tmp1, "used"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_USED));
-			else if (0 == strcmp(tmp1, "free"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_FREE));
-			else if (0 == strcmp(tmp1, "pused"))
-				SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_PUSED));
-			else
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
+			// if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "pfree"))
+			// 	SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_PFREE));
+			// else if (0 == strcmp(tmp1, "total"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_TOTAL));
+			// else if (0 == strcmp(tmp1, "used"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_USED));
+			// else if (0 == strcmp(tmp1, "free"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_FREE));
+			// else if (0 == strcmp(tmp1, "pused"))
+			// 	SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_PUSED));
+			// else
+			// {
+				SET_MSG_RESULT(result, zbx_strdup(NULL, "There is no history cache in Glaber, not supported"));
 				goto out;
-			}
+			//}
 		}
 		else if (0 == strcmp(tmp, "trend"))
 		{
-			if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
-				goto out;
-			}
+			// if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
+			// {
+			// 	SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
+			// 	goto out;
+			// }
 
-			if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "pfree"))
-				SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_TREND_PFREE));
-			else if (0 == strcmp(tmp1, "total"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_TREND_TOTAL));
-			else if (0 == strcmp(tmp1, "used"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_TREND_USED));
-			else if (0 == strcmp(tmp1, "free"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_TREND_FREE));
-			else if (0 == strcmp(tmp1, "pused"))
-				SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_TREND_PUSED));
-			else
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
+			// if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "pfree"))
+			// 	SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_TREND_PFREE));
+			// else if (0 == strcmp(tmp1, "total"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_TREND_TOTAL));
+			// else if (0 == strcmp(tmp1, "used"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_TREND_USED));
+			// else if (0 == strcmp(tmp1, "free"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_TREND_FREE));
+			// else if (0 == strcmp(tmp1, "pused"))
+			// 	SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_TREND_PUSED));
+			// else
+			// {
+				SET_MSG_RESULT(result, zbx_strdup(NULL, "Not supported in Glaber."));
 				goto out;
-			}
+			// }
 		}
 		else if (0 == strcmp(tmp, "index"))
 		{
-			if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "pfree"))
-				SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_INDEX_PFREE));
-			else if (0 == strcmp(tmp1, "total"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_INDEX_TOTAL));
-			else if (0 == strcmp(tmp1, "used"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_INDEX_USED));
-			else if (0 == strcmp(tmp1, "free"))
-				SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_INDEX_FREE));
-			else if (0 == strcmp(tmp1, "pused"))
-				SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_INDEX_PUSED));
-			else
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
+			// if (NULL == tmp1 || '\0' == *tmp1 || 0 == strcmp(tmp1, "pfree"))
+			// 	SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_INDEX_PFREE));
+			// else if (0 == strcmp(tmp1, "total"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_INDEX_TOTAL));
+			// else if (0 == strcmp(tmp1, "used"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_INDEX_USED));
+			// else if (0 == strcmp(tmp1, "free"))
+			// 	SET_UI64_RESULT(result, *(zbx_uint64_t *)DCget_stats(ZBX_STATS_HISTORY_INDEX_FREE));
+			// else if (0 == strcmp(tmp1, "pused"))
+			// 	SET_DBL_RESULT(result, *(double *)DCget_stats(ZBX_STATS_HISTORY_INDEX_PUSED));
+			// else
+			// {
+				SET_MSG_RESULT(result, zbx_strdup(NULL, "Not supported in Glaber."));
 				goto out;
-			}
+			//}
 		}
 		else
 		{

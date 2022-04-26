@@ -24,6 +24,7 @@
 #include "history.h"
 #include "module.h"
 #include "../zbxalgo/vectorimpl.h"
+#include "../glb_process/process.h"
 
 
 ZBX_VECTOR_IMPL(history_record, zbx_history_record_t);
@@ -32,6 +33,7 @@ extern int CONFIG_VALUECACHE_FILL_TIME;
 extern int CONFIG_SERVER_STARTUP_TIME;
 extern zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 const char	*value_type_names[] = {"dbl", "str", "log", "uint", "text"};
+
 /************************************************************************************
  *                                                                                  *
  * Function: glb_load_history_module                                                *
@@ -125,19 +127,7 @@ void glb_history_destroy(void)
 }
 
 
-
-/************************************************************************************
- *                                                                                  *
- * Function: zbx_history_add_values                                                 *
- *                                                                                  *
- * Purpose: Sends values to the history storage                                     *
- *                                                                                  *
- * Parameters: history - [IN] the values to store                                   *
- *                                                                                  *
- * Comments: add history values to the configured storage backends                  *
- *                                                                                  *
- ************************************************************************************/
-int	glb_history_add_history(ZBX_DC_HISTORY *history, int history_num)
+int	glb_history_add_metric(metric_t *metric, metric_processing_data_t *proc_data)
 {
 	int	j,  ret = SUCCEED;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -147,7 +137,7 @@ int	glb_history_add_history(ZBX_DC_HISTORY *history, int history_num)
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values[j];
 		glb_history_add_func_t write_values = callback->callback;
 		
-		write_values(callback->callbackData, history, history_num);
+		write_values(callback->callbackData, metric, proc_data);
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -165,16 +155,17 @@ int	glb_history_add_history(ZBX_DC_HISTORY *history, int history_num)
  *                                                                                  *
  *                                                                                  *
  ************************************************************************************/
-int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
+int	glb_history_add_trend(trend_t *trend, metric_processing_data_t *proc_data)
 {
 	int	j,  ret = SUCCEED;
 	
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values[j];
-		glb_history_add_trends_func_t write_trends = callback->callback;
+		glb_history_add_trend_func_t write_trends = callback->callback;
 		
-		if (SUCCEED == write_trends(callback->callbackData, trends, trends_num) ) return SUCCEED;
+		if (SUCCEED == write_trends(callback->callbackData, trend, proc_data) ) 
+			return SUCCEED;
 	}
 
 	return SUCCEED;
@@ -212,7 +203,6 @@ int	glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int 
 	static char enabled_gets = 1;
 
 	if (time(NULL) > next_account_time) {
-		
 		//resetting counters
 		enabled_gets = 1;
 		get_runtime = 0.0;

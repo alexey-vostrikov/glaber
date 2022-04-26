@@ -715,7 +715,8 @@ void	zbx_sleep_loop(int sleeptime)
 
 	do
 	{
-		sleep(1);
+	//	sleep(1);
+		usleep(1000000);
 	}
 	while (0 < --sleep_remains);
 

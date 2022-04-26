@@ -270,7 +270,7 @@ int	diag_add_historycache_info(const struct zbx_json_parse *jp, struct zbx_json 
 			zbx_uint64_t	values_num, items_num;
 
 			time1 = zbx_time();
-			zbx_hc_get_diag_stats(&items_num, &values_num);
+//			zbx_hc_get_diag_stats(&items_num, &values_num);
 			time2 = zbx_time();
 			time_total += time2 - time1;
 
@@ -314,7 +314,7 @@ int	diag_add_historycache_info(const struct zbx_json_parse *jp, struct zbx_json 
 					zbx_vector_uint64_pair_create(&items);
 
 					time1 = zbx_time();
-					zbx_hc_get_items(&items);
+//					zbx_hc_get_items(&items);
 					time2 = zbx_time();
 					time_total += time2 - time1;
 

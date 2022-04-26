@@ -1,0 +1,18 @@
+#!/bin/sh
+export PATH=$PATH:/usr/local/go/bin
+cd src/glapi
+go build cmd/server/glb_log_listener.go 
+cp -f glb_log_listener /usr/local/sbin/workers/
+cd ../..
+killall -9 zabbix_proxy
+rm src/zabbix_proxy/zabbix_proxy
+rm /var/log/zabbix/zabbix_proxy.log
+echo "started" >  /var/log/zabbix/zabbix_proxy.log
+chown zabbix /var/log/zabbix/zabbix_proxy.log
+make
+#cd ../..
+#mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix_server
+#mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix_server
+TZ='Asia/Yekaterinburg'; export TZ
+src/zabbix_proxy/zabbix_proxy -c /etc/zabbix/zabbix_proxy.conf
+tail -f /var/log/zabbix/zabbix_proxy.log

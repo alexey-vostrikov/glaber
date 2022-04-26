@@ -33,6 +33,8 @@
 #include "preproc_manager.h"
 #include "zbxalgo.h"
 #include "preproc_history.h"
+#include "../../libs/glb_process/process.h"
+#include "../../libs/zbxipcservice/glb_ipc.h"
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num, CONFIG_PREPROCESSOR_FORKS;
@@ -512,8 +514,10 @@ void	preprocessor_flush_value(const zbx_preproc_item_value_t *value)
 {
 	if (0 == (value->item_flags & ZBX_FLAG_DISCOVERY_RULE) || 0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 	{
-		dc_add_history(value->itemid, value->item_value_type, value->item_flags, value->result_ptr->result,
-				value->ts, value->state, value->error);
+		metric_t metric;
+		DEBUG_ITEM(value->itemid,"Sending item from preprocessing to processing");
+		create_metric_from_agent_result(value->hostid, value->itemid, value->ts->sec, value->state, value->result_ptr->result, &metric, value->error);
+		send_metric_to_processing(&metric);
 	}
 	else {
 		DEBUG_ITEM(value->itemid,"Sending to LLD manager");
@@ -1661,7 +1665,10 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 			server_num, get_process_type_string(process_type), process_num);
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
-
+	
+	glb_ipc_init_sender(IPC_PROCESSING, CONFIG_HISTSYNCER_FORKS);
+	glb_ipc_init_sender(IPC_PROCESSING_NOTIFY, CONFIG_HISTSYNCER_FORKS);
+	
 	if (FAIL == zbx_ipc_service_start(&service_requests,preproc_service, &error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot start preprocessing service for requests: %s", error);
@@ -1679,6 +1686,7 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 	}
 
 	preprocessor_init_manager(&manager);
+
 
 	/* initialize statistics */
 	time_stat = zbx_time();
@@ -1768,7 +1776,7 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 
 		if (0 == manager.preproc_num || 1 < time_now - time_flush)
 		{
-			dc_flush_history();
+//			dc_flush_history();
 			time_flush = time_now;
 		}
 	}

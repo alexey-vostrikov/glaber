@@ -19,7 +19,7 @@
 
 #include "zbxserver.h"
 #include "log.h"
-#include "../glb_state/glb_state_items.h"
+#include "../glb_state/state_items.h"
 #include "evalfunc.h"
 #include "zbxeval.h"
 #include "expression.h"
@@ -1023,7 +1023,8 @@ static int	expression_eval_one(zbx_expression_eval_t *eval, zbx_expression_query
 
 	if (0 == args_num)
 	{
-		ret = evaluate_function2(value, item, func_name, "", ts, error);
+		item_func_eval_conf_t item_conf = {.host_proxy_hostid = item->host.proxy_hostid, .hostid = item->host.hostid, .itemid = item->itemid, .value_type = item->value_type};
+		ret = evaluate_function2(value, &item_conf, func_name, "", ts, error);
 		goto out;
 	}
 
@@ -1053,8 +1054,9 @@ static int	expression_eval_one(zbx_expression_eval_t *eval, zbx_expression_query
 				goto out;
 		}
 	}
-
-	ret = evaluate_function2(value, item, func_name, ZBX_NULL2EMPTY_STR(params), ts, error);
+	
+	item_func_eval_conf_t item_conf = {.host_proxy_hostid = item->host.proxy_hostid, .hostid = item->host.hostid, .itemid = item->itemid, .value_type = item->value_type};
+	ret = evaluate_function2(value, &item_conf, func_name, ZBX_NULL2EMPTY_STR(params), ts, error);
 out:
 	zbx_free(params);
 

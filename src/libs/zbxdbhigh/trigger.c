@@ -25,13 +25,18 @@
 #include "zbxserver.h"
 #include "template.h"
 #include "events.h"
-#include "../glb_objects/glb_trigger.h"
+#include "../glb_state/state_triggers.h"
+#include "../glb_conf/conf_triggers.h"
+#include "../glb_process/proc_triggers.h"
+
 
 #define ZBX_FLAGS_TRIGGER_CREATE_NOTHING		0x00
 #define ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT		0x01
 #define ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT		0x02
 #define ZBX_FLAGS_TRIGGER_CREATE_EVENT										\
 		(ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT | ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT)
+
+
 
 /******************************************************************************
  *                                                                            *
@@ -73,8 +78,8 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 	int			new_state, new_value, ret = FAIL;
 	zbx_uint64_t		flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET, event_flags = ZBX_FLAGS_TRIGGER_CREATE_NOTHING;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() triggerid:" ZBX_FS_UI64 " value:%d(%d) new_value:%d",
-			__func__, trigger->triggerid, trigger->value, trigger->state, trigger->new_value);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() triggerid:" ZBX_FS_UI64 " value:%d new_value:%d",
+			__func__, trigger->triggerid, trigger->value, trigger->new_value);
 	//LOG_INF("Processing trigger %ld value: %ld -> %ld ", trigger->triggerid, trigger->value, trigger->new_value );
 	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger");
 
@@ -90,11 +95,11 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 	}
 	new_error = (NULL == trigger->new_error ? "" : trigger->new_error);
 
-	if (trigger->state != new_state)
-	{
-		flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE;
-		event_flags |= ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT;
-	}
+	// if (trigger->state != new_state)
+	// {
+	// 	flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE;
+	// 	event_flags |= ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT;
+	// }
 
 	if (0 != strcmp(trigger->error, new_error))
 		flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR;
@@ -114,7 +119,7 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 	}
 
 	/* check if there is something to be updated */
-	if (0 == (flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE) && 0 == (event_flags & ZBX_FLAGS_TRIGGER_CREATE_EVENT))
+	if (0 == (flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL) && 0 == (event_flags & ZBX_FLAGS_TRIGGER_CREATE_EVENT))
 		goto out;
 
 	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT))
@@ -137,6 +142,14 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 				new_error);
 	}
 
+	// trigger_state_t meta;
+	// meta.state = new_state;
+	// meta.errorstr = new_error;
+	// meta.value = new_value;
+	// meta.lastchange = trigger->timespec.sec;
+	// glb_state_trigger_set_meta(trigger->triggerid, &meta, flags);
+	
+
 	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, flags, trigger->value, new_state,
 			trigger->timespec.sec, new_error);
 
@@ -147,6 +160,8 @@ out:
 
 	return ret;
 }
+
+
 
 /******************************************************************************
  *                                                                            *
@@ -175,7 +190,7 @@ void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)
 		diff = (const zbx_trigger_diff_t *)trigger_diff->values[i];
 		DEBUG_TRIGGER(diff->triggerid,"Saving trigger diff to the database");
 
-		if (0 == (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE))
+		if (0 == (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL))
 			continue;
 
 		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "update triggers set");

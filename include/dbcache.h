@@ -267,7 +267,7 @@ typedef struct _DC_TRIGGER
 	unsigned char		priority;
 	unsigned char		type;
 	unsigned char		value;
-	unsigned char		state;
+	//unsigned char		state;
 	unsigned char		new_value;
 	unsigned char		status;
 	unsigned char		recovery_mode;
@@ -533,25 +533,26 @@ typedef struct
 }
 ZBX_DC_TREND;
 
-typedef struct
-{
-	zbx_uint64_t	itemid;
-	zbx_uint64_t	hostid;
+// typedef struct
+// {
+// 	zbx_uint64_t	itemid;
+// 	zbx_uint64_t	hostid;
 	
-	unsigned char	value_type;
-	history_value_t	value;
-	
-	zbx_uint64_t	lastlogsize;
-	zbx_timespec_t	ts;
-	int		mtime;
+// 	unsigned char	value_type;
 		
-	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
-	unsigned char	state;
-//	int		ttl;		/* time-to-live of the history value */
-	char *host_name; /*hostname to log to history */
-	char *item_key; /* name of metric*/
-}
-ZBX_DC_HISTORY;
+// 	zbx_timespec_t	ts;
+// 	history_value_t	value;
+	
+// 	int		mtime;
+// 	zbx_uint64_t	lastlogsize;
+		
+// 	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
+// 	unsigned char	state;
+
+// //	char *host_name; /*hostname to log to history */
+// //	char *item_key; /* name of metric*/
+// }
+// ZBX_DC_HISTORY;
 
 /* item queue data */
 typedef struct
@@ -651,7 +652,7 @@ int	in_maintenance_without_data_collection(unsigned char maintenance_status, uns
 void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
 		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
 int		dc_flush_history(void);
-void	zbx_sync_history_cache(int *values_num, int *triggers_num, int *more);
+void	zbx_sync_history_cache(int *values_num, int *triggers_num, int *more, int process_num);
 void	zbx_log_sync_history_cache_progress(void);
 int	init_database_cache(char **error);
 void	free_database_cache(void);
@@ -1090,5 +1091,52 @@ void	zbx_get_host_interfaces_availability(zbx_uint64_t	hostid, zbx_agent_availab
 int	zbx_hc_check_proxy(zbx_uint64_t proxyid);
 
 void	zbx_dc_eval_expand_user_macros(zbx_eval_context_t *ctx);
+
+typedef struct
+{
+	zbx_uint64_t	functionid;
+	zbx_uint64_t	triggerid;
+	zbx_uint64_t	itemid;
+	const char	*function;
+	const char	*parameter;
+	int		revision;
+	int		timer_revision;
+	unsigned char	type;
+}
+ZBX_DC_FUNCTION;
+
+typedef struct
+{
+	zbx_uint64_t	triggerid;
+	const char		*description;
+	const char		*expression;
+	const char		*recovery_expression;
+//	const char		*error;
+	const char		*correlation_tag;
+	const char		*opdata;
+	const char		*event_name;
+	const unsigned char	*expression_bin;
+	const unsigned char	*recovery_expression_bin;
+//	int			lastchange;
+	int			revision;
+//	int			timer_revision;
+	unsigned char		topoindex;
+	unsigned char		priority;
+	unsigned char		type;
+//	unsigned char		value;
+//	unsigned char		state;
+//	unsigned char		locked;
+//	unsigned char		status; //ENABLED OR DISABLED
+//	unsigned char		functional;		/* see TRIGGER_FUNCTIONAL_* defines      */
+	unsigned char		recovery_mode;		/* see TRIGGER_RECOVERY_MODE_* defines   */
+	unsigned char		correlation_mode;	/* see ZBX_TRIGGER_CORRELATION_* defines */
+	unsigned char		timer;
+
+//	zbx_uint64_t		*itemids;
+
+	zbx_vector_ptr_t	tags;
+}
+ZBX_DC_TRIGGER;
+
 
 	#endif

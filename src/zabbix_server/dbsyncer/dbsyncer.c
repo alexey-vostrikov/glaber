@@ -28,10 +28,17 @@
 #include "dbcache.h"
 #include "dbsyncer.h"
 #include "export.h"
+#include "../../libs/glb_process/process.h"
+#include "../../libs/glb_process/proc_triggers.h"
+#include "../../libs/glb_process/proc_trigger_timers.h"
+
+#include "../../libs/zbxipcservice/glb_ipc.h"
+#include "../../libs/glb_process/proc_trends.h"
 
 extern int		CONFIG_HISTSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern void *ipc_processing;
 static sigset_t		orig_mask;
 
 /******************************************************************************
@@ -72,11 +79,11 @@ static void	zbx_db_flush_timer_queue(void)
 	zbx_vector_ptr_destroy(&persistent_timers);
 }
 
-static void	db_trigger_queue_cleanup(void)
-{
-	DBexecute("delete from trigger_queue");
-	zbx_db_trigger_queue_unlock();
-}
+//static void	db_trigger_queue_cleanup(void)
+//{
+//	DBexecute("delete from trigger_queue");
+//	zbx_db_trigger_queue_unlock();
+//}
 
 /******************************************************************************
  *                                                                            *
@@ -119,19 +126,15 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	zbx_block_signals(&orig_mask);
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	if (1 == process_num)
-		db_trigger_queue_cleanup();
+//	if (1 == process_num)
+//		db_trigger_queue_cleanup();
 
 	zbx_unblock_signals(&orig_mask);
 
-	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_HISTORY))
-		zbx_history_export_init("history-syncer", process_num);
+	glb_ipc_init_reciever(IPC_PROCESSING);
+	glb_ipc_init_reciever(IPC_PROCESSING_NOTIFY);
 
-	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_TRENDS))
-		zbx_trends_export_init("history-syncer", process_num);
-
-	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
-		zbx_problems_export_init("history-syncer", process_num);
+	trends_init_cache();
 
 	for (;;)
 	{
@@ -147,7 +150,14 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 		/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 		zbx_block_signals(&orig_mask);
-		zbx_sync_history_cache(&values_num, &triggers_num, &more);
+		
+		//zbx_sync_history_cache(&values_num, &triggers_num, &more, process_num);
+		//glb_process_history_items(&values_num,&triggers_num, &more, process_num);
+		values_num = process_metric_values(2048, process_num);
+		process_time_triggers(&triggers_num, 2048, process_num);
+		
+		more = ( (values_num + triggers_num) > 0);
+			
 
 		if (!ZBX_IS_RUNNING() && SUCCEED != zbx_db_trigger_queue_locked())
 			zbx_db_flush_timer_queue();
@@ -160,7 +170,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 		sleeptime = (ZBX_SYNC_MORE == more ? 0 : CONFIG_HISTSYNCER_FREQUENCY);
 
-		if (0 != sleeptime || STAT_INTERVAL <= time(NULL) - last_stat_time)
+		if (STAT_INTERVAL <= time(NULL) - last_stat_time)
 		{
 			stats_offset = 0;
 			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "process %d val/s", total_values_num/STAT_INTERVAL);

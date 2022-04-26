@@ -239,6 +239,7 @@ typedef struct
 {
 	zbx_uint64_t		key;
 	const void		*data;
+	u_int64_t 		local_data; /* to save additional processing info if needed */
 }
 zbx_binary_heap_elem_t;
 
@@ -551,10 +552,13 @@ elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_f
 //                    elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func,
 //                    zbx_compare_func_t compare_func, zbx_hash_func_t hash_func);
 int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data, u_int64_t flags);
+int		elems_hash_process_nb_safe(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data);
+
 int		elems_hash_delete(elems_hash_t *elems,  uint64_t id);
 void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
 int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
+int 	elems_hash_get_ids(elems_hash_t *elems, zbx_vector_uint64_t *ids);
 
 typedef struct {
     elems_hash_t *from_to;
@@ -566,12 +570,19 @@ typedef struct {
 int	obj_index_init(obj_index_t* idx, mem_funcs_t *memf);
 
 void	obj_index_destroy(obj_index_t *idx);
+
 int		obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
+int		obj_index_replace_idx(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *new_refs);
+
 int		obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
-int		obj_index_del_id_from(obj_index_t* idx, u_int64_t id);
-int		obj_index_del_id_to(obj_index_t* idx, u_int64_t id);
-int		obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs);
-int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
+
+int		obj_index_del_id(obj_index_t* idx, u_int64_t id);
+int		obj_index_del_reverse_id(obj_index_t* idx, u_int64_t id);
+
+int		obj_index_get_refs(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs);
+int 	obj_index_get_reverse_refs(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
+
+
 int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
 void 	obj_index_dump(obj_index_t *idx);
 
@@ -588,8 +599,30 @@ const char *strpool_add(strpool_t *strpool, const char *str);
 const char *strpool_add_n(strpool_t *strpool, const char *str, size_t len);
 
 void 		strpool_free(strpool_t *strpool, const char *str);
-const char *strpool_replace(strpool_t *strpool, const char *old_str, const char *new_str);
+void		strpool_replace(strpool_t *strpool, const char **old_str, const char *new_str);
 
 const char *strpool_copy(const char *str);
+
+
+//event queues - interface to add events with callbacks, usefull for async processing
+//and timer-based queues, may use shm and locks for parralel forks
+#define EVENT_QUEUE_CALLBACK(name) \
+        	static int name(void *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf)
+
+typedef int	(*event_queue_cb_func_t)(void *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf);
+
+typedef struct {
+	event_queue_cb_func_t func;
+	int event_id;
+} event_queue_cb_conf_t;
+
+
+void *event_queue_init(mem_funcs_t *s_memf, unsigned char enable_locks, event_queue_cb_conf_t *cbs);
+void event_queue_destroy(void *eq_conf);
+
+int event_queue_register_cb(event_queue_cb_conf_t *cbs);
+int event_queue_process_events(void *eq_conf, int max_events);
+int event_queue_add_event(void *eq_conf, int time, unsigned char event_id, void *data);
+
 
 #endif

@@ -30,7 +30,8 @@
 #include "db.h"
 #include "log.h"
 #include "zbxserver.h"
-#include "../glb_state/glb_state_items.h"
+#include "../glb_state/state_items.h"
+#include "../glb_conf/conf_items.h"
 #include "evalfunc.h"
 #include "zbxregexp.h"
 #include "zbxtrends.h"
@@ -304,7 +305,7 @@ out:
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	get_last_n_value(const DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	get_last_n_value(const item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		zbx_history_record_t *value, char **error)
 {
 	int				arg1 = 1, ret = FAIL, time_shift;
@@ -325,7 +326,7 @@ static int	get_last_n_value(const DC_ITEM *item, const char *parameters, const z
 
 	ts_end.sec -= time_shift;
 
-	if (SUCCEED != zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, 0, arg1, &ts_end))
+	if (SUCCEED != zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, 0, arg1, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -358,7 +359,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LOGEVENTID(zbx_variant_t *value, DC_ITEM *item, const char *parameters,
+static int	evaluate_LOGEVENTID(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	char			*pattern = NULL;
@@ -454,7 +455,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LOGSOURCE(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_LOGSOURCE(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char			*pattern = NULL;
@@ -544,7 +545,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LOGSEVERITY(zbx_variant_t *value, DC_ITEM *item, const char *parameters,
+static int	evaluate_LOGSEVERITY(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	int			ret = FAIL;
@@ -806,7 +807,7 @@ static void	count_one_str(int *count, int op, const char *value, const char *pat
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_COUNT(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_COUNT(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		int limit, int unique, char **error)
 {
 	int				arg1, op = OP_UNKNOWN, numeric_search, nparams, count = 0, i, ret = FAIL;
@@ -997,7 +998,7 @@ static int	evaluate_COUNT(zbx_variant_t *value, DC_ITEM *item, const char *param
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1137,7 +1138,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_SUM(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_SUM(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				arg1, i, ret = FAIL, seconds = 0, nvalues = 0, time_shift;
 	zbx_value_type_t		arg1_type;
@@ -1182,7 +1183,7 @@ static int	evaluate_SUM(zbx_variant_t *value, DC_ITEM *item, const char *paramet
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1226,7 +1227,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_AVG(zbx_variant_t  *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_AVG(zbx_variant_t  *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				arg1, ret = FAIL, i, seconds = 0, nvalues = 0, time_shift;
 	zbx_value_type_t		arg1_type;
@@ -1270,7 +1271,7 @@ static int	evaluate_AVG(zbx_variant_t  *value, DC_ITEM *item, const char *parame
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1323,7 +1324,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_LAST(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_LAST(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int			ret;
@@ -1355,7 +1356,7 @@ static int	evaluate_LAST(zbx_variant_t *value, DC_ITEM *item, const char *parame
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_MIN(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_MIN(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				arg1, i, ret = FAIL, seconds = 0, nvalues = 0, time_shift;
 	zbx_value_type_t		arg1_type;
@@ -1399,7 +1400,7 @@ static int	evaluate_MIN(zbx_variant_t *value, DC_ITEM *item, const char *paramet
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1455,7 +1456,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_MAX(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts, char **error)
+static int	evaluate_MAX(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts, char **error)
 {
 	int				arg1, ret = FAIL, i, seconds = 0, nvalues = 0, time_shift;
 	zbx_value_type_t		arg1_type;
@@ -1499,7 +1500,7 @@ static int	evaluate_MAX(zbx_variant_t *value, DC_ITEM *item, const char *paramet
 			THIS_SHOULD_NEVER_HAPPEN;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1558,7 +1559,7 @@ out:
  *               FAIL    - failed to evaluate function                        *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_PERCENTILE(zbx_variant_t  *value, DC_ITEM *item, const char *parameters,
+static int	evaluate_PERCENTILE(zbx_variant_t  *value, item_func_eval_conf_t *item, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	int				arg1, time_shift, ret = FAIL, seconds = 0, nvalues = 0;
@@ -1612,7 +1613,7 @@ static int	evaluate_PERCENTILE(zbx_variant_t  *value, DC_ITEM *item, const char 
 		goto out;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -1662,7 +1663,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *parameters, char **error)
+static int	evaluate_NODATA(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, char **error)
 {
 	int				arg1, num, period, lazy = 1, ret = FAIL;
 	zbx_value_type_t		arg1_type;
@@ -1698,11 +1699,11 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 	zbx_timespec(&ts);
 	nodata_win.flags = ZBX_PROXY_SUPPRESS_DISABLE;
 
-	if (0 != item->host.proxy_hostid && 0 != lazy)
+	if (0 != item->host_proxy_hostid && 0 != lazy)
 	{
 		int			lastaccess;
 
-		if (SUCCEED != DCget_proxy_nodata_win(item->host.proxy_hostid, &nodata_win, &lastaccess))
+		if (SUCCEED != DCget_proxy_nodata_win(item->host_proxy_hostid, &nodata_win, &lastaccess))
 		{
 			*error = zbx_strdup(*error, "cannot retrieve proxy last access");
 			goto out;
@@ -1756,7 +1757,7 @@ static int	evaluate_NODATA(zbx_variant_t *value, DC_ITEM *item, const char *para
 
 		zbx_variant_set_dbl(value, 1);
 
-		if (0 != item->host.proxy_hostid && 0 != lazy)
+		if (0 != item->host_proxy_hostid && 0 != lazy)
 		{
 			zabbix_log(LOG_LEVEL_TRACE, "Nodata in %s() flag:%d values_num:%d start_time:%d period:%d",
 					__func__, nodata_win.flags, nodata_win.values_num, ts.sec - period, period);
@@ -1786,7 +1787,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_CHANGE(zbx_variant_t *value, DC_ITEM *item, const zbx_timespec_t *ts, char **error)
+static int	evaluate_CHANGE(zbx_variant_t *value, item_func_eval_conf_t *item, const zbx_timespec_t *ts, char **error)
 {
 	int				ret = FAIL;
 	zbx_vector_history_record_t	values;
@@ -1796,7 +1797,7 @@ static int	evaluate_CHANGE(zbx_variant_t *value, DC_ITEM *item, const zbx_timesp
 
 	zbx_history_record_vector_create(&values);
 
-	if (SUCCEED != zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, 0, 2, ts) ||
+	if (SUCCEED != zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, 0, 2, ts) ||
 			2 > values.values_num)
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
@@ -1857,7 +1858,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_FUZZYTIME(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_FUZZYTIME(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int			arg1, ret = FAIL;
@@ -1891,7 +1892,7 @@ static int	evaluate_FUZZYTIME(zbx_variant_t *value, DC_ITEM *item, const char *p
 		goto out;
 	}
 
-	if (SUCCEED != zbx_vc_get_value(item->host.hostid, item->itemid, item->value_type, ts, &vc_value))
+	if (SUCCEED != zbx_vc_get_value(item->hostid, item->itemid, item->value_type, ts, &vc_value))
 	{
 		*error = zbx_strdup(*error, "cannot get value from value cache");
 		goto out;
@@ -1942,7 +1943,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_BITAND(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_BITAND(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char		*last_parameters = NULL;
@@ -2004,7 +2005,7 @@ clean:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_FORECAST(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_FORECAST(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char				*fit_str = NULL, *mode_str = NULL;
@@ -2090,7 +2091,7 @@ static int	evaluate_FORECAST(zbx_variant_t *value, DC_ITEM *item, const char *pa
 
 	ts_end.sec -= time_shift;
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -2159,7 +2160,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_TIMELEFT(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_TIMELEFT(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	char				*fit_str = NULL;
@@ -2235,7 +2236,7 @@ static int	evaluate_TIMELEFT(zbx_variant_t *value, DC_ITEM *item, const char *pa
 
 	ts_end.sec -= time_shift;
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		goto out;
@@ -2308,7 +2309,7 @@ out:
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_TREND(zbx_variant_t *value, DC_ITEM *item, const char *func, const char *parameters,
+static int	evaluate_TREND(zbx_variant_t *value, item_func_eval_conf_t *item, const char *func, const char *parameters,
 		const zbx_timespec_t *ts, char **error)
 {
 	int		ret = FAIL, start, end;
@@ -2382,7 +2383,7 @@ out:
 	return ret;
 }
 
-static int	validate_params_and_get_data(DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	validate_params_and_get_data(item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		zbx_vector_history_record_t *values, char **error)
 {
 	int			arg1, seconds = 0, nvalues = 0, time_shift;
@@ -2424,7 +2425,7 @@ static int	validate_params_and_get_data(DC_ITEM *item, const char *parameters, c
 			return FAIL;
 	}
 
-	if (FAIL == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, values, seconds, nvalues, &ts_end))
+	if (FAIL == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, values, seconds, nvalues, &ts_end))
 	{
 		*error = zbx_strdup(*error, "cannot get values from value cache");
 		return FAIL;
@@ -2447,7 +2448,7 @@ static int	validate_params_and_get_data(DC_ITEM *item, const char *parameters, c
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_FIRST(zbx_variant_t *value, DC_ITEM *item, const char *parameters, const zbx_timespec_t *ts,
+static int	evaluate_FIRST(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters, const zbx_timespec_t *ts,
 		char **error)
 {
 	int				arg1 = 1, ret = FAIL, seconds = 0, time_shift;
@@ -2496,7 +2497,7 @@ static int	evaluate_FIRST(zbx_variant_t *value, DC_ITEM *item, const char *param
 
 	ts_end.sec -= time_shift;
 
-	if (SUCCEED == zbx_vc_get_values(item->host.hostid, item->itemid, item->value_type, &values, seconds, 0, &ts_end))
+	if (SUCCEED == zbx_vc_get_values(item->hostid, item->itemid, item->value_type, &values, seconds, 0, &ts_end))
 	{
 		if (0 < values.values_num)
 		{
@@ -2557,7 +2558,7 @@ static void	history_to_dbl_vector(const zbx_history_record_t *v, int n, unsigned
  *               FAIL - failed to evaluate function                           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_statistical_func(zbx_variant_t *value, DC_ITEM *item, const char *parameters,
+static int	evaluate_statistical_func(zbx_variant_t *value, item_func_eval_conf_t *item, const char *parameters,
 		const zbx_timespec_t *ts, zbx_statistical_func_t stat_func, int min_values, char **error)
 {
 	int				ret = FAIL;
@@ -2608,125 +2609,125 @@ out:
  *               FAIL - evaluation failed                                     *
  *                                                                            *
  ******************************************************************************/
-int	evaluate_function2(zbx_variant_t *value, DC_ITEM *item, const char *function, const char *parameter,
+int	evaluate_function2(zbx_variant_t *value, item_func_eval_conf_t *item_conf, const char *function, const char *parameter,
 		const zbx_timespec_t *ts, char **error)
 {
 	int	ret;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() function:'%s(/%s/%s,%s)' ts:'%s\'", __func__,
-			function, item->host.host, item->key_orig, parameter, zbx_timespec_str(ts));
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() function:'%s(/%ld/%ld,%s)' ts:'%s\'", __func__,
+			function, item_conf->hostid, item_conf->itemid, parameter, zbx_timespec_str(ts));
 
 	if (0 == strcmp(function, "last"))
 	{
-		ret = evaluate_LAST(value, item, parameter, ts, error);
+		ret = evaluate_LAST(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "min"))
 	{
-		ret = evaluate_MIN(value, item, parameter, ts, error);
+		ret = evaluate_MIN(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "max"))
 	{
-		ret = evaluate_MAX(value, item, parameter, ts, error);
+		ret = evaluate_MAX(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "avg"))
 	{
-		ret = evaluate_AVG(value, item, parameter, ts, error);
+		ret = evaluate_AVG(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "sum"))
 	{
-		ret = evaluate_SUM(value, item, parameter, ts, error);
+		ret = evaluate_SUM(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "percentile"))
 	{
-		ret = evaluate_PERCENTILE(value, item, parameter, ts, error);
+		ret = evaluate_PERCENTILE(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "count"))
 	{
-		ret = evaluate_COUNT(value, item, parameter, ts, ZBX_MAX_UINT31_1, COUNT_ALL, error);
+		ret = evaluate_COUNT(value, item_conf, parameter, ts, ZBX_MAX_UINT31_1, COUNT_ALL, error);
 	}
 	else if (0 == strcmp(function, "countunique"))
 	{
-		ret = evaluate_COUNT(value, item, parameter, ts, ZBX_MAX_UINT31_1, COUNT_UNIQUE, error);
+		ret = evaluate_COUNT(value, item_conf, parameter, ts, ZBX_MAX_UINT31_1, COUNT_UNIQUE, error);
 	}
 	else if (0 == strcmp(function, "nodata"))
 	{
-		ret = evaluate_NODATA(value, item, parameter, error);
+		ret = evaluate_NODATA(value, item_conf, parameter, error);
 	}
 	else if (0 == strcmp(function, "change"))
 	{
-		ret = evaluate_CHANGE(value, item, ts, error);
+		ret = evaluate_CHANGE(value, item_conf, ts, error);
 	}
 	else if (0 == strcmp(function, "find"))
 	{
-		ret = evaluate_COUNT(value, item, parameter, ts, 1, COUNT_ALL, error);
+		ret = evaluate_COUNT(value, item_conf, parameter, ts, 1, COUNT_ALL, error);
 	}
 	else if (0 == strcmp(function, "fuzzytime"))
 	{
-		ret = evaluate_FUZZYTIME(value, item, parameter, ts, error);
+		ret = evaluate_FUZZYTIME(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "logeventid"))
 	{
-		ret = evaluate_LOGEVENTID(value, item, parameter, ts, error);
+		ret = evaluate_LOGEVENTID(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "logseverity"))
 	{
-		ret = evaluate_LOGSEVERITY(value, item, parameter, ts, error);
+		ret = evaluate_LOGSEVERITY(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "logsource"))
 	{
-		ret = evaluate_LOGSOURCE(value, item, parameter, ts, error);
+		ret = evaluate_LOGSOURCE(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "bitand"))
 	{
-		ret = evaluate_BITAND(value, item, parameter, ts, error);
+		ret = evaluate_BITAND(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "forecast"))
 	{
-		ret = evaluate_FORECAST(value, item, parameter, ts, error);
+		ret = evaluate_FORECAST(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "timeleft"))
 	{
-		ret = evaluate_TIMELEFT(value, item, parameter, ts, error);
+		ret = evaluate_TIMELEFT(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strncmp(function, "trend", 5))
 	{
-		ret = evaluate_TREND(value, item, function + 5, parameter, ts, error);
+		ret = evaluate_TREND(value, item_conf, function + 5, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "first"))
 	{
-		ret = evaluate_FIRST(value, item, parameter, ts, error);
+		ret = evaluate_FIRST(value, item_conf, parameter, ts, error);
 	}
 	else if (0 == strcmp(function, "kurtosis"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_kurtosis, 1, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_kurtosis, 1, error);
 	}
 	else if (0 == strcmp(function, "mad"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_mad, 1, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_mad, 1, error);
 	}
 	else if (0 == strcmp(function, "skewness"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_skewness, 1, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_skewness, 1, error);
 	}
 	else if (0 == strcmp(function, "stddevpop"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_stddevpop, 1, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_stddevpop, 1, error);
 	}
 	else if (0 == strcmp(function, "stddevsamp"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_stddevsamp, 2, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_stddevsamp, 2, error);
 	}
 	else if (0 == strcmp(function, "sumofsquares"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_sumofsquares, 1, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_sumofsquares, 1, error);
 	}
 	else if (0 == strcmp(function, "varpop"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_varpop, 1, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_varpop, 1, error);
 	}
 	else if (0 == strcmp(function, "varsamp"))
 	{
-		ret = evaluate_statistical_func(value, item, parameter, ts, zbx_eval_calc_varsamp, 2, error);
+		ret = evaluate_statistical_func(value, item_conf, parameter, ts, zbx_eval_calc_varsamp, 2, error);
 	}
 	else
 	{
@@ -2734,7 +2735,7 @@ int	evaluate_function2(zbx_variant_t *value, DC_ITEM *item, const char *function
 		ret = FAIL;
 	}
 
-	DEBUG_ITEM(item->itemid,"Func eval result is %d",ret);
+	DEBUG_ITEM(item_conf->itemid,"Func eval result is %d",ret);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s value:'%s' of type:'%s'", __func__, zbx_result_string(ret),
 			zbx_variant_value_desc(value), zbx_variant_type_desc(value));

@@ -26,6 +26,10 @@
 #include "zbxjson.h"
 #include "zbxvariant.h"
 #include "zbxeval.h"
+#include "../src/libs/glb_state/state_triggers.h"
+#include "../src/libs/glb_process/proc_triggers.h"
+#include "../src/libs/glb_conf/conf_items.h"
+#include "../src/libs/glb_conf/conf_triggers.h"
 
 #define MACRO_TYPE_MESSAGE_NORMAL	0x00000001
 #define MACRO_TYPE_MESSAGE_RECOVERY	0x00000002
@@ -64,7 +68,7 @@
 
 int	evaluate_function(char **value, DC_ITEM *item, const char *function, const char *parameter,
 		const zbx_timespec_t *ts, char **error);
-int	evaluate_function2(zbx_variant_t *value, DC_ITEM *item, const char *function, const char *parameter,
+int	evaluate_function2(zbx_variant_t *value, item_func_eval_conf_t *item_conf, const char *function, const char *parameter,
 		const zbx_timespec_t *ts, char **error);
 
 int	zbx_is_trigger_function(const char *name, size_t len);
@@ -79,9 +83,11 @@ int	substitute_simple_macros_unmasked(const zbx_uint64_t *actionid, const DB_EVE
 		const DB_ALERT *alert, const DB_ACKNOWLEDGE *ack, const char *tz, char **data, int macro_type,
 		char *error, int maxerrlen);
 
-void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
-		const DC_ITEM *history_items, const int *history_errcodes);
+int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, zbx_timespec_t *ts);
+//void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
+//		const DC_ITEM *history_items, const int *history_errcodes);
 void	prepare_triggers(DC_TRIGGER **triggers, int triggers_num);
+
 
 void	zbx_format_value(char *value, size_t max_len, zbx_uint64_t valuemapid,
 		const char *units, unsigned char value_type);

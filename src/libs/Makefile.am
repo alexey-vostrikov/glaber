@@ -37,6 +37,8 @@ DIST_SUBDIRS = \
 	zbxavailability \
 	zbxeval \
 	glb_state \
+	glb_conf \
+	glb_process \
 	zbxxml
 
 if SERVER
@@ -63,6 +65,8 @@ SERVER_SUBDIRS = \
 	zbxtrends \
 	zbxavailability \
 	glb_state \
+	glb_conf \
+	glb_process \
 	zbxeval
 else
 if PROXY
@@ -88,6 +92,8 @@ PROXY_SUBDIRS = \
 	zbxtrends \
 	zbxavailability \
 	glb_state \
+	glb_conf \
+	glb_process \
 	zbxeval
 endif
 endif

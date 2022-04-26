@@ -18,7 +18,7 @@
 **/
 
 #include "common.h"
-#include "../../libs/glb_state/glb_state.h"
+#include "../../libs/glb_state/state.h"
 #include "preproc.h"
 #include "zbxlld.h"
 #include "checks_internal.h"

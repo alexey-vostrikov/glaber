@@ -27,8 +27,7 @@
 #include "preproc.h"
 #include "preprocessing.h"
 #include "preproc_history.h"
-#include "../../libs/glb_state/glb_state_items.h"
-//#include "../../libs/zbxdbcache/glb_state_items.h"
+#include "../../libs/glb_state/state_items.h"
 
 #define PACKED_FIELD_RAW	0
 #define PACKED_FIELD_STRING	1

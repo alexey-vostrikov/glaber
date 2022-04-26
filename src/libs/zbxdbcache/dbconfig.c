@@ -41,11 +41,17 @@
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/glb_poller/glb_pinger.h"
-#include "../glb_objects/glb_trigger.h"
+//#include "../glb_objects/glb_trigger.h"
 //#include "../glb_objects/glb_discovery.h"
 
-#include "../glb_state/glb_state.h"
-#include "../glb_state/glb_state_items.h"
+#include "../glb_state/state.h"
+#include "../glb_state/state_items.h"
+#include "../glb_state/state_triggers.h"
+#include "../glb_process/proc_trigger_timers.h"
+#include "../glb_conf/conf_items.h"
+#include "../glb_conf/conf_triggers.h"
+#include "../glb_conf/conf_index.h"
+#include "../glb_conf/conf.h"
 
 #define ZBX_DBCONFIG_IMPL
 #include "dbconfig.h"
@@ -55,8 +61,10 @@
 #include "zbxtrends.h"
 #include "zbxvault.h"
 #include "zbxserialize.h"
-#include "../glb_state/glb_state.h"
+#include "../glb_state/state.h"
 #include "changeset.h"
+
+extern void *ipc_processing_notify;
 
 int	sync_in_progress = 0;
 
@@ -102,7 +110,6 @@ int	sync_in_progress = 0;
 typedef int (*zbx_value_validator_func_t)(const char *macro, const char *value, char **error);
 
 ZBX_DC_CONFIG	*config = NULL;
-GLB_CONFIG 		*glb_config = NULL;
 
 zbx_rwlock_t	config_lock = ZBX_RWLOCK_NULL;
 static zbx_mem_info_t	*config_mem;
@@ -3209,9 +3216,9 @@ static int DC_remove_item(u_int64_t itemid) {
 //	zbx_strpool_release(item->error);
 	zbx_strpool_release(item->delay);
 
-	if (NULL != item->triggers)
-		config->items.mem_free_func(item->triggers);
-
+//	if (NULL != item->triggers)
+//		config->items.mem_free_func(item->triggers);
+//
 	int i;
 
 	for (i = 0; i < item->tags.values_num; i++)
@@ -3448,10 +3455,12 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			
 		//DCstrpool_replace(found, &item->name, row[51]);
 		//DCstrpool_replace(found, &item->description, row[52]);	
+		item->update_triggers = 1;
+
 		if (0 == found)
 		{
-			item->triggers = NULL;
-			item->update_triggers = 0;
+			//item->triggers = NULL;
+		
 			//ZBX_STR2UINT64(item->lastlogsize, row[20]);	
 			//DCstrpool_replace(found, &item->error, row[27]);
 			item->data_expected_from = now;
@@ -3892,8 +3901,9 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 
 					if (0 == host->proxy_hostid)
 					{
-						dc_add_history(item->itemid, item->value_type, 0, NULL, &ts,
-								ITEM_STATE_NOTSUPPORTED, error);
+						glb_state_item_set_error(item->itemid, error);
+						//dc_add_history(item->itemid, item->value_type, 0, NULL, &ts,
+						//		ITEM_STATE_NOTSUPPORTED, error);
 					}
 					zbx_free(error);
 				}
@@ -4050,24 +4060,45 @@ static void	DCsync_triggers(zbx_dbsync_t *sync)
 		DCstrpool_replace(found, &trigger->event_name, row[15]);
 		ZBX_STR2UCHAR(trigger->priority, row[4]);
 		ZBX_STR2UCHAR(trigger->type, row[5]);
-		ZBX_STR2UCHAR(trigger->status, row[9]);
+//		unsigned char status;
+//		ZBX_STR2UCHAR(status, row[9]);
+		
 		ZBX_STR2UCHAR(trigger->recovery_mode, row[10]);
 		ZBX_STR2UCHAR(trigger->correlation_mode, row[12]);
 
 		if (0 == found)
 		{
-			DCstrpool_replace(found, &trigger->error, "");
-			ZBX_STR2UCHAR(trigger->value, row[6]);
-			ZBX_STR2UCHAR(trigger->state, row[7]);
+			//trigger_state_t meta;
+
+			//DCstrpool_replace(found, &trigger->error, "");
+			unsigned char value,state;
+			int lastchange, timer_revision;
+
+			ZBX_STR2UCHAR(value, row[6]);
+			ZBX_STR2UCHAR(state, row[7]);
 			//trigger->state = TRIGGER_STATE_UNKNOWN;
-			trigger->lastchange = 0;//atoi(row[8]);
-			trigger->locked = 0;
-			trigger->timer_revision = 0;
+			
+			
+			// meta.errorstr = "Trigger hasn't been calculated since the server start yet";
+			// meta.state = TRIGGER_STATE_UNKNOWN;
+			// meta.lastchange= 0; //atoi(row[8]);
+			// //trigger->locked = 0;
+			// meta.timer_revision = 0;
+			// meta.value = TRIGGER_VALUE_UNKNOWN;
+			// glb_state_trigger_set_meta(triggerid, &meta, ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL);
+
+//			if (glb_state_trigger_get_state(triggerid) != TRIGGER_STATE_UNKNOWN ||
+//			    glb_state_trigger_get_value(triggerid) != TRIGGER_VALUE_UNKNOWN) {
+//					LOG_INF("Meta and value set doesn't work well, bug, fix it!!!!");
+//					THIS_SHOULD_NEVER_HAPPEN;
+//					exit(-1);
+//				}
+
 
 			zbx_vector_ptr_create_ext(&trigger->tags, __config_mem_malloc_func, __config_mem_realloc_func,
 					__config_mem_free_func);
 			trigger->topoindex = 1;
-			trigger->itemids = NULL;
+			//trigger->itemids = NULL;
 		}
 		else
 		{
@@ -4094,20 +4125,23 @@ static void	DCsync_triggers(zbx_dbsync_t *sync)
 			if (NULL == (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &rowid)))
 				continue;
 
-			/* force trigger list update for items used in removed trigger */
-			if (NULL != trigger->itemids)
-			{
-				for (itemid = trigger->itemids; 0 != *itemid; itemid++)
-				{
-					if (NULL != (item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, itemid)))
-						dc_item_reset_triggers(item, trigger);
-				}
-			}
+
+			conf_index_deptrigger_to_trigger_del_trigger(trigger->triggerid);
+			
+			/* force trigger list update for items used in removed trigger */		
+//			if (NULL != trigger->itemids)
+//			{
+//				for (itemid = trigger->itemids; 0 != *itemid; itemid++)
+//				{
+//					if (NULL != (item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, itemid)))
+//						dc_item_reset_triggers(item, trigger);
+//				}
+//			}
 
 			zbx_strpool_release(trigger->description);
 			zbx_strpool_release(trigger->expression);
 			zbx_strpool_release(trigger->recovery_expression);
-			zbx_strpool_release(trigger->error);
+			//zbx_strpool_release(trigger->error);
 			zbx_strpool_release(trigger->correlation_tag);
 			zbx_strpool_release(trigger->opdata);
 			zbx_strpool_release(trigger->event_name);
@@ -4119,8 +4153,8 @@ static void	DCsync_triggers(zbx_dbsync_t *sync)
 			if (NULL != trigger->recovery_expression_bin)
 				__config_mem_free_func((void *)trigger->recovery_expression_bin);
 
-			if (NULL != trigger->itemids)
-				__config_mem_free_func((void *)trigger->itemids);
+		//	if (NULL != trigger->itemids)
+		//		__config_mem_free_func((void *)trigger->itemids);
 
 			zbx_hashset_remove_direct(&config->triggers, trigger);
 		}
@@ -4209,7 +4243,7 @@ static int	dc_function_calculate_trends_nextcheck(time_t from, const char *perio
 
 static int	dc_function_calculate_nextcheck(const zbx_trigger_timer_t *timer, time_t from, zbx_uint64_t seed)
 {
-	if (ZBX_TRIGGER_TIMER_FUNCTION_TIME == timer->type || ZBX_TRIGGER_TIMER_TRIGGER == timer->type)
+	if (TRIGGER_TIMER_FUNCTION_TIME == timer->type || TRIGGER_TIMER_TRIGGER == timer->type)
 	{
 		int	nextcheck;
 
@@ -4221,7 +4255,7 @@ static int	dc_function_calculate_nextcheck(const zbx_trigger_timer_t *timer, tim
 
 		return nextcheck;
 	}
-	else if (ZBX_TRIGGER_TIMER_FUNCTION_TREND == timer->type)
+	else if (TRIGGER_TIMER_FUNCTION_TREND == timer->type)
 	{
 		struct tm	tm;
 		time_t		nextcheck;
@@ -4303,12 +4337,12 @@ static zbx_trigger_timer_t	*dc_trigger_function_timer_create(ZBX_DC_FUNCTION *fu
 			zbx_free(error);
 			return NULL;
 		}
-		type = ZBX_TRIGGER_TIMER_FUNCTION_TREND;
+		type = TRIGGER_TIMER_FUNCTION_TREND;
 	}
 	else
 	{
 		trend_base = ZBX_TIME_UNIT_UNKNOWN;
-		type = ZBX_TRIGGER_TIMER_FUNCTION_TIME;
+		type = TRIGGER_TIMER_FUNCTION_TIME;
 	}
 
 	timer = (zbx_trigger_timer_t *)__config_mem_malloc_func(NULL, sizeof(zbx_trigger_timer_t));
@@ -4339,23 +4373,24 @@ static zbx_trigger_timer_t	*dc_trigger_function_timer_create(ZBX_DC_FUNCTION *fu
  * Return value:  Created timer or NULL in the case of error.                 *
  *                                                                            *
  ******************************************************************************/
-static zbx_trigger_timer_t	*dc_trigger_timer_create(ZBX_DC_TRIGGER *trigger)
-{
-	zbx_trigger_timer_t	*timer;
+// static zbx_trigger_timer_t	*dc_trigger_timer_create(ZBX_DC_TRIGGER *trigger)
+// {
+// 	zbx_trigger_timer_t	*timer;
 
-	timer = (zbx_trigger_timer_t *)__config_mem_malloc_func(NULL, sizeof(zbx_trigger_timer_t));
-	timer->type = ZBX_TRIGGER_TIMER_TRIGGER;
-	timer->objectid = trigger->triggerid;
-	timer->triggerid = trigger->triggerid;
-	timer->revision = trigger->revision;
-	timer->trend_base = ZBX_TIME_UNIT_UNKNOWN;
-	timer->lock = 0;
-	timer->parameter = NULL;
+// 	timer = (zbx_trigger_timer_t *)__config_mem_malloc_func(NULL, sizeof(zbx_trigger_timer_t));
+// 	timer->type = TRIGGER_TIMER_TRIGGER;
+// 	timer->objectid = trigger->triggerid;
+// 	timer->triggerid = trigger->triggerid;
+// 	timer->revision = trigger->revision;
+// 	timer->trend_base = ZBX_TIME_UNIT_UNKNOWN;
+// 	timer->lock = 0;
+// 	timer->parameter = NULL;
 
-	trigger->timer_revision = trigger->revision;
+// 	glb_state_trigger_set_timer_revision_to_revision(trigger->triggerid);
+// 	//trigger->timer_revision = trigger->revision;
 
-	return timer;
-}
+// 	return timer;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -4372,18 +4407,18 @@ static void	dc_trigger_timer_free(zbx_trigger_timer_t *timer)
 	__config_mem_free_func(timer);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: dc_schedule_trigger_timer                                        *
- *                                                                            *
- * Purpose: schedule trigger timer to be executed at the specified time       *
- *                                                                            *
- * Parameter: timer   - [IN] the timer to schedule                            *
- *            eval_ts - [IN] the history snapshot time, by default (NULL)     *
- *                           execution time will be used.                     *
- *            exec_ts - [IN] the tiemer execution time                        *
- *                                                                            *
- ******************************************************************************/
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: dc_schedule_trigger_timer                                        *
+//  *                                                                            *
+//  * Purpose: schedule trigger timer to be executed at the specified time       *
+//  *                                                                            *
+//  * Parameter: timer   - [IN] the timer to schedule                            *
+//  *            eval_ts - [IN] the history snapshot time, by default (NULL)     *
+//  *                           execution time will be used.                     *
+//  *            exec_ts - [IN] the tiemer execution time                        *
+//  *                                                                            *
+//  ******************************************************************************/
 static void	dc_schedule_trigger_timer(zbx_trigger_timer_t *timer, const zbx_timespec_t *eval_ts,
 		const zbx_timespec_t *exec_ts)
 {
@@ -4401,14 +4436,14 @@ static void	dc_schedule_trigger_timer(zbx_trigger_timer_t *timer, const zbx_time
 	zbx_binary_heap_insert(&config->trigger_queue, &elem);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: dc_schedule_new_trigger_timers                                   *
- *                                                                            *
- * Purpose: set timer schedule and evaluation times based on functions and    *
- *          old trend function queue                                          *
- *                                                                            *
- ******************************************************************************/
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: dc_schedule_new_trigger_timers                                   *
+//  *                                                                            *
+//  * Purpose: set timer schedule and evaluation times based on functions and    *
+//  *          old trend function queue                                          *
+//  *                                                                            *
+//  ******************************************************************************/
 static void	dc_schedule_trigger_timers(zbx_hashset_t *trend_queue, int now)
 {
 	ZBX_DC_FUNCTION		*function;
@@ -4431,57 +4466,63 @@ static void	dc_schedule_trigger_timers(zbx_hashset_t *trend_queue, int now)
 		if (NULL == (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &function->triggerid)))
 			continue;
 
-		if (TRIGGER_STATUS_ENABLED != trigger->status || TRIGGER_FUNCTIONAL_TRUE != trigger->functional)
-			continue;
+		//if (TRIGGER_STATUS_ENABLED != trigger->status || TRIGGER_FUNCTIONAL_TRUE != trigger->functional)
+		//if (SUCCEED != glb_state_trigger_is_functional(trigger->triggerid) )
+		//	continue;
 
-		if (NULL == (timer = dc_trigger_function_timer_create(function)))
-			continue;
+		if ( ZBX_FUNCTION_TYPE_TRENDS == function->type ||
+			 	ZBX_FUNCTION_TYPE_TIMER == function->type )
+				processing_notify_changed_trigger(function->triggerid);
+			// //		if (NULL == (timer = dc_trigger_function_timer_create(function)))
+// //			continue;
 
-		if (NULL != trend_queue && NULL != (old = (zbx_trigger_timer_t *)zbx_hashset_search(trend_queue,
-				&timer->objectid)) && old->eval_ts.sec < now + 10 * SEC_PER_MIN)
-		{
-			/* if the trigger was scheduled during next 10 minutes         */
-			/* schedule its evaluation later to reduce server startup load */
-			if (old->eval_ts.sec < now + 10 * SEC_PER_MIN)
-				ts.sec = now + 10 * SEC_PER_MIN + timer->triggerid % (10 * SEC_PER_MIN);
-			else
-				ts.sec = old->eval_ts.sec;
+// //		if (NULL != trend_queue && NULL != (old = (zbx_trigger_timer_t *)zbx_hashset_search(trend_queue,
+// //				&timer->objectid)) && old->eval_ts.sec < now + 10 * SEC_PER_MIN)
+// /		{
+// 			/* if the trigger was scheduled during next 10 minutes         */
+// 			/* schedule its evaluation later to reduce server startup load */
+// 			if (old->eval_ts.sec < now + 10 * SEC_PER_MIN)
+// 				ts.sec = now + 10 * SEC_PER_MIN + timer->triggerid % (10 * SEC_PER_MIN);
+// 			else
+// 				ts.sec = old->eval_ts.sec;
 
-			dc_schedule_trigger_timer(timer, &old->eval_ts, &ts);
-		}
-		else
-		{
-			if (0 == (ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
-			{
-				dc_trigger_timer_free(timer);
-				function->timer_revision = 0;
-			}
-			else
-				dc_schedule_trigger_timer(timer, NULL, &ts);
-		}
+//			dc_schedule_trigger_timer(timer, &old->eval_ts, &ts);
+		// }
+		// else
+		// {
+		// 	if (0 == (ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
+		// 	{
+		// 		dc_trigger_timer_free(timer);
+		// 		function->timer_revision = 0;
+		// 	}
+		// 	else
+		// 		dc_schedule_trigger_timer(timer, NULL, &ts);
+		// }
 	}
+	processing_notify_flush();
 
-	zbx_hashset_iter_reset(&config->triggers, &iter);
-	while (NULL != (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
-	{
-		if (ZBX_TRIGGER_TIMER_DEFAULT == trigger->timer)
-			continue;
+// //	zbx_hashset_iter_reset(&config->triggers, &iter);
+// //	while (NULL != (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
+// /	{
+// 		if (ZBX_TRIGGER_TIMER_DEFAULT == trigger->timer)
+// 			continue;
 
-		if (trigger->timer_revision == trigger->revision)
-			continue;
+// 		if ( SUCCEED == glb_state_trigger_timer_revision_equals_revision(trigger->triggerid))
+// 			continue;
 
-		if (NULL == (timer = dc_trigger_timer_create(trigger)))
-			continue;
+// 		if (NULL == (timer = dc_trigger_timer_create(trigger)))
+// 			continue;
 
-		if (0 == (ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
-		{
-			dc_trigger_timer_free(timer);
-			trigger->timer_revision = 0;
-		}
-		else
-			dc_schedule_trigger_timer(timer, NULL, &ts);
+// 		if (0 == (ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
+// 		{
+// 			dc_trigger_timer_free(timer);
+// 			glb_state_trigger_set_timer_revision(trigger->triggerid, 0);
+// 			//trigger->timer_revision = 0;
+// 		}
+// 		else
+// 			dc_schedule_trigger_timer(timer, NULL, &ts);
 
-	}
+// 	}
 }
 
 static void	DCsync_functions(zbx_dbsync_t *sync)
@@ -6042,33 +6083,12 @@ static int	zbx_default_ptr_pair_ptr_second_compare_func(const void *d1, const vo
  ******************************************************************************/
 static void	dc_trigger_add_itemids(ZBX_DC_TRIGGER *trigger, const zbx_vector_uint64_t *itemids)
 {
-	zbx_uint64_t	*itemid;
 	int		i;
 
-	if (NULL != trigger->itemids)
-	{
-		int	itemids_num = 0;
-
-		for (itemid = trigger->itemids; 0 != *itemid; itemid++)
-			itemids_num++;
-
-		trigger->itemids = (zbx_uint64_t *)__config_mem_realloc_func(trigger->itemids,
-				sizeof(zbx_uint64_t) * (size_t)(itemids->values_num + itemids_num + 1));
-	}
-	else
-	{
-		trigger->itemids = (zbx_uint64_t *)__config_mem_malloc_func(trigger->itemids,
-				sizeof(zbx_uint64_t) * (size_t)(itemids->values_num + 1));
-		trigger->itemids[0] = 0;
+	for (int i = 0; i < itemids->values_num; i++) {
+		conf_index_items_to_triggers_add(itemids->values[i], trigger->triggerid);
 	}
 
-	for (itemid = trigger->itemids; 0 != *itemid; itemid++)
-		;
-
-	for (i = 0; i < itemids->values_num; i++)
-		*itemid++ = itemids->values[i];
-
-	*itemid = 0;
 }
 
 /******************************************************************************
@@ -6086,35 +6106,8 @@ static void	dc_item_reset_triggers(ZBX_DC_ITEM *item, ZBX_DC_TRIGGER *trigger_ex
 {
 	ZBX_DC_TRIGGER	**trigger;
 
-	item->update_triggers = 1;
-
-	if (NULL == item->triggers)
-		return;
-
-	for (trigger = item->triggers; NULL != *trigger; trigger++)
-	{
-		zbx_uint64_t	*itemid;
-
-		if (*trigger == trigger_exclude)
-			continue;
-
-		if (NULL != (*trigger)->itemids)
-		{
-			for (itemid = (*trigger)->itemids; 0 != *itemid; itemid++)
-			{
-				if (item->itemid == *itemid)
-				{
-					while (0 != (*itemid = itemid[1]))
-						itemid++;
-
-					break;
-				}
-			}
-		}
-	}
-
-	config->items.mem_free_func(item->triggers);
-	item->triggers = NULL;
+	//item->update_triggers = 1;
+	conf_index_items_to_triggers_del_item(item->itemid);
 }
 
 /******************************************************************************
@@ -6149,11 +6142,9 @@ static void	dc_trigger_update_cache(void)
 	ZBX_DC_HOST		*host;
 
 	zbx_hashset_iter_reset(&config->triggers, &iter);
-	while (NULL != (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
-		trigger->functional = TRIGGER_FUNCTIONAL_TRUE;
-
 	zbx_vector_ptr_pair_create(&itemtrigs);
 	zbx_hashset_iter_reset(&config->functions, &iter);
+	LOG_INF("Filling sorted relations");
 	while (NULL != (function = (ZBX_DC_FUNCTION *)zbx_hashset_iter_next(&iter)))
 	{
 
@@ -6170,25 +6161,12 @@ static void	dc_trigger_update_cache(void)
 			itemtrig.second = trigger;
 			zbx_vector_ptr_pair_append(&itemtrigs, itemtrig);
 		}
-
-		/* disable functionality for triggers with expression containing */
-		/* disabled or not monitored items                               */
-
-		if (TRIGGER_FUNCTIONAL_FALSE == trigger->functional)
-			continue;
-
-		if (ITEM_STATUS_DISABLED == item->status ||
-				(NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &item->hostid)) ||
-						HOST_STATUS_NOT_MONITORED == host->status))
-		{
-			trigger->functional = TRIGGER_FUNCTIONAL_FALSE;
-		}
 	}
+
+	LOG_INF("Got %d pairs in item-trigger", itemtrigs.values_num);
 
 	if (0 != itemtrigs.values_num)
 	{
-		zbx_vector_uint64_t	itemids;
-
 		zbx_vector_ptr_pair_sort(&itemtrigs, zbx_default_ptr_pair_ptr_compare_func);
 		zbx_vector_ptr_pair_uniq(&itemtrigs, zbx_default_ptr_pair_ptr_compare_func);
 
@@ -6203,42 +6181,25 @@ static void	dc_trigger_update_cache(void)
 
 			item = (ZBX_DC_ITEM *)itemtrigs.values[i].first;
 			item->update_triggers = 0;
-			item->triggers = (ZBX_DC_TRIGGER **)config->items.mem_realloc_func(item->triggers,
-					(size_t)(j - i + 1) * sizeof(ZBX_DC_TRIGGER *));
+			
+			LOG_INF("Clearing item - trigger item %ld", item->itemid);		
+			DEBUG_ITEM(item->itemid, "Clearing all items form item->trigger relation");
+			conf_index_items_to_triggers_del_item(item->itemid);
 
-			for (k = i; k < j; k++)
-				item->triggers[k - i] = (ZBX_DC_TRIGGER *)itemtrigs.values[k].second;
 
-			item->triggers[j - i] = NULL;
-
+			for (k = i; k < j; k++) {
+				//LOG_INF("Adding new item->trigger link: %ld -> %ld", item->itemid, ((ZBX_DC_TRIGGER *)itemtrigs.values[k].second)->triggerid);
+				DEBUG_ITEM(item->itemid, "Adding relation to trigger %ld", ((ZBX_DC_TRIGGER *)itemtrigs.values[k].second)->triggerid);
+				conf_index_items_to_triggers_add(item->itemid, ((ZBX_DC_TRIGGER *)itemtrigs.values[k].second)->triggerid);
+			}
 			i = j - 1;
 		}
-
-		/* update reverse links from trigger to items */
-
-		zbx_vector_uint64_create(&itemids);
-		zbx_vector_ptr_pair_sort(&itemtrigs, zbx_default_ptr_pair_ptr_second_compare_func);
-
-		trigger = (ZBX_DC_TRIGGER *)itemtrigs.values[0].second;
-		for (i = 0; i < itemtrigs.values_num; i++)
-		{
-			if (trigger != itemtrigs.values[i].second)
-			{
-				dc_trigger_add_itemids(trigger, &itemids);
-				trigger = (ZBX_DC_TRIGGER *)itemtrigs.values[i].second;
-				zbx_vector_uint64_clear(&itemids);
-			}
-
-			item = (ZBX_DC_ITEM *)itemtrigs.values[i].first;
-			zbx_vector_uint64_append(&itemids, item->itemid);
-		}
-
-		if (0 != itemids.values_num)
-			dc_trigger_add_itemids(trigger, &itemids);
-
-		zbx_vector_uint64_destroy(&itemids);
 	}
-
+	LOG_INF("Finished add item to trigger");
+	
+	//conf_index_items_to_triggers_dump();
+	//exit(-1);
+	
 	zbx_vector_ptr_pair_destroy(&itemtrigs);
 }
 
@@ -6289,7 +6250,7 @@ static void	dc_load_trigger_queue(zbx_hashset_t *trend_functions)
 	{
 		zbx_trigger_timer_t	timer_local, *timer;
 
-		if (ZBX_TRIGGER_TIMER_FUNCTION_TREND != atoi(row[1]))
+		if (TRIGGER_TIMER_FUNCTION_TREND != atoi(row[1]))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
 			continue;
@@ -6596,7 +6557,7 @@ void	DCsync_configuration(unsigned char mode)
 
 	config->item_sync_ts = time(NULL);
 	FINISH_SYNC;
-	dc_flush_history();	/* misconfigured items generate pseudo-historic values to become notsupported */
+	//dc_flush_history();	/* misconfigured items generate pseudo-historic values to become notsupported */
 
 	/* sync function data to support function lookups when resolving macros during configuration sync */
 
@@ -6622,7 +6583,7 @@ void	DCsync_configuration(unsigned char mode)
 	tsec = zbx_time() - sec;
 
 	sec = zbx_time();
-	if (FAIL == zbx_dbsync_compare_trigger_dependency(&tdep_sync, &memf, &glb_config->deptrigger_to_trigger_idx))
+	if (FAIL == zbx_dbsync_compare_trigger_dependency(&tdep_sync))
 		goto out;
 	dsec = zbx_time() - sec;
 
@@ -6669,33 +6630,35 @@ void	DCsync_configuration(unsigned char mode)
 	sec = zbx_time();
 	DCsync_triggers(&triggers_sync);
 	tsec2 = zbx_time() - sec;
-
+	
 //	sec = zbx_time();
 //	DCsync_trigdeps(&tdep_sync);
 //	dsec2 = zbx_time() - sec;
+	
 	sec = zbx_time();
 	DCsync_expressions(&expr_sync);
 	expr_sec2 = zbx_time() - sec;
-
+	
 	sec = zbx_time();
 	DCsync_actions(&action_sync);
 	action_sec2 = zbx_time() - sec;
-
+	
 	sec = zbx_time();
 	DCsync_action_ops(&action_op_sync);
 	action_op_sec2 = zbx_time() - sec;
 	sec = zbx_time();
+	
 	DCsync_action_conditions(&action_condition_sync);
 	action_condition_sec2 = zbx_time() - sec;
 	sec = zbx_time();
 	/* relies on triggers, must be after DCsync_triggers() */
+	
 	DCsync_trigger_tags(&trigger_tag_sync);
 	trigger_tag_sec2 = zbx_time() - sec;
-
+	
 	sec = zbx_time();
 	DCsync_item_tags(&item_tag_sync);
 	item_tag_sec2 = zbx_time() - sec;
-
 	sec = zbx_time();
 	DCsync_correlations(&correlation_sync);
 	correlation_sec2 = zbx_time() - sec;
@@ -6731,6 +6694,8 @@ void	DCsync_configuration(unsigned char mode)
 			ZBX_DBSYNC_UPDATE_TRIGGERS)))
 	{
 		dc_trigger_update_cache();
+	
+		
 		dc_schedule_trigger_timers((ZBX_DBSYNC_INIT == mode ? &trend_queue : NULL), time(NULL));
 	}
 
@@ -6885,8 +6850,8 @@ void	DCsync_configuration(unsigned char mode)
 				config->ipmihosts.num_data, config->ipmihosts.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() host_invent: %d (%d slots)", __func__,
 				config->host_inventories.num_data, config->host_inventories.num_slots);
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() htmpls     : %d (%d slots)", __func__,
-				glb_config->host_to_template_idx.from_to->elems.num_data, glb_config->host_to_template_idx.from_to->elems.num_slots);
+	//	zabbix_log(LOG_LEVEL_DEBUG, "%s() htmpls     : %d (%d slots)", __func__,
+	//			glb_config->host_to_template_idx.from_to->elems.num_data, glb_config->host_to_template_idx.from_to->elems.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() gmacros    : %d (%d slots)", __func__,
 				config->gmacros.num_data, config->gmacros.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() gmacros_m  : %d (%d slots)", __func__,
@@ -6946,8 +6911,8 @@ void	DCsync_configuration(unsigned char mode)
 				config->functions.num_data, config->functions.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() triggers   : %d (%d slots)", __func__,
 				config->triggers.num_data, config->triggers.num_slots);
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() trigdeps   : %d (%d slots)", __func__,
-				glb_config->deptrigger_to_trigger_idx.from_to->elems.num_data, glb_config->deptrigger_to_trigger_idx.from_to->elems.num_slots);
+//		zabbix_log(LOG_LEVEL_DEBUG, "%s() trigdeps   : %d (%d slots)", __func__,
+//				glb_config->deptrigger_to_trigger_idx.from_to->elems.num_data, glb_config->deptrigger_to_trigger_idx.from_to->elems.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() trig. tags : %d (%d slots)", __func__,
 				config->trigger_tags.num_data, config->trigger_tags.num_slots);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() expressions: %d (%d slots)", __func__,
@@ -7599,19 +7564,14 @@ int	init_configuration_cache(char **error)
 	config->last_items_change = time(NULL);
 #undef CREATE_HASHSET
 #undef CREATE_HASHSET_EXT
-out:
 	
-	glb_config = (GLB_CONFIG *) __config_mem_malloc_func(NULL, sizeof(GLB_CONFIG));
-		
-	if (FAIL == obj_index_init(&glb_config->host_to_template_idx, &memf) ||
-	    FAIL == obj_index_init(&glb_config->deptrigger_to_trigger_idx, &memf) ||
-		FAIL == strpool_init(&glb_config->strpool, &memf) 
-//		||   FAIL == glb_discovery_init(&memf, &glb_config->strpool)
-	) 
+	if (FAIL == glb_config_init(&memf)) 
 		ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
+out:
+	
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 	return ret;
 }
 
@@ -7631,7 +7591,7 @@ void	free_configuration_cache(void)
 	WRLOCK_CACHE;
 
 	config = NULL;
-	glb_config = NULL; 
+//	glb_config = NULL; 
 
 	UNLOCK_CACHE;
 
@@ -8486,45 +8446,55 @@ static void	DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src
 	memcpy(dst_function->parameter, src_function->parameter, sz_parameter);
 }
 
-static void	DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger)
+static void	DCget_trigger(DC_TRIGGER *tr_conf, const ZBX_DC_TRIGGER *src_trigger)
 {
 	int	i;
+	trigger_state_t *state;
 
-	dst_trigger->triggerid = src_trigger->triggerid;
-	dst_trigger->description = zbx_strdup(NULL, src_trigger->description);
-	dst_trigger->error = zbx_strdup(NULL, src_trigger->error);
-	dst_trigger->timespec.sec = 0;
-	dst_trigger->timespec.ns = 0;
-	dst_trigger->priority = src_trigger->priority;
-	dst_trigger->type = src_trigger->type;
-	dst_trigger->value = src_trigger->value;
-	dst_trigger->state = src_trigger->state;
-	dst_trigger->new_value = TRIGGER_VALUE_UNKNOWN;
-	dst_trigger->lastchange = src_trigger->lastchange;
-	dst_trigger->topoindex = src_trigger->topoindex;
-	dst_trigger->status = src_trigger->status;
-	dst_trigger->recovery_mode = src_trigger->recovery_mode;
-	dst_trigger->correlation_mode = src_trigger->correlation_mode;
-	dst_trigger->correlation_tag = zbx_strdup(NULL, src_trigger->correlation_tag);
-	dst_trigger->opdata = zbx_strdup(NULL, src_trigger->opdata);
-	dst_trigger->event_name = ('\0' != *src_trigger->event_name ? zbx_strdup(NULL, src_trigger->event_name) : NULL);
-	dst_trigger->flags = 0;
-	dst_trigger->new_error = NULL;
+	if (NULL == (state = state_trigger_get_state(src_trigger->triggerid))) {
+		LOG_INF("Requesting trigger state of non existing trigger should return data");
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(-1);
+	};
 
-	dst_trigger->expression = zbx_strdup(NULL, src_trigger->expression);
-	dst_trigger->recovery_expression = zbx_strdup(NULL, src_trigger->recovery_expression);
+	tr_conf->triggerid = src_trigger->triggerid;
+	tr_conf->description = zbx_strdup(NULL, src_trigger->description);
+	if (NULL!= state_trigger_get_errstr(state) )
+		tr_conf->error = zbx_strdup(NULL, (char *) state_trigger_get_errstr(state));
+	else tr_conf->error = NULL;
+	
+	tr_conf->timespec.sec = 0;
+	tr_conf->timespec.ns = 0;
+	tr_conf->priority = src_trigger->priority;
+	tr_conf->type = src_trigger->type;
+	tr_conf->value = state_trigger_get_value(state);
+	//tr_conf->state = state_trigger_get_state(state);
+	tr_conf->new_value = TRIGGER_VALUE_UNKNOWN;
+	tr_conf->lastchange = state_trigger_get_lastchange(state);
+	tr_conf->topoindex = src_trigger->topoindex;
+	tr_conf->status = state_trigger_get_status(state);
+	tr_conf->recovery_mode = src_trigger->recovery_mode;
+	tr_conf->correlation_mode = src_trigger->correlation_mode;
+	tr_conf->correlation_tag = zbx_strdup(NULL, src_trigger->correlation_tag);
+	tr_conf->opdata = zbx_strdup(NULL, src_trigger->opdata);
+	tr_conf->event_name = ('\0' != *src_trigger->event_name ? zbx_strdup(NULL, src_trigger->event_name) : NULL);
+	tr_conf->flags = 0;
+	tr_conf->new_error = NULL;
 
-	dst_trigger->expression_bin = dup_serialized_expression(src_trigger->expression_bin);
-	dst_trigger->recovery_expression_bin = dup_serialized_expression(src_trigger->recovery_expression_bin);
+	tr_conf->expression = zbx_strdup(NULL, src_trigger->expression);
+	tr_conf->recovery_expression = zbx_strdup(NULL, src_trigger->recovery_expression);
 
-	dst_trigger->eval_ctx = NULL;
-	dst_trigger->eval_ctx_r = NULL;
+	tr_conf->expression_bin = dup_serialized_expression(src_trigger->expression_bin);
+	tr_conf->recovery_expression_bin = dup_serialized_expression(src_trigger->recovery_expression_bin);
 
-	zbx_vector_ptr_create(&dst_trigger->tags);
+	tr_conf->eval_ctx = NULL;
+	tr_conf->eval_ctx_r = NULL;
+
+	zbx_vector_ptr_create(&tr_conf->tags);
 
 	if (0 != src_trigger->tags.values_num)
 	{
-		zbx_vector_ptr_reserve(&dst_trigger->tags, src_trigger->tags.values_num);
+		zbx_vector_ptr_reserve(&tr_conf->tags, src_trigger->tags.values_num);
 
 		for (i = 0; i < src_trigger->tags.values_num; i++)
 		{
@@ -8535,7 +8505,7 @@ static void	DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_tri
 			tag->tag = zbx_strdup(NULL, dc_trigger_tag->tag);
 			tag->value = zbx_strdup(NULL, dc_trigger_tag->value);
 
-			zbx_vector_ptr_append(&dst_trigger->tags, tag);
+			zbx_vector_ptr_append(&tr_conf->tags, tag);
 		}
 	}
 }
@@ -9064,58 +9034,100 @@ void	DCconfig_clean_triggers(DC_TRIGGER *triggers, int *errcodes, size_t num)
  * Return value: the number of items available for processing (unlocked).     *
  *                                                                            *
  ******************************************************************************/
-int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids)
-{
-	int			i, j, locked_num = 0;
-	const ZBX_DC_ITEM	*dc_item;
-	ZBX_DC_TRIGGER		*dc_trigger;
-	zbx_hc_item_t		*history_item;
+// int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids)
+// {
+// 	int			i, j, locked_num = 0;
+// 	const ZBX_DC_ITEM	*dc_item;
+// 	ZBX_DC_TRIGGER		*dc_trigger;
+// 	zbx_hc_item_t		*history_item;
 
-	WRLOCK_CACHE;
+// 	WRLOCK_CACHE;
 
-	for (i = 0; i < history_items->values_num; i++)
-	{
-		history_item = (zbx_hc_item_t *)history_items->values[i];
+// 	for (i = 0; i < history_items->values_num; i++)
+// 	{
+// 		history_item = (zbx_hc_item_t *)history_items->values[i];
 
-		if (0 != (ZBX_DC_FLAG_NOVALUE & history_item->tail->flags))
-			continue;
+// 		if (0 != (ZBX_DC_FLAG_NOVALUE & history_item->tail->flags))
+// 			continue;
 
-		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &history_item->itemid)))
-			continue;
+// 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &history_item->itemid)))
+// 			continue;
 
-		if (NULL == dc_item->triggers)
-			continue;
+// 		if (NULL == dc_item->triggers)
+// 			continue;
 
-		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
-		{
-			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
-				continue;
+// 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
+// 		{
+// 			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
+// 				continue;
 
-			if (1 == dc_trigger->locked)
-			{
-				locked_num++;
-				history_item->status = ZBX_HC_ITEM_STATUS_BUSY;
-				goto next;
-			}
-		}
+// 			if (1 == dc_trigger->locked)
+// 			{
+// 				locked_num++;
+// 				history_item->status = ZBX_HC_ITEM_STATUS_BUSY;
+// 				goto next;
+// 			}
+// 		}
 
-		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
-		{
-			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
-				continue;
+// 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
+// 		{
+// 			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
+// 				continue;
 
-			dc_trigger->locked = 1;
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
-			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
-			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
-		}
-next:;
-	}
+// 			dc_trigger->locked = 1;
+// 			DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
+// 			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
+// 			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
+// 		}
+// next:;
+// 	}
 
-	UNLOCK_CACHE;
+// 	UNLOCK_CACHE;
 
-	return history_items->values_num - locked_num;
-}
+// 	return history_items->values_num - locked_num;
+// }
+
+
+// void DCconfig_get_trigger_ids_by_dc_history(int history_num, ZBX_DC_HISTORY *history, zbx_vector_uint64_t *triggerids)
+// {
+// 	int			i, j, locked_num = 0;
+// 	const ZBX_DC_ITEM	*dc_item;
+// 	ZBX_DC_TRIGGER		*dc_trigger;
+// 	//zbx_hc_item_t		*history_item;
+// 	ZBX_DC_HISTORY *h;
+
+// //	LOG_INF("In: %s, starting", __func__);
+// //	LOG_INF("Getting triggers for %d items", history_num);
+// 	RDLOCK_CACHE;
+
+// 	for (i = 0; i < history_num; i++)
+// 	{
+// 		//history_item = (zbx_hc_item_t *)history_items->values[i];
+// 		h = &history[i];
+
+// 		if (0 != (ZBX_DC_FLAG_NOVALUE & h->flags))
+// 			continue;
+
+// 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &h->itemid)))
+// 			continue;
+
+// 		if (NULL == dc_item->triggers)
+// 			continue;
+
+// 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
+// 		{
+// 			if ( SUCCEED != glb_state_trigger_is_functional(dc_trigger->triggerid) )
+// 				continue;
+// 		//	LOG_INF("Got trigger %ld",dc_trigger->triggerid);
+// 		//	dc_trigger->locked = 1;
+// 			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
+// 			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
+// 		}
+// //next:;
+// 	}
+
+// 	UNLOCK_CACHE;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -9128,32 +9140,32 @@ next:;
  *             triggerids_out - [OUT] ids of locked triggers                  *
  *                                                                            *
  ******************************************************************************/
-void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zbx_vector_uint64_t *triggerids_out)
-{
-	int		i;
-	ZBX_DC_TRIGGER	*dc_trigger;
+// void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zbx_vector_uint64_t *triggerids_out)
+// {
+// 	int		i;
+// 	ZBX_DC_TRIGGER	*dc_trigger;
 
-	if (0 == triggerids_in->values_num)
-		return;
+// 	if (0 == triggerids_in->values_num)
+// 		return;
 
-	WRLOCK_CACHE;
+// 	WRLOCK_CACHE;
 
-	for (i = 0; i < triggerids_in->values_num; i++)
-	{
-		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerids_in->values[i])))
-			continue;
+// 	for (i = 0; i < triggerids_in->values_num; i++)
+// 	{
+// 		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerids_in->values[i])))
+// 			continue;
 
-		if (1 == dc_trigger->locked)
-			continue;
+// 		//if (1 == dc_trigger->locked)
+// 		//	continue;
 
-		dc_trigger->locked = 1;
-		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
+// 		//dc_trigger->locked = 1;
+// 		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
 
-		zbx_vector_uint64_append(triggerids_out, dc_trigger->triggerid);
-	}
+// 		zbx_vector_uint64_append(triggerids_out, dc_trigger->triggerid);
+// 	}
 
-	UNLOCK_CACHE;
-}
+// 	UNLOCK_CACHE;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -9162,25 +9174,25 @@ void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zb
  * Author: Aleksandrs Saveljevs                                               *
  *                                                                            *
  ******************************************************************************/
-void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids)
-{
-	int		i;
-	ZBX_DC_TRIGGER	*dc_trigger;
+// void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids)
+// {
+// 	int		i;
+// 	ZBX_DC_TRIGGER	*dc_trigger;
 
-	/* no other process can modify already locked triggers without write lock */
-	RDLOCK_CACHE;
+// 	/* no other process can modify already locked triggers without write lock */
+// 	RDLOCK_CACHE;
 
-	for (i = 0; i < triggerids->values_num; i++)
-	{
-		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerids->values[i])))
-			continue;
+// 	for (i = 0; i < triggerids->values_num; i++)
+// 	{
+// 		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerids->values[i])))
+// 			continue;
 
-		dc_trigger->locked = 0;
-		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is unlocked");
-	}
+// 		dc_trigger->locked = 0;
+// 		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is unlocked");
+// 	}
 
-	UNLOCK_CACHE;
-}
+// 	UNLOCK_CACHE;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -9190,22 +9202,22 @@ void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids)
  *          program exit                                                      *
  *                                                                            *
  ******************************************************************************/
-void	DCconfig_unlock_all_triggers(void)
-{
-	ZBX_DC_TRIGGER		*dc_trigger;
-	zbx_hashset_iter_t	iter;
+// void	DCconfig_unlock_all_triggers(void)
+// {
+// 	ZBX_DC_TRIGGER		*dc_trigger;
+// 	zbx_hashset_iter_t	iter;
 
-	WRLOCK_CACHE;
+// 	WRLOCK_CACHE;
 
-	zbx_hashset_iter_reset(&config->triggers, &iter);
+// 	zbx_hashset_iter_reset(&config->triggers, &iter);
 
-	while (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter))) {
-		dc_trigger->locked = 0;
-		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
-	}
+// 	while (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter))) {
+// 		dc_trigger->locked = 0;
+// 		DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
+// 	}
 
-	UNLOCK_CACHE;
-}
+// 	UNLOCK_CACHE;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -9216,62 +9228,64 @@ void	DCconfig_unlock_all_triggers(void)
  * Author: Aleksandrs Saveljevs                                               *
  *                                                                            *
  ******************************************************************************/
-void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_ptr_t *trigger_order,
-		const zbx_uint64_t *itemids, const zbx_timespec_t *timespecs, int itemids_num)
-{
-	int			i, j, found;
-	const ZBX_DC_ITEM	*dc_item;
-	const ZBX_DC_TRIGGER	*dc_trigger;
-	DC_TRIGGER		*trigger;
+// void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_ptr_t *trigger_order,
+// 		const zbx_uint64_t *itemids, const zbx_timespec_t *timespecs, int itemids_num)
+// {
+// 	int			i, j, found;
+// 	const ZBX_DC_ITEM	*dc_item;
+// 	const ZBX_DC_TRIGGER	*dc_trigger;
+// 	DC_TRIGGER		*trigger;
 
-	RDLOCK_CACHE;
+// 	RDLOCK_CACHE;
 
-	for (i = 0; i < itemids_num; i++)
-	{
-		/* skip items which are not in configuration cache and items without triggers */
+// 	for (i = 0; i < itemids_num; i++)
+// 	{
+// 		/* skip items which are not in configuration cache and items without triggers */
 
-		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])) || NULL == dc_item->triggers)
-			continue;
-		DEBUG_ITEM(dc_item->itemid, "Retrieving trigger list for the item");
-		/* process all triggers for the specified item */
+// 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])) || NULL == dc_item->triggers)
+// 			continue;
+// 		DEBUG_ITEM(dc_item->itemid, "Retrieving trigger list for the item");
+// 		/* process all triggers for the specified item */
+// 		//LOG_INF("Retrieving trigger list for the item %ld", dc_item->itemid);
 
-		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
-		{
+// 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
+// 		{
 			
-			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
-				continue;
-			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld to the trigger list",dc_trigger->triggerid);
-		
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item calc");
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item %ld calc",dc_item->itemid);
-		
-			/* find trigger by id or create a new record in hashset if not found */
-			trigger = (DC_TRIGGER *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(DC_TRIGGER), &found);
-
-			if (0 == found)
-			{
-				DEBUG_TRIGGER(trigger->triggerid,"Getting trigger from the cfg cache");
-				DCget_trigger(trigger, dc_trigger);
-				zbx_vector_ptr_append(trigger_order, trigger);
-			}
-
-			/* copy latest change timestamp */
+// 			if (SUCCEED != glb_state_trigger_is_functional(dc_trigger->triggerid))
+// 				continue;
+// 			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld to the trigger list",dc_trigger->triggerid);
+// 		//	LOG_INF("Adding trigger %ld to the trigger list",dc_trigger->triggerid);
 			
-			if (trigger->timespec.sec < timespecs[i].sec ||
-					(trigger->timespec.sec == timespecs[i].sec &&
-					trigger->timespec.ns < timespecs[i].ns))
-			{
-				/* DCconfig_get_triggers_by_itemids() function is called during trigger processing */
-				/* when syncing history cache. A trigger cannot be processed by two syncers at the */
-				/* same time, so its safe to update trigger timespec within read lock.             */
-				DEBUG_TRIGGER(trigger->triggerid,"Updating timespecs");
-				trigger->timespec = timespecs[i];
-			}
-		}
-	}
+// 			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item calc");
+// 			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item %ld calc",dc_item->itemid);
+		
+// 			/* find trigger by id or create a new record in hashset if not found */
+// 			trigger = (DC_TRIGGER *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(DC_TRIGGER), &found);
 
-	UNLOCK_CACHE;
-}
+// 			if (0 == found)
+// 			{
+// 				DEBUG_TRIGGER(trigger->triggerid,"Getting trigger from the cfg cache");
+// 				DCget_trigger(trigger, dc_trigger);
+// 				zbx_vector_ptr_append(trigger_order, trigger);
+// 			}
+
+// 			/* copy latest change timestamp */
+			
+// 			if (trigger->timespec.sec < timespecs[i].sec ||
+// 					(trigger->timespec.sec == timespecs[i].sec &&
+// 					trigger->timespec.ns < timespecs[i].ns))
+// 			{
+// 				/* DCconfig_get_triggers_by_itemids() function is called during trigger processing */
+// 				/* when syncing history cache. A trigger cannot be processed by two syncers at the */
+// 				/* same time, so its safe to update trigger timespec within read lock.             */
+// 				DEBUG_TRIGGER(trigger->triggerid,"Updating timespecs");
+// 				trigger->timespec = timespecs[i];
+// 			}
+// 		}
+// 	}
+
+// 	UNLOCK_CACHE;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -9367,8 +9381,11 @@ void	zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 				if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION != dc_trigger->recovery_mode)
 					continue;
 
-				if (TRIGGER_VALUE_PROBLEM != dc_trigger->value)
-					continue;
+				//if (TRIGGER_VALUE_PROBLEM != dc_trigger->value)
+				//if (SUCCEED == glb_state_trigger_is_not_problem(timer->triggerid))
+				//	continue;
+				THIS_SHOULD_NEVER_HAPPEN;
+				exit(-1);
 
 				if (SUCCEED != DCconfig_find_active_time_function(dc_trigger->recovery_expression,
 						dc_trigger->recovery_expression_bin,
@@ -9413,15 +9430,13 @@ static int	trigger_timer_validate(zbx_trigger_timer_t *timer, ZBX_DC_TRIGGER **d
 
 	*dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &timer->triggerid);
 
-	if (0 != (timer->type & ZBX_TRIGGER_TIMER_FUNCTION))
+	if (0 != (timer->type & TRIGGER_TIMER_FUNCTION))
 	{
 		if (NULL == (dc_function = (ZBX_DC_FUNCTION *)zbx_hashset_search(&config->functions, &timer->objectid)))
 			return FAIL;
 
 		if (dc_function->revision > timer->revision ||
-				NULL == *dc_trigger ||
-				TRIGGER_STATUS_ENABLED != (*dc_trigger)->status ||
-				TRIGGER_FUNCTIONAL_TRUE != (*dc_trigger)->functional)
+				SUCCEED != glb_state_trigger_is_functional( timer->triggerid)  )
 		{
 			if (dc_function->timer_revision == timer->revision)
 				dc_function->timer_revision = 0;
@@ -9433,14 +9448,18 @@ static int	trigger_timer_validate(zbx_trigger_timer_t *timer, ZBX_DC_TRIGGER **d
 		if (NULL == (*dc_trigger))
 			return FAIL;
 
-		if ((*dc_trigger)->revision > timer->revision ||
-				TRIGGER_STATUS_ENABLED != (*dc_trigger)->status ||
-				TRIGGER_FUNCTIONAL_TRUE != (*dc_trigger)->functional)
-		{
-			if ((*dc_trigger)->timer_revision == timer->revision)
-				(*dc_trigger)->timer_revision = 0;
-			return FAIL;
-		}
+		//if (FAIL == glb_state_trigger_validate_timer(timer->triggerid, timer->revision))
+		//	return FAIL;
+			//ASDvfqwregqwr
+	//	if ( glb_state_trigger_get_revision(timer->triggerid) > timer->revision ||
+	//			SUCCEED != glb_state_trigger_is_functional( timer->triggerid) )
+	//	{
+	//		if ((*dc_trigger)->timer_revision == timer->revision)
+	//			(*dc_trigger)->timer_revision = 0;
+	//		return FAIL;
+	//	}
+	THIS_SHOULD_NEVER_HAPPEN;
+	exit(-1);
 	}
 
 	return SUCCEED;
@@ -9530,7 +9549,7 @@ void	zbx_dc_get_trigger_timers(zbx_vector_ptr_t *timers, int now, int soft_limit
 		/*  1) time functions uses current time, so trigger evaluation time does not affect their results */
 		/*  2) trend function of the same trigger with the same evaluation timestamp is being             */
 		/*     evaluated by the same process                                                              */
-		if (0 == dc_trigger->locked || ZBX_TRIGGER_TIMER_FUNCTION_TREND != timer->type ||
+		if ( TRIGGER_TIMER_FUNCTION_TREND != timer->type ||
 				(NULL != first_timer && 1 == first_timer->lock))
 		{
 			/* resetting execution timer will cause a new execution time to be set */
@@ -9539,8 +9558,8 @@ void	zbx_dc_get_trigger_timers(zbx_vector_ptr_t *timers, int now, int soft_limit
 		}
 
 		/* remember if the timer locked trigger, so it would unlock during rescheduling */
-		if (0 == dc_trigger->locked)
-			dc_trigger->locked = timer->lock = 1;
+		//if (0 == dc_trigger->locked)
+		//	dc_trigger->locked = timer->lock = 1;
 
 		if (NULL == first_timer)
 			first_timer = timer;
@@ -9549,15 +9568,15 @@ void	zbx_dc_get_trigger_timers(zbx_vector_ptr_t *timers, int now, int soft_limit
 	UNLOCK_CACHE;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: dc_reschedule_trigger_timers                                     *
- *                                                                            *
- * Purpose: reschedule trigger timers                                         *
- *                                                                            *
- * Comments: Triggers are unlocked by DCconfig_unlock_triggers()              *
- *                                                                            *
- ******************************************************************************/
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: dc_reschedule_trigger_timers                                     *
+//  *                                                                            *
+//  * Purpose: reschedule trigger timers                                         *
+//  *                                                                            *
+//  * Comments: Triggers are unlocked by DCconfig_unlock_triggers()              *
+//  *                                                                            *
+//  ******************************************************************************/
 static void	dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers)
 {
 	int	i;
@@ -9571,7 +9590,7 @@ static void	dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers)
 		/* schedule calculation error can result in 0 execution time */
 		if (0 == timer->exec_ts.sec)
 		{
-			if (0 != (timer->type & ZBX_TRIGGER_TIMER_FUNCTION))
+			if (0 != (timer->type & TRIGGER_TIMER_FUNCTION))
 			{
 				ZBX_DC_FUNCTION	*function;
 
@@ -9581,15 +9600,16 @@ static void	dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers)
 					function->timer_revision = 0;
 				}
 			}
-			else if (ZBX_TRIGGER_TIMER_TRIGGER == timer->type)
+			else if (TRIGGER_TIMER_TRIGGER == timer->type)
 			{
 				ZBX_DC_TRIGGER	*trigger;
 
-				if (NULL != (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers,
-						&timer->objectid)) && trigger->timer_revision == timer->revision)
-				{
-					trigger->timer_revision = 0;
-				}
+				//glb_state_trigger_reset_timer_revision_if_equal_revision(timer->objectid);
+				//if (NULL != (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers,
+				//		&timer->objectid)) && trigger->timer_revision == timer->revision)
+				//{
+				//	trigger->timer_revision = 0;
+				//}
 			}
 			dc_trigger_timer_free(timer);
 		}
@@ -9598,15 +9618,15 @@ static void	dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers)
 	}
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_dc_reschedule_trigger_timers                                 *
- *                                                                            *
- * Purpose: reschedule trigger timers while locking configuration cache       *
- *                                                                            *
- * Comments: Triggers are unlocked by DCconfig_unlock_triggers()              *
- *                                                                            *
- ******************************************************************************/
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: zbx_dc_reschedule_trigger_timers                                 *
+//  *                                                                            *
+//  * Purpose: reschedule trigger timers while locking configuration cache       *
+//  *                                                                            *
+//  * Comments: Triggers are unlocked by DCconfig_unlock_triggers()              *
+//  *                                                                            *
+//  ******************************************************************************/
 void	zbx_dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers, int now)
 {
 	int	i;
@@ -9630,13 +9650,13 @@ void	zbx_dc_reschedule_trigger_timers(zbx_vector_ptr_t *timers, int now)
 	UNLOCK_CACHE;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_dc_get_timer_queue                                           *
- *                                                                            *
- * Purpose: clears timer trigger queue                                        *
- *                                                                            *
- ******************************************************************************/
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: zbx_dc_get_timer_queue                                           *
+//  *                                                                            *
+//  * Purpose: clears timer trigger queue                                        *
+//  *                                                                            *
+//  ******************************************************************************/
 void	zbx_dc_clear_timer_queue(zbx_vector_ptr_t *timers)
 {
 	ZBX_DC_FUNCTION	*function;
@@ -9650,7 +9670,7 @@ void	zbx_dc_clear_timer_queue(zbx_vector_ptr_t *timers)
 	{
 		zbx_trigger_timer_t	*timer = (zbx_trigger_timer_t *)config->trigger_queue.elems[i].data;
 
-		if (ZBX_TRIGGER_TIMER_FUNCTION_TREND == timer->type &&
+		if (TRIGGER_TIMER_FUNCTION_TREND == timer->type &&
 				NULL != (function = (ZBX_DC_FUNCTION *)zbx_hashset_search(&config->functions,
 						&timer->objectid)) &&
 				function->timer_revision == timer->revision)
@@ -10376,7 +10396,7 @@ int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsi
 			continue;
 		}
 		
-		DEBUG_ITEM(zbx_dc_item->itemid,"Item found in the async polling cycle in status %d", c_item->status);
+		//DEBUG_ITEM(zbx_dc_item->itemid,"Item found in the async polling cycle in status %d", c_item->status);
 		
 		//only need the desiserd item types
 		if (zbx_dc_item->type != item_type) { 
@@ -11234,22 +11254,22 @@ int	DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities)
 }
 
 
-static int glb_get_trigger_status(u_int64_t triggerid, int *status, int* functional, int *value) {
-	ZBX_DC_TRIGGER *trigger;
+// static int glb_get_trigger_status(u_int64_t triggerid, int *status, int* functional, int *value) {
+// 	ZBX_DC_TRIGGER *trigger;
 	
-	if (NULL == (trigger = (ZBX_DC_TRIGGER*)zbx_hashset_search(&config->triggers, &triggerid))) {
-		*value = TRIGGER_VALUE_UNKNOWN;
-		*status = TRIGGER_STATUS_DISABLED;
-		*functional = TRIGGER_FUNCTIONAL_FALSE;
-		return FAIL;
-	}
+// 	if (NULL == (trigger = (ZBX_DC_TRIGGER*)zbx_hashset_search(&config->triggers, &triggerid))) {
+// 		*value = TRIGGER_VALUE_UNKNOWN;
+// 		*status = TRIGGER_STATUS_DISABLED;
+// 		*functional = TRIGGER_FUNCTIONAL_FALSE;
+// 		return FAIL;
+// 	}
 
-	*value = trigger->value;
-	*functional = trigger->functional;
-	*status = trigger->status;
+// 	*value = trigger->value;
+// 	*functional = trigger->functional;
+// 	*status = trigger->status;
 	
-	return SUCCEED;
-}
+// 	return SUCCEED;
+// }
 /*
 char * glb_vector_uint64_dump(const zbx_vector_uint64_t *v) {
 	//LOG_INF("Called dump");
@@ -11321,11 +11341,10 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 			DEBUG_TRIGGER(triggerid, "Checking dependand trigger");
 			DEBUG_TRIGGER(triggerid, "Checking dependand trigger %ld", next_triggerid);		
 			//checking if trigger has failed
-			glb_get_trigger_status(next_triggerid, &t_status, &t_functional, &t_value);
 			
-			if (TRIGGER_STATUS_ENABLED == t_status &&
-				TRIGGER_FUNCTIONAL_TRUE == t_functional &&
-				TRIGGER_VALUE_PROBLEM == t_value) {
+			//glb_get_trigger_status(next_triggerid, &t_status, &t_functional, &t_value);
+			
+			if (SUCCEED == glb_state_trigger_is_problem(next_triggerid)) {
 				
 				DEBUG_TRIGGER(triggerid, "Dependand trigger %ld has PROBLEM status, check FAILED ", next_triggerid);		
 				return FAIL;
@@ -11337,7 +11356,9 @@ static int	DCconfig_check_trigger_dependencies_rec(u_int64_t triggerid, zbx_vect
 
 			zbx_vector_uint64_create(&next_dep_list);
 			zbx_vector_uint64_clear(&next_dep_list);
-			obj_index_get_refs_from(&glb_config->deptrigger_to_trigger_idx, dep_list->values[i], &next_dep_list);
+
+			conf_index_deptrigger_to_trigger_get_deptriggers(dep_list->values[i],&next_dep_list );
+			//obj_index_get_reverse_refs(&glb_config->deptrigger_to_trigger_idx, dep_list->values[i], &next_dep_list);
 			
 			DEBUG_TRIGGER(triggerid, "Checking recursevly trigger %ld dependancies", next_triggerid);
 			ret == DCconfig_check_trigger_dependencies_rec(next_triggerid, &next_dep_list, level + 1, triggerids,
@@ -11372,7 +11393,9 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 	zbx_vector_uint64_t dep_list;
 	zbx_vector_uint64_create(&dep_list);
 		
-	obj_index_get_refs_to(&glb_config->deptrigger_to_trigger_idx, triggerid, &dep_list);
+	conf_index_deptrigger_to_trigger_get_triggers(triggerid,&dep_list);
+
+	//obj_index_get_refs(&glb_config->deptrigger_to_trigger_idx, , &dep_list);
 	
 	DEBUG_TRIGGER(triggerid, "Checking trigger dependancies, has %d deps", dep_list.values_num);
 	
@@ -11383,58 +11406,61 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 	
 	DEBUG_TRIGGER(triggerid,"checking the trigger dependancies");
 	
-	RDLOCK_CACHE;
+	//RDLOCK_CACHE;
 	
 	ret = DCconfig_check_trigger_dependencies_rec(triggerid, &dep_list,  0, NULL, NULL);
 
-	UNLOCK_CACHE;
+	//UNLOCK_CACHE;
 
 	return ret;
 }
 
-void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
-{
-	int			i;
-	zbx_trigger_diff_t	*diff;
-	ZBX_DC_TRIGGER		*dc_trigger;
+// void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
+// {
+// 	int			i;
+// 	zbx_trigger_diff_t	*diff;
+// 	ZBX_DC_TRIGGER		*dc_trigger;
+// 	trigger_state_t meta;
 
-	if (0 == trigger_diff->values_num)
-		return;
+// 	if (0 == trigger_diff->values_num)
+// 		return;
 
-	WRLOCK_CACHE;
+// 	for (i = 0; i < trigger_diff->values_num; i++)
+// 	{
+// 		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
 
-	for (i = 0; i < trigger_diff->values_num; i++)
-	{
-		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
-
-		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &diff->triggerid)))
-			continue;
+// 		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &diff->triggerid)))
+// 			continue;
 		
-		DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
+// 		DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE)) {
-			dc_trigger->lastchange = diff->lastchange;
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: lastchange = %d", diff->lastchange);
-		}
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE)) {
-			dc_trigger->value = diff->value;
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: value = %d", diff->value);
-		}
+// 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE)) {
+// 			//dc_trigger->lastchange = diff->lastchange;
+// 			meta.lastchange = diff->lastchange;
+// 			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: lastchange = %d", diff->lastchange);
+// 		}
+// 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE)) {
+// 			//dc_trigger->value = diff->value;
+// 			meta.value = diff->value;
+// 			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: value = %d", diff->value);
+// 		}
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE)) {
-			dc_trigger->state = diff->state;
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: state = %d", diff->state);
-		}
+// 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE)) {
+// 			//dc_trigger->state = diff->state;
+// 			meta.state = diff->state;
+// 			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: state = %d", diff->state);
+// 		}
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR)) {
-			DCstrpool_replace(1, &dc_trigger->error, diff->error);
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: error = '%s'", diff->error);
-		}
-	}
+// 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR)) {
+// 			meta.errorstr = diff->error;
+// 			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
+// 			DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache: error = '%s'", diff->error);
+// 		}
 
-	UNLOCK_CACHE;
-}
+// 		glb_state_trigger_set_meta(diff->triggerid, diff->flags);
+// 	}
+
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -11802,10 +11828,7 @@ static void	dc_get_host_macro(const zbx_uint64_t *hostids, int host_num, const c
 
 	for (i = 0; i < host_num; i++)
 	{
-	//	obj_index_get_refs_from(&glb_config->host_to_template_idx, hostids[i], &templateids );
-	//	if (hostids[i] == 160006) {
-	//		LOG_DBG("debug_item: host 160006, got %d templates", templateids.values_num);
-	//	}
+
 		if (NULL != (htmpl = (const ZBX_DC_HTMPL *)zbx_hashset_search(&config->htmpls, &hostids[i])))
 		{
 			for (j = 0; j < htmpl->templateids.values_num; j++)
@@ -12473,41 +12496,43 @@ static void	dc_status_update(void)
 
 	/* loop over triggers to gather enabled and disabled trigger statistics */
 
-	zbx_hashset_iter_reset(&config->triggers, &iter);
 
-	while (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
-	{
-		switch (dc_trigger->status)
-		{
-			case TRIGGER_STATUS_ENABLED:
-				if (SUCCEED == dc_trigger_items_hosts_enabled(dc_trigger->expression,
-						dc_trigger->expression_bin) &&
-						(TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION != dc_trigger->recovery_mode ||
-						SUCCEED == dc_trigger_items_hosts_enabled(dc_trigger->recovery_expression,
-								dc_trigger->recovery_expression_bin)))
-				{
-					switch (dc_trigger->value)
-					{
-						case TRIGGER_VALUE_OK:
-							config->status->triggers_enabled_ok++;
-							break;
-						case TRIGGER_VALUE_PROBLEM:
-							config->status->triggers_enabled_problem++;
-							break;
-						default:
-							THIS_SHOULD_NEVER_HAPPEN;
-					}
+	// zbx_hashset_iter_reset(&config->triggers, &iter);
 
-					break;
-				}
-				ZBX_FALLTHROUGH;
-			case TRIGGER_STATUS_DISABLED:
-				config->status->triggers_disabled++;
-				break;
-			default:
-				THIS_SHOULD_NEVER_HAPPEN;
-		}
-	}
+	// while (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
+	// {
+	// 	switch (glb_state_trigger_get_status(dc_trigger->triggerid))
+	// 	{
+	// 		case TRIGGER_STATUS_ENABLED:
+	// 			if (SUCCEED == dc_trigger_items_hosts_enabled(dc_trigger->expression,
+	// 					dc_trigger->expression_bin) &&
+	// 					(TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION != dc_trigger->recovery_mode ||
+	// 					SUCCEED == dc_trigger_items_hosts_enabled(dc_trigger->recovery_expression,
+	// 							dc_trigger->recovery_expression_bin)))
+	// 			{
+	// 				switch (glb_state_trigger_get_value(dc_trigger->triggerid))
+	// 				{
+	// 					case TRIGGER_VALUE_OK:
+	// 						config->status->triggers_enabled_ok++;
+	// 						break;
+	// 					case TRIGGER_VALUE_PROBLEM:
+	// 						config->status->triggers_enabled_problem++;
+	// 						break;
+	// 					default:
+	// 						LOG_INF("Found trigger %ld in the wrong state %d",dc_trigger->triggerid, glb_state_trigger_get_value(dc_trigger->triggerid) );
+	// 						THIS_SHOULD_NEVER_HAPPEN;
+	// 				}
+
+	// 				break;
+	// 			}
+	// 			ZBX_FALLTHROUGH;
+	// 		case TRIGGER_STATUS_DISABLED:
+	// 			config->status->triggers_disabled++;
+	// 			break;
+	// 		default:
+	// 			THIS_SHOULD_NEVER_HAPPEN;
+	// 	}
+	// }
 
 	config->status->last_update = time(NULL);
 
@@ -13830,7 +13855,7 @@ void	zbx_dc_get_nested_hostgroupids(zbx_uint64_t *groupids, int groupids_num, zb
 {
 	int	i;
 
-	WRLOCK_CACHE;
+	RDLOCK_CACHE;
 
 	for (i = 0; i < groupids_num; i++)
 		dc_get_nested_hostgroupids(groupids[i], nested_groupids);
@@ -14365,13 +14390,14 @@ void	zbx_dc_get_trigger_dependencies(const zbx_vector_uint64_t *triggerids, zbx_
 
 	zbx_vector_uint64_create(&dep_list);
 
-	RDLOCK_CACHE;
+	//RDLOCK_CACHE;
 
 	for (i = 0; i < triggerids->values_num; i++)
 	{
 		zbx_vector_uint64_clear(&dep_list);
-
-		obj_index_get_refs_to(&glb_config->deptrigger_to_trigger_idx, triggerids->values[i], &dep_list);
+	
+		conf_index_deptrigger_to_trigger_get_deptriggers(triggerids->values[i], &dep_list);
+		//obj_index_get_refs(&glb_config->deptrigger_to_trigger_idx, triggerids->values[i], &dep_list);
 		
 		if ( 0 == dep_list.values_num)  //no deps
 			continue;
@@ -14403,7 +14429,7 @@ void	zbx_dc_get_trigger_dependencies(const zbx_vector_uint64_t *triggerids, zbx_
 		zbx_vector_uint64_clear(&masterids);
 	}
 
-	UNLOCK_CACHE;
+//	UNLOCK_CACHE;
 
 	zbx_vector_uint64_destroy(&masterids);
 }
@@ -16598,7 +16624,30 @@ void DC_set_debug_trigger(uint64_t id) {
 	DEBUG_TRIGGER(id, "STARTED DEBUG");
 }
 
+int DC_get_processing_data(u_int64_t itemid, metric_processing_data_t *proc_data) {
+	ZBX_DC_ITEM *item;
+	ZBX_DC_HOST *host;
+	RDLOCK_CACHE;
+	
+	if (NULL == (item=zbx_hashset_search(&config->items, &itemid))) {
+		UNLOCK_CACHE;
+		LOG_INF("Couldn't find item %ld in the config, metric will not be processed", itemid);
+		return FAIL;
+	}
 
+	if (NULL == (host = zbx_hashset_search(&config->hosts, &item->hostid))) {
+		UNLOCK_CACHE;
+		LOG_INF("Couldn't find host %ld in the config, metric will not be processed", item->hostid);
+		return FAIL;	
+	}
+
+	zbx_snprintf(proc_data->hostname, MAX_STRING_LEN, "%s", host->host);
+	zbx_snprintf(proc_data->key, MAX_STRING_LEN, "%s", item->key);
+	proc_data->value_type = item->value_type;
+	UNLOCK_CACHE;
+	
+	return SUCCEED;
+}
 /*
 int glb_dc_get_item_value_type (uint64_t itemid) {
 	int value_type= ITEM_VALUE_TYPE_NONE;
@@ -16612,3 +16661,108 @@ int glb_dc_get_item_value_type (uint64_t itemid) {
 	return value_type;
 }
 */
+
+int DC_get_item_func_config(u_int64_t itemid, item_func_eval_conf_t *item_conf) {
+	ZBX_DC_ITEM *item = NULL;
+	ZBX_DC_HOST *host = NULL;
+	RDLOCK_CACHE;
+	
+	if (NULL == (item=zbx_hashset_search(&config->items, &itemid)) || 
+		NULL == (host = zbx_hashset_search(&config->hosts, &item->hostid))) {
+		UNLOCK_CACHE; 
+		return FAIL;
+	}
+	item_conf->hostid = item->hostid;
+	item_conf->itemid = item->itemid;
+	item_conf->value_type = item->value_type;
+	item_conf->host_proxy_hostid = host->proxy_hostid;
+
+	UNLOCK_CACHE;
+	return SUCCEED;
+}
+
+int DCget_conf_trigger(u_int64_t triggerid, trigger_conf_t *tr_conf) {
+	ZBX_DC_TRIGGER *src_trigger;
+	
+	RDLOCK_CACHE;
+	if (NULL == (src_trigger = zbx_hashset_search(&config->triggers, &triggerid))) {
+		UNLOCK_CACHE; 
+		return FAIL;	
+	}
+
+	int	i;
+		
+	tr_conf->triggerid = src_trigger->triggerid;
+	tr_conf->description = zbx_strdup(NULL, src_trigger->description);
+	tr_conf->priority = src_trigger->priority;
+	tr_conf->type = src_trigger->type;
+	tr_conf->topoindex = src_trigger->topoindex;
+	
+	tr_conf->recovery_mode = src_trigger->recovery_mode;
+	tr_conf->correlation_mode = src_trigger->correlation_mode;
+	tr_conf->correlation_tag = zbx_strdup(NULL, src_trigger->correlation_tag);
+	tr_conf->opdata = zbx_strdup(NULL, src_trigger->opdata);
+	tr_conf->event_name = ('\0' != *src_trigger->event_name ? zbx_strdup(NULL, src_trigger->event_name) : NULL);
+	//tr_conf->flags = 0;
+	
+	tr_conf->expression = zbx_strdup(NULL, src_trigger->expression);
+	tr_conf->recovery_expression = zbx_strdup(NULL, src_trigger->recovery_expression);
+
+	tr_conf->expression_bin = dup_serialized_expression(src_trigger->expression_bin);
+	tr_conf->recovery_expression_bin = dup_serialized_expression(src_trigger->recovery_expression_bin);
+
+	tr_conf->eval_ctx = NULL;
+	tr_conf->eval_ctx_r = NULL;
+
+
+	zbx_vector_ptr_create(&tr_conf->tags);
+
+	if (0 != src_trigger->tags.values_num)
+	{
+		zbx_vector_ptr_reserve(&tr_conf->tags, src_trigger->tags.values_num);
+
+		for (i = 0; i < src_trigger->tags.values_num; i++)
+		{
+			const zbx_dc_trigger_tag_t	*dc_trigger_tag = (const zbx_dc_trigger_tag_t *)src_trigger->tags.values[i];
+			zbx_tag_t			*tag;
+
+			tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
+			tag->tag = zbx_strdup(NULL, dc_trigger_tag->tag);
+			tag->value = zbx_strdup(NULL, dc_trigger_tag->value);
+
+			zbx_vector_ptr_append(&tr_conf->tags, tag);
+		}
+	}
+	UNLOCK_CACHE;
+	return SUCCEED;
+}
+
+static void	DCclean_trigger_conf(trigger_conf_t *trigger)
+{
+//	zbx_free(trigger->new_error);
+//	zbx_free(trigger->error);
+	zbx_free(trigger->expression);
+	zbx_free(trigger->recovery_expression);
+	zbx_free(trigger->description);
+	zbx_free(trigger->correlation_tag);
+	zbx_free(trigger->opdata);
+	zbx_free(trigger->event_name);
+	zbx_free(trigger->expression_bin);
+	zbx_free(trigger->recovery_expression_bin);
+
+	zbx_vector_ptr_clear_ext(&trigger->tags, (zbx_clean_func_t)zbx_free_tag);
+	zbx_vector_ptr_destroy(&trigger->tags);
+
+	if (NULL != trigger->eval_ctx)
+	{
+		zbx_eval_clear(trigger->eval_ctx);
+		zbx_free(trigger->eval_ctx);
+	}
+
+	if (NULL != trigger->eval_ctx_r)
+	{
+		zbx_eval_clear(trigger->eval_ctx_r);
+		zbx_free(trigger->eval_ctx_r);
+	}
+
+}
