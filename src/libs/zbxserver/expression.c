@@ -4694,7 +4694,9 @@ zbx_trigger_func_position_t;
 static int	expand_trigger_macros(zbx_eval_context_t *ctx, const DB_EVENT *event, char *error, size_t maxerrlen)
 {
 	int 	i;
-
+	
+	DEBUG_TRIGGER(event->objectid, "Expanding macros");
+	
 	for (i = 0; i < ctx->stack.values_num; i++)
 	{
 		zbx_eval_token_t	*token = &ctx->stack.values[i];
@@ -5040,7 +5042,7 @@ static void	get_functions_conf(const zbx_vector_uint64_t *functionids, zbx_hashs
 	zbx_ifunc_t	ifunc_local;
 	zbx_func_t	*func, func_local = {0};
 
-	LOG_INF("In %s() functionids_num:%d", __func__, functionids->values_num);
+	LOG_DBG("In %s() functionids_num:%d", __func__, functionids->values_num);
 
 	zbx_variant_set_none(&func_local.value);
 	func_local.error = NULL;
@@ -5078,7 +5080,7 @@ static void	get_functions_conf(const zbx_vector_uint64_t *functionids, zbx_hashs
 	zbx_free(errcodes);
 	zbx_free(functions);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() ifuncs_num:%d", __func__, ifuncs->num_data);
+	LOG_DBG("End of %s() ifuncs_num:%d", __func__, ifuncs->num_data);
 }
 
 
@@ -5343,6 +5345,7 @@ static int 	substitute_trigger_functions(trigger_conf_t *conf, trigger_state_t *
 
 	zbx_vector_uint64_create(&functionids);
 	conf_trigger_get_functionids(&functionids, conf);
+
 	DEBUG_TRIGGER(conf->triggerid, "Extracted %d functions", functionids.values_num);
 
 	if (0 == functionids.values_num) {
@@ -5355,15 +5358,14 @@ static int 	substitute_trigger_functions(trigger_conf_t *conf, trigger_state_t *
 
 	zbx_hashset_create_ext(&funcs, 1, func_hash_func, func_compare_func, func_clean,
 				ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
-	LOG_INF("Calling get functions conf");
+
 	get_functions_conf(&functionids, &funcs, &ifuncs);
 
 	if (0 != ifuncs.num_data)
 	{
-		//zbx_evaluate_item_functions(&funcs, history_itemids, history_items, history_errcodes);
 		DEBUG_TRIGGER(conf->triggerid,"Evaluating functions");
 		evaluate_functions(conf->triggerid, &funcs);
-		LOG_INF("Calling substitute_res");
+
 		ret = substitute_functions_results(&ifuncs, conf, state);
 	}
 
@@ -5371,60 +5373,9 @@ static int 	substitute_trigger_functions(trigger_conf_t *conf, trigger_state_t *
 	zbx_hashset_destroy(&funcs);
 	zbx_vector_uint64_destroy(&functionids);
 
-	LOG_INF("End of %s()", __func__);
 	return ret;
 }
-/******************************************************************************
- *                                                                            *
- * Function: substitute_functions                                             *
- *                                                                            *
- * Purpose: substitute expression functions with their values                 *
- *                                                                            *
- * Parameters: triggers - [IN] vector of DC_TRIGGER pointers, sorted by      *
- *                             triggerids                                     *
- *             unknown_msgs - vector for storing messages for NOTSUPPORTED    *
- *                            items and failed functions                      *
- *                                                                            *
- * Author: Alexei Vladishev, Alexander Vladishev, Aleksandrs Saveljevs        *
- *                                                                            *
- * Comments: example: "({15}>10) or ({123}=1)" => "(26.416>10) or (0=1)"      *
- *                                                                            *
- ******************************************************************************/
-// static void	substitute_functions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
-// 		const DC_ITEM *history_items, const int *history_errcodes)
-// {
-// 	zbx_vector_uint64_t	functionids;
-// 	zbx_hashset_t		ifuncs, funcs;
 
-// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-// 	zbx_vector_uint64_create(&functionids);
-// 	zbx_extract_functionids(&functionids, triggers);
-
-// 	if (0 == functionids.values_num)
-// 		goto empty;
-
-// 	zbx_hashset_create(&ifuncs, triggers->values_num, ZBX_DEFAULT_UINT64_HASH_FUNC,
-// 			ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-
-// 	zbx_hashset_create_ext(&funcs, triggers->values_num, func_hash_func, func_compare_func, func_clean,
-// 				ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
-
-// 	zbx_populate_function_items(&functionids, &funcs, &ifuncs, triggers);
-
-// 	if (0 != ifuncs.num_data)
-// 	{
-// 		zbx_evaluate_item_functions(&funcs, history_itemids, history_items, history_errcodes);
-// 		zbx_substitute_functions_results(&ifuncs, triggers);
-// 	}
-
-// 	zbx_hashset_destroy(&ifuncs);
-// 	zbx_hashset_destroy(&funcs);
-// empty:
-// 	zbx_vector_uint64_destroy(&functionids);
-
-// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-// }
 
 /******************************************************************************
  *                                                                            *
@@ -5460,6 +5411,8 @@ static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts
 {
 	zbx_variant_t	 value;
 	char *err = NULL;
+
+	DEBUG_TRIGGER(triggerid, "evluating expressions");
 
 	if (SUCCEED != zbx_eval_execute(ctx, ts, &value, &err)) {
 		if ( NULL != err ) {
@@ -5498,21 +5451,18 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 	char			err[MAX_STRING_LEN], buf[MAX_STRING_LEN];
 
 
-	LOG_DBG("In %s() ", __func__);
-
 	event.object = EVENT_OBJECT_TRIGGER;
 
 	DEBUG_TRIGGER(conf->triggerid,"Evaluating trigger expressions");
 	event.value =  state_trigger_get_value(state);
 
-	LOG_INF("Trigger %ld: expanding macros", conf->triggerid);
+	
 	if (SUCCEED != expand_trigger_macros(conf->eval_ctx, &event, err, sizeof(err)))
 	{
 		
 		zbx_snprintf(buf, MAX_STRING_LEN,"Cannot evaluate expression: %s", err );
 		DEBUG_TRIGGER(conf->triggerid, "Couldn't expand trigger macro: %s, set to UNKNOWN value", buf);		
 		state_trigger_set_error(state, buf);
-		LOG_INF("Couldn't expand trigger %ld macro: %s", conf->triggerid, buf);
 		return FAIL;
 	}
 
@@ -5523,86 +5473,72 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 		zbx_snprintf(buf, MAX_STRING_LEN,"Cannot evaluate expression: %s", err);
 		state_trigger_set_error(state, buf);
 		DEBUG_TRIGGER(conf->triggerid, "Couldn't expand recovery trigger macro: %s, set to UNKNOWN value", buf);	
-		LOG_INF("Couldn't expand trigger %ld macro: err %s",conf->triggerid,err);
 		return FAIL;
 	}	
 	
-	LOG_INF("Trigger %ld: calling substitute functions", conf->triggerid);
 	if ( FAIL == substitute_trigger_functions(conf, state)) {
-		LOG_INF("Trigger %ld: substitute functions failed", conf->triggerid);
+		DEBUG_TRIGGER( conf->triggerid, "Trigger substitute functions failed");
 		return FAIL;
 	}
 	
-	LOG_INF("Trigger %ld: evluating expressions", conf->triggerid);
+	
 	if (SUCCEED != evaluate_expression(conf->eval_ctx, ts, &expr_result, err, conf->triggerid)) {
-		LOG_INF("Trigger %ld: evluating expressions failed: %s", conf->triggerid, err);
+		DEBUG_TRIGGER( conf->triggerid, "evluating expressions failed: %s", err);
+		
 		state_trigger_set_error(state, err);
-		
-		LOG_DBG("Failed to eval %ld trigger expression", conf->triggerid);
-		DEBUG_TRIGGER(conf->triggerid, "Failed to eval trigger expression");
-		
+				
 		return FAIL;
 	}
 	
-	LOG_INF("Trigger %ld: processing expression result (%f)", conf->triggerid, expr_result);
-
-	//HERE WE'VE CALCULATED TRIGGER CALC RESULT, BUT SEEMS THAT STATE MACHINE 
-	//DOESNT WORK WELL!!!
+	DEBUG_TRIGGER(conf->triggerid,"processing expression result (%f)", expr_result);
 
 	/* trigger expression evaluates to true, set PROBLEM value */
 	if (SUCCEED != zbx_double_compare(expr_result, 0.0))
 	{ //expression is in the problem state
 		
-	//	if (0 == (conf->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION))
-	//	{
-			/* trigger value should remain unchanged and no PROBLEM events should be generated if */
-			/* problem expression evaluates to true, but trigger recalculation was initiated by a */
-			/* time-based function or a new value of an item in recovery expression */
-	//		state_trigger_set_value(state, TRIGGER_VALUE_NONE);
-	//	}
-	//	else
 		state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
-		LOG_INF("Trigger %ld has PROBLEM value", conf->triggerid);
+		DEBUG_TRIGGER(conf->triggerid, "Trigger has PROBLEM value");
 		return SUCCEED;
+
 	} else {
-		LOG_INF("Processing OK value");
+		DEBUG_TRIGGER(conf->triggerid, "Trigger has OK value");
 		//expression is in the OK state
 		switch (conf->recovery_mode) {
 		
 		case TRIGGER_RECOVERY_MODE_EXPRESSION:
-			LOG_INF("Trigger %ld has NO recovery expression, setting  OK value", conf->triggerid);
+			//LOG_INF("Trigger %ld has NO recovery expression, setting  OK value", conf->triggerid);
 			//no recovery expression - set OK state to the trigger
 			state_trigger_set_value(state, TRIGGER_VALUE_OK);
-			LOG_INF("Set OK value");
+			//LOG_INF("Set OK value");
 			return SUCCEED;
 			break;
 		case TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION:
 			if ( SUCCEED != evaluate_expression(conf->eval_ctx_r, ts, &expr_result, buf, conf->triggerid))
 			{ //calc failed - trigger is in the unknow state
  			 	state_trigger_set_value(state, TRIGGER_VALUE_UNKNOWN);
-				LOG_INF("Trigger %ld has UNKNOWN value due to recovery expression eval fail", conf->triggerid);
+				DEBUG_TRIGGER(conf->triggerid, "has UNKNOWN value due to recovery expression eval fail");
+			
 				return SUCCEED;
 			}
 
 			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
 			{	//recovery expression evaluates to true
 				state_trigger_set_value(state, TRIGGER_VALUE_OK);
-				LOG_INF("Trigger %ld has OK value", conf->triggerid);
+				DEBUG_TRIGGER(conf->triggerid, "Trigger has OK value");
 				return SUCCEED;
 			} else {
 				//setting problem state in case is it wasn't problem before
 				state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
-				LOG_INF("Trigger %ld has PROBLEM value", conf->triggerid);
+				DEBUG_TRIGGER(conf->triggerid, "Trigger has PROBLEM value");
+
 				return SUCCEED;
 			}
 			break;
 		case TRIGGER_RECOVERY_MODE_NONE:
-			LOG_INF("Trigger %ld has non recovery mode", conf->triggerid);
+			DEBUG_TRIGGER(conf->triggerid," has no recovery mode");
 			break;
 
 		}
-	LOG_INF("Processing OK value3");
-
 	}
 
 	return SUCCEED;

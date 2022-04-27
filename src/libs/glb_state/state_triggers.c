@@ -210,10 +210,7 @@ ELEMS_CALLBACK(is_problem_cb) {
 }
 
 int glb_state_trigger_is_problem(u_int64_t triggerid) {
-    LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
-    int ret = elems_hash_process(conf->triggers, triggerid, is_problem_cb, NULL, 0);
-    LOG_INF("in: %s, finished processing trigger %ld", __func__, triggerid);
-    return ret;
+    return elems_hash_process(conf->triggers, triggerid, is_problem_cb, NULL, 0);  
 }
 
 ELEMS_CALLBACK(is_functional_cb) {
@@ -262,11 +259,9 @@ ELEMS_CALLBACK(get_meta_cb) {
 
 trigger_state_t *state_trigger_get_state(u_int64_t triggerid) {
     trigger_state_t *state = NULL;
-    LOG_INF("State requestedd");
-    
+        
     int ret = elems_hash_process(conf->triggers, triggerid, get_meta_cb, &state, 0);
-    LOG_INF("ret returned %d, state addr is %p", ret, state);
-     
+         
     if (FAIL == ret)
         return NULL;
 
@@ -355,11 +350,8 @@ void state_trigger_set_error(trigger_state_t *state, char *error) {
 }
 
 void state_trigger_set_value(trigger_state_t *state, unsigned char value) {
-    LOG_INF("Setting trigger value to %d", value);
+    
     if (TRIGGER_VALUE_PROBLEM == value || TRIGGER_VALUE_OK == value) {
-        LOG_INF("Releasing errorstr %p", state->errorstr);  
-        //THIS_SHOULD_NEVER_HAPPEN;
-       // LOG_INF("Releasing errorstr %s", state->errorstr);       
         strpool_free(&conf->strpool, state->errorstr);
         state->errorstr = NULL;
     }
@@ -367,14 +359,8 @@ void state_trigger_set_value(trigger_state_t *state, unsigned char value) {
     state->value = value;
 }
 
-//void state_trigger_set_problem_count(trigger_state_t *state, int problem_count) {
-//    state->problem_count = problem_count;
-//}
-
 //general interface for trigger state processing during it's lock
 int state_trigger_process(u_int64_t triggerid, elems_hash_process_cb_t trigger_state_process_cb, void *data) {
-    
-//    LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
     return elems_hash_process(conf->triggers, triggerid, trigger_state_process_cb, data, 0);
 }
 

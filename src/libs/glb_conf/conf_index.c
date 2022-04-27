@@ -72,40 +72,22 @@ int conf_index_items_to_triggers_get_items(u_int64_t triggerid, zbx_vector_uint6
 
 /*dependand triggers ->triggers */
 int conf_index_deptrigger_to_trigger_add(u_int64_t deptriggerid, u_int64_t triggerid) {
-    int ret;
-	LOG_INF("Called %s", __func__);
-	//return obj_index_add_ref(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggerid);
-	ret = obj_index_add_ref(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggerid);
-	LOG_INF("Finished %s with result %d", __func__, ret);
-	return ret;
+	return obj_index_add_ref(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggerid);
 }
 
 int conf_index_deptrigger_to_trigger_get_triggers(u_int64_t deptriggerid, zbx_vector_uint64_t *triggers) {
-    int ret;
-	LOG_INF("Called %s", __func__);
-	//return obj_index_get_refs(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggers);
-	ret = obj_index_get_refs(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggers);
-	LOG_INF("Finished %s with result %d", __func__, ret);
-	return ret;
+	return obj_index_get_refs(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggers);
 }
 
 int conf_index_deptrigger_to_trigger_get_deptriggers(u_int64_t triggerid, zbx_vector_uint64_t *deptriggers) {
-    int ret;
-	LOG_INF("Called %s", __func__);
-	//return obj_index_get_reverse_refs(&idx_conf->deptrigger_to_trigger_idx, triggerid, deptriggers);
-	ret = obj_index_get_reverse_refs(&idx_conf->deptrigger_to_trigger_idx, triggerid, deptriggers);
-	LOG_INF("Finished %s with result %d", __func__, ret);
-	return ret;
+	return  obj_index_get_reverse_refs(&idx_conf->deptrigger_to_trigger_idx, triggerid, deptriggers);
 }
 
 int conf_index_deptrigger_to_trigger_del_trigger(u_int64_t triggerid) {
-    int ret;
-	LOG_INF("Called %s", __func__);
+    
 	obj_index_del_id(&idx_conf->deptrigger_to_trigger_idx, triggerid);
     obj_index_del_reverse_id(&idx_conf->deptrigger_to_trigger_idx, triggerid);
-	
-	LOG_INF("Finished %s", __func__);
-	
+		
     return SUCCEED;
 }
 
@@ -197,14 +179,14 @@ typedef struct zbx_db_result
 
 int conf_index_deptrigger_sync_from_db(unsigned char sync_mode, DB_RESULT result) {
 	int ret;
-	LOG_INF("Called %s", __func__);
+//	LOG_INF("Called %s", __func__);
 
-	LOG_INF("Updating triggers from db sync, mode is %d, sync items: %d", (int) sync_mode, result->row_num);
+//	LOG_INF("Updating triggers from db sync, mode is %d, sync items: %d", (int) sync_mode, result->row_num);
 	index_update_from_db_result(sync_mode, result, &idx_conf->deptrigger_to_trigger_idx, OBJ_TRIGGERS);
-	LOG_INF("After sync got %d in the hash, %d in rev hash", idx_conf->deptrigger_to_trigger_idx.from_to->elems.num_data, 
-				idx_conf->deptrigger_to_trigger_idx.to_from->elems.num_data);
+//	LOG_INF("After sync got %d in the hash, %d in rev hash", idx_conf->deptrigger_to_trigger_idx.from_to->elems.num_data, 
+//				idx_conf->deptrigger_to_trigger_idx.to_from->elems.num_data);
 
-	LOG_INF("Finished %s with");
+//	LOG_INF("Finished %s with");
 	return SUCCEED;
 	
 }

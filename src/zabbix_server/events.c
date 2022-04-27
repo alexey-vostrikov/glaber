@@ -173,13 +173,11 @@ static void	get_item_tags_by_expression(const DB_TRIGGER *trigger, zbx_vector_pt
 
 static void	clean_event(DB_EVENT *event)
 {
-	LOG_INF("Event name is %p", event->name);
 	if (NULL != event->name) 
 		zbx_free(event->name);
-	LOG_INF("Named is cleaned");
+	
 	if (EVENT_OBJECT_TRIGGER == event->object)
 	{
-		//zbx_db_trigger_clean(&event->trigger);
 		if (NULL != event->trigger.correlation_tag) 
 			zbx_free(event->trigger.correlation_tag);
 	}
@@ -2740,13 +2738,8 @@ void problems_close_by_matching_trigger(trigger_conf_t *conf, trigger_state_t *s
 
 	zbx_vector_ptr_create(&closing_problems);
 	
-	LOG_INF("Recieving list of closing problems");
-	//need to fix it to trigger processing only and to return vector of recovery events
 	get_open_problems_by_trigger(conf->triggerid, &closing_problems);
 	
-	LOG_INF("Recieved list of closing problems");
-	
-	//now should consider tag match mode	
 	DEBUG_TRIGGER(conf->triggerid, "Processing recovery for the trigger");
 
 	/* checking for tags in correlation mode */
@@ -2780,9 +2773,7 @@ void problems_close_by_matching_trigger(trigger_conf_t *conf, trigger_state_t *s
 			zbx_event_recovery_t *rec_event = create_recovery_event(event, conf, problem, ts);
 			zbx_vector_ptr_append(recovery_events, rec_event);
 	}
-	LOG_INF("Destroying problems");
 	zbx_vector_ptr_destroy(&closing_problems);
-	LOG_INF("Saving recovery events to the db");
 	save_trigger_recovery_events_to_db(conf, recovery_events);
 }
 
@@ -2860,16 +2851,13 @@ int	process_trigger_change(trigger_conf_t *conf, trigger_state_t *state, unsigne
 	if ( SUCCEED == is_recovery_change(state)) { 
 		zbx_vector_ptr_t	recovery_events;
 		zbx_vector_ptr_create(&recovery_events);
-		
-		LOG_INF("In recovery change");
+				
 		DEBUG_TRIGGER(conf->triggerid, "Saving recovery data (if any)");
-		
-		LOG_INF("Getting list of recovery events");
+				
 		problems_close_by_matching_trigger(conf, state, &event, &recovery_events, ts);
 
 		DEBUG_TRIGGER(conf->triggerid, "Got %d problems to close", recovery_events.values_num);
 		
-		LOG_INF("Processing actions");
 		process_recovery_actions(&recovery_events);
 		zbx_vector_ptr_clear_ext(&recovery_events, ZBX_DEFAULT_MEM_FREE_FUNC);
 

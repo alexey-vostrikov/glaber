@@ -52,7 +52,7 @@ void	conf_trigger_get_functionids(zbx_vector_uint64_t *functionids, trigger_conf
 {
 	int		i;
 
-	LOG_INF("In %s() ", __func__);
+	LOG_DBG("In %s() ", __func__);
 
 	zbx_vector_uint64_reserve(functionids, 10);
 	zbx_eval_get_functionids(tr->eval_ctx, functionids);
@@ -64,7 +64,7 @@ void	conf_trigger_get_functionids(zbx_vector_uint64_t *functionids, trigger_conf
 	zbx_vector_uint64_sort(functionids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_vector_uint64_uniq(functionids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-	LOG_INF("End of %s() functionids_num:%d", __func__, functionids->values_num);
+	LOG_DBG("End of %s() functionids_num:%d", __func__, functionids->values_num);
 }
 
 

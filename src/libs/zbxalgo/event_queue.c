@@ -111,7 +111,7 @@ int event_queue_process_events(void *eq_conf, int max_events) {
     int now = time(NULL);
     int i = 0;
 
-    LOG_INF("It's %d events in the queue",conf->queue.elems_num);
+    //LOG_INF("It's %d events in the queue",conf->queue.elems_num);
 
     while (FAIL == zbx_binary_heap_empty(&conf->queue) && 
             (max_events == 0 || i < max_events) )
@@ -127,13 +127,13 @@ int event_queue_process_events(void *eq_conf, int max_events) {
 		min = zbx_binary_heap_find_min(&conf->queue);
 		 
 		if ( min->key > now ) {
-            LOG_INF("Closest event is in %d seconds", min->key-now);
+        //    LOG_INF("Closest event is in %d seconds", min->key-now);
             if (conf->locks) 
                 glb_lock_unlock(&conf->lock);   
             break;
         }
 
-        LOG_INF("Queue is %d seconds late", now - min->key);
+      //  LOG_INF("Queue is %d seconds late", now - min->key);
         event_id = (unsigned char )min->local_data;
         data = (void *) min->data;
         msec_time = min->key;

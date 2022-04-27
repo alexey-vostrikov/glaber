@@ -3089,7 +3089,7 @@ int	process_history_data(DC_ITEM *items, zbx_agent_value_t *values, int *errcode
 	int	processed_num = 0, history_num;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-	LOG_INF("Proxy history syncing need significant overwork to start working, disabled by now");
+	
 
 	for (i = 0; i < values_num; i++)
 	{

@@ -6182,20 +6182,18 @@ static void	dc_trigger_update_cache(void)
 			item = (ZBX_DC_ITEM *)itemtrigs.values[i].first;
 			item->update_triggers = 0;
 			
-			LOG_INF("Clearing item - trigger item %ld", item->itemid);		
 			DEBUG_ITEM(item->itemid, "Clearing all items form item->trigger relation");
 			conf_index_items_to_triggers_del_item(item->itemid);
 
 
 			for (k = i; k < j; k++) {
-				//LOG_INF("Adding new item->trigger link: %ld -> %ld", item->itemid, ((ZBX_DC_TRIGGER *)itemtrigs.values[k].second)->triggerid);
 				DEBUG_ITEM(item->itemid, "Adding relation to trigger %ld", ((ZBX_DC_TRIGGER *)itemtrigs.values[k].second)->triggerid);
 				conf_index_items_to_triggers_add(item->itemid, ((ZBX_DC_TRIGGER *)itemtrigs.values[k].second)->triggerid);
 			}
 			i = j - 1;
 		}
 	}
-	LOG_INF("Finished add item to trigger");
+	LOG_DBG("Finished add item to trigger");
 	
 	//conf_index_items_to_triggers_dump();
 	//exit(-1);

@@ -401,7 +401,7 @@ int glb_processing_ipc_init(int consumers, int metrics_queue_size, int notify_qu
     void *ret;
 	char *error;
 
-	LOG_INF("Doing processing ipc init");
+	//LOG_INF("Doing processing ipc init");
 
 	if (SUCCEED != zbx_mem_create(&proc_ipc_mem, CONFIG_PROCESSING_IPC_SIZE, "Processing IPC queue", "Processing IPC queue", 1, &error))
 		return FAIL;
