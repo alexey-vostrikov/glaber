@@ -83,7 +83,7 @@ void	*glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elem
 void	glb_ipc_destroy();
 
 //this will copy data to the ipc mem and put to local queue and try to flush 
-int		glb_ipc_send(void *ipc_conf, int queue_num , void *data);
+int		glb_ipc_send(void *ipc_conf, int queue_num , void *data, unsigned char lock);
 
 int 	glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
 void	glb_ipc_flush(void *ipc);

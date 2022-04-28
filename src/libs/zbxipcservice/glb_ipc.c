@@ -94,10 +94,10 @@ int  glb_ipc_init_sender(unsigned char ipc_type, int consumers) {
 	if (SUCCEED != alloc_local_queues())
 		return FAIL;
 
-	LOG_INF("Doing init of %d local queues for type %d", consumers, ipc_type);
+//	LOG_INF("Doing init of %d local queues for type %d", consumers, ipc_type);
 	local_queues[ipc_type].send_queues = zbx_malloc(NULL, sizeof(ipc_queue_t) * consumers);
 
-	LOG_INF("local snd queue 0 addr is %p", local_queues[ipc_type].send_queues);
+//	LOG_INF("local snd queue 0 addr is %p", local_queues[ipc_type].send_queues);
 	memset(local_queues[ipc_type].send_queues, 0 , sizeof(ipc_queue_t) * consumers);
 	
 	for (i = 0; i < consumers; i++ ) {
@@ -322,7 +322,23 @@ int glb_ipc_flush_all(void *ipc_conf) {
 	}
 }
 
-int glb_ipc_send(void *ipc_conf, int queue_num, void* send_data ) {
+static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, unsigned char lock) {
+	static int laststat = 0;
+	
+	while (local_free_queue->count == 0 ) {
+		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, 16, "ipc_free -> local free")) {
+			if (0 != lock) {
+				usleep(1000);
+				continue;
+			}
+			
+			return FAIL;
+		};
+	}
+	return SUCCEED;
+}
+
+int glb_ipc_send(void *ipc_conf, int queue_num, void* send_data, unsigned char lock ) {
 	ipc_conf_t *ipc = ipc_conf;
 
 	ipc_queue_t *local_free_queue = &local_queues[ipc->type].free_snd_queue,
@@ -331,19 +347,13 @@ int glb_ipc_send(void *ipc_conf, int queue_num, void* send_data ) {
 	ipc_element_t  *element = NULL;
 
 	//LOG_INF("There are %d items in the local free queue", local_free_queue->count);
-
-	if (local_free_queue->count == 0) {
-		//LOG_INF("Requesting 16 items from the global free queue");
-		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, 16, "ipc_free -> local free")) {
-			return FAIL;
-		};
-	}
+	if (FAIL == get_free_queue_items(ipc, local_free_queue, lock))
+		return FAIL;
 	
 	//LOG_INF("Moving element from the local free queue to local send queue, queue num is %d, addr is %p", queue_num, local_send_queue);
-	
 	if (FAIL == move_one_element(local_free_queue, local_send_queue, "local_free -> local_send")) 
 		return FAIL;
-//LOG_INF("Getting ptr to the item to send");
+	//LOG_INF("Getting ptr to the item to send");
 	element = local_send_queue->last;
 	//LOG_INF("Calling callback");
 	ipc->create_cb(&ipc->memf, (void *)(&element->data), send_data);
@@ -408,7 +418,7 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 
 		if (local_rcv_queue->count == 0 &&
 			FAIL == move_all_elements(rcv_queue, local_rcv_queue)) {
-			LOG_INF("No data arrived yet, local and global rcv queue is empty");
+			//LOG_INF("No data arrived yet, local and global rcv queue is empty");
 			break;
 		}
 

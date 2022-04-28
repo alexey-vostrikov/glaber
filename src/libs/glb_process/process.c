@@ -85,7 +85,7 @@ int convert_metric_value(metric_t *metric, unsigned char new_value_type, mem_fun
 		break;
 
 		case VARIANT_STR:
-			DEBUG_ITEM(metric->itemid,"In str coversion, new_value_type is %d",(int)new_value_type);
+		//	DEBUG_ITEM(metric->itemid,"In str coversion, new_value_type is %d",(int)new_value_type);
 			DEBUG_ITEM(metric->itemid,"metric's str is set to %s", metric->value.data.str);
 
 			if (NULL == metric->value.data.str ) {
@@ -121,8 +121,11 @@ int convert_metric_value(metric_t *metric, unsigned char new_value_type, mem_fun
 					metric->value.data.ui64 = uint64_val;
 					metric->value.type = VARIANT_UI64;
 				}
+				break;
 			}
-		
+	
+			break;
+			
 		case VARIANT_UI64:
 			switch (new_value_type) {
 				case ITEM_VALUE_TYPE_FLOAT:
@@ -227,6 +230,9 @@ IPC_PROCESS_CB(process_metric_cb) {
 	if ( SUCCEED == convert_metric_value(metric, proc_data.value_type, memf) )
 	{
 		//LOG_INF("Metric converted, sending to the history");
+		if (ITEM_VALUE_TYPE_TEXT ==  proc_data.value_type ) {
+			DEBUG_ITEM(metric->itemid,"After conversion got string value %s", metric->value.data.str);
+		}
 		glb_history_add_metric(metric, &proc_data);
 		DEBUG_ITEM(metric->itemid, "Accounting in the trends");
 		trends_account_metric(metric, &proc_data);
@@ -384,7 +390,7 @@ void 	send_metric_to_processing(metric_t *metric) {
 
 	//LOG_INF("Sending metric %p to processing, itemid %ld, hostid %ld", metric, metric->itemid, metric->hostid);
 	DEBUG_ITEM(metric->itemid,"Submitting metric to PROCESSING ipc ts is %d", metric->sec);
-	if (FAIL == glb_ipc_send(ipc_processing, metric->hostid % CONFIG_HISTSYNCER_FORKS, metric)) {
+	if (FAIL == glb_ipc_send(ipc_processing, metric->hostid % CONFIG_HISTSYNCER_FORKS, metric, 1)) {
 		LOG_INF("Couldn't send metric to processing: queue is FULL");
 	};
 	

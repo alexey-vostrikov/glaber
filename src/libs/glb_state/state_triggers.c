@@ -38,7 +38,7 @@ struct trigger_state_t {
     unsigned char value;
     int lastchange;
  //   int timer_revision;
-    int revision;
+    u_int64_t revision;
     const char *errorstr; 
     unsigned char	functional;	 /* see TRIGGER_FUNCTIONAL_* defines  expcted to be set according to the item's state */
 //    int problem_count;
@@ -271,24 +271,28 @@ trigger_state_t *state_trigger_get_state(u_int64_t triggerid) {
 
 ELEMS_CALLBACK(get_revison_cb) {
     trigger_state_t *tr_state = elem->data;
-    
-    return tr_state->revision;
+    u_int64_t *revision = data;
+    *revision = tr_state->revision;
+
+    return SUCCEED;
 }
 
-int glb_state_trigger_get_revision(u_int64_t triggerid) {
-//    LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
-    return elems_hash_process(conf->triggers, triggerid, get_revison_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+u_int64_t glb_state_trigger_get_revision(u_int64_t triggerid) {
+    u_int64_t revision;
+    if (SUCCEED == elems_hash_process(conf->triggers, triggerid, get_revison_cb, &revision, ELEM_FLAG_DO_NOT_CREATE))
+        return revision;
+
+    return 0;
 }
 
 ELEMS_CALLBACK(set_revison_cb) {
     trigger_state_t *tr_state = elem->data;
-    tr_state->revision = *(int *)data;
-  //  LOG_INF("Trigger %ld: set revision to %d", elem->id, *(int *)data);
+    tr_state->revision = *(u_int64_t *)data;
+
     return SUCCEED;
 }
 
-int glb_state_trigger_set_revision(u_int64_t triggerid, int revision) {
-//    LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
+int glb_state_trigger_set_revision(u_int64_t triggerid, u_int64_t revision) {
     return elems_hash_process(conf->triggers, triggerid, set_revison_cb, &revision, 0);
 }
 
@@ -297,10 +301,8 @@ ELEMS_CALLBACK(exists_cb) {
 }
 
 int glb_state_trigger_check_exists(u_int64_t triggerid) {
- //   LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
     return elems_hash_process(conf->triggers, triggerid, exists_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
 }
-
 
 ELEMS_CALLBACK(get_status_cb) {
     trigger_state_t *tr_state = elem->data;
@@ -309,26 +311,24 @@ ELEMS_CALLBACK(get_status_cb) {
 }
 
 int glb_state_trigger_get_status(u_int64_t triggerid) {
-  //  LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
     return elems_hash_process(conf->triggers, triggerid, get_status_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-
 ELEMS_CALLBACK(check_revision_cb) {
     trigger_state_t *tr_state = elem->data;
-    int revision = *(int*)data;
+    u_int64_t revision = *(u_int64_t*)data;
+//    LOG_INF("Checking revision for trigger %ld : state has %ld, revision is %ld", elem->id, tr_state->revision, revision);
+
     if (tr_state->revision == revision) 
         return SUCCEED;
- //   LOG_INF("Trigger %ld revision check failed: expected %d, but current %d", revision, tr_state->revision);
+
     return FAIL;
 }
 
-int glb_state_trigger_check_revision(u_int64_t triggerid, int revision) {
-   // LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
+int glb_state_trigger_check_revision(u_int64_t triggerid, u_int64_t revision) {
+//    LOG_INF("in: %s, processing trigger %ld check for revision %d", __func__, triggerid, revision);
     return elems_hash_process(conf->triggers, triggerid, check_revision_cb, &revision, ELEM_FLAG_DO_NOT_CREATE);
 }
-
-
 
 ELEMS_CALLBACK(set_lastchange_cb) {
     trigger_state_t *tr_state = elem->data;
@@ -340,12 +340,10 @@ ELEMS_CALLBACK(set_lastchange_cb) {
 }
 
 int  glb_state_trigger_set_lastchange(u_int64_t triggerid, int lastchange) {
-//      LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
       return elems_hash_process(conf->triggers, triggerid, set_lastchange_cb, &lastchange, ELEM_FLAG_DO_NOT_CREATE);
 } 
 
 void state_trigger_set_error(trigger_state_t *state, char *error) {
- //   LOG_INF("Replacing state error '%s' -> '%s'", state->errorstr, error);
     strpool_replace(&conf->strpool,&state->errorstr, error);
 }
 
@@ -394,8 +392,7 @@ void trigger_event_create(DB_EVENT *event, trigger_conf_t *conf, trigger_state_t
     }
     
     DEBUG_TRIGGER(conf->triggerid,"Creating normal event for the trigger");
-    LOG_INF("Creating normal event for the trigger %ld", conf->triggerid);
-	
+   	
 	create_event(event, EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, conf->triggerid,
 	 	ts, state->value, conf->description,
 	 	conf->expression, conf->recovery_expression,
@@ -408,7 +405,6 @@ int state_trigger_is_changed(trigger_conf_t *conf, trigger_state_t *state, unsig
 {
 	const char		*new_error;
 	int			new_state;
-//    static DB_EVENT event={0};
 	
 	DEBUG_TRIGGER(conf->triggerid, "Checking trigger %ld value: %d -> %d, status: %d ", conf->triggerid, 
 		old_value, state->value, state->status );
@@ -418,11 +414,6 @@ int state_trigger_is_changed(trigger_conf_t *conf, trigger_state_t *state, unsig
         (TRIGGER_VALUE_PROBLEM == state->value &&  TRIGGER_TYPE_MULTIPLE_TRUE == conf->type) ) {
         DEBUG_TRIGGER(conf->triggerid,"Trigger is changed");
 
-    //LOG_INF("Creating trigger event");
-    //trigger_event_create(&event, conf, state, old_value, ts);
-
-    //    state->lastchange = ts->sec;
-        
         return SUCCEED;
     }
     

@@ -19,7 +19,7 @@
 #ifndef CHANGESET_H
 
 #define CHANGESET_WORK_TABLE "changeset_work"
-#define CHANGESET_AUTOLOAD_TIME 3
+#define CHANGESET_AUTOLOAD_TIME 120
 
 #define DB_CREATE 1
 #define DB_UPDATE 2

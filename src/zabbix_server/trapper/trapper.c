@@ -1068,7 +1068,7 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		
 			LOG_DBG("History request processing");
 			zbx_history_record_vector_create(&values);
-			glb_history_get_history(itemid, value_type, start, count, end, GLB_HISTORY_GET_INTERACTIVE, &values);
+			glb_history_get_history(itemid, value_type, start, count, end, HISTORY_GET_INTERACTIVE, &values);
 			
 			for (i = 0; i < values.values_num; i++) 
 				glb_history_history_record_to_json(itemid,value_type, &values.values[i], &json);

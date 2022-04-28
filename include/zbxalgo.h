@@ -611,18 +611,18 @@ const char *strpool_copy(const char *str);
 
 typedef int	(*event_queue_cb_func_t)(void *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf);
 
-typedef struct {
-	event_queue_cb_func_t func;
-	int event_id;
-} event_queue_cb_conf_t;
+// typedef struct {
+// 	event_queue_cb_func_t func;
+// 	int event_id;
+// } event_queue_cb_conf_t;
 
+typedef struct event_queue_conf_t event_queue_conf_t;
 
-void *event_queue_init(mem_funcs_t *s_memf, unsigned char enable_locks, event_queue_cb_conf_t *cbs);
-void event_queue_destroy(void *eq_conf);
+event_queue_conf_t *event_queue_init(mem_funcs_t *s_memf);
+void event_queue_destroy(event_queue_conf_t *eq_conf);
 
-int event_queue_register_cb(event_queue_cb_conf_t *cbs);
-int event_queue_process_events(void *eq_conf, int max_events);
-int event_queue_add_event(void *eq_conf, int time, unsigned char event_id, void *data);
-
+int event_queue_process_events(event_queue_conf_t *eq_conf, int max_events);
+int event_queue_add_event(event_queue_conf_t *eq_conf, u_int64_t msec_time, unsigned char event_id, void *data);
+int event_queue_add_callback(event_queue_conf_t *conf, unsigned char callback_id, event_queue_cb_func_t cb_func);
 
 #endif

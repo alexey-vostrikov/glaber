@@ -1232,6 +1232,9 @@ void	zbx_setproctitle(const char *fmt, ...) __zbx_attr_format_printf(1, 2);
 double		zbx_time(void);
 void		zbx_timespec(zbx_timespec_t *ts);
 u_int64_t 	glb_ms_time();
+u_int64_t 	time_to_ms_time(int sec);
+int		 	msec_time_to_time(u_int64_t msec_time);
+
 double		zbx_current_time(void);
 void		zbx_get_time(struct tm *tm, long *milliseconds, zbx_timezone_t *tz);
 long		zbx_get_timezone_offset(time_t t, struct tm *tm);

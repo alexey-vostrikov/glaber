@@ -37,11 +37,11 @@ int glb_state_trigger_set_functional(u_int64_t triggerid, unsigned char f_value)
 void	glb_state_triggers_apply_diff_changes(zbx_vector_ptr_t *trigger_diff);
 
 /*****move required functions for own queues impl below ***/
-int glb_state_trigger_set_revision(u_int64_t triggerid, int revision);
-int glb_state_trigger_get_revision(u_int64_t triggerid);
+int glb_state_trigger_set_revision(u_int64_t triggerid, u_int64_t revision);
+u_int64_t glb_state_trigger_get_revision(u_int64_t triggerid);
 int glb_state_trigger_check_exists(u_int64_t triggerid);
 
-int glb_state_trigger_check_revision(u_int64_t triggerid, int revision);
+int glb_state_trigger_check_revision(u_int64_t triggerid, u_int64_t revision);
 //int glb_state_trigger_set_problem_count(u_int64_t triggerid, int problem_count);
 int  glb_state_trigger_set_lastchange(u_int64_t triggerid, int lastchange);
 

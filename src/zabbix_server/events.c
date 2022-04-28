@@ -544,6 +544,7 @@ static int	save_event_to_db(DB_EVENT *event)
 
 	//TODO:
 	//NOTE: save to the history here, not DB! 
+
 	zbx_db_insert_prepare(&db_insert, "events", "eventid", "source", "object", "objectid", "clock", "ns", "value",
 			"name", "severity", NULL);
 
@@ -2908,17 +2909,17 @@ static int	flush_events(void)
 	zbx_vector_uint64_pair_t	closed_events;
 	zbx_hashset_iter_t		iter;
 
-	LOG_INF("Flushing events, there are %d in the list", events.values_num);
+//	LOG_INF("Flushing events, there are %d in the list", events.values_num);
 	ret = save_events();
-	LOG_INF("Flushing events: %d saved", ret);
+//	LOG_INF("Flushing events: %d saved", ret);
 
-	LOG_INF("Saving problems");
+//	LOG_INF("Saving problems");
 	save_problems();
 	
-	LOG_INF("Saving recovery data");
+//	LOG_INF("Saving recovery data");
 	save_event_recovery();
 	
-	LOG_INF("Updating suppresed events");
+//	LOG_INF("Updating suppresed events");
 	update_event_suppress_data();
 
 	zbx_vector_uint64_pair_create(&closed_events);
@@ -2932,10 +2933,10 @@ static int	flush_events(void)
 	}
 
 	zbx_vector_uint64_pair_sort(&closed_events, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	LOG_INF("Processing actions");
+//	LOG_INF("Processing actions");
 	process_actions(&events, &closed_events);
 	zbx_vector_uint64_pair_destroy(&closed_events);
-	LOG_INF("Finished");
+//	LOG_INF("Finished");
 	return ret;
 }
 
@@ -3104,7 +3105,7 @@ static void	process_internal_events_without_actions(zbx_vector_ptr_t *internal_p
 	DB_EVENT	*event;
 	int		i;
 	
-	LOG_INF("Getting action count, locking");
+	//LOG_INF("Getting action count, locking");
 	
 	if (0 != DCget_internal_action_count())
 		return;
@@ -3119,7 +3120,7 @@ static void	process_internal_events_without_actions(zbx_vector_ptr_t *internal_p
 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_RECOVER))
 			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 	}
-	LOG_INF("Getting action count, unlocking");
+	//LOG_INF("Getting action count, unlocking");
 }
 
 

@@ -114,7 +114,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
-#define STAT_INTERVAL	1	/* if a process is busy and does not sleep then update status not faster than */
+#define STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
 
 	zbx_setproctitle("%s #%d [connecting to the database]", process_name, process_num);
@@ -153,11 +153,11 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		
 		//zbx_sync_history_cache(&values_num, &triggers_num, &more, process_num);
 		//glb_process_history_items(&values_num,&triggers_num, &more, process_num);
-		values_num = process_metric_values(2048, process_num);
-		process_time_triggers(&triggers_num, 2048, process_num);
+		values_num = process_metric_values(4096, process_num);
+		triggers_num = process_time_triggers(2048, process_num);
+	//	LOG_INF("Processed %d triggers", triggers_num);
 		
-		more = ( (values_num + triggers_num) > 0);
-			
+		more = ( (values_num + triggers_num) > 0);	
 
 		if (!ZBX_IS_RUNNING() && SUCCEED != zbx_db_trigger_queue_locked())
 			zbx_db_flush_timer_queue();
@@ -170,15 +170,15 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 		sleeptime = (ZBX_SYNC_MORE == more ? 0 : CONFIG_HISTSYNCER_FREQUENCY);
 
-		if (STAT_INTERVAL <= time(NULL) - last_stat_time)
+		if ( (STAT_INTERVAL <= time(NULL) - last_stat_time) && total_sec > 0 )
 		{
 			stats_offset = 0;
-			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "process %d val/s", total_values_num/STAT_INTERVAL);
+			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "process %.0f val/s", total_values_num/total_sec);
 
 			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 			{
-				zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, ", %d triggers/s",
-						total_triggers_num/STAT_INTERVAL);
+				zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, ", %.0f triggers/s",
+						total_triggers_num/total_sec);
 			}
 
 			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, " in " ZBX_FS_DBL " sec", total_sec);
@@ -201,7 +201,10 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 			break;
 		//usleep(20000);
 		//if (sleeptime >0 ) zabbix_log(LOG_LEVEL_INFORMATION, "In %s() history_num: sleeping %d sec", __func__, sleeptime);
-		zbx_sleep_loop(sleeptime);
+		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
+		usleep(1000);
+		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	}
 
 	/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */

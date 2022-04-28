@@ -69,4 +69,4 @@ int processing_notify_flush();
 
 int processing_trigger_timers_init();
 
-int process_time_triggers(int *processed_triggers, int max_triggers, int process_num);
+int process_time_triggers(int max_triggers, int process_num);

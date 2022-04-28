@@ -26,8 +26,8 @@
 #include "../src/libs/glb_process/process.h"
 #include "../src/libs/glb_process/proc_trends.h"
 
-#define GLB_HISTORY_GET_NON_INTERACTIVE 2
-#define GLB_HISTORY_GET_INTERACTIVE 3
+#define HISTORY_GET_NON_INTERACTIVE 2
+#define HISTORY_GET_INTERACTIVE 3
 
 /* the item history value */
 typedef struct

@@ -160,6 +160,18 @@ u_int64_t glb_ms_time() {
 	return sec * 1000 + ts.ns/1000000;
 }
 
+u_int64_t time_to_ms_time(int sec) {
+	return (u_int64_t)sec * 1000;
+}
+int ms_time_to_time(u_int64_t msec_time) {
+	uint64_t res;
+
+	res =  msec_time / 1000;
+	
+	return (int) res;
+}
+
+
 
 /******************************************************************************
  *                                                                            *

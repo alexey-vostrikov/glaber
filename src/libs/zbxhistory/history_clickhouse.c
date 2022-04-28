@@ -34,7 +34,7 @@ typedef struct
 	u_int8_t read_aggregate_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t disable_host_item_names;
 	u_int8_t disable_nanoseconds;
-	u_int16_t disable_read_timeout;
+	u_int32_t disable_read_timeout;
 }
 glb_clickhouse_data_t;
 
@@ -419,7 +419,7 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 	if (0 == conf->read_types[value_type])	
 			return SUCCEED;
 
-    if (time(NULL)- conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME && 0 == interactive ) {
+    if (time(NULL) - conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME && HISTORY_GET_NON_INTERACTIVE == interactive ) {
 		LOG_DBG("waiting for cache load, exiting");
       	return SUCCEED;
 	}
@@ -566,7 +566,7 @@ static int	add_history_values(void *data, metric_t *metric, metric_processing_da
 	if (0 == conf->write_types[value_type])	
 		return SUCCEED;
 
-	DEBUG_ITEM(metric->itemid, "Adding metric to the Clickhouse export buffer");
+	DEBUG_ITEM(metric->itemid, "Adding metric to the Clickhouse export buffer, value type is %d", value_type);
 	
 	if (tbuffer[value_type].num == 0) {
 		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
@@ -605,6 +605,7 @@ static int	add_history_values(void *data, metric_t *metric, metric_processing_da
 	case ITEM_VALUE_TYPE_STR:
 	case ITEM_VALUE_TYPE_TEXT:
 		escaped_value = zbx_dyn_escape_string(metric->value.data.str, ESCAPE_CHARS);
+		DEBUG_ITEM(metric->itemid,"Will write string value '%s' to clickhouse", escaped_value);
 		zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,", '%s'", escaped_value);
 		zbx_free(escaped_value);
 		break;

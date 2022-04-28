@@ -20,14 +20,15 @@
 #include "log.h"
 #include "zbxalgo.h"
 
-typedef struct 
+#define MAX_EVENT_CALLBACK_ID 255
+struct event_queue_conf_t
 {
     zbx_binary_heap_t queue;
     unsigned char locks;
     mem_funcs_t memf;
     pthread_mutex_t lock;
-    event_queue_cb_conf_t *callbacks;
-} event_queue_conf_t;
+    event_queue_cb_func_t callbacks[MAX_EVENT_CALLBACK_ID + 1];
+}; 
 
 int event_queue_compare_func(const void *d1, const void *d2)
 {
@@ -39,85 +40,66 @@ int event_queue_compare_func(const void *d1, const void *d2)
 }
 
 
-void *event_queue_init(mem_funcs_t *s_memf, unsigned char enable_locks, event_queue_cb_conf_t *cbs) {
+event_queue_conf_t *event_queue_init(mem_funcs_t *s_memf) {
     mem_funcs_t memf;
     event_queue_conf_t *conf;
-    int i;
+    int i, enable_locks = 1;
     unsigned char max_event_id = 0; 
-    //LOG_INF("Doing event qurue init");
-
+    
+  //  LOG_INF("qfqewrfwerfwr");
     if (NULL == s_memf) 
     {   /* using heap memory func by default */
         memf.free_func = ZBX_DEFAULT_MEM_FREE_FUNC;
         memf.malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC;
         memf.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC;
-    } else 
+    } else {
         memf = *s_memf;
-    
-    if (NULL == (conf = memf.malloc_func(NULL, sizeof(event_queue_conf_t))))
+    }
+
+     if (NULL == (conf = memf.malloc_func(NULL, sizeof(event_queue_conf_t))))
         return NULL;    
+
+    if (NULL == s_memf)  
+        conf->locks = 0; 
+    else {
+        conf->locks = 1;
+        glb_lock_init(&conf->lock);
+    }
+
     conf->memf = memf;
     zbx_binary_heap_create_ext(&conf->queue, event_queue_compare_func, 0, memf.malloc_func, memf.realloc_func, memf.free_func);
-
-    conf->locks = enable_locks;
-    
-    if (conf->locks) 
-        glb_lock_init(&conf->lock);
-    
-    i=0;
-    while (0 != cbs[i].event_id ) {
-      //  LOG_INF("Parsing cb, event id is %d", cbs[i].event_id);
-        max_event_id = MAX( max_event_id, cbs[i].event_id);
-     
-        if (i> 20) {
-            THIS_SHOULD_NEVER_HAPPEN;
-            exit(-1);
-        }
-           i++;
-    }
-
-    //LOG_INF("Max event id is %d",(int)max_event_id);
-    if ( NULL == (conf->callbacks = conf->memf.malloc_func(NULL, sizeof(event_queue_cb_conf_t) * (max_event_id+1))))
-        return NULL;
-    //LOG_INF("doing bzero ");
-    bzero(conf->callbacks, sizeof(event_queue_cb_conf_t) * max_event_id);
-    i=0;
-    //LOG_INF("doing cbs init");
-    while (0 != cbs[i].event_id ) {
-      //  LOG_INF("Creating callback %d", cbs[i].event_id);
-        unsigned char event_id = cbs[i].event_id;
-        conf->callbacks[event_id].event_id = event_id;
-        conf->callbacks[event_id].func = cbs[i].func;
-        
-        i++;
-    }
-    
-    //LOG_INF("init: Heap queue addr is %p",&conf->queue);
-    //LOG_INF("init: Conf is %p", conf);
+   
     return conf;
 }
 
-void event_queue_destroy(void *eq_conf) {
-    event_queue_conf_t *conf = eq_conf;
+int  event_queue_add_callback(event_queue_conf_t *conf, unsigned char callback_id, event_queue_cb_func_t cb_func) {
     
+    if (callback_id > MAX_EVENT_CALLBACK_ID)
+        return FAIL;
+
+    conf->callbacks[callback_id] = cb_func;
+    return SUCCEED;
+}
+
+void event_queue_destroy(event_queue_conf_t *conf) {
+       
     zbx_binary_heap_destroy(&conf->queue);
-    conf->memf.free_func(conf->callbacks);
     conf->memf.free_func(conf);
 }
 
 
-int event_queue_process_events(void *eq_conf, int max_events) {
-    event_queue_conf_t *conf = eq_conf;
-    int now = time(NULL);
+int event_queue_process_events(event_queue_conf_t *conf, int max_events) {
+       
+    u_int64_t now = glb_ms_time();
+
     int i = 0;
-
-    //LOG_INF("It's %d events in the queue",conf->queue.elems_num);
-
+    
     while (FAIL == zbx_binary_heap_empty(&conf->queue) && 
             (max_events == 0 || i < max_events) )
 	{
 		zbx_binary_heap_elem_t *min;
         unsigned char event_id;
+    
         u_int64_t msec_time;
         void *data;
 
@@ -127,13 +109,14 @@ int event_queue_process_events(void *eq_conf, int max_events) {
 		min = zbx_binary_heap_find_min(&conf->queue);
 		 
 		if ( min->key > now ) {
-        //    LOG_INF("Closest event is in %d seconds", min->key-now);
+            LOG_DBG("Queue is %d mseconds ahead, q size is %d", min->key - now, conf->queue.elems_num); 
             if (conf->locks) 
                 glb_lock_unlock(&conf->lock);   
             break;
+    
         }
 
-      //  LOG_INF("Queue is %d seconds late", now - min->key);
+        LOG_DBG("Queue is %d mseconds late, q size is %d", now - min->key, conf->queue.elems_num);
         event_id = (unsigned char )min->local_data;
         data = (void *) min->data;
         msec_time = min->key;
@@ -142,25 +125,19 @@ int event_queue_process_events(void *eq_conf, int max_events) {
 
         if (conf->locks) 
             glb_lock_unlock(&conf->lock);   
-
-      //  LOG_INF("Calling callback for event %d", event_id);
-        conf->callbacks[event_id].func(conf, msec_time, event_id, data, &conf->memf);
-        //LOG_INF("Finished callback for event %d", event_id);
+        
+        conf->callbacks[event_id](conf, msec_time, event_id, data, &conf->memf);
         i++;
     }
     return i;
 }
 
-int event_queue_add_event(void *eq_conf, int time, unsigned char event_id, void *data) {
-    event_queue_conf_t *conf = eq_conf;
- 
-    //LOG_INF("In the %s, conf is %p", __func__, eq_conf);
-   //LOG_INF("Adding new queue elemnt");
+int event_queue_add_event(event_queue_conf_t *conf, u_int64_t msec_time, unsigned char event_id, void *data) {
     		
-	zbx_binary_heap_elem_t elem = { .key = time, .local_data = (u_int64_t) event_id, .data = (const void *)data};
+	zbx_binary_heap_elem_t elem = { .key = msec_time, .local_data = (u_int64_t) event_id, .data = (const void *)data};
 	//LOG_INF("Heap queue addr is %p",&conf->queue);
     //LOG_INF("Add elem: Conf is %p", conf);
-    //LOG_INF("Element is : key: %ld, local_data: %ld, data: %ld", elem.key, elem.local_data, elem.data);
+   // LOG_INF("Element is : key: %ld, local_data: %ld, data: %ld", elem.key, elem.local_data, elem.data);
     zbx_binary_heap_insert(&conf->queue, &elem);
 	//zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
 }

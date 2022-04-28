@@ -6274,6 +6274,7 @@ void DC_RequestConfigSync() {
 }
 
 int DC_ConfigNeedsSync() {
+	
 	if (config->sync_requested > 0) 
 		return SUCCEED;
 

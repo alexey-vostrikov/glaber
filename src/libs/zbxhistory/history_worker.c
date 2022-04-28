@@ -303,7 +303,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 		return FAIL;
 	}
 	
-	if ( GLB_HISTORY_GET_NON_INTERACTIVE == interactive && 
+	if ( HISTORY_GET_NON_INTERACTIVE == interactive && 
 		 time(NULL) - conf->disable_read_timeout < CONFIG_SERVER_STARTUP_TIME) {
 		LOG_DBG("waiting for cache load, exiting");
       	return FAIL;
