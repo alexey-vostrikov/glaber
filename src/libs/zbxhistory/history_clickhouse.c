@@ -272,7 +272,7 @@ static int	get_trend_values_json(void *data, int value_type, zbx_uint64_t itemid
 	LOG_DBG("In %s() trends request for item %ld", __func__,itemid);
 
 	if (end < start ) {
-		zabbix_log(LOG_LEVEL_WARNING,"%s: wrong params requested: start:%d, end:%d, steps:%d",__func__, start, end);
+		zabbix_log(LOG_LEVEL_WARNING,"%s: wrong params requested: start:%d, end:%d",__func__, start, end);
 		return FAIL;
 	}
 
@@ -284,7 +284,7 @@ static int	get_trend_values_json(void *data, int value_type, zbx_uint64_t itemid
 			value_min, \
 			value_max \
 		FROM %s.%s  \
-		WHERE clock BETWEEN %ld AND %ld AND \
+		WHERE clock BETWEEN %d AND %d AND \
 		itemid = %ld \
 		ORDER BY clock \
 		FORMAT JSON",  conf->dbname, trend_tables[value_type], start, end, itemid); 
@@ -321,20 +321,20 @@ static int	get_trend_aggregates_json(void *data, int value_type, zbx_uint64_t it
 			return SUCCEED;
 
 	if (end < start || 1 > steps ) {
-		zabbix_log(LOG_LEVEL_WARNING,"%s: wrong params requested: start:%d, end:%d, steps:%d",__func__, start, end);
+		zabbix_log(LOG_LEVEL_WARNING,"%s: wrong params requested: start:%d, end:%d",__func__, start, end);
 		return FAIL;
 	}
 	
 	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, 
 		"SELECT itemid, \
 			sum(count) as count, \
-			round( multiply((toUnixTimestamp(clock)-%ld), %ld) / %ld ,0) as i,\
+			round( multiply((toUnixTimestamp(clock)-%d), %d) / %d ,0) as i,\
 			max(toUnixTimestamp(clock)) as clcck ,\
 			avg(value_avg) as avg, \
 			min(value_min) as min , \
 			max(value_max) as max \
 		FROM %s.%s  \
-		WHERE clock BETWEEN %ld AND %ld AND \
+		WHERE clock BETWEEN %d AND %d AND \
 		itemid = %ld \
 		GROUP BY itemid, i \
 		ORDER BY i \
@@ -493,7 +493,7 @@ static int	get_history_aggregates_json(void *data, int value_type, zbx_uint64_t 
 			return SUCCEED;
 
 	if (end < start || steps <1 ) {
-		LOG_WRN("%s: wrong params requested: start:%d end:%d, aggregates: %ld",__func__,start,end, steps);
+		LOG_WRN("%s: wrong params requested: start:%d end:%d, aggregates: %d",__func__,start,end, steps);
 		return FAIL;
 	}
 	
@@ -506,14 +506,14 @@ static int	get_history_aggregates_json(void *data, int value_type, zbx_uint64_t 
    
 	zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, 
 	"SELECT itemid, \
-		round( multiply((toUnixTimestamp(clock)-%ld), %ld) / %ld ,0) as i,\
+		round( multiply((toUnixTimestamp(clock)-%d), %d) / %d ,0) as i,\
 		max(toUnixTimestamp(clock)) as clcck ,\
 		avg(value) as avg, \
 		count(value) as count, \
 		min(value) as min , \
 		max(value) as max \
 	FROM %s.%s h \
-	WHERE clock BETWEEN %ld AND %ld AND \
+	WHERE clock BETWEEN %d AND %d AND \
 	itemid = %ld \
 	GROUP BY itemid, i \
 	ORDER BY i \
@@ -612,7 +612,7 @@ static int	add_history_values(void *data, metric_t *metric, metric_processing_da
 	case ITEM_VALUE_TYPE_LOG:	
 		escaped_value=zbx_dyn_escape_string(metric->value.data.str,ESCAPE_CHARS);
 		
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d",
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%s",
 				escaped_value, "", "");
 		zbx_free(escaped_value);
 
@@ -786,7 +786,7 @@ int	glb_history_clickhouse_init(char *params)
 	zabbix_log(LOG_LEVEL_DEBUG,"in %s: starting init", __func__);
 
     if ( SUCCEED != zbx_json_open(params, &jp_config)) {
-		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configureation: '%s', most likely not a valid JSON");
+		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse configuration, most likely not a valid JSON");
 		return FAIL;
 	}
 

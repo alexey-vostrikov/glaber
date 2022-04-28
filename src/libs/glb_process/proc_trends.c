@@ -144,7 +144,7 @@ int trends_account_metric(metric_t *metric , metric_processing_data_t *proc_data
         trend->value_type != proc_data->value_type) 
     {   
         DEBUG_ITEM(trend->itemid, "Exporting trend trend value type is %d, proc_value type is %d, trend accout hour is %d, now hour is %d", 
-        trend->itemid, trend->value_type, (int) proc_data->value_type,  trend->account_hour, now_hour);
+         trend->value_type, (int) proc_data->value_type,  trend->account_hour, now_hour);
 
         export_trend(trend, proc_data);
         reset_trend(trend, metric, now_hour, proc_data->value_type);

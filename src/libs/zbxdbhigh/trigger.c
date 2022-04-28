@@ -199,7 +199,7 @@ void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)
 		{
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%clastchange=%d", delim, diff->lastchange);
 			delim = ',';
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger lastchange: %ld", diff->lastchange);
+			DEBUG_TRIGGER(diff->triggerid,"Saving trigger lastchange: %d", diff->lastchange);
 		}
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
