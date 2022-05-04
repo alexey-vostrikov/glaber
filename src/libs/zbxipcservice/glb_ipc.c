@@ -299,8 +299,8 @@ static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *
 
 static void flush_queues(ipc_conf_t *ipc) {
 	int i;
-	static int last_flush = 0;
-	int now = time(NULL);
+	static u_int64_t last_flush = 0;
+	u_int64_t now = glb_ms_time();
 	
 	if (now == last_flush) 
 		return;
