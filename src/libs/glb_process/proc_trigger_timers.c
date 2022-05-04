@@ -58,7 +58,7 @@ static void requeue_trigger(u_int64_t triggerid) {
     /* to avoid double addition to the queue with the same timer */
 	if (glb_state_trigger_get_revision(triggerid) == revision) {
         //LOG_INF("Revision isn't changed, not adding");
-        DEBUG_TRIGGER(triggerid, "Trigger's revision %d haven't changed, not updating", revision);
+        DEBUG_TRIGGER(triggerid, "Trigger's revision %ld haven't changed, not updating", revision);
     	return;
     }
 	
@@ -70,7 +70,7 @@ static void requeue_trigger(u_int64_t triggerid) {
 //    LOG_INF("Setting new revision2 %ld", time_to_ms_time(nextcheck));
     //LOG_INF("requeue trigger %ld: Adding trigger requeue event in %d seconds, state revision is %d", triggerid, nextcheck - time(NULL), 
     //    glb_state_trigger_get_revision(triggerid));
-    DEBUG_TRIGGER(triggerid, "requeue trigger: Adding trigger requeue event in %d seconds, conf is %p", nextcheck - time(NULL), tm_conf->event_queue);
+    DEBUG_TRIGGER(triggerid, "requeue trigger: Adding trigger requeue event in %ld seconds, conf is %p", nextcheck - time(NULL), tm_conf->event_queue);
     event_queue_add_event(tm_conf->event_queue, time_to_ms_time(nextcheck), PROCESS_TRIGGER, (void *)triggerid);
   //  LOG_INF("Finished requeuing");
 }
@@ -110,7 +110,7 @@ int process_time_triggers(int max_triggers, int process_num){
 
 
 EVENT_QUEUE_CALLBACK(process_timer_triggers_cb){
-	int triggerid = (u_int64_t) data;
+	u_int64_t triggerid = (u_int64_t) data;
 	u_int64_t revision = event_time;
 
 	if (FAIL == glb_state_trigger_check_revision(triggerid, revision)) {

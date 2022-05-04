@@ -929,7 +929,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     if (NULL != (c_val = (glb_state_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
     {
         dc_hist_to_value(c_val, h);
-        DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %ld", glb_tsbuff_get_time_tail(&elm->tsbuff));
+        DEBUG_ITEM(elem->id, "Item added, oldest timestamp is %d", glb_tsbuff_get_time_tail(&elm->tsbuff));
     }
     else
     {
