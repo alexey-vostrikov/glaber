@@ -484,8 +484,6 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 			case GLB_EVENT_NEW_ITEMS_CHECK: {
 				int num;
-
-				
 			//	zbx_timespec(&ts_get_items);
 				num = DCconfig_get_glb_poller_items(&poll, poll.item_type, process_num);
 				//sumtime(&get_items_time, ts_get_items);
@@ -497,7 +495,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 					//an item may wait for some time while other items will be polled and thus get timedout
 					//so after one minute of waiting we consider its timed out anyway whatever the poll process thinks about it
 					//but it's a poller's business to submit timeout result
-					if (glb_item->lastpolltime + SEC_PER_MIN < now && POLL_POLLING == glb_item->state) {
+					if (glb_item->lastpolltime + 10 * SEC_PER_MIN < now && POLL_POLLING == glb_item->state) {
 						LOG_DBG("Item %ld has timed out in the poller, resetting it's queue state",glb_item->itemid);
 						DEBUG_ITEM(glb_item->itemid, "Item has timeout in the poller, resetting the sate")
 						glb_item->state = POLL_QUEUED;
