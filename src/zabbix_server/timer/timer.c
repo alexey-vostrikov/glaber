@@ -632,7 +632,7 @@ ZBX_THREAD_ENTRY(timer_thread, args)
 				if (SUCCEED == update)
 				{
 					zbx_dc_maintenance_set_update_flags();
-					db_update_event_suppress_data(&events_num);
+					//db_update_event_suppress_data(&events_num);
 					zbx_dc_maintenance_reset_update_flag(process_num);
 				}
 				else

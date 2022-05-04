@@ -41,49 +41,6 @@ extern int		server_num, process_num;
 extern void *ipc_processing;
 static sigset_t		orig_mask;
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_db_flush_timer_queue                                         *
- *                                                                            *
- * Purpose: flush timer queue to the database                                 *
- *                                                                            *
- ******************************************************************************/
-static void	zbx_db_flush_timer_queue(void)
-{
-	int			i;
-	zbx_vector_ptr_t	persistent_timers;
-	zbx_db_insert_t		db_insert;
-
-	zbx_vector_ptr_create(&persistent_timers);
-	zbx_dc_clear_timer_queue(&persistent_timers);
-
-	if (0 != persistent_timers.values_num)
-	{
-		zbx_db_insert_prepare(&db_insert, "trigger_queue", "trigger_queueid", "objectid", "type", "clock", "ns", NULL);
-
-		for (i = 0; i < persistent_timers.values_num; i++)
-		{
-			zbx_trigger_timer_t	*timer = (zbx_trigger_timer_t *)persistent_timers.values[i];
-
-			zbx_db_insert_add_values(&db_insert, __UINT64_C(0), timer->objectid, timer->type,
-					timer->eval_ts.sec, timer->eval_ts.ns);
-		}
-
-		zbx_dc_free_timers(&persistent_timers);
-
-		zbx_db_insert_autoincrement(&db_insert, "trigger_queueid");
-		zbx_db_insert_execute(&db_insert);
-		zbx_db_insert_clean(&db_insert);
-	}
-
-	zbx_vector_ptr_destroy(&persistent_timers);
-}
-
-//static void	db_trigger_queue_cleanup(void)
-//{
-//	DBexecute("delete from trigger_queue");
-//	zbx_db_trigger_queue_unlock();
-//}
 
 /******************************************************************************
  *                                                                            *
@@ -135,7 +92,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	glb_ipc_init_reciever(IPC_PROCESSING_NOTIFY);
 
 	trends_init_cache();
-
+	LOG_INF("Loooping");
 	for (;;)
 	{
 		sec = zbx_time();
@@ -144,33 +101,17 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		if (0 != sleeptime)
 			zbx_setproctitle("%s #%d [%s, syncing history]", process_name, process_num, stats);
 
-		/* clear timer trigger queue to avoid processing time triggers at exit */
-		if (!ZBX_IS_RUNNING())
-			zbx_log_sync_history_cache_progress();
-
 		/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 		zbx_block_signals(&orig_mask);
-		
-		//zbx_sync_history_cache(&values_num, &triggers_num, &more, process_num);
-		//glb_process_history_items(&values_num,&triggers_num, &more, process_num);
-		//LOG_INF("Processing metrics and their triggers");
 		values_num = process_metric_values(4096, process_num);
-		//LOG_INF("Processing time triggers");
 		triggers_num = process_time_triggers(2048, process_num);
-		//LOG_INF("Finished processing time triggers");
-	//	LOG_INF("Processed %d triggers", triggers_num);
-		
 		more = ( (values_num + triggers_num) > 0);	
-
-		if (!ZBX_IS_RUNNING() && SUCCEED != zbx_db_trigger_queue_locked())
-			zbx_db_flush_timer_queue();
 
 		zbx_unblock_signals(&orig_mask);
 
 		total_values_num += values_num;
 		total_triggers_num += triggers_num;
 		total_sec += zbx_time() - sec;
-
 		sleeptime = (ZBX_SYNC_MORE == more ? 0 : CONFIG_HISTSYNCER_FREQUENCY);
 
 		if ( (STAT_INTERVAL <= time(NULL) - last_stat_time) && total_sec > 0 )
@@ -197,23 +138,19 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 			last_stat_time = time(NULL);
 		}
 
-		if (ZBX_SYNC_MORE == more)
+		if (more > 0 )
 			continue;
 			
 		if (!ZBX_IS_RUNNING())
 			break;
-		//usleep(20000);
-		//if (sleeptime >0 ) zabbix_log(LOG_LEVEL_INFORMATION, "In %s() history_num: sleeping %d sec", __func__, sleeptime);
+		
 		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
 		usleep(1000);
 		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
-
 	}
 
 	/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 	zbx_block_signals(&orig_mask);
-	if (SUCCEED != zbx_db_trigger_queue_locked())
-		zbx_db_flush_timer_queue();
 
 	DBclose();
 	zbx_unblock_signals(&orig_mask);

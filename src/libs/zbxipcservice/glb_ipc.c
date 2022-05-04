@@ -412,7 +412,7 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 	
 
 	while (i < max_count ) {
-//	LOG_INF("IPC_RECIEVE: ");
+
 //	dump_queue(rcv_queue, "Rcv global queue");
 //	dump_queue(local_rcv_queue, "Rcv local queue");
 
@@ -426,7 +426,6 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 		element = local_rcv_queue->first;
 		
 		//LOG_INF("Filling the buffer/releasing IPC mem, element addr is %p", element);
-		
 		cb_func(&ipc->memf, i, (void *)(&element->data), cb_data);
 		
 		if (NULL != ipc->free_cb)
@@ -468,9 +467,10 @@ void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elem
 	//LOG_INF("Allocating memory for queues %d", consumers);
 	//queues init
 
-	if (NULL == (conf->queues = memf->malloc_func(NULL, sizeof(ipc_queue_t) * consumers)))
+	if (NULL == (conf->queues = memf->malloc_func(NULL, sizeof(ipc_queue_t) * consumers))) {
+		LOG_WRN("Couldn't allocate %ld bytes for queues ", sizeof(ipc_queue_t) * consumers);
 		return NULL;
-	
+	}
 	memset( (void *)conf->queues, 0, sizeof(ipc_queue_t) * consumers);
 	
 	for (i=0; i< consumers; i++) {
@@ -480,9 +480,10 @@ void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elem
 	glb_lock_init(&conf->free_queue.lock);
 
 	size_t full_elem_size = elem_size + sizeof (ipc_element_t *);
-	if (NULL == (elements = memf->malloc_func(NULL, full_elem_size * elems_count) ) ) 
+	if (NULL == (elements = memf->malloc_func(NULL, full_elem_size * elems_count) ) )  {
+		LOG_WRN("Couldn't allocate %ld bytes for elements", full_elem_size * elems_count);
 		return NULL;
-	
+	}
 	//making queue out of elements
 	void * ptr = elements;
 	ipc_element_t *elem;

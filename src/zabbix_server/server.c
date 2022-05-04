@@ -186,7 +186,7 @@ int		server_num		= 0;
 u_int64_t CONFIG_DEBUG_ITEM = 0;
 u_int64_t CONFIG_DEBUG_TRIGGER = 0;
 
-size_t CONFIG_PROCESSING_IPC_SIZE = 1024 * 1024 * 256; //TODO: configurable IPC size
+size_t CONFIG_PROCESSING_IPC_SIZE = 1024 * 1024 * 1024; //TODO: configurable IPC size
 
 int CONFIG_ENABLE_HOST_DEACTIVATION = 1;
 int	CONFIG_ALERTER_FORKS		= 3;
@@ -1441,7 +1441,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	//	exit(EXIT_FAILURE);
 	//}
 
-	if (FAIL == glb_processing_ipc_init(CONFIG_HISTSYNCER_FORKS, 100000, 800000)) {
+	if (FAIL == glb_processing_ipc_init(CONFIG_HISTSYNCER_FORKS, 1000000, 1000000)) {
 		zbx_error("Cannot init processing IPC queues");
 		exit(-1);
 	}

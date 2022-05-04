@@ -64,7 +64,7 @@ int convert_metric_value(metric_t *metric, unsigned char new_value_type, mem_fun
 				case ITEM_VALUE_TYPE_UINT64:
 					if (0 > metric->value.data.dbl) {
 
-						zbx_snprintf(metric->str_buffer,MAX_STRING_LEN, "Cannot convert negative double '%f' to uint format", metric->value.data.dbl);
+						zbx_snprintf(metric->str_buffer, METRIC_BUF_LEN, "Cannot convert negative double '%f' to uint format", metric->value.data.dbl);
 						metric->value.type = VARIANT_ERR;
 						metric->state = ITEM_STATE_NOTSUPPORTED;
 						glb_state_item_set_error(metric->itemid, metric->str_buffer);
@@ -78,7 +78,7 @@ int convert_metric_value(metric_t *metric, unsigned char new_value_type, mem_fun
 				case ITEM_VALUE_TYPE_STR:
 				case ITEM_VALUE_TYPE_TEXT:
 				case ITEM_VALUE_TYPE_LOG:
-					zbx_snprintf(metric->str_buffer, MAX_STRING_LEN, "%f" , metric->value.data.dbl);
+					zbx_snprintf(metric->str_buffer, METRIC_BUF_LEN, "%f" , metric->value.data.dbl);
 					metric->value.type = VARIANT_STR;
 					break;			
 			}
@@ -102,7 +102,7 @@ int convert_metric_value(metric_t *metric, unsigned char new_value_type, mem_fun
 					metric->value.data.dbl = dbl_val;
 					metric->value.type = VARIANT_DBL;
 				} else {
-					zbx_snprintf(metric->str_buffer,MAX_STRING_LEN, "Cannot convert value '%s' to double format", metric->value.data.str);
+					zbx_snprintf(metric->str_buffer,METRIC_BUF_LEN, "Cannot convert value '%s' to double format", metric->value.data.str);
 					metric->value.type = VARIANT_ERR;
 					metric->state = ITEM_STATE_NOTSUPPORTED;
 
@@ -135,7 +135,7 @@ int convert_metric_value(metric_t *metric, unsigned char new_value_type, mem_fun
 				case ITEM_VALUE_TYPE_STR:
 				case ITEM_VALUE_TYPE_TEXT:
 				case ITEM_VALUE_TYPE_LOG:
-					zbx_snprintf(metric->str_buffer, MAX_STRING_LEN, "%ld" , metric->value.data.ui64);
+					zbx_snprintf(metric->str_buffer, METRIC_BUF_LEN, "%ld" , metric->value.data.ui64);
 					metric->value.data.str = metric->str_buffer;
 					metric->value.type = VARIANT_STR;
 					break;			
@@ -272,7 +272,7 @@ IPC_CREATE_CB(metric_ipc_create_cb){
 	//	LOG_INF("Moving text to the IPC: %s", local_metric->value.data.str );
 		size_t len = strlen( local_metric->value.data.str);
 		
-		if (len > MAX_STRING_LEN) {
+		if (len > METRIC_BUF_LEN) {
 		//	LOG_INF("Metric %ld size %d sending as dynamic buffer", local_metric->itemid, len);
 			ipc_metric->value.data.str = memf->malloc_func(NULL, len + 1);
 			memcpy(ipc_metric->value.data.str, local_metric->value.data.str, len + 1);
@@ -413,9 +413,11 @@ int glb_processing_ipc_init(int consumers, int metrics_queue_size, int notify_qu
 		return FAIL;
 //	LOG_INF("Allocating memory for ipc config, func addr is %p ",metric_ipc_create_cb);
 
-    ipc_processing = glb_ipc_init(IPC_PROCESSING, CONFIG_PROCESSING_IPC_SIZE , "Processing queue", 
-				metrics_queue_size, sizeof(metric_t), CONFIG_HISTSYNCER_FORKS,  &memf, metric_ipc_create_cb, metric_ipc_free_cb);
-
+    if (NULL == (ipc_processing = glb_ipc_init(IPC_PROCESSING, CONFIG_PROCESSING_IPC_SIZE , "Processing queue", 
+				metrics_queue_size, sizeof(metric_t), CONFIG_HISTSYNCER_FORKS,  &memf, metric_ipc_create_cb, metric_ipc_free_cb)))
+		
+		return FAIL;
+	
 
 	if (FAIL ==processing_trigger_timers_init(notify_queue_size, &memf)) 
 		return FAIL;

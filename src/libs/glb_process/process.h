@@ -34,6 +34,7 @@
 //#define PROCESS_FLAG_NOHISTORY	0x10	/* values should not be kept in history */
 //#define PROCESS_FLAG_NOTRENDS	0x20	/* values should not be kept in trends */
 #define PROCESS_METRIC_FLAG_EVENTLOG 0x40 /* log is event sourced */
+#define METRIC_BUF_LEN 256
 
 typedef struct
 {
@@ -47,7 +48,7 @@ typedef struct
 	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
 	unsigned char	state;
 
-	char str_buffer[MAX_STRING_LEN];
+	char str_buffer[METRIC_BUF_LEN];
 	//if str ptr == str_buffer then it doesn't need 
 	//to be freed
 } metric_t;
