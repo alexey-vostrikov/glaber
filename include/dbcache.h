@@ -649,8 +649,8 @@ int	is_item_processed_by_server(unsigned char type, const char *key);
 int	zbx_is_counted_in_item_queue(unsigned char type, const char *key);
 int	in_maintenance_without_data_collection(unsigned char maintenance_status, unsigned char maintenance_type,
 		unsigned char type);
-void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
+//void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+//		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
 int		dc_flush_history(void);
 void	zbx_sync_history_cache(int *values_num, int *triggers_num, int *more, int process_num);
 void	zbx_log_sync_history_cache_progress(void);

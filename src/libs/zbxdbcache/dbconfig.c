@@ -8448,30 +8448,22 @@ static void	DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src
 static void	DCget_trigger(DC_TRIGGER *tr_conf, const ZBX_DC_TRIGGER *src_trigger)
 {
 	int	i;
-	trigger_state_t *state;
+	//trigger_state_t *state;
 
-	if (NULL == (state = state_trigger_get_state(src_trigger->triggerid))) {
-		LOG_INF("Requesting trigger state of non existing trigger should return data");
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit(-1);
-	};
+	state_trigger_fill_DC_TRIGGER_state(src_trigger->triggerid, tr_conf);
+
 
 	tr_conf->triggerid = src_trigger->triggerid;
 	tr_conf->description = zbx_strdup(NULL, src_trigger->description);
-	if (NULL!= state_trigger_get_errstr(state) )
-		tr_conf->error = zbx_strdup(NULL, (char *) state_trigger_get_errstr(state));
-	else tr_conf->error = NULL;
 	
 	tr_conf->timespec.sec = 0;
 	tr_conf->timespec.ns = 0;
 	tr_conf->priority = src_trigger->priority;
 	tr_conf->type = src_trigger->type;
-	tr_conf->value = state_trigger_get_value(state);
-	//tr_conf->state = state_trigger_get_state(state);
 	tr_conf->new_value = TRIGGER_VALUE_UNKNOWN;
-	tr_conf->lastchange = state_trigger_get_lastchange(state);
+
 	tr_conf->topoindex = src_trigger->topoindex;
-	tr_conf->status = state_trigger_get_status(state);
+
 	tr_conf->recovery_mode = src_trigger->recovery_mode;
 	tr_conf->correlation_mode = src_trigger->correlation_mode;
 	tr_conf->correlation_tag = zbx_strdup(NULL, src_trigger->correlation_tag);
@@ -16702,7 +16694,6 @@ int DCget_conf_trigger(u_int64_t triggerid, trigger_conf_t *tr_conf) {
 	tr_conf->correlation_tag = zbx_strdup(NULL, src_trigger->correlation_tag);
 	tr_conf->opdata = zbx_strdup(NULL, src_trigger->opdata);
 	tr_conf->event_name = ('\0' != *src_trigger->event_name ? zbx_strdup(NULL, src_trigger->event_name) : NULL);
-	//tr_conf->flags = 0;
 	
 	tr_conf->expression = zbx_strdup(NULL, src_trigger->expression);
 	tr_conf->recovery_expression = zbx_strdup(NULL, src_trigger->recovery_expression);

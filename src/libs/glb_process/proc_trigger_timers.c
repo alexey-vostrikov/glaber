@@ -64,17 +64,21 @@ static void requeue_trigger(u_int64_t triggerid) {
 	
     nextcheck = calc_time_trigger_nextcheck(triggerid, time(NULL) );
 	
-	glb_state_trigger_set_revision(triggerid, time_to_ms_time(nextcheck));
+  //  LOG_INF("Setting new revision %ld", time_to_ms_time(nextcheck));
+
+	state_trigger_set_revision(triggerid, time_to_ms_time(nextcheck));
+//    LOG_INF("Setting new revision2 %ld", time_to_ms_time(nextcheck));
     //LOG_INF("requeue trigger %ld: Adding trigger requeue event in %d seconds, state revision is %d", triggerid, nextcheck - time(NULL), 
     //    glb_state_trigger_get_revision(triggerid));
     DEBUG_TRIGGER(triggerid, "requeue trigger: Adding trigger requeue event in %d seconds, conf is %p", nextcheck - time(NULL), tm_conf->event_queue);
     event_queue_add_event(tm_conf->event_queue, time_to_ms_time(nextcheck), PROCESS_TRIGGER, (void *)triggerid);
-    
+  //  LOG_INF("Finished requeuing");
 }
 
 IPC_PROCESS_CB(process_time_triggers_cb) {
     notify_t *notify = ipc_data;
-        
+    //LOG_INF("Processing new trigger arrival notificatiopn");
+
     DEBUG_TRIGGER(notify->id, "Requeueing trigger arrived on notification");
     requeue_trigger(notify->id);
 
@@ -89,10 +93,8 @@ static void get_new_queue_triggers(int proc_num) {
     if (lastcheck == time(NULL))
         return;
     lastcheck = time(NULL);
-
 	
 	i = glb_ipc_process(ipc_processing_notify, proc_num-1, process_time_triggers_cb, NULL, 1024);
-
    
     glb_ipc_dump_reciever_queues(ipc_processing_notify, "Reciever notify queues", proc_num);
 //	LOG_INF("Saved %d triggers", i);
@@ -102,7 +104,6 @@ static void get_new_queue_triggers(int proc_num) {
 
 int process_time_triggers(int max_triggers, int process_num){
     get_new_queue_triggers(process_num);
-    //LOG_INF("Calling event process for triggers");
     return  event_queue_process_events(tm_conf->event_queue, max_triggers);
 }
 
@@ -112,20 +113,17 @@ EVENT_QUEUE_CALLBACK(process_timer_triggers_cb){
 	int triggerid = (u_int64_t) data;
 	u_int64_t revision = event_time;
 
-   // LOG_INF("Processing time trigger %ld", triggerid);
 	if (FAIL == glb_state_trigger_check_revision(triggerid, revision)) {
-        // LOG_INF("Trigger %d revision number changed %ld->%ld, not processing", triggerid, revision,
-        //    glb_state_trigger_check_revision(triggerid, revision) );
-        DEBUG_TRIGGER( triggerid, "Trigger revision number changed %d->%d, not processing", revision,
+           DEBUG_TRIGGER( triggerid, "Trigger revision number changed %d->%d, not processing", revision,
             glb_state_trigger_check_revision(triggerid, revision) );
 		return FAIL;
 	}
     
-    glb_state_trigger_set_revision(triggerid, 0);
-	//LOG_INF("Recalculating trigger %ld", triggerid);
+    state_trigger_set_revision(triggerid, 0);
+
     recalculate_trigger(triggerid);
 
-    //LOG_INF("Requeueing rigger %ld", triggerid);
+
 	requeue_trigger(triggerid);
 	return SUCCEED;
 }

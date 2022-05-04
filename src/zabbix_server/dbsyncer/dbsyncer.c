@@ -153,8 +153,11 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		
 		//zbx_sync_history_cache(&values_num, &triggers_num, &more, process_num);
 		//glb_process_history_items(&values_num,&triggers_num, &more, process_num);
+		//LOG_INF("Processing metrics and their triggers");
 		values_num = process_metric_values(4096, process_num);
+		//LOG_INF("Processing time triggers");
 		triggers_num = process_time_triggers(2048, process_num);
+		//LOG_INF("Finished processing time triggers");
 	//	LOG_INF("Processed %d triggers", triggers_num);
 		
 		more = ( (values_num + triggers_num) > 0);	

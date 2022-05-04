@@ -31,8 +31,9 @@
 #define PROCESS_FLAG_NOVALUE	0x02	/* entry contains no value */
 #define PROCESS_FLAG_LLD		0x04	/* discovery value */
 #define PROCESS_FLAG_UNDEF	0x08	/* unsupported or undefined (delta calculation failed) value */
-#define PROCESS_FLAG_NOHISTORY	0x10	/* values should not be kept in history */
-#define PROCESS_FLAG_NOTRENDS	0x20	/* values should not be kept in trends */
+//#define PROCESS_FLAG_NOHISTORY	0x10	/* values should not be kept in history */
+//#define PROCESS_FLAG_NOTRENDS	0x20	/* values should not be kept in trends */
+#define PROCESS_METRIC_FLAG_EVENTLOG 0x40 /* log is event sourced */
 
 typedef struct
 {

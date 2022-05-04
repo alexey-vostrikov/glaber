@@ -25,6 +25,7 @@
 #include "state_discovery.h"
 #include "state_items.h"
 #include "state_triggers.h"
+#include "state_problems.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
@@ -90,24 +91,6 @@ int glb_state_get_mem_stats(zbx_mem_stats_t *mem_stats) {
 
 int glb_state_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode) {
 }
-/*
-	zbx_hashset_iter_t	iter;
-	glb_state_elem_t	*elem;
-	
-	*values_num = 0;
-
-    glb_rwlock_rdlock(&glb_cache->items.meta_lock);
-
-	*items_num = glb_cache->items.hset.num_data;
-	
-	zbx_hashset_iter_reset(&glb_cache->items.hset, &iter);
-	while (NULL != (elem = (glb_state_elem_t *)zbx_hashset_iter_next(&iter)))
-			*values_num += elem->values->elem_num;
-
-    glb_rwlock_unlock(&glb_cache->items.meta_lock);
-	
-}
-*/
 
 int glb_state_get_statistics(glb_state_stats_t *stats) {
     stats->hits = glb_cache->stats.hits;
@@ -117,8 +100,6 @@ int glb_state_get_statistics(glb_state_stats_t *stats) {
 }
 
 
-//that's pretty strange destroy proc yet written, the cache is in the SHM which will be destroyed
-//just after the process dies
 void	glb_state_destroy(void)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);

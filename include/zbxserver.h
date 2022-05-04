@@ -83,9 +83,8 @@ int	substitute_simple_macros_unmasked(const zbx_uint64_t *actionid, const DB_EVE
 		const DB_ALERT *alert, const DB_ACKNOWLEDGE *ack, const char *tz, char **data, int macro_type,
 		char *error, int maxerrlen);
 
-int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, zbx_timespec_t *ts);
-//void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
-//		const DC_ITEM *history_items, const int *history_errcodes);
+int evaluate_trigger_expressions(trigger_conf_t *conf, unsigned char *value);
+
 void	prepare_triggers(DC_TRIGGER **triggers, int triggers_num);
 
 

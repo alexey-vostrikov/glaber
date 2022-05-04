@@ -45,10 +45,9 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 
 int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock);
 
-//int process_trigger_event(DB_EVENT *event, trigger_conf_t *conf, trigger_state_t *state);
-int	process_trigger_change(trigger_conf_t *conf, trigger_state_t *state, unsigned char old_vlaue, zbx_timespec_t *ts);
 
-//int	process_event(DB_EVENT *event, trigger_conf_t *conf);
+void	clean_event(DB_EVENT *event);
+int	save_event_to_history(DB_EVENT *event);
 
 void	zbx_clean_events(void);
 void	zbx_reset_event_recovery(void);

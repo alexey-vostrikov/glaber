@@ -43,9 +43,27 @@ better use callbacks with lambda - like processing
 */
 int DCget_conf_trigger(u_int64_t triggerid, trigger_conf_t *conf);
 
+
+/* based on code from dbconfig.c */
+static void	prepare_trigger_conf(trigger_conf_t *tr)
+{
+	tr->eval_ctx = zbx_eval_deserialize_dyn(tr->expression_bin, tr->expression, ZBX_EVAL_EXCTRACT_ALL);
+	DEBUG_TRIGGER(tr->triggerid,"Extracted trigger expression to binary");
+	
+	if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode)
+	{
+		tr->eval_ctx_r = zbx_eval_deserialize_dyn(tr->recovery_expression_bin, tr->recovery_expression,
+					ZBX_EVAL_EXCTRACT_ALL);
+		DEBUG_TRIGGER(tr->triggerid,"Extracted trigger recovery expression to binary");
+	}
+}
+
 int conf_trigger_get_trigger_conf_data(u_int64_t triggerid, trigger_conf_t *conf) {
 	
- 	return DCget_conf_trigger(triggerid, conf);
+ 	DCget_conf_trigger(triggerid, conf);
+	prepare_trigger_conf(conf);
+	return SUCCEED;
+	
 }
 
 void	conf_trigger_get_functionids(zbx_vector_uint64_t *functionids, trigger_conf_t *tr)

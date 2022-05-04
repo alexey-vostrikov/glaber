@@ -3190,6 +3190,42 @@ static void	prepare_actions_conditions_eval(zbx_vector_ptr_t *actions, zbx_hashs
 	}
 }
 
+/* to be optimized - now it's just a dumb conversion */
+void   actions_proccess_trigger_recovery(trigger_recovery_event_t *rec_event) {
+
+	DEBUG_TRIGGER(rec_event->triggerid, "Doing trigger recovery action process for trigger");
+	zbx_vector_ptr_t empty;
+	zbx_vector_uint64_pair_t recovery_events;
+
+	zbx_vector_ptr_create(&empty);
+	zbx_vector_uint64_pair_create(&recovery_events);
+
+	zbx_uint64_pair_t pair = {rec_event->eventid, rec_event->problem_eventid};
+	zbx_vector_uint64_pair_append_ptr(&recovery_events, &pair);
+	
+	process_actions(&empty,&recovery_events);
+
+	zbx_vector_ptr_destroy(&empty);
+	zbx_vector_uint64_pair_destroy(&recovery_events);
+}
+
+/* to be optimized - now it's just a dumb conversion */
+void actions_process_trigger_problem(DB_EVENT *event) {
+	DEBUG_TRIGGER(event->objectid, "Doing trigger problem action process for trigger");
+	zbx_vector_ptr_t events;
+	zbx_vector_uint64_pair_t empty;
+
+	zbx_vector_ptr_create(&events);
+	zbx_vector_uint64_pair_create(&empty);
+	zbx_vector_ptr_append(&events,event);
+
+	process_actions(&events,&empty);
+
+	zbx_vector_ptr_destroy(&events);
+	zbx_vector_uint64_pair_destroy(&empty);
+}
+
+
 /******************************************************************************
  *                                                                            *
  * Function: process_actions                                                  *

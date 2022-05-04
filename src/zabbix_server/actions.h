@@ -22,6 +22,7 @@
 
 #include "common.h"
 #include "db.h"
+#include "../../libs/glb_state/state_triggers.h"
 
 #define ZBX_ACTION_RECOVERY_NONE	0
 #define ZBX_ACTION_RECOVERY_OPERATIONS	1
@@ -61,5 +62,8 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 int	process_actions_by_acknowledgements(const zbx_vector_ptr_t *ack_tasks);
 void	get_db_actions_info(zbx_vector_uint64_t *actionids, zbx_vector_ptr_t *actions);
 void	free_db_action(DB_ACTION *action);
+
+void	actions_proccess_trigger_recovery(trigger_recovery_event_t *rec_event);
+void	actions_process_trigger_problem(DB_EVENT *event);
 
 #endif

@@ -25,6 +25,9 @@
 #include "state_triggers.h"
 #include "../../zabbix_server/events.h"
 #include "../glb_conf/conf_triggers.h"
+#include "state_problems.h"
+//#include "../zbxserver/expression.h"
+#include "zbxserver.h"
 
 typedef struct {
     elems_hash_t *triggers;
@@ -33,44 +36,45 @@ typedef struct {
 } conf_t;
 
 struct trigger_state_t {
- //   unsigned char  state; //TRIGGER_STATE* if UNKNOWN - the errorstr is expected to be set
     unsigned char status; //enabled or disabled
     unsigned char value;
     int lastchange;
- //   int timer_revision;
     u_int64_t revision;
     const char *errorstr; 
     unsigned char	functional;	 /* see TRIGGER_FUNCTIONAL_* defines  expcted to be set according to the item's state */
-//    int problem_count;
+    trigger_problems_t *problems;
 } ;
-
-
-//typedef struct {
-//    trigger_state_t state;
-//} trigger_t;
+typedef struct trigger_state_t trigger_state_t;
 
 static conf_t *conf;
 
 ELEMS_CREATE(trigger_create_cb){
-    trigger_state_t *state = elem->data;
+    trigger_state_t *state = NULL;
+    
     if (NULL == ( state = memf->malloc_func(NULL, sizeof(trigger_state_t)))) 
         return FAIL;
     
+    bzero(state, sizeof(trigger_state_t));
     elem->data = state;
-    bzero(elem->data, sizeof(trigger_state_t));
     
+    //LOG_INF("Doing problems init");
+    if (NULL == ( state->problems = trigger_problems_init(memf)))
+        return FAIL;
+    //LOG_INF("finished problems init");
+    //LOG_INF("Init of t_problems for triggerid %ld is succesifull", elem->id, state);
+   
     state->errorstr = strpool_add(&conf->strpool,"Trigger hasn't been calculated since the server start yet");  
-//	state->state = TRIGGER_STATE_UNKNOWN;
-    state->lastchange= 0; //atoi(row[8]);
-			//trigger->locked = 0;
-	//state->timer_revision = 0;
+    state->lastchange= 0; 
     state->value = TRIGGER_VALUE_UNKNOWN;
 
+    //LOG_INF("Init of t_problems for triggerid %ld is succesifull2", elem->id, state);
     return SUCCEED;
 }
 
 ELEMS_FREE(trigger_free_cb) {
     trigger_state_t *tr_state = elem->data;
+    
+    trigger_problems_destroy(tr_state->problems, memf);
     
     strpool_free(&conf->strpool, tr_state->errorstr);
     
@@ -82,7 +86,6 @@ ELEMS_FREE(trigger_free_cb) {
 
 int glb_state_triggers_init(mem_funcs_t *memf)
 {
-  //  LOG_INF("Doing triggers state init");
     if (NULL == (conf = memf->malloc_func(NULL, sizeof(conf_t))) ||
         NULL == (conf->triggers = elems_hash_init(memf, trigger_create_cb, trigger_free_cb)) 
       ) {
@@ -93,8 +96,22 @@ int glb_state_triggers_init(mem_funcs_t *memf)
     conf->memf = *memf;
 
     strpool_init(&conf->strpool, memf);
+    state_problems_init(&conf->strpool, memf);
+  
     return SUCCEED;
 }
+
+static int  is_event_supressed(DB_EVENT *event) {
+	/* note: should be implemented and put into events */
+	return FAIL;
+}
+
+static int is_recovery_change(unsigned char trigger_value) {
+	if ( TRIGGER_VALUE_OK == trigger_value )
+		return SUCCEED;
+	return FAIL;
+}
+
 
 ELEMS_CALLBACK(set_status_cb){
     trigger_state_t *tr_state = elem->data;
@@ -137,14 +154,14 @@ int glb_state_trigger_set_value(u_int64_t triggerid, unsigned char value) {
     return elems_hash_process(conf->triggers, triggerid, set_value_cb, &value, 0); 
 }
 
-ELEMS_CALLBACK(set_errmsg_cb){
+ELEMS_CALLBACK(set_error_cb){
     trigger_state_t *tr_state = elem->data;
     strpool_replace(&conf->strpool, &tr_state->errorstr, (char *)data);
 }
 
-int glb_state_trigger_set_errmsg(u_int64_t triggerid, char *errmsg) {
+int state_trigger_set_error(u_int64_t triggerid, char *errmsg) {
  //   LOG_INF("in: %s, processing trigger %ld", __func__, triggerid);
-    return elems_hash_process(conf->triggers, triggerid, set_errmsg_cb, errmsg, 0); 
+    return elems_hash_process(conf->triggers, triggerid, set_error_cb, errmsg, 0); 
 };
 
 ELEMS_CALLBACK(get_errmsg_cb) {
@@ -286,14 +303,17 @@ u_int64_t glb_state_trigger_get_revision(u_int64_t triggerid) {
 }
 
 ELEMS_CALLBACK(set_revison_cb) {
+  
     trigger_state_t *tr_state = elem->data;
-    tr_state->revision = *(u_int64_t *)data;
+   // LOG_INF("Setting revision in the callback, state is %p", tr_state);
+    
+    tr_state->revision = (u_int64_t)data;
 
     return SUCCEED;
 }
 
-int glb_state_trigger_set_revision(u_int64_t triggerid, u_int64_t revision) {
-    return elems_hash_process(conf->triggers, triggerid, set_revison_cb, &revision, 0);
+int state_trigger_set_revision(u_int64_t triggerid, u_int64_t revision) {
+    return elems_hash_process(conf->triggers, triggerid, set_revison_cb, (void *)revision, 0);
 }
 
 ELEMS_CALLBACK(exists_cb) {
@@ -343,27 +363,23 @@ int  glb_state_trigger_set_lastchange(u_int64_t triggerid, int lastchange) {
       return elems_hash_process(conf->triggers, triggerid, set_lastchange_cb, &lastchange, ELEM_FLAG_DO_NOT_CREATE);
 } 
 
-void state_trigger_set_error(trigger_state_t *state, char *error) {
-    strpool_replace(&conf->strpool,&state->errorstr, error);
-}
-
-void state_trigger_set_value(trigger_state_t *state, unsigned char value) {
+//void state_trigger_set_value(trigger_state_t *state, unsigned char value) {
     
-    if (TRIGGER_VALUE_PROBLEM == value || TRIGGER_VALUE_OK == value) {
-        strpool_free(&conf->strpool, state->errorstr);
-        state->errorstr = NULL;
-    }
+//    if (TRIGGER_VALUE_PROBLEM == value || TRIGGER_VALUE_OK == value) {
+//        strpool_free(&conf->strpool, state->errorstr);
+//        state->errorstr = NULL;
+//    }
     
-    state->value = value;
-}
+ //   state->value = value;
+//}
 
 //general interface for trigger state processing during it's lock
 int state_trigger_process(u_int64_t triggerid, elems_hash_process_cb_t trigger_state_process_cb, void *data) {
     return elems_hash_process(conf->triggers, triggerid, trigger_state_process_cb, data, 0);
 }
 
-const char* state_trigger_get_errstr(trigger_state_t *state) {
-    return state->errorstr;
+trigger_problems_t *state_trigger_get_problems(trigger_state_t *state) {
+    return state->problems;
 }
 
 int state_trigger_get_lastchange(trigger_state_t *state) {
@@ -378,16 +394,17 @@ unsigned char state_trigger_get_value(trigger_state_t *state) {
     return state->value;
 }
 
-void trigger_event_create(DB_EVENT *event, trigger_conf_t *conf, trigger_state_t *state, unsigned char old_value, zbx_timespec_t *ts){
-    
+static void trigger_event_create(DB_EVENT *event, trigger_conf_t *conf, trigger_state_t *state, unsigned char old_value, zbx_timespec_t *ts){
+
     if (state->value == TRIGGER_VALUE_UNKNOWN || old_value == TRIGGER_VALUE_UNKNOWN ) {
         DEBUG_TRIGGER(conf->triggerid,"Creating internal event for the trigger");
         
-       
+      
         create_event(event, EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, conf->triggerid,
 	 		ts, state->value, NULL, conf->expression,
 	 		conf->recovery_expression, 0, 0, &conf->tags, 0, NULL, 0, NULL, NULL,
 	 		state->errorstr );
+
         return;
     }
     
@@ -401,21 +418,165 @@ void trigger_event_create(DB_EVENT *event, trigger_conf_t *conf, trigger_state_t
 	 	conf->event_name, NULL);
 }
 
-int state_trigger_is_changed(trigger_conf_t *conf, trigger_state_t *state, unsigned char old_value)
+int state_trigger_is_changed(trigger_conf_t *conf, unsigned char new_value, unsigned char old_value)
 {
 	const char		*new_error;
 	int			new_state;
 	
-	DEBUG_TRIGGER(conf->triggerid, "Checking trigger %ld value: %d -> %d, status: %d ", conf->triggerid, 
-		old_value, state->value, state->status );
+	DEBUG_TRIGGER(conf->triggerid, "Checking trigger %ld value: %d -> %d ", conf->triggerid, 
+		old_value, new_value );
 
 	
-    if ( state->value != old_value || 
-        (TRIGGER_VALUE_PROBLEM == state->value &&  TRIGGER_TYPE_MULTIPLE_TRUE == conf->type) ) {
+    if ( new_value != old_value || 
+        (TRIGGER_VALUE_PROBLEM == new_value &&  TRIGGER_TYPE_MULTIPLE_TRUE == conf->type) ) {
         DEBUG_TRIGGER(conf->triggerid,"Trigger is changed");
 
         return SUCCEED;
     }
     
 	return FAIL;
+}
+
+
+typedef struct {
+    trigger_conf_t *conf;
+    DB_EVENT *event;
+} problem_params_t;
+
+ELEMS_CALLBACK(close_problems_cb) {
+    trigger_state_t *state = elem->data;
+    problem_params_t *params = data;
+
+    return problems_close_by_trigger(state->problems, params->conf, params->event);
+}
+
+int trigger_problems_close_problems(DB_EVENT *event, trigger_conf_t *t_conf)  {
+
+    problem_params_t params = {.conf = t_conf, .event = event};
+    return elems_hash_process(conf->triggers, t_conf->triggerid, close_problems_cb, &params, 0);
+
+}
+
+ELEMS_CALLBACK(create_problem_cb) {
+    trigger_state_t *state = elem->data;
+    problem_params_t *params = data;
+    DEBUG_TRIGGER(elem->id, "Called trigger create problem callback for trigger");
+  //  LOG_INF("Called trigger create problem callback for trigger %ld",params->conf->triggerid);
+    problems_create_problem(state->problems, params->event, params->conf->triggerid);
+}
+
+int trigger_problems_create_problem(DB_EVENT *event, trigger_conf_t *t_conf)  {
+    problem_params_t params = {.conf = t_conf, .event = event};
+  //  LOG_INF("Got t_conf %p, event %p", t_conf, event);
+  
+    DEBUG_TRIGGER(t_conf->triggerid, "Calling trigger create problem callback");
+    elems_hash_process(conf->triggers, t_conf->triggerid, create_problem_cb, &params, 0);
+}
+
+ELEMS_CALLBACK(fill_dc_trigger_cb) {
+    DC_TRIGGER *tr_conf = data;
+    trigger_state_t *state = elem->data;
+
+    tr_conf->status = state->status;
+
+	if (NULL != state->errorstr )
+		tr_conf->error = zbx_strdup(NULL, state->errorstr);
+	else tr_conf->error = NULL;
+
+	tr_conf->value = state->value;
+	tr_conf->lastchange = state->lastchange;
+
+    return SUCCEED;
+}
+
+int state_trigger_fill_DC_TRIGGER_state(u_int64_t triggerid, DC_TRIGGER *dctrigger) {
+    elems_hash_process(conf->triggers, triggerid, fill_dc_trigger_cb, dctrigger, 0);
+}
+
+static int	process_trigger_change(trigger_conf_t *conf, trigger_state_t *state, unsigned char old_value, zbx_timespec_t *ts)
+{
+	DB_EVENT event;
+	
+	trigger_event_create(&event, conf, state , old_value, ts);
+	
+	if (SUCCEED == is_event_supressed(&event))
+		return SUCCEED;
+
+	save_event_to_history(&event);	
+	
+	if ( SUCCEED == is_recovery_change(state->value)) { 
+		DEBUG_TRIGGER(conf->triggerid,"Processing trigger PROBLEM->OK change");			
+		/* note: trigger's value might change back to problem if not all correlated
+        problems has been recovered */
+        state->value = trigger_problems_close_problems(&event, conf);
+	} else {
+		DEBUG_TRIGGER(conf->triggerid,"Processing trigger OK->PROBLEM change");	
+	//	LOG_INF("Processing trigger OK->PROBLEM change triggerid %ld", conf->triggerid);		
+		trigger_problems_create_problem(&event, conf);
+	}
+
+	clean_event(&event);
+	return SUCCEED;	
+}
+
+
+int	recalculate_trigger(u_int64_t triggerid)
+{
+
+    DEBUG_TRIGGER(triggerid, "Calculating trigger")
+	static trigger_conf_t conf = {0};
+
+	trigger_state_t *state;
+	zbx_timespec_t ts = {.sec = time(NULL), .ns = 0};
+	
+   // LOG_INF("Recalculating trigger %ld", triggerid);
+
+	DEBUG_TRIGGER(conf.triggerid, "Freeing trigger config data");
+	conf_trigger_free_trigger(&conf);
+
+	/* there is no locking here, if needed, put locking fields to state or state flag */
+	if (FAIL == conf_trigger_get_trigger_conf_data(triggerid, &conf)) {
+	
+		DEBUG_TRIGGER(triggerid, "Trigger configuration fetch failed");
+		return FAIL;
+	}
+	
+	if (NULL ==(state = state_trigger_get_state(triggerid))) {
+		DEBUG_TRIGGER(triggerid,"State configuration fetch failed");
+		return FAIL;
+	}
+	
+	unsigned char old_value = state_trigger_get_value(state);
+
+	DEBUG_TRIGGER(triggerid, "Saved current trigger value: %d", old_value);
+
+	if (SUCCEED != DCconfig_check_trigger_dependencies(triggerid)) {
+	 	DEBUG_TRIGGER(triggerid,"Trigger depends on triggers in PROBLEM state, trigger cannot be calculated right now");
+		 //todo: set new trigger state and error message
+		return FAIL;
+	}
+
+	if ( FAIL == evaluate_trigger_expressions(&conf, &state->value)) {
+		DEBUG_TRIGGER(conf.triggerid,"Evaluate expression failed, finishing processing");
+		return FAIL;
+	}
+
+	if (SUCCEED == state_trigger_is_changed(&conf, state->value, old_value)) {
+	
+		/*trigger calculated to a new value or it's has multiple problem gen */
+		DEBUG_TRIGGER(conf.triggerid, "Trigger processing t, doing event processing");
+	
+		/*note: processing might change trigger state */
+		process_trigger_change(&conf, state, old_value, &ts);
+	
+	} else {
+		DEBUG_TRIGGER(conf.triggerid, "Trigger is not changed, nothing to process");
+	}
+	
+	DEBUG_TRIGGER(conf.triggerid, "Saving new state");
+	state_trigger_set_state(conf.triggerid, state, ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL);
+
+	DEBUG_TRIGGER(conf.triggerid, "Finished trigger processing");
+	
+	return SUCCEED;
 }

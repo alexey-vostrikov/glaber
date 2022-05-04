@@ -32,139 +32,25 @@
 #include "../zbxserver/expression.h"
 
 
-/* based on code from dbconfig.c */
-/* for time-based triggers maybe a separate wrapper required to fetch proc_info */
-void	prepare_trigger_conf(trigger_conf_t *tr)
-{
-	tr->eval_ctx = zbx_eval_deserialize_dyn(tr->expression_bin, tr->expression, ZBX_EVAL_EXCTRACT_ALL);
-	DEBUG_TRIGGER(tr->triggerid,"Extracted trigger expression to binary");
-	
-	if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode)
-	{
-		tr->eval_ctx_r = zbx_eval_deserialize_dyn(tr->recovery_expression_bin, tr->recovery_expression,
-					ZBX_EVAL_EXCTRACT_ALL);
-		DEBUG_TRIGGER(tr->triggerid,"Extracted trigger recovery expression to binary");
-	}
-}
 
-// int check_conf_values(trigger_state_t *conf) {
-// 	switch (conf->state)
-// 	{	
-// 		case TRIGGER_STATE_NORMAL:
-// 		case TRIGGER_STATE_UNKNOWN:
-// 			break;
-// 		default: 
-// 			LOG_INF("Impossible trigger state %d", conf->state);
-// 			return FAIL;
-// 	}
-// 	switch (conf->value) {
-// 		case TRIGGER_VALUE_NONE:
-// 		case TRIGGER_VALUE_OK:
-// 		case TRIGGER_VALUE_PROBLEM:
-// 		case TRIGGER_VALUE_UNKNOWN:
-// 			break;
-// 		default: 
-// 			LOG_INF("Impossible trigger value %d", conf->value);
-// 			return FAIL;
-// 	}
-// 	return SUCCEED;
-// }
 
-// ELEMS_CALLBACK(trigger_process_cb) {
-// 	trigger_conf_t *conf = data;
-// 	trigger_state_t *state = elem->data;
-	
-// 	unsigned char old_value = state_trigger_get_value(state);
-	 
-			
-// 	//zbx_determine_items_in_expressions(&trigger_order, itemids, item_num);
-// 	//HAS_TO_BE_IMPLEMENTED YET
-// 	//maybe this should figure by tests, but so far i couldn't find
-// 	//reasoning for this
-// 	//zbx_determine_items_in_expressions(&trigger_order, itemids, item_num);
-// 	LOG_INF("Trigger %ld: Calling evaluate expression", conf->triggerid);
-// 	//evaluate_expressions(&trigger_order, history_itemids, history_items, history_errcodes);
-// 	if ( FAIL == evaluate_trigger_expressions(conf, state, &ts)) {
-// 		LOG_INF("Trigger %ld: Evaluate expression failed, finishing processing", conf->triggerid);
-// 		return FAIL;
-// 	}
-// 	//zbx_process_triggers(&trigger_order, trigger_diff);
-// 	/* FAST, NO IO, NO LOCKS, OK! */
-// 	LOG_INF("Trigger %ld: Calling trigger changes processing", conf->triggerid);
-// 	state_trigger_process_changes(conf, state, old_value, &ts);
-// 	//process_trigger_changes(conf, state, old_value, &ts);
-	
-// 	//zbx_process_events(&trigger_diff, &triggerids);
-// 	/* SLOW! HAS DB IO, MOVE OUT OF THE LOCK! */
-// 	/* but... it needs the state object for the processing! */
-// 	LOG_INF("Trigger %ld: Calling trigger events processing", conf->triggerid);
-// 	//flush_trigger_events();
-	
-	 
-// 	//if (old_state.value != state->value) {
-// 	//	LOG_INF("Trigger %ld state change %d -> %d", conf->triggerid, old_state.state, state->state);
-// 	//}
 
-// }
-int	recalculate_trigger(u_int64_t triggerid)
-{
-	DEBUG_TRIGGER(triggerid, "Calculating trigger")
-	static trigger_conf_t conf = {0};
 
-	trigger_state_t *state;
-	zbx_timespec_t ts = {.sec = time(NULL), .ns = 0};
-	
+//the question is - how to get state and how to live up with locking?
+//solution1: process trigger's data inside elems lock: 
+//	- bad thing - it's quite long, might deadlock (does so during history sync)
+//solution2: mark trigger as locked, while allow reading it
+//	- this allow unlicked operations with the triggers
+//	- but potentially will fail on trigger deletion
+//solution3: copy - mark locked - work on it - copy back - unlock
+//  - requires locking and several copies
+//solution4: use callback for processing that needs complex data
+//  - like state all together, current tags and so on
+//  - looks like this is the most logical and robust variant
 
-	DEBUG_TRIGGER(conf.triggerid, "Freeing trigger config data");
-	conf_trigger_free_trigger(&conf);
+//actially in most places state isn't required at all,  just need to keep old and new value
+//in most other cases state is used for setting error massage just before exit
 
-	/* there is no locking here, if needed, put locking fields to state or state flag */
-	if (FAIL == conf_trigger_get_trigger_conf_data(triggerid, &conf)) {
-	
-		DEBUG_TRIGGER(triggerid, "Trigger configuration fetch failed");
-		return FAIL;
-	}
-	
-	if (NULL ==(state = state_trigger_get_state(triggerid))) {
-		DEBUG_TRIGGER(triggerid,"State configuration fetch failed");
-		return FAIL;
-	}
-	
-	prepare_trigger_conf(&conf);
-
-	unsigned char old_value = state_trigger_get_value(state);
-	DEBUG_TRIGGER(triggerid, "Saved current trigger value: %d", old_value);
-
-	if (SUCCEED != DCconfig_check_trigger_dependencies(triggerid)) {
-	 	DEBUG_TRIGGER(triggerid,"Trigger depends on triggers in PROBLEM state, trigger cannot be calculated right now");
-		 //todo: set new trigger state and error message
-		return FAIL;
-	}
-
-	if ( FAIL == evaluate_trigger_expressions(&conf, state, &ts)) {
-		DEBUG_TRIGGER(conf.triggerid,"Evaluate expression failed, finishing processing");
-		return FAIL;
-	}
-
-	if (SUCCEED == state_trigger_is_changed(&conf, state, old_value)) {
-	
-		/*trigger calculated to a new value or it's has multiple problem gen */
-		DEBUG_TRIGGER(conf.triggerid, "Trigger processing t, doing event processing");
-	
-		/*note: processing might change trigger state */
-		process_trigger_change(&conf, state, old_value, &ts);
-	
-	} else {
-		DEBUG_TRIGGER(conf.triggerid, "Trigger is not changed, nothing to process");
-	}
-	
-	DEBUG_TRIGGER(conf.triggerid, "Saving new state");
-	state_trigger_set_state(conf.triggerid, state, ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL);
-
-	DEBUG_TRIGGER(conf.triggerid, "Finished trigger processing");
-	
-	return SUCCEED;
-}
 
 
 int process_metric_triggers(u_int64_t itemid) {

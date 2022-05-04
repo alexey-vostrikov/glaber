@@ -215,3 +215,7 @@ ui/locale/frontend.pot
 ui/tests/bootstrap.php
 ui/tests/composer.*
 ui/tests/vendor
+src/glapi/glb_hist_clickhouse
+src/glapi/glb_hist_victoria
+src/glapi/glb_log_listener
+src/glapi/glb_ripe_subscriber

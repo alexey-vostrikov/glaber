@@ -1,3 +1,5 @@
+var 2.11
+    events now logged to history log interface, problems state is kept in the memory
 ver 2.10
     History cache removed, shm ipc introduced, trigger calculation refactored
 ver 2.9.10

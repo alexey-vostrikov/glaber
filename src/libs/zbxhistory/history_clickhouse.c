@@ -567,7 +567,7 @@ static int	add_history_values(void *data, metric_t *metric, metric_processing_da
 		return SUCCEED;
 
 	DEBUG_ITEM(metric->itemid, "Adding metric to the Clickhouse export buffer, value type is %d", value_type);
-	
+
 	if (tbuffer[value_type].num == 0) {
 		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
 			"INSERT INTO %s.%s (day,itemid,clock,value", conf->dbname, hist_tables[value_type]); 
@@ -609,13 +609,19 @@ static int	add_history_values(void *data, metric_t *metric, metric_processing_da
 		zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,", '%s'", escaped_value);
 		zbx_free(escaped_value);
 		break;
-	case ITEM_VALUE_TYPE_LOG:	
-		escaped_value=zbx_dyn_escape_string(metric->value.data.str,ESCAPE_CHARS);
-		
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d",
-				escaped_value, "", "");
-		zbx_free(escaped_value);
+	case ITEM_VALUE_TYPE_LOG: {	
+		char *source;
+		if (0 != (metric->flags & PROCESS_METRIC_FLAG_EVENTLOG)) 
+			source = "events";
+		else 
+			source = "";
 
+		escaped_value=zbx_dyn_escape_string(metric->value.data.str,ESCAPE_CHARS);	
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d",
+			escaped_value, source, 0);
+
+		zbx_free(escaped_value);
+		}
 		break;
 	default:
 		LOG_WRN("Unknown value type %d", value_type);
@@ -644,7 +650,7 @@ static int	add_history_values(void *data, metric_t *metric, metric_processing_da
 	    	 (tbuffer[i].lastflush + GLB_CLICKHOUSE_FLUSH_TIMEOUT < time(NULL) && tbuffer[i].num > 0 ) )
 		{ 		
 			if (SUCCEED != curl_post_request(conf->url, tbuffer[i].buffer, &responce)) 
-			LOG_WRN("FAILED to flush %d values of type %d to clickhouse", tbuffer[i].num, i);
+				LOG_WRN("FAILED to flush %d values of type %d to clickhouse", tbuffer[i].num, i);
 
 			tbuffer[i].offset=0;
 			tbuffer[i].num=0;

@@ -5243,7 +5243,7 @@ static void	evaluate_functions(u_int64_t triggerid, zbx_hashset_t *funcs) {
 }
 
 
-static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_eval_context_t *ctx, trigger_state_t *state)
+static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_eval_context_t *ctx, u_int64_t triggerid)
 {
 	zbx_uint64_t		functionid;
 	zbx_func_t		*func;
@@ -5266,7 +5266,7 @@ static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_ev
 			zbx_snprintf(buf,MAX_STRING_LEN,"Cannot parse function at: \"%s\"",
 					ctx->expression + token->loc.l);
 			
-			state_trigger_set_error(state, buf);
+			state_trigger_set_error(triggerid, buf);
 			return FAIL;
 		}
 
@@ -5275,21 +5275,15 @@ static int	substitute_expression_functions_results(zbx_hashset_t *ifuncs, zbx_ev
 		{
 			zbx_snprintf(buf,MAX_STRING_LEN, "Cannot obtain function"
 					" and item for functionid: " ZBX_FS_UI64, functionid);
-			state_trigger_set_error(state, buf);
+			state_trigger_set_error(triggerid, buf);
 			return FAIL;
 		}
 
 		func = ifunc->func;
-
-//		if (NULL != func->error)
-//		{
-//			*error = zbx_strdup(*error, func->error);
-//			return FAIL;
-//		}
-
+		
 		if (ZBX_VARIANT_NONE == func->value.type)
 		{
-			state_trigger_set_error(state, "Unexpected error while processing a trigger expression");
+			state_trigger_set_error(triggerid, "Unexpected error while processing a trigger expression");
 			return FAIL;
 		}
 
@@ -5314,11 +5308,11 @@ static void	log_expression(const char *prefix, int index, const zbx_eval_context
 
 
 
-static int	substitute_functions_results(zbx_hashset_t *ifuncs, trigger_conf_t *conf, trigger_state_t *state)
+static int	substitute_functions_results(zbx_hashset_t *ifuncs, trigger_conf_t *conf)
 {
 	char *error;
 	
-	if( SUCCEED != substitute_expression_functions_results(ifuncs, conf->eval_ctx, state))
+	if( SUCCEED != substitute_expression_functions_results(ifuncs, conf->eval_ctx, conf->triggerid))
 		return FAIL;
 	
 
@@ -5326,7 +5320,7 @@ static int	substitute_functions_results(zbx_hashset_t *ifuncs, trigger_conf_t *c
 
 	if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == conf->recovery_mode)
 	{
-		if (SUCCEED != substitute_expression_functions_results(ifuncs, conf->eval_ctx_r, state))
+		if (SUCCEED != substitute_expression_functions_results(ifuncs, conf->eval_ctx_r, conf->triggerid))
 			return FAIL;
 		
 		log_expression(__func__, 1, conf->eval_ctx_r);
@@ -5335,7 +5329,7 @@ static int	substitute_functions_results(zbx_hashset_t *ifuncs, trigger_conf_t *c
 }
 
 
-static int 	substitute_trigger_functions(trigger_conf_t *conf, trigger_state_t *state)
+static int 	substitute_trigger_functions(trigger_conf_t *conf)
 {
 	zbx_vector_uint64_t	functionids;
 	zbx_hashset_t		ifuncs, funcs;
@@ -5366,7 +5360,7 @@ static int 	substitute_trigger_functions(trigger_conf_t *conf, trigger_state_t *
 		DEBUG_TRIGGER(conf->triggerid,"Evaluating functions");
 		evaluate_functions(conf->triggerid, &funcs);
 
-		ret = substitute_functions_results(&ifuncs, conf, state);
+		ret = substitute_functions_results(&ifuncs, conf);
 	}
 
 	zbx_hashset_destroy(&ifuncs);
@@ -5444,25 +5438,24 @@ static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts
 }
 
 
-int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, zbx_timespec_t *ts)
+int evaluate_trigger_expressions(trigger_conf_t *conf, unsigned char *value)
 {
 	DB_EVENT		event;
 	double			expr_result;
 	char			err[MAX_STRING_LEN], buf[MAX_STRING_LEN];
-
+	zbx_timespec_t ts = {.sec = time(NULL), .ns = 0};
 
 	event.object = EVENT_OBJECT_TRIGGER;
 
 	DEBUG_TRIGGER(conf->triggerid,"Evaluating trigger expressions");
-	event.value =  state_trigger_get_value(state);
+	event.value = *value;
 
 	
 	if (SUCCEED != expand_trigger_macros(conf->eval_ctx, &event, err, sizeof(err)))
 	{
-		
 		zbx_snprintf(buf, MAX_STRING_LEN,"Cannot evaluate expression: %s", err );
 		DEBUG_TRIGGER(conf->triggerid, "Couldn't expand trigger macro: %s, set to UNKNOWN value", buf);		
-		state_trigger_set_error(state, buf);
+		state_trigger_set_error(conf->triggerid, buf);
 		return FAIL;
 	}
 
@@ -5471,22 +5464,20 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 	{
 		
 		zbx_snprintf(buf, MAX_STRING_LEN,"Cannot evaluate expression: %s", err);
-		state_trigger_set_error(state, buf);
+		state_trigger_set_error(conf->triggerid, buf);
 		DEBUG_TRIGGER(conf->triggerid, "Couldn't expand recovery trigger macro: %s, set to UNKNOWN value", buf);	
 		return FAIL;
 	}	
 	
-	if ( FAIL == substitute_trigger_functions(conf, state)) {
+	if ( FAIL == substitute_trigger_functions(conf)) {
 		DEBUG_TRIGGER( conf->triggerid, "Trigger substitute functions failed");
 		return FAIL;
 	}
-	
-	
-	if (SUCCEED != evaluate_expression(conf->eval_ctx, ts, &expr_result, err, conf->triggerid)) {
+		
+	if (SUCCEED != evaluate_expression(conf->eval_ctx, &ts, &expr_result, err, conf->triggerid)) {
 		DEBUG_TRIGGER( conf->triggerid, "evluating expressions failed: %s", err);
 		
-		state_trigger_set_error(state, err);
-				
+		state_trigger_set_error(conf->triggerid, err);
 		return FAIL;
 	}
 	
@@ -5496,7 +5487,8 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 	if (SUCCEED != zbx_double_compare(expr_result, 0.0))
 	{ //expression is in the problem state
 		
-		state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
+		
+		*value = TRIGGER_VALUE_PROBLEM;
 		DEBUG_TRIGGER(conf->triggerid, "Trigger has PROBLEM value");
 		return SUCCEED;
 
@@ -5508,14 +5500,15 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 		case TRIGGER_RECOVERY_MODE_EXPRESSION:
 			//LOG_INF("Trigger %ld has NO recovery expression, setting  OK value", conf->triggerid);
 			//no recovery expression - set OK state to the trigger
-			state_trigger_set_value(state, TRIGGER_VALUE_OK);
-			//LOG_INF("Set OK value");
+			*value = TRIGGER_VALUE_OK;
+			
 			return SUCCEED;
 			break;
 		case TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION:
-			if ( SUCCEED != evaluate_expression(conf->eval_ctx_r, ts, &expr_result, buf, conf->triggerid))
+			if ( SUCCEED != evaluate_expression(conf->eval_ctx_r, &ts, &expr_result, buf, conf->triggerid))
 			{ //calc failed - trigger is in the unknow state
- 			 	state_trigger_set_value(state, TRIGGER_VALUE_UNKNOWN);
+ 			
+			  	*value = TRIGGER_VALUE_UNKNOWN;
 				DEBUG_TRIGGER(conf->triggerid, "has UNKNOWN value due to recovery expression eval fail");
 			
 				return SUCCEED;
@@ -5523,12 +5516,12 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 
 			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
 			{	//recovery expression evaluates to true
-				state_trigger_set_value(state, TRIGGER_VALUE_OK);
+				*value = TRIGGER_VALUE_OK;
 				DEBUG_TRIGGER(conf->triggerid, "Trigger has OK value");
 				return SUCCEED;
 			} else {
 				//setting problem state in case is it wasn't problem before
-				state_trigger_set_value(state, TRIGGER_VALUE_PROBLEM);
+				*value = TRIGGER_VALUE_PROBLEM;
 				DEBUG_TRIGGER(conf->triggerid, "Trigger has PROBLEM value");
 
 				return SUCCEED;
@@ -5545,128 +5538,6 @@ int evaluate_trigger_expressions(trigger_conf_t *conf, trigger_state_t *state, z
 }
 
 
-/******************************************************************************
- *                                                                            *
- * Function: evaluate_expressions                                             *
- *                                                                            *
- * Purpose: evaluate trigger expressions                                      *
- *                                                                            *
- * Parameters: triggers - [IN] vector of DC_TRIGGER pointers, sorted by       *
- *                             triggerids                                     *
- *                                                                            *
- * Author: Alexei Vladishev                                                   *
- *                                                                            *
- ******************************************************************************/
-// void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t *history_itemids,
-// 		const DC_ITEM *history_items, const int *history_errcodes)
-// {
-// 	DB_EVENT		event;
-// 	DC_TRIGGER		*tr;
-// 	int			i;
-// 	double			expr_result;
-// 	char			err[MAX_STRING_LEN];
-
-// 	LOG_DBG("In %s() tr_num:%d", __func__, triggers->values_num);
-
-// 	event.object = EVENT_OBJECT_TRIGGER;
-
-// 	for (i = 0; i < triggers->values_num; i++)
-// 	{
-// 		tr = (DC_TRIGGER *)triggers->values[i];
-		
-// 		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
-// 		event.value = tr->value;
-
-// 		if (SUCCEED != expand_trigger_macros(tr->eval_ctx, &event, err, sizeof(err)))
-// 		{
-// 			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
-// 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
-// 			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value");
-// 			LOG_INF("Couldn't expand trigger %ld macro",tr->triggerid);
-// 		}
-
-// 		if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode &&
-// 				SUCCEED != expand_trigger_macros(tr->eval_ctx_r, &event, err, sizeof(err)))
-// 		{
-// 			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", err);
-// 			LOG_INF("Couldn't expand trigger %ld macro: err %s",tr->triggerid,err);
-// 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
-// 		}
-// 	}
-
-// 	substitute_functions(triggers, history_itemids, history_items, history_errcodes);
-
-// 	/* calculate new trigger values based on their recovery modes and expression evaluations */
-// 	for (i = 0; i < triggers->values_num; i++)
-// 	{
-// 		tr = (DC_TRIGGER *)triggers->values[i];
-
-// 		if (NULL != tr->new_error)
-// 			continue;
-
-// 		if (SUCCEED != evaluate_expression(tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
-// 			LOG_DBG("Failed to eval %ld trigger expression",tr->triggerid);
-// 			continue;
-// 		}
-// 		/* trigger expression evaluates to true, set PROBLEM value */
-// 		if (SUCCEED != zbx_double_compare(expr_result, 0.0))
-// 		{
-// 			if (0 == (tr->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION))
-// 			{
-// 				/* trigger value should remain unchanged and no PROBLEM events should be generated if */
-// 				/* problem expression evaluates to true, but trigger recalculation was initiated by a */
-// 				/* time-based function or a new value of an item in recovery expression */
-// 				tr->new_value = TRIGGER_VALUE_NONE;
-// 			}
-// 			else
-// 				tr->new_value = TRIGGER_VALUE_PROBLEM;
-
-// 			continue;
-// 		}
-
-// 		/* otherwise try to recover trigger by setting OK value */
-// 		if (TRIGGER_VALUE_PROBLEM == tr->value && TRIGGER_RECOVERY_MODE_NONE != tr->recovery_mode)
-// 		{
-// 			if (TRIGGER_RECOVERY_MODE_EXPRESSION == tr->recovery_mode)
-// 			{
-// 				tr->new_value = TRIGGER_VALUE_OK;
-// 				continue;
-// 			}
-
-// 			/* processing recovery expression mode */
-// 			if (SUCCEED != evaluate_expression(tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
-// 			{
-// 				tr->new_value = TRIGGER_VALUE_UNKNOWN;
-// 				continue;
-// 			}
-
-// 			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
-// 			{
-// 				tr->new_value = TRIGGER_VALUE_OK;
-// 				continue;
-// 			}
-// 		}
-
-// 		/* no changes, keep the old value */
-// 		tr->new_value = TRIGGER_VALUE_NONE;
-// 	}
-
-// 	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
-// 	{
-// 		for (i = 0; i < triggers->values_num; i++)
-// 		{
-// 			tr = (DC_TRIGGER *)triggers->values[i];
-
-// 			if (NULL != tr->new_error)
-// 			{
-// 				zabbix_log(LOG_LEVEL_DEBUG, "%s():expression [%s] cannot be evaluated: %s",
-// 						__func__, tr->expression, tr->new_error);
-// 			}
-// 		}
-
-// 		zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-// 	}
-// }
 
 /******************************************************************************
  *                                                                            *

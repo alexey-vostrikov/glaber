@@ -344,6 +344,7 @@ typedef struct
 	zbx_uint64_t		eventid;
 	DB_TRIGGER		trigger;
 	zbx_uint64_t		objectid;
+	u_int64_t		problem_eventid;
 	char			*name;
 	int			source;
 	int			object;
@@ -353,7 +354,6 @@ typedef struct
 	int			ns;
 	int			severity;
 	unsigned char		suppressed;
-
 	zbx_vector_ptr_t	tags;	/* used for both zbx_tag_t and zbx_host_tag_t */
 
 #define ZBX_FLAGS_DB_EVENT_UNSET		0x0000

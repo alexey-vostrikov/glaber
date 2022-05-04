@@ -53,11 +53,7 @@ typedef struct
 /*inits ipc for config notification */
 int process_trigger_init(int process_num);
 
-//void get_trigger_functionids(zbx_vector_uint64_t *functionids, trigger_conf_t *tr);
-
-/* primary intreface to recalc items triggers when it's needed */
-int process_trigger(u_int64_t triggerid);
 int process_metric_triggers(u_int64_t itemid);
-int	recalculate_trigger(u_int64_t triggerid);
+
 
 #endif
