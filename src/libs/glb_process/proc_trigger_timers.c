@@ -154,7 +154,7 @@ int processing_trigger_timers_init(int notify_queue_size, mem_funcs_t *memf) {
 
     if (NULL == (ipc_processing_notify = glb_ipc_init(IPC_PROCESSING_NOTIFY, 64 * ZBX_MEBIBYTE , "Processing notify queue", 
 				notify_queue_size, sizeof(notify_t), CONFIG_HISTSYNCER_FORKS,  memf, notify_ipc_create_cb, 
-                    notify_ipc_free_cb)))
+                    notify_ipc_free_cb, IPC_LOW_LATENCY)))
 			return FAIL;
     
     return SUCCEED;

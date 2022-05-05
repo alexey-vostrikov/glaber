@@ -43,7 +43,6 @@ better use callbacks with lambda - like processing
 */
 int DCget_conf_trigger(u_int64_t triggerid, trigger_conf_t *conf);
 
-
 /* based on code from dbconfig.c */
 static void	prepare_trigger_conf(trigger_conf_t *tr)
 {

@@ -29,6 +29,7 @@
 
 //for debugging only to have metric 
 #include "../glb_process/process.h"
+#define IPC_BULK_COUNT 256
 
 typedef struct ipc_element_t ipc_element_t;
 
@@ -60,6 +61,7 @@ typedef struct {
 
 	ipc_queue_t free_queue; //init in the SHM
 	ipc_queue_t *queues; //init in the SHM
+	ipc_mode_t mode; //ipc_bulk or ipc_fast
 
 } ipc_conf_t;
 
@@ -185,18 +187,18 @@ static void dump_queue(ipc_queue_t *q, char *name) {
 	ipc_element_t *elem = q->first;
 }
 
-
+/*note: the function is intended to local non blocking use only */
 static int move_one_element(ipc_queue_t *src, ipc_queue_t *dst, char *move_name) {
 	int ret = SUCCEED;
 
-	glb_lock_block(&src->lock);
+	//glb_lock_block(&src->lock);
 
 	if (src->count == 0) {
-		glb_lock_unlock(&src->lock);
+	//	glb_lock_unlock(&src->lock);
 		return FAIL;	
 	}
 
-	glb_lock_block(&dst->lock);
+	//glb_lock_block(&dst->lock);
 //	LOG_INF("Unlocked, dumping before move (%s):",move_name);
 //	dump_queue(src, "Src");
 //	dump_queue(dst, "Dst");
@@ -229,8 +231,10 @@ static int move_one_element(ipc_queue_t *src, ipc_queue_t *dst, char *move_name)
 //	LOG_INF("Unlocking, dump after move (%s):", move_name);
 //	dump_queue(src, "Src");
 //	dump_queue(dst, "Dst");
-	glb_lock_unlock(&dst->lock);
-	glb_lock_unlock(&src->lock);
+
+//	glb_lock_unlock(&dst->lock);
+//	glb_lock_unlock(&src->lock);
+
 //	LOG_INF("Finished");
 	return SUCCEED;
 }
@@ -251,7 +255,7 @@ static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *
 		glb_lock_unlock(&src->lock);
 		return FAIL;	
 	}
-//	Moving adll elements from local queue LOG_INF("Locking destination queue");
+
 	glb_lock_block(&dst->lock);
 
 	ipc_element_t *new_last = src->first;
@@ -284,13 +288,6 @@ static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *
 	dst->count += i;	
 	new_last->next = NULL;
 
-//	LOG_INF("new src->last is %p", src->last);
-//	LOG_INF("After move  src queue has %d items, dst queue has %d items", src->count, dst->count);
-	
-//	LOG_INF("Unlocking, dump after move (%s):", move_name);
-//	dump_queue(dst, "Dst");
-//	dump_queue(src, "Src");
-
 	glb_lock_unlock(&dst->lock);
 	glb_lock_unlock(&src->lock);
 //	LOG_INF("Finished");
@@ -308,8 +305,8 @@ static void flush_queues(ipc_conf_t *ipc) {
 	last_flush = now;
 
 	for (i =0 ; i < ipc->consumers; i ++ ) {
-//		LOG_INF("Moving all elements from local queue [%d, %d] to ipc type %d, queue %d", ipc->type, i, ipc->type, i);
-		move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
+		if (IPC_LOW_LATENCY == ipc->mode || local_queues[ipc->type].send_queues[i].count > IPC_BULK_COUNT)
+			move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
 	}
 	
 }
@@ -318,7 +315,8 @@ int glb_ipc_flush_all(void *ipc_conf) {
 	int i = 0;
 
 	for (i = 0 ; i < ipc->consumers; i ++ ) {
-		move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
+		if (IPC_LOW_LATENCY == ipc->mode || local_queues[ipc->type].send_queues[i].count > IPC_BULK_COUNT)
+			move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
 	}
 }
 
@@ -326,9 +324,10 @@ static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, 
 	static int laststat = 0;
 	
 	while (local_free_queue->count == 0 ) {
-		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, 16, "ipc_free -> local free")) {
+		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, IPC_BULK_COUNT, "ipc_free -> local free")) {
 			if (0 != lock) {
-				usleep(1000);
+			//	LOG_INF("ipc Lock wait");
+				usleep(13300);
 				continue;
 			}
 			
@@ -364,47 +363,14 @@ int glb_ipc_send(void *ipc_conf, int queue_num, void* send_data, unsigned char l
 	return SUCCEED;
 }
 
-
-// int glb_ipc_recieve(void *ipc_conf, int consumerid, void *buffer) {
-	
-// 	ipc_element_t *element;
-// 	ipc_conf_t *ipc = ipc_conf;
-
-// 	ipc_queue_t *local_rcv_queue = &local_queues[ipc->type].rcv_queue,
-// 				*rcv_queue = &ipc->queues[consumerid],
-// 				*local_free_queue = &local_queues[ipc->type].free_rcv_queue;
-	
-// //	LOG_INF("IPC_RECIEVE: ");
-// //	dump_queue(rcv_queue, "Rcv global queue");
-// //	dump_queue(local_rcv_queue, "Rcv local queue");
-
-// 	if (local_rcv_queue->count == 0 &&
-// 		FAIL == move_all_elements(rcv_queue, local_rcv_queue)) {
-// 		LOG_INF("No data arrived yet, local and global rcv queue is empty");
-// 		return NO_DATA;
-// 	}
-
-// 	//LOG_INF("Got %d elements in the rcv queue", local_rcv_queue->count);
-// 	element = local_rcv_queue->first;
-// 	//LOG_INF("Filling the buffer/releasing IPC mem, element addr is %p", element);
-// 	ipc->release_cb(&ipc->memf, (void *)(&element->data), buffer);	
-
-// 	//LOG_INF("Returning to the local free queue, queue size is %d", local_free_queue->count);
-// 	move_one_element(local_rcv_queue, local_free_queue, "local_recieve -> local_free");
-// //	LOG_INF("Moved one element to the free buffer");
-// 	if (local_free_queue->count >= 16 ) {
-// //		LOG_INF("Returning to the global free queue");
-// 		move_all_elements(local_free_queue, &ipc->free_queue);
-// 	}
-// 	return SUCCEED;
-// }
-
 /* callback based interface to process incoming data without need 
 to pop or copy data, returns number of the processed messages */
 int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
 	int i = 0;
 	ipc_element_t *element;
 	ipc_conf_t *ipc = ipc_conf;
+	static u_int64_t last_rcv_check = 0;
+	u_int64_t now = glb_ms_time();
 
 	ipc_queue_t *local_rcv_queue = &local_queues[ipc->type].rcv_queue,
 				*rcv_queue = &ipc->queues[consumerid],
@@ -416,12 +382,18 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 //	dump_queue(rcv_queue, "Rcv global queue");
 //	dump_queue(local_rcv_queue, "Rcv local queue");
 
-		if (local_rcv_queue->count == 0 &&
-			FAIL == move_all_elements(rcv_queue, local_rcv_queue)) {
-			//LOG_INF("No data arrived yet, local and global rcv queue is empty");
-			break;
-		}
+		if (local_rcv_queue->count == 0 ) 
+		{
+			if (now == last_rcv_check)
+				break; /*no reason to hummer queue more then once a millisecind */ 
 
+			last_rcv_check = now;
+
+			if (FAIL == move_all_elements(rcv_queue, local_rcv_queue)) {
+				//LOG_INF("No data arrived yet, local and global rcv queue is empty");
+				break;
+			}
+		}
 		//LOG_INF("Got %d elements in the rcv queue", local_rcv_queue->count);
 		element = local_rcv_queue->first;
 		
@@ -435,7 +407,7 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 		move_one_element(local_rcv_queue, local_free_queue, "local_recieve -> local_free");
 		
 		//	LOG_INF("Moved one element to the free buffer");
-		if (local_free_queue->count >= 16 ) {
+		if (local_free_queue->count >= 256 ) {
 			//LOG_INF("Returning to the global free queue");
 			move_all_elements(local_free_queue, &ipc->free_queue);
 		}
@@ -446,7 +418,7 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 }
 
 void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb) {
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode) {
     
 	ipc_conf_t *conf;
 	int i;

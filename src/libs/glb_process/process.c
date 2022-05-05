@@ -220,7 +220,7 @@ static void free_metric(metric_t *metric, zbx_mem_free_func_t free_func) {
 IPC_PROCESS_CB(process_metric_cb) {
 	metric_t *metric = ipc_data;
 	metric_processing_data_t proc_data;
-	ZBX_DC_HISTORY *history = cb_data;
+	//ZBX_DC_HISTORY *history = cb_data;
 
 	if ( FAIL == fetch_metric_processing_data(metric->itemid, &proc_data) ) {
 		LOG_INF("Failed to fetch processing data for the metric, skipping from processing");
@@ -414,7 +414,7 @@ int glb_processing_ipc_init(int consumers, int metrics_queue_size, int notify_qu
 //	LOG_INF("Allocating memory for ipc config, func addr is %p ",metric_ipc_create_cb);
 
     if (NULL == (ipc_processing = glb_ipc_init(IPC_PROCESSING, CONFIG_PROCESSING_IPC_SIZE , "Processing queue", 
-				metrics_queue_size, sizeof(metric_t), CONFIG_HISTSYNCER_FORKS,  &memf, metric_ipc_create_cb, metric_ipc_free_cb)))
+				metrics_queue_size, sizeof(metric_t), CONFIG_HISTSYNCER_FORKS,  &memf, metric_ipc_create_cb, metric_ipc_free_cb, IPC_HIGH_VOLUME)))
 		
 		return FAIL;
 	

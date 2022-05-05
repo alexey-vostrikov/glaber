@@ -138,12 +138,14 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 			last_stat_time = time(NULL);
 		}
 
-		if (more > 0 )
+		if (values_num + triggers_num > 0) {
 			continue;
-			
+		}
+
 		if (!ZBX_IS_RUNNING())
 			break;
 		
+		LOG_INF("Sleep cycle");
 		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
 		usleep(1000);
 		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);

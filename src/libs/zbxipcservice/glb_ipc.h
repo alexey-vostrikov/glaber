@@ -58,6 +58,12 @@ typedef enum
 	GLB_IPC_NONE 
 } glb_ipc_types_enum;
 
+typedef enum 
+{
+	IPC_HIGH_VOLUME = 8, //for bufferd high volume traffic
+	IPC_LOW_LATENCY //to send local messages, with immediate send, but will produce more locks
+} ipc_mode_t;
+
 typedef void (*ipc_data_create_cb_t)(mem_funcs_t *memf, void *ipc_data, void *buffer);
 typedef void (*ipc_data_free_cb_t)(mem_funcs_t *memf, void *ipc_data);
 typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data);
@@ -79,7 +85,7 @@ typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
 
 //typical init staff
 void	*glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func);
+			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
 void	glb_ipc_destroy();
 
 //this will copy data to the ipc mem and put to local queue and try to flush 

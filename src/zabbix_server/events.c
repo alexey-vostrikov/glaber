@@ -188,7 +188,18 @@ void	clean_event(DB_EVENT *event)
 		zbx_vector_ptr_destroy(&event->tags);
 	}
 }
-
+/* the idea is to use msec time as event id */
+/* this way event id might be non-unique, but so far i don't see where
+ this is important. Event by id should always be requested with triggerid */
+u_int64_t generate_event_id() {
+	static last_id = 0;
+	u_int64_t new_id = glb_ms_time();
+	if (new_id <= last_id) {
+		new_id = last_id +1;
+	} 
+	last_id = new_id;
+	return new_id;
+}
 /******************************************************************************
  *                                                                            *
  * Function: create_event                                                     *
@@ -232,7 +243,7 @@ int create_event(DB_EVENT *event, unsigned char source, unsigned char object, zb
 	zbx_vector_ptr_t	item_tags;
 	int			i;
 	
-	event->eventid = DBget_maxid_num("events", 1);
+	event->eventid = generate_event_id();
 	event->source = source;
 	event->object = object;
 	event->objectid = objectid;
