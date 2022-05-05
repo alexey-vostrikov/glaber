@@ -192,7 +192,7 @@ void	clean_event(DB_EVENT *event)
 /* this way event id might be non-unique, but so far i don't see where
  this is important. Event by id should always be requested with triggerid */
 u_int64_t generate_event_id() {
-	static last_id = 0;
+	static u_int64_t last_id = 0;
 	u_int64_t new_id = glb_ms_time();
 	if (new_id <= last_id) {
 		new_id = last_id +1;
