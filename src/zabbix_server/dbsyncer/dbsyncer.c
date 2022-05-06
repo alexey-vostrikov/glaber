@@ -145,7 +145,6 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		if (!ZBX_IS_RUNNING())
 			break;
 		
-		LOG_INF("Sleep cycle");
 		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
 		usleep(1000);
 		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);

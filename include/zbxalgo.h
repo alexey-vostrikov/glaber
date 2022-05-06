@@ -611,11 +611,6 @@ const char *strpool_copy(const char *str);
 
 typedef int	(*event_queue_cb_func_t)(void *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf);
 
-// typedef struct {
-// 	event_queue_cb_func_t func;
-// 	int event_id;
-// } event_queue_cb_conf_t;
-
 typedef struct event_queue_conf_t event_queue_conf_t;
 
 event_queue_conf_t *event_queue_init(mem_funcs_t *s_memf);

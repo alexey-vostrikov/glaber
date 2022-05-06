@@ -21,6 +21,36 @@
 #include "zbxalgo.h"
 
 #define MAX_EVENT_CALLBACK_ID 255
+/*event queue is done to process async logic
+ - has millisecond precision 
+ - a typical implementation is:
+ //init
+ event_queue_init();
+
+ event_queue_add_callback(EVENT_TYPE1, callback1);
+ event_queue_add_callback(EVENT_TYPE2, callback2);
+ ...
+ event_queue_add_callback(EVENT_TYPE22, callback22);
+//end of init
+
+ event_queue_add_event(TYPE, time_to_call_callback);
+ 
+ while (some condition)
+    event_queue_process_events(MAX_EVENT_PER_RUN); //will process MAX_EVENTS_PER_RUN for which time is arrived
+                                                   //the event handlers might place new events
+
+ //note: there is no way to delete an event from the queue
+ // so to do this you save time for which the right event is planned 
+ // and while processing the event make sure that it has matching time
+ // this logic doesn't covered in the event handling
+
+ //event data holds: 	
+    zbx_uint64_t	key;
+	const void		*data;
+
+    which allows to save object ids in the local_data without extra allocations
+*/
+
 struct event_queue_conf_t
 {
     zbx_binary_heap_t queue;

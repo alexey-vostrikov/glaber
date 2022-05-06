@@ -389,7 +389,25 @@ static int sumtime(u_int64_t *sum, zbx_timespec_t start) {
 	*sum = *sum + (ts.sec - start.sec) * 1000000000 + ts.ns - start.ns;
 }
 
+// EVENT_QUEUE_CALLBACK(item_poll_cb) {
+// 	u_int64_t itemid = (u_int64_t)data;
+// 	GLB_POLLER_ITEM *poller_item;
 
+// 	if (NULL == (poller_item = poller_get_pollable_item(itemid))) /* check if the item is still valid and could be polled */
+// 		return FAIL;
+
+// 	if (FAIL == poller_check_item_version(poller_item, event_time)) {
+// 		DEBUG_ITEM(itemid, "Item poll event outdated event: %ld, item: %ld", event_time, poller_item->event_time)
+// 		return FAIL;
+// 	}
+
+// 	poller_start_item_poll(&poll.poller, glb_item); /* note: most async poller might delay the item's poll due to own logic */
+// 	event_queue_add_event(queue, now + POLLING_ITEM_TIMEOUT, ITEM_POLL, itemid);
+// }
+
+// EVENT_QUEUE_CALLBACK(new_items_notify_check_cb) {
+
+// }
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
@@ -490,7 +508,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 				num = DCconfig_get_glb_poller_items(&poll, poll.item_type, process_num);
 				//sumtime(&get_items_time, ts_get_items);
 				LOG_DBG("Event: got %d new items from the config cache", num);
-				add_event(&poll.events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now+1); 
+				add_event(&poll.events, GLB_EVENT_NEW_ITEMS_CHECK, 0, now + 10); 
 				zbx_hashset_iter_t iter;
 				zbx_hashset_iter_reset(&poll.items, &iter );
 				while ( NULL != (glb_item=zbx_hashset_iter_next(&iter))) {
