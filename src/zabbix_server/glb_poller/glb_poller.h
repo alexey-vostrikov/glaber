@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C) 2001-2020 Glaber JSC
+** Copyright (C) 2001-2028 Glaber JSC
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,8 +23,7 @@
 #include "threads.h"
 
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
-#define GLB_EVENT_ITEM_POLL 1
-#define GLB_EVENT_NEW_ITEMS_CHECK 2
+
 
 #define GLB_DNS_CACHE_TIME 120 //for how long name to ip resolvings have to be remembered
 
@@ -37,74 +36,56 @@
 #define GLB_PROTO_ERRCODE "errcode"
 #define GLB_PROTO_ERROR "error"
 
-typedef struct glb_poll_module_t glb_poll_module_t;
+typedef struct poll_engine_t poll_engine_t;
+typedef struct poller_item_t poller_item_t;
 
-typedef struct
-{
-	zbx_uint64_t itemid;
-	zbx_uint64_t hostid;
-	unsigned char state;
-	unsigned char value_type;
-	const char *delay;
-	unsigned char item_type;
-	unsigned char flags;
-	unsigned int lastpolltime;
-	void *itemdata;		 //item type specific data
-	int change_time; //rules if the item should be updated or it's the same config
-} GLB_POLLER_ITEM;
+typedef	int (*init_item_cb)(void *mod_conf, DC_ITEM *dc_item, poller_item_t *glb_poller_item);
+typedef	void (*delete_item_cb)(void *mod_comf, poller_item_t *glb_item);
+typedef	void (*handle_async_io_cb)(void *mod_conf);
+typedef void (*start_poll_cb)(void *mod_conf, poller_item_t *glb_item);
+typedef void  (*shutdown_cb)(void *mod_conf);
+typedef int (*forks_count_cb)(void *mod_conf);
 
-struct glb_poll_module_t  {
-	int 		(*init_item)(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_ITEM *glb_poller_item);
-	void		(*delete_item)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item);
-	
-	void	(*handle_async_io)(glb_poll_module_t *poll_mod);
-	void		(*start_poll)(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item);
-	
-	void 	(*shutdown)(glb_poll_module_t *poll_mod);
-	int 	(*forks_count)(glb_poll_module_t *poll_mod);
-
-	void *poller_data;
-	
-	int requests;
-	int responses;
-} ;
-
-typedef struct {
-	glb_poll_module_t poller;
-
-	unsigned char item_type;
-
-	zbx_binary_heap_t events; 
-	zbx_hashset_t items;	  
-	zbx_hashset_t hosts;	  
-	
-	int next_stat_time;
-	int old_activity;
-} glb_poll_engine_t;
-
-typedef struct
-{
-	zbx_uint64_t hostid;
-	unsigned int poll_items;
-	unsigned int items;
-	unsigned int fails;
-	unsigned int first_fail;
-	time_t disabled_till;
-
-} GLB_POLLER_HOST;
-
-int event_elem_compare(const void *d1, const void *d2);
-void add_host_fail(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
-void add_host_succeed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_poller_create_item(void *poller_data, DC_ITEM *dc_item);
 int glb_poller_delete_item(void *poller_data, u_int64_t itemid);
-int glb_poller_get_forks(void *poller_data);
+int glb_poller_get_forks();
 
-u_int64_t glb_ms_time(); //retruns time in millisecodns
+poller_item_t *poller_get_pollable_item(u_int64_t itemid);
+u_int64_t poller_get_item_id(poller_item_t *poll_item);
+void * poller_get_item_specific_data(poller_item_t *poll_item);
+void poller_set_item_specific_data(poller_item_t *poll_item, void *data );
+
+void poller_return_item_to_queue(poller_item_t *glb_item);
+void poller_register_item_succeed(poller_item_t *glb_item);
+void poller_register_item_timeout(poller_item_t *glb_item);
+int poller_if_host_is_failed(poller_item_t *glb_item);	
+u_int64_t poller_get_host_id(poller_item_t *glb_item);	
+
+void poller_set_poller_module_data(void *data);
+
+void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item, 
+		handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, forks_count_cb forks_count);
+	
+void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error);
+
+void poller_inc_requests();
+void poller_inc_responces();
+
+
+/*in some cases full item iteration might need  - in such 
+ cases use iterator callback intreface */
+#define POLLER_ITERATOR_CONTINUE	8
+#define POLLER_ITERATOR_STOP 		9
+
+typedef int (*items_iterator_cb)(void *poller_data, poller_item_t *item, void *data);
+#define ITEMS_ITERATOR(func) int func(void *poller_data, poller_item_t *poller_item, void *data)
+
+void poller_items_iterate(items_iterator_cb iter_func, void *data);
+
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args);
-GLB_POLLER_ITEM *glb_get_poller_item(zbx_uint64_t itemid);
+poller_item_t *glb_get_poller_item(zbx_uint64_t itemid);
 
 #endif

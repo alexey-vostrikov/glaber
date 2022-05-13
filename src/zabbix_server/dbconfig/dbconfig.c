@@ -112,7 +112,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	while (ZBX_IS_RUNNING())
 	{
 		sec = time(NULL) - sec;
-		zbx_update_env(sec);
+		zbx_update_env();
 	
 		while (nextcheck > time(NULL) &&  FAIL == DC_ConfigNeedsSync() &&  0 == secrets_reload) 
 		{

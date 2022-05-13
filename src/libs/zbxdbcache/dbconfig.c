@@ -10166,7 +10166,7 @@ int DC_add_changed_items(u_int64_t *itemids, int num, unsigned char status) {
 	
 	for (i = 0; i < num; i++ ) {
 		ZBX_DC_ITEM *item;
-		if(NULL != (item = (ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemids[i]))) {
+		if (NULL != (item = (ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemids[i]))) {
 			c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemids[i], sizeof(glb_changed_item_t), &found);	
 			c_item->status = status;
 			c_item->time = time(NULL);

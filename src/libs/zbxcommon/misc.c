@@ -3888,12 +3888,12 @@ static void	update_resolver_conf(void)
  * Parameters: time_now - [IN] the time for compare in seconds                *
  *                                                                            *
  ******************************************************************************/
-void	zbx_update_env(double time_now)
+void	zbx_update_env()
 {
 	static double	time_update = 0;
-
+	double time_now = zbx_time();
 	/* handle /etc/resolv.conf update and log rotate less often than once a second */
-	if (1.0 < time_now - time_update)
+	if (5.0 < time_now - time_update)
 	{
 		time_update = time_now;
 		zbx_handle_log();

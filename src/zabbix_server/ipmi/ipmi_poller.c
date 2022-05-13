@@ -255,7 +255,7 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 
 		time_read = zbx_time();
 		time_idle += time_read - time_now;
-		zbx_update_env(time_read);
+		zbx_update_env();
 
 		switch (message->code)
 		{

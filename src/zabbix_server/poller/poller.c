@@ -971,7 +971,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
-		zbx_update_env(sec);
+		zbx_update_env();
 
 #ifdef HAVE_NETSNMP
 		if ((ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_UNREACHABLE == poller_type) &&

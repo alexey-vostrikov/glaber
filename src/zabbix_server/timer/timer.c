@@ -605,7 +605,7 @@ ZBX_THREAD_ENTRY(timer_thread, args)
 	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
-		zbx_update_env(sec);
+		zbx_update_env();
 
 		if (1 == process_num)
 		{

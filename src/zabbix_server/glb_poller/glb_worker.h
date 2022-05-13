@@ -23,9 +23,7 @@
 #define GLB_WORKER_MAXCALLS 1000000;
 
 
-void glb_worker_init(glb_poll_engine_t *poll);
-//void glb_worker_shutdown(void *engine);
-//void  glb_worker_handle_async_io(void *engine);
-//int glb_worker_send_request(void *engine, GLB_POLLER_ITEM *glb_item);
+void glb_worker_init(poll_engine_t *poll);
+
 
 #endif

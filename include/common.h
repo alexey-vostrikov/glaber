@@ -1715,7 +1715,7 @@ zbx_log_value_t	*zbx_log_value_dup(const zbx_log_value_t *src);
 
 int	zbx_validate_value_dbl(double value);
 
-void	zbx_update_env(double time_now);
+void	zbx_update_env();
 int	zbx_get_agent_item_nextcheck(zbx_uint64_t itemid, const char *delay, int now,
 		int *nextcheck, char **error);
 #define ZBX_DATA_SESSION_TOKEN_SIZE	(MD5_DIGEST_SIZE * 2)

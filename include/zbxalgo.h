@@ -606,18 +606,23 @@ const char *strpool_copy(const char *str);
 
 //event queues - interface to add events with callbacks, usefull for async processing
 //and timer-based queues, may use shm and locks for parralel forks
+
+
+typedef struct event_queue_t event_queue_t;
+
 #define EVENT_QUEUE_CALLBACK(name) \
-        	static int name(void *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf)
+        	static int name(event_queue_t *eq_conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf)
 
-typedef int	(*event_queue_cb_func_t)(void *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf);
+typedef int	(*event_queue_cb_func_t)(event_queue_t *conf, u_int64_t event_time, int event_id, void *data, mem_funcs_t *memf);
 
-typedef struct event_queue_conf_t event_queue_conf_t;
+event_queue_t *event_queue_init(mem_funcs_t *s_memf);
+void event_queue_destroy(event_queue_t *eq_conf);
 
-event_queue_conf_t *event_queue_init(mem_funcs_t *s_memf);
-void event_queue_destroy(event_queue_conf_t *eq_conf);
+int event_queue_process_events(event_queue_t *eq_conf, int max_events);
+int event_queue_add_event(event_queue_t *eq_conf, u_int64_t msec_time, unsigned char event_id, void *data);
+int event_queue_add_callback(event_queue_t *conf, unsigned char callback_id, event_queue_cb_func_t cb_func);
 
-int event_queue_process_events(event_queue_conf_t *eq_conf, int max_events);
-int event_queue_add_event(event_queue_conf_t *eq_conf, u_int64_t msec_time, unsigned char event_id, void *data);
-int event_queue_add_callback(event_queue_conf_t *conf, unsigned char callback_id, event_queue_cb_func_t cb_func);
+int event_queue_get_events_count(event_queue_t *conf);
+u_int64_t event_queue_get_delay(event_queue_t *conf, u_int64_t now);
 
 #endif

@@ -440,7 +440,7 @@ ZBX_THREAD_ENTRY(taskmanager_thread, args)
 		zbx_sleep_loop(sleeptime);
 
 		sec1 = zbx_time();
-		zbx_update_env(sec1);
+		zbx_update_env();
 
 #ifdef HAVE_NETSNMP
 		if (1 == snmp_cache_reload_requested)

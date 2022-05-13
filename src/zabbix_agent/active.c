@@ -1423,7 +1423,7 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
-		zbx_update_env(zbx_time());
+		zbx_update_env();
 
 		if ((now = time(NULL)) >= nextsend)
 		{

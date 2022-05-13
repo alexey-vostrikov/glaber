@@ -213,7 +213,7 @@ ZBX_THREAD_ENTRY(proxyconfig_thread, args)
 			update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 			sec = zbx_time();
-			zbx_update_env(sec);
+			zbx_update_env();
 
 			if (NULL != message)
 			{
@@ -236,7 +236,7 @@ ZBX_THREAD_ENTRY(proxyconfig_thread, args)
 		}
 
 		sec = zbx_time();
-		zbx_update_env(sec);
+		zbx_update_env();
 
 		zbx_setproctitle("%s [loading configuration]", get_process_type_string(process_type));
 

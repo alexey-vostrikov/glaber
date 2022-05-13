@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C) 2001-2030 Glaber JSC
+** Copyright (C) 2001-2038 Glaber 
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,25 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#ifndef GLABER_PINGER_H
-#define GLABER_PINGER_H
-#include "zbxicmpping.h"
+#ifndef POLL_SNMP_H
+#define POLL_SNMP_H
 #include "glb_poller.h"
 
-#define GLB_ICMP 20
-#define ZBX_ICMP 21
 
-#define GLB_ICMP_NAME "glbmap"
-#define ZBX_ICMP_NAME "fping"
-
-#define GLB_DEFAULT_ICMP_TIMEOUT 500
-#define GLB_DEFAULT_ICMP_INTERVAL 1000
-#define GLB_DEFAULT_ICMP_SIZE 68
-#define GLB_PINGER_DEFAULT_RTT 20
-
-
-
-void glb_pinger_init(poll_engine_t *poll);
-int  glb_can_process_glb_pinger(const char *key);
+void async_snmp_init(poll_engine_t *poll);
 
 #endif
