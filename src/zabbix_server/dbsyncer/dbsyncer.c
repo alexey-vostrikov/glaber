@@ -83,9 +83,6 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	zbx_block_signals(&orig_mask);
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-//	if (1 == process_num)
-//		db_trigger_queue_cleanup();
-
 	zbx_unblock_signals(&orig_mask);
 
 	glb_ipc_init_reciever(IPC_PROCESSING);

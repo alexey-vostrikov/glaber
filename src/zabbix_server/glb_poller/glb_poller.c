@@ -245,9 +245,6 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: re-creating new config");
 		glb_poller_delete_item(conf.poller.poller_data, poller_item->itemid);
-		LOG_INF("Fix improper update logic!");
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit(-1);
 	}
 
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
