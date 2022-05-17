@@ -175,9 +175,9 @@ ubuntu-xenial:
 
 centos-8:
   variables:
-    OS: almalinux
+    OS: centos
     OS_VER: 8
-  image: ${OS}:${OS_VER}
+  image: almalinux:${OS_VER}
   only:
     - master
   script:
