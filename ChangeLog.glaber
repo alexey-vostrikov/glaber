@@ -1,3 +1,5 @@
+ver 2.9.12 
+    - fixed async timings and proper waiting in snmp 
 ver 2.9.8
     - fixes: clickhouse item name quotation, fix value type parsing in item's value cache preload
 ver 2.9.5

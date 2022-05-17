@@ -2804,7 +2804,7 @@ static void  snmp_handle_async_io(glb_poll_module_t *poll_mod) {
 	netsnmp_large_fd_set fdset;
 	static int last_timeout_time = 0; 
 
-	struct timeval timeout={0};
+	struct timeval timeout={.tv_sec = 0, .tv_usec = 200000 };
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 	//todo: make select less frequent on abasence of payload work
@@ -2813,7 +2813,6 @@ static void  snmp_handle_async_io(glb_poll_module_t *poll_mod) {
 		
 	netsnmp_large_fd_set_init(&fdset, GLB_MAX_SNMP_CONNS);
 	snmp_select_info2(&fds, &fdset, &timeout, &block);
-
 	hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, &timeout);
 	
 	if (hosts < 0)

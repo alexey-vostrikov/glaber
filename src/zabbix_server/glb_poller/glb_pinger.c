@@ -488,7 +488,7 @@ static void start_ping(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item)
 
 #define GLB_MAX_SEND_TIME 10
 
-static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
+static int glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
     zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
     uint64_t current_glb_time = glb_ms_time();
     uint64_t finish_send_time = current_glb_time + GLB_MAX_SEND_TIME;
@@ -497,7 +497,7 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
 
     static int tmp_time=0;
     
-    while (FAIL == zbx_binary_heap_empty(&conf->packet_events) && finish_send_time >=glb_ms_time() ) {
+    while (FAIL == zbx_binary_heap_empty(&conf->packet_events) ) {
 	    const zbx_binary_heap_elem_t *min;
 
 		min = zbx_binary_heap_find_min(&conf->packet_events);
@@ -555,6 +555,7 @@ static void glb_pinger_send_scheduled_packets(GLB_PINGER_CONF *conf) {
       
     }
     zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended %d sent", __func__, sent_packets);
+    return sent_packets;
 }
 /*************************************************************************
  * Account the packet, signals by exit status that polling has finished
@@ -580,11 +581,11 @@ static int glb_pinger_process_response(GLB_PINGER_CONF *conf, pinger_item_t *pin
 }
 
 
-static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
+static int glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
     char *worker_response = NULL;
     zbx_json_type_t type;
     zbx_timespec_t ts;
-
+    int processed = 0;
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
     
     zbx_timespec(&ts);
@@ -602,7 +603,9 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
             break;
         
         zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s", worker_response);
-        
+
+        processed++;
+
         if (SUCCEED != zbx_json_open(worker_response, &jp_resp)) {
 		    zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from glbmap %s", worker_response);
 		    continue;
@@ -696,6 +699,7 @@ static void glb_pinger_process_worker_results(GLB_PINGER_CONF *conf) {
     }
 
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
+    return processed;
 }
 
 
@@ -707,6 +711,7 @@ static void  handle_async_io(glb_poll_module_t *poll_mod) {
     
     static u_int64_t lastrun=0;
     u_int64_t queue_delay=0;
+    int sent, processed;
 	GLB_PINGER_CONF *conf = (GLB_PINGER_CONF*)poll_mod->poller_data;
 	LOG_DBG("In %s() Started", __func__);
     
@@ -728,11 +733,15 @@ static void  handle_async_io(glb_poll_module_t *poll_mod) {
     lastrun=glb_ms_time();
 
     //parses and submits arrived ICMP responses
-    glb_pinger_process_worker_results(conf);
+    processed = glb_pinger_process_worker_results(conf);
 
     //send next packets after waiting for delay
-    glb_pinger_send_scheduled_packets(conf);
+    sent = glb_pinger_send_scheduled_packets(conf);
     
+    //it's better to implement wait for async worker responce
+    if (0 == sent + processed ) {
+        usleep(10000);
+    }
     //handling timed-out items
     glb_pinger_handle_timeouts(conf); //timed out items will be marked as -1 result and next retry will be made
 	

@@ -514,9 +514,10 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 		handle_async_io(&poll.poller);
 		
-		if ( old_activity == poll.poller.requests + poll.poller.responses ) {
-			usleep(1000000);
-		}
+	//	if ( old_activity == poll.poller.requests + poll.poller.responses ) {
+	//		usleep(10000);
+	//	}
+
 		old_activity = poll.poller.requests + poll.poller.responses;
 
 		if (next_stat_time < now ) {

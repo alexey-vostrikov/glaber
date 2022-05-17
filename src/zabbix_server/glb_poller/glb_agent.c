@@ -563,7 +563,7 @@ static void agent_handle_async_io(glb_poll_module_t *poll_mod) {
 		glb_agent_handle_timeout(conf, conn);
 	}
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
-
+	usleep(10000);
 }
 static void agent_update_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_poller_item, DC_ITEM* dc_item) {
 
