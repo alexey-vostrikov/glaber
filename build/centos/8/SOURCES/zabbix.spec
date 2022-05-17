@@ -281,10 +281,6 @@ find ui/locale -name '*.po' | xargs rm -f
 find ui/locale -name '*.sh' | xargs rm -f
 %endif
 
-%if 0%{?build_server} || 0%{?build_proxy} || 0%{?build_agent} || 0%{?build_agent2}
-%patch1 -p1
-%endif
-
 %if 0%{?build_server} || 0%{?build_proxy}
 # traceroute command path for global script
 sed -i -e 's|/usr/bin/traceroute|/bin/traceroute|' database/mysql/data.sql
