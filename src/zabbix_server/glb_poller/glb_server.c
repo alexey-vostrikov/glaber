@@ -469,6 +469,7 @@ static void	handle_async_io(glb_poll_module_t *poll_mod) {
             }
         }   
     }
+    usleep(100000);
     LOG_DBG("Finished: %s", __func__);
 }
 
