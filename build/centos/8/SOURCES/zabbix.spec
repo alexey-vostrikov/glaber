@@ -27,7 +27,7 @@ Source20:	zabbix-agent.sysconfig
 Source21:	zabbix-agent2.init
 Source22:	zabbix-agent2.sysconfig
 Patch0:		config.patch
-Patch1:		fping3-sourceip-option.patch
+
 
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)

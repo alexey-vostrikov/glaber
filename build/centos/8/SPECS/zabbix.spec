@@ -19,7 +19,7 @@ Source16:	zabbix-php-fpm.conf
 Source17:	zabbix-web-fcgi.conf
 Source18:	zabbix-nginx.conf
 Patch0:		config.patch
-Patch1:		fping3-sourceip-option.patch
+
 
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
