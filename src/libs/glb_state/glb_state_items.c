@@ -120,9 +120,8 @@ ELEMS_CREATE(item_create_cb)
     i_data->db_fetched_time = ZBX_JAN_2038;
     i_data->value_type = ITEM_VALUE_TYPE_NONE;
     i_data->meta.state = ITEM_STATE_UNKNOWN;
-
     glb_tsbuff_init(&i_data->tsbuff, GLB_CACHE_ITEM_MIN_VALUES, sizeof(glb_state_item_value_t), memf->malloc_func);
-
+    
     return SUCCEED;
 }
 

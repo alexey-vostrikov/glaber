@@ -1,3 +1,5 @@
+ver 2.9.15
+    - valuecache memory switched to strict mode (fail on out_of_mem) to produce more prdedictable server error messages
 ver 2.9.14
     - fixed status widget (removed db upgrade warning), fixed Zabbix-> Glaber naming
 ver 2.9.12 

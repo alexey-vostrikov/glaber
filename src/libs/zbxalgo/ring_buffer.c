@@ -187,7 +187,11 @@ int  glb_tsbuff_init(glb_tsbuff_t *tsbuff, unsigned int size, size_t item_size, 
     tsbuff->item_size = item_size;
     tsbuff->count = 0;
 
-    tsbuff->data = malloc_func(NULL, size * item_size);
+    if (NULL == (tsbuff->data = malloc_func(NULL, size * item_size ))) {
+        LOG_INF("There is not enough memory increase the size in the config");
+        exit(-1);
+    };
+
     bzero(tsbuff->data,  size * item_size);
     tsbuff->head = -1;
     tsbuff->tail = -1;

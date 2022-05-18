@@ -51,7 +51,7 @@ int glb_state_init() {
    
     char *error = NULL;
 	
-	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "State cache size", "GLBCachesize", 1, &error)) {
+	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "State cache size", "GLBCachesize", 0, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	return FAIL;
     }
