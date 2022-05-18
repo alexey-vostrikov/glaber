@@ -528,7 +528,7 @@ function make_status_of_zbx() {
 	$status = get_status();
 
 	$table
-		->addRow([_('Zabbix server is running'),
+		->addRow([_('Glaber server is running'),
 			(new CSpan($status['is_running'] ? _('Yes') : _('No')))
 				->addClass($status['is_running'] ? ZBX_STYLE_GREEN : ZBX_STYLE_RED),
 			$server_details
@@ -604,13 +604,13 @@ function make_status_of_zbx() {
 	// Warn if database history tables have not been upgraded.
 	global $DB;
 
-	if (!$DB['DOUBLE_IEEE754']) {
-		$table->addRow([
-			_('Database history tables upgraded'),
-			(new CSpan(_('No')))->addClass(ZBX_STYLE_RED),
-			''
-		]);
-	}
+	// if (!$DB['DOUBLE_IEEE754']) {
+	// 	$table->addRow([
+	// 		_('Database history tables upgraded'),
+	// 		(new CSpan(_('No')))->addClass(ZBX_STYLE_RED),
+	// 		''
+	// 	]);
+	// }
 
 	// Check DB version.
 	if (CWebUser::getType() == USER_TYPE_SUPER_ADMIN) {
