@@ -241,10 +241,7 @@ static int init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_I
     icmppingsec_type_t	type;
     LOG_DBG( "In %s() Started", __func__);
     
-    if (NULL == (pinger_item = (pinger_item_t *) zbx_calloc(NULL, 0, sizeof(pinger_item_t)))) {
-        LOG_WRN("Cannot allocate mem for pinger item, exiting");
-        return FAIL;
-    }
+    pinger_item = zbx_calloc(NULL, 0, sizeof(pinger_item_t));
     
     poller_item->itemdata = pinger_item;
 
@@ -278,6 +275,9 @@ static int init_item(glb_poll_module_t *poll_mod, DC_ITEM *dc_item, GLB_POLLER_I
         pinger_item->size = size;
     else 
         pinger_item->size = GLB_DEFAULT_ICMP_SIZE;
+    
+    DEBUG_ITEM(poller_item->itemid, "Starting ping: interval: %d, timout: %d, size: %d", 
+            pinger_item->interval, pinger_item->timeout, pinger_item->size );
     
     pinger_item->icmpping = icmpping;
     pinger_item->finish_time = 0;
@@ -464,7 +464,7 @@ static void start_ping(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item)
     LOG_DBG("In %s() Started1", __func__);
 
     //sending the first packet immediately
-    if (SUCCEED != glb_pinger_send_ping(conf,glb_item)) 
+    if (SUCCEED != glb_pinger_send_ping(conf, glb_item)) 
         return;
     
     u_int64_t send_time = glb_time;

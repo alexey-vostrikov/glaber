@@ -117,7 +117,7 @@ static int add_item_check_event(zbx_binary_heap_t *events, zbx_hashset_t *hosts,
 																   custom_intervals, glb_host->disabled_till);
 	}	else
 	{
-		nextcheck = calculate_item_nextcheck(glb_host->hostid, glb_item->item_type, simple_interval,
+		nextcheck = calculate_item_nextcheck(glb_item->itemid, glb_item->item_type, simple_interval,
 											   custom_intervals, now);
 	}
 	
