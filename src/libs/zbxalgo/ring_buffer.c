@@ -200,8 +200,7 @@ int glb_tsbuff_get_time_tail(glb_tsbuff_t *tsbuff) {
     tsbuff_value_t *val;
     
     if ( 0 == glb_tsbuff_get_count(tsbuff)) {
-        THIS_SHOULD_NEVER_HAPPEN;
-        exit(-1);
+        return -1;
     }
     if (NULL != (val = glb_tsbuff_get_value_ptr(tsbuff,tsbuff->tail))) {
         return val->time;

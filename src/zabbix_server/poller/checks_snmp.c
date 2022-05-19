@@ -32,26 +32,6 @@
 #include "../glb_poller/glb_poller.h"
 #include "preproc.h"
 
-
-// typedef struct {
-// 	const char *oid;
-// 	unsigned char parsed_oid_len;
-// 	unsigned char snmp_version;
-// 	const char		*interface_addr;
-// 	unsigned char	useip;
-// 	unsigned short	interface_port;
-// 	unsigned char	snmpv3_securitylevel;
-// 	unsigned char	snmpv3_authprotocol;
-// 	unsigned char	snmpv3_privprotocol;
-// 	const char *community;
-// 	const char *snmpv3_securityname;
-// 	const char *snmpv3_contextname;
-// 	const char *snmpv3_authpassphrase;
-// 	const char *snmpv3_privpassphrase;
-// 	char state;
-// } snmp_item_t;
-
-
 /*
  * SNMP Dynamic Index Cache
  * ========================

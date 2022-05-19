@@ -25,7 +25,7 @@
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 
 
-#define GLB_DNS_CACHE_TIME 120 //for how long name to ip resolvings have to be remembered
+#define GLB_DNS_CACHE_TIME 120 * 1000//for how long name to ip resolvings have to be remembered in msec
 
 //#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
 

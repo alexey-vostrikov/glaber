@@ -645,6 +645,5 @@ void async_snmp_init(poll_engine_t *poll) {
 	}
 	
 	zbx_hashset_create(&conf->items_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	LOG_INF("Conf addr is %p, hash addr is %p", conf, conf->items_idx);
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }

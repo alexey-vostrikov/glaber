@@ -137,7 +137,7 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 	}
 	else
 	{
-		nextcheck = calculate_item_nextcheck(glb_host->hostid, poller_item->item_type, simple_interval,
+		nextcheck = calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
 											 custom_intervals, mstime / 1000);
 	}
 	/*note: since original algo is still seconds-based adding some millisecond-noise
@@ -245,9 +245,9 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: re-creating new config");
 		glb_poller_delete_item(conf.poller.poller_data, poller_item->itemid);
-		LOG_INF("Fix improper update logic!");
-		THIS_SHOULD_NEVER_HAPPEN;
-		exit(-1);
+	//	LOG_INF("Fix improper update logic!");
+	//	THIS_SHOULD_NEVER_HAPPEN;
+	//	exit(-1);
 	}
 
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
@@ -366,7 +366,7 @@ EVENT_QUEUE_CALLBACK(item_poll_cb)
 	{
 		// this means the item has been rescheduled since the last scheduling and current event is outdated
 		DEBUG_ITEM(poller_item->itemid, "Outdated event has been found in the event queue, skipping")
-		LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", poller_item->itemid, event_time, poller_item->event_time);
+	//	LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", poller_item->itemid, event_time, poller_item->event_time);
 		return FAIL;
 	}
 
@@ -645,7 +645,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 		if (old_stat_time + STAT_INTERVAL < mstime)
 		{
-			zbx_setproctitle("%s #%d [sent %d chks/sec, got %d chcks/sec, items: %d, events planned: %d]",
+			zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, events planned: %d]",
 							 get_process_type_string(process_type), process_num, (conf.requests * 1000) / (mstime - old_stat_time),
 							 (conf.responces * 1000) / (mstime - old_stat_time), conf.items.num_data,
 							 event_queue_get_events_count(conf.event_queue));
