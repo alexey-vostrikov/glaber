@@ -1,3 +1,5 @@
+ver 2.9.16
+    - event queues brought to main code, pollers refactored to do async wait for data where it's possible
 ver 2.9.15
     - valuecache memory switched to strict mode (fail on out_of_mem) to produce more prdedictable server error messages
 ver 2.9.14
