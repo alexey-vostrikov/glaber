@@ -20,10 +20,6 @@ extern int CONFIG_EXT_SERVER_FORKS;
 #define WORKER_RESTART_HOLD 10 
 
 typedef struct {
-    zbx_hashset_t *items;
-} worker_server_conf_t;
-
-typedef struct {
     int last_restart;
     GLB_EXT_WORKER worker;
 } worker_t;
@@ -112,36 +108,23 @@ static void add_host_key_regdata( worker_server_conf_t *conf, const char *host, 
 
 */
 
-static void glb_server_submit_fail_result(GLB_POLLER_ITEM *glb_item, char *error) {
-    
-//    worker_t *worker = (worker_t*)glb_item->itemdata;
-    zbx_timespec_t ts;
-
-    zbx_timespec(&ts);
-    zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 
-                                             glb_item->flags , NULL , &ts, ITEM_STATE_NOTSUPPORTED, error);
-    
-    
-    zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
+static void glb_server_submit_fail_result(poller_item_t *poller_item, char *error) {
+    poller_preprocess_value(poller_item , NULL , glb_ms_time(), ITEM_STATE_NOTSUPPORTED, error);
 }
-
-
 
 /************************************************************************
  * submits result to the preprocessor                                   *
  * **********************************************************************/
-static int glb_server_submit_result(GLB_POLLER_ITEM *glb_item, char *response) {
+static int glb_server_submit_result(poller_item_t *poller_item, char *response) {
     
     struct zbx_json_parse jp_resp;
     zbx_json_type_t type;
-    zbx_timespec_t ts;
-    worker_t *worker = (worker_t*)glb_item->itemdata;
+ 
+    worker_t *worker = poller_get_item_specific_data(poller_item);
     u_int64_t hash;
 
     GLB_SERVER_IDX_T *item_idx = NULL;
-
-    zbx_timespec(&ts);
-      
+     
     if (SUCCEED != zbx_json_open(response, &jp_resp)) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response '%s' from worker %s", response, worker->worker.path);
 		return FAIL;
@@ -152,11 +135,9 @@ static int glb_server_submit_result(GLB_POLLER_ITEM *glb_item, char *response) {
     init_result(&result);
     zbx_rtrim(response, ZBX_WHITESPACE);
     set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
-    zbx_preprocess_item_value(glb_item->hostid, glb_item->itemid, glb_item->value_type, 
-                                             glb_item->flags , &result , &ts, ITEM_STATE_NORMAL, NULL);
+    poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
     
     free_result(&result);
-    
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 }
 
@@ -165,7 +146,7 @@ static int glb_server_submit_result(GLB_POLLER_ITEM *glb_item, char *response) {
  * item init - from the general dc_item to compact local item        		  * 
  * ***************************************************************************/
 
-//int glb_server_init_item(DC_ITEM *dc_item, GLB_POLLER_ITEM *poller_item) {
+//int glb_server_init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 //    LOG_INF("Trying to create worker for itm %ld, host %s, key %s, params %s", dc_item->itemid, 
 //			    dc_item->host.host, dc_item->key_orig, dc_item->params);    
     //item and host will be automatically placed to the items hash
@@ -205,17 +186,17 @@ int  glb_server_create_worker( worker_server_conf_t *conf, char *worker_cfg) {
  * item deinit - freeing all interned string								  * 
  * ***************************************************************************/
 /*
-void glb_server_free_item(void *engine, GLB_POLLER_ITEM *glb_poller_item ) {
+void glb_server_free_item(void *engine, poller_item_t *poller_item ) {
     
      worker_server_conf_t *conf = ( worker_server_conf_t*)engine;
-    GLB_SERVER_ITEM *glb_server_item = (GLB_SERVER_ITEM *)glb_poller_item->itemdata;
+    GLB_SERVER_ITEM *glb_server_item = (GLB_SERVER_ITEM *)poller_item->itemdata;
 
     char tmp[MAX_STRING_LEN];
     GLB_SERVER_IDX_T idx;
 
     zbx_snprintf(tmp, MAX_STRING_LEN,"%s,%s", glb_server_item->hostname,glb_server_item->key);
     idx.hash= ZBX_DEFAULT_STRING_HASH_FUNC(tmp);
-    idx.itemid = glb_poller_item->itemid;
+    idx.itemid = poller_item->itemid;
 
     zbx_hashset_remove(&conf->items_idx,&idx);
     
@@ -229,7 +210,7 @@ void glb_server_free_item(void *engine, GLB_POLLER_ITEM *glb_poller_item ) {
     char *worker_response = NULL;
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
            
-    GLB_POLLER_ITEM *glb_poller_item;
+    poller_item_t *poller_item;
     zbx_hashset_iter_t iter;
     GLB_SERVER_T *worker;
     static unsigned int last_reg_send = 0;
@@ -357,7 +338,7 @@ static int	server_idx_cmp_func(const void *d1, const void *d2)
 	return 0;
 }
 
-static int init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_ITEM *glb_poller_item) {
+static int init_item(void *m_conf, DC_ITEM* dcitem, poller_item_t *poller_item) {
 
    // worker_server_conf_t *conf = (worker_server_conf_t *)poll_mod->poller_data;
     worker_t *worker;
@@ -368,11 +349,8 @@ static int init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_IT
 
     LOG_DBG( "In %s() Started", __func__);
 
-    if (NULL == (worker = (worker_t*)zbx_calloc(NULL,0,sizeof(worker_t)))) {
-        LOG_WRN("Couldn't allocate heap mem to create a worker, exiting");
-        return FAIL;
-    }
-
+    worker = (worker_t*)zbx_calloc(NULL,0,sizeof(worker_t));
+        
     if (NULL == CONFIG_WORKERS_DIR) {
         zabbix_log(LOG_LEVEL_WARNING,"To run worker as a server, set WorkerScripts dir location in the configuration file");
         //TODO: submit item in the error state here
@@ -412,81 +390,77 @@ static int init_item(glb_poll_module_t *poll_mod, DC_ITEM* dcitem, GLB_POLLER_IT
     worker->worker.max_calls = GLB_SERVER_MAXCALLS;
     worker->worker.mode_from_worker=GLB_WORKER_MODE_NEWLINE;
     
-    glb_poller_item->itemdata = worker;
-    
+    poller_set_item_specific_data(poller_item, worker);
     glb_start_worker(&worker->worker);
 
-    LOG_DBG("Finished init of server item %ld, worker %s",glb_poller_item->itemid, worker->worker.path);
+    DEBUG_ITEM(poller_get_item_id(poller_item), "Finished init of server item, worker %s", worker->worker.path);
     return SUCCEED;
 };
 
 
-static void delete_item(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item) {
-    LOG_INF("Deleting server worker item %ld", glb_item->itemid);
-    
-    worker_t *worker = (worker_t*)glb_item->itemdata;
-
+static void delete_item(void *m_conf, poller_item_t *poller_item) {
+    worker_t *worker = poller_get_item_specific_data(poller_item);    
+    DEBUG_ITEM(poller_get_item_id(poller_item), "Deleting server worker item ");
     glb_destroy_worker(&worker->worker);
-    LOG_INF("freening the item");
     zbx_free(worker);
-    LOG_INF("Finished deleting the item");
-
 }
 
-static void	handle_async_io(glb_poll_module_t *poll_mod) {
-    zbx_hashset_iter_t iter;
-    GLB_POLLER_ITEM *glb_item;
-    char *worker_response = NULL;
-    //polling all pollers in cycle if they've got some input
-    LOG_DBG("In: %s", __func__);
-    worker_server_conf_t *conf = (worker_server_conf_t*)poll_mod->poller_data;
+ITEMS_ITERATOR(check_workers_data_cb) {
+    worker_t *worker =  poller_get_item_specific_data(poller_item);
     
-    zbx_hashset_iter_reset(conf->items,&iter);
-    
-    while (NULL != (glb_item =(GLB_POLLER_ITEM *) zbx_hashset_iter_next(&iter))) {
-        worker_t *worker = (worker_t*)glb_item->itemdata;
-        if (SUCCEED == worker_is_alive(&worker->worker)) { 
-            int last_status;
-            
-            while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_response)) && (NULL != worker_response)) {
+
+    if (SUCCEED == worker_is_alive(&worker->worker)) { 
+        int last_status;
+        char *worker_responce = NULL;
+
+        while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_responce)) && (NULL != worker_responce)) {
               
-                LOG_DBG("Parsing line %s from worker %s", worker_response, worker->worker.path);
-                glb_server_submit_result(glb_item, worker_response);
-            }
+                LOG_DBG("Parsing line %s from worker %s", *worker_responce, worker->worker.path);
+                glb_server_submit_result(poller_item, worker_responce);
+        }
   
-            if (FAIL == last_status ) {
-                DEBUG_ITEM(glb_item->itemid,"Submitting data in non supported state (last_status is FAIL)");
-                glb_server_submit_fail_result(glb_item,"Couldn't read from the worker - either filename is wrong or temporary fail");
-            }
+        if (FAIL == last_status ) {
+            DEBUG_ITEM(poller_get_item_id(poller_item), "Submitting data in non supported state (last_status is FAIL)");
+            glb_server_submit_fail_result(poller_item,"Couldn't read from the worker - either filename is wrong or temporary fail");
+        }
+        
+        zbx_free(worker_responce);
+    } else {
+        int now = time(NULL);
 
-        } else {
-            int now = time(NULL);
-
-            if (worker->last_restart + WORKER_RESTART_HOLD < now ) {
-                LOG_DBG("Server worker %s is not alive, restarting", worker->worker.path);
-                worker->last_restart = now;
-                glb_start_worker(&worker->worker);
-            }
-        }   
+        if (worker->last_restart + WORKER_RESTART_HOLD < now ) {
+            LOG_DBG("Server worker %s is not alive, restarting", worker->worker.path);
+            worker->last_restart = now;
+            glb_start_worker(&worker->worker);
+        }
     }
-    usleep(100000);
+    return POLLER_ITERATOR_CONTINUE;
+}
+
+static void	handle_async_io(void *m_conf) {
+    LOG_DBG("In: %s", __func__);
+    poller_items_iterate(check_workers_data_cb, NULL);
+    //todo: replace with proper analyzing of the socket states
+    usleep(1000);
     LOG_DBG("Finished: %s", __func__);
 }
 
-static void ws_shutdown(glb_poll_module_t *poll_mod) {
+static void ws_shutdown(void *m_conf) {
 
 }
-static int forks_count(glb_poll_module_t *poll_mod) {
+
+static int forks_count(void *m_conf) {
 	return CONFIG_EXT_SERVER_FORKS;
 }
-static void start_poll(glb_poll_module_t *poll_mod, GLB_POLLER_ITEM *glb_item)
+
+static void start_poll(void *m_conf, poller_item_t *poller_item)
 {
 
 }
 
-int  glb_worker_server_init(glb_poll_engine_t *poll ) {
+int  glb_worker_server_init(poll_engine_t *poll ) {
 	int i, ret;
-	worker_server_conf_t *conf;
+
     char **worker_cfg;
 	
     LOG_DBG("In %s: starting", __func__);
@@ -496,23 +470,8 @@ int  glb_worker_server_init(glb_poll_engine_t *poll ) {
         exit(-1);
     }
     
-    if (NULL == (conf = (worker_server_conf_t *)zbx_malloc(NULL,sizeof(worker_server_conf_t))) )  {
-		LOG_WRN("Couldn't allocate memory for server workers module, exiting");
-		return FAIL;
-	}
+    poller_set_poller_module_data(NULL);
+    poller_set_poller_callbacks(init_item, delete_item, handle_async_io, start_poll, ws_shutdown, forks_count); 
 
-    poll->poller.poller_data = conf;
-    bzero(conf, sizeof(worker_server_conf_t));   
-
-   // zbx_hashset_create(&conf->workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-    conf->items = &poll->items; 
-
-    poll->poller.init_item = init_item;
-    poll->poller.delete_item = delete_item;
-    poll->poller.handle_async_io = handle_async_io;
-    poll->poller.start_poll = start_poll;
-    poll->poller.shutdown = ws_shutdown;
-    poll->poller.forks_count = forks_count;
-	
 	return SUCCEED;
 }

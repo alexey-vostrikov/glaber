@@ -3711,7 +3711,7 @@ static void	hc_free_data(zbx_hc_data_t *data)
  ******************************************************************************/
 static void	hc_queue_item(zbx_hc_item_t *item)
 {
-	zbx_binary_heap_elem_t	elem = {item->itemid, (const void *)item};
+	zbx_binary_heap_elem_t	elem = {.key = item->itemid, .data = (const void *)item};
 
 	zbx_binary_heap_insert(&cache->history_queue, &elem);
 }
