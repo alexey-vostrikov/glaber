@@ -259,7 +259,8 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&zbx_dc_item->itemid);
 
 			//avoiding dynamic and discovery items from being processed by async glb pollers
-			if  ( NULL != snmpitem &&  (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags || ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type) )  {
+			if  ( NULL != snmpitem &&  (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags || 
+					ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type || 0 == strncmp(snmpitem->snmp_oid, "discovery[",10)) )  {
 				//	zabbix_log(LOG_LEVEL_DEBUG, "Item %ld host %s oid %s type %d might not be async poled, will do normal poll",
 				//   			zbx_dc_item->itemid, zbx_dc_host->host, snmpitem->snmp_oid, snmpitem->snmp_oid_type);
 		  	  	return FAIL;

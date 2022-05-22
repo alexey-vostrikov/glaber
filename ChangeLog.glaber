@@ -1,3 +1,5 @@
+ver 2.9.17
+    - fix snmp poller to allow polling discovery (walk) items, removed test assert in ring buffer 
 ver 2.9.16
     - event queues brought to main code, pollers refactored to do async wait for data where it's possible
 ver 2.9.15
