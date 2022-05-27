@@ -434,10 +434,9 @@ static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_fu
 
 	if (ZBX_DBSYNC_INIT == sync->mode || ZBX_DBSYNC_UPDATE == sync->mode)
 	{	
-		if ( NULL == (idx =(obj_index_t *)(*memf->malloc_func)(NULL,sizeof(obj_index_t)))) 
+		if ( NULL == (idx = obj_index_init(memf))) 
 			return FAIL;
-
-		obj_index_init(idx, memf);
+		
 		full_sync = 1;
 	} else  
 		idx = idx_ptr;

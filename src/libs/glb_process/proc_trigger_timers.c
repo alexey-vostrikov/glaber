@@ -26,13 +26,17 @@
 #include "../zbxipcservice/glb_ipc.h"
 #include "../glb_state/state_triggers.h"
 
-extern void *ipc_processing_notify;
+static zbx_mem_info_t	*proc_ipc_notify = NULL;
+ZBX_MEM_FUNC_IMPL(__proc_ipc_notify, proc_ipc_notify);
+static mem_funcs_t notify_memf = {.free_func = __proc_ipc_notify_mem_free_func, .malloc_func = __proc_ipc_notify_mem_malloc_func, .realloc_func = __proc_ipc_notify_mem_realloc_func};
+static ipc_conf_t *ipc_processing_notify;
 
 typedef struct {
     void *event_queue;
 } conf_t;
 
 static conf_t *tm_conf = NULL;
+zbx_vector_uint64_t ipc_triggers = {0};
 
 //TODO: return original code to calc trigger calc time
 //or at least make exception to count trend-based triggers hourly
@@ -55,32 +59,16 @@ static void requeue_trigger(u_int64_t triggerid) {
 	int nextcheck;
     DEBUG_TRIGGER(triggerid, "In %s: starting", __func__);
 	
-    /* to avoid double addition to the queue with the same timer */
 	if (glb_state_trigger_get_revision(triggerid) == revision) {
-        //LOG_INF("Revision isn't changed, not adding");
         DEBUG_TRIGGER(triggerid, "Trigger's revision %ld haven't changed, not updating", revision);
     	return;
     }
 	
     nextcheck = calc_time_trigger_nextcheck(triggerid, time(NULL) );
-	
-  //  LOG_INF("Setting new revision %ld", time_to_ms_time(nextcheck));
 
 	state_trigger_set_revision(triggerid, time_to_ms_time(nextcheck));
-//    LOG_INF("Setting new revision2 %ld", time_to_ms_time(nextcheck));
-    //LOG_INF("requeue trigger %ld: Adding trigger requeue event in %d seconds, state revision is %d", triggerid, nextcheck - time(NULL), 
-    //    glb_state_trigger_get_revision(triggerid));
     DEBUG_TRIGGER(triggerid, "requeue trigger: Adding trigger requeue event in %ld seconds, conf is %p", nextcheck - time(NULL), tm_conf->event_queue);
     event_queue_add_event(tm_conf->event_queue, time_to_ms_time(nextcheck), PROCESS_TRIGGER, (void *)triggerid);
-  //  LOG_INF("Finished requeuing");
-}
-
-IPC_PROCESS_CB(process_time_triggers_cb) {
-    notify_t *notify = ipc_data;
-    //LOG_INF("Processing new trigger arrival notificatiopn");
-
-    DEBUG_TRIGGER(notify->id, "Requeueing trigger arrived on notification");
-    requeue_trigger(notify->id);
 
 }
 
@@ -88,26 +76,26 @@ static void get_new_queue_triggers(int proc_num) {
 	int i=0;
     static int lastcheck = 0;
     u_int64_t triggerid;
-
+    zbx_vector_uint64_t triggers = {0};
 
     if (lastcheck == time(NULL))
         return;
     lastcheck = time(NULL);
+
+    zbx_vector_uint64_create(&triggers);
+
+    i = ipc_vector_uint64_recieve(ipc_processing_notify, proc_num-1, &triggers, IPC_PROCESS_ALL);
 	
-	i = glb_ipc_process(ipc_processing_notify, proc_num-1, process_time_triggers_cb, NULL, 1024);
+    for (i = 0; i< triggers.values_num; i++) 
+        requeue_trigger(triggers.values[i]);  
    
-    glb_ipc_dump_reciever_queues(ipc_processing_notify, "Reciever notify queues", proc_num);
-//	LOG_INF("Saved %d triggers", i);
+    zbx_vector_uint64_destroy(&triggers);
 }
-
-
 
 int process_time_triggers(int max_triggers, int process_num){
     get_new_queue_triggers(process_num);
     return  event_queue_process_events(tm_conf->event_queue, max_triggers);
 }
-
-
 
 EVENT_QUEUE_CALLBACK(process_timer_triggers_cb){
 	u_int64_t triggerid = (u_int64_t) data;
@@ -142,31 +130,38 @@ IPC_FREE_CB(notify_ipc_free_cb) {
 }
 
 
-int processing_trigger_timers_init(int notify_queue_size, mem_funcs_t *memf) {
+int processing_trigger_timers_init(size_t mem_size) {
  
-     if ( NULL == (tm_conf = zbx_calloc(NULL, 0, sizeof(conf_t)))) 
-        return FAIL;
+    char *error;
+    tm_conf = zbx_calloc(NULL, 0, sizeof(conf_t));
+ 
  
     if (NULL == (tm_conf->event_queue = event_queue_init(NULL)) ) 
         return FAIL;
-   
-    event_queue_add_callback(tm_conf->event_queue, PROCESS_TRIGGER, process_timer_triggers_cb);
+    LOG_INF("Allocating mem of size %ld", mem_size);
+    if (SUCCEED != zbx_mem_create(&proc_ipc_notify, mem_size, "Processing IPC notify queue", "Processing IPC  notify queue", 1, &error))
+		return FAIL;
 
-    if (NULL == (ipc_processing_notify = glb_ipc_init(IPC_PROCESSING_NOTIFY, 64 * ZBX_MEBIBYTE , "Processing notify queue", 
-				notify_queue_size, sizeof(notify_t), CONFIG_HISTSYNCER_FORKS,  memf, notify_ipc_create_cb, 
-                    notify_ipc_free_cb, IPC_LOW_LATENCY)))
-			return FAIL;
+    event_queue_add_callback(tm_conf->event_queue, PROCESS_TRIGGER, process_timer_triggers_cb);
+    int messages_count = CONFIG_HISTSYNCER_FORKS * 2 * IPC_BULK_COUNT;
+
+    if (NULL ==(ipc_processing_notify = ipc_vector_uint64_init(IPC_PROCESSING_NOTIFY, messages_count, CONFIG_HISTSYNCER_FORKS,
+        IPC_LOW_LATENCY, &notify_memf))) {
+        
+        return FAIL;
+    }
+
+    zbx_vector_uint64_create(&ipc_triggers);
     
     return SUCCEED;
 }
 
-/*note: local ipc sender init is required */
-int processing_notify_changed_trigger(uint64_t new_triggerid) {
-    DEBUG_TRIGGER(new_triggerid,"Sending changed trigger %ld notification" );
-    glb_ipc_send(ipc_processing_notify, new_triggerid % CONFIG_HISTSYNCER_FORKS, (void *)&new_triggerid, 1);
-    glb_ipc_dump_sender_queues(ipc_processing_notify, "Sender notify queues");
+void processing_notify_changed_trigger(uint64_t triggerid) {
+    zbx_vector_uint64_append(&ipc_triggers, triggerid);
 }
     
-int processing_notify_flush() {
-    glb_ipc_flush_all(ipc_processing_notify);
+void  processing_notify_flush() {
+    LOG_INF("Sending trigger notifications: %d triggers", ipc_triggers.values_num);
+    ipc_vector_uint64_send(ipc_processing_notify, &ipc_triggers, 1);
+    zbx_vector_uint64_clear(&ipc_triggers);
 }

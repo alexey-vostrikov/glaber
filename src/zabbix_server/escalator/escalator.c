@@ -34,6 +34,7 @@
 #include "comms.h"
 #include "../../libs/zbxserver/get_host_from_event.h"
 #include "../../libs/zbxserver/zabbix_users.h"
+#include "../../libs/zbxipcservice/glb_ipc.h"
 
 extern int	CONFIG_ESCALATOR_FORKS;
 
@@ -2747,6 +2748,49 @@ static int	process_escalations(int now, int *nextcheck, unsigned int escalation_
 	return ret; /* performance metric */
 }
 
+/*match actions and if there are mathes, 
+start escalations */
+void create_event_escalation(DB_EVENT *event) {
+
+}
+
+/*need to cancel the esacalation, and notify 
+everyone involved that the problem has been solved */
+void cancel_event_escalation(DB_EVENT *event) {
+
+}
+
+void process_event_actions(u_int64_t eventid) {
+	DB_EVENT *event;
+
+	if (NULL == (event = incidents_get_event_by_id(eventid)))
+		return;
+
+	if (is_recovery_event(event))
+		cancel_event_escalation(event);
+	esle 
+		create_event_escalation(event);
+
+}
+
+void recieve_new_events() {
+	zbx_vector_uint64_t events;
+	int i, num;
+	
+	LOG_INF("Escalator checking for the events");
+	
+	zbx_vector_uint64_create(&events);
+
+	num = actions_notify_get_events(process_num - 1, &events);
+	LOG_INF("Escalator checking for the events, consumer : %d, recieved: %d, values: %d", process_num - 1, num, events.values_num);
+	
+	for(i = 0; i < events.values_num; i++) {
+		LOG_INF("Escalator got event %ld", events.values[i]);
+		process_event_actions(events.values[i]);
+	}
+	zbx_vector_uint64_destroy(&events);
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: main_escalator_loop                                              *
@@ -2777,6 +2821,7 @@ ZBX_THREAD_ENTRY(escalator_thread, args)
 			server_num, get_process_type_string(process_type), process_num);
 
 	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	glb_ipc_init_reciever(IPC_EVENTS_NOTIFY);
 
 #define STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
@@ -2791,6 +2836,9 @@ ZBX_THREAD_ENTRY(escalator_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
+	
+		recieve_new_events();
+
 		sec = zbx_time();
 		zbx_update_env();
 

@@ -846,7 +846,7 @@ int	glb_history_clickhouse_init(char *params)
 		 ( strcmp(tmp_str,"0") == 0 || strcmp(tmp_str,"false") ==0 )) {
 			LOG_WRN("Trends are disabled");
 	} else {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Trends are enabled");
+		//zabbix_log(LOG_LEVEL_INFORMATION, "Trends are enabled");
 		glb_register_callback(GLB_MODULE_API_HISTORY_WRITE_TRENDS,(void (*)(void))add_trend_value, conf);
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON,(void (*)(void))get_trend_aggregates_json, conf);
 		glb_register_callback(GLB_MODULE_API_HISTORY_READ_TRENDS_JSON,(void (*)(void))get_trend_values_json, conf);

@@ -29,7 +29,6 @@
 
 //for debugging only to have metric 
 #include "../glb_process/process.h"
-#define IPC_BULK_COUNT 256
 
 typedef struct ipc_element_t ipc_element_t;
 
@@ -47,7 +46,7 @@ typedef struct
 	u_int64_t sent;
 } ipc_queue_t;
 
-typedef struct {
+struct  ipc_conf_t {
 	zbx_mem_info_t shm;
 	unsigned char   type;
 	unsigned int    elems_count; //per consumer
@@ -63,7 +62,7 @@ typedef struct {
 	ipc_queue_t *queues; //init in the SHM
 	ipc_mode_t mode; //ipc_bulk or ipc_fast
 
-} ipc_conf_t;
+};
 
 typedef struct 
 {
@@ -81,12 +80,12 @@ static int alloc_local_queues() {
 	if (NULL != local_queues)
 		return SUCCEED;
 
-	if(NULL == (local_queues = zbx_malloc(NULL, sizeof(ipc_local_queues_t) * GLB_IPC_TYPE_COUNT))) {
+	if(NULL == (local_queues = zbx_malloc(NULL, sizeof(ipc_local_queues_t) * IPC_TYPE_COUNT))) {
 		LOG_WRN("Cannot allocate heap memory for local ipc structures");
 		return FAIL;
 	}
 
-	memset(local_queues, 0 , sizeof(ipc_local_queues_t) * GLB_IPC_TYPE_COUNT);
+	memset(local_queues, 0 , sizeof(ipc_local_queues_t) * IPC_TYPE_COUNT);
 	return SUCCEED;
 }
 
@@ -122,7 +121,7 @@ int glb_ipc_init_reciever(unsigned char ipc_type) {
 
 void glb_ipc_client_destroy() {
 	int i;
-	for (i = 0; i < GLB_IPC_TYPE_COUNT; i++) {
+	for (i = 0; i < IPC_TYPE_COUNT; i++) {
 		if (NULL != local_queues[i].send_queues)
 			zbx_free(local_queues[i].send_queues);
 	}
@@ -305,11 +304,11 @@ static void flush_queues(ipc_conf_t *ipc) {
 	last_flush = now;
 
 	for (i =0 ; i < ipc->consumers; i ++ ) {
-		if (IPC_LOW_LATENCY == ipc->mode || local_queues[ipc->type].send_queues[i].count > IPC_BULK_COUNT)
+		if (IPC_LOW_LATENCY == ipc->mode || local_queues[ipc->type].send_queues[i].count > IPC_BULK_COUNT) 
 			move_all_elements(&local_queues[ipc->type].send_queues[i], &ipc->queues[i]);
 	}
-	
 }
+
 int glb_ipc_flush_all(void *ipc_conf) {
 	ipc_conf_t *ipc = ipc_conf;
 	int i = 0;
@@ -337,38 +336,35 @@ static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, 
 	return SUCCEED;
 }
 
-int glb_ipc_send(void *ipc_conf, int queue_num, void* send_data, unsigned char lock ) {
-	ipc_conf_t *ipc = ipc_conf;
-
+int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock ) {
+	
 	ipc_queue_t *local_free_queue = &local_queues[ipc->type].free_snd_queue,
 				*local_send_queue = &local_queues[ipc->type].send_queues[queue_num];
 
 	ipc_element_t  *element = NULL;
 
 	//LOG_INF("There are %d items in the local free queue", local_free_queue->count);
-	if (FAIL == get_free_queue_items(ipc, local_free_queue, lock))
+	if (FAIL == get_free_queue_items(ipc, local_free_queue, lock)) 
 		return FAIL;
 	
 	//LOG_INF("Moving element from the local free queue to local send queue, queue num is %d, addr is %p", queue_num, local_send_queue);
 	if (FAIL == move_one_element(local_free_queue, local_send_queue, "local_free -> local_send")) 
 		return FAIL;
+	
 	//LOG_INF("Getting ptr to the item to send");
 	element = local_send_queue->last;
 	//LOG_INF("Calling callback");
 	ipc->create_cb(&ipc->memf, (void *)(&element->data), send_data);
 	
-	//LOG_INF("Flushing local send queues to global queues");
 	flush_queues(ipc);
-	//LOG_INF("Finished");
 	return SUCCEED;
 }
 
 /* callback based interface to process incoming data without need 
 to pop or copy data, returns number of the processed messages */
-int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
+int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
 	int i = 0;
 	ipc_element_t *element;
-	ipc_conf_t *ipc = ipc_conf;
 	static u_int64_t last_rcv_check = 0;
 	u_int64_t now = glb_ms_time();
 
@@ -377,7 +373,7 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 				*local_free_queue = &local_queues[ipc->type].free_rcv_queue;
 	
 
-	while (i < max_count ) {
+	while (i < max_count || 0 == max_count ) {
 
 //	dump_queue(rcv_queue, "Rcv global queue");
 //	dump_queue(local_rcv_queue, "Rcv local queue");
@@ -417,7 +413,7 @@ int  glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_fu
 	return i;
 }
 
-void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
+ipc_conf_t* glb_ipc_init(unsigned char ipc_type, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode) {
     
 	ipc_conf_t *conf;
@@ -427,7 +423,7 @@ void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elem
 	
 	//LOG_INF("Allocating memory for ipc config, func addr is %p, need to allocate %ld bytes ", memf->malloc_func, sizeof(ipc_conf_t));
 	if (NULL == (conf = memf->malloc_func(NULL, sizeof(ipc_conf_t)))) {	
-		LOG_WRN("Cannot allocate IPC structures for IPC %s, exiting", name);
+		LOG_WRN("Cannot allocate IPC structures for IPC, exiting");
 		return NULL;
 	}
 	
@@ -475,7 +471,8 @@ void* glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elem
 	
 	conf->create_cb = create_cb;
 	conf->free_cb = free_cb;
-	
+	conf->mode = mode;
+
 	LOG_DBG("%s:finished", __func__);
 	return (void *)conf;
 }
@@ -485,23 +482,76 @@ void glb_ipc_destroy() {
 
 }
 
-void 	glb_ipc_dump_sender_queues(void *ipc_data, char *name) {
-	ipc_conf_t *ipc = ipc_data;
-	LOG_INF("QUEUES dump at %s: local_free_queue: %d, global_free_queue: %d, local_send_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
+void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {
+	LOG_INF("QUEUE sender dump at %s: local_free_queue: %d, global_free_queue: %d, local_send_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
 		name, local_queues[ipc->type].free_snd_queue.count, ipc->free_queue.count, local_queues[ipc->type].send_queues[0].count, 
 			ipc->queues[0].count, local_queues[ipc->type].rcv_queue.count);
-//	dump_queue(&ipc->queues[0],"IPC send queue");
 }
 
-void 	glb_ipc_dump_reciever_queues(void *ipc_data, char *name, int proc_num) {
-	ipc_conf_t *ipc = ipc_data;
-	LOG_INF("QUEUES dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
+void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc, char *name, int proc_num) {
+	LOG_INF("QUEUE reciever dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
 		name, local_queues[ipc->type].free_rcv_queue.count, ipc->free_queue.count, ipc->queues[proc_num-1].count, local_queues[ipc->type].rcv_queue.count);
-//	dump_queue(&ipc->queues[0],"IPC send queue");
 }
 
-mem_funcs_t *glb_ipc_get_memf_funcs(void *ipc_data) {
-	ipc_conf_t *ipc = ipc_data;
-	return &ipc->memf;
+typedef struct {
+	size_t values_num;
+	u_int64_t *data;
+} ipc_vector_t;
+
+IPC_CREATE_CB(ipc_vector_uint64_create_cb) {
+	zbx_vector_uint64_t *vec = local_data;
+	ipc_vector_t *ipc_arr = ipc_data;
+	ipc_arr->values_num = vec->values_num;
+
+	if (0 == vec->values_num)
+		return;
+
+	if (NULL == (ipc_arr->data = memf->malloc_func(NULL, sizeof(u_int64_t) * vec->values_num))){
+		LOG_WRN("Cannot allocate IPC mem");
+		return;
+	}
+	memcpy(ipc_arr->data, vec->values,  sizeof(u_int64_t)*ipc_arr->values_num);
 }
+
+IPC_PROCESS_CB(ipc_vector_uint64_process_cb) {
+	zbx_vector_uint64_t *vec = cb_data;
+	ipc_vector_t *ipc_arr = ipc_data;
+	LOG_INF("Process vector via ipc called");
+
+	zbx_vector_uint64_append_array(vec, ipc_arr->data, ipc_arr->values_num );
+	memf->free_func(ipc_arr->data);
+}
+
+ipc_conf_t *ipc_vector_uint64_init(int ipc_type, int elems_count, int consumers, int mode, mem_funcs_t *memf) {
+
+	return  glb_ipc_init(ipc_type, elems_count, sizeof(ipc_vector_t), consumers, memf, 
+						ipc_vector_uint64_create_cb, NULL, mode);
+}
+
+int ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint64_t * vector, int max_count) {
+	return glb_ipc_process(ipc, consumerid, ipc_vector_uint64_process_cb, vector, max_count );
+}
+
+int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_t *vector, unsigned char lock ) {
+	zbx_vector_uint64_t *snd = zbx_calloc(NULL, 0, sizeof(zbx_vector_uint64_t)*ipc->consumers);
+	int i;
+		
+	for (i=0; i<ipc->consumers; i++)
+		zbx_vector_uint64_create(&snd[i]);
+	
+	for (i=0; i<vector->values_num; i++) 
+		zbx_vector_uint64_append(&snd[vector->values[i] % ipc->consumers], vector->values[i]);
+	
+	for(i = 0; i < ipc->consumers; i++) {
+		glb_ipc_send(ipc, i, &snd[i], lock);
+		zbx_vector_uint64_destroy(&snd[i]);
+	}
+
+	zbx_free(snd);
+}
+
+void ipc_vector_uint64_destroy(ipc_conf_t *ipc) {
+	glb_ipc_destroy(ipc);
+}
+
 #endif

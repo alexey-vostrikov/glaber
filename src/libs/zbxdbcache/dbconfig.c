@@ -4466,63 +4466,12 @@ static void	dc_schedule_trigger_timers(zbx_hashset_t *trend_queue, int now)
 		if (NULL == (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &function->triggerid)))
 			continue;
 
-		//if (TRIGGER_STATUS_ENABLED != trigger->status || TRIGGER_FUNCTIONAL_TRUE != trigger->functional)
-		//if (SUCCEED != glb_state_trigger_is_functional(trigger->triggerid) )
-		//	continue;
-
 		if ( ZBX_FUNCTION_TYPE_TRENDS == function->type ||
 			 	ZBX_FUNCTION_TYPE_TIMER == function->type )
 				processing_notify_changed_trigger(function->triggerid);
-			// //		if (NULL == (timer = dc_trigger_function_timer_create(function)))
-// //			continue;
-
-// //		if (NULL != trend_queue && NULL != (old = (zbx_trigger_timer_t *)zbx_hashset_search(trend_queue,
-// //				&timer->objectid)) && old->eval_ts.sec < now + 10 * SEC_PER_MIN)
-// /		{
-// 			/* if the trigger was scheduled during next 10 minutes         */
-// 			/* schedule its evaluation later to reduce server startup load */
-// 			if (old->eval_ts.sec < now + 10 * SEC_PER_MIN)
-// 				ts.sec = now + 10 * SEC_PER_MIN + timer->triggerid % (10 * SEC_PER_MIN);
-// 			else
-// 				ts.sec = old->eval_ts.sec;
-
-//			dc_schedule_trigger_timer(timer, &old->eval_ts, &ts);
-		// }
-		// else
-		// {
-		// 	if (0 == (ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
-		// 	{
-		// 		dc_trigger_timer_free(timer);
-		// 		function->timer_revision = 0;
-		// 	}
-		// 	else
-		// 		dc_schedule_trigger_timer(timer, NULL, &ts);
-		// }
 	}
+
 	processing_notify_flush();
-
-// //	zbx_hashset_iter_reset(&config->triggers, &iter);
-// //	while (NULL != (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_iter_next(&iter)))
-// /	{
-// 		if (ZBX_TRIGGER_TIMER_DEFAULT == trigger->timer)
-// 			continue;
-
-// 		if ( SUCCEED == glb_state_trigger_timer_revision_equals_revision(trigger->triggerid))
-// 			continue;
-
-// 		if (NULL == (timer = dc_trigger_timer_create(trigger)))
-// 			continue;
-
-// 		if (0 == (ts.sec = dc_function_calculate_nextcheck(timer, now, timer->triggerid)))
-// 		{
-// 			dc_trigger_timer_free(timer);
-// 			glb_state_trigger_set_timer_revision(trigger->triggerid, 0);
-// 			//trigger->timer_revision = 0;
-// 		}
-// 		else
-// 			dc_schedule_trigger_timer(timer, NULL, &ts);
-
-// 	}
 }
 
 static void	DCsync_functions(zbx_dbsync_t *sync)
@@ -6689,14 +6638,14 @@ void	DCsync_configuration(unsigned char mode)
 		update_flags |= ZBX_DBSYNC_UPDATE_TRIGGER_DEPENDENCY;
 
 	/* update various trigger related links in cache */
+	LOG_INF("Sending triggers notifications");
 	if (0 != (update_flags & (ZBX_DBSYNC_UPDATE_HOSTS | ZBX_DBSYNC_UPDATE_ITEMS | ZBX_DBSYNC_UPDATE_FUNCTIONS |
 			ZBX_DBSYNC_UPDATE_TRIGGERS)))
 	{
 		dc_trigger_update_cache();
-	
-		
 		dc_schedule_trigger_timers((ZBX_DBSYNC_INIT == mode ? &trend_queue : NULL), time(NULL));
 	}
+	LOG_INF("Finished sending triggers notifications");
 
 	update_sec = zbx_time() - sec;
 	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))

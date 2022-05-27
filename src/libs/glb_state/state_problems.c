@@ -21,6 +21,7 @@
 #include "state.h"
 #include "state_problems.h"
 #include "../glb_conf/conf_triggers.h"
+#include "../glb_state/state_events.h"
 #include "../../zabbix_server/actions.h"
 
 #define PROBLEM_STATE_OPEN 1
@@ -139,7 +140,9 @@ int problems_close_by_trigger(trigger_problems_t *t_problems, trigger_conf_t *co
         problem->lastchange = time(NULL);
 
         trigger_recovery_event_t rec_event = { .eventid = DBget_maxid_num("events", 1), .ts.sec = time(NULL), .ts.ns = 0,  .problem_eventid = problem->eventid, .triggerid = conf->triggerid};
-        actions_proccess_trigger_recovery(&rec_event);
+
+//        actions_proccess_trigger_recovery(&rec_event);
+        actions_notify_trigger_event(rec_event.eventid);
         return trigger_value;
     }
 
@@ -165,21 +168,20 @@ static void copy_event_tags_to_problem(DB_EVENT *event, problem_t *problem, mem_
 int  problems_create_problem(trigger_problems_t *problems, DB_EVENT *event, u_int64_t triggerid) {
  
     DEBUG_TRIGGER(triggerid,"Creating new problem for the trigger");
-    //LOG_INF("In %s", __func__);
     problem_t *problem = conf.memf.malloc_func(NULL, sizeof(problem_t));
+    
     bzero(problem, sizeof(problem_t));
-    //LOG_INF("Created and zeored");
+    
     problem->eventid = event->eventid;
     problem->lastchange = time(NULL);
     problem->state = PROBLEM_STATE_OPEN;
-    //LOG_INF("Creating tags");
+    
     zbx_vector_ptr_create_ext(&problem->tags, conf.memf.malloc_func, conf.memf.realloc_func, conf.memf.free_func);
-    //LOG_INF("Doing tags copy");
     copy_event_tags_to_problem(event, problem, &conf.memf);
-    //LOG_INF("Finished tags copy");
     zbx_vector_ptr_append(&problems->vector, problem);
-    //LOG_INF("Calling action process for the event");
-    actions_process_trigger_problem(event);
+    
+    actions_notify_trigger_event(event->eventid);
+    
 }
 
 int state_problems_init(strpool_t *strpool, mem_funcs_t *memf) {

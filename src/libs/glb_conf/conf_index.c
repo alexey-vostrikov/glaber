@@ -25,9 +25,9 @@
 //#include "dbconfig.h"
 
 typedef struct {
-	obj_index_t host_to_template_idx;
-	obj_index_t deptrigger_to_trigger_idx;
-	obj_index_t item_to_trigger_idx;
+	obj_index_t *host_to_template_idx;
+	obj_index_t *deptrigger_to_trigger_idx;
+	obj_index_t *item_to_trigger_idx;
     mem_funcs_t memf;
 } idx_config_t;
 
@@ -40,9 +40,10 @@ int config_index_init(mem_funcs_t *memf) {
     
     idx_conf->memf = *memf;
 
-    if ( FAIL == obj_index_init(&idx_conf->host_to_template_idx, memf) ||
-	    FAIL == obj_index_init(&idx_conf->deptrigger_to_trigger_idx, memf) ||
-		FAIL == obj_index_init(&idx_conf->item_to_trigger_idx, memf)  ) 
+    if ( NULL ==(idx_conf->host_to_template_idx = obj_index_init(memf)) ||
+	     NULL ==(idx_conf->deptrigger_to_trigger_idx = obj_index_init(memf)) ||
+		 NULL ==(idx_conf->item_to_trigger_idx = obj_index_init(memf)) ) 
+
         return FAIL;
 
     return SUCCEED;
@@ -50,43 +51,43 @@ int config_index_init(mem_funcs_t *memf) {
 
 /* items->triggers */
 int conf_index_items_to_triggers_del_trigger(u_int64_t triggerid) {
-    return obj_index_del_reverse_id(&idx_conf->item_to_trigger_idx, triggerid);
+    return obj_index_del_reverse_id(idx_conf->item_to_trigger_idx, triggerid);
 };
 
 int conf_index_items_to_triggers_del_item(u_int64_t itemid) {
-    return obj_index_del_id(&idx_conf->item_to_trigger_idx, itemid);
+    return obj_index_del_id(idx_conf->item_to_trigger_idx, itemid);
 }
 
 int conf_index_items_to_triggers_add(u_int64_t itemid, u_int64_t triggerid) {
-    return obj_index_add_ref(&idx_conf->item_to_trigger_idx, itemid, triggerid);
+    return obj_index_add_ref(idx_conf->item_to_trigger_idx, itemid, triggerid);
 }
 
 int conf_index_items_to_triggers_get_triggers(u_int64_t itemid, zbx_vector_uint64_t *triggers) {
-    obj_index_get_refs(&idx_conf->item_to_trigger_idx, itemid, triggers);
+    obj_index_get_refs(idx_conf->item_to_trigger_idx, itemid, triggers);
 	return SUCCEED;
 }
 
 int conf_index_items_to_triggers_get_items(u_int64_t triggerid, zbx_vector_uint64_t *items) {
-    return obj_index_get_reverse_refs(&idx_conf->item_to_trigger_idx, triggerid, items);
+    return obj_index_get_reverse_refs(idx_conf->item_to_trigger_idx, triggerid, items);
 }
 
 /*dependand triggers ->triggers */
 int conf_index_deptrigger_to_trigger_add(u_int64_t deptriggerid, u_int64_t triggerid) {
-	return obj_index_add_ref(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggerid);
+	return obj_index_add_ref(idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggerid);
 }
 
 int conf_index_deptrigger_to_trigger_get_triggers(u_int64_t deptriggerid, zbx_vector_uint64_t *triggers) {
-	return obj_index_get_refs(&idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggers);
+	return obj_index_get_refs(idx_conf->deptrigger_to_trigger_idx, deptriggerid, triggers);
 }
 
 int conf_index_deptrigger_to_trigger_get_deptriggers(u_int64_t triggerid, zbx_vector_uint64_t *deptriggers) {
-	return  obj_index_get_reverse_refs(&idx_conf->deptrigger_to_trigger_idx, triggerid, deptriggers);
+	return  obj_index_get_reverse_refs(idx_conf->deptrigger_to_trigger_idx, triggerid, deptriggers);
 }
 
 int conf_index_deptrigger_to_trigger_del_trigger(u_int64_t triggerid) {
     
-	obj_index_del_id(&idx_conf->deptrigger_to_trigger_idx, triggerid);
-    obj_index_del_reverse_id(&idx_conf->deptrigger_to_trigger_idx, triggerid);
+	obj_index_del_id(idx_conf->deptrigger_to_trigger_idx, triggerid);
+    obj_index_del_reverse_id(idx_conf->deptrigger_to_trigger_idx, triggerid);
 		
     return SUCCEED;
 }
@@ -105,10 +106,9 @@ static int  index_update_from_db_result(unsigned char sync_mode, DB_RESULT resul
     //this is full sync - building new obj_index
 	if ( DBSYNC_INIT == sync_mode || DBSYNC_UPDATE == sync_mode)
 	{	
-		if ( NULL == (idx = idx_conf->memf.malloc_func(NULL,sizeof(obj_index_t)))) 
-			return FAIL;
+		if ( NULL == (idx = obj_index_init(&idx_conf->memf)))
+				return FAIL;
 
-		obj_index_init(idx, &idx_conf->memf);
 		full_sync = 1;
 	} else  
 		idx = old_idx;
@@ -178,17 +178,16 @@ typedef struct zbx_db_result
 } d_res_t;
 
 int conf_index_deptrigger_sync_from_db(unsigned char sync_mode, DB_RESULT result) {
-	index_update_from_db_result(sync_mode, result, &idx_conf->deptrigger_to_trigger_idx, OBJ_TRIGGERS);
+	index_update_from_db_result(sync_mode, result, idx_conf->deptrigger_to_trigger_idx, OBJ_TRIGGERS);
 	return SUCCEED;
-	
 }
 
 int  conf_index_trigger_to_deptrigger_dump() {
-	obj_index_dump(&idx_conf->deptrigger_to_trigger_idx);
+	obj_index_dump(idx_conf->deptrigger_to_trigger_idx);
 	return SUCCEED;
 }
 
 int conf_index_items_to_triggers_dump() {
-	obj_index_dump(&idx_conf->item_to_trigger_idx);
+	obj_index_dump(idx_conf->item_to_trigger_idx);
 	return SUCCEED;
 }

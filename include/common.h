@@ -96,13 +96,13 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 #ifndef DEBUG_ITEM
 u_int64_t DC_get_debug_item();
 #define DEBUG_ITEM(id, message,...) if ( DC_get_debug_item() == id && id > 0 )\
-		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_item:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__);
+		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_item:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__)
 #endif
 
 #ifndef DEBUG_TRIGGER
 u_int64_t DC_get_debug_trigger();
 #define DEBUG_TRIGGER(id, message,...) if ( DC_get_debug_trigger() == id && id > 0 )\
-		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_trigger:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__);
+		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_trigger:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__)
 #define IF_DEBUG_TRIGGER(id) if ( DC_get_debug_trigger() == id && id > 0 )		
 #endif
 

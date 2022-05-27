@@ -198,7 +198,7 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 			poller_preprocess_value(poller_item, NULL, mstime, ITEM_STATE_NOTSUPPORTED, "Cannot parse response pdu");
 		}
 	} else {
-			DEBUG_ITEM(poller_get_item_id(poller_item),"Async SNMP responce TIMEOUT event")	
+			DEBUG_ITEM(poller_get_item_id(poller_item),"Async SNMP responce TIMEOUT event");
 			glb_snmp_handle_timeout(conn);
 	}
 	
@@ -565,8 +565,10 @@ static void  snmp_handle_async_io(void *m_conf) {
 	
 	hosts = netsnmp_large_fd_set_select(fds, &fdset, NULL, NULL, &timeout);
 	
-	if (hosts < 0)
+	if (hosts < 0) {
 		zabbix_log(LOG_LEVEL_WARNING, "End of %s() Something unexpected happened with fds ", __func__);
+		return;
+	}
 	else if (hosts > 0)
 		snmp_read2(&fdset); //calling this will call snmp callback function for arrived responses
 	else 

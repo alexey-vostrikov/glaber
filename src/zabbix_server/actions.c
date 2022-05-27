@@ -26,6 +26,13 @@
 #include "operations.h"
 #include "events.h"
 #include "zbxregexp.h"
+#include "../libs/zbxipcservice/glb_ipc.h"
+
+static zbx_mem_info_t	*events_ipc_notify = NULL;
+ZBX_MEM_FUNC_IMPL(__events_ipc_notify, events_ipc_notify);
+static mem_funcs_t events_ipc_memf = {.free_func = __events_ipc_notify_mem_free_func, .malloc_func = __events_ipc_notify_mem_malloc_func, 
+				.realloc_func = __events_ipc_notify_mem_realloc_func};
+static zbx_vector_uint64_t events, rec_events;
 
 /******************************************************************************
  *                                                                            *
@@ -3061,7 +3068,7 @@ static void	get_escalation_events(const zbx_vector_ptr_t *events, zbx_vector_ptr
 	for (i = 0; i < events->values_num; i++)
 	{
 		event = (DB_EVENT *)events->values[i];
-		DEBUG_TRIGGER(event->trigger.triggerid,"Checking if this is escalation event %d", i)
+		DEBUG_TRIGGER(event->trigger.triggerid,"Checking if this is escalation event %d", i);
 		if (SUCCEED == is_escalation_event(event) && EVENT_SOURCE_COUNT > (size_t)event->source)
 			zbx_vector_ptr_append(&esc_events[event->source], (void*)event);
 	}
@@ -3190,40 +3197,21 @@ static void	prepare_actions_conditions_eval(zbx_vector_ptr_t *actions, zbx_hashs
 	}
 }
 
-/* to be optimized - now it's just a dumb conversion */
-void   actions_proccess_trigger_recovery(trigger_recovery_event_t *rec_event) {
+// void   actions_proccess_trigger_recovery(trigger_recovery_event_t *rec_event) {
 
-	DEBUG_TRIGGER(rec_event->triggerid, "Doing trigger recovery action process for trigger");
-	zbx_vector_ptr_t empty;
-	zbx_vector_uint64_pair_t recovery_events;
+// 	DEBUG_TRIGGER(rec_event->triggerid, "Doing trigger recovery action process for trigger");
+// 	escalations_notify_new_recovery_event(rec_event);
+// }
 
-	zbx_vector_ptr_create(&empty);
-	zbx_vector_uint64_pair_create(&recovery_events);
 
-	zbx_uint64_pair_t pair = {rec_event->eventid, rec_event->problem_eventid};
-	zbx_vector_uint64_pair_append_ptr(&recovery_events, &pair);
-	
-	process_actions(&empty,&recovery_events);
+// void actions_process_trigger_problem(DB_EVENT *event) {
+// 	DEBUG_TRIGGER(event->objectid, "Doing trigger problem action process for trigger");
 
-	zbx_vector_ptr_destroy(&empty);
-	zbx_vector_uint64_pair_destroy(&recovery_events);
-}
+// 	if (FAIL == is_escalation_event(event))
+// 		return;
+// 	escalations_notify_new_event(event);
+// }
 
-/* to be optimized - now it's just a dumb conversion */
-void actions_process_trigger_problem(DB_EVENT *event) {
-	DEBUG_TRIGGER(event->objectid, "Doing trigger problem action process for trigger");
-	zbx_vector_ptr_t events;
-	zbx_vector_uint64_pair_t empty;
-
-	zbx_vector_ptr_create(&events);
-	zbx_vector_uint64_pair_create(&empty);
-	zbx_vector_ptr_append(&events,event);
-
-	process_actions(&events,&empty);
-
-	zbx_vector_ptr_destroy(&events);
-	zbx_vector_uint64_pair_destroy(&empty);
-}
 
 
 /******************************************************************************
@@ -3398,7 +3386,7 @@ void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pai
 			{
 				case EVENT_OBJECT_TRIGGER:
 					triggerid = new_escalation->event->objectid;
-					DEBUG_TRIGGER(triggerid, "Adding new escalation")
+					DEBUG_TRIGGER(triggerid, "Adding new escalation");
 					break;
 				case EVENT_OBJECT_ITEM:
 				case EVENT_OBJECT_LLDRULE:
@@ -3698,4 +3686,54 @@ void	free_db_action(DB_ACTION *action)
 {
 	zbx_free(action->name);
 	zbx_free(action);
+}
+
+static ipc_conf_t* events_notify_ipc = NULL;
+extern int CONFIG_ESCALATOR_FORKS;
+
+int actions_ipc_init(size_t mem_size) {
+	 char *error;
+
+	 if (SUCCEED != zbx_mem_create(&events_ipc_notify, mem_size, "Processing IPC notify queue", "Processing IPC  notify queue", 1, &error))
+		return FAIL;
+	
+	if (NULL == (events_notify_ipc = ipc_vector_uint64_init(IPC_EVENTS_NOTIFY, IPC_BULK_COUNT * 2 * CONFIG_ESCALATOR_FORKS, 
+					CONFIG_ESCALATOR_FORKS, IPC_LOW_LATENCY, &events_ipc_memf  ))) {
+
+		LOG_INF("Cannot init actions IPC");
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(-1);
+	}
+	
+	zbx_vector_uint64_create(&events);
+	zbx_vector_uint64_create(&rec_events);
+	return SUCCEED;
+}
+
+#define EVENTS_FLUSH_TIMEOUT 2
+#define REASONABLE_SIZE 100000
+
+int actions_notify_trigger_event(u_int64_t eventid) {
+	static int lastflush = 0;
+	
+	zbx_vector_uint64_append(&events, eventid);
+
+	if (lastflush + EVENTS_FLUSH_TIMEOUT >time(NULL)) 
+		return SUCCEED;
+	
+	lastflush = time(NULL);	
+		
+	ipc_vector_uint64_send(events_notify_ipc, &events, IPC_LOCK_NOWAIT);
+
+	if (events.values_num > REASONABLE_SIZE) {
+		zbx_vector_uint64_destroy(&events);
+		zbx_vector_uint64_create(&events);
+	} else 
+		zbx_vector_uint64_clear(&events);
+	
+}
+
+int actions_notify_get_events(int consumerid, zbx_vector_uint64_t* events) {
+
+	return ipc_vector_uint64_recieve(events_notify_ipc, consumerid, events, IPC_PROCESS_ALL);
 }

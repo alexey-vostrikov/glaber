@@ -67,7 +67,7 @@ typedef struct {
 } metric_processing_data_t;
 
 
-int glb_processing_ipc_init(int consumers, int queue_size, int notify_queue_size);
+int processing_ipc_init(size_t ipc_mem_size);
 
 //metric processing loop entry point 
 int process_metric_values(int max_values, int process_num) ;

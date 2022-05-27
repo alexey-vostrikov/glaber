@@ -302,7 +302,7 @@ void static glb_agent_handle_timeout(agent_conf_t *conf, agent_connection_t *con
 
 					LOG_DBG("host %ld item %ld timed out %s", poller_get_host_id(poller_item), itemid, error_str);
 					
-					DEBUG_ITEM(itemid, "Agent cleaned without polling due to host not answering to 6 requests in the row")
+					DEBUG_ITEM(itemid, "Agent cleaned without polling due to host not answering to 6 requests in the row");
 					poller_preprocess_value(glb_next_item, NULL , mstime, ITEM_STATE_NOTSUPPORTED, error_str );
 		}
 	}

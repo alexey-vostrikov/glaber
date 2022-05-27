@@ -35,18 +35,15 @@ extern unsigned char	program_type;
 
 static zbx_mem_info_t	*proc_ipc_mem = NULL;
 ZBX_MEM_FUNC_IMPL(__proc_ipc, proc_ipc_mem)
-static mem_funcs_t memf = {.free_func = __proc_ipc_mem_free_func, .malloc_func = __proc_ipc_mem_malloc_func, .realloc_func = __proc_ipc_mem_realloc_func};
+static mem_funcs_t proc_memf = {.free_func = __proc_ipc_mem_free_func, .malloc_func = __proc_ipc_mem_malloc_func, .realloc_func = __proc_ipc_mem_realloc_func};
 
-extern u_int64_t CONFIG_PROCESSING_IPC_SIZE;
-
-extern void *ipc_processing;
-extern void *ipc_processing_notify;
+static ipc_conf_t* ipc_processing;
 
 int DC_get_processing_data(u_int64_t itemid, metric_processing_data_t *proc_data);
 
 //this fetches parts of configuration and state to normilize and history-process
 //data. Trigger operations are performed inside trigger callback so this 
-//naturally provides locking and access to all the trigger configs needed
+//provides locking and access to all the trigger configs needed
 //todo: fetch configuration should happen in non-locaking manner (at least non-global locking)
 int fetch_metric_processing_data(u_int64_t itemid, metric_processing_data_t *proc_data) {
 	return DC_get_processing_data(itemid, proc_data);
@@ -397,30 +394,28 @@ void 	send_metric_to_processing(metric_t *metric) {
 	static int last_dump = 0;
 
 	if (last_dump != time(NULL)) {
-		glb_ipc_dump_sender_queues(ipc_processing, "Sender side");
+	//	glb_ipc_dump_sender_queues(ipc_processing, "Sender side");
 		last_dump = time(NULL);
 	}
 }
 
 
-int glb_processing_ipc_init(int consumers, int metrics_queue_size, int notify_queue_size) {
+int	processing_ipc_init(size_t ipc_mem_size) {
     void *ret;
 	char *error;
 
+	int proc_ipc_count = ipc_mem_size/ (sizeof(metric_t) *2 );
 	//LOG_INF("Doing processing ipc init");
 
-	if (SUCCEED != zbx_mem_create(&proc_ipc_mem, CONFIG_PROCESSING_IPC_SIZE, "Processing IPC queue", "Processing IPC queue", 1, &error))
+	if (SUCCEED != zbx_mem_create(&proc_ipc_mem, ipc_mem_size, "Processing IPC queue", "Processing IPC queue", 1, &error))
 		return FAIL;
 //	LOG_INF("Allocating memory for ipc config, func addr is %p ",metric_ipc_create_cb);
 
-    if (NULL == (ipc_processing = glb_ipc_init(IPC_PROCESSING, CONFIG_PROCESSING_IPC_SIZE , "Processing queue", 
-				metrics_queue_size, sizeof(metric_t), CONFIG_HISTSYNCER_FORKS,  &memf, metric_ipc_create_cb, metric_ipc_free_cb, IPC_HIGH_VOLUME)))
-		
+    if (NULL == (ipc_processing = glb_ipc_init(IPC_PROCESSING, proc_ipc_count, sizeof(metric_t), CONFIG_HISTSYNCER_FORKS, 
+				&proc_memf, metric_ipc_create_cb, metric_ipc_free_cb, IPC_HIGH_VOLUME))) {
+		LOG_WRN("Processing IPC buffer int fail");
 		return FAIL;
+	}
 	
-
-	if (FAIL ==processing_trigger_timers_init(notify_queue_size, &memf)) 
-		return FAIL;
-
 	return SUCCEED;
 };

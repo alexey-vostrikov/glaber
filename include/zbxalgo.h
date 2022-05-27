@@ -516,36 +516,34 @@ int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need
         static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
 
 #define ELEMS_CREATE(name) \
-        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
+        static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
 			
 #define ELEMS_FREE(name) \
-        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
+        static int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
 
 
 /*elements hash for fast and lockless access */
 #define ELEM_FLAG_DO_NOT_CREATE  1
 #define ELEM_FLAG_DELETE	2
 #define ELEM_FLAG_ITER_WRLOCK	4
-//#define ELEM_FLAG_REMAIN_LOCKED  8
+
 
 typedef struct {
     u_int64_t id;
     pthread_mutex_t lock;
     u_int8_t flags;
 	void *data;
-} elems_hash_elem_t; 
+} elems_hash_elem_t;
+
+#define	ELEMS_HASH_ITERATE_CONTINUE	1
+#define ELEMS_HASH_ITERATE_STOP		2
+#define ELEMS_HASH_ITERATE_DELETE	16
 
 typedef int	(*elems_hash_create_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
 typedef int	(*elems_hash_free_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
 typedef int	(*elems_hash_process_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params);
 
-typedef struct  {
-    zbx_hashset_t elems;
-	mem_funcs_t memf;
-    pthread_rwlock_t meta_lock; 
-	elems_hash_create_cb_t elem_create_func;
-	elems_hash_free_cb_t elem_free_func;
-} elems_hash_t;
+typedef struct elems_hash_t elems_hash_t;
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t elem_free_func );
 //elems_hash_t *elems_hash_init_ext(mem_funcs_t *memf, 
@@ -560,14 +558,10 @@ void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
 int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
 int 	elems_hash_get_ids(elems_hash_t *elems, zbx_vector_uint64_t *ids);
 
-typedef struct {
-    elems_hash_t *from_to;
-    elems_hash_t *to_from;
-    mem_funcs_t memf;
-} obj_index_t;
 
+typedef struct obj_index_t obj_index_t;
 
-int	obj_index_init(obj_index_t* idx, mem_funcs_t *memf);
+obj_index_t* obj_index_init(mem_funcs_t *memf);
 
 void	obj_index_destroy(obj_index_t *idx);
 

@@ -56,9 +56,6 @@ int     glb_state_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_j
 glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);
 
 
-
-
-
 // functions to emulate old valuecache interface
 int zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
                       int count, const zbx_timespec_t *ts);

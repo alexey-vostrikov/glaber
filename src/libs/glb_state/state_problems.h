@@ -43,7 +43,7 @@ trigger_problems_t *trigger_problems_init(mem_funcs_t *memf);
 void trigger_problems_destroy(trigger_problems_t *t_problems, mem_funcs_t *memf);
 
 
-int problems_close_by_trigger(trigger_problems_t *t_problems, trigger_conf_t *conf, DB_EVENT *event);
+int  problems_close_by_trigger(trigger_problems_t *t_problems, trigger_conf_t *conf, DB_EVENT *event);
 int  problems_create_problem(trigger_problems_t *problems, DB_EVENT *event, u_int64_t triggerid);
 
 #endif

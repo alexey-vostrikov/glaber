@@ -15,8 +15,8 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#ifndef GLB_CACHE_C
-#define GLB_CACHE_C
+#ifndef GLB_STATE_C
+#define GLB_STATE_C
 
 #include "zbxvariant.h"
 #include "log.h"
@@ -26,11 +26,11 @@
 #include "state_items.h"
 #include "state_triggers.h"
 #include "state_problems.h"
+//#include "state_events.h"
+#include "state_incidents.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
-
-
 
 #define	REFCOUNT_FIELD_SIZE	sizeof(zbx_uint32_t)
 
@@ -75,7 +75,13 @@ int glb_state_init() {
 	
 	if (SUCCEED != discovery_init(&glb_cache->memf) )
 		return FAIL;
-	
+
+//	if (SUCCEED != state_events_init(&glb_cache->memf) )
+//		return FAIL;
+
+	if (SUCCEED != state_incidents_init(&glb_cache->memf) )
+		return FAIL;
+
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);
 	return SUCCEED;
 }

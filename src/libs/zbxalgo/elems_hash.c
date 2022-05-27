@@ -24,7 +24,13 @@
 //it allows simultanios items change
 //items add/removal are still required locking, so the algo should be used only
 //for slow-changing structure (however elemnt's data might change really fast)
-
+struct elems_hash_t {
+    zbx_hashset_t elems;
+	mem_funcs_t memf;
+    pthread_rwlock_t meta_lock; 
+	elems_hash_create_cb_t elem_create_func;
+	elems_hash_free_cb_t elem_free_func;
+} ;
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
        elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
@@ -194,6 +200,8 @@ int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
 }
 
 
+
+
 void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
    
     //LOG_INF("in  : destroying old hset, new elem's memf addr is %ld", new_elems->memf.free_func);
@@ -222,26 +230,42 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
 //iterator will continue till all data or till proc_func returns SUCCEED
 //TODO: implement readlocked version
 //this one might be quite expensive
-
 int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags) {
    
     elems_hash_elem_t *elem;
-    int last_ret = SUCCEED;
+    int last_ret = SUCCEED, i;
+
+    zbx_vector_uint64_t deleteids;
+
+    zbx_vector_uint64_create(&deleteids);
+
     zbx_hashset_iter_t iter;
 
     glb_rwlock_rdlock(&elems->meta_lock);
 
     zbx_hashset_iter_reset(&elems->elems, &iter);
     
-    while ( (NULL !=(elem = (elems_hash_elem_t*) zbx_hashset_iter_next(&iter))) &&
-            SUCCEED == last_ret ) {
+    while ( (NULL != ( elem = zbx_hashset_iter_next(&iter))) &&
+            0 == (last_ret & ELEMS_HASH_ITERATE_STOP) ) {
         glb_lock_block(&elem->lock);
-        (*proc_func)(elem, &elems->memf, params);
+        last_ret = (*proc_func)(elem, &elems->memf, params);
+        
+        if ( 0 != (last_ret && ELEMS_HASH_ITERATE_DELETE) )
+            zbx_vector_uint64_append(&deleteids, elem->id);
+        
         glb_lock_unlock(&elem->lock);
     }
     
     glb_rwlock_unlock(&elems->meta_lock);
+    if ( 0 < deleteids.values_num) {
+        glb_rwlock_wrlock(&elems->meta_lock);
+            for (i = 0; i < deleteids.values_num; i++ ) 
+                zbx_hashset_remove(&elems->elems, &deleteids.values_num);
+          
+        glb_rwlock_unlock(&elems->meta_lock);
+    }
     
+    zbx_vector_uint64_destroy(&deleteids);
 }
 
 int elems_hash_get_ids(elems_hash_t *elems, zbx_vector_uint64_t *ids) {

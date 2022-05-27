@@ -48,14 +48,16 @@
 5.  sender might use flush function to force immediate sending
 	*/
 
+#define IPC_BULK_COUNT 256
 
 typedef enum
 {
 	IPC_PRE_PROCESSING_TYPE =0 ,  //buffer to send items from pollers to preprocessing
 	IPC_PROCESSING,	//processing queue to send to processors
 	IPC_PROCESSING_NOTIFY,	//processing queue to notify processors about config changes
-	GLB_IPC_TYPE_COUNT,  //these too should always be the last ones
-	GLB_IPC_NONE 
+	IPC_EVENTS_NOTIFY, //report to escalator that a new event has happened
+	IPC_TYPE_COUNT,  //these too should always be the last ones
+	IPC_TYPE_NONE 
 } glb_ipc_types_enum;
 
 typedef enum 
@@ -63,6 +65,14 @@ typedef enum
 	IPC_HIGH_VOLUME = 8, //for bufferd high volume traffic
 	IPC_LOW_LATENCY //to send local messages, with immediate send, but will produce more locks
 } ipc_mode_t;
+
+typedef enum 
+{
+	IPC_LOCK_NOWAIT = 0, //abort waiting if all buffer elements is busy
+	IPC_LOCK_WAIT //wait for free buffer
+} ipc_lock_mode_t;
+
+#define IPC_PROCESS_ALL 0
 
 typedef void (*ipc_data_create_cb_t)(mem_funcs_t *memf, void *ipc_data, void *buffer);
 typedef void (*ipc_data_free_cb_t)(mem_funcs_t *memf, void *ipc_data);
@@ -82,17 +92,17 @@ typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, 
 
 
 typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
-
+typedef struct ipc_conf_t ipc_conf_t;
 //typical init staff
-void	*glb_ipc_init(unsigned char ipc_type, size_t mem_size, char *name, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
+ipc_conf_t	*glb_ipc_init(unsigned char ipc_type, int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
 void	glb_ipc_destroy();
 
 //this will copy data to the ipc mem and put to local queue and try to flush 
-int		glb_ipc_send(void *ipc_conf, int queue_num , void *data, unsigned char lock);
+int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned char lock);
 
-int 	glb_ipc_process(void *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
-void	glb_ipc_flush(void *ipc);
+int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
+void	glb_ipc_flush(ipc_conf_t *ipc);
 
 //sender/reciever should be called once for each type if several IPCs are in use
 int  	glb_ipc_init_sender(unsigned char ipc_type, int consumers);
@@ -102,10 +112,20 @@ int 	glb_ipc_init_reciever(unsigned char ipc_type);
 void	glb_ipc_client_destroy();
 
 //for sides that need to cleanup/malloc data in ipc 
-mem_funcs_t *glb_ipc_get_memf_funcs(void *ipc_data);
+//mem_funcs_t *glb_ipc_get_memf_funcs(void *ipc_data);
 
 //to flush remaining in case of fast processing
 int glb_ipc_flush_all(void *ipc_conf);
 
-void 	glb_ipc_dump_reciever_queues(void *ipc_data, char *name, int queue_num);
-void 	glb_ipc_dump_sender_queues(void *ipc_data, char *name);
+void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
+void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);
+
+/* vector specific ipc functions to pass zbx_vector_uint64_t arrays */
+
+typedef void (*ipc_data_vector_uint64_cb_t)(mem_funcs_t *memf, int i, zbx_vector_uint64_t *vector, void *data);
+ipc_conf_t *ipc_vector_uint64_init(int ipc_type, int elems_count, int consumers, int mode, mem_funcs_t *memf);
+void ipc_vector_uint64_destroy(ipc_conf_t *ipc);
+
+/*it's caller's responsibility to init and clean vector, processing will add new values to it*/
+int ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint64_t * vector, int max_count);
+int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_t *vector, unsigned char lock );

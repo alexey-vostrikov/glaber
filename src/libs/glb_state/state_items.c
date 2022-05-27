@@ -17,9 +17,9 @@
 **/
 
 #include "common.h"
-
 #include "zbxalgo.h"
 #include "state.h"
+
 #include "state_items.h"
 #include <zlib.h>
 #include "glb_lock.h"
@@ -536,7 +536,7 @@ static int glb_state_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
     }
     else
     {
-        DEBUG_ITEM(itemid, "Item has been fetched since %d, need %d", elm->db_fetched_time, head_time - seconds)
+        DEBUG_ITEM(itemid, "Item has been fetched since %d, need %d", elm->db_fetched_time, head_time - seconds);
     }
 
     zbx_history_record_vector_create(&values);

@@ -2098,59 +2098,6 @@ out:
 	zbx_vector_uint64_destroy(&triggerids);
 }
 
-
-// static void	update_trigger_changes_by_trigger(trigger_conf_t *tr_conf, trigger_state_t *state)
-// {
-// 	int			i;
-// 	int			index, j, new_value;
-// 	//zbx_trigger_diff_t	*diff;
-
-// 	update_trigger_problem_count_by_trigger(tr_conf, state);
-
-// 	/* update trigger problem_count for new problem events */
-// 	for (i = 0; i < events.values_num; i++)
-// 	{
-// 		DB_EVENT	*event = (DB_EVENT *)events.values[i];
-// 		DEBUG_TRIGGER(event->objectid,"Updating changed trigger")
-
-// 		if (EVENT_SOURCE_TRIGGERS != event->source || EVENT_OBJECT_TRIGGER != event->object)
-// 			continue;
-
-// 	//	if (tr_conf->triggerid !=event->objectid)
-// 	//	{
-// 	//		LOG_INF("Trying to update trigger %ld but it's not in the diff set", event->objectid);
-// 	//		THIS_SHOULD_NEVER_HAPPEN;
-// 	//		exit(-1);
-// 	//		continue;
-// 	//	}
-
-// 	//	diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
-
-// 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
-// 		{
-// 			tr_conf->flags &= ~(zbx_uint64_t)(ZBX_FLAGS_TRIGGER_DIFF_UPDATE_PROBLEM_COUNT |
-// 					ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE);
-// 			continue;
-// 		}
-
-// 		/* always update trigger last change whenever a trigger event has been created */
-		
-// 		state->lastchange = event->clock;
-// 		//glb_state_trigger_set_lastchange(trigger->triggerid, event->clock);
-// 		tr_conf->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE;
-// 	}
-
-// 	/* recalculate trigger value from problem_count and mark for updating if necessary */
-// 	new_value = (0 == state->problem_count ? TRIGGER_VALUE_OK : TRIGGER_VALUE_PROBLEM);
-
-// 	if (new_value != state->value)
-// 	{
-// 			state->value = new_value;
-// 			tr_conf->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
-// 	}
-// }
-
-
 /******************************************************************************
  *                                                                            *
  * Function: update_trigger_changes                                           *
@@ -2171,7 +2118,7 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 	for (i = 0; i < events.values_num; i++)
 	{
 		DB_EVENT	*event = (DB_EVENT *)events.values[i];
-		DEBUG_TRIGGER(event->objectid,"Updating changed trigger")
+		DEBUG_TRIGGER(event->objectid,"Updating changed trigger");
 
 		if (EVENT_SOURCE_TRIGGERS != event->source || EVENT_OBJECT_TRIGGER != event->object)
 			continue;

@@ -365,7 +365,7 @@ EVENT_QUEUE_CALLBACK(item_poll_cb)
 	if (poller_item->event_time != event_time)
 	{
 		// this means the item has been rescheduled since the last scheduling and current event is outdated
-		DEBUG_ITEM(poller_item->itemid, "Outdated event has been found in the event queue, skipping")
+		DEBUG_ITEM(poller_item->itemid, "Outdated event has been found in the event queue, skipping");
 	//	LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", poller_item->itemid, event_time, poller_item->event_time);
 		return FAIL;
 	}
@@ -408,7 +408,7 @@ EVENT_QUEUE_CALLBACK(new_items_check_cb)
 	poller_item_t *poller_item;
 	u_int64_t mstime = glb_ms_time();
 	int num;
-	LOG_INF("new items check callback");
+	
 	num = DCconfig_get_glb_poller_items(&conf, conf.item_type, process_num);
 	// sumtime(&get_items_time, ts_get_items);
 	LOG_DBG("Event: got %d new items from the config cache", num);
@@ -424,7 +424,7 @@ EVENT_QUEUE_CALLBACK(new_items_check_cb)
 		if (poller_item->lastpolltime + 5 * SEC_PER_MIN * 1000 < mstime && POLL_POLLING == poller_item->state)
 		{
 			LOG_INF("Item %ld has timed out in the poller, resetting it's queue state", poller_item->itemid);
-			DEBUG_ITEM(poller_item->itemid, "Item has timeout in the poller, resetting the sate")
+			DEBUG_ITEM(poller_item->itemid, "Item has timeout in the poller, resetting the sate");
 			poller_item->state = POLL_QUEUED;
 		}
 	}

@@ -30,6 +30,7 @@
 #include "alerter_protocol.h"
 
 #include "../../libs/zbxalgo/vectorimpl.h"
+#include "../../libs/glb_state/state_events.h"
 
 #define ZBX_POLL_INTERVAL	1
 
@@ -151,10 +152,12 @@ static int	am_db_get_alerts(zbx_vector_ptr_t *alerts)
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 			"select a.alertid,a.mediatypeid,a.sendto,a.subject,a.message,a.status,a.retries,"
-				"e.source,e.object,e.objectid,a.parameters,a.eventid,a.p_eventid"
+			//	"e.source,e.object,e.objectid,"
+			"null, null, null,"
+			"a.parameters,a.eventid,a.p_eventid"
 			" from alerts a"
-			" left join events e"
-				" on a.eventid=e.eventid"
+		//	" left join events e"
+		//		" on a.eventid=e.eventid"
 			" where alerttype=%d"
 			" and",
 			ALERT_TYPE_MESSAGE);
@@ -175,8 +178,8 @@ static int	am_db_get_alerts(zbx_vector_ptr_t *alerts)
 		ZBX_DBROW2UINT64(p_eventid, row[12]);
 		status = atoi(row[5]);
 		attempts = atoi(row[6]);
-
-		if (SUCCEED == DBis_null(row[7]))
+		
+		if (FAIL == state_incidents_get_status_source_objectid(eventid, &status, &source, &objectid))
 		{
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 					"update alerts set status=%d,retries=0,error='Related event was removed.';\n",
@@ -185,10 +188,6 @@ static int	am_db_get_alerts(zbx_vector_ptr_t *alerts)
 				break;
 			continue;
 		}
-
-		source = atoi(row[7]);
-		object = atoi(row[8]);
-		ZBX_STR2UINT64(objectid, row[9]);
 
 		alert = am_db_create_alert(alertid, mediatypeid, source, object, objectid, eventid, p_eventid, row[2],
 				row[3], row[4], row[10], status, attempts);
@@ -923,7 +922,7 @@ static void	am_db_update_watchdog(zbx_am_db_t *amdb)
 ZBX_THREAD_ENTRY(alert_syncer_thread, args)
 {
 	double		sec1, sec2;
-	int		alerts_num, sleeptime, nextcheck, freq_watchdog, time_watchdog = 0, time_cleanup = 0,
+	int		alerts_num, sleeptime, nextcheck, notify_num, freq_watchdog, time_watchdog = 0, time_cleanup = 0,
 			results_num;
 	zbx_am_db_t	amdb;
 	char		*error = NULL;
@@ -954,37 +953,68 @@ ZBX_THREAD_ENTRY(alert_syncer_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
-		zbx_sleep_loop(sleeptime);
+// 		zbx_sleep_loop(sleeptime);
+// 		LOG_INF("WARN: ALERTER NEEDS FINISHING");
+// 		sleep(1);
+// 		continue;
 
-		sec1 = zbx_time();
-		zbx_update_env();
+// 		sec1 = zbx_time();
+// 		zbx_update_env();
 
-		zbx_setproctitle("%s [queuing alerts]", get_process_type_string(process_type));
+// 		zbx_setproctitle("%s [queuing alerts]", get_process_type_string(process_type));
 
-		alerts_num = am_db_queue_alerts(&amdb);
-		results_num = am_db_flush_results(&amdb);
+// 		am_update_mediatypes_cache(&amdb);
+// 		am_update_watchdog_cache(&amdb);
 
-		if (time_cleanup + SEC_PER_HOUR < sec1)
-		{
-			am_db_remove_expired_mediatypes(&amdb);
-			time_cleanup = sec1;
-		}
+// 		/* get new escalations, or clean-out recovered ones, which might create recovery alerts*/
+// 		notify_num = process_new_escalations_notify(&amdb);
+		
+// 		/* create new alerts by processing escalation events */
+// 		alerts_num = process_escalations_queue(&amdb);
 
-		if (time_watchdog + freq_watchdog < sec1)
-		{
-			am_db_update_watchdog(&amdb);
-			time_watchdog = sec1;
-		}
+// 		/* send alerts to the alerts manager */
+// 		//alerts_num = am_db_queue_alerts(&amdb);
+// 		am_send_alerts(&amdb);
 
-		sec2 = zbx_time();
+// 		//since alerts aren't in the DB anymore - there is no reason
+// 		//to flush them, but alert processing results must be send to 
+// 		//the history. It's questinable if syncer is needed for this
+// 		//mybe doing export at the alert manager would save a few CPU ticks
+// 		//but so far lets leave it here, mayve for really large scale it
+// 		//would give some more time to the alert_manager
+// 		//results_num = am_db_flush_results(&amdb);
+		
+// 		/* alert's results are written to the log and saved to the event's state */
+// 		results_num = am_process_results(&amdb);
 
-		nextcheck = sec1 + ZBX_POLL_INTERVAL;
+// 		//this should go to mediatypes update cache procedure
+// 		//if (time_cleanup + SEC_PER_HOUR < sec1)
+// 		//{
+// 		//	am_db_remove_expired_mediatypes(&amdb);
+// 		//	time_cleanup = sec1;
+// 		//}
 
-		if (0 > (sleeptime = nextcheck - (int)sec2))
-			sleeptime = 0;
+// 	//	if (time_watchdog + freq_watchdog < sec1)
+// //		{
+// //			am_db_update_watchdog(&amdb);
+// //			time_watchdog = sec1;
+// //		}
 
-		zbx_setproctitle("%s [queued %d alerts(s), flushed %d result(s) in " ZBX_FS_DBL " sec, idle %d sec]",
-				get_process_type_string(process_type), alerts_num, results_num, sec2 - sec1, sleeptime);
+// 		sec2 = zbx_time();
+
+// 	//	nextcheck = sec1 + ZBX_POLL_INTERVAL;
+
+// 	//	if (0 > (sleeptime = nextcheck - (int)sec2))
+// 	//		sleeptime = 0;
+
+// 		zbx_setproctitle("%s [queued %d alerts(s), flushed %d result(s) in " ZBX_FS_DBL " sec, idle %d sec]",
+// 				get_process_type_string(process_type), alerts_num, results_num, sec2 - sec1, sleeptime);
+
+// 		if (0 == (alerts_num + results_num + notify_num)) 
+// 			sleeptime = 1;
+// 		else 
+// 			sleeptime = 0;
+
 	}
 
 	am_db_clear(&amdb);

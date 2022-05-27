@@ -36,6 +36,7 @@
 #include "../../libs/glb_process/proc_trends.h"
 
 extern int		CONFIG_HISTSYNCER_FREQUENCY;
+extern int		CONFIG_ESCALATOR_FORKS;
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
 extern void *ipc_processing;
@@ -87,6 +88,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 	glb_ipc_init_reciever(IPC_PROCESSING);
 	glb_ipc_init_reciever(IPC_PROCESSING_NOTIFY);
+	glb_ipc_init_sender(IPC_EVENTS_NOTIFY, CONFIG_ESCALATOR_FORKS);
 
 	trends_init_cache();
 	LOG_INF("Loooping");

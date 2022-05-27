@@ -363,17 +363,6 @@ int  glb_state_trigger_set_lastchange(u_int64_t triggerid, int lastchange) {
       return elems_hash_process(conf->triggers, triggerid, set_lastchange_cb, &lastchange, ELEM_FLAG_DO_NOT_CREATE);
 } 
 
-//void state_trigger_set_value(trigger_state_t *state, unsigned char value) {
-    
-//    if (TRIGGER_VALUE_PROBLEM == value || TRIGGER_VALUE_OK == value) {
-//        strpool_free(&conf->strpool, state->errorstr);
-//        state->errorstr = NULL;
-//    }
-    
- //   state->value = value;
-//}
-
-//general interface for trigger state processing during it's lock
 int state_trigger_process(u_int64_t triggerid, elems_hash_process_cb_t trigger_state_process_cb, void *data) {
     return elems_hash_process(conf->triggers, triggerid, trigger_state_process_cb, data, 0);
 }
@@ -495,43 +484,54 @@ int state_trigger_fill_DC_TRIGGER_state(u_int64_t triggerid, DC_TRIGGER *dctrigg
 
 static int	process_trigger_change(trigger_conf_t *conf, trigger_state_t *state, unsigned char old_value, zbx_timespec_t *ts)
 {
-	DB_EVENT event;
-	
-	trigger_event_create(&event, conf, state , old_value, ts);
-	
-	if (SUCCEED == is_event_supressed(&event))
-		return SUCCEED;
 
-	save_event_to_history(&event);	
-	
-	if ( SUCCEED == is_recovery_change(state->value)) { 
-		DEBUG_TRIGGER(conf->triggerid,"Processing trigger PROBLEM->OK change");			
-		/* note: trigger's value might change back to problem if not all correlated
-        problems has been recovered */
-        state->value = trigger_problems_close_problems(&event, conf);
-	} else {
-		DEBUG_TRIGGER(conf->triggerid,"Processing trigger OK->PROBLEM change");	
-	//	LOG_INF("Processing trigger OK->PROBLEM change triggerid %ld", conf->triggerid);		
-		trigger_problems_create_problem(&event, conf);
-	}
+    /*note: unlike in Zabbix - trigger is not related to the incidents it creates
+    it's much easy to undestand logic and do unvestigation that way: 
+    
+    so an administrator might distingush trigger behaviur and incidents open/close logic
+    that way
 
-	clean_event(&event);
-	return SUCCEED;	
+    that's why incidents(problems) are separated from the triggers state */
+    state_incidents_account_trigger_change();
+
+	// DB_EVENT event;
+	
+	// trigger_event_create(&event, conf, state , old_value, ts);
+	
+	// if (SUCCEED == is_event_supressed(&event))
+	// 	return SUCCEED;
+
+	// save_event_to_history(&event);	
+	
+	// if ( SUCCEED == is_recovery_change(state->value)) { 
+	// 	DEBUG_TRIGGER(conf->triggerid,"Processing trigger PROBLEM->OK change");			
+		
+    //     /* note: trigger's value might change back to problem if not all correlated
+    //     problems has been recovered */
+        
+    //     //trigger_problems_close_problems
+    //     state->value = state_incidents_close_by_recovery_event(&event, conf);
+	// } else {
+	// 	DEBUG_TRIGGER(conf->triggerid,"Processing trigger OK->PROBLEM change");	
+	// //	LOG_INF("Processing trigger OK->PROBLEM change triggerid %ld", conf->triggerid);		
+	// 	//trigger_problems_create_problem(&event, conf);
+    //     state_incidents_create_incident(&event, conf);
+	// }
+
+	// clean_event(&event);
+	// return SUCCEED;	
 }
 
 
 int	recalculate_trigger(u_int64_t triggerid)
 {
-
-    DEBUG_TRIGGER(triggerid, "Calculating trigger")
+    DEBUG_TRIGGER(triggerid, "Calculating trigger");
 	static trigger_conf_t conf = {0};
 
 	trigger_state_t *state;
 	zbx_timespec_t ts = {.sec = time(NULL), .ns = 0};
-	
-   // LOG_INF("Recalculating trigger %ld", triggerid);
 
-	DEBUG_TRIGGER(conf.triggerid, "Freeing trigger config data");
+	DEBUG_TRIGGER(triggerid, "Freeing trigger config data");
 	conf_trigger_free_trigger(&conf);
 
 	/* there is no locking here, if needed, put locking fields to state or state flag */
@@ -557,26 +557,26 @@ int	recalculate_trigger(u_int64_t triggerid)
 	}
 
 	if ( FAIL == evaluate_trigger_expressions(&conf, &state->value)) {
-		DEBUG_TRIGGER(conf.triggerid,"Evaluate expression failed, finishing processing");
+		DEBUG_TRIGGER(triggerid,"Evaluate expression failed, finishing processing");
 		return FAIL;
 	}
 
 	if (SUCCEED == state_trigger_is_changed(&conf, state->value, old_value)) {
 	
 		/*trigger calculated to a new value or it's has multiple problem gen */
-		DEBUG_TRIGGER(conf.triggerid, "Trigger processing t, doing event processing");
+		DEBUG_TRIGGER(triggerid, "Trigger processing t, doing event processing");
 	
 		/*note: processing might change trigger state */
 		process_trigger_change(&conf, state, old_value, &ts);
 	
 	} else {
-		DEBUG_TRIGGER(conf.triggerid, "Trigger is not changed, nothing to process");
+		DEBUG_TRIGGER(triggerid, "Trigger is not changed, nothing to process");
 	}
 	
-	DEBUG_TRIGGER(conf.triggerid, "Saving new state");
-	state_trigger_set_state(conf.triggerid, state, ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL);
+	DEBUG_TRIGGER(triggerid, "Saving new state");
+	state_trigger_set_state(triggerid, state, ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ALL);
 
-	DEBUG_TRIGGER(conf.triggerid, "Finished trigger processing");
+	DEBUG_TRIGGER(triggerid, "Finished trigger processing");
 	
 	return SUCCEED;
 }

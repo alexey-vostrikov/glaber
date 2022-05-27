@@ -64,9 +64,8 @@ typedef enum {
 #define TRIGGER_TIMER_FUNCTION		(TRIGGER_TIMER_FUNCTION_TIME | TRIGGER_TIMER_FUNCTION_TREND)
 
 
-int processing_notify_changed_trigger(uint64_t new_triggerid);
-int processing_notify_flush();
+void processing_notify_changed_trigger(uint64_t new_triggerid);
+void processing_notify_flush(void);
 
-int processing_trigger_timers_init();
-
+int processing_trigger_timers_init(size_t mem_size);
 int process_time_triggers(int max_triggers, int process_num);

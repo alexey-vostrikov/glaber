@@ -83,6 +83,8 @@
 #include "../libs/glb_state/state.h"
 #include "../libs/glb_state/state_items.h"
 #include "../libs/glb_process/process.h"
+#include "../libs/glb_process/proc_trigger_timers.h"
+#include "actions.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -256,9 +258,6 @@ int	CONFIG_VMWARE_PERF_FREQUENCY	= 60;
 int	CONFIG_VMWARE_TIMEOUT		= 10;
 
 zbx_uint64_t	CONFIG_CONF_CACHE_SIZE		= 8 * ZBX_MEBIBYTE;
-//zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
-//zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
-//zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TREND_FUNC_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 u_int64_t			CONFIG_VALUE_CACHE_SIZE		= 512 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
@@ -278,7 +277,6 @@ char	*CONFIG_FPING_LOCATION		= NULL;
 char	*CONFIG_FPING6_LOCATION		= NULL;
 char 	*CONFIG_GLBMAP_LOCATION		= NULL;
 char 	*CONFIG_GLBMAP_OPTIONS		= NULL;
-//int		CONFIG_GLB_REUEUE_TIME	= 120;
 
 char	*CONFIG_DBHOST			= NULL;
 char	*CONFIG_DBNAME			= NULL;
@@ -1260,14 +1258,13 @@ static void	zbx_check_db(void)
 
 	zbx_json_initarray(&db_ver, ZBX_JSON_STAT_BUF_LEN);
 
-//	if (SUCCEED != DBcheck_capabilities(DBextract_version(&db_ver)) || SUCCEED != DBcheck_version())
-//	{
-//		zbx_json_free(&db_ver);
-//		exit(EXIT_FAILURE);
-//	}
-
 	DBflush_version_requirements(db_ver.buffer);
 	zbx_json_free(&db_ver);
+}
+
+int init_ipc() {
+
+
 }
 
 int	MAIN_ZABBIX_ENTRY(int flags)
@@ -1431,11 +1428,23 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	//	exit(EXIT_FAILURE);
 	//}
 
-	if (FAIL == glb_processing_ipc_init(CONFIG_HISTSYNCER_FORKS, 1000000, 1000000)) {
-		zbx_error("Cannot init processing IPC queues");
-		exit(-1);
+
+	if (FAIL == processing_ipc_init(CONFIG_PROCESSING_IPC_SIZE)) {
+	 	zbx_error("Cannot init processing IPC queues");
+	 	exit(-1);
 	}
 
+	if (FAIL == processing_trigger_timers_init(64 * ZBX_MEBIBYTE)) {
+		zbx_error("Couldn't init processing notify ipc");
+		return FAIL;
+	}
+
+	if (FAIL == actions_ipc_init(64 * ZBX_MEBIBYTE)) {
+	 	zbx_error("Cannot init events notify ipc");
+	 	exit(-1);
+	}
+
+	//todo: move this to preprocessing forks
 	glb_ipc_init_sender(IPC_PROCESSING_NOTIFY, CONFIG_HISTSYNCER_FORKS);
 
 	if (FAIL == glb_state_init()) {
