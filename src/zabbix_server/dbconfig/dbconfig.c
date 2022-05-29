@@ -26,6 +26,7 @@
 #include "dbconfig.h"
 #include "dbcache.h"
 #include "../../libs/zbxdbcache/changeset.h"
+#include "../glb_poller/glb_poller.h"
 
 extern int		CONFIG_CONFSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
@@ -120,8 +121,6 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			zbx_setproctitle("%s [synced configuration in %d sec; next sync in %ld sec]",
 				get_process_type_string(process_type), sec, nextcheck - time(NULL) );
 			
-			DC_CleanOutdatedChangedItems();
-						
 			cset_time = changeset_get_recent_time();
 			 
 			 if ( cset_time > 0 && (time(NULL) - cset_time > CHANGESET_AUTOLOAD_TIME )) {
@@ -148,9 +147,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 
 			DCsync_configuration(sync_type);
 			DCupdate_interfaces_availability();
-			nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 		}
-
 	}
 
 	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);

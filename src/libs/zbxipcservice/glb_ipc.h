@@ -1,78 +1,106 @@
-/***********The cipyright **********/
-//TODO: fill the copy left
+/*
+** Copyright Glaber
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
 
+//#include "zbxvariant.h"
 
-#include "zbxvariant.h"
+//IPC is just a simple single-linked list mechanic brought on top of the shm
 
-typedef struct
+/*to avoid contention the following logix is used:
+1. "local buffering and de-buffering"
+	
+	when a sender want to send a data local buffer of N messages is allocated
+	transparently to the sender. When sendere adds new messages, only ofter the 
+	buffer gets full, it's sent to the IPC
+	
+	same is true when a reciever recieves data, it's M messages are detached locally
+	so they can be processed without addtionall locks
+
+2. Messages are basically anything (at least 8 bytes or u_int64_t value)
+	if complex structures has to be passed or when messaging is used to pipeline
+	metrics, it's better to take special measures to avoid extra memory contention:
+		- allocate structures at init time then each time when needed
+3. To decrease contention, it's a 'try' paradigm used to send and recieve messages
+	- if queue is locked, sender or reciever doesn't wait and return on next try
+	however if needed, waiting of lock might be used
+	This may lead to growing buffers at sender or reciever side. Which is pretty much OK, 
+	and on exchausting MAX buffer count messaging will stop which whould allow reciever 
+	to process all the buffered data
+	- sender might use two strategies: drop data on FAIL or lock till some buffers will 
+	be free, it's up to the particular implementation 
+4. it's better to create separate SHM for the each type of communication: this way
+	it will be much less contention on allocating the new data. However it might be opposite 
+	in cases when same data traverses several steps to avoid extra memory copyings
+5.  sender might use flush function to force immediate sending
+	*/
+
+#define IPC_BULK_COUNT 256
+
+typedef enum 
 {
-	u_int64_t itemid;
-	u_int64_t hostid;
-	zbx_timespec_t ts;
-	
-	char *vector_id; //if metric belongs to a vector, should be set
-	
-	int logeventid;         //log needs theese.
-	unsigned char severity;	//fields either
-							//there is also a source field, but it's quite strange
-							//to keep it as source is identified by host/key items
+	IPC_HIGH_VOLUME = 8, //for bufferd high volume traffic
+	IPC_LOW_LATENCY //to send local messages, with immediate send, but will produce more locks
+} ipc_mode_t;
 
-	char *hostname;	//host (service)
-	char *key;	//and key names are the primary metric identifiers
-
-	unsigned int flags;	//GLB_METRIC_FLAG_*
-	unsigned int code;	//GLB_METRIC_CODE_*
-	
-	struct zbx_variant value;
-
-} GLB_METRIC;
-
-
-
-//all buffers keep their size in the first
-//4 bytes
-//it maybe worth of adding timastap when it was returned to the queue for cleaning
-//OMG, i am writting own memeory management system here, stupid and simple
-
-typedef enum
+typedef enum 
 {
-	GLB_IPC_PROCESSING =0 ,  //buffer to send items from pollers to preprocessing
-	GLB_IPC_TYPE_COUNT,  //these too should always be the last ones
-	GLB_IPC_NONE 
-} glb_ipc_types_enum;
+	IPC_LOCK_NOWAIT = 0, //abort waiting if all buffer elements is busy
+	IPC_LOCK_WAIT //wait for free buffer
+} ipc_lock_mode_t;
 
-//config options for an IPC type
-typedef struct {
-	unsigned char   type;
-	unsigned int    elems_count; //IPC elements for the type
-	unsigned char   consumers; //how many IPC consumer queues to create
-} glb_ipc_type_cfg_t;
+#define IPC_PROCESS_ALL 0
+
+typedef void (*ipc_data_create_cb_t)(mem_funcs_t *memf, void *ipc_data, void *buffer);
+typedef void (*ipc_data_free_cb_t)(mem_funcs_t *memf, void *ipc_data);
+typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data);
+
+#define IPC_CREATE_CB(name) \
+		static void name(mem_funcs_t *memf, void *ipc_data, void *local_data)
+
+#define IPC_FREE_CB(name) \
+		static void name(mem_funcs_t *memf, void *ipc_data)
+
+#define IPC_PROCESS_CB(name) \
+		static void name(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data)
 
 typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
+typedef struct ipc_conf_t ipc_conf_t;
 
-struct glb_ipc_buffer_t {
-	unsigned int buf_idx;
-	unsigned int magic;
-	unsigned int lastuse;
-	glb_ipc_buffer_t *next;
-	char data[32];
-};
+ipc_conf_t	*glb_ipc_init(int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
+			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
+void		glb_ipc_destroy(ipc_conf_t* ipc);
 
-void* glb_ipc_save_localy_hashed(int ipc_type, u_int64_t idx,  void* data);
-void  glb_ipc_flush(int ipc_type);
+//this will copy data to the ipc mem and put to local queue and try to flush 
+int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned char lock);
 
-void* glb_ipc_alloc(size_t size);
-void  glb_ipc_free(void *ptr);
-char* glb_ipc_alloc_str(char *string);
+int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
+void	glb_ipc_flush(ipc_conf_t *ipc);
 
-int  glb_ipc_init_sender(int consumers, int ipc_type);
-int glb_ipc_init(glb_ipc_type_cfg_t *comm_types);
+int		glb_ipc_flush_all(void *ipc_conf);
 
-void* glb_ipc_get_data(int ipc_type, int q_num);
-void glb_ipc_add_data(int ipc_type, int q_num,  void* buffer);
+void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
+void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);
 
-void glb_ipc_dump_metric( GLB_METRIC *metric);
-int glb_ipc_dump_queue_stats();
-glb_ipc_buffer_t *glb_ipc_get_buffer(size_t raw_size);
-void glb_ipc_release_buffer(glb_ipc_buffer_t *buffer);
-void	glb_ipc_destroy(void);
+/* vector specific ipc functions to pass zbx_vector_uint64_t arrays */
+typedef void (*ipc_data_vector_uint64_cb_t)(mem_funcs_t *memf, int i, zbx_vector_uint64_t *vector, void *data);
+
+ipc_conf_t*	ipc_vector_uint64_init(int elems_count, int consumers, int mode, mem_funcs_t *memf);
+
+int 	ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint64_t * vector, int max_count);
+int 	ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock);
+
+void 		ipc_vector_uint64_destroy(ipc_conf_t *ipc);

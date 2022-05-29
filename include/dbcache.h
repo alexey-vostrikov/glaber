@@ -750,8 +750,6 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items);
 int DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *nextcheck, unsigned int process_num);
 int	DCconfig_get_snmp_interfaceids_by_addr(const char *addr, zbx_uint64_t **interfaceids);
 size_t	DCconfig_get_snmp_items_by_interfaceid(zbx_uint64_t interfaceid, DC_ITEM **items);
-int DC_add_changed_items(u_int64_t *itemids, int num,  unsigned char state);
-int DC_add_changed_item(u_int64_t itemid,  unsigned char state);
 
 #define ZBX_HK_OPTION_DISABLED		0
 #define ZBX_HK_OPTION_ENABLED		1

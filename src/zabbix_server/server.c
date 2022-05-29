@@ -1426,31 +1426,21 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-
-
-
-	//IPC init, //TODO: when ipc mechanics is ready, make number of
-	//IPC queues configurable by the config file
-	glb_ipc_type_cfg_t comm_types[] = {
-		{ GLB_IPC_PROCESSING, 1024*1024, CONFIG_PREPROCMAN_FORKS },
-		{ GLB_IPC_NONE, 0 } //last should be none
-	};
-
-	if (FAIL == glb_ipc_init((glb_ipc_type_cfg_t *)&comm_types)) {
-		zbx_error("Cannot initialize Glaber IPC services");
-		exit(EXIT_FAILURE);
-	}
-
+	
 	if (FAIL == glb_state_init()) {
 		zbx_error("Cannot initialize Glaber CACHE");
 		exit(EXIT_FAILURE);
 	}
 
+	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
+		zbx_error("Cannot initialize Processing notify IPC");
+		exit(EXIT_FAILURE);
+	}
+	
 	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_items_load()) {
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
 		exit(EXIT_FAILURE);
 	}
-
 
 	if (SUCCEED != zbx_create_itservices_lock(&error))
 	{
@@ -1782,7 +1772,6 @@ void	zbx_on_exit(int ret)
 //	zbx_vc_destroy();
 	
 	glb_state_destroy();
-	glb_ipc_destroy();
 
 	zbx_destroy_itservices_lock();
 

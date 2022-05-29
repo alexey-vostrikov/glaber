@@ -885,8 +885,7 @@ typedef struct
 	zbx_hashset_t		maintenances;
 	zbx_hashset_t		maintenance_periods;
 	zbx_hashset_t		maintenance_tags;
-	zbx_hashset_t		changed_items; /*changed items since config reload for the pollers with own queues */
-
+	
 	int last_items_change; // when changed_items has been added last time
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)

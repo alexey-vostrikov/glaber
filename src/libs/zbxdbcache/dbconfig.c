@@ -124,6 +124,7 @@ extern int CONFIG_GLB_AGENT_FORKS;
 extern int CONFIG_GLB_PINGER_FORKS;
 extern int CONFIG_GLB_WORKER_FORKS;
 extern int CONFIG_GLB_AGENT_FORKS;
+extern int CONFIG_EXT_SERVER_FORKS;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_WORKERS_DIR;
 extern int CONFIG_CONFSYNCER_FREQUENCY;
@@ -233,6 +234,7 @@ clean:
 
 	return ret;
 }
+
 /*************************************************************
  * returns SUCCEED if the item can be async polled and 
  * doesn't have to be put in any of zabbix standard queues
@@ -1351,22 +1353,22 @@ static void	DCsync_hosts(zbx_dbsync_t *sync)
 		//}
 		//in case of existing item update, notify all active pollers to rebuild
 		//their items queue to reflect changes
-		if ( 1 == found) {
-			zbx_hashset_iter_t iter;
-			u_int64_t *itemid;
-			zbx_hashset_iter_reset(&host->itemids, &iter);
-			while (NULL != (itemid = (u_int64_t*)zbx_hashset_iter_next(&iter))) {
-				//LOG_INF("Host %ld changed, redoing item %ld", hostid, *itemid);
-				if (HOST_STATUS_NOT_MONITORED == status) {
-				//	LOG_INF("Host is disabled, adding remove item notify");
-					DC_add_changed_item(*itemid, ITEM_STATUS_DISABLED);
-				} else {
-					//LOG_INF("Host is enabled, adding add item notify");
-					DC_add_changed_item(*itemid, ITEM_STATUS_ACTIVE);
-				}
-			}
+		// if ( 1 == found) {
+		// 	zbx_hashset_iter_t iter;
+		// 	u_int64_t *itemid;
+		// 	zbx_hashset_iter_reset(&host->itemids, &iter);
+		// 	while (NULL != (itemid = (u_int64_t*)zbx_hashset_iter_next(&iter))) {
+		// 		//LOG_INF("Host %ld changed, redoing item %ld", hostid, *itemid);
+		// 		if (HOST_STATUS_NOT_MONITORED == status) {
+		// 		//	LOG_INF("Host is disabled, adding remove item notify");
+		// 			DC_add_changed_item(*itemid, ITEM_STATUS_DISABLED);
+		// 		} else {
+		// 			//LOG_INF("Host is enabled, adding add item notify");
+		// 			DC_add_changed_item(*itemid, ITEM_STATUS_ACTIVE);
+		// 		}
+		// 	}
 			
-		}
+		// }
 
 		/* see whether we should and can update 'hosts_h' and 'hosts_p' indexes at this point */
 		update_index_h = 0;
@@ -2995,14 +2997,15 @@ static int DC_remove_item(u_int64_t itemid) {
 	if (NULL == (item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemid)))
 		return FAIL;
 
-	DC_add_changed_item(itemid, ITEM_STATUS_DELETED);
-	
 	if (NULL != (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &item->hostid))) {
 		if (NULL != zbx_hashset_search(&host->itemids, &itemid)) {
 			zbx_hashset_remove(&host->itemids, &itemid);
 		}
 	}
 	
+	if (SUCCEED == glb_might_be_async_polled(item, host))
+		poller_item_add_notify(item->type, item->itemid, item->hostid);
+
 	if (ITEM_STATUS_ACTIVE == item->status)
 	{
 		interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &item->interfaceid);
@@ -3369,14 +3372,13 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 
 		ZBX_STR2UCHAR(status, row[2]);
 		ZBX_STR2UCHAR(type, row[3]);
-				
+			
 		/*add to the item ids index of the host */
 		if (NULL == zbx_hashset_search(&host->itemids, &itemid)) {
 			zbx_hashset_insert(&host->itemids, &itemid, sizeof(u_int64_t));
 		}
 
-		DC_add_changed_item(itemid, ITEM_STATUS_ACTIVE);
-				
+			
 		item = (ZBX_DC_ITEM *)DCfind_id(&config->items, itemid, sizeof(ZBX_DC_ITEM), &found);
 
 		/* template item */
@@ -3908,7 +3910,10 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 			item->poller_type = ZBX_NO_POLLER;
 		}
 
-		DCupdate_item_queue(item, old_poller_type);
+		/* items that do not support notify-updates are passed to old queuing */
+		if ( FAIL == glb_might_be_async_polled(item,host)  ||
+			 FAIL == poller_item_add_notify(type, itemid, hostid) )
+			DCupdate_item_queue(item, old_poller_type);
 	}
 
 	/* update dependent item vectors within master items */
@@ -6364,6 +6369,7 @@ void	DCsync_configuration(unsigned char mode)
 	config->sync_requested = 0;
 
 	zbx_dbsync_init_env(config);
+	poller_item_notify_init();
 
 	if (ZBX_DBSYNC_INIT == mode)
 	{
@@ -6372,10 +6378,10 @@ void	DCsync_configuration(unsigned char mode)
 	}
 
 	#ifndef HAVE_SQLITE3
-//	if (GLB_DBSYNC_CHANGESET == mode ) 
-//	{
+	if (GLB_DBSYNC_CHANGESET == mode ) 
+	{
 		changeset_prepare_work_table();
-//	}
+	}
 	#endif
 
 	/* global configuration must be synchronized directly with database */
@@ -7056,6 +7062,9 @@ out:
 	if (GLB_DBSYNC_CHANGESET == mode)
 		changeset_delete_work_table();
 	#endif
+
+	poller_item_notify_flush();
+	
 	LOG_INF("CONFIG RELOAD completed");
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -7472,7 +7481,6 @@ int	init_configuration_cache(char **error)
 	CREATE_HASHSET(config->corr_conditions, 0);
 	CREATE_HASHSET(config->corr_operations, 0);
 	CREATE_HASHSET(config->hostgroups, 0);
-	CREATE_HASHSET(config->changed_items, 0);
 
 	zbx_vector_ptr_create_ext(&config->hostgroups_name, __config_mem_malloc_func, __config_mem_realloc_func,
 			__config_mem_free_func);
@@ -10136,110 +10144,6 @@ typedef struct {
 	
 } glb_changed_item_t;
 
-int DC_add_changed_item(u_int64_t itemid, unsigned char status) {
-	glb_changed_item_t *c_item;
-	int found;
-	WRLOCK_CACHE;
-	DEBUG_ITEM(itemid,"Item is added to the poller notification queue in state %d", status);
-	c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemid, sizeof(glb_changed_item_t), &found);	
-	c_item->status = status;
-	c_item->time = time(NULL);
-	c_item->is_async_polled = FAIL;
-	UNLOCK_CACHE;
-}
-
-int DC_add_changed_items(u_int64_t *itemids, int num, unsigned char status) {
-	glb_changed_item_t *c_item;
-	int found;
-	int i;
-	WRLOCK_CACHE;
-	
-	for (i = 0; i < num; i++ ) {
-		ZBX_DC_ITEM *item;
-		if(NULL != (item = (ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemids[i]))) {
-			c_item = (glb_changed_item_t *) DCfind_id(&config->changed_items, itemids[i], sizeof(glb_changed_item_t), &found);	
-			c_item->status = status;
-			c_item->time = time(NULL);
-			c_item->is_async_polled = FAIL;
-		}
-	}
-
-	UNLOCK_CACHE;
-}
-
-/****************************************************************************
- * removes items from the changed items cache wich has been there more 
- * then one config cache reload time, most async pollers need just 
- * one second to take their items from the cache
- * *************************************************************************/
-
-void DC_CleanOutdatedChangedItems() {
-	zbx_hashset_iter_t iter;
-	glb_changed_item_t *c_item;
-	
-	static int last_clean_time = 0;
-	
-	int i = 0, j = 0;
-	int now = time(NULL);
-
-	int outdate_time = now - 300;
-	
-	if (last_clean_time > now - 5 ) 
-		return;
-
-	WRLOCK_CACHE;
-	zbx_hashset_iter_reset(&config->changed_items, &iter);
-
-	while (NULL != (c_item = zbx_hashset_iter_next(&iter))) {
-		if (c_item->time < outdate_time && SUCCEED != c_item->is_async_polled) {
-			//after timeout checking if item is async polled
-			//and if not, removing from the notification queue
-			//this is done to support heavy configs when loading 
-			//as load speed and cleanup time pose race condition
-			ZBX_DC_ITEM *dc_item;
-			ZBX_DC_HOST *dc_host;
-			//if item doesn't exist or it's host doesn exists
-			if (NULL != (dc_item = zbx_hashset_search(&config->items,&c_item->itemid)) &&
-			   (NULL != (dc_host = zbx_hashset_search(&config->hosts, &dc_item->hostid)))) {
-			
-				//item exists, checking if the item is not for async poll
-				if (SUCCEED == glb_might_be_async_polled(dc_item,dc_host)) {
-					LOG_INF("Item %ld is async polled, leaving in the notify queue", c_item->itemid);
-					//marking item as async polled, not touching it anymore
-					c_item->is_async_polled = SUCCEED;
-				} else {
-					LOG_INF("Cleaning item %ld from the notify queue, it's not async polled", c_item->itemid);
-					//this item isn't for async polling, removing from notify list 
-					//normal pollers doesn't need it
-					i++;
-					zbx_hashset_iter_remove(&iter);
-				}
-			} else {
-				//item in the notify list, but there are no objects in the config
-				//item still might appear in the config a bit later. If system under
-				//really heavy load, then it might not get loaded in 300 sec
-				//but so far, let's log it and remove from the notification queue
-				if (ITEM_STATUS_DELETED != c_item->status) {
-					//item is deleted already in the config, removing the notification
-					LOG_WRN("Item %ld in cahnge notify list, but still no config cache data", c_item->itemid);
-				}
-				zbx_hashset_iter_remove(&iter);
-			}
-		}
-		j++;
-	}
-	
-	UNLOCK_CACHE;
-	LOG_DBG("%s : %d items cleaned, %d total ", __func__, i, j);
-}
-
-//static int sumtime(u_int64_t *sum, zbx_timespec_t start) {
-//	zbx_timespec_t ts;
-//	zbx_timespec(&ts);
-//	*sum = *sum + (ts.sec - start.sec) * 1000000000 + ts.ns - start.ns;
-//}
-
-
 
 static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids) {
 	int i = 0;
@@ -10247,10 +10151,6 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 	RDLOCK_CACHE;
 
-	//not really nice we - do double item search
-	//but we minimize wrlock time
-	//it's better to use something not
-	//completely lockable like glb_cache
 	u_int64_t start_time = glb_ms_time();
 
 	while(i < itemids->values_num )  {//&& ( glb_ms_time() - 1000 ) < start_time ) {
@@ -10272,9 +10172,25 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			if (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
 				LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
 				DEBUG_ITEM(itemids->values[i],"Item didn't get processed due to proxy condition: proxy id %ld progtype is %d",dc_item.host.proxy_hostid, (program_type & ZBX_PROGRAM_TYPE_SERVER)  );
+				glb_poller_delete_item(poll_data, itemids->values[i]);
 				i++;
 				continue;
 			}
+
+			if ( HOST_STATUS_MONITORED != zbx_dc_host->status ||
+				 SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item) || 
+			     ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0 ||
+			     //FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host) || 
+			 	 ITEM_STATUS_DISABLED == zbx_dc_item->status 
+			 	//( 0 != zbx_dc_host->proxy_hostid && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER)) 
+				 ) {
+			//removing any disabled items from the host
+				DEBUG_ITEM(itemids->values[i], "Removing item due to it's disabled or its host is disabled");
+				glb_poller_delete_item(poll_data, itemids->values[i]);
+				i++;
+				continue;
+			}
+
 
 			DCget_item(&dc_item, zbx_dc_item,ZBX_ITEM_GET_ALL);
 			DCget_host(&dc_item.host, zbx_dc_host, ZBX_ITEM_GET_ALL);
@@ -10283,15 +10199,18 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 		
 
 			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
-			glb_poller_create_item(poll_data, &dc_item);
-			init_result(&result);
 
+			glb_poller_create_item(poll_data, &dc_item);
+
+			init_result(&result);
 			zbx_clean_items(&dc_item, 1, &result);
 			DCconfig_clean_items(&dc_item, &errcode, 1);
-				
-		} else 
-			DEBUG_ITEM(itemids->values[i],"NOT found item and host data");
-
+						
+		} else {
+			DEBUG_ITEM(itemids->values[i],"NOT found item and host data, or host/item is disabled, deleting item from the poller");
+			glb_poller_delete_item(poll_data, itemids->values[i]);
+		}
+		
 		num++;
 		i++;
 	}
@@ -10301,132 +10220,24 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 	return num;
 }
 
-
-
-/******************************************************************************
- *                                                                            *
- * Function: DCconfig_get_glb_poller_items                                    *
- *                                                                            *
- *	Note: pollers use pretty dumb logic and doesn't really care about  
- *		items and hosts statuses. This proc decides if changed item that      *
- *		hits changed_config hash  
- *			-should be polled ( then it's added to the poller)                *
- *		    -shouldn't be pollerd ( then it's removed from the poller)        *
- *
- *			a newly added or updated item should immediately be placed        *
- *			to the polling queues whatever the next calculated check is       *
- *			(sure this doesn't applies to passive types)                      * 
- *                                                                            *
- ******************************************************************************/
-int	DCconfig_get_glb_poller_items(void *poll_data, unsigned char item_type, unsigned int process_num)
+int	DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *itemids)
 {
-	int			now, num = 0, queue_num;
-	int forks;
-	static int last_processed_time = 0;
-	zbx_hashset_iter_t iter;
-	//void *item;
-	//zbx_uint64_pair_t *item_pair;
-	glb_changed_item_t *c_item;
-
-	zbx_vector_uint64_t itemids;
-	static int init_items_vector = 0;
+	int num = 0;
+//	int			now, num = 0, queue_num;
+//	int forks;
+//	static int last_processed_time = 0;
+//	zbx_hashset_iter_t iter;
+//	glb_changed_item_t *c_item;
+//	static int init_items_vector = 0;
 	
-	int i;
+//	int i;
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() process num %d" , __func__, process_num);
-
-	now = time(NULL);
+//	now = time(NULL);
 	
-	static int log_time=0;
-	
-	zbx_vector_uint64_create(&itemids);
-	zbx_vector_uint64_reserve(&itemids,1024);
-	
-	WRLOCK_CACHE;
-	last_processed_time = config->last_items_change;
-			
-	zbx_hashset_iter_reset(&config->changed_items,&iter);
-	
-	forks = glb_poller_get_forks(poll_data);
-
-	LOG_DBG("Starting items loop: %d items to process", config->changed_items.num_data);
-
-	while (NULL != (c_item =( glb_changed_item_t*) zbx_hashset_iter_next(&iter) ) ) {
-
-		ZBX_DC_ITEM *zbx_dc_item;
-		ZBX_DC_HOST *zbx_dc_host;
-				
-		//deleted items have nothing but itemid, so deleting it in any poller number and type 
-		if (ITEM_STATUS_DELETED == c_item->status ) {
-			
-			LOG_DBG("Item %ld has been deleted or disabled, trying to remove from the polling", c_item->itemid);
-			
-			if (SUCCEED == glb_poller_delete_item(poll_data, c_item->itemid)) {
-				LOG_DBG("Remove successfull");
-				zbx_hashset_iter_remove(&iter);
-				continue;
-			}
-			LOG_DBG("Remove failed (other process item?)");
-			continue;
-		}
-		
-		if (NULL == ( zbx_dc_item = zbx_hashset_search(&config->items, &c_item->itemid))) {
-			//item doesn't exists, but it might be deleted, so we just need to delete it
-			LOG_WRN("Item %ld couldn't find in the config cache", c_item->itemid);
-			zbx_hashset_iter_remove(&iter);
-			continue;
-		}
-		
-		DEBUG_ITEM(zbx_dc_item->itemid,"Item found in the async polling cycle in status %d", c_item->status);
-		
-		//only need the desiserd item types
-		if (zbx_dc_item->type != item_type) { 
-			continue;
-		}
-		
-		//check for the process number
-		if (zbx_dc_item->hostid % forks != (process_num - 1) ) {
-			DEBUG_ITEM(zbx_dc_item->itemid,"Skipping item, it belongs to other process");
-			continue;
-		}
-		LOG_DBG("Item %ld found for addition to the internal queue", zbx_dc_item->itemid);				
-		
-		if (NULL == (zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &zbx_dc_item->hostid))) {
-			LOG_WRN("Item %ld has wrong host id set (%ld): host doesn't exists", zbx_dc_item->itemid, zbx_dc_item->hostid );
-			zbx_hashset_iter_remove(&iter);
-			continue;
-		}
-
-		if ( HOST_STATUS_MONITORED != zbx_dc_host->status ||
-			 SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item) || 
-			 ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0 ||
-			 FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host) || 
-			 ITEM_STATUS_DISABLED == zbx_dc_item->status  || 
-			 ( 0 != zbx_dc_host->proxy_hostid && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
-			  ) {
-			//removing any disabled items from the host
-			//LOG_INF("Server: removing proxy's item from the poll");
-			glb_poller_delete_item(poll_data, c_item->itemid);
-			zbx_hashset_iter_remove(&iter);	
-			continue;
-		}
-		//LOG_INF("Adding item %ld to the poll, proxy id is %ld",zbx_dc_item->itemid, zbx_dc_host->proxy_hostid );
-		DEBUG_ITEM(zbx_dc_item->itemid,"Item create or change notification fetched");
-		zbx_vector_uint64_append(&itemids,zbx_dc_item->itemid);
-		zbx_hashset_iter_remove(&iter);	
+	if (itemids->values_num > 0 ) {
+		LOG_DBG("Will process %d items", itemids->values_num);		
+		num = process_collected_items(poll_data, itemids);
 	}
-
-	UNLOCK_CACHE;
-
-	if (itemids.values_num > 0 ) {
-		LOG_DBG("Will process %d items", itemids.values_num);		
-		process_collected_items(poll_data, &itemids);
-	}
-	
-	zbx_vector_uint64_destroy(&itemids);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
-
 	return num;
 }
 
