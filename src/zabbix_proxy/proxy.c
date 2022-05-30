@@ -1521,9 +1521,10 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_HISTORYPOLLER:
-				poller_type = ZBX_POLLER_TYPE_HISTORY;
+			//	poller_type = ZBX_POLLER_TYPE_HISTORY;
+				poller_type = ITEM_TYPE_CALCULATED;
 				thread_args.args = &poller_type;
-				zbx_thread_start(poller_thread, &thread_args, &threads[i]);
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_AVAILMAN:
 				threads_flags[i] = ZBX_THREAD_WAIT_EXIT;

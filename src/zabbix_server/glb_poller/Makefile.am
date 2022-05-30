@@ -13,7 +13,8 @@ libglbpoller_a_SOURCES = \
 	glb_server.h \
 	glb_agent.c	\
 	glb_agent.h \
-	snmp.c
+	snmp.c \
+	calculated.c
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \

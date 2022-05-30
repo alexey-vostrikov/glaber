@@ -240,8 +240,12 @@ clean:
  * doesn't have to be put in any of zabbix standard queues
  * **********************************************************/
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
-
+	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked for async polling");
+	
 	switch (zbx_dc_item->type) {
+		case ITEM_TYPE_CALCULATED:
+			return SUCCEED;
+
 		case ITEM_TYPE_WORKER_SERVER:
 	//	case ITEM_TYPE_TRAPPER: 
 			return SUCCEED;
@@ -365,12 +369,13 @@ static unsigned char poller_by_item(unsigned char type, const char *key)
 		case ITEM_TYPE_TELNET:
 		case ITEM_TYPE_HTTPAGENT:
 		case ITEM_TYPE_SCRIPT:
+		case ITEM_TYPE_INTERNAL:
 			if (0 == CONFIG_POLLER_FORKS)
 				break;
 
 			return ZBX_POLLER_TYPE_NORMAL;
+	
 		case ITEM_TYPE_CALCULATED:
-		case ITEM_TYPE_INTERNAL:
 			if (0 == CONFIG_HISTORYPOLLER_FORKS)
 				break;
 
@@ -10199,9 +10204,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 		
 
 			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
-
 			glb_poller_create_item(poll_data, &dc_item);
-
 			init_result(&result);
 			zbx_clean_items(&dc_item, 1, &result);
 			DCconfig_clean_items(&dc_item, &errcode, 1);
@@ -10223,19 +10226,10 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 int	DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *itemids)
 {
 	int num = 0;
-//	int			now, num = 0, queue_num;
-//	int forks;
-//	static int last_processed_time = 0;
-//	zbx_hashset_iter_t iter;
-//	glb_changed_item_t *c_item;
-//	static int init_items_vector = 0;
-	
-//	int i;
-	
-//	now = time(NULL);
 	
 	if (itemids->values_num > 0 ) {
 		LOG_DBG("Will process %d items", itemids->values_num);		
+	//	LOG_INF("IPC Calling process collected items for %d itemids", itemids->values_num);
 		num = process_collected_items(poll_data, itemids);
 	}
 	return num;

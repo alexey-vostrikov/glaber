@@ -13,6 +13,7 @@
 #include "glb_worker.h"
 #include "glb_server.h"
 #include "glb_agent.h"
+#include "calculated.h"
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
 #include "../poller/poller.h"
@@ -322,11 +323,16 @@ static int poll_module_init()
 		break;
 
 	case ITEM_TYPE_WORKER_SERVER:
-		return glb_worker_server_init(&conf);
+		glb_worker_server_init(&conf);
 		break;
 
 	case ITEM_TYPE_AGENT:
 		glb_agent_init(&conf);
+		break;
+	
+//	case ITEM_TYPE_INTERNAL:
+	case ITEM_TYPE_CALCULATED:
+		calculated_poller_init(&conf);
 		break;
 
 	default:
@@ -409,6 +415,7 @@ EVENT_QUEUE_CALLBACK(item_poll_cb)
 
 static int poller_notify_ipc_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items) {
 	ipc_vector_uint64_recieve(ipc_poller_notify[value_type], consumer, changed_items, IPC_PROCESS_ALL);
+	//glb_ipc_dump_reciever_queues(ipc_poller_notify[value_type], " IPC Reciever side", consumer);
 }
 
 int	DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *itemids);
@@ -418,19 +425,22 @@ EVENT_QUEUE_CALLBACK(new_items_check_cb)
 	poller_item_t *poller_item;
 	u_int64_t mstime = glb_ms_time();
 	int num;
-	LOG_INF("new items check callback");
+//	LOG_INF("new items check callback");
 
 	zbx_vector_uint64_t changed_items;
 
 	zbx_vector_uint64_create(&changed_items);
-	LOG_INF("Getting array of ids in poller for IPC consumer %d", process_num -1 );
+//	LOG_INF("Getting array of ids in poller for IPC consumer %d value type %d", process_num -1 , conf.item_type);
 	poller_notify_ipc_rcv(conf.item_type, process_num -1 , &changed_items );
+//	LOG_INF("IPC Got %d new items for sync", changed_items.values_num);
 	num = DCconfig_get_glb_poller_items_by_ids(&conf, &changed_items);
+//	LOG_INF("IPC Synced %d items", num);
 	zbx_vector_uint64_destroy(&changed_items);
-	LOG_INF("Got %d new items");
+
+	
 
 	// sumtime(&get_items_time, ts_get_items);
-	LOG_INF("Event: got %d new items from the config cache", num);
+//	LOG_INF("Event: got %d new items from the config cache", num);
 	event_queue_add_event(conf.event_queue, mstime + 1 * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
 
 	zbx_hashset_iter_t iter;
@@ -442,7 +452,7 @@ EVENT_QUEUE_CALLBACK(new_items_check_cb)
 		// but it's a poller's business to submit timeout result
 		if (poller_item->lastpolltime + 5 * SEC_PER_MIN * 1000 < mstime && POLL_POLLING == poller_item->state)
 		{
-			LOG_INF("Item %ld has timed out in the poller, resetting it's queue state", poller_item->itemid);
+//			LOG_INF("Item %ld has timed out in the poller, resetting it's queue state", poller_item->itemid);
 			DEBUG_ITEM(poller_item->itemid, "Item has timeout in the poller, resetting the sate")
 			poller_item->state = POLL_QUEUED;
 		}
@@ -630,12 +640,7 @@ extern int CONFIG_GLB_SNMP_FORKS;
 extern int CONFIG_GLB_PINGER_FORKS;
 extern int CONFIG_GLB_PINGER_FORKS;
 extern int CONFIG_GLB_WORKER_FORKS;
-
-int get_async_poller_queues_num(void) {
-	return CONFIG_EXT_SERVER_FORKS +  CONFIG_GLB_AGENT_FORKS +
-		   CONFIG_GLB_SNMP_FORKS + CONFIG_GLB_PINGER_FORKS +
-		   CONFIG_GLB_WORKER_FORKS;
-}
+extern int CONFIG_HISTORYPOLLER_FORKS;
 
 /*in milliseconds */
 #define STAT_INTERVAL 5000
@@ -654,7 +659,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	if (SUCCEED != poll_init((zbx_thread_args_t *)args))
 		exit(-1);
 
-	event_queue_add_event(conf.event_queue, glb_ms_time() + (10 + process_num) * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
+	event_queue_add_event(conf.event_queue, glb_ms_time() + (1 + process_num) * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			   server_num, get_process_type_string(process_type), process_num);
@@ -692,8 +697,9 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 #undef STAT_INTERVAL
 }
 static int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
-	if (0 < forks) 
+	if (0 < forks) {
 		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, &ipc_memf);
+	}
 }
 
 int poller_notify_ipc_init(size_t mem_size) {
@@ -701,8 +707,6 @@ int poller_notify_ipc_init(size_t mem_size) {
 	
 	if (SUCCEED != zbx_mem_create(&poller_ipc_notify, mem_size, "Poller IPC notify queue", "Poller IPC notify queue", 1, &error))
 		return FAIL;
-   
-    int messages_count = get_async_poller_queues_num() * 2 * IPC_BULK_COUNT;
 
 	bzero(ipc_poller_notify, sizeof(ipc_conf_t*) * ITEM_TYPE_MAX);
 	
@@ -711,7 +715,8 @@ int poller_notify_ipc_init(size_t mem_size) {
 	poller_init_ipc_type(ipc_poller_notify, ITEM_TYPE_SNMP, CONFIG_GLB_SNMP_FORKS, &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, ITEM_TYPE_SIMPLE, CONFIG_GLB_PINGER_FORKS, &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, ITEM_TYPE_EXTERNAL, CONFIG_GLB_WORKER_FORKS, &ipc_memf);
-
+	poller_init_ipc_type(ipc_poller_notify, ITEM_TYPE_CALCULATED, CONFIG_HISTORYPOLLER_FORKS, &ipc_memf);
+	
 	return SUCCEED;
 }
 
@@ -732,7 +737,7 @@ int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid) {
 
 	if (NULL == ipc_poller_notify[item_type])
 		return FAIL;
-	
+	DEBUG_ITEM(itemid,"Adding item to async polling notify for type %d", item_type);
 	zbx_vector_uint64_pair_append(notify_buffer[item_type], pair);
 	
 	return SUCCEED;
@@ -749,11 +754,10 @@ void poller_item_notify_flush() {
 				THIS_SHOULD_NEVER_HAPPEN;
 				exit(-1);
 			}
-
+//			LOG_INF("IPC: flushing %d items for type %d", notify_buffer[type]->values_num, type);
 			ipc_vector_uint64_send(ipc_poller_notify[type], notify_buffer[type], 1);
 			zbx_vector_uint64_pair_destroy(notify_buffer[type]);
 		}
 	}
-
 };
 

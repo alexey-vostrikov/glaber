@@ -1,14 +1,25 @@
-/*********************************************************
- * this is one more implementation of agent async polling
- *
- * the copyright
- * the fun
- * the result
- * *******************************************************/
+/*
+** Glaber
+** Copyright (C)  Glaber
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+#include "log.h"
 #include "common.h"
 #include "glb_agent.h"
 #include "dbcache.h"
-#include "log.h"
 #include "preproc.h"
 #define GLB_MAX_AGENT_CONNS 8192
 
@@ -44,7 +55,7 @@ extern int CONFIG_GLB_AGENT_FORKS;
  * initiates async tcp connection    										  * 
  * ***************************************************************************/
 #ifdef HAVE_IPV6
-int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port) {
+static int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port) {
 	int		ret = FAIL;
 	struct addrinfo	*ai = NULL, hints;
 	struct addrinfo	*ai_bind = NULL;
@@ -111,7 +122,7 @@ out:
 	return ret;
 }
 #else 
-int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port) {
+static int glb_async_tcp_connect(int *sock, const char *source_ip, const char *ip, unsigned int port) {
 
 	ZBX_SOCKADDR	servaddr_in;
 	struct addrinfo	hints, *ai;
@@ -449,22 +460,18 @@ void handle_socket_operations(agent_conf_t *conf, agent_connection_t *conn)
 
 static int agent_init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_item) {
 	zbx_timespec_t timespec;
+	
 	const char *interface_addr;
 	unsigned int interface_port;
 	const char *key; 
+	
 	agent_item_t *agent_item;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	
-	if (NULL == (agent_item = zbx_calloc(NULL,0,sizeof(agent_item_t)))) {
-		LOG_WRN("Cannot allocate mem to poll agent item, exiting");
-		return FAIL;
-	}
-	
-	poller_set_item_specific_data(poller_item,agent_item);
+	agent_item = zbx_calloc(NULL,0,sizeof(agent_item_t));
 
-	zbx_heap_strpool_release(agent_item->interface_addr);
-	zbx_heap_strpool_release(agent_item->key);
+	poller_set_item_specific_data(poller_item,agent_item);
 	
 	agent_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
 	agent_item->key = zbx_heap_strpool_intern(dc_item->key);
@@ -576,7 +583,7 @@ static int forks_count(void *m_conf) {
 int  glb_agent_init(poll_engine_t *poll) {
 		
 	int i;
-	static agent_conf_t *engine;
+	agent_conf_t *engine;
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	
