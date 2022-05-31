@@ -462,7 +462,9 @@ IPC_PROCESS_CB(ipc_vector_uint64_process_cb) {
 	ipc_vector_t *ipc_arr = ipc_data;
 
 	zbx_vector_uint64_append_array(vec, ipc_arr->data, ipc_arr->values_num );
-	memf->free_func(ipc_arr->data);
+	
+	if (NULL != ipc_arr->data )
+		memf->free_func(ipc_arr->data);
 }
 
 ipc_conf_t *ipc_vector_uint64_init(int elems_count, int consumers, int mode, mem_funcs_t *memf) {
