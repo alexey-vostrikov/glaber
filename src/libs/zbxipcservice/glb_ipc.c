@@ -448,7 +448,8 @@ IPC_CREATE_CB(ipc_vector_uint64_create_cb) {
 	ipc_vector_t *ipc_arr = ipc_data;
 
 	ipc_arr->values_num = vec->values_num;
-
+	ipc_arr->data = NULL;
+	
 	if (0 == vec->values_num)
 		return;
 
