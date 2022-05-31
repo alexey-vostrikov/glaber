@@ -716,6 +716,7 @@ void	__zbx_mem_free(const char *file, int line, zbx_mem_info_t *info, void *ptr)
 	if (NULL == ptr)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): freeing a NULL pointer", file, line, __func__);
+		THIS_SHOULD_NEVER_HAPPEN;
 		exit(EXIT_FAILURE);
 	}
 	
