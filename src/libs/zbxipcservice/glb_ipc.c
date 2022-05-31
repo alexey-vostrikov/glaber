@@ -241,7 +241,7 @@ static void flush_queues(ipc_conf_t *ipc) {
 	static u_int64_t last_flush = 0;
 	u_int64_t now = glb_ms_time();
 	
-	if (now == last_flush) 
+	if (IPC_LOW_LATENCY != ipc->mode && now == last_flush ) 
 		return;
 	
 	last_flush = now;
@@ -298,7 +298,7 @@ int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char 
 
 	ipc->create_cb(&ipc->memf, (void *)(&element->data), send_data);
 	
-	flush_queues(ipc);
+	//flush_queues(ipc);
 	return SUCCEED;
 }
 
@@ -424,14 +424,17 @@ void glb_ipc_destroy(ipc_conf_t *ipc) {
 }
 
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {
-	LOG_INF("QUEUE sender dump at %s: local_free_queue: %d, global_free_queue: %d, local_send_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
-		name, ipc->local_queues.free_snd_queue.count, ipc->free_queue.count, ipc->local_queues.send_queues[0].count, 
-			ipc->queues[0].count, ipc->local_queues.rcv_queue.count);
+	LOG_INF("IPC: QUEUE sender dump at %s: local_free_queue: %d, global_free_queue: %d",
+		name, ipc->local_queues.free_snd_queue.count, ipc->free_queue.count);
+			
+	for (int i=0; i< ipc->consumers; i++) {
+		LOG_INF("IPC consumer %d send: local %d, global %d", i, ipc->local_queues.send_queues[i].count, ipc->queues[i].count);
+	}
 }
 
-void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc, char *name, int proc_num) {
+void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc, char *name, int queue_num) {
 	LOG_INF("QUEUE reciever dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
-		name, ipc->local_queues.free_rcv_queue.count, ipc->free_queue.count, ipc->queues[proc_num-1].count, 
+		name, ipc->local_queues.free_rcv_queue.count, ipc->free_queue.count, ipc->queues[queue_num].count, 
 		ipc->local_queues.rcv_queue.count);
 }
 
@@ -461,8 +464,13 @@ IPC_PROCESS_CB(ipc_vector_uint64_process_cb) {
 	zbx_vector_uint64_t *vec = cb_data;
 	ipc_vector_t *ipc_arr = ipc_data;
 
+	if (0 == ipc_arr->values_num || NULL == ipc_arr->data) {
+		LOG_INF("IPC: Warning: arrived empty message");
+		return;
+	}
+
 	zbx_vector_uint64_append_array(vec, ipc_arr->data, ipc_arr->values_num );
-	
+//	LOG_INF("IPC: Arrived %d values via ipc notify", ipc_arr->values_num );
 	if (NULL != ipc_arr->data )
 		memf->free_func(ipc_arr->data);
 }
@@ -480,7 +488,7 @@ int ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint64
 int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock ) {
 	zbx_vector_uint64_t *snd = zbx_calloc(NULL, 0, sizeof(zbx_vector_uint64_t)*ipc->consumers);
 	int i;
-
+//	LOG_INF("IPC Sending total %d values to consumer %d",vector->values_num, i);
 	for (i=0; i<ipc->consumers; i++)
 		zbx_vector_uint64_create(&snd[i]);
 	
@@ -490,12 +498,15 @@ int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, un
 	}
 	
 	for(i = 0; i < ipc->consumers; i++) {
-//		LOG_INF("Sending %d values to consumer %d", snd[i].values_num, i);
+	//	LOG_INF("IPC Sending %d values to consumer %d", snd[i].values_num, i);
 		glb_ipc_send(ipc, i, &snd[i], lock);
 		zbx_vector_uint64_destroy(&snd[i]);
 	}
-
+	
+	flush_queues(ipc);
+	
 	zbx_free(snd);
+	//glb_ipc_dump_sender_queues(ipc, "Sender side");
 }
 
 void ipc_vector_uint64_destroy(ipc_conf_t *ipc) {
