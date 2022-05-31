@@ -1,3 +1,6 @@
+ver 2.9.19
+    - calculated items pollers are switched to own queues to reduce config cache write locks
+    - fixed changset table creation problem
 ver 2.9.18
     - removed excessive config cache lockings by async processes that reportably caused server to freeze for 5-6 minutes
       during cache reload time. ipc vectors introduced to pass vectors of uint64 for notifications

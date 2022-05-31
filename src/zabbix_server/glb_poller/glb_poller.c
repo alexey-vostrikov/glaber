@@ -647,7 +647,7 @@ extern int CONFIG_HISTORYPOLLER_FORKS;
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
-	int old_activity = 0;
+	//int old_activity = 0;
 	u_int64_t old_stat_time = glb_ms_time();
 	poller_item_t *poller_item;
 	poller_host_t *glb_host;
@@ -674,7 +674,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		event_queue_process_events(conf.event_queue, 200);
 
 		conf.poller.handle_async_io(conf.poller.poller_data);
-		old_activity = conf.requests + conf.responces;
+	//	old_activity = conf.requests + conf.responces;
 
 		if (old_stat_time + STAT_INTERVAL < mstime)
 		{
@@ -696,6 +696,9 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }
+
+
+
 static int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
 	if (0 < forks) {
 		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, &ipc_memf);

@@ -6382,12 +6382,12 @@ void	DCsync_configuration(unsigned char mode)
 		dc_load_trigger_queue(&trend_queue);
 	}
 
-	#ifndef HAVE_SQLITE3
-	if (GLB_DBSYNC_CHANGESET == mode ) 
-	{
+//	#ifndef HAVE_SQLITE3
+//	if (GLB_DBSYNC_CHANGESET == mode ) 
+//	{
 		changeset_prepare_work_table();
-	}
-	#endif
+//	}
+//	#endif
 
 	/* global configuration must be synchronized directly with database */
 	zbx_dbsync_init(&config_sync, ZBX_DBSYNC_INIT);

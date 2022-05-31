@@ -24,6 +24,7 @@
 typedef struct {
     strpool_t strpool;
     mem_funcs_t memf;
+    int lastresponces;
 } calc_module_conf_t;
 
 static calc_module_conf_t conf;
@@ -39,7 +40,13 @@ typedef struct {
 
 /*note: no async processing needed for calc, it's sync */
 void handle_async_io(void *m_conf) {
-    usleep(1000);
+    static int lastresponces = 0;
+    
+    /* CPU burn prevention on idle time */
+    if (conf.lastresponces == lastresponces)
+          usleep(1000);
+    else 
+        lastresponces = conf.lastresponces;
 }
 
 int init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_item) {

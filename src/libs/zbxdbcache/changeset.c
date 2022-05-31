@@ -59,10 +59,12 @@ void changeset_prepare_work_table() {
 	}
 
 	if (SUCCEED !=  DBtable_exists(CHANGESET_TABLE)) {
+		//LOG_INF("Creating changeset table");
 		changeset_create_table();
 	}
 	
 	DBbegin();
+	//LOG_INF("Renaming changset -> changset work table");
 	DBrename_table(CHANGESET_TABLE, CHANGESET_WORK_TABLE);
 	DBrename_index(CHANGESET_WORK_TABLE,CHANGESET_TABLE "_idx_clock", CHANGESET_WORK_TABLE "_idx_clock", "clock", 0);
 	DBrename_index(CHANGESET_WORK_TABLE,CHANGESET_TABLE "_idx_obj_type", CHANGESET_WORK_TABLE "_idx_obj_type", "obj_type", 0);
