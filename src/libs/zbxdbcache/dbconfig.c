@@ -6382,12 +6382,12 @@ void	DCsync_configuration(unsigned char mode)
 		dc_load_trigger_queue(&trend_queue);
 	}
 
-//	#ifndef HAVE_SQLITE3
+	#ifndef HAVE_SQLITE3
 //	if (GLB_DBSYNC_CHANGESET == mode ) 
 //	{
 		changeset_prepare_work_table();
 //	}
-//	#endif
+	#endif
 
 	/* global configuration must be synchronized directly with database */
 	zbx_dbsync_init(&config_sync, ZBX_DBSYNC_INIT);
@@ -10175,7 +10175,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			DEBUG_ITEM(itemids->values[i],"Found item and host data");
 
 			if (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
-				LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
+				//LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
 				DEBUG_ITEM(itemids->values[i],"Item didn't get processed due to proxy condition: proxy id %ld progtype is %d",dc_item.host.proxy_hostid, (program_type & ZBX_PROGRAM_TYPE_SERVER)  );
 				glb_poller_delete_item(poll_data, itemids->values[i]);
 				i++;
