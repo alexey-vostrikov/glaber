@@ -68,6 +68,7 @@ static void	zbx_dbconfig_sigusr_handler(int flags)
 	}
 }
 
+int DC_dump_cache_stats();
 /******************************************************************************
  *                                                                            *
  * Function: main_dbconfig_loop                                               *
@@ -114,7 +115,8 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	{
 		sec = time(NULL) - sec;
 		zbx_update_env(sec);
-	
+
+		LOG_INF("SYNC: Full resync in %d, DC_ConfigNeedsSync() = %d, secrets_reload = %d", nextcheck-time(NULL), DC_ConfigNeedsSync(), secrets_reload);
 		while (nextcheck > time(NULL) &&  FAIL == DC_ConfigNeedsSync() &&  0 == secrets_reload) 
 		{
 
@@ -124,11 +126,12 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			cset_time = changeset_get_recent_time();
 			 
 			 if ( cset_time > 0 && (time(NULL) - cset_time > CHANGESET_AUTOLOAD_TIME )) {
-				LOG_INF("auto load chnageset data");
+			//	LOG_INF("auto load changeset data");
 				DC_RequestConfigSync();
 			}
 			
 			zbx_sleep_loop(1);
+			//DC_dump_cache_stats();
 		}
 		
 		zbx_setproctitle("%s [update: syncing configuration; last sync in %d sec]", get_process_type_string(process_type), sec);
@@ -142,8 +145,13 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		else
 		{	int sync_type= GLB_DBSYNC_CHANGESET;
 			
-			if (SUCCEED != DC_ConfigNeedsSync()) 
+			if (nextcheck < time(NULL)) {
+			//	LOG_INF("It's time for fill config SYNC");
 				sync_type = ZBX_DBSYNC_UPDATE;
+				nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
+			} else {
+			//	LOG_INF("Doing partial config SYNC");
+			}
 
 			DCsync_configuration(sync_type);
 			DCupdate_interfaces_availability();

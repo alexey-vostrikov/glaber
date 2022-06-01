@@ -424,10 +424,11 @@ void glb_ipc_destroy(ipc_conf_t *ipc) {
 }
 
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {
+	int i;
 	LOG_INF("IPC: QUEUE sender dump at %s: local_free_queue: %d, global_free_queue: %d",
 		name, ipc->local_queues.free_snd_queue.count, ipc->free_queue.count);
 			
-	for (int i=0; i< ipc->consumers; i++) {
+	for (i = 0; i < ipc->consumers; i++) {
 		LOG_INF("IPC consumer %d send: local %d, global %d", i, ipc->local_queues.send_queues[i].count, ipc->queues[i].count);
 	}
 }
@@ -449,7 +450,7 @@ IPC_CREATE_CB(ipc_vector_uint64_create_cb) {
 
 	ipc_arr->values_num = vec->values_num;
 	ipc_arr->data = NULL;
-	
+
 	if (0 == vec->values_num)
 		return;
 

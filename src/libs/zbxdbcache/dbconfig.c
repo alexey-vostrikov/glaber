@@ -16405,16 +16405,8 @@ void DC_set_debug_trigger(uint64_t id) {
 }
 
 
-/*
-int glb_dc_get_item_value_type (uint64_t itemid) {
-	int value_type= ITEM_VALUE_TYPE_NONE;
-	ZBX_DC_ITEM * dc_item; 
-	
-	RDLOCK_CACHE;
-	if (NULL != (dc_item=(ZBX_DC_ITEM*)zbx_hashset_search(&config->items, &itemid))) 
-		value_type = dc_item->value_type;
+int DC_dump_cache_stats() {
+	WRLOCK_CACHE;
+	zbx_mem_dump_stats(LOG_LEVEL_CRIT, config_mem );
 	UNLOCK_CACHE;
-	
-	return value_type;
 }
-*/
