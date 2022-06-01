@@ -422,8 +422,8 @@ static void pinger_handle_timeouts(void *m_conf) {
 
     zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
     
-    //once a 10 msecs, may be long if we check a few millions of hosts   
-    if (last_check + 10000 > glb_ms_time() ) 
+    //once a 100 msecs, may be long if we check a few millions of hosts   
+    if (last_check + 100000 > glb_ms_time() ) 
         return;
     
     last_check = glb_ms_time();

@@ -145,13 +145,13 @@ int event_queue_process_events(event_queue_t *conf, int max_events)
 
         if (min->key > now)
         {
-            LOG_DBG("Queue is %d mseconds ahead, q size is %d", min->key - now, conf->queue.elems_num);
+            LOG_DBG("Queue is %ld mseconds ahead, q size is %d", min->key - now, conf->queue.elems_num);
             if (conf->locks)
                 glb_lock_unlock(&conf->lock);
             break;
         }
 
-        LOG_DBG("Queue is %d mseconds late, q size is %d", now - min->key, conf->queue.elems_num);
+        LOG_DBG("Queue is %ld mseconds late, q size is %d", now - min->key, conf->queue.elems_num);
         event_id = (unsigned char)min->local_data;
         data = (void *)min->data;
         msec_time = min->key;

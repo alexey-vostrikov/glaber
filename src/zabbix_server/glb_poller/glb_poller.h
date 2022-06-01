@@ -24,9 +24,7 @@
 
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 
-#define GLB_DNS_CACHE_TIME 120 * 1000 // for how long name to ip resolvings have to be remembered in msec
-
-//#define GLB_AGING_PERIOD 62	 //how often to check the items if they are aged
+#define GLB_DNS_CACHE_TIME 300 * 1000 // for how long name to ip resolvings have to be remembered in msec
 
 #define GLB_MAX_FAILS 6 // how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
