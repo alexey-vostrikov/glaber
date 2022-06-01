@@ -55,6 +55,7 @@ typedef struct {
 typedef struct {
 	zbx_hashset_t items_idx; //items that are being polled right now
 	snmp_conn_t *connections; 
+	zbx_vector_ptr_t free_conns;
 } async_snmp_conf_t;
 
 typedef struct {
@@ -133,6 +134,10 @@ static int glb_snmp_handle_timeout(snmp_conn_t *conn) {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
 }
 
+static void register_finished_conn(snmp_conn_t *conn) {
+	zbx_vector_ptr_append(&conf->free_conns, conn);
+}
+
 /******************************************************************************
  * callback that will be called on async data arrival						  *
  * ***************************************************************************/
@@ -166,7 +171,6 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
 
     poller_inc_responces();
-	
 	poller_return_item_to_queue(poller_item);
 
 	if (operation == NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
@@ -201,6 +205,10 @@ static int glb_snmp_callback(int operation, struct snmp_session *sp, int reqid,
 			DEBUG_ITEM(poller_get_item_id(poller_item),"Async SNMP responce TIMEOUT event")	
 			glb_snmp_handle_timeout(conn);
 	}
+
+	//add connection to the list of finished to restart right after 
+	//exit from snmp_read cycle
+	register_finished_conn(conn);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
 	return 1;
@@ -442,12 +450,30 @@ static int glb_snmp_start_connection(snmp_conn_t *conn)
 }
 
 
+static void restart_finished_conns() {
+	int i;
+	
+	for (i = 0; i < conf->free_conns.values_num; i++) {
+		glb_snmp_start_connection(conf->free_conns.values[i]);
+	}
+	
+	zbx_vector_ptr_clear(&conf->free_conns);
+}
+
+
 /******************************************************************************
  * starts finished connections or a new one that have a data to poll		  * 
  * ***************************************************************************/
 static void  snmp_start_new_connections(async_snmp_conf_t *conf) {
 	
 	int i, item_idx;
+	static u_int64_t lastrun = 0;
+
+	//only run once a second
+	if (glb_ms_time() == lastrun) 
+		return;
+	
+	lastrun = glb_ms_time();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Started", __func__);
 	int now=time(NULL);
@@ -567,8 +593,10 @@ static void  snmp_handle_async_io(void *m_conf) {
 	
 	if (hosts < 0)
 		zabbix_log(LOG_LEVEL_WARNING, "End of %s() Something unexpected happened with fds ", __func__);
-	else if (hosts > 0)
+	else if (hosts > 0) {
 		snmp_read2(&fdset); //calling this will call snmp callback function for arrived responses
+		restart_finished_conns();//starting new requests on connections that finished
+	}
 	else 
 		snmp_timeout();
 
@@ -609,6 +637,7 @@ static void	snmp_async_shutdown(void *m_conf) {
 
 	zbx_hashset_destroy(&conf->items_idx);
 	zbx_shutdown_snmp();
+	zbx_vector_ptr_destroy(&conf->free_conns);
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 
@@ -627,11 +656,8 @@ void async_snmp_init(poll_engine_t *poll) {
 	
 	zbx_init_snmp();
 	
-	if (NULL == (conf = zbx_malloc(NULL,sizeof(async_snmp_conf_t))) ||
-		NULL == ( conf->connections = zbx_malloc(NULL, sizeof(snmp_conn_t)* GLB_MAX_SNMP_CONNS)) )  {
-			zabbix_log(LOG_LEVEL_WARNING,"Couldn't allocate memory for async snmp connections data, exititing");
-			exit(-1);
-		}
+	conf = zbx_malloc(NULL,sizeof(async_snmp_conf_t));
+	conf->connections = zbx_malloc(NULL, sizeof(snmp_conn_t)* GLB_MAX_SNMP_CONNS);
 
     poller_set_poller_module_data(conf);
     poller_set_poller_callbacks(snmp_init_item, snmp_free_item, snmp_handle_async_io, snmp_add_poll_item, snmp_async_shutdown, forks_count);
@@ -646,4 +672,5 @@ void async_snmp_init(poll_engine_t *poll) {
 	
 	zbx_hashset_create(&conf->items_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+	zbx_vector_ptr_create(&conf->free_conns);
 }

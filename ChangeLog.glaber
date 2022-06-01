@@ -1,3 +1,5 @@
+ver 2.9.23
+    - fis of SNMP speed: interpacket delays are minimized
 ver 2.9.22
     - fix of dbsync sync endless sync loop 
 ver 2.9.21
