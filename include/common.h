@@ -1129,12 +1129,6 @@ int	get_param(const char *p, int num, char *buf, size_t max_len, zbx_request_par
 int	num_param(const char *p);
 char	*get_param_dyn(const char *p, int num, zbx_request_parameter_type_t *type);
 
-void zbx_heap_strpool_init();
-void zbx_heap_strpool_destroy();
-const char	*zbx_heap_strpool_intern(const char *str);
-void	zbx_heap_strpool_release(const char *str);
-const char	*zbx_heap_strpool_acquire(const char *str);
-
 void glb_heap_binpool_init();
 void glb_heap_binpool_destroy();
 const binpool_data_t	*glb_heap_binpool_intern(binpool_data_t *bdata);

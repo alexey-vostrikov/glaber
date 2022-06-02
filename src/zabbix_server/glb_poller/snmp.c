@@ -251,9 +251,9 @@ static int snmp_init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_
 	snmp_item->interface_port = dc_item->interface.port;
 	snmp_item->useip = dc_item->interface.useip;
 
-    snmp_item->oid = zbx_heap_strpool_intern(translated_oid);
-	snmp_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
-	snmp_item->community = zbx_heap_strpool_intern(dc_item->snmp_community);
+    snmp_item->oid = poller_strpool_add(translated_oid);
+	snmp_item->interface_addr = poller_strpool_add(dc_item->interface.addr);
+	snmp_item->community = poller_strpool_add(dc_item->snmp_community);
 
     if (SNMP_VERSION_3 == dc_item->snmp_version) {
         snmp_item->v3_conf = zbx_calloc(NULL, 0, sizeof(snmp_v3_conf_t));
@@ -262,10 +262,10 @@ static int snmp_init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_
  	    snmp_item->v3_conf->snmpv3_authprotocol = dc_item->snmpv3_authprotocol;
  	    snmp_item->v3_conf->snmpv3_privprotocol = dc_item->snmpv3_privprotocol;
 	
-	    snmp_item->v3_conf->snmpv3_securityname = zbx_heap_strpool_intern(dc_item->snmpv3_securityname);
-	    snmp_item->v3_conf->snmpv3_contextname = zbx_heap_strpool_intern(dc_item->snmpv3_contextname);
-	    snmp_item->v3_conf->snmpv3_authpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_authpassphrase);
-	    snmp_item->v3_conf->snmpv3_privpassphrase = zbx_heap_strpool_intern(dc_item->snmpv3_privpassphrase);
+	    snmp_item->v3_conf->snmpv3_securityname = poller_strpool_add(dc_item->snmpv3_securityname);
+	    snmp_item->v3_conf->snmpv3_contextname = poller_strpool_add(dc_item->snmpv3_contextname);
+	    snmp_item->v3_conf->snmpv3_authpassphrase = poller_strpool_add(dc_item->snmpv3_authpassphrase);
+	    snmp_item->v3_conf->snmpv3_privpassphrase = poller_strpool_add(dc_item->snmpv3_privpassphrase);
     }
 
 	LOG_DBG("In %s() Ended", __func__);
@@ -278,15 +278,15 @@ static void snmp_free_item(void *m_conf,  poller_item_t *poller_item ) {
     
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 
-	zbx_heap_strpool_release(snmp_item->interface_addr);
-	zbx_heap_strpool_release(snmp_item->community);
-    zbx_heap_strpool_release(snmp_item->oid);
+	poller_strpool_free(snmp_item->interface_addr);
+	poller_strpool_free(snmp_item->community);
+    poller_strpool_free(snmp_item->oid);
     
     if (SNMP_VERSION_3 == snmp_item->snmp_version) {
-        zbx_heap_strpool_release(snmp_item->v3_conf->snmpv3_securityname);
-        zbx_heap_strpool_release(snmp_item->v3_conf->snmpv3_contextname);
- 	    zbx_heap_strpool_release(snmp_item->v3_conf->snmpv3_authpassphrase);
-	    zbx_heap_strpool_release(snmp_item->v3_conf->snmpv3_privpassphrase);
+        poller_strpool_free(snmp_item->v3_conf->snmpv3_securityname);
+        poller_strpool_free(snmp_item->v3_conf->snmpv3_contextname);
+ 	    poller_strpool_free(snmp_item->v3_conf->snmpv3_authpassphrase);
+	    poller_strpool_free(snmp_item->v3_conf->snmpv3_privpassphrase);
 	
         zbx_free(snmp_item->v3_conf);
         snmp_item->v3_conf = NULL;

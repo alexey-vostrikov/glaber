@@ -19,6 +19,7 @@
 #include "../poller/poller.h"
 #include "../../libs/zbxexec/worker.h"
 #include "../zbxipcservice/glb_ipc.h"
+#include <uv.h>
 
 static zbx_mem_info_t	*poller_ipc_notify = NULL;
 ZBX_MEM_FUNC_IMPL(__poller_ipc_notify, poller_ipc_notify);
@@ -57,7 +58,8 @@ struct poller_item_t
 	unsigned char flags;
 	u_int64_t lastpolltime;
 	void *itemdata;		  // item type specific data
-	u_int64_t event_time; // rules if the item should be updated or it's the same config
+//	u_int64_t event_time; // rules if the item should be updated or it's the same config
+	uv_timer_t uv_timer;
 };
 
 typedef struct
@@ -83,7 +85,7 @@ struct poll_engine_t
 {
 	poll_module_t poller;
 	unsigned char item_type;
-	event_queue_t *event_queue;
+//	event_queue_t *event_queue;
 	zbx_hashset_t items;
 	zbx_hashset_t hosts;
 
@@ -92,11 +94,19 @@ struct poll_engine_t
 
 	u_int64_t requests;
 	u_int64_t responces;
+	uv_loop_t* loop;
+	strpool_t strpool;
+	
+	uv_timer_t new_items_check;
+	uv_timer_t update_proc_title;
+	uv_timer_t async_io_proc; //this should be gone
+
 };
 
 static poll_engine_t conf = {0};
 
-static int is_active_item_type(unsigned char item_type)
+//static 
+ int is_active_item_type(unsigned char item_type)
 {
 	switch (item_type)
 	{
@@ -106,10 +116,13 @@ static int is_active_item_type(unsigned char item_type)
 
 	return SUCCEED;
 }
+void item_poll_cb(uv_timer_t *uv_timer);
+
 /******************************************************************
  * adds next check event to the events b-tree					  *
  * ****************************************************************/
-static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
+//static 
+ int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 {
 	int simple_interval;
 	u_int64_t nextcheck;
@@ -152,15 +165,75 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 	zbx_custom_interval_free(custom_intervals);
 
 	DEBUG_ITEM(poller_item->itemid, "Added item %ld poll event in %ld msec", poller_item->itemid, nextcheck - mstime);
-
 	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
-	poller_item->event_time = nextcheck;
 
-	event_queue_add_event(conf.event_queue, nextcheck, EVENT_ITEM_POLL, (void *)poller_item->itemid);
+	//LOG_INF("Doung uv_timer init in add_item_check_event");
+	poller_item->uv_timer.data = (void *)poller_item->itemid;
+	
+	uv_timer_init(conf.loop, &poller_item->uv_timer);
+	uv_timer_start(&poller_item->uv_timer, item_poll_cb, nextcheck - mstime, 0);
+
 	return SUCCEED;
 }
 
-static int add_item_to_host(u_int64_t hostid)
+void item_poll_cb(uv_timer_t *uv_timer)
+{
+//	LOG_INF("Item poll event call");
+	poller_item_t *poller_item;
+	u_int64_t mstime = uv_now(conf.loop);
+	
+	if (NULL == (poller_item = poller_get_pollable_item((u_int64_t)uv_timer->data))) {
+		LOG_INF("Cannot find item id %ld",(u_int64_t)uv_timer->data);
+		return;
+	}
+
+	DEBUG_ITEM(poller_item->itemid, "Item poll event");
+
+	/* note: items added without repetition so that nextcheck calculated on each run */
+
+//	if (poller_item->event_time != event_time)
+//	{
+		// this means the item has been rescheduled since the last scheduling and current event is outdated
+//		DEBUG_ITEM(poller_item->itemid, "Outdated event has been found in the event queue, skipping")
+	//	LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", poller_item->itemid, event_time, poller_item->event_time);
+//		return FAIL;
+//	}
+
+	// checking if host is disabled
+	if (SUCCEED == poller_if_host_is_failed(poller_item))
+	{
+		LOG_DBG("Skipping item %ld from polling, host is still down ",
+				poller_item->itemid);
+		// replaning item polling after disabled_till time
+		add_item_check_event(poller_item, mstime + 10 * 1000);
+		//LOG_INF("host is failed");
+		return;
+	}
+
+	add_item_check_event(poller_item, mstime);
+
+	// the only state common poller logic care - _QUEUED - such an items are considred
+	// to be pollabale, updatable and etc. All other states indicates the item is busy
+	// with type specific poller logic
+	if (POLL_QUEUED != poller_item->state)
+	{
+		//|| poller_item->ttl < now ) {
+		DEBUG_ITEM(poller_item->itemid, "Skipping from polling, not in QUEUED state (%d)", poller_item->state);
+		LOG_DBG("Not sending item %ld to polling, it's in the %d state or aged", poller_item->itemid, poller_item->state);
+//		LOG_INF("Item isn't queued");
+		return;
+	}
+
+	poller_item->state = POLL_POLLING;
+	poller_item->lastpolltime = mstime;
+
+	DEBUG_ITEM(poller_item->itemid, "Starting poller item poll");
+//	LOG_INF("Item poll event call2");
+	conf.poller.start_poll(conf.poller.poller_data, poller_item);
+}
+
+
+int add_item_to_host(u_int64_t hostid)
 {
 
 	poller_host_t *glb_host, new_host = {0};
@@ -178,7 +251,8 @@ static int add_item_to_host(u_int64_t hostid)
 	glb_host->items++;
 }
 
-static void delete_item_from_host(u_int64_t hostid)
+//static 
+ void delete_item_from_host(u_int64_t hostid)
 {
 	poller_host_t *glb_host;
 
@@ -207,7 +281,7 @@ int glb_poller_delete_item(void *poller_data, u_int64_t itemid)
 		LOG_DBG("Calling item delete");
 		conf.poller.delete_item(conf.poller.poller_data, poller_item);
 
-		zbx_heap_strpool_release(poller_item->delay);
+		strpool_free(&conf.strpool, poller_item->delay);
 		zbx_hashset_remove_direct(&conf.items, poller_item);
 		LOG_DBG("in: %s: ended", __func__);
 		return SUCCEED;
@@ -217,7 +291,8 @@ int glb_poller_delete_item(void *poller_data, u_int64_t itemid)
 	return FAIL;
 }
 
-static int get_simple_interval(const char *delay)
+//static 
+ int get_simple_interval(const char *delay)
 {
 	int interval;
 	char *delim;
@@ -241,14 +316,17 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 	poller_host_t *glb_host;
 	u_int64_t mstime = glb_ms_time();
 	int i;
+	
+	//LOG_INF("In create item code");
 
 	DEBUG_ITEM(dc_item->itemid, "Creating/updating item");
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
 	{
 		LOG_DBG("Item %ld has changed, creating new configuration", poller_item->itemid);
-
+	//	LOG_INF("Deleting existing item");
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: re-creating new config");
+		uv_timer_stop(&poller_item->uv_timer);
 		glb_poller_delete_item(conf.poller.poller_data, poller_item->itemid);
 	//	LOG_INF("Fix improper update logic!");
 	//	THIS_SHOULD_NEVER_HAPPEN;
@@ -256,7 +334,7 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 	}
 
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
-
+//	LOG_INF("Adding new item");
 	bzero(&local_glb_item, sizeof(poller_item_t));
 
 	local_glb_item.itemid = dc_item->itemid;
@@ -266,27 +344,34 @@ int glb_poller_create_item(void *poll_data, DC_ITEM *dc_item)
 
 	poller_item->state = POLL_QUEUED;
 	poller_item->hostid = dc_item->host.hostid;
-	poller_item->delay = zbx_heap_strpool_intern(dc_item->delay);
+	poller_item->delay = strpool_add(&conf.strpool, dc_item->delay);
 	poller_item->value_type = dc_item->value_type;
 	poller_item->flags = dc_item->flags;
 	poller_item->item_type = dc_item->type;
 
 	add_item_to_host(poller_item->hostid);
-
+	//LOG_INF("Adding new item2");
 	if (FAIL == conf.poller.init_item(&conf.poller.poller_data, dc_item, poller_item))
 	{
 		LOG_DBG("Item creation func failed, not adding item %ld", poller_item->itemid);
-
-		zbx_heap_strpool_release(poller_item->delay);
+	//	LOG_INF("Adding new item2.5");
+		strpool_free(&conf.strpool, poller_item->delay);
 		delete_item_from_host(poller_item->hostid);
 		zbx_hashset_remove(&conf.items, &poller_item);
 
 		return FAIL;
 	};
 
+	//LOG_INF("Adding new item3");
+
 	if (get_simple_interval(poller_item->delay) > 0) {
-		poller_item->event_time = mstime;
-		event_queue_add_event(conf.event_queue, mstime, EVENT_ITEM_POLL, (void *)poller_item->itemid);
+	/* new items with fixed intervals are planned immediately */
+	//	LOG_INF("Doing uv timer init for the item");
+		poller_item->uv_timer.data = (void *)poller_item->itemid;
+		uv_timer_init(conf.loop, &poller_item->uv_timer);
+		uv_timer_start(&poller_item->uv_timer, item_poll_cb, 0 , 0);
+	//	poller_item->event_time = mstime;
+	//	event_queue_add_event(conf.event_queue, mstime, EVENT_ITEM_POLL, (void *)poller_item->itemid);
 	}
 	else
 		add_item_check_event(poller_item, mstime);
@@ -304,9 +389,10 @@ int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now)
 	return FAIL;
 }
 
-static int poll_module_init()
+//static 
+ int poll_module_init()
 {
-	LOG_INF("Doing module init call");
+//	LOG_INF("Doing module init call");
 	switch (conf.item_type)
 	{
 #ifdef HAVE_NETSNMP
@@ -340,7 +426,7 @@ static int poll_module_init()
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
-	LOG_INF("Finished module init call");
+//	LOG_INF("Finished module init call");
 	return SUCCEED;
 }
 
@@ -350,70 +436,24 @@ void poll_shutdown()
 	conf.poller.shutdown(conf.poller.poller_data);
 	zbx_hashset_destroy(&conf.hosts);
 	zbx_hashset_destroy(&conf.items);
-	event_queue_destroy(conf.event_queue);
-	zbx_heap_strpool_destroy();
-	glb_heap_binpool_destroy();
+//	event_queue_destroy(conf.event_queue);
+	strpool_destroy(&conf.strpool);
+
+	//glb_heap_binpool_destroy();
 }
 
-static int sumtime(u_int64_t *sum, zbx_timespec_t start)
-{
-	zbx_timespec_t ts;
-	zbx_timespec(&ts);
-	*sum = *sum + (ts.sec - start.sec) * 1000000000 + ts.ns - start.ns;
-}
+// //static 
+//  int sumtime(u_int64_t *sum, zbx_timespec_t start)
+// {
+// 	zbx_timespec_t ts;
+// 	zbx_timespec(&ts);
+// 	*sum = *sum + (ts.sec - start.sec) * 1000000000 + ts.ns - start.ns;
+// }
 
-EVENT_QUEUE_CALLBACK(item_poll_cb)
-{
-	poller_item_t *poller_item;
-	u_int64_t mstime = glb_ms_time();
 
-	if (NULL == (poller_item = poller_get_pollable_item((u_int64_t)data)))
-		return FAIL;
 
-	DEBUG_ITEM(poller_item->itemid, "Item poll event");
-	
-	if (poller_item->event_time != event_time)
-	{
-		// this means the item has been rescheduled since the last scheduling and current event is outdated
-		DEBUG_ITEM(poller_item->itemid, "Outdated event has been found in the event queue, skipping")
-	//	LOG_DBG("Item %ld poll skipped, event's time is %d, item's is %d", poller_item->itemid, event_time, poller_item->event_time);
-		return FAIL;
-	}
-
-	// checking if host is disabled
-	if (SUCCEED == poller_if_host_is_failed(poller_item))
-	{
-		LOG_DBG("Skipping item %ld from polling, host is still down ",
-				poller_item->itemid);
-		// replaning item polling after disabled_till time
-		add_item_check_event(poller_item, mstime + 10 * 1000);
-		return FAIL;
-	}
-
-	add_item_check_event(poller_item, mstime);
-
-	// the only state common poller logic care - _QUEUED - such an items are considred
-	// to be pollabale, updatable and etc. All other states indicates the item is busy
-	// with type specific poller logic
-	if (POLL_QUEUED != poller_item->state)
-	{
-		//|| poller_item->ttl < now ) {
-		DEBUG_ITEM(poller_item->itemid, "Skipping from polling, not in QUEUED state (%d)", poller_item->state);
-		LOG_DBG("Not sending item %ld to polling, it's in the %d state or aged", poller_item->itemid, poller_item->state);
-		return FAIL;
-	}
-
-	poller_item->state = POLL_POLLING;
-	poller_item->lastpolltime = mstime;
-
-	DEBUG_ITEM(poller_item->itemid, "Starting poller item poll");
-
-	conf.poller.start_poll(conf.poller.poller_data, poller_item);
-
-	return SUCCEED;
-}
-
-static int poller_notify_ipc_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items) {
+//static 
+ int poller_notify_ipc_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items) {
 	
 //	LOG_INF("IPC: recieving data value type %d,  consumer %d", value_type, consumer);
 
@@ -424,28 +464,27 @@ static int poller_notify_ipc_rcv(int value_type, int consumer, zbx_vector_uint64
 
 int	DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *itemids);
 
-EVENT_QUEUE_CALLBACK(new_items_check_cb)
+//EVENT_QUEUE_CALLBACK
+void new_items_check_cb(uv_timer_t *timer)
 {
 	poller_item_t *poller_item;
-	u_int64_t mstime = glb_ms_time();
+	u_int64_t mstime = uv_now(conf.loop);
+	
 	int num;
-//	LOG_INF("new items check callback");
-
+	//LOG_INF("new items check callback");
 	zbx_vector_uint64_t changed_items;
 
 	zbx_vector_uint64_create(&changed_items);
-//	LOG_INF("Getting array of ids in poller for IPC consumer %d value type %d", process_num -1 , conf.item_type);
+	//LOG_INF("Getting array of ids in poller for IPC consumer %d value type %d", process_num -1 , conf.item_type);
 	poller_notify_ipc_rcv(conf.item_type, process_num -1 , &changed_items );
-//	LOG_INF("IPC Got %d new items for sync", changed_items.values_num);
+	//LOG_INF("IPC Got %d new items for sync", changed_items.values_num);
 	num = DCconfig_get_glb_poller_items_by_ids(&conf, &changed_items);
-//	LOG_INF("IPC Synced %d items", num);
+	//LOG_INF("IPC Synced %d items", num);
 	zbx_vector_uint64_destroy(&changed_items);
-
-	
 
 	// sumtime(&get_items_time, ts_get_items);
 //	LOG_INF("Event: got %d new items from the config cache", num);
-	event_queue_add_event(conf.event_queue, mstime + 1 * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
+//	event_queue_add_event(conf.event_queue, mstime + 1 * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
 
 	zbx_hashset_iter_t iter;
 	zbx_hashset_iter_reset(&conf.items, &iter);
@@ -461,30 +500,60 @@ EVENT_QUEUE_CALLBACK(new_items_check_cb)
 			poller_item->state = POLL_QUEUED;
 		}
 	}
+	//LOG_INF("New items check finished");
 }
 
-static int poll_init(zbx_thread_args_t *args)
+static void update_proc_title_cb(uv_timer_t *timer) {	
+	static u_int64_t last_call = 0;
+	u_int64_t time_diff = uv_now(conf.loop) - last_call;
+	
+	//LOG_INF("new proc title check callback ,requetsts %d, timedif if %ld", conf.requests, time_diff);
+	zbx_update_env(zbx_time());
+	
+	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d]",
+			get_process_type_string(process_type), process_num, (conf.requests * 1000) / (time_diff),
+			(conf.responces * 1000) / (time_diff), conf.items.num_data);
+	conf.requests = 0;
+	conf.responces = 0;
+	last_call = uv_now(conf.loop);
+
+	if (!ZBX_IS_RUNNING())
+		uv_stop(conf.loop);
+}
+
+void async_io_cb(uv_timer_t *timer) {
+//	LOG_INF("Async io call");
+	conf.poller.handle_async_io(conf.poller.poller_data);
+}
+
+//static 
+ int poller_init(zbx_thread_args_t *args)
 {
-
-	zbx_heap_strpool_init();
-	glb_heap_binpool_init();
-
+	mem_funcs_t local_memf = {.free_func = ZBX_DEFAULT_MEM_FREE_FUNC, .malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, 
+				.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC };
 	glb_preprocessing_init();
 	conf.item_type = *(unsigned char *)((zbx_thread_args_t *)args)->args;
 
 	zbx_hashset_create(&conf.items, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_hashset_create(&conf.hosts, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-	conf.event_queue = event_queue_init(NULL);
-
-	event_queue_add_callback(conf.event_queue, EVENT_ITEM_POLL, item_poll_cb);
-	event_queue_add_callback(conf.event_queue, EVENT_NEW_ITEMS_CHECK, new_items_check_cb);
-
+	strpool_init(&conf.strpool, &local_memf);
 	if (SUCCEED != poll_module_init())
 	{
 		LOG_WRN("Couldnt init type-specific module for type %d", conf.item_type);
 		return FAIL;
 	}
+
+	conf.loop = uv_default_loop();
+	
+	uv_timer_init(conf.loop, &conf.new_items_check);
+	uv_timer_start(&conf.new_items_check, new_items_check_cb, 1000 * process_num, 1000);
+
+	uv_timer_init(conf.loop, &conf.update_proc_title);
+	uv_timer_start(&conf.update_proc_title, update_proc_title_cb, 1000, 5000);
+	
+	uv_timer_init(conf.loop, &conf.async_io_proc);
+	uv_timer_start(&conf.async_io_proc, async_io_cb, 100, 100);
 
 	return SUCCEED;
 }
@@ -659,38 +728,21 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
-
-	if (SUCCEED != poll_init((zbx_thread_args_t *)args))
+	
+	if (SUCCEED != poller_init((zbx_thread_args_t *)args))
 		exit(-1);
 
-	event_queue_add_event(conf.event_queue, glb_ms_time() + (1 + process_num) * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
+//	event_queue_add_event(conf.event_queue, glb_ms_time() + (1 + process_num) * 1000, EVENT_NEW_ITEMS_CHECK, NULL);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			   server_num, get_process_type_string(process_type), process_num);
 
-	while (ZBX_IS_RUNNING())
-	{
-		u_int64_t mstime = glb_ms_time();
-		zbx_update_env(zbx_time());
+	LOG_INF("Starting event loop");
+	uv_run(conf.loop, UV_RUN_DEFAULT);
+	//TODO: put async io processing on idle
+	//	conf.poller.handle_async_io(conf.poller.poller_data);
 
 		LOG_DBG("In %s() processing events", __func__);
-
-		event_queue_process_events(conf.event_queue, 200);
-
-		conf.poller.handle_async_io(conf.poller.poller_data);
-	//	old_activity = conf.requests + conf.responces;
-
-		if (old_stat_time + STAT_INTERVAL < mstime)
-		{
-			zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, events planned: %d]",
-							 get_process_type_string(process_type), process_num, (conf.requests * 1000) / (mstime - old_stat_time),
-							 (conf.responces * 1000) / (mstime - old_stat_time), conf.items.num_data,
-							 event_queue_get_events_count(conf.event_queue));
-			conf.requests = 0;
-			conf.responces = 0;
-			old_stat_time = mstime;
-		}
-	}
 
 	poll_shutdown(&conf);
 
@@ -703,7 +755,8 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 
 
-static int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
+//static 
+ int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
 	if (0 < forks) {
 	//	LOG_INF("doing IPC init of type %d forks %d", type, forks);
 		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, &ipc_memf);
@@ -769,3 +822,10 @@ void poller_item_notify_flush() {
 	}
 };
 
+void poller_strpool_free(const char* str) {
+	strpool_free(&conf.strpool, str);
+};
+
+const char *poller_strpool_add(char * str) {
+	return strpool_add(&conf.strpool, str);
+};

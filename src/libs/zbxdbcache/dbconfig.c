@@ -10156,10 +10156,10 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 	RDLOCK_CACHE;
 
-	u_int64_t start_time = glb_ms_time();
+	//u_int64_t start_time = glb_ms_time();
 
 	while(i < itemids->values_num )  {//&& ( glb_ms_time() - 1000 ) < start_time ) {
-	
+		//LOG_INF("Processing item %d : %p", i, itemids->values);
 		ZBX_DC_ITEM *zbx_dc_item;
 		ZBX_DC_HOST *zbx_dc_host;
 	
@@ -10169,11 +10169,12 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 		AGENT_RESULT result;
 		DEBUG_ITEM(itemids->values[i], "Regenerating config");
 		
+		//LOG_INF("Processing item2 %d", i);
 		if (NULL != ( zbx_dc_item = zbx_hashset_search(&config->items, &itemids->values[i])) &&
 			NULL != (zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &zbx_dc_item->hostid))) {
 			
 			DEBUG_ITEM(itemids->values[i],"Found item and host data");
-
+			//LOG_INF("Processing item3 %d", i);
 			if (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
 				//LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
 				DEBUG_ITEM(itemids->values[i],"Item didn't get processed due to proxy condition: proxy id %ld progtype is %d",dc_item.host.proxy_hostid, (program_type & ZBX_PROGRAM_TYPE_SERVER)  );
@@ -10182,6 +10183,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 				continue;
 			}
 
+			//LOG_INF("Processing item3 %d", i);
 			if ( HOST_STATUS_MONITORED != zbx_dc_host->status ||
 				 SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item) || 
 			     ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0 ||
@@ -10196,19 +10198,21 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 				continue;
 			}
 
-
+			//LOG_INF("Processing item5 %d", i);
 			DCget_item(&dc_item, zbx_dc_item,ZBX_ITEM_GET_ALL);
 			DCget_host(&dc_item.host, zbx_dc_host, ZBX_ITEM_GET_ALL);
 
 			DEBUG_ITEM(itemids->values[i],"Calling create item func");
 		
-
+			//LOG_INF("Processing item6 %d", i);
 			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
+			//LOG_INF("Processing item7 %d", i);
 			glb_poller_create_item(poll_data, &dc_item);
+			//LOG_INF("Processing item8 %d", i);
 			init_result(&result);
 			zbx_clean_items(&dc_item, 1, &result);
 			DCconfig_clean_items(&dc_item, &errcode, 1);
-						
+			//LOG_INF("Processing item9 %d", i);
 		} else {
 			DEBUG_ITEM(itemids->values[i],"NOT found item and host data, or host/item is disabled, deleting item from the poller");
 			glb_poller_delete_item(poll_data, itemids->values[i]);

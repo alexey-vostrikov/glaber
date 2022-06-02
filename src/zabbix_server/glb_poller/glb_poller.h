@@ -85,4 +85,8 @@ int poller_notify_ipc_init(size_t mem_size);
 int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid);
 int poller_item_notify_init();
 void poller_item_notify_flush();
+
+void poller_strpool_free(const char* str);
+const char *poller_strpool_add(char * str);
+
 #endif

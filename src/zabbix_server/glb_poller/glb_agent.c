@@ -473,8 +473,8 @@ static int agent_init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller
 
 	poller_set_item_specific_data(poller_item,agent_item);
 	
-	agent_item->interface_addr = zbx_heap_strpool_intern(dc_item->interface.addr);
-	agent_item->key = zbx_heap_strpool_intern(dc_item->key);
+	agent_item->interface_addr = poller_strpool_add(dc_item->interface.addr);
+	agent_item->key = poller_strpool_add(dc_item->key);
 	agent_item->interface_port = dc_item->interface.port;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Ended", __func__);
@@ -485,8 +485,8 @@ static void agent_free_item(void *m_conf, poller_item_t *poller_item ) {
 	
 	agent_item_t *agent_item = poller_get_item_specific_data(poller_item);
 
-	zbx_heap_strpool_release(agent_item->interface_addr);
-	zbx_heap_strpool_release(agent_item->key);
+	poller_strpool_free(agent_item->interface_addr);
+	poller_strpool_free(agent_item->key);
 	zbx_free(agent_item);
 
 }

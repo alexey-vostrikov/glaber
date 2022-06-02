@@ -140,9 +140,9 @@ static int init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_item)
     
     //itemid is always needed in dynamic params, generating new list only having dynamic data
     zbx_snprintf_alloc(&cmd,&cmd_alloc,&cmd_offset,"%s/%s", CONFIG_WORKERS_DIR, get_rkey(&request));
-    zbx_heap_strpool_release(worker_item->full_cmd);
+    poller_strpool_free(worker_item->full_cmd);
     
-    worker_item->full_cmd = zbx_heap_strpool_intern(cmd);
+    worker_item->full_cmd = poller_strpool_add(cmd);
     worker_item->workerid = (u_int64_t)worker_item->full_cmd;
     
     zbx_snprintf_alloc(&key_dyn, &dyn_alloc, &dyn_offset, "'%ld'", dc_item->itemid);
@@ -190,7 +190,7 @@ worker_t * glb_worker_create_worker(worker_conf_t *conf, worker_item_t *worker_i
 
     
     worker.workerid = worker_item->workerid;
-    worker.worker.path = (char *)zbx_heap_strpool_intern(worker_item->full_cmd);
+    worker.worker.path = (char *)poller_strpool_add(worker_item->full_cmd);
     worker.worker.async_mode = 1;
     worker.worker.max_calls = GLB_WORKER_MAXCALLS;
     worker.worker.mode_from_worker=GLB_WORKER_MODE_NEWLINE;
@@ -251,7 +251,7 @@ static void free_item(void *m_conf, poller_item_t *poller_item ) {
     worker_item_t *worker_item = poller_get_item_specific_data(poller_item);
 
     zbx_free(worker_item->params_dyn);
-    zbx_heap_strpool_release(worker_item->full_cmd);
+    poller_strpool_free(worker_item->full_cmd);
     zbx_free(worker_item);
 }
 

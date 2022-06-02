@@ -21,16 +21,6 @@ static int __strpool_compare(const void *d1, const void *d2)
 	return strcmp((char *)d1 + REFCOUNT_FIELD_SIZE, (char *)d2 + REFCOUNT_FIELD_SIZE);
 }
 
-void zbx_heap_strpool_init()
-{
-	zbx_hashset_create(&strpool_local, 100, __strpool_hash, __strpool_compare);
-}
-
-void zbx_heap_strpool_destroy()
-{
-	zbx_hashset_destroy(&strpool_local);
-}
-
 static const char *__strpool_intern_n(zbx_hashset_t *strpool, const char *str, size_t len)
 {
 	void *record;
@@ -68,10 +58,6 @@ static const char *__strpool_intern(zbx_hashset_t *strpool, const char *str)
 	return __strpool_intern_n(strpool, str, len);
 }
 
-const char *zbx_heap_strpool_intern(const char *str)
-{
-	return __strpool_intern(&strpool_local, str);
-}
 
 static void __strpool_release(zbx_hashset_t *strpool, const char *str)
 {
@@ -92,11 +78,6 @@ static void __strpool_release(zbx_hashset_t *strpool, const char *str)
 	}
 }
 
-void zbx_heap_strpool_release(const char *str)
-{
-	__strpool_release(&strpool_local, str);
-}
-
 static const char *__strpool_acquire(const char *str)
 {
 	zbx_uint32_t *refcount;
@@ -105,11 +86,6 @@ static const char *__strpool_acquire(const char *str)
 	(*refcount)++;
 
 	return str;
-}
-
-const char *zbx_heap_strpool_acquire(const char *str)
-{
-	return __strpool_acquire(str);
 }
 
 // mem-based strpool operations

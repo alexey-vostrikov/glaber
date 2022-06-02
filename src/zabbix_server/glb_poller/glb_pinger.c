@@ -713,11 +713,11 @@ static void handle_async_io(void *m_conf)
 
     process_worker_results();
     /*note - this will send all sheduled packets */
-    if (0 == event_queue_process_events(conf.events, 8192)) {
+    if (0 == event_queue_process_events(conf.events, 0)) {
+        pinger_handle_timeouts(&conf);
         usleep(10000);
     }
-    
-    pinger_handle_timeouts(&conf);
+     
 
     LOG_DBG("In %s: Ended", __func__);
 }
