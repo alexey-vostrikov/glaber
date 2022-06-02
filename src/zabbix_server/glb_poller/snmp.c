@@ -464,7 +464,7 @@ static void restart_finished_conns() {
 /******************************************************************************
  * starts finished connections or a new one that have a data to poll		  * 
  * ***************************************************************************/
-static void  snmp_start_new_connections(async_snmp_conf_t *conf) {
+static void  snmp_start_new_connections(void *m_conf) {
 	
 	int i, item_idx;
 	static u_int64_t lastrun = 0;
@@ -507,7 +507,7 @@ static void  snmp_start_new_connections(async_snmp_conf_t *conf) {
  * adds item to the polling list of a conenction							  * 
  * ***************************************************************************/
 static void   snmp_add_poll_item(void *m_conf, poller_item_t *poller_item) {
-	async_snmp_conf_t *conf = m_conf;
+	//async_snmp_conf_t *conf = m_conf;
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
     u_int64_t itemid = poller_get_item_id(poller_item);
 
@@ -536,7 +536,7 @@ static void   snmp_add_poll_item(void *m_conf, poller_item_t *poller_item) {
  * Once in a wile reinits the snmp to do the mem cleaunup					  * 
  * ***************************************************************************/
 
-static void snmp_reset_snmp(async_snmp_conf_t *conf){
+static void snmp_reset_snmp(void *m_conf){
 	static int roll=0;
 	poller_item_t *poller_item;
 
@@ -577,7 +577,6 @@ static void snmp_reset_snmp(async_snmp_conf_t *conf){
  * ***************************************************************************/
 static void  snmp_handle_async_io(void *m_conf) {
 
-	async_snmp_conf_t *conf = m_conf;
 	int block = 1, fds = 0, hosts = 0;
 	netsnmp_large_fd_set fdset;
 	static int last_timeout_time = 0; 
@@ -614,7 +613,6 @@ static void	snmp_async_shutdown(void *m_conf) {
 	
 	int i;
 	struct list_item *litem, *tmp_litem;
-	async_snmp_conf_t *conf = m_conf;
 	poller_item_t *poller_item;
     u_int64_t mstime = glb_ms_time();
 	
