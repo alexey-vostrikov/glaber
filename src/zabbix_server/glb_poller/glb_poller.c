@@ -553,7 +553,7 @@ void async_io_cb(uv_timer_t *timer) {
 	uv_timer_start(&conf.update_proc_title, update_proc_title_cb, 1000, 5000);
 	
 	uv_timer_init(conf.loop, &conf.async_io_proc);
-	uv_timer_start(&conf.async_io_proc, async_io_cb, 100, 100);
+	uv_timer_start(&conf.async_io_proc, async_io_cb, 100, 10);
 
 	return SUCCEED;
 }
