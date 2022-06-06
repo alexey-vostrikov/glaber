@@ -19,6 +19,8 @@ typedef struct {
  } 
  worker_conf_t;
 
+static worker_conf_t conf = {0};
+
 typedef struct {
 	u_int64_t workerid;
 //	char *path; //fill path to the worker
@@ -48,7 +50,7 @@ extern char  *CONFIG_WORKERS_DIR;
 /************************************************************************
  * submits result to the preprocessor                                   *
  * **********************************************************************/
-static int glb_worker_submit_result(worker_conf_t *conf, char *response) {
+static int worker_submit_result(char *response) {
     struct zbx_json_parse jp_resp;
     char value[MAX_STRING_LEN],itemid_s[MAX_ID_LEN],time_sec_s[MAX_ID_LEN], time_ns_s[MAX_ID_LEN];
     u_int64_t itemid;
@@ -74,7 +76,7 @@ static int glb_worker_submit_result(worker_conf_t *conf, char *response) {
 
     itemid = strtol(itemid_s,NULL,10); 
     //looking for the item
-    if (NULL == ( poller_item = poller_get_pollable_item(itemid))) {
+    if (NULL == ( poller_item = poller_get_poller_item(itemid))) {
         zabbix_log(LOG_LEVEL_WARNING, "Worker returned response with unknown itemid %ld, response is skipped", itemid);
         return FAIL;
     }
@@ -102,7 +104,7 @@ static int glb_worker_submit_result(worker_conf_t *conf, char *response) {
 /******************************************************************************
  * item init - from the general dc_item to compact local item        		  * 
  * ***************************************************************************/
-static int init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_item) {
+static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     
     char error[MAX_STRING_LEN];
 	AGENT_REQUEST	request;
@@ -179,7 +181,7 @@ out:
 /*****************************************************************
  * creates a new worker structure
 *****************************************************************/
-worker_t * glb_worker_create_worker(worker_conf_t *conf, worker_item_t *worker_item) {
+static worker_t * worker_create_worker(worker_item_t *worker_item) {
 
     worker_t worker, *retworker;
     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Started", __func__);
@@ -198,7 +200,7 @@ worker_t * glb_worker_create_worker(worker_conf_t *conf, worker_item_t *worker_i
     worker.worker.timeout = CONFIG_TIMEOUT;
    
       
-    retworker = (worker_t*)zbx_hashset_insert(&conf->workers,&worker,sizeof(worker_t));
+    retworker = (worker_t*)zbx_hashset_insert(&conf.workers,&worker,sizeof(worker_t));
     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Finished worker id is %ld", __func__, retworker->workerid);
     
     return retworker;
@@ -207,7 +209,7 @@ worker_t * glb_worker_create_worker(worker_conf_t *conf, worker_item_t *worker_i
 /******************************************************************
  * Sends the actual packet (request to worker to send a packet
  * ****************************************************************/
-static void send_request(void *m_conf, poller_item_t *poller_item) {
+static void send_request(poller_item_t *poller_item) {
     u_int64_t mstime = glb_ms_time();
 
     char request[MAX_STRING_LEN];
@@ -215,16 +217,15 @@ static void send_request(void *m_conf, poller_item_t *poller_item) {
     zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 
     worker_item_t *worker_item = poller_get_item_specific_data(poller_item);
-    worker_conf_t *conf = m_conf;
 
     worker_item->lastrequest = glb_ms_time();
 
-    worker_t *worker = (worker_t *)zbx_hashset_search(&conf->workers,&worker_item->workerid);
+    worker_t *worker = (worker_t *)zbx_hashset_search(&conf.workers,&worker_item->workerid);
     
     if (NULL == worker ) {
         //worker not found - creating a new one
         DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't find a worker for item, creating a new one");
-        worker = glb_worker_create_worker(conf, worker_item);
+        worker = worker_create_worker(worker_item);
     }
     
     zabbix_log(LOG_LEVEL_DEBUG, "Will do request: %s to worker %s",worker_item->params_dyn, worker_item->full_cmd);
@@ -246,7 +247,7 @@ static void send_request(void *m_conf, poller_item_t *poller_item) {
 /******************************************************************************
  * item deinit - freeing all interned string								  * 
  * ***************************************************************************/
-static void free_item(void *m_conf, poller_item_t *poller_item ) {
+static void free_item(poller_item_t *poller_item ) {
     
     worker_item_t *worker_item = poller_get_item_specific_data(poller_item);
 
@@ -262,7 +263,7 @@ static void free_item(void *m_conf, poller_item_t *poller_item ) {
  * checks worker's timeouts (workers that hasn't been used for some time
  *                          are stopped and freed )
  * ***************************************************************************/
-static void glb_worker_handle_timeouts(worker_conf_t *conf) {
+static void worker_handle_timeouts() {
 
 	zbx_hashset_iter_t iter;
     u_int64_t *itemid;
@@ -297,7 +298,7 @@ static void glb_worker_handle_timeouts(worker_conf_t *conf) {
 }
 
 
-static void glb_worker_process_results(worker_conf_t *conf) {
+static void worker_process_results() {
     char *worker_response = NULL;
     zbx_json_type_t type;
     zbx_timespec_t ts;
@@ -317,7 +318,7 @@ static void glb_worker_process_results(worker_conf_t *conf) {
     //reading all the responses we have so far from the worker
     
     //worker iteration loop on the top
-    zbx_hashset_iter_reset(&conf->workers,&iter);
+    zbx_hashset_iter_reset(&conf.workers,&iter);
     while (NULL != (worker = zbx_hashset_iter_next(&iter))) {
         //we only query alive workers
         zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s", worker->worker.path);
@@ -326,7 +327,7 @@ static void glb_worker_process_results(worker_conf_t *conf) {
             while (SUCCEED == async_buffered_responce(&worker->worker, &worker_response)) {
               
                 LOG_DBG("Parsing line %s from worker %s", worker_response, worker->worker.path);
-                glb_worker_submit_result(conf, worker_response);
+                worker_submit_result(worker_response);
             }
         } else {
          zabbix_log(LOG_LEVEL_DEBUG,"Will %s is not alive, skipping", worker->worker.path);
@@ -341,22 +342,18 @@ static void glb_worker_process_results(worker_conf_t *conf) {
  * handles i/o - calls selects/snmp_recieve, 								  * 
  * note: doesn't care about the timeouts - it's done by the poller globbaly   *
  * ***************************************************************************/
-static void  handle_async_io(void *m_conf) {
+static void  handle_async_io(void) {
     
     static u_int64_t lastrun=0;
     u_int64_t queue_delay=0;
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
-
-    worker_conf_t *conf = m_conf;
-	    
+    
     //first, calculating async delay
-    conf->async_delay=glb_ms_time()-lastrun;
+    conf.async_delay=glb_ms_time()-lastrun;
     lastrun=glb_ms_time();
 
-    glb_worker_process_results(conf);
-  
-    //handling timed-out items
-    glb_worker_handle_timeouts(conf); //timed out items will be marked as -1 result and next retry will be made
+    worker_process_results();
+    worker_handle_timeouts(); //timed out items will be marked as -1 result and next retry will be made
 	//todo: upon completing the worker interface, finish
     //the proper wait timeout handling
     usleep(10000);
@@ -367,43 +364,27 @@ static void  handle_async_io(void *m_conf) {
 /******************************************************************************
  * does snmp connections cleanup, not related to snmp shutdown 				  * 
  * ***************************************************************************/
-static void  worker_shutdown(void *m_conf) {
-	worker_conf_t *conf = m_conf;
+static void  worker_shutdown(void) {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 	THIS_SHOULD_NEVER_HAPPEN;
     LOG_INF("Not implemented worker shutdown yet");
     zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
-static int forks_count(void *m_conf) {
+static int forks_count(void) {
 	return CONFIG_GLB_WORKER_FORKS;
 }
 
 /******************************************************************************
  * inits async structures - static connection pool							  *
  * ***************************************************************************/
-void glb_worker_init(poll_engine_t *poll) {
+void glb_worker_init(void) {
 	
-    int i;
-	static worker_conf_t *conf;
-	char init_string[MAX_STRING_LEN];
-    char full_path[MAX_STRING_LEN];
-    char add_params[MAX_STRING_LEN];
-	
-    zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
-	
-    add_params[0]='\0';
-
-	conf = zbx_malloc(NULL,sizeof(worker_conf_t));
-    zbx_hashset_create(&conf->workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-
-    poller_set_poller_module_data(conf);   
+    zbx_hashset_create(&conf.workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, send_request, worker_shutdown, forks_count);
 
     if (NULL == CONFIG_WORKERS_DIR ) {
         zabbix_log(LOG_LEVEL_WARNING, "Warning: trying to run glb_worker without 'WorkersScript' set in the config file, not starting");
         exit(-1);
     }
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 	
 }

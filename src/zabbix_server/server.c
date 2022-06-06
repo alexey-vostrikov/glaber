@@ -53,6 +53,7 @@
 #include "glb_poller/glb_pinger.h"
 #include "poller/poller.h"
 #include "glb_poller/glb_poller.h"
+#include "glb_poller/poller_ipc.h"
 #include "timer/timer.h"
 #include "trapper/trapper.h"
 #include "snmptrapper/snmptrapper.h"

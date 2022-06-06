@@ -38,7 +38,7 @@
 #include "zbxeval.h"
 
 #include "preproc.h"
-#include "../../zabbix_server/glb_poller/glb_poller.h"
+#include "../../zabbix_server/glb_poller/poller_ipc.h"
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/glb_poller/glb_pinger.h"
 #include "../glb_objects/glb_trigger.h"
@@ -10178,7 +10178,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			if (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
 				//LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
 				DEBUG_ITEM(itemids->values[i],"Item didn't get processed due to proxy condition: proxy id %ld progtype is %d",dc_item.host.proxy_hostid, (program_type & ZBX_PROGRAM_TYPE_SERVER)  );
-				glb_poller_delete_item(poll_data, itemids->values[i]);
+				glb_poller_delete_item(itemids->values[i]);
 				i++;
 				continue;
 			}
@@ -10193,7 +10193,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 				 ) {
 			//removing any disabled items from the host
 				DEBUG_ITEM(itemids->values[i], "Removing item due to it's disabled or its host is disabled");
-				glb_poller_delete_item(poll_data, itemids->values[i]);
+				glb_poller_delete_item(itemids->values[i]);
 				i++;
 				continue;
 			}
@@ -10207,7 +10207,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			//LOG_INF("Processing item6 %d", i);
 			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
 			//LOG_INF("Processing item7 %d", i);
-			glb_poller_create_item(poll_data, &dc_item);
+			glb_poller_create_item(&dc_item);
 			//LOG_INF("Processing item8 %d", i);
 			init_result(&result);
 			zbx_clean_items(&dc_item, 1, &result);
@@ -10215,7 +10215,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			//LOG_INF("Processing item9 %d", i);
 		} else {
 			DEBUG_ITEM(itemids->values[i],"NOT found item and host data, or host/item is disabled, deleting item from the poller");
-			glb_poller_delete_item(poll_data, itemids->values[i]);
+			glb_poller_delete_item(itemids->values[i]);
 		}
 		
 		num++;

@@ -28,7 +28,6 @@ extern char  *CONFIG_WORKERS_DIR;
 extern int	 CONFIG_CONFSYNCER_FREQUENCY;
 
 
-
 typedef struct {
     u_int64_t hash;
     u_int64_t itemid;
@@ -338,9 +337,8 @@ static int	server_idx_cmp_func(const void *d1, const void *d2)
 	return 0;
 }
 
-static int init_item(void *m_conf, DC_ITEM* dcitem, poller_item_t *poller_item) {
+static int init_item(DC_ITEM* dcitem, poller_item_t *poller_item) {
 
-   // worker_server_conf_t *conf = (worker_server_conf_t *)poll_mod->poller_data;
     worker_t *worker;
     char *args;
     struct zbx_json_parse jp;
@@ -398,7 +396,7 @@ static int init_item(void *m_conf, DC_ITEM* dcitem, poller_item_t *poller_item) 
 };
 
 
-static void delete_item(void *m_conf, poller_item_t *poller_item) {
+static void delete_item(poller_item_t *poller_item) {
     worker_t *worker = poller_get_item_specific_data(poller_item);    
     DEBUG_ITEM(poller_get_item_id(poller_item), "Deleting server worker item ");
     glb_destroy_worker(&worker->worker);
@@ -408,7 +406,6 @@ static void delete_item(void *m_conf, poller_item_t *poller_item) {
 ITEMS_ITERATOR(check_workers_data_cb) {
     worker_t *worker =  poller_get_item_specific_data(poller_item);
     
-
     if (SUCCEED == worker_is_alive(&worker->worker)) { 
         int last_status;
         char *worker_responce = NULL;
@@ -437,7 +434,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
     return POLLER_ITERATOR_CONTINUE;
 }
 
-static void	handle_async_io(void *m_conf) {
+static void	handle_async_io(void) {
     LOG_DBG("In: %s", __func__);
     poller_items_iterate(check_workers_data_cb, NULL);
     //todo: replace with proper analyzing of the socket states
@@ -445,33 +442,26 @@ static void	handle_async_io(void *m_conf) {
     LOG_DBG("Finished: %s", __func__);
 }
 
-static void ws_shutdown(void *m_conf) {
+static void ws_shutdown(void) {
 
 }
 
-static int forks_count(void *m_conf) {
+static int forks_count(void) {
 	return CONFIG_EXT_SERVER_FORKS;
 }
 
-static void start_poll(void *m_conf, poller_item_t *poller_item)
+static void start_poll(poller_item_t *poller_item)
 {
 
 }
 
-int  glb_worker_server_init(poll_engine_t *poll ) {
-	int i, ret;
-
-    char **worker_cfg;
-	
-    LOG_DBG("In %s: starting", __func__);
+int  glb_worker_server_init(void) {
 
     if (NULL == CONFIG_WORKERS_DIR ) {
         zabbix_log(LOG_LEVEL_WARNING, "Warning: trying to run glb_worker server without 'WorkersScript' set in the config file, not starting");
         exit(-1);
     }
     
-    poller_set_poller_module_data(NULL);
     poller_set_poller_callbacks(init_item, delete_item, handle_async_io, start_poll, ws_shutdown, forks_count); 
-
 	return SUCCEED;
 }

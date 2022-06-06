@@ -713,7 +713,6 @@ void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *resul
 void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results)
 {
 	int	i;
-
 	for (i = 0; i < num; i++)
 	{
 		zbx_free(items[i].key);

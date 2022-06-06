@@ -1,3 +1,5 @@
+ver 2.9.25
+    - libevent - based async io pollers introduced: polling overhead is quite reduced
 ver 2.9.24
     - async pollers are switched to libuv (time loop)
 ver 2.9.23

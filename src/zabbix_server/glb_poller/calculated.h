@@ -18,4 +18,4 @@
 **/
 
 #include "glb_poller.h"
-int     calculated_poller_init(poll_engine_t *poll);
+int     calculated_poller_init(void);

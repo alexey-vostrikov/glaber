@@ -5,6 +5,6 @@
 #include "glb_poller.h"
 //#include "dbcache.h"
 
-int     glb_agent_init(poll_engine_t *poll);
+int     glb_agent_init();
 
 #endif

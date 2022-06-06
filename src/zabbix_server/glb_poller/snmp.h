@@ -22,6 +22,6 @@
 #include "glb_poller.h"
 
 
-void async_snmp_init(poll_engine_t *poll);
+void async_snmp_init(void);
 
 #endif

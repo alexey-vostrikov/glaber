@@ -959,13 +959,13 @@ extern zbx_rwlock_t	config_lock;
 static double wr_lock_wait =0 , wr_lock_time =0, rd_lock_wait=0, rd_lock_time=0, wr_lock_start=0, rd_lock_start=0;
 static int lastddump = 0;
 static int lock_kind = 0; //1 = wr lock 2 = rd lock
-/*
+
 #define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock)
 #define	WRLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_wrlock(config_lock); 
 #define TRY_WRLOCK_CACHE	0 == sync_in_progress ||  SUCCEED == zbx_rwlock_try_wrlock(config_lock)  
-//#define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock);
-*/
+#define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock);
 
+/*
 #define	RDLOCK_CACHE	if (0 == sync_in_progress) \
 		{ rd_lock_start = zbx_time(); \
 		  zbx_rwlock_rdlock(config_lock);\
@@ -995,7 +995,7 @@ static int lock_kind = 0; //1 = wr lock 2 = rd lock
 			lastddump = time(NULL); \
 		} \
 	}
-
+*/
 #define ZBX_IPMI_DEFAULT_AUTHTYPE	-1
 #define ZBX_IPMI_DEFAULT_PRIVILEGE	2
 

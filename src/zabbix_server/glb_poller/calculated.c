@@ -38,19 +38,12 @@ typedef struct {
     u_int64_t hostid;
 } calculated_item_t;
 
-/*note: no async processing needed for calc, it's sync */
-void handle_async_io(void *m_conf) {
-    static int lastresponces = 0;
-    
-    /* CPU burn prevention on idle time */
-    if (conf.lastresponces == lastresponces)
-          usleep(1000);
-    else 
-        lastresponces = conf.lastresponces;
+void handle_async_io(void) {
 }
 
-int init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_item) {
+int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     calculated_item_t *calc_item = zbx_calloc(NULL,0,sizeof(calculated_item_t));
+    
     poller_set_item_specific_data(poller_item, calc_item);
 
 	calc_item->params = strpool_add(&conf.strpool, dc_item->params);
@@ -65,7 +58,7 @@ int init_item(void *m_conf, DC_ITEM *dc_item, poller_item_t *poller_item) {
     return SUCCEED;
 }
 
-void free_item(void *cfg, poller_item_t *poller_item) {
+void free_item(poller_item_t *poller_item) {
     calculated_item_t *calc_item = poller_get_item_specific_data(poller_item);
     
     strpool_free(&conf.strpool, calc_item->params);
@@ -90,7 +83,7 @@ static void prepare_dc_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
        dc_item->host.hostid = calc_item->hostid;
 }
 
-void poll_item(void *m_conf, poller_item_t *poller_item) {
+void poll_item(poller_item_t *poller_item) {
     DC_ITEM dc_item = {0};
 
     AGENT_RESULT result;
@@ -112,15 +105,15 @@ void poll_item(void *m_conf, poller_item_t *poller_item) {
     free_result(&result);
 }
 
-int forks_count(void *m_conf) {
+int forks_count(void) {
     return CONFIG_HISTORYPOLLER_FORKS;
 }
 
-void poller_shutdown(void *cfg) {
+void poller_shutdown(void) {
     strpool_destroy(&conf.strpool);
 }
 
-int calculated_poller_init(poll_engine_t *poll){
+int calculated_poller_init(void){
 
     conf.memf.free_func = ZBX_DEFAULT_MEM_FREE_FUNC;
     conf.memf.malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC;

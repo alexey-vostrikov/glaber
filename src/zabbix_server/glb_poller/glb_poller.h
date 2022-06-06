@@ -33,22 +33,22 @@
 #define GLB_PROTO_ERRCODE "errcode"
 #define GLB_PROTO_ERROR "error"
 
-typedef struct poll_engine_t poll_engine_t;
+
 typedef struct poller_item_t poller_item_t;
 
-typedef int (*init_item_cb)(void *mod_conf, DC_ITEM *dc_item, poller_item_t *glb_poller_item);
-typedef void (*delete_item_cb)(void *mod_comf, poller_item_t *glb_item);
-typedef void (*handle_async_io_cb)(void *mod_conf);
-typedef void (*start_poll_cb)(void *mod_conf, poller_item_t *glb_item);
-typedef void (*shutdown_cb)(void *mod_conf);
-typedef int (*forks_count_cb)(void *mod_conf);
+typedef int (*init_item_cb)(DC_ITEM *dc_item, poller_item_t *glb_poller_item);
+typedef void (*delete_item_cb)(poller_item_t *glb_item);
+typedef void (*handle_async_io_cb)(void);
+typedef void (*start_poll_cb)(poller_item_t *glb_item);
+typedef void (*shutdown_cb)(void);
+typedef int (*forks_count_cb)(void);
 
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
-int glb_poller_create_item(void *poller_data, DC_ITEM *dc_item);
-int glb_poller_delete_item(void *poller_data, u_int64_t itemid);
+int glb_poller_create_item(DC_ITEM *dc_item);
+int glb_poller_delete_item(u_int64_t itemid);
 int glb_poller_get_forks();
 
-poller_item_t *poller_get_pollable_item(u_int64_t itemid);
+poller_item_t *poller_get_poller_item(u_int64_t itemid);
 u_int64_t poller_get_item_id(poller_item_t *poll_item);
 void *poller_get_item_specific_data(poller_item_t *poll_item);
 void poller_set_item_specific_data(poller_item_t *poll_item, void *data);
@@ -74,19 +74,16 @@ void poller_inc_responces();
 #define POLLER_ITERATOR_CONTINUE 8
 #define POLLER_ITERATOR_STOP 9
 
-typedef int (*items_iterator_cb)(void *poller_data, poller_item_t *item, void *data);
-#define ITEMS_ITERATOR(func) int func(void *poller_data, poller_item_t *poller_item, void *data)
+typedef int (*items_iterator_cb)(poller_item_t *item, void *data);
+#define ITEMS_ITERATOR(func) int func(poller_item_t *poller_item, void *data)
 
 void poller_items_iterate(items_iterator_cb iter_func, void *data);
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args);
-poller_item_t *glb_get_poller_item(zbx_uint64_t itemid);
-int poller_notify_ipc_init(size_t mem_size);
-int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid);
-int poller_item_notify_init();
-void poller_item_notify_flush();
 
 void poller_strpool_free(const char* str);
-const char *poller_strpool_add(char * str);
+const char *poller_strpool_add(const char * str);
+
+void poller_preprocess_error(poller_item_t *poller_item, u_int64_t mstime, char *error);
 
 #endif

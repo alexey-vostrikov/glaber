@@ -406,6 +406,10 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     
     return SUCCEED;
 };
+
+int worker_get_fd_from_worker(GLB_EXT_WORKER *worker) {
+    return worker->pipe_from_worker;
+}
 /*
 
 /****************************************************************

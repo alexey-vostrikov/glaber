@@ -23,6 +23,6 @@
 
 #define GLB_SERVER_MAXCALLS 10000000
 
-int glb_worker_server_init( poll_engine_t *poll);
+int glb_worker_server_init(void);
 
 #endif
