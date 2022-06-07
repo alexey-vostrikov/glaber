@@ -1,3 +1,5 @@
+ver 2.9.26
+    - fix race condition in SHM based IPC which might lead to message processing in two workers
 ver 2.9.25
     - libevent - based async io pollers introduced: polling overhead is quite reduced
 ver 2.9.24

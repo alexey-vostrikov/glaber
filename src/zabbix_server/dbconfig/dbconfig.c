@@ -116,7 +116,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		sec = time(NULL) - sec;
 		zbx_update_env(sec);
 
-		LOG_INF("SYNC: Full resync in %d, DC_ConfigNeedsSync() = %d, secrets_reload = %d", nextcheck-time(NULL), DC_ConfigNeedsSync(), secrets_reload);
+		LOG_DBG("SYNC: Full resync in %d, DC_ConfigNeedsSync() = %d, secrets_reload = %d", nextcheck-time(NULL), DC_ConfigNeedsSync(), secrets_reload);
 		while (nextcheck > time(NULL) &&  FAIL == DC_ConfigNeedsSync() &&  0 == secrets_reload) 
 		{
 

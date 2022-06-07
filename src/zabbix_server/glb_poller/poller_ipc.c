@@ -39,8 +39,7 @@ static mem_funcs_t ipc_memf = {.free_func = __poller_ipc_notify_mem_free_func,
 static ipc_conf_t* ipc_poller_notify[ITEM_TYPE_MAX];
 
 
-//static 
- int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
+static int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
 	if (0 < forks) {
 	//	LOG_INF("doing IPC init of type %d forks %d", type, forks);
 		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, &ipc_memf);
@@ -98,7 +97,7 @@ void poller_item_notify_flush() {
 				THIS_SHOULD_NEVER_HAPPEN;
 				exit(-1);
 			}
-	//		LOG_INF("IPC: flushing %d items for type %d", notify_buffer[type]->values_num, type);
+			LOG_INF("IPC: flushing %d items for type %d", notify_buffer[type]->values_num, type);
 			ipc_vector_uint64_send(ipc_poller_notify[type], notify_buffer[type], 1);
 			zbx_vector_uint64_pair_destroy(notify_buffer[type]);
 		}

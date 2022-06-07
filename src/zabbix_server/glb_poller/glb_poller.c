@@ -281,7 +281,11 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		glb_poller_delete_item(poller_item->itemid);
 	}
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
-
+	
+//	if ( ITEM_TYPE_SNMP == dc_item->type) {
+//		LOG_INF("Got configuration for item %ld host %ld procerss num %d", dc_item->itemid, dc_item->host, process_num);
+//	}
+	
 	bzero(&local_glb_item, sizeof(poller_item_t));
 
 	local_glb_item.itemid = dc_item->itemid;
@@ -381,10 +385,12 @@ int	DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *i
 
 void new_items_check_cb(poller_item_t *garbage, void *data)
 {
+	
 	zbx_vector_uint64_t changed_items;
 	zbx_vector_uint64_create(&changed_items);
 	
-	poller_ipc_notify_rcv(conf.item_type, process_num -1 , &changed_items );
+	poller_ipc_notify_rcv(conf.item_type, process_num - 1 , &changed_items );
+
 	DCconfig_get_glb_poller_items_by_ids(&conf, &changed_items);
 
 	zbx_vector_uint64_destroy(&changed_items);
