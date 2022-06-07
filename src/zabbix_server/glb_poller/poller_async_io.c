@@ -21,8 +21,10 @@
 #include "glb_poller.h"
 #include "poller_async_io.h"
 
-#include "event2/event.h"
-#include "event2/dns.h"
+#include <event2/event.h>
+#include <event2/dns.h>
+#include <event2/util.h>
+#include <event2/visibility.h>
 
 typedef struct {
 	u_int64_t itemid;
