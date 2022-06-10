@@ -1021,7 +1021,12 @@ void async_snmp_init(void) {
     } 
 	
 	int flags = fcntl(conf.socket, F_GETFL);
+	int size = ZBX_MEBIBYTE;
 	fcntl(conf.socket, F_SETFL, flags | O_NONBLOCK);
+	if (FAIL == setsockopt(conf.socket, SOL_SOCKET, SO_RCVBUF, &size, sizeof(int))) {
+		LOG_INF("Couldn't send max socket buffer size to %d bytes", ZBX_MEBIBYTE);
+		exit(-1);
+	}
 
 	LOG_INF("Creating socket event on fd %d", conf.socket);
 	conf.socket_event = poller_create_event(NULL, responce_arrived_cb, conf.socket, NULL);
