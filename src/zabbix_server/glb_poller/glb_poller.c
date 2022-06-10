@@ -453,11 +453,6 @@ static int poller_init(zbx_thread_args_t *args)
 	zbx_hashset_create(&conf.hosts, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
 	strpool_init(&conf.strpool, &local_memf);
-	if (SUCCEED != poll_module_init())
-	{
-		LOG_WRN("Couldnt init type-specific module for type %d", conf.item_type);
-		return FAIL;
-	}
 
 	poller_async_loop_init();
 	
@@ -472,6 +467,13 @@ static int poller_init(zbx_thread_args_t *args)
 
 	conf.lost_items_check =  poller_create_event(NULL,lost_items_check_cb, 0, NULL);
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL );
+
+	/*poll modules _should_ be init after lloop event */
+	if (SUCCEED != poll_module_init())
+	{
+		LOG_WRN("Couldnt init type-specific module for type %d", conf.item_type);
+		return FAIL;
+	}
 
 	return SUCCEED;
 }

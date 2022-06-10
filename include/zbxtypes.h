@@ -219,5 +219,6 @@ zbx_uint128_t;
 #endif
 
 typedef struct zbx_variant zbx_variant_t;
+typedef struct zbx_variant variant_t;
 
 #endif

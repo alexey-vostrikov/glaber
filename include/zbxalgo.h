@@ -594,6 +594,13 @@ const char *strpool_replace(strpool_t *strpool, const char *old_str, const char 
 const char *strpool_copy(const char *str);
 
 
+typedef struct binpool_t  binpool_t;
+
+binpool_t *	binpool_init( mem_funcs_t *memf);
+int 		binpool_destroy(binpool_t *binpool);
+const void *binpool_add(binpool_t *binpool, const void *data, size_t len);
+void 		binpool_free(binpool_t *binpool, const void *data);
+
 //event queues - interface to add events with callbacks, usefull for async processing
 //and timer-based queues, may use shm and locks for parralel forks
 
@@ -614,6 +621,11 @@ int event_queue_add_callback(event_queue_t *conf, unsigned char callback_id, eve
 
 int event_queue_get_events_count(event_queue_t *conf);
 u_int64_t event_queue_get_delay(event_queue_t *conf, u_int64_t now);
+
+
+typedef struct dedup_store_t dedup_store_t;
+typedef void* (*dedup_copy_func_t)(void *dest, void* sorce, mem_funcs_t *memf);
+typedef void* (*dedup_clean_func_t)(void *data, mem_funcs_t *memf);
 
 
 #endif

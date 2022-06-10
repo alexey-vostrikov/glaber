@@ -484,12 +484,9 @@ void schedule_item_poll(poller_item_t *poller_item) {
 }
 
 
-static void resolved_callback(poller_item_t *poller_item, char *addr) {
+static void resolved_callback(poller_item_t *poller_item, const char *addr) {
     char buf[128];
     
-    //LOG_INF("Called back resolved callback with ip %s", addr);
-    
-    DEBUG_ITEM(poller_get_item_id(poller_item), "Item's host name has been resolved");
     DEBUG_ITEM(poller_get_item_id(poller_item), "Item's host name has been resolved to %s", addr);
 
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);

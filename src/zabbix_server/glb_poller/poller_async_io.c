@@ -51,18 +51,27 @@ static void poller_cb(int fd, short int flags, void *data) {
 	
 	if (0 == poll_event->itemid || NULL != poller_item)  {
 		poll_event->cb_func(poller_item,poll_event->data);
+	} else {
+		LOG_INF("Event fired, but condition not met");
 	}
 }
 
 poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_func_t callback_func, int fd, void *data) {
+	short int flags = 0;
 	poller_event_t *poller_event = zbx_calloc(NULL, 0, sizeof(poller_event_t));
+	
+	if ( 0 != fd) {
+		flags = EV_READ;
+		LOG_INF("Will create fd event fd is %d", fd);
+	}
+	
 	poller_event->cb_func = callback_func;
 	poller_event->data = data;
 	
 	if (NULL != poller_item)
 		poller_event->itemid = poller_get_item_id(poller_item);
-
-	poller_event->event = event_new(conf.events_base, fd, 0, poller_cb, poller_event);
+	
+	poller_event->event = event_new(conf.events_base, fd, flags, poller_cb, poller_event);
 
 	return poller_event;
 };
@@ -121,7 +130,7 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 	}
 }
 
-int poller_async_resolve(poller_item_t *poller_item,  char *name, resolve_cb resolve_func ) {
+int poller_async_resolve(poller_item_t *poller_item,  const char *name, resolve_cb resolve_func ) {
 	
 	event_resolve_cb_t *cb_data = zbx_malloc(NULL, sizeof(event_resolve_cb_t));
 	

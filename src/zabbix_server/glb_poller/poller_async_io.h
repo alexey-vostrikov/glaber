@@ -24,11 +24,11 @@
 typedef struct poller_event_t poller_event_t;
 
 /*async resolve interface */
-typedef void (*resolve_cb)(poller_item_t *poller_item, char* ipv4_addr);
+typedef void (*resolve_cb)(poller_item_t *poller_item, const char* ipv4_addr);
 typedef void (*poller_event_cb)(poller_item_t *poller_item, void *data);
 
 
-int poller_async_resolve(poller_item_t *poller_item, char* hostname, resolve_cb resolve_callback);
+int poller_async_resolve(poller_item_t *poller_item, const char* hostname, resolve_cb resolve_callback);
 
 
 /* async queue abstraction for pollers */

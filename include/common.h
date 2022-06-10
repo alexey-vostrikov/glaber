@@ -166,11 +166,6 @@ const char	*zbx_result_string(int result);
  ******************************************************************************/
 #define ZBX_UNUSED(var) (void)(var)
 
-typedef struct {
-	size_t size;
-	unsigned long data[1];
-} binpool_data_t;
-
 typedef struct
 {
 	int	sec;	/* seconds */
@@ -1128,12 +1123,6 @@ void	del_zeros(char *s);
 int	get_param(const char *p, int num, char *buf, size_t max_len, zbx_request_parameter_type_t *type);
 int	num_param(const char *p);
 char	*get_param_dyn(const char *p, int num, zbx_request_parameter_type_t *type);
-
-void glb_heap_binpool_init();
-void glb_heap_binpool_destroy();
-const binpool_data_t	*glb_heap_binpool_intern(binpool_data_t *bdata);
-void	glb_heap_binpool_release(const binpool_data_t *bdata);
-const binpool_data_t	*glb_heap_binpool_acquire(binpool_data_t *bdata);
 
 /******************************************************************************
  *                                                                            *

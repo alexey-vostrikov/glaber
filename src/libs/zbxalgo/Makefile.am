@@ -25,7 +25,6 @@ libzbxalgo_a_SOURCES = \
 	vectorimpl.h \
 	serialize.c \
 	ring_buffer.c \
-	binarypool.c \
 	obj_index.c \
 	elems_hash.c \
-	event_queue.c
+	event_queue.c 

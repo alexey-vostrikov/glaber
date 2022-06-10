@@ -16,7 +16,9 @@ libglbpoller_a_SOURCES = \
 	snmp.c \
 	calculated.c \
 	poller_ipc.c \
-	poller_async_io.c
+	poller_async_io.c \
+	csnmp.c \
+	asn1.c
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \

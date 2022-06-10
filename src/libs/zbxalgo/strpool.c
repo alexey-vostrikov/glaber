@@ -9,8 +9,6 @@
 
 #define REFCOUNT_FIELD_SIZE sizeof(zbx_uint32_t)
 
-static zbx_hashset_t strpool_local;
-
 static zbx_hash_t __strpool_hash(const void *data)
 {
 	return ZBX_DEFAULT_STRING_HASH_FUNC((char *)data + REFCOUNT_FIELD_SIZE);
