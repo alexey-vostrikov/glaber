@@ -37,12 +37,13 @@ int poller_async_resolve(poller_item_t *poller_item, const char* hostname, resol
    for most cases it's better to avoid using it at all */
 typedef void (*poller_event_cb_func_t)(poller_item_t *poller_item, void *data);
 
-poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_func_t callback_func, int fd, void *data);
+poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_func_t callback_func, int fd, void *data, int persist);
 
-void poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec);
+int poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec);
 void poller_run_fd_event(poller_event_t *poll_event);
 
 int poller_destroy_event(poller_event_t *event);
+void poller_disable_event(poller_event_t *poll_event);
 
 void poller_async_loop_init();
 void poller_async_loop_run();

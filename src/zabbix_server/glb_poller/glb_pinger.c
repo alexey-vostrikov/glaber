@@ -56,7 +56,8 @@ typedef struct {
 	double	max;
 	int	rcv;
 	int sent;
-    poller_event_t *time_event;
+    poller_event_t *packet_event;
+    poller_event_t *timeout_event;
 } pinger_item_t;
 
 typedef struct {
@@ -108,8 +109,10 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
     
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
     
-    poller_destroy_event(pinger_item->time_event);
-    pinger_item->time_event = NULL;
+    //LOG_INF("Pinger item is %p, time event is %p", pinger_item, pinger_item->time_event);
+
+    //poller_destroy_event(pinger_item->time_event);
+    //pinger_item->time_event = NULL;
     
     init_result(&result);
         
@@ -182,68 +185,6 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
       
     LOG_DBG("In %s: Finished", __func__);
 }
-
-/******************************************************************************
- * item init - from the general dc_item to compactly init and store a specific pinger		  * 
- * ***************************************************************************/
-static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
-	
-    int	num, count, interval, size, timeout, rc;
-    char ip_addr[MAX_ID_LEN], *ip=NULL;
-    char *parsed_key = NULL;
-    char error[MAX_STRING_LEN];
-    char *addr = NULL;
-    pinger_item_t *pinger_item;
-	zbx_timespec_t timespec;
-    icmpping_t icmpping;
-    icmppingsec_type_t	type;
-    
-    pinger_item = (pinger_item_t *) zbx_calloc(NULL, 0, sizeof(pinger_item_t));
-    
-    poller_set_item_specific_data(poller_item, pinger_item);
-    
-    ZBX_STRDUP(parsed_key, dc_item->key_orig);
-    
-	if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
-				sizeof(error)))
-        return FAIL;
-
-    if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
-					&interval, &size, &timeout, &type, error, sizeof(error))) 
-	    return FAIL;
-
-    pinger_item->ip = NULL;
-    pinger_item->addr = addr;
-    pinger_item->lastresolve=0;
-    pinger_item->type = type;
-    pinger_item->count = count;
-
-    if (0 != interval )
-        pinger_item->interval = interval;
-    else 
-        pinger_item->interval = GLB_DEFAULT_ICMP_INTERVAL;
-        
-    if (0 != timeout )
-        pinger_item->timeout = timeout;
-    else 
-        pinger_item->timeout = GLB_DEFAULT_ICMP_TIMEOUT;
-    
-    if (0 != size )
-        pinger_item->size = size;
-    else 
-        pinger_item->size = GLB_DEFAULT_ICMP_SIZE;
-    
-    pinger_item->icmpping = icmpping;
-    pinger_item->finish_time = 0;
-    pinger_item->min = 0;
-	pinger_item->sum = 0;
-	pinger_item->max = 0;
-	pinger_item->rcv = 0;
-    
-    zbx_free(parsed_key);
-    return SUCCEED;
-}
-
 /* this might be imporved by creating ip->items index, but 
  so far it looks like maintaining such an index is more expensive than 
  do a full serach of really rare hosts not capable to echo back icmp payload */
@@ -353,8 +294,6 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
 }
 
-
-
 int subscribe_worker_fd() {
     
     if (NULL != conf.worker_event) {
@@ -362,7 +301,7 @@ int subscribe_worker_fd() {
         poller_destroy_event(conf.worker_event);
     }
 
-    conf.worker_event = poller_create_event(NULL, process_worker_results_cb,  worker_get_fd_from_worker(conf.worker),  NULL);
+    conf.worker_event = poller_create_event(NULL, process_worker_results_cb,  worker_get_fd_from_worker(conf.worker),  NULL, 0);
     poller_run_fd_event(conf.worker_event);
 }
 
@@ -403,6 +342,96 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
     return SUCCEED;
 }
+
+void send_timeout_cb(poller_item_t *poller_item, void *data) {
+
+  DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
+  finish_icmp_poll(poller_item, ITEM_STATE_NORMAL, NULL, glb_ms_time());
+
+}
+
+
+//sends the packet, if all packets are sent, reset packet sent callback and sets timeout callback
+void send_packet_cb(poller_item_t *poller_item, void *data) {
+    pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
+       
+    send_icmp_packet(poller_item);
+
+    if (pinger_item->sent < pinger_item->count) {
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Planing next packet send in %d milliseconds", pinger_item->interval);
+        poller_run_timer_event(pinger_item->packet_event, pinger_item->interval);
+    } else {
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Planing timeout in %d milliseconds", pinger_item->interval);
+        //poller_destroy_event(pinger_item->time_event);
+        //pinger_item->time_event = poller_create_event(poller_item, send_timeout_cb, 0,  NULL, 0);
+        poller_run_timer_event(pinger_item->timeout_event, pinger_item->timeout);
+    }
+}
+
+/******************************************************************************
+ * item init - from the general dc_item to compactly init and store a specific pinger		  * 
+ * ***************************************************************************/
+static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
+	
+    int	num, count, interval, size, timeout, rc;
+    char ip_addr[MAX_ID_LEN], *ip=NULL;
+    char *parsed_key = NULL;
+    char error[MAX_STRING_LEN];
+    char *addr = NULL;
+    pinger_item_t *pinger_item;
+	zbx_timespec_t timespec;
+    icmpping_t icmpping;
+    icmppingsec_type_t	type;
+    
+    pinger_item = (pinger_item_t *) zbx_calloc(NULL, 0, sizeof(pinger_item_t));
+    
+    poller_set_item_specific_data(poller_item, pinger_item);
+    
+    ZBX_STRDUP(parsed_key, dc_item->key_orig);
+    
+	if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
+				sizeof(error)))
+        return FAIL;
+
+    if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
+					&interval, &size, &timeout, &type, error, sizeof(error))) 
+	    return FAIL;
+
+    pinger_item->ip = NULL;
+    pinger_item->addr = addr;
+    pinger_item->lastresolve=0;
+    pinger_item->type = type;
+    pinger_item->count = count;
+
+    if (0 != interval )
+        pinger_item->interval = interval;
+    else 
+        pinger_item->interval = GLB_DEFAULT_ICMP_INTERVAL;
+        
+    if (0 != timeout )
+        pinger_item->timeout = timeout;
+    else 
+        pinger_item->timeout = GLB_DEFAULT_ICMP_TIMEOUT;
+    
+    if (0 != size )
+        pinger_item->size = size;
+    else 
+        pinger_item->size = GLB_DEFAULT_ICMP_SIZE;
+    
+    pinger_item->icmpping = icmpping;
+    pinger_item->finish_time = 0;
+    pinger_item->min = 0;
+	pinger_item->sum = 0;
+	pinger_item->max = 0;
+	pinger_item->rcv = 0;
+    
+    pinger_item->packet_event = poller_create_event(poller_item, send_packet_cb, 0, NULL, 0);
+    pinger_item->timeout_event = poller_create_event(poller_item, send_timeout_cb, 0, NULL, 0);
+
+    zbx_free(parsed_key);
+    return SUCCEED;
+}
+
 /******************************************************************************
  * item deinit - freeing all interned string								  * 
  * ***************************************************************************/
@@ -412,8 +441,9 @@ static void free_item(poller_item_t *glb_poller_item ) {
     zbx_free(pinger_item->ip);
     zbx_free(pinger_item->addr);
     
-    if (NULL != pinger_item->time_event)
-        poller_destroy_event(pinger_item->time_event);
+  //  if (NULL != pinger_item->time_event)
+    poller_destroy_event(pinger_item->packet_event);
+    poller_destroy_event(pinger_item->timeout_event);
 
     zbx_free(pinger_item);
   
@@ -435,34 +465,6 @@ int needs_resolve(pinger_item_t *pinger_item) {
     return SUCCEED;    
 }
 
-
-void send_timeout_cb(poller_item_t *poller_item, void *data) {
-
-  DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
-  finish_icmp_poll(poller_item, ITEM_STATE_NORMAL, NULL, glb_ms_time());
-
-}
-
-//sends the packet, if all packets are sent, reset packet sent callback and sets timeout callback
-void send_packet_cb(poller_item_t *poller_item, void *data) {
-    pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
-    //poller_unset_item_timer_event(poller_item);
-    
-    send_icmp_packet(poller_item);
-
-    if (pinger_item->sent < pinger_item->count) {
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Planing next packet send in %d milliseconds", pinger_item->interval);
-        poller_run_timer_event(pinger_item->time_event, pinger_item->interval);
-    } else {
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Planing timeout in %d milliseconds", pinger_item->interval);
-
-        poller_destroy_event(pinger_item->time_event);
-        pinger_item->time_event = poller_create_event(poller_item, send_timeout_cb, 0,  NULL);
-
-        poller_run_timer_event(pinger_item->time_event, pinger_item->timeout);
-    }
-}
-
 void schedule_item_poll(poller_item_t *poller_item) {
 
     LOG_DBG("Start pinging item %ld", poller_get_item_id(poller_item));
@@ -477,12 +479,11 @@ void schedule_item_poll(poller_item_t *poller_item) {
     pinger_item->sum = 0;
     pinger_item->sent = 0;
     pinger_item->state = POLL_POLLING;
-    pinger_item->time_event = poller_create_event(poller_item, send_packet_cb, 0,  NULL);
+   // pinger_item->time_event = poller_create_event(poller_item, send_packet_cb, 0,  NULL, 0);
 
     poller_inc_requests();
     send_packet_cb(poller_item, NULL);
 }
-
 
 static void resolved_callback(poller_item_t *poller_item, const char *addr) {
     char buf[128];
@@ -529,15 +530,6 @@ static void start_ping(poller_item_t *poller_item)
 
 }
 
-/*************************************************************************
- * Account the packet, signals by exit status that polling has finished
- * ***********************************************************************/
-
-
-/******************************************************************************
- * handles i/o - calls selects/snmp_recieve, 								  * 
- * note: doesn't care about the timeouts - it's done by the poller globbaly   *
- * ***************************************************************************/
 static void handle_async_io(void)
 { 
     //in true async pollers this proc should always be empty!

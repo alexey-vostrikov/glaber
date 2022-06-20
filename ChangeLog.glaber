@@ -1,3 +1,6 @@
+ver 2.10.0
+    - async pollers are switched to libevent, async snmp walk implemented, icmp and snmp pollers are refactored to fully benefit
+        form event library (events + epoll)
 ver 2.9.26
     - fix race condition in SHM based IPC which might lead to message processing in two workers
 ver 2.9.25

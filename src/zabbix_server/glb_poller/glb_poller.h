@@ -84,6 +84,6 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args);
 void poller_strpool_free(const char* str);
 const char *poller_strpool_add(const char * str);
 
-void poller_preprocess_error(poller_item_t *poller_item, u_int64_t mstime, char *error);
+void poller_preprocess_error(poller_item_t *poller_item, char *error);
 
 #endif

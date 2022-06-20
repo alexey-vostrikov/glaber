@@ -259,19 +259,17 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			return SUCCEED;
 
 		case ITEM_TYPE_SNMP: {
-			ZBX_DC_SNMPITEM *snmpitem;
+			ZBX_DC_SNMPINTERFACE *snmp_iface;
 #ifdef HAVE_NETSNMP				
 			if ( CONFIG_GLB_SNMP_FORKS == 0 ) return FAIL;
-			snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems,&zbx_dc_item->itemid);
-
-			//avoiding dynamic and discovery items from being processed by async glb pollers
-			if  ( NULL != snmpitem &&  (ZBX_FLAG_DISCOVERY_RULE & zbx_dc_item->flags || 
-					ZBX_SNMP_OID_TYPE_DYNAMIC == snmpitem->snmp_oid_type || 0 == strncmp(snmpitem->snmp_oid, "discovery[",10)) )  {
-				//	zabbix_log(LOG_LEVEL_DEBUG, "Item %ld host %s oid %s type %d might not be async poled, will do normal poll",
-				//   			zbx_dc_item->itemid, zbx_dc_host->host, snmpitem->snmp_oid, snmpitem->snmp_oid_type);
-		  	  	return FAIL;
-			}
+	
+			snmp_iface = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp, &zbx_dc_item->interfaceid);
+							//avoiding dynamic and discovery items from being processed by async glb pollers
 			
+			/*note: async poller are yet missing v3 functionality support */
+			if ( NULL == snmp_iface || snmp_iface->version == ZBX_IF_SNMP_VERSION_3) 
+				return FAIL;
+	
 			return SUCCEED;
 #endif
 		}

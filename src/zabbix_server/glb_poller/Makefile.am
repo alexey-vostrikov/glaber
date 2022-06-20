@@ -7,18 +7,17 @@ libglbpoller_a_SOURCES = \
 	glb_pinger.c \
 	glb_worker.c \
 	glb_server.c \
-	glb_poller.h \
-	glb_pinger.h \
-	glb_worker.h \
-	glb_server.h \
 	glb_agent.c	\
-	glb_agent.h \
 	snmp.c \
 	calculated.c \
 	poller_ipc.c \
 	poller_async_io.c \
 	csnmp.c \
-	asn1.c
+	asn1.c \
+	snmp_get.c \
+	snmp_walk.c \
+	poller_sessions.c \
+	snmp_util.c
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \

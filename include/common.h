@@ -105,6 +105,10 @@ u_int64_t DC_get_debug_trigger();
 		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_trigger:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__);
 #endif
 
+#ifndef HALT_HERE
+#define HALT_HERE(message,...) { zabbix_log(LOG_LEVEL_WARNING, "In %s:%d, intentional halt: " message, __FILE__, __LINE__, ##__VA_ARGS__); zbx_backtrace(); exit(-1); }
+#endif
+
 
 #define	SUCCEED		0
 #define	FAIL		-1

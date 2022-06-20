@@ -48,15 +48,14 @@ static void poller_cb(int fd, short int flags, void *data) {
 	
 	poller_event_t *poll_event = data;
 	poller_item_t *poller_item = poller_get_poller_item(poll_event->itemid);
-	
+	DEBUG_ITEM(poll_event->itemid, "Item event %p has fired", poll_event->event);
+
 	if (0 == poll_event->itemid || NULL != poller_item)  {
 		poll_event->cb_func(poller_item,poll_event->data);
-	} else {
-		LOG_INF("Event fired, but condition not met");
-	}
+	} 
 }
 
-poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_func_t callback_func, int fd, void *data) {
+poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_func_t callback_func, int fd, void *data, int persist) {
 	short int flags = 0;
 	poller_event_t *poller_event = zbx_calloc(NULL, 0, sizeof(poller_event_t));
 	
@@ -64,17 +63,34 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 		flags = EV_READ;
 		LOG_INF("Will create fd event fd is %d", fd);
 	}
-	
+	if ( persist) 
+		flags |= EV_PERSIST;
+
 	poller_event->cb_func = callback_func;
 	poller_event->data = data;
 	
-	if (NULL != poller_item)
-		poller_event->itemid = poller_get_item_id(poller_item);
-	
 	poller_event->event = event_new(conf.events_base, fd, flags, poller_cb, poller_event);
+	
+	/*note: give io priority */
+	if (fd != 0) {
+		 event_priority_set(poller_event->event, 0);
+	} else {
+		 event_priority_set(poller_event->event, 1);
+	}
+
+
+	if (NULL != poller_item) {
+		poller_event->itemid = poller_get_item_id(poller_item);
+		DEBUG_ITEM(poller_event->itemid, "Created event %p for the item", poller_event->event);
+	}
+	
 
 	return poller_event;
 };
+
+void poller_disable_event(poller_event_t *poll_event) {
+	event_del(poll_event->event);
+}
 
 int poller_destroy_event(poller_event_t *poll_event) {
 	event_del(poll_event->event);
@@ -82,9 +98,10 @@ int poller_destroy_event(poller_event_t *poll_event) {
 	zbx_free(poll_event);
 }
 
-void poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec) {
+int poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec) {
 	struct timeval tv = { .tv_sec = tm_msec/1000, .tv_usec = (tm_msec % 1000) * 1000 };
-	event_add(poll_event->event, &tv);
+	DEBUG_ITEM(poll_event->itemid, "Started timer event %p for the item in %ld sec, %ld msec", poll_event->event, tv.tv_sec, tv.tv_usec);;
+	return event_add(poll_event->event, &tv);
 }
 
 void poller_run_fd_event(poller_event_t *poll_event) {
@@ -112,7 +129,7 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 		//LOG_INF("There was an error resolving item %ld: %s", poller_get_item_id(poller_item), evutil_gai_strerror(result));
 		DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
 		
-		poller_preprocess_error(poller_item, glb_ms_time(), "Couldn't resolve item's hostname");
+		poller_preprocess_error(poller_item, "Couldn't resolve item's hostname");
 		return;
 	}
 
@@ -141,7 +158,7 @@ int poller_async_resolve(poller_item_t *poller_item,  const char *name, resolve_
 		
 		if ( NULL!= poller_item) {
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Async dns lookup failed for addr '%s'", name);
-			poller_preprocess_error(poller_item, glb_ms_time(), "Cannot start DNS lookup. Check the item hostname or interface settings");
+			poller_preprocess_error(poller_item, "Cannot start DNS lookup. Check the item hostname or interface settings");
 		}
 
 		zbx_free(cb_data);
@@ -160,4 +177,5 @@ void poller_async_loop_init() {
     conf.events_base = event_base_new();
 	conf.evdns_base = evdns_base_new(conf.events_base, EVDNS_BASE_DISABLE_WHEN_INACTIVE | 	EVDNS_BASE_INITIALIZE_NAMESERVERS );
 	evdns_base_resolv_conf_parse(conf.evdns_base, DNS_OPTIONS_ALL, "/etc/resolv.conf");
+	event_base_priority_init(conf.events_base, 2);
 }
