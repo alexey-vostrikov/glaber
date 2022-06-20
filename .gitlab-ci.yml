@@ -91,22 +91,6 @@ debian-bullseye:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-debian-stretch:
-  variables:
-    OS: debian
-    OS_VER: stretch
-  image: ${OS}:${OS_VER}
-  only:
-    - master
-  script:
-    - *install_common_apt 
-    - apt-get install -y sass  default-libmysqlclient-dev 
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
-
 ubuntu-focal:
   variables:
     OS: ubuntu
@@ -139,23 +123,6 @@ ubuntu-bionic:
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
-
-ubuntu-xenial:
-  variables:
-    OS: ubuntu
-    OS_VER: xenial
-  image: ${OS}:${OS_VER}
-  only:
-    - master
-  script:
-    - *install_common_apt
-    - apt-get install -y libmysqlclient-dev sass
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b -us
-    - *upload_packages
-
 
 centos-8:
   variables:
