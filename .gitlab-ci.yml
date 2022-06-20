@@ -91,38 +91,6 @@ debian-bullseye:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-debian-stretch:
-  variables:
-    OS: debian
-    OS_VER: stretch
-  image: ${OS}:${OS_VER}
-  only:
-    - master
-  script:
-    - *install_common_apt 
-    - apt-get install -y sass  default-libmysqlclient-dev 
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
-
-debian-jessie:
-  variables:
-    OS: debian
-    OS_VER: jessie
-  image: ${OS}:${OS_VER}
-  only:
-    - master
-  script:
-    - *install_common_apt 
-    - apt-get install -y libmysqlclient-dev ruby-sass libc6-dev
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b -us
-    - *upload_packages
-
 ubuntu-focal:
   variables:
     OS: ubuntu
@@ -156,23 +124,6 @@ ubuntu-bionic:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-ubuntu-xenial:
-  variables:
-    OS: ubuntu
-    OS_VER: xenial
-  image: ${OS}:${OS_VER}
-  only:
-    - master
-  script:
-    - *install_common_apt
-    - apt-get install -y libmysqlclient-dev sass
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b -us
-    - *upload_packages
-
-
 centos-8:
   variables:
     OS: centos
@@ -194,21 +145,5 @@ centos-8:
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
     - *upload_rpms
 
-
-#centos7:
-#  <<: *build_rpm
-#  image: centos:7
-#  variables:
-#    CENTOS: 7
-
-#centos8:
- # <<: *build_rpm
- # image: centos:8
- # variables:
- #   CENTOS: 8
- # before_script:
- #   - dnf -y install dnf-plugins-core epel-release
- #   - dnf config-manager --set-enabled powertools
- #   - dnf -y install OpenIPMI-devel
 
 
