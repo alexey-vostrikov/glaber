@@ -179,20 +179,4 @@ centos-8:
     - *upload_rpms
 
 
-#centos7:
-#  <<: *build_rpm
-#  image: centos:7
-#  variables:
-#    CENTOS: 7
-
-#centos8:
- # <<: *build_rpm
- # image: centos:8
- # variables:
- #   CENTOS: 8
- # before_script:
- #   - dnf -y install dnf-plugins-core epel-release
- #   - dnf config-manager --set-enabled powertools
- #   - dnf -y install OpenIPMI-devel
-
 
