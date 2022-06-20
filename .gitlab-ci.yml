@@ -107,22 +107,6 @@ debian-stretch:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-debian-jessie:
-  variables:
-    OS: debian
-    OS_VER: jessie
-  image: ${OS}:${OS_VER}
-  only:
-    - master
-  script:
-    - *install_common_apt 
-    - apt-get install -y libmysqlclient-dev ruby-sass libc6-dev
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b -us
-    - *upload_packages
-
 ubuntu-focal:
   variables:
     OS: ubuntu
