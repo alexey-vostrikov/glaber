@@ -1,3 +1,5 @@
+ver 2.10.1
+    - limit of 65k sessions per async poller inctroduced. fix: database upgrade from old version was broken
 ver 2.10.0
     - async pollers are switched to libevent, async snmp walk implemented, icmp and snmp pollers are refactored to fully benefit
         form event library (events + epoll)

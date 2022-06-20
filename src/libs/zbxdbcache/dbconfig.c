@@ -10154,10 +10154,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 	RDLOCK_CACHE;
 
-	//u_int64_t start_time = glb_ms_time();
-
 	while(i < itemids->values_num )  {//&& ( glb_ms_time() - 1000 ) < start_time ) {
-		//LOG_INF("Processing item %d : %p", i, itemids->values);
 		ZBX_DC_ITEM *zbx_dc_item;
 		ZBX_DC_HOST *zbx_dc_host;
 	
