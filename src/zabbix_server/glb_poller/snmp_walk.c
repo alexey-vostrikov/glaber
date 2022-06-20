@@ -90,7 +90,7 @@ static int	snmp_ddata_init(poller_item_t *poller_item)
 {
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
 	
-	snmp_ddata_t *data = zbx_malloc(NULL, sizeof(snmp_ddata_t));
+	snmp_ddata_t *data = zbx_calloc(NULL, 0, sizeof(snmp_ddata_t));
 	int	i, j, ret = CONFIG_ERROR;
 
 	init_request(&data->request);
