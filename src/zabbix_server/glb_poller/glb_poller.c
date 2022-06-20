@@ -174,6 +174,12 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 		add_item_check_event(poller_item, mstime + 10 * 1000);
 		return;
 	}
+	
+	if ( poller_sessions_count() > POLLER_MAX_SESSIONS ) {
+		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller is too busy", POLLER_MAX_SESSIONS_DELAY / 1000 );
+		add_item_check_event(poller_item, mstime + POLLER_MAX_SESSIONS_DELAY);
+		return;
+	}
 
 	add_item_check_event(poller_item, mstime);
 
@@ -545,7 +551,6 @@ void poller_register_item_timeout(poller_item_t *item)
 	if (NULL != (glb_host = (poller_host_t *)zbx_hashset_search(&conf.hosts, &item->hostid)) &&
 		(++glb_host->fails > GLB_MAX_FAILS))
 	{
-
 		glb_host->fails = 0;
 		glb_host->disabled_till = time(NULL) + CONFIG_UNREACHABLE_DELAY;
 	}

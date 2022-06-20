@@ -25,14 +25,12 @@
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 
 #define GLB_DNS_CACHE_TIME 300 * 1000 // for how long name to ip resolvings have to be remembered in msec
-
 #define GLB_MAX_FAILS 6 // how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
-#define GLB_PROTO_ITEMID "itemid"
-#define GLB_PROTO_VALUE "value"
-#define GLB_PROTO_ERRCODE "errcode"
-#define GLB_PROTO_ERROR "error"
-
+/*async pollers having too many sessions will stagnate on session support and will loose data packets 
+ so if there are more then this amount of sessions, item's polling is delayed for 30 seconds */
+#define POLLER_MAX_SESSIONS 64 * ZBX_KIBIBYTE 
+#define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
 
 typedef struct poller_item_t poller_item_t;
 
