@@ -412,7 +412,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
 
         while (SUCCEED == (last_status = async_buffered_responce(&worker->worker, &worker_responce)) && (NULL != worker_responce)) {
               
-                LOG_DBG("Parsing line %s from worker %s", *worker_responce, worker->worker.path);
+              //  LOG_DBG("Parsing line %s from worker %s", *worker_responce, worker->worker.path);
                 glb_server_submit_result(poller_item, worker_responce);
         }
   

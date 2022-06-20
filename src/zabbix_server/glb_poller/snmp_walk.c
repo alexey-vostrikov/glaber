@@ -336,7 +336,7 @@ int  snmp_walk_start_next_oid(poller_item_t *poller_item) {
 	ddata->num++;
 
 	if (ddata->num >= ddata->request.nparam / 2) {
-		DEBUG_ITEM(poller_get_item_id(poller_item), "All oids are parsed for item %ld submitting the result");
+		DEBUG_ITEM(poller_get_item_id(poller_item), "All oids are parsed for item, submitting the result");
 		snmp_walk_submit_result(poller_item);
 		stop_item_poll(poller_item);
 		return SUCCEED;

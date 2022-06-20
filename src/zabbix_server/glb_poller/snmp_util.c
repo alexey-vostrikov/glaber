@@ -191,7 +191,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_INT64:
     	case SNMP_TP_UINT64:
     	case SNMP_TP_TIMETICKS: {
-			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived 64bit unsigned value on smnp: %ld",*(long long*)var->value);
+			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived 64bit unsigned value on smnp: %lld",*(long long*)var->value);
 			result->type = AR_UINT64;
 			result->ui64 = *(long long*)var->value;
 			
