@@ -177,7 +177,7 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 	
 	if ( poller_sessions_count() > POLLER_MAX_SESSIONS ) {
 		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller is too busy", POLLER_MAX_SESSIONS_DELAY / 1000 );
-		add_item_check_event(poller_item, mstime + POLLER_MAX_SESSIONS_DELAY);
+		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
 		return;
 	}
 
