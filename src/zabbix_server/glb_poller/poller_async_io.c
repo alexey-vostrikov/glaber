@@ -128,21 +128,17 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 
 		//LOG_INF("There was an error resolving item %ld: %s", poller_get_item_id(poller_item), evutil_gai_strerror(result));
 		DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
-		
 		poller_preprocess_error(poller_item, "Couldn't resolve item's hostname");
+	
 		return;
 	}
 
-	//LOG_INF("Returned %d addresses", count);
-	
 	if (count > 0 ) {
 
 		char buf[128];
 		u_int32_t addr = *(u_int32_t *)addresses;
 
-		evutil_inet_ntop(AF_INET, &addr, buf, sizeof(buf));
-		//LOG_INF("Item %ld resolved to ip addr %s", poller_get_item_id(poller_item), buf);
-
+		evutil_inet_ntop(AF_INET, &addr, buf, sizeof(buf));	
 		cb_func(poller_item, buf);
 	}
 }
@@ -154,7 +150,7 @@ int poller_async_resolve(poller_item_t *poller_item,  const char *name, resolve_
 	cb_data->itemid = poller_get_item_id(poller_item);
 	cb_data->cb = resolve_func;
 
-	if (NULL == evdns_base_resolve_ipv4(conf.evdns_base,name, 0, poller_async_resolve_cb, cb_data)) {
+	if (NULL == evdns_base_resolve_ipv4(conf.evdns_base, name, 0, poller_async_resolve_cb, cb_data)) {
 		
 		if ( NULL!= poller_item) {
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Async dns lookup failed for addr '%s'", name);
