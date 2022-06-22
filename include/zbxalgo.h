@@ -598,6 +598,7 @@ typedef struct binpool_t  binpool_t;
 
 binpool_t *	binpool_init( mem_funcs_t *memf);
 int 		binpool_destroy(binpool_t *binpool);
+
 const void *binpool_add(binpool_t *binpool, const void *data, size_t len);
 void 		binpool_free(binpool_t *binpool, const void *data);
 

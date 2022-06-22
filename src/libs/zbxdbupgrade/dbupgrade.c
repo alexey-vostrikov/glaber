@@ -938,6 +938,7 @@ int	DBcheck_version(void)
 	if (0 != optional_num)
 		zabbix_log(LOG_LEVEL_INFORMATION, "optional patches were found");
 
+
 	zabbix_log(LOG_LEVEL_WARNING, "starting automatic database upgrade");
 
 	for (dbversion = dbversions; NULL != dbversion->patches; dbversion++)

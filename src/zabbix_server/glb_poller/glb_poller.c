@@ -284,7 +284,6 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: re-creating new config");
 		poller_destroy_event(poller_item->poll_event);
-
 		glb_poller_delete_item(poller_item->itemid);
 	}
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
@@ -347,7 +346,7 @@ static int poll_module_init()
 	{
 #ifdef HAVE_NETSNMP
 	case ITEM_TYPE_SNMP:
-		async_snmp_init();
+		snmp_async_init();
 		break;
 #endif
 	case ITEM_TYPE_SIMPLE:
@@ -404,7 +403,6 @@ void new_items_check_cb(poller_item_t *garbage, void *data)
 
 	zbx_vector_uint64_destroy(&changed_items);
 
-	//poller_run_timer_event(conf.new_items_check, NEW_ITEMS_CHECK_INTERVAL );
 }
 
 void lost_items_check_cb(poller_item_t *garbage, void *data) {
@@ -442,12 +440,10 @@ static void update_proc_title_cb(poller_item_t *garbage, void *data) {
 	if (!ZBX_IS_RUNNING()) 
 		poller_async_loop_stop();
 
-//	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL);
 }
 
 void async_io_cb(poller_item_t *garbage, void *data) {
 	conf.poller.handle_async_io();
-//	poller_run_timer_event(conf.async_io_proc, ASYNC_RUN_INTERVAL);
 }
 
 static int poller_init(zbx_thread_args_t *args)
@@ -477,7 +473,7 @@ static int poller_init(zbx_thread_args_t *args)
 	conf.lost_items_check =  poller_create_event(NULL,lost_items_check_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL );
 
-	/*poll modules _should_ be init after lloop event */
+	/*poll modules _should_ be init after loop event */
 	if (SUCCEED != poll_module_init())
 	{
 		LOG_WRN("Couldnt init type-specific module for type %d", conf.item_type);

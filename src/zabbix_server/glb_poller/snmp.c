@@ -133,6 +133,10 @@ static void free_item(poller_item_t *poller_item ) {
 	poller_strpool_free(snmp_item->community);
 
 	poller_disable_event(snmp_item->tm_event);
+	poller_destroy_event(snmp_item->tm_event);
+
+	if (SNMP_CMD_GET_NEXT == snmp_item->snmp_req_type )
+		snmp_walk_destroy_item(poller_item);
 
 	zbx_free(snmp_item);
 		
@@ -257,9 +261,10 @@ void responce_arrived_cb(poller_item_t *null_item, void *null_data) {
 static void  handle_async_io(void) {
 }
 
-static void	snmp_async_shutdown(void) {
+void	snmp_async_shutdown(void) {
 	poller_destroy_event(conf.socket_event);
 	poller_sessions_destroy();
+	//binpool_destroy(conf.binpool);
 	close(conf.socket);
 }
 
@@ -267,7 +272,7 @@ static int forks_count(void) {
 	return CONFIG_GLB_SNMP_FORKS;
 }
 
-void async_snmp_init(void) {
+void snmp_async_init(void) {
 	int i;
 	mem_funcs_t memf = {.free_func = ZBX_DEFAULT_MEM_FREE_FUNC, .malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, .realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC};
 //	LOG_INF("In %s: starting", __func__);
@@ -299,6 +304,8 @@ void async_snmp_init(void) {
 
 	LOG_INF("Running socket event");
 	poller_run_fd_event(conf.socket_event);
+	
+	//conf.binpool = binpool_init(&memf);
 
 	poller_sessions_init();
 }

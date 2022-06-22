@@ -22,24 +22,25 @@
 #include "glb_lock.h"
 
 #define HEADER_SIZE 2 * sizeof(zbx_uint32_t)
+#define SIZE_OFFSET sizeof(zbx_uint32_t)
 
 struct binpool_t{
-	zbx_hashset_t strs;
+	zbx_hashset_t data;
 	pthread_mutex_t lock;
 };
 
 static zbx_hash_t __binpool_hash(const void *data)
-{	u_int32_t *size = *data + 2;
+{	u_int32_t *size = (u_int32_t*) data + SIZE_OFFSET;
 	
 	return ZBX_DEFAULT_STRING_HASH_ALGO(data + HEADER_SIZE, *size , ZBX_DEFAULT_HASH_SEED);
 }
 
 static int __binpool_compare(const void *d1, const void *d2)
 {
-	u_int32_t *size1 = (u_int32_t*)d1[1], *size2 = (u_int32_t*)d2[1];
+	u_int32_t *size1 = (u_int32_t*) d1 + SIZE_OFFSET, *size2 = (u_int32_t*)d2 + SIZE_OFFSET;
 
 	if (*size1 != *size2) 
-		return (ZBX_DEFAULT_INT_COMPARE_FUNC(*size1, *size2))
+		return (ZBX_DEFAULT_INT_COMPARE_FUNC(size1, size2));
 	
 	return memcmp((char *)d1 + HEADER_SIZE, (char *)d2 + HEADER_SIZE, *size1 );
 }
@@ -63,10 +64,10 @@ static void *__binpool_intern_n(zbx_hashset_t *binpool, const char *str, size_t 
 	}
 
 	refcount = (zbx_uint32_t *)record;
-	size = (zbx_uint32_t*)record[1];
+	size = (zbx_uint32_t*)record + SIZE_OFFSET;
 
 	(*refcount)++;
-	size = len;
+	*size = len;
 
 	return (void *)record + HEADER_SIZE;
 }
@@ -100,10 +101,11 @@ static const char *__binpool_acquire(const char *str)
 	return str;
 }
 
-int binpool_init(binpool_t *binpool, mem_funcs_t *memf)
+binpool_t *binpool_init( mem_funcs_t *memf)
 {
+	binpool_t *binpool = memf->malloc_func(NULL, sizeof(binpool_t));
 
-	zbx_hashset_create_ext(&binpool->strs, 100, __binpool_hash, __binpool_compare, NULL,
+	zbx_hashset_create_ext(&binpool->data, 100, __binpool_hash, __binpool_compare, NULL,
 						   memf->malloc_func, memf->realloc_func, memf->free_func);
 
 	glb_lock_init(&binpool->lock);
@@ -114,49 +116,25 @@ int binpool_init(binpool_t *binpool, mem_funcs_t *memf)
 int binpool_destroy(binpool_t *binpool)
 {
 	glb_lock_block(&binpool->lock);
-	zbx_hashset_destroy(&binpool->strs);
+	zbx_hashset_destroy(&binpool->data);
 	return SUCCEED;
 }
 
-const char *binpool_add(binpool_t *binpool, const char *str)
+const void * binpool_add(binpool_t *binpool, const void *data, size_t len)
 {
 	const char *ret;
 	glb_lock_block(&binpool->lock);
-	ret = __binpool_intern(&binpool->strs, str);
+	ret = __binpool_intern_n(&binpool->data, data, len);
 	glb_lock_unlock(&binpool->lock);
 
 	return ret;
 }
 
-const char *binpool_add_n(binpool_t *binpool, const char *str, size_t len)
-{
-	const char *ret;
-	glb_lock_block(&binpool->lock);
-	ret = __binpool_intern_n(&binpool->strs, str, len);
-	glb_lock_unlock(&binpool->lock);
-
-	return ret;
-}
-
-
-void binpool_free(binpool_t *binpool, const char *str)
+void binpool_free(binpool_t *binpool, const void* data)
 {
 	glb_lock_block(&binpool->lock);
-	__binpool_release(&binpool->strs, str);
+	__binpool_release(&binpool->data, data);
 	glb_lock_unlock(&binpool->lock);
-}
-
-const char *binpool_replace(binpool_t *binpool, const char *old_str, const char *new_str)
-{
-	const char *ret;
-
-	glb_lock_block(&binpool->lock);
-	__binpool_release(&binpool->strs, old_str);
-	ret = __binpool_intern(&binpool->strs, new_str);
-
-	glb_lock_unlock(&binpool->lock);
-
-	return ret;
 }
 
 const char *binpool_copy(const char *str)

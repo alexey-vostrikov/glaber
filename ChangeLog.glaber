@@ -1,3 +1,7 @@
+var 2.10.3
+    - minor fixes
+ver 2.10.2
+    - fix: memory leak in snmp_walk code
 ver 2.10.1
     - limit of 65k sessions per async poller inctroduced. fix: database upgrade from old version was broken
 ver 2.10.0

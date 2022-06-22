@@ -24,6 +24,7 @@
 #include "csnmp.h"
 #include "snmp.h"
 #include "poller_async_io.h"
+#include "snmp_util.h"
 
 int snmp_get_send_request(poller_item_t *poller_item) {
 	csnmp_pdu_t pdu;

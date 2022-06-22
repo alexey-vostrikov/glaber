@@ -16,8 +16,9 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+#ifndef SNMP_UTIL_H
+#define SNMP_UTIL_H
 
-//#include "glb_poller.h"
 #include "log.h"
 #include "common.h"
 #include "csnmp.h"
@@ -30,3 +31,6 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 const char* get_octet_string(csnmp_var_t *cvar, unsigned char *string_type);
 char	*snmp_err_to_text(unsigned char type);
 int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *result);
+void csnmp_oid_2_netsnmp(csnmp_oid_t *c_oid, unsigned long *n_oid);
+
+#endif
