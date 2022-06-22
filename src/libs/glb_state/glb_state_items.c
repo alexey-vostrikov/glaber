@@ -1532,8 +1532,6 @@ int marshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t* memf, void *data) {
 
 }
 
-
-
 int glb_state_items_dump() {
 
 	zbx_hashset_iter_t iter;
