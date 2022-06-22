@@ -24,11 +24,6 @@
 #include "csnmp.h"
 
 
-int snmp_get_send_request(poller_item_t *poller_item);
-
-void snmp_get_timeout(poller_item_t *poller_item);
-//int     snmp_get_prepare_pdu(poller_item_t *poller_item, csnmp_pdu_t *pdu);
+int     snmp_get_send_request(poller_item_t *poller_item);
+void    snmp_get_timeout(poller_item_t *poller_item);
 void    snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu);
-
-//void snmp_get_init_item(poller_item_t *poller_item);
-//void snmp_get_destroy_item(poller_item_t *poller_item);

@@ -275,8 +275,8 @@ static int forks_count(void) {
 void snmp_async_init(void) {
 	int i;
 	mem_funcs_t memf = {.free_func = ZBX_DEFAULT_MEM_FREE_FUNC, .malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, .realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC};
-//	LOG_INF("In %s: starting", __func__);
-	/*need libsnmp for parsing text->digital oids*/
+
+	/*need lib net-snmp for parsing text->digital and getting text oids hints*/
 	init_snmp(progname);
 	
 	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count);
@@ -305,7 +305,5 @@ void snmp_async_init(void) {
 	LOG_INF("Running socket event");
 	poller_run_fd_event(conf.socket_event);
 	
-	//conf.binpool = binpool_init(&memf);
-
 	poller_sessions_init();
 }
