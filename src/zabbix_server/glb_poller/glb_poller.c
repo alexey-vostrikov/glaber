@@ -69,6 +69,7 @@ typedef struct
 	start_poll_cb start_poll;
 	shutdown_cb shutdown;
 	forks_count_cb forks_count;
+	poller_resolve_cb resolve_callback;
 
 } poll_module_t;
 
@@ -86,6 +87,7 @@ typedef struct {
 	u_int64_t responces;
 
 	strpool_t strpool;
+	//u_int32_t dns_requests;
 	
 	poller_event_t* new_items_check;
 	poller_event_t* update_proctitle;
@@ -181,6 +183,12 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 		return;
 	}
 
+//	if (poller_async_get_dns_requests() > POLLER_MAX_DNS_REQUESTS) {
+//		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to too many DNS requests are int progress (%d) busy", POLLER_MAX_SESSIONS_DELAY / 1000, POLLER_MAX_DNS_REQUESTS );
+//		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
+//		return;
+//	}
+
 	add_item_check_event(poller_item, mstime);
 
 	if (POLL_QUEUED != poller_item->state)
@@ -234,16 +242,20 @@ int glb_poller_get_forks()
 int glb_poller_delete_item(u_int64_t itemid)
 {
 	poller_item_t *poller_item;
-
+	
+//	LOG_INF("Freeing item %ld", itemid);
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &itemid)))
 	{
 		DEBUG_ITEM(itemid, "Item has been deleted, removing from the poller config");
 
-		LOG_DBG("Calling item delete");
+	//	LOG_INF("Calling item delete for item %ld", itemid);
 		conf.poller.delete_item(poller_item);
-
+		
+		delete_item_from_host(poller_item->hostid);
 		strpool_free(&conf.strpool, poller_item->delay);
+		poller_destroy_event(poller_item->poll_event);
 		zbx_hashset_remove_direct(&conf.items, poller_item);
+
 		LOG_DBG("in: %s: ended", __func__);
 		return SUCCEED;
 	}
@@ -280,11 +292,15 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
 	{
-		LOG_DBG("Item %ld has changed, creating new configuration", poller_item->itemid);
+	//	LOG_INF("Item %ld has changed, creating new configuration", poller_item->itemid);
+		return SUCCEED;
 
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: re-creating new config");
-		poller_destroy_event(poller_item->poll_event);
+		//poller_destroy_event(poller_item->poll_event);
 		glb_poller_delete_item(poller_item->itemid);
+		//if (NULL == (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
+		//	LOG_INF()
+
 	}
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
 	
@@ -430,9 +446,9 @@ static void update_proc_title_cb(poller_item_t *garbage, void *data) {
 	
 	zbx_update_env(zbx_time());
 	
-	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, sessions: %d]",
+	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, sessions: %d, dns_requests: %d]",
 			get_process_type_string(process_type), process_num, (conf.requests * 1000) / (time_diff),
-			(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count());
+			(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count(), poller_async_get_dns_requests());
 	conf.requests = 0;
 	conf.responces = 0;
 	last_call = now;
@@ -479,7 +495,9 @@ static int poller_init(zbx_thread_args_t *args)
 		LOG_WRN("Couldnt init type-specific module for type %d", conf.item_type);
 		return FAIL;
 	}
-
+	
+	poller_async_set_resolve_cb(conf.poller.resolve_callback);
+	
 	return SUCCEED;
 }
 
@@ -564,7 +582,8 @@ void poller_register_item_succeed(poller_item_t *item)
 }
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
-								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, forks_count_cb forks_count)
+								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, 
+								 forks_count_cb forks_count, poller_resolve_cb resolve_callback)
 {
 	conf.poller.init_item = init_item;
 	conf.poller.delete_item = delete_item;
@@ -572,6 +591,7 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 	conf.poller.start_poll = start_poll;
 	conf.poller.shutdown = shutdown;
 	conf.poller.forks_count = forks_count;
+	conf.poller.resolve_callback = resolve_callback;
 }
 void poller_preprocess_error(poller_item_t *poller_item, char *error)  {
 

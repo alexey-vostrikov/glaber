@@ -109,14 +109,13 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 	else 
 		snmp_item->snmp_req_type = SNMP_CMD_GET;
 		
-	LOG_DBG("In %s() Ended", __func__);
 	return SUCCEED;
 }
 
 static void free_item(poller_item_t *poller_item ) {
 	
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
-	//LOG_INF("Item %ld has been freed", poller_get_item_id(poller_item));
+	//LOG_INF("Item %ld freeing snmp data", poller_get_item_id(poller_item));
     
 	//zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 	
@@ -132,11 +131,10 @@ static void free_item(poller_item_t *poller_item ) {
 	poller_strpool_free(snmp_item->interface_addr);
 	poller_strpool_free(snmp_item->community);
 
-	poller_disable_event(snmp_item->tm_event);
 	poller_destroy_event(snmp_item->tm_event);
 
-	if (SNMP_CMD_GET_NEXT == snmp_item->snmp_req_type )
-		snmp_walk_destroy_item(poller_item);
+//	if (SNMP_CMD_GET_NEXT == snmp_item->snmp_req_type )
+//		snmp_walk_destroy_item(poller_item);
 
 	zbx_free(snmp_item);
 		
@@ -234,7 +232,7 @@ static void   start_poll_item(poller_item_t *poller_item) {
 	
 	/* note: quing on per-host basis should be done here */
 	if (1 != snmp_item->useip) {
-		if (FAIL == poller_async_resolve(poller_item, snmp_item->interface_addr, resolve_ready_func_cb)) {
+		if (FAIL == poller_async_resolve(poller_item, snmp_item->interface_addr)) {
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Cannot resolve item's interface addr: '%s'", snmp_item->interface_addr);
 			poller_preprocess_error(poller_item, "Cannot resolve item's interface hostname");
 			poller_return_item_to_queue(poller_item);
@@ -259,12 +257,32 @@ void responce_arrived_cb(poller_item_t *null_item, void *null_data) {
 }
 
 static void  handle_async_io(void) {
+	static unsigned int now = 0;
+
+	if (time(NULL) > now + 120) {
+		now = time(NULL);
+
+		sigset_t	mask, orig_mask;
+
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGTERM);
+		sigaddset(&mask, SIGUSR2);
+		sigaddset(&mask, SIGHUP);
+		sigaddset(&mask, SIGQUIT);
+		sigprocmask(SIG_BLOCK, &mask, &orig_mask);
+
+		snmp_shutdown(progname);
+		
+		sigprocmask(SIG_SETMASK, &orig_mask, NULL);
+
+		snmp_shutdown(progname);
+		init_snmp(progname);
+	}
 }
 
-void	snmp_async_shutdown(void) {
+void snmp_async_shutdown(void) {
 	poller_destroy_event(conf.socket_event);
 	poller_sessions_destroy();
-	//binpool_destroy(conf.binpool);
 	close(conf.socket);
 }
 
@@ -279,7 +297,7 @@ void snmp_async_init(void) {
 	/*need lib net-snmp for parsing text->digital and getting text oids hints*/
 	init_snmp(progname);
 	
-	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count);
+	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count, resolve_ready_func_cb);
 
 	if ( (conf.socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
         LOG_INF("Couldn't create socket for ASYNC snmp poller");

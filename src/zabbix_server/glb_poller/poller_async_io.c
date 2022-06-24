@@ -25,14 +25,16 @@
 #include <event2/dns.h>
 #include <event2/util.h>
 
-typedef struct {
-	u_int64_t itemid;
-	resolve_cb cb;
-} event_resolve_cb_t;
+//typedef struct {
+//	u_int64_t itemid;
+//	resolve_cb cb;
+//} event_resolve_cb_t;
 
 typedef struct {
 	struct evdns_base *evdns_base;
 	struct event_base *events_base;
+	resolve_cb resolve_callback;
+	u_int32_t dns_requests;
 } async_poller_conf_t;
 
 struct poller_event_t {
@@ -42,7 +44,7 @@ struct poller_event_t {
  	struct event* event;
  };
 
-static async_poller_conf_t conf;
+static async_poller_conf_t conf = {0};
 
 static void poller_cb(int fd, short int flags, void *data) {
 	
@@ -95,7 +97,8 @@ void poller_disable_event(poller_event_t *poll_event) {
 int poller_destroy_event(poller_event_t *poll_event) {
 	event_del(poll_event->event);
 	event_free(poll_event->event);
-	zbx_free(poll_event);
+
+	return SUCCEED;
 }
 
 int poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec) {
@@ -110,23 +113,18 @@ void poller_run_fd_event(poller_event_t *poll_event) {
 
 
 void poller_async_resolve_cb(int result, char type, int count, int ttl, void *addresses, void *arg) {
-	event_resolve_cb_t *cb_data = arg;
+	u_int64_t itemid = (u_int64_t)arg;
 	poller_item_t *poller_item;
-	resolve_cb cb_func;
 
-	//LOG_INF("Resolve result callback: itemid %ld", cb_data->itemid);
-
-	poller_item = poller_get_poller_item(cb_data->itemid);
-	cb_func = cb_data->cb;
+	poller_item = poller_get_poller_item(itemid);
+	//LOG_INF("Item %ld resolved", itemid);
+	conf.dns_requests--;
 	
-	free(cb_data);
-
 	if (NULL == poller_item) 
 		return;
 	
 	if (DNS_ERR_NONE != result) {
 
-		//LOG_INF("There was an error resolving item %ld: %s", poller_get_item_id(poller_item), evutil_gai_strerror(result));
 		DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
 		poller_preprocess_error(poller_item, "Couldn't resolve item's hostname");
 	
@@ -139,26 +137,29 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 		u_int32_t addr = *(u_int32_t *)addresses;
 
 		evutil_inet_ntop(AF_INET, &addr, buf, sizeof(buf));	
-		cb_func(poller_item, buf);
+		conf.resolve_callback(poller_item, buf);
 	}
 }
+void poller_async_set_resolve_cb(resolve_cb callback) {
+	conf.resolve_callback = callback;
+}
 
-int poller_async_resolve(poller_item_t *poller_item,  const char *name, resolve_cb resolve_func ) {
-	
-	event_resolve_cb_t *cb_data = zbx_malloc(NULL, sizeof(event_resolve_cb_t));
-	
-	cb_data->itemid = poller_get_item_id(poller_item);
-	cb_data->cb = resolve_func;
+int poller_async_get_dns_requests() {
+	return conf.dns_requests;
+}
 
-	if (NULL == evdns_base_resolve_ipv4(conf.evdns_base, name, 0, poller_async_resolve_cb, cb_data)) {
+int poller_async_resolve(poller_item_t *poller_item,  const char *name) {
+
+	u_int64_t itemid = poller_get_item_id(poller_item);
+	//LOG_INF("Resolving %s", name);
+	if (NULL == evdns_base_resolve_ipv4(conf.evdns_base, name, 0, poller_async_resolve_cb, (void *)itemid)) {
 		
 		if ( NULL!= poller_item) {
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Async dns lookup failed for addr '%s'", name);
 			poller_preprocess_error(poller_item, "Cannot start DNS lookup. Check the item hostname or interface settings");
 		}
-
-		zbx_free(cb_data);
 	}
+	conf.dns_requests++;
 }
 
 void poller_async_loop_run() {
@@ -170,8 +171,9 @@ void poller_async_loop_stop() {
 }
 
 void poller_async_loop_init() {
-    conf.events_base = event_base_new();
+ 	conf.events_base = event_base_new();
 	conf.evdns_base = evdns_base_new(conf.events_base, EVDNS_BASE_DISABLE_WHEN_INACTIVE | 	EVDNS_BASE_INITIALIZE_NAMESERVERS );
+	
 	evdns_base_resolv_conf_parse(conf.evdns_base, DNS_OPTIONS_ALL, "/etc/resolv.conf");
 	event_base_priority_init(conf.events_base, 2);
 }

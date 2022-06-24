@@ -583,7 +583,7 @@ int  glb_agent_init(void) {
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
 
-	poller_set_poller_callbacks(agent_init_item, agent_free_item, agent_handle_async_io, agent_add_poll_item, agent_shutdown, forks_count);
+	poller_set_poller_callbacks(agent_init_item, agent_free_item, agent_handle_async_io, agent_add_poll_item, agent_shutdown, forks_count, NULL);
 		
 	zbx_hashset_create(&conf.items_idx, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 

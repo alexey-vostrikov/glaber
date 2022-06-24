@@ -8641,7 +8641,7 @@ void	DCconfig_get_items_by_keys(DC_ITEM *items, zbx_host_key_t *keys, int *errco
 	{
 		if (NULL == (dc_host = DCfind_host(keys[i].host)))
 		{
-			LOG_INF("Couldn't find host id for name %s", keys[i].host);
+			LOG_DBG("Couldn't find host id for name %s", keys[i].host);
 			errcodes[i] = FAIL;
 			continue;
 

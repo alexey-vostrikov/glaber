@@ -143,15 +143,15 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			secrets_reload = 0;
 		}
 		else
-		{	int sync_type= GLB_DBSYNC_CHANGESET;
+		{	
+			int sync_type = GLB_DBSYNC_CHANGESET;
 			
 			if (nextcheck < time(NULL)) {
 			//	LOG_INF("It's time for fill config SYNC");
-				sync_type = ZBX_DBSYNC_UPDATE;
+				//sync_type = ZBX_DBSYNC_UPDATE;
+				sync_type = ZBX_DBSYNC_INIT;
 				nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
-			} else {
-			//	LOG_INF("Doing partial config SYNC");
-			}
+			} 
 
 			DCsync_configuration(sync_type);
 			DCupdate_interfaces_availability();

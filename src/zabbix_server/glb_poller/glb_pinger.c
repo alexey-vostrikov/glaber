@@ -520,7 +520,7 @@ static void start_ping(poller_item_t *poller_item)
         DEBUG_ITEM(poller_get_item_id(poller_item), "Sending item's hostname to async resolve");
         DEBUG_ITEM(poller_get_item_id(poller_item), "Sending item's hostname %s to async resolve", pinger_item->addr);
 
-        poller_async_resolve(poller_item, pinger_item->addr, resolved_callback);
+        poller_async_resolve(poller_item, pinger_item->addr);
         return;
     } else { 
         DEBUG_ITEM(poller_get_item_id(poller_item), "Item doesn't need resolving");
@@ -563,7 +563,8 @@ void glb_pinger_init(void) {
     bzero(&conf, sizeof(pinger_conf_t));
 	conf.sent_packets = 0;
 
-    poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_ping, pings_shutdown, forks_count);    
+    poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_ping, pings_shutdown, 
+        forks_count,  resolved_callback);    
  
     add_params[0]='\0';
 

@@ -27,10 +27,11 @@
 #define GLB_DNS_CACHE_TIME 300 * 1000 // for how long name to ip resolvings have to be remembered in msec
 #define GLB_MAX_FAILS 6 // how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
-/*async pollers having too many sessions will stagnate on session support and will loose data packets 
+/*async pollers having too many sessions or dns requests will stagnate on session support and will loose data packets 
  so if there are more then this amount of sessions, item's polling is delayed for 30 seconds */
 #define POLLER_MAX_SESSIONS 64 * ZBX_KIBIBYTE 
 #define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
+#define POLLER_MAX_DNS_REQUESTS	3200 /*maximum simultanious DNS requests */
 
 typedef struct poller_item_t poller_item_t;
 
@@ -40,6 +41,7 @@ typedef void (*handle_async_io_cb)(void);
 typedef void (*start_poll_cb)(poller_item_t *glb_item);
 typedef void (*shutdown_cb)(void);
 typedef int (*forks_count_cb)(void);
+typedef void (*poller_resolve_cb)(poller_item_t *glb_item, const char* ipaddr);
 
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_poller_create_item(DC_ITEM *dc_item);
@@ -60,7 +62,8 @@ u_int64_t poller_get_host_id(poller_item_t *glb_item);
 void poller_set_poller_module_data(void *data);
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
-								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, forks_count_cb forks_count);
+								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, 
+								 forks_count_cb forks_count, poller_resolve_cb resolve_callback);
 
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error);
 

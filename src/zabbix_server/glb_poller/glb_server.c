@@ -462,6 +462,6 @@ int  glb_worker_server_init(void) {
         exit(-1);
     }
     
-    poller_set_poller_callbacks(init_item, delete_item, handle_async_io, start_poll, ws_shutdown, forks_count); 
+    poller_set_poller_callbacks(init_item, delete_item, handle_async_io, start_poll, ws_shutdown, forks_count, NULL); 
 	return SUCCEED;
 }

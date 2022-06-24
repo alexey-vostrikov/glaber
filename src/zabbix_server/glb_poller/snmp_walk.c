@@ -193,7 +193,8 @@ static void	snmp_ddata_clean(poller_item_t *poller_item)
 
 void stop_item_poll(poller_item_t *poller_item) {
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
-	
+	//LOG_INF("Item %ld: freeing walk data", poller_get_item_id(poller_item));
+
 	poller_return_item_to_queue(poller_item);
 	snmp_ddata_clean(poller_item);
 	poller_sessions_close_session(snmp_item->sessid);

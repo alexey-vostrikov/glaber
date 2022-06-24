@@ -3822,7 +3822,7 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 		{
 			if (SUCCEED != errcodes[i])
 			{
-				zabbix_log(LOG_LEVEL_INFORMATION, "cannot retrieve key \"%s\" on host \"%s\" from "
+				zabbix_log(LOG_LEVEL_DEBUG, "cannot retrieve key \"%s\" on host \"%s\" from "
 						"configuration cache", hostkeys[i].key, hostkeys[i].host);
 				
 				continue;
