@@ -43,7 +43,7 @@ extern int CONFIG_SERVER_STARTUP_TIME;
 
 typedef struct
 {
-	GLB_EXT_WORKER *worker;
+	ext_worker_t *worker;
 	u_int8_t read_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t read_agg_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t write_types[ITEM_VALUE_TYPE_MAX];
@@ -125,11 +125,11 @@ static int	worker_get_trends_json(void *data, int value_type, zbx_uint64_t itemi
 
 
 	if (SUCCEED != zbx_json_open(response, &jp)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:",conf->worker->path, response);
+		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:", worker_get_path(conf->worker), response);
 		return FAIL;
 	}
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "aggmetrics", &jp_data)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find data section in the worker %s  responce %s:",conf->worker->path, response);
+		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't find data section in the worker %s  responce %s:",worker_get_path(conf->worker), response);
 		return FAIL;
 	};
     
@@ -215,11 +215,11 @@ static int	worker_get_agg_json(void *data, int value_type, zbx_uint64_t itemid, 
 	zabbix_log(LOG_LEVEL_DEBUG, "Got aggregation responce :%s",response);
 
 	if (SUCCEED != zbx_json_open(response, &jp)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:",conf->worker->path, response);
+		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:",worker_get_path(conf->worker), response);
 		return FAIL;
 	}
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "aggmetrics", &jp_data)) {
-		LOG_DBG("Couldn't find data section in the worker %s  responce %s:",conf->worker->path, response);
+		LOG_DBG("Couldn't find data section in the worker %s  responce %s:",worker_get_path(conf->worker), response);
 		return FAIL;
 	};
     
@@ -634,8 +634,8 @@ int	glb_history_worker_init(char *params)
 		return FAIL;
 	}
 
-	conf->worker->mode_from_worker=GLB_WORKER_MODE_EMPTYLINE;
-	conf->worker->mode_to_worker=GLB_WORKER_MODE_NEWLINE;
+	worker_set_mode_from_worker(conf->worker, GLB_WORKER_MODE_EMPTYLINE);
+	worker_set_mode_to_worker(conf->worker, GLB_WORKER_MODE_NEWLINE);
 	
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_WORKER_WRITE_TYPES,MAX_STRING_LEN);
 	zbx_json_value_by_name(&jp_config,"write_types", tmp_str, MAX_STRING_LEN,&type);

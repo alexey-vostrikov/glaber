@@ -20,7 +20,7 @@
 #ifndef GLABER_WORKER_H
 #define GLABER_WORKER_H
 #include "glb_poller.h"
-#define GLB_WORKER_MAXCALLS 1000000;
+#define GLB_WORKER_MAXCALLS 1000000
 
 
 void glb_worker_init(void);

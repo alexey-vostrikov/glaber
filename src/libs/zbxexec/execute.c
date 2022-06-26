@@ -22,9 +22,8 @@
 #include "log.h"
 #include "zbxexec.h"
 #include "dbcache.h"
-//#include "worker.h"
+#include "worker.h"
 
-zbx_uint64_t zbx_dc_get_ext_worker(GLB_EXT_WORKER *worker, char *path );
 /* the size of temporary buffer used to read from output stream */
 #define PIPE_BUFFER_SIZE	4096
 

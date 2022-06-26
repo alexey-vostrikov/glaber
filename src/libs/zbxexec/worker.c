@@ -29,6 +29,23 @@
 #define ENODATA 245
 #endif
 
+struct ext_worker_t {
+	char *path;       //path to executable to run
+	char *args[128];
+    //char *params;     //params
+    pid_t pid;              //pid of the script
+    int calls;              //number of requests processed
+    int timeout;            //how much time to wait for result until consider the worker is dead or stuck
+    int max_calls;          //how many calls per run before worker restart
+	int mode_to_worker;		//how to terminate output to worker
+	int mode_from_worker;	//which termination to expect from the worker when parsing returned data 
+	int pipe_from_worker;	//communication pipes
+	int pipe_to_worker;
+	unsigned char async_mode; //worker is working in async mode - we don't wait it for the answer
+	//int last_fail;
+	int last_start;
+};
+
 extern int CONFIG_TIMEOUT;
 
 static int get_worker_mode(char *mode)
@@ -42,7 +59,7 @@ static int get_worker_mode(char *mode)
     return FAIL;
 }
 
-int glb_process_worker_params(GLB_EXT_WORKER *worker, char *params_buf) {
+int glb_process_worker_params(ext_worker_t *worker, char *params_buf) {
     
     LOG_DBG("%s: parsing params: '%s'", __func__, params_buf);
     
@@ -72,13 +89,13 @@ int glb_process_worker_params(GLB_EXT_WORKER *worker, char *params_buf) {
     }
 }
 
-GLB_EXT_WORKER *glb_init_worker(char *config_line)
+ext_worker_t *glb_init_worker(char *config_line)
 {
     char path[MAX_STRING_LEN], buff[MAX_STRING_LEN];
 
     int i = 0;
     zbx_json_type_t type;
-    GLB_EXT_WORKER *worker = NULL;
+    ext_worker_t *worker = NULL;
 
     path[0] = 0;
  
@@ -87,12 +104,10 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     struct zbx_json_parse jp, jp_config;
 
     zabbix_log(LOG_LEVEL_DEBUG, "%s: got config: '%s'", __func__, config_line);
-    if (NULL == (worker = zbx_malloc(NULL, sizeof(GLB_EXT_WORKER))))
+    if (NULL == (worker = zbx_calloc(NULL, 0, sizeof(ext_worker_t))))
     {
         return NULL;
     }
-
-    bzero(worker, sizeof(GLB_EXT_WORKER));
 
     if (SUCCEED != zbx_json_open(config_line, &jp_config))
     {
@@ -117,6 +132,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     {
         glb_process_worker_params(worker, buff);    
     }    
+    
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "timeout", buff, MAX_STRING_LEN, &type))
     {
         worker->timeout = strtol(buff, NULL, 10);
@@ -126,6 +142,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
         worker->timeout = CONFIG_TIMEOUT;
 
     worker->max_calls = GLB_DEFAULT_WORKER_MAX_CALLS;
+    
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "max_calls", buff, MAX_ID_LEN, &type))
     {
         worker->max_calls = strtol(buff, NULL, 10);
@@ -149,7 +166,7 @@ GLB_EXT_WORKER *glb_init_worker(char *config_line)
     return worker;
 }
 
-static int restart_worker(GLB_EXT_WORKER *worker)
+static int restart_worker(ext_worker_t *worker)
 {
     #define RST_ACCOUNT_PERIOD  20
     #define RST_MAX_RESTARTS    5
@@ -160,22 +177,23 @@ static int restart_worker(GLB_EXT_WORKER *worker)
     static unsigned int count_rst_time=0, restarts=0;
     unsigned int now=time(NULL);
 
-    if (now < worker->last_fail + CONFIG_TIMEOUT) {
-        LOG_DBG("Not restarting, waiting for %d seconds till restart", CONFIG_TIMEOUT);
+    if (worker->last_start + CONFIG_TIMEOUT > now) {
+        LOG_INF("Not restarting, waiting for %d seconds till restart", CONFIG_TIMEOUT);
         return FAIL;
     }
+
     if (now > count_rst_time) {
-        zabbix_log(LOG_LEVEL_DEBUG,"Zeroing restart limit");
+        LOG_INF("Zeroing restart limit");
         count_rst_time=now + RST_ACCOUNT_PERIOD;
         restarts = 0;
     }
      
     if (restarts++ > RST_MAX_RESTARTS ) {
-        zabbix_log(LOG_LEVEL_INFORMATION,"Restart of worker %s delayed in %d seconds to avoid system hammering", worker->path, count_rst_time - now);
+        LOG_INF("Restart of worker %s delayed in %d seconds to avoid system hammering", worker->path, count_rst_time - now);
         return FAIL;
     }
 
-    zabbix_log(LOG_LEVEL_DEBUG, "Restarting worker %s pid %d", worker->path, worker->pid);
+    LOG_INF("Restarting worker %s pid %d", worker->path, worker->pid);
     
     if (worker->pipe_from_worker)
         close(worker->pipe_from_worker);
@@ -185,7 +203,7 @@ static int restart_worker(GLB_EXT_WORKER *worker)
     if ( worker->pid > 0  && !kill(worker->pid, 0))
     {
         int exitstatus;
-        zabbix_log(LOG_LEVEL_INFORMATION, "Killing old worker instance pid %d", worker->pid);
+        LOG_INF( "Killing old worker instance pid %d", worker->pid);
         kill(worker->pid, SIGINT);
         waitpid(worker->pid, &exitstatus,WNOHANG);
         zabbix_log(LOG_LEVEL_INFORMATION, "Waitpid returned %d", exitstatus);
@@ -262,19 +280,21 @@ static int restart_worker(GLB_EXT_WORKER *worker)
    
     zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
+    worker->last_start = time(NULL);
+
     return SUCCEED;
 }
 
-int glb_start_worker(GLB_EXT_WORKER *worker) {
+int glb_start_worker(ext_worker_t *worker) {
     return restart_worker(worker);
 }
 
-int worker_is_alive(GLB_EXT_WORKER *worker)
+int worker_is_alive(ext_worker_t *worker)
 {
     if (!worker->pid)
     {
-        if ( 0 != worker->last_fail) 
-            LOG_DBG("Worker hasn't been running before");
+    //    if ( 0 != worker->last_fail) 
+    //        LOG_DBG("Worker hasn't been running before");
         return FAIL;
     }
     if (kill(worker->pid, 0))
@@ -285,7 +305,7 @@ int worker_is_alive(GLB_EXT_WORKER *worker)
     return SUCCEED;
 }
 
-static void worker_cleanup(GLB_EXT_WORKER *worker)
+static void worker_cleanup(ext_worker_t *worker)
 {
 
     char *buffer[MAX_STRING_LEN];
@@ -313,7 +333,7 @@ static void worker_cleanup(GLB_EXT_WORKER *worker)
 
 }
 
-int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
+int glb_worker_request(ext_worker_t *worker, const char * request) {
  
     int worker_fail = 0;
     int request_len = 0;
@@ -407,7 +427,7 @@ int glb_worker_request(GLB_EXT_WORKER *worker, const char * request) {
     return SUCCEED;
 };
 
-int worker_get_fd_from_worker(GLB_EXT_WORKER *worker) {
+int worker_get_fd_from_worker(ext_worker_t *worker) {
     return worker->pipe_from_worker;
 }
 /*
@@ -416,7 +436,7 @@ int worker_get_fd_from_worker(GLB_EXT_WORKER *worker) {
 * to assist async workeres and to split data by responses 
 * 
 ****************************************************************/
-int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
+int async_buffered_responce(ext_worker_t *worker,  char **response) {
     //char *read_buffer=NULL; //we read from worker here 
     static char *circle_buffer=NULL; //this is constant circle buffer we use to retrun responses
                                      //since we know the maximim reponce returned from worker has 
@@ -426,7 +446,7 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
     char *delim, *request_end=NULL;
     char *wresp;
     
-    static char datapresent = 0;
+    static char data_present = 0;
 
     zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -441,19 +461,19 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
     
     while (1) { //we might need to repeat data 
     
-        //if have any complete data redy in the buffer, send it right away
-        if ( datapresent ) {
-            //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() there are data buffered ", __func__);
+        //if have any complete data ready in the buffer, send it right away
+        if ( data_present ) {
+            LOG_DBG( "In %s() there are data buffered ", __func__);
             if ( NULL != (request_end = strstr(circle_buffer + start, delim) )) {
                 //ok, there is complete request data in the buffer, returning it
                 *response = circle_buffer + start;
                 request_end[0]=0; //setting 0 at the end of responce 
-                zabbix_log(LOG_LEVEL_DEBUG, "In %s() will respond with: %s", __func__, *response);
+                LOG_DBG("In %s() will respond with: %s", __func__, *response);
          
                 start = request_end - circle_buffer + strlen(delim); //setting start to the begining of the new responce
                 
                 if (0 == circle_buffer[start] ) { //reaching 0 means evth has been sent from the buffer
-                        datapresent = 0;
+                        data_present = 0;
                         start = 0;
                 }
                 return SUCCEED;
@@ -476,12 +496,12 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
         
         if (SUCCEED == glb_worker_responce(worker,&wresp)) {
            // zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Adding worker response '%s' at %d ", __func__,wresp, start);
-            if (datapresent) 
+            if (data_present) 
                 buffoffset = strlen(circle_buffer);
             else 
                 buffoffset = 0;
             zbx_strcpy_alloc(&circle_buffer, &bufsize, &buffoffset, wresp);
-            datapresent = 1;
+            data_present = 1;
             //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() new buffer is '%s'", __func__,circle_buffer);
             zbx_free(wresp); 
         } else { //nothing retruned yet, exiting, no reason to burn CPU here
@@ -493,7 +513,7 @@ int async_buffered_responce(GLB_EXT_WORKER *worker,  char **response) {
 }
 
 
-int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
+int glb_worker_responce(ext_worker_t *worker,  char ** responce) {
     
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
     
@@ -608,14 +628,17 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
         LOG_DBG("Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
         
         if (worker->pid != 0) {
-            worker->last_fail = time(NULL);
+            //worker->last_fail = time(NULL);
             //worker->pid = 0;
         }
         
         //sleep(1);
         int resp_len = strlen(resp_buffer);
-    
+        LOG_INF("Restarting the worker, current pid is %d", worker->pid);
+
         restart_worker(worker);
+
+        LOG_INF("Worker has been restarted");
         
         zbx_free(resp_buffer);
         return FAIL;
@@ -631,7 +654,7 @@ int glb_worker_responce(GLB_EXT_WORKER *worker,  char ** responce) {
 };
 
 
-int glb_process_worker_request(GLB_EXT_WORKER *worker, const char *request, char **responce)
+int glb_process_worker_request(ext_worker_t *worker, const char *request, char **responce)
 {
 
     zabbix_log(LOG_LEVEL_DEBUG, "Started %s", __func__);
@@ -681,7 +704,7 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
     return out;
 }
 
-void glb_destroy_worker(GLB_EXT_WORKER *worker)
+void glb_destroy_worker(ext_worker_t *worker)
 {   
     int exitstatus;
     
@@ -691,6 +714,38 @@ void glb_destroy_worker(GLB_EXT_WORKER *worker)
         waitpid(worker->pid, &exitstatus,WNOHANG);
     }
     zbx_free(worker->path);
+    zbx_free(worker);
        
-    LOG_INF("Worker destroy completed");
+    //LOG_INF("Worker destroy completed");
+}
+
+const char *worker_get_path(ext_worker_t *worker) {
+    return worker->path;
+}
+
+void worker_set_mode_from_worker(ext_worker_t *worker, unsigned char mode) {
+    worker->mode_from_worker = mode;
+}
+
+void worker_set_mode_to_worker(ext_worker_t *worker, unsigned char mode) {
+     worker->mode_to_worker = mode;
+}
+
+void worker_set_async_mode(ext_worker_t *worker, unsigned char mode) {
+    worker->async_mode = mode;
+}
+
+ext_worker_t *worker_init( const char* path, unsigned int max_calls, 
+            unsigned char async_mode, unsigned char mode_to_worker, unsigned char mode_from_worker, int timeout ) {
+    ext_worker_t *worker = zbx_calloc(NULL, 0, sizeof(struct ext_worker_t));
+
+    worker->path = zbx_strdup(NULL,path);
+    worker->async_mode = async_mode;
+    worker->max_calls = max_calls;
+    worker->mode_from_worker = mode_from_worker;
+    worker->mode_to_worker = mode_to_worker;
+    worker->timeout = timeout;
+
+    return worker;
+
 }

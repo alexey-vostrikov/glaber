@@ -62,7 +62,7 @@ typedef struct {
 
 typedef struct {
     u_int64_t async_delay; //time between async calls to detect and properly handle timeouts
-    GLB_EXT_WORKER *worker;
+    ext_worker_t *worker;
     u_int64_t sent_packets;
     poller_event_t *worker_event;
 
@@ -591,10 +591,10 @@ void glb_pinger_init(void) {
         exit(-1);
     }
 
-    conf.worker->mode_to_worker = GLB_WORKER_MODE_NEWLINE;
-    conf.worker->mode_from_worker = GLB_WORKER_MODE_NEWLINE;
-    conf.worker->async_mode = 1;
-
+    worker_set_mode_to_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
+    worker_set_mode_from_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
+    worker_set_async_mode(conf.worker, 1);
+    
     conf.worker_event = NULL; //poller_create_event(NULL, process_worker_results_cb, NULL);
 
     LOG_DBG("In %s: Ended", __func__);

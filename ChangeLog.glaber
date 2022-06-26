@@ -1,3 +1,7 @@
+var 2.10.5
+    - fixed bug preventing worker restart on some conditions, worker library refactored
+ver 2.10.4
+    - fixes to avoid leaking of configuration: test release of full init sync each frequency period
 var 2.10.3
     - minor fixes
 ver 2.10.2

@@ -23,14 +23,11 @@ static worker_conf_t conf = {0};
 
 typedef struct {
 	u_int64_t workerid;
-//	char *path; //fill path to the worker
 	u_int64_t lastrequest; //to shutdown and cleanup idle workers
-	GLB_EXT_WORKER worker;
+	ext_worker_t *worker;
 } worker_t;
 
 typedef struct {
-	//config params
-	//const char *key;
 	u_int64_t finish_time;
 	char state; //internal item state for async ops
 	unsigned int timeout; //timeout in ms - for how long to wait for the response before consider worker dead
@@ -168,7 +165,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
         zbx_free(key_dyn);
     
     worker_item->params_dyn = key_dyn;
-    free_request(&request);
+  //  free_request(&request);
 
     ret = SUCCEED;
 out:
@@ -190,15 +187,8 @@ static worker_t * worker_create_worker(worker_item_t *worker_item) {
     zabbix_log(LOG_LEVEL_INFORMATION, "creating a worker params %s", worker_item->params_dyn);
     bzero(&worker, sizeof(worker_t));
 
-    
     worker.workerid = worker_item->workerid;
-    worker.worker.path = (char *)poller_strpool_add(worker_item->full_cmd);
-    worker.worker.async_mode = 1;
-    worker.worker.max_calls = GLB_WORKER_MAXCALLS;
-    worker.worker.mode_from_worker=GLB_WORKER_MODE_NEWLINE;
-    worker.worker.mode_to_worker = GLB_WORKER_MODE_NEWLINE;
-    worker.worker.timeout = CONFIG_TIMEOUT;
-   
+    worker.worker = worker_init(worker_item->full_cmd, GLB_WORKER_MAXCALLS, 1, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE, CONFIG_TIMEOUT  );
       
     retworker = (worker_t*)zbx_hashset_insert(&conf.workers,&worker,sizeof(worker_t));
     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Finished worker id is %ld", __func__, retworker->workerid);
@@ -229,7 +219,7 @@ static void send_request(poller_item_t *poller_item) {
     }
     
     zabbix_log(LOG_LEVEL_DEBUG, "Will do request: %s to worker %s",worker_item->params_dyn, worker_item->full_cmd);
-    if (NULL == worker_item->params_dyn ||  SUCCEED != glb_worker_request(&worker->worker, worker_item->params_dyn) ) {
+    if (NULL == worker_item->params_dyn ||  SUCCEED != glb_worker_request(worker->worker, worker_item->params_dyn) ) {
         //sending config error status for the item
         zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request %s",request);
         
@@ -321,16 +311,16 @@ static void worker_process_results() {
     zbx_hashset_iter_reset(&conf.workers,&iter);
     while (NULL != (worker = zbx_hashset_iter_next(&iter))) {
         //we only query alive workers
-        zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s", worker->worker.path);
-        if (SUCCEED == worker_is_alive(&worker->worker)) { //only read from alive workers
+        zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s", worker_get_path(worker->worker));
+        if (SUCCEED == worker_is_alive(worker->worker)) { //only read from alive workers
             zabbix_log(LOG_LEVEL_DEBUG,"Calling async read");
-            while (SUCCEED == async_buffered_responce(&worker->worker, &worker_response)) {
+            while (SUCCEED == async_buffered_responce(worker->worker, &worker_response)) {
               
-                LOG_DBG("Parsing line %s from worker %s", worker_response, worker->worker.path);
+                LOG_DBG("Parsing line %s from worker %s", worker_response, worker_get_path(worker->worker));
                 worker_submit_result(worker_response);
             }
         } else {
-         zabbix_log(LOG_LEVEL_DEBUG,"Will %s is not alive, skipping", worker->worker.path);
+         zabbix_log(LOG_LEVEL_DEBUG,"Will %s is not alive, skipping", worker_get_path(worker->worker));
         }
     }
 

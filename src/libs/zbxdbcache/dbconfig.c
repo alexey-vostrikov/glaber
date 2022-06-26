@@ -47,6 +47,8 @@
 #include "../glb_state/glb_state.h"
 #include "../glb_state/glb_state_items.h"
 
+
+
 #define ZBX_DBCONFIG_IMPL
 #include "dbconfig.h"
 #include "dbsync.h"
@@ -7083,24 +7085,6 @@ out:
  *                                                                            *
  ******************************************************************************/
 
-static zbx_hash_t	__config_ext_worker_hash(const void *data)
-{
-	const GLB_EXT_WORKER	*ext_worker = (const GLB_EXT_WORKER *)data;
-
-	zbx_hash_t		hash;
-
-	hash = ZBX_DEFAULT_STRING_HASH_FUNC(ext_worker->path);
-
-	return hash;
-}
-
-static int	__config_ext_worker_compare(const void *d1, const void *d2)
-{
-	const GLB_EXT_WORKER	*ext_worker_1 = (const GLB_EXT_WORKER *)d1;
-	const GLB_EXT_WORKER	*ext_worker_2 = (const GLB_EXT_WORKER *)d2;
-
-	return strcmp(ext_worker_1->path, ext_worker_2->path);
-}
 
 static zbx_hash_t	__config_item_hk_hash(const void *data)
 {
@@ -16189,9 +16173,9 @@ int zbx_dc_get_proxy_hosts(u_int64_t proxyid,zbx_vector_uint64_t *hosts) {
 int zbx_dc_add_ext_worker(char *path, char *params, char* socket_file, int max_calls, int timeout, int mode_to_writer, int mode_from_writer) {
 	
 	const char *str=NULL;
-	GLB_EXT_WORKER worker;
+	ext_worker_t worker;
 
-	bzero(&worker,sizeof(GLB_EXT_WORKER));
+	bzero(&worker,sizeof(ext_worker_t));
 
 	worker.max_calls=max_calls;
 //	worker.to_runner_mode = mode_to_writer;
@@ -16211,15 +16195,15 @@ int zbx_dc_add_ext_worker(char *path, char *params, char* socket_file, int max_c
 	worker.workerid=config->ext_workers.num_data;
 
 	zabbix_log(LOG_LEVEL_INFORMATION,"Added worker id %ld", worker.workerid);	
-	zbx_hashset_insert(&config->ext_workers,&worker,sizeof(GLB_EXT_WORKER));
+	zbx_hashset_insert(&config->ext_workers,&worker,sizeof(ext_worker_t));
 	UNLOCK_CACHE;
 
 	
 }
 */
 /*
-zbx_uint64_t zbx_dc_get_ext_worker(GLB_EXT_WORKER *worker, char *path ) {
-	GLB_EXT_WORKER *free_worker;
+zbx_uint64_t zbx_dc_get_ext_worker(ext_worker_t *worker, char *path ) {
+	ext_worker_t *free_worker;
 
 	zbx_hashset_iter_t iter;
 
@@ -16235,7 +16219,7 @@ zbx_uint64_t zbx_dc_get_ext_worker(GLB_EXT_WORKER *worker, char *path ) {
 
 	if (NULL != free_worker) {
 		free_worker->used=1;
-		memcpy(worker,free_worker,sizeof(GLB_EXT_WORKER));
+		memcpy(worker,free_worker,sizeof(ext_worker_t));
 	}	
 	
 	UNLOCK_CACHE;
@@ -16244,9 +16228,9 @@ zbx_uint64_t zbx_dc_get_ext_worker(GLB_EXT_WORKER *worker, char *path ) {
 	return FAIL;
 }
 
-zbx_uint64_t zbx_dc_return_ext_worker(GLB_EXT_WORKER *worker) {
+zbx_uint64_t zbx_dc_return_ext_worker(ext_worker_t *worker) {
 	
-	GLB_EXT_WORKER *dc_worker;
+	ext_worker_t *dc_worker;
 	int ret=FAIL;
 	WRLOCK_CACHE;
 
@@ -16356,32 +16340,7 @@ void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num) {
 unsigned int DCconfig_get_item_sync_ts(void) {
 	return config->item_sync_ts;
 }
-/*
-void DCget_unknown_triggers(int *unknown_triggers, int *not_calculated, int *total_triggers) {
-	zbx_hashset_iter_t iter;
-	ZBX_DC_TRIGGER *trg;
-	RDLOCK_CACHE;
-	
-	*total_triggers = 0;
-	*unknown_triggers = 0;
-	*not_calculated = 0;
 
-	zbx_hashset_iter_reset(&config->triggers,&iter);
-	while (NULL != (trg = (ZBX_DC_TRIGGER*) zbx_hashset_iter_next(&iter))) {
-		if (0 == trg->lastchange) {
-			*not_calculated +=1;
-		} else  if (trg->state == TRIGGER_STATE_UNKNOWN) {
-			*unknown_triggers += 1;
-		}
-
-		*total_triggers += 1;
-	}
-	UNLOCK_CACHE;
-}
-*/
-//note: allthow it's possible that a grbage might be returned
-//this isn't likely on modern archs so not using locks on 
-//read ops
 u_int64_t DC_get_debug_item() {
 	return config->debug_item;
 }
