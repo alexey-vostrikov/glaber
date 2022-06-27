@@ -76,12 +76,12 @@ static void update_proctitle_cb(int fd, short int flags, void *data) {
 }
 
 static void recieve_metrics_cb(int fd, short int flags, void *data) {
-	LOG_INF("APM: Recieving new metrics");
+//	LOG_INF("APM: Recieving new metrics");
 	apm_recieve_new_metrics();
-	LOG_INF("APM: Dumping existing metrics");
+//	LOG_INF("APM: Dumping existing metrics");
 		
-	LOG_INF("APM: %s:", apm_server_dump_metrics());
-	LOG_INF("APM: Finished");
+//	LOG_INF("APM: %s:", apm_server_dump_metrics());
+//	LOG_INF("APM: Finished");
 }
 
 static void collect_selfmon_cb(int fd, short int flags, void *data) {
