@@ -63,7 +63,7 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 	
 	if ( 0 != fd) {
 		flags = EV_READ;
-		LOG_INF("Will create fd event fd is %d", fd);
+	//	LOG_INF("Will create fd event fd is %d", fd);
 	}
 	if ( persist) 
 		flags |= EV_PERSIST;

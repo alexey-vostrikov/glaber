@@ -65,6 +65,7 @@ struct  ipc_conf_t {
 	ipc_local_queues_t *local_queues; //local send and recieve, allocate in heap!!!
 
 	ipc_mode_t mode; //ipc_bulk or ipc_fast
+	unsigned int bulk_count;
 
 };
 
@@ -252,7 +253,7 @@ static void flush_queues(ipc_conf_t *ipc) {
 	}
 }
 
-int glb_ipc_flush_all(void *ipc_conf) {
+int glb_ipc_flush(ipc_conf_t *ipc_conf) {
 	ipc_conf_t *ipc = ipc_conf;
 	int i = 0;
 
@@ -266,7 +267,7 @@ static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, 
 	static int laststat = 0;
 	
 	while (local_free_queue->count == 0 ) {
-		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, IPC_BULK_COUNT, "ipc_free -> local free")) {
+		if (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, ipc->bulk_count, "ipc_free -> local free")) {
 			if (0 != lock) {
 				usleep(13300);
 				continue;
@@ -418,6 +419,12 @@ ipc_conf_t* glb_ipc_init(int elems_count, int elem_size, int consumers, mem_func
 
 	glb_ipc_init_sender(ipc);
 
+	if (IPC_LOW_LATENCY == mode) 
+		ipc->bulk_count = IPC_LOW_LATENCY_COUNT;
+	
+	if (IPC_HIGH_VOLUME == mode) 
+		ipc->bulk_count = IPC_BULK_COUNT;
+
 	LOG_DBG("%s:finished", __func__);
 	return (void *)ipc;
 }
@@ -433,7 +440,7 @@ void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {
 		name, ipc->local_queues->free_snd_queue.count, ipc->free_queue.count);
 			
 	for (i = 0; i < ipc->consumers; i++) {
-		LOG_INF("IPC consumer %d send: local %d, global %d", i, ipc->local_queues->send_queues[i].count, ipc->queues[i].count);
+		LOG_INF("%s, IPC consumer %d send: local %d, global %d", name, i, ipc->local_queues->send_queues[i].count, ipc->queues[i].count);
 	}
 }
 

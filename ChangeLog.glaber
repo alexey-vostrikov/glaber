@@ -1,3 +1,7 @@
+ver 2.11.0
+    - introducing Glaber APM intrenal monitoring via prometheus - style intrface: internal performance metrics are exposed via http and
+      server can do self-mon via prometheus pollers. Zabbix selfmon metrics are deprecated now and planed to be removed and replaced 
+      during until 3.x release cycle
 var 2.10.5
     - fixed bug preventing worker restart on some conditions, worker library refactored
 ver 2.10.4

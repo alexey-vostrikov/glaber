@@ -16163,97 +16163,7 @@ int zbx_dc_get_proxy_hosts(u_int64_t proxyid,zbx_vector_uint64_t *hosts) {
 	UNLOCK_CACHE;
 	return cnt;
 }
- 
-/****************************************************************************
- * Creates struct for a worker and saves it to config cache
- * 
- * 
- * **************************************************************************/
-/*
-int zbx_dc_add_ext_worker(char *path, char *params, char* socket_file, int max_calls, int timeout, int mode_to_writer, int mode_from_writer) {
-	
-	const char *str=NULL;
-	ext_worker_t worker;
 
-	bzero(&worker,sizeof(ext_worker_t));
-
-	worker.max_calls=max_calls;
-//	worker.to_runner_mode = mode_to_writer;
-//	worker.from_runner_mode = mode_from_writer;
-	worker.timeout=timeout;
-	//zbx_strlcpy(worker.path,path,strlen(path));
-	
-	
-	WRLOCK_CACHE;
-	//adding the worker to the workers hashset
-	worker.path=zbx_strpool_intern(path);
-//	worker.params=zbx_strpool_intern(params);
-//	worker.path_to_socket=zbx_strpool_intern(socket_file);
-	//generating socket file name:
-	//
-
-	worker.workerid=config->ext_workers.num_data;
-
-	zabbix_log(LOG_LEVEL_INFORMATION,"Added worker id %ld", worker.workerid);	
-	zbx_hashset_insert(&config->ext_workers,&worker,sizeof(ext_worker_t));
-	UNLOCK_CACHE;
-
-	
-}
-*/
-/*
-zbx_uint64_t zbx_dc_get_ext_worker(ext_worker_t *worker, char *path ) {
-	ext_worker_t *free_worker;
-
-	zbx_hashset_iter_t iter;
-
-	
-	WRLOCK_CACHE;
-
-	zbx_hashset_iter_reset(&config->ext_workers,&iter);
-	//finding a free one
-	while (NULL != (free_worker = zbx_hashset_iter_next(&iter) ) ) { 
-			//zabbix_log(LOG_LEVEL_INFORMATION,"cmp %s to %s",free_worker->path,path);
-			if (!strcmp(free_worker->path,path) && !free_worker->used ) break;
-	}
-
-	if (NULL != free_worker) {
-		free_worker->used=1;
-		memcpy(worker,free_worker,sizeof(ext_worker_t));
-	}	
-	
-	UNLOCK_CACHE;
-
-	if (free_worker) return worker->workerid;
-	return FAIL;
-}
-
-zbx_uint64_t zbx_dc_return_ext_worker(ext_worker_t *worker) {
-	
-	ext_worker_t *dc_worker;
-	int ret=FAIL;
-	WRLOCK_CACHE;
-
-	if (NULL != (dc_worker = zbx_hashset_search(&config->ext_workers,worker) )) { 
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Retruning worker %ld",dc_worker->workerid);
-			//there might be pipe nums and counter changes, saving then
-			if (! dc_worker->used ) THIS_SHOULD_NEVER_HAPPEN; 
-
-			dc_worker->calls=worker->calls;
-			dc_worker->pid=worker->pid;
-			//dc_worker->from_runner=worker->from_runner;
-			//dc_worker->to_runner=worker->to_runner;
-			//and marking the worker as free
-			dc_worker->used=0;
-			ret = SUCCEED; 
-						
-	}
-	
-	UNLOCK_CACHE;
-	return ret;
-
-}
-*/
 int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) {
 	ZBX_DC_ITEM *item;
 	int ret=FAIL;
@@ -16269,42 +16179,7 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) {
 	return ret;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: glb_dc_get_host_state_json                                        *
- *                                                                            *
- * Purpose: generates json object holding host states for the requestd 
- * 		hosts																  *
- * 		data[{"itemid":1234,"lastclock":2342343,"change":45.3,"value":234},   *
- * 			{....}, ]														  *
- *                                                                            *
- ******************************************************************************/
-/*
-int glb_dc_get_triggers_status_json(zbx_vector_uint64_t *triggerids, struct zbx_json *json) {
-	
-	ZBX_DC_TRIGGER *trigger;
-	int i;
 
-	zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);	
-	RDLOCK_CACHE;
-	
-	for (i=0; i<triggerids->values_num; i++) {
-	
-		if ( NULL != (trigger = (ZBX_DC_TRIGGER*)zbx_hashset_search(&config->triggers,&triggerids->values[i])) ) {
-			zbx_json_addobject(json,NULL);
-			zbx_json_adduint64(json,"triggerid",trigger->triggerid);
-			zbx_json_adduint64(json,"status",trigger->status);
-			zbx_json_adduint64(json,"state",trigger->state);
-			zbx_json_close(json);			
-		}
-	}
-	UNLOCK_CACHE;
-	zbx_json_close(json);
-	
-	return SUCCEED;
-}
-
-*/
 
 /************************************************
 * fetches items host names and keys to send to 	*
