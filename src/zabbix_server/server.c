@@ -83,6 +83,7 @@
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
 #include "../libs/glb_state/glb_state_items.h"
+#include "../libs/apm/apm.h"
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -1432,6 +1433,13 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_error("Cannot initialize Glaber CACHE");
 		exit(EXIT_FAILURE);
 	}
+
+	if (FAIL == apm_init()) {
+		zbx_error("Cannot initialize internal monitoring IPC");
+		exit(EXIT_FAILURE);
+	}
+
+
 
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
 		zbx_error("Cannot initialize Processing notify IPC");

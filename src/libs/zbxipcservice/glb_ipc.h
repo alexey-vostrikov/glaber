@@ -49,6 +49,7 @@
 	*/
 
 #define IPC_BULK_COUNT 256
+#define IPC_LOW_LATENCY_COUNT 4
 
 typedef enum 
 {
@@ -88,9 +89,8 @@ void		glb_ipc_destroy(ipc_conf_t* ipc);
 int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned char lock);
 
 int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
-void	glb_ipc_flush(ipc_conf_t *ipc);
 
-int		glb_ipc_flush_all(void *ipc_conf);
+int		glb_ipc_flush(ipc_conf_t *ipc_conf);
 
 void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);

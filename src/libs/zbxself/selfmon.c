@@ -21,6 +21,7 @@
 #include "zbxself.h"
 #include "common.h"
 #include "selfmon.h"
+#include "../apm/apm.h"
 
 #ifndef _WINDOWS
 #	include "mutexs.h"
@@ -746,4 +747,6 @@ int	zbx_sleep_get_remainder(void)
 {
 	return sleep_remains;
 }
+
+
 #endif

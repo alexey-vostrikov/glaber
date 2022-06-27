@@ -21,6 +21,7 @@
 #include "poller_async_io.h"
 #include "poller_ipc.h"
 #include "poller_sessions.h"
+#include "../../libs/apm/apm.h"
 
 extern unsigned char process_type, program_type;
 extern int server_num, process_num;
@@ -85,6 +86,9 @@ typedef struct {
 
 	u_int64_t requests;
 	u_int64_t responces;
+
+	u_int64_t total_requests;
+	u_int64_t total_responces;
 
 	strpool_t strpool;
 	//u_int32_t dns_requests;
@@ -440,17 +444,26 @@ void lost_items_check_cb(poller_item_t *garbage, void *data) {
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
 }
 
+
 static void update_proc_title_cb(poller_item_t *garbage, void *data) {	
 	static u_int64_t last_call = 0;
 	u_int64_t now = glb_ms_time(), time_diff = now - last_call;
-	
+
 	zbx_update_env(zbx_time());
 	
 	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, sessions: %d, dns_requests: %d]",
 			get_process_type_string(process_type), process_num, (conf.requests * 1000) / (time_diff),
 			(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count(), poller_async_get_dns_requests());
+	
+	conf.total_requests += conf.requests;
+	conf.total_responces += conf.responces;
+	
 	conf.requests = 0;
 	conf.responces = 0;
+	
+	apm_update_heap_usage();
+	apm_flush();	
+
 	last_call = now;
 
 	if (!ZBX_IS_RUNNING()) 
@@ -497,6 +510,13 @@ static int poller_init(zbx_thread_args_t *args)
 	}
 	
 	poller_async_set_resolve_cb(conf.poller.resolve_callback);
+
+	apm_track_counter(&conf.total_requests, "requests", NULL);
+	apm_add_proc_labels(&conf.total_requests);
+	apm_track_counter(&conf.total_responces, "responces", NULL);
+	apm_add_proc_labels(&conf.total_responces);
+	
+	apm_add_heap_usage();
 	
 	return SUCCEED;
 }
@@ -667,6 +687,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
+
 	
 	if (SUCCEED != poller_init((zbx_thread_args_t *)args))
 		exit(-1);

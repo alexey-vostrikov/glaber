@@ -75,23 +75,6 @@ extern int	CONFIG_PROXYCONFIG_FREQUENCY;
 extern int	CONFIG_PROXYDATA_FREQUENCY;
 extern int	CONFIG_HISTORYPOLLER_FORKS;
 
-typedef struct {
-	char *path;       //path to executable to run
-	char *args[128];
-    //char *params;     //params
-    pid_t pid;              //pid of the script
-    int calls;              //number of requests processed
-    int timeout;            //how much time to wait for result until consider the worker is dead or stuck
-    int max_calls;          //how many calls per run before worker restart
-	int mode_to_worker;		//how to terminate output to worker
-	int mode_from_worker;	//which termination to expect from the worker when parsing returned data 
-	int pipe_from_worker;	//communication pipes
-	int pipe_to_worker;
-	unsigned char async_mode; //worker is working in async mode - we don't wait it for the answer
-	int last_fail;
-}
-GLB_EXT_WORKER;
-
 typedef struct
 {
 	zbx_uint64_t	interfaceid;
