@@ -471,11 +471,12 @@ int snmp_walk_process_var(poller_item_t *poller_item, csnmp_var_t *var) {
  	if (SUCCEED == snmp_set_result(poller_item, var, &result)) {
 		//if (ISSET_TEXT(&result) && ZBX_SNMP_STR_HEX == val_type)
 		//				zbx_remove_chars(snmp_result.text, "\r\n");
+		char **text_result = GET_TEXT_RESULT(&result);
 		
-		DEBUG_ITEM(poller_get_item_id(poller_item),"Saving walk responce '%s'", result.text);
+		DEBUG_ITEM(poller_get_item_id(poller_item),"Saving walk responce '%s'", *text_result);
 
-		if (NULL != result.text) 
-			snmp_walk_save_result_value(ddata, ddata->request.params[ddata->num * 2 + 1], oid_index, result.text );
+		if (NULL != *text_result) 
+			snmp_walk_save_result_value(ddata, ddata->request.params[ddata->num * 2 + 1], oid_index, *text_result );
 	}
 
 	free_result(&result);
