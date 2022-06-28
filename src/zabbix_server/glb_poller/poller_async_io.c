@@ -83,7 +83,7 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 
 	if (NULL != poller_item) {
 		poller_event->itemid = poller_get_item_id(poller_item);
-		DEBUG_ITEM(poller_event->itemid, "Created event %p for the item", poller_event->event);
+	//	DEBUG_ITEM(poller_event->itemid, "Created event %p for the item", poller_event->event);
 	}
 	
 

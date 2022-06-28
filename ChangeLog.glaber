@@ -1,6 +1,6 @@
 ver 2.11.2
     - fixed sync of global expressions that lead to drop them each second sync
-var 2.11.1
+ver 2.11.1
     - logging fix
 ver 2.11.0
     - introducing Glaber APM intrenal monitoring via prometheus - style intrface: internal performance metrics are exposed via http and

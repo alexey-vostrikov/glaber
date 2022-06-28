@@ -551,7 +551,7 @@ poller_item_t *poller_get_poller_item(u_int64_t itemid)
 
 void poller_return_item_to_queue(poller_item_t *item)
 {
-	DEBUG_ITEM(item->itemid,"Item has been returned to the poller's queue");
+	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue");
 	item->lastpolltime = glb_ms_time();
 	item->state = POLL_QUEUED;
 }
