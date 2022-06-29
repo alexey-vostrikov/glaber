@@ -4034,6 +4034,10 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const DB_
 				{
 					ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid,
 							ZBX_REQUEST_HOST_PORT);
+				} else if (0 == strcmp(m, MVAR_HOST_DESCRIPTION))
+				{
+					ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid,
+							ZBX_REQUEST_HOST_DESCRIPTION);
 				}
 				else if (0 == strcmp(m, MVAR_ITEM_VALUE))
 				{

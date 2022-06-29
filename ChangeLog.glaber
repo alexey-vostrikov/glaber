@@ -1,3 +1,5 @@
+ver 2.11.3
+    - minor fixes, removed metrics logging
 ver 2.11.2
     - fixed sync of global expressions that lead to drop them each second sync
 ver 2.11.1
