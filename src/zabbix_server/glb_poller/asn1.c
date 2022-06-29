@@ -120,7 +120,7 @@ int asn1_dec_length(const char *b, int *i, int l) {
     }
 
     for (int j = 0; j < n; j++) {
-        res = res << 8 | b[(*i)++];
+        res = res << 8 | (unsigned char)b[(*i)++];
     }
 
     return res;
