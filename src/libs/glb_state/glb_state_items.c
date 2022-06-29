@@ -919,9 +919,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
 
     if (h->ts.sec > now + 300)
     {
-        LOG_INF("Warn: item's %ld timestamp %ld is too much ahead of the real time %ld, not adding to the cache", elem->id, h->ts.sec, now);
-        THIS_SHOULD_NEVER_HAPPEN;
-        //  exit(-1);
+        DEBUG_ITEM(elem->id, "Warn: item's imestamp %ld is too much ahead of the real time %ld, not adding to the cache",  h->ts.sec, now);
         return FAIL;
     }
 
