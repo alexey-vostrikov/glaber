@@ -735,17 +735,17 @@ void worker_set_async_mode(ext_worker_t *worker, unsigned char mode) {
     worker->async_mode = mode;
 }
 
-ext_worker_t *worker_init( const char* path, unsigned int max_calls, 
+ext_worker_t *worker_init(const char* path, unsigned int max_calls, 
             unsigned char async_mode, unsigned char mode_to_worker, unsigned char mode_from_worker, int timeout ) {
+    
     ext_worker_t *worker = zbx_calloc(NULL, 0, sizeof(struct ext_worker_t));
 
-    worker->path = zbx_strdup(NULL,path);
+    worker->path = zbx_strdup(NULL, path);
     worker->async_mode = async_mode;
     worker->max_calls = max_calls;
     worker->mode_from_worker = mode_from_worker;
     worker->mode_to_worker = mode_to_worker;
     worker->timeout = timeout;
-
+    
     return worker;
-
 }

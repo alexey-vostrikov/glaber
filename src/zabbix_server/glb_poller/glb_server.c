@@ -345,10 +345,10 @@ static int init_item(DC_ITEM* dcitem, poller_item_t *poller_item) {
     char full_path[MAX_STRING_LEN],  params[MAX_STRING_LEN], tmp_str[MAX_STRING_LEN];
     zbx_json_type_t type;
     char *path = NULL;
-
+    
     LOG_DBG( "In %s() Started", __func__);
 
-   // worker = (worker_t*)zbx_calloc(NULL,0,sizeof(worker_t));
+    worker = (worker_t*)zbx_calloc(NULL,0,sizeof(worker_t));
         
     if (NULL == CONFIG_WORKERS_DIR) {
         zabbix_log(LOG_LEVEL_WARNING,"To run worker as a server, set WorkerScripts dir location in the configuration file");
@@ -377,17 +377,15 @@ static int init_item(DC_ITEM* dcitem, poller_item_t *poller_item) {
     } else 
         args = NULL;
         
-           
     worker->worker = worker_init(path, GLB_SERVER_MAXCALLS, 1, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE, CONFIG_TIMEOUT);
+
     glb_process_worker_params(worker->worker, args);
-//    worker->worker.async_mode = 1;
-  //  worker->worker.max_calls = GLB_SERVER_MAXCALLS;
- //   worker->worker.mode_from_worker=GLB_WORKER_MODE_NEWLINE;
-    
+
     poller_set_item_specific_data(poller_item, worker);
     glb_start_worker(worker->worker);
 
     DEBUG_ITEM(poller_get_item_id(poller_item), "Finished init of server item, worker %s", worker_get_path(worker->worker));
+
     return SUCCEED;
 };
 

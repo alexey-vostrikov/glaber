@@ -1,3 +1,7 @@
+ver 2.11.5
+    - fix: bug in server worker causing segv on boot
+ver 2.11.4
+    - autosync time increased to avoid config cache lock stagnation on large configs
 ver 2.11.3
     - minor fixes, removed metrics logging
 ver 2.11.2
