@@ -1,3 +1,5 @@
+ver 2.11.7
+    - fix: itemid-based session id generation
 ver 2.11.6
     - fix: number of sessions reduced to 16k per poller to eliminate traffic loss
 ver 2.11.5

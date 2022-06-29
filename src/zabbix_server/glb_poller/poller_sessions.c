@@ -28,7 +28,7 @@ static poller_session_conf_t conf = {0};
 
 typedef struct {
     u_int32_t sess_id;
-   // u_int32_t ip;
+    u_int32_t ip;
     u_int64_t itemid;
     int time_added;
 } sess_t;
@@ -66,16 +66,16 @@ static void dump_outdated_sessions() {
     }
 }
 
-u_int32_t poller_sessions_create_session(u_int64_t itemid) {
+u_int32_t poller_sessions_create_session(u_int64_t itemid, u_int32_t ip) {
     sess_t local_session, *session;
 
-    u_int32_t sess_id = gen_random32bit();
+    u_int32_t sess_id = itemid & 0xffffffff;
 
     while (NULL != (session = zbx_hashset_search(&conf.sessions, &sess_id))) 
         sess_id = gen_random32bit();
 
     local_session.sess_id = sess_id;
-    //local_session.ip = ip_addr;
+    local_session.ip = ip;
     local_session.itemid = itemid;
     local_session.time_added = time(NULL);
 

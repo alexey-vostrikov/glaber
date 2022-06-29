@@ -24,7 +24,7 @@
 void poller_sessions_init();
 void poller_sessions_destroy();
 
-u_int32_t poller_sessions_create_session(u_int64_t itemid);
+u_int32_t poller_sessions_create_session(u_int64_t itemid, u_int32_t ip);
 u_int64_t poller_sessions_close_session(u_int32_t sess_id);
 
 int poller_sessions_count();

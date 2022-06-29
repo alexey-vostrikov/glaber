@@ -188,7 +188,7 @@ void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
 	
 	DEBUG_ITEM(poller_get_item_id(poller_item),"Sending request for the item");
-	snmp_item->sessid = poller_sessions_create_session(poller_get_item_id(poller_item));
+	snmp_item->sessid = poller_sessions_create_session(poller_get_item_id(poller_item), 0);
 	pdu->req_id = snmp_item->sessid;
 
 	csnmp_send_pdu(conf.socket, pdu);
