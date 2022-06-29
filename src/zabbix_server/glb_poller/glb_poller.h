@@ -29,7 +29,7 @@
 
 /*async pollers having too many sessions or dns requests will stagnate on session support and will loose data packets 
  so if there are more then this amount of sessions, item's polling is delayed for 30 seconds */
-#define POLLER_MAX_SESSIONS 64 * ZBX_KIBIBYTE 
+#define POLLER_MAX_SESSIONS 16 * ZBX_KIBIBYTE 
 #define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
 #define POLLER_MAX_DNS_REQUESTS	3200 /*maximum simultanious DNS requests */
 

@@ -1,3 +1,5 @@
+ver 2.11.6
+    - fix: number of sessions reduced to 16k per poller to eliminate traffic loss
 ver 2.11.5
     - fix: bug in server worker causing segv on boot
 ver 2.11.4
