@@ -278,6 +278,7 @@ static int get_simple_interval(const char *delay)
 	return interval;
 }
 
+extern int CONFIG_SERVER_STARTUP_TIME;
 /******************************************************************
  * Creates new item for polling, calls appropriate conversion func  *
  * for the type, and fills the new poller_item with key vals          *
@@ -339,7 +340,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		return FAIL;
 	};
 
-	 if (get_simple_interval(poller_item->delay) > 0) {
+	 if (get_simple_interval(poller_item->delay) > 0 && (time(NULL) - CONFIG_SERVER_STARTUP_TIME > 600) )  {
 	 	/*	to avoid system hummering new items are planned to not exceed rate of 10k/sec
 			if a poller handles 1m items, then they all will be polled in 1000000/10000 ~ 100 seconds
 			which should be OK for most installs	*/

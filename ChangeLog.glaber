@@ -1,3 +1,5 @@
+ver 2.11.11
+    - reduced async polling system hammering on startup
 ver 2.11.10
     - fix: icmp timeout improper handling that might lead to fake loss data
 ver 2.11.9
