@@ -1,3 +1,5 @@
+ver 2.11.9
+    - fix: csnmp PDU processing of integers with 1-byte data length is fixed
 ver 2.11.8
     - fix: csnmp bug preventing to parse some PDU snmp data
 ver 2.11.7

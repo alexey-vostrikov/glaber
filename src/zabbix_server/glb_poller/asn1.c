@@ -138,13 +138,22 @@ int asn1_dec_int(const char *b, int *i, int l, int *val) {
     }
 
     int res = 0;
+    // fprintf(stderr, "N is %d\n", n);
 
-    for (int j = 0; j < n; j++) {
-        res = res << 8 | ((int)b[(*i)++] & 0xff);
+    if (1 == n ) {
+        res = (int)b[(*i)++];
+
+    } else {
+        for (int j = 0; j < n; j++) {
+      //      fprintf(stderr, "Decoding byte %d(%x)\n", b[*i], b[*i]);
+            res = res << 8 | ((int)b[(*i)++] & 0xff);
+        //    fprintf(stderr, "Res is %d (%x)\n", res, res);
+        }
     }
 
     if (val) {
         *val = res;
+       // fprintf(stderr, "Resulting value is %d\n", *val);
     }
 
     return 0;
