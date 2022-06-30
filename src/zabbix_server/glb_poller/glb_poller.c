@@ -157,12 +157,12 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 
 	/*note: since original algo is still seconds-based adding some millisecond-noise
 	to distribute checks evenly during one second */
+	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
+	
 	nextcheck = nextcheck * 1000 + rand() % 1000;
-
 	zbx_custom_interval_free(custom_intervals);
 
 	DEBUG_ITEM(poller_item->itemid, "Added item %ld poll event in %ld msec", poller_item->itemid, nextcheck - mstime);
-	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
 
 	poller_run_timer_event(poller_item->poll_event, nextcheck-mstime);
 	return SUCCEED;
@@ -515,7 +515,6 @@ static int poller_init(zbx_thread_args_t *args)
 	apm_add_proc_labels(&conf.total_requests);
 	apm_track_counter(&conf.total_responces, "responces", NULL);
 	apm_add_proc_labels(&conf.total_responces);
-	
 	apm_add_heap_usage();
 	
 	return SUCCEED;

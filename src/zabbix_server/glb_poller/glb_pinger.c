@@ -42,14 +42,14 @@ typedef struct {
 	int 	interval; //in ms time between packets
 	int 	size; //payload size
 	char *addr; //hostname to use
-	u_int64_t lastresolve; //when it was last resolved, it's a kind of a DNS cache
+	//u_int64_t lastresolve; //when it was last resolved, it's a kind of a DNS cache
 	char state; //internal item state to distinguish async ops
 	char *ip; //ip address of the host
 	int count; //how many packets to send
     unsigned int timeout; //timeout in ms - for how long to wait for the packet
-	u_int64_t lastpacket_sent; //to control proper intrevals between packets in case is for some reason 
-							   //there was a deleay in sending a packet, we need control that next 
-							   //packet won't be sent too fast
+//	u_int64_t lastpacket_sent; //to control proper intrevals between packets in case is for some reason 
+//							   //there was a deleay in sending a packet, we need control that next 
+//							   //packet won't be sent too fast
 
 	double	min;
 	double	sum;
@@ -111,7 +111,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
     
     //LOG_INF("Pinger item is %p, time event is %p", pinger_item, pinger_item->time_event);
 
-    //poller_destroy_event(pinger_item->time_event);
+    poller_disable_event(pinger_item->timeout_event);
     //pinger_item->time_event = NULL;
     
     init_result(&result);
@@ -317,8 +317,8 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     LOG_DBG("In %s() Started", __func__);
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
   
-    DEBUG_ITEM(poller_get_item_id(poller_item),"Sending ping %d out %d to addr %s, %ld microseconds to resolve ", 
-                pinger_item->sent + 1, pinger_item->count, pinger_item->addr, pinger_item->lastresolve + GLB_DNS_CACHE_TIME - now);
+    DEBUG_ITEM(poller_get_item_id(poller_item),"Sending ping %d out %d to addr %s(%s)", 
+                pinger_item->sent + 1, pinger_item->count, pinger_item->addr, pinger_item->ip);
 
     zbx_snprintf(request,MAX_STRING_LEN,"%s %d %ld",pinger_item->ip, pinger_item->size, poller_get_item_id(poller_item) );
    // LOG_INF("Sending request for ping: %s, worker is %p", request, conf->worker);
@@ -331,7 +331,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     }
    
     pinger_item->sent++;
-    pinger_item->lastpacket_sent = now;
+ //   pinger_item->lastpacket_sent = now;
 
     if (last_worker_fd != worker_get_fd_from_worker(conf.worker)) {
         LOG_DBG("glbmap worker's FD is changed, subscibing the new FD");
@@ -399,7 +399,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 
     pinger_item->ip = NULL;
     pinger_item->addr = addr;
-    pinger_item->lastresolve=0;
+  //  pinger_item->lastresolve=0;
     pinger_item->type = type;
     pinger_item->count = count;
 
@@ -453,11 +453,11 @@ static void free_item(poller_item_t *glb_poller_item ) {
 int needs_resolve(pinger_item_t *pinger_item) {
     u_int64_t now = glb_ms_time();
 
-    if (pinger_item->lastresolve + GLB_DNS_CACHE_TIME > now) 
-        return FAIL;
+  //  if (pinger_item->lastresolve + GLB_DNS_CACHE_TIME > now) 
+  //      return FAIL;
     
     if (SUCCEED == is_ip4(pinger_item->addr)) {
-            pinger_item->lastresolve = now;
+        //    pinger_item->lastresolve = now;
             pinger_item->ip = zbx_strdup(pinger_item->ip, pinger_item->addr);
             return FAIL;
     }
@@ -491,7 +491,7 @@ static void resolved_callback(poller_item_t *poller_item, const char *addr) {
     DEBUG_ITEM(poller_get_item_id(poller_item), "Item's host name has been resolved to %s", addr);
 
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
-    pinger_item->lastresolve = glb_ms_time();
+  //  pinger_item->lastresolve = glb_ms_time();
     pinger_item->ip = zbx_strdup(pinger_item->ip, addr);
 
     schedule_item_poll(poller_item);

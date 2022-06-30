@@ -208,6 +208,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 			result->dbl = (double)*(int*)var->value;
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to double type %f", result->dbl);
 			return SUCCEED;
+			
 	       	break;
 		case SNMP_TP_BIT_STR:
     	case SNMP_TP_OCT_STR: {
