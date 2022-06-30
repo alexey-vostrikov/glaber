@@ -42,5 +42,5 @@
 #define ZABBIX_REVISION		ZBX_STR(ZABBIX_VERSION_REVISION)
 
 int	zbx_get_component_version(char *value);
-#define GLABER_VERSION	"2.11.11"
+#define GLABER_VERSION	"2.11.12"
 #endif
