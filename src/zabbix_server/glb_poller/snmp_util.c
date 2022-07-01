@@ -191,9 +191,10 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_INT64:
     	case SNMP_TP_UINT64:
     	case SNMP_TP_TIMETICKS: {
-			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived 64bit unsigned value on smnp: %lld",*(long long*)var->value);
+			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived 64bit unsigned value on smnp: %ld",*(u_int64_t*)var->value);
+		//	LOG_INF("Item %llu: Arrived 64bit unsigned value on smnp: %llu",poller_get_item_id(poller_item),*(u_int64_t*)var->value);
 			result->type = AR_UINT64;
-			result->ui64 = *(long long*)var->value;
+			result->ui64 = *(u_int64_t*)var->value;
 			
 			return SUCCEED;
 			break;
@@ -204,6 +205,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_GAUGE:
         	//DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as an int type, value is %u", *(unsigned int*)var->value);
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a signed int type, value is %d", *(int*)var->value);
+//			LOG_INF("Item %ld: Arrived int value on smnp: %d",poller_get_item_id(poller_item),*(int*)var->value);
 			result->type = AR_DOUBLE;
 			result->dbl = (double)*(int*)var->value;
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to double type %f", result->dbl);
@@ -214,13 +216,14 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_OCT_STR: {
 			unsigned char str_type = ZBX_SNMP_STR_UNDEFINED;
 			const char *parsed_str = get_octet_string(var, &str_type);
-
-			result->type = AR_TEXT;
+//			LOG_INF("Item %ld: Arrived string value on smnp: %s",poller_get_item_id(poller_item),parsed_str);
+			result->type = AR_TEXT;	
 			result->text = zbx_strdup(NULL, parsed_str);
 			break;
 		}
 	 	case SNMP_TP_IP_ADDR: {
 			asn1_str_t *str = (asn1_str_t *)var->value;
+//			LOG_INF("Item %ld: Arrived IP addr value on smnp",poller_get_item_id(poller_item));
     		DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as an ip addr type");
 			SET_STR_RESULT(result, zbx_dsprintf(NULL, "%u.%u.%u.%u",
 				(unsigned int)str->b[0],
@@ -231,9 +234,11 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 		 }
 		case SNMP_TP_FLOAT: 
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a float type");
+//			LOG_INF("Item %ld: Arrived float value on smnp: %f",poller_get_item_id(poller_item),*(float*)var->value);
 			SET_DBL_RESULT(result, *(float*)var->value);
 			break;
 		case SNMP_TP_DOUBLE: 
+//			LOG_INF("Item %ld: Arrived double value on smnp: %f",poller_get_item_id(poller_item),*(double*)var->value);
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a double type");
 			SET_DBL_RESULT(result, *(double*)var->value);
 			break;

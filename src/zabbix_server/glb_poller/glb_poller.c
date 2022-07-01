@@ -340,12 +340,12 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		return FAIL;
 	};
 
-//	 if (get_simple_interval(poller_item->delay) > 0 && (time(NULL) - CONFIG_SERVER_STARTUP_TIME > 600) )  {
+	 if (get_simple_interval(poller_item->delay) > 0 )  {
 	 	/*	to avoid system hummering new items are planned to not exceed rate of 10k/sec
 			if a poller handles 1m items, then they all will be polled in 1000000/10000 ~ 100 seconds
 			which should be OK for most installs	*/
-//	 	poller_run_timer_event(poller_item->poll_event, conf.items.num_data/20);
-//	 } else
+	 	poller_run_timer_event(poller_item->poll_event, 100);
+	 } else
 	 	add_item_check_event(poller_item, mstime);
 
 	return SUCCEED;

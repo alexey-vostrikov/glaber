@@ -33,6 +33,7 @@ typedef struct  {
 		
 	poller_event_t	*tm_event;
 	u_int32_t		sessid;
+	u_int32_t		lastpolled;
 	unsigned char	retries;
 	void 			*data;
 	

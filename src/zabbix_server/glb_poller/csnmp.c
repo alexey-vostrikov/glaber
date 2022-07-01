@@ -274,8 +274,8 @@ static int _dec_var(const char *b, int *i, int l, int tp, void *v_) {
     case SNMP_TP_INT64:
     case SNMP_TP_UINT64:
     case SNMP_TP_TIMETICKS:
-        v->value = malloc(sizeof(long long));
-        r = asn1_dec_long(b, i, l, (long long *)v->value);
+        v->value = malloc(sizeof(unsigned long long));
+        r = asn1_dec_long(b, i, l, (unsigned long long *)v->value);
         break;
     case SNMP_TP_BIT_STR:
     case SNMP_TP_OCT_STR:

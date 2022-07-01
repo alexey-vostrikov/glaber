@@ -69,7 +69,8 @@ static void dump_outdated_sessions() {
 u_int32_t poller_sessions_create_session(u_int64_t itemid, u_int32_t ip) {
     sess_t local_session, *session;
 
-    u_int32_t sess_id = itemid & 0xffffffff;
+    u_int32_t sess_id = gen_random32bit();
+    // itemid & 0xffffffff;
 
     while (NULL != (session = zbx_hashset_search(&conf.sessions, &sess_id))) 
         sess_id = gen_random32bit();

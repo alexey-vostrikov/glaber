@@ -154,10 +154,11 @@ static int process_result(csnmp_pdu_t *pdu)
 	if (0 == (itemid = poller_sessions_close_session(pdu->req_id))) {
 		char addr_str[20];
 		inet_ntop(AF_INET, &(pdu->addr), addr_str, INET_ADDRSTRLEN);
-		//LOG_INF("Arrived responce for session %u that doesn't exists, host %s", sess_id, inet_ntoa(saddr->sin_addr));
+	//	LOG_INF("Arrived responce for session %u that doesn't exists, host %s", sess_id, inet_ntoa(saddr->sin_addr));
 		return SUCCEED;
 	}
-	//LOG_INF("Item %ld: got incoming packet", itemid);
+	
+//	LOG_INF("Item %ld: got incoming packet", itemid);
 	DEBUG_ITEM(itemid, "Arrived SNMP responce");
 	
 	if (NULL == (poller_item = poller_get_poller_item(itemid))) {
@@ -187,6 +188,7 @@ static int process_result(csnmp_pdu_t *pdu)
 void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
 	
+	//LOG_INF("Sending request for the item %ld", poller_get_item_id(poller_item));
 	DEBUG_ITEM(poller_get_item_id(poller_item),"Sending request for the item");
 	snmp_item->sessid = poller_sessions_create_session(poller_get_item_id(poller_item), 0);
 	pdu->req_id = snmp_item->sessid;
@@ -230,7 +232,7 @@ static void   start_poll_item(poller_item_t *poller_item) {
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
     u_int64_t itemid = poller_get_item_id(poller_item);
 	
-	/* note: quing on per-host basis should be done here */
+	/* note: queueing on per-host basis should be done here */
 	if (1 != snmp_item->useip) {
 		if (FAIL == poller_async_resolve(poller_item, snmp_item->interface_addr)) {
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Cannot resolve item's interface addr: '%s'", snmp_item->interface_addr);

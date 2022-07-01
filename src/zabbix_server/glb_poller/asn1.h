@@ -51,7 +51,7 @@ asn1_str_t *asn1_new_str(const char *msg, int l);
 int asn1_dec_length(const char *b, int *i, int l);
 
 int asn1_dec_int(const char *b, int *i, int l, int *val);
-int asn1_dec_long(const char *b, int *i, int l, long long *val);
+int asn1_dec_long(const char *b, int *i, int l, unsigned long long *val);
 int asn1_dec_oid(const char *b, int *i, int l, asn1_oid_t *val);
 int asn1_dec_string(const char *b, int *i, int l, asn1_str_t *val);
 

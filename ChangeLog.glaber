@@ -1,3 +1,5 @@
+ver 2.11.13
+    - reverted 2.11.12, introduced minimum snmp get interval to avoid fake huge speeds on Huawei devices
 ver 2.11.12
     - reduced async polling system hammering on startup
 ver 2.11.10

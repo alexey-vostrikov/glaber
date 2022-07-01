@@ -159,7 +159,7 @@ int asn1_dec_int(const char *b, int *i, int l, int *val) {
     return 0;
 }
 
-int asn1_dec_long(const char *b, int *i, int l, long long *val) {
+int asn1_dec_long(const char *b, int *i, int l, unsigned long long *val) {
     if (*i >= l) {
         return -1;
     }
@@ -170,7 +170,7 @@ int asn1_dec_long(const char *b, int *i, int l, long long *val) {
         return -1;
     }
 
-    long long res = 0;
+    unsigned long long res = 0;
 
     for (int j = 0; j < n; j++) {
         res = res << 8 | (unsigned char)b[(*i)++];

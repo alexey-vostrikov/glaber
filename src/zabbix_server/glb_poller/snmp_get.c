@@ -26,14 +26,27 @@
 #include "poller_async_io.h"
 #include "snmp_util.h"
 
+#define MAX_ITEM_SNMP_GET_FREQUENCY	15
+
 int snmp_get_send_request(poller_item_t *poller_item) {
 	csnmp_pdu_t pdu;
 	asn1_oid_t oid;
-	
+	int now = time(NULL);
+
     snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	//unsigned int lastpolled = (u_int64_t)snmp_item->data;
 	
+	if ( now - snmp_item->lastpolled < MAX_ITEM_SNMP_GET_FREQUENCY ) {
+		DEBUG_ITEM(poller_get_item_id(poller_item),"Skipping polling, has been polled last time %ld seconds ago", now - snmp_item->lastpolled);
+	//	LOG_INF("Skipping item %ld from polling, has been polled last time %ld seconds ago", poller_get_item_id(poller_item), now - snmp_item->lastpolled);
+		poller_return_item_to_queue(poller_item);
+		return SUCCEED;
+	}
+
+	//LOG_INF("Item %ld, sending GET packet, last time it was polled in %ld sec", poller_get_item_id(poller_item), now - snmp_item->lastpolled);
 	snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET);
 		
+	/*note: intentionally do not return item to the poller, item is broken anyaway*/
 	if (FAIL == snmp_item_oid_to_asn(snmp_item->oid, &oid)) {
 	 	poller_preprocess_error(poller_item, "Cannot parse oid");
 	 	return FAIL;
@@ -66,6 +79,9 @@ void snmp_get_timeout(poller_item_t *poller_item) {
 void snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu) {
 	u_int64_t mstime=glb_ms_time();
  	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	
+	snmp_item->lastpolled = time(NULL);
+	//LOG_INF("Set item %ld lastpolled time to %ld", poller_get_item_id(poller_item), snmp_item->lastpolled);
 	
 	poller_return_item_to_queue(poller_item);
 	
