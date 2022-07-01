@@ -139,7 +139,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		hist.ts = ts;
 		hist.itemid = itemid;
 
-		glb_state_item_add_values(&hist,1);
+		glb_state_item_add_lld_value(&hist);
 	}
 out:
 	zbx_free(value);

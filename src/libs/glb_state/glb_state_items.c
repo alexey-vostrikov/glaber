@@ -803,8 +803,8 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
         fetch_seconds = req->seconds;
 
     int cache_start = glb_tsbuff_get_time_head(&elm->tsbuff);
-    head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head);
 
+    head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head);
     tail_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head - req->seconds);
 
     item_update_demand(elm, 0, MAX(0, req->seconds), now);
@@ -887,6 +887,44 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
     }
 
     return SUCCEED;
+}
+
+int add_value_lld_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data) {
+    glb_state_item_value_t *c_val;
+    item_elem_t *elm = elem->data;
+    ZBX_DC_HISTORY *h = data;
+
+    int now = time(NULL);
+    
+    //for lld-based items need to store only one element
+    if (glb_tsbuff_get_size(&elm->tsbuff) != 1) {
+  //      LOG_INF("Resizing LLD tsdb buffer to size %d -> 1 for item %ld", glb_tsbuff_get_size(&elm->tsbuff), h->itemid);
+        glb_tsbuff_resize(&elm->tsbuff, 1 , memf->malloc_func, memf->free_func, NULL);
+    }
+
+//    LOG_INF("Clearing existing data");
+    while (1 <= glb_tsbuff_get_count(&elm->tsbuff) ) {
+        c_val = glb_tsbuff_get_value_tail(&elm->tsbuff);
+        item_variant_clear(&c_val->value);
+        glb_tsbuff_free_tail(&elm->tsbuff);
+  //      LOG_INF("LLD Cleared and removed item %ld", h->itemid);
+    }
+
+//    LOG_INF("Adding new data");
+
+    if (NULL != (c_val = (glb_state_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
+    {
+        dc_hist_to_value(c_val, h);
+        elm->value_type = h->value_type;
+        DEBUG_ITEM(elem->id, "Item added to LLD, oldest timestamp is %ld", glb_tsbuff_get_time_tail(&elm->tsbuff));
+  //      LOG_INF("Item %ld added to LLD, oldest timestamp is %ld", elem->id,  glb_tsbuff_get_time_tail(&elm->tsbuff));
+    }
+    else
+    {
+        LOG_WRN("Cannot add LLD value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
+        return FAIL;
+    }
+   
 }
 
 int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
@@ -1226,6 +1264,10 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
     
     return parse_json_item_values(&jp_values, elem, memf);
     
+}
+int  glb_state_item_add_lld_value(ZBX_DC_HISTORY *h) {
+    DEBUG_ITEM(h->itemid,"Adding LLD value to the history");
+    return elems_hash_process(state->items, h->itemid, add_value_lld_cb, h, 0);
 }
 
 int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {

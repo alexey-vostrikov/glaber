@@ -112,7 +112,7 @@ void*  glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
         new_head = 0;
     }
      
-    if (new_head == tsbuff->tail) {
+    if (new_head == tsbuff->tail && glb_tsbuff_get_size(tsbuff) > 1) {
         LOG_WRN("New head reached the tail, not enough buffer space");
         return NULL;
     }

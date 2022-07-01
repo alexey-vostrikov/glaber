@@ -38,6 +38,7 @@ int     glb_state_items_load();
 int     glb_state_items_dump();
 
 int     glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num);
+int     glb_state_item_add_lld_value(ZBX_DC_HISTORY *h);
 
 int     glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
 int     glb_state_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
