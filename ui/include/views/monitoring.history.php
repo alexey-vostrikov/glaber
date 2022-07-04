@@ -58,6 +58,7 @@ if ((count($data['items']) == 1 || $same_host) && $data['itemids']) {
 		count($data['items']) == 1 ? $item['name_expanded'] : $header['left']
 	];
 	$header_row[] = implode('', $header['left']);
+	$historyWidget->setNavigation(getHostNavigation($item,$item['hostid']));
 }
 else {
 	$header_row[] = $header['left'];

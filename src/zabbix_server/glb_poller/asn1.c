@@ -138,22 +138,18 @@ int asn1_dec_int(const char *b, int *i, int l, int *val) {
     }
 
     int res = 0;
-    // fprintf(stderr, "N is %d\n", n);
 
-    if (1 == n ) {
-        res = (int)b[(*i)++];
-
-    } else {
-        for (int j = 0; j < n; j++) {
-      //      fprintf(stderr, "Decoding byte %d(%x)\n", b[*i], b[*i]);
-            res = res << 8 | ((int)b[(*i)++] & 0xff);
-        //    fprintf(stderr, "Res is %d (%x)\n", res, res);
-        }
+    for (int j = 0; j < n; j++) {
+        if (0 == j)
+            res = res << 8 | ((char)b[(*i)++]); 
+            //need to parse the first byte as signed and so fill all ffff's int the result
+        else 
+            res = res << 8 | ((unsigned char)b[(*i)++]); //rest bytes are copied 'as-is'
     }
 
     if (val) {
         *val = res;
-       // fprintf(stderr, "Resulting value is %d\n", *val);
+ //       fprintf(stderr, "Resulting value is %d\n", *val);
     }
 
     return 0;

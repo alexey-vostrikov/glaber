@@ -1,3 +1,7 @@
+ver 2.11.14
+    - fix: SNMP signed int parsing 
+ver 2.11.14
+    - added limit to 1 LLD item to be stored in the value cache te reduce memory usage
 ver 2.11.13
     - reverted 2.11.12, introduced minimum snmp get interval to avoid fake huge speeds on Huawei devices
 ver 2.11.12

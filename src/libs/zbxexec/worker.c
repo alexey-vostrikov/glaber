@@ -183,7 +183,7 @@ static int restart_worker(ext_worker_t *worker)
     }
 
     if (now > count_rst_time) {
-        LOG_INF("Zeroing restart limit");
+        LOG_DBG("Zeroing restart limit");
         count_rst_time=now + RST_ACCOUNT_PERIOD;
         restarts = 0;
     }
