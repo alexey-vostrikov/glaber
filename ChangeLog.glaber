@@ -1,3 +1,5 @@
+ver 2.11.17
+    - added sync decision logging
 ver 2.11.16
     - fix: host change changeset SQL problem
 ver 2.11.15
