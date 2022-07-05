@@ -1,4 +1,6 @@
-ver 2.11.14
+ver 2.11.16
+    - fix: host change changeset SQL problem
+ver 2.11.15
     - fix: SNMP signed int parsing 
 ver 2.11.14
     - added limit to 1 LLD item to be stored in the value cache te reduce memory usage

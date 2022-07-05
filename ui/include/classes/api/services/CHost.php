@@ -724,8 +724,8 @@ class CHost extends CHostGeneral {
 
 		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_HOST, $hosts);
 		
-		CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_CREATE, $hostids);
-		CZabbixServer::notifyConfigChanges();
+	//	CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_CREATE, $hostids);
+	//	CZabbixServer::notifyConfigChanges();
 
 		return ['hostids' => array_column($hosts, 'hostid')];
 	}
@@ -827,8 +827,8 @@ class CHost extends CHostGeneral {
 
 		$this->updateTags(array_column($hosts, 'tags', 'hostid'));
 
-		CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_UPDATE, array_column($hosts, 'hostid'));
-		CZabbixServer::notifyConfigChanges();
+	//	CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_UPDATE, array_column($hosts, 'hostid'));
+	//	CZabbixServer::notifyConfigChanges();
 
 		return ['hostids' => array_column($hosts, 'hostid')];
 	}
@@ -1502,8 +1502,8 @@ class CHost extends CHostGeneral {
 
 		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_HOST, $db_hosts);
 		
-		CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_DELETE, $hostIds);
-		CZabbixServer::notifyConfigChanges();
+	//	CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_DELETE, $hostIds);
+	//	CZabbixServer::notifyConfigChanges();
 
 		return ['hostids' => $hostIds];
 	}
