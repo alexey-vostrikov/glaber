@@ -147,7 +147,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		{	
 			int sync_type = GLB_DBSYNC_CHANGESET;
 			
-			if (nextcheck < time(NULL)) {
+			if (nextcheck <= time(NULL)) {
 				LOG_INF("Doing full SYNC");
 				//sync_type = ZBX_DBSYNC_UPDATE;
 				sync_type = ZBX_DBSYNC_INIT;
