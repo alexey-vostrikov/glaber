@@ -152,7 +152,7 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 	else
 	{
 		nextcheck = calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
-											 custom_intervals, mstime / 1000);
+											 custom_intervals, (mstime / 1000) +1 );
 	}
 
 	/*note: since original algo is still seconds-based adding some millisecond-noise
