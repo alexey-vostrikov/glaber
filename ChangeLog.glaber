@@ -1,3 +1,6 @@
+ver 2.11.20
+    - fix: snmp positive items are now converted to ui64 instead of float,
+    fixed bug leading to crash on debugging SNMP FAILed item
 ver 2.11.19
     - fix: too fast ASYNC agent polling might lead to double polls in the same second
 ver 2.11.18

@@ -628,7 +628,7 @@ void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u
 {
 	zbx_timespec_t ts = {.sec = mstime / 1000, .ns = (mstime % 1000) * 1000000};
 	
-	if (result->type | AR_UINT64) {
+	if (NULL != result && ( result->type | AR_UINT64)) {
 		DEBUG_ITEM(poller_item->itemid, "Preprocessing item of uint64 type value %ld", result->ui64);
 	}
 

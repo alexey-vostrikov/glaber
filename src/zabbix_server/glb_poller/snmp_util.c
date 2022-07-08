@@ -204,11 +204,18 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_COUNTER:
     	case SNMP_TP_GAUGE:
         	//DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as an int type, value is %u", *(unsigned int*)var->value);
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a signed int type, value is %d", *(int*)var->value);
+			//DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a signed int type, value is %d", *(int*)var->value);
 //			LOG_INF("Item %ld: Arrived int value on smnp: %d",poller_get_item_id(poller_item),*(int*)var->value);
-			result->type = AR_DOUBLE;
-			result->dbl = (double)*(int*)var->value;
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to double type %f", result->dbl);
+			if (*(int*)var->value > 0) {
+				result->type = AR_UINT64;
+				result->ui64 = *(int*)var->value;
+				DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to uint type %llu", result->ui64);
+			} else {
+				result->type = AR_DOUBLE;
+				result->dbl = (double)*(int*)var->value;
+				DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to double type %f", result->dbl);
+			}
+			
 			return SUCCEED;
 			
 	       	break;
