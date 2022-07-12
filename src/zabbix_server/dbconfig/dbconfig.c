@@ -153,8 +153,8 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			
 			if (nextcheck <= time(NULL)) {
 				LOG_INF("Doing full SYNC");
-				//sync_type = ZBX_DBSYNC_UPDATE;
-				sync_type = ZBX_DBSYNC_INIT;
+				sync_type = ZBX_DBSYNC_UPDATE;
+				//sync_type = ZBX_DBSYNC_INIT;
 				nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 			} else {
 				LOG_INF("Doing diff SYNC");
