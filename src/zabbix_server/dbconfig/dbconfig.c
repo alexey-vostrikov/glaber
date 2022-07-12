@@ -27,6 +27,7 @@
 #include "dbcache.h"
 #include "../../libs/zbxdbcache/changeset.h"
 #include "../glb_poller/glb_poller.h"
+#include "../../libs/apm/apm.h"
 
 extern int		CONFIG_CONFSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
@@ -110,6 +111,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	
 	DCsync_configuration(ZBX_DBSYNC_INIT);
 	nextcheck = time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
+	apm_add_heap_usage();
 	
 	while (ZBX_IS_RUNNING())
 	{
@@ -133,6 +135,8 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			
 			zbx_sleep_loop(1);
 			//DC_dump_cache_stats();
+			apm_update_heap_usage();
+			apm_flush();
 		}
 		
 		zbx_setproctitle("%s [update: syncing configuration; last sync in %d sec]", get_process_type_string(process_type), sec);

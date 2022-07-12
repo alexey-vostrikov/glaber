@@ -28,6 +28,7 @@
 #include "dbcache.h"
 #include "dbsyncer.h"
 #include "export.h"
+#include "../../libs/apm/apm.h"
 
 extern int		CONFIG_HISTSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
@@ -133,6 +134,8 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
 		zbx_problems_export_init("history-syncer", process_num);
 
+	apm_add_heap_usage();
+	
 	for (;;)
 	{
 		sec = zbx_time();
@@ -192,6 +195,8 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		//usleep(20000);
 		//if (sleeptime >0 ) zabbix_log(LOG_LEVEL_INFORMATION, "In %s() history_num: sleeping %d sec", __func__, sleeptime);
 		zbx_sleep_loop(sleeptime);
+		apm_update_heap_usage();
+		apm_flush();
 	}
 
 	/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */

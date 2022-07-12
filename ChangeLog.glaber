@@ -1,3 +1,5 @@
+ver 2.11.21
+    - added timing debug on config cache reload
 ver 2.11.20
     - fix: snmp positive items are now converted to ui64 instead of float,
     fixed bug leading to crash on debugging SNMP FAILed item
