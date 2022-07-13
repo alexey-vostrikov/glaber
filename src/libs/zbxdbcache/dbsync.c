@@ -2401,7 +2401,7 @@ int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync, mem_funcs_t *memf,
  ******************************************************************************/
 static int	dbsync_compare_function(const ZBX_DC_FUNCTION *function, const DB_ROW dbrow)
 {
-	if (FAIL == dbsync_compare_uint64(dbrow[0], function->itemid))
+	if (FAIL == dbsync_compare_uint64(dbrow[1], function->itemid))
 		return FAIL;
 
 	if (FAIL == dbsync_compare_uint64(dbrow[4], function->triggerid))
@@ -2472,7 +2472,7 @@ int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync)
 	DB_RESULT		result;
 	
 	if (NULL == (result = DBselect(
-			"select i.itemid,f.functionid,f.name,f.parameter,t.triggerid,i.hostid"
+			"select f.functionid,i.itemid,f.name,f.parameter,t.triggerid,i.hostid"
 			" from hosts h,items i,triggers t, functions f"
 			" %s"
 			" where h.hostid=i.hostid"
@@ -2488,7 +2488,7 @@ int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync)
 	{
 		return FAIL;
 	}
-	return glb_dbsync_compare(sync, result, 6, &dbsync_env.cache->functions, 
+	return glb_dbsync_compare_debug(sync, result, 6, &dbsync_env.cache->functions, 
 		(cmp_func_t) dbsync_compare_function, dbsync_function_preproc_row, OBJ_FUNCTIONS, "functions" );
 }
 
