@@ -2488,7 +2488,7 @@ int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync)
 	{
 		return FAIL;
 	}
-	return glb_dbsync_compare_debug(sync, result, 6, &dbsync_env.cache->functions, 
+	return glb_dbsync_compare(sync, result, 6, &dbsync_env.cache->functions, 
 		(cmp_func_t) dbsync_compare_function, dbsync_function_preproc_row, OBJ_FUNCTIONS, "functions" );
 }
 
