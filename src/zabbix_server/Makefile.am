@@ -24,7 +24,8 @@ SUBDIRS = \
 	availability \
 	lld \
 	reporter \
-	glb_poller
+	glb_poller \
+	tests
 
 sbin_PROGRAMS = zabbix_server
 
@@ -70,6 +71,7 @@ zabbix_server_LDADD = \
 	scripts/libzbxscripts.a \
 	preprocessor/libpreprocessor.a \
 	availability/libavailability.a \
+	tests/libservertests.a \
 	$(top_builddir)/src/libs/zbxembed/libzbxembed.a \
 	$(top_builddir)/src/libs/zbxxml/libzbxxml.a \
 	poller/libzbxpoller_server.a \
@@ -94,6 +96,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
 	$(top_builddir)/src/libs/zbxalgo/libzbxalgo.a \
+	$(top_builddir)/src/libs/zbxalgo/tests/libalgotests.a \
 	$(top_builddir)/src/libs/zbxsys/libzbxsys.a \
 	$(top_builddir)/src/libs/zbxconf/libzbxconf.a \
 	$(top_builddir)/src/libs/zbxmedia/libzbxmedia.a \

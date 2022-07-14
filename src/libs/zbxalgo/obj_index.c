@@ -6,6 +6,12 @@
 #include "zbxalgo.h"
 #include "log.h"
 
+struct obj_index_t{
+    elems_hash_t *from_to;
+    elems_hash_t *to_from;
+    mem_funcs_t memf;
+} ;
+
 typedef struct {
     zbx_vector_uint64_t refs;
  } ref_id_t;
@@ -16,9 +22,10 @@ static int ref_free_callback(elems_hash_elem_t *elem, mem_funcs_t *memf) {
 
     zbx_vector_uint64_destroy(&ref->refs);
     (*memf->free_func)(ref);
-
+   // LOG_INF("Releasing elemnt idx for %ld", elem->id);
     return SUCCEED;
 }
+
 
 ELEMS_CREATE(ref_create_callback) {
    
@@ -29,21 +36,21 @@ ELEMS_CREATE(ref_create_callback) {
     return SUCCEED;
 }
 
-int obj_index_init(obj_index_t *idx, mem_funcs_t *memf) {
-        
-    if (NULL == idx) 
-        return FAIL;
-        
+obj_index_t *obj_index_init(mem_funcs_t *memf) {
+   
+    obj_index_t *idx = memf->malloc_func(NULL, sizeof(obj_index_t));
+       
     idx->from_to = elems_hash_init(memf, ref_create_callback, ref_free_callback);
     idx->to_from = elems_hash_init(memf, ref_create_callback, ref_free_callback);
 
     idx->memf = *memf;
-    return SUCCEED;
+    return idx;
 }
 
 void obj_index_destroy(obj_index_t *idx) {
-
+    LOG_INF("Destroying obj index, from->to");
     elems_hash_destroy(idx->from_to);
+    LOG_INF("Destroying obj index, to->from");
     elems_hash_destroy(idx->to_from);    
         
     (*idx->memf.free_func)(idx);
@@ -69,8 +76,10 @@ static int del_ref_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *pa
     
     zbx_vector_uint64_remove(&ref->refs, i);
     
-    if (0 == ref->refs.values_num) 
+    if (0 == ref->refs.values_num) {
+       // zbx_vector_uint64_destroy(&ref->refs);
         elem->flags |= ELEM_FLAG_DELETE;
+    }
 }
 
 static int get_refs_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params) {
@@ -156,12 +165,14 @@ int obj_index_clear_index(obj_index_t *idx) {
 }
 
 int obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx) {
-   // LOG_INF("Replacing old_idx from to, the new idx memf is %ld", new_idx->memf.free_func);
+    LOG_INF("Replacing old_idx from to, the new idx memf is %ld", new_idx->memf.free_func);
     elems_hash_replace(old_idx->from_to, new_idx->from_to);
-  //  LOG_INF("Replacing old_idx to from");
+    LOG_INF("Replacing old_idx to from");
     elems_hash_replace(old_idx->to_from, new_idx->to_from);
+    LOG_INF("Freeing new idx");
     //after replacenent idx of new will be freed, so we just have to free the struct
     (*new_idx->memf.free_func)(new_idx);
+    LOG_INF("Finished replace");
 }
 
 static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params) {
@@ -192,28 +203,6 @@ void obj_index_dump(obj_index_t *idx) {
     elems_hash_iterate(idx->to_from, id_to_vector_dump_cb, NULL, 0);
 }
 
-
-/*
-static int check_hash_has_ref(zbx_hashset_t *hash, u_int64_t id_from, u_int64_t id_to) {
-    int i;
-    
-    ref_id_t *ref = (ref_id_t *)zbx_hashset_search(hash, &id_from);
-    
-    if (NULL == ref) 
-        return FAIL;
-    
-    if (FAIL ==(i = zbx_vector_uint64_bsearch(&hash, id_to, ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
-        return FAIL;
-    
-    return SUCCEED;
+int obj_index_get_numdata(obj_index_t *idx) {
+    return idx->from_to->elems.num_data;
 }
-
-int obj_index_check_if_refers(obj_index_t *idx, u_int64_t id_from, u_int64_t id_to) {
-    return check_hash_has_ref(idx->from_to, id_from, id_to);
-}
-
-int obj_index_check_if_referedby(obj_index_t *idx, u_int64_t id_to, u_int64_t id_from) {
-    return check_hash_has_ref(idx->to_from, id_to, id_from);
-}
-
-*/

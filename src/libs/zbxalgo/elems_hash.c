@@ -1,52 +1,39 @@
-
-/****************** GNU GPL2 copyright goes here ***********************/
+/*
+** Glaber
+** Copyright (C) 2018-2042 Glaber
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
 #include "zbxalgo.h"
 #include "glb_lock.h"
 #include "log.h"
 
-//this implementation of low locking hashes for string cached data
-//it allows simultanios items change
-//items add/removal are still required locking, so the algo should be used only
-//for slow-changing structure (however elemnt's data might change really fast)
-
-//it works on top of zabbix hashes with per-element locks
-//provides several primitives:
-
-//add,update,delete call-back based functions
-//and iterator to process all the elements
-
-
-//elems_hash_t *elems_hash_init_ext(mem_funcs_t *memf, 
-//                    elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func,
-//                    zbx_compare_func_t compare_func, zbx_hash_func_t hash_func) {
-    
-//    elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
-    
-//    zbx_hashset_create_ext(&e_hash->elems, 10, hash_func, compare_func, NULL, 
-//                            memf->malloc_func, memf->realloc_func, memf->free_func); 
-    
-//    e_hash->elem_create_func = create_func;
-//    e_hash->elem_free_func = free_func;
-    
-//    glb_rwlock_init(&e_hash->meta_lock);
-//    e_hash->memf = *memf;
-  
-//    return e_hash;
-//}
-
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
-       elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
     
-    zbx_hashset_create_ext(&e_hash->elems, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC, NULL, 
+    elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
+    
+    zbx_hashset_create_ext(&e_hash->elems, 0, ZBX_DEFAULT_UINT64_HASH_FUNC,
+            ZBX_DEFAULT_UINT64_COMPARE_FUNC, NULL, 
                             memf->malloc_func, memf->realloc_func, memf->free_func); 
-    
+  
     e_hash->elem_create_func = create_func;
     e_hash->elem_free_func = free_func;
     
     glb_rwlock_init(&e_hash->meta_lock);
     e_hash->memf = *memf;
- 
-    return e_hash;
+     return e_hash;
 }
 
 
@@ -62,21 +49,18 @@ void elems_hash_destroy(elems_hash_t *elems) {
     
     zbx_hashset_iter_t iter;
     elems_hash_elem_t *elem;
-    //LOG_INF("About to iter init");
+   
     zbx_hashset_iter_reset(&elems->elems, &iter);
     
-  //  LOG_INF("Starting while, total elements to delete %d",elems->elems.num_data);
-    while ( NULL != (elem = (elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) {
-    //    LOG_INF("Colling delete element for elem id %ld", elem->id);
-        delete_element(elems, elem);
-    //    LOG_INF("Returned from element for elem id %ld", elem->id);
-    }
-   // LOG_INF("destroy the hash");
+    LOG_INF("Starting while, total elements to delete %d",elems->elems.num_data);
+ 
+    while ( NULL != (elem = (elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) 
+        (*elems->elem_free_func)(elem, &elems->memf);
+   
+    
     zbx_hashset_destroy(&elems->elems);
-   // LOG_INF("free myself, free func addr is %ld", elems->memf.free_func);
+   
     (*elems->memf.free_func)(elems);
-  //  LOG_INF("finished");
-
 }
 
 
@@ -182,30 +166,18 @@ int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
 
 }
 
-
 void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
    
-    //LOG_INF("in  : destroying old hset, new elem's memf addr is %ld", new_elems->memf.free_func);
     zbx_hashset_t tmp_hset;
-    //LOG_INF("in locking old elems");
-    glb_rwlock_wrlock(&old_elems->meta_lock);
-    //LOG_INF("in locking new elems");
-    glb_rwlock_wrlock(&new_elems->meta_lock);
-
-    //LOG_INF("in  copy old hset -> tmp hset");
-    memcpy(&tmp_hset, &old_elems->elems, sizeof(zbx_hashset_t));
-   // LOG_INF("in : copy new hset -> old hset");
-    memcpy(&old_elems->elems, &new_elems->elems,sizeof(zbx_hashset_t));
-   // LOG_INF("in  : destroying old hset, new elem's memf addr is %ld", new_elems->memf.free_func);
-   // LOG_INF("in : copy tmp hset -> new hset");
-    memcpy(&new_elems->elems, &tmp_hset, sizeof(zbx_hashset_t));
-    //LOG_INF("in  : destroying old hset, new elem's memf addr is %ld", new_elems->memf.free_func);
-    //LOG_INF("in : unlocking old hset");
-    glb_rwlock_unlock(&old_elems->meta_lock);
     
-    //LOG_INF("in  : destroying old hset, new elem's memf addr is %ld", new_elems->memf.free_func);
+    glb_rwlock_wrlock(&old_elems->meta_lock);
+    glb_rwlock_wrlock(&new_elems->meta_lock);
+    memcpy(&tmp_hset, &old_elems->elems, sizeof(zbx_hashset_t));
+    memcpy(&old_elems->elems, &new_elems->elems,sizeof(zbx_hashset_t));
+    memcpy(&new_elems->elems, &tmp_hset, sizeof(zbx_hashset_t));
+    glb_rwlock_unlock(&old_elems->meta_lock);
     elems_hash_destroy(new_elems);
-    //LOG_INF("finished destroy");
+  
 }   
 
 //iterator will continue till all data or till proc_func returns SUCCEED

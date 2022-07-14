@@ -557,14 +557,8 @@ void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
 int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
 
-typedef struct {
-    elems_hash_t *from_to;
-    elems_hash_t *to_from;
-    mem_funcs_t memf;
-} obj_index_t;
-
-
-int	obj_index_init(obj_index_t* idx, mem_funcs_t *memf);
+typedef struct obj_index_t obj_index_t;
+obj_index_t* obj_index_init(mem_funcs_t *memf);
 
 void	obj_index_destroy(obj_index_t *idx);
 int		obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
@@ -575,6 +569,7 @@ int		obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint6
 int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
 int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
 void 	obj_index_dump(obj_index_t *idx);
+int 	obj_index_get_numdata(obj_index_t *idx);
 
 //memfunction based strpool funcs with lockings to avoid contention
 typedef struct {

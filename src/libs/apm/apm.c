@@ -113,12 +113,12 @@ void apm_add_str_label(void *metric_ptr, const char *key, const char *value) {
         return;
     
     if (NULL == metric->labels) {
-        zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s=%s", key, value);
+        zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s=\"%s\"", key, value);
         metric->labels = zbx_strdup(NULL, buffer);
         return;
     }
     
-    zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s,%s=%s", metric->labels, key, value);
+    zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s,%s=\"%s\"", metric->labels, key, value);
     metric->labels = zbx_strdup(metric->labels, buffer);
 }
 

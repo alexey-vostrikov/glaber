@@ -2033,6 +2033,7 @@ AC_OUTPUT([
 	src/libs/Makefile
 	src/libs/zbxlog/Makefile
 	src/libs/zbxalgo/Makefile
+	src/libs/zbxalgo/tests/Makefile
 	src/libs/zbxmemory/Makefile
 	src/libs/zbxcrypto/Makefile
 	src/libs/zbxconf/Makefile
@@ -2110,6 +2111,7 @@ AC_OUTPUT([
 	src/zabbix_server/preprocessor/Makefile
 	src/zabbix_server/glb_poller/Makefile
 	src/zabbix_server/availability/Makefile
+	src/zabbix_server/tests/Makefile
 	src/zabbix_server/lld/Makefile
 	src/zabbix_server/reporter/Makefile
 	src/zabbix_proxy/Makefile

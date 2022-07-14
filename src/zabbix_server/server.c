@@ -69,6 +69,7 @@
 #include "lld/lld_worker.h"
 #include "reporter/report_manager.h"
 #include "reporter/report_writer.h"
+#include "tests/server_tests.h"
 #include "events.h"
 #include "setproctitle.h"
 #include "zbxcrypto.h"
@@ -1373,6 +1374,14 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zabbix_log(LOG_LEVEL_INFORMATION, "******************************");
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "using configuration file: %s", CONFIG_FILE);
+
+//#define HAVE_TESTS 1
+
+#if defined(HAVE_TESTS)
+	LOG_INF("Running tests");
+	tests_server_run();
+	LOG_INF("Finished tests - SUCCEED");
+#endif
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	if (SUCCEED != zbx_coredump_disable())

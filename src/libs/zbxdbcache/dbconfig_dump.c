@@ -1,5 +1,4 @@
-/*
-** Zabbix
+/** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -274,7 +273,7 @@ static void	DCdump_htmpls(void)
 	int			i, j;
 
 	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __func__);
-	obj_index_dump(&glb_config->host_to_template_idx);
+	obj_index_dump(glb_config->host_to_template_idx);
 	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
@@ -1293,7 +1292,7 @@ void	DCdump_configuration(void)
 	DCdump_prototype_items();
 	DCdump_triggers();
 	//DCdump_trigdeps();
-	obj_index_dump(&glb_config->deptrigger_to_trigger_idx);
+	obj_index_dump(glb_config->deptrigger_to_trigger_idx);
 	DCdump_functions();
 	DCdump_expressions();
 	DCdump_actions();

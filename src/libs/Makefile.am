@@ -65,7 +65,8 @@ SERVER_SUBDIRS = \
 	zbxavailability \
 	glb_state \
 	apm \
-	zbxeval
+	zbxeval \
+	zbxalgo/tests
 else
 if PROXY
 PROXY_SUBDIRS = \

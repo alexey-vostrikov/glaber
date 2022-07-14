@@ -921,10 +921,8 @@ typedef struct
 ZBX_DC_CONFIG;
 
 typedef struct {
-	obj_index_t host_to_template_idx;
-	//obj_index_t item_to_trigger_idx;
-	obj_index_t deptrigger_to_trigger_idx;
-	//elems_hash_t discovery;
+	obj_index_t *host_to_template_idx;
+	obj_index_t *deptrigger_to_trigger_idx;
 	strpool_t strpool;
 } GLB_CONFIG;
 

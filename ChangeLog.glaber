@@ -1,3 +1,9 @@
+ver 2.11.24
+    - fixed config cache memory leaking due to imporper hashset iteration use
+ver 2.11.23
+    - fixed problem with functions syncing leading to memory nd config cache leaking
+ver 2.11.22
+    - reverted 2.11.21, returned UPDATE sync instead of full sync
 ver 2.11.21
     - added timing debug on config cache reload
 ver 2.11.20
