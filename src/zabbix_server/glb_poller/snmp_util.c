@@ -143,15 +143,15 @@ const char* get_octet_string(csnmp_var_t *cvar, unsigned char *string_type)
 	}
 	else if (0 == strncmp(buffer, "BITS: ", 6))
 	{
-		strval_dyn = zbx_strdup(strval_dyn, buffer + 6);
+	//	strval_dyn = zbx_strdup(strval_dyn, buffer + 6);
 		strval_dyn = buffer + 6;
 		type = ZBX_SNMP_STR_BITS;
 	}
 	else
 	{
-		strval_dyn = (char *)zbx_malloc(strval_dyn, val_str->len + 1);
-		memcpy(strval_dyn, val_str->b, val_str->len);
-		strval_dyn[val_str->len] = '\0';
+		strval_dyn = buffer;
+		memcpy(buffer, val_str->b, val_str->len);
+		buffer[val_str->len] = '\0';
 		type = ZBX_SNMP_STR_ASCII;
 	}
 

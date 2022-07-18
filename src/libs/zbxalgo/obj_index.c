@@ -165,14 +165,14 @@ int obj_index_clear_index(obj_index_t *idx) {
 }
 
 int obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx) {
-    LOG_INF("Replacing old_idx from to, the new idx memf is %ld", new_idx->memf.free_func);
+   // LOG_INF("Replacing old_idx from to, the new idx memf is %ld", new_idx->memf.free_func);
     elems_hash_replace(old_idx->from_to, new_idx->from_to);
-    LOG_INF("Replacing old_idx to from");
+//    LOG_INF("Replacing old_idx to from");
     elems_hash_replace(old_idx->to_from, new_idx->to_from);
-    LOG_INF("Freeing new idx");
+  //  LOG_INF("Freeing new idx");
     //after replacenent idx of new will be freed, so we just have to free the struct
     (*new_idx->memf.free_func)(new_idx);
-    LOG_INF("Finished replace");
+//    LOG_INF("Finished replace");
 }
 
 static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params) {

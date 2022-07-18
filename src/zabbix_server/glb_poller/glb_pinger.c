@@ -223,7 +223,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     zbx_json_type_t type;
     u_int64_t mstime = glb_ms_time();
     
-  //  LOG_INF("In %s: starting", __func__);
+    //LOG_INF("In %s: start", __func__);
        
     char itemid_s[MAX_ID_LEN], ip[MAX_ID_LEN], rtt_s[MAX_ID_LEN];
     u_int64_t itemid_l;
@@ -311,7 +311,7 @@ int subscribe_worker_fd() {
 static int send_icmp_packet(poller_item_t *poller_item) {
     
     char request[MAX_STRING_LEN];
-    static int last_worker_fd = 0;
+    static int last_worker_pid = 0;
 
     u_int64_t now = glb_ms_time();
     LOG_DBG("In %s() Started", __func__);
@@ -333,10 +333,10 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     pinger_item->sent++;
  //   pinger_item->lastpacket_sent = now;
 
-    if (last_worker_fd != worker_get_fd_from_worker(conf.worker)) {
-        LOG_DBG("glbmap worker's FD is changed, subscibing the new FD");
-        last_worker_fd = worker_get_fd_from_worker(conf.worker);
-        subscribe_worker_fd(last_worker_fd);
+    if (last_worker_pid != worker_get_pid(conf.worker)) {
+        LOG_INF("glbmap worker's PID is changed, subscibing the new FD");
+        last_worker_pid = worker_get_pid(conf.worker);
+        subscribe_worker_fd(worker_get_fd_from_worker(conf.worker));
     }
     
     zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);

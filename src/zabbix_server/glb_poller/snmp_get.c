@@ -49,6 +49,7 @@ int snmp_get_send_request(poller_item_t *poller_item) {
 	/*note: intentionally do not return item to the poller, item is broken anyaway*/
 	if (FAIL == snmp_item_oid_to_asn(snmp_item->oid, &oid)) {
 	 	poller_preprocess_error(poller_item, "Cannot parse oid");
+		csnmp_free_pdu(&pdu);
 	 	return FAIL;
 	}
     

@@ -98,8 +98,7 @@ ext_worker_t *glb_init_worker(char *config_line)
     ext_worker_t *worker = NULL;
 
     path[0] = 0;
- 
-    buff[0] = 0;
+     buff[0] = 0;
 
     struct zbx_json_parse jp, jp_config;
 
@@ -178,7 +177,7 @@ static int restart_worker(ext_worker_t *worker)
     unsigned int now=time(NULL);
 
     if (worker->last_start + CONFIG_TIMEOUT > now) {
-        LOG_INF("Not restarting, waiting for %d seconds till restart", CONFIG_TIMEOUT);
+        LOG_INF("Not restarting, waiting for %d seconds till restart", now - (CONFIG_TIMEOUT + worker->last_start));
         return FAIL;
     }
 
@@ -203,9 +202,12 @@ static int restart_worker(ext_worker_t *worker)
     if ( worker->pid > 0  && !kill(worker->pid, 0))
     {
         int exitstatus;
+        
         LOG_INF( "Killing old worker instance pid %d", worker->pid);
+        
         kill(worker->pid, SIGINT);
-        waitpid(worker->pid, &exitstatus,WNOHANG);
+        waitpid(worker->pid, &exitstatus, WNOHANG);
+
         zabbix_log(LOG_LEVEL_INFORMATION, "Waitpid returned %d", exitstatus);
         
     }
@@ -346,9 +348,12 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "%s worker %s pid %d exceeded number of requests (%d), restarting it",
                    __func__, worker->path, worker->pid, worker->max_calls);
+        
+        worker->calls = 0;
         if (SUCCEED != restart_worker(worker)) 
             return FAIL;
         zabbix_log(LOG_LEVEL_INFORMATION, "%s: worker restarted, new pid is %d", __func__, worker->pid);
+   
     };
 
     if (SUCCEED != worker_is_alive(worker))
@@ -430,6 +435,11 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
 int worker_get_fd_from_worker(ext_worker_t *worker) {
     return worker->pipe_from_worker;
 }
+int worker_get_pid(ext_worker_t *worker) {
+    return worker->pid;
+}
+
+
 /*
 
 /****************************************************************

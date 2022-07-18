@@ -30,7 +30,9 @@ void glb_destroy_worker(ext_worker_t *runner);
 int glb_escape_worker_string(char *in_string, char *out_buffer);
 int glb_init_external_workers(char **workers_cfg, char *scriptdir);
 int glb_process_worker_params(ext_worker_t *worker, char *params_buf);
+
 int worker_get_fd_from_worker(ext_worker_t *worker);
+int worker_get_pid(ext_worker_t *worker);
 
 ext_worker_t* glb_get_worker_script(char *cmd);
 
