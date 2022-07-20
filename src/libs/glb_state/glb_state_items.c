@@ -711,7 +711,6 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
     if (-1 == head_idx)
     {
         count_db_requests();
-        // LOG_INF("%ld: Requesting item from the DB by time %d->%d", req->ts_head, now);
         DEBUG_ITEM(elem->id, "Requesting item from the DB by time %d->%d", req->ts_head, now);
                 
         if (FAIL == glb_state_fetch_from_db_by_time(req->itemid, elm, now - req->ts_head, now, now))
@@ -898,26 +897,22 @@ int add_value_lld_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data) {
     
     //for lld-based items need to store only one element
     if (glb_tsbuff_get_size(&elm->tsbuff) != 1) {
-  //      LOG_INF("Resizing LLD tsdb buffer to size %d -> 1 for item %ld", glb_tsbuff_get_size(&elm->tsbuff), h->itemid);
         glb_tsbuff_resize(&elm->tsbuff, 1 , memf->malloc_func, memf->free_func, NULL);
     }
 
-//    LOG_INF("Clearing existing data");
     while (1 <= glb_tsbuff_get_count(&elm->tsbuff) ) {
         c_val = glb_tsbuff_get_value_tail(&elm->tsbuff);
         item_variant_clear(&c_val->value);
         glb_tsbuff_free_tail(&elm->tsbuff);
-  //      LOG_INF("LLD Cleared and removed item %ld", h->itemid);
+  
     }
 
-//    LOG_INF("Adding new data");
 
     if (NULL != (c_val = (glb_state_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
     {
         dc_hist_to_value(c_val, h);
         elm->value_type = h->value_type;
         DEBUG_ITEM(elem->id, "Item added to LLD, oldest timestamp is %ld", glb_tsbuff_get_time_tail(&elm->tsbuff));
-  //      LOG_INF("Item %ld added to LLD, oldest timestamp is %ld", elem->id,  glb_tsbuff_get_time_tail(&elm->tsbuff));
     }
     else
     {
