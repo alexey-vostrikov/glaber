@@ -277,9 +277,11 @@ void static glb_agent_handle_timeout(agent_connection_t *conn) {
 			return;
 			
 
-		if (NULL == (poller_item = poller_get_poller_item(conn->current_item))) 
+		if (NULL == (poller_item = poller_get_poller_item(conn->current_item))) {
+			conn->state = POLL_FREE;
 			return;
-
+		}
+		
 		itemid = poller_get_item_id(poller_item);
 		
 		poller_register_item_timeout(poller_item);
