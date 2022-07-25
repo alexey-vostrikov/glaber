@@ -67,8 +67,6 @@ class CJsonRpc {
 		}
 
 		foreach (zbx_toArray($this->_jsonDecoded) as $call) {
-			error_log("Executing call to rpc");
-			error_log(print_r($call,true));
 			
 			if (!$this->validate($call)) {
 				continue;
