@@ -89,7 +89,6 @@ class CJsonRpc {
 			
 			return json_encode(array_values(array_filter($this->_response)), JSON_UNESCAPED_SLASHES);
 		}
-		//error_log(print_r($this->_response,true));
 		return ($this->_response[0] !== null) ? json_encode($this->_response[0], JSON_UNESCAPED_SLASHES) : '';
 	}
 

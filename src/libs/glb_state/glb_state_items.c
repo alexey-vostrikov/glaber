@@ -1398,12 +1398,12 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
         if ( FAIL != elems_hash_process(state->items, itemids->values[i], item_get_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE) ) {
 
             zbx_json_addobject(json,NULL);
-			zbx_json_adduint64(json,"itemid",itemids->values[i]);
-            zbx_json_adduint64(json,"lastdata", req.meta->lastdata);
-            zbx_json_adduint64(json,"nextcheck", req.meta->nextcheck);
-            zbx_json_adduint64(json,"state", req.meta->state);
-            
-            if (NULL != req.meta->error)
+			zbx_json_adduint64string(json,"itemid",itemids->values[i]);
+            zbx_json_adduint64string(json,"lastdata", req.meta->lastdata);
+            zbx_json_adduint64string(json,"nextcheck", req.meta->nextcheck);
+            zbx_json_adduint64string(json,"state", req.meta->state);
+        
+            if (NULL != req.meta->error && strlen(req.meta->error) > 0)
                 zbx_json_addstring(json,"error",req.meta->error,ZBX_JSON_TYPE_STRING );
 
             zbx_json_close(json);

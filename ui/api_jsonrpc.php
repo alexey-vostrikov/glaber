@@ -50,7 +50,7 @@ require_once dirname(__FILE__).'/include/classes/core/APP.php';
 
 header('Content-Type: application/json');
 $data = $http_request->body();
-
+//file_put_contents('/tmp/glaber_api', $data."\n", FILE_APPEND | LOCK_EX);
 try {
 	APP::getInstance()->run(APP::EXEC_MODE_API);
 
@@ -60,7 +60,10 @@ try {
 	API::setWrapper();
 
 	$jsonRpc = new CJsonRpc($apiClient, $data);
-	echo $jsonRpc->execute();
+	
+	$responce = $jsonRpc->execute();
+//	file_put_contents('/tmp/glaber_api', $responce."\n\n", FILE_APPEND | LOCK_EX);
+	echo $responce;
 }
 catch (Exception $e) {
 	// decode input json request to get request's id

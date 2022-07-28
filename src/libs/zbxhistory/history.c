@@ -739,16 +739,16 @@ history_value_t	history_str2value(char *str, unsigned char value_type)
 int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_history_record_t *record, struct zbx_json *json) {
 			
 	zbx_json_addobject(json,NULL);
-	zbx_json_addint64 (json, "itemid", itemid);
-	zbx_json_addint64 (json,"clock", record->timestamp.sec);
-	zbx_json_addint64 (json,"ns", record->timestamp.ns);
+	zbx_json_adduint64string (json, "itemid", itemid);
+	zbx_json_addint64string (json,"clock", record->timestamp.sec);
+	zbx_json_addint64string (json,"ns", record->timestamp.ns);
 	
 	switch (value_type) {
 		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_json_addfloat(json,"value", record->value.dbl);
+			zbx_json_addfloatstring(json,"value", record->value.dbl);
 		 	break;
 		case ITEM_VALUE_TYPE_UINT64:
-			zbx_json_adduint64(json,"value", record->value.ui64);
+			zbx_json_adduint64string(json,"value", record->value.ui64);
 			break;
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:

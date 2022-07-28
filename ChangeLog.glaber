@@ -1,3 +1,7 @@
+ver 2.11.27
+    - fixed API compatability issues that where causing issues with some versions of Grafana (#89, #65)
+ver 2.11.26
+    - fix in async poller that left conncetions stucked under some conditions
 ver 2.11.25
     - fixed glb_pinger to renew fd subscription on worker restart, fixed two sources of leak in snmp module
 ver 2.11.24
