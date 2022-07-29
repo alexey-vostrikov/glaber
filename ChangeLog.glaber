@@ -1,3 +1,5 @@
+ver 2.11.29
+    - added default DNS timeout 1sec, disabled hostname randomization.
 ver 2.11.28
     - changeset is disabled in API/ui/php as causing sql errors with mysql
 ver 2.11.27

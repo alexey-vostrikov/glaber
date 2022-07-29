@@ -124,9 +124,12 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 		return;
 	
 	if (DNS_ERR_NONE != result) {
+		char buff[MAX_STRING_LEN];
 
 		DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
-		poller_preprocess_error(poller_item, "Couldn't resolve item's hostname");
+		zbx_snprintf(buff, MAX_STRING_LEN, "Couldn't resolve item's hostname, errcode is %d, returned %d records", result, count);
+		poller_preprocess_error(poller_item, buff);
+		poller_return_item_to_queue(poller_item);
 	
 		return;
 	}
@@ -173,7 +176,9 @@ void poller_async_loop_stop() {
 void poller_async_loop_init() {
  	conf.events_base = event_base_new();
 	conf.evdns_base = evdns_base_new(conf.events_base, EVDNS_BASE_DISABLE_WHEN_INACTIVE | 	EVDNS_BASE_INITIALIZE_NAMESERVERS );
-	
+
 	evdns_base_resolv_conf_parse(conf.evdns_base, DNS_OPTIONS_ALL, "/etc/resolv.conf");
 	event_base_priority_init(conf.events_base, 2);
+	evdns_base_set_option(conf.evdns_base,"timeout","1000");
+	evdns_base_set_option(conf.evdns_base, "randomize-case", "0");
 }
