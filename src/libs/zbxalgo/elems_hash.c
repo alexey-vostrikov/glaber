@@ -180,11 +180,7 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
   
 }   
 
-//iterator will continue till all data or till proc_func returns SUCCEED
-//TODO: implement readlocked version
-//this one might be quite expensive
-
-int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags) {
+int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params) {
    
     elems_hash_elem_t *elem;
     int last_ret = SUCCEED;

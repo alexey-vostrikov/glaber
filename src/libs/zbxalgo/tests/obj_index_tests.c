@@ -25,8 +25,8 @@ static  zbx_mem_info_t	*shmtest_mem;
 ZBX_MEM_FUNC_IMPL(__shmtest, shmtest_mem);
 
 #define TEST_MEM_SIZE 1 * ZBX_GIBIBYTE
-#define TEST_RECORDS 10000
-#define TEST_ELEMS 50
+#define TEST_RECORDS 100000
+#define TEST_ELEMS 5000
 
 static int test_shm_leak(void) {
     char *error = NULL;
@@ -54,10 +54,7 @@ static int test_shm_leak(void) {
     }
    
    LOG_INF("After adding records free space is %ld", shmtest_mem->free_size);
-    
-  //  for (i=0; i< TEST_RECORDS; i++) {
-  //      obj_index_del_id_from(idx, i);
-  //  }    
+ 
    
     obj_index_destroy(idx);
     LOG_INF("After removing records free space is %ld", shmtest_mem->free_size);
@@ -96,12 +93,49 @@ static int test_shm_leak(void) {
         exit(EXIT_FAILURE);
     } else 
         LOG_INF("Records replace TEST OK");
+    LOG_INF("Testing obj_index_update");
+    
+    obj_index_t *idx_shmem = obj_index_init(&memf);
+    obj_index_t *idx_local = obj_index_init(NULL);
+    
+    for (i = 0; i< TEST_RECORDS; i++) {
+        obj_index_add_ref(idx_local,i,i*23);
+    }    
+    LOG_INF("Updating 1");
+    obj_index_update(idx_shmem, idx_local);
+    LOG_INF("Updating 1 finished");
+    LOG_INF("Updating 1 -same data");
+    obj_index_update(idx_shmem, idx_local);
+    LOG_INF("Updating 1 -same data - finished");
 
+    obj_index_destroy(idx_local);
+    idx_local = obj_index_init(NULL);
+
+    for (i = 0; i< TEST_RECORDS; i++) {
+        obj_index_add_ref(idx_local,i,i*2);
+    }    
+    LOG_INF("Updating 2");
+    obj_index_update(idx_shmem, idx_local);
+    LOG_INF("Updating 2 - finished");
+    obj_index_destroy(idx_local);
+    obj_index_destroy(idx_shmem);
+    
+    if (was_free !=  shmtest_mem->free_size) {
+        
+        LOG_INF("Obj update leak is detected, %d bytes is lost, TEST FAILED",
+            was_free - shmtest_mem->free_size );
+        
+        exit(EXIT_FAILURE);
+    } else 
+        LOG_INF("Records update TEST OK");
+    
+    LOG_INF("Finished testing obj_index_update");
     LOG_INF("Finished shared memory leak test");
 }
 
 void tests_obj_index_run() {
     LOG_INF("Running obj index tests");
     test_shm_leak();
+    
     LOG_INF("Finished obj index tests");
 }
