@@ -181,5 +181,5 @@ void poller_async_loop_init() {
 	event_base_priority_init(conf.events_base, 2);
 	evdns_base_set_option(conf.evdns_base,"timeout","100");
 	evdns_base_set_option(conf.evdns_base, "randomize-case", "0");
-	evdns_base_set_option(conf.evdns_base,"max-inflight","64000");
+//	evdns_base_set_option(conf.evdns_base,"max-inflight","64000");
 }
