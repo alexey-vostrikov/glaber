@@ -1,3 +1,5 @@
+ver 2.11.30
+    - fixed DNS timeout to 100ms, 64k inflight requests
 ver 2.11.29
     - added default DNS timeout 1sec, disabled hostname randomization.
 ver 2.11.28
