@@ -1,3 +1,6 @@
+ver 2.11.32
+    - fixes: inmproper type set on items load caused value cache per item reset on first item arrival. Changed items where not updated in the async poller. 
+             Async poller dns wait time changed to 4 seconds
 ver 2.11.30
     - fixed DNS timeout to 100ms, 64k inflight requests
 ver 2.11.29
