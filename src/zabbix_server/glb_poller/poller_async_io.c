@@ -179,7 +179,6 @@ void poller_async_loop_init() {
 
 	evdns_base_resolv_conf_parse(conf.evdns_base, DNS_OPTIONS_ALL, "/etc/resolv.conf");
 	event_base_priority_init(conf.events_base, 2);
-	evdns_base_set_option(conf.evdns_base,"timeout","100");
+	evdns_base_set_option(conf.evdns_base,"timeout","4");
 	evdns_base_set_option(conf.evdns_base, "randomize-case", "0");
-//	evdns_base_set_option(conf.evdns_base,"max-inflight","64000");
 }

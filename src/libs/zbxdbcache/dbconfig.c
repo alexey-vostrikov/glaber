@@ -3951,8 +3951,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 	
 	if (row_count > 0) 
 		config->last_items_change = time(NULL);
-//	LOG_INF("Dcsync_items finished, template items %d, discovered %d, total %d", temp_count, discovered_count, row_count);
-//	exit(-1);
+
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 

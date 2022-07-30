@@ -25,8 +25,8 @@ static  zbx_mem_info_t	*shmtest_mem;
 ZBX_MEM_FUNC_IMPL(__shmtest, shmtest_mem);
 
 #define TEST_MEM_SIZE 1 * ZBX_GIBIBYTE
-#define TEST_RECORDS 100000
-#define TEST_ELEMS 5000
+#define TEST_RECORDS 1000
+#define TEST_ELEMS 50
 
 static int test_shm_leak(void) {
     char *error = NULL;
@@ -105,6 +105,7 @@ static int test_shm_leak(void) {
     obj_index_update(idx_shmem, idx_local);
     LOG_INF("Updating 1 finished");
     LOG_INF("Updating 1 -same data");
+
     obj_index_update(idx_shmem, idx_local);
     LOG_INF("Updating 1 -same data - finished");
 
@@ -117,10 +118,11 @@ static int test_shm_leak(void) {
     LOG_INF("Updating 2");
     obj_index_update(idx_shmem, idx_local);
     LOG_INF("Updating 2 - finished");
+    
     obj_index_destroy(idx_local);
     obj_index_destroy(idx_shmem);
     
-    if (was_free !=  shmtest_mem->free_size) {
+    if (was_free != shmtest_mem->free_size) {
         
         LOG_INF("Obj update leak is detected, %d bytes is lost, TEST FAILED",
             was_free - shmtest_mem->free_size );
@@ -136,6 +138,5 @@ static int test_shm_leak(void) {
 void tests_obj_index_run() {
     LOG_INF("Running obj index tests");
     test_shm_leak();
-    
     LOG_INF("Finished obj index tests");
 }

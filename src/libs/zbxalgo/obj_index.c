@@ -52,9 +52,9 @@ obj_index_t *obj_index_init(mem_funcs_t *memf) {
 }
 
 void obj_index_destroy(obj_index_t *idx) {
-    LOG_INF("Destroying obj index, from->to");
+  //  LOG_INF("Destroying obj index, from->to");
     elems_hash_destroy(idx->from_to);
-    LOG_INF("Destroying obj index, to->from");
+//    LOG_INF("Destroying obj index, to->from");
     elems_hash_destroy(idx->to_from);    
         
     (*idx->memf.free_func)(idx);
@@ -198,26 +198,26 @@ int obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx) {
 }
 
 
-//ELEMS_CALLBACK(update_array_call)
+static void update_vector(zbx_vector_uint64_t * vector, zbx_vector_uint64_t * new_vector) {
+    zbx_vector_uint64_clear(vector);
+    zbx_vector_uint64_append_array(vector, new_vector->values, new_vector->values_num);
+    zbx_vector_uint64_sort(vector, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+}
 
 
-//ELEMS_CALLBACK(update_idx_cb) { 
-//    elems_hash_t *new_data = data;
-//    zbx_vector_uint64_t *old_ids = elem->data;
-//    if (FAIL == elems_hash_process(new_data, elem->id, update_ids_array_cb, old_ids, ELEM_FLAG_DO_NOT_CREATE)) {
-        //no new data 
+ELEMS_UPDATE(update_func_cb) {
+    ref_id_t *ref = elem->data, *new_ref = elem_new->data;
+    
+    update_vector(&ref->refs, &new_ref->refs);
+}
 
-//    }
-//}
-
-// int obj_index_update(obj_index_t *old_idx, obj_index_t *new_idx) {
-//     LOG_INF("Doing index update");
-//     elems_hash_iterate(old_idx->from_to, update_idx_cb, new_idx->from_to);
-//     elems_hash_iterate(old_idx->to_from, update_idx_cb, new_idx->to_from);
-//     HALT_HERE("Not impmlemented yet");
-
-// }
-
+int obj_index_update(obj_index_t *idx, obj_index_t *new_idx) {
+   // LOG_INF("Calling elems hash update for from->to");
+    elems_hash_update(idx->from_to, new_idx->from_to, update_func_cb);
+  // LOG_INF("Calling elems hash update for to->from");
+    elems_hash_update(idx->to_from, new_idx->to_from, update_func_cb);
+   // LOG_INF("Finsihed");
+}
 
 
 static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params) {
