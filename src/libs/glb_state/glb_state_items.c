@@ -499,7 +499,7 @@ static int ensure_tsbuff_has_space(item_elem_t *elm)
 
     if (SUCCEED == glb_tsbuff_is_full(&elm->tsbuff))
     {
-
+    
         c_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, glb_tsbuff_index(&elm->tsbuff, elm->tsbuff.tail + 1));
 
         if (SUCCEED == ensure_cache_demand_count_met(elm, glb_tsbuff_get_count(&elm->tsbuff) - 1) &&
@@ -938,8 +938,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else if (elm->value_type != h->value_type)
     {
-        DEBUG_ITEM(elem->id, "Resetting cache value type to %d", h->value_type);
-        LOG_DBG("Resetting value type %d -> %d ", elm->value_type, h->value_type);
+        DEBUG_ITEM(elem->id, "Resetting value type %d -> %d ", elm->value_type, h->value_type);
         free_item(elm);
         item_create_cb(elem, memf, NULL);
         elm = (item_elem_t *)elem->data;
@@ -947,7 +946,9 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
+        DEBUG_ITEM(elem->id, "Ensuring there is enough space, before there there %d items, tsbuff size is %d, type is %d", elm->tsbuff.count, elm->tsbuff.size, elm->value_type );
         ensure_tsbuff_has_space(elm);
+        DEBUG_ITEM(elem->id, "After ensuring there %d items, tsbuff size is %d", elm->tsbuff.count, elm->tsbuff.size );
     }
 
     if (h->ts.sec > now + 300)
@@ -1167,6 +1168,7 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
         return FAIL;
 
     hist->ts.ns = 0;
+    hist->value_type = value_type;
 
     switch (value_type)
     {
@@ -1194,6 +1196,8 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
         THIS_SHOULD_NEVER_HAPPEN;
         return FAIL;
     }
+
+
     return SUCCEED;
 }
 
@@ -1234,7 +1238,7 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         LOG_INF("Couldn't parse item fields %s", jp->start);
         return FAIL;
     }
-
+    
 
     if (SUCCEED != zbx_json_brackets_by_name(jp, "item_metadata", &jp_state) ||
         SUCCEED != zbx_json_brackets_by_name(jp, "demand", &jp_demand) ||
@@ -1256,7 +1260,8 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         LOG_INF("Couldn't parse item demand %s", jp->start);
         return FAIL;
     }
-    
+    DEBUG_ITEM(elem->id, "Loaded item value type %d", elm->value_type);
+
     return parse_json_item_values(&jp_values, elem, memf);
     
 }
@@ -1371,18 +1376,6 @@ void	glb_state_get_item_stats(zbx_vector_ptr_t *stats)
 	glb_state_item_stats_t	*item_stats;
 	int i;
 
-
-    //TODO: figure what is this function for
-//    zbx_vector_ptr_reserve(stats, glb_cache->items.hset.num_data);
-//	zbx_hashset_iter_reset(&glb_cache->items.hset, &iter);
-	
-  //  while (NULL != (elem = (elems_hash_elem_t *)zbx_hashset_iter_next(&iter))) {
-//		
-//        item_stats = (glb_state_item_stats_t *)zbx_malloc(NULL, sizeof(glb_state_item_stats_t));
-//		item_stats->itemid = elem->id;
-//		zbx_vector_ptr_append(stats, item_stats);
-//	}
-
 }
 
 
@@ -1398,12 +1391,12 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
         if ( FAIL != elems_hash_process(state->items, itemids->values[i], item_get_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE) ) {
 
             zbx_json_addobject(json,NULL);
-			zbx_json_adduint64(json,"itemid",itemids->values[i]);
-            zbx_json_adduint64(json,"lastdata", req.meta->lastdata);
-            zbx_json_adduint64(json,"nextcheck", req.meta->nextcheck);
-            zbx_json_adduint64(json,"state", req.meta->state);
-            
-            if (NULL != req.meta->error)
+			zbx_json_adduint64string(json,"itemid",itemids->values[i]);
+            zbx_json_adduint64string(json,"lastdata", req.meta->lastdata);
+            zbx_json_adduint64string(json,"nextcheck", req.meta->nextcheck);
+            zbx_json_adduint64string(json,"state", req.meta->state);
+        
+            if (NULL != req.meta->error && strlen(req.meta->error) > 0)
                 zbx_json_addstring(json,"error",req.meta->error,ZBX_JSON_TYPE_STRING );
 
             zbx_json_close(json);
@@ -1581,7 +1574,7 @@ int glb_state_items_dump() {
     marshall_data_t mdata = {.dumper = &dumper, .json = &json, .records = 0, .items = 0};
 
     state_dumper_create(&dumper, "items");
-    elems_hash_iterate(state->items, marshall_item_cb, &mdata, 0);
+    elems_hash_iterate(state->items, marshall_item_cb, &mdata);
     state_dumper_destroy(&dumper);
 
 	zbx_json_free(&json);

@@ -15,8 +15,12 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+
 /* this is simple monitoring engine to export internal metrics
-via prometheus protocol via standart monitoring url */
+via prometheus protocol via standart monitoring url
+
+now it's NOT follows standards as it doesn't support HELP and TYPE keywords
+*/
 
 #include "common.h"
 #include "zbxalgo.h"
@@ -96,12 +100,12 @@ void apm_add_int_label(void *metric_ptr, const char *key, int value) {
         return;
     
     if (NULL == metric->labels) {
-        zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s=%d", key, value);
+        zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s=\"%d\"", key, value);
         metric->labels = zbx_strdup(NULL, buffer);
         return;
     }
     
-    zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s,%s=%d", metric->labels, key, value);
+    zbx_snprintf(buffer, MAX_BUFFER_LEN, "%s,%s=\"%d\"", metric->labels, key, value);
     metric->labels = zbx_strdup(metric->labels, buffer);
 }
 

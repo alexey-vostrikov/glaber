@@ -242,7 +242,7 @@ clean:
  * doesn't have to be put in any of zabbix standard queues
  * **********************************************************/
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
-	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked for async polling");
+//	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked for async polling");
 	
 	switch (zbx_dc_item->type) {
 		case ITEM_TYPE_CALCULATED:
@@ -3951,8 +3951,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 	
 	if (row_count > 0) 
 		config->last_items_change = time(NULL);
-//	LOG_INF("Dcsync_items finished, template items %d, discovered %d, total %d", temp_count, discovered_count, row_count);
-//	exit(-1);
+
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 

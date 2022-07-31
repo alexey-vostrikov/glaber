@@ -97,7 +97,7 @@ static int pinger_process_response(poller_item_t *poller_item, int rtt) {
     if (pinger_item->count == pinger_item->rcv) {
         return POLL_FINISHED;
     } 
-
+    poller_register_item_succeed(poller_item);
     return SUCCEED;
 }
 
@@ -344,10 +344,9 @@ static int send_icmp_packet(poller_item_t *poller_item) {
 }
 
 void send_timeout_cb(poller_item_t *poller_item, void *data) {
-
-  DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
-  finish_icmp_poll(poller_item, ITEM_STATE_NORMAL, NULL, glb_ms_time());
-
+    DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
+    finish_icmp_poll(poller_item, ITEM_STATE_NORMAL, NULL, glb_ms_time());
+    poller_register_item_timeout(poller_item);
 }
 
 

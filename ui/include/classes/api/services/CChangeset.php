@@ -41,16 +41,16 @@ abstract class CChangeset {
     const TABLE_NAME = 'changeset';
 
     public static function add_objects(int $obj_type, int $change_type, array $ids) {
-        $clock = time();
-        $sql ="";
+        // $clock = time();
+        // $sql ="";
         
-        foreach ($ids as $id) {
-            $sql =$sql. "DELETE FROM ". self::TABLE_NAME ." WHERE obj_id = $id;".
-                  "INSERT INTO ". self::TABLE_NAME . 
-                    " (clock, obj_type, obj_id, change_type) VALUES ( $clock, $obj_type, $id, $change_type);";
-        }
+        // foreach ($ids as $id) {
+        //     DBE"DELETE FROM ". self::TABLE_NAME ." WHERE obj_id = $id;".
+        //           "INSERT INTO ". self::TABLE_NAME . 
+        //             " (clock, obj_type, obj_id, change_type) VALUES ( $clock, $obj_type, $id, $change_type);";
+        // }
         
-        DBExecute($sql); 
+        // DBExecute($sql); 
 	}
 
     public static function add_items(int $change_type, array $ids) {

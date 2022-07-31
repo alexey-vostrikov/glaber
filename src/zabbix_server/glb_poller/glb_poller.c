@@ -297,22 +297,11 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
 	{
-	//	LOG_INF("Item %ld has changed, creating new configuration", poller_item->itemid);
-		return SUCCEED;
-
-		DEBUG_ITEM(dc_item->itemid, "Item has changed: re-creating new config");
-		//poller_destroy_event(poller_item->poll_event);
+		DEBUG_ITEM(dc_item->itemid, "Item has changed: deleting the old configuration");
 		glb_poller_delete_item(poller_item->itemid);
-		//if (NULL == (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
-		//	LOG_INF()
-
 	}
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
-	
-//	if ( ITEM_TYPE_SNMP == dc_item->type) {
-//		LOG_INF("Got configuration for item %ld host %ld procerss num %d", dc_item->itemid, dc_item->host, process_num);
-//	}
-	
+
 	bzero(&local_glb_item, sizeof(poller_item_t));
 
 	local_glb_item.itemid = dc_item->itemid;

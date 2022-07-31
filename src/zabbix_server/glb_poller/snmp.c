@@ -63,6 +63,8 @@ static void timeout_event_cb(poller_item_t *poller_item, void *data) {
 		DEBUG_ITEM(poller_get_item_id(poller_item), "SNMP: got GET timeout event");
 		snmp_get_timeout(poller_item);
 	}
+
+	poller_register_item_timeout(poller_item);
 }
 /******************************************************************************
  * item init - from the general dc_item to compact and specific snmp		  * 
@@ -183,6 +185,7 @@ static int process_result(csnmp_pdu_t *pdu)
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit(-1);
 	}
+	poller_register_item_succeed(poller_item);
 }	
 
 void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {

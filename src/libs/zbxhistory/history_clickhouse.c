@@ -244,12 +244,12 @@ static int parse_trends_responce(char *responce, struct zbx_json *json) {
 		)
 		{
 			zbx_json_addobject(json,NULL);
-			zbx_json_addstring (json, "itemid", itemid, ZBX_JSON_TYPE_INT);
-			zbx_json_addstring( json, "clock", clck, ZBX_JSON_TYPE_INT);
+			zbx_json_addstring (json, "itemid", itemid, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "clock", clck, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring( json, "value_max", max_value, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring( json, "value_min", min_value, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring( json, "value_avg", avg_value, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring( json, "num", count, ZBX_JSON_TYPE_INT);
+			zbx_json_addstring( json, "num", count, ZBX_JSON_TYPE_STRING);
 			zbx_json_close(json);
 		} else {
            LOG_INF("Couldn't parse JSON row: %s",p);

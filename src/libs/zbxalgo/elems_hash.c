@@ -52,9 +52,8 @@ void elems_hash_destroy(elems_hash_t *elems) {
    
     zbx_hashset_iter_reset(&elems->elems, &iter);
     
-    LOG_INF("Starting while, total elements to delete %d",elems->elems.num_data);
- 
-    while ( NULL != (elem = (elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) 
+   // LOG_INF("Starting while, total elements to delete %d",elems->elems.num_data);
+     while ( NULL != (elem = (elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) 
         (*elems->elem_free_func)(elem, &elems->memf);
    
     
@@ -71,18 +70,12 @@ elems_hash_elem_t *create_element(elems_hash_t *elems,  uint64_t id, void *data 
     elems_hash_elem_t *elem, elem_local = {.id = id, .data = data };
     
     if (NULL == (elem = zbx_hashset_search(&elems->elems, &elem_local))) {  
-        //note - for id - based objects elems' id will hold the meaningfull id
-        //however for other items it will hold first eight bytes of the object 
-        //intrepreted as id, also  such an objects might redefine the element's id
-        //however it will not be searchable by elems_process,  if search by id 
-        //is required, then the id shoudl be pregenerated and put into the first 
-        //eight bytes or pointer to it should be passed directly
-        //elem_local.id = *(u_int64_t*)id;
+
         glb_lock_init(&elem_local.lock);
         glb_lock_block(&elem_local.lock);
-   //     LOG_INF("Calling callback");
+
         (*elems->elem_create_func)(&elem_local, &elems->memf, data);
-    //    LOG_INF("Return from create callback");
+
         elem = zbx_hashset_insert(&elems->elems,&elem_local,sizeof(elems_hash_elem_t) );
     
     } else {
@@ -99,49 +92,46 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
     
 	if (NULL == process_func)
 		return FAIL;
-   // LOG_INF("Locking");
+
 	glb_rwlock_rdlock(&elems->meta_lock);
-    //LOG_INF("searhing");
+
     if (NULL == (elem = zbx_hashset_search(&elems->elems, &id))) {
-      //LOG_INF("relock in write mode");
+
         glb_rwlock_unlock(&elems->meta_lock); //need to relock in write mode 
 		
         if ( 1 == (flags & ELEM_FLAG_DO_NOT_CREATE))
             return FAIL;
+
         glb_rwlock_wrlock(&elems->meta_lock);
-        
-        //note: create_elem will leave element in blocked state as it needs to be initialized by the user proc first
-        //before becoming accessible to other threads
-	//	LOG_INF("Creating element");
-        if (NULL ==(elem = create_element( elems, id, params ))) {
+
+        if (NULL == ( elem = create_element( elems, id, params ))) {
             glb_rwlock_unlock(&elems->meta_lock);
         	return FAIL;
         }
-
-	//	LOG_INF("Created, re - rdlocking elems");
+	
         glb_rwlock_unlock(&elems->meta_lock);
         glb_rwlock_rdlock(&elems->meta_lock);
+
 	}  else  {
+
         glb_lock_block(&elem->lock);
+
     }
 
 	ret = process_func(elem, &elems->memf, params);
         
     if ( 1 == (elem->flags & ELEM_FLAG_DELETE)) {
-        //processing func marked the element for deletion
-        //we leave element blocked, but reloacking in write mode 
+
         glb_rwlock_unlock(&elems->meta_lock);
-        
         glb_rwlock_wrlock(&elems->meta_lock);
+        
         delete_element(elems, elem);
+        
         glb_rwlock_unlock(&elems->meta_lock);
-    
         return ret;
     }
-    //this is pretty wrong thing, but for long processing and the processing
-    //if (0 == (flags & ELEM_FLAG_REMAIN_LOCKED))
-    glb_lock_unlock(&elem->lock);
 
+    glb_lock_unlock(&elem->lock);
     glb_rwlock_unlock(&elems->meta_lock);
 
 	return ret;
@@ -155,16 +145,65 @@ int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
     glb_rwlock_wrlock(&elems->meta_lock);
     
     elem = zbx_hashset_search(&elems->elems, &id);
-    if (NULL != elem) {
+    if (NULL != elem) 
       ret = delete_element(elems, elem);
-    } else {
+    else 
       ret = FAIL;
-    }
     
     glb_rwlock_unlock(&elems->meta_lock);
     return ret;
 
 }
+
+ELEMS_CALLBACK(update_process_func_cb) {
+    zbx_ptr_pair_t *params = data;
+    elems_hash_update_cb_t cb_func = params->second;
+
+    cb_func(params->first, elem, memf);
+}
+
+ELEMS_CALLBACK(addnew_func_cb) {
+    zbx_ptr_pair_t *params = data;
+    elems_hash_update_cb_t cb_func = params->second;
+
+    cb_func(elem, params->first, memf);
+}
+
+ELEMS_CALLBACK(update_delete_func_cb) {
+    zbx_ptr_pair_t *params = data, 
+                    proc_params = {.first = elem, .second = params->second};
+    elems_hash_t *new_elems = params->first;
+
+    if (FAIL == elems_hash_id_exists(new_elems, elem->id)) {
+        elem->flags = ELEM_FLAG_DELETE;
+        return SUCCEED;
+    }
+
+    elems_hash_process(new_elems, elem->id, update_process_func_cb, &proc_params, 0);
+}
+
+ELEMS_CALLBACK(add_new_func_cb) {
+    zbx_ptr_pair_t *params = data;
+    elems_hash_t *elems = params->first;
+    zbx_ptr_pair_t proc_params = {.first = elem, .second = params->second};
+
+    if (FAIL == elems_hash_id_exists(elems, elem->id)) {
+    //    LOG_INF("Adding element id %ld", elem->id);
+        elems_hash_process(elems, elem->id, addnew_func_cb, &proc_params, 0);
+    }
+}
+
+
+int elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb) {
+    zbx_ptr_pair_t params = {.first = new_elems, .second = update_func_cb};
+ //   LOG_INF("Doing itearion on existing elements");
+    elems_hash_iterate(elems, update_delete_func_cb, &params);
+//    LOG_INF("Adding new elements (%d) total", elems_hash_get_num(new_elems));
+    params.first = elems;
+    elems_hash_iterate(new_elems, add_new_func_cb, &params);
+}
+
+
 
 void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
    
@@ -180,11 +219,7 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
   
 }   
 
-//iterator will continue till all data or till proc_func returns SUCCEED
-//TODO: implement readlocked version
-//this one might be quite expensive
-
-int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags) {
+int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params) {
    
     elems_hash_elem_t *elem;
     int last_ret = SUCCEED;
@@ -203,4 +238,25 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
     
     glb_rwlock_unlock(&elems->meta_lock);
     
+}
+
+int  elems_hash_get_num(elems_hash_t *elems) {
+    int num_data = 0;
+    glb_rwlock_rdlock(&elems->meta_lock);
+    num_data = elems->elems.num_data;
+    glb_rwlock_unlock(&elems->meta_lock);
+
+    return num_data;
+}
+
+int elems_hash_id_exists(elems_hash_t *elems, u_int64_t id) {
+    int ret = FAIL;
+
+    glb_rwlock_rdlock(&elems->meta_lock);
+    
+    if (NULL != zbx_hashset_search(&elems->elems, &id))
+        ret = SUCCEED;
+
+    glb_rwlock_unlock(&elems->meta_lock);
+    return ret;
 }

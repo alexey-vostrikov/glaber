@@ -521,6 +521,8 @@ int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need
 #define ELEMS_FREE(name) \
         	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
 
+#define ELEMS_UPDATE(name) \
+        	int name(elems_hash_elem_t *elem, elems_hash_elem_t *elem_new, mem_funcs_t *memf) 
 
 /*elements hash for fast and lockless access */
 #define ELEM_FLAG_DO_NOT_CREATE  1
@@ -538,7 +540,9 @@ typedef struct {
 typedef int	(*elems_hash_create_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
 typedef int	(*elems_hash_free_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
 typedef int	(*elems_hash_process_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params);
+typedef int	(*elems_hash_update_cb_t)(elems_hash_elem_t *elem, elems_hash_elem_t *elem_new, mem_funcs_t *memf);
 
+//todo: hide elems_hash_t striuture
 typedef struct  {
     zbx_hashset_t elems;
 	mem_funcs_t memf;
@@ -547,28 +551,39 @@ typedef struct  {
 	elems_hash_free_cb_t elem_free_func;
 } elems_hash_t;
 
+
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t elem_free_func );
-//elems_hash_t *elems_hash_init_ext(mem_funcs_t *memf, 
-//                    elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func,
-//                    zbx_compare_func_t compare_func, zbx_hash_func_t hash_func);
 int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data, u_int64_t flags);
 int		elems_hash_delete(elems_hash_t *elems,  uint64_t id);
 void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
-int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
+int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params);
+int 	elems_hash_get_num(elems_hash_t *elems);
+int 	elems_hash_id_exists(elems_hash_t *elems, u_int64_t id);
+int 	elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb);
+
 
 typedef struct obj_index_t obj_index_t;
 obj_index_t* obj_index_init(mem_funcs_t *memf);
 
 void	obj_index_destroy(obj_index_t *idx);
+
 int		obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
+int 	obj_index_add_ref_nosort(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to); 
+
+int		obj_index_set_refs(obj_index_t* idx, u_int64_t id_from, zbx_vector_uint64_t *refs);
+
 int		obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to);
 int		obj_index_del_id_from(obj_index_t* idx, u_int64_t id);
 int		obj_index_del_id_to(obj_index_t* idx, u_int64_t id);
+
 int		obj_index_get_refs_to(obj_index_t *idx, u_int64_t id_from, zbx_vector_uint64_t *out_refs);
 int 	obj_index_get_refs_from(obj_index_t *idx, u_int64_t id_to, zbx_vector_uint64_t *out_refs);
+
 int		obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx);
+int 	obj_index_update(obj_index_t *old_idx, obj_index_t *new_idx);
 void 	obj_index_dump(obj_index_t *idx);
+
 int 	obj_index_get_numdata(obj_index_t *idx);
 
 //memfunction based strpool funcs with lockings to avoid contention

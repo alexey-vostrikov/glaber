@@ -422,61 +422,34 @@ static int glb_inc_dbsync_compare(zbx_dbsync_t *sync, DB_RESULT result, int colu
  * which typiclay are object relation tables
  * ******************************************************/
 static int glb_process_index_update(zbx_dbsync_t *sync, DB_RESULT result, mem_funcs_t *memf, 
-		obj_index_t *idx_ptr,  int obj_type, char * sync_name) {
-	obj_index_t *idx;
+		obj_index_t *idx,  int obj_type, char * sync_name) {
+//	obj_index_t *idx;
 	int full_sync = 0;
 	u_int64_t old_id = 0,id, id_ref;
 	DB_ROW			dbrow;
 	int i = 0, d = 0, del = 0;
 	
 	dbsync_prepare(sync, 2, NULL);
-
-	if (ZBX_DBSYNC_INIT == sync->mode || ZBX_DBSYNC_UPDATE == sync->mode)
-	{	
-		idx = obj_index_init(memf);
-		full_sync = 1;
-	} else  
-		idx = idx_ptr;
+	obj_index_t *local_idx = obj_index_init(NULL);
 
 	while (NULL != (dbrow = DBfetch(result))) {
 		i++;
 
 		ZBX_STR2UINT64(id, dbrow[0]);
 		ZBX_STR2UINT64(id_ref, dbrow[1]);
-			
-		//note: to work correctly rows must be id-ordered in SQL
-		//TODO: this may delete extra indexes - fugure
-		if (old_id != id) {
 
-			obj_index_del_id_from(idx, id);
-			obj_index_del_id_to(idx, id);
-			del++;
-		}
+
+		obj_index_add_ref_nosort(local_idx, id, id_ref);		
 		
 		DEBUG_TRIGGER(id, "Adding dependency ref %ld -> %ld", id, id_ref);
 		DEBUG_TRIGGER(id_ref, "Adding dependency ref %ld -> %ld", id, id_ref);
 
-		obj_index_add_ref(idx, id, id_ref);
 	}
 	DBfree_result(result);
-//	LOG_INF("Total %d indexes deleted + created",del);
-
-	if (1 == full_sync ) {
-		if (NULL == (result = DBselect( "select obj_id from changeset_work where obj_type = %d and change_type = %d;", obj_type, DB_DELETE))) 
-			return FAIL;
-
-		while (NULL != (dbrow = DBfetch(result))) {
-			ZBX_STR2UINT64(id, dbrow[0]);
-			obj_index_del_id_from(idx,id);
-			obj_index_del_id_to(idx,id);
-			d++;	
-		}
-		DBfree_result(result);	
-	//	LOG_INF("Replacing objects index");
-		obj_index_replace(idx_ptr, idx);
-	}
 	
-	//LOG_INF("Index sync for sync type '%s' completed: updated %d items, deleted %d ", sync_name, i, d);
+	obj_index_update(idx, local_idx);
+	obj_index_destroy(local_idx);
+
 	return SUCCEED;
 }
 

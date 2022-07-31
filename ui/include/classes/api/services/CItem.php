@@ -436,7 +436,7 @@ class CItem extends CItemGeneral {
 
 				foreach ($result as $key=>$value) {
 					if (!isset($result[$key]['state'])) 
-						$result[$key]['state'] = ITEM_STATE_UNKNOWN;
+						$result[$key]['state'] = "2";//  ITEM_STATE_UNKNOWN;
 					if (!isset($result[$key]['error'])) 
 						$result[$key]['error'] = "";
 				} 

@@ -1,5 +1,16 @@
+ver 2.11.32
+    - fixes: inmproper type set on items load caused value cache per item reset on first item arrival. Changed items where not updated in the async poller. 
+             Async poller dns wait time changed to 4 seconds
+ver 2.11.30
+    - fixed DNS timeout to 100ms, 64k inflight requests
+ver 2.11.29
+    - added default DNS timeout 1sec, disabled hostname randomization.
+ver 2.11.28
+    - changeset is disabled in API/ui/php as causing sql errors with mysql
+ver 2.11.27
+    - fixed API compatability issues that where causing issues with some versions of Grafana (#89, #65)
 ver 2.11.26
-    - removed extra debugging from API rpc processing
+    - fix in async poller that left conncetions stucked under some conditions
 ver 2.11.25
     - fixed glb_pinger to renew fd subscription on worker restart, fixed two sources of leak in snmp module
 ver 2.11.24

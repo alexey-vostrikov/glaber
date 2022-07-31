@@ -37,7 +37,11 @@ ELEMS_CREATE(ref_create_callback) {
 }
 
 obj_index_t *obj_index_init(mem_funcs_t *memf) {
-   
+    mem_funcs_t local_memf = {.free_func = ZBX_DEFAULT_MEM_FREE_FUNC, .malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, .realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC};
+
+    if (NULL == memf) 
+        memf=&local_memf;
+        
     obj_index_t *idx = memf->malloc_func(NULL, sizeof(obj_index_t));
        
     idx->from_to = elems_hash_init(memf, ref_create_callback, ref_free_callback);
@@ -48,13 +52,22 @@ obj_index_t *obj_index_init(mem_funcs_t *memf) {
 }
 
 void obj_index_destroy(obj_index_t *idx) {
-    LOG_INF("Destroying obj index, from->to");
+  //  LOG_INF("Destroying obj index, from->to");
     elems_hash_destroy(idx->from_to);
-    LOG_INF("Destroying obj index, to->from");
+//    LOG_INF("Destroying obj index, to->from");
     elems_hash_destroy(idx->to_from);    
         
     (*idx->memf.free_func)(idx);
 }
+
+ static int add_ref_nosort_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *param) {
+    
+     ref_id_t *ref = (ref_id_t *)elem->data;
+     u_int64_t *id_to = (u_int64_t *)param;
+  
+     zbx_vector_uint64_append(&ref->refs, *id_to);
+ }
+
 
 static int add_ref_callback(elems_hash_elem_t *elem, mem_funcs_t *memf, void *param) {
     
@@ -143,6 +156,15 @@ int obj_index_add_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
     return SUCCEED;    
 }
 
+int obj_index_add_ref_nosort(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
+    
+    elems_hash_process(idx->from_to, id_from, add_ref_nosort_callback, &id_to, 0);
+    elems_hash_process(idx->to_from, id_to, add_ref_nosort_callback, &id_from, 0);
+    
+    return SUCCEED;    
+}
+
+
 int obj_index_del_ref(obj_index_t* idx, u_int64_t id_from, u_int64_t id_to) {
     
     elems_hash_process(idx->from_to, id_from, del_ref_callback, &id_to, ELEM_FLAG_DO_NOT_CREATE );
@@ -175,6 +197,29 @@ int obj_index_replace(obj_index_t *old_idx, obj_index_t *new_idx) {
 //    LOG_INF("Finished replace");
 }
 
+
+static void update_vector(zbx_vector_uint64_t * vector, zbx_vector_uint64_t * new_vector) {
+    zbx_vector_uint64_clear(vector);
+    zbx_vector_uint64_append_array(vector, new_vector->values, new_vector->values_num);
+    zbx_vector_uint64_sort(vector, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+}
+
+
+ELEMS_UPDATE(update_func_cb) {
+    ref_id_t *ref = elem->data, *new_ref = elem_new->data;
+    
+    update_vector(&ref->refs, &new_ref->refs);
+}
+
+int obj_index_update(obj_index_t *idx, obj_index_t *new_idx) {
+   // LOG_INF("Calling elems hash update for from->to");
+    elems_hash_update(idx->from_to, new_idx->from_to, update_func_cb);
+  // LOG_INF("Calling elems hash update for to->from");
+    elems_hash_update(idx->to_from, new_idx->to_from, update_func_cb);
+   // LOG_INF("Finsihed");
+}
+
+
 static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params) {
     char *str = NULL;
     int i=0;
@@ -198,9 +243,9 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
 
 void obj_index_dump(obj_index_t *idx) {
     LOG_INF("From -> to dump:");
-    elems_hash_iterate(idx->from_to, id_to_vector_dump_cb, NULL, 0);
+    elems_hash_iterate(idx->from_to, id_to_vector_dump_cb, NULL);
     LOG_INF("To -> from dump:");
-    elems_hash_iterate(idx->to_from, id_to_vector_dump_cb, NULL, 0);
+    elems_hash_iterate(idx->to_from, id_to_vector_dump_cb, NULL);
 }
 
 int obj_index_get_numdata(obj_index_t *idx) {
