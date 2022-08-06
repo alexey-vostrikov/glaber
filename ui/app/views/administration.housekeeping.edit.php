@@ -121,41 +121,41 @@ $house_keeper_tab = (new CFormList())
 			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 			->setEnabled($data['hk_sessions_mode'] == 1)
 			->setAriaRequired()
-	)
-	->addRow((new CTag('h4', true, _('History')))->addClass('input-section-header'))
-	->addRow(
-		new CLabel(_('Enable internal housekeeping'), 'hk_history_mode'),
-		(new CCheckBox('hk_history_mode'))->setChecked($data['hk_history_mode'] == 1)
-	)
-	->addRow(
-		new CLabel(_('Override item history period'), 'hk_history_global'),
-		(new CCheckBox('hk_history_global'))->setChecked($data['hk_history_global'] == 1)
-	)
-	->addRow(
-		(new CLabel(_('Data storage period'), 'hk_history'))
-			->setAsteriskMark(),
-		(new CTextBox('hk_history', $data['hk_history'], false, DB::getFieldLength('config', 'hk_history')))
-			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-			->setEnabled($data['hk_history_global'] == 1)
-			->setAriaRequired()
-	)
-	->addRow((new CTag('h4', true, _('Trends')))->addClass('input-section-header'))
-	->addRow(
-		new CLabel(_('Enable internal housekeeping'), 'hk_trends_mode'),
-		(new CCheckBox('hk_trends_mode'))->setChecked($data['hk_trends_mode'] == 1)
-	)
-	->addRow(
-		new CLabel(_('Override item trend period'), 'hk_trends_global'),
-		(new CCheckBox('hk_trends_global'))->setChecked($data['hk_trends_global'] == 1)
-	)
-	->addRow(
-		(new CLabel(_('Data storage period'), 'hk_trends'))
-			->setAsteriskMark(),
-		(new CTextBox('hk_trends', $data['hk_trends'], false, DB::getFieldLength('config', 'hk_trends')))
-			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-			->setEnabled($data['hk_trends_global'] == 1)
-			->setAriaRequired()
 	);
+//	->addRow((new CTag('h4', true, _('History')))->addClass('input-section-header'))
+//	->addRow(
+//		new CLabel(_('Enable internal housekeeping'), 'hk_history_mode'),
+//		(new CCheckBox('hk_history_mode'))->setChecked($data['hk_history_mode'] == 1)
+//	)
+//	->addRow(
+//		new CLabel(_('Override item history period'), 'hk_history_global'),
+//		(new CCheckBox('hk_history_global'))->setChecked($data['hk_history_global'] == 1)
+//	)
+//	->addRow(
+//		(new CLabel(_('Data storage period'), 'hk_history'))
+//			->setAsteriskMark(),
+//		(new CTextBox('hk_history', $data['hk_history'], false, DB::getFieldLength('config', 'hk_history')))
+//			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+//			->setEnabled($data['hk_history_global'] == 1)
+//			->setAriaRequired()
+//	)
+//	->addRow((new CTag('h4', true, _('Trends')))->addClass('input-section-header'))
+//	->addRow(
+//		new CLabel(_('Enable internal housekeeping'), 'hk_trends_mode'),
+//		(new CCheckBox('hk_trends_mode'))->setChecked($data['hk_trends_mode'] == 1)
+//	)
+//	->addRow(
+//		new CLabel(_('Override item trend period'), 'hk_trends_global'),
+//		(new CCheckBox('hk_trends_global'))->setChecked($data['hk_trends_global'] == 1)
+//	)
+//	->addRow(
+//		(new CLabel(_('Data storage period'), 'hk_trends'))
+//			->setAsteriskMark(),
+//		(new CTextBox('hk_trends', $data['hk_trends'], false, DB::getFieldLength('config', 'hk_trends')))
+//			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+//			->setEnabled($data['hk_trends_global'] == 1)
+//			->setAriaRequired()
+//	);
 
 	if ($data['db_extension'] == ZBX_DB_EXTENSION_TIMESCALEDB) {
 		$house_keeper_tab

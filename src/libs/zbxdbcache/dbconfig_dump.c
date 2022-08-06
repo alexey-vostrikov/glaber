@@ -64,11 +64,11 @@ static void	DCdump_config(void)
 	zabbix_log(LOG_LEVEL_TRACE, "  user sessions, mode:%u period:%d", config->config->hk.sessions_mode,
 			config->config->hk.sessions);
 
-	zabbix_log(LOG_LEVEL_TRACE, "  history, mode:%u global:%u period:%d", config->config->hk.history_mode,
-			config->config->hk.history_global, config->config->hk.history);
+//	zabbix_log(LOG_LEVEL_TRACE, "  history, mode:%u global:%u period:%d", config->config->hk.history_mode,
+//			config->config->hk.history_global, config->config->hk.history);
 
-	zabbix_log(LOG_LEVEL_TRACE, "  trends, mode:%u global:%u period:%d", config->config->hk.trends_mode,
-			config->config->hk.trends_global, config->config->hk.trends);
+//	zabbix_log(LOG_LEVEL_TRACE, "  trends, mode:%u global:%u period:%d", config->config->hk.trends_mode,
+//			config->config->hk.trends_global, config->config->hk.trends);
 
 	zabbix_log(LOG_LEVEL_TRACE, "  default timezone '%s'", config->config->default_timezone);
 out:

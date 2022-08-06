@@ -135,8 +135,7 @@ static void free_item(poller_item_t *poller_item ) {
 
 	poller_destroy_event(snmp_item->tm_event);
 
-//	if (SNMP_CMD_GET_NEXT == snmp_item->snmp_req_type )
-//		snmp_walk_destroy_item(poller_item);
+
 
 	zbx_free(snmp_item);
 		

@@ -1,3 +1,7 @@
+ver 2.11.34
+    - trends and history UI and server code cleanup: removed non-working options from the UI, cleaned obsolere housekeeping as well as timescale code from the server
+ver 2.11.33
+    - fixed async pollers events leaking causing high memory leak rates on setups with high item change rates
 ver 2.11.32
     - fixes: inmproper type set on items load caused value cache per item reset on first item arrival. Changed items where not updated in the async poller. 
              Async poller dns wait time changed to 4 seconds

@@ -86,7 +86,6 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 	//	DEBUG_ITEM(poller_event->itemid, "Created event %p for the item", poller_event->event);
 	}
 	
-
 	return poller_event;
 };
 
@@ -97,6 +96,7 @@ void poller_disable_event(poller_event_t *poll_event) {
 int poller_destroy_event(poller_event_t *poll_event) {
 	event_del(poll_event->event);
 	event_free(poll_event->event);
+	zbx_free(poll_event);
 
 	return SUCCEED;
 }

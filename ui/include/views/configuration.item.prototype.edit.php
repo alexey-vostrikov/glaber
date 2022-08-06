@@ -698,28 +698,30 @@ $form_list
 			->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;'),
 		'row_flex_intervals'
 	)
-	->addRow((new CLabel(_('History storage period'), 'history'))->setAsteriskMark(),
+	->addRow((new CLabel(_('History storage'), 'history'))->setAsteriskMark(),
 		(new CDiv([
 			(new CRadioButtonList('history_mode', (int) $data['history_mode']))
 				->addValue(_('Do not keep history'), ITEM_STORAGE_OFF)
-				->addValue(_('Storage period'), ITEM_STORAGE_CUSTOM)
+				->addValue(_('Keep history'), ITEM_STORAGE_CUSTOM)
 				->setModern(true),
-			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			(new CTextBox('history', $data['history']))
-				->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-				->setAriaRequired()
+			(new CInput('hidden', 'history', "1")),
+		//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+		//	(new CTextBox('history', $data['history']))
+		//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+		//		->setAriaRequired()
 		]))->addClass('wrap-multiple-controls')
 	)
-	->addRow((new CLabel(_('Trend storage period'), 'trends'))->setAsteriskMark(),
+	->addRow((new CLabel(_('Trends storage'), 'trends'))->setAsteriskMark(),
 		(new CDiv([
 			(new CRadioButtonList('trends_mode', (int) $data['trends_mode']))
 				->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
-				->addValue(_('Storage period'), ITEM_STORAGE_CUSTOM)
+				->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
 				->setModern(true),
-			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			(new CTextBox('trends', $data['trends']))
-				->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-				->setAriaRequired()
+			(new CInput('hidden', 'trends', "1"))
+		//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+		//	(new CTextBox('trends', $data['trends']))
+		//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+		//		->setAriaRequired()
 		]))->addClass('wrap-multiple-controls'),
 		'row_trends'
 	)

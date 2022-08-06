@@ -761,14 +761,14 @@ if ($data['config']['hk_history_global']  && ($host['status'] == HOST_STATUS_MON
 		->setId('history_mode_hint');
 }
 
-$form_list->addRow((new CLabel(_('History storage period'), 'history'))->setAsteriskMark(),
+$form_list->addRow((new CLabel(_('History storage'), 'history'))->setAsteriskMark(),
 	(new CDiv([
 		(new CRadioButtonList('history_mode', (int) $data['history_mode']))
 			->addValue(_('Do not keep history'), ITEM_STORAGE_OFF)
 			->addValue(_('Keep history'), ITEM_STORAGE_CUSTOM)
 			->setReadonly($discovered_item)
 			->setModern(true),
-			(new CInput('hidden', 'history', $data['history'])),
+		(new CInput('hidden', 'history', "1")),
 	//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 	//	(new CTextBox('history', $data['history'], $discovered_item))
 	//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
@@ -778,35 +778,35 @@ $form_list->addRow((new CLabel(_('History storage period'), 'history'))->setAste
 );
 
 // Append trend storage to form list.
-$keep_trend_hint = null;
-if ($data['config']['hk_trends_global'] && ($host['status'] == HOST_STATUS_MONITORED
-			|| $host['status'] == HOST_STATUS_NOT_MONITORED)) {
-	$link = (CWebUser::getType() == USER_TYPE_SUPER_ADMIN)
-		? (new CLink(_x('global housekeeping settings', 'item_form'), (new CUrl('zabbix.php'))
-				->setArgument('action', 'housekeeping.edit')
-				->getUrl()
-			))
-				->setTarget('_blank')
-		: _x('global housekeeping settings', 'item_form');
+// $keep_trend_hint = null;
+// if ($data['config']['hk_trends_global'] && ($host['status'] == HOST_STATUS_MONITORED
+// 			|| $host['status'] == HOST_STATUS_NOT_MONITORED)) {
+// 	$link = (CWebUser::getType() == USER_TYPE_SUPER_ADMIN)
+// 		? (new CLink(_x('global housekeeping settings', 'item_form'), (new CUrl('zabbix.php'))
+// 				->setArgument('action', 'housekeeping.edit')
+// 				->getUrl()
+// 			))
+// 				->setTarget('_blank')
+// 		: _x('global housekeeping settings', 'item_form');
 
-	$keep_trend_hint = (new CDiv(makeInformationIcon([
-		' '._x('Overridden by', 'item_form').' ',
-		$link,
-		' ('.$data['config']['hk_trends'].')'
-	])))
-		->addStyle('margin: 5px 0 0 5px;')
-		->setId('trends_mode_hint');
-}
+// 	$keep_trend_hint = (new CDiv(makeInformationIcon([
+// 		' '._x('Overridden by', 'item_form').' ',
+// 		$link,
+// 		' ('.$data['config']['hk_trends'].')'
+// 	])))
+// 		->addStyle('margin: 5px 0 0 5px;')
+// 		->setId('trends_mode_hint');
+// }
 
 $form_list
-	->addRow((new CLabel(_('Trend storage period'), 'trends'))->setAsteriskMark(),
+	->addRow((new CLabel(_('Trends storage'), 'trends'))->setAsteriskMark(),
 		(new CDiv([
 			(new CRadioButtonList('trends_mode', (int) $data['trends_mode']))
 				->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
 				->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
 				->setReadonly($discovered_item)
 				->setModern(true),
-			(new CInput('hidden', 'trends', $data['trends']))
+			(new CInput('hidden', 'trends', "1"))
 
 //			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 //			(new CTextBox('trends', $data['trends'], $discovered_item))
