@@ -1551,14 +1551,13 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	if (SUCCEED != is_time_suffix(dbrow[22], &history_sec, ZBX_LENGTH_UNLIMITED))
 		history_sec = ZBX_HK_PERIOD_MAX;
 
-	if (0 != history_sec && ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.history_global)
-		history_sec = dbsync_env.cache->config->hk.history;
 
-	if (item->history != (0 != history_sec)) 
+	if (item->history != (history_sec > 0 ) ) 
 	{
-		DEBUG_ITEM(item->itemid, "history sec is changed");
+		DEBUG_ITEM(item->itemid, "history sec is changed %d->%d", item->history, (history_sec > 0 ));
 		return FAIL;
 	}
+	
 	if (FAIL == dbsync_compare_uchar(dbrow[24], item->inventory_link))
 	{
 		DEBUG_ITEM(item->itemid, "Inventory link is changed");
@@ -1598,10 +1597,10 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 		if (SUCCEED != is_time_suffix(dbrow[23], &trends_sec, ZBX_LENGTH_UNLIMITED))
 			trends_sec = ZBX_HK_PERIOD_MAX;
 
-		if (0 != trends_sec && ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.trends_global)
-			trends_sec = dbsync_env.cache->config->hk.trends;
+	//	if (0 != trends_sec && ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.trends_global)
+	//		trends_sec = dbsync_env.cache->config->hk.trends;
 
-		if (numitem->trends != (0 != trends_sec))
+		if (numitem->trends != (trends_sec > 0))
 		{
 			DEBUG_ITEM(item->itemid, "trends flag is changed");
 			return FAIL;

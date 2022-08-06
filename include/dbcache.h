@@ -347,17 +347,17 @@ typedef struct
 	int		services;
 	int		audit;
 	int		sessions;
-	int		trends;
-	int		history;
+//	int		trends;
+//	int		history;
 
 	unsigned char	services_mode;
 	unsigned char	audit_mode;
 	unsigned char	sessions_mode;
 	unsigned char	events_mode;
-	unsigned char	trends_mode;
-	unsigned char	trends_global;
-	unsigned char	history_mode;
-	unsigned char	history_global;
+//	unsigned char	trends_mode;
+//	unsigned char	trends_global;
+//	unsigned char	history_mode;
+//	unsigned char	history_global;
 }
 zbx_config_hk_t;
 
