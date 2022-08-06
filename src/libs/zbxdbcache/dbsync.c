@@ -1491,67 +1491,109 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	unsigned char		value_type, type;
 	int			history_sec, trends_sec;
 
-	if (FAIL == dbsync_compare_uint64(dbrow[1], item->hostid))
+
+	DEBUG_ITEM(item->itemid, "Checking if config is changed");
+
+	if (FAIL == dbsync_compare_uint64(dbrow[1], item->hostid)) {
+		DEBUG_ITEM(item->itemid, "Hostid is changed");
 		return FAIL;
+	}
 
 //	if (FAIL == dbsync_compare_uint64(dbrow[21], item->mtime))
 //		return FAIL;
 
-	if (FAIL == dbsync_compare_uint64(dbrow[48], item->templateid))
+	if (FAIL == dbsync_compare_uint64(dbrow[48], item->templateid)) 
+	{
+		DEBUG_ITEM(item->itemid, "Templateid is changed");
 		return FAIL;
+	}
 
 	if (FAIL == dbsync_compare_uint64(dbrow[49], item->parent_itemid))
+	{
+		DEBUG_ITEM(item->itemid, "Parent_itemid is changed");
 		return FAIL;
+	}
 
 	if (NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&dbsync_env.cache->hosts, &item->hostid)))
+	{
+		DEBUG_ITEM(item->itemid, "Hostid is not found");
 		return FAIL;
+	}
 
-	if (0 != host->update_items)
+	if (0 != host->update_items) 
+	{
+		DEBUG_ITEM(item->itemid, "Host update items flag is set");
 		return FAIL;
+	}
 
 	if (FAIL == dbsync_compare_uchar(dbrow[2], item->status))
+	{
+		DEBUG_ITEM(item->itemid, "Status is changed");
 		return FAIL;
-
+	}
+	
 	ZBX_STR2UCHAR(type, dbrow[3]);
-	if (item->type != type)
+	if (item->type != type) 
+	{
+		DEBUG_ITEM(item->itemid, "Type is changed");
 		return FAIL;
-
+	}
 	if (FAIL == dbsync_compare_uchar(dbrow[18], item->flags))
+	{
+		DEBUG_ITEM(item->itemid, "Flag is changed");
 		return FAIL;
-
+	}
 	if (FAIL == dbsync_compare_uint64(dbrow[19], item->interfaceid))
+	{
+		DEBUG_ITEM(item->itemid, "Interfaceid is changed");
 		return FAIL;
-
+	}
 	if (SUCCEED != is_time_suffix(dbrow[22], &history_sec, ZBX_LENGTH_UNLIMITED))
 		history_sec = ZBX_HK_PERIOD_MAX;
 
 	if (0 != history_sec && ZBX_HK_OPTION_ENABLED == dbsync_env.cache->config->hk.history_global)
 		history_sec = dbsync_env.cache->config->hk.history;
 
-	if (item->history != (0 != history_sec))
+	if (item->history != (0 != history_sec)) 
+	{
+		DEBUG_ITEM(item->itemid, "history sec is changed");
 		return FAIL;
-
+	}
 	if (FAIL == dbsync_compare_uchar(dbrow[24], item->inventory_link))
+	{
+		DEBUG_ITEM(item->itemid, "Inventory link is changed");
 		return FAIL;
+	}
 
 	if (FAIL == dbsync_compare_uint64(dbrow[25], item->valuemapid))
+	{
+		DEBUG_ITEM(item->itemid, "Valuemapid is changed");
 		return FAIL;
-
+	}
 	ZBX_STR2UCHAR(value_type, dbrow[4]);
 	if (item->value_type != value_type)
+	{
+		DEBUG_ITEM(item->itemid, "Value type is changed");
 		return FAIL;
-
+	}
 	if (FAIL == dbsync_compare_str(dbrow[5], item->key))
+	{
+		DEBUG_ITEM(item->itemid, "Key is changed");
 		return FAIL;
-
+	}
 	if (FAIL == dbsync_compare_str(dbrow[8], item->delay))
+	{
+		DEBUG_ITEM(item->itemid, "Delay is changed");
 		return FAIL;
-
+	}
 	numitem = (ZBX_DC_NUMITEM *)zbx_hashset_search(&dbsync_env.cache->numitems, &item->itemid);
 	if (ITEM_VALUE_TYPE_FLOAT == value_type || ITEM_VALUE_TYPE_UINT64 == value_type)
 	{
 		if (NULL == numitem)
+		{
+			DEBUG_ITEM(item->itemid, "numitem is changed");
 			return FAIL;
+		}
 
 		if (SUCCEED != is_time_suffix(dbrow[23], &trends_sec, ZBX_LENGTH_UNLIMITED))
 			trends_sec = ZBX_HK_PERIOD_MAX;
@@ -1560,28 +1602,48 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 			trends_sec = dbsync_env.cache->config->hk.trends;
 
 		if (numitem->trends != (0 != trends_sec))
+		{
+			DEBUG_ITEM(item->itemid, "trends flag is changed");
 			return FAIL;
+		}
 
 		if (numitem->trends_sec != trends_sec)
+		{
+			DEBUG_ITEM(item->itemid, "Trends seconds is changed");
 			return FAIL;
-
+		}
 		if (FAIL == dbsync_compare_str(dbrow[26], numitem->units))
+		{
+			DEBUG_ITEM(item->itemid, "units is changed");
 			return FAIL;
+		}
 	}
 	else if (NULL != numitem)
-		return FAIL;
+		{
+			DEBUG_ITEM(item->itemid, "numitem is changed");
+			return FAIL;
+		}
 
 	snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&dbsync_env.cache->snmpitems, &item->itemid);
 	if (ITEM_TYPE_SNMP == type)
 	{
 		if (NULL == snmpitem)
+		{
+			DEBUG_ITEM(item->itemid, "snmpitem is not found");
 			return FAIL;
+		}
 
 		if (FAIL == dbsync_compare_str(dbrow[6], snmpitem->snmp_oid))
+		{
+			DEBUG_ITEM(item->itemid, "SNMP oid is changed");
 			return FAIL;
+		}
 	}
 	else if (NULL != snmpitem)
-		return FAIL;
+		{
+			DEBUG_ITEM(item->itemid, "Found snmp conf on non-snmp item - changed");
+			return FAIL;
+		}
 
 	ipmiitem = (ZBX_DC_IPMIITEM *)zbx_hashset_search(&dbsync_env.cache->ipmiitems, &item->itemid);
 	if (ITEM_TYPE_IPMI == item->type)
@@ -1968,6 +2030,7 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 	{
 		return FAIL;
 	}
+
 
 	return glb_dbsync_compare(sync,result, 51 //56
 	, &dbsync_env.cache->items, (cmp_func_t) dbsync_compare_item,

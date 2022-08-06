@@ -247,14 +247,11 @@ int glb_poller_delete_item(u_int64_t itemid)
 {
 	poller_item_t *poller_item;
 	
-//	LOG_INF("Freeing item %ld", itemid);
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &itemid)))
 	{
 		DEBUG_ITEM(itemid, "Item has been deleted, removing from the poller config");
 
-	//	LOG_INF("Calling item delete for item %ld", itemid);
 		conf.poller.delete_item(poller_item);
-		
 		delete_item_from_host(poller_item->hostid);
 		strpool_free(&conf.strpool, poller_item->delay);
 		poller_destroy_event(poller_item->poll_event);
