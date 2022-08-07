@@ -717,7 +717,7 @@ $form_list
 				->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
 				->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
 				->setModern(true),
-			(new CInput('hidden', 'trends', "1"))
+			(new CInput('hidden', 'trends', "86400"))
 		//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 		//	(new CTextBox('trends', $data['trends']))
 		//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
