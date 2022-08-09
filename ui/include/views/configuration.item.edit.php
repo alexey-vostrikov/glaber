@@ -768,7 +768,7 @@ $form_list->addRow((new CLabel(_('History storage'), 'history'))->setAsteriskMar
 			->addValue(_('Keep history'), ITEM_STORAGE_CUSTOM)
 			->setReadonly($discovered_item)
 			->setModern(true),
-		(new CInput('hidden', 'history', "1")),
+		(new CInput('hidden', 'history', "3600")),
 	//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 	//	(new CTextBox('history', $data['history'], $discovered_item))
 	//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)

@@ -1,3 +1,5 @@
+ver 2.11.36
+    - fix: history time range error mesage on item/prototype creation in UI
 ver 2.11.35
     - fix: trends time range error mesage on item/prototype edit in UI
 ver 2.11.34

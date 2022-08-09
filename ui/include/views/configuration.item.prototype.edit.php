@@ -704,7 +704,7 @@ $form_list
 				->addValue(_('Do not keep history'), ITEM_STORAGE_OFF)
 				->addValue(_('Keep history'), ITEM_STORAGE_CUSTOM)
 				->setModern(true),
-			(new CInput('hidden', 'history', "1")),
+			(new CInput('hidden', 'history', "3600")),
 		//	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 		//	(new CTextBox('history', $data['history']))
 		//		->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
