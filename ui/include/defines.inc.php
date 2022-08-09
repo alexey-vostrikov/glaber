@@ -21,7 +21,7 @@
 define('ZABBIX_VERSION',		'5.4.11');
 define('ZABBIX_API_VERSION',	'5.4.11');
 define('ZABBIX_EXPORT_VERSION',	'5.4');
-define('GLABER_VERSION','2.11.36');
+define('GLABER_VERSION','2.11.37');
 
 define('ZABBIX_DB_VERSION',		5040000);
 
@@ -625,6 +625,7 @@ define('ITEM_DELAY_SCHEDULING',	1);
 
 // Item pre-processing types.
 define('GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG',	126);
+define('GLB_PREPROC_DISPATCH_ITEM', 127);
 define('ZBX_PREPROC_MULTIPLIER',				1);
 define('ZBX_PREPROC_RTRIM',						2);
 define('ZBX_PREPROC_LTRIM',						3);

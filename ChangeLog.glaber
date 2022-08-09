@@ -1,3 +1,5 @@
+ver 2.11.37
+   - fix: improper SNMP IP addr translation
 ver 2.11.36
     - fix: history time range error mesage on item/prototype creation in UI
 ver 2.11.35
