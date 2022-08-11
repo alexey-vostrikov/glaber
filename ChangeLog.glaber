@@ -1,3 +1,6 @@
+ver 2.12.0
+   - Items preprocessing dispatching MVP introduced: added feature to reroute items to another items
+   based on JSON contents (possibility to fetch host named and metric name form the data). 
 ver 2.11.37
    - fix: improper SNMP IP addr translation
 ver 2.11.36

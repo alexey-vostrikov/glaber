@@ -1808,6 +1808,10 @@ function get_preprocessing_types($type = null, $grouped = true, array $supported
 			'group' => _('Aggregation'),
 			'name' => _('Aggregate over time')
 		],
+		GLB_PREPROC_DISPATCH_ITEM => [
+			'group' => _('Dispatch'),
+			'name' => _('Dispatch to host from JSON value')
+		],
 		ZBX_PREPROC_REGSUB => [
 			'group' => _('Text'),
 			'name' => _('Regular expression')

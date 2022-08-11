@@ -227,7 +227,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 			asn1_str_t *str = (asn1_str_t *)var->value;
 
     		DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as an ip addr type");
-			SET_STR_RESULT(result, zbx_dsprintf(NULL, "%hhu.%hhu.%hhu.%hhu",// b0, b1, b2, b3 ));
+			SET_STR_RESULT(result, zbx_dsprintf(NULL, "%hhu.%hhu.%hhu.%hhu",
 				(unsigned char)str->b[0],
 				(unsigned char)str->b[1],
 				(unsigned char)str->b[2],

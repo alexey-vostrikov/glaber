@@ -229,6 +229,12 @@
 						placeholder_0: <?= json_encode(_('seconds')) ?>,
 						placeholder_1: <?= json_encode(_('sum|count|min|max|avg')) ?>
 					}));
+				case '<?= GLB_PREPROC_DISPATCH_ITEM ?>':
+					return $(preproc_param_double_tmpl.evaluate({
+						rowNum: index,
+						placeholder_0: <?= json_encode(_('$.path.to.hotsname_attr')) ?>,
+						placeholder_1: <?= json_encode(_('item_key')) ?>
+					}));
 				default:
 					return '';
 			}
@@ -370,6 +376,8 @@
 					case '<?= ZBX_PREPROC_THROTTLE_TIMED_VALUE ?>':
 					case '<?= ZBX_PREPROC_SCRIPT ?>':
 					case '<?= ZBX_PREPROC_STR_REPLACE ?>':
+					case '<?= GLB_PREPROC_DISPATCH_ITEM ?>':
+
 						$on_fail
 							.prop('checked', false)
 							.prop('disabled', true)

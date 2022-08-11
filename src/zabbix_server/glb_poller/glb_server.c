@@ -129,11 +129,12 @@ static int glb_server_submit_result(poller_item_t *poller_item, char *response) 
 		return FAIL;
     }
     
-    AGENT_RESULT	result;
+    AGENT_RESULT	result={0};
        
     init_result(&result);
     zbx_rtrim(response, ZBX_WHITESPACE);
-    set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
+    SET_TEXT_RESULT(&result, zbx_strdup(NULL, response));
+    //set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
     poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
     
     free_result(&result);

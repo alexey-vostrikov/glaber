@@ -23,7 +23,7 @@
 #include "dbcache.h"
 #include "preproc.h"
 
-int	zbx_item_preproc(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+int	zbx_item_preproc(u_int64_t itemid, unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
 		const zbx_preproc_op_t *op, zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **error);
 
 int	zbx_item_preproc_handle_error(zbx_variant_t *value, const zbx_preproc_op_t *op, char **error);

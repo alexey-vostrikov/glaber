@@ -212,7 +212,7 @@ void	worker_format_error(const zbx_variant_t *value, zbx_preproc_result_t *resul
  *               FAIL - otherwise, error contains the error message           *
  *                                                                            *
  ******************************************************************************/
-int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+int	worker_item_preproc_execute(u_int64_t itemid, unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
 		zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
 		zbx_preproc_result_t *results, int *results_num, char **error)
 {
@@ -227,7 +227,7 @@ int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *value, 
 		
 		zbx_preproc_history_pop_value(history_in, i, &history_value, &history_ts);
 		
-		if (FAIL == (ret = zbx_item_preproc(value_type, value, ts, op, &history_value, &history_ts, error)))
+		if (FAIL == (ret = zbx_item_preproc(itemid, value_type, value, ts, op, &history_value, &history_ts, error)))
 		{
 		
 			results[i].action = op->error_handler;
@@ -312,7 +312,7 @@ static void	worker_preprocess_value(zbx_ipc_socket_t *socket, zbx_ipc_message_t 
 	results = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t) * steps_num);
 	memset(results, 0, sizeof(zbx_preproc_result_t) * steps_num);
 
-	if (FAIL == (ret = worker_item_preproc_execute(value_type, &value, ts, steps, steps_num, &history_in,
+	if (FAIL == (ret = worker_item_preproc_execute(itemid, value_type, &value, ts, steps, steps_num, &history_in,
 			&history_out, results, &results_num, &errmsg)) && 0 != results_num)
 	{
 		int action = results[results_num - 1].action;
@@ -445,6 +445,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	zbx_es_init(&es_engine);
 
 	zbx_ipc_message_init(&message);
+	glb_preprocessing_init();
 	
 	zbx_snprintf(service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING_WORKER, (process_num-1) % CONFIG_PREPROCMAN_FORKS);
 

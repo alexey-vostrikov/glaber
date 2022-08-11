@@ -84,6 +84,8 @@ static int	str_to_preproc_type(const char *str)
 		return ZBX_PREPROC_STR_REPLACE;
 	if (0 == strcmp(str, "GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG"))
 		return GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG;
+	if (0 == strcmp(str, "GLB_PREPROC_DISPATCH_ITEM"))
+		return GLB_PREPROC_DISPATCH_ITEM;
 
 	fail_msg("unknow preprocessing step type: %s", str);
 	return FAIL;

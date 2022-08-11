@@ -717,7 +717,7 @@ static void glb_fast_preprocess_item(zbx_preprocessing_manager_t *manager,
 	
 	//5. doing the preprocessing
 	zabbix_log(LOG_LEVEL_DEBUG,"In %s:start 4", __func__);
-	if (FAIL == (ret = worker_item_preproc_execute(preproc_value->item_value_type, &value ,preproc_value->ts,
+	if (FAIL == (ret = worker_item_preproc_execute(item->itemid, preproc_value->item_value_type, &value ,preproc_value->ts,
 			item->preproc_ops, item->preproc_ops_num, history_in,
 			&history_out, results, &results_num, &errmsg)) && 0 != results_num) {
 		

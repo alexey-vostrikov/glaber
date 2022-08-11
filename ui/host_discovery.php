@@ -503,6 +503,7 @@ elseif (hasRequest('add') || hasRequest('update')) {
 				case ZBX_PREPROC_REGSUB:
 				case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
 				case ZBX_PREPROC_STR_REPLACE:
+				case GLB_PREPROC_DISPATCH_ITEM:
 					$step['params'] = implode("\n", $step['params']);
 					break;
 

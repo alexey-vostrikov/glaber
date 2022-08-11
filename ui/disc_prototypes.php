@@ -413,10 +413,11 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 					$step['params'] = implode("\n", $step['params']);
 					break;
-
+				case GLB_PREPROC_DISPATCH_ITEM:
 				case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
 					$step['params'] = implode("\n", $step['params']);
 					break;
+					
 				case ZBX_PREPROC_REGSUB:
 				case ZBX_PREPROC_ERROR_FIELD_REGEX:
 				case ZBX_PREPROC_STR_REPLACE:

@@ -1452,7 +1452,6 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 	char *ptr;
 	const char *time, *aggf_name;
 	char func = GLB_FUNC_UNKNOWN;
-
 	
 	//one special case, if previous step fails, it expected to return string "NaN"
 	//in such just discard the value
@@ -1476,6 +1475,7 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 		*errmsg = zbx_strdup(*errmsg, "first parameter is expected");
 		return FAIL;
 	}
+
 	aggf_name = ptr + 1;
 	len_aggf = strlen(ptr + 1);
 	
@@ -1502,16 +1502,12 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 			return FAIL;
 		}
 	
-		//ok, lets check if there is an unsinged int 
 		errno = 0;
 		char *p = value->data.str;
 
-//		u_int64_t int_val = strtoull(value->data.str,&p,10);
-//		if ( errno != 0 || p == value->data.str || 0 != *p ) {
-			zbx_variant_convert(value,ZBX_VARIANT_DBL);
-//		} else {
-//			zbx_variant_convert(value,ZBX_VARIANT_UI64);
-//		}
+
+		zbx_variant_convert(value,ZBX_VARIANT_DBL);
+
 	}
 			
 	//history value hasn't been init - means we're starting
@@ -1519,33 +1515,19 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 		if ( GLB_FUNC_COUNT == func ) {
 			zbx_variant_set_ui64(history_value,0);
 		} else {
-//			switch (value->type) {
-//				case ZBX_VARIANT_UI64:
-//					zbx_variant_set_ui64(history_value,value->data.ui64);
-//					break;
-//				case ZBX_VARIANT_DBL:
-					zbx_variant_set_dbl(history_value,value->data.dbl);
-//					break;
-//				default: 
-//					THIS_SHOULD_NEVER_HAPPEN;
-//					return FAIL;
-//			}
+			zbx_variant_set_dbl(history_value,value->data.dbl);
 		}
 		
 		history_ts->ns = 0;
 		history_ts->sec = ts->sec;
 	}
-		
-	//keep the number in the nanosecond part of the history data value
-	
+
 
 	if ( GLB_FUNC_MIN == func ) {
-//		switch (value->type) {
-//			case ZBX_VARIANT_UI64:
-				zbx_variant_set_ui64(history_value, MIN(history_value->data.ui64,value->data.ui64));
+//		zbx_variant_set_ui64(history_value, MIN(history_value->data.ui64,value->data.ui64));
 //				break;
 //			case ZBX_VARIANT_DBL:
-				zbx_variant_set_dbl(history_value, MIN(history_value->data.dbl,value->data.dbl));
+		zbx_variant_set_dbl(history_value, MIN(history_value->data.dbl,value->data.dbl));
 //				break;
 //		}
 	} else if ( GLB_FUNC_MAX == func ) {
@@ -1559,12 +1541,7 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 //		}
 	} else if ( GLB_FUNC_AVG == func || GLB_FUNC_SUM ==func ) {
 		if (0 != history_ts->ns) {
-//			switch (history_value->type) {
-//				case ZBX_VARIANT_UI64:
-//					zbx_variant_set_ui64(history_value, history_value->data.ui64 + value->data.ui64);
-//					break;
-//				case ZBX_VARIANT_DBL:
-					zbx_variant_set_dbl(history_value, history_value->data.dbl + value->data.dbl);
+			zbx_variant_set_dbl(history_value, history_value->data.dbl + value->data.dbl);
 //					break;
 //			}
 		}
@@ -1605,6 +1582,89 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 
 	}
 
+	return SUCCEED;
+}
+/***************************************************************************
+ * dispatches or routes the item to another host/item stated in the cfg    *
+ * *************************************************************************/ 
+static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
+		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+{
+	const char *json_field, *key;
+	
+	char *ptr;
+	int len_time;
+
+	DEBUG_ITEM(itemid, "In %s: starting", __func__);
+	
+	json_field = params;
+
+	if (NULL == (ptr = strchr(params, '\n')))
+	{
+		THIS_SHOULD_NEVER_HAPPEN;
+		*errmsg = zbx_strdup(*errmsg, "cannot find second parameter");
+		return FAIL;
+	}
+	
+	*ptr = '\0';
+
+	if (0 == (len_time = ptr - params))
+	{
+		*errmsg = zbx_strdup(*errmsg, "first parameter is expected");
+		return FAIL;
+	}
+
+	key = ptr + 1;
+	//len_aggf = strlen(ptr + 1);
+	
+	DEBUG_ITEM(itemid,"Will fetch host data: host field '%s', host key '%s'", json_field, key);
+	DEBUG_ITEM(itemid,"Doing JSON search for '%s' field", json_field);
+	
+	struct zbx_json_parse	jp;
+	char			*data = NULL;
+
+	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+		return FAIL;
+
+	if (FAIL == zbx_json_open(value->data.str, &jp) || FAIL == zbx_jsonpath_query(&jp, json_field, &data))
+	{
+		*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
+		DEBUG_ITEM(itemid,"Couldn't find json path '%s' in JSON '%s'", json_field, value->data.str);
+		return FAIL;
+	}
+
+	if (NULL == data)
+	{
+		*errmsg = zbx_strdup(*errmsg, "no data matches the specified path");
+		return FAIL;
+	}
+
+	DEBUG_ITEM(itemid, "Got result of field search: '%s'", data);
+	DEBUG_ITEM(itemid, "Looking for the new itemid for host '%s':'%s'", data, key);
+	
+	zbx_host_key_t host_key = {.host = data, .key = (char *)key};
+	zbx_uint64_pair_t host_item_ids;
+
+	//TODO: high load: add caching
+	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids) ) {
+		AGENT_RESULT result={0};
+		zbx_timespec_t ts;
+		zbx_timespec(&ts);
+
+		init_result(&result);
+		SET_STR_RESULT(&result, zbx_strdup(NULL,value->data.str));
+		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
+		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
+			&result, &ts, ITEM_STATE_NORMAL, NULL);
+		free_result(&result);
+		return SUCCEED;
+	} else {
+		DEBUG_ITEM(itemid, "Item hasn't been found, dropping");
+	}
+
+	zbx_free(data);
+
+	DEBUG_ITEM(itemid, "In %s: finished", __func__);
 	return SUCCEED;
 }
 
@@ -2233,11 +2293,13 @@ static int	item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
  *           returned with error set.                                         *
  *                                                                            *
  ******************************************************************************/
-int	zbx_item_preproc(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+int	zbx_item_preproc(u_int64_t itemid, unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
 		const zbx_preproc_op_t *op, zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **error)
 {
 	int	ret;
-
+	
+	DEBUG_ITEM(itemid, "Performing preprocessing step of type %d, incoming value %s", op->type, zbx_variant_value_desc(value));
+	
 	switch (op->type)
 	{
 		case ZBX_PREPROC_MULTIPLIER:
@@ -2305,6 +2367,10 @@ int	zbx_item_preproc(unsigned char value_type, zbx_variant_t *value, const zbx_t
 			ret = item_preproc_throttle_value_agg(value, ts, op->params, history_value, history_ts, value_type,
 					error);
 			break;
+		case GLB_PREPROC_DISPATCH_ITEM:
+			ret = item_preproc_dispatch(itemid, value, ts, op->params, history_value, history_ts, value_type,
+					error);
+			break;
 		case ZBX_PREPROC_SCRIPT:
 			ret = item_preproc_script(value, op->params, history_value, error);
 			break;
@@ -2331,6 +2397,9 @@ int	zbx_item_preproc(unsigned char value_type, zbx_variant_t *value, const zbx_t
 			ret = FAIL;
 	}
 
+	DEBUG_ITEM(itemid, "Result of preprocessing step of type %d, result value %s, return %d",
+		  op->type, zbx_variant_value_desc(value), ret);
+	
 	return ret;
 }
 
@@ -2407,7 +2476,7 @@ int	zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const 
 
 		zbx_preproc_history_pop_value(history_in, i, &history_value, &history_ts);
 
-		if (FAIL == (ret = zbx_item_preproc(value_type, value, ts, op, &history_value, &history_ts, error)))
+		if (FAIL == (ret = zbx_item_preproc(0, value_type, value, ts, op, &history_value, &history_ts, error)))
 		{
 			results[i].action = op->error_handler;
 			results[i].error = zbx_strdup(NULL, *error);

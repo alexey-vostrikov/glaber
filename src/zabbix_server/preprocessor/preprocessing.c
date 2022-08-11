@@ -1152,12 +1152,11 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid,  unsign
 			value.state = ITEM_STATE_NOTSUPPORTED;
 			value.error = "Value is too large.";
 		}
-	} else {
-		
-	}
+	} 
 	
 	if (NULL != value.error && ITEM_STATE_NORMAL != state ) 
 			meta.error = error;
+	
 	meta.lastdata = time(NULL);
 	meta.state = value.state;
 

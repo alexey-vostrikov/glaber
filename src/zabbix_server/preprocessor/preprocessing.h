@@ -124,7 +124,7 @@ void	preprocessor_flush_value(const zbx_preproc_item_value_t *value);
 void	preprocessor_free_request(zbx_preprocessing_request_t *request);
 void	request_free_steps(zbx_preprocessing_request_t *request);
 void 	preproc_item_value_clear(zbx_preproc_item_value_t *value);
-int	worker_item_preproc_execute(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+int	worker_item_preproc_execute(u_int64_t itemid, unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
 		zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
 		zbx_preproc_result_t *results, int *results_num, char **error);
 void	worker_format_error(const zbx_variant_t *value, zbx_preproc_result_t *results, int results_num,

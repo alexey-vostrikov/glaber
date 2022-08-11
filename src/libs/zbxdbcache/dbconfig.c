@@ -8652,6 +8652,37 @@ void	DCconfig_get_items_by_keys(DC_ITEM *items, zbx_host_key_t *keys, int *errco
 	UNLOCK_CACHE;
 }
 
+/*****************************************************
+ * returns host and item ids for the symbolic hosname 
+ * and item names
+ * ***************************************************/
+int	DCconfig_get_itemid_by_key(zbx_host_key_t *key, zbx_uint64_pair_t *host_item_ids)
+{
+	const ZBX_DC_ITEM	*dc_item;
+	const ZBX_DC_HOST	*dc_host;
+	int errcode = SUCCEED;
+
+	RDLOCK_CACHE;
+
+	if (NULL == (dc_host = DCfind_host(key->host)))
+	{
+		LOG_DBG("Couldn't find host id for name %s", key->host);
+		errcode = FAIL;
+	} else  {
+		host_item_ids->first= dc_host->hostid;
+
+		if (NULL == (dc_item = DCfind_item(dc_host->hostid, key->key)))
+		{
+			LOG_DBG("Couldn't find itemd id for key '%s'->'%s'", key->host, key->key );
+			errcode = FAIL;
+		} else 
+			 host_item_ids->second = dc_item->itemid;
+	}
+
+	UNLOCK_CACHE;
+	return errcode;
+}
+
 int	DCconfig_get_hostid_by_name(const char *host, zbx_uint64_t *hostid)
 {
 	const ZBX_DC_HOST	*dc_host;

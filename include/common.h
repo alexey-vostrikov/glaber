@@ -1671,6 +1671,7 @@ char	*zbx_expression_extract_constant(const char *src, const zbx_strloc_t *loc);
 #define ZBX_PREPROC_VALIDATE_NOT_SUPPORTED	26
 #define ZBX_PREPROC_XML_TO_JSON			27
 #define GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG	126
+#define GLB_PREPROC_DISPATCH_ITEM	127
 
 /* custom on fail actions */
 #define ZBX_PREPROC_FAIL_DEFAULT	0

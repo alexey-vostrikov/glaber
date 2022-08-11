@@ -1325,6 +1325,14 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 					$step_param_1->setAttribute('placeholder', _('Aggregation type'))
 				];
 				break;
+			case GLB_PREPROC_DISPATCH_ITEM:
+				$params = [
+					$step_param_0->setAttribute('placeholder', _('Host JSON path')),
+					$step_param_1->setAttribute('placeholder', _('item key'))
+				];
+				break;
+				
+
 
 			case ZBX_PREPROC_SCRIPT:
 				$params = new CMultilineInput($step_param_0->getName(), $step_param_0_value, [
@@ -1397,6 +1405,7 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 			case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 			case ZBX_PREPROC_SCRIPT:
 			case ZBX_PREPROC_STR_REPLACE:
+			case GLB_PREPROC_DISPATCH_ITEM:
 				$on_fail->setEnabled(false);
 				break;
 
