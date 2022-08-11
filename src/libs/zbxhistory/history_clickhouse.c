@@ -558,9 +558,13 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 	for (i = 0; i < history_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)&hist[i];
-				
-		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
+			
+		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOHISTORY))) {
+			DEBUG_ITEM(h->itemid, "Not saving item's history to clickhouse, flags are %u", h->flags);
 			continue;
+		}
+		
+		DEBUG_ITEM(h->itemid, "Saving item's history to clickhouse, flags are %u", h->flags);
 
 		int value_type = h->value_type;
 		

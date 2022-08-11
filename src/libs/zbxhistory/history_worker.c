@@ -459,9 +459,11 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		if (0 == conf->write_types[h->value_type]) 
 			continue;
 		
-		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF)))
+		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOHISTORY))) {
+			DEBUG_ITEM(h->itemid, "Not saving item's history to worker, flags are %u", h->flags);
 			continue;
-	
+		}
+		
 		zbx_json_addobject(&json, NULL);
 		zbx_json_addstring(&json,"hostname",h->host_name,ZBX_JSON_TYPE_STRING);
 		zbx_json_addstring(&json,"item_key",h->item_key,ZBX_JSON_TYPE_STRING);

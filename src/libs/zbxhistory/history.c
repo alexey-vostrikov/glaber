@@ -143,7 +143,7 @@ int	glb_history_add_history(ZBX_DC_HISTORY *history, int history_num)
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values_num; j++) {
-
+		
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE]->values[j];
 		glb_history_add_func_t write_values = callback->callback;
 		
