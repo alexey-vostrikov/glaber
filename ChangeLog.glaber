@@ -1,3 +1,5 @@
+ver 2.12.2
+    - fix: history/trends range chack on web forms
 ver 2.12.1
     - fix of #139 - history was saved even if history saving was disabled for an item
 ver 2.12.0

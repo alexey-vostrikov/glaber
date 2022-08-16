@@ -867,7 +867,7 @@ class CItem extends CItemGeneral {
 	 */
 	protected function checkSpecificFields(array $item, $method) {
 		if (array_key_exists('history', $item)
-				&& !validateTimeUnit($item['history'], SEC_PER_HOUR, 25 * SEC_PER_YEAR, true, $error,
+				&& !validateTimeUnit($item['history'], 0, 25 * SEC_PER_YEAR, true, $error,
 					['usermacros' => true])) {
 			self::exception(ZBX_API_ERROR_PARAMETERS,
 				_s('Incorrect value for field "%1$s": %2$s.', 'history', $error)
@@ -875,7 +875,7 @@ class CItem extends CItemGeneral {
 		}
 
 		if (array_key_exists('trends', $item)
-				&& !validateTimeUnit($item['trends'], SEC_PER_DAY, 25 * SEC_PER_YEAR, true, $error,
+				&& !validateTimeUnit($item['trends'], 0, 25 * SEC_PER_YEAR, true, $error,
 					['usermacros' => true])) {
 			self::exception(ZBX_API_ERROR_PARAMETERS,
 				_s('Incorrect value for field "%1$s": %2$s.', 'trends', $error)
