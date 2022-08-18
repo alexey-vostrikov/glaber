@@ -1094,10 +1094,10 @@ elseif (hasRequest('action') && getRequest('action') === 'item.masscheck_now' &&
 				'itemid' => $itemid
 			]
 		];
-		CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_UPDATE, $itemid);	
+//		CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_UPDATE, $itemid);	
 	}
 	
-	CZabbixServer::notifyConfigChanges();
+//	CZabbixServer::notifyConfigChanges();
 
 	$result = (bool) API::Task()->create($tasks);
 
