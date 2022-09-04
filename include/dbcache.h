@@ -364,8 +364,8 @@ zbx_config_hk_t;
 typedef struct
 {
 	char		*extension;
-	unsigned char	history_compression_status;
-	int		history_compress_older;
+	//unsigned char	history_compression_status;
+	//int		history_compress_older;
 }
 zbx_config_db_t;
 

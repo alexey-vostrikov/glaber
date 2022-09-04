@@ -39,9 +39,9 @@ static void	DCdump_config(void)
 
 	zabbix_log(LOG_LEVEL_TRACE, "db:");
 	zabbix_log(LOG_LEVEL_TRACE, "  extension: %s", config->config->db.extension);
-	zabbix_log(LOG_LEVEL_TRACE, "  history_compression_status: %d",
-			config->config->db.history_compression_status);
-	zabbix_log(LOG_LEVEL_TRACE, "  history_compress_older: %d", config->config->db.history_compress_older);
+	///zabbix_log(LOG_LEVEL_TRACE, "  history_compression_status: %d",
+	//		config->config->db.history_compression_status);
+	//zabbix_log(LOG_LEVEL_TRACE, "  history_compress_older: %d", config->config->db.history_compress_older);
 
 	zabbix_log(LOG_LEVEL_TRACE, "autoreg_tls_accept:%hhu", config->config->autoreg_tls_accept);
 

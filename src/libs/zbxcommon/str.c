@@ -1412,6 +1412,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "preprocessing manager";
 		case ZBX_PROCESS_TYPE_PREPROCESSOR:
 			return "preprocessing worker";
+		case GLB_PROCESS_TYPE_PREPROCESSOR:
+			return "glb_preproc_worker";
 		case ZBX_PROCESS_TYPE_LLDMANAGER:
 			return "lld manager";
 		case ZBX_PROCESS_TYPE_LLDWORKER:

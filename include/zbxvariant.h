@@ -55,6 +55,13 @@ struct zbx_variant
 #define ZBX_VARIANT_DBL_VECTOR	5
 #define ZBX_VARIANT_ERR	6
 
+
+#define VARIANT_VALUE_NONE  ZBX_VARIANT_NONE
+#define VARIANT_VALUE_STR 	ZBX_VARIANT_STR
+#define VARIANT_VALUE_DBL	ZBX_VARIANT_DBL
+#define VARIANT_VALUE_UINT64	ZBX_VARIANT_UI64
+#define VARIANT_VALUE_ERROR	ZBX_VARIANT_ERR
+
 void	zbx_variant_clear(zbx_variant_t *value);
 void	zbx_variant_set_none(zbx_variant_t *value);
 void	zbx_variant_set_str(zbx_variant_t *value, char *text);
@@ -79,6 +86,8 @@ void	*zbx_variant_data_bin_create(const void *data, zbx_uint32_t size);
 zbx_uint32_t	zbx_variant_data_bin_get(const void *bin, void **data);
 
 int	zbx_variant_to_value_type(zbx_variant_t *value, unsigned char value_type, char **errmsg);
+
+int variant_is_dynamic_length(variant_t *variant);
 
 ZBX_VECTOR_DECL(var, zbx_variant_t)
 

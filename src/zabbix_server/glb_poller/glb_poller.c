@@ -6,6 +6,9 @@
 #include "zbxserver.h"
 #include "zbxself.h"
 #include "preproc.h"
+#include "glb_preproc.h"
+#include "metric.h"
+
 #include "../events.h"
 #include "log.h"
 #include "glb_poller.h"
@@ -32,11 +35,11 @@ extern int CONFIG_CONFSYNCER_FREQUENCY;
 #define LOST_ITEMS_CHECK_INTERVAL 30 * 1000
 #define NEW_ITEMS_CHECK_INTERVAL  1 * 1000
 #define PROCTITLE_UPDATE_INTERVAL 5 * 1000
-#define ASYNC_RUN_INTERVAL	100
+#define ASYNC_RUN_INTERVAL	1
 #define ITEMS_REINIT_INTERVAL 300 * 1000 //after this time in poller item will be repolled whatever it's state is
 
-#define EVENT_ITEM_POLL 1
-#define EVENT_NEW_ITEMS_CHECK 2
+//#define EVENT_ITEM_POLL 1
+//#define EVENT_NEW_ITEMS_CHECK 2
 
 typedef struct
 {
@@ -610,6 +613,27 @@ void poller_preprocess_error(poller_item_t *poller_item, char *error)  {
 								  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
 }
 
+void poller_preprocess_error2(poller_item_t *poller_item, char *error) {
+	
+	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
+		 .value.type=VARIANT_VALUE_ERROR, .value.data.str = error };
+
+	preprocess_send_metric(&metric);
+}
+
+void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime) {
+	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
+		 .value.type=VARIANT_VALUE_STR, .value.data.str = value };
+	
+	//LOG_INF("Submitting item's string result to preproc: %s", value);
+	DEBUG_ITEM(poller_get_item_id(poller_item),"Submitting item's string result to preproc: %s", value);
+
+	metric_set_time(&metric, mstime);
+	//LOG_INF("preproc Calling send metric");
+	preprocess_send_metric(&metric);
+}
+
+
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error)
 {
 	zbx_timespec_t ts = {.sec = mstime / 1000, .ns = (mstime % 1000) * 1000000};
@@ -678,9 +702,11 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	if (SUCCEED != poller_init((zbx_thread_args_t *)args))
 		exit(-1);
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+	LOG_INF("%s #%d started [%s #%d]", get_program_type_string(program_type),
 			   server_num, get_process_type_string(process_type), process_num);
 
+	zbx_setproctitle("%s #%d [started]", get_process_type_string(process_type), process_num);
+	
 	poller_async_loop_run();
 	
 	poll_shutdown(&conf);

@@ -243,9 +243,9 @@ static int id_to_vector_dump_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void
 
 void obj_index_dump(obj_index_t *idx) {
     LOG_INF("From -> to dump:");
-    elems_hash_iterate(idx->from_to, id_to_vector_dump_cb, NULL);
+    elems_hash_iterate(idx->from_to, id_to_vector_dump_cb, NULL, ELEMS_HASH_READ_ONLY);
     LOG_INF("To -> from dump:");
-    elems_hash_iterate(idx->to_from, id_to_vector_dump_cb, NULL);
+    elems_hash_iterate(idx->to_from, id_to_vector_dump_cb, NULL, ELEMS_HASH_READ_ONLY);
 }
 
 int obj_index_get_numdata(obj_index_t *idx) {

@@ -17,7 +17,7 @@
 **/
 
 /* this is simple monitoring engine to export internal metrics
-via prometheus protocol via standart monitoring url
+via prometheus protocol via standard monitoring url
 
 now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 */
@@ -78,13 +78,9 @@ static void apm_track_metric(void *metric_ptr, unsigned char type, const char *n
         local_metric.labels = zbx_strdup(NULL,labels);
 
     zbx_hashset_insert(&conf.metrics, &local_metric, sizeof(apm_metric_t));
-//    LOG_INF("Finished");
- 
 }
 
-
 void apm_track_counter(u_int64_t *counter, const char *name, const char* labels) {
-//   LOG_INF("Tracking counter name %s", name);
     apm_track_metric(counter, METRIC_COUNTER, name, labels);
 }
 
@@ -145,11 +141,10 @@ void apm_flush() {
     
     if (time(NULL) < lastflush + conf.flushtime) 
         return;
-//    LOG_INF("APM: flushing metrics");
 
     lastflush = time(NULL);
+
     glb_ipc_send(conf.ipc, 0, &conf.metrics, 0);
-//    glb_ipc_dump_sender_queues(conf.ipc, "APM sender");
     glb_ipc_flush(conf.ipc);
 }
 
@@ -158,9 +153,6 @@ typedef struct {
     char *metrics;  
 } apm_ipc_metrics_t;
 
-/* the 'server' part. this api is really simple - it doesn't have http server
- but just a method for generating list of all the metrics into a buffer which has
- to be feed to the server code*/
 IPC_CREATE_CB(ipc_metric_create_cb) {
     
     apm_ipc_metrics_t *ipc_metric = ipc_data;
@@ -192,12 +184,12 @@ IPC_CREATE_CB(ipc_metric_create_cb) {
             HALT_HERE("Unsupported apm metric type for name %s{%s} : %d, this is programming bug", metric->name, metric->labels, metric->type);
         }
     }
-//    LOG_INF("APM: flush: created buffer '%s'", buffer);
 
     if ( 0 == offset || NULL == (ipc_metric->metrics = memf->malloc_func(NULL, offset)))
         return;
     
     zbx_strlcpy(ipc_metric->metrics, buffer, offset + 1);
+
     ipc_metric->pid =getpid();
 
     if (alloc > ZBX_MEBIBYTE) {
@@ -268,7 +260,6 @@ void apm_recieve_new_metrics() {
 //    glb_ipc_dump_reciever_queues(conf.ipc, "APM queue 0", 0);
 //    glb_ipc_dump_reciever_queues(conf.ipc, "APM queue 1", 1);
     glb_ipc_process(conf.ipc, 0, new_metrics_cb, NULL, 0);
-
 }
 
 const char *apm_server_dump_metrics() {
@@ -316,13 +307,16 @@ static size_t getCurrentRSS( )
 {
     long rss = 0L;
     FILE* fp = NULL;
+    
     if ( (fp = fopen( "/proc/self/statm", "r" )) == NULL )
         return (size_t)0L;      /* Can't open? */
+
     if ( fscanf( fp, "%*s%ld", &rss ) != 1 )
     {
         fclose( fp );
         return (size_t)0L;      /* Can't read? */
     }
+    
     fclose( fp );
     return (size_t)rss * (size_t)sysconf( _SC_PAGESIZE);
 }

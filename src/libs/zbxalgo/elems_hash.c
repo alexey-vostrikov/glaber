@@ -20,6 +20,13 @@
 #include "glb_lock.h"
 #include "log.h"
 
+#define elem_lock(elem, flags) \
+     if ((flags) & ELEMS_HASH_READ_ONLY) glb_rwlock_rdlock(&(elem)->rw_lock); else glb_rwlock_wrlock(&(elem)->rw_lock);
+
+#define elem_unlock(elem) \
+      glb_rwlock_unlock(&(elem)->rw_lock); 
+
+
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
     
     elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
@@ -52,8 +59,7 @@ void elems_hash_destroy(elems_hash_t *elems) {
    
     zbx_hashset_iter_reset(&elems->elems, &iter);
     
-   // LOG_INF("Starting while, total elements to delete %d",elems->elems.num_data);
-     while ( NULL != (elem = (elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) 
+    while ( NULL != (elem = (elems_hash_elem_t*)zbx_hashset_iter_next(&iter))) 
         (*elems->elem_free_func)(elem, &elems->memf);
    
     
@@ -62,17 +68,13 @@ void elems_hash_destroy(elems_hash_t *elems) {
     (*elems->memf.free_func)(elems);
 }
 
-
-//elements are created in and inserted in write lock mode
-//then the element remains blocked, but overall locked mode is switched to read mode
-//this will not allow others to read inconsistent object
 elems_hash_elem_t *create_element(elems_hash_t *elems,  uint64_t id, void *data ) {
     elems_hash_elem_t *elem, elem_local = {.id = id, .data = data };
     
     if (NULL == (elem = zbx_hashset_search(&elems->elems, &elem_local))) {  
 
-        glb_lock_init(&elem_local.lock);
-        glb_lock_block(&elem_local.lock);
+        glb_rwlock_init(&elem_local.rw_lock);
+        glb_rwlock_wrlock(&elem_local.rw_lock);
 
         (*elems->elem_create_func)(&elem_local, &elems->memf, data);
 
@@ -97,7 +99,7 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
 
     if (NULL == (elem = zbx_hashset_search(&elems->elems, &id))) {
 
-        glb_rwlock_unlock(&elems->meta_lock); //need to relock in write mode 
+        glb_rwlock_unlock(&elems->meta_lock);
 		
         if ( 1 == (flags & ELEM_FLAG_DO_NOT_CREATE))
             return FAIL;
@@ -112,11 +114,8 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
         glb_rwlock_unlock(&elems->meta_lock);
         glb_rwlock_rdlock(&elems->meta_lock);
 
-	}  else  {
-
-        glb_lock_block(&elem->lock);
-
-    }
+	}  else  
+        elem_lock(elem, flags);
 
 	ret = process_func(elem, &elems->memf, params);
         
@@ -131,7 +130,7 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
         return ret;
     }
 
-    glb_lock_unlock(&elem->lock);
+    elem_unlock(elem);
     glb_rwlock_unlock(&elems->meta_lock);
 
 	return ret;
@@ -188,7 +187,6 @@ ELEMS_CALLBACK(add_new_func_cb) {
     zbx_ptr_pair_t proc_params = {.first = elem, .second = params->second};
 
     if (FAIL == elems_hash_id_exists(elems, elem->id)) {
-    //    LOG_INF("Adding element id %ld", elem->id);
         elems_hash_process(elems, elem->id, addnew_func_cb, &proc_params, 0);
     }
 }
@@ -196,11 +194,9 @@ ELEMS_CALLBACK(add_new_func_cb) {
 
 int elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb) {
     zbx_ptr_pair_t params = {.first = new_elems, .second = update_func_cb};
- //   LOG_INF("Doing itearion on existing elements");
-    elems_hash_iterate(elems, update_delete_func_cb, &params);
-//    LOG_INF("Adding new elements (%d) total", elems_hash_get_num(new_elems));
+    elems_hash_iterate(elems, update_delete_func_cb, &params, ELEMS_HASH_WRITE);
     params.first = elems;
-    elems_hash_iterate(new_elems, add_new_func_cb, &params);
+    elems_hash_iterate(new_elems, add_new_func_cb, &params, ELEMS_HASH_WRITE);
 }
 
 
@@ -219,7 +215,8 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
   
 }   
 
-int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params) {
+
+int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags ) {
    
     elems_hash_elem_t *elem;
     int last_ret = SUCCEED;
@@ -231,9 +228,9 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
     
     while ( (NULL !=(elem = (elems_hash_elem_t*) zbx_hashset_iter_next(&iter))) &&
             SUCCEED == last_ret ) {
-        glb_lock_block(&elem->lock);
+        elem_lock(elem, flags);
         (*proc_func)(elem, &elems->memf, params);
-        glb_lock_unlock(&elem->lock);
+        elem_unlock(elem);
     }
     
     glb_rwlock_unlock(&elems->meta_lock);

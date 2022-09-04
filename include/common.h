@@ -614,7 +614,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_SERVER	38
 #define GLB_PROCESS_TYPE_AGENT	39
 #define GLB_PROCESS_TYPE_API_TRAPPER	40
-#define ZBX_PROCESS_TYPE_COUNT		41	/* number of process types */
+#define GLB_PROCESS_TYPE_PREPROCESSOR	41
+#define ZBX_PROCESS_TYPE_COUNT		42	/* number of process types */
 
 #define ZBX_PROCESS_TYPE_UNKNOWN	255
 const char	*get_process_type_string(unsigned char proc_type);
@@ -1672,6 +1673,8 @@ char	*zbx_expression_extract_constant(const char *src, const zbx_strloc_t *loc);
 #define ZBX_PREPROC_XML_TO_JSON			27
 #define GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG	126
 #define GLB_PREPROC_DISPATCH_ITEM	127
+#define GLB_PREPROC_JSON_FILTER 	128
+#define GLB_PREPROC_DISCOVERY_PREPARE  129
 
 /* custom on fail actions */
 #define ZBX_PREPROC_FAIL_DEFAULT	0

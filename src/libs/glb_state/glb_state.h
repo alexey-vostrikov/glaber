@@ -19,32 +19,13 @@
 
 //how long we learn new ranges per item
 #define GLB_CACHE_LEARN_RANGE   24*8600
-//extern int CONFIG_STATE_MEM_SIZE;
 extern size_t CONFIG_VALUE_CACHE_SIZE;
-
 
 #define GLB_CACHE_MIN_COUNT     10
 #define GLB_CACHE_MAX_COUNT     1024*1024 
 
 #define GLB_CACHE_ELEM_NOT_FOUND		-2
 #define GLB_CACHE_CANNOT_CREATE			-3
-
-//typedef struct {
-//    u_int64_t id;
-//    pthread_mutex_t lock;
-//    void *data;
-//} glb_cache_elem_t; 
-
-//typedef int	(*elem_update_func_t)(glb_cache_elem_t *elem, void *params);
-
-//typedef struct 
-//{
- //   zbx_hashset_t hset;
- //   pthread_rwlock_t meta_lock; 
-//	elem_update_func_t elem_create_func;
-//	void *config;
-//} glb_cache_elems_t; 
-
 
 typedef struct
 {

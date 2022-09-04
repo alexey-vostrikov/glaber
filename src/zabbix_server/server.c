@@ -64,6 +64,8 @@
 #include "taskmanager/taskmanager.h"
 #include "preprocessor/preproc_manager.h"
 #include "preprocessor/preproc_worker.h"
+#include "preprocessor/glb_preproc_worker.h"
+#include "glb_preproc.h"
 #include "availability/avail_manager.h"
 #include "lld/lld_manager.h"
 #include "lld/lld_worker.h"
@@ -225,6 +227,7 @@ int	CONFIG_IPMIMANAGER_FORKS	= 0;
 int	CONFIG_ALERTMANAGER_FORKS	= 1;
 int	CONFIG_PREPROCMAN_FORKS		= 1;
 int	CONFIG_PREPROCESSOR_FORKS	= 3;
+int	CONFIG_GLB_PREPROCESSOR_FORKS	= 1;
 int	CONFIG_LLDMANAGER_FORKS		= 1;
 int	CONFIG_LLDWORKER_FORKS		= 2;
 int	CONFIG_ALERTDB_FORKS		= 1;
@@ -420,6 +423,10 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
 		*local_process_num = local_server_num - server_count + CONFIG_PREPROCESSOR_FORKS;
+	} else if (local_server_num <= (server_count += CONFIG_GLB_PREPROCESSOR_FORKS))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_PREPROCESSOR;
+		*local_process_num = local_server_num - server_count + CONFIG_GLB_PREPROCESSOR_FORKS;
 	}
 	else if (local_server_num <= (server_count += CONFIG_LLDMANAGER_FORKS))
 	{
@@ -1056,6 +1063,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			100},
 		{"StartPreprocessorsPerManager",		&CONFIG_PREPROCESSOR_FORKS,		TYPE_INT,
 			PARM_OPT,	1,			1000},
+		{"StartGLBPreprocessors",		&CONFIG_GLB_PREPROCESSOR_FORKS,		TYPE_INT,
+			PARM_OPT,	1,			1000},
 		{"ExportDir",			&CONFIG_EXPORT_DIR,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"ExportType",			&CONFIG_EXPORT_TYPE,			TYPE_STRING_LIST,
@@ -1448,13 +1457,18 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-
-
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
 	
+
+	if (FAIL == preproc_ipc_init(128 * ZBX_MEBIBYTE)) {
+		zbx_error("Cannot initialize Processing notify IPC");
+		exit(EXIT_FAILURE);
+	}
+	
+
 	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_items_load()) {
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
 		exit(EXIT_FAILURE);
@@ -1525,6 +1539,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			+ CONFIG_SNMPTRAPPER_FORKS + CONFIG_PROXYPOLLER_FORKS + CONFIG_SELFMON_FORKS
 			+ CONFIG_VMWARE_FORKS + CONFIG_TASKMANAGER_FORKS + CONFIG_IPMIMANAGER_FORKS
 			+ CONFIG_ALERTMANAGER_FORKS + CONFIG_PREPROCMAN_FORKS + CONFIG_PREPROCESSOR_FORKS
+			+ CONFIG_GLB_PREPROCESSOR_FORKS
 			+ CONFIG_LLDMANAGER_FORKS + CONFIG_LLDWORKER_FORKS + CONFIG_ALERTDB_FORKS
 			+ CONFIG_HISTORYPOLLER_FORKS + CONFIG_AVAILMAN_FORKS + CONFIG_REPORTMANAGER_FORKS
 			+ CONFIG_REPORTWRITER_FORKS;
@@ -1684,6 +1699,9 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				break;
 			case ZBX_PROCESS_TYPE_PREPROCESSOR:
 				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
+				break;
+			case GLB_PROCESS_TYPE_PREPROCESSOR:
+				zbx_thread_start(glb_preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
 #ifdef HAVE_OPENIPMI
 			case ZBX_PROCESS_TYPE_IPMIMANAGER:

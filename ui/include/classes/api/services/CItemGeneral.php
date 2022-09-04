@@ -1671,7 +1671,6 @@ abstract class CItemGeneral extends CApiService {
 					case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 					case ZBX_PREPROC_SCRIPT:
 					case ZBX_PREPROC_STR_REPLACE:
-					case GLB_PREPROC_DISPATCH_ITEM:
 						if (is_array($preprocessing['error_handler'])) {
 							self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect arguments passed to function.'));
 						}

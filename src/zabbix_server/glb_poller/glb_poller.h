@@ -86,5 +86,7 @@ void poller_strpool_free(const char* str);
 const char *poller_strpool_add(const char * str);
 
 void poller_preprocess_error(poller_item_t *poller_item, char *error);
+void poller_preprocess_error2(poller_item_t *poller_item, char *error);
+void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime);
 
 #endif

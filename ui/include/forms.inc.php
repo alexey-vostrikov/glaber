@@ -1405,7 +1405,6 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 			case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
 			case ZBX_PREPROC_SCRIPT:
 			case ZBX_PREPROC_STR_REPLACE:
-			case GLB_PREPROC_DISPATCH_ITEM:
 				$on_fail->setEnabled(false);
 				break;
 

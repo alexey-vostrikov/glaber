@@ -279,13 +279,13 @@ static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, 
 	return SUCCEED;
 }
 
-int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock ) {
+int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock_wait ) {
 	
 	ipc_queue_t *local_free_queue = &ipc->local_queues->free_snd_queue;
 	ipc_queue_t *local_send_queue = &ipc->local_queues->send_queues[queue_num];
 	ipc_element_t  *element = NULL;
 
-	if (FAIL == get_free_queue_items(ipc, local_free_queue, lock)) {
+	if (FAIL == get_free_queue_items(ipc, local_free_queue, lock_wait)) {
 
 		return FAIL;
 	}
@@ -325,7 +325,7 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		if (local_rcv_queue->count == 0 ) 
 		{
 			if (now == last_rcv_check)
-				break; /*no reason to hummer queue more then once a millisecind */ 
+				break; /*no reason to hummer queue more then once a millisecond */ 
 
 			last_rcv_check = now;
 
@@ -341,9 +341,9 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		if (NULL != ipc->free_cb)
 			ipc->free_cb(&ipc->memf, (void *)(&element->data));	
 
-		move_one_element(local_rcv_queue, local_free_queue, "local_recieve -> local_free");
+		move_one_element(local_rcv_queue, local_free_queue, "local_receive -> local_free");
 		
-		if (local_free_queue->count >= 256 ) 
+		if (local_free_queue->count >= 64 ) 
 			move_all_elements(local_free_queue, &ipc->free_queue);
 		
 		i++;
@@ -445,7 +445,7 @@ void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {
 }
 
 void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc, char *name, int queue_num) {
-	LOG_INF("QUEUE reciever dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
+	LOG_INF("QUEUE receiver dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
 		name, ipc->local_queues->free_rcv_queue.count, ipc->free_queue.count, ipc->queues[queue_num].count, 
 		ipc->local_queues->rcv_queue.count);
 }

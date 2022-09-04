@@ -194,7 +194,6 @@ static void	hc_free_item_values(ZBX_DC_HISTORY *history, int history_num);
 static void	hc_queue_item(zbx_hc_item_t *item);
 static int	hc_queue_elem_compare_func(const void *d1, const void *d2);
 static int	hc_queue_get_size(void);
-static int	hc_get_history_compression_age(void);
 
 ZBX_PTR_VECTOR_DECL(item_tag, zbx_tag_t)
 ZBX_PTR_VECTOR_IMPL(item_tag, zbx_tag_t)
@@ -888,7 +887,7 @@ static void	DCadd_trend(const ZBX_DC_HISTORY *history, ZBX_DC_TREND **trends, in
  *                                                                            *
  ******************************************************************************/
 static void	DCmass_update_trends(const ZBX_DC_HISTORY *history, int history_num, ZBX_DC_TREND **trends,
-		int *trends_num, int compression_age)
+		int *trends_num)
 {
 	static int	last_trend_discard = 0;
 	zbx_timespec_t	ts;
@@ -2400,7 +2399,7 @@ static void	DBmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
  ******************************************************************************/
 static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uint64_t *itemids,
 		const DC_ITEM *items, const int *errcodes, int history_num, 
-		zbx_vector_ptr_t *inventory_values, int compression_age, zbx_vector_uint64_pair_t *proxy_subscribtions)
+		zbx_vector_ptr_t *inventory_values, zbx_vector_uint64_pair_t *proxy_subscribtions)
 {
 	static time_t	last_history_discard = 0;
 	time_t		now;
@@ -2822,7 +2821,7 @@ static void	sync_proxy_history(int *total_num, int *more)
 static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 {
 	int				i, history_num, 
-					txn_error, compression_age;
+					txn_error;// compression_age;
 
 	unsigned int			item_retrieve_mode;
 	time_t				sync_start;
@@ -2833,7 +2832,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 	item_retrieve_mode = NULL == CONFIG_EXPORT_DIR ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
 
-	compression_age = hc_get_history_compression_age();
+	//compression_age = hc_get_history_compression_age();
 
 	zbx_vector_ptr_create(&inventory_values);
 	zbx_vector_ptr_create(&trigger_diff);
@@ -2906,14 +2905,14 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 					item_retrieve_mode);
 
 			DCmass_prepare_history(history, &itemids, items, errcodes, history_num, 
-					&inventory_values, compression_age, &proxy_subscribtions);
+					&inventory_values, &proxy_subscribtions);
 			
 			//at this call history will be added to the history storage
 			//and state cache
 			glb_state_item_add_values(history, history_num);
 			glb_history_add_history(history,history_num);
 			
-			DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
+			DCmass_update_trends(history, history_num, &trends, &trends_num);
 			//need fix here - we've already have items, so there is no need to extra seraches
 			//however it's better to do different kind of processing
 			DC_get_trends_items_keys(trends,trends_num);
@@ -4220,26 +4219,26 @@ int	hc_queue_get_size(void)
 	return cache->history_queue.elems_num;
 }
 
-int	hc_get_history_compression_age(void)
-{
-#if defined(HAVE_POSTGRESQL)
-	zbx_config_t	cfg;
-	int		compression_age = 0;
+// int	hc_get_history_compression_age(void)
+// {
+// #if defined(HAVE_POSTGRESQL)
+// 	zbx_config_t	cfg;
+// 	int		compression_age = 0;
 
-	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_DB_EXTENSION);
+// 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_DB_EXTENSION);
 
-	if (ON == cfg.db.history_compression_status && 0 != cfg.db.history_compress_older)
-	{
-		compression_age = (int)time(NULL) - cfg.db.history_compress_older;
-	}
+// 	if (ON == cfg.db.history_compression_status && 0 != cfg.db.history_compress_older)
+// 	{
+// 		compression_age = (int)time(NULL) - cfg.db.history_compress_older;
+// 	}
 
-	zbx_config_clean(&cfg);
+// 	zbx_config_clean(&cfg);
 
-	return compression_age;
-#else
-	return 0;
-#endif
-}
+// 	return compression_age;
+// #else
+// 	return 0;
+// #endif
+// }
 
 /******************************************************************************
  *                                                                            *

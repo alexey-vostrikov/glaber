@@ -1574,7 +1574,7 @@ int glb_state_items_dump() {
     marshall_data_t mdata = {.dumper = &dumper, .json = &json, .records = 0, .items = 0};
 
     state_dumper_create(&dumper, "items");
-    elems_hash_iterate(state->items, marshall_item_cb, &mdata);
+    elems_hash_iterate(state->items, marshall_item_cb, &mdata, ELEMS_HASH_READ_ONLY);
     state_dumper_destroy(&dumper);
 
 	zbx_json_free(&json);

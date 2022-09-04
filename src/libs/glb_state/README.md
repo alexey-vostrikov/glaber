@@ -1,0 +1,1 @@
+objects and methods for keeping object's current state in memory and loading/offloading them

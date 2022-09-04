@@ -32,7 +32,8 @@
 #include "preproc_history.h"
 
 #include "item_preproc.h"
-
+#include "json_discovery.h"
+#include "zbxjson.h"
 
 extern zbx_es_t	es_engine;
 
@@ -1615,28 +1616,35 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 	}
 
 	key = ptr + 1;
-	//len_aggf = strlen(ptr + 1);
 	
 	DEBUG_ITEM(itemid,"Will fetch host data: host field '%s', host key '%s'", json_field, key);
 	DEBUG_ITEM(itemid,"Doing JSON search for '%s' field", json_field);
 	
 	struct zbx_json_parse	jp;
-	char			*data = NULL;
+	char *data = NULL;
+	size_t alloc = 0;
+	zbx_json_type_t type;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
 
-	if (FAIL == zbx_json_open(value->data.str, &jp) || FAIL == zbx_jsonpath_query(&jp, json_field, &data))
+	if (FAIL == zbx_json_open(value->data.str, &jp)) {
+		DEBUG_ITEM(itemid,"Cannot open JSON '%s'", value->data.str);
+		return SUCCEED; 
+	}
+
+	if ( ('$' != json_field[0] && FAIL == zbx_json_value_by_name_dyn(&jp, json_field, &data, &alloc, &type)) &&
+		FAIL == zbx_jsonpath_query(&jp, json_field, &data) )
 	{
 		*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
-		DEBUG_ITEM(itemid,"Couldn't find json path '%s' in JSON '%s'", json_field, value->data.str);
-		return FAIL;
+		DEBUG_ITEM(itemid,"Couldn't find json field or path '%s' in JSON '%s'", json_field, value->data.str);
+		return SUCCEED; //attribute not found, cannot be dispatched
 	}
 
 	if (NULL == data)
 	{
 		*errmsg = zbx_strdup(*errmsg, "no data matches the specified path");
-		return FAIL;
+		return SUCCEED;
 	}
 
 	DEBUG_ITEM(itemid, "Got result of field search: '%s'", data);
@@ -1657,16 +1665,122 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
 			&result, &ts, ITEM_STATE_NORMAL, NULL);
 		free_result(&result);
-		return SUCCEED;
-	} else {
-		DEBUG_ITEM(itemid, "Item hasn't been found, dropping");
+		zbx_free(data);
+		return FAIL; //this intentional to be able to stop processing via 'custom on fail checkbox'
+	} 
+	
+	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s", data, key);
+	zbx_free(data);
+	
+	DEBUG_ITEM(itemid, "In %s: finished", __func__);
+	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+}
+/***************************************************************************
+ * dispatches or routes the item to another host/item stated in the cfg    *
+ * *************************************************************************/ 
+static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
+		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+{
+	static unsigned char init_done = 0;
+	const char *ready_data = NULL;
+	struct zbx_json_parse	jp;
+
+	DEBUG_ITEM(itemid, "In %s: starting", __func__);
+
+	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+		return FAIL;
+
+	if (FAIL == zbx_json_open(value->data.str, &jp)) {
+		DEBUG_ITEM(itemid,"Cannot open JSON '%s'", value->data.str);
+		return SUCCEED; 
 	}
 
-	zbx_free(data);
+	//TODO: move to worker init section
+	if (!init_done) {
+//		json_discovery_init();
+		init_done = 1;
+	}
+	HALT_HERE("Not implemented yet");
 
-	DEBUG_ITEM(itemid, "In %s: finished", __func__);
+	int timeout = strtol(params,0,10);
+	DEBUG_ITEM(itemid, "In %s: discovery timeout is %d", timeout);
+	
+	json_discovery_add_data(itemid, (char *)value->data.str);
+	
+	if (NULL != (ready_data = json_discovery_get_data(itemid, timeout))) {
+		zbx_variant_set_str(value, (char *)ready_data);
+		return SUCCEED;
+	}
+
+	zbx_variant_set_none(value);
 	return SUCCEED;
 }
+
+/***************************************************************************
+ * filters and caches JSON data for Discovery processing    			   *
+ * *************************************************************************/ 
+static int item_preproc_json_filter(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
+		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+{
+	static char *json_fields = NULL;
+	
+	char *ptr;
+	int len_time;
+
+	DEBUG_ITEM(itemid, "In %s: starting", __func__);
+	
+	json_fields = zbx_strdup(json_fields, params);
+
+	DEBUG_ITEM(itemid,"Doing JSON search for '%s' fields", json_fields);
+	struct zbx_json_parse	jp;
+
+	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+		return FAIL;
+	
+	if (FAIL == zbx_json_open(value->data.str, &jp)) {
+		DEBUG_ITEM(itemid,"Cannot open data as valid JSON '%s'", value->data.str);
+		return SUCCEED; 
+	}
+	
+	struct zbx_json *new_json;
+	zbx_json_init(new_json, 1024);
+
+	char *field_name = strtok(json_fields,";");
+	
+	while (NULL != field_name) {
+		char field_value[MAX_STRING_LEN];
+		zbx_json_type_t type;
+
+		DEBUG_ITEM(itemid,"Processing field %s", field_name);
+		field_name = strtok(NULL, ";");
+		
+		if (SUCCEED == zbx_json_value_by_name(&jp, field_name, field_value, MAX_STRING_LEN, &type)) {
+			zbx_json_addstring(new_json, field_name, field_value, type);
+		}
+	}
+	
+	zbx_variant_set_str(value, new_json->buffer);
+	zbx_json_free(new_json);
+
+	
+	const char *filtered_json, *discovery_data;
+	HALT_HERE("Not implemented yet, waiting for managerless workers release");
+
+	// if (NULL == (filtered_json = json_discovery_filter_fields(&jp, json_fields)))  {
+	// 	DEBUG_ITEM(itemid,"No data after fields '%s', filtering '%s'", json_fields, value->data.str);
+	// 	return SUCCEED; 
+	// }
+
+	
+	// json_discovery_register_data(filtered_json);
+	
+	// if (NULL != (discovery_data = json_discovery_get_new_data())) {
+	// 	zbx_variant_set_str(value, (char *)filtered_json);
+	// } 
+
+	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -2369,6 +2483,14 @@ int	zbx_item_preproc(u_int64_t itemid, unsigned char value_type, zbx_variant_t *
 			break;
 		case GLB_PREPROC_DISPATCH_ITEM:
 			ret = item_preproc_dispatch(itemid, value, ts, op->params, history_value, history_ts, value_type,
+					error);
+			break;
+		case GLB_PREPROC_JSON_FILTER:
+			ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
+					error);
+			break;
+		case GLB_PREPROC_DISCOVERY_PREPARE:
+			ret = item_preproc_json_discovery_prepare(itemid, value, ts, op->params, history_value, history_ts, value_type,
 					error);
 			break;
 		case ZBX_PREPROC_SCRIPT:

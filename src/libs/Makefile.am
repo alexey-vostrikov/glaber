@@ -37,6 +37,7 @@ DIST_SUBDIRS = \
 	zbxavailability \
 	zbxeval \
 	glb_state \
+	glb_conf \
 	zbxxml \
 	apm
 
@@ -64,6 +65,7 @@ SERVER_SUBDIRS = \
 	zbxtrends \
 	zbxavailability \
 	glb_state \
+	glb_conf \
 	apm \
 	zbxeval \
 	zbxalgo/tests
@@ -91,6 +93,7 @@ PROXY_SUBDIRS = \
 	zbxtrends \
 	zbxavailability \
 	glb_state \
+	glb_conf \
 	apm \
 	zbxeval
 endif

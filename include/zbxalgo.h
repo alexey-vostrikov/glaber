@@ -78,6 +78,7 @@ typedef struct {
 	zbx_mem_free_func_t free_func;
 } mem_funcs_t;
 
+
 void	*zbx_default_mem_malloc_func(void *old, size_t size);
 void	*zbx_default_mem_realloc_func(void *old, size_t size);
 void	zbx_default_mem_free_func(void *ptr);
@@ -528,11 +529,12 @@ int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need
 #define ELEM_FLAG_DO_NOT_CREATE  1
 #define ELEM_FLAG_DELETE	2
 #define ELEM_FLAG_ITER_WRLOCK	4
-//#define ELEM_FLAG_REMAIN_LOCKED  8
+#define ELEMS_HASH_READ_ONLY 8
+#define ELEMS_HASH_WRITE  16
 
 typedef struct {
     u_int64_t id;
-    pthread_mutex_t lock;
+	pthread_rwlock_t rw_lock; 
     u_int8_t flags;
 	void *data;
 } elems_hash_elem_t; 
@@ -553,11 +555,12 @@ typedef struct  {
 
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t elem_free_func );
+
 int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data, u_int64_t flags);
 int		elems_hash_delete(elems_hash_t *elems,  uint64_t id);
 void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
-int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params);
+int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);
 int 	elems_hash_get_num(elems_hash_t *elems);
 int 	elems_hash_id_exists(elems_hash_t *elems, u_int64_t id);
 int 	elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb);

@@ -25,11 +25,6 @@
 #include <event2/dns.h>
 #include <event2/util.h>
 
-//typedef struct {
-//	u_int64_t itemid;
-//	resolve_cb cb;
-//} event_resolve_cb_t;
-
 typedef struct {
 	struct evdns_base *evdns_base;
 	struct event_base *events_base;
@@ -61,10 +56,9 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 	short int flags = 0;
 	poller_event_t *poller_event = zbx_calloc(NULL, 0, sizeof(poller_event_t));
 	
-	if ( 0 != fd) {
+	if ( 0 != fd)
 		flags = EV_READ;
-	//	LOG_INF("Will create fd event fd is %d", fd);
-	}
+	
 	if ( persist) 
 		flags |= EV_PERSIST;
 
@@ -73,7 +67,7 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 	
 	poller_event->event = event_new(conf.events_base, fd, flags, poller_cb, poller_event);
 	
-	/*note: give io priority */
+	/*note: give io more priority */
 	if (fd != 0) {
 		 event_priority_set(poller_event->event, 0);
 	} else {
@@ -81,11 +75,9 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 	}
 
 
-	if (NULL != poller_item) {
+	if (NULL != poller_item) 
 		poller_event->itemid = poller_get_item_id(poller_item);
-	//	DEBUG_ITEM(poller_event->itemid, "Created event %p for the item", poller_event->event);
-	}
-	
+
 	return poller_event;
 };
 
@@ -111,13 +103,11 @@ void poller_run_fd_event(poller_event_t *poll_event) {
 	event_add(poll_event->event, NULL);
 }
 
-
 void poller_async_resolve_cb(int result, char type, int count, int ttl, void *addresses, void *arg) {
 	u_int64_t itemid = (u_int64_t)arg;
 	poller_item_t *poller_item;
 
 	poller_item = poller_get_poller_item(itemid);
-	//LOG_INF("Item %ld resolved", itemid);
 	conf.dns_requests--;
 	
 	if (NULL == poller_item) 
@@ -154,7 +144,7 @@ int poller_async_get_dns_requests() {
 int poller_async_resolve(poller_item_t *poller_item,  const char *name) {
 
 	u_int64_t itemid = poller_get_item_id(poller_item);
-	//LOG_INF("Resolving %s", name);
+
 	if (NULL == evdns_base_resolve_ipv4(conf.evdns_base, name, 0, poller_async_resolve_cb, (void *)itemid)) {
 		
 		if ( NULL!= poller_item) {

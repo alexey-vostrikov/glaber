@@ -27,8 +27,6 @@
 #include "zbxjson.h"
 #include "poller_async_io.h"
 
-#define PINGER_SEND_PACKETS_EVENT 64
-
 typedef struct
 {
 	u_int64_t time;
@@ -46,10 +44,7 @@ typedef struct {
 	char state; //internal item state to distinguish async ops
 	char *ip; //ip address of the host
 	int count; //how many packets to send
-    unsigned int timeout; //timeout in ms - for how long to wait for the packet
-//	u_int64_t lastpacket_sent; //to control proper intrevals between packets in case is for some reason 
-//							   //there was a deleay in sending a packet, we need control that next 
-//							   //packet won't be sent too fast
+    unsigned int timeout; 
 
 	double	min;
 	double	sum;

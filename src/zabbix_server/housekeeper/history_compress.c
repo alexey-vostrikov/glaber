@@ -242,113 +242,113 @@ static void	hk_history_disable_compression(void)
 
 #endif
 
-/******************************************************************************
- *                                                                            *
- * Function: hk_history_compression_init                                      *
- *                                                                            *
- * Purpose: initializing compression for history/trends tables                *
- *                                                                            *
- ******************************************************************************/
-void	hk_history_compression_init(void)
-{
-#if defined(HAVE_POSTGRESQL)
-	int		disable_compression = 0;
-	char		*db_log_level = NULL;
-	zbx_config_t	cfg;
-	DB_RESULT	result;
-	DB_ROW		row;
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: hk_history_compression_init                                      *
+//  *                                                                            *
+//  * Purpose: initializing compression for history/trends tables                *
+//  *                                                                            *
+//  ******************************************************************************/
+// void	hk_history_compression_init(void)
+// {
+// #if defined(HAVE_POSTGRESQL)
+// 	int		disable_compression = 0;
+// 	char		*db_log_level = NULL;
+// 	zbx_config_t	cfg;
+// 	DB_RESULT	result;
+// 	DB_ROW		row;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	DBconnect(ZBX_DB_CONNECT_NORMAL);
-	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_DB_EXTENSION);
-	compression_status_cache = cfg.db.history_compression_status;
-	compress_older_cache = cfg.db.history_compress_older;
+// 	DBconnect(ZBX_DB_CONNECT_NORMAL);
+// 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_DB_EXTENSION);
+// 	compression_status_cache = cfg.db.history_compression_status;
+// 	compress_older_cache = cfg.db.history_compress_older;
 
-	if (0 == zbx_strcmp_null(cfg.db.extension, ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
-	{
-		/* surpress notice logs during DB initialization */
-		result = DBselect("show client_min_messages");
+// 	if (0 == zbx_strcmp_null(cfg.db.extension, ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
+// 	{
+// 		/* surpress notice logs during DB initialization */
+// 		result = DBselect("show client_min_messages");
 
-		if (NULL != (row = DBfetch(result)))
-		{
-			db_log_level = zbx_strdup(db_log_level, row[0]);
-			DBexecute("set client_min_messages to warning");
-		}
-		DBfree_result(result);
+// 		if (NULL != (row = DBfetch(result)))
+// 		{
+// 			db_log_level = zbx_strdup(db_log_level, row[0]);
+// 			DBexecute("set client_min_messages to warning");
+// 		}
+// 		DBfree_result(result);
 
-		if (ON == cfg.db.history_compression_status)
-		{
-			if (0 == cfg.db.history_compress_older)
-			{
-				disable_compression = 1;
-				hk_history_disable_compression();
-			}
-			else
-			{
-				DBexecute(ZBX_TS_UNIX_NOW_CREATE);
-				hk_history_enable_compression(cfg.db.history_compress_older + COMPRESSION_TOLERANCE);
-			}
-		}
-		else
-		{
-			hk_history_disable_compression();
-		}
-	}
-	else if (ON == cfg.db.history_compression_status)
-	{
-		disable_compression = 1;
-	}
+// 		if (ON == cfg.db.history_compression_status)
+// 		{
+// 			if (0 == cfg.db.history_compress_older)
+// 			{
+// 				disable_compression = 1;
+// 				hk_history_disable_compression();
+// 			}
+// 			else
+// 			{
+// 				DBexecute(ZBX_TS_UNIX_NOW_CREATE);
+// 				hk_history_enable_compression(cfg.db.history_compress_older + COMPRESSION_TOLERANCE);
+// 			}
+// 		}
+// 		else
+// 		{
+// 			hk_history_disable_compression();
+// 		}
+// 	}
+// 	else if (ON == cfg.db.history_compression_status)
+// 	{
+// 		disable_compression = 1;
+// 	}
 
-	if (0 != disable_compression && ZBX_DB_OK > DBexecute("update config set compression_status=0"))
-		zabbix_log(LOG_LEVEL_ERR, "failed to set database compression status");
+// 	if (0 != disable_compression && ZBX_DB_OK > DBexecute("update config set compression_status=0"))
+// 		zabbix_log(LOG_LEVEL_ERR, "failed to set database compression status");
 
-	zbx_config_clean(&cfg);
+// 	zbx_config_clean(&cfg);
 
-	if (NULL != db_log_level)
-	{
-		DBexecute("set client_min_messages to %s", db_log_level);
-		zbx_free(db_log_level);
-	}
+// 	if (NULL != db_log_level)
+// 	{
+// 		DBexecute("set client_min_messages to %s", db_log_level);
+// 		zbx_free(db_log_level);
+// 	}
 
-	DBclose();
+// 	DBclose();
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-#endif
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// #endif
+// }
 
-/******************************************************************************
- *                                                                            *
- * Function: hk_history_compression_update                                    *
- *                                                                            *
- * Purpose: history compression settings periodic update                      *
- *                                                                            *
- * Parameters: cfg - [IN] database extension history compression settings     *
- *                                                                            *
- ******************************************************************************/
-void	hk_history_compression_update(zbx_config_db_t *cfg)
-{
-#if defined(HAVE_POSTGRESQL)
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// /******************************************************************************
+//  *                                                                            *
+//  * Function: hk_history_compression_update                                    *
+//  *                                                                            *
+//  * Purpose: history compression settings periodic update                      *
+//  *                                                                            *
+//  * Parameters: cfg - [IN] database extension history compression settings     *
+//  *                                                                            *
+//  ******************************************************************************/
+// void	hk_history_compression_update(zbx_config_db_t *cfg)
+// {
+// #if defined(HAVE_POSTGRESQL)
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	if (ON == cfg->history_compression_status)
-	{
-		if (cfg->history_compression_status != compression_status_cache ||
-				cfg->history_compress_older != compress_older_cache)
-		{
-			DBexecute(ZBX_TS_UNIX_NOW_CREATE);
-			hk_history_enable_compression(cfg->history_compress_older + COMPRESSION_TOLERANCE);
-		}
-	}
-	else if (cfg->history_compression_status != compression_status_cache)
-	{
-		hk_history_disable_compression();
-	}
+// 	if (ON == cfg->history_compression_status)
+// 	{
+// 		if (cfg->history_compression_status != compression_status_cache ||
+// 				cfg->history_compress_older != compress_older_cache)
+// 		{
+// 			DBexecute(ZBX_TS_UNIX_NOW_CREATE);
+// 			hk_history_enable_compression(cfg->history_compress_older + COMPRESSION_TOLERANCE);
+// 		}
+// 	}
+// 	else if (cfg->history_compression_status != compression_status_cache)
+// 	{
+// 		hk_history_disable_compression();
+// 	}
 
-	compression_status_cache = cfg->history_compression_status;
-	compress_older_cache = cfg->history_compress_older;
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-#else
-	ZBX_UNUSED(cfg);
-#endif
-}
+// 	compression_status_cache = cfg->history_compression_status;
+// 	compress_older_cache = cfg->history_compress_older;
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// #else
+// 	ZBX_UNUSED(cfg);
+// #endif
+// }

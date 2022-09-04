@@ -5,7 +5,8 @@ noinst_LIBRARIES = libzbxsys.a
 libzbxsys_a_SOURCES = \
 	mutexs.c \
 	threads.c \
-	glb_lock.c
+	glb_lock.c 
+
 
 EXTRA_DIST = \
 	symbols.c

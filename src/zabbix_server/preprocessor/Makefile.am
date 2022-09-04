@@ -12,7 +12,10 @@ libpreprocessor_a_SOURCES = \
 	preproc_worker.c \
 	preproc_worker.h \
 	preprocessing.c \
-	preprocessing.h
+	preprocessing.h \
+	json_discovery.c \
+	glb_preproc_worker.c \
+	glb_preproc_ipc.c
 
 libpreprocessor_a_CFLAGS = \
 	 $(LIBXML2_CFLAGS)

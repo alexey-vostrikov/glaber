@@ -16,6 +16,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#define _GNU_SOURCE
+
 #include "../../../include/common.h"
 #include "worker.h"
 #include "log.h"
@@ -28,6 +30,8 @@
 #if (__FreeBSD_version) > 700000
 #define ENODATA 245
 #endif
+
+#define WORKER_CHANGE_TIMEOUT 30
 
 struct ext_worker_t {
 	char *path;       //path to executable to run
@@ -42,8 +46,9 @@ struct ext_worker_t {
 	int pipe_from_worker;	//communication pipes
 	int pipe_to_worker;
 	unsigned char async_mode; //worker is working in async mode - we don't wait it for the answer
-	//int last_fail;
 	int last_start;
+    int last_change;
+    int last_change_check;
 };
 
 extern int CONFIG_TIMEOUT;
@@ -58,6 +63,43 @@ static int get_worker_mode(char *mode)
         return GLB_WORKER_MODE_SILENT;
     return FAIL;
 }
+
+#define DEFAULT_PIPE_SIZE 65536
+
+int file_get_lastchange(const char *full_path)
+{
+    struct stat filestat;
+    time_t a;
+
+    if (-1  == stat( full_path ,&filestat))
+        return -1;
+    
+    if (filestat.st_mtime > filestat.st_ctime)
+        return filestat.st_ctime;
+    
+}
+
+static size_t get_max_pipe_buff_size() 
+{
+    long max_pipe_size = 0L;
+
+    FILE* fp = NULL;
+    if ( (fp = fopen("/proc/sys/fs/pipe-max-size", "r" )) == NULL ) {
+        LOG_WRN("Couldn't get max worker pipe size, cannot open proc file, will use 65k bytes as a safe default. Warn: might reduce performance on heavy loaded systems");
+        return DEFAULT_PIPE_SIZE;      /* Can't open, default will work on on most systems */
+    }
+    
+    if ( fscanf( fp, "%ld", &max_pipe_size ) != 1 )
+    {
+        fclose( fp );
+        LOG_WRN("Couldn't get max worker pipe size, cannot read proc file, will use 65k bytes as a safe default. Warn: might reduce performance on heavy loaded systems");
+        return DEFAULT_PIPE_SIZE;      /* Can't read? */
+    }
+    
+    fclose( fp );
+    return (size_t)max_pipe_size;
+}
+
 
 int glb_process_worker_params(ext_worker_t *worker, char *params_buf) {
     
@@ -277,7 +319,12 @@ static int restart_worker(ext_worker_t *worker)
     
     worker->pipe_to_worker = to_child[1];
     worker->pipe_from_worker = from_child[0];
-   
+    
+    int max_pipe_buff_size = get_max_pipe_buff_size();
+
+    fcntl(worker->pipe_from_worker, F_SETPIPE_SZ, max_pipe_buff_size);
+    fcntl(worker->pipe_to_worker, F_SETPIPE_SZ, max_pipe_buff_size);
+
     worker->calls = 0;
    
     zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
@@ -294,17 +341,27 @@ int glb_start_worker(ext_worker_t *worker) {
 int worker_is_alive(ext_worker_t *worker)
 {
     if (!worker->pid)
-    {
-    //    if ( 0 != worker->last_fail) 
-    //        LOG_DBG("Worker hasn't been running before");
         return FAIL;
-    }
+        
     if (kill(worker->pid, 0))
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "sending kill to worker's pid %d has returned non 0",worker->pid);
         return FAIL;
     }
+    
     return SUCCEED;
+}
+
+static int worker_is_changed(ext_worker_t *worker) {
+
+ //   if (time(NULL) - WORKER_CHANGE_TIMEOUT > worker->last_change_check && 
+//         worker->last_change != file_get_lastchange(worker->path)) 
+//    {
+ //       worker->last_change_check = time(NULL);
+ //       return SUCCEED;
+ //   }
+    
+    return FAIL;
 }
 
 static void worker_cleanup(ext_worker_t *worker)
@@ -326,9 +383,6 @@ static void worker_cleanup(ext_worker_t *worker)
     {
         bytes += read_num;
     }
-
-    //if (bytes > 0)
-    //    zabbix_log(LOG_LEVEL_INFORMATION, "GARBAGE DETECTED  %d bytes of garbage from %s: %s", bytes, worker->path, *buffer);
 
     fcntl(worker->pipe_from_worker, F_SETFL, flags);
     zabbix_log(LOG_LEVEL_DEBUG, "%s, finished", __func__);
@@ -362,11 +416,17 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
         if (SUCCEED != restart_worker(worker)) 
             return FAIL;
     }
-    else
+
+    if (SUCCEED == worker_is_changed(worker)) 
     {
-        zabbix_log(LOG_LEVEL_DEBUG, "%s : worker %s is alive, pid is %d, served requests %d out of %d",
-                   __func__, worker->path, worker->pid, worker->calls, worker->max_calls);
+         zabbix_log(LOG_LEVEL_WARNING, "%s: worker %s file has changed, restarting", __func__, worker->path);
+         if (SUCCEED != restart_worker(worker)) 
+             return FAIL;
     }
+
+    zabbix_log(LOG_LEVEL_DEBUG, "%s : worker %s is alive, pid is %d, served requests %d out of %d",
+                   __func__, worker->path, worker->pid, worker->calls, worker->max_calls);
+    
 
     if (request)
         request_len = strlen(request);
@@ -488,7 +548,6 @@ int async_buffered_responce(ext_worker_t *worker,  char **response) {
                 }
                 return SUCCEED;
             } else { //there is an incomplete data sitting in the buffer which starts as start marker
-                zabbix_log(LOG_LEVEL_INFORMATION, "In %s() found incomplete data: %s at %ld", __func__, circle_buffer + start, start);
                 char *tmp_buff = zbx_malloc(NULL, MAX_STRING_LEN);
                 size_t offset = 0, allocated = MAX_STRING_LEN;
                 zbx_strcpy_alloc(&tmp_buff,&allocated, &offset, circle_buffer+start);
@@ -500,9 +559,8 @@ int async_buffered_responce(ext_worker_t *worker,  char **response) {
                 zbx_free(tmp_buff);
             }
         } 
+        
         zabbix_log(LOG_LEVEL_DEBUG, "In %s() finished buffer operations, will read from worker ", __func__);
-        //ok, there is either no data in the buffer or it's incomplete, it's aleady in the start of the buffer
-        //reading next piece of data from the worker
         
         if (SUCCEED == glb_worker_responce(worker,&wresp)) {
            // zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Adding worker response '%s' at %d ", __func__,wresp, start);
@@ -576,7 +634,7 @@ int glb_worker_responce(ext_worker_t *worker,  char ** responce) {
                     //while waitng for some new data to appear
                 
                     if (wait_count++ > 1 && worker->async_mode == 0) {
-                        usleep(1000000);
+                        usleep(1000);
                         zabbix_log(LOG_LEVEL_DEBUG, "Waiting for new data for SYNC responce from the worker");
                     } else {
                         zabbix_log(LOG_LEVEL_DEBUG, "Not waiting for new data from the worker due to ASYNC mode");
@@ -597,7 +655,7 @@ int glb_worker_responce(ext_worker_t *worker,  char ** responce) {
                     continue_read = 0;
                     worker_fail = 1;
                 } else
-                    usleep(1000000); //whatever else is is it's good to time to take a nap to save some CPU heat
+                    usleep(1000); //whatever else is is it's good to time to take a nap to save some CPU heat
                 break;
             
             default: //succesifull read
@@ -756,6 +814,8 @@ ext_worker_t *worker_init(const char* path, unsigned int max_calls,
     worker->mode_from_worker = mode_from_worker;
     worker->mode_to_worker = mode_to_worker;
     worker->timeout = timeout;
+    worker->last_change = file_get_lastchange(path);
+    worker->last_change_check = time(NULL);
     
     return worker;
 }

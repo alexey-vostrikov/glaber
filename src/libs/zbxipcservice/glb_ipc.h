@@ -47,8 +47,10 @@
 	in cases when same data traverses several steps to avoid extra memory copyings
 5.  sender might use flush function to force immediate sending
 	*/
+#ifndef GLB_IPC_H
+#define GLB_IPC_H
 
-#define IPC_BULK_COUNT 256
+#define IPC_BULK_COUNT 512
 #define IPC_LOW_LATENCY_COUNT 4
 
 typedef enum 
@@ -85,9 +87,7 @@ ipc_conf_t	*glb_ipc_init(int elems_count, int elem_size, int consumers, mem_func
 			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
 void		glb_ipc_destroy(ipc_conf_t* ipc);
 
-//this will copy data to the ipc mem and put to local queue and try to flush 
-int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned char lock);
-
+int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned char lock_wait);
 int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
 
 int		glb_ipc_flush(ipc_conf_t *ipc_conf);
@@ -104,3 +104,4 @@ int 	ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint6
 int 	ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock);
 
 void 		ipc_vector_uint64_destroy(ipc_conf_t *ipc);
+#endif
