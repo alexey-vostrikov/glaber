@@ -12824,10 +12824,7 @@ unsigned int	DCget_internal_action_count(void)
  ******************************************************************************/
 void	zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags)
 {
-	LOG_INF("Locking cache");
 	RDLOCK_CACHE;
-	LOG_INF("Locked cache");
-
 	if (0 != (flags & ZBX_CONFIG_FLAGS_SEVERITY_NAME))
 	{
 		int	i;
@@ -12837,37 +12834,26 @@ void	zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags)
 		for (i = 0; i < TRIGGER_SEVERITY_COUNT; i++)
 			cfg->severity_name[i] = zbx_strdup(NULL, config->config->severity_name[i]);
 	}
-	LOG_INF("Locked cache1");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_DISCOVERY_GROUPID))
 		cfg->discovery_groupid = config->config->discovery_groupid;
-	LOG_INF("Locked cache2");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_DEFAULT_INVENTORY_MODE))
 		cfg->default_inventory_mode = config->config->default_inventory_mode;
-	LOG_INF("Locked cache3");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_SNMPTRAP_LOGGING))
 		cfg->snmptrap_logging = config->config->snmptrap_logging;
-	LOG_INF("Locked cache4");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_HOUSEKEEPER))
 		cfg->hk = config->config->hk;
-	LOG_INF("Locked cache5");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_DB_EXTENSION))
 	{
 		cfg->db.extension = zbx_strdup(NULL, config->config->db.extension);
 		//cfg->db.history_compression_status = config->config->db.history_compression_status;
 		//cfg->db.history_compress_older = config->config->db.history_compress_older;
 	}
-	LOG_INF("Locked cache6");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_AUTOREG_TLS_ACCEPT))
 		cfg->autoreg_tls_accept = config->config->autoreg_tls_accept;
-	LOG_INF("Locked cache7");
 	if (0 != (flags & ZBX_CONFIG_FLAGS_DEFAULT_TIMEZONE)) {
-		LOG_INF("Default timezone is");
-		LOG_INF("Default timezone is %s",  config->config->default_timezone);
 		cfg->default_timezone = zbx_strdup(NULL, config->config->default_timezone);
 	}
-	LOG_INF("Locked cache8");
 	UNLOCK_CACHE;
-	LOG_INF("Locked cache9");
 	cfg->flags = flags;
 }
 
