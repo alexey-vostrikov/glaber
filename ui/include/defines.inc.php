@@ -21,7 +21,7 @@
 define('ZABBIX_VERSION',		'5.4.11');
 define('ZABBIX_API_VERSION',	'5.4.11');
 define('ZABBIX_EXPORT_VERSION',	'5.4');
-define('GLABER_VERSION','2.12.4');
+define('GLABER_VERSION','2.13.0');
 
 define('ZABBIX_DB_VERSION',		5040000);
 

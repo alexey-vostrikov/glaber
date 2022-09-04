@@ -1,3 +1,6 @@
+ver 2.13.0
+    - implemented r/w locking for high concurrency objects, several test workers (log, http listener, dummy generator) implemented, structure for
+      managerless preprocessing prepared, history compression code cleaned out, worker pipe size increased to ease worker implementation
 ver 2.12.4
     - fix: changeset broken on 'test now' buttom in UI
 ver 2.12.3
