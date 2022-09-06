@@ -1,3 +1,5 @@
+ver 2.13.3
+    - bug fix: #140 - interface isn't required for worker items anymore
 ver 2.13.2
     - bug fix: #151, tests for reroute steps created and completed, glb_conf a s separate 
     lib initiated
