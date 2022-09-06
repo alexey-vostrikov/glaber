@@ -1585,76 +1585,143 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 
 	return SUCCEED;
 }
+
+
+static char *get_host_name_from_json(u_int64_t itemid, char *json, char *host_param) {
+	
+	static char hostname[MAX_ZBX_HOSTNAME_LEN];
+	static char hostfield[MAX_ZBX_HOSTNAME_LEN];
+
+	char* hostname_dyn = NULL;
+	struct zbx_json_parse	jp;
+	zbx_json_type_t type;
+
+	if (NULL == host_param || NULL == json)
+		return NULL;
+	
+	if (FAIL == zbx_json_open(json, &jp)) {
+		//DEBUG_ITEM(itemid,"Cannot open JSON '%s'", json);
+		return NULL; 
+	}
+
+	char *f_start, *f_end;
+
+	if (NULL != (f_start = strchr(host_param,'{')) && NULL !=(f_end = strchr(f_start, '}'))) {
+		size_t alloc = 0;
+		//LOG_INF("Found brackets");
+
+		if (f_start + 1 == f_end)
+			return NULL;
+		
+		zbx_strlcpy(hostfield, f_start + 1, f_end -f_start);
+	//	LOG_INF("Resulting field name is %s,  suffix is %s", hostfield, f_end + 1);
+		
+		if (f_start > host_param) {
+			zbx_strlcpy(hostname, host_param, f_start - host_param + 1 );
+			alloc = f_start - host_param;
+		}
+	//	LOG_INF("After prexix processing hostname is %s, alloc is %d", hostname, alloc);
+
+		if (hostfield[0] == '$') {
+
+			if (SUCCEED == zbx_jsonpath_query(&jp, hostfield, &hostname_dyn)) {
+				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN,hostname_dyn);
+				zbx_free(hostname_dyn);
+			}
+			else 
+				return NULL;
+		} else {
+		//	LOG_INF("Non-path processing of name in ");
+			char hostvalue[MAX_ZBX_HOSTNAME_LEN];
+			
+			if (SUCCEED == zbx_json_value_by_name(&jp, hostfield, hostvalue, MAX_ZBX_HOSTNAME_LEN, &type)) {
+		//		LOG_INF("Found host value %s, name is %s, alloc is %d", hostvalue, hostname, alloc);
+				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN, hostvalue);
+		//		LOG_INF("Name: prefix+name is :%s", hostname);
+				//alloc = strlen(hostname);
+			} else 
+				return NULL;
+		}
+
+		zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN-alloc, f_end + 1);
+		//LOG_INF("Full name is %s", hostname);
+		return hostname;
+	}
+
+	if (host_param[0] == '$') {
+		zbx_free(hostname_dyn);
+		
+		if (SUCCEED == zbx_jsonpath_query(&jp, host_param, &hostname_dyn)) {
+			zbx_snprintf(hostname, MAX_ZBX_HOSTNAME_LEN,hostname_dyn);
+			zbx_free(hostname_dyn);
+			return hostname;
+		}
+	} else {
+		if (SUCCEED == zbx_json_value_by_name(&jp, host_param, hostname, 256, &type))
+			return hostname;
+	}
+	return NULL;
+}
+
+typedef struct {
+	char *params[16];
+	char count;
+} preproc_params_t;
+
+
+static preproc_params_t* item_preproc_parse_params(char *params_str) {
+	static preproc_params_t params = {0};
+
+	if (NULL == params_str) {
+		params.count = -1;
+		return &params;
+	}
+
+	params.count = 0;
+
+	char *ptr = strtok(params_str, "\n");
+
+	while (NULL != ptr) {
+		params.params[params.count] = ptr;
+		ptr = strtok(NULL, "\n");
+		params.count++;
+	}
+
+	return &params;
+}
+
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
  * *************************************************************************/ 
-static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
 {
-	const char *json_field, *key;
-	
-	char *ptr;
-	int len_time;
+	zbx_uint64_pair_t host_item_ids;
+	char *hostname = NULL;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
 	
-	json_field = params;
-
-	if (NULL == (ptr = strchr(params, '\n')))
-	{
-		THIS_SHOULD_NEVER_HAPPEN;
-		*errmsg = zbx_strdup(*errmsg, "cannot find second parameter");
-		return FAIL;
-	}
-	
-	*ptr = '\0';
-
-	if (0 == (len_time = ptr - params))
-	{
-		*errmsg = zbx_strdup(*errmsg, "first parameter is expected");
-		return FAIL;
-	}
-
-	key = ptr + 1;
-	
-	DEBUG_ITEM(itemid,"Will fetch host data: host field '%s', host key '%s'", json_field, key);
-	DEBUG_ITEM(itemid,"Doing JSON search for '%s' field", json_field);
-	
-	struct zbx_json_parse	jp;
-	char *data = NULL;
-	size_t alloc = 0;
-	zbx_json_type_t type;
-
+			
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
-		return FAIL;
+		return SUCCEED;
 
-	if (FAIL == zbx_json_open(value->data.str, &jp)) {
-		DEBUG_ITEM(itemid,"Cannot open JSON '%s'", value->data.str);
-		return SUCCEED; 
-	}
+//	DEBUG_ITEM(itemid,"Will fetch host data: host field '%s', host key '%s'", json_field, key);
+//	DEBUG_ITEM(itemid,"Doing JSON search for '%s' field", json_field);
+	preproc_params_t *params = item_preproc_parse_params(params_str);
 
-	if ( ('$' != json_field[0] && FAIL == zbx_json_value_by_name_dyn(&jp, json_field, &data, &alloc, &type)) &&
-		FAIL == zbx_jsonpath_query(&jp, json_field, &data) )
-	{
-		*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
-		DEBUG_ITEM(itemid,"Couldn't find json field or path '%s' in JSON '%s'", json_field, value->data.str);
-		return SUCCEED; //attribute not found, cannot be dispatched
-	}
-
-	if (NULL == data)
-	{
-		*errmsg = zbx_strdup(*errmsg, "no data matches the specified path");
+	if (params->count != 2) {
+		DEBUG_ITEM(itemid,"Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
 		return SUCCEED;
 	}
 
-	DEBUG_ITEM(itemid, "Got result of field search: '%s'", data);
-	DEBUG_ITEM(itemid, "Looking for the new itemid for host '%s':'%s'", data, key);
+	if (NULL == (hostname = get_host_name_from_json(itemid, value->data.str, params->params[0]))) {
+		DEBUG_ITEM(itemid,"Cannot dispatch: cannot find host name '%s'", params->params[0]);
+		return SUCCEED;
+	}
 	
-	zbx_host_key_t host_key = {.host = data, .key = (char *)key};
-	zbx_uint64_pair_t host_item_ids;
+	zbx_host_key_t host_key = {.host = hostname, .key = params->params[1]};
 
-	//TODO: high load: add caching
 	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids) ) {
+
 		AGENT_RESULT result={0};
 		zbx_timespec_t ts;
 		zbx_timespec(&ts);
@@ -1665,12 +1732,10 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
 			&result, &ts, ITEM_STATE_NORMAL, NULL);
 		free_result(&result);
-		zbx_free(data);
 		return FAIL; //this intentional to be able to stop processing via 'custom on fail checkbox'
 	} 
 	
-	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s", data, key);
-	zbx_free(data);
+	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s",host_key.host, host_key.key);
 	
 	DEBUG_ITEM(itemid, "In %s: finished", __func__);
 	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
@@ -2482,8 +2547,7 @@ int	zbx_item_preproc(u_int64_t itemid, unsigned char value_type, zbx_variant_t *
 					error);
 			break;
 		case GLB_PREPROC_DISPATCH_ITEM:
-			ret = item_preproc_dispatch(itemid, value, ts, op->params, history_value, history_ts, value_type,
-					error);
+			ret = item_preproc_dispatch(itemid, value, ts, op->params, 	error);
 			break;
 		case GLB_PREPROC_JSON_FILTER:
 			ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
@@ -2633,6 +2697,13 @@ int	zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const 
 
 	return ret;
 }
+
+
+
+#ifdef HAVE_GLB_TESTS
+#	include "item_preproc_test.c"
+
+#endif
 
 #ifdef HAVE_TESTS
 #	include "../../../tests/zabbix_server/preprocessor/item_preproc_test.c"

@@ -1,3 +1,8 @@
+ver 2.13.2
+    - bug fix: #151, tests for reroute steps created and completed, glb_conf a s separate 
+    lib initiated
+ver 2.13.1
+    - logging fix 
 ver 2.13.0
     - implemented r/w locking for high concurrency objects, several test workers (log, http listener, dummy generator) implemented, structure for
       managerless preprocessing prepared, history compression code cleaned out, worker pipe size increased to ease worker implementation

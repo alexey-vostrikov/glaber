@@ -85,6 +85,7 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxprometheus/libzbxprometheus.a \
 	$(top_builddir)/src/libs/zbxvault/libzbxvault.a \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
+	$(top_builddir)/src/libs/glb_conf/libglbconfig.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
 	$(top_builddir)/src/libs/zbxavailability/libzbxavailability.a \
 	libzbxproxy.a

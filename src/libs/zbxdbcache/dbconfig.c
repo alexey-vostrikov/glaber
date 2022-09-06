@@ -42,6 +42,8 @@
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/glb_poller/glb_pinger.h"
 #include "../glb_objects/glb_trigger.h"
+#include "../glb_conf/conf_hosts.h"
+
 //#include "../glb_objects/glb_discovery.h"
 
 #include "../glb_state/glb_state.h"
@@ -2638,10 +2640,13 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 	unsigned char		type, main_, useip;
 	unsigned char		reset_snmp_stats;
 	zbx_vector_ptr_t	interfaces;
+	
+	zbx_vector_uint64_t changed_hosts;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_ptr_create(&interfaces);
+	zbx_vector_uint64_create(&changed_hosts);
 
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
@@ -2659,6 +2664,8 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 		/* This may be possible if the host was added after we synced config for hosts. */
 		if (NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &hostid)))
 			continue;
+
+		zbx_vector_uint64_append(&changed_hosts, hostid);
 
 		interface = (ZBX_DC_INTERFACE *)DCfind_id(&config->interfaces, interfaceid, sizeof(ZBX_DC_INTERFACE), &found);
 		zbx_vector_ptr_append(&interfaces, interface);
@@ -2863,6 +2870,9 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 	}
 
 	zbx_vector_ptr_destroy(&interfaces);
+	
+	conf_hosts_notify_changes(&changed_hosts);
+	zbx_vector_uint64_destroy(&changed_hosts);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -2972,8 +2982,6 @@ static unsigned char	*dup_serialized_expression(const unsigned char *src)
 
 	return dst;
 }
-
-
 
 static int DC_remove_item(u_int64_t itemid) {
 	
@@ -16268,4 +16276,43 @@ int DC_dump_cache_stats() {
 	WRLOCK_CACHE;
 	zbx_mem_dump_stats(LOG_LEVEL_CRIT, config_mem );
 	UNLOCK_CACHE;
+}
+
+void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) {
+	ZBX_DC_HOST *host;
+	zbx_hashset_iter_t iter;
+	u_int64_t *itemid;
+	RDLOCK_CACHE;
+	
+	if (NULL == (host = zbx_hashset_search(&config->hosts, &hostid))) {
+		UNLOCK_CACHE;
+		return;
+	}
+
+	zbx_hashset_iter_reset(&host->itemids, &iter);
+	
+	while (NULL != (itemid = zbx_hashset_iter_next(&iter)))
+		zbx_vector_uint64_append(items, *itemid );
+
+	UNLOCK_CACHE;
+}
+
+void DC_notify_changed_items(zbx_vector_uint64_t *items) {
+	int i;
+
+	poller_item_notify_init();
+	RDLOCK_CACHE;
+	
+	for (i = 0; i < items->values_num; i++ ) {
+		ZBX_DC_ITEM *item;
+		
+		if (NULL == (item = zbx_hashset_search(&config->items, &items->values[i])))
+			continue;
+
+		poller_item_add_notify(item->type, item->itemid, item->hostid);
+	}
+
+	UNLOCK_CACHE;
+	poller_item_notify_flush();
+
 }

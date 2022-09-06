@@ -1386,7 +1386,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 //#define HAVE_TESTS 1
 
-#if defined(HAVE_TESTS)
+#if defined(HAVE_GLB_TESTS)
 	LOG_INF("Running tests");
 	tests_server_run();
 	LOG_INF("Finished tests - SUCCEED");

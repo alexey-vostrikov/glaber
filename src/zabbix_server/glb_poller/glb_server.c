@@ -63,15 +63,17 @@ static int glb_server_submit_result(poller_item_t *poller_item, char *response) 
     //}
    
     poller_inc_responces();
-    
+    // poller_preprocess_str(poller_item, response , NULL);
+
+
     AGENT_RESULT	result={0};
        
     init_result(&result);
     zbx_rtrim(response, ZBX_WHITESPACE);
     SET_TEXT_RESULT(&result, zbx_strdup(NULL, response));
-    //set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
-   // poller_preprocess_str(poller_item, response , NULL);
-    
+    set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
+    poller_preprocess_value(poller_item, &result, glb_ms_time(), ITEM_STATE_NORMAL, NULL);
+       
     free_result(&result);
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 }
@@ -159,7 +161,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
         int last_status;
         char *worker_responce = NULL;
         
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Reading from worker");
+        //DEBUG_ITEM(poller_get_item_id(poller_item), "Reading from worker");
         while (SUCCEED == (last_status = async_buffered_responce(worker->worker, &worker_responce)) && 
                           (NULL != worker_responce) 
                           //&& 
@@ -171,7 +173,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
                 glb_server_submit_result(poller_item, worker_responce);
         }
 
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Finished reading from worker");
+        //DEBUG_ITEM(poller_get_item_id(poller_item), "Finished reading from worker");
         if (FAIL == last_status ) {
             DEBUG_ITEM(poller_get_item_id(poller_item), "Submitting data in non supported state (last_status is FAIL)");
             glb_server_submit_fail_result(poller_item,"Couldn't read from the worker - either filename is wrong or temporary fail");
@@ -187,7 +189,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
             glb_start_worker(worker->worker);
         }
     }
-    LOG_INF("Finished poller read ");
+   // LOG_INF("Finished poller read ");
     return POLLER_ITERATOR_CONTINUE;
 }
 

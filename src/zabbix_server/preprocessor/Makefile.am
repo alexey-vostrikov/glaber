@@ -15,7 +15,7 @@ libpreprocessor_a_SOURCES = \
 	preprocessing.h \
 	json_discovery.c \
 	glb_preproc_worker.c \
-	glb_preproc_ipc.c
+	glb_preproc_ipc.c 
 
 libpreprocessor_a_CFLAGS = \
 	 $(LIBXML2_CFLAGS)

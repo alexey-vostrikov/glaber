@@ -1,6 +1,5 @@
 /*
-** Glaber
-** Copyright (C) 2018-2042 Glaber
+** Copyright Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,22 +15,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#include "common.h"
-//#ifdef HAVE_GLB_TEST
-
-#include "../../libs/zbxalgo/tests/algo_tests.h"
-#include "../preprocessor/worker_tests.h"
-
 #include "log.h"
-void tests_server_run(void) {
-    LOG_INF("Running server tests");
-    
-    LOG_INF("Running preprocessing worker tests");
-    test_worker_steps();
- 
-    LOG_INF("Running algo tests");
-    tests_algo_run();
-    
-    LOG_INF("Server tests finished");
-}
-//#endif
+#include "zbxalgo.h"
+
+void conf_hosts_notify_changes(zbx_vector_uint64_t *changed_hosts);

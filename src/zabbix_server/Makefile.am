@@ -94,6 +94,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxself/libzbxself_server.a \
 	$(top_builddir)/src/libs/zbxnix/libzbxnix.a \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
+	$(top_builddir)/src/libs/glb_conf/libglbconfig.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
 	$(top_builddir)/src/libs/zbxalgo/libzbxalgo.a \
 	$(top_builddir)/src/libs/zbxalgo/tests/libalgotests.a \

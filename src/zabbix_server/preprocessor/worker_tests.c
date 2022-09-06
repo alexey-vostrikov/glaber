@@ -1,6 +1,5 @@
 /*
-** Glaber
-** Copyright (C) 2018-2042 Glaber
+** Copyright Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,22 +15,24 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+
+/* this is simple monitoring engine to export internal metrics
+via prometheus protocol via standart monitoring url
+
+now it's NOT follows standards as it doesn't support HELP and TYPE keywords
+*/
+
+//TODO idea for improvement - implement a kind of a buffer pool to avoid alloc cluttering
 #include "common.h"
-//#ifdef HAVE_GLB_TEST
-
-#include "../../libs/zbxalgo/tests/algo_tests.h"
-#include "../preprocessor/worker_tests.h"
-
+#include "zbxalgo.h"
 #include "log.h"
-void tests_server_run(void) {
-    LOG_INF("Running server tests");
-    
-    LOG_INF("Running preprocessing worker tests");
-    test_worker_steps();
- 
-    LOG_INF("Running algo tests");
-    tests_algo_run();
-    
-    LOG_INF("Server tests finished");
+#include "item_preproc.h"
+
+//int test_worker_json_to_host();
+void test_parse_preproc_params();
+void test_get_host_name_from_json();
+
+void test_worker_steps() {
+    test_parse_preproc_params();
+    test_get_host_name_from_json();
 }
-//#endif

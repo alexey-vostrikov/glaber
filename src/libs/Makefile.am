@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 DIST_SUBDIRS = \
+	glb_conf \
 	zbxdbcache \
 	zbxdbhigh \
 	zbxdb \
@@ -37,12 +38,12 @@ DIST_SUBDIRS = \
 	zbxavailability \
 	zbxeval \
 	glb_state \
-	glb_conf \
 	zbxxml \
 	apm
 
 if SERVER
 SERVER_SUBDIRS = \
+	glb_conf \
 	zbxcommshigh \
 	zbxdb \
 	zbxdbupgrade \
@@ -65,7 +66,6 @@ SERVER_SUBDIRS = \
 	zbxtrends \
 	zbxavailability \
 	glb_state \
-	glb_conf \
 	apm \
 	zbxeval \
 	zbxalgo/tests
