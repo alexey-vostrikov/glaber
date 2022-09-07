@@ -202,7 +202,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_INT:
     	case SNMP_TP_COUNTER:
     	case SNMP_TP_GAUGE:
- 			if (*(int*)var->value > 0) {
+ 			if (*(int*)var->value >= 0) {
 				result->type = AR_UINT64;
 				result->ui64 = *(int*)var->value;
 				DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to uint type %llu", result->ui64);
