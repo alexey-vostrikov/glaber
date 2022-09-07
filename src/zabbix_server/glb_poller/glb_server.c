@@ -196,15 +196,8 @@ ITEMS_ITERATOR(check_workers_data_cb) {
 }
 
 static void	handle_async_io(void) {
-    LOG_DBG("In: %s", __func__);
-   // for (int i=0; i<1000000; i++) {
-     poller_items_iterate(check_workers_data_cb, NULL);
-    //todo: replace with proper analyzing of the socket states
-    //usleep(1000);
-   // }
-    LOG_DBG("Finished: %s", __func__);
+    poller_items_iterate(check_workers_data_cb, NULL);
 }
-
 static void ws_shutdown(void) {
 
 }
