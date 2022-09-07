@@ -1635,10 +1635,7 @@ static char *get_host_name_from_json(u_int64_t itemid, char *json, char *host_pa
 			char hostvalue[MAX_ZBX_HOSTNAME_LEN];
 			
 			if (SUCCEED == zbx_json_value_by_name(&jp, hostfield, hostvalue, MAX_ZBX_HOSTNAME_LEN, &type)) {
-		//		LOG_INF("Found host value %s, name is %s, alloc is %d", hostvalue, hostname, alloc);
 				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN, hostvalue);
-		//		LOG_INF("Name: prefix+name is :%s", hostname);
-				//alloc = strlen(hostname);
 			} else 
 				return NULL;
 		}
@@ -1768,7 +1765,7 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 	HALT_HERE("Not implemented yet");
 
 	int timeout = strtol(params,0,10);
-	DEBUG_ITEM(itemid, "In %s: discovery timeout is %d", timeout);
+	DEBUG_ITEM(itemid, "Discovery timeout is %d", timeout);
 	
 	json_discovery_add_data(itemid, (char *)value->data.str);
 	
