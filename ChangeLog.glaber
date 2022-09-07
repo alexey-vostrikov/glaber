@@ -1,3 +1,5 @@
+ver 2.13.4
+    - fix: glb_server worker was stucking with noisy workers, overall performance fix, moved event library buffer
 ver 2.13.3
     - bug fix: #140 - interface isn't required for worker items anymore
 ver 2.13.2

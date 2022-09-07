@@ -235,17 +235,21 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
         zabbix_log(LOG_LEVEL_DEBUG,"Parsing line %s", worker_response);
         
         if (SUCCEED != zbx_json_open(worker_response, &jp_resp)) {
-		    zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from glbmap %s", worker_response);
-		    continue;
+		    zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response from glbmap %s", worker_response);
+            zbx_free(worker_response);
+            continue;
 	    }
             
         if (SUCCEED != zbx_json_value_by_name(&jp_resp, "saddr", ip, MAX_ID_LEN, &type) ||
             SUCCEED != zbx_json_value_by_name(&jp_resp, "rtt", rtt_s, MAX_ID_LEN, &type) ||
             SUCCEED != zbx_json_value_by_name(&jp_resp, "itemid", itemid_s, MAX_ID_LEN, &type)       
         ) {
-            zabbix_log(LOG_LEVEL_WARNING,"Cannot parse response from the glbmap: %s",worker_response);
+            zabbix_log(LOG_LEVEL_WARNING,"Cannot parse response all fields (saddr, rtt, itemid) from the glbmap: %s",worker_response);
+            zbx_free(worker_response);
             continue;
         }
+        
+        zbx_free(worker_response);
 
         rtt_l = strtol(rtt_s,NULL,10);
         itemid_l = strtol(itemid_s,NULL,10);
@@ -253,8 +257,6 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
         DEBUG_ITEM(itemid_l,"Parsed itemid in icmp payload");
 
         if (NULL == (poller_item = poller_get_poller_item(itemid_l)) )  {
-        //    LOG_INF("ICMP echo responce ...");
-        //    LOG_INF("ICMP echo Responce from host %s doesn't have proper payload: got failed id %ld", ip, itemid_l);
             poller_items_iterate(process_item_by_ip_cb, ip);
             continue;
         }

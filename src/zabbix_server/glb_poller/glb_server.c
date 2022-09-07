@@ -71,10 +71,9 @@ static int glb_server_submit_result(poller_item_t *poller_item, char *response) 
     init_result(&result);
     zbx_rtrim(response, ZBX_WHITESPACE);
     SET_TEXT_RESULT(&result, zbx_strdup(NULL, response));
-    set_result_type(&result, ITEM_VALUE_TYPE_TEXT, response);
     poller_preprocess_value(poller_item, &result, glb_ms_time(), ITEM_STATE_NORMAL, NULL);
-       
     free_result(&result);
+
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 }
 
@@ -153,34 +152,17 @@ static void delete_item(poller_item_t *poller_item) {
     zbx_free(worker);
 }
 
-#define MAX_ITERATIONS 256
+#define MAX_ITERATIONS 10000
 ITEMS_ITERATOR(check_workers_data_cb) {
     worker_t *worker =  poller_get_item_specific_data(poller_item);
-    int iteratons = 0;
-    if (SUCCEED == worker_is_alive(worker->worker)) { 
-        int last_status;
-        char *worker_responce = NULL;
-        
-        //DEBUG_ITEM(poller_get_item_id(poller_item), "Reading from worker");
-        while (SUCCEED == (last_status = async_buffered_responce(worker->worker, &worker_responce)) && 
-                          (NULL != worker_responce) 
-                          //&& 
-                        //  (iteratons < MAX_ITERATIONS) 
-                        ) {
-                //iteratons++; 
-              //  LOG_DBG("Parsing line %s from worker %s", *worker_responce, worker->worker.path);
-                DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_responce);
-                glb_server_submit_result(poller_item, worker_responce);
-        }
+    
+    int iterations = 0;
+    
+    int last_status = SUCCEED;
+    char *worker_responce = NULL;
 
-        //DEBUG_ITEM(poller_get_item_id(poller_item), "Finished reading from worker");
-        if (FAIL == last_status ) {
-            DEBUG_ITEM(poller_get_item_id(poller_item), "Submitting data in non supported state (last_status is FAIL)");
-            glb_server_submit_fail_result(poller_item,"Couldn't read from the worker - either filename is wrong or temporary fail");
-        }
-        
-        zbx_free(worker_responce);
-    } else {
+    
+    if (SUCCEED != worker_is_alive(worker->worker)) {
         int now = time(NULL);
 
         if (worker->last_restart + WORKER_RESTART_HOLD < now ) {
@@ -188,8 +170,28 @@ ITEMS_ITERATOR(check_workers_data_cb) {
             worker->last_restart = now;
             glb_start_worker(worker->worker);
         }
+        return POLLER_ITERATOR_CONTINUE;
     }
-   // LOG_INF("Finished poller read ");
+        
+    while ( iterations < MAX_ITERATIONS ) {
+        last_status = async_buffered_responce(worker->worker, &worker_responce);
+        
+        if (NULL == worker_responce)
+            break;
+
+        iterations++; 
+              
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_responce);
+        glb_server_submit_result(poller_item, worker_responce);
+              
+        zbx_free(worker_responce);
+    }
+
+    if (FAIL == last_status ) {
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Worker is not running, setting UNSUPPORTED value");
+        glb_server_submit_fail_result(poller_item, "Couldn't read from the worker - worker isn't running");
+    }
+
     return POLLER_ITERATOR_CONTINUE;
 }
 

@@ -318,6 +318,7 @@ static void worker_process_results() {
               
                 LOG_DBG("Parsing line %s from worker %s", worker_response, worker_get_path(worker->worker));
                 worker_submit_result(worker_response);
+                zbx_free(worker_response);
             }
         } else {
          zabbix_log(LOG_LEVEL_DEBUG,"Will %s is not alive, skipping", worker_get_path(worker->worker));

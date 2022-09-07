@@ -27,6 +27,10 @@
 #include "dbcache.h"
 #include "zbxipcservice.h"
 
+#include <event2/event.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
+
 #if (__FreeBSD_version) > 700000
 #define ENODATA 245
 #endif
@@ -49,6 +53,7 @@ struct ext_worker_t {
 	int last_start;
     int last_change;
     int last_change_check;
+    struct evbuffer *buffer; 
 };
 
 extern int CONFIG_TIMEOUT;
@@ -203,6 +208,7 @@ ext_worker_t *glb_init_worker(char *config_line)
     }
 
     worker->async_mode = 0;
+    worker->buffer = evbuffer_new();
 
     return worker;
 }
@@ -330,6 +336,15 @@ static int restart_worker(ext_worker_t *worker)
     zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
     worker->last_start = time(NULL);
+    
+    if (0 != worker->async_mode) {
+        LOG_INF("Worker is async");
+        int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
+        fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
+        
+        evbuffer_free(worker->buffer);
+        worker->buffer = evbuffer_new();
+    }
 
     return SUCCEED;
 }
@@ -397,7 +412,7 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
     int i;
     int wr_len = 0, eol_len;
     char *eol = "\n";
-
+    
     if (worker->calls++ >= worker->max_calls)
     {
         zabbix_log(LOG_LEVEL_INFORMATION, "%s worker %s pid %d exceeded number of requests (%d), restarting it",
@@ -454,10 +469,8 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
          exit(-1);
          return FAIL;
     }
-       
     zbx_alarm_on(worker->timeout);
     
-    //so, lets write to the worker's pipe
     wr_len = write(worker->pipe_to_worker, request, strlen(request));
 
     if (0 > wr_len)
@@ -471,7 +484,6 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
             zabbix_log(LOG_LEVEL_WARNING, "Couldn't write eol marker to the script's stdin: %d", errno);
             write_fail = 1;
         }
-    
 
     zbx_alarm_off();
 
@@ -500,84 +512,29 @@ int worker_get_pid(ext_worker_t *worker) {
 }
 
 
+#define MAX_WORKER_BUFF_LEN 32 * ZBX_MEBIBYTE
 /*
-
 /****************************************************************
 * to assist async workeres and to split data by responses 
 * 
 ****************************************************************/
 int async_buffered_responce(ext_worker_t *worker,  char **response) {
-    //char *read_buffer=NULL; //we read from worker here 
-    static char *circle_buffer=NULL; //this is constant circle buffer we use to retrun responses
-                                     //since we know the maximim reponce returned from worker has 
-    static size_t buffoffset = 0, bufsize = 0;                                     
-    static size_t start,  //points to the first character of the string
-                  end; //points to \0 at the end of last data chunk
-    char *delim, *request_end=NULL;
-    char *wresp;
-    
-    static char data_present = 0;
-
     zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+    int read_data = SUCCEED;
 
-    switch  (worker->mode_from_worker) {
-        case GLB_WORKER_MODE_NEWLINE: 
-            delim = "\n";
-            break;
-        case GLB_WORKER_MODE_EMPTYLINE:
-            delim = "\n\n";
-            break;
-    }
+    if ( 0 == worker->pid ) 
+        return FAIL;
     
-    while (1) { //we might need to repeat data 
+    *response = evbuffer_readln(worker->buffer, NULL, EVBUFFER_EOL_CRLF);
+
+    if (evbuffer_get_length(worker->buffer) > MAX_WORKER_BUFF_LEN) 
+        return SUCCEED;
     
-        //if have any complete data ready in the buffer, send it right away
-        if ( data_present ) {
-            LOG_DBG( "In %s() there are data buffered ", __func__);
-            if ( NULL != (request_end = strstr(circle_buffer + start, delim) )) {
-                //ok, there is complete request data in the buffer, returning it
-                *response = circle_buffer + start;
-                request_end[0]=0; //setting 0 at the end of responce 
-                LOG_DBG("In %s() will respond with: %s", __func__, *response);
-         
-                start = request_end - circle_buffer + strlen(delim); //setting start to the begining of the new responce
-                
-                if (0 == circle_buffer[start] ) { //reaching 0 means evth has been sent from the buffer
-                        data_present = 0;
-                        start = 0;
-                }
-                return SUCCEED;
-            } else { //there is an incomplete data sitting in the buffer which starts as start marker
-                char *tmp_buff = zbx_malloc(NULL, MAX_STRING_LEN);
-                size_t offset = 0, allocated = MAX_STRING_LEN;
-                zbx_strcpy_alloc(&tmp_buff,&allocated, &offset, circle_buffer+start);
-                //and copying it all back to the begining of the circle_buffer
-                buffoffset = 0;
-                
-                zabbix_log(LOG_LEVEL_DEBUG, "In %s() copying to the start of the buffer ", __func__);
-                zbx_strcpy_alloc(&circle_buffer,&bufsize,&buffoffset,tmp_buff);
-                zbx_free(tmp_buff);
-            }
-        } 
-        
-        zabbix_log(LOG_LEVEL_DEBUG, "In %s() finished buffer operations, will read from worker ", __func__);
-        
-        if (SUCCEED == glb_worker_responce(worker,&wresp)) {
-           // zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Adding worker response '%s' at %d ", __func__,wresp, start);
-            if (data_present) 
-                buffoffset = strlen(circle_buffer);
-            else 
-                buffoffset = 0;
-            zbx_strcpy_alloc(&circle_buffer, &bufsize, &buffoffset, wresp);
-            data_present = 1;
-            //zabbix_log(LOG_LEVEL_INFORMATION, "In %s() new buffer is '%s'", __func__,circle_buffer);
-            zbx_free(wresp); 
-        } else { //nothing retruned yet, exiting, no reason to burn CPU here
-            *response = NULL;
-            return SUCCEED;
-        }
-    } 
-    zabbix_log(LOG_LEVEL_INFORMATION, "End of %s()", __func__);
+    while (0 < evbuffer_read(worker->buffer, worker->pipe_from_worker, -1) &&
+               evbuffer_get_length(worker->buffer) > MAX_WORKER_BUFF_LEN );
+    
+   // zabbix_log(LOG_LEVEL_INFORMATION, "End of %s()", __func__);
+    return SUCCEED;
 }
 
 
@@ -618,7 +575,7 @@ int glb_worker_responce(ext_worker_t *worker,  char ** responce) {
         //doing non-blocking read. Checking if we eneded up with new line or
         //just a line to understand that all the data has been recieved
         LOG_DBG("Calling read");
-        read_len = read(worker->pipe_from_worker, buffer, MAX_STRING_LEN*10);
+        read_len = read(worker->pipe_from_worker, buffer, MAX_STRING_LEN * 10);
         LOG_DBG("finished read");
         
         switch (read_len) {
@@ -781,6 +738,10 @@ void glb_destroy_worker(ext_worker_t *worker)
         sleep(1);
         waitpid(worker->pid, &exitstatus,WNOHANG);
     }
+    
+   // if (worker->async_mode)
+    evbuffer_free(worker->buffer);
+
     zbx_free(worker->path);
     zbx_free(worker);
        
@@ -788,7 +749,7 @@ void glb_destroy_worker(ext_worker_t *worker)
 }
 
 const char *worker_get_path(ext_worker_t *worker) {
-    return worker->path;
+    return worker->args[0];
 }
 
 void worker_set_mode_from_worker(ext_worker_t *worker, unsigned char mode) {
@@ -816,6 +777,12 @@ ext_worker_t *worker_init(const char* path, unsigned int max_calls,
     worker->timeout = timeout;
     worker->last_change = file_get_lastchange(path);
     worker->last_change_check = time(NULL);
+    
+    //if (worker->async_mode) {
+    worker->buffer = evbuffer_new();
+    //assert(NULL != worker->buffer);
+    //}  
+    
     
     return worker;
 }

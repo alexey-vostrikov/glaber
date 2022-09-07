@@ -36,11 +36,6 @@ int worker_get_pid(ext_worker_t *worker);
 
 ext_worker_t* glb_get_worker_script(char *cmd);
 
-//this will not (yet) work as workers rely on FD which is different for each proc
-//zbx_uint64_t zbx_dc_get_ext_worker(ext_worker_t *worker, char *path);
-//int zbx_dc_add_ext_worker(char *path, char *params, int max_calls, int timeout, int mode_to_writer, int mode_from_writer);
-//zbx_uint64_t zbx_dc_return_ext_worker(ext_worker_t *worker);
-
 //how much time to wait for a runner till it execs before try to restart it
 #define GLB_DEFAULT_WORKER_TIMEOUT 10
 
