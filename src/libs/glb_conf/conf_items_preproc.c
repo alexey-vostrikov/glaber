@@ -1,4 +1,4 @@
-/*
+ /*
 ** Copyright Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -15,24 +15,10 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#include "zbxvariant.h"
+
 #include "log.h"
-#include "memalloc.h"
+#include "zbxalgo.h"
 
-typedef struct
-{
-    zbx_vector_ptr_t	preproc_ops;
-} preproc_ops_t;
-
-
-preproc_ops_t conf_item_init_preproc_ops_json(char *json) {
-
+int conf_items_preproc_get_steps(u_int64_t itemid, zbx_vector_ptr_t *preproc_steps) {
+    
 }
-
-void conf_item_free_preproc_ops(preproc_ops_t *ops) {
-
-}
-
-//void conf_item_process_preproc_ops(preproc_ops_t *ops, preproc_cb_t proc_func) {
-//
-//}

@@ -3221,9 +3221,6 @@ static int DC_remove_item(u_int64_t itemid) {
 		zbx_binary_heap_remove_direct(&config->queues[item->poller_type], item->itemid);
 
 	zbx_strpool_release(item->key);
-//	zbx_strpool_release(item->name);
-//	zbx_strpool_release(item->description);
-//	zbx_strpool_release(item->error);
 	zbx_strpool_release(item->delay);
 
 	if (NULL != item->triggers)

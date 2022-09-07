@@ -54,7 +54,9 @@ typedef struct {
 
 static void preprocess_metric(const metric_t* metric) {
   //preproc_steps_t *steps = conf_items_preproc_get_steps(metric->itemid);
+  
   //zbx_vector_ptr_t *history_steps = preproc_cache_fetch_history(metric->itemid);
+  
   //zbx_vector_uint64_t dep_itemids = conf_items_preproc_get_depitems(metric->itemid);
   //preproc_cache_t *preproc_data = fetch_preproc_data(metric->itemid);
   //metric_t *new_metric = execute_preproc_steps(metric, preproc_data);

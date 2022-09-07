@@ -1608,40 +1608,37 @@ static char *get_host_name_from_json(u_int64_t itemid, char *json, char *host_pa
 
 	if (NULL != (f_start = strchr(host_param,'{')) && NULL !=(f_end = strchr(f_start, '}'))) {
 		size_t alloc = 0;
-		//LOG_INF("Found brackets");
-
+		char hostvalue[MAX_ZBX_HOSTNAME_LEN];
+		
 		if (f_start + 1 == f_end)
 			return NULL;
 		
 		zbx_strlcpy(hostfield, f_start + 1, f_end -f_start);
-	//	LOG_INF("Resulting field name is %s,  suffix is %s", hostfield, f_end + 1);
-		
+			
 		if (f_start > host_param) {
 			zbx_strlcpy(hostname, host_param, f_start - host_param + 1 );
 			alloc = f_start - host_param;
 		}
-	//	LOG_INF("After prexix processing hostname is %s, alloc is %d", hostname, alloc);
-
+	
 		if (hostfield[0] == '$') {
 
 			if (SUCCEED == zbx_jsonpath_query(&jp, hostfield, &hostname_dyn)) {
-				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN,hostname_dyn);
+				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN,"%s", hostname_dyn);
 				zbx_free(hostname_dyn);
 			}
 			else 
 				return NULL;
+			
 		} else {
-		//	LOG_INF("Non-path processing of name in ");
-			char hostvalue[MAX_ZBX_HOSTNAME_LEN];
 			
 			if (SUCCEED == zbx_json_value_by_name(&jp, hostfield, hostvalue, MAX_ZBX_HOSTNAME_LEN, &type)) {
-				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN, hostvalue);
+				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN, "%s",  hostvalue);
 			} else 
 				return NULL;
 		}
 
-		zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN-alloc, f_end + 1);
-		//LOG_INF("Full name is %s", hostname);
+		zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN-alloc, "%s", f_end + 1);
+
 		return hostname;
 	}
 
@@ -1649,7 +1646,7 @@ static char *get_host_name_from_json(u_int64_t itemid, char *json, char *host_pa
 		zbx_free(hostname_dyn);
 		
 		if (SUCCEED == zbx_jsonpath_query(&jp, host_param, &hostname_dyn)) {
-			zbx_snprintf(hostname, MAX_ZBX_HOSTNAME_LEN,hostname_dyn);
+			zbx_snprintf(hostname, MAX_ZBX_HOSTNAME_LEN, "%s", hostname_dyn);
 			zbx_free(hostname_dyn);
 			return hostname;
 		}
