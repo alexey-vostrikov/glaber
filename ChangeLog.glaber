@@ -1,3 +1,5 @@
+ver 2.13.6
+    - added proxy flag check to prevent items set to be polled by proxy to be polled by async pollers
 ver 2.13.5
     - fix: Gauge32 counters with zero value where converted to float value instead of unsigned integer
 ver 2.13.4
