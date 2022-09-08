@@ -245,7 +245,9 @@ clean:
  * **********************************************************/
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
 //	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked for async polling");
-	
+	if ( zbx_dc_host->proxy_hostid > 0)
+	 	return FAIL;
+		
 	switch (zbx_dc_item->type) {
 		case ITEM_TYPE_CALCULATED:
 			return SUCCEED;
