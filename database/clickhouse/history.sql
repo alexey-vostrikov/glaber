@@ -69,7 +69,7 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(day)
 ORDER BY (itemid, clock)
 TTL day + toIntervalMonth(24)
-SETTINGS index_granularity = 8192
+SETTINGS index_granularity = 8192;
 
 --
 CREATE TABLE glaber.trends_uint
@@ -88,7 +88,7 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(day)
 ORDER BY (itemid, clock)
 TTL day + toIntervalMonth(24)
-SETTINGS index_granularity = 8192
+SETTINGS index_granularity = 8192;
 
 -- some stats guide
 -- https://gist.github.com/sanchezzzhak/511fd140e8809857f8f1d84ddb937015
