@@ -137,13 +137,13 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 					break;
 			}
 
-			$result[$value['itemid']]['source'][] = 'history';
-			$result[$value['itemid']]['data'][] = $row;
+			$results[$value['itemid']]['source'][] = 'history';
+			$results[$value['itemid']]['data'][] = $row;
 
 		}
 	}
 
-	return $result;
+	return $results;
 }
 
 	/**
