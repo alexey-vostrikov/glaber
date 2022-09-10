@@ -91,13 +91,9 @@ class CHistoryManager {
 private function getGraphAggregationByIntervalFromServer(array $items, $time_from, $time_to, $function, $interval) {
 	$results = [];
 	$items_by_table = [];
-	//$width=1;
-	
-	//so convert it to number of points first
 	
 	$width = (int)(($time_to -$time_from)/$interval);
-	//error_log("Calculated width is $width");
-
+	
 	//first, let's get all the data 
 	$results = $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"history_agg");
 	$results += $this->getGraphAggregationByWidthFromServer($items,$time_from, $time_to, $width,"trends");

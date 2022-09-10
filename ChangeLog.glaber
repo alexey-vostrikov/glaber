@@ -1,4 +1,6 @@
 ver 2.13.7
+    - fixed CHistoryManager typo that gave an error message on some graph widgets
+ver 2.13.7
     - fixed clickhouse syntax (semicolons where missing in trends ddl)
 ver 2.13.6
     - added proxy flag check to prevent items set to be polled by proxy to be polled by async pollers
@@ -15,13 +17,13 @@ ver 2.13.1
     - logging fix 
 ver 2.13.0
     - implemented r/w locking for high concurrency objects, several test workers (log, http listener, dummy generator) implemented, structure for
-      managerless preprocessing prepared, history compression code cleaned out, worker pipe size increased to ease worker implementation
+      mannerless preprocessing prepared, history compression code cleaned out, worker pipe size increased to ease worker implementation
 ver 2.12.4
-    - fix: changeset broken on 'test now' buttom in UI
+    - fix: changeset broken on 'test now' button in UI
 ver 2.12.3
     - fix: support for server script items in preprocessing in UI 
 ver 2.12.2
-    - fix: history/trends range chack on web forms
+    - fix: history/trends range check on web forms
 ver 2.12.1
     - fix of #139 - history was saved even if history saving was disabled for an item
 ver 2.12.0
@@ -30,15 +32,15 @@ ver 2.12.0
 ver 2.11.37
    - fix: improper SNMP IP addr translation
 ver 2.11.36
-    - fix: history time range error mesage on item/prototype creation in UI
+    - fix: history time range error message on item/prototype creation in UI
 ver 2.11.35
-    - fix: trends time range error mesage on item/prototype edit in UI
+    - fix: trends time range error message on item/prototype edit in UI
 ver 2.11.34
-    - trends and history UI and server code cleanup: removed non-working options from the UI, cleaned obsolere housekeeping as well as timescale code from the server
+    - trends and history UI and server code cleanup: removed non-working options from the UI, cleaned obsolete housekeeping as well as timescale code from the server
 ver 2.11.33
     - fixed async pollers events leaking causing high memory leak rates on setups with high item change rates
 ver 2.11.32
-    - fixes: inmproper type set on items load caused value cache per item reset on first item arrival. Changed items where not updated in the async poller. 
+    - fixes: improper type set on items load caused value cache per item reset on first item arrival. Changed items where not updated in the async poller. 
              Async poller dns wait time changed to 4 seconds
 ver 2.11.30
     - fixed DNS timeout to 100ms, 64k inflight requests
