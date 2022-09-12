@@ -37,6 +37,7 @@ class CControllerLatestView extends CControllerLatest {
 			'filter_hostids' =>				'array_id',
 			'filter_select' =>				'string',
 			'filter_show_without_data' =>	'in 0,1',
+			'filter_group_by_discovery' =>	'in 0,1',
 			'filter_show_details' =>		'in 1',
 			'filter_set' =>					'in 1',
 			'filter_rst' =>					'in 1',
@@ -70,6 +71,9 @@ class CControllerLatestView extends CControllerLatest {
 			CProfile::updateArray('web.latest.filter.hostids', $this->getInput('filter_hostids', []), PROFILE_TYPE_ID);
 			CProfile::update('web.latest.filter.select', trim($this->getInput('filter_select', '')), PROFILE_TYPE_STR);
 			CProfile::update('web.latest.filter.show_without_data', $this->getInput('filter_show_without_data', 1),
+				PROFILE_TYPE_INT
+			);
+			CProfile::update('web.latest.filter.group_by_discovery', $this->getInput('filter_group_by_discovery', 0),
 				PROFILE_TYPE_INT
 			);
 			CProfile::update('web.latest.filter.show_details', $this->getInput('filter_show_details', 0),
@@ -115,6 +119,7 @@ class CControllerLatestView extends CControllerLatest {
 			'select' => CProfile::get('web.latest.filter.select', ''),
 			'show_without_data' => $filter_show_without_data,
 			'show_details' => CProfile::get('web.latest.filter.show_details', 0),
+			'group_by_discovery' => CProfile::get('web.latest.filter.group_by_discovery', 1),
 			'evaltype' => CProfile::get('web.latest.filter.evaltype', TAG_EVAL_TYPE_AND_OR),
 			'tags' => []
 		];
@@ -142,6 +147,7 @@ class CControllerLatestView extends CControllerLatest {
 			'filter_hostids' => $filter['hostids'],
 			'filter_select' => $filter['select'],
 			'filter_show_without_data' => $filter['show_without_data'] ? 1 : null,
+			'filter_group_by_discovery' => $filter['group_by_discovery'] ? 1 : null,
 			'filter_show_details' => $filter['show_details'] ? 1 : null,
 			'filter_evaltype' => $filter['evaltype'],
 			'filter_tags' => $filter['tags'],
@@ -152,7 +158,6 @@ class CControllerLatestView extends CControllerLatest {
 
 		// data sort and pager
 		$prepared_data = $this->prepareData($filter, $sort_field, $sort_order);
-
 		$this->extendData($prepared_data);
 
 		$data = [

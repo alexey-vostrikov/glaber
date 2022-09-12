@@ -46,7 +46,8 @@ abstract class CControllerLatest extends CController {
 		// Select groups for subsequent selection of hosts and items.
 		$multiselect_hostgroup_data = [];
 		$groupids = $filter['groupids'] ? getSubGroups($filter['groupids'], $multiselect_hostgroup_data) : null;
-
+		$group_by_entity = $filter['group_by_discovery'] ? $filter['group_by_discovery'] : null;
+		
 		// Select hosts for subsequent selection of items.
 		$hosts = API::Host()->get([
 			'output' => ['hostid', 'name', 'status'],
@@ -61,75 +62,30 @@ abstract class CControllerLatest extends CController {
 		$select_items_cnt = 0;
 		$select_items = [];
 
-		foreach ($hosts as $hostid => $host) {
-			if ($select_items_cnt > $search_limit) {
-				unset($hosts[$hostid]);
-				continue;
-			}
+		$fetch_options = [
+			'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
+					 'value_type', 'units', 'description', 'state', 'error'],
+			'selectTags' => ['tag', 'value'],
+			'selectValueMap' => ['mappings'],
+			'hostids' => array_column($hosts,'hostid'),
+			'webitems' => true,
+			'evaltype' => $filter['evaltype'],
+			'tags' => $filter['tags'] ? $filter['tags'] : null,
+			'filter' => [ 'status' => [ITEM_STATUS_ACTIVE]	],
+			'search' => ($filter['select'] === '') ? null : ['name' => $filter['select']],
+			'preservekeys' => true,
+			'discovery_items' => true,
+		];
 
-			$host_items = API::Item()->get([
-				'output' => ['itemid', 'hostid', 'value_type'],
-				'hostids' => [$hostid],
-				'webitems' => true,
-				'evaltype' => $filter['evaltype'],
-				'tags' => $filter['tags'] ? $filter['tags'] : null,
-				'filter' => [
-					'status' => [ITEM_STATUS_ACTIVE]
-				],
-				'search' => ($filter['select'] === '') ? null : [
-					'name' => $filter['select']
-				],
-				'preservekeys' => true,
-				'discovery_items' => true
-			]);
-
-			//error_log("Gettind items in prepare data");
-
-			$select_items += $host_items;
+		if (isset($group_by_entity)) {
+			$fetch_options += [
+				'selectTemplates' => ['templateid','name'],
+				'selectDiscoveryRule' => ['itemid', 'name', 'templateid', 'key_'],
+				'selectItemDiscovery' => ['parent_itemid','itemdiscoveryid','itemid'],
+			];
+		}
 		
-		//	$select_items += $filter['show_without_data']
-		//		? $host_items
-		//		: Manager::History()->getItemsHavingValues($host_items, $history_period);
-
-			$select_items_cnt = count($select_items);
-		}
-
-		if ($select_items) {
-			$items = API::Item()->get([
-				'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
-					'value_type', 'units', 'description', 'state', 'error'
-				],
-				'selectTags' => ['tag', 'value'],
-				'selectValueMap' => ['mappings'],
-				'itemids' => array_keys($select_items),
-				'webitems' => true,
-				'preservekeys' => true,
-				'discovery_items' => true
-			]);
-
-			if ($sort_field === 'host') {
-				$items = array_map(function ($item) use ($hosts) {
-					return $item + [
-						'host_name' => $hosts[$item['hostid']]['name']
-					];
-				}, $items);
-
-				CArrayHelper::sort($items, [[
-					'field' => 'host_name',
-					'order' => $sort_order
-				]]);
-			}
-			else {
-				CArrayHelper::sort($items, [[
-					'field' => 'name',
-					'order' => $sort_order
-				]]);
-			}
-		}
-		else {
-			$hosts = [];
-			$items = [];
-		}
+		$items = API::Item()->get($fetch_options);
 
 		$multiselect_host_data = $filter['hostids']
 			? API::Host()->get([
@@ -138,9 +94,16 @@ abstract class CControllerLatest extends CController {
 			])
 			: [];
 
+		$discovery_entitites = API::DiscoveryEntity()->get ([
+				'hostids' => array_column($hosts, 'hostid'),
+				'items' => $items
+			]
+		);
+
 		return [
 			'hosts' => $hosts,
 			'items' => $items,
+			'entities' => $discovery_entitites,
 			'multiselect_hostgroup_data' => $multiselect_hostgroup_data,
 			'multiselect_host_data' => CArrayHelper::renameObjectsKeys($multiselect_host_data, ['hostid' => 'id'])
 		];

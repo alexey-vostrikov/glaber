@@ -177,6 +177,12 @@ class API {
 	public static function DiscoveryRule() {
 		return self::getApi('discoveryrule');
 	}
+	/**
+	 * @return CDiscoveryEntity
+	 */
+	public static function DiscoveryEntity() {
+		return self::getApi('discoveryentity');
+	}
 
 	/**
 	 * @return CDRule

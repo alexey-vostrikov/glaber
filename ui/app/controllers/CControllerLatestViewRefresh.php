@@ -37,6 +37,7 @@ class CControllerLatestViewRefresh extends CControllerLatest {
 			'filter_hostids' =>				'array_id',
 			'filter_select' =>				'string',
 			'filter_show_without_data' =>	'in 1',
+			'filter_group_by_discovery' =>	'in 1',
 			'filter_show_details' =>		'in 1',
 			'filter_evaltype' =>			'in '.TAG_EVAL_TYPE_AND_OR.','.TAG_EVAL_TYPE_OR,
 			'filter_tags' =>				'array',
@@ -74,6 +75,7 @@ class CControllerLatestViewRefresh extends CControllerLatest {
 			'select' => $this->getInput('filter_select', ''),
 			'show_without_data' => $this->getInput('filter_show_without_data', 0),
 			'show_details' => $this->getInput('filter_show_details', 0),
+			'group_by_discovery' =>  $this->getInput('filter_group_by_discovery', 0),
 			'evaltype' => CProfile::get('web.latest.filter.evaltype', TAG_EVAL_TYPE_AND_OR),
 			'tags' => []
 		];

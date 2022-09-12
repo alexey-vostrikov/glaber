@@ -1,3 +1,5 @@
+ver 2.14.0
+    - introducing DiscoveryEntity API and new latest data view in UI to show discovered data in table view.
 ver 2.13.9
     - fixed PIE diagram error due to changed history api
 ver 2.13.8

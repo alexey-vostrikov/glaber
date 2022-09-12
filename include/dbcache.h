@@ -743,8 +743,10 @@ size_t	DCconfig_get_snmp_items_by_interfaceid(zbx_uint64_t interfaceid, DC_ITEM 
 #define ZBX_HK_MODE_REGULAR		ZBX_HK_OPTION_ENABLED
 #define ZBX_HK_MODE_PARTITION		2
 
-#define ZBX_HK_HISTORY_MIN	SEC_PER_HOUR
-#define ZBX_HK_TRENDS_MIN	SEC_PER_DAY
+//Glaber note: there is no practical need to limit this values anymore
+#define ZBX_HK_HISTORY_MIN	1
+#define ZBX_HK_TRENDS_MIN	1
+
 #define ZBX_HK_PERIOD_MAX	(25 * SEC_PER_YEAR)
 
 void	DCrequeue_items(const zbx_uint64_t *itemids, const int *lastclocks,
