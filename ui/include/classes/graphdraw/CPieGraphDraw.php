@@ -195,13 +195,12 @@ class CPieGraphDraw extends CGraphDraw {
 			$items[] = $item;
 		}
 
-		$results = Manager::History()->getGraphAggregationByWidth($items, $from_time, $to_time);
+		$results = Manager::History()->getGraphAggregationByWidth($items, $from_time, $to_time, 2048);
 		$i = 0;
 
 		foreach ($items as $item) {
 			if (array_key_exists($item['itemid'], $results)) {
 				$result = $results[$item['itemid']];
-				$this->dataFrom = $result['source'];
 
 				foreach ($result['data'] as $row) {
 					$this->data[$item['itemid']]['min'] = $row['min'];
@@ -210,9 +209,6 @@ class CPieGraphDraw extends CGraphDraw {
 					$this->data[$item['itemid']]['clock'] = $row['clock'];
 				}
 				unset($result);
-			}
-			else {
-				$this->dataFrom = $item['source'];
 			}
 
 			switch ($this->items[$i]['calc_fnc']) {
@@ -769,7 +765,7 @@ class CPieGraphDraw extends CGraphDraw {
 				$this->fullSizeX - 2,
 				$this->fullSizeY - 5,
 				$this->getColor('Gray'),
-				_s('Data from %1$s. Generated in %2$s sec.', $this->dataFrom, $str)
+				_s('Data generated in %2$s sec.', $str)
 			);
 		}
 

@@ -1,4 +1,6 @@
-ver 2.13.7
+ver 2.13.9
+    - fixed PIE diagram error due to changed history api
+ver 2.13.8
     - fixed CHistoryManager typo that gave an error message on some graph widgets
 ver 2.13.7
     - fixed clickhouse syntax (semicolons where missing in trends ddl)
