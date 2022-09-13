@@ -355,14 +355,11 @@ int glb_start_worker(ext_worker_t *worker) {
 
 int worker_is_alive(ext_worker_t *worker)
 {
-    if (!worker->pid)
+    if (0 == worker->pid) 
         return FAIL;
-        
-    if (kill(worker->pid, 0))
-    {
-        zabbix_log(LOG_LEVEL_INFORMATION, "sending kill to worker's pid %d has returned non 0",worker->pid);
+    
+    if (0 != waitpid(worker->pid, NULL, WNOHANG )) 
         return FAIL;
-    }
     
     return SUCCEED;
 }
@@ -524,6 +521,12 @@ int async_buffered_responce(ext_worker_t *worker,  char **response) {
 
     if ( 0 == worker->pid ) 
         return FAIL;
+    
+    if ( SUCCEED != worker_is_alive(worker)) {
+        LOG_INF("Worker %s is dead, need restart", worker_get_path(worker));
+        return FAIL;
+    }
+
     
     *response = evbuffer_readln(worker->buffer, NULL, EVBUFFER_EOL_CRLF);
 

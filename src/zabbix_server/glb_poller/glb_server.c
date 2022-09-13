@@ -77,19 +77,6 @@ static int glb_server_submit_result(poller_item_t *poller_item, char *response) 
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 }
 
-/*************************************************************
- * compare function for index hash
- * *********************************************************/
-static int	server_idx_cmp_func(const void *d1, const void *d2)
-{
-	const GLB_SERVER_IDX_T	*i1 = (const GLB_SERVER_IDX_T *)d1;
-	const GLB_SERVER_IDX_T	*i2 = (const GLB_SERVER_IDX_T *)d2;
-    
-	ZBX_RETURN_IF_NOT_EQUAL(i1->itemid, i2->itemid);
-
-	return 0;
-}
-
 static int init_item(DC_ITEM* dcitem, poller_item_t *poller_item) {
 
     worker_t *worker;
@@ -161,21 +148,24 @@ ITEMS_ITERATOR(check_workers_data_cb) {
     int last_status = SUCCEED;
     char *worker_responce = NULL;
 
-    
     if (SUCCEED != worker_is_alive(worker->worker)) {
         int now = time(NULL);
 
         if (worker->last_restart + WORKER_RESTART_HOLD < now ) {
-            LOG_DBG("Server worker %s is not alive, restarting", worker_get_path(worker->worker));
             worker->last_restart = now;
             glb_start_worker(worker->worker);
-        }
+        } 
         return POLLER_ITERATOR_CONTINUE;
     }
         
     while ( iterations < MAX_ITERATIONS ) {
         last_status = async_buffered_responce(worker->worker, &worker_responce);
         
+        if (FAIL == last_status ) {
+            DEBUG_ITEM(poller_get_item_id(poller_item), "Worker is not running, setting UNSUPPORTED value");
+            glb_server_submit_fail_result(poller_item, "Couldn't read from the worker - worker isn't running");
+        }
+         
         if (NULL == worker_responce)
             break;
 
@@ -187,10 +177,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
         zbx_free(worker_responce);
     }
 
-    if (FAIL == last_status ) {
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Worker is not running, setting UNSUPPORTED value");
-        glb_server_submit_fail_result(poller_item, "Couldn't read from the worker - worker isn't running");
-    }
+
 
     return POLLER_ITERATOR_CONTINUE;
 }
