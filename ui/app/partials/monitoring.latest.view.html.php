@@ -104,12 +104,18 @@ function show_compact_latest_data(array &$data, &$item) {
            return '';
     
     $itemid = $item['itemid'];
-        
+    $last_value_raw = '';
+
     $last_history = array_key_exists($itemid, $data['history'])
         ? ((count($data['history'][$itemid]) > 0) ? $data['history'][$itemid][0] : null)
         : null;
     
     if ($last_history) {
+        if (isset($last_history['value']))
+            $last_value_raw = $last_history['value'];
+        else 
+            $last_value_raw = '';
+        
         $last_value = formatHistoryValue($last_history['value'], $item, false);
             if ( (ITEM_VALUE_TYPE_TEXT == $item['value_type'] ||  ITEM_VALUE_TYPE_LOG == $item['value_type'] ) && 
                 mb_strlen($last_value) > 20 ) {
@@ -131,8 +137,10 @@ function show_compact_latest_data(array &$data, &$item) {
 
     $contents->addItem((new CSpan($last_value))
             ->addClass(ZBX_STYLE_LINK_ACTION) )
-            ->setMenuPopup(CMenuPopupHelper::getHistory($item['itemid']));
-        
+            ->setMenuPopup(CMenuPopupHelper::getHistory($item['itemid']))
+            ->setAttribute('data-order', $last_value_raw);
+             
+
     return $contents;
 }
     

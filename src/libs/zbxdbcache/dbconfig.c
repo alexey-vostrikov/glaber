@@ -2873,7 +2873,11 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 
 	zbx_vector_ptr_destroy(&interfaces);
 	
-	conf_hosts_notify_changes(&changed_hosts);
+	if (changed_hosts.values_num > 0) {
+		LOG_INF("Sending interface change notify, %d interfaces changed", changed_hosts.values_num);
+		conf_hosts_notify_changes(&changed_hosts);
+	}
+	
 	zbx_vector_uint64_destroy(&changed_hosts);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
