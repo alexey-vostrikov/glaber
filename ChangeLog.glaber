@@ -1,3 +1,6 @@
+ver 2.14.2
+    - #157 - added logging and protection from zero-updates, fixed sort order in the Discovery grouped
+    lastdata view
 ver 2.14.1
     - fix: #156 - workers hasn't been restarted properly
 ver 2.14.0
