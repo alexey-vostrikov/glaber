@@ -1,3 +1,5 @@
+ver 2.14.3
+    - #157 - eliminated double-free situation
 ver 2.14.2
     - #157 - added logging and protection from zero-updates, fixed sort order in the Discovery grouped
     lastdata view

@@ -37,5 +37,4 @@ void conf_hosts_notify_changes(zbx_vector_uint64_t *changed_hosts) {
         conf_hosts_get_host_items(changed_hosts->values[i], &changed_items);
     
     conf_items_notify_changes(&changed_items);
-    zbx_vector_uint64_destroy(&changed_items);
 }
