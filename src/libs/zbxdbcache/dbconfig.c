@@ -2874,9 +2874,9 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 	zbx_vector_ptr_destroy(&interfaces);
 	
 	if (changed_hosts.values_num > 0) {
-	//	LOG_INF("Sending interface change notify, %d interfaces changed", changed_hosts.values_num);
+		LOG_INF("Sending interface change notify, %d interfaces changed", changed_hosts.values_num);
 		conf_hosts_notify_changes(&changed_hosts);
-	//	LOG_INF("Sent interface change notify");
+		LOG_INF("Sent interface change notify");
 	}
 	
 	zbx_vector_uint64_destroy(&changed_hosts);
@@ -16303,7 +16303,7 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) {
 
 void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	int i;
-
+	LOG_INF("Start DC_notify_changed notify changed items");
 	poller_item_notify_init();
 	RDLOCK_CACHE;
 	
@@ -16318,5 +16318,6 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 
 	UNLOCK_CACHE;
 	poller_item_notify_flush();
+	LOG_INF("Finish DC_notify_changed notify changed items");
 
 }
