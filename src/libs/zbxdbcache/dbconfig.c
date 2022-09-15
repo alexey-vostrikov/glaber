@@ -6611,16 +6611,21 @@ void	DCsync_configuration(unsigned char mode)
 	ifsec2 = zbx_time() - sec;
 	/* relies on hosts, proxies and interfaces, must be after DCsync_{hosts,interfaces}() */
 	sec = zbx_time();
+	LOG_INF("Syncing items");
 	DCsync_items(&items_sync, flags);
+	LOG_INF("Syncing templates");
 	DCsync_template_items(&template_items_sync);
+	LOG_INF("Syncing prototypes");
 	DCsync_prototype_items(&prototype_items_sync);
 	isec2 = zbx_time() - sec;
 	/* relies on items, must be after DCsync_items() */
 	sec = zbx_time();
+	LOG_INF("Syncing peprocessing");
 	DCsync_item_preproc(&itempp_sync, sec);
 	itempp_sec2 = zbx_time() - sec;
 	/* relies on items, must be after DCsync_items() */
 	sec = zbx_time();
+	LOG_INF("Syncing itemscrtipts");
 	DCsync_itemscript_param(&itemscrp_sync);
 	itemscrp_sec2 = zbx_time() - sec;
 
