@@ -25,9 +25,9 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items);
 void conf_items_notify_changes(zbx_vector_uint64_t *changed_items) {
     int i;
     
-    for (i = 0; i < changed_items->values_num; i++) {
-        DEBUG_ITEM(changed_items->values[i],"Sending item change notification to the item");
-    }
+//    for (i = 0; i < changed_items->values_num; i++) {
+//        DEBUG_ITEM(changed_items->values[i],"Sending item change notification to the item");
+//    }
 
     DC_notify_changed_items(changed_items);
 }

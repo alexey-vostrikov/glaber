@@ -2642,7 +2642,6 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 	unsigned char		type, main_, useip;
 	unsigned char		reset_snmp_stats;
 	zbx_vector_ptr_t	interfaces;
-	
 	zbx_vector_uint64_t changed_hosts;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -2879,7 +2878,9 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 		LOG_INF("Sent interface change notify");
 	}
 	
+	LOG_INF("Destroying change notify hosts");
 	zbx_vector_uint64_destroy(&changed_hosts);
+	LOG_INF("Destroyed change notify hosts");
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
