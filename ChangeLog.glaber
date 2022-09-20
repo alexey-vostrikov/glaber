@@ -1,3 +1,7 @@
+ver 2.14.7
+    - #160 - glb_syslog_worker is simplified, moved to stantdard distros, also glb_log_listener removed, as well as glb_hist_clickhouse
+ver 2.14.[4,5,6]
+    - fixes to avoid #157
 ver 2.14.3
     - #157 - eliminated double-free situation
 ver 2.14.2
@@ -28,7 +32,7 @@ ver 2.13.1
     - logging fix 
 ver 2.13.0
     - implemented r/w locking for high concurrency objects, several test workers (log, http listener, dummy generator) implemented, structure for
-      mannerless preprocessing prepared, history compression code cleaned out, worker pipe size increased to ease worker implementation
+      mannegerless preprocessing prepared, history compression code cleaned out, worker pipe size increased to ease worker implementation
 ver 2.12.4
     - fix: changeset broken on 'test now' button in UI
 ver 2.12.3
