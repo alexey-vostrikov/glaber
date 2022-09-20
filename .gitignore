@@ -222,3 +222,6 @@ src/glapi/glb_test_worker
 src/glapi/glb_syslog_worker
 src/glapi/glb_http_listener
 src/glapi/glb_domofon_logs_worker
+src/glapi/glb_hist_clickhouse
+src/glapi/glb_log_listener
+src/glapi/glb_hist_clickhouse

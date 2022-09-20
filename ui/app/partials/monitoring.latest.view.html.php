@@ -63,17 +63,13 @@ function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_dat
     foreach($discovery_data['entities'] as $entity_name => $entity_items) {
         $row = [$entity_name];
 		
-        //error_log("\n\nentity items are".json_encode($entity_items));
-
-		foreach($prototype_items as $prototype_itemid => $prototype_item) {
+        foreach($prototype_items as $prototype_itemid => $prototype_item) {
 			if (isset($entity_items[$prototype_itemid])) {
 				array_push($row, show_compact_latest_data($data, $items[$entity_items[$prototype_itemid]]));
                 unset($data['items'][$entity_items[$prototype_itemid]]);
 			} else {
 				array_push($row,"NO item");
-			}
-          //  error_log("Removing".json_encode($prototype_item));
-           
+			} 
 		}
 		$table->addRow($row);
 	}

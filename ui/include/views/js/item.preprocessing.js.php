@@ -232,7 +232,7 @@
 				case '<?= GLB_PREPROC_DISPATCH_ITEM ?>':
 					return $(preproc_param_double_tmpl.evaluate({
 						rowNum: index,
-						placeholder_0: <?= json_encode(_('$.path.to.hotsname_attr')) ?>,
+						placeholder_0: <?= json_encode(_('$.path.to.hostname_attr')) ?>,
 						placeholder_1: <?= json_encode(_('item_key')) ?>
 					}));
 				default:

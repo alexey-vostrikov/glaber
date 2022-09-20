@@ -64,7 +64,7 @@ class CFrontendApiWrapper extends CApiWrapper {
 		API::setWrapper($this);
 
 		// call profiling
-		if ($this->debug) {
+		if ($this->debug && !isset($params['nodebug'])) {
 			$this->profiler->profileApiCall($this->api, $method, $params, $response->data);
 		}
 

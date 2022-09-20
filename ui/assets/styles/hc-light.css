@@ -784,7 +784,7 @@ footer {
   display: none; }
 
 .dashboard-grid-widget-blocker {
-  position: absolute;
+  position: relative;
   width: 100%;
   height: 100%;
   z-index: 998; }
@@ -3221,36 +3221,60 @@ button {
     background-color: #484848;
     border-color: #484848; }
 
+.paginate_button,
+.dt-button,
 .btn-alt {
   color: #000000;
   background-color: transparent; }
+  .paginate_button .plus-icon,
+  .dt-button .plus-icon,
   .btn-alt .plus-icon {
     background-color: #000000;
     margin-right: 8px; }
+    .paginate_button .plus-icon::after,
+    .dt-button .plus-icon::after,
     .btn-alt .plus-icon::after {
       background-color: #000000; }
+  .paginate_button:hover,
+  .dt-button:hover,
   .btn-alt:hover {
     color: #ffffff;
     background-color: #484848;
     border-color: #484848; }
+    .paginate_button:hover .plus-icon,
+    .dt-button:hover .plus-icon,
     .btn-alt:hover .plus-icon {
       background-color: #ffffff; }
+      .paginate_button:hover .plus-icon::after,
+      .dt-button:hover .plus-icon::after,
       .btn-alt:hover .plus-icon::after {
         background-color: #ffffff; }
+  .paginate_button:focus,
+  .dt-button:focus,
   .btn-alt:focus {
     color: #ffffff;
     background-color: #484848;
     border-color: #484848; }
+    .paginate_button:focus .plus-icon,
+    .dt-button:focus .plus-icon,
     .btn-alt:focus .plus-icon {
       background-color: #ffffff; }
+      .paginate_button:focus .plus-icon::after,
+      .dt-button:focus .plus-icon::after,
       .btn-alt:focus .plus-icon::after {
         background-color: #ffffff; }
+  .paginate_button:active,
+  .dt-button:active,
   .btn-alt:active {
     color: #ffffff;
     background-color: #484848;
     border-color: #484848; }
+    .paginate_button:active .plus-icon,
+    .dt-button:active .plus-icon,
     .btn-alt:active .plus-icon {
       background-color: #ffffff; }
+      .paginate_button:active .plus-icon::after,
+      .dt-button:active .plus-icon::after,
       .btn-alt:active .plus-icon::after {
         background-color: #ffffff; }
 
@@ -4517,8 +4541,8 @@ z-select[disabled] button,
   padding: 3px 0 7px; }
 
 .overlay-descr {
-  background: linear-gradient(#ffffff 30%, rgba(255, 255, 255, 0)), linear-gradient(rgba(255, 255, 255, 0), #ffffff 70%) 0 100%, radial-gradient(50% 0, farthest-side, rgba(0, 0, 0, 0.4), transparent), radial-gradient(50% 100%, farthest-side, rgba(0, 0, 0, 0.4), transparent) 0 100%;
-  background: linear-gradient(#ffffff 30%, rgba(255, 255, 255, 0)), linear-gradient(rgba(255, 255, 255, 0), #ffffff 70%) 0 100%, radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.4), transparent), radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.4), transparent) 0 100%;
+  background: linear-gradient(#ffffff 30%, rgba(255, 255, 255, 0)), linear-gradient(rgba(255, 255, 255, 0), #ffffff 70%) 0 100%, radial-gradient(50% 0, farthest-side, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0)), radial-gradient(50% 100%, farthest-side, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0)) 0 100%;
+  background: linear-gradient(#ffffff 30%, rgba(255, 255, 255, 0)), linear-gradient(rgba(255, 255, 255, 0), #ffffff 70%) 0 100%, radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0)), radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0)) 0 100%;
   background-repeat: no-repeat;
   background-color: #ffffff;
   background-size: 100% 40px, 100% 40px, 100% 4px, 100% 4px;
@@ -5329,8 +5353,8 @@ svg {
   .columns-wrapper.columns-3 > div,
   .columns-wrapper.columns-3 > li {
     display: block;
-    flex: 0 0 33.33333%;
-    max-width: 33.33333%; }
+    flex: 0 0 33.3333333333%;
+    max-width: 33.3333333333%; }
   .columns-wrapper .column-5 {
     flex: 0 0 5%;
     max-width: 5%; }
@@ -5749,6 +5773,17 @@ button.icon-action-command, button.icon-action-close, button.icon-action-msg, bu
     left: 0px;
     top: 4px; }
 
+button.icon-action-command, button.icon-action-close, button.icon-action-msg, button.icon-action-msgs, button.icon-action-severity-up, button.icon-action-severity-down, button.icon-action-severity-changed, button.icon-action-message, button.icon-action-ack, button.icon-problem-generated, button.icon-problem-recovery, button.icon-actions-number-gray, button.icon-actions-number-yellow, button.icon-actions-number-red {
+  background: none;
+  border: none;
+  padding: 0px;
+  margin: 0px;
+  margin-right: 5px;
+  min-height: 0px; }
+  button.icon-action-command::after, button.icon-action-close::after, button.icon-action-msg::after, button.icon-action-msgs::after, button.icon-action-severity-up::after, button.icon-action-severity-down::after, button.icon-action-severity-changed::after, button.icon-action-message::after, button.icon-action-ack::after, button.icon-problem-generated::after, button.icon-problem-recovery::after, button.icon-actions-number-gray::after, button.icon-actions-number-yellow::after, button.icon-actions-number-red::after {
+    left: 0px;
+    top: 4px; }
+
 [data-count][class*='icon-']::after,
 .icon-description::after {
   position: absolute;
@@ -5901,8 +5936,8 @@ button.icon-action-command, button.icon-action-close, button.icon-action-msg, bu
     border-radius: 50%;
     background: #555555; }
   .range-control.range-control-focus .range-control-thumb {
-    margin-top: -6.66667px;
-    margin-left: -6.66667px;
+    margin-top: -6.6666666667px;
+    margin-left: -6.6666666667px;
     background: #555555;
     border: 2px solid #6f6f6f; }
   .range-control.range-control-focus .range-control-progress {
@@ -6358,6 +6393,11 @@ z-select.z-select-host-interface li[disabled] .description:not(:empty),
     overflow: auto;
     border: 1px dashed #888888; }
 
+#datatables_buttons_info,
+.dtb-collection-closeable,
+.dataTables_wrapper {
+  background-color: #ffffff; }
+
 .sidebar .logo:focus .sidebar-logo {
   box-shadow: 0 0 0 2px #ffffff; }
 .sidebar button:focus {
@@ -6700,7 +6740,7 @@ z-select button.focusable:focus,
 .log-warning-bg,
 .log-high-bg,
 .log-disaster-bg {
-  background-color: transparent !important; }
+  background-color: rgba(0, 0, 0, 0) !important; }
   .na-bg::before,
   .normal-bg::before,
   .info-bg::before,
@@ -6845,7 +6885,7 @@ td.inactive-bg {
   color: #000000; }
 
 .inactive-bg, td.inactive-bg {
-  background-color: transparent !important; }
+  background-color: rgba(0, 0, 0, 0) !important; }
 
 .inactive-bg::before {
   content: '';
@@ -7064,3 +7104,8 @@ td.inactive-bg {
   content: " /"; }
 .breadcrumbs > :last-child::after {
   content: ""; }
+
+#datatables_buttons_info,
+.dtb-collection-closeable,
+.dataTables_wrapper {
+  background-color: #ffffff; }

@@ -1,3 +1,5 @@
+ver 2.14.8
+    - fix: #159 -Search builder theming, fixed Zabbix to Glaber resource files for sass generator
 ver 2.14.7
     - #160 - glb_syslog_worker is simplified, moved to stantdard distros, also glb_log_listener removed, as well as glb_hist_clickhouse
 ver 2.14.[4,5,6]

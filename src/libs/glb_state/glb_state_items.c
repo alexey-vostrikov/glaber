@@ -97,7 +97,7 @@ typedef struct {
     struct zbx_json *json;
 } item_last_values_req_t;
 
-#define GLB_CACHE_ITEMS_MAX_DURATION  86400 
+#define GLB_CACHE_ITEMS_MAX_DURATION  2*86400 
 #define GLB_CACHE_ITEMS_INIT_SIZE   8192
 #define GLB_CACHE_ITEM_MIN_VALUES   10 //reduce to 2 if too much mem will be used
 
