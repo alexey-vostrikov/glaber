@@ -77,9 +77,15 @@ int poller_item_notify_init() {
 
 int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid) {
 	zbx_uint64_pair_t pair = {.first = hostid, .second = itemid};
-
+	
+	if (item_type >= ITEM_TYPE_MAX) {
+		THIS_SHOULD_NEVER_HAPPEN;
+		return FAIL;
+	}
+	
 	if (NULL == ipc_poller_notify[item_type])
 		return FAIL;
+
 	DEBUG_ITEM(itemid,"Adding item to async polling notify for type %d", item_type);
 	zbx_vector_uint64_pair_append(notify_buffer[item_type], pair);
 	

@@ -278,7 +278,9 @@ static void  handle_async_io(void) {
 		snmp_shutdown(progname);
 		
 		sigprocmask(SIG_SETMASK, &orig_mask, NULL);
-
+		
+		netsnmp_ds_set_boolean(NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_DONT_PERSIST_STATE, 1);
+		
 		snmp_shutdown(progname);
 		init_snmp(progname);
 	}
