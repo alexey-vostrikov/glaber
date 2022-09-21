@@ -245,9 +245,15 @@ clean:
  * **********************************************************/
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
 //	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked for async polling");
+	if ( NULL == zbx_dc_host || NULL == zbx_dc_item ) {
+		THIS_SHOULD_NEVER_HAPPEN;
+		return FAIL;
+	}
+
 	if ( zbx_dc_host->proxy_hostid > 0)
 	 	return FAIL;
 		
+
 	switch (zbx_dc_item->type) {
 		case ITEM_TYPE_CALCULATED:
 			return SUCCEED;
@@ -272,7 +278,7 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			snmp_iface = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp, &zbx_dc_item->interfaceid);
 							//avoiding dynamic and discovery items from being processed by async glb pollers
 			
-			/*note: async poller are yet missing v3 functionality support */
+			/*note: async poller is yet missing v3 functionality support */
 			if ( NULL == snmp_iface || snmp_iface->version == ZBX_IF_SNMP_VERSION_3) 
 				return FAIL;
 	
@@ -283,7 +289,11 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		break;
 		//typical script will look key will look like this: wisi.py["{HOST.CONN}", "1.3.6.1.4.1.7465.20.2.9.4.4.5.1.2.1.7.1.2"] 
 		case ITEM_TYPE_SIMPLE: {
-			if (0 == CONFIG_GLB_PINGER_FORKS )  return FAIL;
+			if (0 == CONFIG_GLB_PINGER_FORKS )  
+				return FAIL;
+
+			if (NULL == zbx_dc_item->key)
+				return FAIL;
 
 			if (SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPING_KEY) ||
 				SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGSEC_KEY) ||
@@ -306,12 +316,16 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		break;
 	
 		case ITEM_TYPE_EXTERNAL: {
-			if (0 == CONFIG_GLB_WORKER_FORKS )  return FAIL;
-	
-			//checking if the script exists in the CONFIG_WORKERS_DIR 
 			char		*cmd = NULL;
 			size_t		cmd_alloc = ZBX_KIBIBYTE, cmd_offset = 0;
 			int		ret = FAIL;
+			
+			if (0 == CONFIG_GLB_WORKER_FORKS )  
+				return FAIL;
+			if (NULL == zbx_dc_item->key)
+				return FAIL;
+			
+			
 
 			AGENT_REQUEST	request;
 			init_request(&request);
@@ -342,9 +356,6 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		}
 
 		break; 
-
-		default: 
-			return FAIL;
 	}
 
 	return FAIL;
@@ -3023,8 +3034,8 @@ static int DC_remove_item(u_int64_t itemid) {
 			zbx_hashset_remove(&host->itemids, &itemid);
 		}
 	}
-	
-	if (SUCCEED == glb_might_be_async_polled(item, host))
+
+	if (SUCCEED == glb_might_be_async_polled(item, host)) 
 		poller_item_add_notify(item->type, item->itemid, item->hostid);
 
 	if (ITEM_STATUS_ACTIVE == item->status)
@@ -3345,7 +3356,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
 		row_count++;
-				
+		
 		if (ZBX_DBSYNC_ROW_REMOVE == tag) {
 			DC_remove_item(rowid);
 			continue;
@@ -3382,10 +3393,10 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		//also some attributes must be finally moved to the state (activated/deactivated and other) 
 		//so that only configuration is kept
 
-		if (templateid > 0 ) {
-			glb_handle_templated_item(templateid, itemid, hostid);
-			temp_count++;
-		}
+		//if (templateid > 0 ) {
+		//	glb_handle_templated_item(templateid, itemid, hostid);
+		//	temp_count++;
+		//}
 
 
 		ZBX_STR2UCHAR(status, row[2]);
@@ -3928,15 +3939,14 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		}
 		else
 		{
-			
+
 			glb_state_item_update_nextcheck(item->itemid, 0);
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->poller_type = ZBX_NO_POLLER;
 		}
 
 		/* items that do not support notify-updates are passed to old queuing */
-		if ( FAIL == glb_might_be_async_polled(item,host)  ||
-			 FAIL == poller_item_add_notify(type, itemid, hostid) )
+		if ( FAIL == glb_might_be_async_polled(item,host) ||  FAIL == poller_item_add_notify(type, itemid, hostid) ) 
 			DCupdate_item_queue(item, old_poller_type);
 	}
 
@@ -3971,7 +3981,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 	if (row_count > 0) 
 		config->last_items_change = time(NULL);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	LOG_INF("End of %s()", __func__);
 }
 
 static void	DCsync_template_items(zbx_dbsync_t *sync)
@@ -16310,7 +16320,7 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) {
 void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	int i;
 	LOG_INF("Start DC_notify_changed notify changed items");
-	poller_item_notify_init();
+//	poller_item_notify_init();
 	RDLOCK_CACHE;
 	
 	for (i = 0; i < items->values_num; i++ ) {
@@ -16323,7 +16333,7 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	}
 
 	UNLOCK_CACHE;
-	poller_item_notify_flush();
+//	poller_item_notify_flush();
 	LOG_INF("Finish DC_notify_changed notify changed items");
 
 }
