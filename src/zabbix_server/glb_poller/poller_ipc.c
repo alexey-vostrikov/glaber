@@ -78,13 +78,14 @@ int poller_item_notify_init() {
 int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid) {
 	zbx_uint64_pair_t pair = {.first = hostid, .second = itemid};
 	
-	if (item_type >= ITEM_TYPE_MAX) {
+	if (item_type >= ITEM_TYPE_MAX || 0 > item_type  ) {
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
 	
 	if (NULL == ipc_poller_notify[item_type])
 		return FAIL;
+	
 
 	DEBUG_ITEM(itemid,"Adding item to async polling notify for type %d", item_type);
 	zbx_vector_uint64_pair_append(notify_buffer[item_type], pair);
@@ -101,7 +102,7 @@ void poller_item_notify_flush() {
 			if (NULL ==  ipc_poller_notify[type]) {
 				LOG_WRN("Got async-synced items of type %d with no async poller initilized, this is a programming bug", type);
 				THIS_SHOULD_NEVER_HAPPEN;
-				exit(-1);
+				//exit(-1);
 			}
 			LOG_INF("IPC: flushing %d items for type %d", notify_buffer[type]->values_num, type);
 			ipc_vector_uint64_send(ipc_poller_notify[type], notify_buffer[type], 1);

@@ -1,5 +1,5 @@
 ver 2.14.9
-    - fix: improper warning message in proxy about valuecache size, default valuecache size in proxy set to 64MB
+    - fix: fixed #157
 ver 2.14.8
     - fix: #159 -Search builder theming, fixed Zabbix to Glaber resource files for sass generator
 ver 2.14.7
