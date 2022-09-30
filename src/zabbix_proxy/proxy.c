@@ -257,7 +257,7 @@ zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 0;
 zbx_uint64_t	CONFIG_TREND_FUNC_CACHE_SIZE	= 0;
-zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 0;
+zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 64 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_EXPORT_FILE_SIZE;
 
@@ -641,7 +641,7 @@ static void	zbx_set_defaults(void)
 /**********************************************************************/
 static int parse_servers() {
 
-	zabbix_log(LOG_LEVEL_INFORMATION,"Parcing servers configuration");
+	zabbix_log(LOG_LEVEL_INFORMATION,"Parsing servers configuration");
 
 	const char s[2] = ",";
    	
@@ -649,10 +649,6 @@ static int parse_servers() {
 	char *server=NULL;
 
 	char tmp[MAX_ZBX_DOMAINS_LEN];
-
-	//zbx_validate_hostname(CONFIG_SERVER)
-	//zabbix_log(LOG_LEVEL_CRIT, "invalid entry in \"Server\" configuration parameter: %s", ch_error);
-	//		zbx_free(ch_error); zbx_validate_peer_list(CONFIG_SERVERS, &ch_error))
 
 	strscpy(tmp, CONFIG_SERVERS);
 	server = strtok(tmp,s);
@@ -1344,7 +1340,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	}
 
 	if (FAIL == glb_state_init()) {
-		zbx_error("Cannot initialize Glaber CACHE");
+		zbx_error("Cannot initialize ValueCache");
 		exit(EXIT_FAILURE);
 	}
 

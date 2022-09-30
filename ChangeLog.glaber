@@ -1,7 +1,9 @@
+ver 2.14.9
+    - fix: improper warning message in proxy about valuecache size, default valuecache size in proxy set to 64MB
 ver 2.14.8
     - fix: #159 -Search builder theming, fixed Zabbix to Glaber resource files for sass generator
 ver 2.14.7
-    - #160 - glb_syslog_worker is simplified, moved to stantdard distros, also glb_log_listener removed, as well as glb_hist_clickhouse
+    - #160 - glb_syslog_worker is simplified, moved to standard distros, also glb_log_listener removed, as well as glb_hist_clickhouse
 ver 2.14.[4,5,6]
     - fixes to avoid #157
 ver 2.14.3
