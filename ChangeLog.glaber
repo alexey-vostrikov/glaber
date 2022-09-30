@@ -1,3 +1,5 @@
+ver 2.14.11
+    - fix: renamed ValueCacheSize -> CacheSize option in proxy
 ver 2.14.10
     - fix: improper warning message in proxy about valuecache size, default valuecache size in proxy set to 64M
 ver 2.14.9
