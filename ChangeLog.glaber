@@ -1,3 +1,5 @@
+ver 2.14.12
+    - fix: fixed PassiveProxy server filter functionality.
 ver 2.14.11
     - fix: renamed ValueCacheSize -> CacheSize option in proxy
 ver 2.14.10

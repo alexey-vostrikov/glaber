@@ -35,7 +35,10 @@
 #include "zbxvault.h"
 #include "zbxavailability.h"
 
+extern char	*CONFIG_SERVERS;
+
 extern char	*CONFIG_SERVER;
+
 extern char	*CONFIG_VAULTDBPATH;
 extern int CONFIG_CLUSTER_REROUTE_DATA;
 extern int CONFIG_CLUSTER_SERVER_ID;
@@ -385,7 +388,7 @@ int	check_access_passive_proxy(zbx_socket_t *sock, int send_response, const char
 {
 	char	*msg = NULL;
 
-	if (FAIL == zbx_tcp_check_allowed_peers(sock, CONFIG_SERVER))
+	if (FAIL == zbx_tcp_check_allowed_peers(sock, CONFIG_SERVERS))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "%s from server \"%s\" is not allowed: %s", req, sock->peer,
 				zbx_socket_strerror());
@@ -1006,7 +1009,7 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 	//for what a freaking reason here you go directly to the database?
 
 	//so instead of fixing this, i just make a separate zbx_dc_get_proxy_hosts(proxyid,&vector) call
-	zbx_dc_get_proxy_hosts(proxy_hostid,hosts);
+	zbx_dc_get_proxy_hosts(proxy_hostid, hosts);
 	/*
 	result = DBselect(
 			"select hostid"
@@ -1016,7 +1019,7 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 				" and flags<>%d",
 			proxy_hostid, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE);
 	*/
-	zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: prefetched %d hosts for configuration of proxy %ld", hosts->values_num, proxy_hostid);
+	//zabbix_log(LOG_LEVEL_INFORMATION,"CLUSTER: prefetched %d hosts for configuration of proxy %ld", hosts->values_num, proxy_hostid);
 	for ( i =0 ; i < hosts->values_num ; i++ )
 	//while (NULL != (row = DBfetch(result)))
 	{
@@ -1054,6 +1057,7 @@ static void	get_proxy_monitored_hosts(zbx_uint64_t proxy_hostid, zbx_vector_uint
 	zbx_free(sql);
 
 	zbx_vector_uint64_sort(hosts, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	//LOG_INF("CLUSTER: returning %d hosts for the proxy", hosts->values_num);
 }
 
 static void	get_proxy_monitored_httptests(zbx_uint64_t proxy_hostid, zbx_vector_uint64_t *httptests)

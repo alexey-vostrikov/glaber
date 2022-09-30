@@ -278,7 +278,6 @@ static int get_simple_interval(const char *delay)
 	return interval;
 }
 
-//extern int CONFIG_SERVER_STARTUP_TIME;
 /******************************************************************
  * Creates new item for polling, calls appropriate conversion func  *
  * for the type, and fills the new poller_item with key vals          *

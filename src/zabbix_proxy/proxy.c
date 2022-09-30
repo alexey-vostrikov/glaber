@@ -66,7 +66,9 @@
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
 #include "../libs/glb_state/glb_state_items.h"
-
+#include "glb_preproc.h"
+#include "../libs/apm/apm.h"
+#include "../zabbix_server/glb_poller/poller_ipc.h"
 
 #ifdef HAVE_OPENIPMI
 #include "../zabbix_server/ipmi/ipmi_manager.h"
@@ -230,7 +232,12 @@ int	CONFIG_HISTORYPOLLER_FORKS	= 1;	/* for zabbix[proxy_history] internal check 
 int	CONFIG_AVAILMAN_FORKS		= 1;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
+
 char	*CONFIG_LISTEN_IP		= NULL;
+
+int CONFIG_SELF_MONITOR_PORT		= DEFAULT_SELF_MONITOR_PORT;
+char	*CONFIG_SELF_MONITOR_IP		= NULL;
+
 char	*CONFIG_SOURCE_IP		= NULL;
 int	CONFIG_TRAPPER_TIMEOUT		= 300;
 
@@ -349,10 +356,6 @@ int SERVERS = 0;
 int CONFIG_EXT_SERVER_FORKS = 1;
 char	*CONFIG_WORKERS_DIR		= NULL;
 char	*CONFIG_SERVERS			= NULL;
-
-//char	*CONFIG_HISTORY_STORAGE_URL		= NULL;
-//char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
-//int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
@@ -919,6 +922,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"ListenPort",			&CONFIG_LISTEN_PORT,			TYPE_INT,
 			PARM_OPT,	1024,			32767},
+		{"SelfMonitorIP",			&CONFIG_SELF_MONITOR_IP,			TYPE_STRING_LIST,
+			PARM_OPT,	0,			0},
+		{"SelfMonitorPort",			&CONFIG_SELF_MONITOR_PORT,			TYPE_INT,
+			PARM_OPT,	1024,			32767},	
 		{"SourceIP",			&CONFIG_SOURCE_IP,			TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"DebugLevel",			&CONFIG_LOG_LEVEL,			TYPE_INT,
@@ -1331,6 +1338,11 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
+	
+	if (FAIL == apm_init()) {
+		zbx_error("Cannot initialize internal monitoring IPC");
+		exit(EXIT_FAILURE);
+	}
 
 	if (0 != CONFIG_VMWARE_FORKS && SUCCEED != zbx_vmware_init(&error))
 	{
@@ -1341,6 +1353,16 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	if (FAIL == glb_state_init()) {
 		zbx_error("Cannot initialize ValueCache");
+		exit(EXIT_FAILURE);
+	}
+
+	if (FAIL == preproc_ipc_init(128 * ZBX_MEBIBYTE)) {
+		zbx_error("Cannot initialize Processing notify IPC");
+		exit(EXIT_FAILURE);
+	}
+	
+	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
+		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
 

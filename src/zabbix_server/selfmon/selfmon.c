@@ -42,6 +42,8 @@
 
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
+extern char *CONFIG_SELF_MONITOR_IP;
+extern int CONFIG_SELF_MONITOR_PORT;	
 
 void respond_metrics_cb (struct evhttp_request *request, void *privParams) {
 	//evhttp_send_error(request, HTTP_NOTFOUND, "Not implemented (yet)"); 
@@ -91,8 +93,6 @@ static void collect_selfmon_cb(int fd, short int flags, void *data) {
 
 ZBX_THREAD_ENTRY(selfmon_thread, args)
 {
-
-
 	process_type = ((zbx_thread_args_t *)args)->process_type;
 	server_num = ((zbx_thread_args_t *)args)->server_num;
 	process_num = ((zbx_thread_args_t *)args)->process_num;
@@ -121,8 +121,8 @@ ZBX_THREAD_ENTRY(selfmon_thread, args)
 	evhttp_set_cb (server, "/metrics", respond_metrics_cb, 0);
 	evhttp_set_gencb (server, notfound, 0);
 
-	if (evhttp_bind_socket (server, "127.0.0.1", 8100) != 0) {
-		LOG_INF("Could not bind to 127.0.0.1:8100");
+	if (evhttp_bind_socket (server, CONFIG_SELF_MONITOR_IP, CONFIG_SELF_MONITOR_PORT) != 0) {
+		LOG_INF("Could not bind to %s:%d", CONFIG_SELF_MONITOR_IP, CONFIG_SELF_MONITOR_PORT);
 		exit(-1);
 	}
 		

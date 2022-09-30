@@ -124,6 +124,9 @@ class CControllerProxyEdit extends CController {
 			$data['tls_issuer'] = $proxy['tls_issuer'];
 			$data['tls_subject'] = $proxy['tls_subject'];
 
+			if (isset($proxy['error'])) 
+				$data['domains']=$proxy['error'];
+
 			if ($data['status'] == HOST_STATUS_SERVER || $data['status'] == HOST_STATUS_PROXY_PASSIVE) {
 				$data['interfaceid'] = $proxy['interface']['interfaceid'];
 				$data['dns'] = $proxy['interface']['dns'];
@@ -146,7 +149,6 @@ class CControllerProxyEdit extends CController {
 		$data['port'] = $this->getInput('port', $data['port']);
 		$data['proxy_address'] = $this->getInput('proxy_address', $data['proxy_address']);
 		$data['description'] = $this->getInput('description', $data['description']);
-		$data['domains']=$proxy['error'];
 		$data['tls_accept'] = $this->getInput('tls_accept', $data['tls_accept']);
 		$data['tls_connect'] = $this->getInput('tls_connect', $data['tls_connect']);
 		$data['tls_psk_identity'] = $this->getInput('tls_psk_identity', '');

@@ -286,8 +286,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 
 	if (SUCCEED != (ret = get_proxyconfig_data(proxy->hostid, &j, &error)))
 	{
-		zabbix_log(LOG_LEVEL_ERR, "cannot collect configuration data for proxy \"%s\": %s",
-				proxy->host, error);
+		LOG_INF("cannot collect configuration data for proxy \"%s\": %s", proxy->host, error);
 		goto out;
 	}
 
@@ -305,8 +304,10 @@ static int	proxy_send_configuration(DC_PROXY *proxy)
 		zbx_json_free(&j);	/* json buffer can be large, free as fast as possible */
 	}
 
-	if (SUCCEED != (ret = connect_to_proxy(proxy, &s, CONFIG_TRAPPER_TIMEOUT)))
+	if (SUCCEED != (ret = connect_to_proxy(proxy, &s, CONFIG_TRAPPER_TIMEOUT))) {
+		LOG_INF("Cannot connect to proxy %s", proxy->host);
 		goto out;
+	}
 
 	if (0 != proxy->auto_compress)
 	{
@@ -800,15 +801,16 @@ static int	process_proxy(void)
 		/* Check if passive proxy has been misconfigured on the server side. If it has happened more */
 		/* recently than last synchronisation of cache then there is no point to retry connecting to */
 		/* proxy again. The next reconnection attempt will happen after cache synchronisation. */
-
 		//if (proxy.last_cfg_error_time < DCconfig_get_last_sync_time() && HOST_STATUS_PROXY_PASSIVE == proxy.proxy_type ) {
 		if ( HOST_STATUS_PROXY_PASSIVE == proxy.proxy_type ) {
-		
+
 			if (proxy.proxy_config_nextcheck <= now) 
 			{
-				if (SUCCEED != (ret = proxy_send_configuration(&proxy)))
+				if (SUCCEED != (ret = proxy_send_configuration(&proxy))) {
+
 					goto error;
-				
+				}
+
 				zbx_dc_register_proxy_availability(proxy.hostid);
 			}
 
@@ -922,8 +924,6 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 			
 			//recalc topology if needed
  			zbx_dc_recalc_topology();
-			
-
 		}
 
 		//zbx_sleep_loop(sleeptime);

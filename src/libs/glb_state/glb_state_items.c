@@ -964,7 +964,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
-        LOG_WRN("Cannot add value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
+        DEBUG_ITEM(h->itemid, "Cannot add value for item with timestamp %d to the cache",  h->ts.sec);
         return FAIL;
     }
 

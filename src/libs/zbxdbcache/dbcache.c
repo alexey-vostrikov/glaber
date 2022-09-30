@@ -2735,6 +2735,8 @@ static void	sync_proxy_history(int *total_num, int *more)
 	zbx_vector_ptr_t	item_diff;
 	ZBX_DC_HISTORY		history[ZBX_HC_SYNC_MAX];
 
+	//LOG_INF("syncing proxy history");
+
 	zbx_vector_ptr_create(&history_items);
 	zbx_vector_ptr_reserve(&history_items, ZBX_HC_SYNC_MAX);
 	zbx_vector_ptr_create(&item_diff);
@@ -3144,7 +3146,7 @@ static void	sync_history_cache_full(void)
 		{
 			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 				sync_server_history(&values_num, &triggers_num, &more);
-			else
+			else 
 				sync_proxy_history(&values_num, &more);
 
 			zabbix_log(LOG_LEVEL_WARNING, "syncing history data... " ZBX_FS_DBL "%%",
