@@ -331,10 +331,10 @@ static int	get_last_n_value(const DC_ITEM *item, const char *parameters, const z
 		goto out;
 	}
 
-	if (arg1 <= values.values_num)
+	if (arg1 <= values.values_num && 0 < values.values_num)
 	{
-		*value = values.values[arg1 - 1];
-		zbx_vector_history_record_remove(&values, arg1 - 1);
+		*value = values.values[0];
+		zbx_vector_history_record_remove(&values, 0);
 		ret = SUCCEED;
 	}
 	else
@@ -2613,7 +2613,7 @@ int	evaluate_function2(zbx_variant_t *value, DC_ITEM *item, const char *function
 {
 	int	ret;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() function:'%s(/%s/%s,%s)' ts:'%s\'", __func__,
+	DEBUG_ITEM(item->itemid, "In %s() function:'%s(/%s/%s,%s)' ts:'%s\'", __func__,
 			function, item->host.host, item->key_orig, parameter, zbx_timespec_str(ts));
 
 	if (0 == strcmp(function, "last"))
@@ -2734,9 +2734,7 @@ int	evaluate_function2(zbx_variant_t *value, DC_ITEM *item, const char *function
 		ret = FAIL;
 	}
 
-	DEBUG_ITEM(item->itemid,"Func eval result is %d",ret);
-	
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s value:'%s' of type:'%s'", __func__, zbx_result_string(ret),
+	DEBUG_ITEM(item->itemid, "End of %s():%s value:'%s' of type:'%s'", __func__, zbx_result_string(ret),
 			zbx_variant_value_desc(value), zbx_variant_type_desc(value));
 
 	return ret;

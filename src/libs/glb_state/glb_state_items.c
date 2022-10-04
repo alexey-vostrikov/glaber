@@ -586,7 +586,7 @@ static int glb_state_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
     return FAIL;
 }
 
-static int fill_items_values_by_index(item_elem_t *elm, int tail_idx, int head_idx, zbx_vector_history_record_t *values)
+static int fill_items_values_by_index(u_int64_t itemid, item_elem_t *elm, int tail_idx, int head_idx, zbx_vector_history_record_t *values)
 {
     int i, iter = 0;
     glb_state_item_value_t *item_val;
@@ -606,6 +606,10 @@ static int fill_items_values_by_index(item_elem_t *elm, int tail_idx, int head_i
         iter++;
 
         item_val = glb_tsbuff_get_value_ptr(&elm->tsbuff, i);
+        
+        DEBUG_ITEM(itemid, "Filled value from cache: ts: %ld, type: '%s', value: '%s'", item_val->time_sec, 
+            zbx_variant_type_desc(&item_val->value), zbx_variant_value_desc(&item_val->value));
+
         glb_state_value_to_hist_copy(&record, item_val, elm->value_type);
 
         zbx_vector_history_record_append_ptr(values, &record);
@@ -614,11 +618,11 @@ static int fill_items_values_by_index(item_elem_t *elm, int tail_idx, int head_i
     return i;
 }
 
-static int fill_items_values_by_count(item_elem_t *elm, int count, int head_idx, zbx_vector_history_record_t *values)
+static int fill_items_values_by_count(u_int64_t itemid, item_elem_t *elm, int count, int head_idx, zbx_vector_history_record_t *values)
 {
     int tail_idx = glb_tsbuff_index(&elm->tsbuff, head_idx - count + 1);
 
-    return fill_items_values_by_index(elm, tail_idx, head_idx, values);
+    return fill_items_values_by_index(itemid, elm, tail_idx, head_idx, values);
 }
 
 static int count_hit()
@@ -700,7 +704,7 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
     if (-1 < head_idx && SUCCEED == glb_tsbuff_check_has_enough_count_data_idx(&elm->tsbuff, req->count, head_idx))
     {
         count_hit();
-        fill_items_values_by_count(elm, req->count, head_idx, req->values);
+        fill_items_values_by_count(elem->id, elm, req->count, head_idx, req->values);
         DEBUG_ITEM(elem->id, "filled %d values from the cache", req->values->values_num);
         
         return SUCCEED;
@@ -761,7 +765,7 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
         return FAIL;
     }
     
-    fill_items_values_by_count(elm, req->count, head_idx, req->values);
+    fill_items_values_by_count(elem->id, elm, req->count, head_idx, req->values);
 
     DEBUG_ITEM(elem->id, "Fetch from db successful, filled %d values", req->count);
 
@@ -822,7 +826,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
     {
         DEBUG_ITEM(elem->id, "Filling from the cache");
         count_hit();
-        fill_items_values_by_index(elm, tail_idx, head_idx, req->values);
+        fill_items_values_by_index(elem->id, elm, tail_idx, head_idx, req->values);
         DEBUG_ITEM(elem->id, "Filled from the cache %d items", req->values->values_num);
         return SUCCEED;
     }
@@ -881,7 +885,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
 
     if (-1 != tail_idx && -1 != head_idx)
     {
-        fill_items_values_by_index(elm, tail_idx, head_idx, req->values);
+        fill_items_values_by_index(elem->id, elm, tail_idx, head_idx, req->values);
         DEBUG_ITEM(elem->id, "DB request successful, data cached and filled %d values", glb_tsbuff_get_count(&elm->tsbuff));
     }
 

@@ -3570,26 +3570,31 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 
 		if (ISSET_LOG(result))
 		{	
+			DEBUG_ITEM(itemid, "Setting log result: '%s'", result->log->value);
 			dc_local_add_history_log(itemid, item_value_type, ts, result->log, result->lastlogsize,
 					result->mtime, value_flags);
 		}
 		else if (ISSET_UI64(result))
 		{	
+			DEBUG_ITEM(itemid, "Setting uint64 result: %lld", result->ui64);
 			dc_local_add_history_uint(itemid, item_value_type, ts, result->ui64, result->lastlogsize,
 					result->mtime, value_flags);
 		}
 		else if (ISSET_DBL(result))
 		{	
+			DEBUG_ITEM(itemid, "Setting dbl result: %f", result->dbl);
 			dc_local_add_history_dbl(itemid, item_value_type, ts, result->dbl, result->lastlogsize,
 					result->mtime, value_flags);
 		}
 		else if (ISSET_STR(result))
 		{	
+			DEBUG_ITEM(itemid, "Setting str result: %s", result->str);
 			dc_local_add_history_text(itemid, item_value_type, ts, result->str, result->lastlogsize,
 					result->mtime, value_flags);
 		}
 		else if (ISSET_TEXT(result))
 		{
+			DEBUG_ITEM(itemid, "Setting text result: %s", result->text);
 			dc_local_add_history_text(itemid, item_value_type, ts, result->text, result->lastlogsize,
 					result->mtime, value_flags);
 		}
@@ -3605,8 +3610,10 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 			dc_local_add_history_log(itemid, item_value_type, ts, NULL, result->lastlogsize, result->mtime,
 					value_flags);
 		}
-		else
+		else {
+			DEBUG_ITEM(itemid, "Result is empty (no data) ");
 			dc_local_add_history_empty(itemid, item_value_type, ts, value_flags);
+		}
 	}
 }
 

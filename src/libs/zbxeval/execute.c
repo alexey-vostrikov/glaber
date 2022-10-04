@@ -2846,7 +2846,6 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 				case ZBX_EVAL_TOKEN_VAR_MACRO:
 				case ZBX_EVAL_TOKEN_VAR_USERMACRO:
 					if (SUCCEED != eval_execute_push_value(ctx, token, &output, &errmsg)) {
-						LOG_INF("eval_execute_push_value(ctx, token, &output,");
 						goto out;
 					}
 					break;

@@ -5283,7 +5283,7 @@ void	prepare_triggers(DC_TRIGGER **triggers, int triggers_num)
 	}
 }
 
-static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts, double *result,
+static int	evaluate_expression(u_int64_t triggerid, zbx_eval_context_t *ctx, const zbx_timespec_t *ts, double *result,
 		char **error)
 {
 	zbx_variant_t	 value;
@@ -5292,12 +5292,12 @@ static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts
 		return FAIL;
 	}
 
-	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
+	if ( DC_get_debug_trigger() == triggerid )
 	{
 		char	*expression = NULL;
 
 		zbx_eval_compose_expression(ctx, &expression);
-		zabbix_log(LOG_LEVEL_DEBUG, "%s(): %s => %s", __func__, expression, zbx_variant_value_desc(&value));
+		DEBUG_TRIGGER(triggerid, "%s(): %s => %s", __func__, expression, zbx_variant_value_desc(&value));
 		zbx_free(expression);
 	}
 
@@ -5306,11 +5306,12 @@ static int	evaluate_expression(zbx_eval_context_t *ctx, const zbx_timespec_t *ts
 		*error = zbx_dsprintf(*error, "Cannot convert expression result of type \"%s\" to"
 				" floating point value", zbx_variant_type_desc(&value));
 		zbx_variant_clear(&value);
-
+		DEBUG_TRIGGER(triggerid, "Cannot convert function result: %s", error);
 		return FAIL;
 	}
 
 	*result = value.data.dbl;
+	DEBUG_TRIGGER(triggerid, "Result of the function calculation is %f", value.data.dbl );
 
 	return SUCCEED;
 }
@@ -5374,7 +5375,7 @@ void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t 
 		if (NULL != tr->new_error)
 			continue;
 
-		if (SUCCEED != evaluate_expression(tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
+		if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
 			LOG_DBG("Failed to eval %ld trigger expression",tr->triggerid);
 			continue;
 		}
@@ -5404,7 +5405,7 @@ void	evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint64_t 
 			}
 
 			/* processing recovery expression mode */
-			if (SUCCEED != evaluate_expression(tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
+			if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
 			{
 				tr->new_value = TRIGGER_VALUE_UNKNOWN;
 				continue;
