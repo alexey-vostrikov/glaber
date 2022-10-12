@@ -2112,7 +2112,6 @@ AC_OUTPUT([
 	src/zabbix_server/preprocessor/Makefile
 	src/zabbix_server/glb_poller/Makefile
 	src/zabbix_server/availability/Makefile
-	src/zabbix_server/tests/Makefile
 	src/zabbix_server/lld/Makefile
 	src/zabbix_server/reporter/Makefile
 	src/zabbix_proxy/Makefile
