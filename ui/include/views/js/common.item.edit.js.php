@@ -211,7 +211,7 @@ zbx_subarray_push($this->data['authTypeVisibility'], ITEM_AUTHTYPE_PUBLICKEY, 'p
 zbx_subarray_push($this->data['authTypeVisibility'], ITEM_AUTHTYPE_PUBLICKEY, 'row_publickey');
 zbx_subarray_push($this->data['authTypeVisibility'], ITEM_AUTHTYPE_PUBLICKEY, 'privatekey');
 zbx_subarray_push($this->data['authTypeVisibility'], ITEM_AUTHTYPE_PUBLICKEY, 'row_privatekey');
-zbx_subarray_push($this->data['typeDisable'], ITEM_TYPE_CALCULATED, [ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_TEXT], 'value_type');
+//zbx_subarray_push($this->data['typeDisable'], ITEM_TYPE_CALCULATED, [ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_TEXT], 'value_type');
 
 ?>
 <script type="text/javascript">
@@ -262,7 +262,7 @@ zbx_subarray_push($this->data['typeDisable'], ITEM_TYPE_CALCULATED, [ITEM_VALUE_
 		if (!empty($this->data['typeVisibility'])) { ?>
 			var typeSwitcher = new CViewSwitcher('type', 'change',
 				<?php echo zbx_jsvalue($this->data['typeVisibility'], true); ?>,
-				<?php echo zbx_jsvalue($this->data['typeDisable'], true); ?>);
+				<?php echo zbx_jsvalue([], true); ?>);
 		<?php } ?>
 		if ($('#http_authtype').length) {
 			new CViewSwitcher('http_authtype', 'change', <?= zbx_jsvalue([

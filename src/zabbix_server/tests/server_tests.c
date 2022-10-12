@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "common.h"
-//#ifdef HAVE_GLB_TEST
+#ifdef HAVE_GLB_TEST
 
 #include "../../libs/zbxalgo/tests/algo_tests.h"
 #include "../preprocessor/worker_tests.h"
@@ -34,4 +34,4 @@ void tests_server_run(void) {
     
     LOG_INF("Server tests finished");
 }
-//#endif
+#endif

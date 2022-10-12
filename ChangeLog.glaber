@@ -1,5 +1,7 @@
+ver 2.14.14
+    - fix: ubuntu 16.0 build, allowed all types for calculated items
 ver 2.14.13
-    - fix: last() wasn't working properly 
+    - fix: last(#N) wasn't working properly 
 ver 2.14.12
     - fix: fixed PassiveProxy server filter functionality.
 ver 2.14.11
