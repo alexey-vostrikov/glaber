@@ -206,16 +206,30 @@ class CZabbixServer {
 
 	public static function  getItemsState(array $itemids) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-	
-		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
-			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
-			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
-		);
+		$i = 0;
+
+		$result = [];
+		foreach (array_chunk($itemids, 16384) as $items_chunk) {
+			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+			);
 		
-		return $zabbix_server->request([
-			'request' => 'itemsstate.get',
-			'itemids' => $itemids
-		]);
+			error_log("Processing chunk $i");
+
+			$result = $result + $zabbix_server->request([
+				'request' => 'itemsstate.get',
+				'itemids' => $items_chunk
+			]);
+
+			$i++;
+		}
+
+		return $result;
+//		return $zabbix_server->request([
+//			'request' => 'itemsstate.get',
+//			'itemids' => $itemids
+//		]);
 			
 	}
 
