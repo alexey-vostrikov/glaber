@@ -62,7 +62,7 @@ class C44XmlValidator extends CXmlValidatorGeneral {
 		CXmlConstantValue::CHECK_XML_ERROR => CXmlConstantName::CHECK_XML_ERROR,
 		CXmlConstantValue::DISCARD_UNCHANGED_HEARTBEAT => CXmlConstantName::DISCARD_UNCHANGED_HEARTBEAT,
 		CXmlConstantValue::DISCARD_AGGREGATE => CXmlConstantName::DISCARD_AGGREGATE,
-		CXmlConstantValue::DISPATH_ITEM => CXmlConstantName::DISPATCH_ITEM,
+		CXmlConstantValue::DISPATCH_ITEM => CXmlConstantName::DISPATCH_ITEM,
 		CXmlConstantValue::JAVASCRIPT => CXmlConstantName::JAVASCRIPT,
 		CXmlConstantValue::PROMETHEUS_TO_JSON => CXmlConstantName::PROMETHEUS_TO_JSON,
 		CXmlConstantValue::CSV_TO_JSON => CXmlConstantName::CSV_TO_JSON
