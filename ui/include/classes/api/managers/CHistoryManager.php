@@ -34,23 +34,13 @@ class CHistoryManager {
 	 * @return array  An array with items IDs as keys and arrays of history objects as values.
 	 */
 	public function getLastValues(array $items, $limit = 1, $period = null) {
-		//there is two possibilites for getlastvalues
-		//most recent 2 values are kept int the server memory, so we requesting them
-		//if we need less then 2 values
-		//
 		return $this->getLastValuesFromServer($items, $limit, $period);
 	}
 	
 	private function getLastValuesFromServer($items, $limit, $period) {
-	  global $ZBX_SERVER, $ZBX_SERVER_PORT;
-		
 	  $result=[];
 				
-	  $server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
-	  	timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
-	    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)),  ZBX_SOCKET_BYTES_LIMIT);
-	
-	  $last_values = $server->getLastValues(CSessionHelper::getId(),array_column($items,'itemid'),$limit, $period); 
+	  $last_values = CZabbixServer::getLastValues(CSessionHelper::getId(),array_column($items,'itemid'),$limit, $period); 
 	
 	  if (!is_array($last_values)) {
 			return [];

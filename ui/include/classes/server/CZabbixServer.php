@@ -209,13 +209,13 @@ class CZabbixServer {
 		$i = 0;
 
 		$result = [];
-		foreach (array_chunk($itemids, 16384) as $items_chunk) {
+		foreach (array_chunk($itemids, 81) as $items_chunk) {
 			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
 		
-			error_log("Processing chunk $i");
+//			error_log("Processing chunk $i");
 
 			$result = $result + $zabbix_server->request([
 				'request' => 'itemsstate.get',
@@ -268,24 +268,30 @@ class CZabbixServer {
 		]);
 	}
 
-	public function getLastValues($sid, array $itemids, $limit, $period) {
-		return $this->request([
-			'request' => 'lastvalues.get',
-			'sid' => $sid,
-			'itemids' => $itemids,
-			'limit'	=> $limit,
-			'period' => $period
-		]);
+	public static function getLastValues2($sid, array $itemids, $limit, $period) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+
+		$result = [];
+
+		foreach (array_chunk($itemids, 16384) as $items_chunk) {
+			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+			);
+		
+			$result = $result + $zabbix_server->request([
+				'request' => 'lastvalues.get',
+				'sid' => $sid,
+				'itemids' => $items_chunk,
+				'limit'	=> $limit,
+				'period' => $period
+			]);
+		}
+
+		return $result;
 	}
 
-//	public function getItemsState($sid, array $itemids) {
-//		return $this->request([
-//			'request' => 'itemsstate.get',
-//			'sid' => $sid,
-//			'itemids' => $itemids,
-//		]);
-//	}
-
+	
 	/**
 	 * Request server to test item preprocessing steps.
 	 *
