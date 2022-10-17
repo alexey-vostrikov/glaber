@@ -75,7 +75,7 @@ class CControllerLatestViewRefresh extends CControllerLatest {
 			'select' => $this->getInput('filter_select', ''),
 			'show_without_data' => $this->getInput('filter_show_without_data', 0),
 			'show_details' => $this->getInput('filter_show_details', 0),
-			'group_by_discovery' =>  $this->getInput('filter_group_by_discovery', 0),
+			'group_by_discovery' =>  $this->getInput('filter_group_by_discovery', 1),
 			'evaltype' => CProfile::get('web.latest.filter.evaltype', TAG_EVAL_TYPE_AND_OR),
 			'tags' => []
 		];

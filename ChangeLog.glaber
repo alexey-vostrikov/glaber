@@ -1,4 +1,6 @@
-ver 2.14.16
+ver 2.14.18
+    -fix : fail if too many items are requesed from the cache at the time, make grouped view deafult
+ver 2.14.17
     -fix : fail if too many items are requesed from the cache at the time
 ver 2.14.16
     -fix : template import not working

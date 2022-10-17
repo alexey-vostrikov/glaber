@@ -268,24 +268,27 @@ class CZabbixServer {
 		]);
 	}
 
-	public static function getLastValues2($sid, array $itemids, $limit, $period) {
+	public static function getLastValues($sid, array $itemids, $limit, $period) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
 		$result = [];
 
 		foreach (array_chunk($itemids, 16384) as $items_chunk) {
+			
 			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
-		
-			$result = $result + $zabbix_server->request([
+
+			$newdata = $zabbix_server->request([
 				'request' => 'lastvalues.get',
 				'sid' => $sid,
 				'itemids' => $items_chunk,
 				'limit'	=> $limit,
 				'period' => $period
 			]);
+
+			$result = array_merge($result, $newdata);
 		}
 
 		return $result;
