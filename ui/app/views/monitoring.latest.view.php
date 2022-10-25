@@ -98,7 +98,7 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 							->setAttribute('disabled', $data['filter']['hostids'] ? null : 'disabled')
 							->setUncheckedValue(0)
 				)->addClass(ZBX_STYLE_TABLE_FORMS_SECOND_COLUMN)
-				->addRow((new CLabel(_('Group items by Discovery (EXPERIMENTAL)'), 'filter_group_by_discovery'))
+				->addRow((new CLabel(_('Group items by Discovery'), 'filter_group_by_discovery'))
 				->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
 			(new CCheckBox('filter_group_by_discovery'))
 				->setChecked($data['filter']['group_by_discovery'] == 1)
