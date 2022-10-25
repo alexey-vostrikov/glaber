@@ -302,8 +302,6 @@ class CDiscoveryRule extends CItemGeneral {
 			
 			$items_state = CZabbixServer::getItemsState(array_keys($result)); 
 			
-			error_log(print_r($items_state,true));
-			
 			if ( !empty($items_state) && (is_array($items_state) || is_object($items_state))) {
 				foreach ($items_state as $state) {
 					 $result[$state['itemid']] += $state;

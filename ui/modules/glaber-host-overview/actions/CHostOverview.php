@@ -193,7 +193,6 @@ class CHostOverview extends CAction {
 				if (isset($templates['links'][$item['itemid']])) {
 
 					$template_id = $templates['links'][$item['itemid']]['hostid'];
-				//	error_log("Found template id $template_id\n");
 
 					if (!isset($templates['templates'][$template_id]['items']))
 						$templates['templates'][$template_id]['items'] = [];

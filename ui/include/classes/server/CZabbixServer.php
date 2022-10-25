@@ -215,8 +215,6 @@ class CZabbixServer {
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
 		
-//			error_log("Processing chunk $i");
-
 			$result = $result + $zabbix_server->request([
 				'request' => 'itemsstate.get',
 				'itemids' => $items_chunk
@@ -226,11 +224,6 @@ class CZabbixServer {
 		}
 
 		return $result;
-//		return $zabbix_server->request([
-//			'request' => 'itemsstate.get',
-//			'itemids' => $itemids
-//		]);
-			
 	}
 
 	public function syncConfiguration() {

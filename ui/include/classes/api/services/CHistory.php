@@ -185,8 +185,6 @@ class CHistory extends CApiService {
 	private function getFromServer($options) {
 		global $HISTORY;
 		
-		//error_log(print_r($options,true));
-		
 		$result = [];
 		
 		if ($options['itemids'] !== null) {
@@ -204,17 +202,12 @@ class CHistory extends CApiService {
 	    
 			$data = $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history");
 			
-			//error_log("$itemid :". print_r($result,true));
-			//error_log(print_r($data,true));
-			
 			if (is_array($data)) {
 				$result = array_merge($result, $data);
 			}
 	
 		}
-		
-		//maybe it's better to add a sortfield here, but it's unlikely 
-		//that it could be anything but clock
+
 		if (isset($options['sortorder'])) {
 			switch ($options['sortorder']) {
 				case 'ASC': 

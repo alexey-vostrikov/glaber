@@ -26,7 +26,6 @@ class CControllerDebugList extends CController {
 	}
 
 	protected function checkInput() {
-		//error_log("Checking input");
 
 		$fields = [
 			'triggerid' =>			'string',
@@ -64,8 +63,6 @@ class CControllerDebugList extends CController {
 				$triggerid = $response['triggerid'];
 
 		}
-
-		//error_log("Got input: trigger id is set to $triggerid, itemid is set to $itemid");
 
 		$data = [
 			'triggerid' => $triggerid,

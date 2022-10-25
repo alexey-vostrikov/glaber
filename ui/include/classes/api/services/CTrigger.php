@@ -879,8 +879,6 @@ class CTrigger extends CTriggerGeneral {
 					]
 			]);
 
-			error_log("Got depids for deletion". print_r($depids, true));
-
 			if ($childTriggers) {
 				$this->deleteDependencies($childTriggers, true);
 			}

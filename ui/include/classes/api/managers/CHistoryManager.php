@@ -229,8 +229,8 @@ private function getGraphAggregationByIntervalFromServer(array $items, $time_fro
 //		switch (self::getDataSourceType($item['value_type'])) {
 			   return $this->getAggregatedValueFromServer($item, $aggregation, $time_from);
 	}
+
 	private function getAggregatedValueFromServer(array $item, $aggregation, $time_from) {
-		error_log("Requested aggregated value for items $item, agg: $aggregation, from: $time_from");
 
 	}
 	

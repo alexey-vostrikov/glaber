@@ -86,13 +86,10 @@ class CTrend extends CApiService {
 	//note: count isn't supported yet by the server server api
 	private function getFromServer($options) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-		//error_log("Server trend code is invoked");
-		//error_log(print_r($options,true));
 
 		$result=[];
 		if (!$options['countOutput']) {
-			//error_log("no counts");
-			//if limit is unset, then assume 5k points is enough
+
 			$limit = ($options['limit'] && zbx_ctype_digit($options['limit'])) ? $options['limit'] : 5000;
 			$result = [];
 			foreach( $options['itemids'] as $itemid) {

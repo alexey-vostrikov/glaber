@@ -1,3 +1,5 @@
+ver 2.14.20
+    -fix: cleaned some logging from UI 
 ver 2.14.19
     -fix: proper value type display for calculated items, remove experimental from the latest data, grouped view made default
 ver 2.14.18

@@ -1180,8 +1180,6 @@ abstract class CTriggerGeneral extends CApiService {
 				$trigger_function['triggerid'] = $triggerid;
 				$new_functions[] = $trigger_function;
 				
-				error_log(print_r($trigger_function,true));
-
 				$itemids[] = $trigger_function['itemid'];
 			}
 
@@ -1313,12 +1311,8 @@ abstract class CTriggerGeneral extends CApiService {
 			$del_func_ids = array_merge($del_func_ids, array_column($trigger['functions'],'functionid'));
 		}
 
-		//error_log("finctions dump". print_r($del_func_ids,true));
-
 		foreach ($triggers as $tnum => $trigger) {
 			
-			//error_log("Trigger dump". print_r($trigger,true));
-
 			$db_trigger = $db_triggers[$tnum];
 			$upd_trigger = ['values' => [], 'where' => ['triggerid' => $trigger['triggerid']]];
 
@@ -1424,7 +1418,6 @@ abstract class CTriggerGeneral extends CApiService {
 		
 		if ($del_functions_triggerids) {
 			DB::delete('functions', ['triggerid' => $del_functions_triggerids]);
-			error_log("del funcs".print_r($del_functions_triggerids,true));
 		}
 		if ($new_functions) {
 			DB::insertBatch('functions', $new_functions, false);
@@ -1432,7 +1425,6 @@ abstract class CTriggerGeneral extends CApiService {
 			CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_CREATE,
 				array_column($new_functions,'functionid'));
 
-			error_log("new funcs".print_r($new_functions,true));
 		}
 		if ($del_triggertagids) {
 			DB::delete('trigger_tag', ['triggertagid' => $del_triggertagids]);

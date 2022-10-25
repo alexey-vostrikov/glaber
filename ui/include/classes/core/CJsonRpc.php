@@ -84,8 +84,6 @@ class CJsonRpc {
 
 		if (is_array($this->_jsonDecoded)
 				&& array_keys($this->_jsonDecoded) === range(0, count($this->_jsonDecoded) - 1)) {
-			// Return response as encoded batch if $this->_jsonDecoded is associative array.
-			//error_log(print_r($this->_response,true));
 			
 			return json_encode(array_values(array_filter($this->_response)), JSON_UNESCAPED_SLASHES);
 		}
