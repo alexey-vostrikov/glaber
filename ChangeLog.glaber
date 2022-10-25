@@ -1,9 +1,9 @@
 ver 2.14.19
     -fix: proper value type display for calculated items, remove experimental from the latest data, grouped view made default
 ver 2.14.18
-    -fix : fail if too many items are requesed from the cache at the time, make grouped view deafult
+    -fix : fail if too many items are requested from the cache at the time, make grouped view default
 ver 2.14.17
-    -fix : fail if too many items are requesed from the cache at the time
+    -fix : fail if too many items are requested from the cache at the time
 ver 2.14.16
     -fix : template import not working
 ver 2.14.15
@@ -29,7 +29,7 @@ ver 2.14.[4,5,6]
 ver 2.14.3
     - #157 - eliminated double-free situation
 ver 2.14.2
-    - #157 - added logging and protection from zero-updates, fixed sort order in the Discovery grouped
+    - #157 - added  logging and protection from zero-updates, fixed sort order in the Discovery grouped
     lastdata view
 ver 2.14.1
     - fix: #156 - workers hasn't been restarted properly
