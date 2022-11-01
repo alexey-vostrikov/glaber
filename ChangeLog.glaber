@@ -1,3 +1,5 @@
+ver 2.14.21
+    -fix: non filtering options (show details, show without data, group by discovery) are made sticky for a user
 ver 2.14.20
     -fix: cleaned some logging from UI 
 ver 2.14.19
