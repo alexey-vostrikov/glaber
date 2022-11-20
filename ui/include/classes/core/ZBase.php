@@ -633,6 +633,8 @@ class ZBase {
 		$this->component_registry->register('router', new CRouter());
 		$this->component_registry->register('menu.main', CMenuHelper::getMainMenu());
 		$this->component_registry->register('menu.user', CMenuHelper::getUserMenu());
+		$this->component_registry->register('links.context.handler', (new CContextLinksHelper));
+
 	}
 
 	/**

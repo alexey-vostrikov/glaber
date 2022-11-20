@@ -31,7 +31,6 @@ $table = (new CTableInfo())
 		->addItem(new CColHeader(_('IP')))
 		->addItem(new CColHeader(_('DNS')))
 		->addItem((new CColHeader(_('Monitoring')))
-			->setColSpan($data['hosts'] ? 5 : 1)
 			->addClass(ZBX_STYLE_TABLE_LEFT_BORDER)
 		)
 		->addItem((new CColHeader(_('Configuration')))
@@ -74,8 +73,7 @@ foreach ($data['hosts'] as $hostid => $host) {
 		)
 		: _('Latest data');
 
-	$latest_data_link = (new CCol($latest_data_link))->addClass(ZBX_STYLE_TABLE_LEFT_BORDER);
-
+	
 	$problems_link = $data['allowed_ui_problems']
 		? new CLink(_('Problems'),
 			(new CUrl('zabbix.php'))
@@ -159,15 +157,28 @@ foreach ($data['hosts'] as $hostid => $host) {
 		), $httptest_count]
 		: _('Web');
 
+	$host_context_links = APP::Component()->get('links.context.handler')->getLinks($host,'host','short');
+
+	$view_links = (new CDiv())
+		->addItem([$latest_data_link, " ", $problems_link, " "]);
+	
+	if ($graph_count > 0) 
+			$view_links->addItem([$charts_link, " "]);
+	
+	$view_links->addItem([$dashboards_link, " "]);
+	
+	if ($httptest_count > 0) 
+		$view_links->addItem([$web_link, " "]);
+
+	if (count($host_context_links) > 0) 
+		$view_links->addItem($host_context_links);
+	
+
 	$table->addRow([
 		$name_link,
 		$interface ? make_decoration($interface['ip'], $data['search']) : '',
 		$interface ? make_decoration($interface['dns'], $data['search']) : '',
-		$latest_data_link,
-		$problems_link,
-		$charts_link,
-		$dashboards_link,
-		$web_link,
+		(new CCol($view_links)),
 		$items_link,
 		$triggers_link,
 		$graphs_link,

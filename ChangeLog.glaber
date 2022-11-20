@@ -1,3 +1,5 @@
+ver 2.15.0
+    - introducing module context callback links extention to allow modules to make links to own/external resources 
 ver 2.14.21
     -fix: non filtering options (show details, show without data, group by discovery) are made sticky for a user
 ver 2.14.20
