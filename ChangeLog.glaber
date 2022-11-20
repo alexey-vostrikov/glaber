@@ -1,5 +1,7 @@
+ver 2.15.1
+    - added inherited tags fetching in search  
 ver 2.15.0
-    - introducing module context callback links extention to allow modules to make links to own/external resources 
+    - introducing module context callback links extension to allow modules to make links to own/external resources 
 ver 2.14.21
     -fix: non filtering options (show details, show without data, group by discovery) are made sticky for a user
 ver 2.14.20
