@@ -216,6 +216,7 @@ class CControllerSearch extends CController {
 			'output' => ['name', 'status', 'host'],
 			'selectInterfaces' => ['ip', 'dns'],
 			'selectTags' => API_OUTPUT_EXTEND,
+			'selectInheritedTags' => API_OUTPUT_EXTEND,
 			'selectItems' => API_OUTPUT_COUNT,
 			'selectTriggers' => API_OUTPUT_COUNT,
 			'selectGraphs' => API_OUTPUT_COUNT,
