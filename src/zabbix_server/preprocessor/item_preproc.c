@@ -1525,26 +1525,12 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 
 
 	if ( GLB_FUNC_MIN == func ) {
-//		zbx_variant_set_ui64(history_value, MIN(history_value->data.ui64,value->data.ui64));
-//				break;
-//			case ZBX_VARIANT_DBL:
 		zbx_variant_set_dbl(history_value, MIN(history_value->data.dbl,value->data.dbl));
-//				break;
-//		}
 	} else if ( GLB_FUNC_MAX == func ) {
-//		switch (history_value->type) {
-//			case ZBX_VARIANT_UI64:
-//				zbx_variant_set_ui64(history_value,MAX(history_value->data.ui64,value->data.ui64));
-//				break;
-//			case ZBX_VARIANT_DBL:
-				zbx_variant_set_dbl(history_value,MAX(history_value->data.dbl,value->data.dbl));
-//				break;
-//		}
+		zbx_variant_set_dbl(history_value,MAX(history_value->data.dbl,value->data.dbl));
 	} else if ( GLB_FUNC_AVG == func || GLB_FUNC_SUM ==func ) {
 		if (0 != history_ts->ns) {
 			zbx_variant_set_dbl(history_value, history_value->data.dbl + value->data.dbl);
-//					break;
-//			}
 		}
 		
 	} else if ( GLB_FUNC_COUNT == func ) {
@@ -1554,26 +1540,19 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 		THIS_SHOULD_NEVER_HAPPEN;
 	}
 	history_ts->ns++;
-	//cleaning up the value, we won't need it until emition
 	zbx_variant_clear(value); 
 	
-	//now lets see if we've got the timeout and aggregation is ready to be emmited
+
 	if (history_ts->sec + timeout < ts->sec ) {
 		
 		if ( GLB_FUNC_MIN == func ||  GLB_FUNC_MAX == func || GLB_FUNC_SUM == func ) {
 			zbx_variant_copy(value,history_value);
 
 		} else if ( GLB_FUNC_AVG == func ) {
-//			switch (history_value->type) {
-//			case ZBX_VARIANT_UI64:
-//				zbx_variant_set_ui64(value,history_value->data.ui64/history_ts->ns);
-//				break;
-//			case ZBX_VARIANT_DBL:
 				zbx_variant_set_dbl(value,history_value->data.dbl/history_ts->ns);
-//				break;
-//			}
+
 		} else if ( GLB_FUNC_COUNT == func ) {
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Emmitting count %d",history_ts->ns);
+
 			zbx_variant_set_ui64(value,history_ts->ns);
 		}
 	
@@ -1586,8 +1565,7 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 	return SUCCEED;
 }
 
-
-static char *get_host_name_from_json(u_int64_t itemid, char *json, char *host_param) {
+static char *get_param_name_from_json(char *json, char *host_param) {
 	
 	static char hostname[MAX_ZBX_HOSTNAME_LEN];
 	static char hostfield[MAX_ZBX_HOSTNAME_LEN];
@@ -1599,11 +1577,9 @@ static char *get_host_name_from_json(u_int64_t itemid, char *json, char *host_pa
 	if (NULL == host_param || NULL == json)
 		return NULL;
 	
-	if (FAIL == zbx_json_open(json, &jp)) {
-		//DEBUG_ITEM(itemid,"Cannot open JSON '%s'", json);
+	if (FAIL == zbx_json_open(json, &jp)) 
 		return NULL; 
-	}
-
+	
 	char *f_start, *f_end;
 
 	if (NULL != (f_start = strchr(host_param,'{')) && NULL !=(f_end = strchr(f_start, '}'))) {
@@ -1698,8 +1674,6 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return SUCCEED;
 
-//	DEBUG_ITEM(itemid,"Will fetch host data: host field '%s', host key '%s'", json_field, key);
-//	DEBUG_ITEM(itemid,"Doing JSON search for '%s' field", json_field);
 	preproc_params_t *params = item_preproc_parse_params(params_str);
 
 	if (params->count != 2) {
@@ -1707,7 +1681,7 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 		return SUCCEED;
 	}
 
-	if (NULL == (hostname = get_host_name_from_json(itemid, value->data.str, params->params[0]))) {
+	if (NULL == (hostname = get_param_name_from_json( value->data.str, params->params[0]))) {
 		DEBUG_ITEM(itemid,"Cannot dispatch: cannot find host name '%s'", params->params[0]);
 		return SUCCEED;
 	}
@@ -1721,8 +1695,10 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 		zbx_timespec(&ts);
 
 		init_result(&result);
+
 		SET_STR_RESULT(&result, zbx_strdup(NULL,value->data.str));
 		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
+
 		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
 			&result, &ts, ITEM_STATE_NORMAL, NULL);
 		free_result(&result);
@@ -1734,6 +1710,67 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 	DEBUG_ITEM(itemid, "In %s: finished", __func__);
 	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }
+
+/***************************************************************************
+ * dispatches or routes the item to another host/item stated in the cfg    *
+ * *************************************************************************/ 
+static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
+{
+	zbx_uint64_pair_t host_item_ids;
+	char *ip_str = NULL, *hostname = NULL;
+
+	DEBUG_ITEM(itemid, "In %s: starting", __func__);
+	
+			
+	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+		return SUCCEED;
+
+	preproc_params_t *params = item_preproc_parse_params(params_str);
+
+	if (params->count != 2) {
+		DEBUG_ITEM(itemid,"Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
+		return SUCCEED;
+	}
+
+	if (NULL == (ip_str = get_param_name_from_json(value->data.str, params->params[0]))) {
+		DEBUG_ITEM(itemid,"Cannot dispatch: cannot find ip addr '%s'", params->params[0]);
+		return SUCCEED;
+	}
+	
+//	if (NULL ==( hostname = getHostNameByIp(ip_str))) {
+//		DEBUG_ITEM(itemid,"Cannot dispatch: cannot host for ip addr '%s'", ip_str);
+//		return SUCCEED;
+//	}
+	
+	zbx_host_key_t host_key = {.host = hostname, .key = params->params[1]};
+
+	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids) ) {
+
+		AGENT_RESULT result={0};
+		zbx_timespec_t ts;
+		zbx_timespec(&ts);
+
+		init_result(&result);
+
+		SET_STR_RESULT(&result, zbx_strdup(NULL,value->data.str));
+		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
+
+		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
+			&result, &ts, ITEM_STATE_NORMAL, NULL);
+		free_result(&result);
+		return FAIL; //this intentional to be able to stop processing via 'custom on fail checkbox'
+	} 
+	
+	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s",host_key.host, host_key.key);
+	
+	DEBUG_ITEM(itemid, "In %s: finished", __func__);
+	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+}
+
+
+
+
+
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
  * *************************************************************************/ 

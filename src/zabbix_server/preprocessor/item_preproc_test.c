@@ -51,42 +51,58 @@ int test_parse_preproc_params() {
 }
 
 void test_get_host_name_from_json() {
-    char *hostname = get_host_name_from_json(0, "{\"test\":\"test\"}", NULL);
+    char *hostname = get_param_name_from_json("{\"test\":\"test\"}", NULL);
     assert(NULL == hostname);
 
-    hostname = get_host_name_from_json(0, "{\"test\":\"test\"}", "test");
+    hostname = get_param_name_from_json( "{\"test\":\"test\"}", "test");
     assert(NULL != hostname && 0 == strcmp(hostname, "test"));
 
-    hostname = get_host_name_from_json(0, NULL, "test");
+    hostname = get_param_name_from_json( NULL, "test");
     assert(NULL == hostname);
     
-    hostname = get_host_name_from_json(0, "{\"test\":\"test\"", "test");
+    hostname = get_param_name_from_json("{\"test\":\"test\"", "test");
     assert(NULL == hostname);
 
-    hostname = get_host_name_from_json(0, "{\"test1\":\"test1\"}", "test1");
+    hostname = get_param_name_from_json("{\"test1\":\"test1\"}", "test1");
     assert(NULL != hostname && 0 == strcmp(hostname, "test1"));
 
-    hostname = get_host_name_from_json(0, "{\"test1\":\"test1\"}", "$.test1");
+    hostname = get_param_name_from_json("{\"test1\":\"test1\"}", "$.test1");
     assert(NULL != hostname && 0 == strcmp(hostname, "test1"));
 
-    hostname = get_host_name_from_json(0, "{\"vtest1\":\"test1\"}", "{vtest1}.server.name");
+    hostname = get_param_name_from_json("{\"vtest1\":\"test1\"}", "{vtest1}.server.name");
     LOG_INF("Result hostname is %s", hostname);
     assert(NULL != hostname && 0 == strcmp(hostname, "test1.server.name"));
 
-    hostname = get_host_name_from_json(0, "{\"test1\":\"vtest1\"}", "{}.server22.name");
+    hostname = get_param_name_from_json("{\"test1\":\"vtest1\"}", "{}.server22.name");
     assert(NULL == hostname);
  
-    hostname = get_host_name_from_json(0, "{\"vtest1\":\"test11\"}", "{vtest1}.server22.name");
+    hostname = get_param_name_from_json("{\"vtest1\":\"test11\"}", "{vtest1}.server22.name");
     assert(NULL != hostname && 0 == strcmp(hostname, "test11.server22.name"));
 
-    hostname = get_host_name_from_json(0, "{\"vtest1\":\"test11\"}", "{$.vtest1}.server22.name");
+    hostname = get_param_name_from_json("{\"vtest1\":\"test11\"}", "{$.vtest1}.server22.name");
     assert(NULL != hostname && 0 == strcmp(hostname, "test11.server22.name"));
 
-    hostname = get_host_name_from_json(0, "{\"vtest1\":\"test11\"}", "prefix.{vtest1}.server22.name");
+    hostname = get_param_name_from_json("{\"vtest1\":\"test11\"}", "prefix.{vtest1}.server22.name");
     assert(NULL != hostname && 0 == strcmp(hostname, "prefix.test11.server22.name"));
     
-    hostname = get_host_name_from_json(0, "{\"vtest1\":\"test11\"}", "prefix.{$.vtest1}.server22.name");
+    hostname = get_param_name_from_json("{\"vtest1\":\"test11\"}", "prefix.{$.vtest1}.server22.name");
     assert(NULL != hostname && 0 == strcmp(hostname, "prefix.test11.server22.name"));
+}
+
+void test_get_ip_from_json() {
+    char *ip_str, *ip;
+    ip_str = get_param_name_from_json("{\"ip\":\"10.100.1.2\"}","ip");
+    assert(NULL != ip_str && 0 == strcmp(ip_str, "10.100.1.2"));
+    
+    ip_str = get_param_name_from_json("{\"ip\":\"10.100.1.2:8016\"}","ip");
+    assert(NULL != ip_str && 0 == strcmp(ip_str, "10.100.1.2:8016"));
+    
+//    ip = get_ip_from_string(ip_str);
+
+    
+    //HALT_HERE("Test has failed");    
+
+    LOG_INF("%s tests is OK",__func__);
 }
 
 int test_worker_json_to_host() {

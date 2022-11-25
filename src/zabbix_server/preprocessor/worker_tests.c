@@ -35,4 +35,5 @@ void test_get_host_name_from_json();
 void test_worker_steps() {
     test_parse_preproc_params();
     test_get_host_name_from_json();
+    test_get_ip_from_json();
 }

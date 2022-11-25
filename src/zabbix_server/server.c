@@ -88,6 +88,10 @@
 #include "../libs/glb_state/glb_state_items.h"
 #include "../libs/apm/apm.h"
 
+#if defined(HAVE_GLB_TESTS)
+#include "./tests/server_tests.h"
+#endif
+
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
 #include "ipmi/ipmi_poller.h"
