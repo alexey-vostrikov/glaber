@@ -24,7 +24,8 @@ SUBDIRS = \
 	availability \
 	lld \
 	reporter \
-	glb_poller 
+	glb_poller \
+	tests
 
 sbin_PROGRAMS = zabbix_server
 
@@ -47,6 +48,7 @@ libzbxserver_a_CFLAGS = \
 zabbix_server_SOURCES = server.c
 
 zabbix_server_LDADD = \
+	$(top_builddir)/src/zabbix_server/tests/libservertests.a \
 	alerter/libzbxalerter.a \
 	dbsyncer/libzbxdbsyncer.a \
 	dbconfig/libzbxdbconfig.a \

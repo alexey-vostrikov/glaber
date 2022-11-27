@@ -262,11 +262,11 @@ Japanese font configuration for Glaber web frontend
 %patch0 -p1
 
 ## remove font file
-rm -f ui/assets/fonts/DejaVuSans.ttf
+# rm -f ui/assets/fonts/DejaVuSans.ttf
 
 # replace font in defines.inc.php
-sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
-	ui/include/defines.inc.php
+#sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
+#	ui/include/defines.inc.php
 
 # remove .htaccess files
 rm -f ui/app/.htaccess
