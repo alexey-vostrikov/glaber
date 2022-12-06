@@ -279,7 +279,8 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 							//avoiding dynamic and discovery items from being processed by async glb pollers
 			
 			/*note: async poller is yet missing v3 functionality support */
-			if ( NULL == snmp_iface || snmp_iface->version == ZBX_IF_SNMP_VERSION_3) 
+			if ( NULL == snmp_iface || snmp_iface->version == ZBX_IF_SNMP_VERSION_3
+			   				|| snmp_iface->version == ZBX_IF_SNMP_VERSION_1) 
 				return FAIL;
 	
 			return SUCCEED;
