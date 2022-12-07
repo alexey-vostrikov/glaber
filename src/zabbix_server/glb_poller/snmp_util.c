@@ -84,8 +84,7 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 		break;
 		default:
 			LOG_INF("Unsuppoerted SNMP version in async code");
-			THIS_SHOULD_NEVER_HAPPEN;
-			exit(-1);
+			
 	}
 
 }

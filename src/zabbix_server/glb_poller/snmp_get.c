@@ -44,7 +44,8 @@ int snmp_get_send_request(poller_item_t *poller_item) {
 	}
 
 	//LOG_INF("Item %ld, sending GET packet, last time it was polled in %ld sec", poller_get_item_id(poller_item), now - snmp_item->lastpolled);
-	snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET);
+	if (FAIL == snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET))
+		return FAIL;
 		
 	/*note: intentionally do not return item to the poller, item is broken anyaway*/
 	if (FAIL == snmp_item_oid_to_asn(snmp_item->oid, &oid)) {

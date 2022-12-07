@@ -379,7 +379,8 @@ int  snmp_walk_start_next_oid(poller_item_t *poller_item) {
 	csnmp_pdu_t pdu={0};
 	asn1_oid_t coid;
 	
-	snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET_NEXT);
+	if (FAIL == snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET_NEXT))
+		return FAIL;
 
 	if ( FAIL == snmp_item_oid_to_asn(next_oid, &coid)) {
 	  	poller_preprocess_error(poller_item, "Cannot parse oid");
@@ -509,9 +510,6 @@ void snmp_walk_process_result(poller_item_t *poller_item, const csnmp_pdu_t *pdu
 	}
 
 //	LOG_INF("Sending next packet for item %d", poller_get_item_id(poller_item));
-
-
-
 
 	copy_oid(&next_oid, &pdu->vars[pdu->vars_len-1].oid);
 	asn1_free_oid(&ddata->last_oid);
