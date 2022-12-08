@@ -83,7 +83,9 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 			pdu->version = SNMP_VERSION_2c;
 		break;
 		default:
-			LOG_INF("Unsuppoerted SNMP version in async code");
+			LOG_INF("Unsupported SNMP version in async code");
+			//THIS_SHOULD_NEVER_HAPPEN;
+			//exit(EXIT_FAILURE);
 			
 	}
 

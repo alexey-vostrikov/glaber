@@ -568,6 +568,7 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 
 	if (SUCCEED == glb_might_be_async_polled(dc_item,dc_host)) {
 		dc_item->poller_type = ZBX_NO_POLLER;
+		poller_item_add_notify(dc_item->type, dc_item->itemid, dc_item->hostid);
 		return;
 	}
 
@@ -785,6 +786,7 @@ static void	DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 	{
 		item->location = ZBX_LOC_NOWHERE;
 		zbx_binary_heap_remove_direct(&config->queues[old_poller_type], item->itemid);
+		DEBUG_ITEM(item->itemid, "Removing item from poller %d ", old_poller_type);
 	}
 
 	if (item->poller_type == ZBX_NO_POLLER)
@@ -797,6 +799,8 @@ static void	DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 	zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts,&item->hostid);
 	
 	if (NULL != zbx_dc_host && SUCCEED == glb_might_be_async_polled(item, zbx_dc_host)) {
+		DEBUG_ITEM(item->itemid, "Not putting item to the queue, it might be async pooled");
+		//poller_item_add_notify(item->type, item->itemid, item->hostid);
 		item->poller_type = ZBX_NO_POLLER;
 		return;
 	}
@@ -807,6 +811,8 @@ static void	DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 	if (ZBX_LOC_QUEUE != item->location)
 	{
 		item->location = ZBX_LOC_QUEUE;
+		DEBUG_ITEM(item->itemid, "Putting item to normal poller queue %d", item->poller_type);
+		DEBUG_ITEM(item->itemid, "Item's next check is in %d", glb_state_item_get_nextcheck(item->itemid) - time(NULL));
 		zbx_binary_heap_insert(&config->queues[item->poller_type], &elem);
 	}
 	else
@@ -3036,8 +3042,10 @@ static int DC_remove_item(u_int64_t itemid) {
 		}
 	}
 
-	if (SUCCEED == glb_might_be_async_polled(item, host)) 
+	if (SUCCEED == glb_might_be_async_polled(item, host)) {
+		DEBUG_ITEM(item->itemid,"Sending poller notify about item removal");
 		poller_item_add_notify(item->type, item->itemid, item->hostid);
+	}
 
 	if (ITEM_STATUS_ACTIVE == item->status)
 	{
@@ -3947,8 +3955,12 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		}
 
 		/* items that do not support notify-updates are passed to old queuing */
-		if ( FAIL == glb_might_be_async_polled(item,host) ||  FAIL == poller_item_add_notify(type, itemid, hostid) ) 
+		DEBUG_ITEM(item->itemid, "About to be checked how to poll");
+		if ( FAIL == glb_might_be_async_polled(item,host) ||  FAIL == poller_item_add_notify(type, itemid, hostid) ) {
+			DEBUG_ITEM(item->itemid, "Updating item from %s", __func__);
 			DCupdate_item_queue(item, old_poller_type);
+			
+		}
 	}
 
 	/* update dependent item vectors within master items */
@@ -9998,7 +10010,7 @@ static void	dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, co
 
 	old_poller_type = dc_item->poller_type;
 	DCitem_poller_type_update(dc_item, dc_host, flags);
-
+	DEBUG_ITEM(dc_item->itemid, "Updating item from %s", __func__);
 	DCupdate_item_queue(dc_item, old_poller_type);
 }
 
@@ -10025,7 +10037,7 @@ static void	dc_requeue_item_at(ZBX_DC_ITEM *dc_item, ZBX_DC_HOST *dc_host, int n
 
 	old_poller_type = dc_item->poller_type;
 	DCitem_poller_type_update(dc_item, dc_host, ZBX_ITEM_COLLECTED);
-
+	DEBUG_ITEM(dc_item->itemid, "Updating item from %s", __func__);
 	DCupdate_item_queue(dc_item, old_poller_type);
 }
 
@@ -16329,11 +16341,15 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	
 	for (i = 0; i < items->values_num; i++ ) {
 		ZBX_DC_ITEM *item;
+		ZBX_DC_HOST *host;
 		
 		if (NULL == (item = zbx_hashset_search(&config->items, &items->values[i])))
 			continue;
-
-		poller_item_add_notify(item->type, item->itemid, item->hostid);
+		if (NULL == (host = zbx_hashset_search(&config->hosts, &item->hostid)))
+			continue;
+		DEBUG_ITEM(item->itemid, "Sending item change notify form dc_notify_changed_items");
+		if (glb_might_be_async_polled(item, host))
+			poller_item_add_notify(item->type, item->itemid, item->hostid);
 	}
 
 	UNLOCK_CACHE;
