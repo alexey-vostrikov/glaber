@@ -317,7 +317,8 @@ const char	*zbx_item_value_type_string(zbx_item_value_type_t value_type);
 typedef struct
 {
 	int	timestamp;
-	int	logeventid;
+	u_int64_t	logeventid; // both are
+//u_int64_t 	objectid; //used to pass reference to the log triggering data for links/colorisation
 	int	severity;
 	char	*source;
 	char	*value;
@@ -732,7 +733,8 @@ const char	*zbx_trigger_state_string(unsigned char state);
 #define TRIGGER_SEVERITY_HIGH		4
 #define TRIGGER_SEVERITY_DISASTER	5
 #define TRIGGER_SEVERITY_COUNT		6	/* number of trigger severities */
-
+#define TRIGGER_SEVERITY_UNDEFINED	255
+		
 /* trigger recovery mode */
 #define TRIGGER_RECOVERY_MODE_EXPRESSION		0
 #define TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION	1

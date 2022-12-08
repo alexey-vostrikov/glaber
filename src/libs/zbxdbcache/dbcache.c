@@ -1564,7 +1564,7 @@ static void	DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
  *             trigger_diff      - [OUT] trigger updates                      *
  *                                                                            *
  ******************************************************************************/
-static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
+static void	recalculate_triggers(ZBX_DC_HISTORY *history, int history_num,
 		const zbx_vector_uint64_t *history_itemids, const DC_ITEM *history_items, const int *history_errcodes,
 		const zbx_vector_ptr_t *timers, zbx_vector_ptr_t *trigger_diff)
 {
@@ -1584,7 +1584,7 @@ static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
 
 		for (i = 0; i < history_num; i++)
 		{
-			const ZBX_DC_HISTORY	*h = &history[i];
+			ZBX_DC_HISTORY	*h = &history[i];
 
 			if (0 != (ZBX_DC_FLAG_NOVALUE & h->flags))
 				continue;
@@ -1636,7 +1636,7 @@ static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
 
 	zbx_vector_ptr_sort(&trigger_order, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
 	evaluate_expressions(&trigger_order, history_itemids, history_items, history_errcodes);
-	zbx_process_triggers(&trigger_order, trigger_diff);
+	zbx_process_triggers(&trigger_order, trigger_diff, history);
 
 	DCfree_triggers(&trigger_order);
 
@@ -1857,6 +1857,7 @@ static void	dc_history_set_value(ZBX_DC_HISTORY *hdata, unsigned char value_type
 				dc_history_clean_value(hdata);
 				hdata->value.log = (zbx_log_value_t *)zbx_malloc(NULL, sizeof(zbx_log_value_t));
 				memset(hdata->value.log, 0, sizeof(zbx_log_value_t));
+				hdata->value.log->severity = TRIGGER_SEVERITY_UNDEFINED; //means no severity is defined
 			}
 			hdata->value.log->value = value->data.str;
 			hdata->value.str[zbx_db_strlen_n(hdata->value.str, HISTORY_LOG_VALUE_LEN)] = '\0';
@@ -1926,6 +1927,9 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 		return;
 	}
 	DEBUG_ITEM(hdata->itemid,"in Normalizing item, will convert type, state is %d", hdata->state);
+	
+	//LOG_INF("Converting item %ld from type %d to type %d", item->itemid, hdata->value_type, item->value_type);
+	
 	switch (hdata->value_type)
 	{
 		case ITEM_VALUE_TYPE_FLOAT:
@@ -2795,7 +2799,6 @@ static void	sync_proxy_history(int *total_num, int *more)
 	zbx_vector_ptr_destroy(&item_diff);
 	zbx_vector_ptr_destroy(&history_items);
 }
-
 /******************************************************************************
  *                                                                            *
  * Function: sync_server_history                                              *
@@ -2832,6 +2835,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	zbx_vector_uint64_pair_t	trends_diff, proxy_subscribtions;
 	ZBX_DC_HISTORY			history[ZBX_HC_SYNC_MAX];
 
+
 	item_retrieve_mode = NULL == CONFIG_EXPORT_DIR ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
 
 	//compression_age = hc_get_history_compression_age();
@@ -2850,15 +2854,15 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	zbx_vector_ptr_create(&history_items);
 	zbx_vector_ptr_reserve(&history_items, ZBX_HC_SYNC_MAX);
 
+
 	sync_start = time(NULL);
 
 	do
 	{
 		DC_ITEM			*items;
-		int			*errcodes, trends_num = 0, timers_num = 0, ret = SUCCEED;
+		int			*errcodes,  timers_num = 0, ret = SUCCEED;
 	
 		zbx_vector_uint64_t	itemids;
-		ZBX_DC_TREND		*trends = NULL;
 
 		zbx_vector_uint64_create(&itemids);
 
@@ -2912,41 +2916,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			//at this call history will be added to the history storage
 			//and state cache
 			glb_state_item_add_values(history, history_num);
-			glb_history_add_history(history,history_num);
-			
-			DCmass_update_trends(history, history_num, &trends, &trends_num);
-			//need fix here - we've already have items, so there is no need to extra seraches
-			//however it's better to do different kind of processing
-			DC_get_trends_items_keys(trends,trends_num);
-			glb_history_add_trends(trends,trends_num);
-				
-			//doing keys and item names cleanup
-			for ( i=0; i<trends_num; i++) {
-				zbx_free(trends[i].item_key);
-				zbx_free(trends[i].host_name);
-			}
-			//TODO: figure wtf is the function
-			//this is trends functions cache! 
-			if (0 != trends_num)
-				zbx_tfc_invalidate_trends(trends, trends_num);
-
-			do
-			{
-				DBbegin();
-
-				zbx_process_events(NULL, NULL);
-
-				if (ZBX_DB_OK == (txn_error = DBcommit()))
-					DCupdate_trends(&trends_diff);
-				else
-					zbx_reset_event_recovery();
-
-				zbx_vector_uint64_pair_clear(&trends_diff);
-			}
-				while (ZBX_DB_DOWN == txn_error);
-			
-			zbx_clean_events();
-			zbx_vector_ptr_clear_ext(&inventory_values, (zbx_clean_func_t)DCinventory_value_free);
 		
 		}
 
@@ -2981,7 +2950,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 							&trigger_timers, &trigger_diff);
 
 					/* process trigger events generated by recalculate_triggers() */
-					zbx_process_events(&trigger_diff, &triggerids);
+					zbx_process_events(&trigger_diff, &triggerids, history);
 					
 					//this must be eliminated with setting the trigger value in the state cache
 					//and when direct API is ready
@@ -3005,7 +2974,7 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 				while (ZBX_DB_DOWN == txn_error);
 			}
 		}
-
+		
 		if (0 != triggerids.values_num)
 		{
 			*triggers_num += triggerids.values_num;
@@ -3058,23 +3027,67 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		if (0 != history_num || 0 != timers_num)
 			zbx_clean_events();
 
-		if (0 != history_num)
-		{
-			zbx_free(trends);
-			DCconfig_clean_items(items, errcodes, history_num);
-			zbx_free(errcodes);
-			zbx_free(items);
-			zbx_vector_ptr_clear(&history_items);
-			hc_free_item_values(history, history_num);
-			//zabbix_log(LOG_LEVEL_INFORMATION,"Synced %d history itemds", history_num);
-		}
+	
 
 		zbx_vector_uint64_destroy(&itemids);
 
 		/* Exit from sync loop if we have spent too much time here.       */
 		/* This is done to allow syncer process to update its statistics. */
+		if (0 != history_num)
+	{
+		int trends_num = 0;
+		ZBX_DC_TREND		*trends = NULL;
+
+		DCmass_update_trends(history, history_num, &trends, &trends_num);
+
+		//todo: put exporting of the history right here
+		glb_history_add_history(history,history_num);
+		DC_get_trends_items_keys(trends,trends_num);
+		glb_history_add_trends(trends,trends_num);
+	
+				
+		//doing keys and item names cleanup
+		for ( i=0; i<trends_num; i++) {
+			zbx_free(trends[i].item_key);
+			zbx_free(trends[i].host_name);
+		}
+
+		if (0 != trends_num)
+				zbx_tfc_invalidate_trends(trends, trends_num);
+
+		do
+		{
+			DBbegin();
+
+			zbx_process_events(NULL, NULL, NULL);
+
+			if (ZBX_DB_OK == (txn_error = DBcommit()))
+				DCupdate_trends(&trends_diff);
+			else
+				zbx_reset_event_recovery();
+			zbx_vector_uint64_pair_clear(&trends_diff);
+		}
+		while (ZBX_DB_DOWN == txn_error);
+			
+		zbx_clean_events();
+		zbx_vector_ptr_clear_ext(&inventory_values, (zbx_clean_func_t)DCinventory_value_free);
+		zbx_free(trends);
+
+		DCconfig_clean_items(items, errcodes, history_num);
+		zbx_free(errcodes);
+		zbx_free(items);
+		zbx_vector_ptr_clear(&history_items);
+		hc_free_item_values(history, history_num);
+		//zabbix_log(LOG_LEVEL_INFORMATION,"Synced %d history itemds", history_num);
+		
+	}	
+
 	}
 	while (ZBX_SYNC_MORE == *more && ZBX_HC_SYNC_TIME_MAX >= time(NULL) - sync_start);
+
+	
+
+
 	zbx_vector_ptr_destroy(&history_items);
 	zbx_vector_ptr_destroy(&inventory_values);
 	zbx_vector_ptr_destroy(&trigger_diff);
@@ -3144,9 +3157,13 @@ static void	sync_history_cache_full(void)
 
 		do
 		{
-			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
-				sync_server_history(&values_num, &triggers_num, &more);
-			else 
+			if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
+				// bad idea, it's much more important to exit fast 
+				// than to sync all that we've got
+				//todo: make JUST syncing, without trigger calc and etc
+				//	sync_server_history(&values_num, &triggers_num, &more);
+			
+			//else 
 				sync_proxy_history(&values_num, &more);
 
 			zabbix_log(LOG_LEVEL_WARNING, "syncing history data... " ZBX_FS_DBL "%%",
@@ -3506,6 +3523,8 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error)
 {
 	unsigned char	value_flags;
+
+	//LOG_INF("Adding to hist cache item %ld in type %d", itemid, item_value_type);
 
 	if (ITEM_STATE_NOTSUPPORTED == state)
 	{
@@ -4046,6 +4065,29 @@ static void	hc_add_item_values(dc_item_value_t *values, int values_num)
 	}
 }
 
+
+int history_update_log_enty_severity(ZBX_DC_HISTORY *h, int severity, u_int64_t eventid, u_int64_t triggerid, int value) {
+	
+	if  (ITEM_VALUE_TYPE_LOG != h->value_type)
+		return FAIL;
+	
+	if ( 1 == value) { //remembering max severity
+	   if ( TRIGGER_SEVERITY_UNDEFINED != h->value.log->severity &&
+		    h->value.log->severity >= severity)
+			return FAIL;
+		h->value.log->severity = severity;
+	} else { //recovery data, for it severity is 0 which is OK
+		h->value.log->severity = 0; // indication of recovery or OK value
+	}	
+
+	h->value.log->logeventid = eventid;
+	char *buff = zbx_malloc(NULL, MAX_ID_LEN);
+	zbx_snprintf(buff, MAX_ID_LEN, "%ld", triggerid);
+	
+	h->value.log->source = buff;
+	
+	return SUCCEED;
+}
 /******************************************************************************
  *                                                                            *
  * Function: hc_copy_history_data                                             *
@@ -4068,7 +4110,7 @@ static void	hc_copy_history_data(ZBX_DC_HISTORY *history, zbx_uint64_t itemid, z
 	history->flags = data->flags;
 	history->lastlogsize = data->lastlogsize;
 	history->mtime = data->mtime;
-
+	//LOG_INF("Init item %ld type %d from hist cache", itemid, data->value_type);
 	if (ITEM_STATE_NOTSUPPORTED == data->state)
 	{
 		DEBUG_ITEM(history->itemid,"Copied unsupported item for history syncer");
@@ -4103,13 +4145,12 @@ static void	hc_copy_history_data(ZBX_DC_HISTORY *history, zbx_uint64_t itemid, z
 					history->value.log->source = NULL;
 
 				history->value.log->timestamp = data->value.log->timestamp;
-				history->value.log->severity = data->value.log->severity;
-				history->value.log->logeventid = data->value.log->logeventid;
+				history->value.log->severity = TRIGGER_SEVERITY_UNDEFINED; // data->value.log->severity;
+				history->value.log->logeventid = 0;// data->value.log->logeventid;
+				//LOG_INF("Init item %ld with severity %d", history->itemid,history->value.log->severity );
 
 				break;
 		}
-
-		
 	}
 }
 
@@ -4386,7 +4427,7 @@ static void	DCsync_all(void)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In DCsync_all()");
 
-	sync_history_cache_full();
+//	sync_history_cache_full();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of DCsync_all()");
 }

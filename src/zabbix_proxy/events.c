@@ -37,11 +37,13 @@ DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t
 		const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
 		unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
 		unsigned char trigger_correlation_mode, const char *trigger_correlation_tag,
-		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error)
+		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error,
+		int history_idx)
 {
 	ZBX_UNUSED(source);
 	ZBX_UNUSED(object);
 	ZBX_UNUSED(objectid);
+	ZBX_UNUSED(history_idx);
 	ZBX_UNUSED(timespec);
 	ZBX_UNUSED(value);
 	ZBX_UNUSED(trigger_description);
@@ -72,10 +74,11 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 	return 0;
 }
 
-int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock)
+int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock, ZBX_DC_HISTORY *history)
 {
 	ZBX_UNUSED(trigger_diff);
 	ZBX_UNUSED(triggerids_lock);
+	ZBX_UNUSED(history);
 
 	THIS_SHOULD_NEVER_HAPPEN;
 	return 0;

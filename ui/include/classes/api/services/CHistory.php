@@ -192,14 +192,14 @@ class CHistory extends CApiService {
 		}
 		$values=[];
 
-		foreach( $options['itemids'] as $itemid) {
-			
-			global $ZBX_SERVER, $ZBX_SERVER_PORT;
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 			$server =  new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 			    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 			    timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
-	    
+
+		foreach( $options['itemids'] as $itemid) {
+			error_log("Fetching item $itemid\n");
 			$data = $server->getHistoryData(CSessionHelper::getId(), $itemid, $options['time_from'], $options['time_till'], $options['limit'], "history");
 			
 			if (is_array($data)) {

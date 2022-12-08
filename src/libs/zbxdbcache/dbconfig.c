@@ -9292,6 +9292,7 @@ void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])) || NULL == dc_item->triggers)
 			continue;
+		
 		DEBUG_ITEM(dc_item->itemid, "Retrieving trigger list for the item");
 		/* process all triggers for the specified item */
 
@@ -9302,8 +9303,8 @@ void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 				continue;
 			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld to the trigger list",dc_trigger->triggerid);
 		
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item calc");
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding trigger for item %ld calc",dc_item->itemid);
+			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding item %ld for trigger calc", dc_item->itemid);
+			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld calc", trigger->triggerid);
 		
 			/* find trigger by id or create a new record in hashset if not found */
 			trigger = (DC_TRIGGER *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(DC_TRIGGER), &found);
@@ -9312,6 +9313,7 @@ void	DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 			{
 				DEBUG_TRIGGER(trigger->triggerid,"Getting trigger from the cfg cache");
 				DCget_trigger(trigger, dc_trigger);
+				trigger->history_idx = i;
 				zbx_vector_ptr_append(trigger_order, trigger);
 			}
 
@@ -9441,6 +9443,7 @@ void	zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 			}
 
 			trigger_local.triggerid = dc_trigger->triggerid;
+			trigger_local.history_idx = -1;
 			trigger = (DC_TRIGGER *)zbx_hashset_insert(trigger_info, &trigger_local, sizeof(trigger_local));
 			DCget_trigger(trigger, dc_trigger);
 

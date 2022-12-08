@@ -65,7 +65,9 @@ function getSeverityStatusStyle($severity) {
 		case TRIGGER_SEVERITY_INFORMATION:
 			return ZBX_STYLE_STATUS_INFO_BG;
 		case TRIGGER_SEVERITY_NOT_CLASSIFIED:
-			return ZBX_STYLE_STATUS_NA_BG;
+			return ZBX_STYLE_STATUS_GREEN;
+		case TRIGGER_SEVERITY_UNDEFINED:
+			return null;
 		default:
 			return null;
 	}

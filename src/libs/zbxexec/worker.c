@@ -338,7 +338,7 @@ static int restart_worker(ext_worker_t *worker)
     worker->last_start = time(NULL);
     
     if (0 != worker->async_mode) {
-        LOG_INF("Worker is async");
+      //  LOG_INF("Worker is async");
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
         fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
         

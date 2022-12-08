@@ -265,14 +265,14 @@ class CZabbixServer {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
 		$result = [];
-
-		foreach (array_chunk($itemids, 16384) as $items_chunk) {
-			
-			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+		
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
-			);
+		);
 
+		foreach (array_chunk($itemids, 16) as $items_chunk) {
+			
 			$newdata = $zabbix_server->request([
 				'request' => 'lastvalues.get',
 				'sid' => $sid,
@@ -571,7 +571,7 @@ class CZabbixServer {
 	}
 
 	/**
-	 * Executes a given JSON request and returns the result. Returns false if an error has occurred.
+	 * Executes a given JSON request and returns the result. Returns false if an error has occonnectcurred.
 	 *
 	 * @param array $params
 	 *
@@ -660,6 +660,7 @@ class CZabbixServer {
 		}
 
 		fclose($this->socket);
+		$this->socket = NULL;
 
 		if ($expected_len > $response_len || $response_len > $expected_len) {
 			$this->error = _s('Incorrect response received from Zabbix server "%1$s".', $this->host);

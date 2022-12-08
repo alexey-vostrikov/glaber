@@ -67,7 +67,7 @@
  *        '-' - should never happen                                           *
  *                                                                            *
  ******************************************************************************/
-static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *diffs)
+static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *diffs, ZBX_DC_HISTORY *history)
 {
 	const char		*new_error;
 	int			new_state, new_value, ret = FAIL;
@@ -119,13 +119,15 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 
 	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT))
 	{
-		DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger");
+		DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger %ld create for item %ld",
+			trigger->triggerid, history[trigger->history_idx].itemid );
+		
 		zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
 				&trigger->timespec, new_value, trigger->description,
 				trigger->expression, trigger->recovery_expression,
 				trigger->priority, trigger->type, &trigger->tags,
 				trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
-				trigger->event_name, NULL);
+				trigger->event_name, NULL, trigger->history_idx);
 	}
 
 	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT))
@@ -134,7 +136,7 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
 				&trigger->timespec, new_state, NULL, trigger->expression,
 				trigger->recovery_expression, 0, 0, &trigger->tags, 0, NULL, 0, NULL, NULL,
-				new_error);
+				new_error, trigger->history_idx);
 	}
 
 	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, flags, trigger->value, new_state,
@@ -271,7 +273,7 @@ static int	zbx_trigger_topoindex_compare(const void *d1, const void *d2)
  *                              (zbx_clean_func_t)zbx_trigger_diff_free);     *
  *                                                                            *
  ******************************************************************************/
-void	zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_diff)
+void	zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_diff, ZBX_DC_HISTORY *history)
 {
 	int	i;
 
@@ -283,7 +285,7 @@ void	zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_
 	zbx_vector_ptr_sort(triggers, zbx_trigger_topoindex_compare);
 
 	for (i = 0; i < triggers->values_num; i++)
-		zbx_process_trigger((struct _DC_TRIGGER *)triggers->values[i], trigger_diff);
+		zbx_process_trigger((struct _DC_TRIGGER *)triggers->values[i], trigger_diff, history);
 
 	zbx_vector_ptr_sort(trigger_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
 out:

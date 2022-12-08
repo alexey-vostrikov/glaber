@@ -353,17 +353,19 @@ static int	get_trend_aggregates_json(void *data, int value_type, zbx_uint64_t it
 	return SUCCEED;
 }
 
-static int parse_history_get_values(glb_clickhouse_data_t *conf, char *responce, int value_type, zbx_vector_history_record_t *values) {
+static int parse_history_get_values(u_int64_t itemid, glb_clickhouse_data_t *conf, char *responce, int value_type, zbx_vector_history_record_t *values) {
 	struct zbx_json_parse	jp, jp_row, jp_data;
 	const char		*p = NULL;
 	zbx_history_record_t	hr;
 
-    char itemid[MAX_ID_LEN], clck[MAX_ID_LEN], ns[MAX_ID_LEN], *value = NULL;
+    char  clck[MAX_ID_LEN], ns[MAX_ID_LEN], *value = NULL, *source = NULL;
     size_t value_alloc = 0;
 
     zbx_json_open(responce, &jp);
     zbx_json_brackets_by_name(&jp, "data", &jp_data);
     
+	//LOG_INF("Read history value for item %ld value type is %d", itemid, value_type);
+
     while (NULL != (p = zbx_json_next(&jp_data, p)))
 	{
 		zbx_json_type_t type;
@@ -379,13 +381,32 @@ static int parse_history_get_values(glb_clickhouse_data_t *conf, char *responce,
 	   	if ( 0 == conf->disable_nanoseconds &&
 			 SUCCEED == zbx_json_value_by_name(&jp_row, "ns", ns, MAX_ID_LEN, &type) ) 
 		{
-			hr.timestamp.ns = atoi(ns); 
+			hr.timestamp.ns =  strtoll(ns,NULL, 10); 
 		} else 
 			hr.timestamp.ns = 0;
-	    hr.timestamp.sec = atoi(clck);
+
+	    hr.timestamp.sec = strtoll( clck,NULL, 10); ;
 		hr.value = history_str2value(value, value_type);
 		zbx_vector_history_record_append_ptr(values, &hr);
-
+		
+		if (ITEM_VALUE_TYPE_LOG == value_type) {
+			//additionally parsing severity, source and logeventid
+			hr.value.log->logeventid = 0;
+			hr.value.log->severity = TRIGGER_SEVERITY_UNDEFINED;
+			hr.value.log->source = NULL;
+			
+			if (SUCCEED == zbx_json_value_by_name(&jp_row, "logeventid", ns, MAX_ID_LEN, &type)) 
+				hr.value.log->logeventid = strtoll(ns,NULL, 10); 
+			
+			if (SUCCEED == zbx_json_value_by_name(&jp_row, "severity", ns, MAX_ID_LEN, &type)) 
+				hr.value.log->severity = strtoll(ns,NULL, 10); 
+			
+			if (SUCCEED ==  zbx_json_value_by_name(&jp_row, "source", ns, MAX_ID_LEN, &type )) 
+				hr.value.log->source = zbx_strdup(NULL,ns);
+			 
+			LOG_INF("Parsed additional LOG data: logeventid: %ld, severity: %d, source: %s",
+				hr.value.log->logeventid, hr.value.log->severity,hr.value.log->source );
+		}
 	}
 	return FAIL;
 }
@@ -428,7 +449,7 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 			"SELECT  toUInt32(clock) clock,value");
 
 	if (value_type==ITEM_VALUE_TYPE_LOG) 
-		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",source,severity");
+		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",source,severity,logeventid");
 	
 	if ( 0 == conf->disable_nanoseconds ) {
 		zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, ",ns");
@@ -460,7 +481,7 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
 	 	return FAIL;
 
-    if (SUCCEED != parse_history_get_values(conf, responce, value_type, values)) 
+    if (SUCCEED != parse_history_get_values(itemid, conf, responce, value_type, values)) 
 		return FAIL;
 
 	zbx_vector_history_record_sort(values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
@@ -558,7 +579,7 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 	for (i = 0; i < history_num; i++)
 	{
 		h = (ZBX_DC_HISTORY *)&hist[i];
-			
+		
 		if (ITEM_STATE_NORMAL != h->state || 0 != (h->flags & (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOHISTORY))) {
 			DEBUG_ITEM(h->itemid, "Not saving item's history to clickhouse, flags are %u", h->flags);
 			continue;
@@ -582,7 +603,7 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"INSERT INTO %s.%s (day,itemid,clock,value", conf->dbname,hist_tables[value_type]); 
 			
 			if (ITEM_VALUE_TYPE_LOG == value_type) {
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",source,severity" ); 
+				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",source,severity,logeventid" ); 
 			}
 
 			if ( 0 == conf->disable_nanoseconds ) {
@@ -610,18 +631,23 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			break;
 		case ITEM_VALUE_TYPE_STR:
 		case ITEM_VALUE_TYPE_TEXT:
-			escaped_value = zbx_dyn_escape_string(h->value.str, ESCAPE_CHARS);
+			if (NULL == h->value.str)
+				escaped_value = zbx_strdup(NULL, "");
+			else 
+				escaped_value = zbx_dyn_escape_string(h->value.str, ESCAPE_CHARS);
+
 			zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,", '%s'", escaped_value);
 			zbx_free(escaped_value);
 			break;
 		case ITEM_VALUE_TYPE_LOG:
-			
-			escaped_value=zbx_dyn_escape_string(h->value.log->value,ESCAPE_CHARS);
+			escaped_value=zbx_dyn_escape_string(h->value.log->value, ESCAPE_CHARS);
 		
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d",
-					escaped_value, h->value.log->source, h->value.log->severity);
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s',%d, %ld",
+					escaped_value, h->value.log->source, h->value.log->severity, h->value.log->logeventid);
 			zbx_free(escaped_value);
-
+		
+			LOG_INF("Adding log record with event id %ld, severity %d, source %d itemid %ld", 
+				h->value.log->logeventid, h->value.log->severity, h->value.log->source,	h->itemid);
 			break;
 		default:
 			LOG_WRN("Unknown value type %d", h->value_type);
@@ -635,9 +661,16 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		}
 		
 		if ( 0 == conf->disable_host_item_names ) {
+			char *host_name, *item_key;
+			if ( h->host_name == NULL) 
+				host_name = zbx_strdup(NULL,"");
+			else 
+				host_name = zbx_dyn_escape_string(h->host_name, ESCAPE_CHARS);   
 			
-			char *host_name = zbx_dyn_escape_string(h->host_name, ESCAPE_CHARS);   
-			char *item_key = zbx_dyn_escape_string(h->item_key, ESCAPE_CHARS);   
+			if (h->item_key == NULL)	
+				item_key = zbx_strdup(NULL, "");
+			else 
+			    item_key = zbx_dyn_escape_string(h->item_key, ESCAPE_CHARS);   
 			
 			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",'%s','%s'", host_name, item_key);
 			

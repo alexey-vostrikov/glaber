@@ -4391,7 +4391,7 @@ json_parse_error:
 			}
 		}
 
-		zbx_process_events(NULL, NULL);
+		zbx_process_events(NULL, NULL, NULL);
 		zbx_clean_events();
 		DBcommit();
 	}

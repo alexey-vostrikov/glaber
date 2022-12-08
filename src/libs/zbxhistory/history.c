@@ -755,7 +755,13 @@ int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_his
 			zbx_json_addstring(json,"value", record->value.str,ZBX_JSON_TYPE_STRING);
 			break;
 		case ITEM_VALUE_TYPE_LOG:
-			zbx_json_addstring(json,"value", record->value.log->value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json,"value", record->value.log->value,  ZBX_JSON_TYPE_STRING);
+			zbx_json_addint64string(json,"logeventid", record->value.log->logeventid);
+			zbx_json_addint64string(json,"severity", record->value.log->severity);
+			
+			if (NULL != record->value.log->source)
+				zbx_json_addstring(json,"source", record->value.log->source, ZBX_JSON_TYPE_STRING);
+			
 			break;
 	}
 	zbx_json_close(json);

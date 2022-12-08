@@ -332,22 +332,39 @@ class CScreenHistory extends CScreenBase {
 				}
 				$sort_order = $has_logs? ZBX_SORT_UP : ZBX_SORT_DOWN;
 				
-			//	$sort_order = ZBX_SORT_DOWN;
-				
+					
 				CArrayHelper::sort($history_data, [
 					['field' => 'clock', 'order' => $sort_order],
 					['field' => 'ns', 'order' => $sort_order]
 				]);
-				
-				// Array $history_data will be modified according page and rows on page.
-			//	$pagination = CPagerHelper::paginate($this->page, $history_data, ZBX_SORT_UP,
-			//		new CUrl($this->page_file)
-			//	);
-				
 
+				//show_error_message("Hello world:".json_encode($history_data));
+				
 				foreach ($history_data as $data) {
 					$data['value'] = rtrim($data['value'], " \t\r\n");
-
+					
+					if (!isset($data['severity'])) 
+						$severity = TRIGGER_SEVERITY_UNDEFINED;
+					else 
+						$severity = $data['severity'];
+					
+					if (isset($data['logeventid']) && isset($data['source'])
+						&& $data['logeventid']>0 ) 
+					{
+						$cell_clock = (new CCol(new CLink(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock']),
+						(new CUrl('tr_events.php'))
+							->setArgument('triggerid', $data['source'])
+							->setArgument('eventid', $data['logeventid'])
+						)))->addClass(ZBX_STYLE_NOWRAP);
+						
+						//show_error_message("Making a link");
+					} else {
+						$cell_clock = (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock'])))
+						->addClass(ZBX_STYLE_NOWRAP)
+						//->addClass($color)
+						;
+					}
+					
 					$item = $items[$data['itemid']];
 					$host = reset($item['hosts']);
 					
@@ -356,15 +373,14 @@ class CScreenHistory extends CScreenBase {
 						: $color = null;
 					
 					$row = [];
-
-					$row[] = (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock'])))
-						->addClass(ZBX_STYLE_NOWRAP)
-						->addClass($color);
+					
+					$row[] = $cell_clock;
 
 					if ($is_many_items) {
 						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name_expanded']))
 							->addClass($color);
 					}
+
 
 					if ($use_log_item) {
 						$row[] = (array_key_exists('timestamp', $data) && $data['timestamp'] != 0)
@@ -373,7 +389,7 @@ class CScreenHistory extends CScreenBase {
 								->addClass($color)
 							: '';
 
-						// If this is a eventLog item, showing additional info.
+						// If this is an eventLog item, showing additional info.
 						if ($use_eventlog_item) {
 							$row[] = array_key_exists('source', $data)
 								? (new CCol($data['source']))
@@ -393,7 +409,7 @@ class CScreenHistory extends CScreenBase {
 						}
 					}
 
-					$row[] = (new CCol(new CPre(zbx_nl2br($data['value']))))->addClass($color);
+					$row[] = (new CCol(new CPre(zbx_nl2br($data['value']))))->addClass(getSeverityStatusStyle($severity));
 
 					$history_table->addRow($row);
 				}

@@ -233,6 +233,7 @@ zbx_item_tag_t;
 typedef struct _DC_TRIGGER
 {
 	zbx_uint64_t		triggerid;
+	zbx_uint64_t		history_idx; //history idx if calculated for the history item
 	char			*description;
 	char			*expression;
 	char			*recovery_expression;
@@ -530,11 +531,14 @@ typedef struct
 		
 	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
 	unsigned char	state;
-//	int		ttl;		/* time-to-live of the history value */
+
 	char *host_name; /*hostname to log to history */
 	char *item_key; /* name of metric*/
 }
 ZBX_DC_HISTORY;
+
+void	zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_diff,
+	 ZBX_DC_HISTORY *history);
 
 /* item queue data */
 typedef struct
@@ -1074,5 +1078,6 @@ void	zbx_get_host_interfaces_availability(zbx_uint64_t	hostid, zbx_agent_availab
 int	zbx_hc_check_proxy(zbx_uint64_t proxyid);
 
 void	zbx_dc_eval_expand_user_macros(zbx_eval_context_t *ctx);
+int history_update_log_enty_severity(ZBX_DC_HISTORY *h, int severity, u_int64_t eventid, u_int64_t triggerid, int value);
 
 	#endif

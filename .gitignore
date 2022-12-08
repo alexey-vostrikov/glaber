@@ -225,3 +225,5 @@ src/glapi/glb_domofon_logs_worker
 src/glapi/glb_hist_clickhouse
 src/glapi/glb_log_listener
 src/glapi/glb_hist_clickhouse
+include/config.h.in~
+build/config.log
