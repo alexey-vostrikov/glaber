@@ -646,7 +646,7 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
 					escaped_value, h->value.log->source, h->value.log->severity, h->value.log->logeventid);
 			zbx_free(escaped_value);
 		
-			LOG_INF("Adding log record with event id %ld, severity %d, source %d itemid %ld", 
+			DEBUG_ITEM(h->itemid, "Adding log record with event id %ld, severity %d, source %d itemid %ld", 
 				h->value.log->logeventid, h->value.log->severity, h->value.log->source,	h->itemid);
 			break;
 		default:
