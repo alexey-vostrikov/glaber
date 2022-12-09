@@ -1492,15 +1492,10 @@ static int	dbsync_compare_item(const ZBX_DC_ITEM *item, const DB_ROW dbrow)
 	int			history_sec, trends_sec;
 
 
-	DEBUG_ITEM(item->itemid, "Checking if config is changed");
-
 	if (FAIL == dbsync_compare_uint64(dbrow[1], item->hostid)) {
 		DEBUG_ITEM(item->itemid, "Hostid is changed");
 		return FAIL;
 	}
-
-//	if (FAIL == dbsync_compare_uint64(dbrow[21], item->mtime))
-//		return FAIL;
 
 	if (FAIL == dbsync_compare_uint64(dbrow[48], item->templateid)) 
 	{

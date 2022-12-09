@@ -1,5 +1,9 @@
+ver 2.16.2
+    - added option to disable v1 polling via async methods
+ver 2.16.1
+    - fix: normal poller items sometimes are acquired by async pollers
 ver 2.16.0
-    - introducing logs colorisation by triggering. 
+    - introducing logs colorization by triggering. 
 ver 2.15.4
     - fixed glb_snmp poller fail on snmpv3
 ver 2.15.3

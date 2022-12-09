@@ -63,7 +63,7 @@
 #include "changeset.h"
 
 int	sync_in_progress = 0;
-
+extern int CONFIG_DISABLE_SNMPV1_ASYNC;
 #define START_SYNC	WRLOCK_CACHE; sync_in_progress = 1
 #define FINISH_SYNC	sync_in_progress = 0; UNLOCK_CACHE
 
@@ -279,8 +279,9 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 							//avoiding dynamic and discovery items from being processed by async glb pollers
 			
 			/*note: async poller is yet missing v3 functionality support */
-			if ( NULL == snmp_iface || snmp_iface->version == ZBX_IF_SNMP_VERSION_3
-			   				|| snmp_iface->version == ZBX_IF_SNMP_VERSION_1) 
+			if ( NULL == snmp_iface || (
+					snmp_iface->version == ZBX_IF_SNMP_VERSION_3) ||
+			   		(snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC) ) 
 				return FAIL;
 	
 			return SUCCEED;
@@ -533,7 +534,8 @@ static int	item_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *inte
 		/* can only be healed by editing configuration (either update interval or macros involved) */
 		/* and such changes will be detected during configuration synchronization. DCsync_items()  */
 		/* detects item configuration changes affecting check scheduling and passes them in flags. */
-		glb_state_item_update_nextcheck(item->itemid, ZBX_JAN_2038);	
+		glb_state_item_update_nextcheck(item->itemid, ZBX_JAN_2038);
+		item->queue_next_check = ZBX_JAN_2038;
 		item->schedulable = 0;
 
 		return FAIL;
@@ -554,6 +556,7 @@ static int	item_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *inte
 	}
 	
 	glb_state_item_update_nextcheck(item->itemid, nextcheck);	
+	item->queue_next_check = nextcheck;
 
 	zbx_custom_interval_free(custom_intervals);
 
@@ -3950,16 +3953,18 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		{
 
 			glb_state_item_update_nextcheck(item->itemid, 0);
+			item->queue_next_check = 0;
 			item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 			item->poller_type = ZBX_NO_POLLER;
 		}
 
 		/* items that do not support notify-updates are passed to old queuing */
 		DEBUG_ITEM(item->itemid, "About to be checked how to poll");
-		if ( FAIL == glb_might_be_async_polled(item,host) ||  FAIL == poller_item_add_notify(type, itemid, hostid) ) {
+		if ( FAIL == glb_might_be_async_polled(item,host) || 
+		     FAIL == poller_item_add_notify(type, itemid, hostid) ) {
+			
 			DEBUG_ITEM(item->itemid, "Updating item from %s", __func__);
 			DCupdate_item_queue(item, old_poller_type);
-			
 		}
 	}
 
@@ -7279,8 +7284,10 @@ static int	__config_heap_elem_compare(const void *d1, const void *d2)
 
 	const ZBX_DC_ITEM		*i1 = (const ZBX_DC_ITEM *)e1->data;
 	const ZBX_DC_ITEM		*i2 = (const ZBX_DC_ITEM *)e2->data;
-
-	ZBX_RETURN_IF_NOT_EQUAL(glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
+	
+	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_next_check, i2->queue_next_check);
+	//ZBX_RETURN_IF_NOT_EQUAL(glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
+	
 	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_priority, i2->queue_priority);
 
 	if (ITEM_TYPE_SNMP != i1->type)
@@ -7307,7 +7314,8 @@ static int	__config_pinger_elem_compare(const void *d1, const void *d2)
 	const ZBX_DC_ITEM		*i1 = (const ZBX_DC_ITEM *)e1->data;
 	const ZBX_DC_ITEM		*i2 = (const ZBX_DC_ITEM *)e2->data;
 
-	ZBX_RETURN_IF_NOT_EQUAL(glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
+	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_next_check, i2->queue_next_check);
+	//	glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
 	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_priority, i2->queue_priority);
 	ZBX_RETURN_IF_NOT_EQUAL(i1->interfaceid, i2->interfaceid);
 
@@ -7339,7 +7347,7 @@ static int	__config_java_elem_compare(const void *d1, const void *d2)
 	const ZBX_DC_ITEM		*i1 = (const ZBX_DC_ITEM *)e1->data;
 	const ZBX_DC_ITEM		*i2 = (const ZBX_DC_ITEM *)e2->data;
 
-	ZBX_RETURN_IF_NOT_EQUAL(glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
+	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_next_check, i2->queue_next_check);
 	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_priority, i2->queue_priority);
 
 	return __config_java_item_compare(i1, i2);
@@ -9958,8 +9966,8 @@ static int	dc_config_get_queue_nextcheck(zbx_binary_heap_t *queue)
 	{
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (const ZBX_DC_ITEM *)min->data;
-		nextcheck = glb_state_item_get_nextcheck(dc_item->itemid);
-		
+		//nextcheck = glb_state_item_get_nextcheck(dc_item->itemid);
+		nextcheck = glb_state_item_get_nextcheck(dc_item->queue_next_check);
 	}
 	else
 		nextcheck = FAIL;
@@ -10104,8 +10112,9 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM **items)
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
-		if (glb_state_item_get_nextcheck(dc_item->itemid) > now)
-			break;
+		if (dc_item->queue_next_check > now) {
+				break;
+		}
 
 		if (0 != num)
 		{
@@ -10341,7 +10350,7 @@ int	DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *
 		//THIS_SHOULD_NEVER_HAPPEN;
 		//exit(-1);
 		
-		if ( glb_state_item_get_nextcheck(dc_item->itemid) > now)
+		if ( dc_item->queue_next_check > now)
 			break;
 
 		zbx_binary_heap_remove_min(queue);
@@ -12103,7 +12112,7 @@ int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 			queue_item = (zbx_queue_item_t *)zbx_malloc(NULL, sizeof(zbx_queue_item_t));
 			queue_item->itemid = dc_item->itemid;
 			queue_item->type = dc_item->type;
-			queue_item->nextcheck = glb_state_item_get_nextcheck(dc_item->itemid);
+			queue_item->nextcheck = dc_item->queue_next_check;
 			queue_item->proxy_hostid = dc_host->proxy_hostid;
 			
 			zbx_vector_ptr_append(queue, queue_item);

@@ -93,6 +93,7 @@ typedef struct
 {
 	zbx_uint64_t		itemid;
 	zbx_uint64_t		hostid;
+	int					queue_next_check;
 	zbx_uint64_t		interfaceid;
 	zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
