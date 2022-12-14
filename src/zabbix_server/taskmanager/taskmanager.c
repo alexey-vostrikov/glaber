@@ -29,6 +29,7 @@
 #include "export.h"
 #include "taskmanager.h"
 #include "zbxdiag.h"
+#include "../glb_poller/poller_ipc.h"
 
 #define ZBX_TM_PROCESS_PERIOD		5
 #define ZBX_TM_CLEANUP_PERIOD		SEC_PER_HOUR
@@ -464,7 +465,10 @@ static int	tm_process_check_now(zbx_vector_uint64_t *taskids)
 		}
 
 		proxy_hostids = (zbx_uint64_t *)zbx_malloc(NULL, tasks.values_num * sizeof(zbx_uint64_t));
+		
+		poller_item_notify_init();
 		zbx_dc_reschedule_items(&itemids, time(NULL), proxy_hostids);
+		poller_item_notify_flush();
 
 		sql_offset = 0;
 		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);

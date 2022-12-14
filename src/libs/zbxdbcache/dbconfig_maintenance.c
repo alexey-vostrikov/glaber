@@ -27,6 +27,8 @@
 
 #include "dbsync.h"
 #include "zbxserver.h"
+#include "../glb_conf/conf_hosts.h"
+
 
 extern int		CONFIG_TIMER_FORKS;
 
@@ -1143,8 +1145,10 @@ void	zbx_dc_flush_host_maintenance_updates(const zbx_vector_ptr_t *updates)
 	const zbx_host_maintenance_diff_t	*diff;
 	ZBX_DC_HOST				*host;
 	int					now;
-
+	zbx_vector_uint64_t changed_hostids;
 	now = time(NULL);
+	zbx_vector_uint64_create(&changed_hostids);
+	zbx_vector_uint64_reserve(&changed_hostids, 100);
 
 	WRLOCK_CACHE;
 
@@ -1156,6 +1160,8 @@ void	zbx_dc_flush_host_maintenance_updates(const zbx_vector_ptr_t *updates)
 
 		if (NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &diff->hostid)))
 			continue;
+
+		zbx_vector_uint64_append(&changed_hostids, host->hostid);
 
 		if (HOST_MAINTENANCE_STATUS_ON == host->maintenance_status &&
 				MAINTENANCE_TYPE_NODATA == host->maintenance_type)
@@ -1186,6 +1192,14 @@ void	zbx_dc_flush_host_maintenance_updates(const zbx_vector_ptr_t *updates)
 	}
 
 	UNLOCK_CACHE;
+	
+	//notify poller with own queues to recalc item's polling statuses
+	poller_item_notify_init();
+	conf_hosts_notify_changes(&changed_hostids);
+	poller_item_notify_flush();
+	
+	zbx_vector_uint64_destroy(&changed_hostids);
+
 }
 
 /******************************************************************************

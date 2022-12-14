@@ -195,8 +195,12 @@ static int	tm_process_check_now(zbx_vector_uint64_t *taskids)
 	}
 	DBfree_result(result);
 
-	if (0 != (processed_num = itemids.values_num))
+	
+	if (0 != (processed_num = itemids.values_num)) {
+		poller_item_notify_init();
 		zbx_dc_reschedule_items(&itemids, time(NULL), NULL);
+		poller_item_notify_flush();
+	}
 
 	if (0 != taskids->values_num)
 	{

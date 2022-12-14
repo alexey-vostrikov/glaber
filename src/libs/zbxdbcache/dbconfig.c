@@ -10277,9 +10277,11 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 			if ( HOST_STATUS_MONITORED != zbx_dc_host->status ||
 			   	 ITEM_STATUS_DISABLED == zbx_dc_item->status 
+			//	 ||
+			//	 SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item)
 			) {
 			
-				DEBUG_ITEM(itemids->values[i], "Removing item due to it's disabled or its host is disabled");
+				DEBUG_ITEM(itemids->values[i], "Removing item due to it's disabled or its host is disabled/in maintenace without collection");
 				glb_poller_delete_item(itemids->values[i]);
 				i++;
 				continue;
