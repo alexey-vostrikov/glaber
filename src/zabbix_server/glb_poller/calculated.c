@@ -99,7 +99,7 @@ void poll_item(poller_item_t *poller_item) {
     } else 
         poller_preprocess_value(poller_item, &result, now, ITEM_STATE_NORMAL, NULL);
     
-    poller_inc_responces();
+    poller_inc_responses();
     poller_return_item_to_queue(poller_item);   
     
     free_result(&result);

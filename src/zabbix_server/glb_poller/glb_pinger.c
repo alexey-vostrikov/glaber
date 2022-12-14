@@ -203,7 +203,7 @@ ITEMS_ITERATOR(process_item_by_ip_cb) {
     if (POLL_FINISHED == pinger_process_response(poller_item, rtt)) {
 
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got the final packet for the item with broken echo data");
-        poller_inc_responces();
+        poller_inc_responses();
         finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
                     
         pinger_item->state = POLL_QUEUED; 
@@ -277,7 +277,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
         if (POLL_FINISHED == pinger_process_response(poller_item, rtt_l)) {
             DEBUG_ITEM(poller_get_item_id(poller_item), "Got the final packet for the item");
  
-            poller_inc_responces();
+            poller_inc_responses();
             finish_icmp_poll(poller_item, SUCCEED, NULL, mstime);
                     
            //theese are two different things, need to set both
@@ -395,7 +395,6 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 
     pinger_item->ip = NULL;
     pinger_item->addr = addr;
-  //  pinger_item->lastresolve=0;
     pinger_item->type = type;
     pinger_item->count = count;
 
@@ -437,7 +436,6 @@ static void free_item(poller_item_t *glb_poller_item ) {
     zbx_free(pinger_item->ip);
     zbx_free(pinger_item->addr);
     
-  //  if (NULL != pinger_item->time_event)
     poller_destroy_event(pinger_item->packet_event);
     poller_destroy_event(pinger_item->timeout_event);
 

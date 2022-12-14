@@ -805,7 +805,9 @@ static int	get_values(unsigned char poller_type, int *nextcheck)
 		*nextcheck = DCconfig_get_poller_nextcheck(poller_type);
 		goto exit;
 	}
-
+	
+	DEBUG_ITEM(items[0].itemid, "Fetched from the queue in zbx poller, total %d items", num);
+	
 	zbx_vector_ptr_create(&add_results);
 
 	zbx_prepare_items(items, errcodes, num, results, MACRO_EXPAND_YES);
@@ -898,6 +900,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck)
 
 		DCpoller_requeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1, poller_type,
 				nextcheck);
+		DEBUG_ITEM(items[i].itemid,"Poller %d: Returned item to the zbx queue", poller_type);
 	}
 
 	zbx_preprocessor_flush();

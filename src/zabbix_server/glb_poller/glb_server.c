@@ -57,15 +57,8 @@ static int glb_server_submit_result(poller_item_t *poller_item, char *response) 
 
     GLB_SERVER_IDX_T *item_idx = NULL;
      
-    //if (SUCCEED != zbx_json_open(response, &jp_resp)) {
-	//	zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON response '%s' from worker %s", response, worker_get_path(worker->worker));
-	//	return FAIL;
-    //}
-   
-    poller_inc_responces();
-    // poller_preprocess_str(poller_item, response , NULL);
-
-
+    poller_inc_responses();
+    
     AGENT_RESULT	result={0};
        
     init_result(&result);

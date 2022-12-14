@@ -442,7 +442,7 @@ void handle_socket_operations(agent_connection_t *conn)
 				poller_preprocess_value(poller_item, NULL , mstime, ITEM_STATE_NOTSUPPORTED, err_str);
 			}
 
-			poller_inc_responces();
+			poller_inc_responses();
 			
 			zbx_tcp_close(&tmp_s);	
 			close(conn->socket);

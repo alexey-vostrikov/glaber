@@ -46,6 +46,7 @@ typedef void (*poller_resolve_cb)(poller_item_t *glb_item, const char* ipaddr);
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_poller_create_item(DC_ITEM *dc_item);
 int glb_poller_delete_item(u_int64_t itemid);
+
 int glb_poller_get_forks();
 
 poller_item_t *poller_get_poller_item(u_int64_t itemid);
@@ -59,8 +60,6 @@ void poller_register_item_timeout(poller_item_t *glb_item);
 int poller_if_host_is_failed(poller_item_t *glb_item);
 u_int64_t poller_get_host_id(poller_item_t *glb_item);
 
-void poller_set_poller_module_data(void *data);
-
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, 
 								 forks_count_cb forks_count, poller_resolve_cb resolve_callback);
@@ -68,7 +67,7 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error);
 
 void poller_inc_requests();
-void poller_inc_responces();
+void poller_inc_responses();
 
 /*in some cases full item iteration might need  - in such
  cases use iterator callback intreface */
@@ -86,7 +85,6 @@ void poller_strpool_free(const char* str);
 const char *poller_strpool_add(const char * str);
 
 void poller_preprocess_error(poller_item_t *poller_item, char *error);
-void poller_preprocess_error2(poller_item_t *poller_item, char *error);
 void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime);
 
 #endif

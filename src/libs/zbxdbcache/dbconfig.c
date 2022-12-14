@@ -244,7 +244,9 @@ clean:
  * doesn't have to be put in any of zabbix standard queues
  * **********************************************************/
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
-//	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked for async polling");
+	
+	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked if can be  async polled");
+	
 	if ( NULL == zbx_dc_host || NULL == zbx_dc_item ) {
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
@@ -253,27 +255,37 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 	if ( zbx_dc_host->proxy_hostid > 0)
 	 	return FAIL;
 		
-
 	switch (zbx_dc_item->type) {
 		case ITEM_TYPE_CALCULATED:
+			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled");
 			return SUCCEED;
 
 		case ITEM_TYPE_WORKER_SERVER:
-	//	case ITEM_TYPE_TRAPPER: 
+			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled");
 			return SUCCEED;
 
 		case ITEM_TYPE_AGENT: 
-			if ( CONFIG_GLB_AGENT_FORKS == 0 ) return FAIL;
+			if ( CONFIG_GLB_AGENT_FORKS == 0 ) {
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
+				return FAIL;
+			}
 			
 			//tls handshake isn't implemented in async mode yet
-			if ( ZBX_TCP_SEC_UNENCRYPTED != zbx_dc_host->tls_connect) return FAIL;
-
+			if ( ZBX_TCP_SEC_UNENCRYPTED != zbx_dc_host->tls_connect) {
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
+				return FAIL;
+			}
+			
+			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled");
 			return SUCCEED;
 
 		case ITEM_TYPE_SNMP: {
 			ZBX_DC_SNMPINTERFACE *snmp_iface;
 #ifdef HAVE_NETSNMP				
-			if ( CONFIG_GLB_SNMP_FORKS == 0 ) return FAIL;
+			if ( CONFIG_GLB_SNMP_FORKS == 0 ) {
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
+				return FAIL;
+			}
 	
 			snmp_iface = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp, &zbx_dc_item->interfaceid);
 							//avoiding dynamic and discovery items from being processed by async glb pollers
@@ -281,38 +293,63 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			/*note: async poller is yet missing v3 functionality support */
 			if ( NULL == snmp_iface || (
 					snmp_iface->version == ZBX_IF_SNMP_VERSION_3) ||
-			   		(snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC) ) 
+			   		(snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC) ) {
+				
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, unsupported snmp version");
 				return FAIL;
-	
+			}
+			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled");
 			return SUCCEED;
 #endif
 		}
+		DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
 		return FAIL;
 		break;
 		//typical script will look key will look like this: wisi.py["{HOST.CONN}", "1.3.6.1.4.1.7465.20.2.9.4.4.5.1.2.1.7.1.2"] 
 		case ITEM_TYPE_SIMPLE: {
-			if (0 == CONFIG_GLB_PINGER_FORKS )  
+			
+			DEBUG_ITEM(zbx_dc_item->itemid, "This is pinger item");
+			
+			if (0 == CONFIG_GLB_PINGER_FORKS )  {
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, no glb pinger forks");
 				return FAIL;
-
-			if (NULL == zbx_dc_item->key)
+			}
+			
+			if (NULL == zbx_dc_item->key) {
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, no key is set");
 				return FAIL;
+			}
 
 			if (SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPING_KEY) ||
 				SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGSEC_KEY) ||
 				SUCCEED == cmp_key_id(zbx_dc_item->key, SERVER_ICMPPINGLOSS_KEY)) 	{  
 				
-				if (NULL != strstr(zbx_dc_item->key,"glbmap]")) return SUCCEED;
-    			if (NULL != strstr(zbx_dc_item->key,"fping]")) return FAIL;
+				if (NULL != strstr(zbx_dc_item->key,"glbmap]")) {
+					DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled, set to glbmap");
+					return SUCCEED;
+				}
+    			
+				if (NULL != strstr(zbx_dc_item->key,"fping]")) {
+					DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, set to fping");
+					return FAIL;
+				}
     
     			//method isn't set per item, looking at default
-    			if (CONFIG_ICMP_METHOD == GLB_ICMP) return SUCCEED;
+    			if (CONFIG_ICMP_METHOD == GLB_ICMP) {
+					DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled, default is glb_icmp");
+					return SUCCEED;
+				}
     
     			//default method is ZBX, so we will only process if there are no zbx pingers are started
-    			if ( 1 > CONFIG_PINGER_FORKS ) return SUCCEED;
-    
-    			return FAIL;
+    			if ( 1 > CONFIG_PINGER_FORKS ) {
+					DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled, no zbx pingers available");
+					return SUCCEED;
 				}
-				
+
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, doesn't meet async pinger conditions");
+    			return FAIL;
+			}
+			DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled due to key mismatch");
 			return FAIL;
 		}
 		break;
@@ -359,7 +396,7 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 
 		break; 
 	}
-
+	DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
 	return FAIL;
 }
 
@@ -1355,6 +1392,8 @@ static void	DCsync_hosts(zbx_dbsync_t *sync)
 	time_t		now;
 	signed char	ipmi_authtype;
 	unsigned char	ipmi_privilege;
+	zbx_vector_uint64_t changed_hosts_ids;
+
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	ZBX_DC_PSK	*psk_i, psk_i_local;
 	zbx_ptr_pair_t	*psk_owner, psk_owner_local;
@@ -1366,6 +1405,8 @@ static void	DCsync_hosts(zbx_dbsync_t *sync)
 	zbx_hashset_create(&psk_owners, 0, ZBX_DEFAULT_PTR_HASH_FUNC, ZBX_DEFAULT_PTR_COMPARE_FUNC);
 #endif
 	now = time(NULL);
+	
+	zbx_vector_uint64_create(&changed_hosts_ids);
 
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
@@ -1377,28 +1418,9 @@ static void	DCsync_hosts(zbx_dbsync_t *sync)
 		ZBX_DBROW2UINT64(proxy_hostid, row[1]);
 		ZBX_STR2UCHAR(status, row[10]);
 
+		zbx_vector_uint64_append(&changed_hosts_ids, hostid);
+		
 		host = (ZBX_DC_HOST *)DCfind_id(&config->hosts, hostid, sizeof(ZBX_DC_HOST), &found);
-		//if (proxy_hostid > 0 ) {
-		//	LOG_INF("Host %ld is monitored by proxy %ld", hostid, proxy_hostid);
-		//}
-		//in case of existing item update, notify all active pollers to rebuild
-		//their items queue to reflect changes
-		// if ( 1 == found) {
-		// 	zbx_hashset_iter_t iter;
-		// 	u_int64_t *itemid;
-		// 	zbx_hashset_iter_reset(&host->itemids, &iter);
-		// 	while (NULL != (itemid = (u_int64_t*)zbx_hashset_iter_next(&iter))) {
-		// 		//LOG_INF("Host %ld changed, redoing item %ld", hostid, *itemid);
-		// 		if (HOST_STATUS_NOT_MONITORED == status) {
-		// 		//	LOG_INF("Host is disabled, adding remove item notify");
-		// 			DC_add_changed_item(*itemid, ITEM_STATUS_DISABLED);
-		// 		} else {
-		// 			//LOG_INF("Host is enabled, adding add item notify");
-		// 			DC_add_changed_item(*itemid, ITEM_STATUS_ACTIVE);
-		// 		}
-		// 	}
-			
-		// }
 
 		/* see whether we should and can update 'hosts_h' and 'hosts_p' indexes at this point */
 		update_index_h = 0;
@@ -1840,6 +1862,8 @@ done:
 
 		host->status = status;
 	}
+	conf_hosts_notify_changes(&changed_hosts_ids);
+	zbx_vector_uint64_destroy(&changed_hosts_ids);
 
 	/* remove deleted hosts from buffer */
 	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
@@ -3963,7 +3987,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		if ( FAIL == glb_might_be_async_polled(item,host) || 
 		     FAIL == poller_item_add_notify(type, itemid, hostid) ) {
 			
-			DEBUG_ITEM(item->itemid, "Updating item from %s", __func__);
+			DEBUG_ITEM(item->itemid, "Cannot be async polled, adding to zbx queue %s", __func__);
 			DCupdate_item_queue(item, old_poller_type);
 		}
 	}
@@ -10241,31 +10265,26 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			NULL != (zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &zbx_dc_item->hostid))) {
 			
 			DEBUG_ITEM(itemids->values[i],"Found item and host data");
-			//LOG_INF("Processing item3 %d", i);
-			if (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) ) {
-				//LOG_WRN("In %s: item %ld shouldn't get into processing", __func__, zbx_dc_item->itemid);
-				DEBUG_ITEM(itemids->values[i],"Item didn't get processed due to proxy condition: proxy id %ld progtype is %d",dc_item.host.proxy_hostid, (program_type & ZBX_PROGRAM_TYPE_SERVER)  );
+
+			if ( (zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER)) ||
+				FAIL == glb_might_be_async_polled(zbx_dc_item,zbx_dc_host) ) {
+				
+				DEBUG_ITEM(itemids->values[i],"Item shouldn't be processed anymore, removing from async polling (if it's there)");
 				glb_poller_delete_item(itemids->values[i]);
 				i++;
 				continue;
 			}
 
-			//LOG_INF("Processing item3 %d", i);
 			if ( HOST_STATUS_MONITORED != zbx_dc_host->status ||
-				 SUCCEED == DCin_maintenance_without_data_collection(zbx_dc_host, zbx_dc_item) || 
-			     ZBX_CLUSTER_HOST_STATE_ACTIVE != zbx_dc_host->cluster_state && CONFIG_CLUSTER_SERVER_ID > 0 ||
-			     //FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host) || 
-			 	 ITEM_STATUS_DISABLED == zbx_dc_item->status 
-			 	//( 0 != zbx_dc_host->proxy_hostid && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER)) 
-				 ) {
-			//removing any disabled items from the host
+			   	 ITEM_STATUS_DISABLED == zbx_dc_item->status 
+			) {
+			
 				DEBUG_ITEM(itemids->values[i], "Removing item due to it's disabled or its host is disabled");
 				glb_poller_delete_item(itemids->values[i]);
 				i++;
 				continue;
 			}
 
-			//LOG_INF("Processing item5 %d", i);
 			DCget_item(&dc_item, zbx_dc_item,ZBX_ITEM_GET_ALL);
 			DCget_host(&dc_item.host, zbx_dc_host, ZBX_ITEM_GET_ALL);
 

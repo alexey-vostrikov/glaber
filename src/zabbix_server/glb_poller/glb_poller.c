@@ -190,12 +190,6 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 		return;
 	}
 
-//	if (poller_async_get_dns_requests() > POLLER_MAX_DNS_REQUESTS) {
-//		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to too many DNS requests are int progress (%d) busy", POLLER_MAX_SESSIONS_DELAY / 1000, POLLER_MAX_DNS_REQUESTS );
-//		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
-//		return;
-//	}
-
 	add_item_check_event(poller_item, mstime);
 
 	if (POLL_QUEUED != poller_item->state)
@@ -612,13 +606,13 @@ void poller_preprocess_error(poller_item_t *poller_item, char *error)  {
 								  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
 }
 
-void poller_preprocess_error2(poller_item_t *poller_item, char *error) {
+//void poller_preprocess_error2(poller_item_t *poller_item, char *error) {
 	
-	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
-		 .value.type=VARIANT_VALUE_ERROR, .value.data.str = error };
+//	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
+//		 .value.type=VARIANT_VALUE_ERROR, .value.data.str = error };
 
-	preprocess_send_metric(&metric);
-}
+//	preprocess_send_metric(&metric);
+//}
 
 void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime) {
 	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
@@ -654,7 +648,7 @@ void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u
 	}
 }
 
-void poller_inc_responces()
+void poller_inc_responses()
 {
 	conf.responces++;
 }

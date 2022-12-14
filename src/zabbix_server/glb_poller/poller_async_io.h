@@ -29,25 +29,22 @@ typedef void (*poller_event_cb)(poller_item_t *poller_item, void *data);
 
 
 int poller_async_resolve(poller_item_t *poller_item, const char* hostname);
-/* async queue abstraction for pollers */
-/* no allocations or frees need to be done, returning event might be used to cancel the event
-   but! it is only valid until the event ocured, using it afterwards will cause SEGV,
-   for most cases it's better to avoid using it at all */
+
 typedef void (*poller_event_cb_func_t)(poller_item_t *poller_item, void *data);
 
 poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_func_t callback_func, int fd, void *data, int persist);
 
-int poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec);
-void poller_run_fd_event(poller_event_t *poll_event);
+int   poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec);
+void  poller_run_fd_event(poller_event_t *poll_event);
+int   poller_destroy_event(poller_event_t *event);
+void  poller_disable_event(poller_event_t *poll_event);
 
-int poller_destroy_event(poller_event_t *event);
-void poller_disable_event(poller_event_t *poll_event);
+void  poller_async_set_resolve_cb(resolve_cb callback);
+int   poller_async_get_dns_requests();
 
-void poller_async_set_resolve_cb(resolve_cb callback);
-int poller_async_get_dns_requests();
-
-void poller_async_loop_init();
-void poller_async_loop_run();
-void poller_async_loop_destroy();
-void poller_async_loop_stop();
+//library abstraction
+void  poller_async_loop_init();
+void  poller_async_loop_run();
+void  poller_async_loop_destroy();
+void  poller_async_loop_stop();
    

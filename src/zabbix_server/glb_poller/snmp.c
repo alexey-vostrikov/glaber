@@ -151,7 +151,7 @@ static int process_result(csnmp_pdu_t *pdu)
 	u_int64_t itemid;
 	struct sockaddr_in *saddr = (struct sockaddr_in *)&pdu->addr;
 	
-	poller_inc_responces();
+	poller_inc_responses();
 	if (0 == (itemid = poller_sessions_close_session(pdu->req_id))) {
 		char addr_str[20];
 		inet_ntop(AF_INET, &(pdu->addr), addr_str, INET_ADDRSTRLEN);
