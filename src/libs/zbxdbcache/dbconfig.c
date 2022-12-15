@@ -608,7 +608,6 @@ static void	DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 
 	if (SUCCEED == glb_might_be_async_polled(dc_item,dc_host)) {
 		dc_item->poller_type = ZBX_NO_POLLER;
-		poller_item_add_notify(dc_item->type, dc_item->itemid, dc_item->hostid);
 		return;
 	}
 
