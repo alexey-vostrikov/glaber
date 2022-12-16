@@ -9990,7 +9990,7 @@ static int	dc_config_get_queue_nextcheck(zbx_binary_heap_t *queue)
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (const ZBX_DC_ITEM *)min->data;
 		//nextcheck = glb_state_item_get_nextcheck(dc_item->itemid);
-		nextcheck = glb_state_item_get_nextcheck(dc_item->queue_next_check);
+		nextcheck = dc_item->queue_next_check;
 	}
 	else
 		nextcheck = FAIL;
