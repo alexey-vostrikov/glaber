@@ -1,3 +1,5 @@
+ver 2.16.9
+    - fix: #174 to prevent too frequent intervals on start
 ver 2.16.8
     - fix: #175 - improper next check calculation where causing poller speed degradation
 ver 2.16.7

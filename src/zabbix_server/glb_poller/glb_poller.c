@@ -167,7 +167,7 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 
 	DEBUG_ITEM(poller_item->itemid, "Added item %ld poll event in %ld msec", poller_item->itemid, nextcheck - mstime);
 
-	poller_run_timer_event(poller_item->poll_event, nextcheck-mstime);
+	poller_run_timer_event(poller_item->poll_event, nextcheck - mstime);
 	return SUCCEED;
 }
 
@@ -198,6 +198,8 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 		LOG_DBG("Not sending item %ld to polling, it's in the %d state or aged", poller_item->itemid, poller_item->state);
 		return;
 	}
+
+
 
 	poller_item->state = POLL_POLLING;
 	poller_item->lastpolltime = mstime;

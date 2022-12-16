@@ -2295,14 +2295,16 @@ int	calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int simple_interv
 				nextcheck = current_delay * (int)(t / (time_t)current_delay) +
 						(int)(seed % (zbx_uint64_t)current_delay);
 
+				int min_delay = current_delay / 4;
+
 				if (0 == attempt)
 				{
-					while (nextcheck <= t)
+					while (nextcheck <= (t + min_delay))
 						nextcheck += current_delay;
 				}
 				else
 				{
-					while (nextcheck < t)
+					while (nextcheck < (t + min_delay))
 						nextcheck += current_delay;
 				}
 			}
