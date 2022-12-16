@@ -219,7 +219,7 @@ static int snmp_send_request(poller_item_t *poller_item) {
  	}
 }
 
-void resolve_ready_func_cb(poller_item_t *poller_item,  const char *addr) {
+static void resolve_ready_cb(poller_item_t *poller_item,  const char *addr) {
 	DEBUG_ITEM(poller_get_item_id(poller_item), "Item resolved to '%s'", addr);
 	
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
@@ -303,7 +303,7 @@ void snmp_async_init(void) {
 	/*need lib net-snmp for parsing text->digital and getting text oids hints*/
 	init_snmp(progname);
 	
-	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count, resolve_ready_func_cb);
+	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count, resolve_ready_cb);
 
 	if ( (conf.socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
         LOG_INF("Couldn't create socket for ASYNC snmp poller");

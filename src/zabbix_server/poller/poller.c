@@ -285,6 +285,8 @@ void	zbx_free_result_ptr(AGENT_RESULT *result)
 static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
 {
 	int	res = FAIL;
+	
+	DEBUG_ITEM(item->itemid,"Fetching item in sync way");
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s'", __func__, item->key_orig);
 
@@ -358,7 +360,8 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(res));
-
+	DEBUG_ITEM(item->itemid,"Fetching item finished");
+	
 	return res;
 }
 

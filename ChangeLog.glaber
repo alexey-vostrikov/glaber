@@ -1,3 +1,5 @@
+ver 2.16.7
+    - added extra logging to figure problems with #175
 ver 2.16.6
     - fix: #173
 ver 2.16.5
