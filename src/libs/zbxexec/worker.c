@@ -524,9 +524,9 @@ int async_buffered_responce(ext_worker_t *worker,  char **response) {
     
     if ( SUCCEED != worker_is_alive(worker)) {
         LOG_INF("Worker %s is dead, need restart", worker_get_path(worker));
+        restart_worker(worker);
         return FAIL;
     }
-
     
     *response = evbuffer_readln(worker->buffer, NULL, EVBUFFER_EOL_CRLF);
 

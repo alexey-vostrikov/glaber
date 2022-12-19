@@ -1,3 +1,5 @@
+ver 2.16.10
+    - fix: endless restart of glbamp if it's failed
 ver 2.16.9
     - fix: #174 to prevent too frequent intervals on start
 ver 2.16.8

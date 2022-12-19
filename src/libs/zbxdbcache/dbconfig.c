@@ -2917,15 +2917,11 @@ static void	DCsync_interfaces(zbx_dbsync_t *sync)
 	zbx_vector_ptr_destroy(&interfaces);
 	
 	if (changed_hosts.values_num > 0) {
-		LOG_INF("Sending interface change notify, %d interfaces changed", changed_hosts.values_num);
 		conf_hosts_notify_changes(&changed_hosts);
-		LOG_INF("Sent interface change notify");
 	}
 	
-	LOG_INF("Destroying change notify hosts");
 	zbx_vector_uint64_destroy(&changed_hosts);
-	LOG_INF("Destroyed change notify hosts");
-
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
@@ -6662,21 +6658,21 @@ void	DCsync_configuration(unsigned char mode)
 	ifsec2 = zbx_time() - sec;
 	/* relies on hosts, proxies and interfaces, must be after DCsync_{hosts,interfaces}() */
 	sec = zbx_time();
-	LOG_INF("Syncing items");
+	
 	DCsync_items(&items_sync, flags);
-	LOG_INF("Syncing templates");
+	
 	DCsync_template_items(&template_items_sync);
-	LOG_INF("Syncing prototypes");
+	
 	DCsync_prototype_items(&prototype_items_sync);
 	isec2 = zbx_time() - sec;
 	/* relies on items, must be after DCsync_items() */
 	sec = zbx_time();
-	LOG_INF("Syncing peprocessing");
+	
 	DCsync_item_preproc(&itempp_sync, sec);
 	itempp_sec2 = zbx_time() - sec;
 	/* relies on items, must be after DCsync_items() */
 	sec = zbx_time();
-	LOG_INF("Syncing itemscrtipts");
+	
 	DCsync_itemscript_param(&itemscrp_sync);
 	itemscrp_sec2 = zbx_time() - sec;
 
@@ -16364,8 +16360,7 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) {
 
 void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	int i;
-	LOG_INF("Start DC_notify_changed notify changed items");
-//	poller_item_notify_init();
+
 	RDLOCK_CACHE;
 	
 	for (i = 0; i < items->values_num; i++ ) {
@@ -16382,7 +16377,5 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	}
 
 	UNLOCK_CACHE;
-//	poller_item_notify_flush();
-	LOG_INF("Finish DC_notify_changed notify changed items");
 
 }
