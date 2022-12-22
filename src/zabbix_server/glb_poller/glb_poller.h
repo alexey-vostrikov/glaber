@@ -65,6 +65,8 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 								 forks_count_cb forks_count, poller_resolve_cb resolve_callback);
 
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error);
+void poller_preprocess_uint64_value(poller_item_t *poller_item, u_int64_t value);
+void poller_preprocess_str_value(poller_item_t *poller_item, char* value);
 
 void poller_inc_requests();
 void poller_inc_responses();
@@ -84,7 +86,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args);
 void poller_strpool_free(const char* str);
 const char *poller_strpool_add(const char * str);
 
-void poller_preprocess_error(poller_item_t *poller_item, char *error);
+void poller_preprocess_error(poller_item_t *poller_item, const char *error);
 void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime);
 
 #endif

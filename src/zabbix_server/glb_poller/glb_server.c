@@ -37,39 +37,6 @@ typedef struct {
     unsigned char value_type;
 } GLB_SERVER_IDX_T;
 
-
-
-static void glb_server_submit_fail_result(poller_item_t *poller_item, char *error) {
-    
-    poller_preprocess_value(poller_item , NULL , glb_ms_time(), ITEM_STATE_NOTSUPPORTED, error);
-}
-
-/************************************************************************
- * submits result to the preprocessor                                   *
- * **********************************************************************/
-static int glb_server_submit_result(poller_item_t *poller_item, char *response) {
-    
-    struct zbx_json_parse jp_resp;
-    zbx_json_type_t type;
- 
-    worker_t *worker = poller_get_item_specific_data(poller_item);
-    u_int64_t hash;
-
-    GLB_SERVER_IDX_T *item_idx = NULL;
-     
-    poller_inc_responses();
-    
-    AGENT_RESULT	result={0};
-       
-    init_result(&result);
-    zbx_rtrim(response, ZBX_WHITESPACE);
-    SET_TEXT_RESULT(&result, zbx_strdup(NULL, response));
-    poller_preprocess_value(poller_item, &result, glb_ms_time(), ITEM_STATE_NORMAL, NULL);
-    free_result(&result);
-
-    zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
-}
-
 static int init_item(DC_ITEM* dcitem, poller_item_t *poller_item) {
 
     worker_t *worker;
@@ -85,7 +52,8 @@ static int init_item(DC_ITEM* dcitem, poller_item_t *poller_item) {
         
     if (NULL == CONFIG_WORKERS_DIR) {
         zabbix_log(LOG_LEVEL_WARNING,"To run worker as a server, set WorkerScripts dir location in the configuration file");
-        //TODO: submit item in the error state here
+        poller_preprocess_error(poller_item, "To run worker as a server, set WorkerScripts dir location in the configuration file");
+     
         return FAIL;
     }
 
@@ -139,7 +107,7 @@ ITEMS_ITERATOR(check_workers_data_cb) {
     int iterations = 0;
     
     int last_status = SUCCEED;
-    char *worker_responce = NULL;
+    char *worker_response = NULL;
 
     if (SUCCEED != worker_is_alive(worker->worker)) {
         int now = time(NULL);
@@ -152,25 +120,24 @@ ITEMS_ITERATOR(check_workers_data_cb) {
     }
         
     while ( iterations < MAX_ITERATIONS ) {
-        last_status = async_buffered_responce(worker->worker, &worker_responce);
+        last_status = async_buffered_responce(worker->worker, &worker_response);
         
         if (FAIL == last_status ) {
             DEBUG_ITEM(poller_get_item_id(poller_item), "Worker is not running, setting UNSUPPORTED value");
-            glb_server_submit_fail_result(poller_item, "Couldn't read from the worker - worker isn't running");
+            poller_preprocess_error(poller_item , "Couldn't read from the worker - worker isn't running");
         }
          
-        if (NULL == worker_responce)
+        if (NULL == worker_response)
             break;
 
         iterations++; 
               
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_responce);
-        glb_server_submit_result(poller_item, worker_responce);
-              
-        zbx_free(worker_responce);
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_response);
+        poller_inc_responses();
+        poller_preprocess_str_value(poller_item, worker_response);
+                      
+        zbx_free(worker_response);
     }
-
-
 
     return POLLER_ITERATOR_CONTINUE;
 }

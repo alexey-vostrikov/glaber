@@ -214,12 +214,14 @@ class CZabbixServer {
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
-		
-			$result = $result + $zabbix_server->request([
+			
+			$new_data = $zabbix_server->request([
 				'request' => 'itemsstate.get',
 				'itemids' => $items_chunk
 			]);
 
+			if (is_array($new_data))
+				$result = $result + $new_data;
 			$i++;
 		}
 

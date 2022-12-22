@@ -172,3 +172,7 @@ void poller_async_loop_init() {
 	evdns_base_set_option(conf.evdns_base,"timeout","4");
 	evdns_base_set_option(conf.evdns_base, "randomize-case", "0");
 }
+
+struct event_base* poller_async_get_events_base() {
+	return conf.events_base;
+}

@@ -308,8 +308,9 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		//typical script will look key will look like this: wisi.py["{HOST.CONN}", "1.3.6.1.4.1.7465.20.2.9.4.4.5.1.2.1.7.1.2"] 
 		case ITEM_TYPE_SIMPLE: {
 			
-			DEBUG_ITEM(zbx_dc_item->itemid, "This is pinger item");
-			
+			if (0 < CONFIG_GLB_AGENT_FORKS && 0 == strncmp(zbx_dc_item->key, "net.tcp.service[http",20) ) 
+				return SUCCEED;
+
 			if (0 == CONFIG_GLB_PINGER_FORKS )  {
 				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, no glb pinger forks");
 				return FAIL;
@@ -3066,7 +3067,7 @@ static int DC_remove_item(u_int64_t itemid) {
 
 	if (SUCCEED == glb_might_be_async_polled(item, host)) {
 		DEBUG_ITEM(item->itemid,"Sending poller notify about item removal");
-		poller_item_add_notify(item->type, item->itemid, item->hostid);
+		poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
 	}
 
 	if (ITEM_STATUS_ACTIVE == item->status)
@@ -3980,7 +3981,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, int flags)
 		/* items that do not support notify-updates are passed to old queuing */
 		DEBUG_ITEM(item->itemid, "About to be checked how to poll");
 		if ( FAIL == glb_might_be_async_polled(item,host) || 
-		     FAIL == poller_item_add_notify(type, itemid, hostid) ) {
+		     FAIL == poller_item_add_notify(type, item->key, itemid, hostid) ) {
 			
 			DEBUG_ITEM(item->itemid, "Cannot be async polled, adding to zbx queue %s", __func__);
 			DCupdate_item_queue(item, old_poller_type);
@@ -10286,16 +10287,12 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 			DCget_host(&dc_item.host, zbx_dc_host, ZBX_ITEM_GET_ALL);
 
 			DEBUG_ITEM(itemids->values[i],"Calling create item func");
-		
-			//LOG_INF("Processing item6 %d", i);
+			errcode = SUCCEED;
 			zbx_prepare_items(&dc_item, &errcode, 1, &result, MACRO_EXPAND_YES);
-			//LOG_INF("Processing item7 %d", i);
 			glb_poller_create_item(&dc_item);
-			//LOG_INF("Processing item8 %d", i);
 			init_result(&result);
 			zbx_clean_items(&dc_item, 1, &result);
 			DCconfig_clean_items(&dc_item, &errcode, 1);
-			//LOG_INF("Processing item9 %d", i);
 		} else {
 			DEBUG_ITEM(itemids->values[i],"NOT found item and host data, or host/item is disabled, deleting item from the poller");
 			glb_poller_delete_item(itemids->values[i]);
@@ -16352,30 +16349,38 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) {
 
 	zbx_hashset_iter_reset(&host->itemids, &iter);
 	
-	while (NULL != (itemid = zbx_hashset_iter_next(&iter)))
+	while (NULL != (itemid = zbx_hashset_iter_next(&iter))) {
 		zbx_vector_uint64_append(items, *itemid );
-
+		DEBUG_ITEM(*itemid, "Added to iface vi DCget_host_items");
+	}
 	UNLOCK_CACHE;
 }
 
 void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	int i;
-
+	//poller_item_notify_init();
 	RDLOCK_CACHE;
 	
 	for (i = 0; i < items->values_num; i++ ) {
 		ZBX_DC_ITEM *item;
 		ZBX_DC_HOST *host;
-		
-		if (NULL == (item = zbx_hashset_search(&config->items, &items->values[i])))
+		DEBUG_ITEM(items->values[i], "Processing item in notify change");
+
+		if (NULL == (item = zbx_hashset_search(&config->items, &items->values[i]))){ 
+			DEBUG_ITEM(items->values[i], "Couldn't find item in items on notify change");
 			continue;
-		if (NULL == (host = zbx_hashset_search(&config->hosts, &item->hostid)))
+		}
+		if (NULL == (host = zbx_hashset_search(&config->hosts, &item->hostid))) {
+			DEBUG_ITEM(items->values[i], "Couldn't host in find in items om notify change");
 			continue;
-		DEBUG_ITEM(item->itemid, "Sending item change notify form dc_notify_changed_items");
-		if (glb_might_be_async_polled(item, host))
-			poller_item_add_notify(item->type, item->itemid, item->hostid);
+		}
+
+		if (SUCCEED == glb_might_be_async_polled(item, host)) {
+			DEBUG_ITEM(item->itemid, "Doing iface poller_item_add_notify");
+			poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
+		} 
 	}
 
 	UNLOCK_CACHE;
-
+	//poller_item_notify_flush();
 }

@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C)  Glaber
+** Copyright (C) 2001-2028 Glaber JSC
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,13 +16,5 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#include "log.h"
-#include "common.h"
 
-int poller_notify_ipc_init(size_t mem_size);
-
-int poller_item_notify_init();
-void poller_item_notify_flush();
-
-int poller_item_add_notify(int item_type, const char *key, u_int64_t itemid, u_int64_t hostid);
-int poller_ipc_notify_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items);
+void tcp_agent_proto_init(tcp_poll_type_procs_t *procs);

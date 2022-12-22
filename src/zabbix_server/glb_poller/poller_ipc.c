@@ -75,19 +75,26 @@ int poller_item_notify_init() {
 	}
 }
 
-int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid) {
+//poller's type is equal to item type
+int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t hostid) {
 	zbx_uint64_pair_t pair = {.first = hostid, .second = itemid};
 	
+	DEBUG_ITEM(itemid,"Adding item to async polling notify for type iface %d", item_type);
+
 	if (item_type >= ITEM_TYPE_MAX || 0 > item_type  ) {
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
 	
+	//tcp pollers handles both agent and simple checks, sending simple tcp items to agent poller
+	//it will be more logical to create poller_type_by_item just like zabbix does
+	if (ITEM_TYPE_SIMPLE == item_type && 0 == strncmp(key, "net.tcp.service[http", 20))
+		item_type = ITEM_TYPE_AGENT;
+
 	if (NULL == ipc_poller_notify[item_type])
 		return FAIL;
 	
-
-	DEBUG_ITEM(itemid,"Adding item to async polling notify for type %d", item_type);
+	DEBUG_ITEM(itemid,"Adding item to async polling notify for type iface %d", item_type);
 	zbx_vector_uint64_pair_append(notify_buffer[item_type], pair);
 	
 	return SUCCEED;

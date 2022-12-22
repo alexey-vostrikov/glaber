@@ -26,6 +26,7 @@
 #include "dbcache.h"
 #include "zbxcrypto.h"
 #include "zbxdiag.h"
+#include "../../zabbix_server/glb_poller/poller_ipc.h"
 
 #include "../../zabbix_server/scripts/scripts.h"
 #include "taskmanager.h"

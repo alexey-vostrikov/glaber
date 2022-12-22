@@ -41,6 +41,7 @@ void  poller_disable_event(poller_event_t *poll_event);
 
 void  poller_async_set_resolve_cb(resolve_cb callback);
 int   poller_async_get_dns_requests();
+struct event_base* poller_async_get_events_base();
 
 //library abstraction
 void  poller_async_loop_init();

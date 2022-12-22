@@ -3595,7 +3595,7 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 		}
 		else if (ISSET_UI64(result))
 		{	
-			DEBUG_ITEM(itemid, "Setting uint64 result: %lld", result->ui64);
+			DEBUG_ITEM(itemid, "Setting uint64 result: %lld, ts is %d", result->ui64, ts->sec);
 			dc_local_add_history_uint(itemid, item_value_type, ts, result->ui64, result->lastlogsize,
 					result->mtime, value_flags);
 		}

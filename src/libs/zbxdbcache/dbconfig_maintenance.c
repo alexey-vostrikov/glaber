@@ -28,6 +28,7 @@
 #include "dbsync.h"
 #include "zbxserver.h"
 #include "../glb_conf/conf_hosts.h"
+#include "../../zabbix_server/glb_poller/poller_ipc.h"
 
 
 extern int		CONFIG_TIMER_FORKS;
