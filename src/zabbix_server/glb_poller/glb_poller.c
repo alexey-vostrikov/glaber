@@ -42,6 +42,7 @@
 #include "poller_async_io.h"
 #include "poller_ipc.h"
 #include "poller_sessions.h"
+#include "poller_contention.h"
 #include "../../libs/apm/apm.h"
 
 extern unsigned char process_type, program_type;
@@ -194,12 +195,13 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 
 //	if (SUCCEED == poller_if_host_is_failed(poller_item))
 //	{
-//		DEBUG_ITEM(poller_item->itemid, "Skipping item from polling, host is still down ");
-//		add_item_check_event(poller_item, mstime + 10 * 1000);
+//		LOG_INF("Host %ld is timed out, delaying item poll for %d sec ", poller_get_host_id(poller_item), CONFIG_UNREACHABLE_PERIOD);
+//		DEBUG_ITEM(poller_item->itemid, "Skipping item from polling, host is still down (too many timeouts) ");
+//		add_item_check_event(poller_item, mstime + CONFIG_UNREACHABLE_PERIOD * 1000);
 //		return;
 //	}
 	
-	if ( poller_sessions_count() > POLLER_MAX_SESSIONS ) {
+	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || poller_contention_sessions_count() > POLLER_MAX_SESSIONS) {
 		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller is too busy", POLLER_MAX_SESSIONS_DELAY / 1000 );
 		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
 		return;
@@ -403,6 +405,7 @@ void poll_shutdown()
 
 	zbx_hashset_destroy(&conf.hosts);
 	zbx_hashset_destroy(&conf.items);
+	poller_contention_destroy();
 	strpool_destroy(&conf.strpool);
 }
 
@@ -447,7 +450,7 @@ static void update_proc_title_cb(poller_item_t *garbage, void *data) {
 	
 	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, sessions: %d, dns_requests: %d]",
 			get_process_type_string(process_type), process_num, (conf.requests * 1000) / (time_diff),
-			(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count(), poller_async_get_dns_requests());
+			(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count() + poller_contention_sessions_count(), poller_async_get_dns_requests());
 	
 	conf.total_requests += conf.requests;
 	conf.total_responces += conf.responces;
@@ -476,6 +479,8 @@ static int poller_init(zbx_thread_args_t *args)
 				.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC };
 
 	glb_preprocessing_init();
+	poller_contention_init();
+
 	conf.item_type = *(unsigned char *)((zbx_thread_args_t *)args)->args;
 
 	zbx_hashset_create(&conf.items, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -501,18 +506,20 @@ static int poller_init(zbx_thread_args_t *args)
 		return FAIL;
 	}
 	
-	if (NULL != conf.async_io_proc) {
+	if (NULL != conf.poller.handle_async_io) {
 		conf.async_io_proc = poller_create_event(NULL, async_io_cb, 0, NULL, 1); 
 		poller_run_timer_event(conf.async_io_proc, ASYNC_RUN_INTERVAL);
 	}
-
+	
 	poller_async_set_resolve_cb(conf.poller.resolve_callback);
+
 
 	apm_track_counter(&conf.total_requests, "requests", NULL);
 	apm_add_proc_labels(&conf.total_requests);
 	apm_track_counter(&conf.total_responces, "responces", NULL);
 	apm_add_proc_labels(&conf.total_responces);
 	apm_add_heap_usage();
+	
 	
 	return SUCCEED;
 }
@@ -550,6 +557,22 @@ void poller_return_item_to_queue(poller_item_t *item)
 	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue");
 	item->lastpolltime = glb_ms_time();
 	item->state = POLL_QUEUED;
+}
+
+#define CONFIG_REPOLL_DELAY 15
+
+void poller_return_delayed_item_to_queue(poller_item_t *item)
+{
+	int nextcheck =  CONFIG_REPOLL_DELAY + rand() % 5 ;
+	//LOG_INF("Item %ld returned to the poller's queue, will repoll in %d msec", item->itemid, nextcheck);
+	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue, will repoll in %d sec", nextcheck);
+	
+	glb_state_item_update_nextcheck(item->itemid, nextcheck * 1000 );
+	item->lastpolltime = glb_ms_time();
+	item->state = POLL_QUEUED;
+
+	poller_disable_event(item->poll_event);
+	poller_run_timer_event(item->poll_event, nextcheck);
 }
 
 u_int64_t poller_get_host_id(poller_item_t *item)
@@ -738,5 +761,6 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 
 	while (1)
 		zbx_sleep(SEC_PER_MIN);
+	
 #undef STAT_INTERVAL
 }

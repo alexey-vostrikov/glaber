@@ -142,7 +142,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 		struct evbuffer *input = bufferevent_get_input(tcp_item->bev);
 		int n = evbuffer_get_length(input);
 
-		DEBUG_ITEM(polelr_item, "Connection has been dropped for the item, there is %d bytes in the buffer" n);
+		DEBUG_ITEM(poller_get_item_id(poller_item), "Connection has been dropped for the item, there is %d bytes in the buffer",n);
 		if (n > 0)
 		{ // agent answered and closed connection - this is fine!
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Connection closed, has %d byets to process", n);
