@@ -25,13 +25,13 @@
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 
 #define GLB_DNS_CACHE_TIME 300 * 1000 // for how long name to ip resolvings have to be remembered in msec
-#define GLB_MAX_FAILS 6 // how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
+#define GLB_MAX_FAILS 4// how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
 /*async pollers having too many sessions or dns requests will stagnate on session support and will loose data packets 
  so if there are more then this amount of sessions, item's polling is delayed for 30 seconds */
-#define POLLER_MAX_SESSIONS 16 * ZBX_KIBIBYTE 
+#define POLLER_MAX_SESSIONS 8 * ZBX_KIBIBYTE 
 #define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
-#define POLLER_MAX_DNS_REQUESTS	3200 /*maximum simultanious DNS requests */
+//#define POLLER_MAX_DNS_REQUESTS	2 * ZBX_KIBIBYTE /*maximum simultanious DNS requests */
 
 typedef struct poller_item_t poller_item_t;
 
@@ -55,6 +55,7 @@ void *poller_get_item_specific_data(poller_item_t *poll_item);
 void poller_set_item_specific_data(poller_item_t *poll_item, void *data);
 
 void poller_return_item_to_queue(poller_item_t *glb_item);
+void poller_return_delayed_item_to_queue(poller_item_t *glb_item);
 void poller_register_item_succeed(poller_item_t *glb_item);
 void poller_register_item_timeout(poller_item_t *glb_item);
 int poller_if_host_is_failed(poller_item_t *glb_item);

@@ -16374,7 +16374,6 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 			DEBUG_ITEM(items->values[i], "Couldn't host in find in items om notify change");
 			continue;
 		}
-
 		if (SUCCEED == glb_might_be_async_polled(item, host)) {
 			DEBUG_ITEM(item->itemid, "Doing iface poller_item_add_notify");
 			poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);

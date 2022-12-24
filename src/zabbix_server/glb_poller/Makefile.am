@@ -17,6 +17,7 @@ libglbpoller_a_SOURCES = \
 	snmp_get.c \
 	snmp_walk.c \
 	poller_sessions.c \
+	poller_contention.c \
 	snmp_util.c \
 	tcp_agent_proto.c \
 	tcp_simple_http_proto.c
