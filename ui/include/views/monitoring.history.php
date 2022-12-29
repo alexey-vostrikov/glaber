@@ -20,13 +20,13 @@
 
 
 /**
- * @var CView $this
+  * @var CView $this
  */
 $this->includeJsFile('monitoring.history.js.php');
 
 $web_layout_mode = CViewHelper::loadLayoutMode();
 
-$historyWidget = (new CWidget())->setWebLayoutMode($web_layout_mode);
+$html_page = (new CHtmlPage())->setWebLayoutMode($web_layout_mode);
 
 $header = [
 	'left' => _n('%1$s item', '%1$s items', count($data['items'])),
@@ -40,6 +40,8 @@ $header_row = [];
 $same_host = true;
 $items_numeric = true;
 $host_name = '';
+$screen_groups = [];
+
 
 if ($data['items']) {
 	$first_item = reset($data['items']);
@@ -48,17 +50,24 @@ if ($data['items']) {
 	foreach ($data['items'] as $item) {
 		$same_host = ($same_host && $host_name === $item['hosts'][0]['name']);
 		$items_numeric = ($items_numeric && array_key_exists($item['value_type'], $data['iv_numeric']));
+	
+		if (GRAPH_TYPE_SEPARATED ==  $data['graphtype']) {
+			$screen_groups[] = [$item['itemid']];
+		} else {
+			$is_numeric = array_key_exists($item['value_type'], $data['iv_numeric']);
+			
+			if (!isset($screen_groups[$is_numeric]))
+					$screen_groups[$is_numeric] = [];
+			
+			$screen_groups[$is_numeric][] = $item['itemid'];
+		}
 	}
 }
+show_error_message(json_encode($screen_groups));
 
 if ((count($data['items']) == 1 || $same_host) && $data['itemids']) {
-	$header['left'] = [
-		$host_name,
-		NAME_DELIMITER,
-		count($data['items']) == 1 ? $item['name_expanded'] : $header['left']
-	];
-	$header_row[] = implode('', $header['left']);
-	$historyWidget->setNavigation(getHostNavigation($item,$item['hostid']));
+	$header['left'] = $host_name.NAME_DELIMITER.(count($data['items']) == 1 ? $item['name'] : $header['left']);
+	$header_row[] = $header['left'];
 }
 else {
 	$header_row[] = $header['left'];
@@ -104,7 +113,7 @@ if ($data['action'] !== HISTORY_GRAPH && $data['action'] !== HISTORY_BATCH_GRAPH
 }
 
 if ($data['action'] == HISTORY_GRAPH && count($data['items']) == 1) {
-	$action_list->addItem(get_icon('favourite', [
+	$action_list->addItem(get_icon('favorite', [
 		'fav' => 'web.favorite.graphids',
 		'elid' => $item['itemid'],
 		'elname' => 'itemid'
@@ -116,7 +125,7 @@ $action_list->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]));
 $header['right']->addItem($action_list);
 
 // create filter
-$filter_form = new CFilter(new CUrl());
+$filter_form = new CFilter();
 $filter_tab = [];
 
 if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
@@ -134,7 +143,7 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 				$items_data[] = [
 					'id' => $itemid,
 					'prefix' => $item['hosts'][0]['name'].NAME_DELIMITER,
-					'name' => $item['name_expanded']
+					'name' => $item['name']
 				];
 			}
 			CArrayHelper::sort($items_data, ['prefix', 'name']);
@@ -194,105 +203,60 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 	}
 }
 
-
-
+foreach ($screen_groups as $itemids) {}
 // create history screen
 if ($data['itemids']) {
-
-	//splitting items into 2 groups - numerical and tex/log ones
-	$items = API::Item()->get([
-		'output' => ['itemid', 'value_type'],
+	$screen = CScreenBuilder::getScreen([
+		'resourcetype' => SCREEN_RESOURCE_HISTORY,
+		'action' => $data['action'],
 		'itemids' => $data['itemids'],
-		'webitems' => true,
-		'preservekeys' => true
+		'pageFile' => (new CUrl('history.php'))
+			->setArgument('action', $data['action'])
+			->setArgument('itemids', $data['itemids'])
+			->setArgument('filter', $data['filter'])
+			->setArgument('filter_task', $data['filter_task'])
+			->setArgument('mark_color', $data['mark_color'])
+			->getUrl(),
+		'profileIdx' => $data['profileIdx'],
+		'profileIdx2' => $data['profileIdx2'],
+		'from' => $data['from'],
+		'to' => $data['to'],
+		'page' => $data['page'],
+		'filter' => $data['filter'],
+		'filter_task' => $data['filter_task'],
+		'mark_color' => $data['mark_color'],
+		'plaintext' => $data['plaintext'],
+		'graphtype' => $data['graphtype']
 	]);
-
-	$items_by_type = [];
-
-
-	$iv_string = [
-		ITEM_VALUE_TYPE_LOG => 1,
-		ITEM_VALUE_TYPE_TEXT => 1,
-		ITEM_VALUE_TYPE_STR => 1
-	];
-
-
-	foreach ($items as $itemid => $item) {
-		if (array_key_exists($item['value_type'], $iv_string)) {
-			$items_by_type['text'][$itemid] = $itemid;
-		} else {
-			$items_by_type['numeric'][$itemid] = $itemid;
-		}
-	}
-
-	$screens = [];
-
-	foreach ($items_by_type as $typename => $type_items) {
-		if (count($type_items) == 0)
-			continue;
-
-		if ('text' == $typename)
-			$action = HISTORY_VALUES;
-		else
-			$action = $data['action'];
-
-		$screens[$typename] = CScreenBuilder::getScreen([
-			'resourcetype' => SCREEN_RESOURCE_HISTORY,
-			'action' => $action,
-			'itemids' => $type_items,
-			'pageFile' => (new CUrl('history.php'))
-				->setArgument('action', $action)
-				->setArgument('itemids', $type_items)
-				->getUrl(),
-			'profileIdx' => $data['profileIdx'],
-			'profileIdx2' => $data['profileIdx2'],
-			'from' => $data['from'],
-			'to' => $data['to'],
-			'page' => $data['page'],
-			'filter' => $data['filter'],
-			'filter_task' => $data['filter_task'],
-			'mark_color' => getRequest('mark_color'),
-			'plaintext' => $data['plaintext'],
-			'graphtype' => $data['graphtype'],
-			'screenid' => $typename
-		]);
-	}
 }
-
 
 // append plaintext to widget
 if ($data['plaintext']) {
 	foreach ($header_row as $text) {
-		$historyWidget->addItem([new CSpan($text), BR()]);
+		$html_page->addItem([new CSpan($text), BR()]);
 	}
 
 	if ($data['itemids']) {
-//		$screen = $screen->get();
+		$screen = $screen->get();
 		$pre = new CPre();
-
-		foreach($screens as $screen_type => $screen) {
-			foreach ($screen->get() as $text) {
-				$pre->addItem([$text, BR()]);
-			}
+		foreach ($screen as $text) {
+			$pre->addItem([$text, BR()]);
 		}
-
-		$historyWidget->addItem($pre);
+		$html_page->addItem($pre);
 	}
 }
 else {
-	$historyWidget
+	$html_page
 		->setTitle($header['left'])
+		->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_HISTORY))
 		->setControls((new CTag('nav', true, $header['right']))->setAttribute('aria-label', _('Content controls')));
 
 	if ($data['itemids'] && $data['action'] !== HISTORY_LATEST) {
-		
-		$filter_form->addTimeSelector(reset($screens)->timeline['from'], reset($screens)->timeline['to'],
+		$filter_form->addTimeSelector($screen->timeline['from'], $screen->timeline['to'],
 			$web_layout_mode != ZBX_LAYOUT_KIOSKMODE);
-	
-
 	}
 
-	if ($data['action'] == HISTORY_BATCH_GRAPH) {
+	if ($data['action'] == HISTORY_BATCH_GRAPH || $data['action'] == HISTORY_SEPARATED_GRAPH) {
 		$filter_form
 			->hideFilterButtons()
 			->addVar('action', $data['action'])
@@ -303,6 +267,7 @@ else {
 				(new CRadioButtonList('graphtype', (int) $data['graphtype']))
 					->addValue(_('Normal'), GRAPH_TYPE_NORMAL)
 					->addValue(_('Stacked'), GRAPH_TYPE_STACKED)
+					->addValue(_('Individual'), GRAPH_TYPE_SEPARATED)
 					->setModern(true)
 					->onChange('jQuery(this).closest("form").submit();')
 			)
@@ -319,28 +284,21 @@ else {
 
 	if ($data['itemids']) {
 		if ($data['action'] !== HISTORY_LATEST) {
-			$historyWidget->addItem($filter_form);
+			$html_page->addItem($filter_form);
 		}
 
-		//need to create a separate screen for each group of data
-		foreach (array('numeric','text') as $idx => $typename) {
-			if (!isset($screens[$typename])) 
-				continue;
-		
-			$historyWidget->addItem($screens[$typename]->get());
-	
-			if ($data['action'] !== HISTORY_LATEST ) {
-				CScreenBuilder::insertScreenStandardJs($screens[$typename]->timeline);
-	
-			}
+		$html_page->addItem($screen->get());
+
+		if ($data['action'] !== HISTORY_LATEST) {
+			CScreenBuilder::insertScreenStandardJs($screen->timeline);
 		}
 	}
 	else {
 		if ($filter_tab) {
-			$historyWidget->addItem($filter_form);
+			$html_page->addItem($filter_form);
 		}
 
-		$historyWidget->addItem(
+		$html_page->addItem(
 			(new CTableInfo())
 				->setHeader([
 					(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH),
@@ -352,4 +310,4 @@ else {
 	}
 }
 
-$historyWidget->show();
+$html_page->show();

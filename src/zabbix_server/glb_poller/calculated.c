@@ -17,8 +17,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "glb_poller.h"
+#include "zbxsysinfo.h"
 #include "../poller/checks_calculated.h"
 
 typedef struct {
@@ -90,7 +91,7 @@ void poll_item(poller_item_t *poller_item) {
     u_int64_t now = glb_ms_time();
 
     prepare_dc_item(&dc_item, poller_item);
-    init_result(&result);
+    zbx_init_agent_result(&result);
 
     poller_inc_requests();
 
@@ -99,10 +100,10 @@ void poll_item(poller_item_t *poller_item) {
     } else 
         poller_preprocess_value(poller_item, &result, now, ITEM_STATE_NORMAL, NULL);
     
-    poller_inc_responces();
+    poller_inc_responses();
     poller_return_item_to_queue(poller_item);   
     
-    free_result(&result);
+    zbx_free_agent_result(&result);
 }
 
 int forks_count(void) {

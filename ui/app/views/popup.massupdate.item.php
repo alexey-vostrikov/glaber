@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,15 +23,10 @@
  * @var CView $this
  */
 
-// Visibility box javascript is already added. It should not be added in popup response.
-define('CVISIBILITYBOX_JAVASCRIPT_INSERTED', 1);
-define('IS_TEXTAREA_MAXLENGTH_JS_INSERTED', 1);
-
 // Create form.
 $form = (new CForm())
 	->setId('massupdate-form')
 	->setName('massupdate-form')
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 	->addVar('ids', $data['ids'])
 	->addVar('action', $data['action'])
 	->addVar('prototype', $data['prototype'])
@@ -288,34 +283,32 @@ $item_form_list
 	// Append history to form list.
 	->addRow(
 		(new CVisibilityBox('visible[history]', 'history_div', _('Original')))
-			->setLabel(_('History storage')),
+			->setLabel(_('History storage period')),
 		(new CDiv([
 			(new CRadioButtonList('history_mode', ITEM_STORAGE_CUSTOM))
 				->addValue(_('Do not keep history'), ITEM_STORAGE_OFF)
-				->addValue(_('Keep hisory'), ITEM_STORAGE_CUSTOM)
+				->addValue(_('Storage period'), ITEM_STORAGE_CUSTOM)
 				->setModern(true),
-			(new CInput('hidden', 'history', "3600")),
-			//(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			//(new CTextBox('history', DB::getDefault('items', 'history')))
-			//	->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-			//	->setAriaRequired()
+			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+			(new CTextBox('history', DB::getDefault('items', 'history')))
+				->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+				->setAriaRequired()
 		]))
 			->addClass('wrap-multiple-controls')
 			->setId('history_div')
 	)
 	// Append trends to form list.
 	->addRow(
-		(new CVisibilityBox('visible[trends]', 'trends_div', _('Original')))->setLabel(_('Trends storage')),
+		(new CVisibilityBox('visible[trends]', 'trends_div', _('Original')))->setLabel(_('Trend storage period')),
 		(new CDiv([
 			(new CRadioButtonList('trends_mode', ITEM_STORAGE_CUSTOM))
-				->addValue(_('Do not keep trends'), ITEM_STORAGE_CUSTOM)
-				->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
+				->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
+				->addValue(_('Storage period'), ITEM_STORAGE_CUSTOM)
 				->setModern(true),
-		(new CInput('hidden', 'trends', "86400")),
-			// (new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			// (new CTextBox('trends', DB::getDefault('items', 'trends')))
-			// 	->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-			// 	->setAriaRequired()
+			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+			(new CTextBox('trends', DB::getDefault('items', 'trends')))
+				->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+				->setAriaRequired()
 		]))
 			->addClass('wrap-multiple-controls')
 			->setId('trends_div')
@@ -402,8 +395,7 @@ if ($data['single_host_selected']) {
 						'dstfrm' => $form->getName(),
 						'dstfld1' => 'master_itemid',
 						'hostid' => $data['hostid'],
-						'only_hostid' => $data['hostid'],
-						'webitems' => true
+						'only_hostid' => $data['hostid']
 					]
 				]
 			]))
@@ -423,35 +415,36 @@ if ($data['single_host_selected']) {
 		$master_item[] = (new CButton('button', _('Select')))
 			->addClass(ZBX_STYLE_BTN_GREY)
 			->removeId()
-			->onClick('return PopUp("popup.generic",'.
-				json_encode([
-					'srctbl' => 'items',
-					'srcfld1' => 'itemid',
-					'srcfld2' => 'name',
-					'dstfrm' => $form->getName(),
-					'dstfld1' => 'master_itemid',
-					'dstfld2' => 'master_itemname',
-					'only_hostid' => $data['hostid'],
-					'with_webitems' => 1,
-					'normal_only' => 1
-				]).', null, this);'
-			);
+			->setAttribute('data-hostid', $data['hostid'])
+			->onClick('
+				PopUp("popup.generic", {
+					srctbl: "items",
+					srcfld1: "itemid",
+					srcfld2: "name",
+					dstfrm: "'.$form->getName().'",
+					dstfld1: "master_itemid",
+					dstfld2: "master_itemname",
+					only_hostid: this.dataset.hostid,
+					normal_only: 1
+				}, {dialogue_class: "modal-popup-generic"});
+			');
 
 		$master_item[] = (new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN);
 		$master_item[] = (new CButton('button', _('Select prototype')))
 			->addClass(ZBX_STYLE_BTN_GREY)
 			->removeId()
-			->onClick('return PopUp("popup.generic",'.
-				json_encode([
-					'srctbl' => 'item_prototypes',
-					'srcfld1' => 'itemid',
-					'srcfld2' => 'name',
-					'dstfrm' => $form->getName(),
-					'dstfld1' => 'master_itemid',
-					'dstfld2' => 'master_itemname',
-					'parent_discoveryid' => $data['parent_discoveryid']
-				]).', null, this);'
-			);
+			->setAttribute('data-parent_discoveryid', $data['parent_discoveryid'])
+			->onClick('
+				PopUp("popup.generic", {
+					srctbl: "item_prototypes",
+					srcfld1: "itemid",
+					srcfld2: "name",
+					dstfrm: "'.$form->getName().'",
+					dstfld1: "master_itemid",
+					dstfld2: "master_itemname",
+					parent_discoveryid: this.dataset.parent_discoveryid
+				}, {dialogue_class: "modal-popup-generic"});
+			');
 	}
 
 	$item_form_list->addRow(
@@ -486,7 +479,7 @@ $tags_form_list = (new CFormList('tags-form-list'))
 				->addStyle('margin-bottom: 10px;'),
 			renderTagTable([['tag' => '', 'value' => '']])
 				->setHeader([_('Name'), _('Value'), _('Action')])
-				->setId('tags-table')
+				->addClass('tags-table')
 		]))->setId('tags-div')
 	);
 
@@ -507,6 +500,7 @@ $form->addItem(new CJsScript($this->readJsFile('../../../include/views/js/itemte
 
 $output = [
 	'header' => $data['title'],
+	'doc_url' => CDocHelper::getUrl(CDocHelper::POPUP_MASSUPDATE_ITEM),
 	'body' => $form->toString(),
 	'buttons' => [
 		[

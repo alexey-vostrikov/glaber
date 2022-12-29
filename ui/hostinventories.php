@@ -25,7 +25,6 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = _('Host inventory');
 $page['file'] = 'hostinventories.php';
-$page['scripts'] = ['layout.mode.js', 'multiselect.js'];
 
 $hostId = getRequest('hostid', 0);
 
@@ -204,7 +203,7 @@ else {
 		$options = [
 			'output' => ['hostid', 'name', 'status'],
 			'selectInventory' => ['name', 'type', 'os', 'serialno_a', 'tag', 'macaddress_a', $data['filter']['field']],
-			'selectGroups' => API_OUTPUT_EXTEND,
+			'selectHostGroups' => ['name'],
 			'groupids' => $filter_groupids,
 			'filter' => ['inventory_mode' => [HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC]]
 		];

@@ -19,10 +19,11 @@
 #ifndef GLB_IPC_SERVICE_H
 #define GLB_IPC_SERVICE_H
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
 #include "zbxalgo.h"
+#include "zbxtime.h"
 #include "glb_ipc.h"
 #include "glb_lock.h"
 #include <pthread.h>

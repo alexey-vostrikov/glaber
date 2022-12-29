@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"git.zabbix.com/ap/plugin-support/log"
+	"git.zabbix.com/ap/plugin-support/plugin"
 	"zabbix.com/internal/agent"
-	"zabbix.com/pkg/log"
-	"zabbix.com/pkg/plugin"
 )
 
 type mockWriter struct {
@@ -36,10 +36,10 @@ type mockWriter struct {
 	t       *testing.T
 }
 
-func (w *mockWriter) Write(data []byte, timeout time.Duration) (err error) {
+func (w *mockWriter) Write(data []byte, timeout time.Duration) (err []error) {
 	log.Debugf("%s", string(data))
 	if w.counter&1 != 0 {
-		err = errors.New("mock error")
+		err = []error{errors.New("mock error")}
 	} else {
 		var request AgentDataRequest
 		_ = json.Unmarshal(data, &request)
@@ -65,6 +65,10 @@ func (w *mockWriter) CanRetry() bool {
 }
 
 func (w *mockWriter) Hostname() string {
+	return ""
+}
+
+func (w *mockWriter) Session() string {
 	return ""
 }
 
@@ -96,21 +100,6 @@ func TestResultCache(t *testing.T) {
 	cache.write(&result)
 	cache.write(&result)
 	cache.flushOutput(&writer)
-}
-
-func TestToken(t *testing.T) {
-	tokens := make(map[string]bool)
-	for i := 0; i < 100000; i++ {
-		token := newToken()
-		if len(token) != 32 {
-			t.Errorf("Expected token length 32 while got %d", len(token))
-			return
-		}
-		if _, ok := tokens[token]; ok {
-			t.Errorf("Duplicated token detected")
-		}
-		tokens[token] = true
-	}
 }
 
 func checkBuffer(t *testing.T, c *MemoryCache, input []*plugin.Result, expected []*AgentData) {

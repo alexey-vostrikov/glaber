@@ -17,12 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 
 int poller_notify_ipc_init(size_t mem_size);
 
 int poller_item_notify_init();
 void poller_item_notify_flush();
 
-int poller_item_add_notify(int item_type, u_int64_t itemid, u_int64_t hostid);
+int poller_item_add_notify(int item_type, const char *key, u_int64_t itemid, u_int64_t hostid);
 int poller_ipc_notify_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items);

@@ -26,7 +26,6 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 $page['title'] = _('Configuration of network maps');
 $page['file'] = 'sysmaps.php';
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
-$page['scripts'] = ['multiselect.js', 'class.tab-indicators.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -183,7 +182,6 @@ if (hasRequest('add') || hasRequest('update')) {
 
 		$messageSuccess = _('Network map updated');
 		$messageFailed = _('Cannot update network map');
-		$auditAction = AUDIT_ACTION_UPDATE;
 	}
 	else {
 		if (getRequest('form') === 'full_clone') {
@@ -214,11 +212,9 @@ if (hasRequest('add') || hasRequest('update')) {
 
 		$messageSuccess = _('Network map added');
 		$messageFailed = _('Cannot add network map');
-		$auditAction = AUDIT_ACTION_ADD;
 	}
 
 	if ($result) {
-		add_audit($auditAction, AUDIT_RESOURCE_MAP, 'Name ['.$map['name'].']');
 		unset($_REQUEST['form']);
 	}
 
@@ -252,10 +248,6 @@ elseif ((hasRequest('delete') && hasRequest('sysmapid'))
 
 	if ($result) {
 		unset($_REQUEST['form']);
-
-		foreach ($maps as $map) {
-			add_audit_ext(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_MAP, $map['sysmapid'], $map['name'], null, null, null);
-		}
 	}
 
 	$result = DBend($result);

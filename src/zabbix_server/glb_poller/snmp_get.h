@@ -18,7 +18,7 @@
 **/
 
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "glb_poller.h"
 #include "csnmp.h"

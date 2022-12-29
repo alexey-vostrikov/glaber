@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,24 +23,25 @@
  * @var CView $this
  */
 
-$this->addJsFile('multiselect.js');
-
 if ($data['uncheck']) {
 	uncheckTableRows('scheduledreport');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Scheduled reports'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::REPORTS_SCHEDULEDREPORT_LIST))
 	->setControls(
 		(new CTag('nav', true,
-			(new CList())->addItem(
-				(new CRedirectButton(_('Create report'),
-					(new CUrl('zabbix.php'))->setArgument('action', 'scheduledreport.edit')
-				))->setEnabled($data['allowed_edit'])
-			)
+			(new CList())
+				->addItem(
+					(new CRedirectButton(_('Create report'),
+						(new CUrl('zabbix.php'))->setArgument('action', 'scheduledreport.edit')
+					))->setEnabled($data['allowed_edit'])
+				)
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'scheduledreport.list')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'scheduledreport.list'))
 		->addVar('action', 'scheduledreport.list')
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
@@ -99,6 +100,6 @@ $form->addItem([
 		], 'scheduledreport')
 	]);
 
-$widget
+$html_page
 	->addItem($form)
 	->show();

@@ -21,16 +21,34 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
-$submenu_source = [
-	EVENT_SOURCE_TRIGGERS => _('Trigger actions'),
-	EVENT_SOURCE_DISCOVERY => _('Discovery actions'),
-	EVENT_SOURCE_AUTOREGISTRATION => _('Autoregistration actions'),
-	EVENT_SOURCE_INTERNAL => _('Internal actions')
-];
+$submenu_source = [];
 
+if (CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TRIGGER_ACTIONS)) {
+	$submenu_source[EVENT_SOURCE_TRIGGERS] = _('Trigger actions');
+}
+
+if (CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_SERVICE_ACTIONS)) {
+	$submenu_source[EVENT_SOURCE_SERVICE] = _('Service actions');
+}
+
+if (CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_DISCOVERY_ACTIONS)) {
+	$submenu_source[EVENT_SOURCE_DISCOVERY] = _('Discovery actions');
+}
+
+if (CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_AUTOREGISTRATION_ACTIONS)) {
+	$submenu_source[EVENT_SOURCE_AUTOREGISTRATION] = _('Autoregistration actions');
+}
+
+if (CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_INTERNAL_ACTIONS)) {
+	$submenu_source[EVENT_SOURCE_INTERNAL] = _('Internal actions');
+}
+
+$title = $submenu_source[$data['eventsource']];
 $submenu = [];
+
 foreach ($submenu_source as $value => $label) {
 	$url = (new CUrl('actionconf.php'))
 		->setArgument('eventsource', $value)
@@ -41,13 +59,10 @@ foreach ($submenu_source as $value => $label) {
 
 $current_url = (new CUrl('actionconf.php'))->setArgument('eventsource', $data['eventsource']);
 
-$widget = (new CWidget())
-	->setTitle(array_key_exists($data['eventsource'], $submenu_source) ? $submenu_source[$data['eventsource']] : null)
-	->setTitleSubmenu([
-		'main_section' => [
-			'items' => $submenu
-		]
-	])
+$html_page = (new CHtmlPage())
+	->setTitle($title)
+	->setTitleSubmenu(['main_section' => ['items' => $submenu]])
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ALERTS_ACTION_LIST))
 	->setControls((new CTag('nav', true,
 		(new CForm('get'))
 			->cleanItems()
@@ -58,7 +73,8 @@ $widget = (new CWidget())
 		))
 			->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter($current_url))
+	->addItem((new CFilter())
+		->setResetUrl($current_url)
 		->addVar('eventsource', $data['eventsource'])
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
@@ -100,7 +116,9 @@ $actionTable = (new CTableInfo())
 
 if ($this->data['actions']) {
 	$actionConditionStringValues = actionConditionValueToString($this->data['actions']);
-	$actionOperationDescriptions = getActionOperationDescriptions($this->data['actions'], ACTION_OPERATION);
+	$actionOperationDescriptions = getActionOperationDescriptions($data['eventsource'], $data['actions'],
+		ACTION_OPERATION
+	);
 
 	foreach ($this->data['actions'] as $aIdx => $action) {
 		$conditions = [];
@@ -159,10 +177,9 @@ $actionForm->addItem([
 		'action.massenable' => ['name' => _('Enable'), 'confirm' => _('Enable selected actions?')],
 		'action.massdisable' => ['name' => _('Disable'), 'confirm' => _('Disable selected actions?')],
 		'action.massdelete' => ['name' => _('Delete'), 'confirm' => _('Delete selected actions?')]
-	])
+	], $data['eventsource'])
 ]);
 
-// append form to widget
-$widget->addItem($actionForm);
-
-$widget->show();
+$html_page
+	->addItem($actionForm)
+	->show();

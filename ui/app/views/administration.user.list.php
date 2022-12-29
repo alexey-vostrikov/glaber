@@ -23,15 +23,15 @@
  * @var CView $this
  */
 
-$this->addJsFile('multiselect.js');
 $this->includeJsFile('administration.user.list.js.php');
 
 if ($data['uncheck']) {
 	uncheckTableRows('user');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Users'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::USERS_USER_LIST))
 	->setControls((new CList([
 		(new CForm('get'))
 			->cleanItems()
@@ -55,7 +55,8 @@ $widget = (new CWidget())
 				))->setAttribute('aria-label', _('Content controls'))
 		]))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'user.list')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'user.list'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFilterTab(_('Filter'), [
@@ -67,10 +68,10 @@ $widget = (new CWidget())
 			(new CFormList())->addRow(_('Name'),
 				(new CTextBox('filter_name', $data['filter']['name']))->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 			),
-			(new CFormList())->addRow(_('Surname'),
+			(new CFormList())->addRow(_('Last name'),
 				(new CTextBox('filter_surname', $data['filter']['surname']))->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 			),
-			(new CFormList())->addRow((new CLabel(_('User roles'), 'filter_roles')),
+			(new CFormList())->addRow((new CLabel(_('User roles'), 'filter_roles__ms')),
 				(new CMultiSelect([
 					'name' => 'filter_roles[]',
 					'object_name' => 'roles',
@@ -105,7 +106,7 @@ $table = (new CTableInfo())
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
 		make_sorting_header(_('Username'), 'username', $data['sort'], $data['sortorder'], $url),
 		make_sorting_header(_x('Name', 'user first name'), 'name', $data['sort'], $data['sortorder'], $url),
-		make_sorting_header(_('Surname'), 'surname', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('Last name'), 'surname', $data['sort'], $data['sortorder'], $url),
 		make_sorting_header(_('User role'), 'role_name', $data['sort'], $data['sortorder'], $url),
 		_('Groups'),
 		_('Is online?'),
@@ -164,7 +165,7 @@ foreach ($data['users'] as $user) {
 			$users_groups[] = ', ';
 		}
 
-		$group = $data['allowed_ui_user_grpups']
+		$group = $data['allowed_ui_user_groups']
 			? (new CLink($user_group['name'], (new CUrl('zabbix.php'))
 				->setArgument('action', 'usergroup.edit')
 				->setArgument('usrgrpid', $user_group['usrgrpid'])
@@ -199,7 +200,7 @@ foreach ($data['users'] as $user) {
 		->setArgument('userid', $userid)
 	);
 
-	if (!CRoleHelper::checkAccess(CRoleHelper::API_ACCESS, $user['roleid'])) {
+	if (!CRoleHelper::checkAccess('api.access', $user['roleid'])) {
 		$api_access = (new CSpan(_('Disabled')))->addClass(ZBX_STYLE_RED);
 	}
 	else {
@@ -208,7 +209,7 @@ foreach ($data['users'] as $user) {
 
 		if ($api_methods) {
 			$hint_api_methods = [];
-			$status_class = CRoleHelper::checkAccess(CRoleHelper::API_MODE, $user['roleid'])
+			$status_class = CRoleHelper::checkAccess('api.mode', $user['roleid'])
 				? ZBX_STYLE_STATUS_GREEN
 				: ZBX_STYLE_STATUS_GREY;
 
@@ -252,6 +253,6 @@ $form->addItem([
 ]);
 
 // Append form to widget.
-$widget
+$html_page
 	->addItem($form)
 	->show();

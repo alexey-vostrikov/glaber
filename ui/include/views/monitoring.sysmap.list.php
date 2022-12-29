@@ -23,23 +23,34 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Maps'))
-	->setControls((new CTag('nav', true,
-		(new CForm('get'))
-			->cleanItems()
-			->addItem((new CList())
-				->addItem((new CSubmit('form', _('Create map')))->setEnabled($data['allowed_edit']))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_SYSMAP_LIST))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(
+					(new CForm('get'))
+						->cleanItems()
+						->addItem(
+							(new CSubmit('form', _('Create map')))->setEnabled($data['allowed_edit'])
+						)
+				)
 				->addItem(
 					(new CButton('form', _('Import')))
-						->onClick('return PopUp("popup.import", {rules_preset: "map"}, null, this);')
+						->onClick(
+							'return PopUp("popup.import", {rules_preset: "map"},
+								{dialogue_class: "modal-popup-generic"}
+							);'
+						)
 						->setEnabled($data['allowed_edit'])
 						->removeId()
 				)
-		)))->setAttribute('aria-label', _('Content controls'))
+		))->setAttribute('aria-label', _('Content controls'))
 	)
 	->addItem(
-		(new CFilter(new CUrl('sysmaps.php')))
+		(new CFilter())
+			->setResetUrl(new CUrl('sysmaps.php'))
 			->setProfile($data['profileIdx'])
 			->setActiveTab($data['active_tab'])
 			->addFilterTab(_('Filter'), [
@@ -112,7 +123,6 @@ $sysmapForm->addItem([
 	])
 ]);
 
-// append form to widget
-$widget->addItem($sysmapForm);
-
-$widget->show();
+$html_page
+	->addItem($sysmapForm)
+	->show();

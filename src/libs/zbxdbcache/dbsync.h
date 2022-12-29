@@ -20,7 +20,8 @@
 #ifndef ZABBIX_DBSYNC_H
 #define ZABBIX_DBSYNC_H
 
-#include "common.h"
+#include "zbxcommon.h"
+#include "dbconfig.h"
 
 /* no changes */
 #define ZBX_DBSYNC_ROW_NONE	0
@@ -38,7 +39,7 @@
 #define ZBX_DBSYNC_UPDATE_TRIGGER_DEPENDENCY	__UINT64_C(0x0010)
 #define ZBX_DBSYNC_UPDATE_HOST_GROUPS		__UINT64_C(0x0020)
 #define ZBX_DBSYNC_UPDATE_MAINTENANCE_GROUPS	__UINT64_C(0x0040)
-
+#define ZBX_DBSYNC_UPDATE_MACROS		__UINT64_C(0x0080)
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 #	define ZBX_HOST_TLS_OFFSET	4
@@ -50,8 +51,6 @@
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_dbsync_preproc_row_func_t                                    *
- *                                                                            *
  * Purpose: applies necessary preprocessing before row is compared/used       *
  *                                                                            *
  * Parameter: row - [IN] the row to preprocess                                *
@@ -60,7 +59,6 @@
  *                                                                            *
  * Comments: The row preprocessing can be used to expand user macros in       *
  *           some columns.                                                    *
- *                                                                            *
  *                                                                            *
  ******************************************************************************/
 typedef char **(*zbx_dbsync_preproc_row_func_t)(char **row);
@@ -110,8 +108,11 @@ struct zbx_dbsync
 	zbx_uint64_t	remove_num;
 };
 
-void	zbx_dbsync_init_env(ZBX_DC_CONFIG *cache);
-void	zbx_dbsync_free_env(void);
+void	zbx_dbsync_env_init(ZBX_DC_CONFIG *cache);
+int	zbx_dbsync_env_prepare(unsigned char mode);
+void	zbx_dbsync_env_flush_changelog(void);
+void	zbx_dbsync_env_clear(void);
+int	zbx_dbsync_env_changelog_num(void);
 
 void	zbx_dbsync_init(zbx_dbsync_t *sync, unsigned char mode);
 void	zbx_dbsync_clear(zbx_dbsync_t *sync);
@@ -119,17 +120,19 @@ int	zbx_dbsync_next(zbx_dbsync_t *sync, zbx_uint64_t *rowid, char ***row, unsign
 
 int	zbx_dbsync_compare_config(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_autoreg_psk(zbx_dbsync_t *sync);
+int	zbx_dbsync_compare_autoreg_host(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_inventory(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_templates(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_global_macros(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_macros(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_interfaces(zbx_dbsync_t *sync);
+int	zbx_dbsync_compare_item_discovery(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_items(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_template_items(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_prototype_items(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync);
-int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync, mem_funcs_t *memf, obj_index_t *idx_ptr);
+int	zbx_dbsync_compare_trigger_dependency(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_functions(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_expressions(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_actions(zbx_dbsync_t *sync);
@@ -150,6 +153,15 @@ int	zbx_dbsync_compare_maintenance_periods(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_maintenance_groups(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_maintenance_hosts(zbx_dbsync_t *sync);
 int	zbx_dbsync_compare_host_group_hosts(zbx_dbsync_t *sync);
-int glb_clean_deleted_items();
+
+int	zbx_dbsync_prepare_drules(zbx_dbsync_t *sync);
+int	zbx_dbsync_prepare_dchecks(zbx_dbsync_t *sync);
+
+int	zbx_dbsync_prepare_httptests(zbx_dbsync_t *sync);
+int	zbx_dbsync_prepare_httptest_fields(zbx_dbsync_t *sync);
+int	zbx_dbsync_prepare_httpsteps(zbx_dbsync_t *sync);
+int	zbx_dbsync_prepare_httpstep_fields(zbx_dbsync_t *sync);
+void	zbx_dbsync_clear_user_macros(void);
+
 
 #endif /* BUILD_SRC_LIBS_ZBXDBCACHE_DBSYNC_H_ */

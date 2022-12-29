@@ -20,10 +20,8 @@
 #ifndef ZABBIX_PREPROC_H
 #define ZABBIX_PREPROC_H
 
-#include "common.h"
 #include "module.h"
 #include "dbcache.h"
-#include "zbxvariant.h"
 
 /* preprocessing step execution result */
 typedef struct
@@ -45,7 +43,7 @@ zbx_preproc_item_stats_t;
 /* the following functions are implemented differently for server and proxy */
 
 void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error);
+		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, const char *error);
 void	zbx_preprocessor_flush(void);
 zbx_uint64_t	zbx_preprocessor_get_queue_size(void);
 
@@ -67,5 +65,5 @@ void glb_fast_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, un
 		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error, DC_ITEM *item, zbx_hashset_t *history_cache, int poller_type);
  
 void glb_preprocessing_init();
-void preproc_item_clear(zbx_preproc_item_t *item);
+//void preproc_item_clear(zbx_preproc_item_t *item);
 #endif /* ZABBIX_PREPROC_H */

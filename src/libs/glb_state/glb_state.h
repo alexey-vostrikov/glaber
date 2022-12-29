@@ -54,7 +54,7 @@ int glb_state_init();
 
 int glb_state_get_statistics(glb_state_stats_t *stats);
 
-int glb_state_get_mem_stats(zbx_mem_stats_t *mem_stats);
+int glb_state_get_mem_stats(zbx_shmem_stats_t *mem_stats);
 int glb_state_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
 
 int glb_state_housekeep();

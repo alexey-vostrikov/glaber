@@ -17,29 +17,28 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "zbxregexp.h"
-#include "log.h"
-#include "zbxembed.h"
-#include "zbxprometheus.h"
-
-/* LIBXML2 is used */
-#ifdef HAVE_LIBXML2
-#	include <libxml/parser.h>
-#	include <libxml/tree.h>
-#	include <libxml/xpath.h>
-#endif
-
-#include "preproc_history.h"
-
 #include "item_preproc.h"
 #include "json_discovery.h"
 #include "zbxjson.h"
 
-extern zbx_es_t	es_engine;
+#include "../db_lengths.h"
+#include "zbxregexp.h"
+#include "log.h"
+#include "zbxembed.h"
+#include "zbxprometheus.h"
+#include "zbxsysinfo.h"
 
+#include "zbxxml.h"
+#ifdef HAVE_LIBXML2
+#include <libxml/xpath.h>
+#endif
+
+#include "zbxnum.h"
+
+#include "preproc_history.h"
+
+extern zbx_es_t es_engine;
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_numeric_type_hint                                   *
  *                                                                            *
  * Purpose: returns numeric type hint based on item value type                *
  *                                                                            *
@@ -48,22 +47,20 @@ extern zbx_es_t	es_engine;
  * Return value: variant numeric type or none                                 *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_numeric_type_hint(unsigned char value_type)
+static int item_preproc_numeric_type_hint(unsigned char value_type)
 {
 	switch (value_type)
 	{
-		case ITEM_VALUE_TYPE_FLOAT:
-			return ZBX_VARIANT_DBL;
-		case ITEM_VALUE_TYPE_UINT64:
-			return ZBX_VARIANT_UI64;
-		default:
-			return ZBX_VARIANT_NONE;
+	case ITEM_VALUE_TYPE_FLOAT:
+		return ZBX_VARIANT_DBL;
+	case ITEM_VALUE_TYPE_UINT64:
+		return ZBX_VARIANT_UI64;
+	default:
+		return ZBX_VARIANT_NONE;
 	}
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_convert_value                                       *
  *                                                                            *
  * Purpose: convert variant value to the requested type                       *
  *                                                                            *
@@ -75,7 +72,7 @@ static int	item_preproc_numeric_type_hint(unsigned char value_type)
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_convert_value(zbx_variant_t *value, unsigned char type, char **errmsg)
+static int item_preproc_convert_value(zbx_variant_t *value, unsigned char type, char **errmsg)
 {
 	if (FAIL == zbx_variant_convert(value, type))
 	{
@@ -88,8 +85,6 @@ static int	item_preproc_convert_value(zbx_variant_t *value, unsigned char type, 
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_item_preproc_convert_value_to_numeric                        *
- *                                                                            *
  * Purpose: converts variant value to numeric                                 *
  *                                                                            *
  * Parameters: value_num  - [OUT] the converted value                         *
@@ -101,23 +96,23 @@ static int	item_preproc_convert_value(zbx_variant_t *value, unsigned char type, 
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-int	zbx_item_preproc_convert_value_to_numeric(zbx_variant_t *value_num, const zbx_variant_t *value,
-		unsigned char value_type, char **errmsg)
+int zbx_item_preproc_convert_value_to_numeric(zbx_variant_t *value_num, const zbx_variant_t *value,
+											  unsigned char value_type, char **errmsg)
 {
-	int	ret, type_hint;
+	int ret, type_hint;
 
 	switch (value->type)
 	{
-		case ZBX_VARIANT_DBL:
-		case ZBX_VARIANT_UI64:
-			zbx_variant_copy(value_num, value);
-			ret = SUCCEED;
-			break;
-		case ZBX_VARIANT_STR:
-			ret = zbx_variant_set_numeric(value_num, value->data.str);
-			break;
-		default:
-			ret = FAIL;
+	case ZBX_VARIANT_DBL:
+	case ZBX_VARIANT_UI64:
+		zbx_variant_copy(value_num, value);
+		ret = SUCCEED;
+		break;
+	case ZBX_VARIANT_STR:
+		ret = zbx_variant_set_numeric(value_num, value->data.str);
+		break;
+	default:
+		ret = FAIL;
 	}
 
 	if (FAIL == ret)
@@ -134,8 +129,6 @@ int	zbx_item_preproc_convert_value_to_numeric(zbx_variant_t *value_num, const zb
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_multiplier_variant                                  *
- *                                                                            *
  * Purpose: execute custom multiplier preprocessing operation on variant      *
  *          value type                                                        *
  *                                                                            *
@@ -148,32 +141,32 @@ int	zbx_item_preproc_convert_value_to_numeric(zbx_variant_t *value_num, const zb
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_multiplier_variant(unsigned char value_type, zbx_variant_t *value, const char *params,
-		char **errmsg)
+static int item_preproc_multiplier_variant(unsigned char value_type, zbx_variant_t *value, const char *params,
+										   char **errmsg)
 {
-	zbx_uint64_t	multiplier_ui64, value_ui64;
-	double		value_dbl;
-	zbx_variant_t	value_num;
+	zbx_uint64_t multiplier_ui64, value_ui64;
+	double value_dbl;
+	zbx_variant_t value_num;
 
 	if (FAIL == zbx_item_preproc_convert_value_to_numeric(&value_num, value, value_type, errmsg))
 		return FAIL;
 
 	switch (value_num.type)
 	{
-		case ZBX_VARIANT_DBL:
-			value_dbl = value_num.data.dbl * atof(params);
-			zbx_variant_clear(value);
-			zbx_variant_set_dbl(value, value_dbl);
-			break;
-		case ZBX_VARIANT_UI64:
-			if (SUCCEED == is_uint64(params, &multiplier_ui64))
-				value_ui64 = value_num.data.ui64 * multiplier_ui64;
-			else
-				value_ui64 = (double)value_num.data.ui64 * atof(params);
+	case ZBX_VARIANT_DBL:
+		value_dbl = value_num.data.dbl * atof(params);
+		zbx_variant_clear(value);
+		zbx_variant_set_dbl(value, value_dbl);
+		break;
+	case ZBX_VARIANT_UI64:
+		if (SUCCEED == zbx_is_uint64(params, &multiplier_ui64))
+			value_ui64 = value_num.data.ui64 * multiplier_ui64;
+		else
+			value_ui64 = (double)value_num.data.ui64 * atof(params);
 
-			zbx_variant_clear(value);
-			zbx_variant_set_ui64(value, value_ui64);
-			break;
+		zbx_variant_clear(value);
+		zbx_variant_set_ui64(value, value_ui64);
+		break;
 	}
 
 	zbx_variant_clear(&value_num);
@@ -183,22 +176,18 @@ static int	item_preproc_multiplier_variant(unsigned char value_type, zbx_variant
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_validate_notsupport                                 *
- *                                                                            *
  * Purpose: executes during notsupported item preprocessing                   *
  *                                                                            *
  * Return value: FAIL - for further error handling                            *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_validate_notsupport(char **errmsg)
+static int item_preproc_validate_notsupport(char **errmsg)
 {
 	*errmsg = zbx_dsprintf(*errmsg, "item is not supported");
 	return FAIL;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_multiplier                                          *
  *                                                                            *
  * Purpose: execute custom multiplier preprocessing operation                 *
  *                                                                            *
@@ -211,23 +200,23 @@ static int	item_preproc_validate_notsupport(char **errmsg)
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_multiplier(unsigned char value_type, zbx_variant_t *value, const char *params,
-		char **errmsg)
+static int item_preproc_multiplier(unsigned char value_type, zbx_variant_t *value, const char *params,
+								   char **errmsg)
 {
-	char	buffer[MAX_STRING_LEN];
-	char	*err = NULL;
+	char buffer[MAX_STRING_LEN];
+	char *err = NULL;
 
 	zbx_strlcpy(buffer, params, sizeof(buffer));
 
 	zbx_trim_float(buffer);
 
-	if (FAIL == is_double(buffer, NULL))
+	if (FAIL == zbx_is_double(buffer, NULL))
 		err = zbx_dsprintf(NULL, "a numerical value is expected or the value is out of range");
 	else if (SUCCEED == item_preproc_multiplier_variant(value_type, value, buffer, &err))
 		return SUCCEED;
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot apply multiplier \"%s\" to value of type \"%s\": %s",
-			params, zbx_variant_type_desc(value), err);
+						   params, zbx_variant_type_desc(value), err);
 	zbx_free(err);
 
 	return FAIL;
@@ -235,8 +224,6 @@ static int	item_preproc_multiplier(unsigned char value_type, zbx_variant_t *valu
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_delta_float                                         *
- *                                                                            *
  * Purpose: execute delta type preprocessing operation                        *
  *                                                                            *
  * Parameters: value         - [IN/OUT] the value to process                  *
@@ -249,33 +236,31 @@ static int	item_preproc_multiplier(unsigned char value_type, zbx_variant_t *valu
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_delta_float(zbx_variant_t *value, const zbx_timespec_t *ts, unsigned char op_type,
-		const zbx_variant_t *history_value, const zbx_timespec_t *history_ts)
+static int item_preproc_delta_float(zbx_variant_t *value, const zbx_timespec_t *ts, unsigned char op_type,
+									const zbx_variant_t *history_value, const zbx_timespec_t *history_ts)
 {
 	if (0 == history_ts->sec || history_value->data.dbl > value->data.dbl)
 		return FAIL;
 
 	switch (op_type)
 	{
-		case ZBX_PREPROC_DELTA_SPEED:
-			if (0 <= zbx_timespec_compare(history_ts, ts))
-				return FAIL;
+	case ZBX_PREPROC_DELTA_SPEED:
+		if (0 <= zbx_timespec_compare(history_ts, ts))
+			return FAIL;
 
-			value->data.dbl = (value->data.dbl - history_value->data.dbl) /
-					((ts->sec - history_ts->sec) +
-						(double)(ts->ns - history_ts->ns) / 1000000000);
-			break;
-		case ZBX_PREPROC_DELTA_VALUE:
-			value->data.dbl = value->data.dbl - history_value->data.dbl;
-			break;
+		value->data.dbl = (value->data.dbl - history_value->data.dbl) /
+						  ((ts->sec - history_ts->sec) +
+						   (double)(ts->ns - history_ts->ns) / 1000000000);
+		break;
+	case ZBX_PREPROC_DELTA_VALUE:
+		value->data.dbl = value->data.dbl - history_value->data.dbl;
+		break;
 	}
 
 	return SUCCEED;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_delta_uint64                                        *
  *                                                                            *
  * Purpose: execute delta type preprocessing operation                        *
  *                                                                            *
@@ -289,33 +274,31 @@ static int	item_preproc_delta_float(zbx_variant_t *value, const zbx_timespec_t *
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_delta_uint64(zbx_variant_t *value, const zbx_timespec_t *ts, unsigned char op_type,
-		const zbx_variant_t *history_value, const zbx_timespec_t *history_ts)
+static int item_preproc_delta_uint64(zbx_variant_t *value, const zbx_timespec_t *ts, unsigned char op_type,
+									 const zbx_variant_t *history_value, const zbx_timespec_t *history_ts)
 {
 	if (0 == history_ts->sec || history_value->data.ui64 > value->data.ui64)
 		return FAIL;
 
 	switch (op_type)
 	{
-		case ZBX_PREPROC_DELTA_SPEED:
-			if (0 <= zbx_timespec_compare(history_ts, ts))
-				return FAIL;
+	case ZBX_PREPROC_DELTA_SPEED:
+		if (0 <= zbx_timespec_compare(history_ts, ts))
+			return FAIL;
 
-			value->data.ui64 = (value->data.ui64 - history_value->data.ui64) /
-					((ts->sec - history_ts->sec) +
-						(double)(ts->ns - history_ts->ns) / 1000000000);
-			break;
-		case ZBX_PREPROC_DELTA_VALUE:
-			value->data.ui64 = value->data.ui64 - history_value->data.ui64;
-			break;
+		value->data.ui64 = (value->data.ui64 - history_value->data.ui64) /
+						   ((ts->sec - history_ts->sec) +
+							(double)(ts->ns - history_ts->ns) / 1000000000);
+		break;
+	case ZBX_PREPROC_DELTA_VALUE:
+		value->data.ui64 = value->data.ui64 - history_value->data.ui64;
+		break;
 	}
 
 	return SUCCEED;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_delta                                               *
  *                                                                            *
  * Purpose: execute delta type preprocessing operation                        *
  *                                                                            *
@@ -331,10 +314,10 @@ static int	item_preproc_delta_uint64(zbx_variant_t *value, const zbx_timespec_t 
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_delta(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-		unsigned char op_type, zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
+static int item_preproc_delta(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+							  unsigned char op_type, zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
 {
-	zbx_variant_t			value_num;
+	zbx_variant_t value_num;
 
 	if (FAIL == zbx_item_preproc_convert_value_to_numeric(&value_num, value, value_type, errmsg))
 		return FAIL;
@@ -343,7 +326,7 @@ static int	item_preproc_delta(unsigned char value_type, zbx_variant_t *value, co
 
 	if (ZBX_VARIANT_NONE != history_value->type)
 	{
-		int				ret;
+		int ret;
 
 		zbx_variant_copy(value, &value_num);
 
@@ -374,8 +357,6 @@ static int	item_preproc_delta(unsigned char value_type, zbx_variant_t *value, co
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_delta_value                                         *
- *                                                                            *
  * Purpose: execute delta (simple change) preprocessing operation             *
  *                                                                            *
  * Parameters: value_type    - [IN] the item value type                       *
@@ -389,19 +370,20 @@ static int	item_preproc_delta(unsigned char value_type, zbx_variant_t *value, co
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_delta_value(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
+static int item_preproc_delta_value(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+									zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
 	if (SUCCEED == item_preproc_delta(value_type, value, ts, ZBX_PREPROC_DELTA_VALUE, history_value, history_ts,
-			&err))
+									  &err))
 	{
 		return SUCCEED;
 	}
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot calculate delta (simple change) for value of type"
-				" \"%s\": %s", zbx_variant_type_desc(value), err);
+									" \"%s\": %s",
+						   zbx_variant_type_desc(value), err);
 
 	zbx_free(err);
 
@@ -409,8 +391,6 @@ static int	item_preproc_delta_value(unsigned char value_type, zbx_variant_t *val
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_delta_speed                                         *
  *                                                                            *
  * Purpose: execute delta (speed per second) preprocessing operation          *
  *                                                                            *
@@ -425,19 +405,20 @@ static int	item_preproc_delta_value(unsigned char value_type, zbx_variant_t *val
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_delta_speed(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
+static int item_preproc_delta_speed(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+									zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
 	if (SUCCEED == item_preproc_delta(value_type, value, ts, ZBX_PREPROC_DELTA_SPEED, history_value, history_ts,
-			&err))
+									  &err))
 	{
 		return SUCCEED;
 	}
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot calculate delta (speed per second) for value of type"
-				" \"%s\": %s", zbx_variant_type_desc(value), err);
+									" \"%s\": %s",
+						   zbx_variant_type_desc(value), err);
 
 	zbx_free(err);
 
@@ -445,8 +426,6 @@ static int	item_preproc_delta_speed(unsigned char value_type, zbx_variant_t *val
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: unescape_param                                                   *
  *                                                                            *
  * Purpose: copy first n chars from in to out, unescape escaped characters    *
  *          during copying                                                    *
@@ -457,37 +436,37 @@ static int	item_preproc_delta_speed(unsigned char value_type, zbx_variant_t *val
  *             out     - [OUT] the value to process                           *
  *                                                                            *
  ******************************************************************************/
-static void	unescape_param(int op_type, const char *in, int len, char *out)
+static void unescape_param(int op_type, const char *in, int len, char *out)
 {
-	const char	*end = in + len;
+	const char *end = in + len;
 
-	for (;in < end; in++, out++)
+	for (; in < end; in++, out++)
 	{
 		if ('\\' == *in)
 		{
 			switch (*(++in))
 			{
-				case 's':
-					*out = ' ';
+			case 's':
+				*out = ' ';
+				break;
+			case 'r':
+				*out = '\r';
+				break;
+			case 'n':
+				*out = '\n';
+				break;
+			case 't':
+				*out = '\t';
+				break;
+			case '\\':
+				if (ZBX_PREPROC_STR_REPLACE == op_type)
+				{
+					*out = '\\';
 					break;
-				case 'r':
-					*out = '\r';
-					break;
-				case 'n':
-					*out = '\n';
-					break;
-				case 't':
-					*out = '\t';
-					break;
-				case '\\':
-					if (ZBX_PREPROC_STR_REPLACE == op_type)
-					{
-						*out = '\\';
-						break;
-					}
-					ZBX_FALLTHROUGH;
-				default:
-					*out = *(--in);
+				}
+				ZBX_FALLTHROUGH;
+			default:
+				*out = *(--in);
 			}
 		}
 		else
@@ -498,8 +477,6 @@ static void	unescape_param(int op_type, const char *in, int len, char *out)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_trim                                                *
  *                                                                            *
  * Purpose: execute trim type preprocessing operation                         *
  *                                                                            *
@@ -514,7 +491,7 @@ static void	unescape_param(int op_type, const char *in, int len, char *out)
  ******************************************************************************/
 static int item_preproc_trim(zbx_variant_t *value, unsigned char op_type, const char *params, char **errmsg)
 {
-	char	params_raw[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
+	char params_raw[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -532,8 +509,6 @@ static int item_preproc_trim(zbx_variant_t *value, unsigned char op_type, const 
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_rtrim                                               *
- *                                                                            *
  * Purpose: execute right trim preprocessing operation                        *
  *                                                                            *
  * Parameters: value   - [IN/OUT] the value to process                        *
@@ -546,14 +521,14 @@ static int item_preproc_trim(zbx_variant_t *value, unsigned char op_type, const 
  ******************************************************************************/
 static int item_preproc_rtrim(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char	*err = NULL, *characters;
+	char *err = NULL, *characters;
 
 	if (SUCCEED == item_preproc_trim(value, ZBX_PREPROC_RTRIM, params, &err))
 		return SUCCEED;
 
 	characters = zbx_str_printable_dyn(params);
 	*errmsg = zbx_dsprintf(*errmsg, "cannot perform right trim of \"%s\" for value of type \"%s\": %s",
-			characters, zbx_variant_type_desc(value), err);
+						   characters, zbx_variant_type_desc(value), err);
 
 	zbx_free(characters);
 	zbx_free(err);
@@ -562,8 +537,6 @@ static int item_preproc_rtrim(zbx_variant_t *value, const char *params, char **e
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_ltrim                                               *
  *                                                                            *
  * Purpose: execute left trim preprocessing operation                         *
  *                                                                            *
@@ -577,14 +550,14 @@ static int item_preproc_rtrim(zbx_variant_t *value, const char *params, char **e
  ******************************************************************************/
 static int item_preproc_ltrim(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char	*err = NULL, *characters;
+	char *err = NULL, *characters;
 
 	if (SUCCEED == item_preproc_trim(value, ZBX_PREPROC_LTRIM, params, &err))
 		return SUCCEED;
 
 	characters = zbx_str_printable_dyn(params);
 	*errmsg = zbx_dsprintf(*errmsg, "cannot perform left trim of \"%s\" for value of type \"%s\": %s",
-			characters, zbx_variant_type_desc(value), err);
+						   characters, zbx_variant_type_desc(value), err);
 
 	zbx_free(characters);
 	zbx_free(err);
@@ -593,8 +566,6 @@ static int item_preproc_ltrim(zbx_variant_t *value, const char *params, char **e
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_lrtrim                                              *
  *                                                                            *
  * Purpose: execute left and right trim preprocessing operation               *
  *                                                                            *
@@ -608,14 +579,14 @@ static int item_preproc_ltrim(zbx_variant_t *value, const char *params, char **e
  ******************************************************************************/
 static int item_preproc_lrtrim(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char	*err = NULL, *characters;
+	char *err = NULL, *characters;
 
 	if (SUCCEED == item_preproc_trim(value, ZBX_PREPROC_TRIM, params, &err))
 		return SUCCEED;
 
 	characters = zbx_str_printable_dyn(params);
 	*errmsg = zbx_dsprintf(*errmsg, "cannot perform trim of \"%s\" for value of type \"%s\": %s",
-			characters, zbx_variant_type_desc(value), err);
+						   characters, zbx_variant_type_desc(value), err);
 
 	zbx_free(characters);
 	zbx_free(err);
@@ -625,7 +596,113 @@ static int item_preproc_lrtrim(zbx_variant_t *value, const char *params, char **
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_2dec                                                *
+ * Purpose: check if the string is boolean                                    *
+ *                                                                            *
+ * Parameters: str - string to check                                          *
+ *                                                                            *
+ * Return value:  SUCCEED - the string is boolean                             *
+ *                FAIL - otherwise                                            *
+ *                                                                            *
+ ******************************************************************************/
+static int is_boolean(const char *str, zbx_uint64_t *value)
+{
+	double dbl_tmp;
+	int res;
+
+	if (SUCCEED == (res = zbx_is_double(str, &dbl_tmp)))
+		*value = (0 != dbl_tmp);
+	else
+	{
+		char tmp[16];
+
+		zbx_strscpy(tmp, str);
+		zbx_strlower(tmp);
+
+		if (SUCCEED == (res = zbx_str_in_list("true,t,yes,y,on,up,running,enabled,available,ok,master", tmp,
+											  ',')))
+		{
+			*value = 1;
+		}
+		else if (SUCCEED == (res = zbx_str_in_list(
+								 "false,f,no,n,off,down,unused,disabled,unavailable,err,slave", tmp, ',')))
+		{
+			*value = 0;
+		}
+	}
+
+	return res;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: check if the string is unsigned octal                             *
+ *                                                                            *
+ * Parameters: str - string to check                                          *
+ *                                                                            *
+ * Return value:  SUCCEED - the string is unsigned octal                      *
+ *                FAIL - otherwise                                            *
+ *                                                                            *
+ ******************************************************************************/
+static int is_uoct(const char *str)
+{
+	int res = FAIL;
+
+	while (' ' == *str) /* trim left spaces */
+		str++;
+
+	for (; '\0' != *str; str++)
+	{
+		if (*str < '0' || *str > '7')
+			break;
+
+		res = SUCCEED;
+	}
+
+	while (' ' == *str) /* check right spaces */
+		str++;
+
+	if ('\0' != *str)
+		return FAIL;
+
+	return res;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: check if the string is unsigned hexadecimal representation of     *
+ *          data in the form "0-9, a-f or A-F"                                *
+ *                                                                            *
+ * Parameters: str - string to check                                          *
+ *                                                                            *
+ * Return value:  SUCCEED - the string is unsigned hexadecimal                *
+ *                FAIL - otherwise                                            *
+ *                                                                            *
+ ******************************************************************************/
+static int is_uhex(const char *str)
+{
+	int res = FAIL;
+
+	while (' ' == *str) /* trim left spaces */
+		str++;
+
+	for (; '\0' != *str; str++)
+	{
+		if (0 == isxdigit(*str))
+			break;
+
+		res = SUCCEED;
+	}
+
+	while (' ' == *str) /* check right spaces */
+		str++;
+
+	if ('\0' != *str)
+		return FAIL;
+
+	return res;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: execute decimal value conversion operation                        *
  *                                                                            *
@@ -637,9 +714,12 @@ static int item_preproc_lrtrim(zbx_variant_t *value, const char *params, char **
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_2dec(zbx_variant_t *value, unsigned char op_type, char **errmsg)
+static int item_preproc_2dec(zbx_variant_t *value, unsigned char op_type, char **errmsg)
 {
-	zbx_uint64_t	value_ui64;
+#define OCT2UINT64(uint, string) sscanf(string, ZBX_FS_UO64, &uint)
+#define HEX2UINT64(uint, string) sscanf(string, ZBX_FS_UX64, &uint)
+
+	zbx_uint64_t value_ui64;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -649,48 +729,48 @@ static int	item_preproc_2dec(zbx_variant_t *value, unsigned char op_type, char *
 
 	switch (op_type)
 	{
-		case ZBX_PREPROC_BOOL2DEC:
-			if (SUCCEED != is_boolean(value->data.str, &value_ui64))
-			{
-				*errmsg = zbx_strdup(NULL, "invalid value format");
-				return FAIL;
-			}
-			break;
-		case ZBX_PREPROC_OCT2DEC:
-			if (SUCCEED != is_uoct(value->data.str))
-			{
-				*errmsg = zbx_strdup(NULL, "invalid value format");
-				return FAIL;
-			}
-			ZBX_OCT2UINT64(value_ui64, value->data.str);
-			break;
-		case ZBX_PREPROC_HEX2DEC:
-			if (SUCCEED != is_uhex(value->data.str))
-			{
-				if (SUCCEED != is_hex_string(value->data.str))
-				{
-					*errmsg = zbx_strdup(NULL, "invalid value format");
-					return FAIL;
-				}
-
-				zbx_remove_chars(value->data.str, " \n");
-			}
-			ZBX_HEX2UINT64(value_ui64, value->data.str);
-			break;
-		default:
-			*errmsg = zbx_strdup(NULL, "unknown operation type");
+	case ZBX_PREPROC_BOOL2DEC:
+		if (SUCCEED != is_boolean(value->data.str, &value_ui64))
+		{
+			*errmsg = zbx_strdup(NULL, "invalid value format");
 			return FAIL;
+		}
+		break;
+	case ZBX_PREPROC_OCT2DEC:
+		if (SUCCEED != is_uoct(value->data.str))
+		{
+			*errmsg = zbx_strdup(NULL, "invalid value format");
+			return FAIL;
+		}
+		OCT2UINT64(value_ui64, value->data.str);
+		break;
+	case ZBX_PREPROC_HEX2DEC:
+		if (SUCCEED != is_uhex(value->data.str))
+		{
+			if (SUCCEED != zbx_is_hex_string(value->data.str))
+			{
+				*errmsg = zbx_strdup(NULL, "invalid value format");
+				return FAIL;
+			}
+
+			zbx_remove_chars(value->data.str, " \n");
+		}
+		HEX2UINT64(value_ui64, value->data.str);
+		break;
+	default:
+		*errmsg = zbx_strdup(NULL, "unknown operation type");
+		return FAIL;
 	}
 
 	zbx_variant_clear(value);
 	zbx_variant_set_ui64(value, value_ui64);
 
 	return SUCCEED;
+#undef OCT2UINT64
+#undef HEX2UINT64
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_bool2dec                                            *
  *                                                                            *
  * Purpose: execute boolean to decimal value conversion operation             *
  *                                                                            *
@@ -701,15 +781,15 @@ static int	item_preproc_2dec(zbx_variant_t *value, unsigned char op_type, char *
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_bool2dec(zbx_variant_t *value, char **errmsg)
+static int item_preproc_bool2dec(zbx_variant_t *value, char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
 	if (SUCCEED == item_preproc_2dec(value, ZBX_PREPROC_BOOL2DEC, &err))
 		return SUCCEED;
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot convert value of type \"%s\" from boolean format: %s",
-			zbx_variant_type_desc(value), err);
+						   zbx_variant_type_desc(value), err);
 
 	zbx_free(err);
 
@@ -717,8 +797,6 @@ static int	item_preproc_bool2dec(zbx_variant_t *value, char **errmsg)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_oct2dec                                             *
  *                                                                            *
  * Purpose: execute octal to decimal value conversion operation               *
  *                                                                            *
@@ -729,15 +807,15 @@ static int	item_preproc_bool2dec(zbx_variant_t *value, char **errmsg)
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_oct2dec(zbx_variant_t *value, char **errmsg)
+static int item_preproc_oct2dec(zbx_variant_t *value, char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
 	if (SUCCEED == item_preproc_2dec(value, ZBX_PREPROC_OCT2DEC, &err))
 		return SUCCEED;
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot convert value of type \"%s\" from octal format: %s",
-			zbx_variant_type_desc(value), err);
+						   zbx_variant_type_desc(value), err);
 
 	zbx_free(err);
 
@@ -745,8 +823,6 @@ static int	item_preproc_oct2dec(zbx_variant_t *value, char **errmsg)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_hex2dec                                             *
  *                                                                            *
  * Purpose: execute hexadecimal to decimal value conversion operation         *
  *                                                                            *
@@ -757,15 +833,15 @@ static int	item_preproc_oct2dec(zbx_variant_t *value, char **errmsg)
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_hex2dec(zbx_variant_t *value, char **errmsg)
+static int item_preproc_hex2dec(zbx_variant_t *value, char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
 	if (SUCCEED == item_preproc_2dec(value, ZBX_PREPROC_HEX2DEC, &err))
 		return SUCCEED;
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot convert value of type \"%s\" from hexadecimal format: %s",
-			zbx_variant_type_desc(value), err);
+						   zbx_variant_type_desc(value), err);
 
 	zbx_free(err);
 
@@ -773,8 +849,6 @@ static int	item_preproc_hex2dec(zbx_variant_t *value, char **errmsg)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_regsub_op                                           *
  *                                                                            *
  * Purpose: execute regular expression substitution operation                 *
  *                                                                            *
@@ -786,12 +860,12 @@ static int	item_preproc_hex2dec(zbx_variant_t *value, char **errmsg)
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_regsub_op(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_regsub_op(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char		pattern[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
-	char		*output, *new_value = NULL;
-	const char	*regex_error;
-	zbx_regexp_t	*regex = NULL;
+	char pattern[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
+	char *output, *new_value = NULL;
+	const char *regex_error;
+	zbx_regexp_t *regex = NULL;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -806,9 +880,10 @@ static int	item_preproc_regsub_op(zbx_variant_t *value, const char *params, char
 
 	*output++ = '\0';
 
-	if (FAIL == zbx_regexp_compile_ext(pattern, &regex, 0, &regex_error))	/* PCRE_MULTILINE is not used here */
+	if (FAIL == zbx_regexp_compile_ext(pattern, &regex, 0, &regex_error)) /* PCRE_MULTILINE is not used here */
 	{
 		*errmsg = zbx_dsprintf(*errmsg, "invalid regular expression: %s", regex_error);
+		zbx_regexp_err_msg_free(regex_error);
 		return FAIL;
 	}
 
@@ -829,8 +904,6 @@ static int	item_preproc_regsub_op(zbx_variant_t *value, const char *params, char
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_regsub                                              *
- *                                                                            *
  * Purpose: execute regular expression substitution operation                 *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -841,10 +914,10 @@ static int	item_preproc_regsub_op(zbx_variant_t *value, const char *params, char
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_regsub(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_regsub(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char	*err = NULL, *ptr;
-	int	len;
+	char *err = NULL, *ptr;
+	int len;
 
 	if (SUCCEED == item_preproc_regsub_op(value, params, &err))
 		return SUCCEED;
@@ -855,7 +928,7 @@ static int	item_preproc_regsub(zbx_variant_t *value, const char *params, char **
 		len = ptr - params;
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot perform regular expression \"%.*s\" match for value of type \"%s\": %s",
-			len, params, zbx_variant_type_desc(value), err);
+						   len, params, zbx_variant_type_desc(value), err);
 
 	zbx_free(err);
 
@@ -864,11 +937,10 @@ static int	item_preproc_regsub(zbx_variant_t *value, const char *params, char **
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_jsonpath_op                                         *
- *                                                                            *
  * Purpose: execute jsonpath query                                            *
  *                                                                            *
- * Parameters: value  - [IN/OUT] the value to process                         *
+ * Parameters: cache  - [IN] the preprocessing cache                          *
+ *             value  - [IN/OUT] the value to process                         *
  *             params - [IN] the operation parameters                         *
  *             errmsg - [OUT] error message                                   *
  *                                                                            *
@@ -876,18 +948,59 @@ static int	item_preproc_regsub(zbx_variant_t *value, const char *params, char **
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_jsonpath_op(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_jsonpath_op(zbx_preproc_cache_t *cache, zbx_variant_t *value, const char *params,
+									char **errmsg)
 {
-	struct zbx_json_parse	jp;
-	char			*data = NULL;
+	char *data = NULL;
 
-	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
-		return FAIL;
-
-	if (FAIL == zbx_json_open(value->data.str, &jp) || FAIL == zbx_jsonpath_query(&jp, params, &data))
+	if (NULL == cache)
 	{
-		*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
-		return FAIL;
+		zbx_jsonobj_t obj;
+
+		if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+			return FAIL;
+
+		if (FAIL == zbx_jsonobj_open(value->data.str, &obj))
+		{
+			*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
+			return FAIL;
+		}
+
+		if (FAIL == zbx_jsonobj_query(&obj, params, &data))
+		{
+			zbx_jsonobj_clear(&obj);
+			*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
+			return FAIL;
+		}
+
+		zbx_jsonobj_clear(&obj);
+	}
+	else
+	{
+		zbx_jsonobj_t *obj;
+
+		if (NULL == (obj = (zbx_jsonobj_t *)zbx_preproc_cache_get(cache, ZBX_PREPROC_JSONPATH)))
+		{
+			if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+				return FAIL;
+
+			obj = (zbx_jsonobj_t *)zbx_malloc(NULL, sizeof(zbx_jsonobj_t));
+
+			if (SUCCEED != zbx_jsonobj_open(value->data.str, obj))
+			{
+				*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
+				zbx_free(obj);
+				return FAIL;
+			}
+
+			zbx_preproc_cache_put(cache, ZBX_PREPROC_JSONPATH, obj);
+		}
+
+		if (FAIL == zbx_jsonobj_query(obj, params, &data))
+		{
+			*errmsg = zbx_strdup(*errmsg, zbx_json_strerror());
+			return FAIL;
+		}
 	}
 
 	if (NULL == data)
@@ -904,11 +1017,10 @@ static int	item_preproc_jsonpath_op(zbx_variant_t *value, const char *params, ch
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_jsonpath                                            *
- *                                                                            *
  * Purpose: execute jsonpath query                                            *
  *                                                                            *
- * Parameters: value  - [IN/OUT] the value to process                         *
+ * Parameters: cache  - [IN] the preprocessing cache                          *
+ *             value  - [IN/OUT] the value to process                         *
  *             params - [IN] the operation parameters                         *
  *             errmsg - [OUT] error message                                   *
  *                                                                            *
@@ -916,11 +1028,12 @@ static int	item_preproc_jsonpath_op(zbx_variant_t *value, const char *params, ch
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_jsonpath(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_jsonpath(zbx_preproc_cache_t *cache, zbx_variant_t *value, const char *params,
+								 char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
-	if (SUCCEED == item_preproc_jsonpath_op(value, params, &err))
+	if (SUCCEED == item_preproc_jsonpath_op(cache, value, params, &err))
 		return SUCCEED;
 
 	*errmsg = zbx_dsprintf(*errmsg, "cannot extract value from json by path \"%s\": %s", params, err);
@@ -932,8 +1045,6 @@ static int	item_preproc_jsonpath(zbx_variant_t *value, const char *params, char 
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_xpath                                               *
- *                                                                            *
  * Purpose: execute xpath query                                               *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -944,9 +1055,9 @@ static int	item_preproc_jsonpath(zbx_variant_t *value, const char *params, char 
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_xpath(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_xpath(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char	*err = NULL;
+	char *err = NULL;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -962,8 +1073,6 @@ static int	item_preproc_xpath(zbx_variant_t *value, const char *params, char **e
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_validate_range                                      *
- *                                                                            *
  * Purpose: validates value to be within the specified range                  *
  * Parameters: value_type - [IN] the item type                                *
  *             value      - [IN/OUT] the value to process                     *
@@ -974,13 +1083,13 @@ static int	item_preproc_xpath(zbx_variant_t *value, const char *params, char **e
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_validate_range(unsigned char value_type, const zbx_variant_t *value, const char *params,
-		char **errmsg)
+static int item_preproc_validate_range(unsigned char value_type, const zbx_variant_t *value, const char *params,
+									   char **errmsg)
 {
-	zbx_variant_t	value_num;
-	char		min[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *max;
-	zbx_variant_t	range_min, range_max;
-	int		ret = FAIL;
+	zbx_variant_t value_num;
+	char min[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *max;
+	zbx_variant_t range_min, range_max;
+	int ret = FAIL;
 
 	if (FAIL == zbx_item_preproc_convert_value_to_numeric(&value_num, value, value_type, errmsg))
 		return FAIL;
@@ -1010,9 +1119,9 @@ static int	item_preproc_validate_range(unsigned char value_type, const zbx_varia
 	}
 
 	if ((ZBX_VARIANT_NONE != range_min.type && 0 > zbx_variant_compare(&value_num, &range_min)) ||
-			(ZBX_VARIANT_NONE != range_max.type && 0 > zbx_variant_compare(&range_max, &value_num)))
+		(ZBX_VARIANT_NONE != range_max.type && 0 > zbx_variant_compare(&range_max, &value_num)))
 	{
-		size_t	errmsg_alloc = 0, errmsg_offset = 0;
+		size_t errmsg_alloc = 0, errmsg_offset = 0;
 
 		zbx_free(*errmsg);
 
@@ -1040,8 +1149,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_validate_regex                                      *
- *                                                                            *
  * Purpose: validates value to match regular expression                       *
  * Parameters: value_type - [IN] the item type                                *
  *             value      - [IN/OUT] the value to process                     *
@@ -1052,13 +1159,13 @@ out:
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	  item_preproc_validate_regex(const zbx_variant_t *value, const char *params, char **error)
+static int item_preproc_validate_regex(const zbx_variant_t *value, const char *params, char **error)
 {
-	zbx_variant_t	value_str;
-	int		ret = FAIL;
-	zbx_regexp_t	*regex;
-	const char	*errptr = NULL;
-	char		*errmsg;
+	zbx_variant_t value_str;
+	int ret = FAIL;
+	zbx_regexp_t *regex;
+	const char *errptr = NULL;
+	char *errmsg;
 
 	zbx_variant_copy(&value_str, value);
 
@@ -1071,6 +1178,7 @@ static int	  item_preproc_validate_regex(const zbx_variant_t *value, const char 
 	if (FAIL == zbx_regexp_compile(params, &regex, &errptr))
 	{
 		errmsg = zbx_dsprintf(NULL, "invalid regular expression pattern: %s", errptr);
+		zbx_regexp_err_msg_free(errptr);
 		goto out;
 	}
 
@@ -1086,8 +1194,8 @@ out:
 	if (FAIL == ret)
 	{
 		*error = zbx_dsprintf(*error, "cannot perform regular expression \"%s\" validation"
-				" for value of type \"%s\": %s",
-				params, zbx_variant_type_desc(value), errmsg);
+									  " for value of type \"%s\": %s",
+							  params, zbx_variant_type_desc(value), errmsg);
 		zbx_free(errmsg);
 	}
 
@@ -1095,8 +1203,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_validate_not_regex                                  *
  *                                                                            *
  * Purpose: validates value to not match regular expression                   *
  * Parameters: value_type - [IN] the item type                                *
@@ -1108,13 +1214,13 @@ out:
  *               FAIL - otherwise, errmsg contains the error message          *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_validate_not_regex(const zbx_variant_t *value, const char *params, char **error)
+static int item_preproc_validate_not_regex(const zbx_variant_t *value, const char *params, char **error)
 {
-	zbx_variant_t	value_str;
-	int		ret = FAIL;
-	zbx_regexp_t	*regex;
-	const char	*errptr = NULL;
-	char		*errmsg;
+	zbx_variant_t value_str;
+	int ret = FAIL;
+	zbx_regexp_t *regex;
+	const char *errptr = NULL;
+	char *errmsg;
 
 	zbx_variant_copy(&value_str, value);
 
@@ -1127,6 +1233,7 @@ static int	item_preproc_validate_not_regex(const zbx_variant_t *value, const cha
 	if (FAIL == zbx_regexp_compile(params, &regex, &errptr))
 	{
 		errmsg = zbx_dsprintf(NULL, "invalid regular expression pattern: %s", errptr);
+		zbx_regexp_err_msg_free(errptr);
 		goto out;
 	}
 
@@ -1144,8 +1251,8 @@ out:
 	if (FAIL == ret)
 	{
 		*error = zbx_dsprintf(*error, "cannot perform regular expression \"%s\" validation"
-				" for value of type \"%s\": %s",
-				params, zbx_variant_type_desc(value), errmsg);
+									  " for value of type \"%s\": %s",
+							  params, zbx_variant_type_desc(value), errmsg);
 		zbx_free(errmsg);
 	}
 
@@ -1153,8 +1260,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_get_error_from_json                                 *
  *                                                                            *
  * Purpose: checks for presence of error field in json data                   *
  *                                                                            *
@@ -1171,11 +1276,11 @@ out:
  *           error, while returning SUCCEED.                                  *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_get_error_from_json(const zbx_variant_t *value, const char *params, char **error)
+static int item_preproc_get_error_from_json(const zbx_variant_t *value, const char *params, char **error)
 {
-	zbx_variant_t		value_str;
-	int			ret;
-	struct zbx_json_parse	jp;
+	zbx_variant_t value_str;
+	int ret;
+	struct zbx_json_parse jp;
 
 	zbx_variant_copy(&value_str, value);
 
@@ -1210,8 +1315,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_get_error_from_xml                                  *
- *                                                                            *
  * Purpose: checks for presence of error field in XML data                    *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -1227,7 +1330,7 @@ out:
  *           error, while returning SUCCEED.                                  *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_get_error_from_xml(const zbx_variant_t *value, const char *params, char **error)
+static int item_preproc_get_error_from_xml(const zbx_variant_t *value, const char *params, char **error)
 {
 #ifndef HAVE_LIBXML2
 	ZBX_UNUSED(value);
@@ -1236,13 +1339,13 @@ static int	item_preproc_get_error_from_xml(const zbx_variant_t *value, const cha
 	*error = zbx_dsprintf(*error, "Zabbix was compiled without libxml2 support");
 	return FAIL;
 #else
-	zbx_variant_t		value_str;
-	int			ret = SUCCEED, i;
-	xmlDoc			*doc = NULL;
-	xmlXPathContext		*xpathCtx = NULL;
-	xmlXPathObject		*xpathObj = NULL;
-	xmlErrorPtr		pErr;
-	xmlBufferPtr		xmlBufferLocal;
+	zbx_variant_t value_str;
+	int ret = SUCCEED, i;
+	xmlDoc *doc = NULL;
+	xmlXPathContext *xpathCtx = NULL;
+	xmlXPathObject *xpathObj = NULL;
+	xmlErrorPtr pErr;
+	xmlBufferPtr xmlBufferLocal;
 
 	zbx_variant_copy(&value_str, value);
 
@@ -1267,30 +1370,30 @@ static int	item_preproc_get_error_from_xml(const zbx_variant_t *value, const cha
 
 	switch (xpathObj->type)
 	{
-		case XPATH_NODESET:
-			if (0 != xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
-				goto out;
+	case XPATH_NODESET:
+		if (0 != xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
+			goto out;
 
-			xmlBufferLocal = xmlBufferCreate();
+		xmlBufferLocal = xmlBufferCreate();
 
-			for (i = 0; i < xpathObj->nodesetval->nodeNr; i++)
-				xmlNodeDump(xmlBufferLocal, doc, xpathObj->nodesetval->nodeTab[i], 0, 0);
+		for (i = 0; i < xpathObj->nodesetval->nodeNr; i++)
+			xmlNodeDump(xmlBufferLocal, doc, xpathObj->nodesetval->nodeTab[i], 0, 0);
 
-			*error = zbx_strdup(*error, (const char *)xmlBufferLocal->content);
-			xmlBufferFree(xmlBufferLocal);
-			break;
-		case XPATH_STRING:
-			*error = zbx_strdup(*error, (const char *)xpathObj->stringval);
-			break;
-		case XPATH_BOOLEAN:
-			*error = zbx_dsprintf(*error, "%d", xpathObj->boolval);
-			break;
-		case XPATH_NUMBER:
-			*error = zbx_dsprintf(*error, ZBX_FS_DBL, xpathObj->floatval);
-			break;
-		default:
-			*error = zbx_strdup(*error, "Unknown error");
-			break;
+		*error = zbx_strdup(*error, (const char *)xmlBufferLocal->content);
+		xmlBufferFree(xmlBufferLocal);
+		break;
+	case XPATH_STRING:
+		*error = zbx_strdup(*error, (const char *)xpathObj->stringval);
+		break;
+	case XPATH_BOOLEAN:
+		*error = zbx_dsprintf(*error, "%d", xpathObj->boolval);
+		break;
+	case XPATH_NUMBER:
+		*error = zbx_dsprintf(*error, ZBX_FS_DBL, xpathObj->floatval);
+		break;
+	default:
+		*error = zbx_strdup(*error, "Unknown error");
+		break;
 	}
 
 	zbx_lrtrim(*error, ZBX_WHITESPACE);
@@ -1316,8 +1419,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_get_error_from_regex                                *
- *                                                                            *
  * Purpose: checks for presence of error pattern matching regular expression  *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -1333,11 +1434,11 @@ out:
  *           error, while returning SUCCEED.                                  *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_get_error_from_regex(const zbx_variant_t *value, const char *params, char **error)
+static int item_preproc_get_error_from_regex(const zbx_variant_t *value, const char *params, char **error)
 {
-	zbx_variant_t	value_str;
-	int		ret;
-	char		pattern[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *output;
+	zbx_variant_t value_str;
+	int ret;
+	char pattern[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *output;
 
 	zbx_variant_copy(&value_str, value);
 
@@ -1380,8 +1481,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_throttle_value                                      *
- *                                                                            *
  * Purpose: throttles value by suppressing identical values                   *
  *                                                                            *
  * Parameters: value         - [IN/OUT] the value to process                  *
@@ -1394,10 +1493,10 @@ out:
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_throttle_value(zbx_variant_t *value, const zbx_timespec_t *ts,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts)
+static int item_preproc_throttle_value(zbx_variant_t *value, const zbx_timespec_t *ts,
+									   zbx_variant_t *history_value, zbx_timespec_t *history_ts)
 {
-	int	ret;
+	int ret;
 
 	ret = zbx_variant_compare(value, history_value);
 
@@ -1412,21 +1511,27 @@ static int	item_preproc_throttle_value(zbx_variant_t *value, const zbx_timespec_
 	return SUCCEED;
 }
 
-#define GLB_FUNC_UNKNOWN	0
-#define GLB_FUNC_SUM	1
-#define GLB_FUNC_COUNT	2
-#define GLB_FUNC_AVG	3
-#define GLB_FUNC_MAX	4
-#define GLB_FUNC_MIN	5
+#define GLB_FUNC_UNKNOWN 0
+#define GLB_FUNC_SUM 1
+#define GLB_FUNC_COUNT 2
+#define GLB_FUNC_AVG 3
+#define GLB_FUNC_MAX 4
+#define GLB_FUNC_MIN 5
 
-static char get_agg_func(const char *func_name) {
+static char get_agg_func(const char *func_name)
+{
 
-	if (0 == strcmp(func_name,"sum")) return GLB_FUNC_SUM;
-	if (0 == strcmp(func_name,"count")) return GLB_FUNC_COUNT;
-	if (0 == strcmp(func_name,"avg")) return GLB_FUNC_AVG;
-	if (0 == strcmp(func_name,"max")) return GLB_FUNC_MAX;
-	if (0 == strcmp(func_name,"min")) return GLB_FUNC_MIN;
-	
+	if (0 == strcmp(func_name, "sum"))
+		return GLB_FUNC_SUM;
+	if (0 == strcmp(func_name, "count"))
+		return GLB_FUNC_COUNT;
+	if (0 == strcmp(func_name, "avg"))
+		return GLB_FUNC_AVG;
+	if (0 == strcmp(func_name, "max"))
+		return GLB_FUNC_MAX;
+	if (0 == strcmp(func_name, "min"))
+		return GLB_FUNC_MIN;
+
 	return GLB_FUNC_UNKNOWN;
 }
 /******************************************************************************
@@ -1446,22 +1551,23 @@ static char get_agg_func(const char *func_name) {
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+static int item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
+										   zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
 {
-	int	ret, timeout, period = 0, len_time, len_aggf;
+	int ret, timeout, period = 0, len_time, len_aggf;
 	char *ptr;
 	const char *time, *aggf_name;
 	char func = GLB_FUNC_UNKNOWN;
-	
-	//one special case, if previous step fails, it expected to return string "NaN"
-	//in such just discard the value
-	if (ZBX_VARIANT_STR == value->type && 0 == strcmp(value->data.str,"NaN")) {
+
+	// one special case, if previous step fails, it expected to return string "NaN"
+	// in such just discard the value
+	if (ZBX_VARIANT_STR == value->type && 0 == strcmp(value->data.str, "NaN"))
+	{
 		zbx_variant_clear(value);
 		return SUCCEED;
 	}
-	
-	//there are two params - aggregation time and aggregation function
+
+	// there are two params - aggregation time and aggregation function
 	time = params;
 
 	if (NULL == (ptr = strchr(params, '\n')))
@@ -1479,170 +1585,201 @@ static int	item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 
 	aggf_name = ptr + 1;
 	len_aggf = strlen(ptr + 1);
-	
+
 	func = get_agg_func(aggf_name);
-	
-	if (GLB_FUNC_UNKNOWN == func) {
+
+	if (GLB_FUNC_UNKNOWN == func)
+	{
 		*errmsg = zbx_dsprintf(*errmsg, "invalid function name: %s", aggf_name);
 		return FAIL;
 	}
 
-	if (FAIL == is_time_suffix(time, &timeout, len_time))
+	if (FAIL == zbx_is_time_suffix(time, &timeout, len_time))
 	{
 		*errmsg = zbx_dsprintf(*errmsg, "invalid time period: %s", params);
 		zbx_variant_clear(history_value);
 		return FAIL;
 	}
-	
-	//all type of metrics except count require numerical values, converting
-	if ( GLB_FUNC_COUNT != func && ZBX_VARIANT_DBL != value->type && ZBX_VARIANT_UI64 != value->type) {
-		
-		if (ZBX_VARIANT_STR != value->type ) {
+
+	// all type of metrics except count require numerical values, converting
+	if (GLB_FUNC_COUNT != func && ZBX_VARIANT_DBL != value->type && ZBX_VARIANT_UI64 != value->type)
+	{
+
+		if (ZBX_VARIANT_STR != value->type)
+		{
 			zbx_variant_clear(history_value);
 			zbx_variant_clear(value);
 			return FAIL;
 		}
-	
+
 		errno = 0;
 		char *p = value->data.str;
 
-
-		zbx_variant_convert(value,ZBX_VARIANT_DBL);
-
+		zbx_variant_convert(value, ZBX_VARIANT_DBL);
 	}
-			
-	//history value hasn't been init - means we're starting
-	if (ZBX_VARIANT_NONE == history_value->type) {
-		if ( GLB_FUNC_COUNT == func ) {
-			zbx_variant_set_ui64(history_value,0);
-		} else {
-			zbx_variant_set_dbl(history_value,value->data.dbl);
+
+	// history value hasn't been init - means we're starting
+	if (ZBX_VARIANT_NONE == history_value->type)
+	{
+		if (GLB_FUNC_COUNT == func)
+		{
+			zbx_variant_set_ui64(history_value, 0);
 		}
-		
+		else
+		{
+			zbx_variant_set_dbl(history_value, value->data.dbl);
+		}
+
 		history_ts->ns = 0;
 		history_ts->sec = ts->sec;
 	}
 
-
-	if ( GLB_FUNC_MIN == func ) {
-		zbx_variant_set_dbl(history_value, MIN(history_value->data.dbl,value->data.dbl));
-	} else if ( GLB_FUNC_MAX == func ) {
-		zbx_variant_set_dbl(history_value,MAX(history_value->data.dbl,value->data.dbl));
-	} else if ( GLB_FUNC_AVG == func || GLB_FUNC_SUM ==func ) {
-		if (0 != history_ts->ns) {
+	if (GLB_FUNC_MIN == func)
+	{
+		zbx_variant_set_dbl(history_value, MIN(history_value->data.dbl, value->data.dbl));
+	}
+	else if (GLB_FUNC_MAX == func)
+	{
+		zbx_variant_set_dbl(history_value, MAX(history_value->data.dbl, value->data.dbl));
+	}
+	else if (GLB_FUNC_AVG == func || GLB_FUNC_SUM == func)
+	{
+		if (0 != history_ts->ns)
+		{
 			zbx_variant_set_dbl(history_value, history_value->data.dbl + value->data.dbl);
 		}
-		
-	} else if ( GLB_FUNC_COUNT == func ) {
-		//noop here
-	} else {
+	}
+	else if (GLB_FUNC_COUNT == func)
+	{
+		// noop here
+	}
+	else
+	{
 		zabbix_log(LOG_LEVEL_WARNING, "Unknown function %d for aggregation", func);
 		THIS_SHOULD_NEVER_HAPPEN;
 	}
 	history_ts->ns++;
-	zbx_variant_clear(value); 
-	
+	zbx_variant_clear(value);
 
-	if (history_ts->sec + timeout < ts->sec ) {
-		
-		if ( GLB_FUNC_MIN == func ||  GLB_FUNC_MAX == func || GLB_FUNC_SUM == func ) {
-			zbx_variant_copy(value,history_value);
+	if (history_ts->sec + timeout < ts->sec)
+	{
 
-		} else if ( GLB_FUNC_AVG == func ) {
-				zbx_variant_set_dbl(value,history_value->data.dbl/history_ts->ns);
-
-		} else if ( GLB_FUNC_COUNT == func ) {
-
-			zbx_variant_set_ui64(value,history_ts->ns);
+		if (GLB_FUNC_MIN == func || GLB_FUNC_MAX == func || GLB_FUNC_SUM == func)
+		{
+			zbx_variant_copy(value, history_value);
 		}
-	
-		zbx_variant_clear(history_value);
-	} else {
-		zabbix_log(LOG_LEVEL_DEBUG,"Result is not ready to be emmited, %d seconds left, %d values collected", history_ts->sec + timeout - ts->sec , history_ts->ns);	
+		else if (GLB_FUNC_AVG == func)
+		{
+			zbx_variant_set_dbl(value, history_value->data.dbl / history_ts->ns);
+		}
+		else if (GLB_FUNC_COUNT == func)
+		{
 
+			zbx_variant_set_ui64(value, history_ts->ns);
+		}
+
+		zbx_variant_clear(history_value);
+	}
+	else
+	{
+		zabbix_log(LOG_LEVEL_DEBUG, "Result is not ready to be emmited, %d seconds left, %d values collected", history_ts->sec + timeout - ts->sec, history_ts->ns);
 	}
 
 	return SUCCEED;
 }
 
-static char *get_param_name_from_json(char *json, char *host_param) {
-	
-	static char hostname[MAX_ZBX_HOSTNAME_LEN];
-	static char hostfield[MAX_ZBX_HOSTNAME_LEN];
+static char *get_param_name_from_json(char *json, char *host_param)
+{
 
-	char* hostname_dyn = NULL;
-	struct zbx_json_parse	jp;
+	static char hostname[ZBX_MAX_HOSTNAME_LEN];
+	static char hostfield[ZBX_MAX_HOSTNAME_LEN];
+
+	char *hostname_dyn = NULL;
+	struct zbx_json_parse jp;
 	zbx_json_type_t type;
 
 	if (NULL == host_param || NULL == json)
 		return NULL;
-	
-	if (FAIL == zbx_json_open(json, &jp)) 
-		return NULL; 
-	
+
+	if (FAIL == zbx_json_open(json, &jp))
+		return NULL;
+
 	char *f_start, *f_end;
 
-	if (NULL != (f_start = strchr(host_param,'{')) && NULL !=(f_end = strchr(f_start, '}'))) {
+	if (NULL != (f_start = strchr(host_param, '{')) && NULL != (f_end = strchr(f_start, '}')))
+	{
 		size_t alloc = 0;
-		char hostvalue[MAX_ZBX_HOSTNAME_LEN];
-		
+		char hostvalue[ZBX_MAX_HOSTNAME_LEN];
+
 		if (f_start + 1 == f_end)
 			return NULL;
-		
-		zbx_strlcpy(hostfield, f_start + 1, f_end -f_start);
-			
-		if (f_start > host_param) {
-			zbx_strlcpy(hostname, host_param, f_start - host_param + 1 );
+
+		zbx_strlcpy(hostfield, f_start + 1, f_end - f_start);
+
+		if (f_start > host_param)
+		{
+			zbx_strlcpy(hostname, host_param, f_start - host_param + 1);
 			alloc = f_start - host_param;
 		}
-	
-		if (hostfield[0] == '$') {
 
-			if (SUCCEED == zbx_jsonpath_query(&jp, hostfield, &hostname_dyn)) {
-				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN,"%s", hostname_dyn);
+		if (hostfield[0] == '$')
+		{
+
+			if (SUCCEED == zbx_jsonpath_query(&jp, hostfield, &hostname_dyn))
+			{
+				alloc += zbx_snprintf(hostname + alloc, ZBX_MAX_HOSTNAME_LEN, "%s", hostname_dyn);
 				zbx_free(hostname_dyn);
 			}
-			else 
+			else
 				return NULL;
-			
-		} else {
-			
-			if (SUCCEED == zbx_json_value_by_name(&jp, hostfield, hostvalue, MAX_ZBX_HOSTNAME_LEN, &type)) {
-				alloc += zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN, "%s",  hostvalue);
-			} else 
+		}
+		else
+		{
+
+			if (SUCCEED == zbx_json_value_by_name(&jp, hostfield, hostvalue, ZBX_MAX_HOSTNAME_LEN, &type))
+			{
+				alloc += zbx_snprintf(hostname + alloc, ZBX_MAX_HOSTNAME_LEN, "%s", hostvalue);
+			}
+			else
 				return NULL;
 		}
 
-		zbx_snprintf(hostname + alloc, MAX_ZBX_HOSTNAME_LEN-alloc, "%s", f_end + 1);
+		zbx_snprintf(hostname + alloc, ZBX_MAX_HOSTNAME_LEN - alloc, "%s", f_end + 1);
 
 		return hostname;
 	}
 
-	if (host_param[0] == '$') {
+	if (host_param[0] == '$')
+	{
 		zbx_free(hostname_dyn);
-		
-		if (SUCCEED == zbx_jsonpath_query(&jp, host_param, &hostname_dyn)) {
-			zbx_snprintf(hostname, MAX_ZBX_HOSTNAME_LEN, "%s", hostname_dyn);
+
+		if (SUCCEED == zbx_jsonpath_query(&jp, host_param, &hostname_dyn))
+		{
+			zbx_snprintf(hostname, ZBX_MAX_HOSTNAME_LEN, "%s", hostname_dyn);
 			zbx_free(hostname_dyn);
 			return hostname;
 		}
-	} else {
+	}
+	else
+	{
 		if (SUCCEED == zbx_json_value_by_name(&jp, host_param, hostname, 256, &type))
 			return hostname;
 	}
 	return NULL;
 }
 
-typedef struct {
+typedef struct
+{
 	char *params[16];
 	char count;
 } preproc_params_t;
 
-
-static preproc_params_t* item_preproc_parse_params(char *params_str) {
+static preproc_params_t *item_preproc_parse_params(char *params_str)
+{
 	static preproc_params_t params = {0};
 
-	if (NULL == params_str) {
+	if (NULL == params_str)
+	{
 		params.count = -1;
 		return &params;
 	}
@@ -1651,7 +1788,8 @@ static preproc_params_t* item_preproc_parse_params(char *params_str) {
 
 	char *ptr = strtok(params_str, "\n");
 
-	while (NULL != ptr) {
+	while (NULL != ptr)
+	{
 		params.params[params.count] = ptr;
 		ptr = strtok(NULL, "\n");
 		params.count++;
@@ -1662,148 +1800,151 @@ static preproc_params_t* item_preproc_parse_params(char *params_str) {
 
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
- * *************************************************************************/ 
+ * *************************************************************************/
 static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
 {
 	zbx_uint64_pair_t host_item_ids;
 	char *hostname = NULL;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
-	
-			
+
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return SUCCEED;
 
 	preproc_params_t *params = item_preproc_parse_params(params_str);
 
-	if (params->count != 2) {
-		DEBUG_ITEM(itemid,"Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
+	if (params->count != 2)
+	{
+		DEBUG_ITEM(itemid, "Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
 		return SUCCEED;
 	}
 
-	if (NULL == (hostname = get_param_name_from_json( value->data.str, params->params[0]))) {
-		DEBUG_ITEM(itemid,"Cannot dispatch: cannot find host name '%s'", params->params[0]);
+	if (NULL == (hostname = get_param_name_from_json(value->data.str, params->params[0])))
+	{
+		DEBUG_ITEM(itemid, "Cannot dispatch: cannot find host name '%s'", params->params[0]);
 		return SUCCEED;
 	}
-	
+
 	zbx_host_key_t host_key = {.host = hostname, .key = params->params[1]};
 
-	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids) ) {
+	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
+	{
 
-		AGENT_RESULT result={0};
+		AGENT_RESULT result = {0};
 		zbx_timespec_t ts;
 		zbx_timespec(&ts);
 
-		init_result(&result);
+		zbx_init_agent_result(&result);
 
-		SET_STR_RESULT(&result, zbx_strdup(NULL,value->data.str));
+		SET_STR_RESULT(&result, zbx_strdup(NULL, value->data.str));
 		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
 
-		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
-			&result, &ts, ITEM_STATE_NORMAL, NULL);
-		free_result(&result);
-		return FAIL; //this intentional to be able to stop processing via 'custom on fail checkbox'
-	} 
-	
-	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s",host_key.host, host_key.key);
-	
+		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0,
+								  &result, &ts, ITEM_STATE_NORMAL, NULL);
+		zbx_free_agent_result(&result);
+		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
+	}
+
+	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s", host_key.host, host_key.key);
+
 	DEBUG_ITEM(itemid, "In %s: finished", __func__);
-	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }
 
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
- * *************************************************************************/ 
+ * *************************************************************************/
 static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
 {
 	zbx_uint64_pair_t host_item_ids;
 	char *ip_str = NULL, *hostname = NULL;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
-	
-			
+
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return SUCCEED;
 
 	preproc_params_t *params = item_preproc_parse_params(params_str);
 
-	if (params->count != 2) {
-		DEBUG_ITEM(itemid,"Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
+	if (params->count != 2)
+	{
+		DEBUG_ITEM(itemid, "Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
 		return SUCCEED;
 	}
 
-	if (NULL == (ip_str = get_param_name_from_json(value->data.str, params->params[0]))) {
-		DEBUG_ITEM(itemid,"Cannot dispatch: cannot find ip addr '%s'", params->params[0]);
+	if (NULL == (ip_str = get_param_name_from_json(value->data.str, params->params[0])))
+	{
+		DEBUG_ITEM(itemid, "Cannot dispatch: cannot find ip addr '%s'", params->params[0]);
 		return SUCCEED;
 	}
-	
-//	if (NULL ==( hostname = getHostNameByIp(ip_str))) {
-//		DEBUG_ITEM(itemid,"Cannot dispatch: cannot host for ip addr '%s'", ip_str);
-//		return SUCCEED;
-//	}
-	
+
+	//	if (NULL ==( hostname = getHostNameByIp(ip_str))) {
+	//		DEBUG_ITEM(itemid,"Cannot dispatch: cannot host for ip addr '%s'", ip_str);
+	//		return SUCCEED;
+	//	}
+
 	zbx_host_key_t host_key = {.host = hostname, .key = params->params[1]};
 
-	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids) ) {
+	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
+	{
 
-		AGENT_RESULT result={0};
+		AGENT_RESULT result = {0};
 		zbx_timespec_t ts;
 		zbx_timespec(&ts);
 
-		init_result(&result);
+		zbx_init_agent_result(&result);
 
-		SET_STR_RESULT(&result, zbx_strdup(NULL,value->data.str));
+		SET_STR_RESULT(&result, zbx_strdup(NULL, value->data.str));
 		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
 
-		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0, 
-			&result, &ts, ITEM_STATE_NORMAL, NULL);
-		free_result(&result);
-		return FAIL; //this intentional to be able to stop processing via 'custom on fail checkbox'
-	} 
-	
-	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s",host_key.host, host_key.key);
-	
+		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0,
+								  &result, &ts, ITEM_STATE_NORMAL, NULL);
+		zbx_free_agent_result(&result);
+		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
+	}
+
+	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s", host_key.host, host_key.key);
+
 	DEBUG_ITEM(itemid, "In %s: finished", __func__);
-	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }
-
-
-
-
 
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
- * *************************************************************************/ 
+ * *************************************************************************/
 static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+											   zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
 {
 	static unsigned char init_done = 0;
 	const char *ready_data = NULL;
-	struct zbx_json_parse	jp;
+	struct zbx_json_parse jp;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
 
-	if (FAIL == zbx_json_open(value->data.str, &jp)) {
-		DEBUG_ITEM(itemid,"Cannot open JSON '%s'", value->data.str);
-		return SUCCEED; 
+	if (FAIL == zbx_json_open(value->data.str, &jp))
+	{
+		DEBUG_ITEM(itemid, "Cannot open JSON '%s'", value->data.str);
+		return SUCCEED;
 	}
 
-	//TODO: move to worker init section
-	if (!init_done) {
-//		json_discovery_init();
+	// TODO: move to worker init section
+	if (!init_done)
+	{
+		//		json_discovery_init();
 		init_done = 1;
 	}
 	HALT_HERE("Not implemented yet");
 
-	int timeout = strtol(params,0,10);
+	int timeout = strtol(params, 0, 10);
 	DEBUG_ITEM(itemid, "Discovery timeout is %d", timeout);
-	
+
 	json_discovery_add_data(itemid, (char *)value->data.str);
-	
-	if (NULL != (ready_data = json_discovery_get_data(itemid, timeout))) {
+
+	if (NULL != (ready_data = json_discovery_get_data(itemid, timeout)))
+	{
 		zbx_variant_set_str(value, (char *)ready_data);
 		return SUCCEED;
 	}
@@ -1814,73 +1955,71 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 
 /***************************************************************************
  * filters and caches JSON data for Discovery processing    			   *
- * *************************************************************************/ 
+ * *************************************************************************/
 static int item_preproc_json_filter(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
+									zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
 {
 	static char *json_fields = NULL;
-	
+
 	char *ptr;
 	int len_time;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
-	
+
 	json_fields = zbx_strdup(json_fields, params);
 
-	DEBUG_ITEM(itemid,"Doing JSON search for '%s' fields", json_fields);
-	struct zbx_json_parse	jp;
+	DEBUG_ITEM(itemid, "Doing JSON search for '%s' fields", json_fields);
+	struct zbx_json_parse jp;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
-	
-	if (FAIL == zbx_json_open(value->data.str, &jp)) {
-		DEBUG_ITEM(itemid,"Cannot open data as valid JSON '%s'", value->data.str);
-		return SUCCEED; 
+
+	if (FAIL == zbx_json_open(value->data.str, &jp))
+	{
+		DEBUG_ITEM(itemid, "Cannot open data as valid JSON '%s'", value->data.str);
+		return SUCCEED;
 	}
-	
+
 	struct zbx_json *new_json;
 	zbx_json_init(new_json, 1024);
 
-	char *field_name = strtok(json_fields,";");
-	
-	while (NULL != field_name) {
+	char *field_name = strtok(json_fields, ";");
+
+	while (NULL != field_name)
+	{
 		char field_value[MAX_STRING_LEN];
 		zbx_json_type_t type;
 
-		DEBUG_ITEM(itemid,"Processing field %s", field_name);
+		DEBUG_ITEM(itemid, "Processing field %s", field_name);
 		field_name = strtok(NULL, ";");
-		
-		if (SUCCEED == zbx_json_value_by_name(&jp, field_name, field_value, MAX_STRING_LEN, &type)) {
+
+		if (SUCCEED == zbx_json_value_by_name(&jp, field_name, field_value, MAX_STRING_LEN, &type))
+		{
 			zbx_json_addstring(new_json, field_name, field_value, type);
 		}
 	}
-	
+
 	zbx_variant_set_str(value, new_json->buffer);
 	zbx_json_free(new_json);
 
-	
 	const char *filtered_json, *discovery_data;
 	HALT_HERE("Not implemented yet, waiting for managerless workers release");
 
 	// if (NULL == (filtered_json = json_discovery_filter_fields(&jp, json_fields)))  {
 	// 	DEBUG_ITEM(itemid,"No data after fields '%s', filtering '%s'", json_fields, value->data.str);
-	// 	return SUCCEED; 
+	// 	return SUCCEED;
 	// }
 
-	
 	// json_discovery_register_data(filtered_json);
-	
+
 	// if (NULL != (discovery_data = json_discovery_get_new_data())) {
 	// 	zbx_variant_set_str(value, (char *)filtered_json);
-	// } 
+	// }
 
-	return SUCCEED; //we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }
 
-
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_throttle_timed_value                                *
  *                                                                            *
  * Purpose: throttles value by suppressing identical values                   *
  *                                                                            *
@@ -1895,12 +2034,12 @@ static int item_preproc_json_filter(u_int64_t itemid, zbx_variant_t *value, cons
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_throttle_timed_value(zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
-		zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
+static int item_preproc_throttle_timed_value(zbx_variant_t *value, const zbx_timespec_t *ts, const char *params,
+											 zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **errmsg)
 {
-	int	ret, timeout, period = 0;
+	int ret, timeout, period = 0;
 
-	if (FAIL == is_time_suffix(params, &timeout, strlen(params)))
+	if (FAIL == zbx_is_time_suffix(params, &timeout, strlen(params)))
 	{
 		*errmsg = zbx_dsprintf(*errmsg, "invalid time period: %s", params);
 		zbx_variant_clear(history_value);
@@ -1915,7 +2054,7 @@ static int	item_preproc_throttle_timed_value(zbx_variant_t *value, const zbx_tim
 	if (ZBX_VARIANT_NONE != history_value->type)
 		period = ts->sec - history_ts->sec;
 
-	if (0 == ret && period < timeout )
+	if (0 == ret && period < timeout)
 		zbx_variant_clear(value);
 	else
 		*history_ts = *ts;
@@ -1924,8 +2063,6 @@ static int	item_preproc_throttle_timed_value(zbx_variant_t *value, const zbx_tim
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: item_preproc_script                                              *
  *                                                                            *
  * Purpose: executes script passed with params                                *
  *                                                                            *
@@ -1938,10 +2075,10 @@ static int	item_preproc_throttle_timed_value(zbx_variant_t *value, const zbx_tim
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_script(zbx_variant_t *value, const char *params, zbx_variant_t *bytecode, char **errmsg)
+static int item_preproc_script(zbx_variant_t *value, const char *params, zbx_variant_t *bytecode, char **errmsg)
 {
-	char	*code, *output = NULL, *error = NULL;
-	int	size;
+	char *code, *output = NULL, *error = NULL;
+	int size;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -1979,7 +2116,7 @@ fail:
 		if (SUCCEED != zbx_es_destroy_env(&es_engine, &error))
 		{
 			zabbix_log(LOG_LEVEL_WARNING,
-					"Cannot destroy embedded scripting engine environment: %s", error);
+					   "Cannot destroy embedded scripting engine environment: %s", error);
 			zbx_free(error);
 		}
 	}
@@ -1989,11 +2126,10 @@ fail:
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_prometheus_pattern                                  *
- *                                                                            *
  * Purpose: parse Prometheus format metrics                                   *
  *                                                                            *
- * Parameters: value  - [IN/OUT] the value to process                         *
+ * Parameters: cache  - [IN] the preprocessing cache                          *
+ *             value  - [IN/OUT] the value to process                         *
  *             params - [IN] the operation parameters                         *
  *             errmsg - [OUT] error message                                   *
  *                                                                            *
@@ -2001,25 +2137,61 @@ fail:
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_prometheus_pattern(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_prometheus_pattern(zbx_preproc_cache_t *cache, zbx_variant_t *value, const char *params,
+										   char **errmsg)
 {
-	char	pattern[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *output, *value_out = NULL,
-		*err = NULL;
-
-	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
-		return FAIL;
+	char pattern[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *request, *output, *value_out = NULL,
+																							   *err = NULL;
+	int ret = FAIL;
 
 	zbx_strlcpy(pattern, params, sizeof(pattern));
 
-	if (NULL == (output = strchr(pattern, '\n')))
+	if (NULL == (request = strchr(pattern, '\n')))
 	{
 		*errmsg = zbx_strdup(*errmsg, "cannot find second parameter");
 		return FAIL;
 	}
+	*request++ = '\0';
 
+	if (NULL == (output = strchr(request, '\n')))
+	{
+		*errmsg = zbx_strdup(*errmsg, "cannot find third parameter");
+		return FAIL;
+	}
 	*output++ = '\0';
 
-	if (FAIL == zbx_prometheus_pattern(value->data.str, pattern, output, &value_out, &err))
+	if (NULL == cache)
+	{
+		if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+			return FAIL;
+
+		ret = zbx_prometheus_pattern(value->data.str, pattern, request, output, &value_out, &err);
+	}
+	else
+	{
+		zbx_prometheus_t *prom_cache;
+
+		if (NULL == (prom_cache = (zbx_prometheus_t *)zbx_preproc_cache_get(cache,
+																			ZBX_PREPROC_PROMETHEUS_PATTERN)))
+		{
+			prom_cache = (zbx_prometheus_t *)zbx_malloc(NULL, sizeof(zbx_prometheus_t));
+
+			if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
+				return FAIL;
+
+			if (SUCCEED != zbx_prometheus_init(prom_cache, value->data.str, &err))
+			{
+				zbx_free(prom_cache);
+				goto out;
+			}
+
+			zbx_preproc_cache_put(cache, ZBX_PREPROC_PROMETHEUS_PATTERN, prom_cache);
+		}
+
+		ret = zbx_prometheus_pattern_ex(prom_cache, pattern, request, output, &value_out, &err);
+	}
+out:
+	if (FAIL == ret)
 	{
 		*errmsg = zbx_dsprintf(*errmsg, "cannot apply Prometheus pattern: %s", err);
 		zbx_free(err);
@@ -2034,8 +2206,6 @@ static int	item_preproc_prometheus_pattern(zbx_variant_t *value, const char *par
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_prometheus_to_json                                  *
- *                                                                            *
  * Purpose: convert Prometheus format metrics to JSON format                  *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -2046,9 +2216,9 @@ static int	item_preproc_prometheus_pattern(zbx_variant_t *value, const char *par
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_prometheus_to_json(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_prometheus_to_json(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	char	*value_out = NULL, *err = NULL;
+	char *value_out = NULL, *err = NULL;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -2068,8 +2238,6 @@ static int	item_preproc_prometheus_to_json(zbx_variant_t *value, const char *par
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_csv_to_json_add_field                               *
- *                                                                            *
  * Purpose: convert CSV format metrics to JSON format                         *
  *                                                                            *
  * Parameters: json    - [IN/OUT] json object                                 *
@@ -2084,15 +2252,15 @@ static int	item_preproc_prometheus_to_json(zbx_variant_t *value, const char *par
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_csv_to_json_add_field(struct zbx_json *json, char ***names, char *field, unsigned int num,
-		unsigned int num_max, unsigned int header, char **errmsg)
+static int item_preproc_csv_to_json_add_field(struct zbx_json *json, char ***names, char *field, unsigned int num,
+											  unsigned int num_max, unsigned int header, char **errmsg)
 {
-	char	**fld_names = *names;
+	char **fld_names = *names;
 
 	if (0 < num_max && num >= num_max && 1 == header)
 	{
 		*errmsg = zbx_strdup(*errmsg,
-				"cannot convert CSV to JSON: data row contains more fields than header row");
+							 "cannot convert CSV to JSON: data row contains more fields than header row");
 		return FAIL;
 	}
 
@@ -2101,19 +2269,19 @@ static int	item_preproc_csv_to_json_add_field(struct zbx_json *json, char ***nam
 
 	if (0 == num_max && 1 == header)
 	{
-		unsigned int	i;
+		unsigned int i;
 
 		for (i = 0; i < num; i++)
 		{
 			if (0 == strcmp(fld_names[i], field))
 			{
 				*errmsg = zbx_dsprintf(*errmsg,
-						"cannot convert CSV to JSON: duplicated column name \"%s\"", field);
+									   "cannot convert CSV to JSON: duplicated column name \"%s\"", field);
 				return FAIL;
 			}
 		}
 
-		fld_names = zbx_realloc(fld_names, (num + 1) * sizeof(char*));
+		fld_names = zbx_realloc(fld_names, (num + 1) * sizeof(char *));
 		fld_names[num] = zbx_strdup(NULL, field);
 		*names = fld_names;
 	}
@@ -2124,7 +2292,7 @@ static int	item_preproc_csv_to_json_add_field(struct zbx_json *json, char ***nam
 
 		if (0 == header)
 		{
-			char	num_buf[ZBX_MAX_UINT64_LEN];
+			char num_buf[ZBX_MAX_UINT64_LEN];
 
 			zbx_snprintf(num_buf, ZBX_MAX_UINT64_LEN, "%u", num + 1);
 			zbx_json_addstring(json, num_buf, field, ZBX_JSON_TYPE_STRING);
@@ -2144,8 +2312,6 @@ static int	item_preproc_csv_to_json_add_field(struct zbx_json *json, char ***nam
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_csv_to_json                                         *
- *                                                                            *
  * Purpose: convert CSV format metrics to JSON format                         *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -2156,18 +2322,18 @@ static int	item_preproc_csv_to_json_add_field(struct zbx_json *json, char ***nam
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_csv_to_json(zbx_variant_t *value, const char *params, char **errmsg)
 {
-#define CSV_STATE_FIELD		0
-#define CSV_STATE_DELIM		1
-#define CSV_STATE_FIELD_QUOTED	2
+#define CSV_STATE_FIELD 0
+#define CSV_STATE_DELIM 1
+#define CSV_STATE_FIELD_QUOTED 2
 
-	unsigned int	fld_num = 0, fld_num_max = 0, hdr_line, state = CSV_STATE_DELIM;
-	char		*field, *field_esc = NULL, **field_names = NULL, *data, *value_out = NULL,
-			delim[ZBX_MAX_BYTES_IN_UTF8_CHAR], quote[ZBX_MAX_BYTES_IN_UTF8_CHAR];
-	struct zbx_json	json;
-	size_t		data_len, delim_sz = 1, quote_sz = 0, step;
-	int		ret = SUCCEED;
+	unsigned int fld_num = 0, fld_num_max = 0, hdr_line, state = CSV_STATE_DELIM;
+	char *field, *field_esc = NULL, **field_names = NULL, *data, *value_out = NULL,
+				 delim[ZBX_MAX_BYTES_IN_UTF8_CHAR], quote[ZBX_MAX_BYTES_IN_UTF8_CHAR];
+	struct zbx_json json;
+	size_t data_len, delim_sz = 1, quote_sz = 0, step;
+	int ret = SUCCEED;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -2177,11 +2343,11 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 	data = value->data.str;
 	data_len = strlen(value->data.str);
 
-#define CSV_SEP_LINE	"sep="
+#define CSV_SEP_LINE "sep="
 	if (0 == zbx_strncasecmp(data, CSV_SEP_LINE, ZBX_CONST_STRLEN(CSV_SEP_LINE)))
 	{
-		char	*p;
-		size_t	del_sz;
+		char *p;
+		size_t del_sz;
 
 		p = value->data.str + ZBX_CONST_STRLEN(CSV_SEP_LINE);
 
@@ -2262,7 +2428,7 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 				if ('\n' != *(++data) && '\0' != *data)
 				{
 					*errmsg = zbx_strdup(*errmsg, "cannot convert CSV to JSON: unsupported line "
-							"break");
+												  "break");
 					ret = FAIL;
 					goto out;
 				}
@@ -2277,8 +2443,8 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 					do
 					{
 						if (FAIL == (ret = item_preproc_csv_to_json_add_field(&json,
-								&field_names, field, fld_num, fld_num_max, hdr_line,
-								errmsg)))
+																			  &field_names, field, fld_num, fld_num_max, hdr_line,
+																			  errmsg)))
 							goto out;
 
 						field = NULL;
@@ -2301,8 +2467,8 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 				*data = '\0';
 
 				if (FAIL == (ret = item_preproc_csv_to_json_add_field(&json,
-						&field_names, field, fld_num, fld_num_max, hdr_line,
-						errmsg)))
+																	  &field_names, field, fld_num, fld_num_max, hdr_line,
+																	  errmsg)))
 					goto out;
 
 				field = NULL;
@@ -2322,11 +2488,11 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 		}
 		else if (step == quote_sz && 0 == memcmp(data, quote, quote_sz))
 		{
-			char	*data_next = data + quote_sz;
-			size_t	char_sz;
+			char *data_next = data + quote_sz;
+			size_t char_sz;
 
 			if (0 == (char_sz = zbx_utf8_char_len(data_next)))
-				continue;	/* invalid UTF-8 */
+				continue; /* invalid UTF-8 */
 
 			if (char_sz == quote_sz && 0 == memcmp(data_next, quote, quote_sz))
 			{
@@ -2339,7 +2505,7 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 				data = data_next;
 			}
 			else if ('\r' == *data_next || '\n' == *data_next || '\0' == *data_next ||
-					(char_sz == delim_sz && 0 == memcmp(data_next, delim, delim_sz)))
+					 (char_sz == delim_sz && 0 == memcmp(data_next, delim, delim_sz)))
 			{
 				state = CSV_STATE_FIELD;
 				*data = '\0';
@@ -2347,15 +2513,15 @@ static int	item_preproc_csv_to_json(zbx_variant_t *value, const char *params, ch
 				if (NULL != field_esc)
 				{
 					field_esc = zbx_dsprintf(field_esc, "%s%s", field_esc,
-							ZBX_NULL2EMPTY_STR(field));
+											 ZBX_NULL2EMPTY_STR(field));
 					field = field_esc;
 				}
 			}
 			else
 			{
 				*errmsg = zbx_dsprintf(*errmsg, "cannot convert CSV to JSON: delimiter character or "
-						"end of line are not detected after quoted field \"%.*s\"",
-						(int)(data - field), field);
+												"end of line are not detected after quoted field \"%.*s\"",
+									   (int)(data - field), field);
 				ret = FAIL;
 				goto out;
 			}
@@ -2402,8 +2568,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_xml_to_json                                         *
- *                                                                            *
  * Purpose: convert XML format value to JSON format                           *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -2413,9 +2577,9 @@ out:
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_xml_to_json(zbx_variant_t *value, char **errmsg)
+static int item_preproc_xml_to_json(zbx_variant_t *value, char **errmsg)
 {
-	char	*json = NULL;
+	char *json = NULL;
 
 	if (FAIL == item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
@@ -2431,8 +2595,6 @@ static int	item_preproc_xml_to_json(zbx_variant_t *value, char **errmsg)
 
 /******************************************************************************
  *                                                                            *
- * Function: item_preproc_str_replace                                         *
- *                                                                            *
  * Purpose: replace substrings in string                                      *
  *                                                                            *
  * Parameters: value  - [IN/OUT] the value to process                         *
@@ -2443,12 +2605,12 @@ static int	item_preproc_xml_to_json(zbx_variant_t *value, char **errmsg)
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-static int	item_preproc_str_replace(zbx_variant_t *value, const char *params, char **errmsg)
+static int item_preproc_str_replace(zbx_variant_t *value, const char *params, char **errmsg)
 {
-	unsigned int	len_search, len_replace;
-	const char	*ptr;
-	char		*new_string, search_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1],
-			replace_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
+	unsigned int len_search, len_replace;
+	const char *ptr;
+	char *new_string, search_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1],
+		replace_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 
 	if (NULL == (ptr = strchr(params, '\n')))
 	{
@@ -2474,7 +2636,7 @@ static int	item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 		return FAIL;
 	}
 
-	new_string = string_replace(value->data.str, search_str, replace_str);
+	new_string = zbx_string_replace(value->data.str, search_str, replace_str);
 	zbx_variant_clear(value);
 	zbx_variant_set_str(value, new_string);
 
@@ -2483,11 +2645,10 @@ static int	item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_item_preproc                                                 *
- *                                                                            *
  * Purpose: execute preprocessing operation                                   *
  *                                                                            *
- * Parameters: value_type    - [IN] the item value type                       *
+ * Parameters: cache         - [IN/OUT] the preprocessing cache               *
+ *             value_type    - [IN] the item value type                       *
  *             value         - [IN/OUT] the value to process                  *
  *             ts            - [IN] the value timestamp                       *
  *             op            - [IN] the preprocessing operation to execute    *
@@ -2503,126 +2664,125 @@ static int	item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
  *           returned with error set.                                         *
  *                                                                            *
  ******************************************************************************/
-int	zbx_item_preproc(u_int64_t itemid, unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-		const zbx_preproc_op_t *op, zbx_variant_t *history_value, zbx_timespec_t *history_ts, char **error)
+int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char value_type, zbx_variant_t *value,
+					 const zbx_timespec_t *ts, const zbx_preproc_op_t *op, zbx_variant_t *history_value,
+					 zbx_timespec_t *history_ts, char **error)
 {
-	int	ret;
-	
+	int ret;
+
 	DEBUG_ITEM(itemid, "Performing preprocessing step of type %d, incoming value %s", op->type, zbx_variant_value_desc(value));
 	
 	switch (op->type)
 	{
-		case ZBX_PREPROC_MULTIPLIER:
-			ret = item_preproc_multiplier(value_type, value, op->params, error);
-			break;
-		case ZBX_PREPROC_RTRIM:
-			ret = item_preproc_rtrim(value, op->params, error);
-			break;
-		case ZBX_PREPROC_LTRIM:
-			ret = item_preproc_ltrim(value, op->params, error);
-			break;
-		case ZBX_PREPROC_TRIM:
-			ret = item_preproc_lrtrim(value, op->params, error);
-			break;
-		case ZBX_PREPROC_REGSUB:
-			ret = item_preproc_regsub(value, op->params, error);
-			break;
-		case ZBX_PREPROC_BOOL2DEC:
-			ret = item_preproc_bool2dec(value, error);
-			break;
-		case ZBX_PREPROC_OCT2DEC:
-			ret = item_preproc_oct2dec(value, error);
-			break;
-		case ZBX_PREPROC_HEX2DEC:
-			ret = item_preproc_hex2dec(value, error);
-			break;
-		case ZBX_PREPROC_DELTA_VALUE:
-			ret = item_preproc_delta_value(value_type, value, ts, history_value, history_ts, error);
-			break;
-		case ZBX_PREPROC_DELTA_SPEED:
-			ret = item_preproc_delta_speed(value_type, value, ts, history_value, history_ts, error);
-			break;
-		case ZBX_PREPROC_XPATH:
-			ret = item_preproc_xpath(value, op->params, error);
-			break;
-		case ZBX_PREPROC_JSONPATH:
-			ret = item_preproc_jsonpath(value, op->params, error);
-			break;
-		case ZBX_PREPROC_VALIDATE_RANGE:
-			ret = item_preproc_validate_range(value_type, value, op->params, error);
-			break;
-		case ZBX_PREPROC_VALIDATE_REGEX:
-			ret = item_preproc_validate_regex(value, op->params, error);
-			break;
-		case ZBX_PREPROC_VALIDATE_NOT_REGEX:
-			ret = item_preproc_validate_not_regex(value, op->params, error);
-			break;
-		case ZBX_PREPROC_ERROR_FIELD_JSON:
-			ret = item_preproc_get_error_from_json(value, op->params, error);
-			break;
-		case ZBX_PREPROC_ERROR_FIELD_XML:
-			ret = item_preproc_get_error_from_xml(value, op->params, error);
-			break;
-		case ZBX_PREPROC_ERROR_FIELD_REGEX:
-			ret = item_preproc_get_error_from_regex(value, op->params, error);
-			break;
-		case ZBX_PREPROC_THROTTLE_VALUE:
-			ret = item_preproc_throttle_value(value, ts, history_value, history_ts);
-			break;
-		case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
-			ret = item_preproc_throttle_timed_value(value, ts, op->params, history_value, history_ts,
-					error);
-			break;
-		case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
-			ret = item_preproc_throttle_value_agg(value, ts, op->params, history_value, history_ts, value_type,
-					error);
-			break;
-		case GLB_PREPROC_DISPATCH_ITEM:
-			ret = item_preproc_dispatch(itemid, value, ts, op->params, 	error);
-			break;
-		case GLB_PREPROC_JSON_FILTER:
-			ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
-					error);
-			break;
-		case GLB_PREPROC_DISCOVERY_PREPARE:
-			ret = item_preproc_json_discovery_prepare(itemid, value, ts, op->params, history_value, history_ts, value_type,
-					error);
-			break;
-		case ZBX_PREPROC_SCRIPT:
-			ret = item_preproc_script(value, op->params, history_value, error);
-			break;
-		case ZBX_PREPROC_PROMETHEUS_PATTERN:
-			ret = item_preproc_prometheus_pattern(value, op->params, error);
-			break;
-		case ZBX_PREPROC_PROMETHEUS_TO_JSON:
-			ret = item_preproc_prometheus_to_json(value, op->params, error);
-			break;
-		case ZBX_PREPROC_CSV_TO_JSON:
-			ret = item_preproc_csv_to_json(value, op->params, error);
-			break;
-		case ZBX_PREPROC_STR_REPLACE:
-			ret = item_preproc_str_replace(value, op->params, error);
-			break;
-		case ZBX_PREPROC_VALIDATE_NOT_SUPPORTED:
-			ret = item_preproc_validate_notsupport(error);
-			break;
-		case ZBX_PREPROC_XML_TO_JSON:
-			ret = item_preproc_xml_to_json(value, error);
-			break;
-		default:
-			*error = zbx_dsprintf(*error, "unknown preprocessing operation");
-			ret = FAIL;
+	case ZBX_PREPROC_MULTIPLIER:
+		ret = item_preproc_multiplier(value_type, value, op->params, error);
+		break;
+	case ZBX_PREPROC_RTRIM:
+		ret = item_preproc_rtrim(value, op->params, error);
+		break;
+	case ZBX_PREPROC_LTRIM:
+		ret = item_preproc_ltrim(value, op->params, error);
+		break;
+	case ZBX_PREPROC_TRIM:
+		ret = item_preproc_lrtrim(value, op->params, error);
+		break;
+	case ZBX_PREPROC_REGSUB:
+		ret = item_preproc_regsub(value, op->params, error);
+		break;
+	case ZBX_PREPROC_BOOL2DEC:
+		ret = item_preproc_bool2dec(value, error);
+		break;
+	case ZBX_PREPROC_OCT2DEC:
+		ret = item_preproc_oct2dec(value, error);
+		break;
+	case ZBX_PREPROC_HEX2DEC:
+		ret = item_preproc_hex2dec(value, error);
+		break;
+	case ZBX_PREPROC_DELTA_VALUE:
+		ret = item_preproc_delta_value(value_type, value, ts, history_value, history_ts, error);
+		break;
+	case ZBX_PREPROC_DELTA_SPEED:
+		ret = item_preproc_delta_speed(value_type, value, ts, history_value, history_ts, error);
+		break;
+	case ZBX_PREPROC_XPATH:
+		ret = item_preproc_xpath(value, op->params, error);
+		break;
+	case ZBX_PREPROC_JSONPATH:
+		ret = item_preproc_jsonpath(cache, value, op->params, error);
+		break;
+	case ZBX_PREPROC_VALIDATE_RANGE:
+		ret = item_preproc_validate_range(value_type, value, op->params, error);
+		break;
+	case ZBX_PREPROC_VALIDATE_REGEX:
+		ret = item_preproc_validate_regex(value, op->params, error);
+		break;
+	case ZBX_PREPROC_VALIDATE_NOT_REGEX:
+		ret = item_preproc_validate_not_regex(value, op->params, error);
+		break;
+	case ZBX_PREPROC_ERROR_FIELD_JSON:
+		ret = item_preproc_get_error_from_json(value, op->params, error);
+		break;
+	case ZBX_PREPROC_ERROR_FIELD_XML:
+		ret = item_preproc_get_error_from_xml(value, op->params, error);
+		break;
+	case ZBX_PREPROC_ERROR_FIELD_REGEX:
+		ret = item_preproc_get_error_from_regex(value, op->params, error);
+		break;
+	case ZBX_PREPROC_THROTTLE_VALUE:
+		ret = item_preproc_throttle_value(value, ts, history_value, history_ts);
+		break;
+	case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
+		ret = item_preproc_throttle_timed_value(value, ts, op->params, history_value, history_ts,
+												error);
+		break;
+	case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
+		ret = item_preproc_throttle_value_agg(value, ts, op->params, history_value, history_ts, value_type,
+											  error);
+		break;
+	case GLB_PREPROC_DISPATCH_ITEM:
+		ret = item_preproc_dispatch(itemid, value, ts, op->params, error);
+		break;
+	case GLB_PREPROC_JSON_FILTER:
+		ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
+									   error);
+		break;
+	case GLB_PREPROC_DISCOVERY_PREPARE:
+		ret = item_preproc_json_discovery_prepare(itemid, value, ts, op->params, history_value, history_ts, value_type,
+												  error);
+		break;
+	case ZBX_PREPROC_SCRIPT:
+		ret = item_preproc_script(value, op->params, history_value, error);
+		break;
+	case ZBX_PREPROC_PROMETHEUS_PATTERN:
+		ret = item_preproc_prometheus_pattern(cache, value, op->params, error);
+		break;
+	case ZBX_PREPROC_PROMETHEUS_TO_JSON:
+		ret = item_preproc_prometheus_to_json(value, op->params, error);
+		break;
+	case ZBX_PREPROC_CSV_TO_JSON:
+		ret = item_preproc_csv_to_json(value, op->params, error);
+		break;
+	case ZBX_PREPROC_STR_REPLACE:
+		ret = item_preproc_str_replace(value, op->params, error);
+		break;
+	case ZBX_PREPROC_VALIDATE_NOT_SUPPORTED:
+		ret = item_preproc_validate_notsupport(error);
+		break;
+	case ZBX_PREPROC_XML_TO_JSON:
+		ret = item_preproc_xml_to_json(value, error);
+		break;
+	default:
+		*error = zbx_dsprintf(*error, "unknown preprocessing operation");
+		ret = FAIL;
 	}
 
 	DEBUG_ITEM(itemid, "Result of preprocessing step of type %d, result value %s, return %d",
-		  op->type, zbx_variant_value_desc(value), ret);
-	
+			   op->type, zbx_variant_value_desc(value), ret);
+
 	return ret;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_item_preproc_handle_error                                    *
  *                                                                            *
  * Purpose: apply 'on fail' preprocessing error handler                       *
  *                                                                            *
@@ -2637,30 +2797,28 @@ int	zbx_item_preproc(u_int64_t itemid, unsigned char value_type, zbx_variant_t *
  *                         have been changed.                                 *
  *                                                                            *
  ******************************************************************************/
-int	zbx_item_preproc_handle_error(zbx_variant_t *value, const zbx_preproc_op_t *op, char **error)
+int zbx_item_preproc_handle_error(zbx_variant_t *value, const zbx_preproc_op_t *op, char **error)
 {
 	switch (op->error_handler)
 	{
-		case ZBX_PREPROC_FAIL_DISCARD_VALUE:
-			zbx_variant_clear(value);
-			zbx_free(*error);
-			return SUCCEED;
-		case ZBX_PREPROC_FAIL_SET_VALUE:
-			zbx_variant_clear(value);
-			zbx_variant_set_str(value, zbx_strdup(NULL, op->error_handler_params));
-			zbx_free(*error);
-			return SUCCEED;
-		case ZBX_PREPROC_FAIL_SET_ERROR:
-			*error = zbx_strdup(*error, op->error_handler_params);
-			return FAIL;
-		default:
-			return FAIL;
+	case ZBX_PREPROC_FAIL_DISCARD_VALUE:
+		zbx_variant_clear(value);
+		zbx_free(*error);
+		return SUCCEED;
+	case ZBX_PREPROC_FAIL_SET_VALUE:
+		zbx_variant_clear(value);
+		zbx_variant_set_str(value, zbx_strdup(NULL, op->error_handler_params));
+		zbx_free(*error);
+		return SUCCEED;
+	case ZBX_PREPROC_FAIL_SET_ERROR:
+		*error = zbx_strdup(*error, op->error_handler_params);
+		return FAIL;
+	default:
+		return FAIL;
 	}
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_item_preproc_test                                            *
  *                                                                            *
  * Purpose: test preprocessing steps                                          *
  *                                                                            *
@@ -2679,21 +2837,22 @@ int	zbx_item_preproc_handle_error(zbx_variant_t *value, const zbx_preproc_op_t *
  *               FAIL - otherwise, error contains the error message           *
  *                                                                            *
  ******************************************************************************/
-int	zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-		zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
-		zbx_preproc_result_t *results, int *results_num, char **error)
+int zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+						  zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
+						  zbx_preproc_result_t *results, int *results_num, char **error)
 {
-	int	i, ret = SUCCEED;
+	int i, ret = SUCCEED;
 
 	for (i = 0; i < steps_num; i++)
 	{
-		zbx_preproc_op_t	*op = &steps[i];
-		zbx_variant_t		history_value;
-		zbx_timespec_t		history_ts;
+		zbx_preproc_op_t *op = &steps[i];
+		zbx_variant_t history_value;
+		zbx_timespec_t history_ts;
 
 		zbx_preproc_history_pop_value(history_in, i, &history_value, &history_ts);
 
-		if (FAIL == (ret = zbx_item_preproc(0, value_type, value, ts, op, &history_value, &history_ts, error)))
+		if (FAIL == (ret = zbx_item_preproc(0, NULL, value_type, value, ts, op, &history_value, &history_ts,
+											error)))
 		{
 			results[i].action = op->error_handler;
 			results[i].error = zbx_strdup(NULL, *error);
@@ -2729,13 +2888,11 @@ int	zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const 
 	return ret;
 }
 
-
-
 #ifdef HAVE_GLB_TESTS
-#	include "item_preproc_test.c"
+#include "item_preproc_test.c"
 
 #endif
 
 #ifdef HAVE_TESTS
-#	include "../../../tests/zabbix_server/preprocessor/item_preproc_test.c"
+#include "../../../tests/zabbix_server/preprocessor/item_preproc_test.c"
 #endif

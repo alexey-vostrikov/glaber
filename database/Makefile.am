@@ -7,5 +7,4 @@ SUBDIRS = \
 	sqlite3
 
 EXTRA_DIST = \
-	elasticsearch \
-	clickhouse
+	elasticsearch

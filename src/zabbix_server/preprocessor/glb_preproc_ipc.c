@@ -24,11 +24,11 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 
 //TODO idea for improvement - implement a kind of a buffer pool to avoid alloc cluttering
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "../../libs/zbxipcservice/glb_ipc.h"
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
 #include "metric.h"
 
 #define CONFIG_PREPROC_IPC_SIZE     128 * ZBX_MEBIBYTE
@@ -36,8 +36,8 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 
 extern int  CONFIG_GLB_PREPROCESSOR_FORKS;
 
-static  zbx_mem_info_t	*preproc_ipc_mem;
-ZBX_MEM_FUNC_IMPL(_preprocipc, preproc_ipc_mem);
+static  zbx_shmem_info_t	*preproc_ipc_mem;
+ZBX_SHMEM_FUNC_IMPL(_preprocipc, preproc_ipc_mem);
 
 typedef struct  {
     mem_funcs_t memf;
@@ -91,15 +91,15 @@ IPC_FREE_CB(preproc_ipc_metric_free_cb) {
 int preproc_ipc_init(size_t ipc_size) {
     char *error = NULL;
   //  LOG_INF("doing preproc ipc init");
-    if (SUCCEED != zbx_mem_create(&preproc_ipc_mem, ipc_size, "Preproc IPC buffer size", "PreprocBufferSize ", 1, &error)) {
+    if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, ipc_size, "Preproc IPC buffer size", "PreprocBufferSize ", 1, &error)) {
         LOG_WRN("Shared memory create failed: %s", error);
     	return FAIL;
     }
       // LOG_INF("doing preproc ipc init2");
 
-    conf.memf.free_func = _preprocipc_mem_free_func;
-    conf.memf.malloc_func = _preprocipc_mem_malloc_func;
-    conf.memf.realloc_func = _preprocipc_mem_realloc_func;
+    conf.memf.free_func = _preprocipc_shmem_free_func;
+    conf.memf.malloc_func = _preprocipc_shmem_malloc_func;
+    conf.memf.realloc_func = _preprocipc_shmem_realloc_func;
 
     conf.ipc = glb_ipc_init(PREPROC_IPC_METRICS_BUFFER * CONFIG_GLB_PREPROCESSOR_FORKS, sizeof(metric_t), 
     CONFIG_GLB_PREPROCESSOR_FORKS , &conf.memf, preproc_ipc_metric_create_cb,

@@ -40,7 +40,20 @@ class CPieGraphDraw extends CGraphDraw {
 	/* PRE CONFIG: ADD / SET / APPLY
 	/********************************************************************************************************/
 	public function addItem($itemid, $calc_fnc = CALC_FNC_AVG, $color = null, $type = null) {
-		$items = CMacrosResolverHelper::resolveItemNames([get_item_by_itemid($itemid)]);
+		$items = API::Item()->get([
+			'output' => ['itemid', 'hostid', 'name', 'key_', 'units', 'value_type', 'valuemapid', 'history', 'trends'],
+			'itemids' => [$itemid],
+			'webitems' => true
+		]);
+
+		if (!$items) {
+			$items = API::ItemPrototype()->get([
+				'output' => ['itemid', 'hostid', 'name', 'key_', 'units', 'value_type', 'valuemapid', 'history',
+					'trends'
+				],
+				'itemids' => [$itemid]
+			]);
+		}
 
 		$this->items[$this->num] = reset($items);
 
@@ -88,22 +101,24 @@ class CPieGraphDraw extends CGraphDraw {
 		$count *= $this->exploderad;
 		$anglemid = (int) (($anglestart + $angleend) / 2);
 
-		$y+= round($count * sin(deg2rad($anglemid)));
-		$x+= round($count * cos(deg2rad($anglemid)));
+		$y += round($count * sin(deg2rad($anglemid)));
+		$x += round($count * cos(deg2rad($anglemid)));
 
-		return [$x, $y];
+		return [(int) $x, (int) $y];
 	}
 
 	protected function calcExplodedRadius($sizeX, $sizeY, $count) {
 		$count *= $this->exploderad * 2;
 		$sizeX -= $count;
 		$sizeY -= $count;
-		return [$sizeX, $sizeY];
+
+		return [(int) $sizeX, (int) $sizeY];
 	}
 
 	protected function calc3DAngle($sizeX, $sizeY) {
 		$sizeY *= GRAPH_3D_ANGLE / 90;
-		return [$sizeX, round($sizeY)];
+
+		return [$sizeX, (int) round($sizeY)];
 	}
 
 	protected function selectData() {
@@ -135,7 +150,8 @@ class CPieGraphDraw extends CGraphDraw {
 		$items = [];
 
 		for ($i = 0; $i < $this->num; $i++) {
-			$item = get_item_by_itemid($this->items[$i]['itemid']);
+			$item = $this->items[$i];
+
 			$from_time = $this->from_time;
 			$to_time = $this->to_time;
 
@@ -211,7 +227,7 @@ class CPieGraphDraw extends CGraphDraw {
 				unset($result);
 			}
 
-			switch ($this->items[$i]['calc_fnc']) {
+			switch ($item['calc_fnc']) {
 				case CALC_FNC_MIN:
 					$fncName = 'min';
 					break;
@@ -230,7 +246,7 @@ class CPieGraphDraw extends CGraphDraw {
 				? 0
 				: abs($this->data[$item['itemid']][$fncName]);
 
-			if ($this->items[$i]['calc_type'] == GRAPH_ITEM_SUM) {
+			if ($item['calc_type'] == GRAPH_ITEM_SUM) {
 				$this->background = $i;
 				$graph_sum = $item_value;
 			}
@@ -262,7 +278,7 @@ class CPieGraphDraw extends CGraphDraw {
 		$functionNameXShift = 0;
 
 		foreach ($this->items as $item) {
-			$name = $displayHostName ? $item['hostname'].': '.$item['name_expanded'] : $item['name_expanded'];
+			$name = $displayHostName ? $item['hostname'].NAME_DELIMITER.$item['name'] : $item['name'];
 			$dims = imageTextSize($fontSize, 0, $name);
 
 			if ($dims['width'] > $functionNameXShift) {
@@ -326,7 +342,7 @@ class CPieGraphDraw extends CGraphDraw {
 				$this->shiftXleft + 15,
 				$this->sizeY + $shiftY + 14 * $i + 5,
 				$this->getColor($this->graphtheme['textcolor'], 0),
-				$displayHostName ? $item['hostname'].': '.$item['name_expanded'] : $item['name_expanded']
+				$displayHostName ? $item['hostname'].NAME_DELIMITER.$item['name'] : $item['name']
 			);
 
 			// function name
@@ -430,8 +446,8 @@ class CPieGraphDraw extends CGraphDraw {
 			list($sizeX, $sizeY) = $this->calcExplodedRadius($sizeX, $sizeY, count($values));
 		}
 
-		$xc = $x = (int) $this->sizeX / 2 + $this->shiftXleft;
-		$yc = $y = (int) $this->sizeY / 2 + $this->shiftY;
+		$xc = $x = (int) ($this->sizeX / 2) + $this->shiftXleft;
+		$yc = $y = (int) ($this->sizeY / 2) + $this->shiftY;
 
 		$anglestart = 0;
 		$angleend = 0;
@@ -511,8 +527,8 @@ class CPieGraphDraw extends CGraphDraw {
 
 		list($sizeX, $sizeY) = $this->calc3DAngle($sizeX, $sizeY);
 
-		$xc = $x = (int) $this->sizeX / 2 + $this->shiftXleft;
-		$yc = $y = (int) $this->sizeY / 2 + $this->shiftY;
+		$xc = $x = (int) ($this->sizeX / 2) + $this->shiftXleft;
+		$yc = $y = (int) ($this->sizeY / 2) + $this->shiftY;
 
 		// bottom angle line
 		$anglestart = 0;
@@ -652,7 +668,7 @@ class CPieGraphDraw extends CGraphDraw {
 		$this->calculateTopPadding();
 
 		$this->selectData();
-		if (hasErrorMesssages()) {
+		if (hasErrorMessages()) {
 			show_messages();
 		}
 
@@ -699,12 +715,8 @@ class CPieGraphDraw extends CGraphDraw {
 		$this->exploderad = (int) $this->sizeX / 100;
 		$this->exploderad3d = (int) $this->sizeX / 60;
 
-		if (function_exists('ImageColorExactAlpha') && function_exists('ImageCreateTrueColor') && @imagecreatetruecolor(1, 1)) {
-			$this->im = imagecreatetruecolor($this->fullSizeX, $this->fullSizeY);
-		}
-		else {
-			$this->im = imagecreate($this->fullSizeX, $this->fullSizeY);
-		}
+		$this->im = imagecreatetruecolor($this->fullSizeX, $this->fullSizeY);
+
 		$this->initColors();
 		$this->drawRectangle();
 		$this->drawHeader();

@@ -17,10 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "db.h"
 #include "dbupgrade.h"
+
+#include "zbxdbhigh.h"
 #include "log.h"
+#include "zbxnum.h"
 
 /*
  * 3.4 development database patches
@@ -369,7 +370,7 @@ static int	DBpatch_3030030(void)
 		}
 
 		sql_offset = 0;
-		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+		zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 		while (NULL != (row = DBfetch(result)))
 		{
@@ -388,7 +389,7 @@ static int	DBpatch_3030030(void)
 			upd_num++;
 		}
 
-		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+		zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 		if (16 < sql_offset)
 		{
@@ -1063,7 +1064,7 @@ static int	DBpatch_table_convert(const char *table, const char *recid, const DBp
 
 	sql_offset = 0;
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	while (NULL != (row = DBfetch(result)))
 	{
@@ -1083,7 +1084,7 @@ static int	DBpatch_table_convert(const char *table, const char *recid, const DBp
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
 	{
@@ -1248,7 +1249,7 @@ static int	DBpatch_3030093(void)
 
 	result = DBselect("select itemid,delay,delay_flex from items");
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	while (NULL != (row = DBfetch(result)))
 	{
@@ -1283,7 +1284,7 @@ static int	DBpatch_3030093(void)
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
 	{
@@ -1370,7 +1371,7 @@ static int	DBpatch_3030102(void)
 
 	result = DBselect("select itemid,lifetime from items");
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	while (NULL != (row = DBfetch(result)))
 	{
@@ -1391,7 +1392,7 @@ static int	DBpatch_3030102(void)
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
 	{
@@ -1706,7 +1707,7 @@ static int	DBpatch_trailing_semicolon_remove(const char *table, const char *reci
 
 	result = DBselect("select %s,%s from %s%s", recid, field, table, condition);
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	while (NULL != (row = DBfetch(result)))
 	{
@@ -1720,7 +1721,7 @@ static int	DBpatch_trailing_semicolon_remove(const char *table, const char *reci
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
 	{
@@ -1748,7 +1749,7 @@ static int	DBpatch_3030139(void)
 
 static int	DBpatch_3030140(void)
 {
-	/* CONDITION_TYPE_TIME_PERIOD */
+	/* ZBX_CONDITION_TYPE_TIME_PERIOD */
 	return DBpatch_trailing_semicolon_remove("conditions", "conditionid", "value", " where conditiontype=6");
 }
 
@@ -2161,7 +2162,7 @@ static int	DBpatch_3030186(void)
 	return DBadd_foreign_key("items", 5, &field);
 }
 
-/* Patches 3030187-3030198 are solve ZBX-12505 issue */
+/* Patches 3030187-3030198 solve the issue ZBX-12505 */
 
 static int	DBpatch_3030187(void)
 {

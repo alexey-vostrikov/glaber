@@ -17,16 +17,18 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "dbcache.h"
-#include "zbxself.h"
-#include "daemon.h"
-#include "log.h"
-#include "proxy.h"
 #include "snmptrapper.h"
 #include "zbxserver.h"
+#include "zbxdbwrap.h"
+
+#include "zbxself.h"
+#include "zbxnix.h"
+#include "log.h"
 #include "zbxregexp.h"
 #include "preproc.h"
+#include "zbxnum.h"
+#include "zbxtime.h"
+#include "zbxsysinfo.h"
 
 static int	trap_fd = -1;
 static off_t	trap_lastsize;
@@ -35,8 +37,7 @@ static char	*buffer = NULL;
 static int	offset = 0;
 static int	force = 0;
 
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
+extern unsigned char			program_type;
 
 static void	DBget_lastsize(void)
 {
@@ -69,29 +70,28 @@ static void	DBupdate_lastsize(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: process_trap_for_interface                                       *
- *                                                                            *
  * Purpose: add trap to all matching items for the specified interface        *
  *                                                                            *
  * Return value: SUCCEED - a matching item was found                          *
  *               FAIL - no matching item was found (including fallback items) *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_timespec_t *ts)
 {
 	DC_ITEM			*items = NULL;
 	const char		*regex;
-	char			error[ITEM_ERROR_LEN_MAX];
+	char			error[ZBX_ITEM_ERROR_LEN_MAX];
 	size_t			num, i;
 	int			ret = FAIL, fb = -1, *lastclocks = NULL, *errcodes = NULL, value_type, regexp_ret;
 	zbx_uint64_t		*itemids = NULL;
 	AGENT_RESULT		*results = NULL;
 	AGENT_REQUEST		request;
 	zbx_vector_ptr_t	regexps;
+	zbx_dc_um_handle_t	*um_handle;
 
 	zbx_vector_ptr_create(&regexps);
+
+	um_handle = zbx_dc_open_user_macros();
 
 	num = DCconfig_get_snmp_items_by_interfaceid(interfaceid, &items);
 
@@ -102,11 +102,11 @@ static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_
 
 	for (i = 0; i < num; i++)
 	{
-		init_result(&results[i]);
+		zbx_init_agent_result(&results[i]);
 		errcodes[i] = FAIL;
 
 		items[i].key = zbx_strdup(items[i].key, items[i].key_orig);
-		if (SUCCEED != substitute_key_macros(&items[i].key, NULL, &items[i], NULL, NULL,
+		if (SUCCEED != zbx_substitute_key_macros(&items[i].key, NULL, &items[i], NULL, NULL,
 				MACRO_TYPE_ITEM_KEY, error, sizeof(error)))
 		{
 			SET_MSG_RESULT(&results[i], zbx_strdup(NULL, error));
@@ -120,9 +120,9 @@ static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_
 			continue;
 		}
 
-		init_request(&request);
+		zbx_init_agent_request(&request);
 
-		if (SUCCEED != parse_item_key(items[i].key, &request))
+		if (SUCCEED != zbx_parse_item_key(items[i].key, &request))
 			goto next;
 
 		if (0 != strcmp(get_rkey(&request), "snmptrap"))
@@ -161,17 +161,17 @@ static int	process_trap_for_interface(zbx_uint64_t interfaceid, char *trap, zbx_
 		}
 
 		value_type = (ITEM_VALUE_TYPE_LOG == items[i].value_type ? ITEM_VALUE_TYPE_LOG : ITEM_VALUE_TYPE_TEXT);
-		set_result_type(&results[i], value_type, trap);
+		zbx_set_agent_result_type(&results[i], value_type, trap);
 		errcodes[i] = SUCCEED;
 		ret = SUCCEED;
 next:
-		free_request(&request);
+		zbx_free_agent_request(&request);
 	}
 
 	if (FAIL == ret && -1 != fb)
 	{
 		value_type = (ITEM_VALUE_TYPE_LOG == items[fb].value_type ? ITEM_VALUE_TYPE_LOG : ITEM_VALUE_TYPE_TEXT);
-		set_result_type(&results[fb], value_type, trap);
+		zbx_set_agent_result_type(&results[fb], value_type, trap);
 		errcodes[fb] = SUCCEED;
 		ret = SUCCEED;
 	}
@@ -205,7 +205,7 @@ next:
 		}
 
 		zbx_free(items[i].key);
-		free_result(&results[i]);
+		zbx_free_agent_result(&results[i]);
 	}
 
 	zbx_free(results);
@@ -219,6 +219,8 @@ next:
 	DCconfig_clean_items(items, NULL, num);
 	zbx_free(items);
 
+	zbx_dc_close_user_macros(um_handle);
+
 	zbx_regexp_clean_expressions(&regexps);
 	zbx_vector_ptr_destroy(&regexps);
 
@@ -229,15 +231,11 @@ next:
 
 /******************************************************************************
  *                                                                            *
- * Function: process_trap                                                     *
- *                                                                            *
  * Purpose: process a single trap                                             *
  *                                                                            *
  * Parameters: addr - [IN] address of the target interface(s)                 *
  *             begin - [IN] beginning of the trap message                     *
  *             end - [IN] end of the trap message                             *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 static void	process_trap(const char *addr, char *begin, char *end)
@@ -276,11 +274,7 @@ static void	process_trap(const char *addr, char *begin, char *end)
 
 /******************************************************************************
  *                                                                            *
- * Function: parse_traps                                                      *
- *                                                                            *
  * Purpose: split traps and process them with process_trap()                  *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 static void	parse_traps(int flag)
@@ -386,8 +380,6 @@ static void	parse_traps(int flag)
 
 /******************************************************************************
  *                                                                            *
- * Function: delay_trap_logs                                                  *
- *                                                                            *
  * Purpose: delay SNMP trapper file related issue log entries for 60 seconds  *
  *          unless this is the first time this issue has occurred             *
  *                                                                            *
@@ -415,11 +407,7 @@ static void	delay_trap_logs(char *error, int log_level)
 
 /******************************************************************************
  *                                                                            *
- * Function: read_traps                                                       *
- *                                                                            *
  * Purpose: read the traps and then parse them with parse_traps()             *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 static int	read_traps(void)
@@ -462,11 +450,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: close_trap_file                                                  *
- *                                                                            *
  * Purpose: close trap file and reset lastsize                                *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  * Comments: !!! do not reset lastsize elsewhere !!!                          *
  *                                                                            *
@@ -483,13 +467,9 @@ static void	close_trap_file(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: open_trap_file                                                   *
- *                                                                            *
  * Purpose: open the trap file and get it's node number                       *
  *                                                                            *
  * Return value: file descriptor of the opened file or -1 otherwise           *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 static int	open_trap_file(void)
@@ -527,15 +507,11 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: get_latest_data                                                  *
- *                                                                            *
  * Purpose: Open the latest trap file. If the current file has been rotated,  *
  *          process that and then open the latest file.                       *
  *                                                                            *
  * Return value: SUCCEED - there are new traps to be parsed                   *
  *               FAIL - there are no new traps or trap file does not exist    *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 static int	get_latest_data(void)
@@ -606,20 +582,16 @@ static int	get_latest_data(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: main_snmptrapper_loop                                            *
- *                                                                            *
  * Purpose: SNMP trap reader's entry point                                    *
- *                                                                            *
- * Author: Rudolfs Kreicbergs                                                 *
  *                                                                            *
  ******************************************************************************/
 ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 {
-	double	sec;
-
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+	double			sec;
+	const zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
+	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
+	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
@@ -627,7 +599,7 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 	glb_preprocessing_init();
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trapfile:'%s'", __func__, CONFIG_SNMPTRAP_FILE);
 
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
@@ -652,7 +624,7 @@ ZBX_THREAD_ENTRY(snmptrapper_thread, args)
 		zbx_setproctitle("%s [processed data in " ZBX_FS_DBL " sec, idle 1 sec]",
 				get_process_type_string(process_type), sec);
 
-		zbx_sleep_loop(1);
+		zbx_sleep_loop(info, 1);
 	}
 
 	zbx_free(buffer);

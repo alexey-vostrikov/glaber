@@ -5,8 +5,6 @@ noinst_LIBRARIES = libzbxtrapper.a libzbxtrapper_server.a libzbxtrapper_proxy.a
 libzbxtrapper_a_SOURCES = \
 	active.c \
 	active.h \
-	proxyconfig.c \
-	proxyconfig.h \
 	trapper_auth.c \
 	trapper_auth.h \
 	nodecommand.c \
@@ -30,3 +28,10 @@ libzbxtrapper_server_a_SOURCES = \
 libzbxtrapper_proxy_a_SOURCES = \
 	trapper_proxy.c \
 	trapper_request.h
+
+libzbxtrapper_a_CFLAGS = \
+	$(LIBXML2_CFLAGS)
+	
+libzbxtrapper_server_a_CFLAGS = -I$(top_srcdir)/src/zabbix_server
+	
+libzbxtrapper_proxy_a_CFLAGS = -I$(top_srcdir)/src/zabbix_proxy	

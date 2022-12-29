@@ -36,12 +36,18 @@ abstract class CControllerUserEditGeneral extends CController {
 	 */
 	protected $timezones = [];
 
-	protected function init() {
+	protected function init(): void {
 		$this->disableSIDValidation();
 
+		$timezone = CSettingsHelper::get(CSettingsHelper::DEFAULT_TIMEZONE);
+
+		if ($timezone === ZBX_DEFAULT_TIMEZONE || $timezone === TIMEZONE_DEFAULT) {
+			$timezone = CTimezoneHelper::getSystemTimezone();
+		}
+
 		$this->timezones = [
-			TIMEZONE_DEFAULT => CDateTimeZoneHelper::getDefaultDateTimeZone()
-		] + (new CDateTimeZoneHelper())->getAllDateTimeZones();
+			TIMEZONE_DEFAULT => CTimezoneHelper::getTitle($timezone, _('System default'))
+		] + CTimezoneHelper::getList();
 	}
 
 	/**
@@ -93,5 +99,12 @@ abstract class CControllerUserEditGeneral extends CController {
 		unset($media);
 
 		return $data;
+	}
+
+	protected function getPasswordRequirements(): array {
+		return [
+			'min_length' => CAuthenticationHelper::get(CAuthenticationHelper::PASSWD_MIN_LENGTH),
+			'check_rules' => CAuthenticationHelper::get(CAuthenticationHelper::PASSWD_CHECK_RULES)
+		];
 	}
 }

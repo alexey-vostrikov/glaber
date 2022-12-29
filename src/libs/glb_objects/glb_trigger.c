@@ -1,5 +1,5 @@
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "log.h"
 #include "glb_trigger.h"

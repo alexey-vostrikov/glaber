@@ -38,7 +38,6 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 				' ',
 				new CSup($element['count'])
 			]))
-				->addClass(ZBX_STYLE_NOWRAP)
 				->addClass(ZBX_STYLE_SUBFILTER)
 				->addClass(ZBX_STYLE_SUBFILTER_ENABLED);
 		}
@@ -67,9 +66,7 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 					$link,
 					' ',
 					new CSup(($subfilter ? '+' : '').$element['count'])
-				]))
-					->addClass(ZBX_STYLE_NOWRAP)
-					->addClass(ZBX_STYLE_SUBFILTER);
+				]))->addClass(ZBX_STYLE_SUBFILTER);
 			}
 		}
 	}
@@ -111,7 +108,6 @@ function prepareTagsSubfilterOutput(array $data, array &$subfilter): array {
 				' ',
 				new CSup($tag['count'])
 			]))
-				->addClass(ZBX_STYLE_NOWRAP)
 				->addClass(ZBX_STYLE_SUBFILTER)
 				->addClass(ZBX_STYLE_SUBFILTER_ENABLED);
 		}
@@ -137,9 +133,7 @@ function prepareTagsSubfilterOutput(array $data, array &$subfilter): array {
 					$link,
 					' ',
 					new CSup(($subfilter ? '+' : '').$tag['count'])
-				]))
-					->addClass(ZBX_STYLE_NOWRAP)
-					->addClass(ZBX_STYLE_SUBFILTER);
+				]))->addClass(ZBX_STYLE_SUBFILTER);
 			}
 		}
 
@@ -149,14 +143,14 @@ function prepareTagsSubfilterOutput(array $data, array &$subfilter): array {
 	return $output;
 }
 
-function makeItemSubfilter(array &$filter_data, array $items = [], string $context) {
+function makeItemSubfilter(array &$filter_data, array $items, string $context) {
 	// subfilters
 	$table_subfilter = (new CTableInfo())
 		->addRow([
 			new CTag('h4', true, [
 				_('Subfilter'), SPACE, (new CSpan(_('affects only filtered data')))->addClass(ZBX_STYLE_GREY)
 			])
-		]);
+		], ZBX_STYLE_HOVER_NOBG);
 
 	// array contains subfilters and number of items in each
 	$item_params = [
@@ -191,7 +185,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name === 'subfilter_tags') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 
 			if ($show_item) {
@@ -211,7 +208,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_hosts') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				$host = reset($item['hosts']);
@@ -229,7 +229,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_types') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				$item_params['types'][$item['type']]['count']++;
@@ -250,7 +253,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_value_types') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				$item_params['value_types'][$item['value_type']]['count']++;
@@ -270,7 +276,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_status') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				$item_params['status'][$item['status']]['count']++;
@@ -290,7 +299,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_state') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				$item_params['state'][$item['state']]['count']++;
@@ -310,7 +322,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_inherited') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				if ($item['templateid'] == 0) {
@@ -335,7 +350,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_with_triggers') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				if (count($item['triggers']) == 0) {
@@ -360,7 +378,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name == 'subfilter_discovered') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 			if ($show_item) {
 				if ($item['flags'] == ZBX_FLAG_DISCOVERY_NORMAL) {
@@ -380,7 +401,7 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 
 			if ($simple_interval_parser->parse($trends) == CParser::PARSE_SUCCESS) {
 				$value = timeUnitToSeconds($trends);
-				$trends = convertUnitsS($value);
+				$trends = convertSecondsToTimeUnits($value);
 			}
 
 			if (!array_key_exists($trends, $item_params['trends'])) {
@@ -397,7 +418,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name === 'subfilter_trends') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 
 			if ($show_item) {
@@ -412,7 +436,7 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 
 			if ($simple_interval_parser->parse($history) == CParser::PARSE_SUCCESS) {
 				$value = timeUnitToSeconds($history);
-				$history = convertUnitsS($value);
+				$history = convertSecondsToTimeUnits($value);
 			}
 
 			if (!array_key_exists($history, $item_params['history'])) {
@@ -429,7 +453,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name === 'subfilter_history') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 
 			if ($show_item) {
@@ -452,7 +479,7 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				// "value" is delay represented in seconds and it is used for sorting the subfilter.
 				if ($delay[0] !== '{') {
 					$value = timeUnitToSeconds($delay);
-					$delay = convertUnitsS($value);
+					$delay = convertSecondsToTimeUnits($value);
 				}
 				else {
 					$value = $delay;
@@ -473,7 +500,10 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 				if ($name === 'subfilter_interval') {
 					continue;
 				}
-				$show_item &= $value;
+				if (!$value) {
+					$show_item = false;
+					break;
+				}
 			}
 
 			if ($show_item) {
@@ -484,9 +514,7 @@ function makeItemSubfilter(array &$filter_data, array $items = [], string $conte
 
 	// output
 	if (count($item_params['tags']) > 1) {
-		$tags_output = prepareTagsSubfilterOutput($item_params['tags'], $filter_data['subfilter_tags'],
-			'subfilter_tags'
-		);
+		$tags_output = prepareTagsSubfilterOutput($item_params['tags'], $filter_data['subfilter_tags']);
 		$table_subfilter->addRow([$tags_output]);
 	}
 
@@ -594,23 +622,34 @@ function prepareItemHttpAgentFormData(array $item) {
 
 		foreach ($item['query_fields']['name'] as $index => $key) {
 			$value = $item['query_fields']['value'][$index];
+			$sortorder = $item['query_fields']['sortorder'][$index];
 
 			if ($key !== '' || $value !== '') {
-				$query_fields[] = [$key => $value];
+				$query_fields[$sortorder] = [$key => $value];
 			}
 		}
+
+		ksort($query_fields);
 		$item['query_fields'] = $query_fields;
 	}
 
 	if ($item['headers']) {
-		$headers = [];
+		$tmp_headers = [];
 
 		foreach ($item['headers']['name'] as $index => $key) {
 			$value = $item['headers']['value'][$index];
+			$sortorder = $item['headers']['sortorder'][$index];
 
 			if ($key !== '' || $value !== '') {
-				$headers[$key] = $value;
+				$tmp_headers[$sortorder] = [$key => $value];
 			}
+		}
+
+		ksort($tmp_headers);
+		$headers = [];
+
+		foreach ($tmp_headers as $key_value_pair) {
+			$headers[key($key_value_pair)] = reset($key_value_pair);
 		}
 
 		$item['headers'] = $headers;
@@ -750,7 +789,8 @@ function getItemFormData(array $item = [], array $options = []) {
 		'preprocessing_script_maxlength' => DB::getFieldLength('item_preproc', 'params'),
 		'context' => getRequest('context'),
 		'show_inherited_tags' => getRequest('show_inherited_tags', 0),
-		'tags' => getRequest('tags', [])
+		'tags' => getRequest('tags', []),
+		'backurl' => getRequest('backurl')
 	];
 
 	// Unset empty and inherited tags.
@@ -783,10 +823,12 @@ function getItemFormData(array $item = [], array $options = []) {
 					&& array_key_exists('value', $data[$property])) {
 				foreach ($data[$property]['name'] as $index => $key) {
 					if (array_key_exists($index, $data[$property]['value'])) {
-						$values[] = [$key => $data[$property]['value'][$index]];
+						$sortorder = $data[$property]['sortorder'][$index];
+						$values[$sortorder] = [$key => $data[$property]['value'][$index]];
 					}
 				}
 			}
+			ksort($values);
 			$data[$property] = $values;
 		}
 
@@ -819,10 +861,8 @@ function getItemFormData(array $item = [], array $options = []) {
 
 	// Dependent item initialization by master_itemid.
 	if (array_key_exists('master_item', $item)) {
-		$expanded = CMacrosResolverHelper::resolveItemNames([$item['master_item']]);
-		$master_item = reset($expanded);
-		$data['master_itemid'] = $master_item['itemid'];
-		$data['master_itemname'] = $master_item['name_expanded'];
+		$data['master_itemid'] = $item['master_item']['itemid'];
+		$data['master_itemname'] = $item['master_item']['name'];
 		// Do not initialize item data if only master_item array was passed.
 		unset($item['master_item']);
 	}
@@ -880,7 +920,7 @@ function getItemFormData(array $item = [], array $options = []) {
 		}
 
 		$data['templates'] = makeItemTemplatesHtml($item['itemid'], getItemParentTemplates([$item], $flag), $flag,
-			CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES), $data['context']
+			CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES)
 		);
 	}
 
@@ -1349,11 +1389,37 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 				break;
 
 			case ZBX_PREPROC_PROMETHEUS_PATTERN:
+				$step_param_2_value = (array_key_exists('params', $step) && array_key_exists(2, $step['params']))
+					? $step['params'][2]
+					: '';
+
+				if ($step_param_1_value === ZBX_PREPROC_PROMETHEUS_FUNCTION) {
+					$step_param_1_value = $step_param_2_value;
+					$step_param_2_value = '';
+				}
+
 				$params = [
 					$step_param_0->setAttribute('placeholder',
 						_('<metric name>{<label name>="<label value>", ...} == <value>')
 					),
-					$step_param_1->setAttribute('placeholder', _('<label name>'))
+					(new CSelect('preprocessing['.$i.'][params][1]'))
+						->addOptions(CSelect::createOptionsFromArray([
+							ZBX_PREPROC_PROMETHEUS_VALUE => _('value'),
+							ZBX_PREPROC_PROMETHEUS_LABEL => _('label'),
+							ZBX_PREPROC_PROMETHEUS_SUM => 'sum',
+							ZBX_PREPROC_PROMETHEUS_MIN => 'min',
+							ZBX_PREPROC_PROMETHEUS_MAX => 'max',
+							ZBX_PREPROC_PROMETHEUS_AVG => 'avg',
+							ZBX_PREPROC_PROMETHEUS_COUNT => 'count'
+						]))
+						->addClass('js-preproc-param-prometheus-pattern-function')
+						->setValue($step_param_1_value)
+						->setReadonly($readonly),
+					(new CTextBox('preprocessing['.$i.'][params][2]', $step_param_2_value))
+						->setTitle($step_param_2_value)
+						->setAttribute('placeholder', _('<label name>'))
+						->setEnabled($step_param_1_value === ZBX_PREPROC_PROMETHEUS_LABEL)
+						->setReadonly($readonly)
 				];
 				break;
 
@@ -1363,7 +1429,6 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 				);
 				break;
 
-			// ZBX-16642
 			case ZBX_PREPROC_CSV_TO_JSON:
 				$step_param_2_value = (array_key_exists('params', $step) && array_key_exists(2, $step['params']))
 					? $step['params'][2]
@@ -1461,7 +1526,7 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 		$preprocessing_list->addItem(
 			(new CListItem([
 				(new CDiv([
-					(new CDiv())
+					(new CDiv(new CVar('preprocessing['.$i.'][sortorder]', $step['sortorder'])))
 						->addClass(ZBX_STYLE_DRAG_ICON)
 						->addClass(!$sortable ? ZBX_STYLE_DISABLED : null),
 					(new CDiv($preproc_types_select))
@@ -1523,10 +1588,17 @@ function getCopyElementsFormData($elements_field, $title = null) {
 		'title' => $title,
 		'elements_field' => $elements_field,
 		'elements' => getRequest($elements_field, []),
-		'copy_type' => getRequest('copy_type', COPY_TYPE_TO_HOST_GROUP),
+		'copy_type' => getRequest('copy_type', COPY_TYPE_TO_TEMPLATE_GROUP),
 		'copy_targetids' => getRequest('copy_targetids', []),
-		'hostid' => getRequest('hostid', 0)
+		'hostid' => 0
 	];
+
+	$prefix = (getRequest('context') === 'host') ? 'web.hosts.' : 'web.templates.';
+	$filter_hostids = getRequest('filter_hostids', CProfile::getArray($prefix.'triggers.filter_hostids', []));
+
+	if (count($filter_hostids) == 1) {
+		$data['hostid'] = reset($filter_hostids);
+	}
 
 	if (!$data['elements'] || !is_array($data['elements'])) {
 		show_error_message(_('Incorrect list of items.'));
@@ -1558,6 +1630,15 @@ function getCopyElementsFormData($elements_field, $title = null) {
 					'templateids' => $data['copy_targetids'],
 					'editable' => true
 				]), ['templateid' => 'id']);
+				break;
+
+			case COPY_TYPE_TO_TEMPLATE_GROUP:
+				$data['copy_targetids'] = CArrayHelper::renameObjectsKeys(API::TemplateGroup()->get([
+					'output' => ['groupid', 'name'],
+					'groupids' => $data['copy_targetids'],
+					'editable' => true
+				]), ['groupid' => 'id']);
+				break;
 		}
 	}
 
@@ -1694,7 +1775,7 @@ function getTriggerFormData(array $data) {
 		// Get templates.
 		$data['templates'] = makeTriggerTemplatesHtml($trigger['triggerid'],
 			getTriggerParentTemplates([$trigger], $flag), $flag,
-			CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES), $data['context']
+			CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES)
 		);
 
 		if ($data['show_inherited_tags']) {
@@ -1761,7 +1842,8 @@ function getTriggerFormData(array $data) {
 			$db_hosts = API::Host()->get([
 				'output' => [],
 				'selectTags' => ['tag', 'value'],
-				'hostids' => $data['hostid']
+				'hostids' => $data['hostid'],
+				'templated_hosts' => true
 			]);
 
 			if ($db_hosts) {
@@ -1824,6 +1906,7 @@ function getTriggerFormData(array $data) {
 			$data['priority'] = $trigger['priority'];
 			$data['status'] = $trigger['status'];
 			$data['comments'] = $trigger['comments'];
+			$data['url_name'] = $trigger['url_name'];
 			$data['url'] = $trigger['url'];
 
 			if ($data['parent_discoveryid'] !== null) {
@@ -1998,24 +2081,29 @@ function getTriggerFormData(array $data) {
  * Renders tag table row.
  *
  * @param int|string $index
- * @param string     $tag      (optional)
- * @param string     $value    (optional)
- * @param array      $options  (optional)
+ * @param string     $tag        (optional)
+ * @param string     $value      (optional)
+ * @param int        $automatic  (optional)
+ * @param array      $options    (optional)
  *
  * @return CRow
  */
-function renderTagTableRow($index, $tag = '', $value = '', array $options = []) {
-	$options = array_merge([
+function renderTagTableRow($index, $tag = '', $value = '', int $automatic = ZBX_TAG_MANUAL, array $options = []) {
+	$options += [
 		'readonly' => false,
-		'field_name' => 'tags'
-	], $options);
+		'field_name' => 'tags',
+		'with_automatic' => false
+	];
 
 	return (new CRow([
-		(new CCol(
+		(new CCol([
 			(new CTextAreaFlexible($options['field_name'].'['.$index.'][tag]', $tag, $options))
 				->setAdaptiveWidth(ZBX_TEXTAREA_TAG_WIDTH)
-				->setAttribute('placeholder', _('tag'))
-		))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT),
+				->setAttribute('placeholder', _('tag')),
+			$options['with_automatic']
+				? new CVar($options['field_name'].'['.$index.'][automatic]', $automatic)
+				: null
+		]))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT),
 		(new CCol(
 			(new CTextAreaFlexible($options['field_name'].'['.$index.'][value]', $value, $options))
 				->setAdaptiveWidth(ZBX_TEXTAREA_TAG_VALUE_WIDTH)
@@ -2047,14 +2135,21 @@ function renderTagTable(array $tags, $readonly = false, array $options = []) {
 		->addStyle('width: 100%; max-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 		->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_CONTAINER);
 
-	$row_options = ['readonly' => $readonly];
+	$with_automatic = array_key_exists('with_automatic', $options) && $options['with_automatic'];
+
+	$row_options = [
+		'readonly' => $readonly,
+		'with_automatic' => $with_automatic
+	];
 
 	if (array_key_exists('field_name', $options)) {
 		$row_options['field_name'] = $options['field_name'];
 	}
 
 	foreach ($tags as $index => $tag) {
-		$table->addRow(renderTagTableRow($index, $tag['tag'], $tag['value'], $row_options));
+		$table->addRow(renderTagTableRow($index, $tag['tag'], $tag['value'],
+			$with_automatic ? $tag['automatic'] : ZBX_TAG_MANUAL, $row_options
+		));
 	}
 
 	return $table->setFooter(new CCol(

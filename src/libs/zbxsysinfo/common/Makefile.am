@@ -2,11 +2,13 @@
 
 noinst_LIBRARIES = libcommonsysinfo.a libcommonsysinfo_http.a libcommonsysinfo_httpmetrics.a
 
-libcommonsysinfo_a_CFLAGS = -I@top_srcdir@/src/zabbix_agent/
+libcommonsysinfo_a_CFLAGS = \
+	-I@top_srcdir@/src/zabbix_agent/ \
+	$(TLS_CFLAGS)
 
 libcommonsysinfo_a_SOURCES = \
-	common.c \
-	common.h \
+	zbxsysinfo_common.c \
+	zbxsysinfo_common.h \
 	cpu.c \
 	cpu.h \
 	dir.c \
@@ -25,6 +27,9 @@ libcommonsysinfo_a_SOURCES = \
 libcommonsysinfo_http_a_SOURCES = \
 	http.c \
 	http.h
+
+libcommonsysinfo_http_a_CFLAGS = \
+	$(TLS_CFLAGS)
 
 libcommonsysinfo_httpmetrics_a_SOURCES = \
 	http_metrics.c \

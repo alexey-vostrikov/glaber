@@ -66,9 +66,10 @@ class CConfigurationImport {
 	public function __construct(array $options, CImportReferencer $referencer,
 			CImportedObjectContainer $importedObjectContainer) {
 		$default_options = [
-			'groups' => ['updateExisting' => false, 'createMissing' => false],
-			'hosts' => ['updateExisting' => false, 'createMissing' => false],
+			'template_groups' => ['updateExisting' => false, 'createMissing' => false],
 			'templates' => ['updateExisting' => false, 'createMissing' => false],
+			'host_groups' => ['updateExisting' => false, 'createMissing' => false],
+			'hosts' => ['updateExisting' => false, 'createMissing' => false],
 			'templateDashboards' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false],
 			'templateLinkage' => ['createMissing' => false, 'deleteMissing' => false],
 			'items' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false],
@@ -82,10 +83,9 @@ class CConfigurationImport {
 			'valueMaps' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false]
 		];
 
+		$options += $default_options;
 		foreach ($default_options as $entity => $rules) {
-			$options[$entity] = array_key_exists($entity, $options)
-				? array_merge($rules, $options[$entity])
-				: $rules;
+			$options[$entity] += $rules;
 		}
 
 		$object_options = (
@@ -134,8 +134,9 @@ class CConfigurationImport {
 		// Parse all import for references to resolve them all together with less sql count.
 		$this->gatherReferences();
 
-		$this->processGroups();
+		$this->processTemplateGroups();
 		$this->processTemplates();
+		$this->processHostGroups();
 		$this->processHosts();
 
 		// Delete missing objects from processed hosts and templates.
@@ -168,8 +169,9 @@ class CConfigurationImport {
 	 * @see CImportReferencer
 	 */
 	protected function gatherReferences(): void {
-		$groups_refs = [];
+		$template_groups_refs = [];
 		$templates_refs = [];
+		$host_groups_refs = [];
 		$hosts_refs = [];
 		$items_refs = [];
 		$valuemaps_refs = [];
@@ -187,15 +189,15 @@ class CConfigurationImport {
 		$httptests_refs = [];
 		$httpsteps_refs = [];
 
-		foreach ($this->getFormattedGroups() as $group) {
-			$groups_refs[$group['name']] = ['uuid' => $group['uuid']];
+		foreach ($this->getFormattedTemplateGroups() as $group) {
+			$template_groups_refs[$group['name']] = ['uuid' => $group['uuid']];
 		}
 
 		foreach ($this->getFormattedTemplates() as $template) {
 			$templates_refs[$template['host']] = ['uuid' => $template['uuid']];
 
 			foreach ($template['groups'] as $group) {
-				$groups_refs += [$group['name'] => []];
+				$template_groups_refs += [$group['name'] => []];
 			}
 
 			if (array_key_exists('macros', $template)) {
@@ -211,11 +213,15 @@ class CConfigurationImport {
 			}
 		}
 
+		foreach ($this->getFormattedHostGroups() as $group) {
+			$host_groups_refs[$group['name']] = ['uuid' => $group['uuid']];
+		}
+
 		foreach ($this->getFormattedHosts() as $host) {
 			$hosts_refs[$host['host']] = [];
 
 			foreach ($host['groups'] as $group) {
-				$groups_refs += [$group['name'] => []];
+				$host_groups_refs += [$group['name'] => []];
 			}
 
 			if (array_key_exists('macros', $host)) {
@@ -335,10 +341,8 @@ class CConfigurationImport {
 						$host_prototypes_refs['host'][$host][$discovery_rule['key_']][] = $host_prototype['host'];
 					}
 
-					foreach ($host_prototype['group_prototypes'] as $group_prototype) {
-						if (isset($group_prototype['group'])) {
-							$groups_refs += [$group_prototype['group']['name'] => []];
-						}
+					foreach ($host_prototype['group_links'] as $group_prototype) {
+						$host_groups_refs += [$group_prototype['group']['name'] => []];
 					}
 
 					if (array_key_exists('macros', $host_prototype)) {
@@ -465,7 +469,7 @@ class CConfigurationImport {
 							break;
 
 						case SYSMAP_ELEMENT_TYPE_HOST_GROUP:
-							$groups_refs += [$selement['elements'][0]['name'] => []];
+							$host_groups_refs += [$selement['elements'][0]['name'] => []];
 							break;
 
 						case SYSMAP_ELEMENT_TYPE_HOST:
@@ -575,8 +579,9 @@ class CConfigurationImport {
 			$images_refs[$image['name']] = [];
 		}
 
-		$this->referencer->addGroups($groups_refs);
+		$this->referencer->addTemplateGroups($template_groups_refs);
 		$this->referencer->addTemplates($templates_refs);
+		$this->referencer->addHostGroups($host_groups_refs);
 		$this->referencer->addHosts($hosts_refs);
 		$this->referencer->addItems($items_refs);
 		$this->referencer->addValuemaps($valuemaps_refs);
@@ -596,18 +601,19 @@ class CConfigurationImport {
 	}
 
 	/**
-	 * Import groups.
+	 * Import template groups.
 	 */
-	protected function processGroups(): void {
-		if (!$this->options['groups']['createMissing'] && !$this->options['groups']['updateExisting']) {
+	protected function processTemplateGroups(): void {
+		if (!$this->options['template_groups']['createMissing']
+				&& !$this->options['template_groups']['updateExisting']) {
 			return;
 		}
 
 		$groups_to_create = [];
 		$groups_to_update = [];
 
-		foreach ($this->getFormattedGroups() as $group) {
-			$groupid = $this->referencer->findGroupidByUuid($group['uuid']);
+		foreach ($this->getFormattedTemplateGroups() as $group) {
+			$groupid = $this->referencer->findTemplateGroupidByUuid($group['uuid']);
 
 			if ($groupid) {
 				$groups_to_update[] = $group + ['groupid' => $groupid];
@@ -617,22 +623,64 @@ class CConfigurationImport {
 			}
 		}
 
-		if ($this->options['groups']['updateExisting'] && $groups_to_update) {
+		if ($this->options['template_groups']['updateExisting'] && $groups_to_update) {
+			API::TemplateGroup()->update(array_map(function($group) {
+				unset($group['uuid']);
+				return $group;
+			}, $groups_to_update));
+
+			foreach ($groups_to_update as $group) {
+				$this->referencer->setDbTemplateGroup($group['groupid'], $group);
+			}
+		}
+
+		if ($this->options['template_groups']['createMissing'] && $groups_to_create) {
+			$created_groups = API::TemplateGroup()->create($groups_to_create);
+
+			foreach ($created_groups['groupids'] as $index => $groupid) {
+				$this->referencer->setDbTemplateGroup($groupid, $groups_to_create[$index]);
+			}
+		}
+	}
+
+	/**
+	 * Import host groups.
+	 */
+	protected function processHostGroups(): void {
+		if (!$this->options['host_groups']['createMissing'] && !$this->options['host_groups']['updateExisting']) {
+			return;
+		}
+
+		$groups_to_create = [];
+		$groups_to_update = [];
+
+		foreach ($this->getFormattedHostGroups() as $group) {
+			$groupid = $this->referencer->findHostGroupidByUuid($group['uuid']);
+
+			if ($groupid) {
+				$groups_to_update[] = $group + ['groupid' => $groupid];
+			}
+			else {
+				$groups_to_create[] = $group;
+			}
+		}
+
+		if ($this->options['host_groups']['updateExisting'] && $groups_to_update) {
 			API::HostGroup()->update(array_map(function($group) {
 				unset($group['uuid']);
 				return $group;
 			}, $groups_to_update));
 
 			foreach ($groups_to_update as $group) {
-				$this->referencer->setDbGroup($group['groupid'], $group);
+				$this->referencer->setDbHostGroup($group['groupid'], $group);
 			}
 		}
 
-		if ($this->options['groups']['createMissing'] && $groups_to_create) {
+		if ($this->options['host_groups']['createMissing'] && $groups_to_create) {
 			$created_groups = API::HostGroup()->create($groups_to_create);
 
 			foreach ($created_groups['groupids'] as $index => $groupid) {
-				$this->referencer->setDbGroup($groupid, $groups_to_create[$index]);
+				$this->referencer->setDbHostGroup($groupid, $groups_to_create[$index]);
 			}
 		}
 	}
@@ -710,7 +758,18 @@ class CConfigurationImport {
 			foreach ($order_tree[$host] as $item_key => $level) {
 				$item = $items[$item_key];
 				$item['hostid'] = $hostid;
+				unset($item['triggers']);
+
 				$levels[$level] = true;
+
+				$delay_types = [ITEM_TYPE_ZABBIX, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL, ITEM_TYPE_ZABBIX_ACTIVE,
+					ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, ITEM_TYPE_SSH, ITEM_TYPE_TELNET,
+					ITEM_TYPE_CALCULATED, ITEM_TYPE_JMX, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
+				];
+
+				if (!in_array($item['type'], $delay_types)) {
+					unset($item['delay']);
+				}
 
 				if (array_key_exists('interface_ref', $item) && $item['interface_ref']) {
 					$interfaceid = $this->referencer->findInterfaceidByRef($hostid, $item['interface_ref']);
@@ -723,6 +782,7 @@ class CConfigurationImport {
 
 					$item['interfaceid'] = $interfaceid;
 				}
+				unset($item['interface_ref']);
 
 				if (array_key_exists('valuemap', $item) && $item['valuemap']) {
 					$valuemapid = $this->referencer->findValuemapidByName($hostid, $item['valuemap']['name']);
@@ -737,8 +797,8 @@ class CConfigurationImport {
 					}
 
 					$item['valuemapid'] = $valuemapid;
-					unset($item['valuemap']);
 				}
+				unset($item['valuemap']);
 
 				if ($item['type'] == ITEM_TYPE_DEPENDENT) {
 					if (!array_key_exists('key', $item[$master_item_key])) {
@@ -789,17 +849,9 @@ class CConfigurationImport {
 				if ($itemid !== null) {
 					$item['itemid'] = $itemid;
 
-					if (!array_key_exists($level, $items_to_update)) {
-						$items_to_update[$level] = [];
-					}
-
 					$items_to_update[$level][] = $item;
 				}
 				else {
-					if (!array_key_exists($level, $items_to_create)) {
-						$items_to_create[$level] = [];
-					}
-
 					$items_to_create[$level][] = $item;
 				}
 			}
@@ -860,7 +912,7 @@ class CConfigurationImport {
 	 * Update CItem or CItemPrototype with dependency.
 	 *
 	 * @param array $items_by_level              Associative array of entities where key is entity dependency
-	 *                                             level and value is array of entities for this level.
+	 *                                           level and value is array of entities for this level.
 	 * @param string $master_item_key            Master entity array key in xml parsed data.
 	 * @param CItem|CItemPrototype $api_service  Entity service which is capable to proceed with entity update.
 	 *
@@ -869,6 +921,8 @@ class CConfigurationImport {
 	protected function updateItemsWithDependency(array $items_by_level, string $master_item_key,
 			CItemGeneral $api_service): void {
 		foreach ($items_by_level as $items_to_update) {
+			$hostids = [];
+
 			foreach ($items_to_update as &$item) {
 				if (array_key_exists($master_item_key, $item)) {
 					$item['master_itemid'] = $this->referencer->findItemidByKey($item['hostid'],
@@ -882,15 +936,19 @@ class CConfigurationImport {
 					}
 					unset($item[$master_item_key]);
 				}
+
+				unset($item['uuid']);
+
+				$hostids[] = $item['hostid'];
+				unset($item['hostid']);
 			}
 			unset($item);
 
-			$updated_items = $api_service->update(array_map(function($item) {
-				unset($item['uuid']);
-				return $item;
-			}, $items_to_update));
+			$updated_items = $api_service->update($items_to_update);
 
 			foreach ($items_to_update as $index => $item) {
+				$item['hostid'] = array_shift($hostids);
+
 				$this->referencer->setDbItem($updated_items['itemids'][$index], $item);
 			}
 		}
@@ -1071,7 +1129,6 @@ class CConfigurationImport {
 		$item_prototypes_to_create = [];
 		$host_prototypes_to_update = [];
 		$host_prototypes_to_create = [];
-		$ex_group_prototypes_where = [];
 		$levels = [];
 
 		foreach ($discovery_rules_by_hosts as $host => $discovery_rules) {
@@ -1091,7 +1148,18 @@ class CConfigurationImport {
 				foreach ($item_prototypes as $index => $level) {
 					$item_prototype = $discovery_rule['item_prototypes'][$index];
 					$item_prototype['hostid'] = $hostid;
+					unset($item_prototype['trigger_prototypes']);
+
 					$levels[$level] = true;
+
+					$delay_types = [ITEM_TYPE_ZABBIX, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL, ITEM_TYPE_ZABBIX_ACTIVE,
+						ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, ITEM_TYPE_SSH, ITEM_TYPE_TELNET,
+						ITEM_TYPE_CALCULATED, ITEM_TYPE_JMX, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
+					];
+
+					if (!in_array($item_prototype['type'], $delay_types)) {
+						unset($item_prototype['delay']);
+					}
 
 					if (array_key_exists('interface_ref', $item_prototype) && $item_prototype['interface_ref']) {
 						$interfaceid = $this->referencer->findInterfaceidByRef($hostid,
@@ -1111,6 +1179,7 @@ class CConfigurationImport {
 							));
 						}
 					}
+					unset($item_prototype['interface_ref']);
 
 					if ($item_prototype['valuemap']) {
 						$valuemapid = $this->referencer->findValuemapidByName($hostid,
@@ -1128,8 +1197,8 @@ class CConfigurationImport {
 						}
 
 						$item_prototype['valuemapid'] = $valuemapid;
-						unset($item_prototype['valuemap']);
 					}
+					unset($item_prototype['valuemap']);
 
 					if ($item_prototype['type'] == ITEM_TYPE_DEPENDENT) {
 						if (!array_key_exists('key', $item_prototype[$master_item_key])) {
@@ -1173,11 +1242,9 @@ class CConfigurationImport {
 						? $this->referencer->findItemidByUuid($item_prototype['uuid'])
 						: $this->referencer->findItemidByKey($hostid, $item_prototype['key_']);
 
-					$item_prototype['rule'] = [
-						'hostid' => $hostid,
-						'key' => $discovery_rule['key_']
-					];
-					$item_prototype['ruleid'] = $itemid;
+					if ($item_prototypeid === null) {
+						$item_prototype['ruleid'] = $itemid;
+					}
 
 					foreach ($item_prototype['preprocessing'] as &$preprocessing_step) {
 						$preprocessing_step['params'] = implode("\n", $preprocessing_step['parameters']);
@@ -1205,7 +1272,7 @@ class CConfigurationImport {
 					$group_links = [];
 
 					foreach ($host_prototype['group_links'] as $group_link) {
-						$groupid = $this->referencer->findGroupidByName($group_link['group']['name']);
+						$groupid = $this->referencer->findHostGroupidByName($group_link['group']['name']);
 
 						if ($groupid === null) {
 							throw new Exception(_s(
@@ -1252,14 +1319,6 @@ class CConfigurationImport {
 						);
 
 					if ($host_prototypeid !== null) {
-						if ($host_prototype['groupPrototypes']) {
-							$ex_group_prototypes_where[] = '('.dbConditionInt('hostid', [$host_prototypeid]).
-								' AND '.dbConditionString('name',
-									array_column($host_prototype['groupPrototypes'], 'name')
-								).
-							')';
-						}
-
 						if (array_key_exists('macros', $host_prototype)) {
 							foreach ($host_prototype['macros'] as &$macro) {
 								$hostmacroid = $this->referencer->findHostPrototypeMacroid($host_prototypeid,
@@ -1282,37 +1341,6 @@ class CConfigurationImport {
 						$host_prototypes_to_create[] = $host_prototype;
 					}
 				}
-			}
-		}
-
-		// Attach existing host group prototype ids.
-		if ($ex_group_prototypes_where) {
-			$db_group_prototypes = DBFetchArray(DBselect(
-				'SELECT group_prototypeid,name,hostid'.
-					' FROM group_prototype'.
-					' WHERE '.implode(' OR ', $ex_group_prototypes_where)
-			));
-
-			if ($db_group_prototypes) {
-				$groups_hash = [];
-				foreach ($db_group_prototypes as $group) {
-					$groups_hash[$group['hostid']][$group['name']] = $group['group_prototypeid'];
-				}
-
-				foreach ($host_prototypes_to_update as &$host_prototype) {
-					if (!array_key_exists($host_prototype['hostid'], $groups_hash)) {
-						continue;
-					}
-
-					$hash = $groups_hash[$host_prototype['hostid']];
-					foreach ($host_prototype['groupPrototypes'] as &$group_prototype) {
-						if (array_key_exists($group_prototype['name'], $hash)) {
-							$group_prototype['group_prototypeid'] = $hash[$group_prototype['name']];
-						}
-					}
-					unset($group_prototype, $hash);
-				}
-				unset($host_prototype, $groups_hash);
 			}
 		}
 
@@ -2386,15 +2414,11 @@ class CConfigurationImport {
 			return;
 		}
 
-		$dashboards = $this->getFormattedTemplateDashboards();
+		$dashboard_importer = new CTemplateDashboardImporter($this->options, $this->referencer,
+			$this->importedObjectContainer
+		);
 
-		if ($dashboards) {
-			$dashboard_importer = new CTemplateDashboardImporter($this->options, $this->referencer,
-				$this->importedObjectContainer
-			);
-
-			$dashboard_importer->delete($dashboards);
-		}
+		$dashboard_importer->delete($this->getFormattedTemplateDashboards());
 	}
 
 	/**
@@ -2452,16 +2476,29 @@ class CConfigurationImport {
 	}
 
 	/**
-	 * Get formatted groups.
+	 * Get formatted template groups.
 	 *
 	 * @return array
 	 */
-	protected function getFormattedGroups(): array {
-		if (!array_key_exists('groups', $this->formattedData)) {
-			$this->formattedData['groups'] = $this->adapter->getGroups();
+	protected function getFormattedTemplateGroups(): array {
+		if (!array_key_exists('template_groups', $this->formattedData)) {
+			$this->formattedData['template_groups'] = $this->adapter->getTemplateGroups();
 		}
 
-		return $this->formattedData['groups'];
+		return $this->formattedData['template_groups'];
+	}
+
+	/**
+	 * Get formatted host groups.
+	 *
+	 * @return array
+	 */
+	protected function getFormattedHostGroups(): array {
+		if (!array_key_exists('host_groups', $this->formattedData)) {
+			$this->formattedData['host_groups'] = $this->adapter->getHostGroups();
+		}
+
+		return $this->formattedData['host_groups'];
 	}
 
 	/**
@@ -2601,7 +2638,7 @@ class CConfigurationImport {
 	 */
 	protected function getFormattedTemplateDashboards(): array {
 		if (!array_key_exists('templateDashboards', $this->formattedData)) {
-				$this->formattedData['templateDashboards'] = $this->adapter->getTemplateDashboards();
+			$this->formattedData['templateDashboards'] = $this->adapter->getTemplateDashboards();
 		}
 
 		return $this->formattedData['templateDashboards'];
@@ -2684,23 +2721,17 @@ class CConfigurationImport {
 		$parent_item_keys = [];
 		$resolved_masters_cache = [];
 
-		$host_name_to_hostid = array_fill_keys(array_keys($items_by_hosts), null);
-
-		foreach ($host_name_to_hostid as $host_name => &$hostid) {
-			$hostid = $this->referencer->findTemplateidOrHostidByHost($host_name);
-		}
-		unset($hostid);
+		$host_name_to_hostid = [];
 
 		foreach ($items_by_hosts as $host_name => $items) {
-			if (!array_key_exists($host_name, $host_name_to_hostid)) {
-				throw new Exception(_s('Incorrect value for field "%1$s": %2$s.', 'host',
-					_s('value "%1$s" not found', $host_name)
-				));
+			$hostid = $this->referencer->findTemplateidOrHostidByHost($host_name);
+
+			if ($hostid === null) {
+				unset($items_by_hosts[$host_name]);
+				continue;
 			}
 
-			if (!array_key_exists($host_name, $resolved_masters_cache)) {
-				$resolved_masters_cache[$host_name] = [];
-			}
+			$host_name_to_hostid[$host_name] = $hostid;
 
 			// Cache input array entities.
 			foreach ($items as $item) {
@@ -2710,7 +2741,7 @@ class CConfigurationImport {
 				];
 
 				if ($item['type'] == ITEM_TYPE_DEPENDENT && array_key_exists('key', $item[$master_item_key])) {
-					$parent_item_hostids[$host_name_to_hostid[$host_name]] = true;
+					$parent_item_hostids[$hostid] = true;
 					$parent_item_keys[$item[$master_item_key]['key']] = true;
 				}
 			}

@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,14 +23,15 @@
  * @var CView $this
  */
 
-$this->addJsFile('multiselect.js');
 $this->addJsFile('class.calendar.js');
 $this->includeJsFile('reports.scheduledreport.edit.js.php', [
 	'old_dashboardid' => $data['old_dashboardid'],
 	'dashboard_inaccessible' => $data['dashboard_inaccessible']
 ]);
 
-$widget = (new CWidget())->setTitle(_('Scheduled reports'));
+$html_page = (new CHtmlPage())
+	->setTitle(_('Scheduled reports'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::REPORTS_SCHEDULEDREPORT_EDIT));
 
 $form = (new CForm())
 	->setId('scheduledreport-form')
@@ -40,7 +41,7 @@ $form = (new CForm())
 			->setArgument('action', ($data['reportid'] == 0) ? 'scheduledreport.create' : 'scheduledreport.update')
 			->getUrl()
 	)
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID);
 
 if ($data['reportid'] != 0) {
 	$form->addVar('reportid', $data['reportid']);
@@ -57,6 +58,6 @@ $form_grid = new CPartial('scheduledreport.formgrid.html', [
 
 $form->addItem((new CTabView())->addTab('scheduledreport_tab', _('Scheduled report'), $form_grid));
 
-$widget
+$html_page
 	->addItem($form)
 	->show();

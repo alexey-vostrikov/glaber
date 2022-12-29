@@ -19,7 +19,7 @@
 
 
 
-#include "common.h"
+#include "zbxcommon.h"
 
 #ifdef HAVE_GLB_TESTS
 

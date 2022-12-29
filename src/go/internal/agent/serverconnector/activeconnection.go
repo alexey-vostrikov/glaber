@@ -31,37 +31,45 @@ import (
 )
 
 type activeConnection struct {
-	address   string
+	addresses []string
 	hostname  string
 	localAddr net.Addr
 	tlsConfig *tls.Config
+	timeout   int
+	session   string
 }
 
-func (c *activeConnection) Write(data []byte, timeout time.Duration) (err error) {
-	b, err := zbxcomms.Exchange(c.address, &c.localAddr, timeout, data, c.tlsConfig)
-	if err != nil {
-		return err
+func (c *activeConnection) Write(data []byte, timeout time.Duration) []error {
+	b, errs, _ := zbxcomms.Exchange(&c.addresses, &c.localAddr, timeout, time.Second*time.Duration(c.timeout),
+		data, c.tlsConfig)
+	if errs != nil {
+		return errs
 	}
 
 	var response agentDataResponse
 
-	err = json.Unmarshal(b, &response)
+	err := json.Unmarshal(b, &response)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 
 	if response.Response != "success" {
 		if len(response.Info) != 0 {
-			return fmt.Errorf("%s", response.Info)
+			return []error{fmt.Errorf("%s", response.Info)}
 		}
-		return errors.New("unsuccessful response")
+
+		return []error{errors.New("unsuccessful response")}
 	}
 
 	return nil
 }
 
 func (c *activeConnection) Addr() (s string) {
-	return c.address
+	return c.addresses[0]
+}
+
+func (c *activeConnection) Session() (s string) {
+	return c.session
 }
 
 func (c *activeConnection) Hostname() (s string) {

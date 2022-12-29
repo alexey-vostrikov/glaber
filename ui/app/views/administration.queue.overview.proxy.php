@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,7 +23,7 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Queue overview by proxy'))
 	->setTitleSubmenu([
 		'main_section' => [
@@ -39,7 +39,8 @@ $widget = (new CWidget())
 					->getUrl() => _('Queue details')
 			]
 		]
-	]);
+	])
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::QUEUE_OVERVIEW_PROXY));
 
 $table = (new CTableInfo())->setHeader([
 	_('Proxy'),
@@ -66,17 +67,17 @@ foreach ($data['proxies'] as $proxyid => $proxy) {
 	$table->addRow([
 		$proxy['host'],
 		($proxy_queue['delay5'] == 0) ? 0 : (new CCol($proxy_queue['delay5']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_NOT_CLASSIFIED)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_NOT_CLASSIFIED)),
 		($proxy_queue['delay10'] == 0) ? 0 : (new CCol($proxy_queue['delay10']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_INFORMATION)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_INFORMATION)),
 		($proxy_queue['delay30'] == 0) ? 0 : (new CCol($proxy_queue['delay30']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_WARNING)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_WARNING)),
 		($proxy_queue['delay60'] == 0) ? 0 : (new CCol($proxy_queue['delay60']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_AVERAGE)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_AVERAGE)),
 		($proxy_queue['delay300'] == 0) ? 0 : (new CCol($proxy_queue['delay300']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_HIGH)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_HIGH)),
 		($proxy_queue['delay600'] == 0) ? 0 : (new CCol($proxy_queue['delay600']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_DISASTER))
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_DISASTER))
 	]);
 }
 
@@ -86,7 +87,7 @@ if (CWebUser::getRefresh()) {
 		->show();
 }
 
-$widget
+$html_page
 	->addItem($table)
 	->addItem((new CDiv())
 		->addClass(ZBX_STYLE_TABLE_PAGING)

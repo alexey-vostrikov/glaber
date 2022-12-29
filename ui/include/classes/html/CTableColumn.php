@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -38,5 +38,16 @@ class CTableColumn extends CTag {
 	 */
 	public function getHeader(): CCol {
 		return $this->header;
+	}
+
+	/**
+	 * Passes through setting of class names to the internal header object.
+	 *
+	 * @return CTableColumn
+	 */
+	public function addClass($class) {
+		$this->header->addClass($class);
+
+		return $this;
 	}
 }

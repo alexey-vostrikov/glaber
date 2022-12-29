@@ -17,13 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxcommon.h"
 
-#include "db.h"
+#include "zbxdbhigh.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_db_save_item_changes                                         *
  *                                                                            *
  * Purpose: save item state, error, mtime, lastlogsize changes to             *
  *          database                                                          *

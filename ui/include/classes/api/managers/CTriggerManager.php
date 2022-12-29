@@ -90,19 +90,6 @@ class CTriggerManager {
 			DB::delete('conditions', ['conditionid' => $conditionids]);
 		}
 
-		// Update IT services.
-		if (self::usedInItServices($del_triggerids)) {
-			DB::update('services', [
-				'values' => [
-					'triggerid' => null,
-					'showsla' => SERVICE_SHOW_SLA_OFF
-				],
-				'where' => ['triggerid' => $del_triggerids]
-			]);
-
-			updateItServices();
-		}
-
 		// Remove trigger sysmap elements.
 		$selement_triggerids = [];
 		$selementids = [];
@@ -146,43 +133,18 @@ class CTriggerManager {
 				'value' => $del_triggerid
 			];
 		}
-		
 
 		DB::insertBatch('housekeeper', $ins_housekeeper);
-		//before deleting deps, put them to the changeset to remove from the server cfg
-		
-		$removed_deps = DBselect(
-				'SELECT *'.
-				' FROM trigger_depends'.
-				' WHERE '.dbConditionInt('triggerid_down', $del_triggerids).
-				'    OR '.dbConditionInt('triggerid_up', $del_triggerids)
-			);
-		
-		
+
+		DB::delete('functions', ['triggerid' => $del_triggerids]);
+		DB::delete('trigger_discovery', ['triggerid' => $del_triggerids]);
 		DB::delete('trigger_depends', ['triggerid_down' => $del_triggerids]);
 		DB::delete('trigger_depends', ['triggerid_up' => $del_triggerids]);
-		
-		DB::delete('trigger_discovery', ['triggerid' => $del_triggerids]);
 		DB::delete('trigger_tag', ['triggerid' => $del_triggerids]);
-
+		DB::update('triggers', [
+			'values' => ['templateid' => 0],
+			'where' => ['triggerid' => $del_triggerids]
+		]);
 		DB::delete('triggers', ['triggerid' => $del_triggerids]);
-		
-		CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS,CChangeset::DB_DELETE, $del_func_ids); 
-		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS,CChangeset::DB_DELETE, $del_triggerids);
-						
-		CZabbixServer::notifyConfigChanges();
-	}
-
-	/**
-	 * Returns true if at least one of the given triggers is used in services.
-	 *
-	 * @param array $triggerids
-	 *
-	 * @return bool
-	 */
-	public static function usedInItServices(array $triggerids) {
-		$db_services = DBselect('SELECT NULL FROM services WHERE '.dbConditionInt('triggerid', $triggerids), 1);
-
-		return (bool) DBfetch($db_services);
 	}
 }

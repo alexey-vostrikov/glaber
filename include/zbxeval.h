@@ -20,9 +20,9 @@
 #ifndef ZABBIX_ZBXEVAL_H
 #define ZABBIX_ZBXEVAL_H
 
-#include "common.h"
-#include "zbxalgo.h"
+#include "zbxtime.h"
 #include "zbxvariant.h"
+#include "zbxexpr.h"
 
 /*
  * Token type flags (32 bits):
@@ -105,12 +105,12 @@
 
 /* expression parsing rules */
 
-#define	ZBX_EVAL_PARSE_TRIGGER_EXPRESSSION	(ZBX_EVAL_PARSE_MACRO | ZBX_EVAL_PARSE_USERMACRO 	|\
+#define	ZBX_EVAL_PARSE_TRIGGER_EXPRESSION	(ZBX_EVAL_PARSE_MACRO | ZBX_EVAL_PARSE_USERMACRO 	|\
 						ZBX_EVAL_PARSE_FUNCTIONID | ZBX_EVAL_PARSE_FUNCTION 	|\
 						ZBX_EVAL_PARSE_MATH | ZBX_EVAL_PARSE_COMPARE 		|\
 						ZBX_EVAL_PARSE_LOGIC | ZBX_EVAL_PARSE_VAR)
 
-#define	ZBX_EVAL_PARSE_CALC_EXPRESSSION		(ZBX_EVAL_PARSE_MACRO | ZBX_EVAL_PARSE_USERMACRO 	|\
+#define	ZBX_EVAL_PARSE_CALC_EXPRESSION		(ZBX_EVAL_PARSE_MACRO | ZBX_EVAL_PARSE_USERMACRO 	|\
 						ZBX_EVAL_PARSE_ITEM_QUERY | ZBX_EVAL_PARSE_FUNCTION	|\
 						ZBX_EVAL_PARSE_MATH | ZBX_EVAL_PARSE_COMPARE 		|\
 						ZBX_EVAL_PARSE_LOGIC | ZBX_EVAL_PARSE_VAR 		|\
@@ -138,16 +138,16 @@
 
 /* composite rules */
 
-#define ZBX_EVAL_TRIGGER_EXPRESSION	(ZBX_EVAL_PARSE_TRIGGER_EXPRESSSION | \
+#define ZBX_EVAL_TRIGGER_EXPRESSION	(ZBX_EVAL_PARSE_TRIGGER_EXPRESSION | \
 					ZBX_EVAL_PARSE_CONST_INDEX | \
 					ZBX_EVAL_PROCESS_ERROR)
 
-#define ZBX_EVAL_TRIGGER_EXPRESSION_LLD	(ZBX_EVAL_PARSE_TRIGGER_EXPRESSSION | \
+#define ZBX_EVAL_TRIGGER_EXPRESSION_LLD	(ZBX_EVAL_PARSE_TRIGGER_EXPRESSION | \
 					ZBX_EVAL_PARSE_LLDMACRO | \
 					ZBX_EVAL_COMPOSE_LLD | \
 					ZBX_EVAL_COMPOSE_FUNCTIONID)
 
-#define ZBX_EVAL_CALC_EXPRESSION_LLD	(ZBX_EVAL_PARSE_CALC_EXPRESSSION | \
+#define ZBX_EVAL_CALC_EXPRESSION_LLD	(ZBX_EVAL_PARSE_CALC_EXPRESSION | \
 					ZBX_EVAL_PARSE_LLDMACRO | \
 					ZBX_EVAL_COMPOSE_LLD)
 
@@ -210,8 +210,8 @@ typedef struct
 }
 zbx_eval_context_t;
 
-typedef int (*zbx_macro_resolve_func_t)(const char *str, size_t length, zbx_uint64_t *hostids,
-		int hostids_num, char **value, char **error);
+typedef int	(*zbx_macro_expand_func_t)(void *data, char **str, const zbx_uint64_t *hostids, int hostids_num, \
+		char **error);
 
 int	zbx_eval_parse_expression(zbx_eval_context_t *ctx, const char *expression, zbx_uint64_t rules, char **error);
 void	zbx_eval_init(zbx_eval_context_t *ctx);
@@ -226,15 +226,18 @@ int	zbx_eval_execute_ext(zbx_eval_context_t *ctx, const zbx_timespec_t *ts, zbx_
 		zbx_eval_function_cb_t history_func_cb, void *data, zbx_variant_t *value, char **error);
 void	zbx_eval_get_functionids(zbx_eval_context_t *ctx, zbx_vector_uint64_t *functionids);
 void	zbx_eval_get_functionids_ordered(zbx_eval_context_t *ctx, zbx_vector_uint64_t *functionids);
-int	zbx_eval_expand_user_macros(const zbx_eval_context_t *ctx, zbx_uint64_t *hostids, int hostids_num,
-		zbx_macro_resolve_func_t resolver_cb, char **error);
+int	zbx_eval_expand_user_macros(const zbx_eval_context_t *ctx, const zbx_uint64_t *hostids, int hostids_num,
+		zbx_macro_expand_func_t um_expand_cb, void *data, char **error);
+
 void	zbx_eval_set_exception(zbx_eval_context_t *ctx, char *message);
 
 #define ZBX_EVAL_EXTRACT_FUNCTIONID	0x0001
 #define ZBX_EVAL_EXTRACT_VAR_STR	0x0002
 #define ZBX_EVAL_EXTRACT_VAR_MACRO	0x0004
+#define ZBX_EVAL_EXTRACT_VAR_USERMACRO	0x0008
 
-#define ZBX_EVAL_EXCTRACT_ALL	(ZBX_EVAL_EXTRACT_FUNCTIONID | ZBX_EVAL_EXTRACT_VAR_STR | ZBX_EVAL_EXTRACT_VAR_MACRO)
+#define ZBX_EVAL_EXTRACT_ALL	(ZBX_EVAL_EXTRACT_FUNCTIONID | ZBX_EVAL_EXTRACT_VAR_STR | ZBX_EVAL_EXTRACT_VAR_MACRO | \
+		ZBX_EVAL_EXTRACT_VAR_USERMACRO)
 
 zbx_eval_context_t *zbx_eval_deserialize_dyn(const unsigned char *data, const char *expression,
 		zbx_uint64_t mask);
@@ -250,7 +253,6 @@ char	*zbx_eval_format_function_error(const char *function, const char *host, con
 		const char *parameter, const char *error);
 
 void	zbx_eval_extract_item_refs(zbx_eval_context_t *ctx, zbx_vector_str_t *refs);
-
 
 typedef struct
 {
@@ -276,5 +278,11 @@ int	zbx_eval_calc_stddevsamp(zbx_vector_dbl_t *values, double *result, char **er
 int	zbx_eval_calc_sumofsquares(zbx_vector_dbl_t *values, double *result, char **error);
 int	zbx_eval_calc_varpop(zbx_vector_dbl_t *values, double *result, char **error);
 int	zbx_eval_calc_varsamp(zbx_vector_dbl_t *values, double *result, char **error);
+int	zbx_eval_calc_histogram_quantile(const double q, const zbx_vector_dbl_t *values, const char *err_fn,
+		double *result, char **error);
 
+int	zbx_eval_calc_avg(zbx_vector_dbl_t *values, double *result, char **error);
+int	zbx_eval_calc_min(zbx_vector_dbl_t *values, double *result, char **error);
+int	zbx_eval_calc_max(zbx_vector_dbl_t *values, double *result, char **error);
+int	zbx_eval_calc_sum(zbx_vector_dbl_t *values, double *result, char **error);
 #endif

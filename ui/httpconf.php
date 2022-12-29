@@ -26,9 +26,7 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = _('Configuration of web monitoring');
 $page['file'] = 'httpconf.php';
-$page['scripts'] = ['class.cviewswitcher.js', 'multiselect.js', 'class.tab-indicators.js', 'textareaflexible.js',
-	'class.tagfilteritem.js'
-];
+$page['scripts'] = ['class.tagfilteritem.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -186,35 +184,7 @@ elseif (isset($_REQUEST['clone']) && isset($_REQUEST['httptestid'])) {
 	$_REQUEST['form'] = 'clone';
 }
 elseif (hasRequest('del_history') && hasRequest('httptestid')) {
-	$result = true;
-
-	$httpTestId = getRequest('httptestid');
-
-	$httpTests = API::HttpTest()->get([
-		'output' => ['name'],
-		'httptestids' => [$httpTestId],
-		'selectHosts' => ['name'],
-		'editable' => true
-	]);
-
-	if ($httpTests) {
-		DBstart();
-
-		$result = deleteHistoryByHttpTestIds([$httpTestId]);
-		$result = ($result && DBexecute('UPDATE httptest SET nextcheck=0 WHERE httptestid='.zbx_dbstr($httpTestId)));
-
-		if ($result) {
-			$httpTest = reset($httpTests);
-			$host = reset($httpTest['hosts']);
-
-			add_audit(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_SCENARIO,
-				_('Web scenario').' ['.$httpTest['name'].'] ['.$httpTestId.'] '.
-					_('Host').' ['.$host['name'].'] '._('History cleared')
-			);
-		}
-
-		$result = DBend($result);
-	}
+	$result = deleteHistoryByHttpTestIds([getRequest('httptestid')]);
 
 	show_messages($result, _('History cleared'), _('Cannot clear history'));
 }
@@ -452,42 +422,12 @@ elseif (hasRequest('action') && str_in_array(getRequest('action'), ['httptest.ma
 	show_messages($result, $messageSuccess, $messageFailed);
 }
 elseif (hasRequest('action') && getRequest('action') === 'httptest.massclearhistory'
-		&& hasRequest('group_httptestid') && is_array(getRequest('group_httptestid'))) {
-	$result = false;
+		&& hasRequest('group_httptestid') && is_array(getRequest('group_httptestid'))
+		&& getRequest('group_httptestid')) {
+	$result = deleteHistoryByHttpTestIds(getRequest('group_httptestid'));
 
-	$httpTestIds = getRequest('group_httptestid');
-
-	$httpTests = API::HttpTest()->get([
-		'output' => ['httptestid', 'name'],
-		'httptestids' => $httpTestIds,
-		'selectHosts' => ['name'],
-		'editable' => true
-	]);
-
-	if ($httpTests) {
-		DBstart();
-
-		$result = deleteHistoryByHttpTestIds($httpTestIds);
-		$result = ($result && DBexecute(
-			'UPDATE httptest SET nextcheck=0 WHERE '.dbConditionInt('httptestid', $httpTestIds)
-		));
-
-		if ($result) {
-			foreach ($httpTests as $httpTest) {
-				$host = reset($httpTest['hosts']);
-
-				add_audit(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_SCENARIO,
-					_('Web scenario').' ['.$httpTest['name'].'] ['.$httpTest['httptestid'].'] '.
-						_('Host').' ['.$host['name'].'] '._('History cleared')
-				);
-			}
-		}
-
-		$result = DBend($result);
-
-		if ($result) {
-			uncheckTableRows(getRequest('hostid'));
-		}
+	if ($result) {
+		uncheckTableRows(getRequest('hostid'));
 	}
 
 	show_messages($result, _('History cleared'), _('Cannot clear history'));
@@ -511,8 +451,6 @@ if (hasRequest('action') && hasRequest('group_httptestid') && !$result) {
 
 	uncheckTableRows(getRequest('hostid'), zbx_objectValues($httptests, 'httptestid'));
 }
-
-show_messages();
 
 /*
  * Display
@@ -561,8 +499,7 @@ if (isset($_REQUEST['form'])) {
 		$data['retries'] = $db_httptest['retries'];
 		$data['status'] = $db_httptest['status'];
 		$data['templates'] = makeHttpTestTemplatesHtml($db_httptest['httptestid'],
-			getHttpTestParentTemplates($db_httptests), CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES),
-			$data['context']
+			getHttpTestParentTemplates($db_httptests), CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES)
 		);
 
 		$data['agent'] = ZBX_AGENT_OTHER;
@@ -802,11 +739,14 @@ else {
 
 	$filter = [
 		'status' => CProfile::get($prefix.'httpconf.filter_status', -1),
-		'groups' => CProfile::getArray($prefix.'httpconf.filter_groupids', null),
-		'hosts' => CProfile::getArray($prefix.'httpconf.filter_hostids', null),
+		'groups' => [],
+		'hosts' => [],
 		'evaltype' => CProfile::get($prefix.'httpconf.filter.evaltype', TAG_EVAL_TYPE_AND_OR),
 		'tags' => []
 	];
+
+	$filter_groupids = CProfile::getArray($prefix.'httpconf.filter_groupids', []);
+	$filter_hostids = CProfile::getArray($prefix.'httpconf.filter_hostids', []);
 
 	foreach (CProfile::getArray($prefix.'httpconf.filter.tags.tag', []) as $i => $tag) {
 		$filter['tags'][] = [
@@ -817,35 +757,23 @@ else {
 	}
 
 	// Get host groups.
-	$filter['groups'] = $filter['groups']
-		? CArrayHelper::renameObjectsKeys(API::HostGroup()->get([
-			'output' => ['groupid', 'name'],
-			'groupids' => $filter['groups'],
-			'editable' => true,
-			'preservekeys' => true
-		]), ['groupid' => 'id'])
-		: [];
-
-	$filter_groupids = $filter['groups'] ? array_keys($filter['groups']) : null;
-	if ($filter_groupids) {
-		$filter_groupids = getSubGroups($filter_groupids);
-	}
+	$filter_groupids = getSubGroups($filter_groupids, $filter['groups'], ['editable' => true], $data['context']);
 
 	if ($data['context'] === 'host') {
-		$filter['hosts'] = $filter['hosts']
+		$filter['hosts'] = $filter_hostids
 			? CArrayHelper::renameObjectsKeys(API::Host()->get([
 				'output' => ['hostid', 'name'],
-				'hostids' => $filter['hosts'],
+				'hostids' => $filter_hostids,
 				'editable' => true,
 				'preservekeys' => true
 			]), ['hostid' => 'id'])
 			: [];
 	}
 	else {
-		$filter['hosts'] = $filter['hosts']
+		$filter['hosts'] = $filter_hostids
 			? CArrayHelper::renameObjectsKeys(API::Template()->get([
 				'output' => ['templateid', 'name'],
-				'templateids' => $filter['hosts'],
+				'templateids' => $filter_hostids,
 				'editable' => true,
 				'preservekeys' => true
 			]), ['templateid' => 'id'])
@@ -870,7 +798,7 @@ else {
 		'output' => ['httptestid', $sortField],
 		'selectTags' => ['tag', 'value'],
 		'hostids' => $filter['hosts'] ? array_keys($filter['hosts']) : null,
-		'groupids' => $filter_groupids,
+		'groupids' => $filter_groupids ? $filter_groupids : null,
 		'tags' => $data['filter']['tags'],
 		'evaltype' => $data['filter']['evaltype'],
 		'templated' => ($data['context'] === 'template'),

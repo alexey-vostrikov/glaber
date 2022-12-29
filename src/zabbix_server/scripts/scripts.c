@@ -17,20 +17,20 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "scripts.h"
+#include "zbxserver.h"
+
 #include "../poller/checks_agent.h"
 #include "../ipmi/ipmi.h"
 #include "../poller/checks_ssh.h"
 #include "../poller/checks_telnet.h"
 #include "zbxexec.h"
-#include "zbxserver.h"
-#include "db.h"
+#include "zbxdbhigh.h"
 #include "log.h"
 #include "zbxtasks.h"
-#include "scripts.h"
-#include "zbxjson.h"
 #include "zbxembed.h"
-#include "../events.h"
+#include "zbxnum.h"
+#include "zbxsysinfo.h"
 
 extern int	CONFIG_TRAPPER_TIMEOUT;
 extern int	CONFIG_IPMIPOLLER_FORKS;
@@ -56,17 +56,17 @@ static int	zbx_execute_script_on_agent(const DC_HOST *host, const char *command,
 	}
 
 	port = zbx_strdup(port, item.interface.port_orig);
-	substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, NULL,
+	zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host->hostid, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&port, MACRO_TYPE_COMMON, NULL, 0);
 
-	if (SUCCEED != (ret = is_ushort(port, &item.interface.port)))
+	if (SUCCEED != (ret = zbx_is_ushort(port, &item.interface.port)))
 	{
 		zbx_snprintf(error, max_error_len, "Invalid port number [%s]", item.interface.port_orig);
 		goto fail;
 	}
 
 	param = zbx_strdup(param, command);
-	if (SUCCEED != (ret = quote_key_param(&param, 0)))
+	if (SUCCEED != (ret = zbx_quote_key_param(&param, 0)))
 	{
 		zbx_snprintf(error, max_error_len, "Invalid param [%s]", param);
 		goto fail;
@@ -75,22 +75,22 @@ static int	zbx_execute_script_on_agent(const DC_HOST *host, const char *command,
 	item.key = zbx_dsprintf(item.key, "system.run[%s%s]", param, NULL == result ? ",nowait" : "");
 	item.value_type = ITEM_VALUE_TYPE_TEXT;
 
-	init_result(&agent_result);
+	zbx_init_agent_result(&agent_result);
 
 	zbx_alarm_on(CONFIG_TIMEOUT);
 
 	if (SUCCEED != (ret = get_value_agent(&item, &agent_result)))
 	{
-		if (ISSET_MSG(&agent_result))
+		if (ZBX_ISSET_MSG(&agent_result))
 			zbx_strlcpy(error, agent_result.msg, max_error_len);
 		ret = FAIL;
 	}
-	else if (NULL != result && ISSET_TEXT(&agent_result))
+	else if (NULL != result && ZBX_ISSET_TEXT(&agent_result))
 		*result = zbx_strdup(*result, agent_result.text);
 
 	zbx_alarm_off();
 
-	free_result(&agent_result);
+	zbx_free_agent_result(&agent_result);
 
 	zbx_free(item.key);
 fail:
@@ -167,22 +167,22 @@ static int	zbx_execute_script_on_terminal(const DC_HOST *host, const zbx_script_
 	item.value_type = ITEM_VALUE_TYPE_TEXT;
 	item.params = zbx_strdup(item.params, script->command);
 
-	init_result(&agent_result);
+	zbx_init_agent_result(&agent_result);
 
 	zbx_alarm_on(CONFIG_TIMEOUT);
 
 	if (SUCCEED != (ret = function(&item, &agent_result)))
 	{
-		if (ISSET_MSG(&agent_result))
+		if (ZBX_ISSET_MSG(&agent_result))
 			zbx_strlcpy(error, agent_result.msg, max_error_len);
 		ret = FAIL;
 	}
-	else if (NULL != result && ISSET_TEXT(&agent_result))
+	else if (NULL != result && ZBX_ISSET_TEXT(&agent_result))
 		*result = zbx_strdup(*result, agent_result.text);
 
 	zbx_alarm_off();
 
-	free_result(&agent_result);
+	zbx_free_agent_result(&agent_result);
 
 	zbx_free(item.params);
 	zbx_free(item.key);
@@ -284,8 +284,6 @@ void	zbx_script_clean(zbx_script_t *script)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_webhook_params_pack_json                                     *
- *                                                                            *
  * Purpose: pack webhook script parameters into JSON                          *
  *                                                                            *
  * Parameters: params      - [IN] vector of pairs of pointers to parameter    *
@@ -314,8 +312,6 @@ void	zbx_webhook_params_pack_json(const zbx_vector_ptr_pair_t *params, char **pa
 
 /***********************************************************************************
  *                                                                                 *
- * Function: zbx_script_prepare                                                    *
- *                                                                                 *
  * Purpose: prepares user script                                                   *
  *                                                                                 *
  * Parameters: script        - [IN] the script to prepare                          *
@@ -334,35 +330,38 @@ void	zbx_webhook_params_pack_json(const zbx_vector_ptr_pair_t *params, char **pa
  ***********************************************************************************/
 int	zbx_script_prepare(zbx_script_t *script, const zbx_uint64_t *hostid, char *error, size_t max_error_len)
 {
-	int	ret = FAIL;
+	int			ret = FAIL;
+	zbx_dc_um_handle_t	*um_handle;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	um_handle = zbx_dc_open_user_macros();
 
 	switch (script->type)
 	{
 		case ZBX_SCRIPT_TYPE_SSH:
-			substitute_simple_macros(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL,
-					&script->publickey, MACRO_TYPE_COMMON, NULL, 0);
-			substitute_simple_macros(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL,
-					&script->privatekey, MACRO_TYPE_COMMON, NULL, 0);
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+					NULL, &script->publickey, MACRO_TYPE_COMMON, NULL, 0);
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+					NULL, &script->privatekey, MACRO_TYPE_COMMON, NULL, 0);
 			ZBX_FALLTHROUGH;
 		case ZBX_SCRIPT_TYPE_TELNET:
-			substitute_simple_macros(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL,
-					&script->port, MACRO_TYPE_COMMON, NULL, 0);
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+					NULL, &script->port, MACRO_TYPE_COMMON, NULL, 0);
 
-			if ('\0' != *script->port && SUCCEED != (ret = is_ushort(script->port, NULL)))
+			if ('\0' != *script->port && SUCCEED != (ret = zbx_is_ushort(script->port, NULL)))
 			{
 				zbx_snprintf(error, max_error_len, "Invalid port number \"%s\"", script->port);
 				goto out;
 			}
 
-			substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL,
-					NULL, &script->username, MACRO_TYPE_COMMON, NULL, 0);
-			substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL,
-					NULL, &script->password, MACRO_TYPE_COMMON, NULL, 0);
+			zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL,
+					NULL, NULL, &script->username, MACRO_TYPE_COMMON, NULL, 0);
+			zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, hostid, NULL, NULL, NULL, NULL, NULL,
+					NULL, NULL, &script->password, MACRO_TYPE_COMMON, NULL, 0);
 			break;
 		case ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT:
-			dos2unix(script->command);	/* CR+LF (Windows) => LF (Unix) */
+			zbx_dos2unix(script->command);	/* CR+LF (Windows) => LF (Unix) */
 			break;
 		case ZBX_SCRIPT_TYPE_WEBHOOK:
 		case ZBX_SCRIPT_TYPE_IPMI:
@@ -372,6 +371,8 @@ int	zbx_script_prepare(zbx_script_t *script, const zbx_uint64_t *hostid, char *e
 			goto out;
 	}
 
+	zbx_dc_close_user_macros(um_handle);
+
 	ret = SUCCEED;
 out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
@@ -379,8 +380,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DBfetch_webhook_params                                           *
  *                                                                            *
  * Purpose: fetch webhook parameters                                          *
  *                                                                            *
@@ -427,8 +426,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_script_execute                                               *
- *                                                                            *
  * Purpose: executing user scripts or remote commands                         *
  *                                                                            *
  * Parameters:  script         - [IN] the script to be executed               *
@@ -468,8 +465,11 @@ int	zbx_script_execute(const zbx_script_t *script, const DC_HOST *host, const ch
 					break;
 				case ZBX_SCRIPT_EXECUTE_ON_SERVER:
 				case ZBX_SCRIPT_EXECUTE_ON_PROXY:
-					ret = zbx_execute(script->command, result, error, max_error_len,
-							CONFIG_TRAPPER_TIMEOUT, ZBX_EXIT_CODE_CHECKS_ENABLED, NULL);
+					if (SUCCEED != (ret = zbx_execute(script->command, result, error, max_error_len,
+							CONFIG_TRAPPER_TIMEOUT, ZBX_EXIT_CODE_CHECKS_ENABLED, NULL)))
+					{
+						ret = FAIL;
+					}
 					break;
 				default:
 					zbx_snprintf(error, max_error_len, "Invalid 'Execute on' option \"%d\".",
@@ -516,8 +516,6 @@ int	zbx_script_execute(const zbx_script_t *script, const DC_HOST *host, const ch
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_script_create_task                                           *
- *                                                                            *
  * Purpose: creates remote command task from a script                         *
  *                                                                            *
  * Return value:  the identifier of the created task or 0 in the case of      *
@@ -531,7 +529,7 @@ zbx_uint64_t	zbx_script_create_task(const zbx_script_t *script, const DC_HOST *h
 	zbx_uint64_t	taskid;
 
 	if (NULL != script->port && '\0' != script->port[0])
-		is_ushort(script->port, &port);
+		zbx_is_ushort(script->port, &port);
 	else
 		port = 0;
 

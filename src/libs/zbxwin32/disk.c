@@ -17,12 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxwin32.h"
+
+#include "zbxstr.h"
 #include "log.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: get_cluster_size                                                 *
  *                                                                            *
  * Purpose: get file system cluster size for specified path (for cases when   *
  *          the file system is mounted on empty NTFS directory)               *
@@ -34,7 +34,7 @@
  *               On error, 0 is returned.                                     *
  *                                                                            *
  ******************************************************************************/
-zbx_uint64_t	get_cluster_size(const char *path, char **error)
+zbx_uint64_t	zbx_get_cluster_size(const char *path, char **error)
 {
 	wchar_t 	*disk = NULL, *wpath = NULL;
 	unsigned long	sectors_per_cluster, bytes_per_sector, path_length;

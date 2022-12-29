@@ -25,7 +25,9 @@
 
 require_once dirname(__FILE__).'/js/configuration.action.edit.js.php';
 
-$widget = (new CWidget())->setTitle(_('Actions'));
+$html_page = (new CHtmlPage())
+	->setTitle(_('Actions'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ALERTS_ACTION_EDIT));
 
 // create form
 $actionForm = (new CForm())
@@ -35,7 +37,7 @@ $actionForm = (new CForm())
 		->setArgument('eventsource', $data['eventsource'])
 		->getUrl()
 	)
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
 	->addVar('form', $data['form']);
 
 if ($data['actionid']) {
@@ -95,7 +97,7 @@ if ($data['action']['filter']['conditions']) {
 				)))->addClass(ZBX_STYLE_TABLE_FORMS_OVERFLOW_BREAK),
 				(new CCol([
 					(new CButton('remove', _('Remove')))
-						->onClick('javascript: removeCondition('.$i.');')
+						->onClick('removeCondition('.$i.');')
 						->addClass(ZBX_STYLE_BTN_LINK)
 						->removeId(),
 					new CVar('conditions['.$i.']', $condition)
@@ -108,7 +110,9 @@ if ($data['action']['filter']['conditions']) {
 	}
 }
 
-$formula = (new CTextBox('formula', $data['action']['filter']['formula']))
+$formula = (new CTextBox('formula', $data['action']['filter']['formula'], false,
+		DB::getFieldLength('actions', 'formula')
+	))
 	->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	->setId('formula')
 	->setAttribute('placeholder', 'A or (B and C) &hellip;');
@@ -131,10 +135,13 @@ $action_tab->addRow(new CLabel(_('Type of calculation'), 'label-evaltype'), [
 
 $condition_table->addRow([
 	(new CSimpleButton(_('Add')))
-		->onClick('return PopUp("popup.condition.actions",'.json_encode([
-			'type' => ZBX_POPUP_CONDITION_TYPE_ACTION,
-			'source' => $data['eventsource']
-		]).', null, this);')
+		->setAttribute('data-eventsource', $data['eventsource'])
+		->onClick('
+			PopUp("popup.condition.actions", {
+				type: '.ZBX_POPUP_CONDITION_TYPE_ACTION.',
+				source: this.dataset.eventsource,
+			}, {dialogue_class: "modal-popup-medium"});
+		')
 		->addClass(ZBX_STYLE_BTN_LINK)
 ]);
 
@@ -151,7 +158,7 @@ $action_tab->addRow(_('Enabled'),
 // Operations tab.
 $operation_tab = new CFormList();
 
-if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVENT_SOURCE_INTERNAL) {
+if (in_array($data['eventsource'], [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE])) {
 	$operation_tab->addRow((new CLabel(_('Default operation step duration'), 'esc_period'))->setAsteriskMark(),
 		(new CTextBox('esc_period', $data['action']['esc_period']))
 			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
@@ -159,18 +166,12 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVE
 	);
 }
 
-if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS) {
-	$operation_tab->addRow(_('Pause operations for suppressed problems'),
-		(new CCheckBox('pause_suppressed', ACTION_PAUSE_SUPPRESSED_TRUE))
-			->setChecked($data['action']['pause_suppressed'] == ACTION_PAUSE_SUPPRESSED_TRUE)
-	);
-}
-
 // create operation table
 $operations_table = (new CTable())
 	->setId('op-table')
 	->setAttribute('style', 'width: 100%;');
-if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVENT_SOURCE_INTERNAL) {
+
+if (in_array($data['eventsource'], [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE])) {
 	$operations_table->setHeader([_('Steps'), _('Details'), _('Start in'), _('Duration'), _('Action')]);
 	$delays = count_operations_delay($data['action']['operations'], $data['action']['esc_period']);
 }
@@ -179,7 +180,7 @@ else {
 }
 
 if ($data['action']['operations']) {
-	$actionOperationDescriptions = getActionOperationDescriptions([$data['action']], ACTION_OPERATION);
+	$actionOperationDescriptions = getActionOperationDescriptions($data['eventsource'], [$data['action']], ACTION_OPERATION);
 
 	$simple_interval_parser = new CSimpleIntervalParser();
 
@@ -197,9 +198,6 @@ if ($data['action']['operations']) {
 		if (!isset($operation['opconditions'])) {
 			$operation['opconditions'] = [];
 		}
-		if (!isset($operation['mediatypeid'])) {
-			$operation['mediatypeid'] = 0;
-		}
 
 		$details = new CSpan($actionOperationDescriptions[0][$operationid]);
 
@@ -210,7 +208,7 @@ if ($data['action']['operations']) {
 			}
 		}
 
-		if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVENT_SOURCE_INTERNAL) {
+		if (in_array($data['eventsource'], [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE])) {
 			$esc_steps_txt = null;
 			$esc_period_txt = null;
 			$esc_delay_txt = null;
@@ -302,7 +300,11 @@ if ($data['action']['operations']) {
 
 $operations_table->addRow(
 	(new CSimpleButton(_('Add')))
-		->onClick('operation_details.open(this,'.$data['actionid'].','.$data['eventsource'].','.ACTION_OPERATION.')')
+		->setAttribute('data-actionid', $data['actionid'])
+		->setAttribute('data-eventsource', $data['eventsource'])
+		->onClick('
+			operation_details.open(this, this.dataset.actionid, this.dataset.eventsource, '.ACTION_OPERATION.');
+		')
 		->addClass(ZBX_STYLE_BTN_LINK)
 );
 
@@ -312,8 +314,8 @@ $operation_tab->addRow(_('Operations'),
 		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 );
 
-// Recovery operation tab.
-if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVENT_SOURCE_INTERNAL) {
+// Recovery operations.
+if (in_array($data['eventsource'], [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE])) {
 	// Create operation table.
 	$operations_table = (new CTable())
 		->setId('rec-table')
@@ -321,7 +323,9 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVE
 	$operations_table->setHeader([_('Details'), _('Action')]);
 
 	if ($data['action']['recovery_operations']) {
-		$actionOperationDescriptions = getActionOperationDescriptions([$data['action']], ACTION_RECOVERY_OPERATION);
+		$actionOperationDescriptions = getActionOperationDescriptions($data['eventsource'], [$data['action']],
+			ACTION_RECOVERY_OPERATION
+		);
 
 		foreach ($data['action']['recovery_operations'] as $operationid => $operation) {
 			if (!str_in_array($operation['operationtype'], $data['allowedOperations'][ACTION_RECOVERY_OPERATION])) {
@@ -366,9 +370,8 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVE
 							])),
 						[
 							(new CButton('remove', _('Remove')))
-								->onClick(
-									'javascript: removeOperation('.$operationid.', '.ACTION_RECOVERY_OPERATION.');'
-								)
+								->setAttribute('data-operationid', $operationid)
+								->onClick('removeOperation(this.dataset.operationid, '.ACTION_RECOVERY_OPERATION.');')
 								->addClass(ZBX_STYLE_BTN_LINK)
 								->removeId(),
 							new CVar('recovery_operations['.$operationid.']', $operation),
@@ -384,9 +387,13 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVE
 
 	$operations_table->addRow(
 		(new CSimpleButton(_('Add')))
-			->onClick('operation_details.open(this,'.$data['actionid'].','.$data['eventsource'].','.
-				ACTION_RECOVERY_OPERATION.')'
-			)
+			->setAttribute('data-actionid', $data['actionid'])
+			->setAttribute('data-eventsource', $data['eventsource'])
+			->onClick('
+				operation_details.open(this, this.dataset.actionid, this.dataset.eventsource,
+					'.ACTION_RECOVERY_OPERATION.'
+				);
+			')
 			->addClass(ZBX_STYLE_BTN_LINK)
 	);
 
@@ -397,25 +404,27 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVE
 	);
 }
 
-// Acknowledge operations
-if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS) {
+// Update operations.
+if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS || $data['eventsource'] == EVENT_SOURCE_SERVICE) {
 	$action_formname = $actionForm->getName();
 
 	$operations_table = (new CTable())
-		->setId('ack-table')
-		->setAttribute('style', 'width: 100%;');
-	$operations_table->setHeader([_('Details'), _('Action')]);
+		->setId('upd-table')
+		->setAttribute('style', 'width: 100%;')
+		->setHeader([_('Details'), _('Action')]);
 
-	if ($data['action']['ack_operations']) {
-		$operation_descriptions = getActionOperationDescriptions([$data['action']], ACTION_ACKNOWLEDGE_OPERATION);
+	if ($data['action']['update_operations']) {
+		$operation_descriptions = getActionOperationDescriptions($data['eventsource'], [$data['action']],
+			ACTION_UPDATE_OPERATION
+		);
 
-		foreach ($data['action']['ack_operations'] as $operationid => $operation) {
-			if (!str_in_array($operation['operationtype'], $data['allowedOperations'][ACTION_ACKNOWLEDGE_OPERATION])) {
+		foreach ($data['action']['update_operations'] as $operationid => $operation) {
+			if (!str_in_array($operation['operationtype'], $data['allowedOperations'][ACTION_UPDATE_OPERATION])) {
 				continue;
 			}
+
 			$operation += [
-				'opconditions'	=> [],
-				'mediatypeid'	=> 0
+				'opconditions'	=> []
 			];
 
 			$details = new CSpan($operation_descriptions[0][$operationid]);
@@ -438,31 +447,34 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS) {
 								'operationid' => $operationid,
 								'actionid' => $data['actionid'],
 								'eventsource' => $data['eventsource'],
-								'operationtype' => ACTION_ACKNOWLEDGE_OPERATION
+								'operationtype' => ACTION_UPDATE_OPERATION
 							])),
 						[
 							(new CButton('remove', _('Remove')))
-								->onClick('javascript: removeOperation('.$operationid.', '.ACTION_ACKNOWLEDGE_OPERATION.
-									');'
-								)
+								->setAttribute('data-operationid', $operationid)
+								->onClick('removeOperation(this.dataset.operationid, '.ACTION_UPDATE_OPERATION.');')
 								->addClass(ZBX_STYLE_BTN_LINK)
 								->removeId(),
-							new CVar('ack_operations['.$operationid.']', $operation),
-							new CVar('operations_for_popup['.ACTION_ACKNOWLEDGE_OPERATION.']['.$operationid.']',
+							new CVar('update_operations['.$operationid.']', $operation),
+							new CVar('operations_for_popup['.ACTION_UPDATE_OPERATION.']['.$operationid.']',
 								json_encode($operation_for_popup)
 							)
 						]
 					])
 				))->addClass(ZBX_STYLE_NOWRAP)
-			], null, 'ack_operations_'.$operationid);
+			], null, 'update_operations_'.$operationid);
 		}
 	}
 
 	$operations_table->addRow(
 		(new CSimpleButton(_('Add')))
-			->onClick('operation_details.open(this,'.$data['actionid'].','.$data['eventsource'].','.
-				ACTION_ACKNOWLEDGE_OPERATION.')'
-			)
+			->setAttribute('data-actionid', $data['actionid'])
+			->setAttribute('data-eventsource', $data['eventsource'])
+			->onClick('
+				operation_details.open(this, this.dataset.actionid, this.dataset.eventsource,
+					'.ACTION_UPDATE_OPERATION.'
+				);
+			')
 			->addClass(ZBX_STYLE_BTN_LINK)
 	);
 
@@ -471,6 +483,18 @@ if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS) {
 			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 			->addStyle('min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 	);
+}
+
+if ($data['eventsource'] == EVENT_SOURCE_TRIGGERS) {
+	$operation_tab
+		->addRow(_('Pause operations for suppressed problems'),
+			(new CCheckBox('pause_suppressed', ACTION_PAUSE_SUPPRESSED_TRUE))
+				->setChecked($data['action']['pause_suppressed'] == ACTION_PAUSE_SUPPRESSED_TRUE)
+		)
+		->addRow(_('Notify about canceled escalations'),
+			(new CCheckBox('notify_if_canceled', ACTION_NOTIFY_IF_CANCELED_TRUE))
+				->setChecked($data['action']['notify_if_canceled'] == ACTION_NOTIFY_IF_CANCELED_TRUE)
+		);
 }
 
 // Append tabs to form.
@@ -515,7 +539,6 @@ $action_tabs->setFooter([
 ]);
 $actionForm->addItem($action_tabs);
 
-// Append form to widget.
-$widget->addItem($actionForm);
-
-$widget->show();
+$html_page
+	->addItem($actionForm)
+	->show();

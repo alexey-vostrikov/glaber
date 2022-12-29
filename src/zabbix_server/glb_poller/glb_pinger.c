@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxserver.h"
 #include "../../libs/zbxexec/worker.h"
 #include "glb_pinger.h"
@@ -26,6 +26,10 @@
 #include "preproc.h"
 #include "zbxjson.h"
 #include "poller_async_io.h"
+#include "zbxsysinfo.h"
+#include "zbxip.h"
+
+#define PINGER_FLOAT_PRECISION	0.0001
 
 typedef struct
 {
@@ -109,7 +113,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
     poller_disable_event(pinger_item->timeout_event);
     //pinger_item->time_event = NULL;
     
-    init_result(&result);
+    zbx_init_agent_result(&result);
         
     LOG_DBG("In %s: Starting, itemid is %ld, status is %d, error is '%s', mstime is %ld", __func__,
                 poller_get_item_id(poller_item), status, error, mstime);
@@ -144,8 +148,8 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
                     //but zabbix expects seconds
                     value_dbl = value_dbl/1000;
 
-					if (0 < value_dbl && ZBX_FLOAT_PRECISION > value_dbl)
-						value_dbl = ZBX_FLOAT_PRECISION;
+					if (0 < value_dbl && PINGER_FLOAT_PRECISION > value_dbl)
+						value_dbl = PINGER_FLOAT_PRECISION;
                         SET_DBL_RESULT(&result, value_dbl);
                         //zabbix_log(LOG_LEVEL_DEBUG,"For item %ld submitting  min/max/avg value %f",poller_item->itemid,value_dbl);
                         poller_preprocess_value(poller_item, &result , mstime, ITEM_STATE_NORMAL, NULL);
@@ -163,7 +167,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
                     exit(-1);
 			}
 
-            free_result(&result);
+            zbx_free_agent_result(&result);
             break;
          }
         default:
@@ -203,7 +207,7 @@ ITEMS_ITERATOR(process_item_by_ip_cb) {
     if (POLL_FINISHED == pinger_process_response(poller_item, rtt)) {
 
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got the final packet for the item with broken echo data");
-        poller_inc_responces();
+        poller_inc_responses();
         finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
                     
         pinger_item->state = POLL_QUEUED; 
@@ -277,7 +281,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
         if (POLL_FINISHED == pinger_process_response(poller_item, rtt_l)) {
             DEBUG_ITEM(poller_get_item_id(poller_item), "Got the final packet for the item");
  
-            poller_inc_responces();
+            poller_inc_responses();
             finish_icmp_poll(poller_item, SUCCEED, NULL, mstime);
                     
            //theese are two different things, need to set both
@@ -385,17 +389,16 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     
     ZBX_STRDUP(parsed_key, dc_item->key_orig);
     
-	if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
+	if (SUCCEED != zbx_substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
 				sizeof(error)))
         return FAIL;
 
-    if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
+    if (SUCCEED != zbx_parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
 					&interval, &size, &timeout, &type, error, sizeof(error))) 
 	    return FAIL;
 
     pinger_item->ip = NULL;
     pinger_item->addr = addr;
-  //  pinger_item->lastresolve=0;
     pinger_item->type = type;
     pinger_item->count = count;
 
@@ -437,7 +440,6 @@ static void free_item(poller_item_t *glb_poller_item ) {
     zbx_free(pinger_item->ip);
     zbx_free(pinger_item->addr);
     
-  //  if (NULL != pinger_item->time_event)
     poller_destroy_event(pinger_item->packet_event);
     poller_destroy_event(pinger_item->timeout_event);
 
@@ -452,7 +454,7 @@ int needs_resolve(pinger_item_t *pinger_item) {
   //  if (pinger_item->lastresolve + GLB_DNS_CACHE_TIME > now) 
   //      return FAIL;
     
-    if (SUCCEED == is_ip4(pinger_item->addr)) {
+    if (SUCCEED == zbx_is_ip4(pinger_item->addr)) {
         //    pinger_item->lastresolve = now;
             pinger_item->ip = zbx_strdup(pinger_item->ip, pinger_item->addr);
             return FAIL;
@@ -570,7 +572,7 @@ void glb_pinger_init(void) {
 		exit(-1);
 	};
 
-    if ( NULL != CONFIG_SOURCE_IP && SUCCEED == is_ip4(CONFIG_SOURCE_IP) ) {
+    if ( NULL != CONFIG_SOURCE_IP && SUCCEED == zbx_is_ip4(CONFIG_SOURCE_IP) ) {
         zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s ",CONFIG_SOURCE_IP);
     } 
 

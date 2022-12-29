@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -38,7 +39,7 @@ const (
 )
 
 // GetMemory reads /proc/meminfo file and returns and returns the value in bytes for the
-// specific memory type. Returns an error if the value was not found, or if theres is an issue
+// specific memory type. Returns an error if the value was not found, or if there is an issue
 // with reading the file or parsing the value.
 func GetMemory(memType string) (mem uint64, err error) {
 	meminfo, err := ReadAll("/proc/meminfo")

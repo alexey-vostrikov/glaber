@@ -17,114 +17,113 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 
-typedef struct {
+typedef struct
+{
     zbx_hashset_t sessions;
 } poller_session_conf_t;
 
 static poller_session_conf_t conf = {0};
 
-typedef struct {
+typedef struct
+{
     u_int32_t sess_id;
-    u_int32_t ip;
     u_int64_t itemid;
     int time_added;
 } sess_t;
 
-static u_int32_t gen_random32bit(){
+static u_int32_t gen_random32bit()
+{
     u_int32_t x;
-    
- //   x = rand() & 0x00;
- //   x |= (rand() & 0xff) << 8;
- //   x |= (rand() & 0xff) << 16;
- //   x |= (rand() & 0xff) << 24;
     x = rand();
     return x;
 }
 
 /*this is for testing if the state machine performs well */
-static void dump_outdated_sessions() {
-    zbx_hashset_iter_t iter;
-    sess_t *sess;
-    static int lastrun = 0;
+// static void dump_outdated_sessions() {
+//     zbx_hashset_iter_t iter;
+//     sess_t *sess;
+//     static int lastrun = 0;
 
-    int now = time(NULL);
+//     int now = time(NULL);
 
-    if (now-lastrun < 10) 
-        return;
-    lastrun = now;
-    
-    zbx_hashset_iter_reset(&conf.sessions, &iter);
-    
-    while ( NULL != (sess = zbx_hashset_iter_next(&iter))) {
-        if (now - sess->time_added > 30 ) {
-            LOG_INF("Warning: found outdated session %u", sess->sess_id);
-            zbx_hashset_iter_remove(&iter);
-        }
-    }
-}
+//     if (now-lastrun < 10)
+//         return;
+//     lastrun = now;
 
-u_int32_t poller_sessions_create_session(u_int64_t itemid, u_int32_t ip) {
+//     zbx_hashset_iter_reset(&conf.sessions, &iter);
+
+//     while ( NULL != (sess = zbx_hashset_iter_next(&iter))) {
+//         if (now - sess->time_added > 30 ) {
+//             LOG_INF("Warning: found outdated session %u", sess->sess_id);
+//             zbx_hashset_iter_remove(&iter);
+//         }
+//     }
+// }
+
+u_int32_t poller_sessions_create_session(u_int64_t itemid, u_int32_t ip)
+{
     sess_t local_session, *session;
 
     u_int32_t sess_id = gen_random32bit();
     // itemid & 0xffffffff;
 
-    while (NULL != (session = zbx_hashset_search(&conf.sessions, &sess_id))) 
+    while (NULL != (session = zbx_hashset_search(&conf.sessions, &sess_id)))
         sess_id = gen_random32bit();
 
     local_session.sess_id = sess_id;
-    local_session.ip = ip;
+    //  local_session.ip = ip;
     local_session.itemid = itemid;
     local_session.time_added = time(NULL);
 
     zbx_hashset_insert(&conf.sessions, &local_session, sizeof(local_session));
-  //  LOG_INF("Generated session id %u for item %ld", sess_id, itemid);
- //   LOG_INF("Created session %u for ip %s (%u), itemid %ld", sess_id, ip_str, ip_addr,  itemid);
-  //  dump_outdated_sessions();
+
+    //  dump_outdated_sessions();
     return sess_id;
 }
 
-u_int64_t poller_sessions_close_session(u_int32_t sess_id) {
-//int poller_sessions_check_id(u_int64_t sess_id) {
-    
+u_int64_t poller_sessions_close_session(u_int32_t sess_id)
+{
+
     sess_t *sess;
     u_int64_t itemid;
-    if (NULL == ( sess = zbx_hashset_search(&conf.sessions, &sess_id))) {
-     //   LOG_INF("No data found for session %u", sess_id);
+    if (NULL == (sess = zbx_hashset_search(&conf.sessions, &sess_id)))
         return 0;
-    }
-    
+
     itemid = sess->itemid;
     zbx_hashset_remove_direct(&conf.sessions, sess);
-   // LOG_INF("Removed session %u for item %ld age %d sec",sess->sess_id, sess->itemid, time(NULL) - sess->time_added);
+
     return itemid;
 }
 
-int poller_sessions_count() {
+int poller_sessions_count()
+{
     return conf.sessions.num_data;
 }
 
-static zbx_hash_t sess_hash(const void *data) {
-    return *(u_int32_t*)data;
+static zbx_hash_t sess_hash(const void *data)
+{
+    return *(u_int32_t *)data;
 }
 
-static int	sess_compare_func(const void *d1, const void *d2) {
-	const u_int32_t	*i1 = (const u_int32_t *)d1;
-	const u_int32_t	*i2 = (const u_int32_t *)d2;
+static int sess_compare_func(const void *d1, const void *d2)
+{
+    const u_int32_t *i1 = (const u_int32_t *)d1;
+    const u_int32_t *i2 = (const u_int32_t *)d2;
 
-	ZBX_RETURN_IF_NOT_EQUAL(*i1, *i2);
+    ZBX_RETURN_IF_NOT_EQUAL(*i1, *i2);
 
-	return 0;
+    return 0;
 }
 
-void poller_sessions_init() {
+void poller_sessions_init()
+{
     zbx_hashset_create(&conf.sessions, 1000, sess_hash, sess_compare_func);
 }
 
-void poller_sessions_destroy() {
+void poller_sessions_destroy()
+{
     zbx_hashset_destroy(&conf.sessions);
 }
-

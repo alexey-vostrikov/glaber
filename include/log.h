@@ -20,7 +20,7 @@
 #ifndef ZABBIX_LOG_H
 #define ZABBIX_LOG_H
 
-#include "common.h"
+#include "zbxcommon.h"
 
 #define LOG_LEVEL_EMPTY		0	/* printing nothing (if not LOG_LEVEL_INFORMATION set) */
 #define LOG_LEVEL_CRIT		1
@@ -46,18 +46,6 @@ extern int	zbx_log_level;
 #define ZBX_CHECK_LOG_LEVEL(level)			\
 		((LOG_LEVEL_INFORMATION != (level) &&	\
 		((level) > zbx_log_level || LOG_LEVEL_EMPTY == (level))) ? FAIL : SUCCEED)
-
-typedef enum
-{
-	ERR_Z3001 = 3001,
-	ERR_Z3002,
-	ERR_Z3003,
-	ERR_Z3004,
-	ERR_Z3005,
-	ERR_Z3006,
-	ERR_Z3007
-}
-zbx_err_codes_t;
 
 #ifdef HAVE___VA_ARGS__
 #	define ZBX_ZABBIX_LOG_CHECK
@@ -102,4 +90,6 @@ void		zbx_handle_log(void);
 int		zbx_get_log_type(const char *logtype);
 int		zbx_validate_log_parameters(ZBX_TASK_EX *task);
 
+void	zbx_strlog_alloc(int level, char **out, size_t *out_alloc, size_t *out_offset, const char *format,
+		...) __zbx_attr_format_printf(5, 6);
 #endif

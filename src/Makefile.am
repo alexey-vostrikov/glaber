@@ -70,7 +70,6 @@ PROXY_SUBDIRS = \
 	zabbix_server/poller \
 	zabbix_server/glb_poller \
 	zabbix_server/trapper \
-	zabbix_server/selfmon \
 	zabbix_server/snmptrapper \
 	zabbix_server/vmware \
 	zabbix_server/ipmi \
@@ -78,9 +77,9 @@ PROXY_SUBDIRS = \
 	zabbix_server/scripts \
 	zabbix_server/preprocessor \
 	zabbix_server/availability \
+	zabbix_server/service \
 	zabbix_proxy \
 	zabbix_js
-	
 endif
 endif
 
@@ -96,7 +95,6 @@ SUBDIRS = \
 	$(SERVER_SUBDIRS) \
 	$(PROXY_SUBDIRS) \
 	$(JAVA_SUBDIRS)
-	
 
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:

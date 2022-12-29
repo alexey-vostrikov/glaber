@@ -1,7 +1,7 @@
 #ifndef DISCOVERY_H
 #define DISCOVERY_H
 
-#include "common.h"
+#include "zbxcommon.h"
 
 //chekcs if row has to be passwed to the processing of LLD
 int discovery_init(mem_funcs_t *memf);

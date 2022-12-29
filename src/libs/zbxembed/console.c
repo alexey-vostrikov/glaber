@@ -17,17 +17,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "console.h"
+#include "embed.h"
+
 #include "log.h"
 #include "zbxjson.h"
-#include "zbxembed.h"
-#include "embed.h"
 #include "duktape.h"
-#include "console.h"
+#include "zbxstr.h"
+#include "zbxtime.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: es_console_dtor                                                  *
  *                                                                            *
  * Purpose: console destructor                                                *
  *                                                                            *
@@ -40,8 +39,6 @@ static duk_ret_t	es_console_dtor(duk_context *ctx)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: es_console_ctor                                                  *
  *                                                                            *
  * Purpose: console constructor                                               *
  *                                                                            *
@@ -61,8 +58,6 @@ static duk_ret_t	es_console_ctor(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_log_message                                                   *
- *                                                                            *
  * Purpose: Write message to centralized Zabbix log                           *
  *                                                                            *
  ******************************************************************************/
@@ -81,7 +76,7 @@ static duk_ret_t	es_log_message(duk_context *ctx, int level)
 
 	if (0 == duk_is_null_or_undefined(ctx, -1))
 	{
-		if (SUCCEED != zbx_cesu8_to_utf8(msg_raw, &msg_output))
+		if (SUCCEED != es_duktape_string_decode(msg_raw, &msg_output))
 		{
 			msg_output = zbx_strdup(msg_output, msg_raw);
 			zbx_replace_invalid_utf8(msg_output);
@@ -121,8 +116,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: es_console_log                                                   *
- *                                                                            *
  * Purpose: console.log method                                                *
  *                                                                            *
  ******************************************************************************/
@@ -133,8 +126,6 @@ static duk_ret_t	es_console_log(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_console_warn                                                  *
- *                                                                            *
  * Purpose: console.warn method                                               *
  *                                                                            *
  ******************************************************************************/
@@ -144,8 +135,6 @@ static duk_ret_t	es_console_warn(duk_context *ctx)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: es_console_error                                                 *
  *                                                                            *
  * Purpose: console.error method                                              *
  *                                                                            *

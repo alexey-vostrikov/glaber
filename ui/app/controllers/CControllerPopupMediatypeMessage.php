@@ -37,7 +37,7 @@ class CControllerPopupMediatypeMessage extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'type' =>				'in '.implode(',', array_keys(media_type2str())),
+			'type' =>				'in '.implode(',', array_keys(CMediatypeHelper::getMediaTypes())),
 			'content_type' =>		'in '.SMTP_MESSAGE_FORMAT_PLAIN_TEXT.','.SMTP_MESSAGE_FORMAT_HTML,
 			'message_type' =>		'in -1,'.implode(',', $this->message_types),
 			'old_message_type' =>	'in -1,'.implode(',', $this->message_types),
@@ -49,14 +49,12 @@ class CControllerPopupMediatypeMessage extends CController {
 		$ret = $this->validateInput($fields);
 
 		if (!$ret) {
-			$output = [];
-
-			if (($messages = getMessages()) !== null) {
-				$output['errors'] = $messages->toString();
-			}
-
 			$this->setResponse(
-				(new CControllerResponseData(['main_block' => json_encode($output)]))->disableView()
+				(new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])]))->disableView()
 			);
 		}
 

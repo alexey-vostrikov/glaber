@@ -25,9 +25,9 @@
 
 $this->includeJsFile('administration.housekeeping.edit.js.php');
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Housekeeping'))
-	->setTitleSubmenu(getAdministrationGeneralSubmenu());
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_HOUSEKEEPING_EDIT));
 
 $form = (new CForm())
 	->setId('housekeeping')
@@ -35,7 +35,7 @@ $form = (new CForm())
 		->setArgument('action', 'housekeeping.update')
 		->getUrl()
 	)
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID);
 
 $house_keeper_tab = (new CFormList())
 	->addRow((new CTag('h4', true, _('Events and alerts')))->addClass('input-section-header'))
@@ -49,6 +49,15 @@ $house_keeper_tab = (new CFormList())
 		(new CLabel(_('Trigger data storage period'), 'hk_events_trigger'))->setAsteriskMark(),
 		(new CTextBox('hk_events_trigger', $data['hk_events_trigger'], false,
 			DB::getFieldLength('config', 'hk_events_trigger')
+		))
+			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+			->setEnabled($data['hk_events_mode'] == 1)
+			->setAriaRequired()
+	)
+	->addRow(
+		(new CLabel(_('Service data storage period'), 'hk_events_service'))->setAsteriskMark(),
+		(new CTextBox('hk_events_service', $data['hk_events_service'], false,
+			DB::getFieldLength('config', 'hk_events_service')
 		))
 			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 			->setEnabled($data['hk_events_mode'] == 1)
@@ -96,19 +105,6 @@ $house_keeper_tab = (new CFormList())
 			->setEnabled($data['hk_services_mode'] == 1)
 			->setAriaRequired()
 	)
-	->addRow((new CTag('h4', true, _('Audit')))->addClass('input-section-header'))
-	->addRow(
-		new CLabel(_('Enable internal housekeeping'), 'hk_audit_mode'),
-		(new CCheckBox('hk_audit_mode'))->setChecked($data['hk_audit_mode'] == 1)
-	)
-	->addRow(
-		(new CLabel(_('Data storage period'), 'hk_audit'))
-			->setAsteriskMark(),
-		(new CTextBox('hk_audit', $data['hk_audit'], false, DB::getFieldLength('config', 'hk_audit')))
-			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-			->setEnabled($data['hk_audit_mode'] == 1)
-			->setAriaRequired()
-	)
 	->addRow((new CTag('h4', true, _('User sessions')))->addClass('input-section-header'))
 	->addRow(
 		new CLabel(_('Enable internal housekeeping'), 'hk_sessions_mode'),
@@ -121,69 +117,47 @@ $house_keeper_tab = (new CFormList())
 			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 			->setEnabled($data['hk_sessions_mode'] == 1)
 			->setAriaRequired()
+	)
+	->addRow((new CTag('h4', true, _('History')))->addClass('input-section-header'))
+	->addRow(
+		new CLabel(_('Enable internal housekeeping'), 'hk_history_mode'),
+		(new CCheckBox('hk_history_mode'))->setChecked($data['hk_history_mode'] == 1)
+	)
+	->addRow(
+		new CLabel(_('Override item history period'), 'hk_history_global'),
+		[
+			(new CCheckBox('hk_history_global'))->setChecked($data['hk_history_global'] == 1),
+			array_key_exists(CHousekeepingHelper::OVERRIDE_NEEDED_HISTORY, $data)
+				? new CSpan([
+					' ',
+					makeWarningIcon(
+						_('This setting should be enabled, because history tables contain compressed chunks.')
+					)
+						->addStyle('display:none;')
+						->addClass('js-hk-history-warning')
+				])
+				: null
+		]
 	);
-//	->addRow((new CTag('h4', true, _('History')))->addClass('input-section-header'))
-//	->addRow(
-//		new CLabel(_('Enable internal housekeeping'), 'hk_history_mode'),
-//		(new CCheckBox('hk_history_mode'))->setChecked($data['hk_history_mode'] == 1)
-//	)
-//	->addRow(
-//		new CLabel(_('Override item history period'), 'hk_history_global'),
-//		(new CCheckBox('hk_history_global'))->setChecked($data['hk_history_global'] == 1)
-//	)
-//	->addRow(
-//		(new CLabel(_('Data storage period'), 'hk_history'))
-//			->setAsteriskMark(),
-//		(new CTextBox('hk_history', $data['hk_history'], false, DB::getFieldLength('config', 'hk_history')))
-//			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-//			->setEnabled($data['hk_history_global'] == 1)
-//			->setAriaRequired()
-//	)
-//	->addRow((new CTag('h4', true, _('Trends')))->addClass('input-section-header'))
-//	->addRow(
-//		new CLabel(_('Enable internal housekeeping'), 'hk_trends_mode'),
-//		(new CCheckBox('hk_trends_mode'))->setChecked($data['hk_trends_mode'] == 1)
-//	)
-//	->addRow(
-//		new CLabel(_('Override item trend period'), 'hk_trends_global'),
-//		(new CCheckBox('hk_trends_global'))->setChecked($data['hk_trends_global'] == 1)
-//	)
-//	->addRow(
-//		(new CLabel(_('Data storage period'), 'hk_trends'))
-//			->setAsteriskMark(),
-//		(new CTextBox('hk_trends', $data['hk_trends'], false, DB::getFieldLength('config', 'hk_trends')))
-//			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-//			->setEnabled($data['hk_trends_global'] == 1)
-//			->setAriaRequired()
-//	);
+	
+if (CWebUser::checkAccess(CRoleHelper::UI_ADMINISTRATION_AUDIT_LOG)) {
+	$house_keeper_tab
+		->addRow((new CTag('h4', true, _('Audit log')))->addClass('input-section-header'))
+		->addRow(
+			new CLink(_('Audit settings'),
+			(new CUrl('zabbix.php'))->setArgument('action', 'audit.settings.edit'))
+		);
+}
 
-	if ($data['db_extension'] == ZBX_DB_EXTENSION_TIMESCALEDB) {
-		$house_keeper_tab
-			->addRow((new CTag('h4', true, _('History and trends compression')))->addClass('input-section-header'))
-			->addRow(
-				new CLabel(_('Enable compression'), 'compression_status'),
-				(new CCheckBox('compression_status'))
-					->setChecked($data['compression_status'] == 1)
-			)
-			->addRow(
-				(new CLabel(_('Compress records older than'), 'compress_older'))
-					->setAsteriskMark(),
-				(new CTextBox('compress_older', $data['compress_older'], false,
-					DB::getFieldLength('config', 'compress_older')
-				))
-					->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
-					->setEnabled($data['compression_status'] == 1)
-					->setAriaRequired()
-			);
-	}
+$form->addItem(
+	(new CTabView())
+		->addTab('houseKeeper', _('Housekeeping'), $house_keeper_tab)
+		->setFooter(makeFormFooter(
+			new CSubmit('update', _('Update')),
+			[new CButton('resetDefaults', _('Reset defaults'))]
+		))
+);
 
-$house_keeper_view = (new CTabView())
-	->addTab('houseKeeper', _('Housekeeping'), $house_keeper_tab)
-	->setFooter(makeFormFooter(
-		new CSubmit('update', _('Update')),
-		[new CButton('resetDefaults', _('Reset defaults'))]
-	));
-
-$widget
-	->addItem($form->addItem($house_keeper_view))
+$html_page
+	->addItem($form)
 	->show();

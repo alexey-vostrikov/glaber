@@ -17,28 +17,26 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "alert_manager.h"
 
-#include "daemon.h"
+#include "zbxnix.h"
 #include "zbxself.h"
 #include "log.h"
-#include "zbxipcservice.h"
-#include "zbxalgo.h"
 #include "zbxserver.h"
 #include "alerter_protocol.h"
-#include "alert_manager.h"
 #include "zbxmedia.h"
 #include "zbxembed.h"
 #include "zbxserialize.h"
-#include "zbxalert.h"
+#include "zbxxml.h"
+#include "zbxtime.h"
 
 #define ZBX_AM_LOCATION_NOWHERE		0
 #define ZBX_AM_LOCATION_QUEUE		1
 
 #define ZBX_UPDATE_STR(dst, src)			\
 	if (NULL == src)				\
-		zbx_free(dst); 				\
-	else if (NULL == dst || 0 != strcmp(dst, src)) 	\
+		zbx_free(dst);				\
+	else if (NULL == dst || 0 != strcmp(dst, src))	\
 		dst = zbx_strdup(dst, src);
 
 #define ZBX_AM_DB_POLL_DELAY	1
@@ -59,8 +57,7 @@
 
 #define ZBX_MEDIA_CONTENT_TYPE_DEFAULT	255
 
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
+extern unsigned char			program_type;
 
 extern int	CONFIG_ALERTER_FORKS;
 extern char	*CONFIG_ALERT_SCRIPTS_PATH;
@@ -78,7 +75,7 @@ extern char	*CONFIG_ALERT_SCRIPTS_PATH;
  *     alertpools
  *         alerts
  *
- * Media type queue is sorted by the timestamp of the miminum item of its alertpool queue.
+ * Media type queue is sorted by the timestamp of the minimum item of its alertpool queue.
  * Alert pool queue is sorted by the timestamp of the minimum item of its alerts queue.
  * Alerts queue is sorted by the alert scheduled send timestamp.
  *
@@ -162,13 +159,12 @@ zbx_am_dispatch_t;
 /* alerter data */
 typedef struct
 {
-	/* the connected aleter client */
+	/* the connected alerter client */
 	zbx_ipc_client_t	*client;
 
 	zbx_am_alert_t		*alert;
 }
 zbx_am_alerter_t;
-
 
 /* alert manager data */
 typedef struct
@@ -208,7 +204,6 @@ typedef struct
 	zbx_ipc_service_t	ipc;
 }
 zbx_am_t;
-
 
 /* alerters client index hashset support */
 
@@ -353,11 +348,6 @@ static void	shared_str_release(zbx_shared_str_t str)
 	}
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: am_dispatch_free                                                 *
- *                                                                            *
- ******************************************************************************/
 static void	am_dispatch_free(zbx_am_dispatch_t *dispatch)
 {
 	zbx_free(dispatch->subject);
@@ -368,10 +358,7 @@ static void	am_dispatch_free(zbx_am_dispatch_t *dispatch)
 	zbx_free(dispatch);
 }
 
-
 /******************************************************************************
- *                                                                            *
- * Function: am_get_mediatype                                                 *
  *                                                                            *
  * Purpose: gets media type object                                            *
  *                                                                            *
@@ -388,15 +375,13 @@ static zbx_am_mediatype_t	*am_get_mediatype(zbx_am_t *manager, zbx_uint64_t medi
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_am_update_webhook                                            *
- *                                                                            *
  * Purpose: updates additional webhook media type fields                      *
  *                                                                            *
  ******************************************************************************/
 static void	zbx_am_update_webhook(zbx_am_t *manager, zbx_am_mediatype_t *mediatype, const char *script,
 		const char *timeout)
 {
-	if (FAIL == is_time_suffix(timeout, &mediatype->timeout, ZBX_LENGTH_UNLIMITED))
+	if (FAIL == zbx_is_time_suffix(timeout, &mediatype->timeout, ZBX_LENGTH_UNLIMITED))
 	{
 		mediatype->error = zbx_strdup(mediatype->error, "Invalid timeout value in media type configuration.");
 		return;
@@ -421,8 +406,6 @@ static void	zbx_am_update_webhook(zbx_am_t *manager, zbx_am_mediatype_t *mediaty
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_update_mediatype                                              *
  *                                                                            *
  * Purpose: updates media type object, creating one if necessary              *
  *                                                                            *
@@ -483,7 +466,7 @@ static void	am_update_mediatype(zbx_am_t *manager, zbx_uint64_t mediatypeid, uns
 	mediatype->maxattempts = maxattempts;
 	mediatype->content_type = content_type;
 
-	if (FAIL == is_time_suffix(attempt_interval, &mediatype->attempt_interval, ZBX_LENGTH_UNLIMITED))
+	if (FAIL == zbx_is_time_suffix(attempt_interval, &mediatype->attempt_interval, ZBX_LENGTH_UNLIMITED))
 	{
 		mediatype->error = zbx_strdup(mediatype->error, "Invalid media type attempt interval.");
 		return;
@@ -495,14 +478,12 @@ static void	am_update_mediatype(zbx_am_t *manager, zbx_uint64_t mediatypeid, uns
 
 /******************************************************************************
  *                                                                            *
- * Function: am_push_mediatype                                                *
- *                                                                            *
  * Purpose: pushes media type into manager media type queue                   *
  *                                                                            *
  * Parameters: manager   - [IN] the alert manager                             *
  *             mediatype - [IN] the media type                                *
  *                                                                            *
- * Comments: The media tyep is inserted into queue only if it was not already *
+ * Comments: The media type is inserted into queue only if it was not already *
  *           queued and if the number of media type alerts being processed    *
  *           not reached the limit.                                           *
  *           If media type is already queued only its location in the queue   *
@@ -530,8 +511,6 @@ static void	am_push_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_pop_mediatype                                                 *
- *                                                                            *
  * Purpose: gets the next media type from queue                               *
  *                                                                            *
  * Parameters: manager - [IN] the alert manager                               *
@@ -556,11 +535,6 @@ static zbx_am_mediatype_t	*am_pop_mediatype(zbx_am_t *manager)
 	return mediatype;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: am_remove_mediatype                                              *
- *                                                                            *
- ******************************************************************************/
 static void am_remove_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "%s() mediatypeid:" ZBX_FS_UI64, __func__, mediatype->mediatypeid);
@@ -581,11 +555,6 @@ static void am_remove_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype
 	zbx_hashset_remove_direct(&manager->mediatypes, mediatype);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: am_release_mediatype                                             *
- *                                                                            *
- ******************************************************************************/
 static int	am_release_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype)
 {
 	if (0 != --mediatype->refcount)
@@ -598,8 +567,6 @@ static int	am_release_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_calc_alertpoolid                                              *
  *                                                                            *
  * Purpose: calculate alert pool id from event source, object and objectid    *
  *                                                                            *
@@ -630,8 +597,6 @@ static zbx_uint64_t	am_calc_alertpoolid(int source, int object, zbx_uint64_t obj
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_get_alertpool                                                 *
  *                                                                            *
  * Purpose: gets alert pool object, creating one if the object with specified *
  *          identifiers was not found                                         *
@@ -667,8 +632,6 @@ static zbx_am_alertpool_t	*am_get_alertpool(zbx_am_t *manager, zbx_uint64_t medi
 
 /******************************************************************************
  *                                                                            *
- * Function: am_push_alertpool                                                *
- *                                                                            *
  * Purpose: pushes alert pool into media type alert pool queue                *
  *                                                                            *
  * Parameters: mediatype - [IN] the media type                                *
@@ -696,8 +659,6 @@ static void	am_push_alertpool(zbx_am_mediatype_t *mediatype, zbx_am_alertpool_t 
 
 /******************************************************************************
  *                                                                            *
- * Function: am_pop_alertpool                                                 *
- *                                                                            *
  * Purpose: gets the next alert pool from queue                               *
  *                                                                            *
  * Parameters: mediatype - [IN] the media type                                *
@@ -724,12 +685,10 @@ static zbx_am_alertpool_t	*am_pop_alertpool(zbx_am_mediatype_t *mediatype)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_release_alertpool                                             *
- *                                                                            *
  * Purpose: removes alert pool                                                *
  *                                                                            *
- * Parameters: manager - [IN] the alert manager                               *
- *             alert   - [IN] the alert pool                                  *
+ * Parameters: manager     - [IN] the alert manager                           *
+ *             alertpool   - [IN] the alert pool                              *
  *                                                                            *
  * Return value: SUCCEED - the object was removed                             *
  *               FAIL    - otherwise                                          *
@@ -748,8 +707,6 @@ static int	am_release_alertpool(zbx_am_t *manager, zbx_am_alertpool_t *alertpool
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_create_alert                                                  *
  *                                                                            *
  * Purpose: creates new alert object                                          *
  *                                                                            *
@@ -799,8 +756,6 @@ static zbx_am_alert_t	*am_create_alert(zbx_uint64_t alertid, zbx_uint64_t mediat
 
 /******************************************************************************
  *                                                                            *
- * Function: am_copy_db_alert                                                 *
- *                                                                            *
  * Purpose: creates new alert object from db alert                            *
  *                                                                            *
  * Parameters: db_alert - [IN] the db alert object                            *
@@ -843,8 +798,6 @@ static zbx_am_alert_t	*am_copy_db_alert(zbx_am_db_alert_t *db_alert)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_alert_free                                                    *
- *                                                                            *
  * Purpose: frees the alert object                                            *
  *                                                                            *
  * Parameters: alert - [IN] the alert object                                  *
@@ -861,12 +814,10 @@ static void	am_alert_free(zbx_am_alert_t *alert)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_push_alert                                                    *
- *                                                                            *
  * Purpose: pushes alert into alert pool alert queue                          *
  *                                                                            *
- * Parameters: alertpool - [IN] the alert pool                                *
- *             alert     - [IN] the alert                                     *
+ * Parameters: alertpool - [IN]                                               *
+ *             alert     - [IN]                                               *
  *                                                                            *
  ******************************************************************************/
 static void	am_push_alert(zbx_am_alertpool_t *alertpool, zbx_am_alert_t *alert)
@@ -878,11 +829,9 @@ static void	am_push_alert(zbx_am_alertpool_t *alertpool, zbx_am_alert_t *alert)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_pop_alert                                                     *
- *                                                                            *
  * Purpose: gets the next alert from queue                                    *
  *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
+ * Parameters: manager - [IN]                                                 *
  *                                                                            *
  * Return value: The alert object.                                            *
  *                                                                            *
@@ -897,7 +846,8 @@ static zbx_am_alert_t	*am_pop_alert(zbx_am_t *manager)
 	if (NULL == (mediatype = am_pop_mediatype(manager)))
 		return NULL;
 
-	alertpool = am_pop_alertpool(mediatype);
+	if (NULL == (alertpool = am_pop_alertpool(mediatype)))
+		return NULL;
 
 	elem = zbx_binary_heap_find_min(&alertpool->queue);
 	alert = (zbx_am_alert_t *)elem->data;
@@ -913,8 +863,6 @@ static zbx_am_alert_t	*am_pop_alert(zbx_am_t *manager)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_remove_alert                                                  *
  *                                                                            *
  * Purpose: removes alert and requeues associated alert pool and media type   *
  *                                                                            *
@@ -949,12 +897,10 @@ static void	am_remove_alert(zbx_am_t *manager, zbx_am_alert_t *alert)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_retry_alert                                                   *
- *                                                                            *
  * Purpose: retries alert if there are attempts left or removes it            *
  *                                                                            *
  * Parameters: manager - [IN] the alert manager                               *
- *             alert   - [IN] the alert                                       *
+ *             alert   - [IN]                                                 *
  *                                                                            *
  * Return value: SUCCEED - the alert was queued to be sent again              *
  *               FAIL - the alert retries value exceeded the mediatype        *
@@ -995,8 +941,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: am_alerter_free                                                  *
- *                                                                            *
  * Purpose: frees alerter                                                     *
  *                                                                            *
  ******************************************************************************/
@@ -1007,8 +951,6 @@ static void	am_alerter_free(zbx_am_alerter_t *alerter)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_register_alerter                                              *
  *                                                                            *
  * Purpose: registers alerter                                                 *
  *                                                                            *
@@ -1054,11 +996,9 @@ static void	am_register_alerter(zbx_am_t *manager, zbx_ipc_client_t *client, zbx
 
 /******************************************************************************
  *                                                                            *
- * Function: am_get_alerter_by_client                                         *
- *                                                                            *
  * Purpose: returns alerter by connected client                               *
  *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
+ * Parameters: manager - [IN]                                                 *
  *             client  - [IN] the connected alerter                           *
  *                                                                            *
  * Return value: The alerter                                                  *
@@ -1090,8 +1030,6 @@ static zbx_am_alerter_t	*am_get_alerter_by_client(zbx_am_t *manager, zbx_ipc_cli
 #endif
 
 /******************************************************************************
- *                                                                            *
- * Function: am_create_db_alert_message                                       *
  *                                                                            *
  * Purpose: get and format error message from database when it is unavailable *
  *                                                                            *
@@ -1133,8 +1071,6 @@ static char	*am_create_db_alert_message(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_queue_watchdog_alerts                                         *
- *                                                                            *
  * Purpose: queues 'database down' watchdog alerts                            *
  *                                                                            *
  * Parameters: manager - [IN] the alert manager                               *
@@ -1169,7 +1105,7 @@ static void	am_queue_watchdog_alerts(zbx_am_t *manager)
 		{
 			char	*am_esc;
 
-			am_esc = xml_escape_dyn(alert_message);
+			am_esc = zbx_xml_escape_dyn(alert_message);
 			alert_message = zbx_dsprintf(alert_message, "<html><pre>%s</pre></html>", am_esc);
 			zbx_free(am_esc);
 		}
@@ -1189,8 +1125,6 @@ static void	am_queue_watchdog_alerts(zbx_am_t *manager)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_init                                                          *
  *                                                                            *
  * Purpose: initializes alert manager                                         *
  *                                                                            *
@@ -1238,8 +1172,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: am_destroy                                                       *
- *                                                                            *
  * Purpose: destroys alert manager                                            *
  *                                                                            *
  * Parameters: manager - [IN] the manager to destroy                          *
@@ -1277,8 +1209,6 @@ static void	am_destroy(zbx_am_t *manager)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_db_update_alert                                               *
  *                                                                            *
  * Purpose: update alert status in local cache to be flushed after reading    *
  *          new alerts from database                                          *
@@ -1325,13 +1255,12 @@ static void	am_db_update_alert(zbx_am_t *manager, zbx_am_alert_t *alert, int sta
 
 /******************************************************************************
  *                                                                            *
- * Function: am_external_alert_send_response                                  *
- *                                                                            *
  * Purpose: send response to external alert request                           *
  *                                                                            *
  * Parameters: alerter_service - [IN] the IPC service                         *
- *             alert           - [IN] the alert                               *
- *             value           - [IN] the value                               *
+ *             alert           - [IN]                                         *
+ *             value           - [IN]                                         *
+ *             errcode         - [IN]                                         *
  *             error           - [IN] error message                           *
  *             debug           - [IN] debug message                           *
  *                                                                            *
@@ -1355,8 +1284,6 @@ static void	am_external_alert_send_response(const zbx_ipc_service_t *alerter_ser
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_sync_watchdog                                                 *
  *                                                                            *
  * Purpose: synchronize watchdog alert recipients                             *
  *                                                                            *
@@ -1425,12 +1352,10 @@ static void	am_sync_watchdog(zbx_am_t *manager, zbx_am_media_t **medias, int med
 
 /******************************************************************************
  *                                                                            *
- * Function: am_prepare_mediatype_exec_command                                *
- *                                                                            *
  * Purpose: gets script media type parameters with expanded macros            *
  *                                                                            *
- * Parameters: mediatype - [IN] the media type                                *
- *             alert     - [IN] the alert                                     *
+ * Parameters: mediatype - [IN]                                               *
+ *             alert     - [IN]                                               *
  *             cmd       - [OUT] the command to execute                       *
  *             error     - [OUT] the error message                            *
  *                                                                            *
@@ -1451,7 +1376,10 @@ static int	am_prepare_mediatype_exec_command(zbx_am_mediatype_t *mediatype, zbx_
 
 	if (0 == access(*cmd, X_OK))
 	{
-		char	*pstart, *pend;
+		char			*pstart, *pend;
+		zbx_dc_um_handle_t	*um_handle;
+
+		um_handle = zbx_dc_open_user_macros();
 
 		db_alert.sendto = (NULL != alert->sendto ? alert->sendto : zbx_strdup(NULL, ""));
 		db_alert.subject = (NULL != alert->subject ? alert->subject : zbx_strdup(NULL, ""));
@@ -1464,8 +1392,8 @@ static int	am_prepare_mediatype_exec_command(zbx_am_mediatype_t *mediatype, zbx_
 
 			zbx_strncpy_alloc(&param, &param_alloc, &param_offset, pstart, pend - pstart);
 
-			substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL, &db_alert, NULL,
-					NULL, &param, MACRO_TYPE_ALERT, NULL, 0);
+			zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL, &db_alert, NULL,
+					NULL, NULL, NULL, &param, MACRO_TYPE_ALERT, NULL, 0);
 
 			param_esc = zbx_dyn_escape_shell_single_quote(param);
 			zbx_snprintf_alloc(cmd, &cmd_alloc, &cmd_offset, " '%s'", param_esc);
@@ -1481,6 +1409,8 @@ static int	am_prepare_mediatype_exec_command(zbx_am_mediatype_t *mediatype, zbx_
 		if (db_alert.message != alert->message)
 			zbx_free(db_alert.message);
 
+		zbx_dc_close_user_macros(um_handle);
+
 		ret = SUCCEED;
 	}
 	else
@@ -1493,8 +1423,6 @@ static int	am_prepare_mediatype_exec_command(zbx_am_mediatype_t *mediatype, zbx_
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_process_alert                                                 *
  *                                                                            *
  * Purpose: sends alert to the alerter                                        *
  *                                                                            *
@@ -1609,11 +1537,9 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: am_process_result                                                *
- *                                                                            *
  * Purpose: process alerter result                                            *
  *                                                                            *
- * Parameters: manager         - [IN] the manager                             *
+ * Parameters: manager         - [IN]                                         *
  *             client          - [IN] the connected alerter                   *
  *             message         - [IN] the received message                    *
  *                                                                            *
@@ -1686,8 +1612,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: am_check_queue                                                   *
- *                                                                            *
  * Purpose: checks alert queue if there is an alert that should be sent now   *
  *                                                                            *
  * Parameters: manager - [IN] the alert manager                               *
@@ -1730,8 +1654,6 @@ static int	am_check_queue(zbx_am_t *manager, int now)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_update_mediatypes                                             *
- *                                                                            *
  * Purpose: update cached media types                                         *
  *                                                                            *
  ******************************************************************************/
@@ -1766,8 +1688,6 @@ static void	am_update_mediatypes(zbx_am_t *manager, zbx_ipc_message_t *message)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_queue_alert                                                   *
- *                                                                            *
  * Purpose: queue new alerts                                                  *
  *                                                                            *
  ******************************************************************************/
@@ -1797,8 +1717,6 @@ static int	am_queue_alert(zbx_am_t *manager, zbx_am_alert_t *alert, int now)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_queue_alerts                                                  *
- *                                                                            *
  * Purpose: queue new alerts                                                  *
  *                                                                            *
  ******************************************************************************/
@@ -1826,8 +1744,6 @@ static void	am_queue_alerts(zbx_am_t *manager, zbx_ipc_message_t *message, int n
 
 /******************************************************************************
  *                                                                            *
- * Function: am_update_watchdog                                               *
- *                                                                            *
  * Purpose: update 'database down' watchdog alert recipients                  *
  *                                                                            *
  ******************************************************************************/
@@ -1845,8 +1761,6 @@ static void	am_update_watchdog(zbx_am_t *manager, zbx_ipc_message_t *message)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_drop_mediatypes                                               *
  *                                                                            *
  * Purpose: remove unused mediatypes                                          *
  *                                                                            *
@@ -1874,8 +1788,6 @@ static void	am_drop_mediatypes(zbx_am_t *manager, zbx_ipc_message_t *message)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_flush_results                                                 *
  *                                                                            *
  * Purpose: returns alert sending results                                     *
  *                                                                            *
@@ -1927,8 +1839,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_process_external_alert_request                                *
  *                                                                            *
  * Purpose: process external alert request                                    *
  *                                                                            *
@@ -1992,13 +1902,7 @@ static void	am_process_external_alert_request(zbx_am_t *manager, zbx_uint64_t id
 
 /******************************************************************************
  *                                                                            *
- * Function: am_process_begin_dispatch                                        *
- *                                                                            *
  * Purpose: begin file dispatch                                               *
- *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
- *             client  - [IN] the connected worker IPC client data            *
- *             message - [IN] the received message                            *
  *                                                                            *
  ******************************************************************************/
 static void	am_process_begin_dispatch(zbx_ipc_client_t *client, const unsigned char *data)
@@ -2019,8 +1923,6 @@ static void	am_process_begin_dispatch(zbx_ipc_client_t *client, const unsigned c
 
 /******************************************************************************
  *                                                                            *
- * Function: am_prepare_dispatch_message                                      *
- *                                                                            *
  * Purpose: prepare message to dispatch by attaching dispatch contents for    *
  *          supported media types                                             *
  *                                                                            *
@@ -2030,8 +1932,8 @@ static void	am_process_begin_dispatch(zbx_ipc_client_t *client, const unsigned c
  *             content_type - [OUT] the message content type                  *
  *                                                                            *
  ******************************************************************************/
-static void	am_prepare_dispatch_message(zbx_am_dispatch_t *dispatch, DB_MEDIATYPE *mt, zbx_shared_str_t *message,
-		unsigned char *content_type)
+static void	am_prepare_dispatch_message(zbx_am_dispatch_t *dispatch, ZBX_DB_MEDIATYPE *mt,
+		zbx_shared_str_t *message, unsigned char *content_type)
 {
 	char	*body = NULL;
 
@@ -2059,13 +1961,7 @@ static void	am_prepare_dispatch_message(zbx_am_dispatch_t *dispatch, DB_MEDIATYP
 
 /******************************************************************************
  *                                                                            *
- * Function: am_process_send_dispatch                                         *
- *                                                                            *
  * Purpose: send dispatch to the specified media type users                   *
- *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
- *             client  - [IN] the connected worker IPC client                 *
- *             message - [IN] the received message                            *
  *                                                                            *
  ******************************************************************************/
 static void	am_process_send_dispatch(zbx_am_t *manager, zbx_ipc_client_t *client, const unsigned char *data)
@@ -2073,7 +1969,7 @@ static void	am_process_send_dispatch(zbx_am_t *manager, zbx_ipc_client_t *client
 	int			i;
 	zbx_vector_str_t	recipients;
 	zbx_am_alert_t		*alert;
-	DB_MEDIATYPE		mt;
+	ZBX_DB_MEDIATYPE		mt;
 	zbx_shared_str_t	message;
 	unsigned char		content_type;
 	zbx_uint64_t		id;
@@ -2127,8 +2023,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: am_process_end_dispatch                                          *
- *                                                                            *
  * Purpose: finish sending dispatches                                         *
  *                                                                            *
  * Parameters: client  - [IN] the connected worker IPC client                 *
@@ -2149,8 +2043,6 @@ static void	am_process_end_dispatch(zbx_ipc_client_t *client)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_remove_unused_mediatypes                                      *
- *                                                                            *
  * Purpose: remove unused media types                                         *
  *                                                                            *
  ******************************************************************************/
@@ -2169,8 +2061,6 @@ static void	am_remove_unused_mediatypes(zbx_am_t *manager)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_process_diag_stats                                            *
- *                                                                            *
  * Purpose: process diagnostic statistics request                             *
  *                                                                            *
  ******************************************************************************/
@@ -2186,8 +2076,6 @@ static void	am_process_diag_stats(zbx_am_t *manager, zbx_ipc_client_t *client)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_compare_mediatype_by_alerts_desc                              *
- *                                                                            *
  * Purpose: compare mediatypes by total queued alerts                         *
  *                                                                            *
  ******************************************************************************/
@@ -2201,11 +2089,9 @@ static int	am_compare_mediatype_by_alerts_desc(const void *d1, const void *d2)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_process_diag_top_mediatypes                                   *
- *                                                                            *
  * Purpose: processes top mediatypes by queued alerts                         *
  *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
+ * Parameters: manager - [IN]                                                 *
  *             client  - [IN] the connected worker IPC client data            *
  *             message - [IN] the received message                            *
  *                                                                            *
@@ -2276,11 +2162,9 @@ static int	am_source_compare_func(const void *d1, const void *d2)
 }
 /******************************************************************************
  *                                                                            *
- * Function: am_process_diag_top_sources                                      *
- *                                                                            *
  * Purpose: processes top alert sources by queued alerts                      *
  *                                                                            *
- * Parameters: manager - [IN] the manager                                     *
+ * Parameters: manager - [IN]                                                 *
  *             client  - [IN] the connected worker IPC client data            *
  *             message - [IN] the received message                            *
  *                                                                            *
@@ -2320,8 +2204,8 @@ static void	am_process_diag_top_sources(zbx_am_t *manager, zbx_ipc_client_t *cli
 
 			if (NULL == (source = zbx_hashset_search(&sources, &source_local)))
 			{
+				source_local.alerts_num = 0;
 				source = zbx_hashset_insert(&sources, &source_local, sizeof(source_local));
-				source->alerts_num = 0;
 				zbx_vector_ptr_append(&view, source);
 			}
 			source->alerts_num++;
@@ -2354,17 +2238,18 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 	int			ret, sent_num = 0, failed_num = 0, now, time_watchdog = 0, time_ping = 0,
 				time_mediatype = 0;
 	double			time_stat, time_idle = 0, time_now, sec;
-
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+	zbx_timespec_t		timeout = {1, 0};
+	const zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
+	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
+	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
 	zbx_setproctitle("%s #%d starting", get_process_type_string(process_type), process_num);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 	if (FAIL == am_init(&manager, &error))
 	{
@@ -2383,9 +2268,9 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 	while (ZBX_IS_RUNNING())
 	{
 		time_now = zbx_time();
-		now = time_now;
+		now = (int)time_now;
 
-		if (time_ping + ZBX_DB_PING_FREQUENCY < now)
+		if ((time_ping + ZBX_DB_PING_FREQUENCY) < now)
 		{
 			manager.dbstatus = DBconnect(ZBX_DB_CONNECT_ONCE);
 			DBclose();
@@ -2437,9 +2322,9 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 			time_mediatype = now;
 		}
 
-		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
-		ret = zbx_ipc_service_recv(&manager.ipc, 1, &client, &message);
-		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_IDLE);
+		ret = zbx_ipc_service_recv(&manager.ipc, &timeout, &client, &message);
+		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 		sec = zbx_time();
 		zbx_update_env(sec);

@@ -38,8 +38,8 @@ ZBX_Notifications.ALARM_ONCE_SERVER = 1;
  * these "actions" by passing the new received state value through a method prefixed with <consume> that will adjust
  * instance's internal state, that in turn can be dispatched as "action". Other methods prefixed with <handle> responds
  * to other events than localStorage change event - (poll, focus, timeout..) and still they would reuse <consume>
- * domain methods and issue an anction via <push> if needed and call to render method explicitly. The <handlePushed> is
- * not reused on the instance that produces the action. This is so to reduce complexity and increase maintainebility,
+ * domain methods and issue an action via <push> if needed and call to render method explicitly. The <handlePushed> is
+ * not reused on the instance that produces the action. This is so to reduce complexity and increase maintainability,
  * because when an action produces an action, logic diverges deep, instead <consume> various domain within logic
  * and call `render` once, then <push> into localStorage once.
  *
@@ -382,12 +382,12 @@ ZBX_Notifications.prototype.handlePushedActiveTabid = function(tabid) {
  * When active tab is unloaded, any sibling tab is set to become active. If single session, then we drop LS (privacy).
  * We cannot know if this unload will happen because of navigation, scripted reload or a tab was just closed.
  * Latter is always assumed, so when navigating active tab, focus is deligated onto to any tab if possible,
- * then this tab might reclaim focus again at construction if during during that time document has focus.
+ * then this tab might reclaim focus again at construction if during that time document has focus.
  * At slow connection during page navigation there will be another active tab polling for notifications (if multitab).
  * Here `tab` is referred as ZBX_Notifications instance and `focus` - whether instance is `active` (not focused).
  *
  * @param {ZBX_BrowseTab} removed_tab  Current tab instance.
- * @param {array} other_tabids  List of alive tab ids (wuthout current tabid).
+ * @param {array} other_tabids  List of alive tab ids (without current tabid).
  */
 ZBX_Notifications.prototype.handleTabBeforeUnload = function(removed_tab, other_tabids) {
 	if (this.active && other_tabids.length) {
@@ -418,9 +418,13 @@ ZBX_Notifications.prototype.handleTabFocusIn = function() {
  * @param {MouseEvent} e
  */
 ZBX_Notifications.prototype.handleCloseClicked = function(e) {
-	this.fetch('notifications.read', {ids: this.getEventIds()})
-		.catch(console.error)
-		.then(function(resp) {
+	this
+		.fetch('notifications.read', {ids: this.getEventIds()})
+		.then((resp) => {
+			if ('error' in resp) {
+				throw {error: resp.error};
+			}
+
 			resp.ids.forEach(function(id) {
 				this.removeById(id);
 				this.debounceRender();
@@ -428,7 +432,19 @@ ZBX_Notifications.prototype.handleCloseClicked = function(e) {
 
 			this.alarm.reset();
 			this.pushUpdates();
-		}.bind(this));
+		})
+		.catch((exception) => {
+			if (typeof exception === 'object' && 'error' in exception) {
+				clearMessages();
+
+				const message_box = makeMessageBox('bad', exception.error.messages, exception.error.title);
+
+				addMessage(message_box);
+			}
+			else {
+				console.log('Could not read notifications:', exception);
+			}
+		});
 };
 
 /**
@@ -453,14 +469,35 @@ ZBX_Notifications.prototype.handleSnoozeClicked = function(e) {
  * @param {MouseEvent} e
  */
 ZBX_Notifications.prototype.handleMuteClicked = function(e) {
-	this.fetch('notifications.mute', {muted: this.alarm.muted ? 0 : 1})
-		.catch(console.error)
-		.then(function(resp) {
+	this
+		.fetch('notifications.mute', {muted: this.alarm.muted ? 0 : 1})
+		.then((resp) => {
+			if ('error' in resp) {
+				throw {error: resp.error};
+			}
+
 			this._cached_user_settings.muted = (resp.muted == 1);
 			this.alarm.consume({muted: this._cached_user_settings.muted});
 			this.pushUpdates();
 			this.render();
-		}.bind(this));
+		})
+		.catch((exception) => {
+			clearMessages();
+
+			let title, messages;
+
+			if (typeof exception === 'object' && 'error' in exception) {
+				title = exception.error.title;
+				messages = exception.error.messages;
+			}
+			else {
+				messages = [t('Unexpected server error.')];
+			}
+
+			const message_box = makeMessageBox('bad', messages, title);
+
+			addMessage(message_box);
+		});
 };
 
 /**
@@ -522,7 +559,7 @@ ZBX_Notifications.prototype.renderAudio = function() {
 
 /**
  * @param {string} resource  A value for 'action' parameter.
- * @param {object} params    Form data to be send.
+ * @param {object} params    Form data to be sent.
  *
  * @return {Promise}
  */
@@ -552,9 +589,27 @@ ZBX_Notifications.prototype.mainLoop = function() {
 		return;
 	}
 
-	this.fetch('notifications.get', {known_eventids: this.getEventIds()})
-		.catch(console.error)
-		.then(this.handleMainLoopResp.bind(this));
+	this
+		.fetch('notifications.get', {known_eventids: this.getEventIds()})
+		.then((resp) => {
+			if ('error' in resp) {
+				throw {error: resp.error};
+			}
+
+			this.handleMainLoopResp(resp);
+		})
+		.catch((exception) => {
+			if (typeof exception === 'object' && 'error' in exception) {
+				clearMessages();
+
+				const message_box = makeMessageBox('bad', exception.error.messages, exception.error.title);
+
+				addMessage(message_box);
+			}
+			else {
+				console.log('Could not get notifications:', exception);
+			}
+		});
 };
 
 /**
@@ -938,7 +993,9 @@ $(function() {
 		pos_side = 10,
 		side = 'right';
 
-	main.appendChild(ntf_node);
+	if (main !== null) {
+		main.appendChild(ntf_node);
+	}
 
 	if (ntf_pos !== null && 'top' in ntf_pos) {
 		side = ('right' in ntf_pos ? 'right' : ('left' in ntf_pos ? 'left' : null));

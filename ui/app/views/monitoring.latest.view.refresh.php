@@ -21,10 +21,14 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
 $output = [
-	'body' => (new CPartial('monitoring.latest.view.html', $data))->getOutput()
+	'body' => (new CPartial('monitoring.latest.view.html', $data['results']))->getOutput(),
+	'subfilter' => (new CPartial('monitoring.latest.subfilter',
+		array_intersect_key($data, array_flip(['subfilters', 'subfilters_expanded']))
+	))->getOutput()
 ];
 
 if (($messages = getMessages()) !== null) {

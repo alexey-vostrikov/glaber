@@ -227,6 +227,13 @@ class API {
 	}
 
 	/**
+	 * @return CHaNode
+	 */
+	public static function HaNode() {
+		return self::getApi('hanode');
+	}
+
+	/**
 	 * @return CHistory
 	 */
 	public static function History() {
@@ -346,6 +353,13 @@ class API {
 	}
 
 	/**
+	 * @return CRegexp
+	 */
+	public static function Regexp() {
+		return self::getApi('regexp');
+	}
+
+	/**
 	 * @return CRole
 	 */
 	public static function Role() {
@@ -364,6 +378,13 @@ class API {
 	 */
 	public static function Service() {
 		return self::getApi('service');
+	}
+
+	/**
+	 * @return CSla
+	 */
+	public static function Sla() {
+		return self::getApi('sla');
 	}
 
 	/**
@@ -392,6 +413,13 @@ class API {
 	 */
 	public static function TemplateDashboard() {
 		return self::getApi('templatedashboard');
+	}
+
+	/**
+	 * @return CTemplateGroup
+	 */
+	public static function TemplateGroup() {
+		return self::getApi('templategroup');
 	}
 
 	/**
@@ -427,6 +455,13 @@ class API {
 	 */
 	public static function User() {
 		return self::getApi('user');
+	}
+
+	/**
+	 * @return CUserDirectory
+	 */
+	public static function UserDirectory() {
+		return self::getApi('userdirectory');
 	}
 
 	/**

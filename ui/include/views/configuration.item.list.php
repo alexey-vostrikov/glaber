@@ -26,34 +26,39 @@
 require_once dirname(__FILE__).'/js/configuration.item.list.js.php';
 //$this->includeJsFile('datatables.js.php');
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Items'))
+	->setDocUrl(CDocHelper::getUrl($data['context'] === 'host'
+		? CDocHelper::DATA_COLLECTION_HOST_ITEM_LIST
+		: CDocHelper::DATA_COLLECTION_TEMPLATE_ITEM_LIST
+	))
 	->setControls(
 		(new CTag('nav', true,
-			(new CList())->addItem(
-				($data['hostid'] != 0)
-					? new CRedirectButton(_('Create item'), (new CUrl('items.php'))
-						->setArgument('form', 'create')
-						->setArgument('hostid', $data['hostid'])
-						->setArgument('context', $data['context'])
-						->getUrl()
-					)
-					: (new CButton('form',
-						($data['context'] === 'host')
-							? _('Create item (select host first)')
-							: _('Create item (select template first)')
-					))->setEnabled(false)
-			)
+			(new CList())
+				->addItem(
+					$data['hostid'] != 0
+						? new CRedirectButton(_('Create item'),
+							(new CUrl('items.php'))
+								->setArgument('form', 'create')
+								->setArgument('hostid', $data['hostid'])
+								->setArgument('context', $data['context'])
+						)
+						: (new CButton('form',
+							$data['context'] === 'host'
+								? _('Create item (select host first)')
+								: _('Create item (select template first)')
+						))->setEnabled(false)
+				)
 		))->setAttribute('aria-label', _('Content controls'))
 	);
 
 if ($data['hostid'] != 0) {
-	$widget->setNavigation(getHostNavigation('items', $data['hostid']));
+	$html_page->setNavigation(getHostNavigation('items', $data['hostid']));
 }
-//
-$widget->addItem(new CPartial('configuration.filter.items', [
+
+$html_page->addItem(new CPartial('configuration.filter.items', [
 	'filter_data' => $data['filter_data'],
-	'subfilter' => '', //$data['subfilter'],
+//	'subfilter' => $data['subfilter'],
 	'context' => $data['context']
 ]));
 
@@ -65,36 +70,34 @@ $url = (new CUrl('items.php'))
 $itemForm = (new CForm('post', $url))
 	->setName('items')
 	->addVar('checkbox_hash', $data['checkbox_hash'])
-	->addVar('context', $data['context']);
+	->addVar('context', $data['context'], 'form_context');
 
 if (!empty($data['hostid'])) {
 	$itemForm->addVar('hostid', $data['hostid']);
 }
-//this must be fixed with another class
+
 // create table
-$itemTable = (
-	new CDataTable('items_table',['advanced_search' => true]))
+$itemTable = (new CTableInfo())
 	->setHeader([
 		(new CColHeader(
-			(new CCheckBox('all_items'))
-				->onClick("checkAll('".$itemForm->getName()."', 'all_items', 'group_itemid');")
-		))->addClass('no-sort'),
-		(new CColHeader(_('Wizard')))->addClass('no-sort'),
+			(new CCheckBox('all_items'))->onClick("checkAll('".$itemForm->getName()."', 'all_items', 'group_itemid');")
+		))->addClass(ZBX_STYLE_CELL_WIDTH),
+		'',
 		($data['hostid'] == 0)
 			? ($data['context'] === 'host')
-				? (new CColHeader(_('Host')))->addClass('search')
-				: (new CColHeader(_('Template')))->addClass('search')
+				? _('Host')
+				: _('Template')
 			: null,
-		(new CColHeader(_('Name')))->addClass('search'),
-		(new CColHeader(_('Triggers')))->addClass('search'),
-		(new CColHeader(_('Key')))->addClass('search'),
-		(new CColHeader(_('Interval')))->addClass('search'),
-		_('History'), 
-		_('Trends'), 
-		(new CColHeader(_('Type')))->addClass('search'), 
-		(new CColHeader(_('Status')))->addClass('search'), 
-		(new CColHeader(_('Tags')))->addClass('search'),
-		($data['context'] === 'host') ? (new CColHeader(_('Info'))) : null
+		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder'], $url),
+		_('Triggers'),
+		make_sorting_header(_('Key'), 'key_', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('Interval'), 'delay', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('History'), 'history', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('Trends'), 'trends', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('Status'), 'status', $data['sort'], $data['sortorder'], $url),
+		_('Tags'),
+		($data['context'] === 'host') ? _('Info') : null
 	]);
 
 $current_time = time();
@@ -139,10 +142,10 @@ foreach ($data['items'] as $item) {
 
 	if ($item['type'] == ITEM_TYPE_DEPENDENT) {
 		if ($item['master_item']['type'] == ITEM_TYPE_HTTPTEST) {
-			$description[] = CHtml::encode($item['master_item']['name_expanded']);
+			$description[] = CHtml::encode($item['master_item']['name']);
 		}
 		else {
-			$description[] = (new CLink(CHtml::encode($item['master_item']['name_expanded']),
+			$description[] = (new CLink(CHtml::encode($item['master_item']['name']),
 				(new CUrl('items.php'))
 					->setArgument('form', 'update')
 					->setArgument('hostid', $item['hostid'])
@@ -156,7 +159,7 @@ foreach ($data['items'] as $item) {
 		$description[] = NAME_DELIMITER;
 	}
 
-	$description[] = new CLink(CHtml::encode($item['name_expanded']),
+	$description[] = new CLink(CHtml::encode($item['name']),
 		(new CUrl('items.php'))
 			->setArgument('form', 'update')
 			->setArgument('hostid', $item['hostid'])
@@ -175,18 +178,21 @@ foreach ($data['items'] as $item) {
 					: 'item.massdisable'
 				)
 				->setArgument('context', $data['context'])
+				->setArgument('checkbox_hash', $data['checkbox_hash'])
+				->setArgumentSID()
 				->getUrl()
 		))
-		->addClass(ZBX_STYLE_LINK_ACTION)
-		->addClass(itemIndicatorStyle($item['status'], $item['state']))
-		->addSID()
+			->addClass(ZBX_STYLE_LINK_ACTION)
+			->addClass(itemIndicatorStyle($item['status'], $item['state']))
 	);
 
 	// triggers info
-	$triggerHintTable = (new CTableInfo('trigger'.$item['itemid']))
-			->setHeader([_('Severity'), _('Name'), _('Expression'), _('Status')])
-			->addClass('nowrap');
-			
+	$triggerHintTable = (new CTableInfo())->setHeader([_('Severity'), _('Name'), _('Expression'), _('Status')]);
+
+	$backurl = (new CUrl('items.php'))
+		->setArgument('context', $data['context'])
+		->getUrl();
+
 	foreach ($item['triggers'] as $num => &$trigger) {
 		$trigger = $data['itemTriggers'][$trigger['triggerid']];
 
@@ -197,19 +203,15 @@ foreach ($data['items'] as $item) {
 
 		$trigger['hosts'] = zbx_toHash($trigger['hosts'], 'hostid');
 
-		if ($trigger['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
-			$trigger_description[] = new CSpan(CHtml::encode($trigger['description']));
-		}
-		else {
-			$trigger_description[] = new CLink(
-				CHtml::encode($trigger['description']),
-				(new CUrl('triggers.php'))
-					->setArgument('form', 'update')
-					->setArgument('hostid', key($trigger['hosts']))
-					->setArgument('triggerid', $trigger['triggerid'])
-					->setArgument('context', $data['context'])
-			);
-		}
+		$trigger_description[] = new CLink(
+			CHtml::encode($trigger['description']),
+			(new CUrl('triggers.php'))
+				->setArgument('form', 'update')
+				->setArgument('hostid', key($trigger['hosts']))
+				->setArgument('triggerid', $trigger['triggerid'])
+				->setArgument('context', $data['context'])
+				->setArgument('backurl', $backurl)
+		);
 
 		if ($trigger['state'] == TRIGGER_STATE_UNKNOWN) {
 			$trigger['error'] = '';
@@ -226,7 +228,7 @@ foreach ($data['items'] as $item) {
 		}
 
 		$triggerHintTable->addRow([
-			getSeverityCell($trigger['priority']),
+			CSeverityHelper::makeSeverityCell((int) $trigger['priority']),
 			$trigger_description,
 			(new CDiv($expression))->addClass(ZBX_STYLE_WORDWRAP),
 			(new CSpan(triggerIndicator($trigger['status'], $trigger['state'])))
@@ -247,17 +249,16 @@ foreach ($data['items'] as $item) {
 		$triggercount = 0;
 	}
 
-	$wizard = (new CSpan(
-		(new CButton(null))
-			->addClass(ZBX_STYLE_ICON_WZRD_ACTION)
-			->setMenuPopup(CMenuPopupHelper::getItem(['itemid' => $item['itemid'], 'context' => $data['context']]))
-	))->addClass(ZBX_STYLE_REL_CONTAINER);
+	$wizard = (new CButton(null))
+		->addClass(ZBX_STYLE_ICON_WIZARD_ACTION)
+		->setMenuPopup(CMenuPopupHelper::getItem([
+			'itemid' => $item['itemid'],
+			'context' => $data['context'],
+			'backurl' => $backurl
+		]));
 
 	if (in_array($item['value_type'], [ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_TEXT])) {
 		$item['trends'] = '';
-	}
-	else if ($item['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
-		$wizard = '';
 	}
 
 	// Hide zeros for trapper, SNMP trap and dependent items.
@@ -285,28 +286,23 @@ foreach ($data['items'] as $item) {
 		//}
 	}
 
+	$checkbox = new CCheckBox('group_itemid['.$item['itemid'].']', $item['itemid']);
+
+	if (in_array($item['type'], checkNowAllowedTypes())
+			&& $item['status'] == ITEM_STATUS_ACTIVE && $item['hosts'][0]['status'] == HOST_STATUS_MONITORED) {
+		$checkbox->setAttribute('data-actions', 'execute');
+	}
+
 	$itemTable->addRow([
-		new CCheckBox('group_itemid['.$item['itemid'].']', $item['itemid']),
+		$checkbox,
 		$wizard,
 		($data['hostid'] == 0) ? $item['host'] : null,
-		$description,
-		(new CCol($triggerInfo))
-			->setAttribute('data-order',$triggercount),
+		(new CCol($description))->addClass(ZBX_STYLE_WORDBREAK),
+		$triggerInfo,
 		(new CDiv(CHtml::encode($item['key_'])))->addClass(ZBX_STYLE_WORDWRAP),
 		$item['delay'],
-
-		$item['history'] > 0 ?
-				(new CSpan(""))
-				   ->setAttribute("data-indicator","mark")
-				   ->setAttribute("data-indicator-value",1)
-			   : " "
-		,
-		$item['trends'] > 0 ? 
-			(new CSpan(""))
-				   ->setAttribute("data-indicator","mark")
-				   ->setAttribute("data-indicator-value",1)
-			   : " "
-		,
+		$item['history'],
+		$item['trends'],
 		item_type2str($item['type']),
 		$status,
 		$data['tags'][$item['itemid']],
@@ -322,8 +318,7 @@ $button_list = [
 if ($data['context'] === 'host') {
 	$massclearhistory = [
 		'name' => _('Clear history'),
-		'confirm' => _('Delete history of selected items?'),
-		'disabled' => $data['is_template']
+		'confirm' => _('Delete history of selected items?')
 	];
 
 	if ($data['config']['compression_status']) {
@@ -331,8 +326,14 @@ if ($data['context'] === 'host') {
 	}
 
 	$button_list += [
-		'item.masscheck_now' => ['name' => _('Execute now'), 'disabled' => $data['is_template']],
-	//	'item.massclearhistory' => $massclearhistory
+		'item.masscheck_now' => [
+			'content' => (new CSimpleButton(_('Execute now')))
+				->onClick('view.massCheckNow(this);')
+				->addClass(ZBX_STYLE_BTN_ALT)
+				->addClass('no-chkbxrange')
+				->setAttribute('data-required', 'execute')
+		],
+		'item.massclearhistory' => $massclearhistory
 	];
 }
 
@@ -340,7 +341,12 @@ $button_list += [
 	'item.masscopyto' => ['name' => _('Copy')],
 	'popup.massupdate.item' => [
 		'content' => (new CButton('', _('Mass update')))
-			->onClick("return openMassupdatePopup(this, 'popup.massupdate.item');")
+			->onClick(
+				"openMassupdatePopup('popup.massupdate.item', {}, {
+					dialogue_class: 'modal-popup-preprocessing',
+					trigger_element: this
+				});"
+			)
 			->addClass(ZBX_STYLE_BTN_ALT)
 			->removeAttribute('id')
 	],
@@ -352,7 +358,15 @@ $itemForm->addItem([$itemTable, NULL, new CActionButtonList('action', 'group_ite
 	$data['checkbox_hash']
 )]);
 
-// Append form to widget.
-$widget->addItem($itemForm);
+$html_page
+	->addItem($itemForm)
+	->show();
 
-$widget->show();
+(new CScriptTag('
+	view.init('.json_encode([
+		'checkbox_hash' => $data['checkbox_hash'],
+		'checkbox_object' => 'group_itemid'
+	]).');
+'))
+	->setOnDocumentReady()
+	->show();

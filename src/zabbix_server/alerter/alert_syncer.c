@@ -17,27 +17,25 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "daemon.h"
+#include "alert_syncer.h"
+
+#include "../db_lengths.h"
+#include "zbxnix.h"
 #include "zbxself.h"
 #include "log.h"
-#include "db.h"
-#include "dbcache.h"
-#include "zbxipcservice.h"
-#include "zbxjson.h"
-#include "alert_manager.h"
-#include "alert_syncer.h"
 #include "alerter_protocol.h"
-
-#include "../../libs/zbxalgo/vectorimpl.h"
+#include "zbxservice.h"
+#include "dbcache.h"
+#include "zbxnum.h"
+#include "zbxtime.h"
+#include "zbxexpr.h"
 
 #define ZBX_POLL_INTERVAL	1
 
 #define ZBX_ALERT_BATCH_SIZE		1000
 #define ZBX_MEDIATYPE_CACHE_TTL		SEC_PER_DAY
 
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
+extern unsigned char			program_type;
 
 extern int	CONFIG_CONFSYNCER_FREQUENCY;
 
@@ -49,8 +47,6 @@ typedef struct
 zbx_am_db_t;
 
 /******************************************************************************
- *                                                                            *
- * Function: am_db_create_alert                                               *
  *                                                                            *
  * Purpose: creates new alert object                                          *
  *                                                                            *
@@ -85,11 +81,6 @@ static zbx_am_db_alert_t	*am_db_create_alert(zbx_uint64_t alertid, zbx_uint64_t 
 	return alert;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: am_db_init                                                       *
- *                                                                            *
- ******************************************************************************/
 static int 	am_db_init(zbx_am_db_t *amdb, char **error)
 {
 	zbx_hashset_create(&amdb->mediatypes, 5, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -100,11 +91,6 @@ static int 	am_db_init(zbx_am_db_t *amdb, char **error)
 	return SUCCEED;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: am_db_clear                                                      *
- *                                                                            *
- ******************************************************************************/
 static void	am_db_clear(zbx_am_db_t *amdb)
 {
 	zbx_hashset_iter_t	iter;
@@ -118,8 +104,6 @@ static void	am_db_clear(zbx_am_db_t *amdb)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_db_get_alerts                                                 *
  *                                                                            *
  * Purpose: reads the new alerts from database                                *
  *                                                                            *
@@ -165,7 +149,7 @@ static int	am_db_get_alerts(zbx_vector_ptr_t *alerts)
 	DBbegin();
 	result = DBselect("%s", sql);
 	sql_offset = 0;
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	while (NULL != (row = DBfetch(result)))
 	{
@@ -251,8 +235,6 @@ static int	am_db_get_alerts(zbx_vector_ptr_t *alerts)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_db_update_mediatype                                           *
- *                                                                            *
  * Purpose: updates media type object, creating one if necessary              *
  *                                                                            *
  * Return value: Updated mediatype or NULL, if the cached media was up to     *
@@ -312,8 +294,6 @@ static zbx_am_db_mediatype_t	*am_db_update_mediatype(zbx_am_db_t *amdb, time_t n
 
 /******************************************************************************
  *                                                                            *
- * Function: am_db_update_mediatypes                                          *
- *                                                                            *
  * Purpose: updates alert manager media types                                 *
  *                                                                            *
  * Parameters: amdb            - [IN] the alert manager cache                 *
@@ -354,7 +334,7 @@ static void	am_db_update_mediatypes(zbx_am_db_t *amdb, const zbx_uint64_t *media
 	now = time(NULL);
 	while (NULL != (row = DBfetch(result)))
 	{
-		if (FAIL == is_ushort(row[9], &smtp_port))
+		if (FAIL == zbx_is_ushort(row[9], &smtp_port))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
 			continue;
@@ -384,8 +364,6 @@ static void	am_db_update_mediatypes(zbx_am_db_t *amdb, const zbx_uint64_t *media
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_db_queue_alerts                                               *
  *                                                                            *
  * Purpose: reads alerts/mediatypes from database and queues them in alert    *
  *          manager                                                           *
@@ -464,9 +442,6 @@ static int	am_db_compare_tags(const void *d1, const void *d2)
 	return strcmp(tag1->value, tag2->value);
 }
 
-ZBX_PTR_VECTOR_DECL(tags, zbx_tag_t*)
-ZBX_PTR_VECTOR_IMPL(tags, zbx_tag_t*)
-
 static void	tag_free(zbx_tag_t *tag)
 {
 	zbx_free(tag->tag);
@@ -504,8 +479,6 @@ static void	event_tags_free(zbx_event_tags_t *event_tags)
 
 /******************************************************************************
  *                                                                            *
- * Function: am_db_update_event_tags                                          *
- *                                                                            *
  * Purpose: adds event tags to sql query                                      *
  *                                                                            *
  * Parameters: eventid     - [IN]  problem_tag update db event                *
@@ -521,7 +494,7 @@ static void	am_db_update_event_tags(zbx_uint64_t eventid, const char *params, zb
 	DB_ROW			row;
 	struct zbx_json_parse	jp, jp_tags;
 	const char		*pnext = NULL;
-	char			key[TAG_NAME_LEN * 4 + 1], value[TAG_VALUE_LEN * 4 + 1];
+	char			key[ZBX_DB_TAG_NAME_LEN * 4 + 1], value[ZBX_DB_TAG_VALUE_LEN * 4 + 1];
 	zbx_tag_t		*tag, tag_local = {.tag = key, .value = value};
 	int			event_tag_index, need_to_add_problem_tag = 0;
 	zbx_event_tags_t	*event_tags, local_event_tags;
@@ -580,10 +553,10 @@ static void	am_db_update_event_tags(zbx_uint64_t eventid, const char *params, zb
 		zbx_ltrim(key, ZBX_WHITESPACE);
 		zbx_ltrim(value, ZBX_WHITESPACE);
 
-		if (TAG_NAME_LEN < zbx_strlen_utf8(key))
-			key[zbx_strlen_utf8_nchars(key, TAG_NAME_LEN)] = '\0';
-		if (TAG_VALUE_LEN < zbx_strlen_utf8(value))
-			value[zbx_strlen_utf8_nchars(value, TAG_VALUE_LEN)] = '\0';
+		if (ZBX_DB_TAG_NAME_LEN < zbx_strlen_utf8(key))
+			key[zbx_strlen_utf8_nchars(key, ZBX_DB_TAG_NAME_LEN)] = '\0';
+		if (ZBX_DB_TAG_VALUE_LEN < zbx_strlen_utf8(value))
+			value[zbx_strlen_utf8_nchars(value, ZBX_DB_TAG_VALUE_LEN)] = '\0';
 
 		zbx_rtrim(key, ZBX_WHITESPACE);
 		zbx_rtrim(value, ZBX_WHITESPACE);
@@ -603,8 +576,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_db_validate_tags_for_update                                   *
  *                                                                            *
  * Purpose: removes duplicate event tags and checks if problem tags need to   *
  *          be updated                                                        *
@@ -654,7 +625,7 @@ static void	am_db_validate_tags_for_update(zbx_vector_events_tags_t *update_even
 
 		for (j = 0; j < local_event_tags->tags.values_num; j++)
 		{
-			tag = (zbx_tag_t *)(local_event_tags->tags).values[j];
+			tag = local_event_tags->tags.values[j];
 			zbx_db_insert_add_values(db_event, __UINT64_C(0), local_event_tags->eventid, tag->tag,
 					tag->value);
 
@@ -669,9 +640,28 @@ static void	am_db_validate_tags_for_update(zbx_vector_events_tags_t *update_even
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
+static void	am_service_add_event_tags(zbx_vector_events_tags_t *events_tags)
+{
+	unsigned char	*data = NULL;
+	size_t		data_alloc = 0, data_offset = 0;
+	int		i;
+
+	for (i = 0; i < events_tags->values_num; i++)
+	{
+		zbx_event_tags_t	*event_tag = events_tags->values[i];
+
+		zbx_service_serialize_problem_tags(&data, &data_alloc, &data_offset, event_tag->eventid,
+				&event_tag->tags);
+	}
+
+	if (NULL == data)
+		return;
+
+	zbx_service_flush(ZBX_IPC_SERVICE_SERVICE_PROBLEMS_TAGS, data, data_offset);
+	zbx_free(data);
+}
+
 /******************************************************************************
- *                                                                            *
- * Function: am_db_flush_results                                              *
  *                                                                            *
  * Purpose: retrieves alert updates from alert manager and flushes them into  *
  *          database                                                          *
@@ -695,27 +685,29 @@ static int	am_db_flush_results(zbx_am_db_t *amdb)
 		return 0;
 	}
 
+	zbx_vector_events_tags_create(&update_events_tags);
+
 	zbx_alerter_deserialize_results(message.data, &results, &results_num);
 
 	if (0 != results_num)
 	{
-		int 		i;
+		int 		i, ret;
 		char		*sql;
 		size_t		sql_alloc = results_num * 128, sql_offset;
 		zbx_db_insert_t	db_event, db_problem;
 
 		sql = (char *)zbx_malloc(NULL, sql_alloc);
 
-		do {
+		do
+		{
+			zbx_vector_events_tags_clear_ext(&update_events_tags, event_tags_free);
 			sql_offset = 0;
 
 			DBbegin();
-			DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+			zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 			zbx_db_insert_prepare(&db_event, "event_tag", "eventtagid", "eventid", "tag", "value", NULL);
 			zbx_db_insert_prepare(&db_problem, "problem_tag", "problemtagid", "eventid", "tag", "value",
 					NULL);
-
-			zbx_vector_events_tags_create(&update_events_tags);
 
 			for (i = 0; i < results_num; i++)
 			{
@@ -753,7 +745,7 @@ static int	am_db_flush_results(zbx_am_db_t *amdb)
 
 			am_db_validate_tags_for_update(&update_events_tags, &db_event, &db_problem);
 
-			DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+			zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 			if (16 < sql_offset)
 				DBexecute("%s", sql);
 
@@ -764,11 +756,11 @@ static int	am_db_flush_results(zbx_am_db_t *amdb)
 			zbx_db_insert_autoincrement(&db_problem, "problemtagid");
 			zbx_db_insert_execute(&db_problem);
 			zbx_db_insert_clean(&db_problem);
-
-			zbx_vector_events_tags_clear_ext(&update_events_tags, event_tags_free);
-			zbx_vector_events_tags_destroy(&update_events_tags);
 		}
-		while (ZBX_DB_DOWN == DBcommit());
+		while (ZBX_DB_DOWN == (ret = DBcommit()));
+
+		if (ZBX_DB_OK == ret)
+			am_service_add_event_tags(&update_events_tags);
 
 		for (i = 0; i < results_num; i++)
 		{
@@ -782,6 +774,8 @@ static int	am_db_flush_results(zbx_am_db_t *amdb)
 		zbx_free(sql);
 	}
 
+	zbx_vector_events_tags_clear_ext(&update_events_tags, event_tags_free);
+	zbx_vector_events_tags_destroy(&update_events_tags);
 	zbx_free(results);
 	zbx_ipc_message_clean(&message);
 
@@ -790,8 +784,6 @@ static int	am_db_flush_results(zbx_am_db_t *amdb)
 	return results_num;
 }
 /******************************************************************************
- *                                                                            *
- * Function: am_db_remove_expired_mediatypes                                  *
  *                                                                            *
  * Purpose: removes cached media types used more than a day ago               *
  *                                                                            *
@@ -838,8 +830,6 @@ static void	am_db_remove_expired_mediatypes(zbx_am_db_t *amdb)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: am_db_update_watchdog                                            *
  *                                                                            *
  * Purpose: updates watchdog recipients                                       *
  *                                                                            *
@@ -888,7 +878,6 @@ static void	am_db_update_watchdog(zbx_am_db_t *amdb)
 	}
 	DBfree_result(result);
 
-
 	/* update media types used for watchdog alerts */
 
 	if (0 != mediatypeids.values_num)
@@ -922,15 +911,14 @@ static void	am_db_update_watchdog(zbx_am_db_t *amdb)
 
 ZBX_THREAD_ENTRY(alert_syncer_thread, args)
 {
-	double		sec1, sec2;
-	int		alerts_num, sleeptime, nextcheck, freq_watchdog, time_watchdog = 0, time_cleanup = 0,
-			results_num;
-	zbx_am_db_t	amdb;
-	char		*error = NULL;
-
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+	double			sec1, sec2, time_cleanup = 0, time_watchdog = 0;
+	int			alerts_num, sleeptime, nextcheck, freq_watchdog, results_num;
+	zbx_am_db_t		amdb;
+	char			*error = NULL;
+	const zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
+	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
+	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
@@ -954,7 +942,7 @@ ZBX_THREAD_ENTRY(alert_syncer_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
-		zbx_sleep_loop(sleeptime);
+		zbx_sleep_loop(info, sleeptime);
 
 		sec1 = zbx_time();
 		zbx_update_env(sec1);

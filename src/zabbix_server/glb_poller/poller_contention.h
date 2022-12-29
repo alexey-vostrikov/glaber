@@ -1,0 +1,34 @@
+/*
+** Glaber
+** Copyright (C)  Glaber
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+#include "log.h"
+#include "zbxcommon.h"
+#include "zbxalgo.h"
+
+
+void poller_contention_init();
+void poller_contention_destroy();
+
+void    poller_contention_add_session(const char *resource);
+void    poller_contention_remove_session(const char *resource);
+int     poller_contention_get_sessions(const char *resource);
+
+int     poller_contention_sessions_count();
+void    poller_contention_housekeep();
+
+

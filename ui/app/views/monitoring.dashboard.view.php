@@ -21,6 +21,7 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
 if (array_key_exists('error', $data)) {
@@ -31,37 +32,31 @@ if (array_key_exists('error', $data)) {
 
 $this->addJsFile('flickerfreescreen.js');
 $this->addJsFile('gtlc.js');
+$this->addJsFile('leaflet.js');
+$this->addJsFile('leaflet.markercluster.js');
 $this->addJsFile('class.dashboard.js');
 $this->addJsFile('class.dashboard.page.js');
 $this->addJsFile('class.dashboard.widget.placeholder.js');
+$this->addJsFile('class.geomaps.js');
 $this->addJsFile('class.widget.js');
+$this->addJsFile('class.widget.inaccessible.js');
 $this->addJsFile('class.widget.iterator.js');
-$this->addJsFile('class.widget.clock.js');
-$this->addJsFile('class.widget.graph.js');
-$this->addJsFile('class.widget.graph-prototype.js');
-$this->addJsFile('class.widget.map.js');
-$this->addJsFile('class.widget.navtree.js');
 $this->addJsFile('class.widget.paste-placeholder.js');
-$this->addJsFile('class.widget.problems.js');
-$this->addJsFile('class.widget.problemsbysv.js');
-$this->addJsFile('class.widget.svggraph.js');
-$this->addJsFile('class.widget.trigerover.js');
 $this->addJsFile('class.calendar.js');
-$this->addJsFile('multiselect.js');
 $this->addJsFile('layout.mode.js');
 $this->addJsFile('class.coverride.js');
-$this->addJsFile('class.cverticalaccordion.js');
 $this->addJsFile('class.crangecontrol.js');
 $this->addJsFile('colorpicker.js');
 $this->addJsFile('class.csvggraph.js');
 $this->addJsFile('class.cnavtree.js');
 $this->addJsFile('class.svg.canvas.js');
 $this->addJsFile('class.svg.map.js');
-$this->addJsFile('class.tab-indicators.js');
 $this->addJsFile('class.tagfilteritem.js');
 $this->addJsFile('class.sortable.js');
 
 $this->includeJsFile('monitoring.dashboard.view.js.php');
+
+$this->addCssFile('assets/styles/vendors/Leaflet/Leaflet/leaflet.css');
 
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
@@ -95,9 +90,10 @@ if ($data['dynamic']['has_dynamic_widgets']) {
 		]);
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle($data['dashboard']['name'])
 	->setWebLayoutMode($web_layout_mode)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::DASHBOARDS_VIEW))
 	->setControls(
 		(new CList())
 			->setId('dashboard-control')
@@ -131,9 +127,11 @@ $widget = (new CWidget())
 					(new CButton('dashboard-config'))->addClass(ZBX_STYLE_BTN_DASHBOARD_CONF),
 					(new CList())
 						->addClass(ZBX_STYLE_BTN_SPLIT)
-						->addItem((new CButton('dashboard-add-widget',
-							[(new CSpan())->addClass(ZBX_STYLE_PLUS_ICON), _('Add')]
-						))->addClass(ZBX_STYLE_BTN_ALT))
+						->addItem(
+							(new CButton('dashboard-add-widget',
+								[(new CSpan())->addClass(ZBX_STYLE_PLUS_ICON), _('Add')]
+							))->addClass(ZBX_STYLE_BTN_ALT)
+						)
 						->addItem(
 							(new CButton('dashboard-add', '&#8203;'))
 								->addClass(ZBX_STYLE_BTN_ALT)
@@ -191,8 +189,8 @@ $widget = (new CWidget())
 	])));
 
 if ($data['has_time_selector']) {
-	$widget->addItem(
-		(new CFilter(new CUrl()))
+	$html_page->addItem(
+		(new CFilter())
 			->setProfile($data['time_period']['profileIdx'], $data['time_period']['profileIdx2'])
 			->setActiveTab($data['active_tab'])
 			->addTimeSelector($data['time_period']['from'], $data['time_period']['to'],
@@ -246,19 +244,22 @@ if ($web_layout_mode != ZBX_LAYOUT_KIOSKMODE) {
 
 $dashboard->addItem((new CDiv())->addClass(ZBX_STYLE_DASHBOARD_GRID));
 
-$widget
+$html_page
 	->addItem($dashboard)
 	->show();
 
 (new CScriptTag('
-	initializeView(
-		'.json_encode($data['dashboard']).',
-		'.json_encode($data['widget_defaults']).',
-		'.json_encode($data['has_time_selector']).',
-		'.json_encode($data['time_period']).',
-		'.json_encode($data['dynamic']).',
-		'.json_encode($web_layout_mode).'
-	);
+	view.init('.json_encode([
+		'dashboard' => $data['dashboard'],
+		'widget_defaults' => $data['widget_defaults'],
+		'widget_last_type' => $data['widget_last_type'],
+		'configuration_hash' => $data['configuration_hash'],
+		'has_time_selector' => $data['has_time_selector'],
+		'time_period' => $data['time_period'],
+		'dynamic' => $data['dynamic'],
+		'web_layout_mode' => $web_layout_mode,
+		'clone' => $data['clone']
+	]).');
 '))
 	->setOnDocumentReady()
 	->show();

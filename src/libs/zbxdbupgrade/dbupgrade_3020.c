@@ -17,9 +17,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "db.h"
 #include "dbupgrade.h"
+
+#include "zbxnum.h"
+#include "zbxdbhigh.h"
 
 /*
  * 3.2 maintenance database patches

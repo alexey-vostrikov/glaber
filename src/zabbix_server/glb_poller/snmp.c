@@ -19,7 +19,7 @@
 
 #include "glb_poller.h"
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/types.h>
@@ -80,6 +80,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 	char error_str[1024];
 
 	LOG_DBG("In %s: starting", __func__);
+	//LOG_INF("SNMP Item creating");	
 	snmp_item = zbx_calloc(NULL, 0, sizeof(snmp_item_t));
 
     poller_set_item_specific_data(poller_item, snmp_item);
@@ -110,7 +111,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 		snmp_item->snmp_req_type = SNMP_CMD_GET_NEXT;
 	else 
 		snmp_item->snmp_req_type = SNMP_CMD_GET;
-		
+	//LOG_INF("SNMP Item has been created");	
 	return SUCCEED;
 }
 
@@ -151,7 +152,7 @@ static int process_result(csnmp_pdu_t *pdu)
 	u_int64_t itemid;
 	struct sockaddr_in *saddr = (struct sockaddr_in *)&pdu->addr;
 	
-	poller_inc_responces();
+	poller_inc_responses();
 	if (0 == (itemid = poller_sessions_close_session(pdu->req_id))) {
 		char addr_str[20];
 		inet_ntop(AF_INET, &(pdu->addr), addr_str, INET_ADDRSTRLEN);
@@ -219,7 +220,7 @@ static int snmp_send_request(poller_item_t *poller_item) {
  	}
 }
 
-void resolve_ready_func_cb(poller_item_t *poller_item,  const char *addr) {
+static void resolve_ready_cb(poller_item_t *poller_item,  const char *addr) {
 	DEBUG_ITEM(poller_get_item_id(poller_item), "Item resolved to '%s'", addr);
 	
 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
@@ -303,7 +304,7 @@ void snmp_async_init(void) {
 	/*need lib net-snmp for parsing text->digital and getting text oids hints*/
 	init_snmp(progname);
 	
-	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count, resolve_ready_func_cb);
+	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item, snmp_async_shutdown, forks_count, resolve_ready_cb);
 
 	if ( (conf.socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
         LOG_INF("Couldn't create socket for ASYNC snmp poller");
@@ -330,4 +331,5 @@ void snmp_async_init(void) {
 	poller_run_fd_event(conf.socket_event);
 	
 	poller_sessions_init();
+	LOG_INF("Finished snmp init");
 }

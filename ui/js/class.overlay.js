@@ -43,32 +43,50 @@ function Overlay(type, dialogueid) {
 		'data-dialogueid': this.dialogueid,
 		'role': 'dialog',
 		'aria-modal': 'true',
-		'aria-labeledby': this.headerid
+		'aria-labelledby': this.headerid
 	});
 
-	var $close_btn = jQuery('<button>', {
-			class: 'overlay-close-btn',
-			title: t('S_CLOSE')
-		})
-		.click(function(e) {
-			overlayDialogueDestroy(this.dialogueid);
-			e.preventDefault();
-		}.bind(this));
-
-	this.$dialogue.append($close_btn);
-
 	this.$dialogue.$header = jQuery('<h4>', {id: this.headerid});
+
+	const $close_btn = jQuery('<button>', {
+		class: 'overlay-close-btn',
+		title: t('S_CLOSE')
+	}).click(function(e) {
+		overlayDialogueDestroy(this.dialogueid);
+		e.preventDefault();
+	}.bind(this));
+
 	this.$dialogue.$controls = jQuery('<div>', {class: 'overlay-dialogue-controls'});
+	this.$dialogue.$head = jQuery('<div>', {class: 'dashboard-widget-head'});
 	this.$dialogue.$body = jQuery('<div>', {class: 'overlay-dialogue-body'});
 	this.$dialogue.$debug = jQuery('<pre>', {class: 'debug-output'});
 	this.$dialogue.$footer = jQuery('<div>', {class: 'overlay-dialogue-footer'});
 	this.$dialogue.$script = jQuery('<script>');
 
-	this.$dialogue.append(jQuery('<div>', {class: 'dashboard-widget-head'}).append(this.$dialogue.$header));
+	this.$dialogue.$head.append(this.$dialogue.$header, $close_btn);
+
+	this.$dialogue.append(this.$dialogue.$head);
 	this.$dialogue.append(this.$dialogue.$body);
 	this.$dialogue.append(this.$dialogue.$footer);
 
-	this.center_dialog_function = this.centerDialog.bind(this);
+	this.$dialogue.$body.on('submit', 'form', function(e) {
+		if (this.$btn_submit) {
+			e.preventDefault();
+			this.$btn_submit.trigger('click');
+		}
+	}.bind(this));
+
+	this.center_dialog_animation_frame = null;
+	this.center_dialog_function = () => {
+		if (this.center_dialog_animation_frame !== null) {
+			cancelAnimationFrame(this.center_dialog_animation_frame);
+		}
+
+		this.center_dialog_animation_frame = requestAnimationFrame(() => {
+			this.center_dialog_animation_frame = null;
+			this.centerDialog();
+		});
+	};
 
 	var body_mutation_observer = window.MutationObserver || window.WebKitMutationObserver;
 	this.body_mutation_observer = new body_mutation_observer(this.center_dialog_function);
@@ -104,10 +122,10 @@ Overlay.prototype.centerDialog = function() {
 	});
 
 	this.$dialogue.css({
-		'left': Math.max(0, parseInt((jQuery(window).width() - this.$dialogue.outerWidth(true)) / 2)) + 'px',
-		'top': this.$dialogue.hasClass('sticked-to-top')
-			? ''
-			: Math.max(0, parseInt((jQuery(window).height() - this.$dialogue.outerHeight(true)) / 2)) + 'px'
+		'left': Math.max(0, Math.floor((jQuery(window).width() - this.$dialogue.outerWidth(true)) / 2)) + 'px',
+		'top': this.$dialogue.hasClass('position-middle')
+			? Math.max(0, Math.floor((jQuery(window).height() - this.$dialogue.outerHeight(true)) / 2)) + 'px'
+			: ''
 	});
 
 	var size = {
@@ -149,13 +167,14 @@ Overlay.prototype.recoverFocus = function() {
 Overlay.prototype.containFocus = function() {
 	var focusable = jQuery(':focusable', this.$dialogue);
 
+	focusable.off('keydown.containFocus');
+
 	if (focusable.length > 1) {
 		var first_focusable = focusable.filter(':first'),
 			last_focusable = focusable.filter(':last');
 
 		first_focusable
-			.off('keydown')
-			.on('keydown', function(e) {
+			.on('keydown.containFocus', function(e) {
 				// TAB and SHIFT
 				if (e.which == 9 && e.shiftKey) {
 					last_focusable.focus();
@@ -164,8 +183,7 @@ Overlay.prototype.containFocus = function() {
 			});
 
 		last_focusable
-			.off('keydown')
-			.on('keydown', function(e) {
+			.on('keydown.containFocus', function(e) {
 				// TAB and not SHIFT
 				if (e.which == 9 && !e.shiftKey) {
 					first_focusable.focus();
@@ -175,8 +193,7 @@ Overlay.prototype.containFocus = function() {
 	}
 	else {
 		focusable
-			.off('keydown')
-			.on('keydown', function(e) {
+			.on('keydown.containFocus', function(e) {
 				if (e.which == 9) {
 					return false;
 				}
@@ -185,20 +202,27 @@ Overlay.prototype.containFocus = function() {
 };
 
 /**
- * Sets dialogue in loading sate.
+ * Sets dialogue in loading state.
  */
 Overlay.prototype.setLoading = function() {
-	this.$dialogue.$body.addClass('is-loading');
+	this.$dialogue.$body.addClass('is-loading is-loading-fadein');
 	this.$dialogue.$controls.find('z-select, button').prop('disabled', true);
-	this.$btn_submit && this.$btn_submit.prop('disabled', true);
+
+	this.$dialogue.$footer.find('button:not(.js-cancel)').each(function() {
+		$(this).prop('disabled', true);
+	});
 };
 
 /**
- * Sets dialogue in idle sate.
+ * Sets dialogue in idle state.
  */
 Overlay.prototype.unsetLoading = function() {
-	this.$dialogue.$body.removeClass('is-loading');
-	this.$btn_submit && this.$btn_submit.removeClass('is-loading').prop('disabled', false);
+	this.$dialogue.$body.removeClass('is-loading is-loading-fadein');
+	this.$dialogue.$footer.find('button:not(.js-cancel)').each(function() {
+		if ($(this).data('disabled') !== true) {
+			$(this).removeClass('is-loading').prop('disabled', false);
+		}
+	});
 };
 
 /**
@@ -242,10 +266,16 @@ Overlay.prototype.unmount = function() {
 
 	jQuery.unsubscribe('debug.click', this.center_dialog_function);
 
+	this.unsetProperty('prevent_navigation');
+
 	this.$backdrop.remove();
 	this.$dialogue.remove();
 
 	this.body_mutation_observer.disconnect();
+
+	if (this.center_dialog_animation_frame !== null) {
+		cancelAnimationFrame(this.center_dialog_animation_frame);
+	}
 
 	var $wrapper = jQuery('.wrapper');
 
@@ -269,7 +299,14 @@ Overlay.prototype.mount = function() {
 	this.$backdrop.appendTo($wrapper);
 	this.$dialogue.appendTo($wrapper);
 
-	this.body_mutation_observer.observe(this.$dialogue[0], {childList: true, subtree: true});
+	for (const dialog_part of ['$header', '$controls', '$body', '$footer']) {
+		this.body_mutation_observer.observe(this.$dialogue[dialog_part][0], {
+			childList: true,
+			subtree: true,
+			attributeFilter: ['style', 'class']
+		});
+	}
+
 	this.centerDialog();
 
 	jQuery.subscribe('debug.click', this.center_dialog_function);
@@ -292,8 +329,13 @@ Overlay.prototype.makeButton = function(obj) {
 			return;
 		}
 
-		if (obj.isSubmit && this.$btn_submit) {
-			this.$btn_submit.blur().addClass('is-loading');
+		if (!('cancel' in obj) || !obj.cancel) {
+			$(e.target)
+				.blur()
+				.addClass('is-loading')
+				.prop('disabled', true)
+				.siblings(':not(.js-cancel)')
+					.prop('disabled', true);
 		}
 
 		if (obj.action && obj.action(this) !== false) {
@@ -312,7 +354,9 @@ Overlay.prototype.makeButton = function(obj) {
 	}
 
 	if (obj.enabled === false) {
-		$button.prop('disabled', true);
+		$button
+			.prop('disabled', true)
+			.data('disabled', true);
 	}
 
 	return $button;
@@ -354,6 +398,11 @@ Overlay.prototype.makeButtons = function(arr) {
 	return buttons;
 };
 
+Overlay.prototype.preventNavigation = function(event) {
+	event.preventDefault();
+	event.returnValue = '';
+};
+
 /**
  * @param {string} key
  */
@@ -361,6 +410,13 @@ Overlay.prototype.unsetProperty = function(key) {
 	switch (key) {
 		case 'title':
 			this.$dialogue.$header.text('');
+			break;
+
+		case 'doc_url':
+			const doc_link = this.$dialogue.$head[0].querySelector('.icon-doc-link');
+			if (doc_link !== null) {
+				doc_link.remove();
+			}
 			break;
 
 		case 'buttons':
@@ -385,6 +441,10 @@ Overlay.prototype.unsetProperty = function(key) {
 		case 'script_inline':
 			this.$dialogue.$script.remove();
 			break;
+
+		case 'prevent_navigation':
+			window.removeEventListener('beforeunload', this.preventNavigation);
+			break;
 	}
 };
 
@@ -407,6 +467,13 @@ Overlay.prototype.setProperties = function(obj) {
 
 			case 'title':
 				this.$dialogue.$header.text(obj[key]);
+				break;
+
+			case 'doc_url':
+				this.unsetProperty(key);
+				this.$dialogue.$header[0].insertAdjacentHTML('afterend', `
+					<a class="icon-doc-link" target="_blank" title="${t('Help')}" href="${obj[key]}"></a>
+				`);
 				break;
 
 			case 'buttons':
@@ -444,6 +511,11 @@ Overlay.prototype.setProperties = function(obj) {
 				this.$dialogue.$footer.prepend(this.$dialogue.$script);
 				break;
 
+			case 'prevent_navigation':
+				this.unsetProperty(key);
+				window.addEventListener('beforeunload', this.preventNavigation, {passive: false});
+				break;
+
 			case 'element':
 				this.element = obj[key];
 				break;
@@ -453,10 +525,4 @@ Overlay.prototype.setProperties = function(obj) {
 				break;
 		}
 	}
-
-	// Hijack form.
-	this.$btn_submit && this.$dialogue.$body.find('form').on('submit', function(e) {
-		e.preventDefault();
-		this.$btn_submit.trigger('click');
-	}.bind(this));
 };

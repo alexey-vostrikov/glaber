@@ -20,7 +20,7 @@
 
 #include "zbxvariant.h"
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
 #include "glb_state.h"
 #include "discovery.h"
 #include "glb_state_items.h"
@@ -32,7 +32,7 @@
 
 extern u_int64_t CONFIG_VALUE_CACHE_SIZE;
 
-static  zbx_mem_info_t	*cache_mem;
+static  zbx_shmem_info_t	*cache_mem;
 
 typedef struct {
     glb_state_stats_t stats;
@@ -42,28 +42,28 @@ typedef struct {
 static glb_state_t *glb_cache;
 
 
-ZBX_MEM_FUNC_IMPL(__cache, cache_mem);
+ZBX_SHMEM_FUNC_IMPL(__cache, cache_mem);
 
 
 int glb_state_init() {
    
     char *error = NULL;
 	
-	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "Items values cache size", "ValueCacheSize", 0, &error)) {
+	if (SUCCEED != zbx_shmem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "Items values cache size", "ValueCacheSize", 0, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	return FAIL;
     }
  
-	if (NULL == (glb_cache = (glb_state_t *)zbx_mem_malloc(cache_mem, NULL, sizeof(glb_state_t)))) {	
+	if (NULL == (glb_cache = (glb_state_t *)zbx_shmem_malloc(cache_mem, NULL, sizeof(glb_state_t)))) {	
 		zabbix_log(LOG_LEVEL_CRIT,"Cannot allocate Cache structures, exiting");
 		return FAIL;
 	}
     
     memset((void *)glb_cache, 0, sizeof(glb_state_t));
 	
-	glb_cache->memf.free_func = __cache_mem_free_func;
-	glb_cache->memf.malloc_func = __cache_mem_malloc_func;
-	glb_cache->memf.realloc_func = __cache_mem_realloc_func;
+	glb_cache->memf.free_func = __cache_shmem_free_func;
+	glb_cache->memf.malloc_func = __cache_shmem_malloc_func;
+	glb_cache->memf.realloc_func = __cache_shmem_realloc_func;
 
 	if (SUCCEED != glb_state_items_init(&glb_cache->memf) )
 		return FAIL;
@@ -77,10 +77,10 @@ int glb_state_init() {
 
 
 
-int glb_state_get_mem_stats(zbx_mem_stats_t *mem_stats) {
+int glb_state_get_mem_stats(zbx_shmem_stats_t *mem_stats) {
     
-    memset(&mem_stats, 0, sizeof(zbx_mem_stats_t));
-	zbx_mem_get_stats(cache_mem, mem_stats);
+    memset(&mem_stats, 0, sizeof(zbx_shmem_stats_t));
+	zbx_shmem_get_stats(cache_mem, mem_stats);
   
 }
 

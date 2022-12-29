@@ -17,19 +17,19 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "log.h"
-#include "zbxjson.h"
-#include "dbcache.h"
+#include "trapper_item_test.h"
 #include "zbxserver.h"
+
+#include "log.h"
 #include "../poller/poller.h"
 #include "zbxtasks.h"
+#include "zbxcommshigh.h"
 #ifdef HAVE_OPENIPMI
 #include "../ipmi/ipmi.h"
 #endif
-
+#include "zbxnum.h"
+#include "zbxsysinfo.h"
 #include "trapper_auth.h"
-#include "trapper_item_test.h"
-extern int CONFIG_IPMIPOLLER_FORKS;
 
 static void	dump_item(const DC_ITEM *item)
 {
@@ -126,7 +126,8 @@ static void	db_uchar_from_json(const struct zbx_json_parse *jp, const char *name
 		ZBX_STR2UCHAR(*string, DBget_field(table, fieldname)->default_value);
 }
 
-int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t proxy_hostid, char **info)
+int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t proxy_hostid, char **info,
+		const zbx_config_comms_args_t *zbx_config)
 {
 	char			tmp[MAX_STRING_LEN + 1], **pvalue;
 	DC_ITEM			item;
@@ -148,7 +149,8 @@ int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t
 
 	if (0 != proxy_hostid && FAIL == is_item_processed_by_server(item.type, item.key))
 	{
-		ret = zbx_tm_execute_task_data(jp_data->start, jp_data->end - jp_data->start + 1, proxy_hostid, info);
+		ret = zbx_tm_execute_task_data(jp_data->start, (size_t)(jp_data->end - jp_data->start + 1),
+				proxy_hostid, info);
 		goto out;
 	}
 
@@ -299,9 +301,9 @@ int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t
 
 	if (ITEM_TYPE_IPMI == item.type)
 	{
-		init_result(&result);
+		zbx_init_agent_result(&result);
 
-		if (FAIL == is_ushort(item.interface.port_orig, &item.interface.port))
+		if (FAIL == zbx_is_ushort(item.interface.port_orig, &item.interface.port))
 		{
 			*info = zbx_dsprintf(NULL, "Invalid port number [%s]", item.interface.port_orig);
 		}
@@ -339,7 +341,7 @@ int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t
 			zbx_eval_context_t	ctx;
 			char			*error = NULL;
 
-			if (FAIL == zbx_eval_parse_expression(&ctx, item.params, ZBX_EVAL_PARSE_CALC_EXPRESSSION, &error))
+			if (FAIL == zbx_eval_parse_expression(&ctx, item.params, ZBX_EVAL_PARSE_CALC_EXPRESSION, &error))
 			{
 				zbx_eval_set_exception(&ctx, zbx_dsprintf(NULL, "Cannot parse formula: %s", error));
 				zbx_free(error);
@@ -349,12 +351,12 @@ int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t
 			zbx_eval_clear(&ctx);
 		}
 
-		zbx_check_items(&item, &errcode, 1, &result, &add_results, ZBX_NO_POLLER);
+		zbx_check_items(&item, &errcode, 1, &result, &add_results, ZBX_NO_POLLER, zbx_config);
 
 		switch (errcode)
 		{
 			case SUCCEED:
-				if (NULL == (pvalue = GET_TEXT_RESULT(&result)))
+				if (NULL == (pvalue = ZBX_GET_TEXT_RESULT(&result)))
 				{
 					*info = zbx_strdup(NULL, "no value");
 				}
@@ -365,13 +367,13 @@ int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t
 				}
 				break;
 			default:
-				if (NULL == (pvalue = GET_MSG_RESULT(&result)))
+				if (NULL == (pvalue = ZBX_GET_MSG_RESULT(&result)))
 					*info = zbx_dsprintf(NULL, "unknown error with code %d", errcode);
 				else
 					*info = zbx_strdup(NULL, *pvalue);
 		}
 
-		zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_result_ptr);
+		zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
 		zbx_vector_ptr_destroy(&add_results);
 	}
 
@@ -408,7 +410,7 @@ out:
 	return ret;
 }
 
-void	zbx_trapper_item_test(zbx_socket_t *sock, const struct zbx_json_parse *jp)
+void	zbx_trapper_item_test(zbx_socket_t *sock, const struct zbx_json_parse *jp, const zbx_config_comms_args_t *zbx_config)
 {
 	zbx_user_t		user;
 	struct zbx_json_parse	jp_data;
@@ -420,10 +422,12 @@ void	zbx_trapper_item_test(zbx_socket_t *sock, const struct zbx_json_parse *jp)
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
+	zbx_user_init(&user);
+
 	if (FAIL == zbx_get_user_from_json(jp, &user, NULL) || USER_TYPE_ZABBIX_ADMIN > user.type)
 	{
 		zbx_send_response(sock, FAIL, "Permission denied.", CONFIG_TIMEOUT);
-		return;
+		goto out;
 	}
 
 	if (SUCCEED != zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_DATA, &jp_data))
@@ -433,7 +437,7 @@ void	zbx_trapper_item_test(zbx_socket_t *sock, const struct zbx_json_parse *jp)
 		error = zbx_dsprintf(NULL, "Cannot parse request tag: %s.", ZBX_PROTO_TAG_DATA);
 		zbx_send_response(sock, FAIL, error, CONFIG_TIMEOUT);
 		zbx_free(error);
-		return;
+		goto out;
 	}
 
 	zbx_json_init(&json, 1024);
@@ -443,7 +447,7 @@ void	zbx_trapper_item_test(zbx_socket_t *sock, const struct zbx_json_parse *jp)
 	else
 		proxy_hostid = 0;
 
-	ret = zbx_trapper_item_test_run(&jp_data, proxy_hostid, &info);
+	ret = zbx_trapper_item_test_run(&jp_data, proxy_hostid, &info, zbx_config);
 
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, "success", ZBX_JSON_TYPE_STRING);
 	zbx_json_addobject(&json, ZBX_PROTO_TAG_DATA);
@@ -455,6 +459,7 @@ void	zbx_trapper_item_test(zbx_socket_t *sock, const struct zbx_json_parse *jp)
 
 	zbx_free(info);
 	zbx_json_free(&json);
-
+out:
+	zbx_user_free(&user);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

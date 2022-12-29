@@ -18,11 +18,14 @@
 **/
 
 #include "zbxicmpping.h"
-#include "threads.h"
-#include "comms.h"
+
+#include "zbxthreads.h"
+#include "zbxcomms.h"
 #include "zbxexec.h"
 #include "log.h"
 #include <signal.h>
+#include "zbxstr.h"
+#include "zbxip.h"
 
 extern char	*CONFIG_SOURCE_IP;
 extern char	*CONFIG_FPING_LOCATION;
@@ -87,8 +90,6 @@ static void	get_source_ip_option(const char *fping, const char **option, unsigne
 
 /******************************************************************************
  *                                                                            *
- * Function: get_interval_option                                              *
- *                                                                            *
  * Purpose: detect minimal possible fping packet interval                     *
  *                                                                            *
  * Parameters: fping         - [IN] the location of fping program             *
@@ -149,7 +150,7 @@ static int	get_interval_option(const char *fping, ZBX_FPING_HOST *hosts, int hos
 				goto out;
 			}
 
-			if (FAIL == ret_exec)
+			if (SUCCEED != ret_exec)
 			{
 				zbx_snprintf(error, max_error_len, "Cannot execute \"%s\": %s", tmp, err);
 				goto out;
@@ -234,8 +235,6 @@ out:
 
 #ifdef HAVE_IPV6
 /******************************************************************************
- *                                                                            *
- * Function: get_ipv6_support                                                 *
  *                                                                            *
  * Purpose: check fping supports IPv6                                         *
  *                                                                            *
@@ -327,7 +326,7 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 #else
 		if (NULL != CONFIG_SOURCE_IP)
 		{
-			if (FAIL == is_ip4(CONFIG_SOURCE_IP)) /* we do not have IPv4 family address in CONFIG_SOURCE_IP */
+			if (FAIL == zbx_is_ip4(CONFIG_SOURCE_IP)) /* we do not have IPv4 family address in CONFIG_SOURCE_IP */
 			{
 				zbx_snprintf(error, max_error_len,
 					"You should enable IPv6 support to use IPv6 family address for SourceIP '%s'.", CONFIG_SOURCE_IP);
@@ -361,7 +360,7 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 		offset += zbx_snprintf(params + offset, sizeof(params) - offset, " -t%d", timeout);
 
 #ifdef HAVE_IPV6
-	strscpy(params6, params);
+	zbx_strscpy(params6, params);
 	offset6 = offset;
 
 	if (0 != (fping_existence & FPING_EXISTS) && 0 != hosts_count)
@@ -706,8 +705,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_ping                                                         *
- *                                                                            *
  * Purpose: ping hosts listed in the host files                               *
  *                                                                            *
  *             hosts_count   - [IN]  number of target hosts                   *
@@ -726,8 +723,6 @@ out:
  *                                                                            *
  * Return value: SUCCEED - successfully processed hosts                       *
  *               NOTSUPPORTED - otherwise                                     *
- *                                                                            *
- * Author: Alexei Vladishev                                                   *
  *                                                                            *
  * Comments: use external binary 'fping' to avoid superuser privileges        *
  *                                                                            *

@@ -80,6 +80,8 @@ class CGraphPrototype extends CGraphGeneral {
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
 			'selectGroups'				=> null,
+			'selectHostGroups'			=> null,
+			'selectTemplateGroups'		=> null,
 			'selectTemplates'			=> null,
 			'selectHosts'				=> null,
 			'selectItems'				=> null,
@@ -93,6 +95,8 @@ class CGraphPrototype extends CGraphGeneral {
 			'limit'						=> null
 		];
 		$options = zbx_array_merge($defOptions, $options);
+
+		$this->checkDeprecatedParam($options, 'selectGroups');
 
 		// editable + PERMISSION CHECK
 		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
@@ -111,36 +115,6 @@ class CGraphPrototype extends CGraphGeneral {
 					' AND i.hostid=hgg.hostid'.
 				' GROUP BY i.hostid'.
 				' HAVING MAX(permission)<'.zbx_dbstr($permission).
-					' OR MIN(permission) IS NULL'.
-					' OR MIN(permission)='.PERM_DENY.
-				')';
-			// check permissions by Y min item
-			$sqlParts['where'][] = 'NOT EXISTS ('.
-				'SELECT NULL'.
-				' FROM items i,hosts_groups hgg'.
-					' LEFT JOIN rights r'.
-						' ON r.id=hgg.groupid'.
-							' AND '.dbConditionInt('r.groupid', $userGroups).
-				' WHERE g.ymin_type='.GRAPH_YAXIS_TYPE_ITEM_VALUE.
-					' AND g.ymin_itemid=i.itemid'.
-					' AND i.hostid=hgg.hostid'.
-				' GROUP BY i.hostid'.
-				' HAVING MAX(permission)<'.$permission.
-					' OR MIN(permission) IS NULL'.
-					' OR MIN(permission)='.PERM_DENY.
-				')';
-			// check permissions by Y max item
-			$sqlParts['where'][] = 'NOT EXISTS ('.
-				'SELECT NULL'.
-				' FROM items i,hosts_groups hgg'.
-					' LEFT JOIN rights r'.
-						' ON r.id=hgg.groupid'.
-							' AND '.dbConditionInt('r.groupid', $userGroups).
-				' WHERE g.ymax_type='.GRAPH_YAXIS_TYPE_ITEM_VALUE.
-					' AND g.ymax_itemid=i.itemid'.
-					' AND i.hostid=hgg.hostid'.
-				' GROUP BY i.hostid'.
-				' HAVING MAX(permission)<'.$permission.
 					' OR MIN(permission) IS NULL'.
 					' OR MIN(permission)='.PERM_DENY.
 				')';
@@ -337,7 +311,7 @@ class CGraphPrototype extends CGraphGeneral {
 
 		CGraphPrototypeManager::delete($graphids);
 
-		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_GRAPH_PROTOTYPE, $db_graphs);
+		$this->addAuditBulk(CAudit::ACTION_DELETE, CAudit::RESOURCE_GRAPH_PROTOTYPE, $db_graphs);
 
 		return ['graphids' => $graphids];
 	}
@@ -500,7 +474,7 @@ class CGraphPrototype extends CGraphGeneral {
 		}
 		unset($graph);
 
-		$itemIds = $this->validateItemsUpdate($graphs);
+		$itemIds = $this->validateItemsUpdate($graphs, $dbGraphs);
 
 		$allowedItems = API::Item()->get([
 			'itemids' => $itemIds,

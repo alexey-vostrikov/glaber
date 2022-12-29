@@ -24,13 +24,127 @@ class CMediatypeHelper {
 	/**
 	 * Message types.
 	 */
-	const MSG_TYPE_PROBLEM = 0;
-	const MSG_TYPE_RECOVERY = 1;
-	const MSG_TYPE_UPDATE = 2;
-	const MSG_TYPE_DISCOVERY = 3;
-	const MSG_TYPE_AUTOREG = 4;
-	const MSG_TYPE_INTERNAL = 5;
-	const MSG_TYPE_INTERNAL_RECOVERY = 6;
+	public const MSG_TYPE_PROBLEM = 0;
+	public const MSG_TYPE_RECOVERY = 1;
+	public const MSG_TYPE_UPDATE = 2;
+	public const MSG_TYPE_SERVICE = 3;
+	public const MSG_TYPE_SERVICE_RECOVERY = 4;
+	public const MSG_TYPE_SERVICE_UPDATE = 5;
+	public const MSG_TYPE_DISCOVERY = 6;
+	public const MSG_TYPE_AUTOREG = 7;
+	public const MSG_TYPE_INTERNAL = 8;
+	public const MSG_TYPE_INTERNAL_RECOVERY = 9;
+
+	/**
+	 * Email type providers.
+	 */
+	public const EMAIL_PROVIDER_SMTP = 0;
+	public const EMAIL_PROVIDER_GMAIL = 1;
+	public const EMAIL_PROVIDER_GMAIL_RELAY = 2;
+	public const EMAIL_PROVIDER_OFFICE365 = 3;
+	public const EMAIL_PROVIDER_OFFICE365_RELAY = 4;
+
+	/**
+	 * Returns an array of Email providers default settings.
+	 *
+	 * @return array
+	 */
+	public static function getEmailProviders($provider = null) {
+		$providers = [
+			self::EMAIL_PROVIDER_SMTP => [
+				'name' => 'Generic SMTP',
+				'smtp_server' => 'mail.example.com',
+				'smtp_email' => 'zabbix@example.com',
+				'smtp_port' => 25,
+				'smtp_security' => SMTP_CONNECTION_SECURITY_NONE,
+				'smtp_authentication' => SMTP_AUTHENTICATION_NONE,
+				'smtp_verify_host' => HTTPTEST_VERIFY_HOST_OFF,
+				'smtp_verify_peer' => HTTPTEST_VERIFY_PEER_OFF,
+				'content_type' => SMTP_MESSAGE_FORMAT_HTML
+			],
+			self::EMAIL_PROVIDER_GMAIL => [
+				'name' => 'Gmail',
+				'smtp_server' => 'smtp.gmail.com',
+				'smtp_email' => 'zabbix@example.com',
+				'smtp_port' => 587,
+				'smtp_security' => SMTP_CONNECTION_SECURITY_STARTTLS,
+				'smtp_authentication' => SMTP_AUTHENTICATION_NORMAL,
+				'smtp_verify_host' => HTTPTEST_VERIFY_HOST_OFF,
+				'smtp_verify_peer' => HTTPTEST_VERIFY_PEER_OFF,
+				'content_type' => SMTP_MESSAGE_FORMAT_HTML
+			],
+			self::EMAIL_PROVIDER_GMAIL_RELAY => [
+				'name' => 'Gmail relay',
+				'smtp_server' => 'smtp-relay.gmail.com',
+				'smtp_email' => 'zabbix@example.com',
+				'smtp_port' => 587,
+				'smtp_security' => SMTP_CONNECTION_SECURITY_STARTTLS,
+				'smtp_authentication' => SMTP_AUTHENTICATION_NONE,
+				'smtp_verify_host' => HTTPTEST_VERIFY_HOST_OFF,
+				'smtp_verify_peer' => HTTPTEST_VERIFY_PEER_OFF,
+				'content_type' => SMTP_MESSAGE_FORMAT_HTML
+			],
+			self::EMAIL_PROVIDER_OFFICE365 => [
+				'name' => 'Office365',
+				'smtp_server' => 'smtp.office365.com',
+				'smtp_email' => 'zabbix@example.com',
+				'smtp_port' => 587,
+				'smtp_security' => SMTP_CONNECTION_SECURITY_STARTTLS,
+				'smtp_authentication' => SMTP_AUTHENTICATION_NORMAL,
+				'smtp_verify_host' => HTTPTEST_VERIFY_HOST_OFF,
+				'smtp_verify_peer' => HTTPTEST_VERIFY_PEER_OFF,
+				'content_type' => SMTP_MESSAGE_FORMAT_HTML
+			],
+			self::EMAIL_PROVIDER_OFFICE365_RELAY => [
+				'name' => 'Office365 relay',
+				'smtp_server' => '.mail.protection.outlook.com',
+				'smtp_email' => 'zabbix@example.com',
+				'smtp_port' => 25,
+				'smtp_security' => SMTP_CONNECTION_SECURITY_STARTTLS,
+				'smtp_authentication' => SMTP_AUTHENTICATION_NONE,
+				'smtp_verify_host' => HTTPTEST_VERIFY_HOST_OFF,
+				'smtp_verify_peer' => HTTPTEST_VERIFY_PEER_OFF,
+				'content_type' => SMTP_MESSAGE_FORMAT_HTML
+			]
+		];
+
+		if ($provider === null) {
+			return $providers;
+		}
+
+		return $providers[$provider];
+	}
+
+	/**
+	 * Returns all providers names.
+	 *
+	 * @return array
+	 */
+	public static function getAllEmailProvidersNames() {
+		return array_column(self::getEmailProviders(), 'name');
+	}
+
+	/**
+	 * Returns media types names.
+	 *
+	 * @return array
+	 */
+	public static function getMediaTypes($type = null) {
+		$types = [
+			MEDIA_TYPE_EMAIL => _('Email'),
+			MEDIA_TYPE_EXEC => _('Script'),
+			MEDIA_TYPE_SMS => _('SMS'),
+			MEDIA_TYPE_WEBHOOK => _('Webhook')
+		];
+
+		if ($type === null) {
+			natsort($types);
+
+			return $types;
+		}
+
+		return $types[$type];
+	}
 
 	/**
 	 * Returns an array of message templates.
@@ -72,7 +186,7 @@ class CMediatypeHelper {
 			],
 			self::MSG_TYPE_UPDATE => [
 				'eventsource' => EVENT_SOURCE_TRIGGERS,
-				'recovery' => ACTION_ACKNOWLEDGE_OPERATION,
+				'recovery' => ACTION_UPDATE_OPERATION,
 				'name' => _('Problem update'),
 				'template' => [
 					'subject' => 'Updated problem in {EVENT.AGE}: {EVENT.NAME}',
@@ -85,6 +199,73 @@ class CMediatypeHelper {
 						"{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.\n".
 						"{EVENT.UPDATE.MESSAGE}\n\n".
 						"Current problem status is {EVENT.STATUS}, age is {EVENT.AGE}, acknowledged: {EVENT.ACK.STATUS}."
+				]
+			],
+			self::MSG_TYPE_SERVICE => [
+				'eventsource' => EVENT_SOURCE_SERVICE,
+				'recovery' => ACTION_OPERATION,
+				'name' => _('Service'),
+				'template' => [
+					'subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+					'html' =>
+						'<b>Service problem started</b> at {EVENT.TIME} on {EVENT.DATE}<br>'.
+						'<b>Service problem name:</b> {EVENT.NAME}<br>'.
+						'<b>Service:</b> {SERVICE.NAME}<br>'.
+						'<b>Severity:</b> {EVENT.SEVERITY}<br>'.
+						'<b>Original problem ID:</b> {EVENT.ID}<br>'.
+						'<b>Service description:</b> {SERVICE.DESCRIPTION}<br><br>'.
+						'{SERVICE.ROOTCAUSE}',
+					'sms' => "{EVENT.NAME}\n{EVENT.DATE} {EVENT.TIME}",
+					'text' =>
+						"Service problem started at {EVENT.TIME} on {EVENT.DATE}\n".
+						"Service problem name: {EVENT.NAME}\n".
+						"Service: {SERVICE.NAME}\n".
+						"Severity: {EVENT.SEVERITY}\n".
+						"Original problem ID: {EVENT.ID}\n".
+						"Service description: {SERVICE.DESCRIPTION}\n\n".
+						"{SERVICE.ROOTCAUSE}"
+				]
+			],
+			self::MSG_TYPE_SERVICE_RECOVERY => [
+				'eventsource' => EVENT_SOURCE_SERVICE,
+				'recovery' => ACTION_RECOVERY_OPERATION,
+				'name' => _('Service recovery'),
+				'template' => [
+					'subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+					'html' =>
+						'<b>Service "{SERVICE.NAME}" has been resolved</b> at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}<br>'.
+						'<b>Problem name:</b> {EVENT.NAME}<br>'.
+						'<b>Problem duration:</b> {EVENT.DURATION}<br>'.
+						'<b>Severity:</b> {EVENT.SEVERITY}<br>'.
+						'<b>Original problem ID:</b> {EVENT.ID}<br>'.
+						'<b>Service description:</b> {SERVICE.DESCRIPTION}',
+					'sms' => "{EVENT.NAME}\n{EVENT.DATE} {EVENT.TIME}",
+					'text' =>
+						"Service \"{SERVICE.NAME}\" has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}\n".
+						"Problem name: {EVENT.NAME}\n".
+						"Problem duration: {EVENT.DURATION}\n".
+						"Severity: {EVENT.SEVERITY}\n".
+						"Original problem ID: {EVENT.ID}\n".
+						"Service description: {SERVICE.DESCRIPTION}"
+				]
+			],
+			self::MSG_TYPE_SERVICE_UPDATE => [
+				'eventsource' => EVENT_SOURCE_SERVICE,
+				'recovery' => ACTION_UPDATE_OPERATION,
+				'name' => _('Service update'),
+				'template' => [
+					'subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+					'html' =>
+						'<b>Changed "{SERVICE.NAME}" service status</b> to {EVENT.UPDATE.SEVERITY} at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.<br>'.
+						'<b>Current problem age</b> is {EVENT.AGE}.<br>'.
+						'<b>Service description:</b> {SERVICE.DESCRIPTION}<br><br>'.
+						'{SERVICE.ROOTCAUSE}',
+					'sms' => "{EVENT.NAME}\n{EVENT.DATE} {EVENT.TIME}",
+					'text' =>
+						"Changed \"{SERVICE.NAME}\" service status to {EVENT.UPDATE.SEVERITY} at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.\n".
+						"Current problem age is {EVENT.AGE}.\n".
+						"Service description: {SERVICE.DESCRIPTION}\n\n".
+						"{SERVICE.ROOTCAUSE}"
 				]
 			],
 			self::MSG_TYPE_DISCOVERY => [

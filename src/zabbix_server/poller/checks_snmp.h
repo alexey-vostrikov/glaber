@@ -20,10 +20,10 @@
 #ifndef ZABBIX_CHECKS_SNMP_H
 #define ZABBIX_CHECKS_SNMP_H
 
-#include "common.h"
-#include "log.h"
+#include "config.h"
+#include "module.h"
 #include "dbcache.h"
-#include "sysinfo.h"
+
 #include "../glb_poller/glb_poller.h"
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>

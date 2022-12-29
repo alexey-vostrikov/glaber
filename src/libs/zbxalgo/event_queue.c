@@ -19,6 +19,7 @@
 #include "glb_lock.h"
 #include "log.h"
 #include "zbxalgo.h"
+#include "zbxtime.h"
 
 #define MAX_EVENT_CALLBACK_ID 255
 /*event queue is done to process async logic

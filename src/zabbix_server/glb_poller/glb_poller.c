@@ -1,8 +1,8 @@
-#include "common.h"
-#include "db.h"
+#include "zbxcommon.h"
+#include "zbxdb.h"
 #include "dbcache.h"
-#include "comms.h"
-#include "daemon.h"
+#include "zbxcomms.h"
+#include "zbxnix.h"
 #include "zbxserver.h"
 #include "zbxself.h"
 #include "preproc.h"
@@ -15,7 +15,7 @@
 #include "glb_pinger.h"
 #include "glb_worker.h"
 #include "glb_server.h"
-#include "glb_agent.h"
+#include "poller_tcp.h"
 #include "calculated.h"
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
@@ -24,22 +24,27 @@
 #include "poller_async_io.h"
 #include "poller_ipc.h"
 #include "poller_sessions.h"
+#include "poller_contention.h"
 #include "../../libs/apm/apm.h"
+#include "zbxsysinfo.h"
 
-extern unsigned char process_type, program_type;
-extern int server_num, process_num;
-extern int CONFIG_GLB_REQUEUE_TIME;
 extern int CONFIG_CONFSYNCER_FREQUENCY;
 
 /* poller timings in milliseconds */
 #define LOST_ITEMS_CHECK_INTERVAL 30 * 1000
-#define NEW_ITEMS_CHECK_INTERVAL  1 * 1000
+#define NEW_ITEMS_CHECK_INTERVAL 1 * 1000
 #define PROCTITLE_UPDATE_INTERVAL 5 * 1000
-#define ASYNC_RUN_INTERVAL	1
-#define ITEMS_REINIT_INTERVAL 300 * 1000 //after this time in poller item will be repolled whatever it's state is
+#define ASYNC_RUN_INTERVAL 1
+#define ITEMS_REINIT_INTERVAL 300 * 1000 // after this time in poller item will be repolled whatever it's state is
 
-//#define EVENT_ITEM_POLL 1
-//#define EVENT_NEW_ITEMS_CHECK 2
+typedef struct
+{
+	
+	int server_num;
+	int process_num;
+	int process_type; //by type of polling -agent, snmp, worker, etc polling
+	int program_type; //server, proxy etc....
+} poller_proc_info_t;
 
 typedef struct
 {
@@ -61,7 +66,7 @@ struct poller_item_t
 	unsigned char item_type;
 	unsigned char flags;
 	u_int64_t lastpolltime;
-	void *itemdata;		  // item type specific data
+	void *itemdata; // item type specific data
 	poller_event_t *poll_event;
 };
 
@@ -77,15 +82,12 @@ typedef struct
 
 } poll_module_t;
 
-typedef struct {
+typedef struct
+{
 	poll_module_t poller;
-	unsigned char item_type;
-
 	zbx_hashset_t items;
 	zbx_hashset_t hosts;
-
-	int next_stat_time;
-	int old_activity;
+	poller_proc_info_t procinfo;
 
 	u_int64_t requests;
 	u_int64_t responces;
@@ -94,16 +96,15 @@ typedef struct {
 	u_int64_t total_responces;
 
 	strpool_t strpool;
-	//u_int32_t dns_requests;
-	
-	poller_event_t* new_items_check;
-	poller_event_t* update_proctitle;
-	poller_event_t* async_io_proc;
-	poller_event_t* lost_items_check;
+
+	poller_event_t *new_items_check;
+	poller_event_t *update_proctitle;
+	poller_event_t *async_io_proc;
+	poller_event_t *lost_items_check;
 
 } poll_engine_t;
 
-//typedef struct poll_engine_t poll_engine_t;
+// typedef struct poll_engine_t poll_engine_t;
 
 static poll_engine_t conf = {0};
 
@@ -149,52 +150,53 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 
 	if (glb_host->disabled_till > mstime)
 	{
-		nextcheck = calculate_item_nextcheck_unreachable(simple_interval,
-														 custom_intervals, glb_host->disabled_till);
+		nextcheck = zbx_calculate_item_nextcheck_unreachable(simple_interval,
+															 custom_intervals, glb_host->disabled_till);
 	}
 	else
 	{
-		nextcheck = calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
-											 custom_intervals, (mstime / 1000) +1 );
+		nextcheck = zbx_calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
+												 custom_intervals, (mstime / 1000) + 1);
 	}
 
 	/*note: since original algo is still seconds-based adding some millisecond-noise
 	to distribute checks evenly during one second */
 	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
-	
+
 	nextcheck = nextcheck * 1000 + rand() % 1000;
 	zbx_custom_interval_free(custom_intervals);
 
 	DEBUG_ITEM(poller_item->itemid, "Added item %ld poll event in %ld msec", poller_item->itemid, nextcheck - mstime);
 
-	poller_run_timer_event(poller_item->poll_event, nextcheck-mstime);
+	poller_run_timer_event(poller_item->poll_event, nextcheck - mstime);
 	return SUCCEED;
 }
 
-void item_poll_cb(poller_item_t *poller_item, void *data)
-{
+void item_poll_cb(poller_item_t *poller_item, void *data) {
+
 	u_int64_t mstime = glb_ms_time();
-	
+
 	DEBUG_ITEM(poller_item->itemid, "Item poll event");
 
-	if (SUCCEED == poller_if_host_is_failed(poller_item))
+	// if (SUCCEED == poller_if_host_is_failed(poller_item))
+	// {
+	// 	DEBUG_ITEM(poller_item->itemid, "Skipping item from polling, host is still down ");
+	// 	add_item_check_event(poller_item, mstime + 10 * 1000);
+	// 	return;
+	// }
+
+	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || poller_contention_sessions_count() > POLLER_MAX_SESSIONS) 
 	{
-		DEBUG_ITEM(poller_item->itemid, "Skipping item from polling, host is still down ");
-		add_item_check_event(poller_item, mstime + 10 * 1000);
-		return;
-	}
-	
-	if ( poller_sessions_count() > POLLER_MAX_SESSIONS ) {
-		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller is too busy", POLLER_MAX_SESSIONS_DELAY / 1000 );
+		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller is too busy", POLLER_MAX_SESSIONS_DELAY / 1000);
 		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
 		return;
 	}
 
-//	if (poller_async_get_dns_requests() > POLLER_MAX_DNS_REQUESTS) {
-//		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to too many DNS requests are int progress (%d) busy", POLLER_MAX_SESSIONS_DELAY / 1000, POLLER_MAX_DNS_REQUESTS );
-//		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
-//		return;
-//	}
+	//	if (poller_async_get_dns_requests() > POLLER_MAX_DNS_REQUESTS) {
+	//		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to too many DNS requests are int progress (%d) busy", POLLER_MAX_SESSIONS_DELAY / 1000, POLLER_MAX_DNS_REQUESTS );
+	//		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
+	//		return;
+	//	}
 
 	add_item_check_event(poller_item, mstime);
 
@@ -211,7 +213,6 @@ void item_poll_cb(poller_item_t *poller_item, void *data)
 	DEBUG_ITEM(poller_item->itemid, "Starting poller item poll");
 	conf.poller.start_poll(poller_item);
 }
-
 
 static int add_item_to_host(u_int64_t hostid)
 {
@@ -249,7 +250,7 @@ int glb_poller_get_forks()
 int glb_poller_delete_item(u_int64_t itemid)
 {
 	poller_item_t *poller_item;
-	
+
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &itemid)))
 	{
 		DEBUG_ITEM(itemid, "Item has been deleted, removing from the poller config");
@@ -272,7 +273,7 @@ static int get_simple_interval(const char *delay)
 	int interval;
 	char *delim;
 
-	if (SUCCEED != is_time_suffix(delay, &interval, (int)(NULL == (delim = strchr(delay, ';')) ? ZBX_LENGTH_UNLIMITED : delim - delay)))
+	if (SUCCEED != zbx_is_time_suffix(delay, &interval, (int)(NULL == (delim = strchr(delay, ';')) ? ZBX_LENGTH_UNLIMITED : delim - delay)))
 		return 0;
 
 	return interval;
@@ -291,7 +292,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_host_t *glb_host;
 	u_int64_t mstime = glb_ms_time();
 	int i;
-	
+
 	DEBUG_ITEM(dc_item->itemid, "Creating/updating item");
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
@@ -314,27 +315,28 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item->value_type = dc_item->value_type;
 	poller_item->flags = dc_item->flags;
 	poller_item->item_type = dc_item->type;
-	
 	poller_item->poll_event = poller_create_event(poller_item, item_poll_cb, 0, NULL, 0);
 
 	add_item_to_host(poller_item->hostid);
-	
+
 	if (FAIL == conf.poller.init_item(dc_item, poller_item))
 	{
+		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
 		strpool_free(&conf.strpool, poller_item->delay);
 		delete_item_from_host(poller_item->hostid);
-		zbx_hashset_remove(&conf.items, &poller_item);
+		zbx_hashset_remove(&conf.items, &poller_item->itemid);
+		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
 
 		return FAIL;
 	};
 
-	 if (get_simple_interval(poller_item->delay) > 0 )  {
-	 	/*	to avoid system hummering new items are planned to not exceed rate of 10k/sec
-			if a poller handles 1m items, then they all will be polled in 1000000/10000 ~ 100 seconds
-			which should be OK for most installs	*/
-	 	poller_run_timer_event(poller_item->poll_event, 100);
-	 } else
-	 	add_item_check_event(poller_item, mstime);
+	if (get_simple_interval(poller_item->delay) > 0)
+	{
+		/*	to avoid system hummering new items are planned to not exceed rate of 10k/sec */
+		poller_run_timer_event(poller_item->poll_event, conf.items.num_data / 10000);
+	}
+	else
+		add_item_check_event(poller_item, mstime);
 
 	return SUCCEED;
 }
@@ -351,35 +353,35 @@ int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now)
 
 static int poll_module_init()
 {
-	switch (conf.item_type)
+	switch (conf.procinfo.process_type)
 	{
 #ifdef HAVE_NETSNMP
-	case ITEM_TYPE_SNMP:
+	case GLB_PROCESS_TYPE_SNMP:
 		snmp_async_init();
 		break;
 #endif
-	case ITEM_TYPE_SIMPLE:
+	case GLB_PROCESS_TYPE_PINGER:
 		glb_pinger_init();
 		break;
 
-	case ITEM_TYPE_EXTERNAL:
+	case GLB_PROCESS_TYPE_WORKER:
 		glb_worker_init();
 		break;
 
-	case ITEM_TYPE_WORKER_SERVER:
+	case GLB_PROCESS_TYPE_SERVER:
 		glb_worker_server_init();
 		break;
 
-	case ITEM_TYPE_AGENT:
-		glb_agent_init(&conf);
+	case GLB_PROCESS_TYPE_AGENT:
+		glb_tcp_init(&conf);
 		break;
-	
-	case ITEM_TYPE_CALCULATED:
+
+	case ZBX_PROCESS_TYPE_HISTORYPOLLER:
 		calculated_poller_init();
 		break;
 
 	default:
-		LOG_WRN("Cannot init worker for item type %d, this is a BUG", conf.item_type);
+		LOG_WRN("Cannot init worker for item type %d, this is a BUG", conf.procinfo.process_type);
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
@@ -389,35 +391,36 @@ static int poll_module_init()
 
 void poll_shutdown()
 {
-
-	conf.poller.shutdown();
+	if (NULL != conf.poller.shutdown) 
+		conf.poller.shutdown();
+	
 
 	zbx_hashset_destroy(&conf.hosts);
 	zbx_hashset_destroy(&conf.items);
+	poller_contention_destroy();
 	strpool_destroy(&conf.strpool);
-
 }
 
-int	DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *itemids);
+int DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *itemids);
 
 void new_items_check_cb(poller_item_t *garbage, void *data)
 {
-	
+	zbx_thread_args_t *args = data;
 	zbx_vector_uint64_t changed_items;
 	zbx_vector_uint64_create(&changed_items);
 	
-	poller_ipc_notify_rcv(conf.item_type, process_num - 1 , &changed_items );
-
+	poller_ipc_notify_rcv(args->info.process_type, args->info.process_num - 1, &changed_items);
 	DCconfig_get_glb_poller_items_by_ids(&conf, &changed_items);
 
 	zbx_vector_uint64_destroy(&changed_items);
 
 }
 
-void lost_items_check_cb(poller_item_t *garbage, void *data) {
+void lost_items_check_cb(poller_item_t *garbage, void *data)
+{
 	u_int64_t mstime = glb_ms_time();
 
-	poller_item_t *poller_item;	
+	poller_item_t *poller_item;
 	zbx_hashset_iter_t iter;
 	zbx_hashset_iter_reset(&conf.items, &iter);
 
@@ -433,44 +436,50 @@ void lost_items_check_cb(poller_item_t *garbage, void *data) {
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
 }
 
-
-static void update_proc_title_cb(poller_item_t *garbage, void *data) {	
+static void update_proc_title_cb(poller_item_t *garbage, void *data)
+{
 	static u_int64_t last_call = 0;
+	zbx_thread_args_t *args = data;
 	u_int64_t now = glb_ms_time(), time_diff = now - last_call;
+	
+	//zbx_update_env(zbx_time());
 
-	zbx_update_env(zbx_time());
-	
 	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld chcks/sec, items: %d, sessions: %d, dns_requests: %d]",
-			get_process_type_string(process_type), process_num, (conf.requests * 1000) / (time_diff),
-			(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count(), poller_async_get_dns_requests());
-	
+					get_process_type_string(args->info.process_type), args->info.process_num, (conf.requests * 1000) / (time_diff),
+					(conf.responces * 1000) / (time_diff), conf.items.num_data, poller_sessions_count() + poller_contention_sessions_count(),
+						 poller_async_get_dns_requests());
+
 	conf.total_requests += conf.requests;
 	conf.total_responces += conf.responces;
-	
+
 	conf.requests = 0;
 	conf.responces = 0;
-	
+
 	apm_update_heap_usage();
-	apm_flush();	
+	apm_flush();
 
 	last_call = now;
 
-	if (!ZBX_IS_RUNNING()) 
+	if (!ZBX_IS_RUNNING())
 		poller_async_loop_stop();
-
+	
 }
 
-void async_io_cb(poller_item_t *garbage, void *data) {
-	conf.poller.handle_async_io();
+void async_io_cb(poller_item_t *garbage, void *data)
+{
+if (NULL != conf.poller.handle_async_io) 
+		conf.poller.handle_async_io();
 }
 
 static int poller_init(zbx_thread_args_t *args)
 {
-	mem_funcs_t local_memf = {.free_func = ZBX_DEFAULT_MEM_FREE_FUNC, .malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, 
-				.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC };
+	mem_funcs_t local_memf = {.free_func = ZBX_DEFAULT_MEM_FREE_FUNC, 
+	  					.malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, 
+						.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC};
 
 	glb_preprocessing_init();
-	conf.item_type = *(unsigned char *)((zbx_thread_args_t *)args)->args;
+	poller_contention_init();
+	// conf.item_type = args->info.process_type;
 
 	zbx_hashset_create(&conf.items, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_hashset_create(&conf.hosts, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -478,24 +487,26 @@ static int poller_init(zbx_thread_args_t *args)
 	strpool_init(&conf.strpool, &local_memf);
 
 	poller_async_loop_init();
-	
-	conf.new_items_check =  poller_create_event(NULL, new_items_check_cb, 0,  NULL, 1);
+
+	conf.new_items_check = poller_create_event(NULL, new_items_check_cb, 0, args, 1);
 	poller_run_timer_event(conf.new_items_check, NEW_ITEMS_CHECK_INTERVAL);
-
-	conf.async_io_proc = poller_create_event(NULL, async_io_cb, 0, NULL, 1);
-	poller_run_timer_event(conf.async_io_proc, ASYNC_RUN_INTERVAL);
-
-	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, NULL, 1);
+	
+	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, args, 1);
 	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL);
 
-	conf.lost_items_check =  poller_create_event(NULL,lost_items_check_cb, 0, NULL, 1);
-	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL );
+	conf.lost_items_check = poller_create_event(NULL, lost_items_check_cb, 0, NULL, 1);
+	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
 
 	/*poll modules _should_ be init after loop event */
 	if (SUCCEED != poll_module_init())
 	{
-		LOG_WRN("Couldnt init type-specific module for type %d", conf.item_type);
+		LOG_WRN("Couldnt init type-specific module for type %d", args->info.process_type);
 		return FAIL;
+	}
+
+	if (NULL != conf.poller.handle_async_io) {
+		conf.async_io_proc = poller_create_event(NULL, async_io_cb, 0, NULL, 1); 
+		poller_run_timer_event(conf.async_io_proc, ASYNC_RUN_INTERVAL);
 	}
 	
 	poller_async_set_resolve_cb(conf.poller.resolve_callback);
@@ -505,7 +516,7 @@ static int poller_init(zbx_thread_args_t *args)
 	apm_track_counter(&conf.total_responces, "responces", NULL);
 	apm_add_proc_labels(&conf.total_responces);
 	apm_add_heap_usage();
-	
+
 	return SUCCEED;
 }
 
@@ -539,9 +550,25 @@ poller_item_t *poller_get_poller_item(u_int64_t itemid)
 
 void poller_return_item_to_queue(poller_item_t *item)
 {
-	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue");
+	DEBUG_ITEM(item->itemid, "Item returned to the poller's queue");
 	item->lastpolltime = glb_ms_time();
 	item->state = POLL_QUEUED;
+}
+
+#define CONFIG_REPOLL_DELAY 15
+
+void poller_return_delayed_item_to_queue(poller_item_t *item)
+{
+	int nextcheck =  CONFIG_REPOLL_DELAY + rand() % 5 ;
+	//LOG_INF("Item %ld returned to the poller's queue, will repoll in %d msec", item->itemid, nextcheck);
+	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue, will repoll in %d sec", nextcheck);
+	
+	glb_state_item_update_nextcheck(item->itemid, nextcheck * 1000 );
+	item->lastpolltime = glb_ms_time();
+	item->state = POLL_QUEUED;
+
+	poller_disable_event(item->poll_event);
+	poller_run_timer_event(item->poll_event, nextcheck);
 }
 
 u_int64_t poller_get_host_id(poller_item_t *item)
@@ -590,7 +617,7 @@ void poller_register_item_succeed(poller_item_t *item)
 }
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
-								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, 
+								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown,
 								 forks_count_cb forks_count, poller_resolve_cb resolve_callback)
 {
 	conf.poller.init_item = init_item;
@@ -601,43 +628,65 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 	conf.poller.forks_count = forks_count;
 	conf.poller.resolve_callback = resolve_callback;
 }
-void poller_preprocess_error(poller_item_t *poller_item, char *error)  {
 
+void poller_preprocess_error(poller_item_t *poller_item, const char *error)  
+{
 
 	zbx_timespec_t ts;
-	
+
 	zbx_timespec(&ts);
-	 
+
 	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
-								  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
+							  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
 }
 
-void poller_preprocess_error2(poller_item_t *poller_item, char *error) {
-	
-	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
-		 .value.type=VARIANT_VALUE_ERROR, .value.data.str = error };
+void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime)
+{
+	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid, .value.type = VARIANT_VALUE_STR, .value.data.str = value};
 
-	preprocess_send_metric(&metric);
-}
-
-void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime) {
-	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid,
-		 .value.type=VARIANT_VALUE_STR, .value.data.str = value };
-	
-	//LOG_INF("Submitting item's string result to preproc: %s", value);
-	DEBUG_ITEM(poller_get_item_id(poller_item),"Submitting item's string result to preproc: %s", value);
+	DEBUG_ITEM(poller_get_item_id(poller_item), "Submitting item's string result to preproc: %s", value);
 
 	metric_set_time(&metric, mstime);
-	//LOG_INF("preproc Calling send metric");
 	preprocess_send_metric(&metric);
+}
+
+
+void poller_preprocess_uint64_value(poller_item_t *poller_item, u_int64_t value) {
+	AGENT_RESULT result;
+	zbx_timespec_t ts;
+
+	zbx_timespec(&ts);
+	zbx_init_agent_result(&result);
+
+	SET_UI64_RESULT(&result, value);
+
+	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
+								  &result, &ts, ITEM_STATE_NORMAL, NULL);
+	zbx_free_agent_result(&result);
+}
+
+void poller_preprocess_str_value(poller_item_t *poller_item, char* value) {
+	AGENT_RESULT result;
+	zbx_timespec_t ts;
+
+	zbx_timespec(&ts);
+
+	zbx_init_agent_result(&result);
+	SET_TEXT_RESULT(&result, strdup(value));
+	
+	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
+								  &result, &ts, ITEM_STATE_NORMAL, NULL);
+   
+	zbx_free_agent_result(&result);
 }
 
 
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error)
 {
 	zbx_timespec_t ts = {.sec = mstime / 1000, .ns = (mstime % 1000) * 1000000};
-	
-	if (NULL != result && ( result->type | AR_UINT64)) {
+
+	if (NULL != result && (result->type | AR_UINT64))
+	{
 		DEBUG_ITEM(poller_item->itemid, "Preprocessing item of uint64 type value %ld", result->ui64);
 	}
 
@@ -654,7 +703,7 @@ void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u
 	}
 }
 
-void poller_inc_responces()
+void poller_inc_responses()
 {
 	conf.responces++;
 }
@@ -679,40 +728,52 @@ void poller_items_iterate(items_iterator_cb iter_func, void *data)
 	}
 }
 
-void poller_strpool_free(const char* str) {
+void poller_strpool_free(const char *str)
+{
 	strpool_free(&conf.strpool, str);
 };
 
-const char *poller_strpool_add(const char * str) {
+const char *poller_strpool_add(const char *str)
+{
 	return strpool_add(&conf.strpool, str);
 };
 
+void set_poller_proc_info(zbx_thread_args_t *args)
+{
+	zbx_thread_poller_args *poller_args_in = (zbx_thread_poller_args *)(args->args);
+	//conf.procinfo.poller_type = poller_args_in->poller_type;
+	conf.procinfo.server_num = args->info.server_num;
+	conf.procinfo.process_num = args->info.process_num;
+	conf.procinfo.process_type = args->info.process_type;
+	conf.procinfo.program_type = poller_args_in->zbx_get_program_type_cb_arg();
+	LOG_INF("Set program type %d, server num %d, process num %d, process type %d", 
+	   conf.procinfo.program_type, conf.procinfo.server_num, conf.procinfo.process_num, conf.procinfo.process_type );
+}
 
 /*in milliseconds */
 #define STAT_INTERVAL 5000
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+	set_poller_proc_info((zbx_thread_args_t *)args);
 
-	
-	if (SUCCEED != poller_init((zbx_thread_args_t *)args))
+	if (SUCCEED != poller_init(args))
 		exit(-1);
 
-	LOG_INF("%s #%d started [%s #%d]", get_program_type_string(program_type),
-			   server_num, get_process_type_string(process_type), process_num);
+	LOG_INF("%s #%d started [%s #%d]", get_program_type_string(conf.procinfo.program_type),
+			conf.procinfo.server_num, get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);
 
-	zbx_setproctitle("%s #%d [started]", get_process_type_string(process_type), process_num);
-	
+	zbx_setproctitle("%s #%d [started]", get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);
+	LOG_INF("Started async loop");
+
 	poller_async_loop_run();
-	
+
 	poll_shutdown(&conf);
 
-	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);
 
 	while (1)
 		zbx_sleep(SEC_PER_MIN);
+	
 #undef STAT_INTERVAL
 }

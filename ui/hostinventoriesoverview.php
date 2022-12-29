@@ -25,7 +25,6 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = _('Host inventory overview');
 $page['file'] = 'hostinventoriesoverview.php';
-$page['scripts'] = ['multiselect.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -69,10 +68,6 @@ $filter = [
 
 $ms_groups = [];
 $filter_groupids = $filter['groups'] ? getSubGroups($filter['groups'], $ms_groups) : null;
-
-if (count($ms_groups) != count($filter['groups'])) {
-	show_error_message(_('No permissions to referred object or it does not exist!'));
-}
 
 $inventories = [];
 foreach (getHostInventories() as $inventory) {
@@ -147,10 +142,12 @@ $select_groupby = (new CSelect('filter_groupby'))
 	->addOption(new CSelectOption('', _('not selected')))
 	->addOptions(CSelect::createOptionsFromArray($inventories));
 
-(new CWidget())
+(new CHtmlPage())
 	->setTitle(_('Host inventory overview'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::INVENTORY_HOST_OVERVIEW))
 	->addItem(
-		(new CFilter(new CUrl('hostinventoriesoverview.php')))
+		(new CFilter())
+			->setResetUrl(new CUrl('hostinventoriesoverview.php'))
 			->setProfile('web.hostinventoriesoverview.filter')
 			->setActiveTab(CProfile::get('web.hostinventoriesoverview.filter.active', 1))
 			->addFilterTab(_('Filter'), [
@@ -167,7 +164,7 @@ $select_groupby = (new CSelect('filter_groupby'))
 									'srcfld1' => 'groupid',
 									'dstfrm' => 'zbx_filter',
 									'dstfld1' => 'filter_groups_',
-									'real_hosts' => 1,
+									'with_hosts' => true,
 									'enrich_parent_groups' => true
 								]
 							]

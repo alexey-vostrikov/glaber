@@ -20,7 +20,7 @@
 #define SNMP_UTIL_H
 
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "csnmp.h"
 #include "glb_poller.h"
 #include "snmp.h"

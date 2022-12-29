@@ -21,17 +21,21 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
-$pageHeader = (new CPageHeader(_('Warning').' ['._s('refreshed every %1$s sec.', 30).']'))
-	->addCssFile('assets/styles/'.CHtml::encode($data['theme']).'.css')
-	->display();
+$page_header = (new CHtmlPageHeader(_('Warning').' ['._s('refreshed every %1$s sec.', 30).']', CWebUser::getLang()));
+
+$page_header
+	->setTheme($data['theme'])
+	->addCssFile('assets/styles/'.$page_header->getTheme().'.css')
+	->show();
 
 $buttons = array_key_exists('buttons', $data)
 	? $data['buttons']
 	: [(new CButton(null, _('Retry')))->onClick('document.location.reload();')];
 
-echo '<body lang="'.CWebUser::getLang().'">';
+echo '<body>';
 
 (new CDiv((new CTag('main', true,
 	new CWarning($data['header'], $data['messages'], $buttons)

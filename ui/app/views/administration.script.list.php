@@ -27,15 +27,17 @@ if ($data['uncheck']) {
 	uncheckTableRows('script');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Scripts'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ALERTS_SCRIPT_LIST))
 	->setControls((new CTag('nav', true,
 		(new CList())
 			->addItem(new CRedirectButton(_('Create script'), 'zabbix.php?action=script.edit'))
 		))
 			->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'script.list')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'script.list'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFilterTab(_('Filter'), [
@@ -104,8 +106,27 @@ foreach ($data['scripts'] as $script) {
 						$actions[] = ', ';
 					}
 
-					if (CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_ACTIONS)) {
+					switch ($action['eventsource']) {
+						case EVENT_SOURCE_TRIGGERS:
+							$has_access = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TRIGGER_ACTIONS);
+							break;
+						case EVENT_SOURCE_SERVICE:
+							$has_access = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_SERVICE_ACTIONS);
+							break;
+						case EVENT_SOURCE_DISCOVERY:
+							$has_access = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_DISCOVERY_ACTIONS);
+							break;
+						case EVENT_SOURCE_AUTOREGISTRATION:
+							$has_access = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_AUTOREGISTRATION_ACTIONS);
+							break;
+						case EVENT_SOURCE_INTERNAL:
+							$has_access = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_INTERNAL_ACTIONS);
+							break;
+					}
+
+					if ($has_access) {
 						$url = (new CUrl('actionconf.php'))
+							->setArgument('eventsource', $action['eventsource'])
 							->setArgument('form', 'update')
 							->setArgument('actionid', $action['actionid']);
 
@@ -114,8 +135,7 @@ foreach ($data['scripts'] as $script) {
 							->addClass(ZBX_STYLE_GREY);
 					}
 					else {
-						$actions[] = (new CSpan($action['name']))
-							->addClass(ZBX_STYLE_GREY);
+						$actions[] = (new CSpan($action['name']))->addClass(ZBX_STYLE_GREY);
 					}
 				}
 			}
@@ -149,6 +169,10 @@ foreach ($data['scripts'] as $script) {
 
 		case ZBX_SCRIPT_TYPE_WEBHOOK:
 			$type = _('Webhook');
+			break;
+
+		case ZBX_SCRIPT_TYPE_URL:
+			$type = _('URL');
 			break;
 	}
 
@@ -199,6 +223,6 @@ $scriptsForm->addItem([
 ]);
 
 // append form to widget
-$widget
+$html_page
 	->addItem($scriptsForm)
 	->show();

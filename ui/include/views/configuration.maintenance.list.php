@@ -23,18 +23,21 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Maintenance periods'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_MAINTENANCE_LIST))
 	->setControls(
 		(new CTag('nav', true,
-			(new CRedirectButton(_('Create maintenance period'), (new CUrl('maintenance.php'))
-				->removeArgument('maintenanceid')
-				->setArgument('form', 'create')
-				->getUrl()
-			))->setEnabled($data['allowed_edit']))
-		)->setAttribute('aria-label', _('Content controls'))
+			(new CList())
+				->addItem(
+					(new CRedirectButton(_('Create maintenance period'),
+						(new CUrl('maintenance.php'))->setArgument('form', 'create')
+					))->setEnabled($data['allowed_edit'])
+				)
+		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter(new CUrl('maintenance.php')))
+	->addItem((new CFilter())
+		->setResetUrl(new CUrl('maintenance.php'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFilterTab(_('Filter'), [
@@ -126,7 +129,6 @@ $maintenanceForm->addItem([
 	])
 ]);
 
-// append form to widget
-$widget->addItem($maintenanceForm);
-
-$widget->show();
+$html_page
+	->addItem($maintenanceForm)
+	->show();

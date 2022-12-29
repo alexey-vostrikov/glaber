@@ -27,12 +27,13 @@ $this->addJsFile('colorpicker.js');
 
 $this->includeJsFile('administration.trigdisplay.edit.js.php');
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Trigger displaying options'))
-	->setTitleSubmenu(getAdministrationGeneralSubmenu());
+	->setTitleSubmenu(getAdministrationGeneralSubmenu())
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_TRIGDISPLAY_EDIT));
 
 $form_list = (new CFormList())
-	->addRow(_('Use custom event status colours'), (new CCheckBox('custom_color'))
+	->addRow(_('Use custom event status colors'), (new CCheckBox('custom_color'))
 		->setUncheckedValue(EVENT_CUSTOM_COLOR_DISABLED)
 		->setChecked($data['custom_color'] == EVENT_CUSTOM_COLOR_ENABLED)
 		->setAttribute('autofocus', 'autofocus')
@@ -155,7 +156,7 @@ $form_list = (new CFormList())
 	->addInfo(_('Custom severity names affect all locales and require manual translation!'));
 
 $form = (new CForm())
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
 	->setAction((new CUrl('zabbix.php'))
 		->setArgument('action', 'trigdisplay.update')
 		->getUrl()
@@ -169,4 +170,4 @@ $form = (new CForm())
 			))
 	);
 
-$widget->addItem($form)->show();
+$html_page->addItem($form)->show();

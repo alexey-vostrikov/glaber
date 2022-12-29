@@ -17,12 +17,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "zbxalgo.h"
-#include "dbcache.h"
-
-#include "trapper_auth.h"
 #include "trapper_expressions_evaluate.h"
+
+#include "zbxalgo.h"
+#include "zbxnum.h"
+#include "dbcache.h"
+#include "trapper_auth.h"
+#include "zbxcommshigh.h"
 
 static int	trapper_parse_expressions_evaluate(const struct zbx_json_parse *jp, zbx_vector_ptr_t *expressions,
 				char **error)
@@ -32,6 +33,8 @@ static int	trapper_parse_expressions_evaluate(const struct zbx_json_parse *jp, z
 	zbx_user_t		user;
 	int			ret = FAIL;
 	struct zbx_json_parse	jp_data, jp_expressions;
+
+	zbx_user_init(&user);
 
 	if (FAIL == zbx_get_user_from_json(jp, &user, NULL) || USER_TYPE_ZABBIX_ADMIN > user.type)
 	{
@@ -58,6 +61,7 @@ static int	trapper_parse_expressions_evaluate(const struct zbx_json_parse *jp, z
 
 	ret = SUCCEED;
 out:
+	zbx_user_free(&user);
 	return ret;
 }
 
@@ -68,7 +72,7 @@ static int	trapper_expression_evaluate(const char *expression, const zbx_timespe
 	int			ret;
 	zbx_variant_t		value;
 
-	if (SUCCEED != zbx_eval_parse_expression(&ctx, expression, ZBX_EVAL_PARSE_TRIGGER_EXPRESSSION, error))
+	if (SUCCEED != zbx_eval_parse_expression(&ctx, expression, ZBX_EVAL_PARSE_TRIGGER_EXPRESSION, error))
 		return FAIL;
 
 	if (SUCCEED == (ret = zbx_eval_execute(&ctx, ts, &value, error)))

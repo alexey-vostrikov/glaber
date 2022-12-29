@@ -1,4 +1,5 @@
-// +build linux,386 linux,amd64 linux,arm64
+//go:build (linux && 386) || (linux && amd64) || (linux && arm64) || (linux && mips64le) || (linux && mipsle)
+// +build linux,386 linux,amd64 linux,arm64 linux,mips64le linux,mipsle
 
 /*
 ** Zabbix
@@ -32,4 +33,3 @@ func arrayToString(unameArray *[65]int8) string {
 	}
 	return string(byteString[:indexLength])
 }
-

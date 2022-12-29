@@ -23,17 +23,17 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Icon mapping'))
 	->setTitleSubmenu(getAdministrationGeneralSubmenu())
-	->setControls((new CTag('nav', true,
-		(new CForm())
-			->cleanItems()
-			->addItem(new CRedirectButton(_('Create icon map'), (new CUrl('zabbix.php'))
-				->setArgument('action', 'iconmap.edit')
-			))
-		))
-			->setAttribute('aria-label', _('Content controls'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_ICONMAP_LIST))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(new CRedirectButton(_('Create icon map'),
+					(new CUrl('zabbix.php'))->setArgument('action', 'iconmap.edit')
+				))
+		))->setAttribute('aria-label', _('Content controls'))
 	);
 
 $table = (new CTableInfo())->setHeader([_('Name'), _('Icon map')]);
@@ -52,4 +52,4 @@ foreach ($data['iconmaps'] as $icon_map) {
 	), $row]);
 }
 
-$widget->addItem($table)->show();
+$html_page->addItem($table)->show();

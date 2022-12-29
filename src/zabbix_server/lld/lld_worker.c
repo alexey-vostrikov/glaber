@@ -17,26 +17,21 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "daemon.h"
-#include "db.h"
+#include "lld_worker.h"
+#include "lld.h"
+
+#include "zbxnix.h"
 #include "log.h"
 #include "zbxipcservice.h"
 #include "zbxself.h"
-#include "dbcache.h"
-#include "proxy.h"
 #include "../events.h"
-#include "../../libs/glb_state/glb_state_items.h"
-
-#include "lld_worker.h"
 #include "lld_protocol.h"
-
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
+#include "zbxtime.h"
+#include "zbxdbwrap.h"
+#include "../../libs/glb_state/glb_state_items.h"
+extern unsigned char			program_type;
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_register_worker                                              *
  *                                                                            *
  * Purpose: registers lld worker with lld manager                             *
  *                                                                            *
@@ -53,8 +48,6 @@ static void	lld_register_worker(zbx_ipc_socket_t *socket)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_process_task                                                 *
  *                                                                            *
  * Purpose: processes lld task and updates rule state/error in configuration  *
  *          cache and database                                                *
@@ -104,7 +97,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NORMAL, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL,
-						NULL, NULL);				
+						NULL, NULL, 0);				
 			}
 			else
 			{
@@ -112,13 +105,14 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 						item.host.host, item.key_orig, error);
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NOTSUPPORTED, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0,
-						NULL, NULL, error);
+						NULL, NULL, error, -1);
 			}
 
-			zbx_process_events(NULL, NULL);
+			zbx_process_events(NULL, NULL, NULL);
 			zbx_clean_events();
 		}
 
+		/* with successful LLD processing LLD error will be set to empty string */
 		cache_state.state = state;
 		cache_state.lastdata = time(NULL);
 		cache_state.error = error;
@@ -127,27 +121,24 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 				GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG , ITEM_VALUE_TYPE_STR );	
 		/* with successful LLD processing LLD error will be set to empty string */
 		if (NULL != error)
-		{
-			hist.value.err = error;
-		}
-	}
-	DCconfig_clean_items(&item, &errcode, 1);
+				hist.value.err = error;
+		DCconfig_clean_items(&item, &errcode, 1);
 	
-	if (NULL != value )	 {
-		hist.value_type = ITEM_VALUE_TYPE_TEXT;
-		hist.value.str = value;
-		hist.ts = ts;
-		hist.itemid = itemid;
-
-		glb_state_item_add_lld_value(&hist);
+		if (NULL != value )	 {
+			hist.value_type = ITEM_VALUE_TYPE_TEXT;
+			hist.value.str = value;
+			hist.ts = ts;
+			hist.itemid = itemid;
+			glb_state_item_add_lld_value(&hist);
+ 		}
 	}
+
 out:
 	zbx_free(value);
 	zbx_free(error);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
-
 
 ZBX_THREAD_ENTRY(lld_worker_thread, args)
 {
@@ -159,10 +150,10 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 	zbx_ipc_message_t	message;
 	double			time_stat, time_idle = 0, time_now, time_read;
 	zbx_uint64_t		processed_num = 0;
-
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+	zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
+	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
+	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
@@ -182,12 +173,11 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 
 	time_stat = zbx_time();
 
-
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
 
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 	while (ZBX_IS_RUNNING())
 	{
@@ -204,13 +194,13 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 			processed_num = 0;
 		}
 
-		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
+		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_IDLE);
 		if (SUCCEED != zbx_ipc_socket_read(&lld_socket, &message))
 		{
 			zabbix_log(LOG_LEVEL_CRIT, "cannot read LLD manager service request");
 			exit(EXIT_FAILURE);
 		}
-		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 		time_read = zbx_time();
 		time_idle += time_read - time_now;

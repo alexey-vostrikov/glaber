@@ -58,6 +58,7 @@ $form->addItem($form_list);
 
 $output = [
 	'header' => _('Dashboard page properties'),
+	'doc_url' => CDocHelper::getUrl(CDocHelper::DASHBOARDS_PAGE_PROPERTIES_EDIT),
 	'body' => $form->toString(),
 	'buttons' => [
 		[

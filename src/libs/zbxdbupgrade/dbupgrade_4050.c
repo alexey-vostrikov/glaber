@@ -17,12 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "db.h"
 #include "dbupgrade.h"
+
+#include "zbxnum.h"
+#include "zbxdbhigh.h"
 #include "log.h"
 #include "zbxalgo.h"
-#include "../zbxalgo/vectorimpl.h"
 
 /*
  * 5.0 development database patches
@@ -121,7 +121,7 @@ static int	DBpatch_4050014(void)
 	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		return SUCCEED;
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	result = DBselect(
 			"select wf.widget_fieldid,wf.name"
@@ -153,7 +153,7 @@ static int	DBpatch_4050014(void)
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset && ZBX_DB_OK > DBexecute("%s", sql))
 		ret = FAIL;
@@ -730,10 +730,10 @@ typedef struct
 }
 dbu_interface_t;
 
-ZBX_PTR_VECTOR_DECL(dbu_interface, dbu_interface_t);
-ZBX_PTR_VECTOR_IMPL(dbu_interface, dbu_interface_t);
-ZBX_PTR_VECTOR_DECL(dbu_snmp_if, dbu_snmp_if_t);
-ZBX_PTR_VECTOR_IMPL(dbu_snmp_if, dbu_snmp_if_t);
+ZBX_PTR_VECTOR_DECL(dbu_interface, dbu_interface_t)
+ZBX_PTR_VECTOR_IMPL(dbu_interface, dbu_interface_t)
+ZBX_PTR_VECTOR_DECL(dbu_snmp_if, dbu_snmp_if_t)
+ZBX_PTR_VECTOR_IMPL(dbu_snmp_if, dbu_snmp_if_t)
 
 static void	db_interface_free(dbu_interface_t interface)
 {
@@ -812,8 +812,6 @@ static int	db_snmp_new_if_find(const dbu_snmp_if_t *snmp, const zbx_vector_dbu_s
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DBpatch_load_data                                                *
  *                                                                            *
  * Purpose: loading a set of unique combination of snmp data within a single  *
  *          interface and associated interface data                           *
@@ -1039,18 +1037,26 @@ static int	DBpatch_items_update(zbx_vector_dbu_snmp_if_t *snmp_ifs)
 	size_t	sql_alloc = snmp_ifs->values_num * ZBX_KIBIBYTE / 3 , sql_offset = 0;
 
 	sql = (char *)zbx_malloc(NULL, sql_alloc);
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	for (i = 0; i < snmp_ifs->values_num && SUCCEED == ret; i++)
 	{
+		int		item_type;
 		dbu_snmp_if_t	*s = &snmp_ifs->values[i];
+
+		if (ZBX_IF_SNMP_VERSION_1 == s->version)
+			item_type = ITEM_TYPE_SNMPv1;
+		else if (ZBX_IF_SNMP_VERSION_2 == s->version)
+			item_type = ITEM_TYPE_SNMPv2c;
+		else
+			item_type = ITEM_TYPE_SNMPv3;
 
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 #ifdef HAVE_ORACLE
 				"update items i set type=%d, interfaceid=" ZBX_FS_UI64
 				" where exists (select 1 from hosts h"
 					" where i.hostid=h.hostid and"
-					" i.type in (%d,%d,%d) and h.status <> 3 and"
+					" i.type=%d and h.status <> 3 and"
 					" i.interfaceid=" ZBX_FS_UI64 " and"
 					" (('%s' is null and i.snmp_community is null) or"
 						" i.snmp_community='%s') and"
@@ -1067,7 +1073,7 @@ static int	DBpatch_items_update(zbx_vector_dbu_snmp_if_t *snmp_ifs)
 						" i.snmpv3_contextname='%s') and"
 					" (('%s' is null and i.port is null) or"
 						" i.port='%s'));\n",
-				ITEM_TYPE_SNMP, s->interfaceid, ITEM_TYPE_SNMPv1, ITEM_TYPE_SNMPv2c, ITEM_TYPE_SNMPv3,
+				ITEM_TYPE_SNMP, s->interfaceid, item_type,
 				s->item_interfaceid, s->community, s->community, s->securityname, s->securityname,
 				(int)s->securitylevel, s->authpassphrase, s->authpassphrase, s->privpassphrase,
 				s->privpassphrase, (int)s->authprotocol, (int)s->privprotocol, s->contextname,
@@ -1080,7 +1086,7 @@ static int	DBpatch_items_update(zbx_vector_dbu_snmp_if_t *snmp_ifs)
 				"update items i set type=%d, interfaceid=" ZBX_FS_UI64 " from hosts h"
 #	endif
 				" where i.hostid=h.hostid and"
-					" type in (%d,%d,%d) and h.status <> 3 and"
+					" type=%d and h.status <> 3 and"
 					" interfaceid=" ZBX_FS_UI64 " and"
 					" snmp_community='%s' and"
 					" snmpv3_securityname='%s' and"
@@ -1092,7 +1098,7 @@ static int	DBpatch_items_update(zbx_vector_dbu_snmp_if_t *snmp_ifs)
 					" snmpv3_contextname='%s' and"
 					" port='%s';\n",
 				ITEM_TYPE_SNMP, s->interfaceid,
-				ITEM_TYPE_SNMPv1, ITEM_TYPE_SNMPv2c, ITEM_TYPE_SNMPv3,
+				item_type,
 				s->item_interfaceid, s->community, s->securityname, (int)s->securitylevel,
 				s->authpassphrase, s->privpassphrase, (int)s->authprotocol, (int)s->privprotocol,
 				s->contextname, s->item_port);
@@ -1102,7 +1108,7 @@ static int	DBpatch_items_update(zbx_vector_dbu_snmp_if_t *snmp_ifs)
 
 	if (SUCCEED == ret)
 	{
-		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+		zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 		if (16 < sql_offset && ZBX_DB_OK > DBexecute("%s", sql))
 			ret = FAIL;
@@ -1140,8 +1146,6 @@ static int	DBpatch_items_type_update(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DBpatch_4050046                                                  *
  *                                                                            *
  * Purpose: migration snmp data from 'items' table to 'interface_snmp' new    *
  *          table linked with 'interface' table, except interface links for   *
@@ -1251,8 +1255,6 @@ static void	db_if_link(zbx_uint64_t if_slave, zbx_uint64_t if_master, zbx_vector
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DBpatch_if_load_data                                             *
  *                                                                            *
  * Purpose: loading all unlinked interfaces, snmp data and hostid of host     *
  *          prototype for discovered hosts                                    *
@@ -1383,8 +1385,6 @@ static int	DBpatch_interface_discovery_save(zbx_vector_uint64_pair_t *if_links)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DBpatch_4050047                                                  *
  *                                                                            *
  * Purpose: recovery links between the interfaceid of discovered host and     *
  *          parent interfaceid from parent host                               *

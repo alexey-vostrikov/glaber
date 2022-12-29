@@ -20,8 +20,8 @@
 #ifndef ZABBIX_ZBXIPCSERVICE_H
 #define ZABBIX_ZBXIPCSERVICE_H
 
-#include "common.h"
 #include "zbxalgo.h"
+#include "zbxtime.h"
 
 #define ZBX_IPC_SOCKET_BUFFER_SIZE	4096
 
@@ -95,7 +95,7 @@ zbx_ipc_async_socket_t;
 int	zbx_ipc_service_init_env(const char *path, char **error);
 void	zbx_ipc_service_free_env(void);
 int	zbx_ipc_service_start(zbx_ipc_service_t *service, const char *service_name, char **error);
-int	zbx_ipc_service_recv(zbx_ipc_service_t *service, int timeout, zbx_ipc_client_t **client,
+int	zbx_ipc_service_recv(zbx_ipc_service_t *service, const zbx_timespec_t *timeout, zbx_ipc_client_t **client,
 		zbx_ipc_message_t **message);
 void	zbx_ipc_service_close(zbx_ipc_service_t *service);
 
@@ -115,6 +115,7 @@ void	zbx_ipc_socket_close(zbx_ipc_socket_t *csocket);
 int	zbx_ipc_socket_write(zbx_ipc_socket_t *csocket, zbx_uint32_t code, const unsigned char *data,
 		zbx_uint32_t size);
 int	zbx_ipc_socket_read(zbx_ipc_socket_t *csocket, zbx_ipc_message_t *message);
+int	zbx_ipc_socket_connected(const zbx_ipc_socket_t *csocket);
 
 int	zbx_ipc_async_socket_open(zbx_ipc_async_socket_t *asocket, const char *service_name, int timeout, char **error);
 void	zbx_ipc_async_socket_close(zbx_ipc_async_socket_t *asocket);
@@ -127,7 +128,6 @@ int	zbx_ipc_async_socket_connected(zbx_ipc_async_socket_t *asocket);
 int	zbx_ipc_async_exchange(const char *service_name, zbx_uint32_t code, int timeout, const unsigned char *data,
 		zbx_uint32_t size, unsigned char **out, char **error);
 
-
 void	zbx_ipc_message_free(zbx_ipc_message_t *message);
 void	zbx_ipc_message_clean(zbx_ipc_message_t *message);
 void	zbx_ipc_message_init(zbx_ipc_message_t *message);
@@ -135,4 +135,3 @@ void	zbx_ipc_message_format(const zbx_ipc_message_t *message, char **data);
 void	zbx_ipc_message_copy(zbx_ipc_message_t *dst, const zbx_ipc_message_t *src);
 
 #endif
-

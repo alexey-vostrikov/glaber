@@ -77,7 +77,7 @@ class CControllerPopupItemTestGetValue extends CControllerPopupItemTest {
 		if ($ret) {
 			$testable_item_types = self::getTestableItemTypes($this->getInput('hostid', '0'));
 			$this->item_type = $this->getInput('item_type');
-			$this->preproc_item = self::getPreprocessingItemClassInstance($this->getInput('test_type'));
+			$this->test_type = $this->getInput('test_type');
 			$this->is_item_testable = in_array($this->item_type, $testable_item_types);
 
 			if (!$this->is_item_testable) {
@@ -117,17 +117,15 @@ class CControllerPopupItemTestGetValue extends CControllerPopupItemTest {
 			}
 		}
 
-		if (($messages = getMessages()) !== null) {
+		if ($messages = array_column(get_and_clear_messages(), 'message')) {
 			$this->setResponse(
-				(new CControllerResponseData([
-					'main_block' => json_encode([
-						'messages' => $messages->toString(),
-						'user' => [
-							'debug_mode' => $this->getDebugMode()
-						]
-					])
-				]))->disableView()
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => $messages
+					]
+				])])
 			);
+
 			$ret = false;
 		}
 
@@ -215,10 +213,10 @@ class CControllerPopupItemTestGetValue extends CControllerPopupItemTest {
 			}
 		}
 
-		if (($messages = getMessages(false)) !== null) {
-			$output['messages'] = $messages->toString();
+		if ($messages = get_and_clear_messages()) {
+			$output['error']['messages'] = array_column($messages, 'message');
 		}
 
-		$this->setResponse((new CControllerResponseData(['main_block' => json_encode($output)]))->disableView());
+		$this->setResponse(new CControllerResponseData(['main_block' => json_encode($output)]));
 	}
 }

@@ -17,10 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "log.h"
 #include "zbxvariant.h"
 #include "metric.h"
+#include "zbxtime.h"
 
 void metric_set_time(metric_t *metric, u_int64_t *mstime) {
     if (NULL == mstime) {

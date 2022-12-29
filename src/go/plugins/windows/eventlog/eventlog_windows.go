@@ -25,17 +25,17 @@ import (
 	"time"
 	"unsafe"
 
+	"git.zabbix.com/ap/plugin-support/conf"
+	"git.zabbix.com/ap/plugin-support/plugin"
 	"zabbix.com/internal/agent"
-	"zabbix.com/pkg/conf"
 	"zabbix.com/pkg/glexpr"
 	"zabbix.com/pkg/itemutil"
-	"zabbix.com/pkg/plugin"
 	"zabbix.com/pkg/zbxlib"
 )
 
 type Options struct {
-	MaxLinesPerSecond int `conf:"range=1:1000,default=20"`
-	Capacity          int `conf:"optional,range=1:100"`
+	plugin.SystemOptions `conf:"optional,name=System"`
+	MaxLinesPerSecond    int `conf:"range=1:1000,default=20"`
 }
 
 // Plugin -
@@ -60,7 +60,7 @@ func (p *Plugin) Configure(global *plugin.GlobalOptions, options interface{}) {
 
 func (p *Plugin) Validate(options interface{}) error {
 	var o Options
-	return conf.Unmarshal(options, &o)
+	return conf.Unmarshal(options, &o, false)
 }
 
 func (p *Plugin) Export(key string, params []string, ctx plugin.ContextProvider) (result interface{}, err error) {
@@ -73,7 +73,7 @@ func (p *Plugin) Export(key string, params []string, ctx plugin.ContextProvider)
 		data = &metadata{key: key, params: params}
 		runtime.SetFinalizer(data, func(d *metadata) { zbxlib.FreeActiveMetric(d.blob) })
 		if data.blob, err = zbxlib.NewActiveMetric(key, params, meta.LastLogsize(), meta.Mtime()); err != nil {
-			return
+			return nil, err
 		}
 		meta.Data = data
 	} else {
@@ -82,8 +82,8 @@ func (p *Plugin) Export(key string, params []string, ctx plugin.ContextProvider)
 			zbxlib.FreeActiveMetric(data.blob)
 			data.key = key
 			data.params = params
-			// reset lastlogsize/mtime if item key has been changed
-			if data.blob, err = zbxlib.NewActiveMetric(key, params, 0, 0); err != nil {
+			// recreate if item key has been changed
+			if data.blob, err = zbxlib.NewActiveMetric(key, params, meta.LastLogsize(), meta.Mtime()); err != nil {
 				return nil, err
 			}
 		}

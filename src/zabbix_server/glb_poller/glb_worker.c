@@ -3,13 +3,14 @@
     supports async and sync flow
  ***********************************************************************/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxserver.h"
 #include "../../libs/zbxexec/worker.h"
 #include "glb_worker.h"
 #include "module.h"
 #include "preproc.h"
 #include "zbxjson.h"
+#include "zbxsysinfo.h"
 
 extern int CONFIG_GLB_WORKER_FORKS;
 typedef struct {
@@ -80,14 +81,14 @@ static int worker_submit_result(char *response) {
 
     worker_item = poller_get_item_specific_data(poller_item);      
            
-    init_result(&result);
+    zbx_init_agent_result(&result);
     zbx_rtrim(value, ZBX_WHITESPACE);
     
-    set_result_type(&result, ITEM_VALUE_TYPE_TEXT, value);
+    zbx_set_agent_result_type(&result, ITEM_VALUE_TYPE_TEXT, value);
     
 	poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
     
-    free_result(&result);
+    zbx_free_agent_result(&result);
     
      
     poller_return_item_to_queue(poller_item);
@@ -117,21 +118,21 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
         
     poller_set_item_specific_data(poller_item, worker_item);
     
-    init_request(&request);
+    zbx_init_agent_request(&request);
 
     cmd = (char *)zbx_malloc(cmd, cmd_alloc);
     ZBX_STRDUP(parsed_key, dc_item->key_orig);
     
     //translating dynamic params
     //for worker params we will use parsed parameters, cache them to config cache reload time
-    if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
+    if (SUCCEED != zbx_substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
 				sizeof(error))) {
         zabbix_log(LOG_LEVEL_INFORMATION,"Failed to apply macroses to dynamic params %s",parsed_key);
         ret = FAIL;
         goto out;
     }
     
-    if (SUCCEED != parse_item_key(parsed_key, &request)) {
+    if (SUCCEED !=zbx_parse_item_key(parsed_key, &request)) {
 	    zabbix_log(LOG_LEVEL_INFORMATION,"Failed to parse item key %s",parsed_key);
         ret = FAIL;
         goto out;
@@ -165,14 +166,14 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
         zbx_free(key_dyn);
     
     worker_item->params_dyn = key_dyn;
-  //  free_request(&request);
+  //  zbx_free_agent_request(&request);
 
     ret = SUCCEED;
 out:
     zbx_free(parsed_key);
     zbx_free(params_stat);
     zbx_free(cmd);
-    free_request(&request);
+    zbx_free_agent_request(&request);
     return ret;
 }
 /*****************************************************************

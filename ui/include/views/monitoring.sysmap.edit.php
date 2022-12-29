@@ -25,7 +25,9 @@
 
 require_once dirname(__FILE__).'/js/monitoring.sysmap.edit.js.php';
 
-$widget = (new CWidget())->setTitle(_('Network maps'));
+$html_page = (new CHtmlPage())
+	->setTitle(_('Network maps'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_SYSMAP_EDIT));
 
 $tabs = new CTabView();
 
@@ -265,7 +267,7 @@ $map_tab->addRow(new CLabel(_('Problem display'), 'label-show-unack'),
 );
 
 $map_tab->addRow(_('Minimum severity'),
-	new CSeverity(['name' => 'severity_min', 'value' => (int) $data['sysmap']['severity_min']])
+	new CSeverity('severity_min', (int) $data['sysmap']['severity_min'])
 );
 
 $map_tab->addRow(_('Show suppressed problems'),
@@ -323,14 +325,14 @@ $user_group_shares_table = (new CTable())
 	->setAttribute('style', 'width: 100%;');
 
 $add_user_group_btn = ([(new CButton(null, _('Add')))
-	->onClick('return PopUp("popup.generic",'.
-		json_encode([
+	->onClick(
+		'return PopUp("popup.generic", '.json_encode([
 			'srctbl' => 'usrgrp',
 			'srcfld1' => 'usrgrpid',
 			'srcfld2' => 'name',
 			'dstfrm' => $form->getName(),
 			'multiselect' => '1'
-		]).', null, this);'
+		]).', {dialogue_class: "modal-popup-generic"});'
 	)
 	->addClass(ZBX_STYLE_BTN_LINK)]);
 
@@ -344,14 +346,14 @@ $user_groups = [];
 
 foreach ($data['sysmap']['userGroups'] as $user_group) {
 	$user_groupid = $user_group['usrgrpid'];
-	$user_groups[$user_groupid] = [
+	$user_groups[] = [
 		'usrgrpid' => $user_groupid,
 		'name' => $data['user_groups'][$user_groupid]['name'],
 		'permission' => $user_group['permission']
 	];
 }
 
-$js_insert = 'window.addPopupValues('.zbx_jsvalue(['object' => 'usrgrpid', 'values' => $user_groups]).');';
+$js_insert = 'window.addPopupValues('.json_encode(['object' => 'usrgrpid', 'values' => $user_groups]).');';
 
 // User sharing table.
 $user_shares_table = (new CTable())
@@ -360,14 +362,14 @@ $user_shares_table = (new CTable())
 	->setAttribute('style', 'width: 100%;');
 
 $add_user_btn = ([(new CButton(null, _('Add')))
-	->onClick('return PopUp("popup.generic",'.
-		json_encode([
+	->onClick(
+		'return PopUp("popup.generic", '.json_encode([
 			'srctbl' => 'users',
 			'srcfld1' => 'userid',
 			'srcfld2' => 'fullname',
 			'dstfrm' => $form->getName(),
 			'multiselect' => '1'
-		]).', null, this);'
+		]).', {dialogue_class: "modal-popup-generic"});'
 	)
 	->addClass(ZBX_STYLE_BTN_LINK)]);
 
@@ -381,14 +383,14 @@ $users = [];
 
 foreach ($data['sysmap']['users'] as $user) {
 	$userid = $user['userid'];
-	$users[$userid] = [
+	$users[] = [
 		'id' => $userid,
 		'name' => getUserFullname($data['users'][$userid]),
 		'permission' => $user['permission']
 	];
 }
 
-$js_insert .= 'window.addPopupValues('.zbx_jsvalue(['object' => 'userid', 'values' => $users]).');';
+$js_insert .= 'window.addPopupValues('.json_encode(['object' => 'userid', 'values' => $users]).');';
 
 zbx_add_post_js($js_insert);
 
@@ -434,7 +436,6 @@ else {
 
 $form->addItem($tabs);
 
-// Append form to widget.
-$widget->addItem($form);
-
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

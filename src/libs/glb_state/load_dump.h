@@ -14,7 +14,7 @@
 #define GLB_CACHE_READWRITE_H
 
 
-#include "common.h"
+#include "zbxcommon.h"
 #include <zlib.h>
 
 

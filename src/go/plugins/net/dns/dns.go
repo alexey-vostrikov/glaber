@@ -20,15 +20,16 @@
 package dns
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
+	"git.zabbix.com/ap/plugin-support/plugin"
+	"git.zabbix.com/ap/plugin-support/zbxerr"
 	"github.com/miekg/dns"
-	"zabbix.com/pkg/plugin"
-	"zabbix.com/pkg/zbxerr"
 )
 
 const (
@@ -102,6 +103,10 @@ func (p *Plugin) Export(key string, params []string, ctx plugin.ContextProvider)
 func exportDns(params []string) (result interface{}, err error) {
 	answer, err := getDNSAnswers(params)
 	if err != nil {
+		if errors.Is(err, zbxerr.ErrorCannotFetchData.Unwrap()) {
+			return 0, nil
+		}
+
 		return
 	}
 
@@ -167,7 +172,7 @@ func parseAnswers(answers []dns.RR) string {
 			out += getSRVString(rr)
 		}
 
-		if i != answersNum - 1 {
+		if i != answersNum-1 {
 			out += "\n"
 		}
 	}

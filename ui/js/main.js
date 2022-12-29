@@ -23,6 +23,9 @@
 // Sync with SASS variable: $ui-transition-duration.
 const UI_TRANSITION_DURATION = 300;
 
+const PROFILE_TYPE_INT = 2;
+const PROFILE_TYPE_STR = 3;
+
 // Array indexOf method for javascript<1.6 compatibility
 if (!Array.prototype.indexOf) {
 	Array.prototype.indexOf = function (searchElement) {
@@ -208,7 +211,6 @@ var AudioControl = {
  * Elements with class 'blink' will blink for 'data-seconds-to-blink' seconds
  * If 'data-seconds-to-blink' is omitted, element will blink forever.
  * For elements with class 'blink' and attribute 'data-toggle-class' class will be toggled.
- * @author Konstantin Buravcov
  */
 var jqBlink = {
 	shown: true, // are objects currently shown or hidden?
@@ -317,7 +319,10 @@ var hintBox = {
 				return false;
 			}
 
-			hintBox.displayHint(e, $target, 400);
+			hintBox.displayHint(e, $target, $target.data('hintbox-delay') !== undefined
+				? $target.data('hintbox-delay')
+				: 400
+			);
 
 			return false;
 		});
@@ -396,11 +401,19 @@ var hintBox = {
 
 			var $hint_box = $target.next('.hint-box').empty();
 
-			if (resp.messages) {
-				$hint_box.append(resp.messages);
+			if ('error' in resp) {
+				const message_box = makeMessageBox('bad', resp.error.messages, resp.error.title, false, true);
+
+				$hint_box.append(message_box);
 			}
-			if (resp.data) {
-				$hint_box.append(resp.data);
+			else {
+				if (resp.messages) {
+					$hint_box.append(resp.messages);
+				}
+
+				if (resp.data) {
+					$hint_box.append(resp.data);
+				}
 			}
 
 			hintBox.displayHint(e, $target);
@@ -481,13 +494,20 @@ var hintBox = {
 
 		jQuery(appendTo).append(box);
 
-		var removeHandler = function() {
-			hintBox.deleteHint(target);
-		};
+		target.observer = new MutationObserver(() => {
+			const node = target instanceof Node ? target : target[0];
 
-		jQuery(target)
-			.off('remove', removeHandler)
-			.on('remove', removeHandler);
+			if (document.body.contains(node)) {
+				return;
+			}
+
+			hintBox.deleteHint(target);
+		})
+
+		target.observer.observe(document, {
+			childList: true,
+			subtree: true
+		})
 
 		return box;
 	},
@@ -610,11 +630,17 @@ var hintBox = {
 			delete target.hintBoxItem;
 
 			if (target.isStatic) {
-				if (jQuery(target).data('return-control') !== 'undefined') {
+				if (jQuery(target).data('return-control') !== undefined) {
 					jQuery(target).data('return-control').focus();
 				}
 				delete target.isStatic;
 			}
+		}
+
+		if (target.observer !== undefined) {
+			target.observer.disconnect();
+
+			delete target.observer;
 		}
 	},
 
@@ -629,10 +655,10 @@ var hintBox = {
 };
 
 /**
- * Add object to the list of favourites.
+ * Add object to the list of favorites.
  */
 function add2favorites(object, objectid) {
-	sendAjaxData('zabbix.php?action=favourite.create', {
+	sendAjaxData('zabbix.php?action=favorite.create', {
 		data: {
 			object: object,
 			objectid: objectid
@@ -641,10 +667,10 @@ function add2favorites(object, objectid) {
 }
 
 /**
- * Remove object from the list of favourites. Remove all favourites if objectid==0.
+ * Remove object from the list of favorites. Remove all favorites if objectid==0.
  */
 function rm4favorites(object, objectid) {
-	sendAjaxData('zabbix.php?action=favourite.delete', {
+	sendAjaxData('zabbix.php?action=favorite.delete', {
 		data: {
 			object: object,
 			objectid: objectid
@@ -656,38 +682,42 @@ function rm4favorites(object, objectid) {
  * Toggles filter state and updates title and icons accordingly.
  *
  * @param {string} 	idx					User profile index
- * @param {string} 	value_int			Integer value
+ * @param {string} 	value				Value
  * @param {object} 	idx2				An array of IDs
+ * @param {int} 	profile_type		Profile type
  */
-function updateUserProfile(idx, value_int, idx2) {
+function updateUserProfile(idx, value, idx2, profile_type = PROFILE_TYPE_INT) {
+	const value_fields = {
+		[PROFILE_TYPE_INT]: 'value_int',
+		[PROFILE_TYPE_STR]: 'value_str'
+	};
+
 	return sendAjaxData('zabbix.php?action=profile.update', {
 		data: {
 			idx: idx,
-			value_int: value_int,
+			[value_fields[profile_type]]: value,
 			idx2: idx2
 		}
 	});
 }
 
-function changeWidgetState(obj, widgetId, idx) {
-	var widgetObj = jQuery('#' + widgetId + '_widget'),
-		css = switchElementClass(obj, 'btn-widget-collapse', 'btn-widget-expand'),
-		state = 0;
+/**
+ * Section collapse toggle.
+ *
+ * @param {string}      id
+ * @param {string|null} profile_idx  If not null, stores state in profile.
+ */
+function toggleSection(id, profile_idx) {
+	const section = document.getElementById(id);
+	const toggle = section.querySelector('.section-toggle');
 
-	if (css === 'btn-widget-expand') {
-		jQuery('.body', widgetObj).slideUp(50);
-		jQuery('.dashboard-widget-foot', widgetObj).slideUp(50);
-	}
-	else {
-		jQuery('.body', widgetObj).slideDown(50);
-		jQuery('.dashboard-widget-foot', widgetObj).slideDown(50);
+	let is_collapsed = section.classList.contains('section-collapsed');
 
-		state = 1;
-	}
+	section.classList.toggle('section-collapsed', !is_collapsed);
+	toggle.setAttribute('title', is_collapsed ? t('S_COLLAPSE') : t('S_EXPAND'));
 
-	obj.title = (state == 1) ? t('S_COLLAPSE') : t('S_EXPAND');
-	if (idx !== '' && typeof idx !== 'undefined') {
-		updateUserProfile(idx, state, []);
+	if (profile_idx !== '') {
+		updateUserProfile(profile_idx, is_collapsed ? '1' : '0', []);
 	}
 }
 
@@ -920,10 +950,13 @@ function getConditionFormula(conditions, evalType) {
 
 			for (const name in data) {
 				// Set 'z-select' value.
-				$row.find('z-select[name$="[' + counter + '][' + name + ']"]').val(data[name]);
+				$row
+					.find(`z-select[name$="[${counter}][${name}]"]`)
+					.val(data[name]);
 
 				// Set 'radio' value.
-				$row.find('[type="radio"][name$="[' + counter + '][' + name + ']"][value="' + data[name] + '"]')
+				$row
+					.find(`[type="radio"][name$="[${counter}][${name}]"][value="${$.escapeSelector(data[name])}"]`)
 					.attr('checked', 'checked');
 			}
 

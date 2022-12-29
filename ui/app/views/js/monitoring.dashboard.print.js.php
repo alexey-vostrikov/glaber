@@ -25,9 +25,8 @@
 ?>
 
 <script>
-	function initializeView(dashboard, widget_defaults, time_period) {
-
-		const init = () => {
+	const view = {
+		init({dashboard, widget_defaults, time_period}) {
 			timeControl.refreshPage = false;
 
 			ZABBIX.Dashboard = new CDashboard(document.querySelector('.<?= ZBX_STYLE_DASHBOARD ?>'), {
@@ -68,15 +67,12 @@
 			for (const page of dashboard.pages) {
 				for (const widget of page.widgets) {
 					widget.fields = (typeof widget.fields === 'object') ? widget.fields : {};
-					widget.configuration = (typeof widget.configuration === 'object') ? widget.configuration : {};
 				}
 
 				ZABBIX.Dashboard.addDashboardPage(page);
 			}
 
 			ZABBIX.Dashboard.activate();
-		};
-
-		init();
+		}
 	}
 </script>

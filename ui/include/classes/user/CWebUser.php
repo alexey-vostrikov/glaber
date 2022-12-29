@@ -64,17 +64,17 @@ class CWebUser {
 				throw new Exception();
 			}
 
-			$result = (bool) self::$data;
-
 			if (isset(self::$data['attempt_failed']) && self::$data['attempt_failed']) {
 				CProfile::init();
 				CProfile::update('web.login.attempt.failed', self::$data['attempt_failed'], PROFILE_TYPE_INT);
 				CProfile::update('web.login.attempt.ip', self::$data['attempt_ip'], PROFILE_TYPE_STR);
 				CProfile::update('web.login.attempt.clock', self::$data['attempt_clock'], PROFILE_TYPE_INT);
-				$result &= CProfile::flush();
+				if (!CProfile::flush()) {
+					return false;
+				}
 			}
 
-			return $result;
+			return true;
 		}
 		catch (Exception $e) {
 			self::setDefault();
@@ -131,6 +131,8 @@ class CWebUser {
 	 * @param string $rule_name  Rule name.
 	 *
 	 * @return bool  Returns true if user has access to specified rule, false - otherwise.
+	 *
+	 * @throws Exception
 	 */
 	public static function checkAccess(string $rule_name): bool {
 		if (empty(self::$data) || self::$data['roleid'] == 0) {
@@ -151,6 +153,7 @@ class CWebUser {
 			'username' => ZBX_GUEST_USER,
 			'userid' => 0,
 			'lang' => CSettingsHelper::getGlobal(CSettingsHelper::DEFAULT_LANG),
+			'theme' => CSettingsHelper::getGlobal(CSettingsHelper::DEFAULT_THEME),
 			'type' => 0,
 			'gui_access' => GROUP_GUI_ACCESS_SYSTEM,
 			'debug_mode' => false,
@@ -231,13 +234,11 @@ class CWebUser {
 	}
 
 	/**
-	 * Get user ip address.
+	 * Get user IP address.
 	 *
 	 * @return string
 	 */
 	public static function getIp(): string {
-		return (array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) && $_SERVER['HTTP_X_FORWARDED_FOR'] !== '')
-			? $_SERVER['HTTP_X_FORWARDED_FOR']
-			: $_SERVER['REMOTE_ADDR'];
+		return $_SERVER['REMOTE_ADDR'];
 	}
 }

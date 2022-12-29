@@ -34,7 +34,8 @@ function eventSource($source = null) {
 		EVENT_SOURCE_TRIGGERS => _('trigger'),
 		EVENT_SOURCE_DISCOVERY => _('discovery'),
 		EVENT_SOURCE_AUTOREGISTRATION => _('autoregistration'),
-		EVENT_SOURCE_INTERNAL => _x('internal', 'event source')
+		EVENT_SOURCE_INTERNAL => _x('internal', 'event source'),
+		EVENT_SOURCE_SERVICE => _('service')
 	];
 
 	if ($source === null) {
@@ -61,7 +62,8 @@ function eventObject($object = null) {
 		EVENT_OBJECT_DSERVICE => _('discovered service'),
 		EVENT_OBJECT_AUTOREGHOST => _('autoregistered host'),
 		EVENT_OBJECT_ITEM => _('item'),
-		EVENT_OBJECT_LLDRULE => _('low-level discovery rule')
+		EVENT_OBJECT_LLDRULE => _('low-level discovery rule'),
+		EVENT_OBJECT_SERVICE => _('service')
 	];
 
 	if ($object === null) {
@@ -88,7 +90,8 @@ function eventSourceObjects() {
 		['source' => EVENT_SOURCE_AUTOREGISTRATION, 'object' => EVENT_OBJECT_AUTOREGHOST],
 		['source' => EVENT_SOURCE_INTERNAL, 'object' => EVENT_OBJECT_TRIGGER],
 		['source' => EVENT_SOURCE_INTERNAL, 'object' => EVENT_OBJECT_ITEM],
-		['source' => EVENT_SOURCE_INTERNAL, 'object' => EVENT_OBJECT_LLDRULE]
+		['source' => EVENT_SOURCE_INTERNAL, 'object' => EVENT_OBJECT_LLDRULE],
+		['source' => EVENT_SOURCE_SERVICE, 'object' => EVENT_OBJECT_SERVICE]
 	];
 }
 
@@ -152,24 +155,12 @@ function get_events_unacknowledged($db_element, $value_trigger = null, $value_ev
  * @param bool   $allowed['change_severity']         Whether user is allowed to change problems severity.
  * @param bool   $allowed['acknowledge']             Whether user is allowed to acknowledge problems.
  * @param bool   $allowed['close']                   Whether user is allowed to close problems.
+ * @param bool   $allowed['suppress_problems']       Whether user is allowed to manually suppress/unsuppress problems.
  *
  * @return CTableInfo
  */
 function make_event_details(array $event, array $allowed) {
-	$can_be_closed = $allowed['close'];
-
-	if ($event['r_eventid'] != 0) {
-		$can_be_closed = false;
-	}
-	else {
-		foreach ($event['acknowledges'] as $acknowledge) {
-			if (($acknowledge['action'] & ZBX_PROBLEM_UPDATE_CLOSE) == ZBX_PROBLEM_UPDATE_CLOSE) {
-				$can_be_closed = false;
-				break;
-			}
-		}
-	}
-
+	$can_be_closed = $allowed['close'] && !isEventClosed($event);
 	$is_acknowledged = ($event['acknowledged'] == EVENT_ACKNOWLEDGED);
 
 	$table = (new CTableInfo())
@@ -179,11 +170,11 @@ function make_event_details(array $event, array $allowed) {
 		])
 		->addRow([
 			_('Operational data'),
-			$event['opdata']
+			$event['opdata']->addClass(ZBX_STYLE_WORDBREAK)
 		])
 		->addRow([
 			_('Severity'),
-			getSeverityCell($event['severity'])
+			CSeverityHelper::makeSeverityCell((int) $event['severity'])
 		])
 		->addRow([
 			_('Time'),
@@ -191,11 +182,13 @@ function make_event_details(array $event, array $allowed) {
 		])
 		->addRow([
 			_('Acknowledged'),
-			($allowed['add_comments'] || $allowed['change_severity'] || $allowed['acknowledge'] || $can_be_closed)
+			($allowed['add_comments'] || $allowed['change_severity'] || $allowed['acknowledge'] || $can_be_closed
+					|| $allowed['suppress_problems'])
 				? (new CLink($is_acknowledged ? _('Yes') : _('No')))
 					->addClass($is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED)
 					->addClass(ZBX_STYLE_LINK_ALT)
-					->onClick('acknowledgePopUp('.json_encode(['eventids' => [$event['eventid']]]).', this);')
+					->setAttribute('data-eventid', $event['eventid'])
+					->onClick('acknowledgePopUp({eventids: [this.dataset.eventid]}, this);')
 				: (new CSpan($is_acknowledged ? _('Yes') : _('No')))->addClass(
 					$is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED
 				)
@@ -258,7 +251,7 @@ function make_event_details(array $event, array $allowed) {
 
 	$table
 		->addRow([_('Tags'), $tags[$event['eventid']]])
-		->addRow([_('Description'), (new CDiv(zbx_str2links($event['comments'])))]);
+		->addRow([_('Description'), (new CDiv(zbx_str2links($event['comments'])))->addClass(ZBX_STYLE_WORDBREAK)]);
 
 	return $table;
 }
@@ -273,6 +266,7 @@ function make_event_details(array $event, array $allowed) {
  * @param bool   $allowed['change_severity']  Whether user is allowed to change problems severity.
  * @param bool   $allowed['acknowledge']      Whether user is allowed to acknowledge problems.
  * @param bool   $allowed['close']            Whether user is allowed to close problems.
+ * @param bool   $allowed['suppress']         Whether user is allowed to suppress/unsuppress problems.
  *
  * @return CTableInfo
  */
@@ -290,7 +284,9 @@ function make_small_eventlist(array $startEvent, array $allowed) {
 
 	$events = API::Event()->get([
 		'output' => ['eventid', 'source', 'object', 'objectid', 'acknowledged', 'clock', 'ns', 'severity', 'r_eventid'],
-		'select_acknowledges' => ['userid', 'clock', 'message', 'action', 'old_severity', 'new_severity'],
+		'select_acknowledges' => ['userid', 'clock', 'message', 'action', 'old_severity', 'new_severity',
+			'suppress_until'
+		],
 		'source' => EVENT_SOURCE_TRIGGERS,
 		'object' => EVENT_OBJECT_TRIGGER,
 		'value' => TRIGGER_VALUE_TRUE,
@@ -361,12 +357,9 @@ function make_small_eventlist(array $startEvent, array $allowed) {
 		else {
 			$in_closing = false;
 
-			foreach ($event['acknowledges'] as $acknowledge) {
-				if (($acknowledge['action'] & ZBX_PROBLEM_UPDATE_CLOSE) == ZBX_PROBLEM_UPDATE_CLOSE) {
-					$in_closing = true;
-					$can_be_closed = false;
-					break;
-				}
+			if (hasEventCloseAction($event['acknowledges'])) {
+				$in_closing = true;
+				$can_be_closed = false;
 			}
 
 			$value = $in_closing ? TRIGGER_VALUE_FALSE : TRIGGER_VALUE_TRUE;
@@ -385,11 +378,12 @@ function make_small_eventlist(array $startEvent, array $allowed) {
 
 		// Create acknowledge link.
 		$problem_update_link = ($allowed['add_comments'] || $allowed['change_severity'] || $allowed['acknowledge']
-				|| $can_be_closed)
+				|| $can_be_closed || $allowed['suppress_problems'])
 			? (new CLink($is_acknowledged ? _('Yes') : _('No')))
 				->addClass($is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED)
 				->addClass(ZBX_STYLE_LINK_ALT)
-				->onClick('acknowledgePopUp('.json_encode(['eventids' => [$event['eventid']]]).', this);')
+				->setAttribute('data-eventid', $event['eventid'])
+				->onClick('acknowledgePopUp({eventids: [this.dataset.eventid]}, this);')
 			: (new CSpan($is_acknowledged ? _('Yes') : _('No')))->addClass(
 				$is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED
 			);
@@ -412,6 +406,99 @@ function make_small_eventlist(array $startEvent, array $allowed) {
 	}
 
 	return $table;
+}
+
+/**
+ * Checks if event is closed.
+ *
+ * @param array $event                              Event object.
+ * @param array $event['r_eventid']                 OK event id. 0 if not resolved.
+ * @param array $event['acknowledges']              List of problem updates.
+ * @param int   $event['acknowledges'][]['action']  Action performed in update.
+ *
+ * @return bool
+ */
+function isEventClosed(array $event): bool {
+	if ($event['r_eventid'] != 0) {
+		return true;
+	}
+	else {
+		return hasEventCloseAction($event['acknowledges']);
+	}
+}
+
+/**
+ * Checks if event has manual close action.
+ *
+ * @param array $event                              Event object.
+ * @param array $event['acknowledges']              List of problem updates.
+ * @param int   $event['acknowledges'][]['action']  Action performed in update.
+ *
+ * @return bool
+ */
+function hasEventCloseAction(array $acknowledges): bool {
+	foreach ($acknowledges as $acknowledge) {
+		if (($acknowledge['action'] & ZBX_PROBLEM_UPDATE_CLOSE) == ZBX_PROBLEM_UPDATE_CLOSE) {
+			// If at least one manual close update was found, event is closing.
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Returns true if event is suppressed and not unsuppressed after that.
+ *
+ * @param array $acknowledges
+ * @param int   $acknowledges['action']
+ * @param ?array $unsuppression_action   [OUT] Variable to store suppression action data.
+ *
+ * @return bool
+ */
+function isEventRecentlySuppressed(array $acknowledges, &$suppression_action = null): bool {
+	CArrayHelper::sort($acknowledges, [['field' => 'clock', 'order' => ZBX_SORT_DOWN]]);
+
+	foreach ($acknowledges as $ack) {
+		if (($ack['action'] & ZBX_PROBLEM_UPDATE_UNSUPPRESS) == ZBX_PROBLEM_UPDATE_UNSUPPRESS) {
+			return false;
+		}
+		elseif (($ack['action'] & ZBX_PROBLEM_UPDATE_SUPPRESS) == ZBX_PROBLEM_UPDATE_SUPPRESS) {
+			if ($ack['suppress_until'] == ZBX_PROBLEM_SUPPRESS_TIME_INDEFINITE || $ack['suppress_until'] > time()) {
+				$suppression_action = $ack;
+
+				return true;
+			}
+			break;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Returns true if event is unsuppressed and not suppressed after that.
+ *
+ * @param array  $acknowledges
+ * @param int    $acknowledges['action']
+ * @param ?array $unsuppression_action   [OUT] Variable to store unsuppression action data.
+ *
+ * @return bool
+ */
+function isEventRecentlyUnsuppressed(array $acknowledges, &$unsuppression_action = null): bool {
+	CArrayHelper::sort($acknowledges, [['field' => 'clock', 'order' => ZBX_SORT_DOWN]]);
+
+	foreach ($acknowledges as $ack) {
+		if (($ack['action'] & ZBX_PROBLEM_UPDATE_SUPPRESS) == ZBX_PROBLEM_UPDATE_SUPPRESS) {
+			return false;
+		}
+		elseif (($ack['action'] & ZBX_PROBLEM_UPDATE_UNSUPPRESS) == ZBX_PROBLEM_UPDATE_UNSUPPRESS) {
+			$unsuppression_action = $ack;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**
@@ -484,22 +571,29 @@ function orderEventTagsByPriority(array $event_tags, array $priorities) {
  *                                            - 'eventid' - for events and problems (default);
  *                                            - 'hostid' - for hosts and host prototypes;
  *                                            - 'templateid' - for templates;
- *                                            - 'triggerid' - for triggers.
+ *                                            - 'triggerid' - for triggers;
+ *                                            - 'httptestid' - for web scenarios.
  * @param int    $list_tag_count             Maximum number of tags to display.
  * @param array  $filter_tags                An array of tag filtering data.
+ * @param ?array $subfilter_tags             Array of selected sub-filter tags. Null when tags are not clickable.
+ * @param array  $subfilter_tags[<tag>]
+ * @param array  $subfilter_tags[<tag>][<value1>]
+ * @param array  $subfilter_tags[<tag>][<value2>]
+ * @param array  $subfilter_tags[<tag>][<value...>]
  * @param string $filter_tags[]['tag']
  * @param int    $filter_tags[]['operator']
  * @param string $filter_tags[]['value']
  * @param int    $tag_name_format            Tag name format. Possible values:
- *                                            - PROBLEMS_TAG_NAME_FULL (default);
- *                                            - PROBLEMS_TAG_NAME_SHORTENED;
- *                                            - PROBLEMS_TAG_NAME_NONE.
+ *                                            - TAG_NAME_FULL (default);
+ *                                            - TAG_NAME_SHORTENED;
+ *                                            - TAG_NAME_NONE.
  * @param string $tag_priority               A list of comma-separated tag names.
  *
  * @return array
  */
 function makeTags(array $list, bool $html = true, string $key = 'eventid', int $list_tag_count = ZBX_TAG_COUNT_DEFAULT,
-		array $filter_tags = [], int $tag_name_format = PROBLEMS_TAG_NAME_FULL, string $tag_priority = ''): array {
+		array $filter_tags = [], ?array $subfilter_tags = null, int $tag_name_format = TAG_NAME_FULL,
+		string $tag_priority = ''): array {
 	$tags = [];
 
 	if ($html) {
@@ -544,9 +638,25 @@ function makeTags(array $list, bool $html = true, string $key = 'eventid', int $
 				$value = getTagString($tag, $tag_name_format);
 
 				if ($value !== '') {
-					$tags[$element[$key]][] = (new CSpan($value))
-						->addClass(ZBX_STYLE_TAG)
-						->setHint(getTagString($tag));
+					if ($subfilter_tags !== null
+							&& !(array_key_exists($tag['tag'], $subfilter_tags)
+								&& array_key_exists($tag['value'], $subfilter_tags[$tag['tag']]))) {
+						$tags[$element[$key]][] = (new CSimpleButton($value))
+							->setAttribute('data-key', $tag['tag'])
+							->setAttribute('data-value', $tag['value'])
+							->onClick(
+								'view.setSubfilter([`subfilter_tags[${encodeURIComponent(this.dataset.key)}][]`,'.
+									'this.dataset.value'.
+								']);'
+							)
+							->addClass(ZBX_STYLE_BTN_TAG)
+							->setHint(getTagString($tag), '', false);
+					}
+					else {
+						$tags[$element[$key]][] = (new CSpan($value))
+							->addClass(ZBX_STYLE_TAG)
+							->setHint(getTagString($tag));
+					}
 
 					$tags_shown++;
 
@@ -563,16 +673,31 @@ function makeTags(array $list, bool $html = true, string $key = 'eventid', int $
 
 				foreach ($element['tags'] as $tag) {
 					$value = getTagString($tag);
-					$hint_content[$element[$key]][] = (new CSpan($value))
-						->addClass(ZBX_STYLE_TAG)
-						->setHint($value);
+
+					if ($subfilter_tags !== null
+							&& !(array_key_exists($tag['tag'], $subfilter_tags)
+								&& array_key_exists($tag['value'], $subfilter_tags[$tag['tag']]))) {
+						$hint_content[$element[$key]][] = (new CSimpleButton($value))
+							->setAttribute('data-key', $tag['tag'])
+							->setAttribute('data-value', $tag['value'])
+							->onClick(
+								'view.setSubfilter([`subfilter_tags[${encodeURIComponent(this.dataset.key)}][]`,'.
+									'this.dataset.value'.
+								']);'
+							)
+							->addClass(ZBX_STYLE_BTN_TAG)
+							->setHint(getTagString($tag), '', false);
+					}
+					else {
+						$hint_content[$element[$key]][] = (new CSpan($value))
+							->addClass(ZBX_STYLE_TAG)
+							->setHint($value);
+					}
 				}
 
-				$tags[$element[$key]][] = (new CSpan(
-					(new CButton(null))
-						->addClass(ZBX_STYLE_ICON_WZRD_ACTION)
-						->setHint(new CDiv($hint_content), '', true, 'max-width: 500px')
-				))->addClass(ZBX_STYLE_REL_CONTAINER);
+				$tags[$element[$key]][] = (new CButton(null))
+					->addClass(ZBX_STYLE_ICON_WIZARD_ACTION)
+					->setHint($hint_content, ZBX_STYLE_HINTBOX_WRAP, true);
 			}
 		}
 		else {
@@ -593,17 +718,17 @@ function makeTags(array $list, bool $html = true, string $key = 'eventid', int $
  * @param array  $tag
  * @param string $tag['tag']
  * @param string $tag['value']
- * @param int    $tag_name_format  PROBLEMS_TAG_NAME_*
+ * @param int    $tag_name_format  TAG_NAME_*
  *
  * @return string
  */
-function getTagString(array $tag, $tag_name_format = PROBLEMS_TAG_NAME_FULL) {
+function getTagString(array $tag, $tag_name_format = TAG_NAME_FULL) {
 	switch ($tag_name_format) {
-		case PROBLEMS_TAG_NAME_NONE:
+		case TAG_NAME_NONE:
 			return $tag['value'];
 
-		case PROBLEMS_TAG_NAME_SHORTENED:
-			return substr($tag['tag'], 0, 3).(($tag['value'] === '') ? '' : ': '.$tag['value']);
+		case TAG_NAME_SHORTENED:
+			return mb_substr($tag['tag'], 0, 3).(($tag['value'] === '') ? '' : ': '.$tag['value']);
 
 		default:
 			return $tag['tag'].(($tag['value'] === '') ? '' : ': '.$tag['value']);

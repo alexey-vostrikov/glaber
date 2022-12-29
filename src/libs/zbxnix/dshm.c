@@ -17,15 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "ipc.h"
+#include "zbxnix.h"
+
+#include "zbxcommon.h"
 #include "log.h"
 
-extern char	*CONFIG_FILE;
-
 /******************************************************************************
- *                                                                            *
- * Function: zbx_dshm_create                                                  *
  *                                                                            *
  * Purpose: creates dynamic shared memory segment                             *
  *                                                                            *
@@ -76,8 +73,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_dshm_destroy                                                 *
- *                                                                            *
  * Purpose: destroys dynamic shared memory segment                            *
  *                                                                            *
  * Parameters: shm    - [IN] the dynamic shared memory data                   *
@@ -114,29 +109,17 @@ out:
 	return ret;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_dshm_lock                                                    *
- *                                                                            *
- ******************************************************************************/
 void	zbx_dshm_lock(zbx_dshm_t *shm)
 {
 	zbx_mutex_lock(shm->lock);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_dshm_unlock                                                  *
- *                                                                            *
- ******************************************************************************/
 void	zbx_dshm_unlock(zbx_dshm_t *shm)
 {
 	zbx_mutex_unlock(shm->lock);
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_dshm_validate_ref                                            *
  *                                                                            *
  * Purpose: validates local reference to dynamic shared memory segment        *
  *                                                                            *
@@ -193,8 +176,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_dshm_realloc                                                 *
  *                                                                            *
  * Purpose: reallocates dynamic shared memory segment                         *
  *                                                                            *

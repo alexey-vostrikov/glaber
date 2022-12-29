@@ -23,8 +23,8 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
-	->setTitle(('Set Debug objects'))
+$page = (new CHtmlPage())
+	->setTitle(('Set Debug objects '))
 	->addItem( (new CForm('get'))
 		->addItem((new CFormList())->addRow(('Item ID'),
 				(new CTextBox('itemid', isset($data['itemid'])?$data['itemid']:'0'))
@@ -40,4 +40,4 @@ $widget = (new CWidget())
 		->addItem((new CFormList())->addRow((''), (new CSubmitButton('Apply'))))
 	);
 
-$widget->show();
+$page->show();

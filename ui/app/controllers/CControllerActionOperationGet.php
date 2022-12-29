@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -21,23 +21,24 @@
 
 class CControllerActionOperationGet extends CController {
 
-	protected function checkInput() {
+	protected function checkInput(): bool {
 		$fields = [
-			'eventsource'   => 'required|in '.implode(',', [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_DISCOVERY, EVENT_SOURCE_AUTOREGISTRATION, EVENT_SOURCE_INTERNAL]),
-			'recovery'      => 'required|in '.implode(',', [ACTION_OPERATION, ACTION_RECOVERY_OPERATION, ACTION_ACKNOWLEDGE_OPERATION]),
-			'actionid'      => 'db actions.actionid',
-			'operation'     => 'array'
+			'eventsource' =>	'required|in '.implode(',', [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_DISCOVERY, EVENT_SOURCE_AUTOREGISTRATION, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE]),
+			'recovery' =>		'required|in '.implode(',', [ACTION_OPERATION, ACTION_RECOVERY_OPERATION, ACTION_UPDATE_OPERATION]),
+			'actionid' =>		'db actions.actionid',
+			'operation' =>		'array'
 		];
 
 		$ret = $this->validateInput($fields) && $this->validateInputConstraints();
 
 		if (!$ret) {
-			$output = [];
-			if (($messages = getMessages()) !== null) {
-				$output['errors'] = $messages->toString();
-			}
-
-			$this->setResponse(new CControllerResponseData(['main_block' => json_encode($output)]));
+			$this->setResponse(
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])])
+			);
 		}
 
 		return $ret;
@@ -57,7 +58,7 @@ class CControllerActionOperationGet extends CController {
 		return true;
 	}
 
-	protected function checkPermissions() {
+	protected function checkPermissions(): bool {
 		if ($this->getUserType() >= USER_TYPE_ZABBIX_ADMIN) {
 			if (!$this->getInput('actionid', '0')) {
 				return true;
@@ -73,7 +74,7 @@ class CControllerActionOperationGet extends CController {
 		return false;
 	}
 
-	protected function doAction() {
+	protected function doAction(): void {
 		$operation = $this->getInput('operation', []) + $this->defaultOperationObject();
 
 		$eventsource = (int) $this->getInput('eventsource');
@@ -223,14 +224,13 @@ class CControllerActionOperationGet extends CController {
 	 * @return array|null
 	 */
 	private function popupConfigOperationSteps(array $operation, int $eventsource, int $recovery): ?array {
-		if ($eventsource == EVENT_SOURCE_TRIGGERS || $eventsource == EVENT_SOURCE_INTERNAL) {
-			if ($recovery == ACTION_OPERATION) {
-				return [
-					'from' => $operation['esc_step_from'],
-					'to' => $operation['esc_step_to'],
-					'duration' => $operation['esc_period']
-				];
-			}
+		if (in_array($eventsource, [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE])
+				&& $recovery == ACTION_OPERATION) {
+			return [
+				'from' => $operation['esc_step_from'],
+				'to' => $operation['esc_step_to'],
+				'duration' => $operation['esc_period']
+			];
 		}
 
 		return null;
@@ -245,48 +245,43 @@ class CControllerActionOperationGet extends CController {
 	 * @return array|null
 	 */
 	private function popupConfigOperationMessage(array $operation, int $eventsource): ?array {
-		if ($eventsource == EVENT_SOURCE_TRIGGERS || $eventsource == EVENT_SOURCE_DISCOVERY
-				|| $eventsource == EVENT_SOURCE_AUTOREGISTRATION || $eventsource == EVENT_SOURCE_INTERNAL) {
-			$usergroups = [];
-			if ($operation['opmessage_grp']) {
-				$usergroups = API::UserGroup()->get([
-					'output' => ['usergroupid', 'name'],
-					'usrgrpids' => array_column($operation['opmessage_grp'], 'usrgrpid')
-				]);
-			}
-
-			$users = [];
-			if ($operation['opmessage_usr']) {
-				$db_users = API::User()->get([
-					'output' => ['userid', 'username', 'name', 'surname'],
-					'userids' => array_column($operation['opmessage_usr'], 'userid')
-				]);
-				CArrayHelper::sort($db_users, ['username']);
-
-				foreach ($db_users as $db_user) {
-					$users[] = [
-						'id' => $db_user['userid'],
-						'name' => getUserFullname($db_user)
-					];
-				}
-			}
-
-			$mediatypes = API::MediaType()->get(['output' => ['mediatypeid', 'name', 'status']]);
-			CArrayHelper::sort($mediatypes, ['name']);
-			$mediatypes = array_values($mediatypes);
-
-			return [
-				'custom_message' => $operation['opmessage']['default_msg'] === '0',
-				'subject' => $operation['opmessage']['subject'],
-				'body' => $operation['opmessage']['message'],
-				'mediatypeid' => $operation['opmessage']['mediatypeid'],
-				'mediatypes' => $mediatypes,
-				'usergroups' => $usergroups,
-				'users' => $users
-			];
+		$usergroups = [];
+		if ($operation['opmessage_grp']) {
+			$usergroups = API::UserGroup()->get([
+				'output' => ['usergroupid', 'name'],
+				'usrgrpids' => array_column($operation['opmessage_grp'], 'usrgrpid')
+			]);
 		}
 
-		return null;
+		$users = [];
+		if ($operation['opmessage_usr']) {
+			$db_users = API::User()->get([
+				'output' => ['userid', 'username', 'name', 'surname'],
+				'userids' => array_column($operation['opmessage_usr'], 'userid')
+			]);
+			CArrayHelper::sort($db_users, ['username']);
+
+			foreach ($db_users as $db_user) {
+				$users[] = [
+					'id' => $db_user['userid'],
+					'name' => getUserFullname($db_user)
+				];
+			}
+		}
+
+		$mediatypes = API::MediaType()->get(['output' => ['mediatypeid', 'name', 'status']]);
+		CArrayHelper::sort($mediatypes, ['name']);
+		$mediatypes = array_values($mediatypes);
+
+		return [
+			'custom_message' => ($operation['opmessage']['default_msg'] === '0'),
+			'subject' => $operation['opmessage']['subject'],
+			'body' => $operation['opmessage']['message'],
+			'mediatypeid' => $operation['opmessage']['mediatypeid'],
+			'mediatypes' => $mediatypes,
+			'usergroups' => $usergroups,
+			'users' => $users
+		];
 	}
 
 	/**
@@ -298,44 +293,43 @@ class CControllerActionOperationGet extends CController {
 	 * @return array|null
 	 */
 	private function popupConfigOperationCommand(array $operation, int $eventsource): ?array {
-		if ($eventsource == EVENT_SOURCE_TRIGGERS || $eventsource == EVENT_SOURCE_DISCOVERY
-				|| $eventsource == EVENT_SOURCE_AUTOREGISTRATION) {
-			$current_host = false;
-
-			$hostids = [];
-			foreach ($operation['opcommand_hst'] as $hostid) {
-				if ($hostid == '0') {
-					$current_host = true;
-				}
-				else {
-					$hostids[] = $hostid;
-				}
-			}
-
-			$operation_command = [
-				'current_host' => $current_host,
-				'hosts' => [],
-				'groups' => []
-			];
-
-			if ($hostids) {
-				$operation_command['hosts'] = CArrayHelper::renameObjectsKeys(API::Host()->get([
-					'output' => ['hostid', 'name'],
-					'hostids' => $hostids
-				]), ['hostid' => 'id']);
-			}
-
-			if ($operation['opcommand_grp']) {
-				$operation_command['groups'] = CArrayHelper::renameObjectsKeys(API::HostGroup()->get([
-					'output' => ['groupid', 'name'],
-					'groupids' => $operation['opcommand_grp']
-				]), ['groupid' => 'id']);
-			}
-
-			return $operation_command;
+		if (!in_array($eventsource, [EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_DISCOVERY, EVENT_SOURCE_AUTOREGISTRATION])) {
+			return null;
 		}
 
-		return null;
+		$current_host = false;
+
+		$hostids = [];
+		foreach ($operation['opcommand_hst'] as $hostid) {
+			if ($hostid === '0') {
+				$current_host = true;
+			}
+			else {
+				$hostids[] = $hostid;
+			}
+		}
+
+		$operation_command = [
+			'current_host' => $current_host,
+			'hosts' => [],
+			'groups' => []
+		];
+
+		if ($hostids) {
+			$operation_command['hosts'] = CArrayHelper::renameObjectsKeys(API::Host()->get([
+				'output' => ['hostid', 'name'],
+				'hostids' => $hostids
+			]), ['hostid' => 'id']);
+		}
+
+		if ($operation['opcommand_grp']) {
+			$operation_command['groups'] = CArrayHelper::renameObjectsKeys(API::HostGroup()->get([
+				'output' => ['groupid', 'name'],
+				'groupids' => $operation['opcommand_grp']
+			]), ['groupid' => 'id']);
+		}
+
+		return $operation_command;
 	}
 
 	/**

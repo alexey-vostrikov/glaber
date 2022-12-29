@@ -17,13 +17,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "stats.h"
 #include "perfstat.h"
-#include "alias.h"
+
+#include "stats.h"
 #include "log.h"
-#include "mutexs.h"
-#include "sysinfo.h"
+#include "zbxmutexs.h"
+#include "zbxsysinfo.h"
+#include "zbxstr.h"
 
 #define OBJECT_CACHE_REFRESH_INTERVAL	60
 #define NAMES_UPDATE_INTERVAL		60
@@ -75,7 +75,7 @@ static void	deactivate_perf_counter(zbx_perf_counter_data_t *counter)
 
 /******************************************************************************
  *                                                                            *
- * Comments: if the specified counter exists or a new is successfully         *
+ * Comments: if the specified counter exists or the new one is successfully   *
  *           added, a pointer to that counter is returned, NULL otherwise     *
  *                                                                            *
  ******************************************************************************/
@@ -151,7 +151,7 @@ zbx_perf_counter_data_t	*add_perf_counter(const char *name, const char *counterp
 		char	*alias_name;
 
 		alias_name = zbx_dsprintf(NULL, "__UserPerfCounter[%s]", name);
-		add_alias(name, alias_name);
+		zbx_add_alias(name, alias_name);
 		zbx_free(alias_name);
 	}
 out:
@@ -163,8 +163,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: extend_perf_counter_interval                                     *
  *                                                                            *
  * Purpose: extends the performance counter buffer to store the new data      *
  *          interval                                                          *
@@ -212,8 +210,6 @@ static void	free_object_names(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: set_object_names                                                 *
- *                                                                            *
  * Purpose: obtains PDH object localized names and associates them with       *
  *          English names, to be used by perf_instance_en.discovery           *
  *                                                                            *
@@ -253,8 +249,8 @@ static int	set_object_names(void)
 	if (TRUE == refresh)
 		ppsd.lastrefresh_objects = time(NULL);
 
-	if (NULL == (p_eng = names_eng = get_all_counter_names(HKEY_PERFORMANCE_TEXT, L"Counter")) ||
-			NULL == (p_loc = names_loc = get_all_counter_names(HKEY_PERFORMANCE_NLSTEXT, L"Counter")))
+	if (NULL == (p_eng = names_eng = zbx_get_all_counter_names(HKEY_PERFORMANCE_TEXT, L"Counter")) ||
+			NULL == (p_loc = names_loc = zbx_get_all_counter_names(HKEY_PERFORMANCE_NLSTEXT, L"Counter")))
 	{
 		goto out;
 	}
@@ -452,17 +448,14 @@ int	init_perf_collector(zbx_threadedness_t threadedness, char **error)
 	ppsd.lastrefresh_objects = 0;
 	ppsd.lastupdate_names = 0;
 
-	if (SUCCEED != init_builtin_counter_indexes())
+	if (SUCCEED != zbx_init_builtin_counter_indexes())
 	{
 		*error = zbx_strdup(*error, "cannot initialize built-in counter indexes");
 		goto out;
 	}
 
 	if (SUCCEED != set_object_names())
-	{
-		*error = zbx_strdup(*error, "cannot initialize object names");
-		goto out;
-	}
+		zabbix_log(LOG_LEVEL_WARNING, "%s(): cannot initialize object names", __func__);
 
 	ret = SUCCEED;
 out:
@@ -627,8 +620,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: get_perf_counter_value_by_name                                   *
- *                                                                            *
  * Purpose: gets average named performance counter value                      *
  *                                                                            *
  * Parameters: name  - [IN] the performance counter name                      *
@@ -689,7 +680,7 @@ out:
 	if (NULL != counterpath)
 	{
 		/* request counter value directly from Windows performance counters */
-		PDH_STATUS pdh_status = calculate_counter_value(__func__, counterpath, perfs->lang, value);
+		PDH_STATUS pdh_status = zbx_calculate_counter_value(__func__, counterpath, perfs->lang, value);
 
 		if (PDH_NOT_IMPLEMENTED == pdh_status)
 			*error = zbx_strdup(*error, "Counter is not supported for this Microsoft Windows version");
@@ -705,8 +696,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: get_perf_counter_value_by_path                                   *
  *                                                                            *
  * Purpose: gets average performance counter value                            *
  *                                                                            *
@@ -767,7 +756,7 @@ out:
 	if (SUCCEED != ret && NULL != perfs)
 	{
 		/* request counter value directly from Windows performance counters */
-		if (ERROR_SUCCESS == calculate_counter_value(__func__, counterpath, lang, value))
+		if (ERROR_SUCCESS == zbx_calculate_counter_value(__func__, counterpath, lang, value))
 			ret = SUCCEED;
 	}
 
@@ -777,8 +766,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: get_perf_counter_value                                           *
  *                                                                            *
  * Purpose: gets average value of the specified performance counter interval  *
  *                                                                            *
@@ -878,8 +865,6 @@ static wchar_t	*get_object_name(char *eng_name)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: get_object_name_local                                            *
  *                                                                            *
  * Purpose: get localized name of the object                                  *
  *                                                                            *

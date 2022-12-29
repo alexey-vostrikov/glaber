@@ -2,7 +2,7 @@
 // id1->id2 indexes whith back-linking to allow correctly
 // id1 ( keys) and id2 ( values )
 // it's based on glb_elems implementation to work in shm with as less locking as possible
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "log.h"
 

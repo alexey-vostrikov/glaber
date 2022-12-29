@@ -16,7 +16,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxcommon.h"
 
 #include "zbxalgo.h"
 #include "glb_state.h"
@@ -1594,4 +1594,8 @@ ELEMS_CALLBACK(get_valuetype_cb) {
 
 int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+void	zbx_vc_remove_items_by_ids(zbx_vector_uint64_t *itemids) {
+    
 }

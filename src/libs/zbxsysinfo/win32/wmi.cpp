@@ -17,15 +17,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "sysinc.h"
+#include "zbxsysinc.h"
 
 extern "C"
 {
-#	include "common.h"
-#	include "sysinfo.h"
+#	include "../sysinfo.h"
+#	include "zbxstr.h"
 #	include "log.h"
 #	include "zbxalgo.h"
-#	include "../../zbxalgo/vectorimpl.h"
 #	include "zbxjson.h"
 #	include "cfg.h"
 }
@@ -112,9 +111,44 @@ extern "C" void	zbx_co_uninitialize()
 		CoUninitialize();
 }
 
+extern "C" static void	get_error_code_text(HRESULT hres, char **error)
+{
+	IWbemStatusCodeText	*pStatus = NULL;
+	SCODE			sc;
+
+	sc = CoCreateInstance(CLSID_WbemStatusCodeText, 0, CLSCTX_INPROC_SERVER, IID_IWbemStatusCodeText,
+			(LPVOID *) &pStatus);
+
+	if(S_OK == sc)
+	{
+		BSTR	bstr = 0;
+
+		sc = pStatus->GetErrorCodeText(hres, 0, 0, &bstr);
+		if (S_OK == sc)
+		{
+			*error = zbx_unicode_to_utf8((wchar_t *)bstr);
+			zbx_rtrim(*error, "\n\r");
+			SysFreeString(bstr);
+		}
+		else
+		{
+			*error = zbx_dsprintf(*error, "error code:" ZBX_FS_I64, hres);
+			zabbix_log(LOG_LEVEL_DEBUG, "GetErrorCodeText() failed with code:" ZBX_FS_I64
+					" when retrieving error code for " ZBX_FS_I64, sc, hres);
+		}
+	}
+	else
+	{
+		*error = zbx_dsprintf(*error, "error code:" ZBX_FS_I64, hres);
+		zabbix_log(LOG_LEVEL_DEBUG, "CoCreateInstance() failed with code:" ZBX_FS_I64
+				" when retrieving error code for:" ZBX_FS_I64, sc, hres);
+	}
+
+	if (NULL != pStatus)
+		pStatus->Release();
+}
+
 /******************************************************************************
- *                                                                            *
- * Function: parse_first_first                                                *
  *                                                                            *
  * Purpose: extract only one value from the search result                     *
  *                                                                            *
@@ -124,7 +158,7 @@ extern "C" void	zbx_co_uninitialize()
  *             error       - [OUT] the error description                      *
  *                                                                            *
  * Return value: SYSINFO_RET_OK   - wmi_values contains the retrieved value   *
- *               SYSINFO_RET_FAIL - retreiving WMI value failed               *
+ *               SYSINFO_RET_FAIL - retrieving WMI value failed               *
  *                                                                            *
  * Comments: one value is the value from the first property of the first      *
  *           instance from search result                                      *
@@ -149,7 +183,13 @@ extern "C" static int	parse_first_first(IEnumWbemClassObject *pEnumerator, doubl
 		goto out2;
 	}
 
-	if (FAILED(hres) || 0 == uReturn)
+	if (FAILED(hres))
+	{
+		get_error_code_text(hres, error);
+		goto out2;
+	}
+
+	if (0 == uReturn)
 		goto out2;
 
 	hres = pclsObj->BeginEnumeration(WBEM_FLAG_NONSYSTEM_ONLY);
@@ -189,13 +229,11 @@ extern "C" static int	parse_first_first(IEnumWbemClassObject *pEnumerator, doubl
 	zbx_vector_wmi_instance_append(wmi_values, inst_val);
 out1:
 	pclsObj->Release();
-out2:	
+out2:
 	return ret;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: parse_all                                                        *
  *                                                                            *
  * Purpose: extract all values from the search result                         *
  *                                                                            *
@@ -205,7 +243,7 @@ out2:
  *             error       - [OUT] the error description                      *
  *                                                                            *
  * Return value: SYSINFO_RET_OK   - wmi_values contains the retrieved values  *
- *               SYSINFO_RET_FAIL - retreiving WMI value failed               *
+ *               SYSINFO_RET_FAIL - retrieving WMI value failed               *
  *                                                                            *
  ******************************************************************************/
 extern "C" static int	parse_all(IEnumWbemClassObject *pEnumerator, double timeout,
@@ -233,7 +271,13 @@ extern "C" static int	parse_all(IEnumWbemClassObject *pEnumerator, double timeou
 		if (WBEM_S_FALSE == hres && 0 == uReturn)
 			return SYSINFO_RET_OK;
 
-		if (FAILED(hres) || 0 == uReturn)
+		if (FAILED(hres))
+		{
+			get_error_code_text(hres, error);
+			return ret;
+		}
+
+		if (0 == uReturn)
 			return ret;
 
 		hres = pclsObj->BeginEnumeration(WBEM_FLAG_NONSYSTEM_ONLY);
@@ -281,8 +325,6 @@ extern "C" static int	parse_all(IEnumWbemClassObject *pEnumerator, double timeou
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_wmi_get_variant                                              *
  *                                                                            *
  * Purpose: retrieves WMI value and stores it in the provided memory location *
  *                                                                            *
@@ -373,8 +415,6 @@ exit:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_wmi_get                                                      *
- *                                                                            *
  * Purpose: wrapper function for zbx_wmi_get_variant(), stores the retrieved  *
  *          WMI value as UTF-8 encoded string                                 *
  *                                                                            *
@@ -430,18 +470,16 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: WMI_GET                                                          *
- *                                                                            *
  * Purpose: wrapper function for wmi.get metric                               *
  *                                                                            *
  * Parameters: request - [IN] WMI request parameters                          *
  *             result  - [OUT] one value of property from WMI Class           *
  *                                                                            *
  * Return value: SYSINFO_RET_OK   - result contains the retrieved WMI value   *
- *               SYSINFO_RET_FAIL - retreiving WMI value failed               *
+ *               SYSINFO_RET_FAIL - retrieving WMI value failed               *
  *                                                                            *
  ******************************************************************************/
-extern "C" int	WMI_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
+extern "C" int	wmi_get(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char				*wmi_namespace, *wmi_query, *error = NULL;
 	VARIANT				*vtProp;
@@ -549,8 +587,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: proc_arr_element                                                 *
  *                                                                            *
  * Purpose: take one element from array and put value to JSON document        *
  *                                                                            *
@@ -686,8 +722,6 @@ extern "C" int	proc_arr_element(SAFEARRAY *sa, LONG *index, const char *prop_err
 
 /******************************************************************************
  *                                                                            *
- * Function: convert_wmiarray_json                                            *
- *                                                                            *
  * Purpose: transformation of variant array from WMI search result to JSON    *
  *                                                                            *
  * Parameters: vtProp     - [IN] variant WMI property value                   *
@@ -756,8 +790,6 @@ extern "C" int	convert_wmiarray_json(VARIANT *vtProp, const char *prop_name, ULO
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: put_variant_json                                                 *
  *                                                                            *
  * Purpose: copy value of VARIANT type to JSON document                       *
  *                                                                            *
@@ -850,8 +882,6 @@ extern "C" int	put_variant_json(const char *prop_json, const char *prop_err, VAR
 
 /******************************************************************************
  *                                                                            *
- * Function: convert_wmi_json                                                 *
- *                                                                            *
  * Purpose: transformation of WMI search result to JSON                       *
  *                                                                            *
  * Parameters: wmi_values - [IN] WMI search result                            *
@@ -897,12 +927,11 @@ extern "C" int	convert_wmi_json(zbx_vector_wmi_instance_t *wmi_values, char **js
 	}
 
 	zbx_json_free(&j);
+
 	return ret;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: WMI_GETALL                                                       *
  *                                                                            *
  * Purpose: wrapper function for wmi.getall metric                            *
  *                                                                            *
@@ -913,7 +942,7 @@ extern "C" int	convert_wmi_json(zbx_vector_wmi_instance_t *wmi_values, char **js
  *               SYSINFO_RET_FAIL - retrieving WMI value failed               *
  *                                                                            *
  ******************************************************************************/
-extern "C" int	WMI_GETALL(AGENT_REQUEST *request, AGENT_RESULT *result)
+extern "C" int	wmi_getall(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char				*wmi_namespace, *wmi_query, *jd = NULL, *error = NULL;
 	int				ret = SYSINFO_RET_FAIL;

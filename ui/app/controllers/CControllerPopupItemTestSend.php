@@ -114,7 +114,7 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 			$testable_item_types = self::getTestableItemTypes($this->getInput('hostid', '0'));
 			$this->get_value_from_host = (bool) $this->getInput('get_value');
 			$this->item_type = $this->hasInput('item_type') ? $this->getInput('item_type') : -1;
-			$this->preproc_item = self::getPreprocessingItemClassInstance($this->getInput('test_type'));
+			$this->test_type = $this->getInput('test_type');
 			$this->is_item_testable = in_array($this->item_type, $testable_item_types);
 
 			$interface = $this->getInput('interface', []);
@@ -158,9 +158,32 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 			}
 
 			// Check preprocessing steps.
-			if ($steps && ($error = $this->preproc_item->validateItemPreprocessingSteps($steps)) !== true) {
-				error($error);
-				$ret = false;
+			if ($steps) {
+				if ($this->test_type == self::ZBX_TEST_TYPE_LLD) {
+					$lld_instance = new CDiscoveryRule();
+					$steps_validation_response = $lld_instance->validateItemPreprocessingSteps($steps);
+
+					if ($steps_validation_response !== true) {
+						error($steps_validation_response);
+						$ret = false;
+					}
+				}
+				else {
+					switch ($this->test_type) {
+						case self::ZBX_TEST_TYPE_ITEM:
+							$api_input_rules = CItem::getPreprocessingValidationRules();
+							break;
+
+						case self::ZBX_TEST_TYPE_ITEM_PROTOTYPE:
+							$api_input_rules = CItemPrototype::getPreprocessingValidationRules();
+							break;
+					}
+
+					if (!CApiInputValidator::validate($api_input_rules, $steps, '/', $error)) {
+						error($error);
+						$ret = false;
+					}
+				}
 			}
 
 			// Check previous time.
@@ -201,18 +224,15 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 			}
 		}
 
-		if (($messages = getMessages()) !== null) {
+		if ($messages = array_column(get_and_clear_messages(), 'message')) {
 			$this->setResponse(
-				(new CControllerResponseData([
-					'main_block' => json_encode([
-						'messages' => $messages->toString(),
-						'steps' => [],
-						'user' => [
-							'debug_mode' => $this->getDebugMode()
-						]
-					])
-				]))->disableView()
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => $messages
+					]
+				])])
 			);
+
 			$ret = false;
 		}
 
@@ -224,7 +244,7 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 
 		/*
 		 * Define values used to test preprocessing steps.
-		 * Steps array can be empty if only value convertation is tested.
+		 * Steps array can be empty if only value conversion is tested.
 		 */
 		$preproc_test_data = [
 			'value' => $this->getInput('value', ''),
@@ -352,8 +372,8 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 				}
 			}
 
-			if (($messages = getMessages(false)) !== null) {
-				$output['messages'] = $messages->toString();
+			if ($messages = get_and_clear_messages()) {
+				$output['error']['messages'] = array_column($messages, 'message');
 			}
 		}
 		else {
@@ -363,7 +383,7 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 		// Test preprocessing steps.
 		$this->eol = parent::getInput('eol', ZBX_EOL_LF);
 
-		if (!array_key_exists('messages', $output)) {
+		if (!array_key_exists('error', $output)) {
 			$preproc_test_data['value_type'] = $this->getInput('value_type', ITEM_VALUE_TYPE_STR);
 
 			$preproc_test_data['steps'] = $this->resolvePreprocessingStepMacros($preproc_test_data['steps']);
@@ -384,7 +404,7 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 
 				foreach ($preproc_test_data['steps'] as $i => &$step) {
 					if ($test_failed) {
-						// If test is failed, proceesing steps are skipped from results.
+						// If test is failed, processing steps are skipped from results.
 						unset($preproc_test_data['steps'][$i]);
 						continue;
 					}
@@ -447,11 +467,11 @@ class CControllerPopupItemTestSend extends CControllerPopupItemTest {
 				$output['steps'] = $preproc_test_data['steps'];
 			}
 
-			if (($messages = getMessages(false)) !== null) {
-				$output['messages'] = $messages->toString();
+			if ($messages = get_and_clear_messages()) {
+				$output['error']['messages'] = array_column($messages, 'message');
 			}
 		}
 
-		$this->setResponse((new CControllerResponseData(['main_block' => json_encode($output)]))->disableView());
+		$this->setResponse(new CControllerResponseData(['main_block' => json_encode($output)]));
 	}
 }

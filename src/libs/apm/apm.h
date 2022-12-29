@@ -29,7 +29,7 @@ monitoring */
 #ifndef APM_IPC_H
 #define APM_IPC_H
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 
 #define APM_UPDATE_TIEMOUT  1000

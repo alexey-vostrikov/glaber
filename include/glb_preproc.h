@@ -21,7 +21,7 @@
 #ifndef GLB_PREPROC_H
 #define GLB_PREPROC_H
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "metric.h"
 
 int preproc_ipc_init(size_t ipc_mem_size);

@@ -2,6 +2,7 @@
 
 DIST_SUBDIRS = \
 	agent \
+	alias \
 	common \
 	aix \
 	freebsd \
@@ -17,6 +18,7 @@ DIST_SUBDIRS = \
 
 SUBDIRS = \
 	agent \
+	alias \
 	common \
 	simple \
 	$(ARCH)
@@ -40,6 +42,7 @@ libzbxagentsysinfo_a_CFLAGS = \
 	-DWITH_HOSTNAME_METRIC
 
 libzbxagentsysinfo_a_SOURCES = \
+	sysinfo.h \
 	specsysinfo.h \
 	sysinfo.c
 
@@ -49,7 +52,7 @@ libzbxagent2sysinfo_a_CFLAGS = \
 	-DWITH_AGENT2_METRICS
 
 libzbxagent2sysinfo_a_SOURCES = \
-	sysinfo.c
+		sysinfo.c
 
 # SERVER version of sysinfo library
 libzbxserversysinfo_a_CFLAGS = \

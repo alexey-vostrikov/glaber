@@ -140,17 +140,17 @@ function BR() {
 
 function get_icon($type, $params = []) {
 	switch ($type) {
-		case 'favourite':
+		case 'favorite':
 			if (CFavorite::exists($params['fav'], $params['elid'], $params['elname'])) {
 				$icon = (new CRedirectButton(SPACE, null))
 					->addClass(ZBX_STYLE_BTN_REMOVE_FAV)
-					->setTitle(_('Remove from favourites'))
+					->setTitle(_('Remove from favorites'))
 					->onClick('rm4favorites("'.$params['elname'].'", "'.$params['elid'].'");');
 			}
 			else {
 				$icon = (new CRedirectButton(SPACE, null))
 					->addClass(ZBX_STYLE_BTN_ADD_FAV)
-					->setTitle(_('Add to favourites'))
+					->setTitle(_('Add to favorites'))
 					->onClick('add2favorites("'.$params['elname'].'", "'.$params['elid'].'");');
 			}
 			$icon->setId('addrm_fav');
@@ -175,10 +175,6 @@ function get_icon($type, $params = []) {
 			}
 
 			return $icon;
-
-		case 'overviewhelp':
-			return (new CRedirectButton(SPACE, null))
-				->addClass(ZBX_STYLE_BTN_INFO);
 	}
 }
 
@@ -194,7 +190,7 @@ function get_icon($type, $params = []) {
 function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 	$options = [
 		'output' => [
-			'hostid', 'status', 'name', 'maintenance_status', 'flags'
+			'hostid', 'status', 'name', 'maintenance_status', 'flags', 'active_available'
 		],
 		'selectHostDiscovery' => ['ts_delete'],
 		'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error'],
@@ -241,6 +237,25 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 	}
 
 	$db_host = reset($db_host);
+
+	if (!$is_template) {
+		// Get count for item type ITEM_TYPE_ZABBIX_ACTIVE (7).
+		$db_item_active_count = API::Item()->get([
+			'countOutput' => true,
+			'filter' => ['type' => ITEM_TYPE_ZABBIX_ACTIVE],
+			'hostids' => [$hostid]
+		]);
+
+		if ($db_item_active_count > 0) {
+			// Add active checks interface if host have items with type ITEM_TYPE_ZABBIX_ACTIVE (7).
+			$db_host['interfaces'][] = [
+				'type' => INTERFACE_TYPE_AGENT_ACTIVE,
+				'available' => $db_host['active_available'],
+				'error' => ''
+			];
+			unset($db_host['active_available']);
+		}
+	}
 
 	// get lld-rules
 	if ($lld_ruleid != 0) {
@@ -292,22 +307,31 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 				break;
 		}
 
-		$host = new CSpan(new CLink(CHtml::encode($db_host['name']),
-			'hosts.php?form=update&hostid='.$db_host['hostid']
-		));
+		$host = new CSpan(
+			(new CLink(CHtml::encode($db_host['name']),
+				(new CUrl('zabbix.php'))
+					->setArgument('action', 'host.edit')
+					->setArgument('hostid', $db_host['hostid'])
+				)
+			)
+			->setAttribute('data-hostid', $db_host['hostid'])
+			->onClick('view.editHost(event, this.dataset.hostid);')
+		);
+
+		if ($current_element === '') {
+			$host->addClass(ZBX_STYLE_SELECTED);
+		}
 
 		$latest_link = (new CLink(_('Latest data'),
 					(new CUrl('zabbix.php'))
 						->setArgument('action', 'latest.view')
 						->setArgument('filter_set', '1')
 						->setArgument('filter_hostids', [$db_host['hostid']]) ));
-		
-		if ($current_element === '') {
-			$host->addClass(ZBX_STYLE_SELECTED);
-		}
 
 		$list
-			->addItem(new CBreadcrumbs([new CSpan($host)]))
+			->addItem(new CBreadcrumbs([new CSpan(new CLink(_('All hosts'),
+				(new CUrl('zabbix.php'))->setArgument('action', 'host.list'))), $host
+			]))
 			->addItem($status)
 			->addItem(getHostAvailabilityTable($db_host['interfaces']))
 			->addItem($latest_link);
@@ -582,24 +606,11 @@ function makeFormFooter(CButtonInterface $main_button = null, array $other_butto
 /**
  * Create HTML helper element for host interfaces availability.
  *
- * @param array $host_interfaces                                Array of arrays of host interfaces.
- * @param int   $host_interfaces[]['type']                      Interface type.
- * @param int   $host_interfaces[]['available']                 Interface availability.
- * @param int   $host_interfaces[]['useip']                     Interface use IP or DNS.
- * @param int   $host_interfaces[]['ip']                        Interface IP address.
- * @param int   $host_interfaces[]['dns']                       Interface domain name.
- * @param int   $host_interfaces[]['port']                      Interface port.
- * @param int   $host_interfaces[]['details']['version']        Interface SNMP version.
- * @param int   $host_interfaces[]['details']['contextname']    Interface context name for SNMP version 3.
- * @param int   $host_interfaces[]['details']['community']      Interface community for SNMP non version 3 interface.
- * @param int   $host_interfaces[]['details']['securitylevel']  Security level for SNMP version 3 interface.
- * @param int   $host_interfaces[]['details']['authprotocol']   Authentication protocol for SNMP version 3 interface.
- * @param int   $host_interfaces[]['details']['privprotocol']   Privacy protocol for SNMP version 3 interface.
- * @param int   $host_interfaces[]['error']                     Interface error message.
+ * @param array $host_interfaces
  *
  * @return CHostAvailability
  */
-function getHostAvailabilityTable($host_interfaces): CHostAvailability {
+function getHostAvailabilityTable(array $host_interfaces): CHostAvailability {
 	$interfaces = [];
 
 	foreach ($host_interfaces as $interface) {
@@ -802,11 +813,11 @@ function makePageFooter($with_version = true) {
 /**
  * Get drop-down submenu item list for the User settings section.
  *
- * @return array|null  Menu definition for CWidget::setTitleSubmenu.
+ * @return array  Menu definition for CHtmlPage::setTitleSubmenu.
  */
-function getUserSettingsSubmenu(): ?array {
+function getUserSettingsSubmenu(): array {
 	if (!CWebUser::checkAccess(CRoleHelper::ACTIONS_MANAGE_API_TOKENS)) {
-		return null;
+		return [];
 	}
 
 	$profile_url = (new CUrl('zabbix.php'))
@@ -830,7 +841,7 @@ function getUserSettingsSubmenu(): ?array {
 /**
  * Get drop-down submenu item list for the Administration->General section.
  *
- * @return array  Menu definition for CWidget::setTitleSubmenu.
+ * @return array  Menu definition for CHtmlPage::setTitleSubmenu.
  */
 function getAdministrationGeneralSubmenu() {
 	$gui_url = (new CUrl('zabbix.php'))
@@ -839,10 +850,6 @@ function getAdministrationGeneralSubmenu() {
 
 	$autoreg_url = (new CUrl('zabbix.php'))
 		->setArgument('action', 'autoreg.edit')
-		->getUrl();
-
-	$housekeeping_url = (new CUrl('zabbix.php'))
-		->setArgument('action', 'housekeeping.edit')
 		->getUrl();
 
 	$image_url = (new CUrl('zabbix.php'))
@@ -857,42 +864,34 @@ function getAdministrationGeneralSubmenu() {
 		->setArgument('action', 'regex.list')
 		->getUrl();
 
-	$macros_url = (new CUrl('zabbix.php'))
-		->setArgument('action', 'macros.edit')
-		->getUrl();
-
 	$trigdisplay_url = (new CUrl('zabbix.php'))
 		->setArgument('action', 'trigdisplay.edit')
+		->getUrl();
+
+	$geomap_url = (new CUrl('zabbix.php'))
+		->setArgument('action', 'geomaps.edit')
 		->getUrl();
 
 	$modules_url = (new CUrl('zabbix.php'))
 		->setArgument('action', 'module.list')
 		->getUrl();
 
-	$tokens_url = (new CUrl('zabbix.php'))
-		->setArgument('action', 'token.list')
-		->getUrl();
-
 	$miscconfig_url = (new CUrl('zabbix.php'))
 		->setArgument('action', 'miscconfig.edit')
 		->getUrl();
 
-	$can_access_tokens = (!CWebUser::isGuest() && CWebUser::checkAccess(CRoleHelper::ACTIONS_MANAGE_API_TOKENS));
-
 	return [
 		'main_section' => [
 			'items' => array_filter([
-				$gui_url          => _('GUI'),
-				$autoreg_url      => _('Autoregistration'),
-				$housekeeping_url => _('Housekeeping'),
-				$image_url        => _('Images'),
-				$iconmap_url      => _('Icon mapping'),
-				$regex_url        => _('Regular expressions'),
-				$macros_url       => _('Macros'),
-				$trigdisplay_url  => _('Trigger displaying options'),
-				$modules_url      => _('Modules'),
-				$tokens_url       => $can_access_tokens ? _('API tokens') : null,
-				$miscconfig_url   => _('Other')
+				$gui_url            => _('GUI'),
+				$autoreg_url        => _('Autoregistration'),
+				$image_url          => _('Images'),
+				$iconmap_url        => _('Icon mapping'),
+				$regex_url          => _('Regular expressions'),
+				$trigdisplay_url    => _('Trigger displaying options'),
+				$geomap_url			=> _('Geographical maps'),
+				$modules_url        => _('Modules'),
+				$miscconfig_url     => _('Other')
 			])
 		]
 	];
@@ -914,10 +913,10 @@ function makeInformationList($info_icons) {
  *
  * @param string $message
  *
- * @return CSpan
+ * @return CLink
  */
 function makeInformationIcon($message) {
-	return (new CSpan())
+	return (new CLink())
 		->addClass(ZBX_STYLE_ICON_INFO)
 		->addClass(ZBX_STYLE_STATUS_GREEN)
 		->setHint($message, ZBX_STYLE_HINTBOX_WRAP);
@@ -930,7 +929,7 @@ function makeInformationIcon($message) {
  * @param string $name         Name of the maintenance.
  * @param string $description  Description of the maintenance.
  *
- * @return CSpan
+ * @return CLink
  */
 function makeMaintenanceIcon($type, $name, $description) {
 	$hint = $name.' ['.($type
@@ -941,9 +940,8 @@ function makeMaintenanceIcon($type, $name, $description) {
 		$hint .= "\n".$description;
 	}
 
-	return (new CSpan())
-		->addClass(ZBX_STYLE_ICON_MAINT)
-		->addClass(ZBX_STYLE_CURSOR_POINTER)
+	return (new CLink())
+		->addClass(ZBX_STYLE_ICON_MAINTENANCE)
 		->setHint($hint);
 }
 
@@ -953,25 +951,48 @@ function makeMaintenanceIcon($type, $name, $description) {
  * @param array  $icon_data
  * @param string $icon_data[]['suppress_until']    Time until the problem is suppressed.
  * @param string $icon_data[]['maintenance_name']  Name of the maintenance.
+ * @param string $icon_data[]['username']          User who created manual suppression.
+ * @param bool   $blink                            Add 'blink' CSS class for jqBlink.
  *
- * @return CSpan
+ * @return CLink
  */
-function makeSuppressedProblemIcon(array $icon_data) {
-	$suppress_until = max(zbx_objectValues($icon_data, 'suppress_until'));
+function makeSuppressedProblemIcon(array $icon_data, bool $blink = false) {
+	$suppress_until_values = array_column($icon_data, 'suppress_until');
+
+	if (in_array(ZBX_PROBLEM_SUPPRESS_TIME_INDEFINITE, $suppress_until_values)) {
+		$suppressed_till = _s('Indefinitely');
+	}
+	else {
+		$max_value = max($suppress_until_values);
+		$suppressed_till = $max_value < strtotime('tomorrow')
+			? zbx_date2str(TIME_FORMAT, $max_value)
+			: zbx_date2str(DATE_TIME_FORMAT, $max_value);
+	}
 
 	CArrayHelper::sort($icon_data, ['maintenance_name']);
-	$maintenance_names = implode(', ', zbx_objectValues($icon_data, 'maintenance_name'));
 
-	return (new CSpan())
-		->addClass(ZBX_STYLE_ICON_INVISIBLE)
-		->addClass(ZBX_STYLE_CURSOR_POINTER)
+	$maintenance_names = [];
+	$username = '';
+
+	foreach ($icon_data as $suppression) {
+		if (array_key_exists('maintenance_name', $suppression)) {
+			$maintenance_names[] = $suppression['maintenance_name'];
+		}
+		else {
+			$username = $suppression['username'];
+		}
+	}
+
+	$maintenances = implode(',', $maintenance_names);
+
+	return (new CSimpleButton())
+		->addClass(ZBX_STYLE_ACTION_ICON_SUPPRESS)
+		->addClass($blink ? 'blink' : null)
 		->setHint(
-			_s('Suppressed till: %1$s', ($suppress_until < strtotime('tomorrow'))
-				? zbx_date2str(TIME_FORMAT, $suppress_until)
-				: zbx_date2str(DATE_TIME_FORMAT, $suppress_until)
-			).
+			_s('Suppressed till: %1$s', $suppressed_till).
 			"\n".
-			_s('Maintenance: %1$s', $maintenance_names)
+			($username !== '' ? _s('Manually by: %1$s', $username)."\n" : '').
+			($maintenances !== '' ? _s('Maintenance: %1$s', $maintenances)."\n" : '')
 		);
 }
 
@@ -1025,12 +1046,11 @@ function makeActionIcon(array $icon_data): CTag {
  *
  * @param string $description
  *
- * @return CSpan
+ * @return CLink
  */
 function makeDescriptionIcon($description) {
-	return (new CSpan())
+	return (new CLink())
 		->addClass(ZBX_STYLE_ICON_DESCRIPTION)
-		->addClass(ZBX_STYLE_CURSOR_POINTER)
 		->setHint(zbx_str2links($description), ZBX_STYLE_HINTBOX_WRAP);
 }
 
@@ -1039,27 +1059,26 @@ function makeDescriptionIcon($description) {
  *
  * @param string $error
  *
- * @return CSpan
+ * @return CLink
  */
 function makeErrorIcon($error) {
-	return (new CSpan())
+	return (new CLink())
 		->addClass(ZBX_STYLE_ICON_INFO)
 		->addClass(ZBX_STYLE_STATUS_RED)
 		->setHint($error, ZBX_STYLE_HINTBOX_WRAP." ".ZBX_STYLE_RED);
 }
 
 /**
- * Renders an unknown icon like grey [i] with error message
+ * Renders an icon with question mark and text in hint.
  *
- * @param string $error
+ * @param string|array|CTag $help_text
  *
- * @return CSpan
+ * @return CLink
  */
-function makeUnknownIcon($error) {
-	return (new CSpan())
-		->addClass(ZBX_STYLE_ICON_INFO)
-		->addClass(ZBX_STYLE_STATUS_DARK_GREY)
-		->setHint($error, ZBX_STYLE_HINTBOX_WRAP." ".ZBX_STYLE_RED);
+function makeHelpIcon($help_text): CLink {
+	return (new CLink())
+		->addClass(ZBX_STYLE_ICON_HELP_HINT)
+		->setHint($help_text, ZBX_STYLE_HINTBOX_WRAP);
 }
 
 /**
@@ -1067,10 +1086,10 @@ function makeUnknownIcon($error) {
  *
  * @param string $error
  *
- * @return CSpan
+ * @return CLink
  */
 function makeWarningIcon($error) {
-	return (new CSpan())
+	return (new CLink())
 		->addClass(ZBX_STYLE_ICON_INFO)
 		->addClass(ZBX_STYLE_STATUS_YELLOW)
 		->setHint($error, ZBX_STYLE_HINTBOX_WRAP);
@@ -1092,6 +1111,12 @@ function getTriggerSeverityCss() {
 		ZBX_STYLE_HIGH_BG => CSettingsHelper::getGlobal(CSettingsHelper::SEVERITY_COLOR_4),
 		ZBX_STYLE_DISASTER_BG => CSettingsHelper::getGlobal(CSettingsHelper::SEVERITY_COLOR_5)
 	];
+
+	$css .= ':root {'."\n";
+	foreach ($severities as $class => $color) {
+		$css .= '--severity-color-'.$class.': #'.$color.';'."\n";
+	}
+	$css .= '}'."\n";
 
 	foreach ($severities as $class => $color) {
 		$css .= '.'.$class.', .'.$class.' input[type="radio"]:checked + label, .'.$class.':before, .flh-'.$class.

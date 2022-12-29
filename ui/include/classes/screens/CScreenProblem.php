@@ -164,7 +164,7 @@ class CScreenProblem extends CScreenBase {
 				if ($filter_groupids === null) {
 					$filter_groupids = array_keys(API::HostGroup()->get([
 						'output' => [],
-						'real_hosts' => true,
+						'with_hosts' => true,
 						'preservekeys' => true
 					]));
 				}
@@ -258,7 +258,6 @@ class CScreenProblem extends CScreenBase {
 			}
 			if (array_key_exists('show_suppressed', $filter) && $filter['show_suppressed']) {
 				unset($options['suppressed']);
-				$options['selectSuppressionData'] = ['maintenanceid', 'suppress_until'];
 			}
 
 			$problems = ($filter['show'] == TRIGGERS_OPTION_ALL)
@@ -270,10 +269,6 @@ class CScreenProblem extends CScreenBase {
 			if ($problems) {
 				$eventid_till = end($problems)['eventid'] - 1;
 				$triggerids = [];
-
-				if (array_key_exists('show_suppressed', $filter) && $filter['show_suppressed']) {
-					self::addMaintenanceNames($problems);
-				}
 
 				foreach ($problems as $problem) {
 					if (!array_key_exists($problem['objectid'], $seen_triggerids)) {
@@ -332,7 +327,7 @@ class CScreenProblem extends CScreenBase {
 
 		if ($show_opdata && $data['triggers']) {
 			$items = API::Item()->get([
-				'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'units'],
+				'output' => ['itemid', 'name', 'value_type', 'units'],
 				'selectValueMap' => ['mappings'],
 				'triggerids' => array_keys($data['triggers']),
 				'webitems' => true,
@@ -352,21 +347,26 @@ class CScreenProblem extends CScreenBase {
 	}
 
 	/**
-	 * Adds maintenance names of suppressed problems.
+	 * Adds a user or maintenance names of suppressed problems.
 	 *
 	 * @param array $problems
 	 * @param array $problems[]['suppression_data']
 	 * @param int   $problems[]['suppression_data'][]['maintenanceid']
+	 * @param int   $problems[]['suppression_data'][]['userid']
 	 *
 	 * @static
 	 */
-	public static function addMaintenanceNames(array &$problems) {
+	public static function addSuppressionNames(array &$problems) {
 		$maintenanceids = [];
+		$userids = [];
 
 		foreach ($problems as $problem) {
-			if (array_key_exists('suppression_data', $problem) && $problem['suppression_data']) {
-				foreach ($problem['suppression_data'] as $data) {
+			foreach ($problem['suppression_data'] as $data) {
+				if ($data['maintenanceid'] != 0) {
 					$maintenanceids[] = $data['maintenanceid'];
+				}
+				elseif ($data['userid'] != 0) {
+					$userids[] = $data['userid'];
 				}
 			}
 		}
@@ -377,19 +377,31 @@ class CScreenProblem extends CScreenBase {
 				'maintenanceids' => $maintenanceids,
 				'preservekeys' => true
 			]);
+		}
 
-			foreach ($problems as &$problem) {
-				if (array_key_exists('suppression_data', $problem) && $problem['suppression_data']) {
-					foreach ($problem['suppression_data'] as &$data) {
-						$data['maintenance_name'] = array_key_exists($data['maintenanceid'], $maintenances)
-							? $maintenances[$data['maintenanceid']]['name']
-							: _('Inaccessible maintenance');
-					}
-					unset($data);
+		if ($userids) {
+			$users = API::User()->get([
+				'output' => ['username', 'name', 'surname'],
+				'userids' => $userids,
+				'preservekeys' => true
+			]);
+		}
+
+		foreach ($problems as &$problem) {
+			foreach ($problem['suppression_data'] as &$data) {
+				if ($data['maintenanceid'] != 0) {
+					$data['maintenance_name'] = $maintenances[$data['maintenanceid']]['name'];
+				}
+				elseif ($data['userid'] != 0 && array_key_exists($data['userid'], $users)) {
+					$data['username'] = getUserFullname($users[$data['userid']]);
+				}
+				else {
+					$data['username'] = _('Inaccessible user');
 				}
 			}
-			unset($problem);
+			unset($data);
 		}
+		unset($problem);
 	}
 
 	/**
@@ -473,7 +485,10 @@ class CScreenProblem extends CScreenBase {
 		$events = API::Event()->get([
 			'output' => ['eventid', 'r_eventid', 'acknowledged'],
 			'selectTags' => ['tag', 'value'],
-			'select_acknowledges' => ['userid', 'clock', 'message', 'action', 'old_severity', 'new_severity'],
+			'select_acknowledges' => ['userid', 'clock', 'message', 'action', 'old_severity', 'new_severity',
+				'suppress_until'
+			],
+			'selectSuppressionData' => ['maintenanceid', 'userid', 'suppress_until'],
 			'source' => EVENT_SOURCE_TRIGGERS,
 			'object' => EVENT_OBJECT_TRIGGER,
 			'eventids' => $eventids,
@@ -527,7 +542,10 @@ class CScreenProblem extends CScreenBase {
 		return API::Problem()->get([
 			'output' => ['eventid', 'r_eventid', 'r_clock', 'r_ns', 'correlationid', 'userid', 'acknowledged'],
 			'selectTags' => ['tag', 'value'],
-			'selectAcknowledges' => ['userid', 'clock', 'message', 'action', 'old_severity', 'new_severity'],
+			'selectAcknowledges' => ['userid', 'clock', 'message', 'action', 'old_severity', 'new_severity',
+				'suppress_until'
+			],
+			'selectSuppressionData' => ['maintenanceid', 'userid', 'suppress_until'],
 			'source' => EVENT_SOURCE_TRIGGERS,
 			'object' => EVENT_OBJECT_TRIGGER,
 			'eventids' => $eventids,
@@ -586,11 +604,6 @@ class CScreenProblem extends CScreenBase {
 			// Sort items.
 			if ($filter['show_opdata'] != OPERATIONAL_DATA_SHOW_NONE) {
 				$data['triggers'] = CMacrosResolverHelper::sortItemsByExpressionOrder($data['triggers']);
-
-				foreach ($data['triggers'] as &$trigger) {
-					$trigger['items'] = CMacrosResolverHelper::resolveItemNames($trigger['items']);
-				}
-				unset($trigger);
 			}
 		}
 
@@ -638,6 +651,7 @@ class CScreenProblem extends CScreenBase {
 				$problem['correlationid'] = $problem_data['correlationid'];
 				$problem['userid'] = $problem_data['userid'];
 				$problem['acknowledged'] = $problem_data['acknowledged'];
+				$problem['suppression_data'] = $problem_data['suppression_data'];
 
 				if ($problem['correlationid'] != 0) {
 					$correlationids[$problem['correlationid']] = true;
@@ -651,6 +665,8 @@ class CScreenProblem extends CScreenBase {
 			}
 		}
 		unset($problem);
+
+		self::addSuppressionNames($data['problems']);
 
 		// Possible performance improvement: one API call may be saved, if r_clock for problem will be used.
 		$actions = getEventsActionsIconsData($data['problems'], $data['triggers']);
@@ -700,8 +716,8 @@ class CScreenProblem extends CScreenBase {
 			if ($clock < $today) {
 				$breakpoint = _('Today');
 			}
-			elseif (strftime('%H', $last_clock) != strftime('%H', $clock)) {
-				$breakpoint = strftime('%H:00', $last_clock);
+			elseif (date('H', $last_clock) != date('H', $clock)) {
+				$breakpoint = date('H:00', $last_clock);
 			}
 		}
 		elseif ($last_clock >= $yesterday) {
@@ -710,10 +726,10 @@ class CScreenProblem extends CScreenBase {
 			}
 		}
 		elseif ($last_clock >= $this_year && $clock < $this_year) {
-			$breakpoint = strftime('%Y', $last_clock);
+			$breakpoint = date('Y', $last_clock);
 		}
-		elseif (strftime('%Y%m', $last_clock) != strftime('%Y%m', $clock)) {
-			$breakpoint = getMonthCaption(strftime('%m', $last_clock));
+		elseif (date('Ym', $last_clock) != date('Ym', $clock)) {
+			$breakpoint = getMonthCaption(date('m', $last_clock));
 		}
 
 		if ($breakpoint !== null) {
@@ -756,7 +772,7 @@ class CScreenProblem extends CScreenBase {
 		$data = self::getData($this->data['filter'], true);
 		$data = self::sortData($data, $this->data['sort'], $this->data['sortorder']);
 
-		if ($this->data['action'] === 'problem.view') {
+		if ($this->data['action'] === 'problem.view' || $this->data['action'] === 'problem.view.refresh') {
 			$paging = CPagerHelper::paginate($this->page, $data['problems'], ZBX_SORT_UP, $url);
 		}
 
@@ -788,7 +804,7 @@ class CScreenProblem extends CScreenBase {
 			? OPERATIONAL_DATA_SHOW_NONE
 			: $this->data['filter']['show_opdata'];
 
-		if ($this->data['action'] === 'problem.view') {
+		if ($this->data['action'] === 'problem.view' || $this->data['action'] === 'problem.view.refresh') {
 			$form = (new CForm('post', 'zabbix.php'))
 				->setId('problem_form')
 				->setName('problem')
@@ -832,20 +848,20 @@ class CScreenProblem extends CScreenBase {
 
 			// Create table.
 			if ($this->data['filter']['compact_view']) {
-				if ($this->data['filter']['show_tags'] == PROBLEMS_SHOW_TAGS_NONE) {
+				if ($this->data['filter']['show_tags'] == SHOW_TAGS_NONE) {
 					$tags_header = null;
 				}
 				else {
 					$tags_header = (new CColHeader(_('Tags')));
 
 					switch ($this->data['filter']['show_tags']) {
-						case PROBLEMS_SHOW_TAGS_1:
+						case SHOW_TAGS_1:
 							$tags_header->addClass(ZBX_STYLE_COLUMN_TAGS_1);
 							break;
-						case PROBLEMS_SHOW_TAGS_2:
+						case SHOW_TAGS_2:
 							$tags_header->addClass(ZBX_STYLE_COLUMN_TAGS_2);
 							break;
-						case PROBLEMS_SHOW_TAGS_3:
+						case SHOW_TAGS_3:
 							$tags_header->addClass(ZBX_STYLE_COLUMN_TAGS_3);
 							break;
 					}
@@ -898,7 +914,7 @@ class CScreenProblem extends CScreenBase {
 
 			if ($this->data['filter']['show_tags']) {
 				$tags = makeTags($data['problems'], true, 'eventid', $this->data['filter']['show_tags'],
-					array_key_exists('tags', $this->data['filter']) ? $this->data['filter']['tags'] : [],
+					array_key_exists('tags', $this->data['filter']) ? $this->data['filter']['tags'] : [], null,
 					$this->data['filter']['tag_name_format'], $this->data['filter']['tag_priority']
 				);
 			}
@@ -919,7 +935,8 @@ class CScreenProblem extends CScreenBase {
 				'add_comments' => CWebUser::checkAccess(CRoleHelper::ACTIONS_ADD_PROBLEM_COMMENTS),
 				'change_severity' => CWebUser::checkAccess(CRoleHelper::ACTIONS_CHANGE_SEVERITY),
 				'acknowledge' => CWebUser::checkAccess(CRoleHelper::ACTIONS_ACKNOWLEDGE_PROBLEMS),
-				'close' => CWebUser::checkAccess(CRoleHelper::ACTIONS_CLOSE_PROBLEMS)
+				'close' => CWebUser::checkAccess(CRoleHelper::ACTIONS_CLOSE_PROBLEMS),
+				'suppress' => CWebUser::checkAccess(CRoleHelper::ACTIONS_SUPPRESS_PROBLEMS)
 			];
 
 			// Add problems to table.
@@ -951,8 +968,6 @@ class CScreenProblem extends CScreenBase {
 					$cell_r_clock = '';
 				}
 
-				$can_be_closed = ($trigger['manual_close'] == ZBX_TRIGGER_MANUAL_CLOSE_ALLOWED && $allowed['close']);
-
 				if ($problem['r_eventid'] != 0) {
 					$value = TRIGGER_VALUE_FALSE;
 					$value_str = _('RESOLVED');
@@ -960,16 +975,10 @@ class CScreenProblem extends CScreenBase {
 					$can_be_closed = false;
 				}
 				else {
-					$in_closing = false;
-
-					foreach ($problem['acknowledges'] as $acknowledge) {
-						if (($acknowledge['action'] & ZBX_PROBLEM_UPDATE_CLOSE) == ZBX_PROBLEM_UPDATE_CLOSE) {
-							$in_closing = true;
-							$can_be_closed = false;
-							break;
-						}
-					}
-
+					$in_closing = hasEventCloseAction($problem['acknowledges']);
+					$can_be_closed = ($trigger['manual_close'] == ZBX_TRIGGER_MANUAL_CLOSE_ALLOWED && $allowed['close']
+						&& !$in_closing
+					);
 					$value = $in_closing ? TRIGGER_VALUE_FALSE : TRIGGER_VALUE_TRUE;
 					$value_str = $in_closing ? _('CLOSING') : _('PROBLEM');
 					$value_clock = $in_closing ? time() : $problem['clock'];
@@ -1002,26 +1011,51 @@ class CScreenProblem extends CScreenBase {
 					}
 				}
 
-				if (array_key_exists('suppression_data', $problem) && $problem['suppression_data']) {
-					$info_icons[] = makeSuppressedProblemIcon($problem['suppression_data']);
+				if (array_key_exists('suppression_data', $problem)) {
+					if (count($problem['suppression_data']) == 1
+							&& $problem['suppression_data'][0]['maintenanceid'] == 0
+							&& isEventRecentlyUnsuppressed($problem['acknowledges'], $unsuppression_action)) {
+						// Show blinking button if the last manual suppression was recently revoked.
+						$user_unsuppressed = array_key_exists($unsuppression_action['userid'], $data['users'])
+							? getUserFullname($data['users'][$unsuppression_action['userid']])
+							: _('Inaccessible user');
+
+						$info_icons[] = (new CSimpleButton())
+							->addClass(ZBX_STYLE_ACTION_ICON_UNSUPPRESS)
+							->addClass('blink')
+							->setHint(_s('Unsuppressed by: %1$s', $user_unsuppressed));
+					}
+					elseif ($problem['suppression_data']) {
+						$info_icons[] = makeSuppressedProblemIcon($problem['suppression_data'], false);
+					}
+					elseif (isEventRecentlySuppressed($problem['acknowledges'], $suppression_action)) {
+						// Show blinking button if suppression was made but is not yet processed by server.
+						$info_icons[] = makeSuppressedProblemIcon([[
+							'suppress_until' => $suppression_action['suppress_until'],
+							'username' => array_key_exists($suppression_action['userid'], $data['users'])
+								? getUserFullname($data['users'][$suppression_action['userid']])
+								: _('Inaccessible user')
+						]], true);
+					}
 				}
 
-				$cell_info = ($this->data['filter']['compact_view'] && $this->data['filter']['show_suppressed']
-						&& count($info_icons) > 1)
-					? (new CSpan(
-							(new CButton(null))
-								->addClass(ZBX_STYLE_ICON_WZRD_ACTION)
-								->addStyle('margin-left: -3px;')
-								->setHint((new CDiv($info_icons))->addClass(ZBX_STYLE_REL_CONTAINER))
-							))->addClass(ZBX_STYLE_REL_CONTAINER)
-					: makeInformationList($info_icons);
+				if ($this->data['filter']['compact_view'] && $this->data['filter']['show_suppressed']
+						&& count($info_icons) > 1) {
+					$cell_info = (new CButton(null))
+						->addClass(ZBX_STYLE_ICON_WIZARD_ACTION)
+						->addStyle('margin-left: -3px;')
+						->setHint(makeInformationList($info_icons));
+				}
+				else {
+					$cell_info = makeInformationList($info_icons);
+				}
 
 				$description = array_key_exists($trigger['triggerid'], $dependencies)
 					? makeTriggerDependencies($dependencies[$trigger['triggerid']])
 					: [];
 				$description[] = (new CLinkAction($problem['name']))
-					->addClass(ZBX_STYLE_WORDWRAP)
-					->setMenuPopup(CMenuPopupHelper::getTrigger($trigger['triggerid'], $problem['eventid']));
+					->setMenuPopup(CMenuPopupHelper::getTrigger($trigger['triggerid'], $problem['eventid']))
+					->addClass(ZBX_STYLE_WORDBREAK);
 
 				$opdata = null;
 
@@ -1044,9 +1078,7 @@ class CScreenProblem extends CScreenBase {
 								'events' => true,
 								'html' => true
 							]
-						)))
-							->addClass('opdata')
-							->addClass(ZBX_STYLE_WORDWRAP);
+						)))->addClass('opdata');
 
 						if ($show_opdata == OPERATIONAL_DATA_SHOW_WITH_PROBLEM) {
 							$description[] = ' (';
@@ -1062,8 +1094,10 @@ class CScreenProblem extends CScreenBase {
 					$description[] = BR();
 
 					if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-						$description[] = [_('Problem'), ': ', (new CDiv($trigger['expression_html']))->addClass(ZBX_STYLE_WORDWRAP), BR()];
-						$description[] = [_('Recovery'), ': ', (new CDiv($trigger['recovery_expression_html']))->addClass(ZBX_STYLE_WORDWRAP)];
+						$description[] = [_('Problem'), ': ', (new CDiv($trigger['expression_html']))
+							->addClass(ZBX_STYLE_WORDWRAP), BR()];
+						$description[] = [_('Recovery'), ': ', (new CDiv($trigger['recovery_expression_html']))
+							->addClass(ZBX_STYLE_WORDWRAP)];
 					}
 					else {
 						$description[] = (new CDiv($trigger['expression_html']))->addClass(ZBX_STYLE_WORDWRAP);
@@ -1094,11 +1128,12 @@ class CScreenProblem extends CScreenBase {
 
 				// Create acknowledge link.
 				$problem_update_link = ($allowed['add_comments'] || $allowed['change_severity']
-						|| $allowed['acknowledge'] || $can_be_closed)
+						|| $allowed['acknowledge'] || $can_be_closed || $allowed['suppress'])
 					? (new CLink($is_acknowledged ? _('Yes') : _('No')))
 						->addClass($is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED)
 						->addClass(ZBX_STYLE_LINK_ALT)
-						->onClick('acknowledgePopUp('.json_encode(['eventids' => [$problem['eventid']]]).', this);')
+						->setAttribute('data-eventid', $problem['eventid'])
+						->onClick('acknowledgePopUp({eventids: [this.dataset.eventid]}, this);')
 					: (new CSpan($is_acknowledged ? _('Yes') : _('No')))->addClass(
 						$is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED
 					);
@@ -1106,17 +1141,17 @@ class CScreenProblem extends CScreenBase {
 				// Add table row.
 				$table->addRow(array_merge($row, [
 					new CCheckBox('eventids['.$problem['eventid'].']', $problem['eventid']),
-					getSeverityCell($problem['severity'], null, $value == TRIGGER_VALUE_FALSE),
+					CSeverityHelper::makeSeverityCell((int) $problem['severity'], null, $value == TRIGGER_VALUE_FALSE),
 					$show_recovery_data ? $cell_r_clock : null,
 					$show_recovery_data ? $cell_status : null,
 					$cell_info,
 					$this->data['filter']['compact_view']
-						? (new CDiv($triggers_hosts[$trigger['triggerid']]))->addClass('action-container')
+						? (new CDiv($triggers_hosts[$trigger['triggerid']]))->addClass(ZBX_STYLE_ACTION_CONTAINER)
 						: $triggers_hosts[$trigger['triggerid']],
 					$this->data['filter']['compact_view']
-						? (new CDiv($description))->addClass('action-container')
+						? (new CDiv($description))->addClass(ZBX_STYLE_ACTION_CONTAINER)
 						: $description,
-					($show_opdata == OPERATIONAL_DATA_SHOW_SEPARATELY) ? $opdata : null,
+					($show_opdata == OPERATIONAL_DATA_SHOW_SEPARATELY) ? $opdata->addClass(ZBX_STYLE_WORDBREAK) : null,
 					($problem['r_eventid'] != 0)
 						? zbx_date2age($problem['clock'], $problem['r_clock'])
 						: zbx_date2age($problem['clock']),
@@ -1124,7 +1159,7 @@ class CScreenProblem extends CScreenBase {
 					makeEventActionsIcons($problem['eventid'], $data['actions'], $data['users']),
 					$this->data['filter']['show_tags'] ? $tags[$problem['eventid']] : null
 				]), ($this->data['filter']['highlight_row'] && $value == TRIGGER_VALUE_TRUE)
-					? getSeverityFlhStyle($problem['severity'])
+					? self::getSeverityFlhStyle($problem['severity'])
 					: null
 				);
 			}
@@ -1133,12 +1168,12 @@ class CScreenProblem extends CScreenBase {
 				'popup.acknowledge.edit' => [
 					'name' => _('Mass update'),
 					'disabled' => !($allowed['add_comments'] || $allowed['change_severity'] || $allowed['acknowledge']
-							|| $allowed['close']
+							|| $allowed['close'] || $allowed['suppress']
 					)
 				]
 			], 'problem');
 
-			return $this->getOutput($form->addItem([$table, $paging, $footer]), true, $this->data);
+			return $this->getOutput($form->addItem([$table, $paging, $footer]), false, $this->data);
 		}
 
 		/*
@@ -1219,13 +1254,21 @@ class CScreenProblem extends CScreenBase {
 			if ($data['actions']['severities'][$problem['eventid']]['count'] > 0) {
 				$actions_performed[] = _('Severity changes');
 			}
+
+			if ((bool) array_column($problem['suppression_data'], 'userid')) {
+				$actions_performed[] = _('Suppressed');
+			}
+			elseif ($data['actions']['suppressions'][$problem['eventid']]['count'] > 0) {
+				$actions_performed[] = _('Unsuppressed');
+			}
+
 			if ($data['actions']['actions'][$problem['eventid']]['count'] > 0) {
 				$actions_performed[] = _('Actions').' ('.$data['actions']['actions'][$problem['eventid']]['count'].')';
 			}
 
 			$row = [];
 
-			$row[] = getSeverityName($problem['severity']);
+			$row[] = CSeverityHelper::getName((int) $problem['severity']);
 			$row[] = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $problem['clock']);
 			$row[] = ($problem['r_eventid'] != 0) ? zbx_date2str(DATE_TIME_FORMAT_SECONDS, $problem['r_clock']) : '';
 			$row[] = $value_str;
@@ -1299,7 +1342,7 @@ class CScreenProblem extends CScreenBase {
 
 			if ($html) {
 				$hint_table->addRow([
-					new CCol($item['name_expanded']),
+					new CCol($item['name']),
 					new CCol(
 						($last_value['clock'] !== null)
 							? zbx_date2str(DATE_TIME_FORMAT_SECONDS, $last_value['clock'])
@@ -1354,5 +1397,31 @@ class CScreenProblem extends CScreenBase {
 		}
 
 		return implode(', ', $latest_values);
+	}
+
+	/**
+	 * Get trigger severity full line height css style name.
+	 *
+	 * @param int $severity  Trigger severity.
+	 *
+	 * @return string|null
+	 */
+	private static function getSeverityFlhStyle($severity) {
+		switch ($severity) {
+			case TRIGGER_SEVERITY_DISASTER:
+				return ZBX_STYLE_FLH_DISASTER_BG;
+			case TRIGGER_SEVERITY_HIGH:
+				return ZBX_STYLE_FLH_HIGH_BG;
+			case TRIGGER_SEVERITY_AVERAGE:
+				return ZBX_STYLE_FLH_AVERAGE_BG;
+			case TRIGGER_SEVERITY_WARNING:
+				return ZBX_STYLE_FLH_WARNING_BG;
+			case TRIGGER_SEVERITY_INFORMATION:
+				return ZBX_STYLE_FLH_INFO_BG;
+			case TRIGGER_SEVERITY_NOT_CLASSIFIED:
+				return ZBX_STYLE_FLH_NA_BG;
+			default:
+				return null;
+		}
 	}
 }

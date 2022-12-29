@@ -1,7 +1,7 @@
 #ifndef GLB_CACHE_READWRITE_C
 #define GLB_CACHE_READWRITE_C
 #include "load_dump.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "log.h"
 #include <zlib.h>
 

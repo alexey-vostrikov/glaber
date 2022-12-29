@@ -17,14 +17,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
 #include "lld.h"
-#include "db.h"
-#include "log.h"
-#include "zbxalgo.h"
+#include "zbxdbwrap.h"
 #include "zbxserver.h"
+
+#include "log.h"
 #include "zbxregexp.h"
-#include "proxy.h"
+#include "audit/zbxaudit.h"
+#include "zbxnum.h"
 #include "../../libs/glb_state/discovery.h"
 
 #define OVERRIDE_STOP_TRUE	1
@@ -62,8 +62,6 @@ lld_override_t;
 
 /******************************************************************************
  *                                                                            *
- * Function: lld_condition_free                                               *
- *                                                                            *
  * Purpose: release resources allocated by filter condition                   *
  *                                                                            *
  * Parameters: condition  - [IN] the filter condition                         *
@@ -81,8 +79,6 @@ static void	lld_condition_free(lld_condition_t *condition)
 
 /******************************************************************************
  *                                                                            *
- * Function: lld_conditions_free                                              *
- *                                                                            *
  * Purpose: release resources allocated by filter conditions                  *
  *                                                                            *
  * Parameters: conditions - [IN] the filter conditions                        *
@@ -95,8 +91,6 @@ static void	lld_conditions_free(zbx_vector_ptr_t *conditions)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_condition_compare_by_macro                                   *
  *                                                                            *
  * Purpose: compare two filter conditions by their macros                     *
  *                                                                            *
@@ -114,8 +108,6 @@ static int	lld_condition_compare_by_macro(const void *item1, const void *item2)
 
 /******************************************************************************
  *                                                                            *
- * Function: lld_filter_init                                                  *
- *                                                                            *
  * Purpose: initializes lld filter                                            *
  *                                                                            *
  * Parameters: filter  - [IN] the lld filter                                  *
@@ -125,12 +117,10 @@ static void	lld_filter_init(lld_filter_t *filter)
 {
 	zbx_vector_ptr_create(&filter->conditions);
 	filter->expression = NULL;
-	filter->evaltype = CONDITION_EVAL_TYPE_AND_OR;
+	filter->evaltype = ZBX_ACTION_CONDITION_EVAL_TYPE_AND_OR;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_filter_clean                                                 *
  *                                                                            *
  * Purpose: releases resources allocated by lld filter                        *
  *                                                                            *
@@ -171,7 +161,7 @@ static int	lld_filter_condition_add(zbx_vector_ptr_t *conditions, const char *id
 	}
 	else
 	{
-		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, item, NULL, NULL, NULL,
+		zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, item, NULL, NULL, NULL, NULL, NULL,
 				&condition->regexp, MACRO_TYPE_LLD_FILTER, NULL, 0);
 	}
 
@@ -179,8 +169,6 @@ static int	lld_filter_condition_add(zbx_vector_ptr_t *conditions, const char *id
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_filter_load                                                  *
  *                                                                            *
  * Purpose: loads lld filter data                                             *
  *                                                                            *
@@ -208,7 +196,7 @@ static int	lld_filter_load(lld_filter_t *filter, zbx_uint64_t lld_ruleid, const 
 		;
 	DBfree_result(result);
 
-	if (CONDITION_EVAL_TYPE_AND_OR == filter->evaltype)
+	if (ZBX_ACTION_CONDITION_EVAL_TYPE_AND_OR == filter->evaltype)
 		zbx_vector_ptr_sort(&filter->conditions, lld_condition_compare_by_macro);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
@@ -217,8 +205,6 @@ static int	lld_filter_load(lld_filter_t *filter, zbx_uint64_t lld_ruleid, const 
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: filter_condition_match                                           *
  *                                                                            *
  * Purpose: check if the lld data passes filter evaluation                    *
  *                                                                            *
@@ -239,30 +225,30 @@ static int	filter_condition_match(const struct zbx_json_parse *jp_row, const zbx
 
 	if (SUCCEED == (ret = zbx_lld_macro_value_by_name(jp_row, lld_macro_paths, condition->macro, &value)))
 	{
-		if (CONDITION_OPERATOR_NOT_EXIST == condition->op)
+		if (ZBX_CONDITION_OPERATOR_NOT_EXIST == condition->op)
 		{
 			ret = FAIL;
 		}
-		else if (CONDITION_OPERATOR_EXIST != condition->op)
+		else if (ZBX_CONDITION_OPERATOR_EXIST != condition->op)
 		{
 			switch (regexp_match_ex(&condition->regexps, value, condition->regexp, ZBX_CASE_SENSITIVE))
 			{
 				case ZBX_REGEXP_MATCH:
-					ret = (CONDITION_OPERATOR_REGEXP == condition->op ? SUCCEED : FAIL);
+					ret = (ZBX_CONDITION_OPERATOR_REGEXP == condition->op ? SUCCEED : FAIL);
 					break;
 				case ZBX_REGEXP_NO_MATCH:
-					ret = (CONDITION_OPERATOR_NOT_REGEXP == condition->op ? SUCCEED : FAIL);
+					ret = (ZBX_CONDITION_OPERATOR_NOT_REGEXP == condition->op ? SUCCEED : FAIL);
 					break;
 				default:
 					ret = FAIL;
 			}
 		}
 	}
-	else if (CONDITION_OPERATOR_NOT_EXIST == condition->op)
+	else if (ZBX_CONDITION_OPERATOR_NOT_EXIST == condition->op)
 	{
 		ret = SUCCEED;
 	}
-	else if (CONDITION_OPERATOR_EXIST != condition->op)
+	else if (ZBX_CONDITION_OPERATOR_EXIST != condition->op)
 	{
 		*info = zbx_strdcatf(*info,
 				"Cannot accurately apply filter: no value received for macro \"%s\".\n",
@@ -275,8 +261,6 @@ static int	filter_condition_match(const struct zbx_json_parse *jp_row, const zbx
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: filter_evaluate_and_or                                           *
  *                                                                            *
  * Purpose: check if the lld data passes filter evaluation by and/or rule     *
  *                                                                            *
@@ -328,8 +312,6 @@ static int	filter_evaluate_and_or(const lld_filter_t *filter, const struct zbx_j
 
 /******************************************************************************
  *                                                                            *
- * Function: filter_evaluate_and                                              *
- *                                                                            *
  * Purpose: check if the lld data passes filter evaluation by and rule        *
  *                                                                            *
  * Parameters: filter          - [IN] the lld filter                          *
@@ -364,8 +346,6 @@ static int	filter_evaluate_and(const lld_filter_t *filter, const struct zbx_json
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: filter_evaluate_or                                               *
  *                                                                            *
  * Purpose: check if the lld data passes filter evaluation by or rule         *
  *                                                                            *
@@ -402,8 +382,6 @@ static int	filter_evaluate_or(const lld_filter_t *filter, const struct zbx_json_
 
 /******************************************************************************
  *                                                                            *
- * Function: filter_evaluate_expression                                       *
- *                                                                            *
  * Purpose: check if the lld data passes filter evaluation by custom          *
  *          expression                                                        *
  *                                                                            *
@@ -417,7 +395,7 @@ static int	filter_evaluate_or(const lld_filter_t *filter, const struct zbx_json_
  *                                                                            *
  * Comments: 1) replace {item_condition} references with action condition     *
  *              evaluation results (1 or 0)                                   *
- *           2) call evaluate() to calculate the final result                 *
+ *           2) call zbx_evaluate() to calculate the final result                 *
  *                                                                            *
  ******************************************************************************/
 static int	filter_evaluate_expression(const lld_filter_t *filter, const struct zbx_json_parse *jp_row,
@@ -450,7 +428,7 @@ static int	filter_evaluate_expression(const lld_filter_t *filter, const struct z
 		}
 	}
 
-	if (SUCCEED == evaluate(&result, expression, error, sizeof(error), NULL))
+	if (SUCCEED == zbx_evaluate(&result, expression, error, sizeof(error), NULL))
 		ret = (SUCCEED != zbx_double_compare(result, 0) ? SUCCEED : FAIL);
 
 	zbx_free(expression);
@@ -461,8 +439,6 @@ static int	filter_evaluate_expression(const lld_filter_t *filter, const struct z
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: filter_evaluate                                                  *
  *                                                                            *
  * Purpose: check if the lld data passes filter evaluation                    *
  *                                                                            *
@@ -480,13 +456,13 @@ static int	filter_evaluate(const lld_filter_t *filter, const struct zbx_json_par
 {
 	switch (filter->evaltype)
 	{
-		case CONDITION_EVAL_TYPE_AND_OR:
+		case ZBX_ACTION_CONDITION_EVAL_TYPE_AND_OR:
 			return filter_evaluate_and_or(filter, jp_row, lld_macro_paths, info);
-		case CONDITION_EVAL_TYPE_AND:
+		case ZBX_ACTION_CONDITION_EVAL_TYPE_AND:
 			return filter_evaluate_and(filter, jp_row, lld_macro_paths, info);
-		case CONDITION_EVAL_TYPE_OR:
+		case ZBX_ACTION_CONDITION_EVAL_TYPE_OR:
 			return filter_evaluate_or(filter, jp_row, lld_macro_paths, info);
-		case CONDITION_EVAL_TYPE_EXPRESSION:
+		case ZBX_ACTION_CONDITION_EVAL_TYPE_EXPRESSION:
 			return filter_evaluate_expression(filter, jp_row, lld_macro_paths, info);
 	}
 
@@ -537,7 +513,7 @@ static int	lld_override_conditions_load(zbx_vector_ptr_t *overrides, const zbx_v
 	{
 		override = (lld_override_t *)overrides->values[i];
 
-		if (CONDITION_EVAL_TYPE_AND_OR == override->filter.evaltype)
+		if (ZBX_ACTION_CONDITION_EVAL_TYPE_AND_OR == override->filter.evaltype)
 			zbx_vector_ptr_sort(&override->filter.conditions, lld_condition_compare_by_macro);
 	}
 
@@ -618,7 +594,7 @@ static void	lld_dump_overrides(const zbx_vector_ptr_t *overrides)
 			zabbix_log(LOG_LEVEL_TRACE, "    delay '%s'", ZBX_NULL2STR(override_operation->delay));
 			zabbix_log(LOG_LEVEL_TRACE, "    history '%s'", ZBX_NULL2STR(override_operation->history));
 			zabbix_log(LOG_LEVEL_TRACE, "    trends '%s'", ZBX_NULL2STR(override_operation->trends));
-			zabbix_log(LOG_LEVEL_TRACE, "    inventory_mode: %d", override_operation->inventory_mode);
+			zabbix_log(LOG_LEVEL_TRACE, "    inventory_mode: %d", (int)override_operation->inventory_mode);
 			for (k = 0; k < override_operation->tags.values_num; k++)
 			{
 				zabbix_log(LOG_LEVEL_TRACE, "    tag:'%s' value:'%s'",
@@ -711,11 +687,11 @@ static int	regexp_strmatch_condition(const char *value, const char *pattern, uns
 {
 	switch (op)
 	{
-		case CONDITION_OPERATOR_REGEXP:
+		case ZBX_CONDITION_OPERATOR_REGEXP:
 			if (NULL != zbx_regexp_match(value, pattern, NULL))
 				return SUCCEED;
 			break;
-		case CONDITION_OPERATOR_NOT_REGEXP:
+		case ZBX_CONDITION_OPERATOR_NOT_REGEXP:
 			if (NULL == zbx_regexp_match(value, pattern, NULL))
 				return SUCCEED;
 			break;
@@ -866,7 +842,7 @@ void	lld_override_trigger(const zbx_vector_ptr_t *overrides, const char *name, u
 }
 
 void	lld_override_host(const zbx_vector_ptr_t *overrides, const char *name, zbx_vector_uint64_t *lnk_templateids,
-		char *inventory_mode, zbx_vector_db_tag_ptr_t *override_tags, unsigned char *status,
+		signed char *inventory_mode, zbx_vector_db_tag_ptr_t *override_tags, unsigned char *status,
 		unsigned char *discover)
 {
 	int	i, j, k;
@@ -1015,7 +991,7 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	int			ret = FAIL, i;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
+	
 	if (SUCCEED != zbx_json_open(value, &jp))
 	{
 		*error = zbx_dsprintf(*error, "Invalid discovery rule value: %s", zbx_json_strerror());
@@ -1111,8 +1087,6 @@ static void	lld_row_free(zbx_lld_row_t *lld_row)
 
 /******************************************************************************
  *                                                                            *
- * Function: lld_process_discovery_rule                                       *
- *                                                                            *
  * Purpose: add or update items, triggers and graphs for discovery item       *
  *                                                                            *
  * Parameters: lld_ruleid - [IN] discovery item identifier from database      *
@@ -1133,11 +1107,13 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	lld_filter_t		filter;
 	time_t			now;
 	DC_ITEM			item;
+	zbx_config_t		cfg;
+	zbx_dc_um_handle_t	*um_handle;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64, __func__, lld_ruleid);
-	
-	DEBUG_ITEM(lld_ruleid,"Processing discovery rule: %s",value);
-	
+
+	um_handle = zbx_dc_open_user_macros();
+
 	zbx_vector_ptr_create(&lld_rows);
 	zbx_vector_ptr_create(&lld_macro_paths);
 	zbx_vector_ptr_create(&overrides);
@@ -1168,10 +1144,10 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		filter.evaltype = atoi(row[2]);
 		filter.expression = zbx_strdup(NULL, row[3]);
 		lifetime_str = zbx_strdup(NULL, row[4]);
-		substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL,
+		zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 				&lifetime_str, MACRO_TYPE_COMMON, NULL, 0);
 
-		if (SUCCEED != is_time_suffix(lifetime_str, &lifetime, ZBX_LENGTH_UNLIMITED))
+		if (SUCCEED != zbx_is_time_suffix(lifetime_str, &lifetime, ZBX_LENGTH_UNLIMITED))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "cannot process lost resources for the discovery rule \"%s:%s\":"
 					" \"%s\" is not a valid value",
@@ -1220,6 +1196,9 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 
 	now = time(NULL);
 
+	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_AUDITLOG_ENABLED);
+	zbx_audit_init(cfg.auditlog_enabled);
+
 	if (SUCCEED != lld_update_items(hostid, lld_ruleid, &lld_rows, &lld_macro_paths, error, lifetime, now))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot update/add items because parent host was removed while"
@@ -1255,6 +1234,7 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	if (NULL != info)
 		*error = zbx_strdcat(*error, info);
 out:
+	zbx_audit_flush();
 	DCconfig_clean_items(&item, &errcode, 1);
 	zbx_free(info);
 	zbx_free(discovery_key);
@@ -1267,6 +1247,8 @@ out:
 	zbx_vector_ptr_destroy(&lld_rows);
 	zbx_vector_ptr_clear_ext(&lld_macro_paths, (zbx_clean_func_t)zbx_lld_macro_path_free);
 	zbx_vector_ptr_destroy(&lld_macro_paths);
+
+	zbx_dc_close_user_macros(um_handle);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 

@@ -22,18 +22,21 @@ via prometheus protocol via standard monitoring url
 now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 */
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "../zbxipcservice/glb_ipc.h"
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
+#include "zbxthreads.h"
 
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
+//unsigned char	process_type, program_type;
+//int		server_num, process_num;
 
-static  zbx_mem_info_t	*apm_ipc;
-ZBX_MEM_FUNC_IMPL(_apmipc, apm_ipc);
-mem_funcs_t apm_memf = {.free_func = _apmipc_mem_free_func, .malloc_func = _apmipc_mem_malloc_func, .realloc_func = _apmipc_mem_realloc_func };
+static  zbx_shmem_info_t	*apm_ipc;
+ZBX_SHMEM_FUNC_IMPL(_apmipc, apm_ipc);
+mem_funcs_t apm_memf = {.free_func = _apmipc_shmem_free_func, 
+                        .malloc_func = _apmipc_shmem_malloc_func, 
+                        .realloc_func = _apmipc_shmem_realloc_func };
 
 typedef struct {
     zbx_hashset_t metrics; /* clients will use it */    
@@ -217,7 +220,7 @@ IPC_FREE_CB(ipc_metric_free_cb) {
 int apm_init() {
     char *error = NULL;
     
-    if (SUCCEED != zbx_mem_create(&apm_ipc, CONFIG_APM_IPC_SIZE, "APM ipc cache size", "APMIPCsize ", 1, &error)) {
+    if (SUCCEED != zbx_shmem_create(&apm_ipc, CONFIG_APM_IPC_SIZE, "APM ipc cache size", "APMIPCsize ", 1, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	return FAIL;
     }
@@ -291,8 +294,8 @@ const char *apm_server_dump_metrics() {
 
 void apm_add_proc_labels(void *metric) {
 	apm_add_int_label(metric, "pid", getpid());
-    apm_add_int_label(metric, "procnum", process_num);
-    apm_add_str_label(metric, "proctype", get_process_type_string(process_type));
+   // apm_add_int_label(metric, "procnum", args->info.process_num);
+   // apm_add_str_label(metric, "proctype", get_process_type_string(args->info.process_type));
 }
 
 

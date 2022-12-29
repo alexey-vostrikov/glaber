@@ -17,15 +17,15 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "comms.h"
+#include "zabbix_stats.h"
+#include "zbxsysinfo.h"
+
+#include "zbxstr.h"
+#include "zbxnum.h"
+#include "zbxcomms.h"
 #include "zbxjson.h"
 
-#include "zabbix_stats.h"
-
 /******************************************************************************
- *                                                                            *
- * Function: check_response                                                   *
  *                                                                            *
  * Purpose: Check whether JSON response is "success" or "failed"              *
  *                                                                            *
@@ -68,8 +68,6 @@ static int	check_response(const char *response, AGENT_RESULT *result)
 
 /******************************************************************************
  *                                                                            *
- * Function: get_remote_zabbix_stats                                          *
- *                                                                            *
  * Purpose: send Zabbix stats request and receive the result data             *
  *                                                                            *
  * Parameters: json   - [IN] the request                                      *
@@ -84,7 +82,7 @@ static void	get_remote_zabbix_stats(const struct zbx_json *json, const char *ip,
 	zbx_socket_t	s;
 
 	if (SUCCEED == zbx_tcp_connect(&s, CONFIG_SOURCE_IP, ip, port, CONFIG_TIMEOUT, ZBX_TCP_SEC_UNENCRYPTED,
-			NULL, NULL))
+		NULL, NULL))
 	{
 		if (SUCCEED == zbx_tcp_send(&s, json->buffer))
 		{
@@ -96,7 +94,7 @@ static void	get_remote_zabbix_stats(const struct zbx_json *json, const char *ip,
 							"Cannot obtain internal statistics: received empty response."));
 				}
 				else if (SUCCEED == check_response(s.buffer, result))
-					set_result_type(result, ITEM_VALUE_TYPE_TEXT, s.buffer);
+					zbx_set_agent_result_type(result, ITEM_VALUE_TYPE_TEXT, s.buffer);
 			}
 			else
 			{
@@ -121,8 +119,6 @@ static void	get_remote_zabbix_stats(const struct zbx_json *json, const char *ip,
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_get_remote_zabbix_stats                                      *
- *                                                                            *
  * Purpose: create Zabbix stats request                                       *
  *                                                                            *
  * Parameters: ip     - [IN] external Zabbix instance hostname                *
@@ -144,12 +140,10 @@ int	zbx_get_remote_zabbix_stats(const char *ip, unsigned short port, AGENT_RESUL
 
 	zbx_json_free(&json);
 
-	return 0 == ISSET_MSG(result) ? SUCCEED : FAIL;
+	return 0 == ZBX_ISSET_MSG(result) ? SUCCEED : FAIL;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_get_remote_zabbix_stats_queue                                *
  *                                                                            *
  * Purpose: create Zabbix stats queue request                                 *
  *                                                                            *
@@ -185,10 +179,10 @@ int	zbx_get_remote_zabbix_stats_queue(const char *ip, unsigned short port, const
 
 	zbx_json_free(&json);
 
-	return 0 == ISSET_MSG(result) ? SUCCEED : FAIL;
+	return 0 == ZBX_ISSET_MSG(result) ? SUCCEED : FAIL;
 }
 
-int	ZABBIX_STATS(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	zabbix_stats(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	const char	*ip_str, *port_str, *queue_str;
 	unsigned short	port_number;
@@ -206,7 +200,7 @@ int	ZABBIX_STATS(AGENT_REQUEST *request, AGENT_RESULT *result)
 	{
 		port_number = ZBX_DEFAULT_SERVER_PORT;
 	}
-	else if (SUCCEED != is_ushort(port_str, &port_number))
+	else if (SUCCEED != zbx_is_ushort(port_str, &port_number))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
 		return SYSINFO_RET_FAIL;

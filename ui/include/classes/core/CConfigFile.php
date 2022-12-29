@@ -57,6 +57,7 @@ class CConfigFile {
 		if (!file_exists($this->configFile)) {
 			self::exception('Config file does not exist.', self::CONFIG_NOT_FOUND);
 		}
+
 		if (!is_readable($this->configFile)) {
 			self::exception('Permission denied.');
 		}
@@ -141,6 +142,10 @@ class CConfigFile {
 			$this->config['DB']['DOUBLE_IEEE754'] = $DB['DOUBLE_IEEE754'];
 		}
 
+		if (isset($DB['VAULT'])) {
+			$this->config['DB']['VAULT'] = $DB['VAULT'];
+		}
+
 		if (isset($DB['VAULT_URL'])) {
 			$this->config['DB']['VAULT_URL'] = $DB['VAULT_URL'];
 		}
@@ -153,12 +158,26 @@ class CConfigFile {
 			$this->config['DB']['VAULT_TOKEN'] = $DB['VAULT_TOKEN'];
 		}
 
-		if (isset($ZBX_SERVER)) {
+		if (isset($DB['VAULT_CACHE'])) {
+			$this->config['DB']['VAULT_CACHE'] = $DB['VAULT_CACHE'];
+		}
+
+		if (isset($DB['VAULT_KEY_FILE'])) {
+			$this->config['DB']['VAULT_KEY_FILE'] = $DB['VAULT_KEY_FILE'];
+		}
+
+		if (isset($DB['VAULT_CERT_FILE'])) {
+			$this->config['DB']['VAULT_CERT_FILE'] = $DB['VAULT_CERT_FILE'];
+		}
+
+		if (isset($ZBX_SERVER) && $ZBX_SERVER !== '') {
 			$this->config['ZBX_SERVER'] = $ZBX_SERVER;
 		}
-		if (isset($ZBX_SERVER_PORT)) {
+
+		if (isset($ZBX_SERVER_PORT) && $ZBX_SERVER_PORT !== '') {
 			$this->config['ZBX_SERVER_PORT'] = $ZBX_SERVER_PORT;
 		}
+
 		if (isset($ZBX_SERVER_NAME)) {
 			$this->config['ZBX_SERVER_NAME'] = $ZBX_SERVER_NAME;
 		}
@@ -175,45 +194,9 @@ class CConfigFile {
 			$this->config['SSO'] = $SSO;
 		}
 
-		if ($this->config['DB']['VAULT_URL'] !== ''
-				&& $this->config['DB']['VAULT_DB_PATH'] !== ''
-				&& $this->config['DB']['VAULT_TOKEN'] !== '') {
-			list($this->config['DB']['USER'], $this->config['DB']['PASSWORD']) = $this->getCredentialsFromVault();
-
-			if ($this->config['DB']['USER'] === '' || $this->config['DB']['PASSWORD'] === '') {
-				self::exception(_('Unable to load database credentials from Vault.'), self::CONFIG_VAULT_ERROR);
-			}
-		}
-
 		$this->makeGlobal();
 
 		return $this->config;
-	}
-
-	protected function getCredentialsFromVault(): array {
-		$username = CDataCacheHelper::getValue('db_username', '');
-		$password = CDataCacheHelper::getValue('db_password', '');
-
-		if ($username === '' || $password === '') {
-			$vault = new CVaultHelper($this->config['DB']['VAULT_URL'], $this->config['DB']['VAULT_TOKEN']);
-			$secret = $vault->loadSecret($this->config['DB']['VAULT_DB_PATH']);
-
-			$username = array_key_exists('username', $secret) ? $secret['username'] : '';
-			$password = array_key_exists('password', $secret) ? $secret['password'] : '';
-
-			if ($username !== '' && $password !== '') {
-				// Update cache.
-				CDataCacheHelper::setValueArray([
-					'db_username' => $username,
-					'db_password' => $password
-				]);
-			}
-			else {
-				CDataCacheHelper::clearValues(['db_username', 'db_password']);
-			}
-		}
-
-		return [$username, $password];
 	}
 
 	public function makeGlobal() {
@@ -271,11 +254,11 @@ class CConfigFile {
 '<?php
 // Zabbix GUI configuration file.
 
-$DB[\'TYPE\']				= \''.addcslashes($this->config['DB']['TYPE'], "'\\").'\';
+$DB[\'TYPE\']			= \''.addcslashes($this->config['DB']['TYPE'], "'\\").'\';
 $DB[\'SERVER\']			= \''.addcslashes($this->config['DB']['SERVER'], "'\\").'\';
-$DB[\'PORT\']				= \''.addcslashes($this->config['DB']['PORT'], "'\\").'\';
+$DB[\'PORT\']			= \''.addcslashes($this->config['DB']['PORT'], "'\\").'\';
 $DB[\'DATABASE\']			= \''.addcslashes($this->config['DB']['DATABASE'], "'\\").'\';
-$DB[\'USER\']				= \''.addcslashes($this->config['DB']['USER'], "'\\").'\';
+$DB[\'USER\']			= \''.addcslashes($this->config['DB']['USER'], "'\\").'\';
 $DB[\'PASSWORD\']			= \''.addcslashes($this->config['DB']['PASSWORD'], "'\\").'\';
 
 // Schema name. Used for PostgreSQL.
@@ -290,17 +273,24 @@ $DB[\'VERIFY_HOST\']		= '.($this->config['DB']['VERIFY_HOST'] ? 'true' : 'false'
 $DB[\'CIPHER_LIST\']		= \''.addcslashes($this->config['DB']['CIPHER_LIST'], "'\\").'\';
 
 // Vault configuration. Used if database credentials are stored in Vault secrets manager.
+$DB[\'VAULT\']			= \''.addcslashes($this->config['DB']['VAULT'], "'\\").'\';
 $DB[\'VAULT_URL\']		= \''.addcslashes($this->config['DB']['VAULT_URL'], "'\\").'\';
-$DB[\'VAULT_DB_PATH\']	= \''.addcslashes($this->config['DB']['VAULT_DB_PATH'], "'\\").'\';
+$DB[\'VAULT_DB_PATH\']		= \''.addcslashes($this->config['DB']['VAULT_DB_PATH'], "'\\").'\';
 $DB[\'VAULT_TOKEN\']		= \''.addcslashes($this->config['DB']['VAULT_TOKEN'], "'\\").'\';
+$DB[\'VAULT_CERT_FILE\']		= \''.addcslashes($this->config['DB']['VAULT_CERT_FILE'], "'\\").'\';
+$DB[\'VAULT_KEY_FILE\']		= \''.addcslashes($this->config['DB']['VAULT_KEY_FILE'], "'\\").'\';
+// Uncomment to bypass local caching of credentials.
+// $DB[\'VAULT_CACHE\']		= true;
 
 // Use IEEE754 compatible value range for 64-bit Numeric (float) history values.
 // This option is enabled by default for new Zabbix installations.
 // For upgraded installations, please read database upgrade notes before enabling this option.
-$DB[\'DOUBLE_IEEE754\']	= '.($this->config['DB']['DOUBLE_IEEE754'] ? 'true' : 'false').';
+$DB[\'DOUBLE_IEEE754\']		= '.($this->config['DB']['DOUBLE_IEEE754'] ? 'true' : 'false').';
 
-$ZBX_SERVER				= \''.addcslashes($this->config['ZBX_SERVER'], "'\\").'\';
-$ZBX_SERVER_PORT		= \''.addcslashes($this->config['ZBX_SERVER_PORT'], "'\\").'\';
+// Uncomment and set to desired values to override Zabbix hostname/IP and port.
+// $ZBX_SERVER			= \'\';
+// $ZBX_SERVER_PORT		= \'\';
+
 $ZBX_SERVER_NAME		= \''.addcslashes($this->config['ZBX_SERVER_NAME'], "'\\").'\';
 
 $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
@@ -339,12 +329,16 @@ $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
 			'VERIFY_HOST' => true,
 			'CIPHER_LIST' => '',
 			'DOUBLE_IEEE754' => false,
+			'VAULT' => '',
 			'VAULT_URL' => '',
 			'VAULT_DB_PATH' => '',
-			'VAULT_TOKEN' => ''
+			'VAULT_TOKEN' => '',
+			'VAULT_CERT_FILE' => '',
+			'VAULT_KEY_FILE' => '',
+			'VAULT_CACHE' => false
 		];
-		$this->config['ZBX_SERVER'] = 'localhost';
-		$this->config['ZBX_SERVER_PORT'] = '10051';
+		$this->config['ZBX_SERVER'] = null;
+		$this->config['ZBX_SERVER_PORT'] = null;
 		$this->config['ZBX_SERVER_NAME'] = '';
 		$this->config['IMAGE_FORMAT_DEFAULT'] = IMAGE_FORMAT_PNG;
 		$this->config['HISTORY'] = null;

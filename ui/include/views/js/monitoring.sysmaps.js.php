@@ -32,7 +32,7 @@ $shape_border_types = [
 
 $horizontal_align_types = [
 	SYSMAP_SHAPE_LABEL_HALIGN_LEFT		=> _('Left'),
-	SYSMAP_SHAPE_LABEL_HALIGN_CENTER	=> _('Centre'),
+	SYSMAP_SHAPE_LABEL_HALIGN_CENTER	=> _('Center'),
 	SYSMAP_SHAPE_LABEL_HALIGN_RIGHT		=> _('Right')
 ];
 
@@ -74,7 +74,13 @@ function createFontSelect(string $name): CSelect {
 }
 ?>
 <script type="text/x-jquery-tmpl" id="mapElementFormTpl">
-	<?= (new CDiv(new CTag('h4', true, _('Map element'))))
+	<?= (new CDiv([
+			(new CTag('h4', true, _('Map element'))),
+			(new CLink(null, CDocHelper::getUrl(CDocHelper::POPUP_MAP_ELEMENT)))
+				->setTitle(_('Help'))
+				->addClass(ZBX_STYLE_ICON_DOC_LINK)
+				->setTarget('_blank')
+		]))
 			->addClass(ZBX_STYLE_DASHBOARD_WIDGET_HEAD)
 			->setId('formDragHandler')
 			->toString()
@@ -127,7 +133,7 @@ function createFontSelect(string $name): CSelect {
 							->setId('areaSizeHeight')
 					], 'areaSizeRow')
 					->addRow(_('Placing algorithm'),
-						(new CRadioButtonList(null, SYSMAP_ELEMENT_AREA_VIEWTYPE_GRID))
+						(new CRadioButtonList('viewtype', SYSMAP_ELEMENT_AREA_VIEWTYPE_GRID))
 							->addValue(_('Grid'), SYSMAP_ELEMENT_AREA_VIEWTYPE_GRID)
 							->setModern(true),
 						'areaPlacingRow'
@@ -190,8 +196,7 @@ function createFontSelect(string $name): CSelect {
 										'dstfrm' => 'selementForm',
 										'dstfld1' => 'elementNameTriggers',
 										'with_triggers' => true,
-										'editable' => true,
-										'noempty' => true,
+										'editable' => 1,
 										'real_hosts' => true
 									]
 								]
@@ -215,16 +220,15 @@ function createFontSelect(string $name): CSelect {
 						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 						(new CButton(null, _('Select')))
 							->addClass(ZBX_STYLE_BTN_GREY)
-							->onClick('return PopUp("popup.generic",jQuery.extend('.
-								json_encode([
+							->onClick(
+								'return PopUp("popup.generic", jQuery.extend('.json_encode([
 									'srctbl' => 'sysmaps',
 									'srcfld1' => 'sysmapid',
 									'srcfld2' => 'name',
 									'dstfrm' => 'selementForm',
 									'dstfld1' => 'sysmapid',
 									'dstfld2' => 'elementNameMap'
-								]).
-									',{excludeids: [#{sysmapid}]}), null, this);'
+								]).', {excludeids: [#{sysmapid}]}), {dialogue_class: "modal-popup-generic"});'
 							)
 					], 'mapSelectRow')
 					->addRow(_('Tags'),
@@ -344,7 +348,13 @@ function createFontSelect(string $name): CSelect {
 </script>
 
 <script type="text/x-jquery-tmpl" id="mapShapeFormTpl">
-	<?= (new CDiv(new CTag('h4', true, _('Map shape'))))
+	<?= (new CDiv([
+			(new CTag('h4', true, _('Map shape'))),
+			(new CLink(null, CDocHelper::getUrl(CDocHelper::POPUP_MAP_SHAPE)))
+				->setTitle(_('Help'))
+				->addClass(ZBX_STYLE_ICON_DOC_LINK)
+				->setTarget('_blank')
+		]))
 			->addClass(ZBX_STYLE_DASHBOARD_WIDGET_HEAD)
 			->setId('shapeDragHandler')
 			->toString().
@@ -378,7 +388,7 @@ function createFontSelect(string $name): CSelect {
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 							(new CTextBox('font_size'))->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH),
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-							_('Colour'),
+							_('Color'),
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 							(new CColor('font_color', '#{color}'))->appendColorPickerJs(false),
 							BR(),
@@ -399,7 +409,7 @@ function createFontSelect(string $name): CSelect {
 					)
 					->addRow(_('Background'),
 						(new CDiv([
-							_('Colour'),
+							_('Color'),
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 							(new CColor('background_color', '#{color}'))->appendColorPickerJs(false)
 						]))->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR),
@@ -419,7 +429,7 @@ function createFontSelect(string $name): CSelect {
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 							(new CTextBox('border_width'))->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH),
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-							_('Colour'),
+							_('Color'),
 							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 							(new CColor('border_color', '#{color}'))->appendColorPickerJs(false)
 						]))
@@ -497,7 +507,13 @@ function createFontSelect(string $name): CSelect {
 </script>
 
 <script type="text/x-jquery-tmpl" id="mapMassShapeFormTpl">
-	<?= (new CDiv(new CTag('h4', true, _('Mass update shapes'))))
+	<?= (new CDiv([
+			(new CTag('h4', true, _('Mass update shapes'))),
+			(new CLink(null, CDocHelper::getUrl(CDocHelper::POPUP_MAP_MASSUPDATE_SHAPES)))
+				->setTitle(_('Help'))
+				->addClass(ZBX_STYLE_ICON_DOC_LINK)
+				->setTarget('_blank')
+		]))
 			->addClass(ZBX_STYLE_DASHBOARD_WIDGET_HEAD)
 			->setId('massShapeDragHandler')
 			->toString().
@@ -538,7 +554,7 @@ function createFontSelect(string $name): CSelect {
 					)
 					->addRow((new CCheckBox('chkbox_font_color'))
 							->setId('chkboxFontColor')
-							->setLabel(_('Font colour')),
+							->setLabel(_('Font color')),
 						(new CColor('mass_font_color', '#{color}'))->appendColorPickerJs(false),
 						null, 'shape_figure_row'
 					)
@@ -562,7 +578,7 @@ function createFontSelect(string $name): CSelect {
 					)
 					->addRow((new CCheckBox('chkbox_background'))
 							->setId('chkboxBackground')
-							->setLabel(_('Background colour')),
+							->setLabel(_('Background color')),
 						(new CColor('mass_background_color', '#{color}'))->appendColorPickerJs(false),
 						null, 'shape_figure_row'
 					)
@@ -593,8 +609,8 @@ function createFontSelect(string $name): CSelect {
 							->setLabel((new CDiv())
 								->addClass('form-input-margin')
 								->addClass('switchable-content')
-								->setAttribute('data-value', _('Border colour'))
-								->setAttribute('data-value-2', _('Line colour'))
+								->setAttribute('data-value', _('Border color'))
+								->setAttribute('data-value-2', _('Line color'))
 							),
 						(new CColor('mass_border_color', '#{color}'))->appendColorPickerJs(false)
 					)
@@ -621,7 +637,13 @@ function createFontSelect(string $name): CSelect {
 </script>
 
 <script type="text/x-jquery-tmpl" id="mapMassFormTpl">
-	<?= (new CDiv(new CTag('h4', true, _('Mass update elements'))))
+	<?= (new CDiv([
+			(new CTag('h4', true, _('Mass update elements'))),
+			(new CLink(null, CDocHelper::getUrl(CDocHelper::POPUP_MAP_MASSUPDATE_ELEMENTS)))
+				->setTitle(_('Help'))
+				->addClass(ZBX_STYLE_ICON_DOC_LINK)
+				->setTarget('_blank')
+		]))
 			->addClass(ZBX_STYLE_DASHBOARD_WIDGET_HEAD)
 			->setId('massDragHandler')
 			->toString()
@@ -783,27 +805,26 @@ function createFontSelect(string $name): CSelect {
 								GRAPH_ITEM_DRAWTYPE_DASHED_LINE => _('Dashed line')
 							]))
 					)
-					->addRow(_('Colour (OK)'),
+					->addRow(_('Color (OK)'),
 						(new CColor('color', '#{color}'))->appendColorPickerJs(false)
 					)
 					->addRow(_('Link indicators'),
 						(new CDiv([
 							(new CTable())
-								->setHeader([_('Trigger'), _('Type'), _('Colour'), _('Action')])
+								->setHeader([_('Trigger'), _('Type'), _('Color'), _('Action')])
 								->setAttribute('style', 'width: 100%;')
 								->setId('linkTriggerscontainer'),
 							(new CButton(null, _('Add')))
 								->addClass(ZBX_STYLE_BTN_LINK)
-								->onClick('return PopUp("popup.generic",'.
-									json_encode([
+								->onClick(
+									'return PopUp("popup.generic", '.json_encode([
 										'srctbl' => 'triggers',
 										'srcfld1' => 'triggerid',
 										'reference' => 'linktrigger',
 										'multiselect' => '1',
 										'real_hosts' => '1',
-										'with_triggers' => '1',
-										'noempty' => '1'
-									]).', null, this);'
+										'with_triggers' => '1'
+									]).', {dialogue_class: "modal-popup-generic"});'
 								)
 						]))
 							->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)

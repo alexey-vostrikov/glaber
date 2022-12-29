@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -46,11 +46,11 @@ class CReport extends CApiService {
 	protected $tableAlias = 'r';
 	protected $sortColumns = ['reportid', 'name', 'status'];
 
-	protected $output_fields = ['reportid', 'userid', 'name', 'description', 'status', 'dashboardid', 'period', 'cycle',
+	private $output_fields = ['reportid', 'userid', 'name', 'description', 'status', 'dashboardid', 'period', 'cycle',
 		'weekdays', 'start_time', 'active_since', 'active_till', 'state', 'lastsent', 'info', 'subject', 'message'
 	];
-	protected $user_output_fields = ['userid', 'access_userid', 'exclude'];
-	protected $usrgrp_output_fields = ['usrgrpid', 'access_userid'];
+	private $user_output_fields = ['userid', 'access_userid', 'exclude'];
+	private $usrgrp_output_fields = ['usrgrpid', 'access_userid'];
 
 	/**
 	 * @param array $options
@@ -64,17 +64,8 @@ class CReport extends CApiService {
 			// filter
 			'reportids' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'default' => null],
 			'expired' =>				['type' => API_BOOLEAN, 'flags' => API_ALLOW_NULL, 'default' => null],
-			'filter' =>					['type' => API_OBJECT, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => [
-				'reportid' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'userid' =>					['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'name' =>					['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'dashboardid' =>			['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'status' =>					['type' => API_INTS32, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'in' => ZBX_REPORT_STATUS_DISABLED.','.ZBX_REPORT_STATUS_ENABLED],
-				'state' =>					['type' => API_INTS32, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'in' => implode(',', [ZBX_REPORT_STATE_UNKNOWN, ZBX_REPORT_STATE_SENT, ZBX_REPORT_STATE_ERROR, ZBX_REPORT_STATE_SUCCESS_INFO])]
-			]],
-			'search' =>					['type' => API_OBJECT, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => [
-				'name' =>					['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE]
-			]],
+			'filter' =>					['type' => API_FILTER, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => ['reportid', 'userid', 'name', 'dashboardid', 'status', 'state']],
+			'search' =>					['type' => API_FILTER, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => ['name']],
 			'searchByAny' =>			['type' => API_BOOLEAN, 'default' => false],
 			'startSearch' =>			['type' => API_FLAG, 'default' => false],
 			'excludeSearch' =>			['type' => API_FLAG, 'default' => false],
@@ -91,6 +82,7 @@ class CReport extends CApiService {
 			// flags
 			'preservekeys' =>			['type' => API_BOOLEAN, 'default' => false]
 		]];
+
 		if (!CApiInputValidator::validate($api_input_rules, $options, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
@@ -133,27 +125,20 @@ class CReport extends CApiService {
 	 * @return array
 	 */
 	public function create(array $reports): array {
-		$this->validateCreate($reports);
+		self::validateCreate($reports);
 
-		$ins_reports = [];
-
-		foreach ($reports as $report) {
-			unset($report['subject'], $report['message'], $report['users'], $report['user_groups']);
-			$ins_reports[] = $report;
-		}
-
-		$reportids = DB::insert('report', $ins_reports);
+		$reportids = DB::insert('report', $reports);
 
 		foreach ($reports as $index => &$report) {
 			$report['reportid'] = $reportids[$index];
 		}
 		unset($report);
 
-		$this->updateParams($reports, __FUNCTION__);
-		$this->updateUsers($reports, __FUNCTION__);
-		$this->updateUserGroups($reports, __FUNCTION__);
+		self::updateParams($reports, __FUNCTION__);
+		self::updateUsers($reports);
+		self::updateUserGroups($reports);
 
-		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_SCHEDULED_REPORT, $reports);
+		self::addAuditLog(CAudit::ACTION_ADD, CAudit::RESOURCE_SCHEDULED_REPORT, $reports);
 
 		return ['reportids' => $reportids];
 	}
@@ -161,9 +146,9 @@ class CReport extends CApiService {
 	/**
 	 * @param array $reports
 	 *
-	 * @throws APIException if no permissions or the input is invalid.
+	 * @throws APIException
 	 */
-	protected function validateCreate(array &$reports): void {
+	private static function validateCreate(array &$reports): void {
 		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['name']], 'fields' => [
 			'userid' =>				['type' => API_ID, 'default' => self::$userData['userid']],
 			'name' =>				['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('report', 'name')],
@@ -189,30 +174,28 @@ class CReport extends CApiService {
 				'access_userid' =>		['type' => API_ID]
 			]]
 		]];
+
 		if (!CApiInputValidator::validate($api_input_rules, $reports, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
 
-		$rnum = 0;
-		foreach ($reports as &$report) {
-			$rnum++;
-
+		foreach ($reports as $i => &$report) {
 			if ($report['cycle'] == ZBX_REPORT_CYCLE_WEEKLY) {
 				if (!array_key_exists('weekdays', $report)) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.', '/'.$rnum,
+					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.', '/'.($i + 1),
 						_s('the parameter "%1$s" is missing', 'weekdays')
 					));
 				}
 
 				if ($report['weekdays'] < 1 || $report['weekdays'] > 127) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
-						'/'.$rnum.'/weekdays', _s('value must be one of %1$s', '1-127')
+						'/'.($i + 1).'/weekdays', _s('value must be one of %1$s', '1-127')
 					));
 				}
 			}
 			elseif (array_key_exists('weekdays', $report) && $report['weekdays'] != 0) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
-					'/'.$rnum.'/weekdays', _s('value must be %1$s', '0')
+					'/'.($i + 1).'/weekdays', _s('value must be %1$s', '0')
 				));
 			}
 
@@ -240,39 +223,90 @@ class CReport extends CApiService {
 		}
 		unset($report);
 
-		$this->checkDuplicates(array_column($reports, 'name'));
-		$this->checkDashboards(array_unique(array_column($reports, 'dashboardid')));
-		$this->checkUsers($reports);
-		$this->checkUserGroups($reports);
+		self::checkDuplicates($reports);
+		self::checkDashboards($reports);
+		self::checkUsers($reports);
+		self::checkUserGroups($reports);
 	}
 
 	/**
-	 * Check for duplicated reports.
+	 * @param array      $reports
+	 * @param array|null $db_reports
 	 *
-	 * @param array $names
-	 *
-	 * @throws APIException if report already exists.
+	 * @throws APIException
 	 */
-	protected function checkDuplicates(array $names): void {
-		$db_reports = DB::select('report', [
+	private static function checkDuplicates(array $reports, array $db_reports = null): void {
+		$names = [];
+
+		foreach ($reports as $report) {
+			if (!array_key_exists('name', $report)) {
+				continue;
+			}
+
+			if ($db_reports === null || $report['name'] !== $db_reports[$report['reportid']]['name']) {
+				$names[] = $report['name'];
+			}
+		}
+
+		if (!$names) {
+			return;
+		}
+
+		$duplicates = DB::select('report', [
 			'output' => ['name'],
 			'filter' => ['name' => $names],
 			'limit' => 1
 		]);
 
-		if ($db_reports) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _s('Report "%1$s" already exists.', $db_reports[0]['name']));
+		if ($duplicates) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s('Report "%1$s" already exists.', $duplicates[0]['name']));
 		}
 	}
 
 	/**
-	 * Check for valid dashboards.
+	 * @param array      $reports
+	 * @param array|null $db_reports
 	 *
-	 * @param array $dashboardids
-	 *
-	 * @throws APIException if dashboard is not valid.
+	 * @throws APIException
 	 */
-	protected function checkDashboards(array $dashboardids): void {
+	private static function checkDashboards(array $reports, array $db_reports = null): void {
+		$dashboardids = [];
+
+		foreach ($reports as $i => $report) {
+			if ($db_reports === null) {
+				$dashboardids[$report['dashboardid']] = true;
+
+				continue;
+			}
+
+			if (!array_key_exists('dashboardid', $report)
+					|| bccomp($report['dashboardid'], $db_reports[$report['reportid']]['dashboardid']) == 0) {
+				continue;
+			}
+
+			// When changing the dashboard, new lists of users and user groups must be provided.
+
+			if (!array_key_exists('users', $report)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.', '/'.($i + 1),
+					_s('the parameter "%1$s" is missing', 'users')
+				));
+			}
+
+			if (!array_key_exists('user_groups', $report)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.', '/'.($i + 1),
+					_s('the parameter "%1$s" is missing', 'user_groups')
+				));
+			}
+
+			$dashboardids[$report['dashboardid']] = true;
+		}
+
+		if (!$dashboardids) {
+			return;
+		}
+
+		$dashboardids = array_keys($dashboardids);
+
 		$db_dashboards = API::Dashboard()->get([
 			'output' => [],
 			'dashboardids' => $dashboardids,
@@ -289,44 +323,22 @@ class CReport extends CApiService {
 	}
 
 	/**
-	 * Check for valid users.
+	 * @param array      $reports
+	 * @param array|null $db_reports
 	 *
-	 * @param array  $reports
-	 * @param string $reports[]['userid']                          (optional)
-	 * @param string $reports[]['dashboardid']                     (optional)
-	 * @param array  $reports[]['users']                           (optional)
-	 * @param string $reports[]['users'][]['userid']
-	 * @param string $reports[]['users'][]['access_userid']        (optional)
-	 * @param string $reports[]['users'][]['exclude']
-	 * @param array  $reports[]['user_groups']                     (optional)
-	 * @param string $reports[]['user_groups'][]['access_userid']  (optional)
-	 * @param array  $db_reports                                   (optional)
-	 * @param string $db_reports[]['reportid']
-	 * @param string $db_reports[]['userid']
-	 * @param string $db_reports[]['dashboardid']
-	 * @param array  $db_reports[]['users']
-	 * @param string $db_reports[]['users'][]['userid']
-	 * @param string $db_reports[]['users'][]['access_userid']
-	 * @param string $db_reports[]['users'][]['exclude']
-	 * @param array  $db_reports[]['user_groups']
-	 * @param string $db_reports[]['user_groups'][]['access_userid']
-	 *
-	 * @throws APIException if user is not valid.
+	 * @throws APIException
 	 */
-	protected function checkUsers(array $reports, array $db_reports = []): void {
+	private static function checkUsers(array $reports, array $db_reports = null): void {
 		$userids = [];
 
 		foreach ($reports as $report) {
 			$db_report = [];
-			$dashboardid_has_changed = false;
 			$users = array_key_exists('users', $report) ? $report['users'] : [];
 			$user_groups = array_key_exists('user_groups', $report) ? $report['user_groups'] : [];
 
-			if ($db_reports) {
+			if ($db_reports !== null) {
 				$db_report = $db_reports[$report['reportid']];
-				$dashboardid_has_changed = (array_key_exists('dashboardid', $report)
-					&& $report['dashboardid'] != $db_report['dashboardid']
-				);
+
 				if (!array_key_exists('users', $report)) {
 					$users = $db_report['users'];
 				}
@@ -367,13 +379,12 @@ class CReport extends CApiService {
 				}
 
 				foreach ($report['users'] as $user) {
-					if ($dashboardid_has_changed || !array_key_exists($user['userid'], $db_userids)) {
+					if (!array_key_exists($user['userid'], $db_userids)) {
 						$userids[$user['userid']] = true;
 					}
 
 					if (array_key_exists('access_userid', $user) && $user['access_userid'] != 0
-							&& ($dashboardid_has_changed
-								|| !array_key_exists($user['access_userid'], $db_access_userids))) {
+							&& !array_key_exists($user['access_userid'], $db_access_userids)) {
 						$userids[$user['access_userid']] = true;
 					}
 				}
@@ -386,8 +397,7 @@ class CReport extends CApiService {
 
 				foreach ($report['user_groups'] as $usrgrp) {
 					if (array_key_exists('access_userid', $usrgrp) && $usrgrp['access_userid'] != 0
-							&& ($dashboardid_has_changed
-								|| !array_key_exists($usrgrp['access_userid'], $db_access_userids))) {
+							&& !array_key_exists($usrgrp['access_userid'], $db_access_userids)) {
 						$userids[$usrgrp['access_userid']] = true;
 					}
 				}
@@ -416,38 +426,22 @@ class CReport extends CApiService {
 	}
 
 	/**
-	 * Check for valid user groups.
+	 * @param array      $reports
+	 * @param array|null $db_reports
 	 *
-	 * @param array  $reports
-	 * @param string $reports[]['dashboarid']                    (optional)
-	 * @param array  $reports[]['user_groups']                   (optional)
-	 * @param string $reports[]['user_groups'][]['usrgrpid']
-	 * @param array  $db_reports                                 (optional)
-	 * @param string $db_reports[]['reportid']
-	 * @param string $db_reports[]['dashboarid']
-	 * @param array  $db_reports[]['user_groups']
-	 * @param string $db_reports[]['user_groups'][]['usrgrpid']
-	 *
-	 * @throws APIException if user group is not valid.
+	 * @throws APIException
 	 */
-	protected function checkUserGroups(array $reports, array $db_reports = []): void {
+	private static function checkUserGroups(array $reports, array $db_reports = null): void {
 		$usrgrpids = [];
 
 		foreach ($reports as $report) {
 			if (array_key_exists('user_groups', $report) && $report['user_groups']) {
-				$db_usrgrpids = [];
-				$dashboardid_has_changed = false;
-
-				if ($db_reports) {
-					$db_report = $db_reports[$report['reportid']];
-					$db_usrgrpids = array_flip(array_column($db_report['user_groups'], 'usrgrpid'));
-					$dashboardid_has_changed = (array_key_exists('dashboarid', $report)
-						&& $report['dashboarid'] != $db_report['dashboarid']
-					);
-				}
+				$db_usrgrpids = $db_reports !== null
+					? array_flip(array_column($db_reports[$report['reportid']]['user_groups'], 'usrgrpid'))
+					: [];
 
 				foreach ($report['user_groups'] as $usrgrp) {
-					if ($dashboardid_has_changed || !array_key_exists($usrgrp['usrgrpid'], $db_usrgrpids)) {
+					if (!array_key_exists($usrgrp['usrgrpid'], $db_usrgrpids)) {
 						$usrgrpids[$usrgrp['usrgrpid']] = true;
 					}
 				}
@@ -484,22 +478,7 @@ class CReport extends CApiService {
 		$upd_reports = [];
 
 		foreach ($reports as $report) {
-			$db_report = $db_reports[$report['reportid']];
-
-			$upd_report = [];
-
-			foreach (['userid', 'status', 'dashboardid', 'period', 'cycle', 'weekdays', 'start_time', 'active_since',
-					'active_till'] as $field_name) {
-				if (array_key_exists($field_name, $report) && $report[$field_name] != $db_report[$field_name]) {
-					$upd_report[$field_name] = $report[$field_name];
-				}
-			}
-
-			foreach (['name', 'description'] as $field_name) {
-				if (array_key_exists($field_name, $report) && $report[$field_name] !== $db_report[$field_name]) {
-					$upd_report[$field_name] = $report[$field_name];
-				}
-			}
+			$upd_report = DB::getUpdatedValues('report', $report, $db_reports[$report['reportid']]);
 
 			if ($upd_report) {
 				$upd_reports[] = [
@@ -513,11 +492,11 @@ class CReport extends CApiService {
 			DB::update('report', $upd_reports);
 		}
 
-		$this->updateParams($reports, __FUNCTION__);
-		$this->updateUsers($reports, __FUNCTION__);
-		$this->updateUserGroups($reports, __FUNCTION__);
+		self::updateParams($reports, __FUNCTION__);
+		self::updateUsers($reports, $db_reports);
+		self::updateUserGroups($reports, $db_reports);
 
-		$this->addAuditBulk(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_SCHEDULED_REPORT, $reports, $db_reports);
+		self::addAuditLog(CAudit::ACTION_UPDATE, CAudit::RESOURCE_SCHEDULED_REPORT, $reports, $db_reports);
 
 		return ['reportids' => array_column($reports, 'reportid')];
 	}
@@ -526,9 +505,9 @@ class CReport extends CApiService {
 	 * @param array      $reports
 	 * @param array|null $db_reports
 	 *
-	 * @throws APIException if no permissions or the input is invalid.
+	 * @throws APIException
 	 */
-	protected function validateUpdate(array &$reports, ?array &$db_reports = null): void {
+	private function validateUpdate(array &$reports, ?array &$db_reports): void {
 		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['name']], 'fields' => [
 			'reportid' =>			['type' => API_ID, 'flags' => API_REQUIRED],
 			'userid' =>				['type' => API_ID],
@@ -555,52 +534,37 @@ class CReport extends CApiService {
 				'access_userid' =>		['type' => API_ID]
 			]]
 		]];
+
 		if (!CApiInputValidator::validate($api_input_rules, $reports, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
 
 		$db_reports = $this->get([
-			'output' => $this->output_fields,
-			'selectUsers' => $this->user_output_fields,
-			'selectUserGroups' => $this->usrgrp_output_fields,
+			'output' => ['reportid', 'userid', 'name', 'description', 'status', 'dashboardid', 'period', 'cycle',
+				'weekdays', 'start_time', 'subject', 'message'
+			],
 			'reportids' => array_column($reports, 'reportid'),
 			'preservekeys' => true
 		]);
 
-		$names = [];
-		$dashboardids = [];
+		if (count($reports) != count($db_reports)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _('No permissions to referred object or it does not exist!'));
+		}
 
-		$rnum = 0;
-		foreach ($reports as &$report) {
-			$rnum++;
+		// Get raw values of "active_*" fields.
+		$options = [
+			'output' => ['reportid', 'active_since', 'active_till'],
+			'reportids' => array_keys($db_reports)
+		];
+		$db_reports_active_fields = DBselect(DB::makeSql('report', $options));
 
-			if (!array_key_exists($report['reportid'], $db_reports)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS,
-					_s('Report with ID "%1$s" is not available.', $report['reportid'])
-				);
-			}
+		while ($db_report_active_fields = DBfetch($db_reports_active_fields)) {
+			$db_reports[$db_report_active_fields['reportid']] +=
+				array_diff_key($db_report_active_fields, array_flip(['reportid']));
+		}
 
+		foreach ($reports as $i => &$report) {
 			$db_report = $db_reports[$report['reportid']];
-
-			if (array_key_exists('name', $report) && $report['name'] !== $db_report['name']) {
-				$names[] = $report['name'];
-			}
-
-			if (array_key_exists('dashboardid', $report) && $report['dashboardid'] != $db_report['dashboardid']) {
-				if (!array_key_exists('users', $report)) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.', '/'.$rnum,
-						_s('the parameter "%1$s" is missing', 'users')
-					));
-				}
-
-				if (!array_key_exists('user_groups', $report)) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.', '/'.$rnum,
-						_s('the parameter "%1$s" is missing', 'user_groups')
-					));
-				}
-
-				$dashboardids[$report['dashboardid']] = true;
-			}
 
 			if (array_key_exists('cycle', $report) || array_key_exists('weekdays', $report)) {
 				$cycle = array_key_exists('cycle', $report) ? $report['cycle'] : $db_report['cycle'];
@@ -609,13 +573,13 @@ class CReport extends CApiService {
 				if ($cycle == ZBX_REPORT_CYCLE_WEEKLY) {
 					if ($weekdays < 1 || $weekdays > 127) {
 						self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
-							'/'.$rnum.'/weekdays', _s('value must be one of %1$s', '1-127')
+							'/'.($i + 1).'/weekdays', _s('value must be one of %1$s', '1-127')
 						));
 					}
 				}
 				elseif ($weekdays != 0) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
-						'/'.$rnum.'/weekdays', _s('value must be %1$s', '0')
+						'/'.($i + 1).'/weekdays', _s('value must be %1$s', '0')
 					));
 				}
 			}
@@ -655,14 +619,13 @@ class CReport extends CApiService {
 		}
 		unset($report);
 
-		if ($names) {
-			$this->checkDuplicates($names);
-		}
-		if ($dashboardids) {
-			$this->checkDashboards(array_keys($dashboardids));
-		}
-		$this->checkUsers($reports, $db_reports);
-		$this->checkUserGroups($reports, $db_reports);
+		self::checkDuplicates($reports, $db_reports);
+		self::checkDashboards($reports, $db_reports);
+
+		self::addAffectedObjects($reports, $db_reports);
+
+		self::checkUsers($reports, $db_reports);
+		self::checkUserGroups($reports, $db_reports);
 	}
 
 	/**
@@ -671,7 +634,7 @@ class CReport extends CApiService {
 	 * @param array  $reports
 	 * @param string $method
 	 */
-	protected function updateParams(array $reports, string $method): void {
+	private static function updateParams(array $reports, string $method): void {
 		$params_by_name = [
 			'subject' => 'subject',
 			'body' => 'message'
@@ -752,148 +715,157 @@ class CReport extends CApiService {
 	}
 
 	/**
-	 * Update table "report_user".
-	 *
-	 * @param array  $reports
-	 * @param string $method
+	 * @param array      $reports
+	 * @param array|null $db_reports
 	 */
-	protected function updateUsers(array $reports, string $method): void {
-		$report_users = [];
-
-		foreach ($reports as $report) {
-			if (array_key_exists('users', $report)) {
-				$report_users[$report['reportid']] = array_column($report['users'], null, 'userid');
-			}
-		}
-
-		if (!$report_users) {
-			return;
-		}
-
-		$db_report_users = ($method === 'update')
-			? DB::select('report_user', [
-				'output' => ['reportuserid', 'reportid', 'userid', 'access_userid', 'exclude'],
-				'filter' => ['reportid' => array_keys($report_users)]
-			])
-			: [];
-
+	private static function updateUsers(array &$reports, array $db_reports = null): void {
 		$ins_report_users = [];
 		$upd_report_users = [];
 		$del_reportuserids = [];
 
-		foreach ($db_report_users as $db_report_user) {
-			if (array_key_exists($db_report_user['userid'], $report_users[$db_report_user['reportid']])) {
-				$report_user = $report_users[$db_report_user['reportid']][$db_report_user['userid']];
-				unset($report_users[$db_report_user['reportid']][$db_report_user['userid']]);
+		foreach ($reports as &$report) {
+			if (!array_key_exists('users', $report)) {
+				continue;
+			}
 
-				$upd_report_user = DB::getUpdatedValues('report_user', $report_user, $db_report_user);
+			$db_report_users = $db_reports !== null
+				? array_column($db_reports[$report['reportid']]['users'], null, 'userid')
+				: [];
 
-				if ($upd_report_user) {
-					$upd_report_users[] = [
-						'values' => $upd_report_user,
-						'where' => ['reportuserid' => $db_report_user['reportuserid']]
-					];
+			foreach ($report['users'] as &$report_user) {
+				if (array_key_exists($report_user['userid'], $db_report_users)) {
+					$db_report_user = $db_report_users[$report_user['userid']];
+					$report_user['reportuserid'] = $db_report_user['reportuserid'];
+					unset($db_report_users[$report_user['userid']]);
+
+					$upd_report_user = DB::getUpdatedValues('report_user', $report_user, $db_report_user);
+
+					if ($upd_report_user) {
+						$upd_report_users[] = [
+							'values' => $upd_report_user,
+							'where' => ['reportuserid' => $db_report_user['reportuserid']]
+						];
+					}
+				}
+				else {
+					$ins_report_users[] = ['reportid' => $report['reportid']] + $report_user;
 				}
 			}
-			else {
-				$del_reportuserids[] = $db_report_user['reportuserid'];
-			}
-		}
+			unset($report_user);
 
-		foreach ($report_users as $reportid => $users) {
-			foreach ($users as $user) {
-				$ins_report_users[] = ['reportid' => $reportid] + $user;
-			}
+			$del_reportuserids = array_merge($del_reportuserids, array_column($db_report_users, 'reportuserid'));
 		}
+		unset($report);
 
-		if ($ins_report_users) {
-			DB::insert('report_user', $ins_report_users);
+		if ($del_reportuserids) {
+			DB::delete('report_user', ['reportuserid' => $del_reportuserids]);
 		}
 
 		if ($upd_report_users) {
 			DB::update('report_user', $upd_report_users);
 		}
 
-		if ($del_reportuserids) {
-			DB::delete('report_user', ['reportuserid' => $del_reportuserids]);
+		if ($ins_report_users) {
+			$reportuserids = DB::insert('report_user', $ins_report_users);
 		}
+
+		foreach ($reports as &$report) {
+			if (!array_key_exists('users', $report)) {
+				continue;
+			}
+
+			foreach ($report['users'] as &$report_user) {
+				if (!array_key_exists('reportuserid', $report_user)) {
+					$report_user['reportuserid'] = array_shift($reportuserids);
+				}
+			}
+			unset($report_user);
+		}
+		unset($report);
 	}
 
 	/**
-	 * Update table "report_usrgrp".
-	 *
-	 * @param array  $reports
-	 * @param string $method
+	 * @param array      $reports
+	 * @param array|null $db_reports
 	 */
-	protected function updateUserGroups(array $reports, string $method): void {
-		$report_usrgrps = [];
-
-		foreach ($reports as $report) {
-			if (array_key_exists('user_groups', $report)) {
-				$report_usrgrps[$report['reportid']] = array_column($report['user_groups'], null, 'usrgrpid');
-			}
-		}
-
-		if (!$report_usrgrps) {
-			return;
-		}
-
-		$db_report_usrgrps = ($method === 'update')
-			? DB::select('report_usrgrp', [
-				'output' => ['reportusrgrpid', 'reportid', 'usrgrpid', 'access_userid'],
-				'filter' => ['reportid' => array_keys($report_usrgrps)]
-			])
-			: [];
-
+	private static function updateUserGroups(array &$reports, array $db_reports = null): void {
 		$ins_report_usrgrps = [];
 		$upd_report_usrgrps = [];
 		$del_reportusrgrpids = [];
 
-		foreach ($db_report_usrgrps as $db_report_usrgrp) {
-			if (array_key_exists($db_report_usrgrp['usrgrpid'], $report_usrgrps[$db_report_usrgrp['reportid']])) {
-				$report_usrgrp = $report_usrgrps[$db_report_usrgrp['reportid']][$db_report_usrgrp['usrgrpid']];
-				unset($report_usrgrps[$db_report_usrgrp['reportid']][$db_report_usrgrp['usrgrpid']]);
+		foreach ($reports as &$report) {
+			if (!array_key_exists('user_groups', $report)) {
+				continue;
+			}
 
-				$upd_report_usrgrp = DB::getUpdatedValues('report_usrgrp', $report_usrgrp, $db_report_usrgrp);
+			$db_report_usrgrps = $db_reports !== null
+				? array_column($db_reports[$report['reportid']]['user_groups'], null, 'usrgrpid')
+				: [];
 
-				if ($upd_report_usrgrp) {
-					$upd_report_usrgrps[] = [
-						'values' => $upd_report_usrgrp,
-						'where' => ['reportusrgrpid' => $db_report_usrgrp['reportusrgrpid']]
-					];
+			foreach ($report['user_groups'] as &$report_usrgrp) {
+				if (array_key_exists($report_usrgrp['usrgrpid'], $db_report_usrgrps)) {
+					$db_report_usrgrp = $db_report_usrgrps[$report_usrgrp['usrgrpid']];
+					$report_usrgrp['reportusrgrpid'] = $db_report_usrgrp['reportusrgrpid'];
+					unset($db_report_usrgrps[$report_usrgrp['usrgrpid']]);
+
+					$upd_report_usrgrp = DB::getUpdatedValues('report_user', $report_usrgrp, $db_report_usrgrp);
+
+					if ($upd_report_usrgrp) {
+						$upd_report_usrgrps[] = [
+							'values' => $upd_report_usrgrp,
+							'where' => ['reportusrgrpid' => $db_report_usrgrp['reportusrgrpid']]
+						];
+					}
+				}
+				else {
+					$ins_report_usrgrps[] = ['reportid' => $report['reportid']] + $report_usrgrp;
 				}
 			}
-			else {
-				$del_reportusrgrpids[] = $db_report_usrgrp['reportusrgrpid'];
-			}
-		}
+			unset($report_usrgrp);
 
-		foreach ($report_usrgrps as $reportid => $usrgrps) {
-			foreach ($usrgrps as $usrgrp) {
-				$ins_report_usrgrps[] = ['reportid' => $reportid] + $usrgrp;
-			}
+			$del_reportusrgrpids = array_merge($del_reportusrgrpids,
+				array_column($db_report_usrgrps, 'reportusrgrpid')
+			);
 		}
+		unset($report);
 
-		if ($ins_report_usrgrps) {
-			DB::insert('report_usrgrp', $ins_report_usrgrps);
+		if ($del_reportusrgrpids) {
+			DB::delete('report_usrgrp', ['reportusrgrpid' => $del_reportusrgrpids]);
 		}
 
 		if ($upd_report_usrgrps) {
 			DB::update('report_usrgrp', $upd_report_usrgrps);
 		}
 
-		if ($del_reportusrgrpids) {
-			DB::delete('report_usrgrp', ['reportusrgrpid' => $del_reportusrgrpids]);
+		if ($ins_report_usrgrps) {
+			$reportusrgrpids = DB::insert('report_usrgrp', $ins_report_usrgrps);
 		}
+
+		foreach ($reports as &$report) {
+			if (!array_key_exists('user_groups', $report)) {
+				continue;
+			}
+
+			foreach ($report['user_groups'] as &$report_usrgrp) {
+				if (!array_key_exists('reportusrgrpid', $report_usrgrp)) {
+					$report_usrgrp['reportusrgrpid'] = array_shift($reportusrgrpids);
+				}
+			}
+			unset($report_usrgrp);
+		}
+		unset($report);
 	}
 
 	/**
 	 * @param array $reportids
 	 *
+	 * @throws APIException
+	 *
 	 * @return array
 	 */
 	public function delete(array $reportids): array {
 		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+
 		if (!CApiInputValidator::validate($api_input_rules, $reportids, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
@@ -904,17 +876,13 @@ class CReport extends CApiService {
 			'preservekeys' => true
 		]);
 
-		foreach ($reportids as $reportid) {
-			if (!array_key_exists($reportid, $db_reports)) {
-				self::exception(ZBX_API_ERROR_PERMISSIONS,
-					_('No permissions to referred object or it does not exist!')
-				);
-			}
+		if (count($db_reports) != count($reportids)) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
 		DB::delete('report', ['reportid' => $reportids]);
 
-		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_SCHEDULED_REPORT, $db_reports);
+		self::addAuditLog(CAudit::ACTION_DELETE, CAudit::RESOURCE_SCHEDULED_REPORT, $db_reports);
 
 		return ['reportids' => $reportids];
 	}
@@ -1038,5 +1006,62 @@ class CReport extends CApiService {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * @param array $reports
+	 * @param array $db_reports
+	 */
+	private static function addAffectedObjects(array $reports, array &$db_reports): void {
+		self::addAffectedUsers($reports, $db_reports);
+		self::addAffectedUserGroups($reports, $db_reports);
+	}
+
+	/**
+	 * @param array $reports
+	 * @param array $db_reports
+	 */
+	private static function addAffectedUsers(array $reports, array &$db_reports): void {
+		$reportids = [];
+
+		foreach ($reports as $report) {
+			$reportids[] = $report['reportid'];
+			$db_reports[$report['reportid']]['users'] = [];
+		}
+
+		$options = [
+			'output' => ['reportuserid', 'reportid', 'userid', 'exclude', 'access_userid'],
+			'filter' => ['reportid' => $reportids]
+		];
+		$db_report_users = DBselect(DB::makeSql('report_user', $options));
+
+		while ($db_report_user = DBfetch($db_report_users)) {
+			$db_reports[$db_report_user['reportid']]['users'][$db_report_user['reportuserid']] =
+				array_diff_key($db_report_user, array_flip(['reportid']));
+		}
+	}
+
+	/**
+	 * @param array $reports
+	 * @param array $db_reports
+	 */
+	private static function addAffectedUserGroups(array $reports, array &$db_reports): void {
+		$reportids = [];
+
+		foreach ($reports as $report) {
+			$reportids[] = $report['reportid'];
+			$db_reports[$report['reportid']]['user_groups'] = [];
+		}
+
+		$options = [
+			'output' => ['reportusrgrpid', 'reportid', 'usrgrpid', 'access_userid'],
+			'filter' => ['reportid' => $reportids]
+		];
+		$db_report_usrgrps = DBselect(DB::makeSql('report_usrgrp', $options));
+
+		while ($db_report_usrgrp = DBfetch($db_report_usrgrps)) {
+			$db_reports[$db_report_usrgrp['reportid']]['user_groups'][$db_report_usrgrp['reportusrgrpid']] =
+				array_diff_key($db_report_usrgrp, array_flip(['reportid']));
+		}
 	}
 }

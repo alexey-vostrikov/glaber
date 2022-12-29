@@ -31,8 +31,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Create CMacrosResolver object and store in static variable.
-	 *
-	 * @static
 	 */
 	private static function init() {
 		if (self::$macrosResolver === null) {
@@ -42,8 +40,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve macros.
-	 *
-	 * @static
 	 *
 	 * @param array $options
 	 *
@@ -57,8 +53,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve macros in http test name.
-	 *
-	 * @static
 	 *
 	 * @param int    $hostId
 	 * @param string $name
@@ -78,8 +72,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve macros in host interfaces.
-	 *
-	 * @static
 	 *
 	 * @param array  $interfaces
 	 * @param string $interfaces[n]['hostid']
@@ -273,8 +265,6 @@ class CMacrosResolverHelper {
 	/**
 	 * Resolve macros in trigger name.
 	 *
-	 * @static
-	 *
 	 * @param array $trigger
 	 *
 	 * @return string
@@ -287,8 +277,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve macros in trigger names.
-	 *
-	 * @static
 	 *
 	 * @param array $triggers
 	 * @param bool  $references_only
@@ -305,8 +293,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve macros in trigger operational data.
-	 *
-	 * @static
 	 *
 	 * @param array  $trigger
 	 * @param string $trigger['expression']
@@ -331,8 +317,6 @@ class CMacrosResolverHelper {
 	/**
 	 * Resolve macros in trigger description.
 	 *
-	 * @static
-	 *
 	 * @param array  $trigger
 	 * @param string $trigger['expression']
 	 * @param string $trigger['comments']
@@ -355,8 +339,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve macros in trigger descriptions and operational data.
-	 *
-	 * @static
 	 *
 	 * @param array  $triggers
 	 * @param string $triggers[$triggerid]['expression']
@@ -385,8 +367,6 @@ class CMacrosResolverHelper {
 	/**
 	 * Resolve macros in trigger url.
 	 *
-	 * @static
-	 *
 	 * @param array  $trigger
 	 * @param string $trigger['triggerid']
 	 * @param string $trigger['expression']
@@ -403,9 +383,25 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Resolve macros in trigger expression.
+	 * Resolve macros in trigger url name.
 	 *
-	 * @static
+	 * @param array  $trigger
+	 * @param string $trigger['triggerid']
+	 * @param string $trigger['expression']
+	 * @param string $trigger['url_name']
+	 * @param string $trigger['eventid']
+	 * @param string $url
+	 *
+	 * @return bool
+	 */
+	public static function resolveTriggerUrlName(array $trigger, &$url_name) {
+		self::init();
+
+		return self::$macrosResolver->resolveTriggerUrlName($trigger, $url_name);
+	}
+
+	/**
+	 * Resolve macros in trigger expression.
 	 *
 	 * @param string $expression
 	 * @param array  $options     See CMacrosResolver::resolveTriggerExpressions() for more details.
@@ -424,8 +420,6 @@ class CMacrosResolverHelper {
 	/**
 	 * Resolve macros in trigger expressions.
 	 *
-	 * @static
-	 *
 	 * @param array $triggers
 	 * @param array $options   See CMacrosResolver::resolveTriggerExpressions() for more details.
 	 *
@@ -438,113 +432,77 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Resolve positional macros and functional item macros, for example, {{HOST.HOST1}:key.func(param)}.
+	 * Resolve expression macros. For example, {?func(/host/key, param)} or {?func(/{HOST.HOST1}/key, param)}.
 	 *
-	 * @static
+	 * @param string $name
+	 * @param array  $items
+	 * @param string $items[]['hostid']
+	 * @param string $items[]['host']
 	 *
-	 * @param type   $name					string in which macros should be resolved
-	 * @param array  $items					list of graph items
-	 * @param int    $items[n]['hostid']	graph n-th item corresponding host Id
-	 * @param string $items[n]['host']		graph n-th item corresponding host name
-	 *
-	 * @return string	string with macros replaced with corresponding values
+	 * @return string  A graph name with resolved macros.
 	 */
 	public static function resolveGraphName($name, array $items) {
 		self::init();
 
-		$graph = self::$macrosResolver->resolve([
-			'config' => 'graphName',
-			'data' => [['name' => $name, 'items' => $items]]
-		]);
-		$graph = reset($graph);
-
-		return $graph['name'];
+		return self::$macrosResolver->resolveGraphNames([['name' => $name, 'items' => $items]])[0]['name'];
 	}
 
 	/**
-	 * Resolve positional macros and functional item macros, for example, {{HOST.HOST1}:key.func(param)}.
-	 * ! if same graph will be passed more than once only name for first entry will be resolved.
+	 * Resolve expression macros. For example, {?func(/host/key, param)} or {?func(/{HOST.HOST1}/key, param)}.
 	 *
-	 * @static
+	 * @param array  $graphs
+	 * @param string $graphs[]['graphid']
+	 * @param string $graphs[]['name']
 	 *
-	 * @param array  $data					list or hashmap of graphs
-	 * @param int    $data[n]['graphid']	id of graph
-	 * @param string $data[n]['name']		name of graph
-	 *
-	 * @return array	inputted data with resolved names
+	 * @return array	Inputted data with resolved graph name.
 	 */
-	public static function resolveGraphNameByIds(array $data) {
+	public static function resolveGraphNameByIds(array $graphs) {
 		self::init();
 
-		$graphIds = [];
-		$graphMap = [];
-		foreach ($data as $graph) {
-			// skip graphs without macros
-			if (strpos($graph['name'], '{') !== false) {
-				$graphMap[$graph['graphid']] = [
+		$_graphs = [];
+
+		foreach ($graphs as $graph) {
+			// Skip graphs without expression macros.
+			if (strpos($graph['name'], '{?') !== false) {
+				$_graphs[$graph['graphid']] = [
 					'graphid' => $graph['graphid'],
 					'name' => $graph['name'],
 					'items' => []
 				];
-				$graphIds[$graph['graphid']] = $graph['graphid'];
 			}
 		}
 
+		if (!$_graphs) {
+			return $graphs;
+		}
+
 		$items = DBfetchArray(DBselect(
-			'SELECT i.hostid,gi.graphid,h.host'.
+			'SELECT gi.graphid,h.host'.
 			' FROM graphs_items gi,items i,hosts h'.
 			' WHERE gi.itemid=i.itemid'.
 				' AND i.hostid=h.hostid'.
-				' AND '.dbConditionInt('gi.graphid', $graphIds).
+				' AND '.dbConditionInt('gi.graphid', array_keys($_graphs)).
 			' ORDER BY gi.sortorder'
 		));
 
 		foreach ($items as $item) {
-			$graphMap[$item['graphid']]['items'][] = ['hostid' => $item['hostid'], 'host' => $item['host']];
+			$_graphs[$item['graphid']]['items'][] = ['host' => $item['host']];
 		}
 
-		$graphMap = self::$macrosResolver->resolve([
-			'config' => 'graphName',
-			'data' => $graphMap
-		]);
+		$_graphs = self::$macrosResolver->resolveGraphNames($_graphs);
 
-		$resolvedGraph = reset($graphMap);
-		foreach ($data as &$graph) {
-			if ($resolvedGraph && $graph['graphid'] === $resolvedGraph['graphid']) {
-				$graph['name'] = $resolvedGraph['name'];
-				$resolvedGraph = next($graphMap);
+		foreach ($graphs as &$graph) {
+			if (array_key_exists($graph['graphid'], $_graphs)) {
+				$graph['name'] = $_graphs[$graph['graphid']]['name'];
 			}
 		}
 		unset($graph);
 
-		return $data;
-	}
-
-	/**
-	 * Resolve item name macros to "name_expanded" field.
-	 *
-	 * @static
-	 *
-	 * @param array  $items
-	 * @param string $items[n]['itemid']
-	 * @param string $items[n]['hostid']
-	 * @param string $items[n]['name']
-	 * @param string $items[n]['key_']				item key (optional)
-	 *												but is (mandatory) if macros exist and "key_expanded" is not present
-	 * @param string $items[n]['key_expanded']		expanded item key (optional)
-	 *
-	 * @return array
-	 */
-	public static function resolveItemNames(array $items) {
-		self::init();
-
-		return self::$macrosResolver->resolveItemNames($items);
+		return $graphs;
 	}
 
 	/**
 	 * Resolve item key macros to "key_expanded" field.
-	 *
-	 * @static
 	 *
 	 * @param array  $items
 	 * @param string $items[n]['itemid']
@@ -560,9 +518,7 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Resolve macros in item description.
-	 *
-	 * @static
+	 * Resolve item description macros to "description_expanded" field.
 	 *
 	 * @param array	 $items
 	 * @param string $items[n]['hostid']
@@ -577,24 +533,69 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Expand functional macros in given map label.
+	 * Resolve single item widget description macros.
 	 *
-	 * @param string $label			label to expand
-	 * @param array  $replaceHosts	list of hosts in order which they appear in trigger expression if trigger label is
-	 * given, or single host when host label is given
+	 * @param array  $items
+	 * @param string $items[n]['hostid']
+	 * @param string $items[n]['itemid']
+	 * @param string $items[n]['name']    Field to resolve. Required.
 	 *
-	 * @return string
+	 * @return array                      Returns array of items with macros resolved.
 	 */
-	public static function resolveMapLabelMacros($label, array $replaceHosts = []) {
+	public static function resolveWidgetItemNames(array $items) {
 		self::init();
 
-		return self::$macrosResolver->resolveMapLabelMacros($label, $replaceHosts);
+		return self::$macrosResolver->resolveWidgetItemNames($items);
+	}
+
+	/**
+	 * Resolve text-type column macros for top-hosts widget.
+	 *
+	 * @param array $columns
+	 * @param array $items
+	 *
+	 * @return array
+	 */
+	public static function resolveWidgetTopHostsTextColumns(array $columns, array $items): array {
+		self::init();
+
+		return self::$macrosResolver->resolveWidgetTopHostsTextColumns($columns, $items);
+	}
+
+	/**
+	 * Expand functional macros in given map link labels.
+	 *
+	 * @param array  $links
+	 * @param string $links[]['label']
+	 * @param array  $fields            A mapping between source and destination fields.
+	 *
+	 * @return array
+	 */
+	public static function resolveMapLinkLabelMacros(array $links, array $fields = ['label' => 'label']): array {
+		self::init();
+
+		return self::$macrosResolver->resolveMapLinkLabelMacros($links, $fields);
+	}
+
+	/**
+	 * Expand functional macros in given map shape labels.
+	 *
+	 * @param string $map_name
+	 * @param array  $shapes
+	 * @param string $shapes[]['text']
+	 * @param array  $fields            A mapping between source and destination fields.
+	 *
+	 * @return array
+	 */
+	public static function resolveMapShapeLabelMacros(string $map_name, array $shapes,
+			array $fields = ['text' => 'text']): array {
+		self::init();
+
+		return self::$macrosResolver->resolveMapShapeLabelMacros($map_name, $shapes, $fields);
 	}
 
 	/**
 	 * Resolve macros in dashboard widget URL.
-	 *
-	 * @static
 	 *
 	 * @param array $widget
 	 *
@@ -619,8 +620,6 @@ class CMacrosResolverHelper {
 	/**
 	 * Resolve time unit macros.
 	 *
-	 * @static
-	 *
 	 * @param array $data
 	 * @param array $field_names
 	 *
@@ -634,8 +633,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Resolve supported macros used in map element label as well as in URL names and values.
-	 *
-	 * @static
 	 *
 	 * @param array        $selements[]
 	 * @param int          $selements[]['elementtype']          Map element type.
@@ -659,8 +656,6 @@ class CMacrosResolverHelper {
 
 	/**
 	 * Set every trigger items array elements order by item usage order in trigger expression and recovery expression.
-	 *
-	 * @static
 	 *
 	 * @param array  $triggers                            Array of triggers.
 	 * @param string $triggers[]['expression']            Trigger expression used to define order of trigger items.
@@ -717,5 +712,42 @@ class CMacrosResolverHelper {
 		self::init();
 
 		return self::$macrosResolver->resolveMediaTypeUrls($events, $urls);
+	}
+
+	/**
+	 * Resolve macros for manual host action scripts. Resolves host macros, interface macros, inventory, user macros
+	 * and user data macros.
+	 *
+	 * @param array $data                        Array of unersolved macros.
+	 * @param array $data[<hostid>]              Array of scripts. Contains script ID as keys.
+	 * @param array $data[<hostid>][<scriptid>]  Script fields to resolve macros for.
+	 *
+	 * @return array
+	 */
+	public static function resolveManualHostActionScripts(array $data): array {
+		self::init();
+
+		return self::$macrosResolver->resolveManualHostActionScripts($data);
+	}
+
+	/**
+	 * Resolve macros for manual event action scripts. Resolves host<1-9> macros, interface<1-9> macros,
+	 * inventory<1-9> macros, user macros, event macros and user data macros.
+	 *
+	 * @param array $data                                  Array of unersolved macros.
+	 * @param array $data[<eventid>]                       Array of scripts. Contains script ID as keys.
+	 * @param array $data[<eventid>][<scriptid>]           Script fields to resolve macros for.
+	 * @param array $events                                Array of events.
+	 * @param array $events[<eventid>]                     Event fields.
+	 * @param array $events[<eventid>][hosts]              Array of hosts that created the event.
+	 * @param array $events[<eventid>][hosts][][<hostid>]  Host ID.
+	 * @param array $events[<eventid>][objectid]           Trigger ID.
+	 *
+	 * @return array
+	 */
+	public static function resolveManualEventActionScripts(array $data, array $events): array {
+		self::init();
+
+		return self::$macrosResolver->resolveManualEventActionScripts($data, $events);
 	}
 }

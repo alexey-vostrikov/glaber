@@ -87,11 +87,27 @@ function validateConditionPopup(overlay) {
 		.done(function(response) {
 			overlay.$dialogue.find('.msg-bad').remove();
 
-			if (typeof response.errors !== 'undefined') {
-				jQuery(response.errors).insertBefore($form);
+			if ('error' in response) {
+				const message_box = makeMessageBox('bad', response.error.messages, response.error.title);
+
+				message_box.insertBefore($form);
 			}
 			else {
 				submitConditionPopup(response, overlay);
 			}
 		});
+}
+
+function selectServices() {
+	const overlay = PopUp('popup.services', {title: t('Services')}, {dialogueid: 'services'});
+
+	overlay.$dialogue[0].addEventListener('dialogue.submit', (e) => {
+		const data = [];
+
+		for (const service of e.detail) {
+			data.push({id: service.serviceid, name: service.name});
+		}
+
+		$('#service-new-condition').multiSelect('addData', data);
+	});
 }

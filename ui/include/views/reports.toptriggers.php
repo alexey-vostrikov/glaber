@@ -21,14 +21,17 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
-$filterForm = new CFilter(new CUrl('toptriggers.php'));
+$this->includeJsFile('reports.toptriggers.js.php');
+
+$filterForm = (new CFilter())->setResetUrl(new CUrl('toptriggers.php'));
 
 $severities = [];
 foreach (range(TRIGGER_SEVERITY_NOT_CLASSIFIED, TRIGGER_SEVERITY_COUNT - 1) as $severity) {
 	$severities[] = [
-		'name' => getSeverityName($severity),
+		'name' => CSeverityHelper::getName($severity),
 		'value' => $severity
 	];
 }
@@ -43,9 +46,9 @@ $filter_column = (new CFormList())
 				'parameters' => [
 					'srctbl' => 'host_groups',
 					'srcfld1' => 'groupid',
-					'dstfrm' => $filterForm->getName(),
+					'dstfrm' => 'zbx_filter',
 					'dstfld1' => 'groupids_',
-					'real_hosts' => true,
+					'with_hosts' => true,
 					'enrich_parent_groups' => true
 				]
 			]
@@ -57,13 +60,14 @@ $filter_column = (new CFormList())
 			'object_name' => 'hosts',
 			'data' => $data['multiSelectHostData'],
 			'popup' => [
-				'filter_preselect_fields' => [
-					'hostgroups' => 'groupids_'
+				'filter_preselect' => [
+					'id' => 'groupids_',
+					'submit_as' => 'groupid'
 				],
 				'parameters' => [
 					'srctbl' => 'hosts',
 					'srcfld1' => 'hostid',
-					'dstfrm' => $filterForm->getName(),
+					'dstfrm' => 'zbx_filter',
 					'dstfld1' => 'hostids_'
 				]
 			]
@@ -96,7 +100,7 @@ foreach ($data['triggers'] as $trigger) {
 	$table->addRow([
 		$hostName,
 		$triggerDescription,
-		getSeverityCell($trigger['priority']),
+		CSeverityHelper::makeSeverityCell((int) $trigger['priority']),
 		$trigger['cnt_event']
 	]);
 }
@@ -111,8 +115,9 @@ $obj_data = [
 zbx_add_post_js('timeControl.addObject("toptriggers", '.zbx_jsvalue($data['filter']).', '.zbx_jsvalue($obj_data).');');
 zbx_add_post_js('timeControl.processObjects();');
 
-(new CWidget())
+(new CHtmlPage())
 	->setTitle(_('100 busiest triggers'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::REPORTS_TOPTRIGGERS))
 	->addItem($filterForm)
 	->addItem($table)
 	->show();

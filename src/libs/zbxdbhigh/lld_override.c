@@ -17,10 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "dbcache.h"
+#include "zbxdbhigh.h"
+
 #include "log.h"
-#include "db.h"
+#include "zbxalgo.h"
+#include "zbxdb.h"
+#include "zbxnum.h"
 
 void	zbx_lld_override_operation_free(zbx_lld_override_operation_t *override_operation)
 {
@@ -37,8 +39,6 @@ void	zbx_lld_override_operation_free(zbx_lld_override_operation_t *override_oper
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_override_operations_load_tags                                *
  *                                                                            *
  * Purpose: load tag override operations from database                        *
  *                                                                            *
@@ -91,9 +91,7 @@ static void	lld_override_operations_load_tags(const zbx_vector_uint64_t *overrid
 			op = (zbx_lld_override_operation_t *)ops->values[index];
 		}
 
-		tag = (zbx_db_tag_t *)zbx_malloc(NULL, sizeof(zbx_db_tag_t));
-		tag->tag = zbx_strdup(NULL, row[1]);
-		tag->value = zbx_strdup(NULL, row[2]);
+		tag = zbx_db_tag_create(row[1], row[2]);
 		zbx_vector_db_tag_ptr_append(&op->tags, tag);
 	}
 	DBfree_result(result);
@@ -102,8 +100,6 @@ static void	lld_override_operations_load_tags(const zbx_vector_uint64_t *overrid
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_override_operations_load_templates                           *
  *                                                                            *
  * Purpose: load template lld override operations from database               *
  *                                                                            *
@@ -163,8 +159,6 @@ static void	lld_override_operations_load_templates(const zbx_vector_uint64_t *ov
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_load_lld_override_operations                                 *
  *                                                                            *
  * Purpose: load lld override operations from database                        *
  *                                                                            *
@@ -246,8 +240,8 @@ void	zbx_load_lld_override_operations(const zbx_vector_uint64_t *overrideids, ch
 		override_operation->severity = FAIL == DBis_null(row[10]) ? (unsigned char)atoi(row[10]) :
 				TRIGGER_SEVERITY_COUNT;
 
-		override_operation->inventory_mode = FAIL == DBis_null(row[11]) ?
-				(unsigned char)atoi(row[11]) : HOST_INVENTORY_COUNT;
+		override_operation->inventory_mode = FAIL == DBis_null(row[11]) ? (signed char)atoi(row[11]) :
+				HOST_INVENTORY_COUNT;
 
 		zbx_vector_ptr_append(ops, override_operation);
 

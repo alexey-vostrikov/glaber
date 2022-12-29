@@ -17,36 +17,46 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "discoverer.h"
 
-#include "db.h"
 #include "log.h"
-#include "sysinfo.h"
 #include "zbxicmpping.h"
-#include "discovery.h"
+#include "zbxdiscovery.h"
 #include "zbxserver.h"
 #include "zbxself.h"
-
-#include "daemon.h"
-#include "discoverer.h"
+#include "zbxrtc.h"
+#include "zbxnix.h"
 #include "../poller/checks_agent.h"
 #include "../poller/checks_snmp.h"
-#include "zbxcrypto.h"
 #include "../events.h"
+#include "zbxnum.h"
+#include "zbxtime.h"
+#include "zbxip.h"
+#include "zbxsysinfo.h"
+#include "zbx_rtc_constants.h"
 
-extern int		CONFIG_DISCOVERER_FORKS;
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
-
-#ifdef HAVE_NETSNMP
-static volatile sig_atomic_t	snmp_cache_reload_requested;
-#endif
+extern unsigned char			program_type;
 
 #define ZBX_DISCOVERER_IPRANGE_LIMIT	(1 << 16)
 
+typedef struct
+{
+	zbx_uint64_t	dcheckid;
+	char		*ports;
+	char		*key_;
+	char		*snmp_community;
+	char		*snmpv3_securityname;
+	char		*snmpv3_authpassphrase;
+	char		*snmpv3_privpassphrase;
+	char		*snmpv3_contextname;
+	int		type;
+	unsigned char	snmpv3_securitylevel;
+	unsigned char	snmpv3_authprotocol;
+	unsigned char	snmpv3_privprotocol;
+}
+DB_DCHECK;
+
 /******************************************************************************
- *                                                                            *
- * Function: proxy_update_service                                             *
  *                                                                            *
  * Purpose: process new service status                                        *
  *                                                                            *
@@ -73,8 +83,6 @@ static void	proxy_update_service(zbx_uint64_t druleid, zbx_uint64_t dcheckid, co
 
 /******************************************************************************
  *                                                                            *
- * Function: proxy_update_host                                                *
- *                                                                            *
  * Purpose: process new service status                                        *
  *                                                                            *
  * Parameters: service - service info                                         *
@@ -97,8 +105,6 @@ static void	proxy_update_host(zbx_uint64_t druleid, const char *ip, const char *
 
 /******************************************************************************
  *                                                                            *
- * Function: discover_service                                                 *
- *                                                                            *
  * Purpose: check if service is available                                     *
  *                                                                            *
  * Parameters: service type, ip address, port number                          *
@@ -110,11 +116,11 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 {
 	int		ret = SUCCEED;
 	const char	*service = NULL;
-	AGENT_RESULT 	result;
+	AGENT_RESULT	result;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	init_result(&result);
+	zbx_init_agent_result(&result);
 
 	**value = '\0';
 
@@ -170,7 +176,7 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 		size_t		value_offset = 0;
 		ZBX_FPING_HOST	host;
 		DC_ITEM		item;
-		char		key[MAX_STRING_LEN], error[ITEM_ERROR_LEN_MAX];
+		char		key[MAX_STRING_LEN], error[ZBX_ITEM_ERROR_LEN_MAX];
 
 		zbx_alarm_on(CONFIG_TIMEOUT);
 
@@ -190,8 +196,8 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 			case SVC_TELNET:
 				zbx_snprintf(key, sizeof(key), "net.tcp.service[%s,%s,%d]", service, ip, port);
 
-				if (SUCCEED != process(key, 0, &result) || NULL == GET_UI64_RESULT(&result) ||
-						0 == result.ui64)
+				if (SUCCEED != zbx_execute_agent_check(key, 0, &result) || NULL ==
+						ZBX_GET_UI64_RESULT(&result) || 0 == result.ui64)
 				{
 					ret = FAIL;
 				}
@@ -203,7 +209,7 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 			case SVC_SNMPv3:
 				memset(&item, 0, sizeof(DC_ITEM));
 
-				strscpy(item.key_orig, dcheck->key_);
+				zbx_strscpy(item.key_orig, dcheck->key_);
 				item.key = item.key_orig;
 
 				item.interface.useip = 1;
@@ -236,7 +242,7 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 					item.host.tls_connect = ZBX_TCP_SEC_UNENCRYPTED;
 
 					if (SUCCEED == get_value_agent(&item, &result) &&
-							NULL != (pvalue = GET_TEXT_RESULT(&result)))
+							NULL != (pvalue = ZBX_GET_TEXT_RESULT(&result)))
 					{
 						zbx_strcpy_alloc(value, value_alloc, &value_offset, *pvalue);
 					}
@@ -249,10 +255,10 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 					item.snmp_community = strdup(dcheck->snmp_community);
 					item.snmp_oid = strdup(dcheck->key_);
 
-					substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-							NULL, NULL, NULL, &item.snmp_community, MACRO_TYPE_COMMON,
-							NULL, 0);
-					substitute_key_macros(&item.snmp_oid, NULL, NULL, NULL, NULL,
+					zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+							NULL, NULL, NULL, NULL, NULL, &item.snmp_community,
+							MACRO_TYPE_COMMON, NULL, 0);
+					zbx_substitute_key_macros(&item.snmp_oid, NULL, NULL, NULL, NULL,
 							MACRO_TYPE_SNMP_OID, NULL, 0);
 
 					if (ZBX_IF_SNMP_VERSION_3 == item.snmp_version)
@@ -268,22 +274,23 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 						item.snmpv3_privprotocol = dcheck->snmpv3_privprotocol;
 						item.snmpv3_contextname = zbx_strdup(NULL, dcheck->snmpv3_contextname);
 
-						substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, &item.snmpv3_securityname,
-								MACRO_TYPE_COMMON, NULL, 0);
-						substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, &item.snmpv3_authpassphrase,
-								MACRO_TYPE_COMMON, NULL, 0);
-						substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, &item.snmpv3_privpassphrase,
-								MACRO_TYPE_COMMON, NULL, 0);
-						substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, &item.snmpv3_contextname,
-								MACRO_TYPE_COMMON, NULL, 0);
+						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+								NULL, NULL, NULL, NULL, NULL, NULL,
+								&item.snmpv3_securityname, MACRO_TYPE_COMMON, NULL, 0);
+						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+								NULL, NULL, NULL, NULL, NULL, NULL,
+								&item.snmpv3_authpassphrase, MACRO_TYPE_COMMON, NULL,
+								0);
+						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+								NULL, NULL, NULL, NULL, NULL, NULL,
+								&item.snmpv3_privpassphrase, MACRO_TYPE_COMMON, NULL, 0);
+						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+								NULL, NULL, NULL, NULL, NULL, NULL,
+								&item.snmpv3_contextname, MACRO_TYPE_COMMON, NULL, 0);
 					}
 
 					if (SUCCEED == get_value_snmp(&item, &result, ZBX_NO_POLLER) &&
-							NULL != (pvalue = GET_TEXT_RESULT(&result)))
+							NULL != (pvalue = ZBX_GET_TEXT_RESULT(&result)))
 					{
 						zbx_strcpy_alloc(value, value_alloc, &value_offset, *pvalue);
 					}
@@ -305,7 +312,7 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 					ret = FAIL;
 #endif	/* HAVE_NETSNMP */
 
-				if (FAIL == ret && ISSET_MSG(&result))
+				if (FAIL == ret && ZBX_ISSET_MSG(&result))
 				{
 					zabbix_log(LOG_LEVEL_DEBUG, "discovery: item [%s] error: %s",
 							item.key, result.msg);
@@ -326,7 +333,7 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 
 		zbx_alarm_off();
 	}
-	free_result(&result);
+	zbx_free_agent_result(&result);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
@@ -334,8 +341,6 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, char **
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: process_check                                                    *
  *                                                                            *
  * Purpose: check if service is available and update database                 *
  *                                                                            *
@@ -382,7 +387,7 @@ static void	process_check(const DB_DCHECK *dcheck, int *host_status, char *ip, i
 			service->dcheckid = dcheck->dcheckid;
 			service->itemtime = (time_t)now;
 			service->port = port;
-			zbx_strlcpy_utf8(service->value, value, MAX_DISCOVERED_VALUE_SIZE);
+			zbx_strlcpy_utf8(service->value, value, ZBX_MAX_DISCOVERED_VALUE_SIZE);
 			zbx_vector_ptr_append(services, service);
 
 			/* update host status */
@@ -403,12 +408,7 @@ static void	process_check(const DB_DCHECK *dcheck, int *host_status, char *ip, i
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: process_checks                                                   *
- *                                                                            *
- ******************************************************************************/
-static void	process_checks(const DB_DRULE *drule, int *host_status, char *ip, int unique, int now,
+static void	process_checks(const ZBX_DB_DRULE *drule, int *host_status, char *ip, int unique, int now,
 		zbx_vector_ptr_t *services, zbx_vector_uint64_t *dcheckids)
 {
 	DB_RESULT	result;
@@ -459,13 +459,8 @@ static void	process_checks(const DB_DRULE *drule, int *host_status, char *ip, in
 	DBfree_result(result);
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: process_services                                                 *
- *                                                                            *
- ******************************************************************************/
-static int	process_services(const DB_DRULE *drule, DB_DHOST *dhost, const char *ip, const char *dns, int now,
-		const zbx_vector_ptr_t *services, zbx_vector_uint64_t *dcheckids)
+static int	process_services(const ZBX_DB_DRULE *drule, ZBX_DB_DHOST *dhost, const char *ip, const char *dns,
+		int now, const zbx_vector_ptr_t *services, zbx_vector_uint64_t *dcheckids)
 {
 	int	i, ret;
 
@@ -485,7 +480,7 @@ static int	process_services(const DB_DRULE *drule, DB_DHOST *dhost, const char *
 
 		if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		{
-			discovery_update_service(drule, service->dcheckid, dhost, ip, dns, service->port,
+			zbx_discovery_update_service(drule, service->dcheckid, dhost, ip, dns, service->port,
 					service->status, service->value, now);
 		}
 		else if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
@@ -502,16 +497,14 @@ fail:
 
 /******************************************************************************
  *                                                                            *
- * Function: process_rule                                                     *
- *                                                                            *
  * Purpose: process single discovery rule                                     *
  *                                                                            *
  ******************************************************************************/
-static void	process_rule(DB_DRULE *drule)
+static void	process_rule(ZBX_DB_DRULE *drule)
 {
-	DB_DHOST		dhost;
+	ZBX_DB_DHOST		dhost;
 	int			host_status, now;
-	char			ip[INTERFACE_IP_LEN_MAX], *start, *comma, dns[INTERFACE_DNS_LEN_MAX];
+	char			ip[ZBX_INTERFACE_IP_LEN_MAX], *start, *comma, dns[ZBX_INTERFACE_DNS_LEN_MAX];
 	int			ipaddress[8];
 	zbx_iprange_t		iprange;
 	zbx_vector_ptr_t	services;
@@ -529,14 +522,14 @@ static void	process_rule(DB_DRULE *drule)
 
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() range:'%s'", __func__, start);
 
-		if (SUCCEED != iprange_parse(&iprange, start))
+		if (SUCCEED != zbx_iprange_parse(&iprange, start))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s\": wrong format of IP range \"%s\"",
 					drule->name, start);
 			goto next;
 		}
 
-		if (ZBX_DISCOVERER_IPRANGE_LIMIT < iprange_volume(&iprange))
+		if (ZBX_DISCOVERER_IPRANGE_LIMIT < zbx_iprange_volume(&iprange))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s\": IP range \"%s\" exceeds %d address limit",
 					drule->name, start, ZBX_DISCOVERER_IPRANGE_LIMIT);
@@ -550,7 +543,7 @@ static void	process_rule(DB_DRULE *drule)
 			goto next;
 		}
 #endif
-		iprange_first(&iprange, ipaddress);
+		zbx_iprange_first(&iprange, ipaddress);
 
 		do
 		{
@@ -614,8 +607,8 @@ static void	process_rule(DB_DRULE *drule)
 
 			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 			{
-				discovery_update_host(&dhost, host_status, now);
-				zbx_process_events(NULL, NULL);
+				zbx_discovery_update_host(&dhost, host_status, now);
+				zbx_process_events(NULL, NULL, NULL);
 				zbx_clean_events();
 			}
 			else if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
@@ -623,7 +616,7 @@ static void	process_rule(DB_DRULE *drule)
 
 			DBcommit();
 		}
-		while (SUCCEED == iprange_next(&iprange, ipaddress));
+		while (SUCCEED == zbx_iprange_next(&iprange, ipaddress));
 next:
 		if (NULL != comma)
 		{
@@ -641,8 +634,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: discovery_clean_services                                         *
  *                                                                            *
  * Purpose: clean dservices and dhosts not presenting in drule                *
  *                                                                            *
@@ -689,7 +680,7 @@ static void	discovery_clean_services(zbx_uint64_t druleid)
 		{
 			zbx_vector_uint64_append(&del_dhostids, dhostid);
 		}
-		else if (SUCCEED != ip_in_list(iprange, row[2]))
+		else if (SUCCEED != zbx_ip_in_list(iprange, row[2]))
 		{
 			ZBX_STR2UINT64(dserviceid, row[1]);
 
@@ -756,169 +747,124 @@ out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static int	process_discovery(void)
+static int	process_discovery(time_t *nextcheck)
 {
-	DB_RESULT	result;
-	DB_ROW		row;
-	int		rule_count = 0;
-	char		*delay_str = NULL;
+	DB_RESULT		result;
+	DB_ROW			row;
+	int			rule_count = 0, delay;
+	char			*delay_str = NULL;
+	zbx_dc_um_handle_t	*um_handle;
+	zbx_uint64_t		druleid;
+	time_t			now;
 
-	result = DBselect(
-			"select distinct r.druleid,r.iprange,r.name,c.dcheckid,r.proxy_hostid,r.delay"
-			" from drules r"
-				" left join dchecks c"
-					" on c.druleid=r.druleid"
-						" and c.uniq=1"
-			" where r.status=%d"
-				" and r.nextcheck<=%d"
-				" and " ZBX_SQL_MOD(r.druleid,%d) "=%d",
-			DRULE_STATUS_MONITORED,
-			(int)time(NULL),
-			CONFIG_DISCOVERER_FORKS,
-			process_num - 1);
+	now = time(NULL);
 
-	while (ZBX_IS_RUNNING() && NULL != (row = DBfetch(result)))
+	if (SUCCEED != zbx_dc_drule_next(now, &druleid, nextcheck))
+		return 0;
+
+	um_handle = zbx_dc_open_user_macros();
+
+	do
 	{
-		int		now, delay;
-		zbx_uint64_t	druleid;
+		result = DBselect(
+				"select distinct r.iprange,r.name,c.dcheckid,r.delay"
+				" from drules r"
+					" left join dchecks c"
+						" on c.druleid=r.druleid"
+							" and c.uniq=1"
+				" where r.druleid=" ZBX_FS_UI64, druleid);
 
-		rule_count++;
-
-		ZBX_STR2UINT64(druleid, row[0]);
-
-		delay_str = zbx_strdup(delay_str, row[5]);
-		substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &delay_str,
-				MACRO_TYPE_COMMON, NULL, 0);
-
-		if (SUCCEED != is_time_suffix(delay_str, &delay, ZBX_LENGTH_UNLIMITED))
+		if (NULL != (row = DBfetch(result)))
 		{
-			zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s\": invalid update interval \"%s\"",
-					row[2], delay_str);
+			ZBX_DB_DRULE	drule;
 
-			now = (int)time(NULL);
+			rule_count++;
 
-			DBexecute("update drules set nextcheck=%d where druleid=" ZBX_FS_UI64,
-					0 > now ? ZBX_JAN_2038 : now, druleid);
+			delay_str = zbx_strdup(delay_str, row[3]);
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+					&delay_str, MACRO_TYPE_COMMON, NULL, 0);
 
-			continue;
+			if (SUCCEED != zbx_is_time_suffix(delay_str, &delay, ZBX_LENGTH_UNLIMITED))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s\": invalid update interval \"%s\"",
+						row[1], delay_str);
+
+				delay = ZBX_DEFAULT_INTERVAL;
+			}
+			else
+			{
+				memset(&drule, 0, sizeof(drule));
+
+				drule.druleid = druleid;
+				drule.iprange = row[0];
+				drule.name = row[1];
+				ZBX_DBROW2UINT64(drule.unique_dcheckid, row[2]);
+
+				process_rule(&drule);
+			}
+
+			zbx_dc_drule_queue(now, druleid, delay);
+			zbx_free(delay_str);
+
+			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
+				discovery_clean_services(druleid);
+
 		}
+		DBfree_result(result);
 
-		if (SUCCEED == DBis_null(row[4]))
-		{
-			DB_DRULE	drule;
-
-			memset(&drule, 0, sizeof(drule));
-
-			drule.druleid = druleid;
-			drule.iprange = row[1];
-			drule.name = row[2];
-			ZBX_DBROW2UINT64(drule.unique_dcheckid, row[3]);
-
-			process_rule(&drule);
-		}
-
-		if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
-			discovery_clean_services(druleid);
-
-		now = (int)time(NULL);
-		if (0 > now + delay)
-		{
-			zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s\": nextcheck update causes overflow",
-					row[2]);
-			DBexecute("update drules set nextcheck=%d where druleid=" ZBX_FS_UI64, ZBX_JAN_2038, druleid);
-		}
-		else
-			DBexecute("update drules set nextcheck=%d where druleid=" ZBX_FS_UI64, now + delay, druleid);
+		now = time(NULL);
 	}
-	DBfree_result(result);
+	while (ZBX_IS_RUNNING() && SUCCEED == zbx_dc_drule_next(now, &druleid, nextcheck));
 
-	zbx_free(delay_str);
+	zbx_dc_close_user_macros(um_handle);
 
 	return rule_count;	/* performance metric */
 }
 
-static int	get_minnextcheck(void)
-{
-	DB_RESULT	result;
-	DB_ROW		row;
-	int		res = FAIL;
-
-	result = DBselect(
-			"select count(*),min(nextcheck)"
-			" from drules"
-			" where status=%d"
-				" and " ZBX_SQL_MOD(druleid,%d) "=%d",
-			DRULE_STATUS_MONITORED, CONFIG_DISCOVERER_FORKS, process_num - 1);
-
-	row = DBfetch(result);
-
-	if (NULL == row || DBis_null(row[0]) == SUCCEED || DBis_null(row[1]) == SUCCEED)
-		zabbix_log(LOG_LEVEL_DEBUG, "get_minnextcheck(): no items to update");
-	else if (0 != atoi(row[0]))
-		res = atoi(row[1]);
-
-	DBfree_result(result);
-
-	return res;
-}
-
-static void	zbx_discoverer_sigusr_handler(int flags)
-{
-#ifdef HAVE_NETSNMP
-	if (ZBX_RTC_SNMP_CACHE_RELOAD == ZBX_RTC_GET_MSG(flags))
-		snmp_cache_reload_requested = 1;
-#else
-	ZBX_UNUSED(flags);
-#endif
-}
-
 /******************************************************************************
- *                                                                            *
- * Function: discoverer_thread                                                *
  *                                                                            *
  * Purpose: periodically try to find new hosts and services                   *
  *                                                                            *
  ******************************************************************************/
 ZBX_THREAD_ENTRY(discoverer_thread, args)
 {
-	int	nextcheck, sleeptime = -1, rule_count = 0, old_rule_count = 0;
-	double	sec, total_sec = 0.0, old_total_sec = 0.0;
-	time_t	last_stat_time;
+	zbx_thread_discoverer_args	*discoverer_args_in = (zbx_thread_discoverer_args *)
+							(((zbx_thread_args_t *)args)->args);
+	int				sleeptime = -1, rule_count = 0, old_rule_count = 0;
+	double				sec, total_sec = 0.0, old_total_sec = 0.0;
+	time_t				last_stat_time, nextcheck = 0;
+	zbx_ipc_async_socket_t		rtc;
+	const zbx_thread_info_t		*info = &((zbx_thread_args_t *)args)->info;
+	int				server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int				process_num = ((zbx_thread_args_t *)args)->info.process_num;
+	unsigned char			process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]",
+			get_program_type_string(discoverer_args_in->zbx_get_program_type_cb_arg()), server_num,
+			get_process_type_string(process_type), process_num);
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
-			server_num, get_process_type_string(process_type), process_num);
-
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 #define STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
-	zbx_tls_init_child();
+	zbx_tls_init_child(discoverer_args_in->zbx_config_tls, discoverer_args_in->zbx_get_program_type_cb_arg);
 #endif
 	zbx_setproctitle("%s #%d [connecting to the database]", get_process_type_string(process_type), process_num);
 	last_stat_time = time(NULL);
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	zbx_set_sigusr_handler(zbx_discoverer_sigusr_handler);
+	zbx_rtc_subscribe(&rtc, process_type, process_num);
 
 	while (ZBX_IS_RUNNING())
 	{
+		zbx_uint32_t	rtc_cmd;
+		unsigned char	*rtc_data;
+
 		sec = zbx_time();
 		zbx_update_env(sec);
-
-#ifdef HAVE_NETSNMP
-		if (1 == snmp_cache_reload_requested)
-		{
-			zbx_clear_cache_snmp(process_type, process_num);
-			snmp_cache_reload_requested = 0;
-		}
-#endif
 
 		if (0 != sleeptime)
 		{
@@ -927,11 +873,16 @@ ZBX_THREAD_ENTRY(discoverer_thread, args)
 					old_total_sec);
 		}
 
-		rule_count += process_discovery();
-		total_sec += zbx_time() - sec;
+		if ((int)sec >= nextcheck)
+		{
+			rule_count += process_discovery(&nextcheck);
+			total_sec += zbx_time() - sec;
 
-		nextcheck = get_minnextcheck();
-		sleeptime = calculate_sleeptime(nextcheck, DISCOVERER_DELAY);
+			if (0 == nextcheck)
+				nextcheck = time(NULL) + DISCOVERER_DELAY;
+		}
+
+		sleeptime = zbx_calculate_sleeptime(nextcheck, DISCOVERER_DELAY);
 
 		if (0 != sleeptime || STAT_INTERVAL <= time(NULL) - last_stat_time)
 		{
@@ -954,7 +905,16 @@ ZBX_THREAD_ENTRY(discoverer_thread, args)
 			last_stat_time = time(NULL);
 		}
 
-		zbx_sleep_loop(sleeptime);
+		if (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
+		{
+#ifdef HAVE_NETSNMP
+			if (ZBX_RTC_SNMP_CACHE_RELOAD == rtc_cmd)
+				zbx_clear_cache_snmp(process_type, process_num);
+#endif
+			if (ZBX_RTC_SHUTDOWN == rtc_cmd)
+				break;
+		}
+
 	}
 
 	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);

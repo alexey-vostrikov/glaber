@@ -10,13 +10,11 @@ libzbxdbcache_a_SOURCES = \
 	dbconfig_maintenance.c \
 	dbsync.c \
 	dbsync.h \
-	changeset.h \
-	changeset.c 
-#	\
-#	../glb_objects/glb_discovery.h \
-#	../glb_objects/glb_discovery.c
+	lld_macro.c \
+	user_macro.c \
+	user_macro.h
 
 libzbxdbcache_a_CFLAGS = \
 	-I$(top_srcdir)/src/zabbix_server/ \
-	-I$(top_srcdir)/src/libs/zbxalgo \
+	$(TLS_CFLAGS) \
 	$(TEST_FLAGS)

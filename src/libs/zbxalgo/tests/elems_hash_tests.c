@@ -18,20 +18,21 @@
 **/
 
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
 #include "zbxalgo.h"
 
-static  zbx_mem_info_t	*shmtest_mem;
-ZBX_MEM_FUNC_IMPL(__shmtest, shmtest_mem);
+static  zbx_shmem_info_t	*shmtest_mem;
+ZBX_SHMEM_FUNC_IMPL(__shmtest, shmtest_mem);
 
-mem_funcs_t test_memf = {.free_func = __shmtest_mem_free_func, .malloc_func= __shmtest_mem_malloc_func,
-        .realloc_func = __shmtest_mem_realloc_func};
+mem_funcs_t test_memf = {.free_func = __shmtest_shmem_free_func, 
+        .malloc_func= __shmtest_shmem_malloc_func,
+        .realloc_func = __shmtest_shmem_realloc_func};
 
 #define TEST_MEM_SIZE 1 * ZBX_GIBIBYTE
 #define TEST_RECORDS 20
 void init(void) {
     char *error = NULL;
-    if (SUCCEED != zbx_mem_create(&shmtest_mem, TEST_MEM_SIZE, "State cache size", "TestMemSize", 0, &error)) {
+    if (SUCCEED != zbx_shmem_create(&shmtest_mem, TEST_MEM_SIZE, "State cache size", "TestMemSize", 0, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	exit(EXIT_FAILURE);
     }

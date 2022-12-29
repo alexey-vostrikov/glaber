@@ -22,6 +22,7 @@
 
 #include "zbxvariant.h"
 #include "zbxjson.h"
+#include "zbxtime.h"
 #include "dbcache.h"
 
 #define GLB_HISTORY_GET_NON_INTERACTIVE 2
@@ -36,6 +37,8 @@ typedef struct
 zbx_history_record_t;
 
 ZBX_VECTOR_DECL(history_record, zbx_history_record_t)
+
+int     history_record_float_compare(const zbx_history_record_t *d1, const zbx_history_record_t *d2);
 
 void	zbx_history_record_vector_clean(zbx_vector_history_record_t *vector, int value_type);
 void	zbx_history_record_vector_destroy(zbx_vector_history_record_t *vector, int value_type);
@@ -54,7 +57,6 @@ void	zbx_history_value2variant(const history_value_t *value, unsigned char value
 /* mirrors the vector creation function to vector destroying function.                    */
 #define zbx_history_record_vector_create(vector)	zbx_vector_history_record_create(vector)
 
-
 int glb_history_init(char **history_modules, char **error);
 
 int glb_history_add_history(ZBX_DC_HISTORY *history, int history_num);
@@ -62,11 +64,16 @@ int glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int 
 int glb_history_add_trends(ZBX_DC_TREND *trend, int trends_num);
 
 int glb_history_get_trends_json(zbx_uint64_t itemid, int value_type, int start, int end, struct zbx_json *json);
-
+ 
 int glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, struct zbx_json *json);
 int glb_history_get_history_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, struct zbx_json *json);
 
 int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_history_record_t *record, struct zbx_json *json);
 int	glb_history_json_to_history_record(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
+ 
+
+#define FLUSH_SUCCEED		0
+#define FLUSH_FAIL		-1
+#define FLUSH_DUPL_REJECTED	-2
 
 #endif

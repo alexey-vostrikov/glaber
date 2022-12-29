@@ -23,12 +23,12 @@
  * @var CView $this
  */
 
-$this->addJsFile('multiselect.js');
-$this->addJsFile('textareaflexible.js');
 $this->addJsFile('popup.condition.common.js');
 $this->includeJsFile('configuration.correlation.edit.js.php');
 
-$widget = (new CWidget())->setTitle(_('Event correlation rules'));
+$html_page = (new CHtmlPage())
+	->setTitle(_('Event correlation rules'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_CORRELATION_EDIT));
 
 $form = (new CForm())
 	->setId('correlation.edit')
@@ -37,7 +37,7 @@ $form = (new CForm())
 		->setArgument('action', 'correlation.condition.add')
 		->getUrl()
 	)
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID);
 
 if ($data['correlationid'] != 0) {
 	$form->addVar('correlationid', $data['correlationid']);
@@ -71,7 +71,7 @@ if ($data['conditions']) {
 			continue;
 		}
 
-		$label = isset($condition['formulaid']) ? $condition['formulaid'] : num2letter($i);
+		$label = ($data['evaltype'] == CONDITION_EVAL_TYPE_EXPRESSION) ? $condition['formulaid'] : num2letter($i);
 
 		$labelSpan = (new CSpan($label))
 			->addClass('label')
@@ -80,7 +80,7 @@ if ($data['conditions']) {
 
 		$condition_table->addRow([
 				$labelSpan,
-				(new CCol(getCorrConditionDescription($condition, $data['group_names'])))
+				(new CCol(CCorrelationHelper::getConditionDescription($condition, $data['group_names'])))
 					->addClass(ZBX_STYLE_TABLE_FORMS_OVERFLOW_BREAK),
 				(new CCol([
 					(new CButton('remove', _('Remove')))
@@ -99,9 +99,12 @@ if ($data['conditions']) {
 
 $condition_table->addRow([
 	(new CSimpleButton(_('Add')))
-		->onClick('return PopUp("popup.condition.event.corr",'.json_encode([
-			'type' => ZBX_POPUP_CONDITION_TYPE_EVENT_CORR
-		]).', null, this);')
+		->onClick(
+			'return PopUp("popup.condition.event.corr", '.
+				json_encode(['type' => ZBX_POPUP_CONDITION_TYPE_EVENT_CORR]).',
+				{dialogue_class: "modal-popup-medium"}
+			);'
+		)
 		->addClass(ZBX_STYLE_BTN_LINK)
 ]);
 
@@ -134,7 +137,9 @@ $form_list
 
 $form_list
 	->addRow(_('Description'),
-		(new CTextArea('description', $data['description']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+		(new CTextArea('description', $data['description']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setMaxlength(DB::getFieldLength('hosts', 'description'))
 	)
 	->addRow(
 		_('Operations'),
@@ -188,6 +193,6 @@ else {
 
 $form->addItem($correlation_tabs);
 
-$widget->addItem($form);
-
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

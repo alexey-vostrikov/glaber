@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,7 +23,7 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Queue overview'))
 	->setTitleSubmenu([
 		'main_section' => [
@@ -39,7 +39,8 @@ $widget = (new CWidget())
 					->getUrl() => _('Queue details')
 			]
 		]
-	]);
+	])
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::QUEUE_OVERVIEW));
 
 $table = (new CTableInfo())->setHeader([
 	_('Items'),
@@ -66,17 +67,17 @@ foreach ($data['item_types'] as $item_type) {
 	$table->addRow([
 		item_type2str($item_type),
 		($item_type_queue['delay5'] == 0) ? 0 : (new CCol($item_type_queue['delay5']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_NOT_CLASSIFIED)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_NOT_CLASSIFIED)),
 		($item_type_queue['delay10'] == 0) ? 0 : (new CCol($item_type_queue['delay10']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_INFORMATION)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_INFORMATION)),
 		($item_type_queue['delay30'] == 0) ? 0 : (new CCol($item_type_queue['delay30']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_WARNING)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_WARNING)),
 		($item_type_queue['delay60'] == 0) ? 0 : (new CCol($item_type_queue['delay60']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_AVERAGE)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_AVERAGE)),
 		($item_type_queue['delay300'] == 0) ? 0 : (new CCol($item_type_queue['delay300']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_HIGH)),
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_HIGH)),
 		($item_type_queue['delay600'] == 0) ? 0 : (new CCol($item_type_queue['delay600']))
-			->addClass(getSeverityStyle(TRIGGER_SEVERITY_DISASTER))
+			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_DISASTER))
 	]);
 }
 
@@ -86,6 +87,6 @@ if (CWebUser::getRefresh()) {
 		->show();
 }
 
-$widget
+$html_page
 	->addItem($table)
 	->show();

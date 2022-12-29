@@ -25,12 +25,12 @@
 
 $this->includeJsFile('administration.regex.edit.js.php');
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Regular expressions'))
-	->setTitleSubmenu(getAdministrationGeneralSubmenu());
+	->setTitleSubmenu(getAdministrationGeneralSubmenu())
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_REGEX_EDIT));
 
-$action = (new CUrl('zabbix.php'))
-	->setArgument('action', ($data['regexid'] == 0) ? 'regex.create' : 'regex.update');
+$action = (new CUrl('zabbix.php'))->setArgument('action', ($data['regexid'] == 0) ? 'regex.create' : 'regex.update');
 
 if ($data['regexid'] != 0) {
 	$action->setArgument('regexid', $data['regexid']);
@@ -39,7 +39,7 @@ if ($data['regexid'] != 0) {
 $form = (new CForm())
 	->setId('regex')
 	->setAction($action->getUrl())
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID);
 
 $table = (new CTable())
 	->setId('tbl_expr')
@@ -57,7 +57,8 @@ foreach ($data['expressions'] as $i => $expression) {
 		->setValue($expression['exp_delimiter'])
 		->setId('expressions_'.$i.'_exp_delimiter')
 		->addClass('js-expression-delimiter-select')
-		->addOptions(CSelect::createOptionsFromArray(expressionDelimiters()));
+		->addOptions(CSelect::createOptionsFromArray(CRegexHelper::expressionDelimiters()))
+		->setDisabled($expression['expression_type'] != EXPRESSION_TYPE_ANY_INCLUDED);
 
 	if ($expression['expression_type'] != EXPRESSION_TYPE_ANY_INCLUDED) {
 		$exp_delimiter->addStyle('display: none;');
@@ -67,7 +68,7 @@ foreach ($data['expressions'] as $i => $expression) {
 		(new CSelect('expressions['.$i.'][expression_type]'))
 			->setId('expressions_'.$i.'_expression_type')
 			->addClass('js-expression-type-select')
-			->addOptions(CSelect::createOptionsFromArray(expression_type2str()))
+			->addOptions(CSelect::createOptionsFromArray(CRegexHelper::expression_type2str()))
 			->setValue($expression['expression_type']),
 		(new CTextBox('expressions['.$i.'][expression]', $expression['expression'], false, 255))
 			->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
@@ -171,6 +172,6 @@ else {
 
 $form->addItem($reg_exp_view);
 
-$widget
+$html_page
 	->addItem($form)
 	->show();

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -21,100 +21,71 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
-$this->addJsFile('multiselect.js');
 $this->addJsFile('layout.mode.js');
 $this->addJsFile('class.tagfilteritem.js');
+$this->addJsFile('class.tabfilter.js');
+$this->addJsFile('class.tabfilteritem.js');
+$this->addJsFile('class.expandable.subfilter.js');
 
 $this->includeJsFile('monitoring.latest.view.js.php');
 
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-$widget = (new CWidget())
+if ($data['uncheck']) {
+	uncheckTableRows('latest');
+}
+
+$html_page = (new CHtmlPage())
 	->setTitle(_('Latest data'))
 	->setWebLayoutMode($web_layout_mode)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_LATEST_VIEW))
 	->setControls(
 		(new CTag('nav', true, (new CList())->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))))
 			->setAttribute('aria-label', _('Content controls'))
 	);
 
-if (1 == count( $data['hosts']) ) {
-	$widget->setNavigation(getHostNavigation('latest data', array_keys($data['hosts'])[0]));
-}
-
 if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
+	$filter = (new CTabFilter())
+		->setId('monitoring_latest_filter')
+		->setOptions($data['tabfilter_options'])
+		->addSubfilter(new CPartial('monitoring.latest.subfilter',
+			array_intersect_key($data, array_flip(['subfilters', 'subfilters_expanded'])))
+		)
+		->addTemplate(new CPartial($data['filter_view'], $data['filter_defaults']));
 
-	$widget->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'latest.view')))
-		->setProfile('web.latest.filter')
-		->setActiveTab($data['active_tab'])
-		->addFormItem((new CVar('action', 'latest.view'))->removeId())
-		->addFilterTab(_('Filter'), [
-			(new CFormList())
-				->addRow((new CLabel(_('Host groups'), 'filter_groupids__ms')),
-					(new CMultiSelect([
-						'name' => 'filter_groupids[]',
-						'object_name' => 'hostGroup',
-						'data' => $data['multiselect_hostgroup_data'],
-						'popup' => [
-							'parameters' => [
-								'srctbl' => 'host_groups',
-								'srcfld1' => 'groupid',
-								'dstfrm' => 'zbx_filter',
-								'dstfld1' => 'filter_groupids_',
-								'real_hosts' => true,
-								'enrich_parent_groups' => true
-							]
-						]
-					]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-				)
-				->addRow((new CLabel(_('Hosts'), 'filter_hostids__ms')),
-					(new CMultiSelect([
-						'name' => 'filter_hostids[]',
-						'object_name' => 'hosts',
-						'data' => $data['multiselect_host_data'],
-						'popup' => [
-							'filter_preselect_fields' => [
-								'hostgroups' => 'filter_groupids_'
-							],
-							'parameters' => [
-								'srctbl' => 'hosts',
-								'srcfld1' => 'hostid',
-								'dstfrm' => 'zbx_filter',
-								'dstfld1' => 'filter_hostids_'
-							]
-						]
-					]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-				)
-				,
-			(new CFormList())
-				->addRow(_('Show details'), 
-					(new CCheckBox('filter_show_details'))->setChecked($data['filter']['show_details'] == 1))
-				->addRow((new CLabel(_('Show items without data'), 'filter_show_without_data'))
-							->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
-						(new CCheckBox('filter_show_without_data'))
-							->setChecked($data['filter']['show_without_data'] == 1)
-							->setAttribute('disabled', $data['filter']['hostids'] ? null : 'disabled')
-							->setUncheckedValue(0)
-				)->addClass(ZBX_STYLE_TABLE_FORMS_SECOND_COLUMN)
-				->addRow((new CLabel(_('Group items by Discovery'), 'filter_group_by_discovery'))
-				->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
-			(new CCheckBox('filter_group_by_discovery'))
-				->setChecked($data['filter']['group_by_discovery'] == 1)
-				->setUncheckedValue(0))
+	foreach ($data['filter_tabs'] as $tab) {
+		$tab['tab_view'] = $data['filter_view'];
+		$filter->addTemplatedTab($tab['filter_name'], $tab);
+	}
 
-				
-		])
-	);
+	// Set javascript options for tab filter initialization in monitoring.latest.view.js.php file.
+	$data['filter_options'] = $filter->options;
+	$html_page->addItem($filter);
+}
+else {
+	$data['filter_options'] = null;
 }
 
-$widget->addItem(new CPartial('monitoring.latest.view.html', $data));
+$html_page
+	->addItem(new CPartial('monitoring.latest.view.html', array_intersect_key($data,
+		array_flip(['filter', 'sort_field', 'sort_order', 'view_curl', 'paging', 'hosts', 'items', 'history', 'config',
+			'tags', 'maintenances', 'items_rw'
+		])
+	)))
+	->show();
 
-//array_intersect_key($data,
-//	array_flip(['filter', 'sort_field', 'sort_order', 'view_curl', 'paging', 'hosts', 'items', 'discoveryentities', 'history', 'config',
-//		'tags'
-//	])
-//)));
-
-$widget->show();
+(new CScriptTag('
+	view.init('.json_encode([
+		'filter_options' => $data['filter_options'],
+		'refresh_url' => $data['refresh_url'],
+		'refresh_data' => $data['refresh_data'],
+		'refresh_interval' => $data['refresh_interval'],
+		'checkbox_object' => 'itemids'
+	]).');
+'))
+	->setOnDocumentReady()
+	->show();

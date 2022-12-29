@@ -20,18 +20,18 @@
 #ifndef GLABER_POLLER_H
 #define GLABER_POLLER_H
 #include "dbcache.h"
-#include "threads.h"
+#include "zbxthreads.h"
 
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 
 #define GLB_DNS_CACHE_TIME 300 * 1000 // for how long name to ip resolvings have to be remembered in msec
-#define GLB_MAX_FAILS 6 // how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
+#define GLB_MAX_FAILS 4// how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
 /*async pollers having too many sessions or dns requests will stagnate on session support and will loose data packets 
  so if there are more then this amount of sessions, item's polling is delayed for 30 seconds */
-#define POLLER_MAX_SESSIONS 16 * ZBX_KIBIBYTE 
+#define POLLER_MAX_SESSIONS 8 * ZBX_KIBIBYTE 
 #define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
-#define POLLER_MAX_DNS_REQUESTS	3200 /*maximum simultanious DNS requests */
+//#define POLLER_MAX_DNS_REQUESTS	2 * ZBX_KIBIBYTE /*maximum simultanious DNS requests */
 
 typedef struct poller_item_t poller_item_t;
 
@@ -46,6 +46,7 @@ typedef void (*poller_resolve_cb)(poller_item_t *glb_item, const char* ipaddr);
 int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now);
 int glb_poller_create_item(DC_ITEM *dc_item);
 int glb_poller_delete_item(u_int64_t itemid);
+
 int glb_poller_get_forks();
 
 poller_item_t *poller_get_poller_item(u_int64_t itemid);
@@ -54,21 +55,22 @@ void *poller_get_item_specific_data(poller_item_t *poll_item);
 void poller_set_item_specific_data(poller_item_t *poll_item, void *data);
 
 void poller_return_item_to_queue(poller_item_t *glb_item);
+void poller_return_delayed_item_to_queue(poller_item_t *glb_item);
 void poller_register_item_succeed(poller_item_t *glb_item);
 void poller_register_item_timeout(poller_item_t *glb_item);
 int poller_if_host_is_failed(poller_item_t *glb_item);
 u_int64_t poller_get_host_id(poller_item_t *glb_item);
-
-void poller_set_poller_module_data(void *data);
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown, 
 								 forks_count_cb forks_count, poller_resolve_cb resolve_callback);
 
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error);
+void poller_preprocess_uint64_value(poller_item_t *poller_item, u_int64_t value);
+void poller_preprocess_str_value(poller_item_t *poller_item, char* value);
 
 void poller_inc_requests();
-void poller_inc_responces();
+void poller_inc_responses();
 
 /*in some cases full item iteration might need  - in such
  cases use iterator callback intreface */
@@ -85,8 +87,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args);
 void poller_strpool_free(const char* str);
 const char *poller_strpool_add(const char * str);
 
-void poller_preprocess_error(poller_item_t *poller_item, char *error);
-void poller_preprocess_error2(poller_item_t *poller_item, char *error);
+void poller_preprocess_error(poller_item_t *poller_item, const char *error);
 void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime);
 
 #endif

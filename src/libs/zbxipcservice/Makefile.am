@@ -7,4 +7,5 @@ libzbxipcservice_a_SOURCES = \
 	glb_ipc.c	\
 	glb_ipc.h
 
-libzbxipcservice_a_CFLAGS = $(LIBEVENT_CFLAGS)
+libzbxipcservice_a_CFLAGS = \
+	$(LIBEVENT_CFLAGS)

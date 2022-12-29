@@ -18,7 +18,7 @@
 
 #define _GNU_SOURCE
 
-#include "../../../include/common.h"
+#include "../../../include/zbxcommon.h"
 #include "worker.h"
 #include "log.h"
 #include <sys/types.h>
@@ -338,7 +338,7 @@ static int restart_worker(ext_worker_t *worker)
     worker->last_start = time(NULL);
     
     if (0 != worker->async_mode) {
-        LOG_INF("Worker is async");
+      //  LOG_INF("Worker is async");
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
         fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
         
@@ -524,9 +524,9 @@ int async_buffered_responce(ext_worker_t *worker,  char **response) {
     
     if ( SUCCEED != worker_is_alive(worker)) {
         LOG_INF("Worker %s is dead, need restart", worker_get_path(worker));
+        restart_worker(worker);
         return FAIL;
     }
-
     
     *response = evbuffer_readln(worker->buffer, NULL, EVBUFFER_EOL_CRLF);
 

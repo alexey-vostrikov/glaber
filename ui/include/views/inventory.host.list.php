@@ -23,7 +23,9 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())->setTitle(_('Host inventory'));
+$html_page = (new CHtmlPage())
+	->setTitle(_('Host inventory'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::INVENTORY_HOST_LIST));
 
 // Make an inventory field dropdown.
 $inventory_field_select = (new CSelect('filter_field'))
@@ -35,8 +37,9 @@ foreach ($data['host_inventories'] as $inventoryField) {
 }
 
 // filter
-$widget->addItem(
-	(new CFilter(new CUrl('hostinventories.php')))
+$html_page->addItem(
+	(new CFilter())
+		->setResetUrl(new CUrl('hostinventories.php'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFilterTab(_('Filter'), [
@@ -53,7 +56,7 @@ $widget->addItem(
 								'srcfld1' => 'groupid',
 								'dstfrm' => 'zbx_filter',
 								'dstfld1' => 'filter_groups_',
-								'real_hosts' => 1,
+								'with_hosts' => true,
 								'enrich_parent_groups' => true
 							]
 						]
@@ -91,17 +94,13 @@ $table = (new CTableInfo())
 	]);
 
 foreach ($this->data['hosts'] as $host) {
-	$hostGroups = [];
-	foreach ($host['groups'] as $group) {
-		$hostGroups[] = $group['name'];
-	}
-	natsort($hostGroups);
-	$hostGroups = implode(', ', $hostGroups);
+	$hostgroups = array_column($host['hostgroups'], 'name');
+	natsort($hostgroups);
 
 	$row = [
 		(new CLink($host['name'], (new CUrl('hostinventories.php'))->setArgument('hostid', $host['hostid'])))
 			->addClass($host['status'] == HOST_STATUS_NOT_MONITORED ? ZBX_STYLE_RED : null),
-		$hostGroups,
+		implode(', ', $hostgroups),
 		zbx_str2links($host['inventory']['name']),
 		zbx_str2links($host['inventory']['type']),
 		zbx_str2links($host['inventory']['os']),
@@ -113,6 +112,6 @@ foreach ($this->data['hosts'] as $host) {
 	$table->addRow($row);
 }
 
-$widget->addItem([$table, $this->data['paging']]);
-
-$widget->show();
+$html_page
+	->addItem([$table, $this->data['paging']])
+	->show();

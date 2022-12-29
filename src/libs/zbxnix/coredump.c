@@ -17,14 +17,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "log.h"
 #include "zbxnix.h"
+
+#include "zbxcommon.h"
+#include "log.h"
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 /******************************************************************************
- *                                                                            *
- * Function: zbx_coredump_disable                                             *
  *                                                                            *
  * Purpose: disable core dump                                                 *
  *                                                                            *

@@ -1,3 +1,34 @@
+var 3.0.0
+    - mirgated to Zabbix 6.4. sources
+ver 2.18.0
+    - introducing poller connection contention library. It allow to control per-ip (not per-hostid) number of connections and supports control event in cases when host or ip is taken from the key, not from the interface configuration 
+ver 2.17.0
+    - introducing async simple tcp checks. Now glb_agent poller deals with all tcp connections. For now net.tcp.serivce[http is either supported by glb_agent poller, which will eventually
+    will be renamed to glb_tcp_poller
+ver 2.16.10
+    - fix: endless restart of glbamp if it's failed
+ver 2.16.9
+    - fix: #174 to prevent too frequent intervals on start
+ver 2.16.8
+    - fix: #175 - improper next check calculation where causing poller speed degradation
+ver 2.16.7
+    - added extra logging to figure problems with #175
+ver 2.16.6
+    - fix: #173
+ver 2.16.5
+    - fix: #171 : added proper notify init/flush to avoid segvs on items notify via taskmanager
+ver 2.16.4
+    - fixed maintenance host's items disabling in async code (#169), fixed #170 due to host's changed items notification
+ver 2.16.2
+    - added option to disable v1 polling via async methods
+ver 2.16.1
+    - fix: normal poller items sometimes are acquired by async pollers
+ver 2.16.0
+    - introducing logs colorization by triggering. 
+ver 2.15.4
+    - fixed glb_snmp poller fail on snmpv3
+ver 2.15.3
+    - moved snmp v1 out of async processing
 ver 2.15.2
     - added default font to RPM web packet 
 ver 2.15.1

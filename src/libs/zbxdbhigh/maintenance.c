@@ -17,12 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "db.h"
+#include "zbxdbhigh.h"
+
+#include "zbxnum.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_db_lock_maintenanceids                                       *
  *                                                                            *
  * Purpose: lock maintenances in database                                     *
  *                                                                            *

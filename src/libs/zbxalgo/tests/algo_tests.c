@@ -18,7 +18,7 @@
 **/
 
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
 #include "zbxalgo.h"
 #include "elems_hash_tests.h"
 #include "obj_index_tests.h"

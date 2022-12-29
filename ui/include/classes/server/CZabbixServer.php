@@ -58,7 +58,7 @@ class CZabbixServer {
 	const ZBX_TCP_EXPECT_DATA = 2;
 
 	/**
-	 * Max number of bytes to read from the response for each each iteration.
+	 * Max number of bytes to read from the response for each iteration.
 	 */
 	const READ_BYTES_LIMIT = 8192;
 
@@ -126,11 +126,11 @@ class CZabbixServer {
 	/**
 	 * Class constructor.
 	 *
-	 * @param string $host
-	 * @param int $port
-	 * @param int $connect_timeout
-	 * @param int $timeout
-	 * @param int $totalBytesLimit
+	 * @param string|null $host
+	 * @param int|null    $port
+	 * @param int         $connect_timeout
+	 * @param int         $timeout
+	 * @param int         $totalBytesLimit
 	 */
 	public function __construct($host, $port, $connect_timeout, $timeout, $totalBytesLimit) {
 		$this->host = $host;
@@ -215,10 +215,13 @@ class CZabbixServer {
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
 		
-			$result = $result + $zabbix_server->request([
+			$newdata = $zabbix_server->request([
 				'request' => 'itemsstate.get',
 				'itemids' => $items_chunk
 			]);
+			
+			if (is_array($newdata))
+				$result = $result + $newdata;
 
 			$i++;
 		}
@@ -265,14 +268,14 @@ class CZabbixServer {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
 		$result = [];
-
-		foreach (array_chunk($itemids, 16384) as $items_chunk) {
-			
-			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+		
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
-			);
+		);
 
+		foreach (array_chunk($itemids, 16) as $items_chunk) {
+			
 			$newdata = $zabbix_server->request([
 				'request' => 'lastvalues.get',
 				'sid' => $sid,
@@ -281,7 +284,8 @@ class CZabbixServer {
 				'period' => $period
 			]);
 
-			$result = array_merge($result, $newdata);
+			if (is_array($newdata))
+				$result = array_merge($result, $newdata);
 		}
 
 		return $result;
@@ -497,6 +501,21 @@ class CZabbixServer {
 	 * @return bool
 	 */
 	public function isRunning($sid) {
+		$active_node = API::getApiService('hanode')->get([
+			'output' => ['address', 'port', 'lastaccess'],
+			'filter' => ['status' => ZBX_NODE_STATUS_ACTIVE],
+			'sortfield' => 'lastaccess',
+			'sortorder' => 'DESC',
+			'limit' => 1
+		], false);
+
+		if ($active_node && $active_node[0]['address'] === $this->host && $active_node[0]['port'] == $this->port) {
+			if ((time() - $active_node[0]['lastaccess']) <
+					timeUnitToSeconds(CSettingsHelper::getGlobal(CSettingsHelper::HA_FAILOVER_DELAY))) {
+				return true;
+			}
+		}
+
 		$response = $this->request([
 			'request' => 'status.get',
 			'type' => 'ping',
@@ -508,6 +527,7 @@ class CZabbixServer {
 		}
 
 		$api_input_rules = ['type' => API_OBJECT, 'fields' => []];
+
 		return CApiInputValidator::validate($api_input_rules, $response, '/', $this->error);
 	}
 
@@ -571,7 +591,7 @@ class CZabbixServer {
 	}
 
 	/**
-	 * Executes a given JSON request and returns the result. Returns false if an error has occurred.
+	 * Executes a given JSON request and returns the result. Returns false if an error has occonnectcurred.
 	 *
 	 * @param array $params
 	 *
@@ -660,6 +680,7 @@ class CZabbixServer {
 		}
 
 		fclose($this->socket);
+		$this->socket = NULL;
 
 		if ($expected_len > $response_len || $response_len > $expected_len) {
 			$this->error = _s('Incorrect response received from Zabbix server "%1$s".', $this->host);
@@ -700,26 +721,28 @@ class CZabbixServer {
 	 */
 	protected function connect() {
 		if (!$this->socket) {
-			if (!$this->host || !$this->port) {
+			if ($this->host === null || $this->port === null) {
+				$this->error = _('Connection to Zabbix server failed. Incorrect configuration.');
 				return false;
 			}
 
 			if (!$socket = @fsockopen($this->host, $this->port, $errorCode, $errorMsg, $this->connect_timeout)) {
+				$host_port = $this->host.':'.$this->port;
 				switch ($errorMsg) {
 					case 'Connection refused':
-						$dErrorMsg = _s("Connection to Zabbix server \"%1\$s\" refused. Possible reasons:\n1. Incorrect server IP/DNS in the \"zabbix.conf.php\";\n2. Security environment (for example, SELinux) is blocking the connection;\n3. Zabbix server daemon not running;\n4. Firewall is blocking TCP connection.\n", $this->host);
+						$dErrorMsg = _s("Connection to Zabbix server \"%1\$s\" refused. Possible reasons:\n1. Incorrect \"NodeAddress\" or \"ListenPort\" in the \"zabbix_server.conf\" or server IP/DNS override in the \"zabbix.conf.php\";\n2. Security environment (for example, SELinux) is blocking the connection;\n3. Zabbix server daemon not running;\n4. Firewall is blocking TCP connection.\n", $host_port);
 						break;
 
 					case 'No route to host':
-						$dErrorMsg = _s("Zabbix server \"%1\$s\" can not be reached. Possible reasons:\n1. Incorrect server IP/DNS in the \"zabbix.conf.php\";\n2. Incorrect network configuration.\n", $this->host);
+						$dErrorMsg = _s("Zabbix server \"%1\$s\" cannot be reached. Possible reasons:\n1. Incorrect \"NodeAddress\" or \"ListenPort\" in the \"zabbix_server.conf\" or server IP/DNS override in the \"zabbix.conf.php\";\n2. Incorrect network configuration.\n", $host_port);
 						break;
 
 					case 'Connection timed out':
-						$dErrorMsg = _s("Connection to Zabbix server \"%1\$s\" timed out. Possible reasons:\n1. Incorrect server IP/DNS in the \"zabbix.conf.php\";\n2. Firewall is blocking TCP connection.\n", $this->host);
+						$dErrorMsg = _s("Connection to Zabbix server \"%1\$s\" timed out. Possible reasons:\n1. Incorrect \"NodeAddress\" or \"ListenPort\" in the \"zabbix_server.conf\" or server IP/DNS override in the \"zabbix.conf.php\";\n2. Firewall is blocking TCP connection.\n", $host_port);
 						break;
 
 					default:
-						$dErrorMsg = _s("Connection to Zabbix server \"%1\$s\" failed. Possible reasons:\n1. Incorrect server IP/DNS in the \"zabbix.conf.php\";\n2. Incorrect DNS server configuration.\n", $this->host);
+						$dErrorMsg = _s("Connection to Zabbix server \"%1\$s\" failed. Possible reasons:\n1. Incorrect \"NodeAddress\" or \"ListenPort\" in the \"zabbix_server.conf\" or server IP/DNS override in the \"zabbix.conf.php\";\n2. Incorrect DNS server configuration.\n", $host_port);
 				}
 
 				$this->error = $dErrorMsg.$errorMsg;

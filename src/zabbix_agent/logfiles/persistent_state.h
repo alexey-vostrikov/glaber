@@ -20,10 +20,12 @@
 #ifndef ZABBIX_PERSISTENT_STATE_H
 #define ZABBIX_PERSISTENT_STATE_H
 
-#include "common.h"	/* for SEC_PER_DAY */
-#include "md5.h"	/* for MD5_DIGEST_SIZE, md5_byte_t */
+#include "zbxcommon.h"	/* for SEC_PER_DAY */
+#include "zbxhash.h"	/* for ZBX_MD5_DIGEST_SIZE, md5_byte_t */
 #include "zbxtypes.h"	/* for zbx_uint64_t struct st_logfile; */
 #include "zbxalgo.h"
+
+struct st_logfile;
 
 #define ZBX_PERSIST_INACTIVITY_PERIOD	SEC_PER_DAY	/* the time period after which persistent files used by log */
 							/* items which are not received in active check list can be */
@@ -44,9 +46,9 @@ typedef struct
 	zbx_uint64_t	size;
 	zbx_uint64_t	processed_size;
 	int		md5_block_size;
-	md5_byte_t	first_block_md5[MD5_DIGEST_SIZE];
+	md5_byte_t	first_block_md5[ZBX_MD5_DIGEST_SIZE];
 	zbx_uint64_t	last_block_offset;
-	md5_byte_t	last_block_md5[MD5_DIGEST_SIZE];
+	md5_byte_t	last_block_md5[ZBX_MD5_DIGEST_SIZE];
 }
 zbx_pre_persistent_t;
 

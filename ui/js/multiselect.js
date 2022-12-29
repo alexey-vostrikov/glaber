@@ -18,7 +18,7 @@
 **/
 
 
-jQuery(function($) {
+(function($) {
 	var ZBX_STYLE_CLASS = 'multiselect-control';
 	const MS_ACTION_POPUP = 0;
 	const MS_ACTION_AUTOSUGGEST = 1;
@@ -245,6 +245,47 @@ jQuery(function($) {
 			});
 
 			return ret;
+		},
+
+		/**
+		 * @return HTMLElement
+		 */
+		getSelectButton: function() {
+			var ret = null;
+
+			this.each(function() {
+				var $obj = $(this);
+
+				if ($obj.data('multiSelect') !== undefined) {
+					ret = $obj.data('multiSelect').select_button[0];
+
+					return false;
+				}
+			});
+
+			return ret;
+		},
+
+		/**
+		 * @param array entries  IDs to mark disabled.
+		 */
+		setDisabledEntries: function (entries) {
+			this.each(function() {
+				const $obj = $(this);
+				const ms_parameters = $obj.data('multiSelect');
+
+				if (typeof ms_parameters === 'undefined') {
+					return;
+				}
+
+				const link = new Curl(ms_parameters.options.url, false);
+				link.setArgument('disabledids', entries);
+
+				ms_parameters.options.url = link.getUrl();
+				ms_parameters.options.popup.parameters.disableids = entries;
+
+				$obj.data('multiSelect', ms_parameters);
+			});
 		}
 	};
 
@@ -269,12 +310,19 @@ jQuery(function($) {
 	 * @param int    options['limit']				how many available items can be received from backend (optional)
 	 * @param object options['popup']				popup data {parameters, width, height} (optional)
 	 * @param string options['popup']['parameters']
-	 * @param string options['popup']['filter_preselect_fields']
+	 * @param string options['popup']['filter_preselect']
+	 * @param string options['popup']['filter_preselect']['id']
+	 * @param string options['popup']['filter_preselect']['submit_as']
+	 * @param object options['popup']['filter_preselect']['submit_parameters']
+	 * @param bool   options['popup']['filter_preselect']['multiple']
 	 * @param int    options['popup']['width']
 	 * @param int    options['popup']['height']
 	 * @param object options['autosuggest']         autosuggest options (optional)
-	 * @param object options['autosuggest']['filter_preselect_fields'] autosuggest preselect fields (optional)
-	 * @param string options['autosuggest']['filter_preselect_fields']['hosts'] autosuggest host preselect field (optional)
+	 * @param object options['autosuggest']['filter_preselect']
+	 * @param string options['autosuggest']['filter_preselect']['id']
+	 * @param string options['autosuggest']['filter_preselect']['submit_as']
+	 * @param object options['autosuggest']['filter_preselect']['submit_parameters']
+	 * @param bool   options['autosuggest']['filter_preselect']['multiple']
 	 * @param string options['styles']				additional style for multiselect wrapper HTML element (optional)
 	 * @param string options['styles']['property']
 	 * @param string options['styles']['value']
@@ -299,7 +347,6 @@ jQuery(function($) {
 				},
 				placeholder: t('type here to search'),
 				data: [],
-				only_hostid: 0,
 				excludeids: [],
 				addNew: false,
 				defaultValue: null,
@@ -337,7 +384,8 @@ jQuery(function($) {
 						 * In such case the "focusout" event (IE) of the search input should not be processed.
 						 */
 						available_false_click: false
-					}
+					},
+					select_button: null
 				};
 
 			ms.values.available_div.on('mousedown', 'li', function() {
@@ -399,38 +447,40 @@ jQuery(function($) {
 				});
 			}
 
-			if (ms.options.popup.parameters != null) {
-				if (typeof ms.options.popup.parameters['only_hostid'] !== 'undefined') {
-					ms.options.only_hostid = ms.options.popup.parameters['only_hostid'];
-				}
-
-				var popup_button = $('<button>', {
-						type: 'button',
-						'class': 'btn-grey',
-						text: ms.options.labels['Select']
-					});
-
-				if (ms.options.disabled) {
-					popup_button.prop('disabled', true);
-				}
-
-				popup_button.on('click', function(event) {
-					var popup_options = ms.options.popup.parameters;
-
-					if (ms.options.popup.filter_preselect_fields) {
-						popup_options = jQuery.extend(popup_options, getFilterPreselectField($obj, MS_ACTION_POPUP));
-					}
-
-					if (typeof popup_options['disable_selected'] !== 'undefined' && popup_options['disable_selected']) {
-						popup_options['disableids'] = Object.keys(ms.values.selected);
-					}
-
-					// Click used instead focus because in patternselect listen only click.
-					$('input[type="text"]', $obj).click();
-					return PopUp('popup.generic', popup_options, null, event.target);
+			if (ms.options.custom_select || ms.options.popup.parameters !== undefined) {
+				ms.select_button = $('<button>', {
+					type: 'button',
+					'class': 'btn-grey',
+					text: ms.options.labels['Select']
 				});
 
-				$obj.after($('<div>', {'class': 'multiselect-button'}).append(popup_button));
+				if (ms.options.disabled) {
+					ms.select_button.prop('disabled', true);
+				}
+
+				if (ms.options.popup.parameters !== undefined) {
+					ms.select_button.on('click', function(event) {
+						var parameters = ms.options.popup.parameters;
+
+						if (ms.options.popup.filter_preselect) {
+							parameters = jQuery.extend(parameters, getFilterPreselect($obj, MS_ACTION_POPUP));
+						}
+
+						if (typeof parameters['disable_selected'] !== 'undefined' && parameters['disable_selected']) {
+							parameters['disableids'] = Object.keys(ms.values.selected);
+						}
+
+						// Click used instead focus because in patternselect only click is listened for.
+						$('input[type="text"]', $obj).click();
+
+						return PopUp('popup.generic', parameters, {
+							dialogue_class: 'modal-popup-generic',
+							trigger_element: event.target
+						});
+					});
+				}
+
+				$obj.after($('<div>', {'class': 'multiselect-button'}).append(ms.select_button));
 			}
 		});
 	};
@@ -443,27 +493,36 @@ jQuery(function($) {
 	 *
 	 * @return {object}
 	 */
-	function getFilterPreselectField($obj, action) {
-		var ms = $obj.data('multiSelect'),
-			preselect_options = ms.options[(action == MS_ACTION_AUTOSUGGEST) ? 'autosuggest' : 'popup'] || null,
-			ret = {};
+	function getFilterPreselect($obj, action) {
+		const ms = $obj.data('multiSelect');
+		const options_key = action == MS_ACTION_AUTOSUGGEST ? 'autosuggest' : 'popup';
 
-		if (!preselect_options) {
-			return ret;
+		if (!(options_key in ms.options) || !('filter_preselect' in ms.options[options_key])) {
+			return {};
 		}
 
-		if (typeof preselect_options.filter_preselect_fields.hosts !== 'undefined') {
-			var hosts = $('#' + preselect_options.filter_preselect_fields.hosts).multiSelect('getData');
-			if (hosts.length != 0) {
-				ret.hostid = hosts[0].id;
-			}
+		const filter_preselect = ms.options[options_key].filter_preselect;
+		const data = $('#' + filter_preselect.id).multiSelect('getData');
+
+		if (data.length === 0) {
+			return {};
 		}
 
-		if (typeof preselect_options.filter_preselect_fields.hostgroups !== 'undefined') {
-			var host_groups = $('#' + preselect_options.filter_preselect_fields.hostgroups).multiSelect('getData');
-			if (host_groups.length != 0) {
-				ret.groupid = host_groups[0].id;
+		let ret = {};
+
+		if ('multiple' in filter_preselect && filter_preselect.multiple) {
+			ret[filter_preselect.submit_as] = [];
+
+			for (const item of data) {
+				ret[filter_preselect.submit_as].push(item.id);
 			}
+		}
+		else {
+			ret[filter_preselect.submit_as] = data[0].id;
+		}
+
+		if ('submit_parameters' in filter_preselect) {
+			ret = {...ret, ...filter_preselect.submit_parameters};
 		}
 
 		return ret;
@@ -508,7 +567,7 @@ jQuery(function($) {
 					}
 
 					if (search !== '') {
-						var preselect_values = getFilterPreselectField($obj, MS_ACTION_AUTOSUGGEST),
+						var preselect_values = getFilterPreselect($obj, MS_ACTION_AUTOSUGGEST),
 							cache_key = search + JSON.stringify(preselect_values);
 
 						/*
@@ -674,7 +733,7 @@ jQuery(function($) {
 										$aria_live.text(aria_text);
 									}
 									else {
-										$aria_live.text(t('Can not be removed'));
+										$aria_live.text(t('Cannot be removed'));
 									}
 								}
 								else if (e.which == KEY_BACKSPACE) {
@@ -1226,4 +1285,4 @@ jQuery(function($) {
 			? ms.options.limit + objectSize(ms.values.selected) + ms.options.excludeids.length + 1
 			: null;
 	}
-});
+})(jQuery);

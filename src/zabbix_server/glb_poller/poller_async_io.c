@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "glb_poller.h"
 #include "poller_async_io.h"
 
@@ -171,4 +171,8 @@ void poller_async_loop_init() {
 	event_base_priority_init(conf.events_base, 2);
 	evdns_base_set_option(conf.evdns_base,"timeout","4");
 	evdns_base_set_option(conf.evdns_base, "randomize-case", "0");
+}
+
+struct event_base* poller_async_get_events_base() {
+	return conf.events_base;
 }

@@ -70,15 +70,18 @@ $form->addItem([
 	], $checkbox_hash)
 ]);
 
-(new CWidget())
+(new CHtmlPage())
 	->setTitle(_('Dashboards'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::CONFIGURATION_DASHBOARDS_LIST))
 	->setControls(
-		(new CTag('nav', true, new CRedirectButton(_('Create dashboard'),
-			(new CUrl('zabbix.php'))
-				->setArgument('action', 'template.dashboard.edit')
-				->setArgument('templateid', $data['templateid'])
-				->getUrl()
-		)))->setAttribute('aria-label', _('Content controls'))
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(new CRedirectButton(_('Create dashboard'),
+					(new CUrl('zabbix.php'))
+						->setArgument('action', 'template.dashboard.edit')
+						->setArgument('templateid', $data['templateid'])
+				))
+		))->setAttribute('aria-label', _('Content controls'))
 	)
 	->setNavigation(getHostNavigation('dashboards', $data['templateid']))
 	->addItem($form)

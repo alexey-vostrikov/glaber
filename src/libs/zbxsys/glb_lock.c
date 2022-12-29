@@ -10,7 +10,7 @@ exclusive locks
 It maybe also a good idea to introduce atomic spin locks
 here either*/
 #include "pthread.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "log.h"
 
 #define GLB_LOCK_SLEEP_US 10000 //how much nanoseconds to sleep waiting for spinlock

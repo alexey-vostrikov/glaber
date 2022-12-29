@@ -18,7 +18,10 @@
 **/
 
 #include "control.h"
-#include "zbxdiag.h"
+#include "zbxnix.h"
+
+#include "zbxnum.h"
+#include "zbx_rtc_constants.h"
 
 static int	parse_log_level_options(const char *opt, size_t len, unsigned int *scope, unsigned int *data)
 {
@@ -40,7 +43,7 @@ static int	parse_log_level_options(const char *opt, size_t len, unsigned int *sc
 	else if (0 != isdigit(*(++rtc_options)))
 	{
 		/* convert PID */
-		if (FAIL == is_pid(rtc_options, &num) || 0 == num)
+		if (FAIL == zbx_is_ushort(rtc_options, &num) || 0 == num)
 		{
 			zbx_error("invalid log level control target: invalid or unsupported process identifier");
 			return FAIL;
@@ -89,7 +92,7 @@ static int	parse_log_level_options(const char *opt, size_t len, unsigned int *sc
 			}
 
 			/* convert Zabbix process number (e.g. "2" in "poller,2") */
-			if (FAIL == is_ushort(proc_num, &num) || 0 == num)
+			if (FAIL == zbx_is_ushort(proc_num, &num) || 0 == num)
 			{
 				zbx_error("invalid log level control target: invalid or unsupported process number"
 						" \"%s\"", proc_num);
@@ -109,13 +112,10 @@ static int	parse_log_level_options(const char *opt, size_t len, unsigned int *sc
 
 /******************************************************************************
  *                                                                            *
- * Function: parse_rtc_options                                                *
- *                                                                            *
  * Purpose: parse runtime control options and create a runtime control        *
  *          message                                                           *
  *                                                                            *
  * Parameters: opt          - [IN] the command line argument                  *
- *             program_type - [IN] the program type                           *
  *             message      - [OUT] the message containing options for log    *
  *                                  level change or cache reload              *
  *                                                                            *
@@ -123,7 +123,7 @@ static int	parse_log_level_options(const char *opt, size_t len, unsigned int *sc
  *               FAIL    - an error occurred                                  *
  *                                                                            *
  ******************************************************************************/
-int	parse_rtc_options(const char *opt, unsigned char program_type, int *message)
+int	zbx_parse_rtc_options(const char *opt, int *message)
 {
 	unsigned int	scope, data, command;
 
@@ -141,81 +141,9 @@ int	parse_rtc_options(const char *opt, unsigned char program_type, int *message)
 		if (SUCCEED != parse_log_level_options(opt, ZBX_CONST_STRLEN(ZBX_LOG_LEVEL_DECREASE), &scope, &data))
 			return FAIL;
 	}
-	else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER | ZBX_PROGRAM_TYPE_PROXY)) &&
-			0 == strcmp(opt, ZBX_CONFIG_CACHE_RELOAD))
+	else if (0 == strcmp(opt, ZBX_USER_PARAMETERS_RELOAD))
 	{
-		command = ZBX_RTC_CONFIG_CACHE_RELOAD;
-		scope = 0;
-		data = 0;
-	}
-	else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER | ZBX_PROGRAM_TYPE_PROXY)) &&
-			0 == strcmp(opt, ZBX_HOUSEKEEPER_EXECUTE))
-	{
-		command = ZBX_RTC_HOUSEKEEPER_EXECUTE;
-		scope = 0;
-		data = 0;
-	}
-	else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER | ZBX_PROGRAM_TYPE_PROXY)) &&
-			0 == strcmp(opt, ZBX_SNMP_CACHE_RELOAD))
-	{
-#ifdef HAVE_NETSNMP
-		command = ZBX_RTC_SNMP_CACHE_RELOAD;
-		/* Scope is ignored for SNMP. R/U pollers, trapper, discoverer and taskmanager always get targeted. */
-		scope = 0;
-		data = 0;
-#else
-		zbx_error("invalid runtime control option: no SNMP support enabled");
-		return FAIL;
-#endif
-	}
-	else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER | ZBX_PROGRAM_TYPE_PROXY)) &&
-			0 == strncmp(opt, ZBX_DIAGINFO, ZBX_CONST_STRLEN(ZBX_DIAGINFO)))
-	{
-		command = ZBX_RTC_DIAGINFO;
-		data = 0;
-		scope = ZBX_DIAGINFO_ALL;
-
-		if ('=' == opt[ZBX_CONST_STRLEN(ZBX_DIAGINFO)])
-		{
-			const char	*section = opt + ZBX_CONST_STRLEN(ZBX_DIAGINFO) + 1;
-
-			if (0 == strcmp(section, ZBX_DIAG_HISTORYCACHE))
-			{
-				scope = ZBX_DIAGINFO_HISTORYCACHE;
-			}
-			else if (0 == strcmp(section, ZBX_DIAG_PREPROCESSING))
-			{
-				scope = ZBX_DIAGINFO_PREPROCESSING;
-			}
-			else if (0 == strcmp(section, ZBX_DIAG_LOCKS))
-			{
-				scope = ZBX_DIAGINFO_LOCKS;
-			}
-			else if (0 != (program_type & (ZBX_PROGRAM_TYPE_SERVER)))
-			{
-				if (0 == strcmp(section, ZBX_DIAG_VALUECACHE))
-					scope = ZBX_DIAGINFO_VALUECACHE;
-				else if (0 == strcmp(section, ZBX_DIAG_LLD))
-					scope = ZBX_DIAGINFO_LLD;
-				else if (0 == strcmp(section, ZBX_DIAG_ALERTING))
-					scope = ZBX_DIAGINFO_ALERTING;
-			}
-
-			if (0 == scope)
-			{
-				zbx_error("invalid diaginfo section: %s", section);
-				return FAIL;
-			}
-		}
-		else if ('\0' != opt[ZBX_CONST_STRLEN(ZBX_DIAGINFO)])
-		{
-			zbx_error("invalid runtime control option: %s", opt);
-			return FAIL;
-		}
-	}
-	else if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) && 0 == strcmp(opt, ZBX_SECRETS_RELOAD))
-	{
-		command = ZBX_RTC_SECRETS_RELOAD;
+		command = ZBX_RTC_USER_PARAMETERS_RELOAD;
 		scope = 0;
 		data = 0;
 	}

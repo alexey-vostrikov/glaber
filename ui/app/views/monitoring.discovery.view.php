@@ -26,21 +26,22 @@
 $this->addJsFile('gtlc.js');
 $this->addJsFile('flickerfreescreen.js');
 $this->addJsFile('layout.mode.js');
-$this->addJsFile('multiselect.js');
 
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Status of discovery'))
 	->setWebLayoutMode($web_layout_mode)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_DISCOVERY_VIEW))
 	->setControls((new CTag('nav', true,
 		(new CList())
 			->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))
 		))
 			->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'discovery.view')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'discovery.view'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFilterTab(_('Filter'), [
@@ -76,4 +77,4 @@ $discovery_table = CScreenBuilder::getScreen([
 	]
 ])->get();
 
-$widget->addItem($discovery_table)->show();
+$html_page->addItem($discovery_table)->show();

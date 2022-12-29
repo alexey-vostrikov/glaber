@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -43,7 +43,7 @@ $left_column = (new CFormList())
 					'srcfld1' => 'groupid',
 					'dstfrm' => 'zbx_filter',
 					'dstfld1' => 'groupids_',
-					'real_hosts' => true,
+					'with_hosts' => true,
 					'enrich_parent_groups' => true
 				]
 			]
@@ -57,8 +57,9 @@ $left_column = (new CFormList())
 			'object_name' => 'hosts',
 			'data' => array_key_exists('hosts', $data) ? $data['hosts'] : [],
 			'popup' => [
-				'filter_preselect_fields' => [
-					'hostgroups' => 'groupids_'
+				'filter_preselect' => [
+					'id' => 'groupids_',
+					'submit_as' => 'groupid'
 				],
 				'parameters' => [
 					'srctbl' => 'hosts',
@@ -77,8 +78,9 @@ $left_column = (new CFormList())
 			'object_name' => 'triggers',
 			'data' => array_key_exists('triggers', $data) ? $data['triggers'] : [],
 			'popup' => [
-				'filter_preselect_fields' => [
-					'hosts' => 'hostids_'
+				'filter_preselect' => [
+					'id' => 'hostids_',
+					'submit_as' => 'hostid'
 				],
 				'parameters' => [
 					'srctbl' => 'triggers',
@@ -86,8 +88,7 @@ $left_column = (new CFormList())
 					'dstfrm' => 'zbx_filter',
 					'dstfld1' => 'triggerids_',
 					'monitored_hosts' => true,
-					'with_monitored_triggers' => true,
-					'noempty' => true
+					'with_monitored_triggers' => true
 				]
 			]
 		]))
@@ -118,7 +119,6 @@ $left_column
 			->setChecked($data['age_state'] == 1)
 			->setUncheckedValue(0)
 			->setId('age_state_#{uniqid}'),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 		$filter_age,
 		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 		_('days')
@@ -208,21 +208,21 @@ $filter_tags_table->addRow(
 
 $tag_format_line = (new CHorList())
 	->addItem((new CRadioButtonList('show_tags', (int) $data['show_tags']))
-		->addValue(_('None'), PROBLEMS_SHOW_TAGS_NONE, 'show_tags_0#{uniqid}')
-		->addValue(PROBLEMS_SHOW_TAGS_1, PROBLEMS_SHOW_TAGS_1, 'show_tags_1#{uniqid}')
-		->addValue(PROBLEMS_SHOW_TAGS_2, PROBLEMS_SHOW_TAGS_2, 'show_tags_2#{uniqid}')
-		->addValue(PROBLEMS_SHOW_TAGS_3, PROBLEMS_SHOW_TAGS_3, 'show_tags_3#{uniqid}')
+		->addValue(_('None'), SHOW_TAGS_NONE, 'show_tags_0#{uniqid}')
+		->addValue(SHOW_TAGS_1, SHOW_TAGS_1, 'show_tags_1#{uniqid}')
+		->addValue(SHOW_TAGS_2, SHOW_TAGS_2, 'show_tags_2#{uniqid}')
+		->addValue(SHOW_TAGS_3, SHOW_TAGS_3, 'show_tags_3#{uniqid}')
 		->setModern(true)
 		->setId('show_tags_#{uniqid}')
 	)
 	->addItem((new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN))
 	->addItem(new CLabel(_('Tag name')))
 	->addItem((new CRadioButtonList('tag_name_format', (int) $data['tag_name_format']))
-		->addValue(_('Full'), PROBLEMS_TAG_NAME_FULL, 'tag_name_format_0#{uniqid}')
-		->addValue(_('Shortened'), PROBLEMS_TAG_NAME_SHORTENED, 'tag_name_format_1#{uniqid}')
-		->addValue(_('None'), PROBLEMS_TAG_NAME_NONE, 'tag_name_format_2#{uniqid}')
+		->addValue(_('Full'), TAG_NAME_FULL, 'tag_name_format_0#{uniqid}')
+		->addValue(_('Shortened'), TAG_NAME_SHORTENED, 'tag_name_format_1#{uniqid}')
+		->addValue(_('None'), TAG_NAME_NONE, 'tag_name_format_2#{uniqid}')
 		->setModern(true)
-		->setEnabled((int) $data['show_tags'] !== PROBLEMS_SHOW_TAGS_NONE)
+		->setEnabled((int) $data['show_tags'] !== SHOW_TAGS_NONE)
 		->setId('tag_name_format_#{uniqid}')
 	);
 
@@ -234,7 +234,7 @@ $right_column = (new CFormList())
 		(new CTextBox('tag_priority', $data['tag_priority']))
 			->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 			->setAttribute('placeholder', _('comma-separated list'))
-			->setEnabled((int) $data['show_tags'] !== PROBLEMS_SHOW_TAGS_NONE)
+			->setEnabled((int) $data['show_tags'] !== SHOW_TAGS_NONE)
 			->setId('tag_priority_#{uniqid}')
 	)
 	->addRow(_('Show operational data'), [
@@ -268,7 +268,7 @@ $right_column = (new CFormList())
 		(new CDiv([
 			(new CLabel(_('Show timeline'), 'show_timeline_#{uniqid}'))->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
 			(new CCheckBox('show_timeline'))
-				->setChecked($data['show_timeline'] == 1)
+				->setChecked($data['show_timeline'] == ZBX_TIMELINE_ON)
 				->setEnabled($data['compact_view'] == 0)
 				->setUncheckedValue(0)
 				->setId('show_timeline_#{uniqid}')
@@ -281,7 +281,7 @@ $right_column = (new CFormList())
 			->setUncheckedValue(0)
 			->setId('details_#{uniqid}'),
 		(new CDiv([
-			(new CLabel(_('Highlight whole row'), 'highlight_row'))->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
+			(new CLabel(_('Highlight whole row'), 'highlight_row_#{uniqid}'))->addClass(ZBX_STYLE_SECOND_COLUMN_LABEL),
 			(new CCheckBox('highlight_row'))
 				->setChecked($data['highlight_row'] == 1)
 				->setEnabled($data['compact_view'] == 1)
@@ -323,12 +323,12 @@ if (array_key_exists('render_html', $data)) {
 	return;
 }
 
-(new CScriptTemplate('filter-monitoring-problem'))
+(new CTemplateTag('filter-monitoring-problem'))
 	->setAttribute('data-template', 'monitoring.problem.filter')
 	->addItem($template)
 	->show();
 
-(new CScriptTemplate('filter-inventory-row'))
+(new CTemplateTag('filter-inventory-row'))
 	->addItem(
 		(new CRow([
 			(new CSelect('inventory[#{rowNum}][field]'))
@@ -346,7 +346,7 @@ if (array_key_exists('render_html', $data)) {
 	)
 	->show();
 
-(new CScriptTemplate('filter-tag-row-tmpl'))
+(new CTemplateTag('filter-tag-row-tmpl'))
 	->addItem(
 		(new CRow([
 			(new CTextBox('tags[#{rowNum}][tag]', '#{tag}'))
@@ -432,7 +432,7 @@ if (array_key_exists('render_html', $data)) {
 					$('[name="highlight_row"]', container).prop('disabled', !checked);
 				},
 				show_tags: () => {
-					let disabled = ($('[name="show_tags"]:checked', container).val() == <?= PROBLEMS_SHOW_TAGS_NONE ?>);
+					let disabled = ($('[name="show_tags"]:checked', container).val() == <?= SHOW_TAGS_NONE ?>);
 
 					$('[name="tag_priority"]', container).prop('disabled', disabled);
 					$('[name="tag_name_format"]', container).prop('disabled', disabled);
@@ -451,7 +451,7 @@ if (array_key_exists('render_html', $data)) {
 			}
 		});
 
-		// Show timeline default value is checked and it will be rendered in template therefore initalize if unchecked.
+		// Show timeline default value is checked and it will be rendered in template therefore initialize if unchecked.
 		$('[name="show_timeline"][unchecked-value="' + data['show_timeline'] + '"]', container).removeAttr('checked');
 
 		// Severities checkboxes.
@@ -501,7 +501,7 @@ if (array_key_exists('render_html', $data)) {
 			name: 'groupids[]',
 			data: data.filter_view_data.groups || [],
 			objectOptions: {
-				real_hosts: 1,
+				with_hosts: 1,
 				enrich_parent_groups: 1
 			},
 			popup: {
@@ -511,7 +511,6 @@ if (array_key_exists('render_html', $data)) {
 					dstfrm: 'zbx_filter',
 					dstfld1: 'groupids_' + data.uniqid,
 					multiselect: 1,
-					noempty: 1,
 					real_hosts: 1,
 					enrich_parent_groups: 1
 				}
@@ -525,8 +524,9 @@ if (array_key_exists('render_html', $data)) {
 			name: 'hostids[]',
 			data: data.filter_view_data.hosts || [],
 			popup: {
-				filter_preselect_fields: {
-					hostgroups: 'groupids_' + data.uniqid
+				filter_preselect: {
+					id: 'groupids_' + data.uniqid,
+					submit_as: 'groupid'
 				},
 				parameters: {
 					multiselect: 1,
@@ -545,8 +545,9 @@ if (array_key_exists('render_html', $data)) {
 			name: 'triggerids[]',
 			data: data.filter_view_data.triggers || [],
 			popup: {
-				filter_preselect_fields: {
-					hosts: 'hostids_' + data.uniqid
+				filter_preselect: {
+					id: 'hostids_' + data.uniqid,
+					submit_as: 'hostid'
 				},
 				parameters: {
 					srctbl: 'triggers',
@@ -554,7 +555,6 @@ if (array_key_exists('render_html', $data)) {
 					dstfrm: 'zbx_filter',
 					dstfld1: 'triggerids_' + data.uniqid,
 					multiselect: 1,
-					noempty: 1,
 					monitored_hosts: 1,
 					with_monitored_triggers: 1
 				}

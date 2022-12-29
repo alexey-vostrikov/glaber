@@ -17,10 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "sysinfo.h"
-#include "log.h"
+#include "zbxsysinfo.h"
 #include "inodes.h"
+#include "../sysinfo.h"
+
+#include "log.h"
 
 int	get_fs_inode_stat(const char *fs, zbx_uint64_t *itotal, zbx_uint64_t *ifree, zbx_uint64_t *iused, double *pfree,
 		double *pused, const char *mode, char **error)
@@ -41,7 +42,6 @@ int	get_fs_inode_stat(const char *fs, zbx_uint64_t *itotal, zbx_uint64_t *ifree,
 				zbx_strerror(errno));
 		return SYSINFO_RET_FAIL;
 	}
-
 	*itotal = (zbx_uint64_t)s.f_files;
 	*ifree = (zbx_uint64_t)s.ZBX_FFREE;
 	*iused =  (zbx_uint64_t)(s.f_files - s.f_ffree);
@@ -59,14 +59,17 @@ int	get_fs_inode_stat(const char *fs, zbx_uint64_t *itotal, zbx_uint64_t *ifree,
 		*error = zbx_strdup(NULL, "Cannot calculate percentage because total is zero.");
 		return SYSINFO_RET_FAIL;
 	}
+
 	return SYSINFO_RET_OK;
+#undef ZBX_STATFS
+#undef ZBX_FFREE
 }
 
-static int	vfs_fs_inode(AGENT_REQUEST *request, AGENT_RESULT *result)
+static int	vfs_fs_inode_local(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			*fsname, *mode, *error;
 	zbx_uint64_t		total, free, used;
-	double 			pfree, pused;
+	double			pfree, pused;
 
 	if (2 < request->nparam)
 	{
@@ -118,7 +121,7 @@ static int	vfs_fs_inode(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int	VFS_FS_INODE(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	vfs_fs_inode(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	return zbx_execute_threaded_metric(vfs_fs_inode, request, result);
+	return zbx_execute_threaded_metric(vfs_fs_inode_local, request, result);
 }

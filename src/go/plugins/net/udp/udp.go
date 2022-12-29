@@ -27,16 +27,19 @@ import (
 	"strconv"
 	"time"
 
-	"zabbix.com/pkg/conf"
-	"zabbix.com/pkg/log"
-	"zabbix.com/pkg/plugin"
+	"git.zabbix.com/ap/plugin-support/conf"
+	"git.zabbix.com/ap/plugin-support/log"
+	"git.zabbix.com/ap/plugin-support/plugin"
 )
 
 const (
-	errorInvalidFirstParam = "Invalid first parameter."
-	errorInvalidThirdParam = "Invalid third parameter."
-	errorTooManyParams     = "Too many parameters."
-	errorUnsupportedMetric = "Unsupported metric."
+	errorInvalidFirstParam  = "Invalid first parameter."
+	errorInvalidSecondParam = "Invalid second parameter."
+	errorInvalidThirdParam  = "Invalid third parameter."
+	errorInvalidFourthParam = "Invalid fourth parameter."
+	errorInvalidFifthParam  = "Invalid fifth parameter."
+	errorTooManyParams      = "Too many parameters."
+	errorUnsupportedMetric  = "Unsupported metric."
 )
 
 const (
@@ -51,8 +54,8 @@ const (
 )
 
 type Options struct {
-	Timeout  time.Duration `conf:"optional,range=1:30"`
-	Capacity int           `conf:"optional,range=1:100"`
+	plugin.SystemOptions `conf:"optional,name=System"`
+	Timeout              time.Duration `conf:"optional,range=1:30"`
 }
 
 // Plugin -
@@ -234,6 +237,8 @@ func (p *Plugin) Export(key string, params []string, ctx plugin.ContextProvider)
 		} else if key == "net.udp.service.perf" {
 			return p.exportNetServicePerf(params), nil
 		}
+	case "net.udp.socket.count":
+		return p.exportNetUdpSocketCount(params)
 	}
 
 	/* SHOULD_NEVER_HAPPEN */
@@ -257,5 +262,6 @@ func (p *Plugin) Validate(options interface{}) error {
 func init() {
 	plugin.RegisterMetrics(&impl, "UDP",
 		"net.udp.service", "Checks if service is running and responding to UDP requests.",
-		"net.udp.service.perf", "Checks performance of UDP service.")
+		"net.udp.service.perf", "Checks performance of UDP service.",
+		"net.udp.socket.count", "Returns number of TCP sockets that match parameters.")
 }

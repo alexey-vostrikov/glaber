@@ -17,9 +17,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
-#include "daemon.h"
+#include "zbxthreads.h"
 //#include "zbxself.h"
 #include "log.h"
 //#include "preprocessing.h"
@@ -28,9 +28,6 @@
 #include "glb_preproc_ipc.h"
 
 #include "../../libs/zbxipcservice/glb_ipc.h"
-
-extern unsigned char process_type, program_type;
-extern int server_num, process_num;
 
 
 //logic of the preprocessing worker:
@@ -75,9 +72,12 @@ IPC_PROCESS_CB(metrics_proc_cb) {
 ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args) {
   int i = 0, total_proc =0, proctitle_update=0;
 
- 	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
+ unsigned char process_type, program_type;
+ int server_num, process_num;
+
+ 	process_type = ((zbx_thread_args_t *)args)->info.process_type;
+	server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	process_num = ((zbx_thread_args_t *)args)->info.process_num;
 
   zbx_setproctitle("glb_preproc_worker");
   LOG_INF("glb_preproc_worker started");

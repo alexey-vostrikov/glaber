@@ -22,22 +22,25 @@
 class CControllerDashboardPagePropertiesCheck extends CController {
 
 	protected function init() {
-		$this->disableSIDValidation();
+		$this->setPostContentType(self::POST_CONTENT_TYPE_JSON);
 	}
 
 	protected function checkInput() {
 		$fields = [
-			'name' => 'required|db dashboard_page.name',
-			'display_period' => 'required|db dashboard_page.display_period|in '.
-				implode(',', array_merge([0], DASHBOARD_DISPLAY_PERIODS))
+			'name' =>			'required|db dashboard_page.name',
+			'display_period' =>	'required|db dashboard_page.display_period|in '.implode(',', array_merge([0], DASHBOARD_DISPLAY_PERIODS))
 		];
 
 		$ret = $this->validateInput($fields);
 
 		if (!$ret) {
-			$this->setResponse(new CControllerResponseData([
-				'main_block' => json_encode(['errors' => getMessages()->toString()])
-			]));
+			$this->setResponse(
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])])
+			);
 		}
 
 		return $ret;
