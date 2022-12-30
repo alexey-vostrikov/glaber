@@ -129,7 +129,7 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 				$items_data[] = [
 					'id' => $itemid,
 					'prefix' => $item['hosts'][0]['name'].NAME_DELIMITER,
-					'name' => $item['name_expanded']
+					'name' => $item['name']
 				];
 			}
 			CArrayHelper::sort($items_data, ['prefix', 'name']);
