@@ -267,16 +267,6 @@ class CTrigger extends CTriggerGeneral {
 			$sqlParts['where'][] = 't.status='.TRIGGER_STATUS_ENABLED;
 		}
 
-		// lastChangeSince
-		if ($options['lastChangeSince'] !== null) {
-			$sqlParts['where']['lastchangesince'] = 't.lastchange>'.zbx_dbstr($options['lastChangeSince']);
-		}
-
-		// lastChangeTill
-		if ($options['lastChangeTill'] !== null) {
-			$sqlParts['where']['lastchangetill'] = 't.lastchange<'.zbx_dbstr($options['lastChangeTill']);
-		}
-
 		// withUnacknowledgedEvents
 		if ($options['withUnacknowledgedEvents'] !== null) {
 			$sqlParts['where']['unack'] = 'EXISTS ('.
@@ -358,6 +348,10 @@ class CTrigger extends CTriggerGeneral {
 			$options['filter'] = [];
 		}
 
+        // -----------------------------------------------------------
+        // KLUDGE: Judging by the dbFilter code, it makes no sense to pass filters 'value' and 'lastchange',
+        // so we do not process them in postSqlFilter
+        // -----------------------------------------------------------
 		if (is_array($options['filter'])) {
 			if (!array_key_exists('flags', $options['filter'])) {
 				$options['filter']['flags'] = [
@@ -415,16 +409,6 @@ class CTrigger extends CTriggerGeneral {
 			$sqlParts['where']['host'] = ' h.host='.zbx_dbstr($options['host']);
 		}
 
-		// only_true
-		if ($options['only_true'] !== null) {
-			$sqlParts['where']['ot'] = '((t.value='.TRIGGER_VALUE_TRUE.')'.
-				' OR ((t.value='.TRIGGER_VALUE_FALSE.')'.
-					' AND (t.lastchange>'.
-					(time() - timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::OK_PERIOD))).
-				'))'.
-			')';
-		}
-
 		// min_severity
 		if ($options['min_severity'] !== null) {
 			$sqlParts['where'][] = 't.priority>='.zbx_dbstr($options['min_severity']);
@@ -461,7 +445,15 @@ class CTrigger extends CTriggerGeneral {
 
 		$result = zbx_toHash($this->customFetch(self::createSelectQueryFromParts($sqlParts), $options), 'triggerid');
 
-		// return count for post SQL filtered result sets
+        if (!$this->requiresPostSqlFiltering($options)) {
+            $triggerValues = $this->getTriggerValues(array_keys($result));
+            foreach ($result as $triggerId => $trigger) {
+                $result[$triggerId]['value'] = $triggerValues[$triggerId][0];
+                $result[$triggerId]['lastchange'] = $triggerValues[$triggerId][1];
+            }
+        }
+
+        // return count for post SQL filtered result sets
 		if ($options['countOutput']) {
 			return (string) count($result);
 		}
@@ -918,9 +910,12 @@ class CTrigger extends CTriggerGeneral {
 		return $sqlParts;
 	}
 
-	protected function requiresPostSqlFiltering(array $options) {
-		return $options['skipDependent'] !== null || $options['withLastEventUnacknowledged'] !== null;
-	}
+    protected function requiresPostSqlFiltering(array $options)
+    {
+        return $options['skipDependent'] !== null || $options['withLastEventUnacknowledged'] !== null
+            || $options['only_true'] !== null
+            || $options['lastChangeSince'] !== null || $options['lastChangeTill'] !== null;
+    }
 
 	protected function applyPostSqlFiltering(array $triggers, array $options) {
 		$triggers = zbx_toHash($triggers, 'triggerid');
@@ -1034,12 +1029,14 @@ class CTrigger extends CTriggerGeneral {
 				} while ($triggerIds);
 			}
 
-			// Clean result set.
+            $upTriggerValues = $this->getTriggerValues($allUpTriggerIds);
+
+            // Clean result set.
 			foreach ($resultTriggerIds as $resultTriggerId) {
 				foreach ($downToUpTriggerIds[$resultTriggerId] as $upTriggerId) {
 					// If "up" trigger is in problem state, dependent trigger should not be returned and is removed
 					// from results.
-					if ($upTriggerValues[$upTriggerId] == TRIGGER_VALUE_TRUE) {
+					if ($upTriggerValues[$upTriggerId][0] == TRIGGER_VALUE_TRUE) {
 						unset($triggers[$resultTriggerId]);
 					}
 				}
@@ -1082,6 +1079,47 @@ class CTrigger extends CTriggerGeneral {
 			}
 		}
 
-		return $triggers;
+        $triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
+
+        foreach ($triggers as $triggerId => $trigger) {
+            $triggers[$triggerId]['value'] = $triggerValues[$triggerId][0];
+            $triggers[$triggerId]['lastchange'] = $triggerValues[$triggerId][1];
+        }
+
+        // only_true
+        if ($options['only_true'] !== null) {
+            foreach ($triggers as $triggerId => $trigger) {
+                if ($trigger['value'] == TRIGGER_VALUE_FALSE) {
+                    if ($trigger['lastchange'] > (time() - timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::OK_PERIOD)))) {
+                        unset($triggers[$triggerId]);
+                    }
+                }
+            }
+        }
+
+        // lastChangeSince
+        if ($options['lastChangeSince'] !== null) {
+            foreach ($triggers as $triggerId => $trigger) {
+                if ($trigger['lastchange'] <= $options['lastChangeSince']) {
+                    unset($triggers[$triggerId]);
+                }
+            }
+        }
+
+        // lastChangeTill
+        if ($options['lastChangeTill'] !== null) {
+            foreach ($triggers as $triggerId => $trigger) {
+                if ($trigger['lastchange'] >= $options['lastChangeTill']) {
+                    unset($triggers[$triggerId]);
+                }
+            }
+        }
+
+        return $triggers;
 	}
+
+    protected function getTriggerValues($triggerIds)
+    {
+        return CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);
+    }
 }
