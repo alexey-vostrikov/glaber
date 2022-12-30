@@ -140,7 +140,7 @@ class CScreenHistory extends CScreenBase {
 		$output = [];
 		
 		$items = API::Item()->get([
-			'output' => ['itemid', 'name', 'key_', 'value_type'],
+			'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'history', 'trends'],
 			'selectHosts' => ['name'],
 			'selectValueMap' => ['mappings'],
 			'itemids' => $this->itemids,
@@ -153,6 +153,8 @@ class CScreenHistory extends CScreenBase {
 
 			return;
 		}
+
+	///	$items = CMacrosResolverHelper::resolveItemNames($items);
 
 		$iv_string = [
 			ITEM_VALUE_TYPE_LOG => 1,
@@ -264,7 +266,7 @@ class CScreenHistory extends CScreenBase {
 
 					if ($is_many_items) {
 						$row .= ' "'.$items[$history_row['itemid']]['hosts'][0]['name'].NAME_DELIMITER.
-							$items[$history_row['itemid']]['name'].'"';
+							$items[$history_row['itemid']]['name_expanded'].'"';
 					}
 					$output[] = $row;
 				}
@@ -371,13 +373,14 @@ class CScreenHistory extends CScreenBase {
 						: $color = null;
 					
 					$row = [];
-
+					
 					$row[] = $cell_clock;
 
 					if ($is_many_items) {
 						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name']))
 							->addClass($color);
 					}
+
 
 					if ($use_log_item) {
 						$row[] = (array_key_exists('timestamp', $data) && $data['timestamp'] != 0)
@@ -472,7 +475,7 @@ class CScreenHistory extends CScreenBase {
 			 */
 			else {
 				CArrayHelper::sort($items, [
-					['field' => 'name', 'order' => ZBX_SORT_UP]
+					['field' => 'name_expanded', 'order' => ZBX_SORT_UP]
 				]);
 				$table_header = [(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)];
 				$history_data = [];
@@ -489,9 +492,9 @@ class CScreenHistory extends CScreenBase {
 						['field' => 'ns', 'order' => ZBX_SORT_DOWN]
 					]);
 
-					$table_header[] = (new CColHeader($item['name']))
+					$table_header[] = (new CColHeader($item['name_expanded']))
 						->addClass('vertical_rotation')
-						->setTitle($item['name']);
+						->setTitle($item['name_expanded']);
 					$history_data_index = 0;
 
 					foreach ($item_data as $item_data_row) {
