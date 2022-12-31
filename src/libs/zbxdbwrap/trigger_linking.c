@@ -1312,7 +1312,7 @@ static int	execute_triggers_inserts(zbx_vector_trigger_copies_insert_t *trigger_
 				(int)trigger_copy_template->priority, (int)trigger_copy_template->status,
 				trigger_copy_template->comments, trigger_copy_template->url,
 				trigger_copy_template->url_name, (int)trigger_copy_template->type, TRIGGER_VALUE_OK,
-				TRIGGER_STATE_NORMAL, trigger_copy_template->templateid,
+				0, trigger_copy_template->templateid,
 				(int)trigger_copy_template->flags, (int)trigger_copy_template->recovery_mode,
 				(int)trigger_copy_template->correlation_mode, trigger_copy_template->correlation_tag,
 				(int)trigger_copy_template->manual_close, trigger_copy_template->opdata,
@@ -1324,7 +1324,7 @@ static int	execute_triggers_inserts(zbx_vector_trigger_copies_insert_t *trigger_
 				(int)trigger_copy_template->flags);
 		zbx_audit_trigger_update_json_add_data(triggerid, trigger_copy_template->templateid,
 				trigger_copy_template->recovery_mode, trigger_copy_template->status,
-				trigger_copy_template->type, TRIGGER_VALUE_OK, TRIGGER_STATE_NORMAL,
+				trigger_copy_template->type, TRIGGER_VALUE_OK, 0,
 				trigger_copy_template->priority, trigger_copy_template->comments,
 				trigger_copy_template->url, trigger_copy_template->url_name,
 				trigger_copy_template->flags, trigger_copy_template->correlation_mode,

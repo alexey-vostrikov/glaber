@@ -1,3 +1,21 @@
+/*
+** Copyright Glaber
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+
 #ifndef GLB_CACHE_ITEMS_H
 #define GLB_CACHE_ITEMS_H
 
@@ -44,11 +62,6 @@ int     glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct
 int     glb_state_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
 void    glb_state_get_item_stats(zbx_vector_ptr_t *stats);
 int     glb_state_get_item_state(u_int64_t itemid);
-
-
-
-
-
 int     glb_state_get_values_by_count(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int count, int ts_end);
 int     glb_state_get_values_by_time(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds, int ts_end);
 

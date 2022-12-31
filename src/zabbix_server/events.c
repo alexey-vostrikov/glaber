@@ -27,6 +27,7 @@
 #include "zbxservice.h"
 #include "zbxnum.h"
 #include "zbxexpr.h"
+#include "../../libs/glb_state/glb_state_triggers.h"
 
 /* event recovery data */
 typedef struct
@@ -491,7 +492,7 @@ static void	save_problems(void)
 			switch (event->object)
 			{
 				case EVENT_OBJECT_TRIGGER:
-					if (TRIGGER_STATE_UNKNOWN != event->value)
+					if (TRIGGER_VALUE_UNKNOWN != event->value)
 						continue;
 
 					tags_num += event->tags.values_num;
@@ -1456,8 +1457,7 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 			{
 				zbx_append_trigger_diff(trigger_diff, trigger->triggerid, trigger->priority,
-						ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT, trigger->value,
-						TRIGGER_STATE_NORMAL, 0, NULL);
+						ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT, trigger->value, 0, NULL);
 
 				/* TODO: should we store trigger diffs in hashset rather than vector? */
 				zbx_vector_ptr_sort(trigger_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
@@ -1667,6 +1667,7 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 
 		if (new_value != diff->value)
 		{
+			LOG_INF("Set1 new value for trigger %ld to %d", diff->triggerid, new_value);
 			diff->value = new_value;
 			diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
 		}
@@ -2568,7 +2569,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 
 		if (TRIGGER_VALUE_OK != event->value)
 			continue;
-
+		
 		/* attempt to recover problem events/triggers */
 
 		if (ZBX_TRIGGER_CORRELATION_NONE == event->trigger.correlation_mode)
@@ -2584,15 +2585,11 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 
 				if (problem->triggerid == event->objectid)
 				{
-					
-				//	LOG_INF("Adding recovery event for event %ld, source %ld, history idx is %d, itemid is %ld", problem->eventid, 
-				//		event->trigger.triggerid, event->history_idx );
-
 					recover_event(problem->eventid, EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER,
 							event->objectid, event->history_idx);
 				}
 			}
-
+			
 			diff->value = TRIGGER_VALUE_OK;
 			diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
 		}
@@ -2781,7 +2778,7 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 				switch (event->object)
 				{
 					case EVENT_OBJECT_TRIGGER:
-						if (TRIGGER_STATE_NORMAL == event->value)
+						if (TRIGGER_VALUE_OK == event->value|| TRIGGER_VALUE_PROBLEM == event->value)
 							zbx_vector_ptr_append(&internal_ok_events, event);
 						else
 							zbx_vector_ptr_append(&internal_problem_events, event);
@@ -2864,7 +2861,7 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 
 		zbx_append_trigger_diff(&trigger_diff, triggerid, trigger.priority,
 				ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT, trigger.value,
-				TRIGGER_STATE_NORMAL, 0, NULL);
+				0, NULL);
 
 		zbx_timespec(&ts);
 
@@ -2878,12 +2875,11 @@ int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t
 
 		processed_num = flush_events(NULL);
 		update_trigger_changes(&trigger_diff);
-		zbx_db_save_trigger_changes(&trigger_diff);
+//		zbx_db_save_trigger_changes(&trigger_diff);
 
 		if (ZBX_DB_OK == DBcommit())
 		{
-			DCconfig_triggers_apply_changes(&trigger_diff);
-
+			glb_state_triggers_apply_diffs(&trigger_diff);
 			if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
 				zbx_export_events();
 

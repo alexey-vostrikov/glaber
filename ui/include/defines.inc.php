@@ -19,7 +19,7 @@
 **/
 
 define('ZABBIX_VERSION',		'6.4.0beta3');
-define('GLABER_VERSION',		'3.0.0');
+define('GLABER_VERSION',		'3.0.1');
 define('ZABBIX_API_VERSION',	'6.4.0');
 define('ZABBIX_EXPORT_VERSION',	'6.4');
 
@@ -763,6 +763,7 @@ define('TRIGGER_NO_DISCOVER',	1);
 
 define('TRIGGER_VALUE_FALSE',	0);
 define('TRIGGER_VALUE_TRUE',	1);
+define('TRIGGER_VALUE_UNKNOWN',	2);
 
 define('TRIGGER_STATE_NORMAL',	0);
 define('TRIGGER_STATE_UNKNOWN',	1);

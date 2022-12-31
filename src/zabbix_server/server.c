@@ -91,7 +91,8 @@
 #include "../libs/glb_state/glb_state_items.h"
 #include "../libs/apm/apm.h"
 
-#if defined(HAVE_GLB_TESTS)
+
+#ifdef HAVE_GLB_TESTS
 #include "./tests/server_tests.h"
 #endif
 
@@ -2017,9 +2018,9 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "using configuration file: %s", config_file);
 
-//#define HAVE_TESTS 1
 
-#if defined(HAVE_GLB_TESTS)
+
+#ifdef HAVE_GLB_TESTS
 	LOG_INF("Running tests");
 	tests_server_run();
 	LOG_INF("Finished tests - SUCCEED");

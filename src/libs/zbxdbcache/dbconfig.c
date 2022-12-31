@@ -48,6 +48,7 @@
 #include "../glb_conf/conf_hosts.h"
 #include "../glb_state/glb_state.h"
 #include "../glb_state/glb_state_items.h"
+#include "../glb_state/glb_state_triggers.h"
 #include "../glb_state/glb_state.h"
 #include "log.h"
 
@@ -3840,9 +3841,9 @@ static void DCsync_triggers(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		if (0 == found)
 		{
 			dc_strpool_replace(found, &trigger->error, "");
-			ZBX_STR2UCHAR(trigger->value, row[6]);
-			ZBX_STR2UCHAR(trigger->state, row[7]);
-			trigger->lastchange = 0;
+		//	ZBX_STR2UCHAR(trigger->value, row[6]);
+		//	ZBX_STR2UCHAR(trigger->state, row[7]);
+		//	trigger->lastchange = 0;
 			trigger->locked = 0;
 			trigger->timer_revision = 0;
 
@@ -9128,10 +9129,11 @@ static void	DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_tri
 	dst_trigger->timespec.ns = 0;
 	dst_trigger->priority = src_trigger->priority;
 	dst_trigger->type = src_trigger->type;
-	dst_trigger->value = src_trigger->value;
-	dst_trigger->state = src_trigger->state;
+	//dst_trigger->value = glb_state_trigger_get_value(src_trigger->triggerid);//src_trigger->value;
+	//dst_trigger->state = src_trigger->state;
 	dst_trigger->new_value = TRIGGER_VALUE_UNKNOWN;
-	dst_trigger->lastchange = src_trigger->lastchange;
+	//dst_trigger->lastchange = src_trigger->lastchange;
+	glb_state_trigger_get_value_lastchange(src_trigger->triggerid, &dst_trigger->value, &dst_trigger->lastchange);
 	dst_trigger->topoindex = src_trigger->topoindex;
 	dst_trigger->status = src_trigger->status;
 	dst_trigger->recovery_mode = src_trigger->recovery_mode;
@@ -10299,7 +10301,7 @@ void zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 				if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION != dc_trigger->recovery_mode)
 					continue;
 
-				if (TRIGGER_VALUE_PROBLEM != dc_trigger->value)
+				if (TRIGGER_VALUE_PROBLEM != glb_state_trigger_get_value(dc_trigger->triggerid))
 					continue;
 
 				if (SUCCEED != DCconfig_find_active_time_function(dc_trigger->recovery_expression,
@@ -11855,24 +11857,24 @@ int DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities)
 	return ret;
 }
 
-static int glb_get_trigger_status(u_int64_t triggerid, int *status, int *functional, int *value)
-{
-	ZBX_DC_TRIGGER *trigger;
+// static int glb_get_trigger_status(u_int64_t triggerid, int *status, int *functional, int *value)
+// {
+// 	ZBX_DC_TRIGGER *trigger;
 
-	if (NULL == (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerid)))
-	{
-		*value = TRIGGER_VALUE_UNKNOWN;
-		*status = TRIGGER_STATUS_DISABLED;
-		*functional = TRIGGER_FUNCTIONAL_FALSE;
-		return FAIL;
-	}
+// 	if (NULL == (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerid)))
+// 	{
+// 		*value = TRIGGER_VALUE_UNKNOWN;
+// 		*status = TRIGGER_STATUS_DISABLED;
+// 		*functional = TRIGGER_FUNCTIONAL_FALSE;
+// 		return FAIL;
+// 	}
 
-	*value = trigger->value;
-	*functional = trigger->functional;
-	*status = trigger->status;
+// 	*value = trigger->value;
+// 	*functional = trigger->functional;
+// 	*status = trigger->status;
 
-	return SUCCEED;
-}
+// 	return SUCCEED;
+// }
 /*
 char * glb_vector_uint64_dump(const zbx_vector_uint64_t *v) {
 	//LOG_INF("Called dump");
@@ -11946,7 +11948,7 @@ static int	DCconfig_check_trigger_dependencies_rec(const ZBX_DC_TRIGGER_DEPLIST 
 				if (NULL == triggerids || FAIL == zbx_vector_uint64_bsearch(triggerids,
 						next_trigger->triggerid, ZBX_DEFAULT_UINT64_COMPARE_FUNC))
 				{
-					if (TRIGGER_VALUE_PROBLEM == next_trigger->value)
+					if (TRIGGER_VALUE_PROBLEM == glb_state_trigger_get_value(next_trigger->triggerid))
 						return FAIL;
 				}
 				else
@@ -11986,52 +11988,6 @@ int	DCconfig_check_trigger_dependencies(zbx_uint64_t triggerid)
 	UNLOCK_CACHE;
 
 	return ret;
-}
-
-
-
-
-
-/******************************************************************************
- *                                                                            *
- * Purpose: apply trigger value,state,lastchange or error changes to          *
- *          configuration cache after committed to database                   *
- *                                                                            *
- ******************************************************************************/
-void DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
-{
-	int i;
-	zbx_trigger_diff_t *diff;
-	ZBX_DC_TRIGGER *dc_trigger;
-
-	if (0 == trigger_diff->values_num)
-		return;
-
-	WRLOCK_CACHE;
-
-	for (i = 0; i < trigger_diff->values_num; i++)
-	{
-		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
-
-		DEBUG_TRIGGER(diff->triggerid,"Saving trigger to CCache");
-
-		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &diff->triggerid)))
-			continue;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE))
-			dc_trigger->lastchange = diff->lastchange;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
-			dc_trigger->value = diff->value;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE))
-			dc_trigger->state = diff->state;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
-			dc_strpool_replace(1, &dc_trigger->error, diff->error);
-	}
-
-	UNLOCK_CACHE;
 }
 
 /******************************************************************************
@@ -12483,15 +12439,19 @@ static void get_trigger_statistics(zbx_hashset_t *triggers)
 		switch (dc_trigger->status)
 		{
 		case TRIGGER_STATUS_ENABLED:
+			//todo: this statistics should be calculated inside glb_state_triggers in the Iterator
 			if (TRIGGER_FUNCTIONAL_TRUE == dc_trigger->functional)
 			{
-				switch (dc_trigger->value)
+				switch (glb_state_trigger_get_value(dc_trigger->triggerid))
 				{
 				case TRIGGER_VALUE_OK:
 					config->status->triggers_enabled_ok++;
 					break;
 				case TRIGGER_VALUE_PROBLEM:
 					config->status->triggers_enabled_problem++;
+					break;
+				case TRIGGER_VALUE_UNKNOWN:
+				case TRIGGER_VALUE_NONE:
 					break;
 				default:
 					THIS_SHOULD_NEVER_HAPPEN;
@@ -16291,9 +16251,7 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) {
 }
 void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	int i;
-	LOG_INF("Start DC_notify_changed notify changed items");
-
-//	poller_item_notify_init();
+	
 	RDLOCK_CACHE;
 	
 	for (i = 0; i < items->values_num; i++ ) {
@@ -16317,9 +16275,6 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items) {
 	}
 
 	UNLOCK_CACHE;
-//	poller_item_notify_flush();
-	LOG_INF("Finish DC_notify_changed notify changed items");
-
 }
 
 #ifdef HAVE_TESTS

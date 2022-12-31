@@ -26,83 +26,7 @@
 #include "zbxnum.h"
 #include "../glb_objects/glb_trigger.h"
 
-/******************************************************************************
- *                                                                            *
- * Purpose: save the trigger changes to database                              *
- *                                                                            *
- * Parameters: trigger_diff - [IN] the trigger changeset                      *
- *                                                                            *
- ******************************************************************************/
-void	zbx_db_save_trigger_changes(const zbx_vector_ptr_t *trigger_diff)
-{
-	int				i;
-	char				*sql = NULL;
-	size_t				sql_alloc = 0, sql_offset = 0;
-	const zbx_trigger_diff_t	*diff;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-	for (i = 0; i < trigger_diff->values_num; i++)
-	{
-		
-		char	delim = ' ';
-		diff = (const zbx_trigger_diff_t *)trigger_diff->values[i];
-		DEBUG_TRIGGER(diff->triggerid,"Saving trigger diff to the database");
-
-		if (0 == (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE))
-			continue;
-
-		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "update triggers set");
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE))
-		{
-			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%clastchange=%d", delim, diff->lastchange);
-			delim = ',';
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger lastchange: %ld", diff->lastchange);
-		}
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
-		{
-			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%cvalue=%d", delim, diff->value);
-			delim = ',';
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger value = %d",diff->value);
-		}
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE))
-		{
-			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%cstate=%d", delim, diff->state);
-			delim = ',';
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger state = %d", diff->state);	
-		}
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
-		{
-			char	*error_esc;
-
-			error_esc = DBdyn_escape_field("triggers", "error", diff->error);
-			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%cerror='%s'", delim, error_esc);
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger error ");
-			DEBUG_TRIGGER(diff->triggerid,"Saving trigger error '%s'",error_esc);
-			zbx_free(error_esc);
-		}
-
-		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " where triggerid=" ZBX_FS_UI64 ";\n",
-				diff->triggerid);
-
-		DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
-	}
-
-	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-	if (sql_offset > 16)	/* in ORACLE always present begin..end; */
-		DBexecute("%s", sql);
-
-	zbx_free(sql);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
 
 /******************************************************************************
  *                                                                            *
@@ -121,7 +45,7 @@ void	zbx_trigger_diff_free(zbx_trigger_diff_t *diff)
  *                                                                            *
  ******************************************************************************/
 void	zbx_append_trigger_diff(zbx_vector_ptr_t *trigger_diff, zbx_uint64_t triggerid, unsigned char priority,
-		zbx_uint64_t flags, unsigned char value, unsigned char state, int lastchange, const char *error)
+		zbx_uint64_t flags, unsigned char value, int lastchange, const char *error)
 {
 	zbx_trigger_diff_t	*diff;
 
@@ -130,7 +54,6 @@ void	zbx_append_trigger_diff(zbx_vector_ptr_t *trigger_diff, zbx_uint64_t trigge
 	diff->priority = priority;
 	diff->flags = flags;
 	diff->value = value;
-	diff->state = state;
 	diff->lastchange = lastchange;
 	diff->error = (NULL != error ? zbx_strdup(NULL, error) : NULL);
 

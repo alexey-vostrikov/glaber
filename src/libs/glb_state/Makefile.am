@@ -10,8 +10,12 @@ libglbstate_a_SOURCES = \
 	glb_state_items.h \
 	glb_state_items.c \
 	discovery.h \
-	discovery.c
+	discovery.c \
+	glb_state_triggers.c \
+	glb_state
 
 libglbstate_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxalgo
      
+SUBDIRS = \
+	tests

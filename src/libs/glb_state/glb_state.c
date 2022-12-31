@@ -24,6 +24,7 @@
 #include "glb_state.h"
 #include "discovery.h"
 #include "glb_state_items.h"
+#include "glb_state_triggers.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
@@ -71,6 +72,10 @@ int glb_state_init() {
 	if (SUCCEED != discovery_init(&glb_cache->memf) )
 		return FAIL;
 	
+	if (SUCCEED != glb_state_triggers_init(&glb_cache->memf) )
+		return FAIL;
+
+
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);
 	return SUCCEED;
 }

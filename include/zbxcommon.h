@@ -20,6 +20,8 @@
 #ifndef ZABBIX_COMMON_H
 #define ZABBIX_COMMON_H
 
+//#define HAVE_GLB_TESTS 1
+
 #include "zbxsysinc.h"
 #include "module.h"
 #include "version.h"
@@ -586,8 +588,8 @@ zbx_prototype_discover_t;
 #define TRIGGER_VALUE_NONE		3	/* only in server code, never in DB */
 
 /* trigger states */
-#define TRIGGER_STATE_NORMAL		0
-#define TRIGGER_STATE_UNKNOWN		1
+//#define TRIGGER_STATE_NORMAL		0
+//#define TRIGGER_STATE_UNKNOWN		1
 
 /* trigger severity */
 #define TRIGGER_SEVERITY_NOT_CLASSIFIED	0

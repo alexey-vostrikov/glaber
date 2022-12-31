@@ -45,14 +45,11 @@ typedef struct
 	const char		*event_name;
 	const unsigned char	*expression_bin;
 	const unsigned char	*recovery_expression_bin;
-	int			lastchange;
 	zbx_uint64_t		revision;
 	zbx_uint64_t		timer_revision;
 	unsigned char		topoindex;
 	unsigned char		priority;
 	unsigned char		type;
-	unsigned char		value;
-	unsigned char		state;
 	unsigned char		locked;
 	unsigned char		status; //ENABLED OR DISABLED
 	unsigned char		functional;		/* see TRIGGER_FUNCTIONAL_* defines      */

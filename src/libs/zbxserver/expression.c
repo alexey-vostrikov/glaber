@@ -2074,17 +2074,15 @@ static void	get_event_tag_by_name(const char *text, const ZBX_DB_EVENT *event, c
 	}
 }
 
-static const char      *trigger_state_string(unsigned char state)
-{
-	switch (state)
-	{
-		case TRIGGER_STATE_NORMAL:
-			return "Normal";
-		case TRIGGER_STATE_UNKNOWN:
-			return "Unknown";
-		default:
-			return "unknown";
-	}
+ static const char      *trigger_state_string(unsigned char state)
+ {
+ 	switch (state)
+ 	{
+ 		case TRIGGER_VALUE_OK:
+		case TRIGGER_VALUE_PROBLEM:
+ 			return "Normal";
+ 	}
+	return "unknown";
 }
 
 static const char	*item_state_string(unsigned char state)
@@ -3541,7 +3539,7 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const ZBX
 				}
 				else if (0 == strcmp(m, MVAR_TRIGGER_STATE))
 				{
-					replace_to = zbx_strdup(replace_to, trigger_state_string(c_event->value));
+					replace_to = zbx_strdup(replace_to, trigger_state_string(c_event->trigger.value));
 				}
 				else if (0 == strcmp(m, MVAR_TRIGGER_STATE_ERROR))
 				{
@@ -5721,9 +5719,8 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 		char	*error = NULL;
 		int	j, k;
 
-		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
-
 		tr = (DC_TRIGGER *)triggers->values[i];
+		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
 
 		for (j = 0; j < tr->itemids.values_num; j++)
 		{
@@ -5732,7 +5729,6 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 			{
 				if (SUCCEED != history_errcodes[k])
 					continue;
-
 				zbx_vector_uint64_append(&hostids, history_items[k].host.hostid);
 			}
 			else
@@ -5842,7 +5838,7 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 			}
 		}
 
-		zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+		LOG_INF( "End of %s()", __func__);
 	}
 }
 

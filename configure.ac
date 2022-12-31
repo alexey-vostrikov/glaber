@@ -1950,6 +1950,7 @@ AC_CONFIG_FILES([
 	src/libs/zbxaudit/Makefile
 	src/libs/zbxavailability/Makefile
 	src/libs/glb_state/Makefile
+	src/libs/glb_state/tests/Makefile
 	src/libs/apm/Makefile
 	src/libs/zbxcommon/Makefile
 	src/libs/zbxcomms/Makefile

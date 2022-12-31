@@ -2056,7 +2056,7 @@ static int	check_intern_event_type_condition(const zbx_vector_ptr_t *esc_events,
 					zbx_vector_uint64_append(&condition->eventids, event->eventid);
 				break;
 			case EVENT_TYPE_TRIGGER_UNKNOWN:
-				if (EVENT_OBJECT_TRIGGER == event->object && TRIGGER_STATE_UNKNOWN == event->value)
+				if (EVENT_OBJECT_TRIGGER == event->object && TRIGGER_VALUE_UNKNOWN == event->value)
 					zbx_vector_uint64_append(&condition->eventids, event->eventid);
 				break;
 			case EVENT_TYPE_LLDRULE_NOTSUPPORTED:
@@ -2852,7 +2852,7 @@ static int	is_recovery_event(const ZBX_DB_EVENT *event)
 		switch (event->object)
 		{
 			case EVENT_OBJECT_TRIGGER:
-				if (TRIGGER_STATE_NORMAL == event->value)
+				if (TRIGGER_VALUE_OK == event->value)
 					return SUCCEED;
 				break;
 			case EVENT_OBJECT_ITEM:

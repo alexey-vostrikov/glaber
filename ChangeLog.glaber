@@ -1,4 +1,6 @@
-var 3.0.0
+ver 3.0.1
+    - triggers state moved to memory, saving triggers to DB is eliminated
+ver 3.0.0
     - mirgated to Zabbix 6.4. sources
 ver 2.18.0
     - introducing poller connection contention library. It allow to control per-ip (not per-hostid) number of connections and supports control event in cases when host or ip is taken from the key, not from the interface configuration 

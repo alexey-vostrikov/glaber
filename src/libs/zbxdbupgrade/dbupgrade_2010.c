@@ -1634,7 +1634,7 @@ static int	DBpatch_2010192(void)
 					" and i.hostid=h.hostid"
 					" and h.status=%d"
 			")",
-			TRIGGER_STATE_NORMAL, TRIGGER_VALUE_OK, HOST_STATUS_TEMPLATE))
+			TRIGGER_VALUE_UNKNOWN, TRIGGER_VALUE_OK, HOST_STATUS_TEMPLATE))
 	{
 		return SUCCEED;
 	}

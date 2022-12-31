@@ -2602,7 +2602,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 			zbx_db_insert_add_values(&db_insert, triggerid, trigger->description, trigger->expression,
 					(int)trigger->priority, (int)trigger->status,
 					trigger->comments, trigger->url, trigger->url_name, (int)trigger_prototype->type,
-					(int)TRIGGER_VALUE_OK, (int)TRIGGER_STATE_NORMAL,
+					(int)TRIGGER_VALUE_OK, (int)TRIGGER_VALUE_UNKNOWN,
 					(int)ZBX_FLAG_DISCOVERY_CREATED, (int)trigger_prototype->recovery_mode,
 					trigger->recovery_expression, (int)trigger_prototype->correlation_mode,
 					trigger->correlation_tag, (int)trigger_prototype->manual_close,
@@ -2613,7 +2613,7 @@ static int	lld_triggers_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *trigge
 
 			zbx_audit_trigger_update_json_add_data(triggerid, 0, (int)trigger_prototype->recovery_mode,
 					trigger->status, trigger_prototype->type, TRIGGER_VALUE_OK,
-					TRIGGER_STATE_NORMAL, trigger->priority, trigger->comments, trigger->url,
+					0, trigger->priority, trigger->comments, trigger->url,
 					trigger->url_name, ZBX_FLAG_DISCOVERY_CREATED,
 					trigger_prototype->correlation_mode, trigger->correlation_tag,
 					trigger_prototype->manual_close, trigger->opdata, 0, trigger->event_name);
