@@ -252,7 +252,33 @@ class CZabbixServer {
 		]);
 	}
 
-	public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
+    // miramir: костыль
+    public static  function getTriggersValues($sid, $triggerIds) {
+        global $ZBX_SERVER, $ZBX_SERVER_PORT;
+
+        $result = [];
+
+        foreach (array_chunk($triggerIds, 16384) as $triggers_chunk) {
+
+            $zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+                timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+                timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+            );
+
+            $newdata = $zabbix_server->request([
+                'request' => 'triggers.get',
+                'sid' => $sid,
+                'triggerids' => $triggers_chunk
+            ]);
+
+            $result = array_merge($result, $newdata);
+        }
+
+        // Ожидаемый ответ что-то типа [id => [value, lastchange], id => [value, lastchange], ...]
+        return $result;
+    }
+
+    public function getHistoryData($sid, $itemid, $start, $end, $count, $type) {
 		return $this->request([
 			'request' => 'history.get',
 			'sid' => $sid,
