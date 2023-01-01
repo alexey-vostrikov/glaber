@@ -101,8 +101,6 @@ int glb_state_get_statistics(glb_state_stats_t *stats) {
 }
 
 
-//that's pretty strange destroy proc yet written, the cache is in the SHM which will be destroyed
-//just after the process dies
 void	glb_state_destroy(void)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
@@ -111,7 +109,27 @@ void	glb_state_destroy(void)
 }
 
 int glb_state_housekeep() {
+	LOG_INF("Running state housekeep");
+	glb_state_items_housekeep();
+	glb_state_triggers_housekeep(300);
+	LOG_INF("Finished state housekeep");
+
+	LOG_INF("Starting state dump");
+	LOG_INF("Dumping items");
+	glb_state_items_dump();
+	LOG_INF("Dumping triggers");
+	glb_state_triggers_dump();
+	LOG_INF("Finish state dump");
 
 } 
+
+int glb_state_load() {
+	if (FAIL == glb_state_items_load())
+		return FAIL;
+	if (FAIL == glb_state_triggers_load())
+		return FAIL;
+	
+	return SUCCEED;
+}
 
 #endif

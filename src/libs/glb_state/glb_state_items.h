@@ -22,7 +22,7 @@
 #include "glb_state.h"
 
 
-
+#define STATE_ITEMS_INIT_SIZE (1000)
 //TODO: avoid flags, they are puzzling, do clear function calls instead
 #define  GLB_CACHE_ITEM_UPDATE_LASTDATA     0x01
 #define  GLB_CACHE_ITEM_UPDATE_NEXTCHECK    0x02
@@ -68,7 +68,7 @@ int     glb_state_get_values_by_time(zbx_uint64_t itemid, int value_type, zbx_ve
 int     glb_state_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
 
 glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);
-
+void glb_state_items_housekeep();
 
 
 

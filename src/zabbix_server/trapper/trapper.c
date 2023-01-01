@@ -183,6 +183,30 @@ static void glb_trapper_set_debug(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	zbx_json_free(&json);
 }
 
+static int  get_trigger_states(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	zbx_vector_uint64_t ids;
+	struct zbx_json		response_json;
+
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: start",__func__);
+	
+	zbx_json_init(&response_json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&response_json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	
+	zbx_vector_uint64_create(&ids);
+	
+	if (0 < json_ids_to_vector(jp, &ids, "triggerids") ) 
+		glb_state_triggers_get_state_json(&ids, &response_json);
+		
+	zbx_vector_uint64_destroy(&ids);
+	zbx_json_close(&response_json);
+	
+	zabbix_log(LOG_LEVEL_DEBUG,"%s: Response is %s",__func__, response_json.buffer);
+	(void)zbx_tcp_send(sock, response_json.buffer);
+
+	zbx_json_free(&response_json);
+	return SUCCEED;
+}
+
 static int  get_items_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_t itemids;
 	struct zbx_json		response_json;
@@ -1405,6 +1429,8 @@ static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx
 			ret = get_items_lastvalues(sock, &jp);
 		else if (0 == strcmp(value, "itemsstate.get"))
 			ret = get_items_state(sock,&jp);
+		else  if (0 ==strcmp(value, GLB_PROTO_VALUE_GET_TRIGGER_STATUS))
+			ret = glb_triggers_statuses(sock,&jp);
 //		else if (0 == strcmp(value, "config.sync")) {
 //			LOG_INF("CONFIG RELOAD trapper command recieved");
 //			request_config_sync(sock,&jp);

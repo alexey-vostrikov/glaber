@@ -116,6 +116,31 @@ static void state_test_triggers(){
     glb_state_trigger_set_value(123423525,TRIGGER_VALUE_UNKNOWN,0);
     assert(TRIGGER_VALUE_UNKNOWN == glb_state_trigger_get_value(123423525));
 
+    //test housekeeping
+    info.id=200;
+    info.lastcalc = time(NULL);
+    info.value = TRIGGER_VALUE_OK;
+    assert(SUCCEED == glb_state_trigger_set_info(&info));
+    glb_state_triggers_housekeep(1);
+    assert(SUCCEED == glb_state_trigger_get_info(&info));
+    assert(200 == info.id);
+    
+    //now adding outdated item and sleep for 2 seconds to allow housekeeping to run
+    //and checkout it has gone
+    info.lastcalc = 100;
+    assert(SUCCEED == glb_state_trigger_set_info(&info));
+    sleep(2);
+    assert(SUCCEED == glb_state_trigger_get_info(&info)); 
+    assert(100 == info.lastcalc);
+    glb_state_triggers_housekeep(1);
+    assert(FAIL == glb_state_trigger_get_info(&info)); 
+
+    //now test that housekeep will not run too frequently
+    glb_state_trigger_set_value(200, TRIGGER_VALUE_OK, 300);
+    assert(SUCCEED == glb_state_trigger_get_info(&info)); 
+    glb_state_triggers_housekeep(10);//this shouldn't run and clean the 200 item
+    assert(SUCCEED == glb_state_trigger_get_info(&info)); 
+
     LOG_INF("Doing destroy");
     glb_state_triggers_destroy();
     

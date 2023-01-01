@@ -1,3 +1,5 @@
+ver 3.0.2
+    - state save/dump refactored, added trigger load/dump support, added trigger memory housekeeping
 ver 3.0.1
     - triggers state moved to memory, saving triggers to DB is eliminated
 ver 3.0.0

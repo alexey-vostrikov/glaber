@@ -151,7 +151,29 @@ int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
     
     glb_rwlock_unlock(&elems->meta_lock);
     return ret;
+}
 
+int elems_hash_mass_delete(elems_hash_t *elems, zbx_vector_uint64_t *ids) {
+    elems_hash_elem_t *elem;
+    int i, count = 0;
+
+    if (0 == ids->values_num)
+        return 0;
+
+    glb_rwlock_wrlock(&elems->meta_lock);
+
+    for (i = 0; i<ids->values_num; i++) {
+
+        if (NULL != (elem = zbx_hashset_search(&elems->elems, &ids->values[i])));
+        {
+            LOG_INF("Deleting element id %ld", elem->id);
+            delete_element(elems, elem);
+            count++;
+        }
+    }
+
+    glb_rwlock_unlock(&elems->meta_lock);
+    return count;
 }
 
 ELEMS_CALLBACK(update_process_func_cb) {

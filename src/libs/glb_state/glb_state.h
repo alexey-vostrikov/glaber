@@ -1,20 +1,11 @@
 #ifndef GLB_CACHE_H
 #define GLB_CACHE_H
-/*one cache is expected to store an information of of *
-* some kind, like items or values or states            *
-*/
 
-//to make the access less concurent CAHCE must be split to N
-//N should be the number of the processed
 #include "zbxalgo.h"
 #include "zbxhistory.h"
 #include "log.h"
-//#include "glb_state_items.h"
-//#include "glb_state_items.h"
 
 
-//there are two type of data - cache (several records related to an object)
-#define STATE_ITEMS_INIT_SIZE (1000)
 #define STATE_STRPOOL_INIT_SIZE	(1000)
 
 //how long we learn new ranges per item
@@ -51,14 +42,15 @@ glb_state_item_stats_t;
 
 
 int glb_state_init();
+void glb_state_destroy(void);
+
+int glb_state_load();
 
 int glb_state_get_statistics(glb_state_stats_t *stats);
-
 int glb_state_get_mem_stats(zbx_shmem_stats_t *mem_stats);
 int glb_state_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
 
 int glb_state_housekeep();
-void glb_state_destroy(void);
 
 
 

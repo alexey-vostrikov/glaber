@@ -1514,7 +1514,7 @@ static int	server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 	}
 	
 
-	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_items_load()) {
+	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_load()) {
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions",CONFIG_VCDUMP_LOCATION);
 		exit(EXIT_FAILURE);
 	}

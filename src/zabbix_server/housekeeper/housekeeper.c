@@ -27,6 +27,7 @@
 #include "zbxnum.h"
 #include "zbxtime.h"
 #include "zbx_rtc_constants.h"
+#include "../../libs/glb_state/glb_state.h"
 
 
 static struct zbx_db_version_info_t	*db_version_info;
@@ -767,6 +768,14 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		int		hk_execute = 0;
 
 		sec = zbx_time();
+
+		LOG_INF("Housekeeper waits 30 seconds and dumps");
+		int i;
+		for (i=0; i< 10 ; i++ ) {
+			sleep(30);
+			glb_state_housekeep();
+		}
+		HALT_HERE("housekeeper need event overhaul");
 
 		while (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
 		{

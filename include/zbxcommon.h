@@ -1211,4 +1211,23 @@ u_int64_t DC_get_debug_trigger();
 #define HALT_HERE(message,...) { zabbix_log(LOG_LEVEL_WARNING, "In %s:%d, intentional halt: " message, __FILE__, __LINE__, ##__VA_ARGS__); zbx_backtrace(); exit(-1); }
 #endif
 
+#ifndef RUN_ONCE_IN
+
+#define RUN_ONCE_IN(freq) { \
+        static int __lastcall= 0; \
+        int __now = time(NULL); \
+        if (__lastcall + freq > __now) \
+            return; \
+        __lastcall = __now; \
+        }
+
+#define RUN_ONCE_IN_WITH_RET(freq, ret) { \
+        static int __lastcall= 0; \
+        int __now = time(NULL); \
+        if (__lastcall + freq > __now) \
+            return ret; \
+        __lastcall = __now; \
+        }
+#endif
+
 #endif

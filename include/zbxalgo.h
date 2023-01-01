@@ -825,6 +825,7 @@ elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_f
 
 int		elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t process_func, void *data, u_int64_t flags);
 int		elems_hash_delete(elems_hash_t *elems,  uint64_t id);
+int 	elems_hash_mass_delete(elems_hash_t *elems, zbx_vector_uint64_t *ids);
 void	elems_hash_destroy(elems_hash_t *elems);
 void	elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems);
 int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags);

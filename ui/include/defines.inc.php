@@ -19,7 +19,7 @@
 **/
 
 define('ZABBIX_VERSION',		'6.4.0beta3');
-define('GLABER_VERSION',		'3.0.1');
+define('GLABER_VERSION',		'3.0.2');
 define('ZABBIX_API_VERSION',	'6.4.0');
 define('ZABBIX_EXPORT_VERSION',	'6.4');
 

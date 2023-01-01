@@ -17,10 +17,10 @@
 **/
 
 #include "zbxcommon.h"
-
 #include "zbxalgo.h"
 #include "glb_state.h"
 #include "glb_state_triggers.h"
+#include "load_dump.h"
 
 typedef struct {
     elems_hash_t *triggers;
@@ -58,7 +58,7 @@ ELEMS_FREE(trigger_free_cb) {
 ELEMS_CALLBACK(get_trigger_info) {
     state_trigger_t *trigger = elem->data;
     state_trigger_info_t *info = data;
-
+   
     info->value = trigger->value;
     info->lastcalc = trigger->lastcalc;
     info->lastchange = trigger->lastchange;
@@ -74,7 +74,6 @@ ELEMS_CALLBACK(set_trigger_info) {
     state_trigger_t *trigger = elem->data;
     state_trigger_info_t *info = data;
 
-    
     if (trigger->value != info->value) {
         trigger->value = info->value;
         trigger->lastchange = time(NULL);
@@ -132,10 +131,8 @@ int glb_state_triggers_init(mem_funcs_t *memf)
     state->memf = *memf;
     strpool_init(&state->strpool, memf);
 
-
-  return SUCCEED;
+    return SUCCEED;
 }
-
 
 int glb_state_triggers_destroy() {
     elems_hash_destroy(state->triggers);
@@ -159,7 +156,6 @@ unsigned char glb_state_trigger_get_value(u_int64_t id) {
     return ret;
 }
 
-
 unsigned char glb_state_trigger_get_value_lastchange(u_int64_t id, unsigned char *value, int *lastchange) {
     state_trigger_info_t info = {0};
     if ( 0 == id)
@@ -173,7 +169,6 @@ unsigned char glb_state_trigger_get_value_lastchange(u_int64_t id, unsigned char
 
     return SUCCEED;
 }
-
 
 void glb_state_trigger_set_value(u_int64_t id, unsigned char value, int lastcalc) {
     state_trigger_info_t info = {0};
@@ -190,9 +185,7 @@ void glb_state_trigger_set_value(u_int64_t id, unsigned char value, int lastcalc
     }
 
 }
-/******************************************************************************
-* mass trigger change apply - used in processing                              *
- ******************************************************************************/
+
 void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 {
 	int i;
@@ -217,6 +210,103 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 			info.error = diff->error;		
 
 		if (FAIL == glb_state_trigger_set_info(&info))
-			HALT_HERE("Trigger state set logic error id= %ld, value = %d, error = %s", info.id, info.value, info.error);
+			THIS_SHOULD_NEVER_HAPPEN;
+            //HALT_HERE("Trigger state set logic error id= %ld, value = %d, error = %s", info.id, info.value, info.error);
 	}
+}
+
+DUMPER_TO_JSON(trigger_to_json)
+{
+    state_trigger_t *trigger = data;
+    zbx_json_addint64(json, "id", id);
+    zbx_json_addint64(json, "value", trigger->value);
+    zbx_json_addint64(json, "lastchange", trigger->lastchange);
+    zbx_json_addint64(json, "lastcalc", trigger->lastcalc);
+    
+    if (NULL != trigger->error)
+        zbx_json_addstring(json, "error", trigger->error, ZBX_JSON_TYPE_STRING);
+    
+    return 1; //returns number of objects added
+}
+
+int glb_state_triggers_dump() {
+	state_dump_objects(state->triggers, "triggers", trigger_to_json);
+	return SUCCEED;
+}
+
+ELEMS_CALLBACK(check_outdated_triggers) {
+    state_trigger_t *trigger = elem->data;
+    zbx_vector_uint64_t *ids = data;
+    
+    if (trigger->lastcalc < time(NULL) - TRIGGER_STATE_TTL) 
+        zbx_vector_uint64_append(ids, elem->id);
+}
+
+void glb_state_triggers_housekeep(int frequency) {
+    RUN_ONCE_IN(frequency); 
+
+    zbx_vector_uint64_t remove_ids;
+    zbx_vector_uint64_create(&remove_ids);
+    
+    elems_hash_iterate(state->triggers, check_outdated_triggers, &remove_ids, ELEMS_HASH_READ_ONLY);
+    elems_hash_mass_delete(state->triggers, &remove_ids);
+
+    zbx_vector_uint64_destroy(&remove_ids);
+}
+
+DUMPER_FROM_JSON(unmarshall_trigger_cb) {
+    state_trigger_t *trigger = elem->data;
+    char buff[MAX_STRING_LEN];
+     zbx_json_type_t type;
+
+    int errflag = 0;
+    
+    trigger->value = glb_json_get_int_value_by_name(jp, "value", &errflag);
+    if (1 == errflag) 
+        trigger->value = TRIGGER_VALUE_UNKNOWN;
+        
+    trigger->lastcalc = glb_json_get_int_value_by_name(jp, "lastcalc", &errflag);
+    if (1 == errflag) 
+        trigger->lastcalc = 0;
+
+    trigger->lastchange = glb_json_get_int_value_by_name(jp, "lastchange", &errflag);
+    if (1 == errflag) 
+        trigger->lastchange = 0;
+
+    if (NULL != trigger->error) {
+            strpool_free(&state->strpool, trigger->error);
+            trigger->error = NULL;
+    }
+
+    if (SUCCEED == zbx_json_value_by_name(jp, "error", buff, MAX_STRING_LEN, &type))
+        trigger->error = strpool_add(&state->strpool, buff);
+    
+    DEBUG_TRIGGER(elem->id, "Loaded trigger %ld data: value %d, lastcalc %d, lastchange %d, error:%s",
+            elem->id, trigger->value, trigger->lastcalc, trigger->lastchange, trigger->error);
+    return 1;
+}
+
+int glb_state_triggers_load() {
+    state_load_objects(state->triggers,"triggers","id", unmarshall_trigger_cb);
+    return SUCCEED;
+}
+
+
+ELEMS_CALLBACK(get_state_json) {
+    trigger_to_json(elem->id, elem->data, (struct zbx_json *)data);
+}
+
+int glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json *json) {
+    
+    int i;
+    zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
+    
+    for (i=0; i < ids->values_num; i++) {
+        zbx_json_addobject(json, "item");
+        elems_hash_process(state->triggers, ids->values[i], get_state_json, json, ELEM_FLAG_DO_NOT_CREATE);
+        zbx_json_close(json);
+            
+        DEBUG_TRIGGER(ids->values[i], "Added info to the trapper state request");
+    }
+    zbx_json_close(json); 
 }

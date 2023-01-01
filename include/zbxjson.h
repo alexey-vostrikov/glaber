@@ -226,6 +226,8 @@
 #define ZBX_PROTO_VALUE_GET_QUEUE		"queue.get"
 #define ZBX_PROTO_VALUE_GET_STATUS		"status.get"
 #define ZBX_PROTO_VALUE_GET_HISTORY		"history.get"
+#define GLB_PROTO_VALUE_GET_TRIGGER_STATUS		"triggers.status.get"
+
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"
 #define ZBX_PROTO_VALUE_ACTIVE_CHECK_HEARTBEAT	"active check heartbeat"
@@ -252,6 +254,8 @@
 
 #define ZBX_PROTO_VALUE_SUPPRESSION_SUPPRESS	"suppress"
 #define ZBX_PROTO_VALUE_SUPPRESSION_UNSUPPRESS	"unsuppress"
+
+
 
 typedef enum
 {
