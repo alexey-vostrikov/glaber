@@ -368,7 +368,7 @@ $item_tab
 		))->setId('js-item-posts-field')
 	])
 	// Append worker server Params;
-	
+	 
 	->addItem([
 		(new CLabel(_('Worker path'), 'path'))->setId('js-item-wokerpath-label'),
 		(new CFormField((new CTextBox('path', $data['params']))
@@ -877,7 +877,8 @@ $item_tab->addItem([
 $item_tab
 	->addItem([
 			 (new CLabel(_('Trends storage'), 'trends'))
-			 	->setAsteriskMark(),
+			 	->setAsteriskMark()
+				->setId('js-item-trends-label'),
 			(new CDiv([
 				(new CRadioButtonList('trends_mode', (int) $data['trends_mode']))
 					->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)

@@ -846,7 +846,7 @@ else {
 		}
 		$triggers = $prefetched_triggers;
 	}
-
+	
 	$show_info_column = false;
 	$show_value_column = false;
 

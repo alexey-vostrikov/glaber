@@ -252,7 +252,6 @@ class CZabbixServer {
 		]);
 	}
 
-    // miramir: костыль
     public static  function getTriggersValues($sid, $triggerIds) {
         global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
@@ -266,15 +265,15 @@ class CZabbixServer {
             );
 
             $newdata = $zabbix_server->request([
-                'request' => 'triggers.get',
+                'request' => 'triggers.state.get',
                 'sid' => $sid,
                 'triggerids' => $triggers_chunk
             ]);
 
-            $result = array_merge($result, $newdata);
+			if (is_array($newdata))
+            	$result = array_merge($result, $newdata);
         }
 
-        // Ожидаемый ответ что-то типа [id => [value, lastchange], id => [value, lastchange], ...]
         return $result;
     }
 

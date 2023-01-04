@@ -266,13 +266,22 @@ foreach ($data['items'] as $itemid => $item) {
 			$item_delay = (new CSpan($item['delay']))->addClass(ZBX_STYLE_RED);
 		}
 
+
+
 		$table_row = new CRow([
 			$checkbox,
 			$host_name_container,
 			(new CCol([$item_name, $item_key]))->addClass($state_css),
-			(new CCol($item_delay))->addClass($state_css),
-			(new CCol($item_history))->addClass($state_css),
-			(new CCol($item_trends))->addClass($state_css),
+			(new CCol( $item_history > 0 ?
+				(new CSpan(""))
+			   		->setAttribute("data-indicator","mark")
+			   		->setAttribute("data-indicator-value",1)
+		   			: " "))->addClass($state_css),
+			(new CCol($item_trends> 0 ? 
+				(new CSpan(""))
+					->setAttribute("data-indicator","mark")
+					->setAttribute("data-indicator-value",1)
+					: " "))->addClass($state_css),
 			(new CCol(item_type2str($item['type'])))->addClass($state_css),
 			(new CCol($last_check))->addClass($state_css),
 			(new CCol($last_value))->addClass($state_css),

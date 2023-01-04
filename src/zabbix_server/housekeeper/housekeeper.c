@@ -769,14 +769,6 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 		sec = zbx_time();
 
-		LOG_INF("Housekeeper waits 30 seconds and dumps");
-		int i;
-		for (i=0; i< 10 ; i++ ) {
-			sleep(30);
-			glb_state_housekeep();
-		}
-		HALT_HERE("housekeeper need event overhaul");
-
 		while (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
 		{
 			switch (rtc_cmd)
@@ -817,6 +809,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		zabbix_log(LOG_LEVEL_WARNING, "executing housekeeper");
 
 		now = time(NULL);
+
+		zbx_setproctitle("%s [Housekeeping state objects in memory]", get_process_type_string(process_type));
+		glb_state_housekeep();
 
 		zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 		DBconnect(ZBX_DB_CONNECT_NORMAL);

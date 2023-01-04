@@ -218,6 +218,9 @@ if ($data['context'] === 'host') {
 	);
 }
 
+if (!isset($data['subfilter']))
+	$data['subfilter'] = " ";
+	
 $filter
 	->setProfile('web.items.filter')
 	->setActiveTab(CProfile::get('web.items.filter.active', 1))

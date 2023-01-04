@@ -186,8 +186,16 @@ foreach ($data['items'] as $item) {
 		$description,
 		(new CDiv(CHtml::encode($item['key_'])))->addClass(ZBX_STYLE_WORDWRAP),
 		$item['delay'],
-		$item['history'],
-		$item['trends'],
+		$item['history'] > 0 ?
+			(new CSpan(""))
+		  		->setAttribute("data-indicator","mark")
+		  		->setAttribute("data-indicator-value",1)
+				: " ",
+		$item['trends'] > 0 ?
+			(new CSpan(""))
+				->setAttribute("data-indicator","mark")
+				->setAttribute("data-indicator-value",1)
+				: " ",
 		item_type2str($item['type']),
 		$status,
 		$discover,

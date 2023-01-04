@@ -218,6 +218,7 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 DUMPER_TO_JSON(trigger_to_json)
 {
     state_trigger_t *trigger = data;
+
     zbx_json_addint64(json, "id", id);
     zbx_json_addint64(json, "value", trigger->value);
     zbx_json_addint64(json, "lastchange", trigger->lastchange);
@@ -226,6 +227,8 @@ DUMPER_TO_JSON(trigger_to_json)
     if (NULL != trigger->error)
         zbx_json_addstring(json, "error", trigger->error, ZBX_JSON_TYPE_STRING);
     
+  // 
+            
     return 1; //returns number of objects added
 }
 
@@ -293,19 +296,21 @@ int glb_state_triggers_load() {
 
 
 ELEMS_CALLBACK(get_state_json) {
+    //new object is added in the callback to ensure object exists and avoid empty objects creation
+    zbx_json_addobject((struct zbx_json *)data, NULL); 
     trigger_to_json(elem->id, elem->data, (struct zbx_json *)data);
+    zbx_json_close((struct zbx_json *)data);
 }
 
-int glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json *json) {
-    
+int glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json *json) 
+{
     int i;
+   
     zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
     
     for (i=0; i < ids->values_num; i++) {
-        zbx_json_addobject(json, "item");
         elems_hash_process(state->triggers, ids->values[i], get_state_json, json, ELEM_FLAG_DO_NOT_CREATE);
-        zbx_json_close(json);
-            
+    
         DEBUG_TRIGGER(ids->values[i], "Added info to the trapper state request");
     }
     zbx_json_close(json); 

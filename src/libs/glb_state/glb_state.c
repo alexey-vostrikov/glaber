@@ -75,7 +75,6 @@ int glb_state_init() {
 	if (SUCCEED != glb_state_triggers_init(&glb_cache->memf) )
 		return FAIL;
 
-
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);
 	return SUCCEED;
 }

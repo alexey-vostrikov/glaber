@@ -1377,8 +1377,7 @@ else {
 	$data['allowed_ui_conf_templates'] = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES);
 
 	$data['tags'] = makeTags($data['items'], true, 'itemid', ZBX_TAG_COUNT_DEFAULT, $filter_tags);
-
-	// render view
+	
 	echo (new CView('configuration.item.list', $data))->getOutput();
 }
 

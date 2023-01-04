@@ -442,15 +442,26 @@ class CTrigger extends CTriggerGeneral {
 			}
 			return $result;
 		}
-
+	
 		$result = zbx_toHash($this->customFetch(self::createSelectQueryFromParts($sqlParts), $options), 'triggerid');
 
         if (!$this->requiresPostSqlFiltering($options)) {
             $triggerValues = $this->getTriggerValues(array_keys($result));
-            foreach ($result as $triggerId => $trigger) {
-                $result[$triggerId]['value'] = $triggerValues[$triggerId][0];
-                $result[$triggerId]['lastchange'] = $triggerValues[$triggerId][1];
-            }
+          //  error_log("Got rsponse:".json_encode($triggerValues)."\n");
+		//	foreach ($result as $triggerId => $trigger) {
+          //      $result[$triggerId]['value'] = $triggerValues[$triggerId][0];
+            //    $result[$triggerId]['lastchange'] = $triggerValues[$triggerId][1];
+           // }
+		   foreach ($triggerValues as $tr_state) {
+				//error_log("Got state trigger data:".json_encode($tr_state)."\n");
+				$result[$tr_state['id']]['value'] = "2";// $tr_state['value'];
+				$result[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
+				$result[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
+
+				if (isset($result['error']))
+					$result[$tr_state['id']]['error'] = $tr_state['error'];
+
+		   }
         }
 
         // return count for post SQL filtered result sets
@@ -502,6 +513,28 @@ class CTrigger extends CTriggerGeneral {
 				unset($row['discover']);
 			}
 			unset($row);
+		}
+
+		foreach ($result as $triggerid => $trigger) {
+			$result[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
+			$result[$triggerid]['lastchange'] = 0;
+			$result[$triggerid]['error'] = "";
+		}
+		
+		if ($this->needsOperationTriggersStatus($options['output'])) {
+
+			$triggerValues = $this->getTriggerValues(array_keys($result));
+	
+			foreach ($triggerValues as $tr_state) {
+				$result[$tr_state['id']]['value'] = $tr_state['value'];
+				$result[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
+				$result[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
+  
+				if (isset($tr_state['error']))
+					$result[$tr_state['id']]['error'] = $tr_state['error'];
+				else 
+				   	$result[$tr_state['id']]['error'] = "";
+			}
 		}
 
 		return $result;
@@ -1036,9 +1069,9 @@ class CTrigger extends CTriggerGeneral {
 				foreach ($downToUpTriggerIds[$resultTriggerId] as $upTriggerId) {
 					// If "up" trigger is in problem state, dependent trigger should not be returned and is removed
 					// from results.
-					if ($upTriggerValues[$upTriggerId][0] == TRIGGER_VALUE_TRUE) {
-						unset($triggers[$resultTriggerId]);
-					}
+				//	if ($upTriggerValues[$upTriggerId][0] == TRIGGER_VALUE_TRUE) {
+				//		unset($triggers[$resultTriggerId]);
+				//	}
 				}
 
 				// Check if result trigger is disabled and if so, remove from results.
@@ -1081,10 +1114,16 @@ class CTrigger extends CTriggerGeneral {
 
         $triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
 
-        foreach ($triggers as $triggerId => $trigger) {
-            $triggers[$triggerId]['value'] = $triggerValues[$triggerId][0];
-            $triggers[$triggerId]['lastchange'] = $triggerValues[$triggerId][1];
-        }
+		foreach ($triggerValues as $tr_state) {
+			//error_log("Got state trigger data:".json_encode($tr_state)."\n");
+			$triggers[$tr_state['id']]['value'] = "2";// $tr_state['value'];
+			$triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
+			$triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
+
+			if (isset($result['error']))
+				$result[$tr_state['id']]['error'] = "afgergewrg";$tr_state['error'];
+
+	    }
 
         // only_true
         if ($options['only_true'] !== null) {
@@ -1117,9 +1156,18 @@ class CTrigger extends CTriggerGeneral {
 
         return $triggers;
 	}
-
+	protected function needsOperationTriggersStatus($fields) {
+		if (in_array('value', $fields))
+			return true;
+		if (in_array('error', $fields))
+			return true;
+		if (in_array('lastchange', $fields))
+			return true;
+		return false;
+	}
     protected function getTriggerValues($triggerIds)
     {
-        return CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);
+        $trigger_data= CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);
+		return $trigger_data;
     }
 }

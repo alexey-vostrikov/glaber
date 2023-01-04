@@ -9492,7 +9492,7 @@ void DCconfig_get_items_by_itemids_partial(DC_ITEM *items, const zbx_uint64_t *i
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])))
 		{
 			DEBUG_ITEM(itemids[i], "Failed to retrieve item config for history sync");
-			LOG_INF("Reason1, itemid is %ld",itemids[i]);
+		//	LOG_INF("Reason1, itemid is %ld",itemids[i]);
 			errcodes[i] = FAIL;
 			continue;
 		}
