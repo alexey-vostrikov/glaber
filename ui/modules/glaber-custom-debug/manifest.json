@@ -1,0 +1,18 @@
+{
+    "manifest_version": 2.0,
+    "id": "glaber-custom-debug",
+    "name": "Custom Debug",
+    "version": "0.0.1",
+    "namespace": "CustomDebug",
+    "author": "Mikhail Makurov",
+    "url": "https://gitlbab.com/mikler/glaber",
+    "description": "UI module to manage glaber custom item and/or trigger debugging on the fly",
+    
+    "actions": {
+        "module.debug.list": {
+            "class": "CControllerDebugList",
+            "view": "module.debug.list"
+        }
+        
+    }
+}

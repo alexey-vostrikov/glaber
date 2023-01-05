@@ -35,7 +35,7 @@ $page = (new CHtmlPage())
 				(new CTextBox('triggerid', isset($data['triggerid'])?$data['triggerid']:'0'))
 					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 		))
-		->addVar('action', 'debug.list')
+		->addVar('action', 'module.debug.list')
 		->addVar('apply_new','1')
 		->addItem((new CFormList())->addRow((''), (new CSubmitButton('Apply'))))
 	);

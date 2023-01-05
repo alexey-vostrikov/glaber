@@ -140,8 +140,6 @@ class CRouter {
 		'mediatype.enable'							=> ['CControllerMediatypeEnable',						null,					null],
 		'mediatype.list'							=> ['CControllerMediatypeList',							'layout.htmlpage',		'administration.mediatype.list'],
 		'mediatype.update'							=> ['CControllerMediatypeUpdate',						null,					null],
-		'debug.list'								=> ['CControllerDebugList',								'layout.htmlpage',		'administration.debug.list'],
-		'debug.update'								=> ['CControllerDebugUpdate',							null,					null],
 		'menu.popup'								=> ['CControllerMenuPopup',								'layout.json',			null],
 		'miscconfig.edit'							=> ['CControllerMiscConfigEdit',						'layout.htmlpage',		'administration.miscconfig.edit'],
 		'miscconfig.update'							=> ['CControllerMiscConfigUpdate',						null,					null],

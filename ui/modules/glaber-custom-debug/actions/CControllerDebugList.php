@@ -18,8 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+namespace Modules\CustomDebug\Actions;
 
-class CControllerDebugList extends CController {
+class CControllerDebugList extends \CController {
 
 	protected function init() {
 		$this->disableSIDValidation();
@@ -43,7 +44,7 @@ class CControllerDebugList extends CController {
 	}
 
 	protected function checkPermissions() {
-		return $this->checkAccess(CRoleHelper::UI_ADMINISTRATION_MEDIA_TYPES);
+		return $this->checkAccess(\CRoleHelper::UI_ADMINISTRATION_MEDIA_TYPES);
 	}
 
 	protected function doAction() {
@@ -52,9 +53,9 @@ class CControllerDebugList extends CController {
 		$apply_new = $this->getInput('apply_new', 0);
 		
 		if ( $apply_new > 0 ) {
-			CZabbixServer::setDebugObjects($itemid, $triggerid);
+			\CZabbixServer::setDebugObjects($itemid, $triggerid);
 		} else {
-			$response = CZabbixServer::getDebugObjects();
+			$response = \CZabbixServer::getDebugObjects();
 						
 			if (isset($response['itemid'])) 
 				$itemid = $response['itemid'];
@@ -69,7 +70,7 @@ class CControllerDebugList extends CController {
 			'itemid' => $itemid
 		];
 		
-		$response = new CControllerResponseData($data);
+		$response = new \CControllerResponseData($data);
 		$response->setTitle(_('Debug objects'));
 		$this->setResponse($response);
 	}
