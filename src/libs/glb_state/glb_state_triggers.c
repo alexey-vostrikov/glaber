@@ -87,6 +87,12 @@ ELEMS_CALLBACK(set_trigger_info) {
         trigger->error = strpool_add(&state->strpool, info->error);
     }
 
+    if ( (TRIGGER_VALUE_OK == trigger->value || TRIGGER_VALUE_PROBLEM == trigger->value) &&
+            NULL != trigger->error ) {
+        strpool_free(&state->strpool, trigger->error);
+        trigger->error = NULL;
+    }
+
     return SUCCEED;
 }
 
