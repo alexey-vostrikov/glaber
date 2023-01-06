@@ -50,6 +50,7 @@ if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
 $triggers = API::Trigger()->get([
 	'output' => API_OUTPUT_EXTEND,
 	'selectHosts' => API_OUTPUT_EXTEND,
+    'selectItems' => ["name", "lastvalue", "state", "value_type"],
 	'triggerids' => getRequest('triggerid')
 ]);
 
@@ -161,13 +162,16 @@ require_once dirname(__FILE__).'/include/views/js/tr_events.js.php';
 
 $event_tab = (new CDiv([
 	new CDiv([
+        (new CSection(make_trigger_opdata($trigger, $event)))
+            ->setId(SECTION_HAT_TRIGGEROPDATA)
+            ->setHeader(new CTag('h4', true, _('Operational data'))),
 		(new CSection(make_trigger_details($trigger, $event['eventid'])))
 			->setId(SECTION_HAT_TRIGGERDETAILS)
 			->setHeader(new CTag('h4', true, _('Trigger details'))),
 		(new CSection(make_event_details($event, $allowed)))
 			->setId(SECTION_HAT_EVENTDETAILS)
-			->setHeader(new CTag('h4', true, _('Event details')))
-	]),
+			->setHeader(new CTag('h4', true, _('Event details'))),
+    ]),
 	new CDiv([
 		(new CSectionCollapsible(makeEventDetailsActionsTable($actions, $users, $mediatypes)))
 			->setId(SECTION_HAT_EVENTACTIONS)
