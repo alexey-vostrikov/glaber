@@ -169,10 +169,6 @@ function make_event_details(array $event, array $allowed) {
 			(new CCol($event['name']))->addClass(ZBX_STYLE_WORDWRAP)
 		])
 		->addRow([
-			_('Operational data'),
-			$event['opdata']->addClass(ZBX_STYLE_WORDBREAK)
-		])
-		->addRow([
 			_('Severity'),
 			CSeverityHelper::makeSeverityCell((int) $event['severity'])
 		])

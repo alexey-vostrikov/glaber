@@ -1643,6 +1643,7 @@ define('ZBX_WIDGET_INACCESSIBLE',	'inaccessible');
 
 // event details sections
 define('SECTION_HAT_TRIGGERDETAILS',	'hat_triggerdetails');
+define('SECTION_HAT_TRIGGEROPDATA',	    'hat_triggeropdata');
 define('SECTION_HAT_EVENTDETAILS',		'hat_eventdetails');
 define('SECTION_HAT_EVENTACTIONS',		'hat_eventactions');
 define('SECTION_HAT_EVENTLIST',			'hat_eventlist');

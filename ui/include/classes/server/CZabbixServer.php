@@ -206,7 +206,6 @@ class CZabbixServer {
 
 	public static function  getItemsState(array $itemids) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
-		$i = 0;
 
 		$result = [];
 		foreach (array_chunk($itemids, 81) as $items_chunk) {
@@ -222,8 +221,6 @@ class CZabbixServer {
 			
 			if (is_array($newdata))
 				$result = $result + $newdata;
-
-			$i++;
 		}
 
 		return $result;
@@ -252,6 +249,7 @@ class CZabbixServer {
 		]);
 	}
 
+    // miramir: костыль
     public static  function getTriggersValues($sid, $triggerIds) {
         global $ZBX_SERVER, $ZBX_SERVER_PORT;
 

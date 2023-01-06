@@ -442,27 +442,8 @@ class CTrigger extends CTriggerGeneral {
 			}
 			return $result;
 		}
-	
+
 		$result = zbx_toHash($this->customFetch(self::createSelectQueryFromParts($sqlParts), $options), 'triggerid');
-
-        if (!$this->requiresPostSqlFiltering($options)) {
-            $triggerValues = $this->getTriggerValues(array_keys($result));
-          //  error_log("Got rsponse:".json_encode($triggerValues)."\n");
-		//	foreach ($result as $triggerId => $trigger) {
-          //      $result[$triggerId]['value'] = $triggerValues[$triggerId][0];
-            //    $result[$triggerId]['lastchange'] = $triggerValues[$triggerId][1];
-           // }
-		   foreach ($triggerValues as $tr_state) {
-				//error_log("Got state trigger data:".json_encode($tr_state)."\n");
-				$result[$tr_state['id']]['value'] = "2";// $tr_state['value'];
-				$result[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
-				$result[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
-
-				if (isset($result['error']))
-					$result[$tr_state['id']]['error'] = $tr_state['error'];
-
-		   }
-        }
 
         // return count for post SQL filtered result sets
 		if ($options['countOutput']) {
@@ -513,28 +494,6 @@ class CTrigger extends CTriggerGeneral {
 				unset($row['discover']);
 			}
 			unset($row);
-		}
-
-		foreach ($result as $triggerid => $trigger) {
-			$result[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
-			$result[$triggerid]['lastchange'] = 0;
-			$result[$triggerid]['error'] = "";
-		}
-		
-		if ($this->needsOperationTriggersStatus($options['output'])) {
-
-			$triggerValues = $this->getTriggerValues(array_keys($result));
-	
-			foreach ($triggerValues as $tr_state) {
-				$result[$tr_state['id']]['value'] = $tr_state['value'];
-				$result[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
-				$result[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
-  
-				if (isset($tr_state['error']))
-					$result[$tr_state['id']]['error'] = $tr_state['error'];
-				else 
-				   	$result[$tr_state['id']]['error'] = "";
-			}
 		}
 
 		return $result;
@@ -946,8 +905,7 @@ class CTrigger extends CTriggerGeneral {
     protected function requiresPostSqlFiltering(array $options)
     {
         return $options['skipDependent'] !== null || $options['withLastEventUnacknowledged'] !== null
-            || $options['only_true'] !== null
-            || $options['lastChangeSince'] !== null || $options['lastChangeTill'] !== null;
+            || $this->needsTriggersStatusRequest($options);
     }
 
 	protected function applyPostSqlFiltering(array $triggers, array $options) {
@@ -1063,15 +1021,15 @@ class CTrigger extends CTriggerGeneral {
 			}
 
             $upTriggerValues = $this->getTriggerValues($allUpTriggerIds);
-
+            $upTriggerValues = array_column($upTriggerValues, null, 'id');
             // Clean result set.
 			foreach ($resultTriggerIds as $resultTriggerId) {
 				foreach ($downToUpTriggerIds[$resultTriggerId] as $upTriggerId) {
 					// If "up" trigger is in problem state, dependent trigger should not be returned and is removed
 					// from results.
-				//	if ($upTriggerValues[$upTriggerId][0] == TRIGGER_VALUE_TRUE) {
-				//		unset($triggers[$resultTriggerId]);
-				//	}
+					if (isset($upTriggerValues[$upTriggerId]) && $upTriggerValues[$upTriggerId]['value'] == TRIGGER_VALUE_TRUE) {
+						unset($triggers[$resultTriggerId]);
+					}
 				}
 
 				// Check if result trigger is disabled and if so, remove from results.
@@ -1112,18 +1070,27 @@ class CTrigger extends CTriggerGeneral {
 			}
 		}
 
-        $triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
+        foreach ($triggers as $triggerid => $trigger) {
+            $triggers[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
+            $triggers[$triggerid]['lastchange'] = 0;
+            $triggers[$triggerid]['lastvaluechange'] = 0;
+            $triggers[$triggerid]['error'] = "";
+        }
 
-		foreach ($triggerValues as $tr_state) {
-			//error_log("Got state trigger data:".json_encode($tr_state)."\n");
-			$triggers[$tr_state['id']]['value'] = "2";// $tr_state['value'];
-			$triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
-			$triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
+        if ($this->needsTriggersStatusRequest($options)) {
 
-			if (isset($tr_state['error']))
-				$result[$tr_state['id']]['error'] = $tr_state['error'];
+            $triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
+            foreach ($triggerValues as $tr_state) {
+                $triggers[$tr_state['id']]['value'] = $tr_state['value'];
+                $triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
+                $triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
 
-	    }
+                if (isset($tr_state['error']))
+                    $triggers[$tr_state['id']]['error'] = $tr_state['error'];
+                else
+                    $triggers[$tr_state['id']]['error'] = "";
+            }
+        }
 
         // only_true
         if ($options['only_true'] !== null) {
@@ -1156,18 +1123,38 @@ class CTrigger extends CTriggerGeneral {
 
         return $triggers;
 	}
-	protected function needsOperationTriggersStatus($fields) {
-		if (in_array('value', $fields))
-			return true;
-		if (in_array('error', $fields))
-			return true;
-		if (in_array('lastchange', $fields))
-			return true;
+
+	protected function needsTriggersStatusRequest($options) {
+        // fields from server exists in requested fields
+        if ($options['output'] === API_OUTPUT_EXTEND)
+            return true;
+
+        if (is_array($options['output'])) {
+            if (in_array('value', $options['output']))
+                return true;
+            if (in_array('error', $options['output']))
+                return true;
+            if (in_array('lastchange', $options['output']))
+                return true;
+        }
+
+        // fields from server exists in filters
+        if ($options['only_true'] !== null || $options['lastChangeSince'] !== null || $options['lastChangeTill'] !== null) {
+            return true;
+        }
+
+        // fields from server exists in sorts
+        // Надо это обработать, но чуть позже
+//        if ($options['sortfield'] === 'lastchange') {
+//
+//        }
+
 		return false;
 	}
+
     protected function getTriggerValues($triggerIds)
     {
-        $trigger_data= CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);
-		return $trigger_data;
+        return CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);;
     }
 }
+
