@@ -1039,6 +1039,58 @@ function make_trigger_details($trigger, $eventid) {
 }
 
 /**
+ * Make trigger operational data block.
+ *
+ * @param array $trigger  Trigger described in info block.
+ *
+ * @return object
+ */
+function make_trigger_opdata($trigger, $event) {
+    $triggerValCol = CSeverityHelper::makeSeverityCell((int) $trigger['priority'], trigger_value2str($trigger["value"]));
+    if ($trigger["error"] !== "") {
+        $triggerValCol->setHint($trigger["error"], 'hintbox-wrap');
+    }
+
+    $table = new CTableInfo();
+    $last_change = zbx_date2age($trigger["lastchange"]);
+    if (isset($trigger["lastvaluechange"]) && $trigger["lastvaluechange"] > 0) {
+        $last_check = (new CSpan($last_change))
+            ->addClass(ZBX_STYLE_LINK_ACTION)
+            ->setHint("Next request in: " . zbx_date2age($trigger["lastvaluechange"]), 'hintbox-wrap');
+    }
+
+    $table->addRow([
+        new CCol(_('Trigger value')),
+        new CCol($last_change),
+        $triggerValCol,
+    ]);
+
+    foreach ($trigger["items"] as $item) {
+        $last_check = zbx_date2age($item['lastdata']);
+
+        if (isset($item['nextcheck']) && $item['nextcheck'] > 0) {
+            $last_check = (new CSpan($last_check))
+                ->addClass(ZBX_STYLE_LINK_ACTION)
+                ->setHint("Next request in: " . zbx_date2age(2 * time() - $item['nextcheck']), 'hintbox-wrap');
+        }
+
+        $is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
+        $last_value = new CLink($item["lastvalue"],
+            (new CUrl('history.php'))
+                ->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
+                ->setArgument('itemids[]', $item['itemid']));
+
+        $table->addRow([
+            new CCol($item["name"]),
+            $last_check,
+            new CCol($last_value),
+        ]);
+    }
+
+    return $table;
+}
+
+/**
  * Analyze an expression and returns expression html tree.
  *
  * @param string $expression  Trigger expression or recovery expression string.
@@ -1056,7 +1108,6 @@ function analyzeExpression(string $expression, int $type, string &$error = null)
 
 	if ($expression_parser->parse($expression) != CParser::PARSE_SUCCESS) {
 		$error = $expression_parser->getError();
-
 		return false;
 	}
 
