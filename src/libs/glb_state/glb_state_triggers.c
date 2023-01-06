@@ -217,7 +217,6 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 
 		if (FAIL == glb_state_trigger_set_info(&info))
 			THIS_SHOULD_NEVER_HAPPEN;
-            //HALT_HERE("Trigger state set logic error id= %ld, value = %d, error = %s", info.id, info.value, info.error);
 	}
 }
 
@@ -233,8 +232,9 @@ DUMPER_TO_JSON(trigger_to_json)
     if (NULL != trigger->error)
         zbx_json_addstring(json, "error", trigger->error, ZBX_JSON_TYPE_STRING);
     
-  // 
-            
+    DEBUG_TRIGGER(id, "Added trapper into json: id: %lld, value: %d, lastchange: %d, lastcalc: %d, error: %s",
+          id, trigger->value, trigger->lastchange, trigger->lastcalc, trigger->error);
+
     return 1; //returns number of objects added
 }
 
@@ -300,12 +300,22 @@ int glb_state_triggers_load() {
     return SUCCEED;
 }
 
-
 ELEMS_CALLBACK(get_state_json) {
-    //new object is added in the callback to ensure object exists and avoid empty objects creation
     zbx_json_addobject((struct zbx_json *)data, NULL); 
     trigger_to_json(elem->id, elem->data, (struct zbx_json *)data);
     zbx_json_close((struct zbx_json *)data);
+}
+
+int json_add_nonexsting_trigger(u_int64_t id, struct zbx_json *json) {
+    zbx_json_type_t type = ZBX_JSON_TYPE_STRING;
+
+    zbx_json_addobject(json, NULL); 
+    zbx_json_addint64(json, "id", id);
+    zbx_json_addint64(json, "value", TRIGGER_VALUE_UNKNOWN);
+    zbx_json_addint64(json, "lastchange", 0);
+    zbx_json_addint64(json, "lastcalc", 0 );
+    zbx_json_addstring(json, "error", "trigger hasn't been calculated since the server startup", ZBX_JSON_TYPE_STRING);
+    zbx_json_close(json);
 }
 
 int glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json *json) 
@@ -315,9 +325,9 @@ int glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json 
     zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
     
     for (i=0; i < ids->values_num; i++) {
-        elems_hash_process(state->triggers, ids->values[i], get_state_json, json, ELEM_FLAG_DO_NOT_CREATE);
-    
-        DEBUG_TRIGGER(ids->values[i], "Added info to the trapper state request");
+        
+        if (FAIL == elems_hash_process(state->triggers, ids->values[i], get_state_json, json, ELEM_FLAG_DO_NOT_CREATE))
+          json_add_nonexsting_trigger( ids->values[i], json);
     }
     zbx_json_close(json); 
 }

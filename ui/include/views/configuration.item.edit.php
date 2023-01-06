@@ -886,9 +886,7 @@ $item_tab
 					->setReadonly($discovered_item)
  					->setModern(true),
 				(new CInput('hidden', 'trends', "86400"))])
-
-
-			)]);
+			)->setId('js-item-trends-field')]);
 
 if ($data['host']['flags'] != ZBX_FLAG_DISCOVERY_CREATED) {
 	$item_tab->addItem([
@@ -983,19 +981,19 @@ $item_tab
 		new CFormField((new CCheckBox('status', ITEM_STATUS_ACTIVE))->setChecked($data['status'] == ITEM_STATUS_ACTIVE))
 	]);
 
-	// Add link to Latest data.
-if (CWebUser::checkAccess(CRoleHelper::UI_MONITORING_LATEST_DATA) && $data['itemid'] != 0
-		&& $data['context'] === 'host') {
-	$item_tab->addItem(
-		(new CFormField((new CLink(_('Latest data'),
-			(new CUrl('zabbix.php'))
-				->setArgument('action', 'latest.view')
-				->setArgument('hostids[]', $data['hostid'])
-				->setArgument('name', $data['name'])
-				->setArgument('filter_name', '')
-		))->setTarget('_blank')))
-	);
-}
+// 	// Add link to Latest data.
+// if (CWebUser::checkAccess(CRoleHelper::UI_MONITORING_LATEST_DATA) && $data['itemid'] != 0
+// 		&& $data['context'] === 'host') {
+// 	$item_tab->addItem(
+// 		(new CFormField((new CLink(_('Latest data'),
+// 			(new CUrl('zabbix.php'))
+// 				->setArgument('action', 'latest.view')
+// 				->setArgument('hostids[]', $data['hostid'])
+// 				->setArgument('name', $data['name'])
+// 				->setArgument('filter_name', '')
+// 		))->setTarget('_blank')))
+// 	);
+// }
 
 // Append tabs to form.
 $item_tabs = (new CTabView())

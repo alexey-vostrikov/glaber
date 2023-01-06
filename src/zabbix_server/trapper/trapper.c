@@ -200,7 +200,6 @@ static int  get_triggers_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_destroy(&ids);
 	zbx_json_close(&response_json);
 	
-	LOG_INF("%s: trigger Response is %s",__func__, response_json.buffer);
 	(void)zbx_tcp_send(sock, response_json.buffer);
 
 	zbx_json_free(&response_json);

@@ -4086,6 +4086,19 @@ class CApiInputValidator {
 					'2' =>	['type' => API_STRING_UTF8, 'default' => '']
 				]];
 				break;
+			case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
+				$api_input_rules = ['type' => API_OBJECT, 'fields' => [
+					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY],
+					'2' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
+				]];
+				break;
+			case GLB_PREPROC_DISPATCH_ITEM:
+				$api_input_rules = ['type' => API_OBJECT, 'fields' => [
+					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY],
+					'2' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
+				]];
+				break;
+	
 		}
 
 		if (self::validate($api_input_rules, $params, $path, $error)) {

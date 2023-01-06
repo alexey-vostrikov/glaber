@@ -137,8 +137,9 @@ $fields = [
 											' && '.IN(ITEM_VALUE_TYPE_FLOAT.','.ITEM_VALUE_TYPE_UINT64, 'value_type')
 									],
 	'logtimefmt' =>					[T_ZBX_STR, O_OPT, null,	null,
-										'(isset({add}) || isset({update})) && isset({value_type})'.
-											' && {value_type} == '.ITEM_VALUE_TYPE_LOG
+							//			'(isset({add}) || isset({update})) && isset({value_type})'.
+							//				' && {value_type} == '.ITEM_VALUE_TYPE_LOG
+										null
 									],
 	'preprocessing' =>				[T_ZBX_STR, O_OPT, P_NO_TRIM,	null,	null],
 	'group_itemid' =>				[T_ZBX_INT, O_OPT, null,	DB_ID,		null],
