@@ -1120,8 +1120,8 @@ class CTrigger extends CTriggerGeneral {
 			$triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
 			$triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
 
-			if (isset($result['error']))
-				$result[$tr_state['id']]['error'] = "afgergewrg";$tr_state['error'];
+			if (isset($tr_state['error']))
+				$result[$tr_state['id']]['error'] = $tr_state['error'];
 
 	    }
 
