@@ -94,6 +94,7 @@ class CTrigger extends CTriggerGeneral {
 			'evaltype'						=> TAG_EVAL_TYPE_AND_OR,
 			'tags'							=> null,
 			'filter'						=> null,
+            'filterForServer'               => null,
 			'search'						=> null,
 			'searchByAny'					=> null,
 			'startSearch'					=> false,
@@ -348,17 +349,29 @@ class CTrigger extends CTriggerGeneral {
 			$options['filter'] = [];
 		}
 
+        if ($options['filterForServer'] === null) {
+            $options['filterForServer'] = [];
+        }
+
         // -----------------------------------------------------------
         // KLUDGE: Judging by the dbFilter code, it makes no sense to pass filters 'value' and 'lastchange',
         // so we do not process them in postSqlFilter
         // -----------------------------------------------------------
-		if (is_array($options['filter'])) {
+		if (is_array($options['filter']) && $options['filter'] !== []) {
 			if (!array_key_exists('flags', $options['filter'])) {
 				$options['filter']['flags'] = [
 					ZBX_FLAG_DISCOVERY_NORMAL,
 					ZBX_FLAG_DISCOVERY_CREATED
 				];
 			}
+
+            // move to server filter
+            foreach (['state', 'value'] as $field) {
+                if (array_key_exists($field, $options['filter'])) {
+                    $options['filterForServer'][$field] = $options['filter'][$field];
+                    unset($options['filter'][$field]);
+                }
+            }
 
 			$this->dbFilter('triggers t', $options, $sqlParts);
 
@@ -1070,25 +1083,23 @@ class CTrigger extends CTriggerGeneral {
 			}
 		}
 
-        foreach ($triggers as $triggerid => $trigger) {
-            $triggers[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
-            $triggers[$triggerid]['lastchange'] = 0;
-            $triggers[$triggerid]['lastvaluechange'] = 0;
-            $triggers[$triggerid]['error'] = "";
-        }
-
         if ($this->needsTriggersStatusRequest($options)) {
+            foreach ($triggers as $triggerid => $trigger) {
+                $triggers[$triggerid]['state'] = TRIGGER_STATE_UNKNOWN;
+                $triggers[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
+                $triggers[$triggerid]['lastchange'] = 0;
+                $triggers[$triggerid]['lastvaluechange'] = 0;
+                $triggers[$triggerid]['error'] = "Server not return result";
+            }
 
             $triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
+
             foreach ($triggerValues as $tr_state) {
+                $triggers[$tr_state['id']]['state'] = $tr_state['value'] == TRIGGER_VALUE_UNKNOWN ? TRIGGER_STATE_UNKNOWN : TRIGGER_STATE_NORMAL;
                 $triggers[$tr_state['id']]['value'] = $tr_state['value'];
                 $triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
                 $triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
-
-                if (isset($tr_state['error']))
-                    $triggers[$tr_state['id']]['error'] = $tr_state['error'];
-                else
-                    $triggers[$tr_state['id']]['error'] = "";
+                $triggers[$tr_state['id']]['error'] = $tr_state['error'];
             }
         }
 
@@ -1121,26 +1132,52 @@ class CTrigger extends CTriggerGeneral {
             }
         }
 
+        // filter state
+        if (is_array($options['filterForServer']) && array_key_exists("state", $options['filterForServer'])){
+            foreach ($triggers as $triggerId => $trigger) {
+                if ($trigger['state'] != $options['filterForServer']['state']) {
+                    unset($triggers[$triggerId]);
+                }
+            }
+        }
+
+        // filter value
+        if (is_array($options['filterForServer']) && array_key_exists("value", $options['filterForServer'])){
+            foreach ($triggers as $triggerId => $trigger) {
+                if ($trigger['value'] != $options['filterForServer']['value']) {
+                    unset($triggers[$triggerId]);
+                }
+            }
+        }
+
         return $triggers;
 	}
 
 	protected function needsTriggersStatusRequest($options) {
         // fields from server exists in requested fields
-        if ($options['output'] === API_OUTPUT_EXTEND)
-            return true;
+        if (!$options['countOutput']) {
+            if ($options['output'] === API_OUTPUT_EXTEND)
+                return true;
 
-        if (is_array($options['output'])) {
-            if (in_array('value', $options['output']))
-                return true;
-            if (in_array('error', $options['output']))
-                return true;
-            if (in_array('lastchange', $options['output']))
-                return true;
+            if (is_array($options['output'])) {
+                if (in_array('state', $options['output']))
+                    return true;
+                if (in_array('value', $options['output']))
+                    return true;
+                if (in_array('error', $options['output']))
+                    return true;
+                if (in_array('lastchange', $options['output']))
+                    return true;
+            }
         }
 
         // fields from server exists in filters
         if ($options['only_true'] !== null || $options['lastChangeSince'] !== null || $options['lastChangeTill'] !== null) {
             return true;
+        }
+
+        if (is_array($options['filterForServer']) && $options['filterForServer'] !== []) {
+                return true;
         }
 
         // fields from server exists in sorts

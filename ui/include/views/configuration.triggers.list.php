@@ -73,16 +73,6 @@ $filter_column1 = (new CFormList())
 	)
 	->addRow(_('Severity'),	(new CSeverityCheckBoxList('filter_priority'))->setChecked($data['filter_priority']));
 
-if ($data['context'] === 'host') {
-	$filter_column1->addRow(_('State'),
-		(new CRadioButtonList('filter_state', (int) $data['filter_state']))
-			->addValue(_('all'), -1)
-			->addValue(_('Normal'), TRIGGER_STATE_NORMAL)
-			->addValue(_('Unknown'), TRIGGER_STATE_UNKNOWN)
-			->setModern(true)
-	);
-}
-
 $filter_column1->addRow(_('Status'),
 	(new CRadioButtonList('filter_status', (int) $data['filter_status']))
 		->addValue(_('all'), -1)
@@ -97,6 +87,7 @@ if ($data['context'] === 'host') {
 			->addValue(_('all'), -1)
 			->addValue(_('Ok'), TRIGGER_VALUE_FALSE)
 			->addValue(_('Problem'), TRIGGER_VALUE_TRUE)
+            ->addValue(_('Unknown'), TRIGGER_VALUE_UNKNOWN)
 			->setModern(true)
 	);
 }
@@ -288,7 +279,7 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 
 	// status
 	$status = (new CLink(
-		triggerIndicator($trigger['status'], $trigger['state']),
+		triggerIndicatorByValue($trigger['status'], $trigger['value']),
 		(new CUrl('triggers.php'))
 			->setArgument('g_triggerid', $triggerid)
 			->setArgument('action', ($trigger['status'] == TRIGGER_STATUS_DISABLED)
@@ -299,7 +290,7 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 			->getUrl()
 		))
 		->addClass(ZBX_STYLE_LINK_ACTION)
-		->addClass(triggerIndicatorStyle($trigger['status'], $trigger['state']))
+		->addClass(triggerIndicatorStyleByValue($trigger['status'], $trigger['value']))
 		->addSID();
 
 	// hosts
