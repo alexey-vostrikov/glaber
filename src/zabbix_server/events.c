@@ -1667,7 +1667,8 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 
 		if (new_value != diff->value)
 		{
-			LOG_INF("Set1 new value for trigger %ld to %d", diff->triggerid, new_value);
+			//LOG_INF("Set1 new value for trigger %ld to %d", diff->triggerid, new_value);
+			
 			diff->value = new_value;
 			diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
 		}

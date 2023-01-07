@@ -1099,7 +1099,9 @@ class CTrigger extends CTriggerGeneral {
                 $triggers[$tr_state['id']]['value'] = $tr_state['value'];
                 $triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
                 $triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
-                $triggers[$tr_state['id']]['error'] = $tr_state['error'];
+				
+				if (isset($tr_state['error']))
+					$triggers[$tr_state['id']]['error'] = $tr_state['error'];
             }
         }
 

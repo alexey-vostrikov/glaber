@@ -93,6 +93,9 @@ ELEMS_CALLBACK(set_trigger_info) {
         trigger->error = NULL;
     }
 
+    DEBUG_TRIGGER(elem->id, "Set new trigger state: value: %d, lastcalc: %d, lastchange: %d, error: %s",
+          trigger->value, trigger->lastcalc, trigger->lastchange, trigger->error);
+
     return SUCCEED;
 }
 
@@ -107,7 +110,7 @@ static int validate_info(state_trigger_info_t *info){
 
    if (NULL == info || 0 == info->id || info->lastcalc == 0) 
         return FAIL;
-    if ( (TRIGGER_VALUE_NONE != info->value) && 
+    if ( //(TRIGGER_VALUE_NONE != info->value) &&  this shouln't ever be stored in the state
          (TRIGGER_VALUE_OK != info->value) &&
          (TRIGGER_VALUE_PROBLEM != info->value) &&
          (TRIGGER_VALUE_UNKNOWN != info->value))
@@ -120,9 +123,10 @@ static int validate_info(state_trigger_info_t *info){
 
 int glb_state_trigger_set_info(state_trigger_info_t *info){
     
-    if (FAIL == validate_info(info))
+    if (FAIL == validate_info(info)) {
+        DEBUG_TRIGGER(info->id, "Validation of the new trigger state has been failed");
         return FAIL;
-
+    }
     return elems_hash_process(state->triggers, info->id, set_trigger_info, info, 0);
 }
     
@@ -205,12 +209,14 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 	{
 		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
 
-		DEBUG_TRIGGER(diff->triggerid,"Saving new trigger state to glb_state cache");
         bzero(&info, sizeof(info));
 		
 		info.id = diff->triggerid;
 		info.value = diff->value;
 		info.lastcalc = diff->lastchange;   
+
+        DEBUG_TRIGGER(diff->triggerid,"Saving trigger state to state cache: value %d, lastcalc: %d",
+            info.value, info.lastcalc);
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
 			info.error = diff->error;		
@@ -231,7 +237,9 @@ DUMPER_TO_JSON(trigger_to_json)
     
     if (NULL != trigger->error)
         zbx_json_addstring(json, "error", trigger->error, ZBX_JSON_TYPE_STRING);
-    
+    else 
+        zbx_json_addstring(json, "error", "", ZBX_JSON_TYPE_STRING);
+        
     DEBUG_TRIGGER(id, "Added trapper into json: id: %lld, value: %d, lastchange: %d, lastcalc: %d, error: %s",
           id, trigger->value, trigger->lastchange, trigger->lastcalc, trigger->error);
 

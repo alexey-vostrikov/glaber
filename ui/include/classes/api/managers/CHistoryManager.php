@@ -109,29 +109,29 @@ class CHistoryManager {
 				$row['clock'] = $value['clock'];
 					
 				switch ($function) {
-					case GRAPH_AGGREGATE_MIN:
+					case AGGREGATE_MIN:
 						$row['value'] = $value['min'];
 						break;
-					case GRAPH_AGGREGATE_MAX:
+					case AGGREGATE_MAX:
 						$row['value'] = $value['max'];
 						break;
-					case GRAPH_AGGREGATE_AVG:
+					case AGGREGATE_AVG:
 						$row['value'] = $value['avg'];
 						break;
-					case GRAPH_AGGREGATE_COUNT:
+					case AGGREGATE_COUNT:
 						$row['count'] = $value['count'];
 						break;
-					case GRAPH_AGGREGATE_SUM:
+					case AGGREGATE_SUM:
 						$row['value'] = $value['count']*$value['avg'];
 						break;
 		
 					//oooops, this is something which cannot be done right now
 					//TODO figure how to do this or remove first and last from the menu
-					case GRAPH_AGGREGATE_FIRST:
+					case AGGREGATE_FIRST:
 						$row['value'] = $value['avg'];
 							//$sql_select[] = 'MIN(clock) AS clock';
 						break;
-					case GRAPH_AGGREGATE_LAST:
+					case AGGREGATE_LAST:
 						$row['value'] = $value['avg'];
 						break;
 				}
@@ -158,10 +158,13 @@ class CHistoryManager {
 	 * @return array  History value aggregation.
 	 */
 	public function getAggregationByInterval(array $items, $time_from, $time_to, $function, $interval) {
-		return $this->getGraphAggregationByIntervalFromServer($items,$time_from, $time_to, $function, $interval);
+		return $this->getGraphAggregationByIntervalFromServer($items, $time_from, $time_to, $function, $interval);
 	}
 
-	
+	public function getItemsHavingValues(array $items, $period ) {
+		return $this->getGraphAggregationByIntervalFromServer($items, time() - $period - 1, time(), 
+				AGGREGATE_AVG, $period);
+	}
 	/**
 	 * Returns history value aggregation for graphs.
 	 *

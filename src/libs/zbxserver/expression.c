@@ -5780,49 +5780,49 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 
 		if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
 			LOG_DBG("Failed to eval %ld trigger expression",tr->triggerid);
+			DEBUG_TRIGGER(tr->triggerid,"Failed to eval expression: %s", tr->new_error);
+			tr->new_value = TRIGGER_VALUE_UNKNOWN;
 			continue;
 		}
+		
+		tr->new_value = tr->value;
+		
 		/* trigger expression evaluates to true, set PROBLEM value */
 		if (SUCCEED != zbx_double_compare(expr_result, 0.0))
 		{
-			if (0 == (tr->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION))
-			{
-				/* trigger value should remain unchanged and no PROBLEM events should be generated if */
-				/* problem expression evaluates to true, but trigger recalculation was initiated by a */
-				/* time-based function or a new value of an item in recovery expression */
-				tr->new_value = TRIGGER_VALUE_NONE;
-			}
-			else
+			DEBUG_TRIGGER(tr->triggerid, "Trigger expression calculated to non-zero (PROBLEM)");
+			
+			/* trigger value should remain unchanged and no PROBLEM events should be generated if */
+			/* problem expression evaluates to true, but trigger recalculation was initiated by a */
+			/* time-based function or a new value of an item in recovery expression */
+			if (0 != (tr->flags & ZBX_DC_TRIGGER_PROBLEM_EXPRESSION)) 
 				tr->new_value = TRIGGER_VALUE_PROBLEM;
-
+			
 			continue;
 		}
 
-		/* otherwise try to recover trigger by setting OK value */
-		if (TRIGGER_VALUE_PROBLEM == tr->value && TRIGGER_RECOVERY_MODE_NONE != tr->recovery_mode)
+		/* OK value */
+		if (TRIGGER_RECOVERY_MODE_NONE == tr->recovery_mode)
+			continue;
+
+		if (TRIGGER_RECOVERY_MODE_EXPRESSION == tr->recovery_mode)
 		{
-			if (TRIGGER_RECOVERY_MODE_EXPRESSION == tr->recovery_mode)
-			{
-				tr->new_value = TRIGGER_VALUE_OK;
-				continue;
-			}
-
-			/* processing recovery expression mode */
-			if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
-			{
-				tr->new_value = TRIGGER_VALUE_UNKNOWN;
-				continue;
-			}
-
-			if (SUCCEED != zbx_double_compare(expr_result, 0.0))
-			{
-				tr->new_value = TRIGGER_VALUE_OK;
-				continue;
-			}
+			tr->new_value = TRIGGER_VALUE_OK;
+			continue;
 		}
 
-		/* no changes, keep the old value */
-		tr->new_value = TRIGGER_VALUE_NONE;
+		/* processing recovery expression mode */
+		if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
+		{
+			tr->new_value = TRIGGER_VALUE_UNKNOWN;
+			continue;
+		}
+
+		if (SUCCEED != zbx_double_compare(expr_result, 0.0))
+		{
+			tr->new_value = TRIGGER_VALUE_OK;
+			continue;
+		}
 	}
 
 	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))

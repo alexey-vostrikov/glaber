@@ -277,7 +277,7 @@ typedef struct _DC_TRIGGER
 	unsigned char		priority;
 	unsigned char		type;
 	unsigned char		value;
-	unsigned char		state;
+	//unsigned char		state;
 	unsigned char		new_value;
 	unsigned char		status;
 	unsigned char		recovery_mode;

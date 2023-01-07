@@ -1476,11 +1476,11 @@ static void DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
 
 
 
-#define ZBX_FLAGS_TRIGGER_CREATE_NOTHING 0x00
-#define ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT 0x01
-#define ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT 0x02
-#define ZBX_FLAGS_TRIGGER_CREATE_EVENT \
-	(ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT | ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT)
+// #define ZBX_FLAGS_TRIGGER_CREATE_NOTHING 0x00
+// #define ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT 0x01
+// #define ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT 0x02
+// #define ZBX_FLAGS_TRIGGER_CREATE_EVENT \
+// 	(ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT | ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT)
 
 /******************************************************************************
  *                                                                            *
@@ -1516,73 +1516,45 @@ static void DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
  ******************************************************************************/
 static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *diffs, ZBX_DC_HISTORY *history)
 {
-	const char *new_error;
-	int  new_value, ret = FAIL;
-	zbx_uint64_t flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET, event_flags = ZBX_FLAGS_TRIGGER_CREATE_NOTHING;
+	LOG_DBG("In %s() triggerid:" ZBX_FS_UI64 " value:%d new_value:%d",
+			   __func__, trigger->triggerid, trigger->value,  trigger->new_value);
 
-	LOG_DBG("In %s() triggerid:" ZBX_FS_UI64 " value:%d(%d) new_value:%d",
-			   __func__, trigger->triggerid, trigger->value, trigger->state, trigger->new_value);
+	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger, value is %d, new value is %d", trigger->value, trigger->new_value);
 
-	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger");
-
-	new_error = (NULL == trigger->new_error ? "" : trigger->new_error);
-
-	if (trigger->value != new_value && 
-	  (TRIGGER_VALUE_UNKNOWN == trigger->value || TRIGGER_VALUE_UNKNOWN == new_value))
-		event_flags |= ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT;
-	
-	if (0 != strcmp(trigger->error, new_error))
-		flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR;
-
-	if (new_value != TRIGGER_VALUE_UNKNOWN)
-	{
-		if (TRIGGER_VALUE_PROBLEM == new_value)
-		{
-			if (TRIGGER_VALUE_OK == trigger->value || TRIGGER_TYPE_MULTIPLE_TRUE == trigger->type)
-				event_flags |= ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT;
-		}
-		else if (TRIGGER_VALUE_OK == new_value)
-		{
-			if (TRIGGER_VALUE_PROBLEM == trigger->value || 0 == trigger->lastchange)
-				event_flags |= ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT;
-		}
-	}
-
-	/* check if there is something to be updated */
-	if (0 == (flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE) && 0 == (event_flags & ZBX_FLAGS_TRIGGER_CREATE_EVENT))
-		goto out;
-
-	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_TRIGGER_EVENT))
-	{
-		DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger %ld create for item %ld",
-			trigger->triggerid, history[trigger->history_idx].itemid );
-
-		zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
-					  &trigger->timespec, trigger->new_value, trigger->description,
-					  trigger->expression, trigger->recovery_expression,
-					  trigger->priority, trigger->type, &trigger->tags,
-					  trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
-					  trigger->event_name, NULL, trigger->history_idx);
-	}
-
-	if (0 != (event_flags & ZBX_FLAGS_TRIGGER_CREATE_INTERNAL_EVENT))
-	{
-		DEBUG_TRIGGER(trigger->triggerid,"Creating internal event for the trigger");
-		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
-					  &trigger->timespec, new_value, NULL, trigger->expression,
-					  trigger->recovery_expression, 0, 0, &trigger->tags, 0, NULL, 0, NULL, NULL,
-					  new_error, trigger->history_idx);
-	}
-	
-	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, flags, trigger->new_value, 
+	//updating state anyway
+	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, ZBX_FLAGS_TRIGGER_DIFF_UPDATE, trigger->new_value, 
 							trigger->timespec.sec, trigger->new_error);
+	
+	//if state hasn't changed, and not problem in multi-problem gen config, nothing to do
+	if (trigger->value == trigger->new_value) {
+		if ( TRIGGER_VALUE_PROBLEM != trigger->new_value || 
+			 TRIGGER_TYPE_MULTIPLE_TRUE != trigger->type ) 
+		return SUCCEED;
+	}
 
-	ret = SUCCEED;
-out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s flags:" ZBX_FS_UI64, __func__, zbx_result_string(ret),
-			   flags);
+	if (TRIGGER_VALUE_UNKNOWN == trigger->value || TRIGGER_VALUE_UNKNOWN == trigger->new_value) {
+		DEBUG_TRIGGER(trigger->triggerid,"Creating internal event for the trigger");
+		
+		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
+				&trigger->timespec, trigger->new_value, NULL, trigger->expression,
+				trigger->recovery_expression, 0, 0, &trigger->tags, 0, NULL, 0, NULL, NULL,
+				trigger->error, trigger->history_idx);
+	}
+	
+	if (trigger->new_value == TRIGGER_VALUE_UNKNOWN)
+		return SUCCEED;
 
-	return ret;
+	DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger %ld create for item %ld",
+		trigger->triggerid, history[trigger->history_idx].itemid );
+
+	zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
+		&trigger->timespec, trigger->new_value, trigger->description,
+		trigger->expression, trigger->recovery_expression,
+		trigger->priority, trigger->type, &trigger->tags,
+		trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
+		trigger->event_name, NULL, trigger->history_idx);
+
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -3291,17 +3263,9 @@ static void sync_server_history(int *values_num, int *triggers_num, int *more)
 
 					/* process trigger events generated by recalculate_triggers() */
 					zbx_process_events(&trigger_diff, &triggerids, history);
-
-					// this must be eliminated with setting the trigger value in the state cache
-					// and when direct API is ready
-					// this must be removed at all!!!!
-					//if (0 != trigger_diff.values_num)
-					//	zbx_db_save_trigger_changes(&trigger_diff);
-
-					// this must change trigger states in the state cache
-					if (ZBX_DB_OK == (txn_error = DBcommit()))
-						glb_state_triggers_apply_diffs(&trigger_diff);
-					else
+					glb_state_triggers_apply_diffs(&trigger_diff);
+					
+					if (ZBX_DB_OK != (txn_error = DBcommit()))
 						zbx_clean_events();
 
 					zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);

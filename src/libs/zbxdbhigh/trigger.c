@@ -56,7 +56,6 @@ void	zbx_append_trigger_diff(zbx_vector_ptr_t *trigger_diff, zbx_uint64_t trigge
 	diff->value = value;
 	diff->lastchange = lastchange;
 	diff->error = (NULL != error ? zbx_strdup(NULL, error) : NULL);
-
 	diff->problem_count = 0;
 
 	zbx_vector_ptr_append(trigger_diff, diff);
