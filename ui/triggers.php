@@ -92,14 +92,11 @@ $fields = [
 	'filter_discovered' =>						[T_ZBX_INT, O_OPT, null, IN([-1, 0, 1]), null],
 	'filter_dependent' =>						[T_ZBX_INT, O_OPT, null, IN([-1, 0, 1]), null],
 	'filter_name' =>							[T_ZBX_STR, O_OPT, null, null, null],
-	'filter_state' =>							[T_ZBX_INT, O_OPT, null,
-													IN([-1, TRIGGER_STATE_NORMAL, TRIGGER_STATE_UNKNOWN]), null
-												],
 	'filter_status' =>							[T_ZBX_INT, O_OPT, null,
 													IN([-1, TRIGGER_STATUS_ENABLED, TRIGGER_STATUS_DISABLED]), null
 												],
 	'filter_value' =>							[T_ZBX_INT, O_OPT, null,
-													IN([-1, TRIGGER_VALUE_FALSE, TRIGGER_VALUE_TRUE]), null
+													IN([-1, TRIGGER_VALUE_FALSE, TRIGGER_VALUE_TRUE, TRIGGER_VALUE_UNKNOWN]), null
 												],
 	'filter_evaltype' =>						[T_ZBX_INT, O_OPT, null,
 													IN([TAG_EVAL_TYPE_AND_OR, TAG_EVAL_TYPE_OR]), null
@@ -625,7 +622,6 @@ else {
 		$filter_priority = getRequest('filter_priority', []);
 		$filter_groupids = getRequest('filter_groupids', []);
 		$filter_hostids = getRequest('filter_hostids', []);
-		$filter_state = getRequest('filter_state', -1);
 		$filter_status = getRequest('filter_status', -1);
 		$filter_value = getRequest('filter_value', -1);
 		$filter_evaltype = getRequest('filter_evaltype', TAG_EVAL_TYPE_AND_OR);
@@ -642,7 +638,6 @@ else {
 		if (count($filter_hostids) != 1) {
 			$filter_hostids = [];
 		}
-		$filter_state = -1;
 		$filter_status = -1;
 		$filter_value = -1;
 		$filter_evaltype = TAG_EVAL_TYPE_AND_OR;
@@ -656,7 +651,6 @@ else {
 		$filter_priority = CProfile::getArray($prefix.'triggers.filter_priority', []);
 		$filter_groupids = CProfile::getArray($prefix.'triggers.filter_groupids', []);
 		$filter_hostids = CProfile::getArray($prefix.'triggers.filter_hostids', []);
-		$filter_state = CProfile::get($prefix.'triggers.filter_state', -1);
 		$filter_status = CProfile::get($prefix.'triggers.filter_status', -1);
 		$filter_value = CProfile::get($prefix.'triggers.filter_value', -1);
 		$filter_evaltype = CProfile::get($prefix.'triggers.filter.evaltype', TAG_EVAL_TYPE_AND_OR);
@@ -723,10 +717,6 @@ else {
 		'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1
 	];
 
-	if ($sort === 'status') {
-		$options['output'][] = 'state';
-	}
-
 	if ($filter_discovered != -1) {
 		$options['filter']['flags'] = ($filter_discovered == 1)
 			? ZBX_FLAG_DISCOVERY_CREATED
@@ -744,30 +734,14 @@ else {
 		$options['filter']['priority'] = $filter_priority;
 	}
 
-	switch ($filter_state) {
-		case TRIGGER_STATE_NORMAL:
-			$options['filter']['state'] = TRIGGER_STATE_NORMAL;
-			$options['filter']['status'] = TRIGGER_STATUS_ENABLED;
-			break;
-
-		case TRIGGER_STATE_UNKNOWN:
-			$options['filter']['state'] = TRIGGER_STATE_UNKNOWN;
-			$options['filter']['status'] = TRIGGER_STATUS_ENABLED;
-			break;
-
-		default:
-			if ($filter_status != -1) {
-				$options['filter']['status'] = $filter_status;
-			}
-	}
-
 	if ($filter_tags) {
 		$options['evaltype'] = $filter_evaltype;
 		$options['tags'] = $filter_tags;
 	}
 
 	$prefetched_triggers = API::Trigger()->get($options);
-	if ($sort === 'status') {
+
+    if ($sort === 'status') {
 		orderTriggersByStatus($prefetched_triggers, $sortorder);
 	}
 	else {
@@ -795,7 +769,7 @@ else {
 	$triggers = [];
 	if ($prefetched_triggers) {
 		$triggers = API::Trigger()->get([
-			'output' => ['triggerid', 'expression', 'description', 'status', 'priority', 'error', 'templateid', 'state',
+			'output' => ['triggerid', 'expression', 'description', 'status', 'priority', 'error', 'templateid',
 				'recovery_mode', 'recovery_expression', 'value', 'opdata', $sort
 			],
 			'selectHosts' => ['hostid', 'host', 'name', 'status'],
@@ -901,7 +875,6 @@ else {
 		CProfile::updateArray($prefix.'triggers.filter_priority', $filter_priority, PROFILE_TYPE_INT);
 		CProfile::updateArray($prefix.'triggers.filter_groupids', $filter_groupids, PROFILE_TYPE_ID);
 		CProfile::updateArray($prefix.'triggers.filter_hostids', $filter_hostids, PROFILE_TYPE_ID);
-		CProfile::update($prefix.'triggers.filter_state', $filter_state, PROFILE_TYPE_INT);
 		CProfile::update($prefix.'triggers.filter_status', $filter_status, PROFILE_TYPE_INT);
 		CProfile::update($prefix.'triggers.filter.evaltype', $filter_evaltype, PROFILE_TYPE_INT);
 
@@ -937,7 +910,6 @@ else {
 			CProfile::deleteIdx($prefix.'triggers.filter_hostids');
 		}
 
-		CProfile::deleteIdx($prefix.'triggers.filter_state');
 		CProfile::deleteIdx($prefix.'triggers.filter_status');
 		CProfile::deleteIdx($prefix.'triggers.filter.evaltype');
 		CProfile::deleteIdx($prefix.'triggers.filter.tags.tag');
@@ -967,7 +939,6 @@ else {
 		'filter_hostids_ms' => $filter_hostids_ms,
 		'filter_name' => $filter_name,
 		'filter_priority' => $filter_priority,
-		'filter_state' => $filter_state,
 		'filter_status' => $filter_status,
 		'filter_value' => $filter_value,
 		'filter_tags' => $filter_tags,

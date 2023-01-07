@@ -1962,6 +1962,43 @@ function triggerIndicatorStyle($status, $state = null) {
 }
 
 /**
+ * Returns the text indicating the trigger's status and state. If the $value parameter is not given, only the status of
+ * the trigger will be taken into account.
+ *
+ * @param int $status
+ * @param int $value
+ *
+ * @return string
+ */
+function triggerIndicatorByValue($status, $value = null) {
+    if ($status == TRIGGER_STATUS_ENABLED) {
+        return ($value == TRIGGER_VALUE_UNKNOWN) ? _('Unknown') : _('Enabled');
+    }
+
+    return _('Disabled');
+}
+
+/**
+ * Returns the CSS class for the trigger's status and state indicator. If the $value parameter is not given, only the
+ * status of the trigger will be taken into account.
+ *
+ * @param int $status
+ * @param int $value
+ *
+ * @return string
+ */
+function triggerIndicatorStyleByValue($status, $value = null) {
+    if ($status == TRIGGER_STATUS_ENABLED) {
+        return ($value == TRIGGER_VALUE_UNKNOWN) ?
+            ZBX_STYLE_GREY :
+            ZBX_STYLE_GREEN;
+    }
+
+    return ZBX_STYLE_RED;
+}
+
+
+/**
  * Orders triggers by both status and state. Triggers are sorted in the following order: enabled, disabled, unknown.
  *
  * Keep in sync with orderItemsByStatus().
