@@ -222,10 +222,11 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 					snmp_iface->version == ZBX_IF_SNMP_VERSION_3) ||
 			   		(snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC) ) {
 				
-				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled, unsupported snmp version");
+				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be SNMP async polled, unsupported by async snmp version");
+				return FAIL;
 			}
 			
-			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be async polled");
+			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be SNMP async polled");
 			
 			return SUCCEED;
 #endif
@@ -6727,7 +6728,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 
 	poller_item_notify_init();
 	zbx_hashset_create(&activated_hosts, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	LOG_INF("Sync1");
 	sec = zbx_time();
 	changelog_num = zbx_dbsync_env_prepare(mode);
 	changelog_sec = zbx_time() - sec;
@@ -6760,7 +6760,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	zbx_dbsync_init(&func_sync, changelog_sync_mode);
 	zbx_dbsync_init(&expr_sync, mode);
 	zbx_dbsync_init(&action_sync, mode);
-	LOG_INF("Sync2");
 	/* Action operation sync produces virtual rows with two columns - actionid, opflags. */
 	/* Because of this it cannot return the original database select and must always be  */
 	/* initialized in update mode.                                                       */
@@ -6825,7 +6824,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	sec = zbx_time();
 	DCsync_autoreg_config(&autoreg_config_sync, new_revision);
 	autoreg_csec2 = zbx_time() - sec;
-	LOG_INF("Sync3");
 	sec = zbx_time();
 	DCsync_autoreg_host(&autoreg_host_sync);
 	autoreg_host_csec2 = zbx_time() - sec;
@@ -6872,7 +6870,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	}
 
 	/* sync host data to support host lookups when resolving macros during configuration sync */
-	LOG_INF("Sync4");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_hosts(&hosts_sync))
 		goto out;
@@ -6920,7 +6917,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_prepare_httpstep_fields(&httpstep_field_sync))
 		goto out;
 	httptest_sec = zbx_time() - sec;
-	LOG_INF("Sync5");
 	START_SYNC;
 	sec = zbx_time();
 	zbx_vector_uint64_create(&active_avail_diff);
@@ -6964,59 +6960,48 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	zbx_vector_uint64_destroy(&active_avail_diff);
 
 	/* sync item data to support item lookups when resolving macros during configuration sync */
-	LOG_INF("Sync6");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_interfaces(&if_sync))
 		goto out;
 	ifsec = zbx_time() - sec;
-	LOG_INF("Sync61");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_items(&items_sync))
 		goto out;
 	isec = zbx_time() - sec;
-	LOG_INF("Sync62");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_template_items(&template_items_sync))
 		goto out;
 	tisec = zbx_time() - sec;
-	LOG_INF("Sync63");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_prototype_items(&prototype_items_sync))
 		goto out;
 	pisec = zbx_time() - sec;
-	LOG_INF("Sync64");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_item_discovery(&item_discovery_sync))
 		goto out;
 	idsec = zbx_time() - sec;
-	LOG_INF("Sync65");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_item_preprocs(&itempp_sync))
 		goto out;
 	itempp_sec = zbx_time() - sec;
-	LOG_INF("Sync66");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_item_script_param(&itemscrp_sync))
 		goto out;
 	itemscrp_sec = zbx_time() - sec;
-	LOG_INF("Sync67");
 	START_SYNC;
 
 	/* resolves macros for interface_snmpaddrs, must be after DCsync_hmacros() */
 	sec = zbx_time();
 	DCsync_interfaces(&if_sync, new_revision);
 	ifsec2 = zbx_time() - sec;
-	LOG_INF("Sync68");
 	/* relies on hosts, proxies and interfaces, must be after DCsync_{hosts,interfaces}() */
 
 	sec = zbx_time();
 	DCsync_items(&items_sync, new_revision, flags, synced, deleted_itemids);
 	isec2 = zbx_time() - sec;
-	LOG_INF("Sync69");
 	sec = zbx_time();
 	DCsync_template_items(&template_items_sync);
 	tisec2 = zbx_time() - sec;
-	LOG_INF("Sync7");
 	sec = zbx_time();
 	DCsync_prototype_items(&prototype_items_sync);
 	pisec2 = zbx_time() - sec;
@@ -7047,7 +7032,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_item_tags(&item_tag_sync))
 		goto out;
 	item_tag_sec = zbx_time() - sec;
-	LOG_INF("Sync8");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_functions(&func_sync))
 		goto out;
@@ -7088,7 +7072,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_action_conditions(&action_condition_sync))
 		goto out;
 	action_condition_sec = zbx_time() - sec;
-	LOG_INF("Sync9");
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_trigger_tags(&trigger_tag_sync))
 		goto out;
@@ -7118,7 +7101,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	sec = zbx_time();
 	DCsync_trigdeps(&tdep_sync);
 	dsec2 = zbx_time() - sec;
-	LOG_INF("Sync10");
 	sec = zbx_time();
 	DCsync_expressions(&expr_sync, new_revision);
 	expr_sec2 = zbx_time() - sec;
@@ -7168,7 +7150,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	dc_sync_httpstep_fields(&httpstep_field_sync, new_revision);
 	httptest_sec2 = zbx_time() - sec;
 	
-	LOG_INF("Sync11");
 	sec = zbx_time();
 
 	if (0 != hosts_sync.add_num + hosts_sync.update_num + hosts_sync.remove_num)
@@ -7206,7 +7187,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	update_sec = zbx_time() - sec;
 
 	config->revision.config = new_revision;
-	LOG_INF("Sync13");
 	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_DEBUG))
 	{
 		total = csec + hsec + hisec + htsec + gmsec + hmsec + ifsec + idsec + isec + tisec + pisec + tsec +
@@ -7481,7 +7461,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 
 		zbx_shmem_dump_stats(LOG_LEVEL_DEBUG, config_mem);
 	}
-	LOG_INF("Sync14");
 	dberr = ZBX_DB_OK;
 out:
 	if (0 == sync_in_progress)
@@ -7490,7 +7469,6 @@ out:
 	config->status->last_update = 0;
 	config->sync_ts = time(NULL);
 	FINISH_SYNC;
-	LOG_INF("Sync15");
 #ifdef HAVE_ORACLE
 	if (ZBX_DB_OK == dberr)
 		dberr = DBcommit();
@@ -7515,7 +7493,7 @@ out:
 									  " sync.");
 		break;
 	}
-	LOG_INF("Sync16");
+
 	if (0 != (update_flags & (ZBX_DBSYNC_UPDATE_HOSTS | ZBX_DBSYNC_UPDATE_ITEMS | ZBX_DBSYNC_UPDATE_MACROS)))
 	{
 		sec = zbx_time();
@@ -7583,8 +7561,7 @@ clean:
 
 	poller_item_notify_flush();
 
-	LOG_INF("CONFIG RELOAD completed");
-	LOG_INF("Sync17");
+	LOG_INF("CONFIG reloaded");
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 

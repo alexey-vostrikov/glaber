@@ -162,8 +162,7 @@ class CHistoryManager {
 	}
 
 	public function getItemsHavingValues(array $items, $period ) {
-		return $this->getGraphAggregationByIntervalFromServer($items, time() - $period - 1, time(), 
-				AGGREGATE_AVG, $period);
+		return $this->getLastValuesFromServer($items, 1, $period);
 	}
 	/**
 	 * Returns history value aggregation for graphs.
