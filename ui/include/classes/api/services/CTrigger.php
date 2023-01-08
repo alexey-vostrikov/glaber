@@ -348,16 +348,16 @@ class CTrigger extends CTriggerGeneral {
 		if ($options['filter'] === null) {
 			$options['filter'] = [];
 		}
+		//if (is_array($options['filter'])) {
+         if ($options['filterForServer'] === null) {
+             $options['filterForServer'] = [];
+         }
 
-        if ($options['filterForServer'] === null) {
-            $options['filterForServer'] = [];
-        }
-
-        // -----------------------------------------------------------
-        // KLUDGE: Judging by the dbFilter code, it makes no sense to pass filters 'value' and 'lastchange',
-        // so we do not process them in postSqlFilter
-        // -----------------------------------------------------------
-		if (is_array($options['filter']) && $options['filter'] !== []) {
+        // // -----------------------------------------------------------
+        // // KLUDGE: Judging by the dbFilter code, it makes no sense to pass filters 'value' and 'lastchange',
+        // // so we do not process them in postSqlFilter
+        // // -----------------------------------------------------------
+		 if (is_array($options['filter'])) {//} && $options['filter'] !==[] ) {
 			if (!array_key_exists('flags', $options['filter'])) {
 				$options['filter']['flags'] = [
 					ZBX_FLAG_DISCOVERY_NORMAL,
