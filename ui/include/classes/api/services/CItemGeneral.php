@@ -795,9 +795,6 @@ abstract class CItemGeneral extends CApiService {
 			unset($tag);
 		}
 		
-		CChangeset::add_objects(CChangeset::OBJ_ITEMS, CChangeset::DB_UPDATE, array_column($new_items,'itemid'));
-		CZabbixServer::notifyConfigChanges();
-
 		if (array_key_exists('preprocessing', $item)) {
 			foreach ($item['preprocessing'] as &$preprocessing) {
 				unset($preprocessing['item_preprocid']);

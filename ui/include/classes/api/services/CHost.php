@@ -855,9 +855,6 @@ class CHost extends CHostGeneral {
 
 		$this->updateTags($hosts, $db_hosts);
 
-	//	CChangeset::add_objects(CChangeset::OBJ_HOSTS, CChangeset::DB_UPDATE, array_column($hosts, 'hostid'));
-	//	CZabbixServer::notifyConfigChanges();
-
 		return ['hostids' => array_column($hosts, 'hostid')];
 	}
 

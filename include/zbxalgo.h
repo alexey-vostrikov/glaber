@@ -811,7 +811,7 @@ typedef int	(*elems_hash_free_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf);
 typedef int	(*elems_hash_process_cb_t)(elems_hash_elem_t *elem, mem_funcs_t *memf, void *params);
 typedef int	(*elems_hash_update_cb_t)(elems_hash_elem_t *elem, elems_hash_elem_t *elem_new, mem_funcs_t *memf);
 
-//todo: hide elems_hash_t striuture
+//todo: hide elems_hash_t structure
 typedef struct  {
     zbx_hashset_t elems;
 	mem_funcs_t memf;
@@ -819,7 +819,6 @@ typedef struct  {
 	elems_hash_create_cb_t elem_create_func;
 	elems_hash_free_cb_t elem_free_func;
 } elems_hash_t;
-
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t elem_free_func );
 
@@ -832,7 +831,6 @@ int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, 
 int 	elems_hash_get_num(elems_hash_t *elems);
 int 	elems_hash_id_exists(elems_hash_t *elems, u_int64_t id);
 int 	elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb);
-
 
 typedef struct obj_index_t obj_index_t;
 obj_index_t* obj_index_init(mem_funcs_t *memf);

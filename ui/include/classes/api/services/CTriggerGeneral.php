@@ -1518,12 +1518,6 @@ abstract class CTriggerGeneral extends CApiService {
 		DB::insert('triggers', $new_triggers, false);
 		DB::insertBatch('functions', $new_functions, false);
 		
-		CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_CREATE,
-		array_column($new_functions,'functionid'));
-		
-		CChangeset::add_items(CChangeset::DB_UPDATE, $itemids);
-		CZabbixServer::notifyConfigChanges();
-
 		if ($new_tags) {
 			DB::insert('trigger_tag', $new_tags);
 		}
@@ -1532,12 +1526,6 @@ abstract class CTriggerGeneral extends CApiService {
 			$resource = ($this instanceof CTrigger) ? CAudit::RESOURCE_TRIGGER : CAudit::RESOURCE_TRIGGER_PROTOTYPE;
 			$this->addAuditBulk(CAudit::ACTION_ADD, $resource, $triggers);
 		}
-
-		
-		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS, CChangeset::DB_CREATE, 
-				array_column($triggers, 'triggerid') );
-		
-		CZabbixServer::notifyConfigChanges();	
 	}
 
 
@@ -1706,9 +1694,6 @@ abstract class CTriggerGeneral extends CApiService {
 		}
 		if ($new_functions) {
 			DB::insertBatch('functions', $new_functions, false);
-			
-			CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_CREATE,
-				array_column($new_functions,'functionid'));
 
 		}
 		if ($del_triggertagids) {
@@ -1722,15 +1707,6 @@ abstract class CTriggerGeneral extends CApiService {
 			$resource = ($this instanceof CTrigger) ? CAudit::RESOURCE_TRIGGER : CAudit::RESOURCE_TRIGGER_PROTOTYPE;
 			$this->addAuditBulk(CAudit::ACTION_UPDATE, $resource, $save_triggers, $db_triggers);
 		}
-		
-		if (count($del_func_ids) > 0) {
-			CChangeset::add_objects(CChangeset::OBJ_FUNCTIONS, CChangeset::DB_DELETE, $del_func_ids);
-		}
-		
-		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS, CChangeset::DB_UPDATE, 
-				array_column($triggers, 'triggerid') );
-		
-		CZabbixServer::notifyConfigChanges();		
 		
 	}
 

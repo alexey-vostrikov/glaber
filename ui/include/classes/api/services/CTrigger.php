@@ -574,10 +574,6 @@ class CTrigger extends CTriggerGeneral {
 		
 		CTriggerManager::delete($triggerids);
 		
-		CChangeset::add_objects(CChangeset::OBJ_TRIGGERS, CChangeset::DB_DELETE, 
-				array_column($triggers, 'triggerid') );
-		CZabbixServer::notifyConfigChanges();	
-
 		$this->addAuditBulk(CAudit::ACTION_DELETE, CAudit::RESOURCE_TRIGGER, $db_triggers);
 
 		return ['triggerids' => $triggerids];
