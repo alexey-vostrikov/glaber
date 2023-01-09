@@ -48,6 +48,7 @@ class C54XmlValidator extends CXmlValidatorGeneral {
 		CXmlConstantValue::DISCARD_UNCHANGED_HEARTBEAT => CXmlConstantName::DISCARD_UNCHANGED_HEARTBEAT,
 		CXmlConstantValue::DISCARD_AGGREGATE => CXmlConstantName::DISCARD_AGGREGATE,
 		CXmlConstantValue::DISPATCH_ITEM => CXmlConstantName::DISPATCH_ITEM,
+		CXmlConstantValue::DISPATCH_ITEM_BY_IP => CXmlConstantName::DISPATCH_ITEM_BY_IP,
 		CXmlConstantValue::JAVASCRIPT => CXmlConstantName::JAVASCRIPT,
 		CXmlConstantValue::PROMETHEUS_PATTERN => CXmlConstantName::PROMETHEUS_PATTERN,
 		CXmlConstantValue::PROMETHEUS_TO_JSON => CXmlConstantName::PROMETHEUS_TO_JSON,

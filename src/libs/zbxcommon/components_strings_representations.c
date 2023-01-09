@@ -196,7 +196,7 @@ const char	*zbx_interface_type_string(zbx_interface_type_t type)
 	switch (type)
 	{
 		case INTERFACE_TYPE_AGENT:
-			return "Zabbix agent";
+			return "AGENT";
 		case INTERFACE_TYPE_SNMP:
 			return "SNMP";
 		case INTERFACE_TYPE_IPMI:

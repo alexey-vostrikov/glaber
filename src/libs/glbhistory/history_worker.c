@@ -69,7 +69,7 @@ static void	worker_destroy(void *data)
 {
 	zbx_worker_data_t	*conf = (zbx_worker_data_t *)data;
 		
-	glb_destroy_worker(conf->worker);
+	glb_worker_destroy(conf->worker);
 	zbx_free(conf->worker);
 	zbx_free(data);
 }

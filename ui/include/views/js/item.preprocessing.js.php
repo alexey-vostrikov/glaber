@@ -258,6 +258,12 @@
 						placeholder_0: <?= json_encode(_('$.path.to.hostname_attr')) ?>,
 						placeholder_1: <?= json_encode(_('item_key')) ?>
 					}));
+				case '<?= GLB_PREPROC_DISPATCH_ITEM_BY_IP ?>':
+					return $(preproc_param_double_tmpl.evaluate({
+						rowNum: index,
+						placeholder_0: <?= json_encode(_('$.path.to.ip_attr')) ?>,
+						placeholder_1: <?= json_encode(_('item_key')) ?>
+					}));
 				default:
 					return '';
 			}
@@ -421,6 +427,7 @@
 					case '<?= ZBX_PREPROC_SCRIPT ?>':
 					case '<?= ZBX_PREPROC_STR_REPLACE ?>':
 					case '<?= GLB_PREPROC_DISPATCH_ITEM ?>':
+					case '<?= GLB_PREPROC_DISPATCH_ITEM_BY_IP ?>':
 
 						$on_fail
 							.prop('checked', false)

@@ -4092,6 +4092,7 @@ class CApiInputValidator {
 					'2' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
 				]];
 				break;
+			case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
 			case GLB_PREPROC_DISPATCH_ITEM:
 				$api_input_rules = ['type' => API_OBJECT, 'fields' => [
 					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY],

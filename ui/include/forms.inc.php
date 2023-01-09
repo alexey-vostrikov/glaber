@@ -1371,7 +1371,13 @@ function getItemPreprocessing(CForm $form, array $preprocessing, $readonly, arra
 					$step_param_1->setAttribute('placeholder', _('item key'))
 				];
 				break;
-				
+			case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
+				$params = [
+					$step_param_0->setAttribute('placeholder', _('IP addr JSON path')),
+					$step_param_1->setAttribute('placeholder', _('item key'))
+				];
+				break;
+			
 
 
 			case ZBX_PREPROC_SCRIPT:

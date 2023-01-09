@@ -26,15 +26,18 @@ int async_buffered_responce(ext_worker_t *worker,  char **response);
 int worker_is_alive(ext_worker_t *worker);
 int glb_start_worker(ext_worker_t *worker);
 
-void glb_destroy_worker(ext_worker_t *runner);
-int glb_escape_worker_string(char *in_string, char *out_buffer);
-int glb_init_external_workers(char **workers_cfg, char *scriptdir);
-int glb_process_worker_params(ext_worker_t *worker, char *params_buf);
+
+int     glb_workers_init(char **workers_cfg, char *scriptdir);
+void    glb_worker_destroy(ext_worker_t *runner);
+int     glb_worker_restart(ext_worker_t *worker);
+int     glb_worker_escape_string(char *in_string, char *out_buffer);
+int     glb_worker_process_params(ext_worker_t *worker, char *params_buf);
 
 int worker_get_fd_from_worker(ext_worker_t *worker);
 int worker_get_pid(ext_worker_t *worker);
 
 ext_worker_t* glb_get_worker_script(char *cmd);
+const char *glb_worker_get_path(ext_worker_t *worker);
 
 //how much time to wait for a runner till it execs before try to restart it
 #define GLB_DEFAULT_WORKER_TIMEOUT 10

@@ -27,6 +27,7 @@
 #include "zbxembed.h"
 #include "zbxprometheus.h"
 #include "zbxsysinfo.h"
+#include "../../libs/glb_state/glb_state_interfaces.h"
 
 #include "zbxxml.h"
 #ifdef HAVE_LIBXML2
@@ -1690,7 +1691,6 @@ static int item_preproc_throttle_value_agg(zbx_variant_t *value, const zbx_times
 
 static char *get_param_name_from_json(char *json, char *host_param)
 {
-
 	static char hostname[ZBX_MAX_HOSTNAME_LEN];
 	static char hostfield[ZBX_MAX_HOSTNAME_LEN];
 
@@ -1856,8 +1856,9 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
  * *************************************************************************/
 static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
 {
-	zbx_uint64_pair_t host_item_ids;
-	char *ip_str = NULL, *hostname = NULL;
+//	zbx_uint64_pair_t host_item_ids;
+	u_int64_t hostid, new_itemid;
+	char *ip_str = NULL, *key = NULL;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
 
@@ -1871,6 +1872,7 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 		DEBUG_ITEM(itemid, "Cannot dispatch: Wrong number of params: %d instead of 2", params->count);
 		return SUCCEED;
 	}
+	key = params->params[1];
 
 	if (NULL == (ip_str = get_param_name_from_json(value->data.str, params->params[0])))
 	{
@@ -1878,14 +1880,21 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 		return SUCCEED;
 	}
 
-	//	if (NULL ==( hostname = getHostNameByIp(ip_str))) {
-	//		DEBUG_ITEM(itemid,"Cannot dispatch: cannot host for ip addr '%s'", ip_str);
-	//		return SUCCEED;
-	//	}
+	//ip often comes with port, so ignore evth after semicolon
+	char *semicolon = NULL;
 
-	zbx_host_key_t host_key = {.host = hostname, .key = params->params[1]};
+	if (NULL != (semicolon = strchr(ip_str, ':'))) {
+		*semicolon ='\0';
+		DEBUG_ITEM(itemid, "Found semicolon, set to 0, new string is %s", ip_str);
+	}		
 
-	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
+	if (0 == (hostid = glb_state_interfaces_find_host_by_ip(ip_str))) {
+		DEBUG_ITEM(itemid,"Cannot dispatch: cannot find host for ip addr '%s'", ip_str);
+		return SUCCEED;
+	}
+
+
+	if (SUCCEED == DCconfig_get_itemid_by_item_key_hostid(hostid, key, &new_itemid))
 	{
 
 		AGENT_RESULT result = {0};
@@ -1895,15 +1904,15 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 		zbx_init_agent_result(&result);
 
 		SET_STR_RESULT(&result, zbx_strdup(NULL, value->data.str));
-		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
+		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", hostid, new_itemid);
 
-		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0,
+		zbx_preprocess_item_value(hostid, new_itemid, ITEM_VALUE_TYPE_TEXT, 0,
 								  &result, &ts, ITEM_STATE_NORMAL, NULL);
 		zbx_free_agent_result(&result);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
-	DEBUG_ITEM(itemid, "Couldn find itemid for host %s item %s", host_key.host, host_key.key);
+	DEBUG_ITEM(itemid, "Couldn find itemid for host %ld item %s", hostid, key);
 
 	DEBUG_ITEM(itemid, "In %s: finished", __func__);
 	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
@@ -2742,6 +2751,9 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 	case GLB_PREPROC_DISPATCH_ITEM:
 		ret = item_preproc_dispatch(itemid, value, ts, op->params, error);
 		break;
+	case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
+		ret = item_preproc_dispatch_ip(itemid, value, ts, op->params, error);
+		break;	
 	case GLB_PREPROC_JSON_FILTER:
 		ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
 									   error);

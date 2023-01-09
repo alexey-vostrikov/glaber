@@ -26,7 +26,6 @@
 #define elem_unlock(elem) \
       glb_rwlock_unlock(&(elem)->rw_lock); 
 
-
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
     
     elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
@@ -42,7 +41,6 @@ elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_f
     e_hash->memf = *memf;
      return e_hash;
 }
-
 
 static int delete_element(elems_hash_t *elems, elems_hash_elem_t *elem) {
     
@@ -136,7 +134,6 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
 	return ret;
 }
 
-
 int elems_hash_delete(elems_hash_t *elems, uint64_t id) {
     elems_hash_elem_t *elem;
     int ret = SUCCEED;
@@ -213,15 +210,12 @@ ELEMS_CALLBACK(add_new_func_cb) {
     }
 }
 
-
 int elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb) {
     zbx_ptr_pair_t params = {.first = new_elems, .second = update_func_cb};
     elems_hash_iterate(elems, update_delete_func_cb, &params, ELEMS_HASH_WRITE);
     params.first = elems;
     elems_hash_iterate(new_elems, add_new_func_cb, &params, ELEMS_HASH_WRITE);
 }
-
-
 
 void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
    
@@ -236,7 +230,6 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
     elems_hash_destroy(new_elems);
   
 }   
-
 
 int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags ) {
    

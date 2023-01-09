@@ -28,14 +28,15 @@ class CItemTypeWorkerServer extends CItemType {
 	/**
 	 * @inheritDoc
 	 */
-	const FIELD_NAMES = ['path', 'delay'];
+	const FIELD_NAMES = ['params', 'delay'];
 
 	/**
 	 * @inheritDoc
 	 */
 	public static function getCreateValidationRules(array $item): array {
 		return [
-			'delay' =>			self::getCreateFieldRule('delay', $item)
+			'delay' =>			self::getCreateFieldRule('delay', $item),
+			'params' =>			self::getCreateFieldRule('params', $item)
 		];
 	}
 
@@ -45,7 +46,8 @@ class CItemTypeWorkerServer extends CItemType {
 	public static function getUpdateValidationRules(array $db_item): array {
 		return [
 		
-			'delay' =>			self::getUpdateFieldRule('delay', $db_item)
+			'delay' =>			self::getUpdateFieldRule('delay', $db_item),
+			'params' =>			self::getUpdateFieldRule('params', $db_item)
 		];
 	}
 
@@ -54,7 +56,8 @@ class CItemTypeWorkerServer extends CItemType {
 	 */
 	public static function getUpdateValidationRulesInherited(array $db_item): array {
 		return [
-			'delay' =>			self::getUpdateFieldRuleInherited('delay', $db_item)
+			'delay' =>			self::getUpdateFieldRuleInherited('delay', $db_item),
+			'params' =>			self::getUpdateFieldRuleInherited('params', $db_item)
 		];
 	}
 
@@ -63,7 +66,8 @@ class CItemTypeWorkerServer extends CItemType {
 	 */
 	public static function getUpdateValidationRulesDiscovered(): array {
 		return [
-			'delay' =>			self::getUpdateFieldRuleDiscovered('delay')
+			'delay' =>			self::getUpdateFieldRuleDiscovered('delay'),
+			'params' =>			self::getUpdateFieldRuleDiscovered('params')
 		];
 	}
 }

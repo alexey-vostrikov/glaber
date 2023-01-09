@@ -1769,7 +1769,11 @@ function get_preprocessing_types($type = null, $grouped = true, array $supported
 		],
 		GLB_PREPROC_DISPATCH_ITEM => [
 			'group' => _('Dispatch'),
-			'name' => _('Dispatch to host from JSON value')
+			'name' => _('Dispatch by Hostname from JSON value')
+		],
+		GLB_PREPROC_DISPATCH_ITEM_BY_IP => [
+			'group' => _('Dispatch'),
+			'name' => _('Dispatch by IP from JSON')
 		],
 		ZBX_PREPROC_REGSUB => [
 			'group' => _('Text'),
@@ -2151,6 +2155,7 @@ function normalizeItemPreprocessingSteps(array $preprocessing): array {
 				break;
 			
 			case GLB_PREPROC_DISPATCH_ITEM:
+			case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
 			case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
 				$step['params'] = implode("\n", $step['params']);
 				break;
@@ -2535,9 +2540,9 @@ function getTypeItemFieldNames(array $input): array {
 				return ['delay'];
 			}
 		case ITEM_TYPE_WORKER_SERVER:
-			if ($input['templateid'] == 0) 
+			if ($input['templateid'] != 0) 
 				return ['delay'];
-			return ['path', 'delay'];
+			return ['params', 'delay'];
 	}
 }
 

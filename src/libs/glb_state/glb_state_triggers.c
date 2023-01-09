@@ -107,9 +107,9 @@ int glb_state_trigger_get_info(state_trigger_info_t *info){
 }
 
 static int validate_info(state_trigger_info_t *info){
-
-   if (NULL == info || 0 == info->id || info->lastcalc == 0) 
+    if (NULL == info || 0 == info->id || info->lastcalc == 0) 
         return FAIL;
+  
     if ( //(TRIGGER_VALUE_NONE != info->value) &&  this shouln't ever be stored in the state
          (TRIGGER_VALUE_OK != info->value) &&
          (TRIGGER_VALUE_PROBLEM != info->value) &&
@@ -124,7 +124,8 @@ static int validate_info(state_trigger_info_t *info){
 int glb_state_trigger_set_info(state_trigger_info_t *info){
     
     if (FAIL == validate_info(info)) {
-        DEBUG_TRIGGER(info->id, "Validation of the new trigger state has been failed");
+        if (NULL != info)
+            DEBUG_TRIGGER(info->id, "Validation of the new trigger state has been failed");
         return FAIL;
     }
     return elems_hash_process(state->triggers, info->id, set_trigger_info, info, 0);
@@ -239,7 +240,7 @@ DUMPER_TO_JSON(trigger_to_json)
         zbx_json_addstring(json, "error", trigger->error, ZBX_JSON_TYPE_STRING);
     else 
         zbx_json_addstring(json, "error", "", ZBX_JSON_TYPE_STRING);
-        
+
     DEBUG_TRIGGER(id, "Added trapper into json: id: %lld, value: %d, lastchange: %d, lastcalc: %d, error: %s",
           id, trigger->value, trigger->lastchange, trigger->lastcalc, trigger->error);
 
@@ -337,5 +338,6 @@ int glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json 
         if (FAIL == elems_hash_process(state->triggers, ids->values[i], get_state_json, json, ELEM_FLAG_DO_NOT_CREATE))
           json_add_nonexsting_trigger( ids->values[i], json);
     }
+
     zbx_json_close(json); 
 }

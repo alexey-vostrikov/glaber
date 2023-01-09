@@ -12,6 +12,7 @@ libglbstate_a_SOURCES = \
 	discovery.h \
 	discovery.c \
 	glb_state_triggers.c \
+	glb_state_interfaces.c \
 	glb_state
 
 libglbstate_a_CFLAGS = \

@@ -1358,6 +1358,9 @@ int	main(int argc, char **argv)
 
 		exit(SUCCEED == ret ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
+	
+	//reason: https://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+	setenv("TZ", ":/etc/localtime", 0);
 
 	return zbx_daemon_start(config_allow_root, CONFIG_USER, t.flags, get_pid_file_path, zbx_on_exit);
 }
@@ -1398,9 +1401,6 @@ static void	zbx_check_db(void)
 		}
 #endif
 		zbx_db_version_json_create(&db_version_json, &db_version_info);
-
-//		if (SUCCEED == result)
-//			zbx_history_check_version(&db_version_json, &result);
 
 		zbx_db_flush_version_requirements(db_version_json.buffer);
 		zbx_json_free(&db_version_json);
@@ -2111,12 +2111,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
     zbx_check_db();
 	zbx_db_save_server_status();
 
-	if (SUCCEED != DBcheck_double_type())
-	{
-		CONFIG_DOUBLE_PRECISION = ZBX_DB_DBL_PRECISION_DISABLED;
-		zbx_update_epsilon_to_float_precision();
-		zabbix_log(LOG_LEVEL_WARNING, "database is not upgraded to use double precision values");
-	}
+	// if (SUCCEED != DBcheck_double_type())
+	// {
+	// 	CONFIG_DOUBLE_PRECISION = ZBX_DB_DBL_PRECISION_DISABLED;
+	// 	zbx_update_epsilon_to_float_precision();
+	// 	zabbix_log(LOG_LEVEL_WARNING, "database is not upgraded to use double precision values");
+	// }
 
 	if (SUCCEED != zbx_db_check_instanceid())
 		exit(EXIT_FAILURE);

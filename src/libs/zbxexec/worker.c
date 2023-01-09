@@ -97,7 +97,7 @@ static size_t get_max_pipe_buff_size()
     if ( fscanf( fp, "%ld", &max_pipe_size ) != 1 )
     {
         fclose( fp );
-        LOG_WRN("Couldn't get max worker pipe size, cannot read proc file, will use 65k bytes as a safe default. Warn: might reduce performance on heavy loaded systems");
+        LOG_WRN("Couldn't get max worker pipe size, cannot read proc file, will use 65k bytes as a safe default. Warn: might perform poor on heavy loaded systems");
         return DEFAULT_PIPE_SIZE;      /* Can't read? */
     }
     
@@ -105,8 +105,7 @@ static size_t get_max_pipe_buff_size()
     return (size_t)max_pipe_size;
 }
 
-
-int glb_process_worker_params(ext_worker_t *worker, char *params_buf) {
+int glb_worker_process_params(ext_worker_t *worker, char *params_buf) {
     
     LOG_DBG("%s: parsing params: '%s'", __func__, params_buf);
     
@@ -176,7 +175,7 @@ ext_worker_t *glb_init_worker(char *config_line)
 
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "params", buff, MAX_STRING_LEN, &type))
     {
-        glb_process_worker_params(worker, buff);    
+        glb_worker_process_params(worker, buff);    
     }    
     
     if (SUCCEED == zbx_json_value_by_name(&jp_config, "timeout", buff, MAX_STRING_LEN, &type))
@@ -213,7 +212,7 @@ ext_worker_t *glb_init_worker(char *config_line)
     return worker;
 }
 
-static int restart_worker(ext_worker_t *worker)
+int glb_worker_restart(ext_worker_t *worker)
 {
     #define RST_ACCOUNT_PERIOD  20
     #define RST_MAX_RESTARTS    5
@@ -335,8 +334,8 @@ static int restart_worker(ext_worker_t *worker)
    
     zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' pid is %d", worker->path, worker->pid);
     zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
-    worker->last_start = time(NULL);
     
+    worker->last_start = time(NULL);
     if (0 != worker->async_mode) {
       //  LOG_INF("Worker is async");
         int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
@@ -350,17 +349,21 @@ static int restart_worker(ext_worker_t *worker)
 }
 
 int glb_start_worker(ext_worker_t *worker) {
-    return restart_worker(worker);
+    return glb_worker_restart(worker);
 }
 
 int worker_is_alive(ext_worker_t *worker)
 {
-    if (0 == worker->pid) 
+    if (0 == worker->pid) {
+        LOG_INF("Worker isn't alive, pid is zero");
         return FAIL;
+    }
     
-    if (0 != waitpid(worker->pid, NULL, WNOHANG )) 
+    if (0 != kill(worker->pid, 0) ) {
+     
         return FAIL;
-    
+    }
+
     return SUCCEED;
 }
 
@@ -416,7 +419,7 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
                    __func__, worker->path, worker->pid, worker->max_calls);
         
         worker->calls = 0;
-        if (SUCCEED != restart_worker(worker)) 
+        if (SUCCEED != glb_worker_restart(worker)) 
             return FAIL;
         zabbix_log(LOG_LEVEL_INFORMATION, "%s: worker restarted, new pid is %d", __func__, worker->pid);
    
@@ -425,14 +428,14 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
     if (SUCCEED != worker_is_alive(worker))
     {
         zabbix_log(LOG_LEVEL_WARNING, "%s: worker %s is not running, starting", __func__, worker->path);
-        if (SUCCEED != restart_worker(worker)) 
+        if (SUCCEED != glb_worker_restart(worker)) 
             return FAIL;
     }
 
     if (SUCCEED == worker_is_changed(worker)) 
     {
          zabbix_log(LOG_LEVEL_WARNING, "%s: worker %s file has changed, restarting", __func__, worker->path);
-         if (SUCCEED != restart_worker(worker)) 
+         if (SUCCEED != glb_worker_restart(worker)) 
              return FAIL;
     }
 
@@ -487,14 +490,14 @@ int glb_worker_request(ext_worker_t *worker, const char * request) {
     if (wr_len != strlen(request))
     {
         zabbix_log(LOG_LEVEL_WARNING, "WARNING: wrote less bytes then buffer size: %d of %ld, consider decreasing amount of data or increase write timeout or worker has died", wr_len, strlen(request));
-        restart_worker(worker);
+        glb_worker_restart(worker);
         return FAIL;
     }
 
     if (SUCCEED == zbx_alarm_timed_out() || 1 == write_fail)
     {
         zabbix_log(LOG_LEVEL_WARNING, "%s: FAIL: script %s took too long to read input data, it will be restarted", __func__, worker->path);
-        restart_worker(worker);
+        glb_worker_restart(worker);
         return FAIL;
     }
     
@@ -524,7 +527,7 @@ int async_buffered_responce(ext_worker_t *worker,  char **response) {
     
     if ( SUCCEED != worker_is_alive(worker)) {
         LOG_INF("Worker %s is dead, need restart", worker_get_path(worker));
-        restart_worker(worker);
+        glb_worker_restart(worker);
         return FAIL;
     }
     
@@ -653,7 +656,7 @@ int glb_worker_responce(ext_worker_t *worker,  char ** responce) {
         zabbix_log(LOG_LEVEL_WARNING,
                    "%s: FAIL: script %s failed or took too long to respond or may be there was no newline/empty line in the output, or it has simply died. Will be restarted",
                    __func__, worker->path);
-        LOG_DBG("Continue read: %d, worker_fail: %d, Hisread:%s",continue_read,worker_fail,resp_buffer);
+        LOG_DBG("Continue read: %d, worker_fail: %d, read:%s",continue_read,worker_fail,resp_buffer);
         
         if (worker->pid != 0) {
             //worker->last_fail = time(NULL);
@@ -664,7 +667,7 @@ int glb_worker_responce(ext_worker_t *worker,  char ** responce) {
         int resp_len = strlen(resp_buffer);
         LOG_INF("Restarting the worker, current pid is %d", worker->pid);
 
-        restart_worker(worker);
+        glb_worker_restart(worker);
 
         LOG_INF("Worker has been restarted");
         
@@ -699,7 +702,7 @@ int glb_process_worker_request(ext_worker_t *worker, const char *request, char *
 }
 
 
-int glb_escape_worker_string(char *in_string, char *out_buffer)
+int glb_worker_escape_string(char *in_string, char *out_buffer)
 {
     
     int in = 0, out = 0;
@@ -732,7 +735,7 @@ int glb_escape_worker_string(char *in_string, char *out_buffer)
     return out;
 }
 
-void glb_destroy_worker(ext_worker_t *worker)
+void glb_worker_destroy(ext_worker_t *worker)
 {   
     int exitstatus;
     
@@ -788,4 +791,8 @@ ext_worker_t *worker_init(const char* path, unsigned int max_calls,
     
     
     return worker;
+}
+
+const char *glb_worker_get_path(ext_worker_t *worker) {
+    return worker->path;
 }

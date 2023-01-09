@@ -100,7 +100,7 @@ foreach ($data['groups'] as $group) {
 				->setArgument('hostid', $host['hostid'])
 			))
 			->setAttribute('data-hostid', $host['hostid'])
-			->onClick('view.editHost(event, this.dataset.hostid);')
+			//->onClick('view.editHost(event, this.dataset.hostid);')
 			->addClass(ZBX_STYLE_LINK_ALT);
 		}
 		else {

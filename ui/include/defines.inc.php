@@ -633,8 +633,11 @@ define('ITEM_DELAY_FLEXIBLE',	0);
 define('ITEM_DELAY_SCHEDULING',	1);
 
 // Item pre-processing types.
+
 define('GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG',	126);
 define('GLB_PREPROC_DISPATCH_ITEM', 127);
+define('GLB_PREPROC_DISPATCH_ITEM_BY_IP', 125);
+
 define('ZBX_PREPROC_MULTIPLIER',				1);
 define('ZBX_PREPROC_RTRIM',						2);
 define('ZBX_PREPROC_LTRIM',						3);

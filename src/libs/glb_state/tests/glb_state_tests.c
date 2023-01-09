@@ -18,6 +18,46 @@
 #include "zbxcommon.h"
 
 #include "../glb_state_triggers.h"
+#include "../glb_state_interfaces.h"
+
+static void state_test_interfaces() {
+    LOG_INF("Starting interfaces tests");
+     mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
+            .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
+    
+    glb_state_interfaces_init(&memf);
+
+    assert(FAIL == glb_state_interfaces_register_ip(NULL, 0));
+    assert(SUCCEED == glb_state_interfaces_register_ip("1.4.5.6", 1));
+    
+    assert(0 == glb_state_interfaces_find_host_by_ip("4.5.6.7"));
+    assert(0 == glb_state_interfaces_find_host_by_ip(NULL));
+    
+    assert(1 == glb_state_interfaces_find_host_by_ip("1.4.5.6"));
+    //check several ip->same host
+    assert(SUCCEED == glb_state_interfaces_register_ip("127.0.0.1", 1));
+    assert(1 == glb_state_interfaces_find_host_by_ip("1.4.5.6"));
+    assert(1 == glb_state_interfaces_find_host_by_ip("127.0.0.1"));
+    //check ip change to another host
+    assert(SUCCEED == glb_state_interfaces_register_ip("127.0.0.1", 5461));
+    assert(5461 == glb_state_interfaces_find_host_by_ip("127.0.0.1"));
+
+    //cleanup check
+    LOG_INF("Deleting ip addr");
+    glb_state_interfaces_release_ip("127.0.0.1");
+    LOG_INF("Deleted ip addr");
+    assert(0 == glb_state_interfaces_find_host_by_ip("127.0.0.1"));
+
+    //some shit to test stability
+    glb_state_interfaces_release_ip(NULL);
+    glb_state_interfaces_release_ip("dfcwedfwe");
+    glb_state_interfaces_release_ip("127.0.0.1");
+    glb_state_interfaces_release_ip("127.0.0.1");
+
+    glb_state_interfaces_destroy();
+  //  HALT_HERE("Host tests succeed");
+ 
+}
 
 
 static void state_test_triggers(){
@@ -25,17 +65,20 @@ static void state_test_triggers(){
      mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
             .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
     state_trigger_info_t info;
-     LOG_INF("doing trigger init");
+    
+    LOG_INF("doing trigger init");
     glb_state_triggers_init(&memf);
-    LOG_INF("Fail fetch test 1");
 
+    LOG_INF("Fail fetch test 1");
     info.id = 0;
 
     assert(FAIL == glb_state_trigger_get_info(&info));
+    LOG_INF("Fail fetch test 1.1");
     assert(FAIL == glb_state_trigger_get_info(NULL));
+    LOG_INF("Fail fetch test 1.2");
     assert(FAIL == glb_state_trigger_set_info(NULL));
+    LOG_INF("Fail fetch test 1.3");
     assert(FAIL == glb_state_trigger_set_info(&info));
-
     info.id = 1;
     info.lastcalc = 0;
     //should due to lastcalc is unset
@@ -150,9 +193,8 @@ static void state_test_triggers(){
 
 #ifdef HAVE_GLB_TESTS
 void glb_state_run_tests(void) {
-
+    state_test_interfaces();
     state_test_triggers();
    
-    
 }
 #endif

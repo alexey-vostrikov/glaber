@@ -251,7 +251,8 @@ foreach ($data['hosts'] as $host) {
 			->setArgument('hostid', $host['hostid'])
 	))
 		->setAttribute('data-hostid', $host['hostid'])
-		->onClick('view.editHost(event, this.dataset.hostid);');
+		//->onClick('view.editHost(event, this.dataset.hostid);')
+		;
 
 	$maintenance_icon = false;
 	$status_toggle_url = (new CUrl('zabbix.php'))

@@ -49,6 +49,7 @@
 #include "../glb_state/glb_state.h"
 #include "../glb_state/glb_state_items.h"
 #include "../glb_state/glb_state_triggers.h"
+#include "../glb_state/glb_state_interfaces.h"
 #include "../glb_state/glb_state.h"
 #include "log.h"
 
@@ -2452,6 +2453,12 @@ static void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		}
 
 		dc_host_update_revision(host, revision);
+		
+		//registering ip->host index in the state;
+		if (interface->useip)
+			glb_state_interfaces_register_ip(interface->ip, interface->hostid);
+		else 	
+			glb_state_interfaces_register_ip(interface->dns, interface->hostid);
 	}
 
 	/* resolve macros in other interfaces */
@@ -3347,6 +3354,10 @@ static void	DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 
 			zbx_vector_ptr_destroy(&scriptitem->params);
 			zbx_hashset_remove_direct(&config->scriptitems, scriptitem);
+		}
+
+		if (ITEM_TYPE_WORKER_SERVER == item->type) {
+			dc_strpool_replace(found, &item->params, row[11]);
 		}
 
 		/* it is crucial to update type specific (config->snmpitems, config->ipmiitems, etc.) hashsets before */
@@ -8674,8 +8685,7 @@ static void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE 
 	dst_interface->addr = (1 == dst_interface->useip ? dst_interface->ip_orig : dst_interface->dns_orig);
 	dst_interface->port = 0;
 }
-// THIS is very heavy and quite a bad call does lots of allocations and
-// searches, better avoid and replace with mission specific calls
+
 static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned int mode)
 {
 	const ZBX_DC_NUMITEM *numitem;
@@ -9199,26 +9209,25 @@ static void DCclean_trigger(DC_TRIGGER *trigger)
 
 	zbx_vector_uint64_destroy(&trigger->itemids);
 }
-/*
-int	DCconfig_get_item_by_key_hostid(DC_ITEM *item, u_int64_t hostid, char *key) {
+
+int	DCconfig_get_itemid_by_item_key_hostid(u_int64_t hostid, char *key, u_int64_t *itemid) {
 
 	const ZBX_DC_ITEM	*dc_item;
 
 	RDLOCK_CACHE;
 	if (NULL == (dc_item = DCfind_item(hostid, key)))
 	{
-		LOG_INF("Couldn't find itemd id for key '%ld'->'%s'", hostid, key );
+		LOG_DBG("Couldn't find itemd id for key '%ld'->'%s'", hostid, key );
 		UNLOCK_CACHE;
 		return FAIL;
 	}
+	*itemid = dc_item->itemid;
 
-	//DCget_host(&items[i].host, dc_host, ZBX_ITEM_GET_ALL);
-	DCget_item(item, dc_item, ZBX_ITEM_GET_ALL);
 	UNLOCK_CACHE;
 
 	return SUCCEED;
 }
-*/
+
 /******************************************************************************
  *                                                                            *
  * Purpose: locate item in configuration cache by host and key                *

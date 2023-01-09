@@ -315,7 +315,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 				)
 			)
 			->setAttribute('data-hostid', $db_host['hostid'])
-			->onClick('view.editHost(event, this.dataset.hostid);')
+		//	->onClick('view.editHost(event, this.dataset.hostid);')
 		);
 
 		if ($current_element === '') {
@@ -329,8 +329,8 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 						->setArgument('filter_hostids', [$db_host['hostid']]) ));
 
 		$list
-			->addItem(new CBreadcrumbs([new CSpan(new CLink(_('All hosts'),
-				(new CUrl('zabbix.php'))->setArgument('action', 'host.list'))), $host
+			->addItem(new CBreadcrumbs(
+				[ $host
 			]))
 			->addItem($status)
 			->addItem(getHostAvailabilityTable($db_host['interfaces']))
