@@ -27,8 +27,7 @@
 
 extern int CONFIG_EXT_SERVER_FORKS;
 
-#define WORKER_RESTART_HOLD 10
-#define WORKER_TIMEOUT 60
+#define WORKER_SILENCE_TIMEOUT 60
 
 typedef struct
 {
@@ -84,8 +83,12 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
         args[0] = 0;
         args++;
     }
-   
-    worker->worker = glb_worker_init(path, args, 60,   GLB_SERVER_MAXCALLS, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE);
+    //it's a potential flaw here - until item updated server worker won't start
+    if (NULL == (worker->worker = glb_worker_init(path, args, 60,   GLB_SERVER_MAXCALLS, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE))) {
+        zbx_free(worker);
+        poller_preprocess_error(poller_item, "Couldn't create server worker, check if file exist");
+        return FAIL;
+    }
     worker->last_heard = time(NULL);
    
     poller_set_item_specific_data(poller_item, worker);
@@ -127,13 +130,13 @@ ITEMS_ITERATOR(check_workers_data_cb)
     }
     
     /*if worker is silent for too long, restarting it*/
-    if (worker->last_heard < time(NULL) - WORKER_TIMEOUT)
+    if (worker->last_heard < time(NULL) - WORKER_SILENCE_TIMEOUT)
     {
-        LOG_INF("Worker has been silent for %d seconds, restarting", WORKER_TIMEOUT);
-        glb_worker_restart(worker->worker);
+        LOG_INF("Worker has been silent for %d seconds, restarting", WORKER_SILENCE_TIMEOUT);
+        glb_worker_restart(worker->worker, "Worker has been silent for too long");
         worker->last_heard = now + rand() % 10;
         
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Worker was silent for too long, setting UNSUPPORTED value");
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Worker has been silent for too long, setting UNSUPPORTED value");
         poller_preprocess_error(poller_item, "Couldn't read from the worker - worker is silent for too long");
     }
 

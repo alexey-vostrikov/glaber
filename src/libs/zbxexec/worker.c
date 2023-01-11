@@ -25,24 +25,16 @@
 #include <string.h>
 #include <signal.h>
 #include "dbcache.h"
-#include "zbxipcservice.h"
-
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
-#if (__FreeBSD_version) > 700000
-#define ENODATA 245
-#endif
-
-//how many reqeusts process by a runner befeore terminate it and start a new one
-#define GLB_DEFAULT_WORKER_MAX_CALLS 1000000000
-#define WORKER_CHANGE_TIMEOUT 30
+#define GLB_DEFAULT_WORKER_MAX_CALLS 1000000000 //how many reqeusts process by a runner befeore terminate it and start a new one
+#define WORKER_RESTART_TIMEOUT 15 //time to wait between restarts
 
 struct glb_worker_t {
 	char *path;       //path to executable to run
 	char *args[128];
-    //char *params;     //params
     pid_t pid;              //pid of the script
     int calls;              //number of requests processed
     int timeout;            //how much time to wait for result until consider the worker is dead or stuck
@@ -51,11 +43,11 @@ struct glb_worker_t {
 	int mode_from_worker;	//which termination to expect from the worker when parsing returned data 
 	int pipe_from_worker;	//communication pipes
 	int pipe_to_worker;
-	//unsigned char async_mode; //worker is working in async mode - we don't wait it for the answer
 	int last_start;
     int last_change;
     int last_change_check;
-    struct evbuffer *buffer; 
+    struct evbuffer *in_buffer;
+    struct evbuffer *out_buffer; 
 };
 
 extern int CONFIG_TIMEOUT;
@@ -109,7 +101,7 @@ int worker_process_args(glb_worker_t *worker, const char *params_buf) {
     
     LOG_DBG("%s: parsing params: '%s'", __func__, params_buf);
     
-    if ( NULL!= params_buf && strlen(params_buf) >0 )   {
+    if ( NULL != params_buf && strlen(params_buf) > 0 )   {
 
         char prevchar = 0, *params=NULL;
         int i=0, args_num=2;
@@ -123,6 +115,7 @@ int worker_process_args(glb_worker_t *worker, const char *params_buf) {
             if ( ' ' == params[i] && '\\' != prevchar ) {
                 params[i]=0;
                 worker->args[args_num++]=params+i+1;
+                
             }
         
             prevchar = params[i];
@@ -133,6 +126,13 @@ int worker_process_args(glb_worker_t *worker, const char *params_buf) {
         worker->args[0] = worker->path;
         worker->args[1] = NULL;
     }
+    int i = 0;
+
+    while (worker->args[i] != NULL) {
+        LOG_INF("Will start: args Parsed arg %d value %s", i, worker->args[i]);
+        i++;
+    }
+
 }
 
 glb_worker_t *glb_worker_init(const char *path, const char* args, int timeout, int max_calls, 
@@ -152,9 +152,7 @@ glb_worker_t *glb_worker_init(const char *path, const char* args, int timeout, i
     
     worker->mode_from_worker = mode_from_worker;
     worker->mode_to_worker = mode_to_worker;
-
-    if (NULL != args)
-        worker_process_args(worker, args);   
+    worker_process_args(worker, args);   
 
     if ( 0 == timeout )   
         worker->timeout = CONFIG_TIMEOUT;
@@ -168,12 +166,14 @@ glb_worker_t *glb_worker_init(const char *path, const char* args, int timeout, i
     if (GLB_WORKER_MODE_DEFAULT == worker->mode_from_worker) 
         worker->mode_from_worker = GLB_WORKER_MODE_NEWLINE;
 
-    worker->buffer = evbuffer_new();
+    worker->in_buffer = evbuffer_new();
+    worker->out_buffer = evbuffer_new();
   
+    LOG_INF("Will start: %s %s", worker->path, args);
     return worker;
 }
 
-int glb_worker_restart(glb_worker_t *worker)
+int glb_worker_restart(glb_worker_t *worker, char *reason)
 {
     int i;
     
@@ -186,7 +186,7 @@ int glb_worker_restart(glb_worker_t *worker)
         return FAIL;
    
 
-    LOG_INF("Restarting worker %s pid %d", worker->path, worker->pid);
+    LOG_INF("Restarting worker %s due to %s", worker->path, reason);
     
     if (worker->pipe_from_worker)
         close(worker->pipe_from_worker);
@@ -290,38 +290,38 @@ int glb_worker_restart(glb_worker_t *worker)
 
     int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
     fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
+    
+    flags = fcntl(worker->pipe_to_worker, F_GETFL, 0);
+    fcntl(worker->pipe_to_worker, F_SETFL, flags | O_NONBLOCK);
         
-    evbuffer_free(worker->buffer);
-    worker->buffer = evbuffer_new();
-
+  //  evbuffer_free(worker->in_buffer);
+  //  evbuffer_free(worker->out_buffer);
+  //  worker->in_buffer = evbuffer_new();
+  //  worker->out_buffer = evbuffer_new();
     return SUCCEED;
 }
 
 int glb_worker_is_alive(glb_worker_t *worker)
 {
-    int status;
-    if (0 == worker->pid) {
-        LOG_INF("Worker pid is zero, not alive");
+    int status, n_pid;
+    if (0 == worker->pid) 
         return FAIL;
-    }
     
     if (worker->last_start +1 >= time(NULL)) 
         return SUCCEED;
 
-    LOG_INF("%s: Worker pid is %d", __func__, worker->pid);
-
-    waitpid(worker->pid, &status, WNOHANG);
+    if (0 == (n_pid = waitpid(worker->pid, &status, WNOHANG)))
+        return SUCCEED;
+    LOG_INF("Worker %d changed status: %d", n_pid, status);
     
-    if (WIFEXITED(status)) { //|| WIFSIGNALED(status)) {
-        LOG_INF("Alive check: the process pid %d has stopped", worker->pid);
-        worker->pid = 0; 
-        return FAIL;
-    }
+    //if (WIFEXITED(status)) { //|| WIFSIGNALED(status)) {
+    LOG_INF("Alive check: the process pid %d (worker's pid is %d) has stopped", n_pid, worker->pid);
     
-//    if (0 != kill(worker->pid, 0) )     
-//      return FAIL;
-
-    return SUCCEED;
+    if (worker->last_start + WORKER_RESTART_TIMEOUT > time(NULL))
+        LOG_INF("Next restart attempt in %d seconds", worker->last_start + CONFIG_TIMEOUT - time(NULL));
+    
+    worker->pid = 0; 
+    return FAIL;
 }
 
 //static int worker_is_changed(glb_worker_t *worker) {
@@ -339,90 +339,16 @@ static void worker_cleanup(glb_worker_t *worker)
 }
 
 int glb_worker_send_request(glb_worker_t *worker, const char * request) {
- 
-    int worker_fail = 0;
-    int request_len = 0;
-    int write_fail = 0;
-    int i;
-    int wr_len = 0;
-   // char *eol = "\n";
+   
+    if ( (worker->calls++ >= worker->max_calls) || (SUCCEED != glb_worker_is_alive(worker) ) ) {
+         glb_worker_restart(worker, "need to restart after 10000000 requetsts");
+    }
+
+    evbuffer_add_printf(worker->out_buffer, "%s%s", request, "\n");
     
-    if (worker->calls++ >= worker->max_calls)
-    {
-        LOG_INF("%s worker %s pid %d exceeded number of requests (%d), restarting it",
-                   __func__, worker->path, worker->pid, worker->max_calls);
-        
-        if (SUCCEED != glb_worker_restart(worker)) 
-            return FAIL;
-        
-        LOG_INF("%s: worker restarted, new pid is %d", __func__, worker->pid);
-    };
+    if ( 0 > evbuffer_write(worker->out_buffer, worker->pipe_to_worker) ) 
+         glb_worker_restart(worker, "write to the srcipt failed");
 
-    if (SUCCEED != glb_worker_is_alive(worker))
-    {
-      
-        if (SUCCEED != glb_worker_restart(worker)) 
-            return FAIL;
-        
-        zabbix_log(LOG_LEVEL_WARNING, "%s: worker %s has been (re)started", __func__, worker->path);
-    }
-
-    LOG_DBG("%s : worker %s is alive, pid is %d, served requests %d out of %d",
-                   __func__, worker->path, worker->pid, worker->calls, worker->max_calls);
-    
-    if (request)
-        request_len = strlen(request);
-    else
-    {
-        LOG_WRN("%s: Request must not be NULL", __func__);
-        THIS_SHOULD_NEVER_HAPPEN;
-        return FAIL;
-    };
-
-    if (!request_len)
-    {
-        zabbix_log(LOG_LEVEL_WARNING, "Got zero length request while mode in SINGLE LINE, switch to SILENT");
-        return FAIL;
-    }
-
-    if (NULL != strstr(request, "\n")) {
-        LOG_WRN("New line marker shouldn't be inside the request '%s' this is a bug", request);
-        THIS_SHOULD_NEVER_HAPPEN;
-        return FAIL;
-    }
-
-    zbx_alarm_on(worker->timeout);
-    
-    wr_len = write(worker->pipe_to_worker, request, strlen(request));
-
-    if (0 > wr_len)
-    {
-        zabbix_log(LOG_LEVEL_WARNING, "Couldn't write to the script's stdin: %d", errno);
-        write_fail = 1;
-    }
-    
-    if (!write_fail) 
-        if (0 > write(worker->pipe_to_worker, "\n", strlen("\n"))) {
-            zabbix_log(LOG_LEVEL_WARNING, "Couldn't write eol marker to the script's stdin: %d", errno);
-            write_fail = 1;
-        }
-
-    zbx_alarm_off();
-
-    if (wr_len != strlen(request))
-    {
-        zabbix_log(LOG_LEVEL_WARNING, "WARNING: wrote less bytes then buffer size: %d of %ld, consider decreasing amount of data or increase write timeout or worker has died", wr_len, strlen(request));
-        glb_worker_restart(worker);
-        return FAIL;
-    }
-
-    if (SUCCEED == zbx_alarm_timed_out() || 1 == write_fail)
-    {
-        zabbix_log(LOG_LEVEL_WARNING, "%s: FAIL: script %s took too long to read input data, it will be restarted", __func__, worker->path);
-        glb_worker_restart(worker);
-        return FAIL;
-    }
-    
     return SUCCEED;
 };
 
@@ -430,27 +356,23 @@ int worker_get_fd_from_worker(glb_worker_t *worker) {
     return worker->pipe_from_worker;
 }
 
-
 int glb_worker_get_async_buffered_responce(glb_worker_t *worker,  char **response) {
 
     //if there are data ready - just return it, don't care if worker is running (it maybe dead already, but sent us data)
-    if ( NULL != ( *response = evbuffer_readln(worker->buffer, NULL, EVBUFFER_EOL_CRLF)))
+    if ( NULL != ( *response = evbuffer_readln(worker->in_buffer, NULL, EVBUFFER_EOL_CRLF)))
         return SUCCEED;
-
-    //need to read from the worker, need it alive
+    
     if ( SUCCEED != glb_worker_is_alive(worker)) {
-        glb_worker_restart(worker); 
-        //worker will need some time to start, so next time we read from it
+        glb_worker_restart(worker, "alive check in async buff response failed"); 
         return SUCCEED; 
     }
+
+    while (0 < evbuffer_read(worker->in_buffer, worker->pipe_from_worker, -1)); 
     
-    //reading whaterever is there in the pipe ready
-    while (0 < evbuffer_read(worker->buffer, worker->pipe_from_worker, -1)); 
+    *response = evbuffer_readln(worker->in_buffer, NULL, EVBUFFER_EOL_CRLF);
     
-    *response = evbuffer_readln(worker->buffer, NULL, EVBUFFER_EOL_CRLF);
     return SUCCEED;
 }
-
 
 int glb_worker_get_sync_response(glb_worker_t *worker,  char ** response) {
     *response = NULL;
@@ -521,7 +443,8 @@ void glb_worker_destroy(glb_worker_t *worker)
         waitpid(worker->pid, &exitstatus, WNOHANG);
     }
 
-    evbuffer_free(worker->buffer);
+    evbuffer_free(worker->in_buffer);
+    evbuffer_free(worker->out_buffer);
     zbx_free(worker->path);
     zbx_free(worker);
 }

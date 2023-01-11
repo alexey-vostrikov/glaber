@@ -335,7 +335,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
  //   pinger_item->lastpacket_sent = now;
 
     if (last_worker_pid != glb_worker_get_pid(conf.worker)) {
-        LOG_INF("glbmap worker's PID is changed, subscibing the new FD");
+        LOG_INF("glbmap worker's PID (%d) is changed, subscibing the new FD (%d)", last_worker_pid, glb_worker_get_pid(conf.worker));
         last_worker_pid = glb_worker_get_pid(conf.worker);
         subscribe_worker_fd(worker_get_fd_from_worker(conf.worker));
     }
@@ -573,14 +573,12 @@ void glb_pinger_init(void) {
         zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s ",CONFIG_SOURCE_IP);
     } 
 
-    
-    
     if ( NULL != CONFIG_GLBMAP_OPTIONS ) {
          zbx_snprintf(add_params,MAX_STRING_LEN,"%s ",CONFIG_GLBMAP_OPTIONS);
     }
     
     zbx_snprintf(args, MAX_STRING_LEN, "%s-v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=saddr,rtt,itemid,success",
-        CONFIG_GLBMAP_LOCATION, add_params);
+         add_params);
 
 	conf.worker = glb_worker_init(CONFIG_GLBMAP_LOCATION, args, 60, 0, 0, 0);
     

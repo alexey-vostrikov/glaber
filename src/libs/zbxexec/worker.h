@@ -36,7 +36,7 @@ glb_worker_t *glb_worker_init(const char *path, const char* params, int timeout,
                     glb_worker_termination_type_t mode_to_worker, glb_worker_termination_type_t mode_from_worker);
 
 void    glb_worker_destroy(glb_worker_t *worker);
-int     glb_worker_restart(glb_worker_t *worker);
+int     glb_worker_restart(glb_worker_t *worker, char *reason);
 int     glb_worker_escape_string(char *in_string, char *out_buffer);
 int     glb_worker_process_params(glb_worker_t *worker, char *params_buf);
 

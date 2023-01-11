@@ -16,6 +16,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "zbxcommon.h"
+#include <signal.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "../worker.h"
@@ -73,8 +75,15 @@ void test_worker_run() {
     zbx_free(response);
     glb_worker_destroy(worker);
 
+    char * test_data = "line1\nline2\nline3\nline4\nline5\n";
+    FILE *fp;
+    fp = fopen("/tmp/glaber_exec_test.txt", "w");
+    assert(fp != NULL);
+    fwrite(test_data,1,strlen(test_data),fp);
+    fclose(fp);
+    
     //try sync read line by line
-    assert(NULL != (worker = glb_worker_init("/bin/cat","/etc/passwd",0,0,0,0)));
+    assert(NULL != (worker = glb_worker_init("/bin/cat","/tmp/glaber_exec_test.txt",0,0,0,0)));
     for (int i =0; i< 5; i++) {
         response = NULL;
         glb_worker_get_sync_response(worker, &response);
@@ -82,6 +91,23 @@ void test_worker_run() {
         assert(NULL != response);
         zbx_free(response);
     }
+    
+    //try restart after worker die after the 5th line
+    response = NULL;
+    //int pid = glb_worker_get_pid(worker);
+    //kill(pid,SIGKILL);
+    //sleep(1);
+    for (int i =0; i < 5; i++) {
+        response = NULL;
+        glb_worker_get_sync_response(worker, &response);
+       // assert(NULL != response);
+        LOG_INF("Worker returned '%s'",response);
+        zbx_free(response);
+        if (i == 4)
+            assert(response != NULL);
+    }
+
+
     LOG_INF("Finished exec tests");
 }
 
@@ -89,6 +115,6 @@ void glb_exec_run_tests() {
     LOG_INF("Running execution tests");
     test_worker_run();
     LOG_INF("Finished execution tests");
-    HALT_HERE("All exec test succesifull");
+    HALT_HERE("All exec test successfull");
 }
 
