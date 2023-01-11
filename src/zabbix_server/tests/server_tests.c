@@ -27,10 +27,15 @@
 #include "../../libs/zbxalgo/tests/algo_tests.h"
 #include "../preprocessor/worker_tests.h"
 
+#include "../../libs/zbxexec/tests/exec_tests.c"
+
 #include "log.h"
 void tests_server_run(void) {
     LOG_INF("Running server tests");
     
+    LOG_INF("Running glb_exec tests");
+    glb_exec_run_tests();
+
     LOG_INF("Running glb_state tests");
     glb_state_run_tests();
 

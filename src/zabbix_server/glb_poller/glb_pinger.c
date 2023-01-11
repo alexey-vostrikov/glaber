@@ -61,7 +61,7 @@ typedef struct {
 
 typedef struct {
     u_int64_t async_delay; //time between async calls to detect and properly handle timeouts
-    ext_worker_t *worker;
+    glb_worker_t *worker;
     u_int64_t sent_packets;
     poller_event_t *worker_event;
 
@@ -231,7 +231,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     poller_item_t *poller_item;
 
     //reading all the responses we have so far from the worker
-    while (SUCCEED == async_buffered_responce(conf.worker, &worker_response)) {
+    while (SUCCEED == glb_worker_get_async_buffered_responce(conf.worker, &worker_response)) {
         
         if ( NULL == worker_response) //read succesifull, no data yet
             break;
@@ -324,7 +324,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     zbx_snprintf(request,MAX_STRING_LEN,"%s %d %ld",pinger_item->ip, pinger_item->size, poller_get_item_id(poller_item) );
    // LOG_INF("Sending request for ping: %s, worker is %p", request, conf->worker);
     
-    if (SUCCEED != glb_worker_request(conf.worker, request) ) {
+    if (SUCCEED != glb_worker_send_request(conf.worker, request) ) {
         //sending config error status for the item
         DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't send request for ping: %s",request);
         finish_icmp_poll(poller_item, CONFIG_ERROR ,"Couldn't start or pass request to glbmap", now);
@@ -334,9 +334,9 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     pinger_item->sent++;
  //   pinger_item->lastpacket_sent = now;
 
-    if (last_worker_pid != worker_get_pid(conf.worker)) {
+    if (last_worker_pid != glb_worker_get_pid(conf.worker)) {
         LOG_INF("glbmap worker's PID is changed, subscibing the new FD");
-        last_worker_pid = worker_get_pid(conf.worker);
+        last_worker_pid = glb_worker_get_pid(conf.worker);
         subscribe_worker_fd(worker_get_fd_from_worker(conf.worker));
     }
     
@@ -553,10 +553,7 @@ static int forks_count(void) {
  * ***************************************************************************/
 void glb_pinger_init(void) {
 
-	int i;
-	char init_string[MAX_STRING_LEN];
-    char full_path[MAX_STRING_LEN];
-    char add_params[MAX_STRING_LEN];
+	char args[MAX_STRING_LEN], add_params[MAX_STRING_LEN];
 	
     bzero(&conf, sizeof(pinger_conf_t));
 	conf.sent_packets = 0;
@@ -576,22 +573,25 @@ void glb_pinger_init(void) {
         zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s ",CONFIG_SOURCE_IP);
     } 
 
+    
+    
     if ( NULL != CONFIG_GLBMAP_OPTIONS ) {
          zbx_snprintf(add_params,MAX_STRING_LEN,"%s ",CONFIG_GLBMAP_OPTIONS);
     }
     
-    zbx_snprintf(init_string,MAX_STRING_LEN,"{\"path\":\"%s\", \"params\":\"%s-v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=saddr,rtt,itemid,success\"}\n",
+    zbx_snprintf(args, MAX_STRING_LEN, "%s-v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=saddr,rtt,itemid,success",
         CONFIG_GLBMAP_LOCATION, add_params);
 
-	conf.worker = glb_init_worker(init_string);
+	conf.worker = glb_worker_init(CONFIG_GLBMAP_LOCATION, args, 60, 0, 0, 0);
+    
     if (NULL == conf.worker) {
-        zabbix_log(LOG_LEVEL_WARNING,"Cannot create pinger woker, check the coniguration: '%s'",init_string);
+        zabbix_log(LOG_LEVEL_WARNING,"Cannot create pinger woker, check the coniguration: path '%s', args %s",CONFIG_GLBMAP_LOCATION, args);
         exit(-1);
     }
 
     worker_set_mode_to_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
     worker_set_mode_from_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
-    worker_set_async_mode(conf.worker, 1);
+    //worker_set_async_mode(conf.worker, 1);
     
     conf.worker_event = NULL; //poller_create_event(NULL, process_worker_results_cb, NULL);
 

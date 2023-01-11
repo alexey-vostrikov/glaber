@@ -178,11 +178,6 @@ static int process_response(poller_item_t *poller_item, const char *buffer, size
 
     DEBUG_ITEM(poller_get_item_id(poller_item), "Got payload of size %d", payload_len);
     
-    if (0 == payload_len && buffer_size == AGENT_HEADERS_SIZE) {
-        poller_preprocess_error(poller_item, "Zero length response is arrived");
-        return SUCCEED;
-    } 
-
     if (payload_len + AGENT_HEADERS_SIZE > buffer_size)
         return FAIL; 
 

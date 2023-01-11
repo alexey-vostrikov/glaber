@@ -1,5 +1,23 @@
+/*
+** Glaber
+** Copyright (C) 2001-2030 Glaber JSC
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+
 #include "zbxcommon.h"
-#include "zbxdb.h"
 #include "dbcache.h"
 #include "zbxcomms.h"
 #include "zbxnix.h"
@@ -211,7 +229,9 @@ void item_poll_cb(poller_item_t *poller_item, void *data) {
 	poller_item->lastpolltime = mstime;
 
 	DEBUG_ITEM(poller_item->itemid, "Starting poller item poll");
-	conf.poller.start_poll(poller_item);
+	
+	if (NULL != conf.poller.start_poll)
+		conf.poller.start_poll(poller_item);
 }
 
 static int add_item_to_host(u_int64_t hostid)
@@ -365,7 +385,7 @@ static int poll_module_init()
 		break;
 
 	case GLB_PROCESS_TYPE_WORKER:
-		glb_worker_init();
+		glb_worker_poller_init();
 		break;
 
 	case GLB_PROCESS_TYPE_SERVER:

@@ -43,7 +43,7 @@ extern int CONFIG_SERVER_STARTUP_TIME;
 
 typedef struct
 {
-	ext_worker_t *worker;
+	glb_worker_t *worker;
 	u_int8_t read_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t read_agg_types[ITEM_VALUE_TYPE_MAX];
 	u_int8_t write_types[ITEM_VALUE_TYPE_MAX];
@@ -617,9 +617,10 @@ int	glb_history_worker_init(char *params)
 
 	 //history mode expects old good JSON as a config, let's parse it
     struct zbx_json_parse jp, jp_config;
-	char  cmd[MAX_STRING_LEN],tmp_str[MAX_STRING_LEN];
+	char  cmd[MAX_STRING_LEN],tmp_str[MAX_STRING_LEN], path[MAX_STRING_LEN], args[MAX_STRING_LEN];
 	size_t alloc=0,offset=0;
 	zbx_json_type_t type;
+	int timeout = 0, max_calls = 0;
     
 	conf = (zbx_worker_data_t *)zbx_malloc(NULL, sizeof(zbx_worker_data_t));
 	memset(conf, 0, sizeof(zbx_worker_data_t));
@@ -631,12 +632,28 @@ int	glb_history_worker_init(char *params)
 		return FAIL;
 	}
 
-	if (NULL == (conf->worker=glb_init_worker(params)) ) {
+	if (SUCCEED != zbx_json_value_by_name(&jp_config, "path", path, MAX_STRING_LEN, &type))
+    {
+       LOG_WRN("Couldn't parse configuration: couldn't find 'path' parameter");
+       return FAIL;
+    }
+	
+	if (SUCCEED != zbx_json_value_by_name(&jp_config, "params", args, MAX_STRING_LEN, &type))
+		args[0] = '\0';
+      
+        
+    if (SUCCEED == zbx_json_value_by_name(&jp_config, "timeout", tmp_str, MAX_STRING_LEN, &type))
+    	timeout = strtol(tmp_str, NULL, 10);
+   
+    if (SUCCEED == zbx_json_value_by_name(&jp_config, "max_calls", tmp_str, MAX_STRING_LEN, &type))
+        max_calls = strtol(tmp_str, NULL, 10);
+    
+	if (NULL == (conf->worker=glb_worker_init(path, tmp_str, timeout, max_calls, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE))) {
 		zabbix_log(LOG_LEVEL_WARNING,"Load worker history couldn't create new worker");
 		return FAIL;
 	}
 
-	worker_set_mode_from_worker(conf->worker, GLB_WORKER_MODE_EMPTYLINE);
+	worker_set_mode_from_worker(conf->worker, GLB_WORKER_MODE_NEWLINE);
 	worker_set_mode_to_worker(conf->worker, GLB_WORKER_MODE_NEWLINE);
 	
 	zbx_strlcpy(tmp_str,GLB_DEFAULT_WORKER_WRITE_TYPES,MAX_STRING_LEN);

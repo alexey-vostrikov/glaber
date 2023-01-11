@@ -25,7 +25,7 @@ static worker_conf_t conf = {0};
 typedef struct {
 	u_int64_t workerid;
 	u_int64_t lastrequest; //to shutdown and cleanup idle workers
-	ext_worker_t *worker;
+	glb_worker_t *worker;
 } worker_t;
 
 typedef struct {
@@ -189,7 +189,8 @@ static worker_t * worker_create_worker(worker_item_t *worker_item) {
     bzero(&worker, sizeof(worker_t));
 
     worker.workerid = worker_item->workerid;
-    worker.worker = worker_init(worker_item->full_cmd, GLB_WORKER_MAXCALLS, 1, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE, CONFIG_TIMEOUT  );
+    worker.worker = glb_worker_init(worker_item->full_cmd, worker_item->params_dyn , CONFIG_TIMEOUT, GLB_WORKER_MAXCALLS, 
+            GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE);
       
     retworker = (worker_t*)zbx_hashset_insert(&conf.workers,&worker,sizeof(worker_t));
     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Finished worker id is %ld", __func__, retworker->workerid);
@@ -220,7 +221,7 @@ static void send_request(poller_item_t *poller_item) {
     }
     
     zabbix_log(LOG_LEVEL_DEBUG, "Will do request: %s to worker %s",worker_item->params_dyn, worker_item->full_cmd);
-    if (NULL == worker_item->params_dyn ||  SUCCEED != glb_worker_request(worker->worker, worker_item->params_dyn) ) {
+    if (NULL == worker_item->params_dyn ||  SUCCEED != glb_worker_send_request(worker->worker, worker_item->params_dyn) ) {
         //sending config error status for the item
         zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request %s",request);
         
@@ -313,9 +314,9 @@ static void worker_process_results() {
     while (NULL != (worker = zbx_hashset_iter_next(&iter))) {
         //we only query alive workers
         zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s", worker_get_path(worker->worker));
-        if (SUCCEED == worker_is_alive(worker->worker)) { //only read from alive workers
+        if (SUCCEED == glb_worker_is_alive(worker->worker)) { //only read from alive workers
             zabbix_log(LOG_LEVEL_DEBUG,"Calling async read");
-            while (SUCCEED == async_buffered_responce(worker->worker, &worker_response)) {
+            while (SUCCEED == glb_worker_get_async_buffered_responce(worker->worker, &worker_response)) {
               
                 LOG_DBG("Parsing line %s from worker %s", worker_response, worker_get_path(worker->worker));
                 worker_submit_result(worker_response);
@@ -369,8 +370,18 @@ static int forks_count(void) {
 /******************************************************************************
  * inits async structures - static connection pool							  *
  * ***************************************************************************/
-void glb_worker_init(void) {
+void glb_worker_poller_init(void) {
+    
+    sigset_t	mask, orig_mask;
 	
+    sigemptyset(&mask);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGQUIT);
+    sigaddset(&mask, SIGCHLD);
+
+    if (0 > sigprocmask(SIG_BLOCK, &mask, &orig_mask))
+		zbx_error("cannot set sigprocmask to block the user signal");
+
     zbx_hashset_create(&conf.workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, send_request, worker_shutdown, forks_count, NULL);
 

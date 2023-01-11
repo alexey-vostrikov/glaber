@@ -1885,7 +1885,7 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 
 	if (NULL != (semicolon = strchr(ip_str, ':'))) {
 		*semicolon ='\0';
-		DEBUG_ITEM(itemid, "Found semicolon, set to 0, new string is %s", ip_str);
+		DEBUG_ITEM(itemid, "Found semicolon, new IP string is %s", ip_str);
 	}		
 
 	if (0 == (hostid = glb_state_interfaces_find_host_by_ip(ip_str))) {
