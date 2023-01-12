@@ -153,7 +153,6 @@ static void process_payload_response(poller_item_t *poller_item, const char* buf
 
 /*returns success if buffer has been processed and there is no need to wait for more data*/
 static int process_response(poller_item_t *poller_item, const char *buffer, size_t buffer_size) {
-
     #define PAYLOAD_OFFSET 5 
     
     if (buffer_size < AGENT_HEADERS_SIZE) 
@@ -178,8 +177,9 @@ static int process_response(poller_item_t *poller_item, const char *buffer, size
 
     DEBUG_ITEM(poller_get_item_id(poller_item), "Got payload of size %d", payload_len);
     
-    if (payload_len + AGENT_HEADERS_SIZE > buffer_size)
+    if (payload_len + AGENT_HEADERS_SIZE > buffer_size) {
         return FAIL; 
+    }
 
     process_payload_response(poller_item, buffer + AGENT_HEADERS_SIZE, payload_len);
     

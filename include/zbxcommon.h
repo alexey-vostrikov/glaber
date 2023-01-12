@@ -1232,4 +1232,27 @@ u_int64_t DC_get_debug_trigger();
         }
 #endif
 
+#ifndef TIME_MEASURE
+#define TIME_MEASURE
+/*usage:
+ { //something that happens frequently, might be module-wise
+	INIT_MEASURE(some_usefull_name); // vars will be static
+
+	START_MEASURE(some_usefull_name);
+	some_long_procedure;
+	STOP_MEASURE(some_usefull_name);
+ }
+*/
+#define INIT_MEASURE(name) double __time_start_##name; \
+	static double __time_summ_##name = 0;\
+	static u_int64_t __time_count_##name = 0;\
+	static int __time_report_##name = 0; \
+	if (time(NULL) > __time_report_##name + 10) {\
+		LOG_INF("Time spent in "#name": %f sec, calls: %ld", __time_summ_##name, __time_count_##name);\
+		__time_report_##name = time(NULL);\
+	}
+#define START_MEASURE(name) __time_start_##name = zbx_time(); 
+#define STOP_MEASURE(name) __time_summ_##name += zbx_time() - __time_start_##name;__time_count_##name++;
+#endif
+
 #endif

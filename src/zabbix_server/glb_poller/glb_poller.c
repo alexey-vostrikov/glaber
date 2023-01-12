@@ -575,7 +575,7 @@ void poller_return_item_to_queue(poller_item_t *item)
 	item->state = POLL_QUEUED;
 }
 
-#define CONFIG_REPOLL_DELAY 15
+#define CONFIG_REPOLL_DELAY 10
 
 void poller_return_delayed_item_to_queue(poller_item_t *item)
 {
@@ -583,12 +583,12 @@ void poller_return_delayed_item_to_queue(poller_item_t *item)
 	//LOG_INF("Item %ld returned to the poller's queue, will repoll in %d msec", item->itemid, nextcheck);
 	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue, will repoll in %d sec", nextcheck);
 	
-	glb_state_item_update_nextcheck(item->itemid, nextcheck * 1000 );
+	glb_state_item_update_nextcheck(item->itemid, time(NULL) + nextcheck * 1000 );
 	item->lastpolltime = glb_ms_time();
 	item->state = POLL_QUEUED;
 
 	poller_disable_event(item->poll_event);
-	poller_run_timer_event(item->poll_event, nextcheck);
+	poller_run_timer_event(item->poll_event, nextcheck * 1000);
 }
 
 u_int64_t poller_get_host_id(poller_item_t *item)
@@ -757,6 +757,12 @@ const char *poller_strpool_add(const char *str)
 {
 	return strpool_add(&conf.strpool, str);
 };
+
+const char *poller_strpool_copy(const char *str)
+{
+	return strpool_copy(str);
+};
+
 
 void set_poller_proc_info(zbx_thread_args_t *args)
 {
