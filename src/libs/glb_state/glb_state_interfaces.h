@@ -36,10 +36,13 @@ void        glb_state_interfaces_release_ip(const char *addr);
 typedef struct {
     char *error;
     unsigned char avail;
+    int lastchange;
 } glb_state_interface_info_t;
 
-void    glb_state_interfaces_register_if_fail(u_int64_t id, char *error);
-void    glb_state_interfaces_register_if_ok(u_int64_t id);
-int     glb_state_interfaces_register_get_if_avail(glb_state_interface_info_t *info);
+
+//normal  ifaces
+int    glb_state_interfaces_register_fail(u_int64_t interfaceid, const char *error); 
+int    glb_state_interfaces_register_ok(u_int64_t interfaceid, const char *error); 
+glb_state_interface_info_t *glb_state_interfaces_get_avail(u_int64_t id);
 
 #endif

@@ -227,6 +227,7 @@
 #define ZBX_PROTO_VALUE_GET_STATUS		"status.get"
 #define ZBX_PROTO_VALUE_GET_HISTORY		"history.get"
 #define GLB_PROTO_VALUE_GET_TRIGGER_STATUS		"triggers.state.get"
+#define GLB_PROTO_VALUE_GET_INTERFACE_STATE		"interface.state.get"
 
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"

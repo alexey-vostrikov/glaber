@@ -37,6 +37,7 @@
 #include "calculated.h"
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
+#include "../../libs/glb_state/glb_state_interfaces.h"
 #include "../poller/poller.h"
 #include "../../libs/zbxexec/worker.h"
 #include "poller_async_io.h"
@@ -86,6 +87,7 @@ struct poller_item_t
 	u_int64_t lastpolltime;
 	void *itemdata; // item type specific data
 	poller_event_t *poll_event;
+	u_int64_t interfaceid;
 };
 
 typedef struct
@@ -336,6 +338,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item->flags = dc_item->flags;
 	poller_item->item_type = dc_item->type;
 	poller_item->poll_event = poller_create_event(poller_item, item_poll_cb, 0, NULL, 0);
+	poller_item->interfaceid = dc_item->interface.interfaceid;
 
 	add_item_to_host(poller_item->hostid);
 
@@ -658,6 +661,8 @@ void poller_preprocess_error(poller_item_t *poller_item, const char *error)
 
 	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
 							  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
+	
+	glb_state_interfaces_register_fail(poller_item->interfaceid, error);
 }
 
 void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime)
@@ -714,12 +719,16 @@ void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u
 	{
 		zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
 								  result, &ts, state, NULL);
+		
+		glb_state_interfaces_register_ok(poller_item->interfaceid, "Succesifully got data");
 	}
 
 	if (ITEM_STATE_NOTSUPPORTED == state)
 	{
 		zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
 								  NULL, &ts, state, error);
+		
+		glb_state_interfaces_register_fail(poller_item->interfaceid, error);
 	}
 }
 

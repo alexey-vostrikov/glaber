@@ -625,8 +625,8 @@ function getHostAvailabilityTable(array $host_interfaces): CHostAvailability {
 			'available' => $interface['available'],
 			'interface' => getHostInterface($interface),
 			'description' => $description,
-			'error' => ($interface['available'] == INTERFACE_AVAILABLE_TRUE) ? '' : $interface['error']
-		];
+			'error' =>  $interface['error'],
+			'lastchange' => (isset($interface['lastchange']) ? $interface['lastchange'] : 0) ];
 	}
 
 	return (new CHostAvailability())->setInterfaces($interfaces);

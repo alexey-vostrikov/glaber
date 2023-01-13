@@ -44,7 +44,7 @@ void test_worker_run() {
     
     //lets try to run cut and read something
     assert(NULL != (worker = glb_worker_init("/bin/cat","",0,0,0,0)));
-    assert(SUCCEED == glb_worker_restart(worker));
+    assert(SUCCEED == glb_worker_restart(worker,""));
     sleep(1); //intentional wait
     assert(SUCCEED == glb_worker_is_alive(worker));
 

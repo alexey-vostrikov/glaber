@@ -70,7 +70,8 @@ function addTriggerValueStyle($object, $triggerValue, $triggerLastChange, $isAck
 function trigger_value2str($value = null) {
 	$triggerValues = [
 		TRIGGER_VALUE_FALSE => _('OK'),
-		TRIGGER_VALUE_TRUE => _('PROBLEM')
+		TRIGGER_VALUE_TRUE => _('PROBLEM'),
+		TRIGGER_VALUE_UNKNOWN => _('UNKNWON')
 	];
 
 	if ($value === null) {
@@ -1972,12 +1973,21 @@ function triggerIndicatorStyle($status, $state = null) {
  */
 function triggerIndicatorByValue($status, $value = null) {
     if ($status == TRIGGER_STATUS_ENABLED) {
-        return ($value == TRIGGER_VALUE_UNKNOWN) ? _('Unknown') : _('Enabled');
+        return  _('Enabled');
     }
-
     return _('Disabled');
 }
 
+function triggerValueClass($value) {
+	switch ($value) {
+		case TRIGGER_VALUE_TRUE:
+			return ZBX_STYLE_PROBLEM_UNACK_FG;
+		case TRIGGER_VALUE_FALSE:
+			return ZBX_STYLE_OK_UNACK_FG;
+		case TRIGGER_VALUE_UNKNWON:
+			return "";
+	}	
+} 
 /**
  * Returns the CSS class for the trigger's status and state indicator. If the $value parameter is not given, only the
  * status of the trigger will be taken into account.

@@ -87,7 +87,7 @@ if ($data['context'] === 'host') {
 			->addValue(_('all'), -1)
 			->addValue(_('Ok'), TRIGGER_VALUE_FALSE)
 			->addValue(_('Problem'), TRIGGER_VALUE_TRUE)
-            ->addValue(_('Unknown'), TRIGGER_VALUE_UNKNOWN)
+            ->addValue(_('UNKNOWN'), TRIGGER_VALUE_UNKNOWN)
 			->setModern(true)
 	);
 }
@@ -315,11 +315,11 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 	}
 
 	$host = reset($trigger['hosts']);
+	
 	$trigger_value = ($host['status'] == HOST_STATUS_MONITORED || $host['status'] == HOST_STATUS_NOT_MONITORED)
-		? (new CSpan(trigger_value2str($trigger['value'])))->addClass(
-			($trigger['value'] == TRIGGER_VALUE_TRUE) ? ZBX_STYLE_PROBLEM_UNACK_FG : ZBX_STYLE_OK_UNACK_FG
-		)
-		: '';
+		? (new CSpan(trigger_value2str($trigger['value'])))
+			->addClass(triggerValueClass($trigger['value']),
+		): '';
 
 	$triggers_table->addRow([
 		new CCheckBox('g_triggerid['.$triggerid.']', $triggerid),

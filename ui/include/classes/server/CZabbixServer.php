@@ -249,7 +249,32 @@ class CZabbixServer {
 		]);
 	}
 
-    // miramir: костыль
+    
+    public static  function getInterfacesAvail($sid, $Ids) {
+        global $ZBX_SERVER, $ZBX_SERVER_PORT;
+
+        $result = [];
+
+        foreach (array_chunk($Ids, 16384) as $chunk) {
+
+            $zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+                timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+                timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+            );
+
+            $newdata = $zabbix_server->request([
+                'request' => 'interface.state.get',
+                'sid' => $sid,
+                'interfaceids' => $chunk
+            ]);
+
+			if (is_array($newdata))
+            	$result = array_merge($result, $newdata);
+        }
+
+        return $result;
+    }
+
     public static  function getTriggersValues($sid, $triggerIds) {
         global $ZBX_SERVER, $ZBX_SERVER_PORT;
 

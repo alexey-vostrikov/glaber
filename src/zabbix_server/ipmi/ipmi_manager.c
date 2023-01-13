@@ -35,6 +35,7 @@
 #include "zbxavailability.h"
 #include "zbxtime.h"
 #include "zbxsysinfo.h"
+#include "../../libs/glb_state/glb_state_interfaces.h"
 
 #define ZBX_IPMI_MANAGER_DELAY	1
 
@@ -641,7 +642,7 @@ static void	ipmi_manager_activate_interface(zbx_ipmi_manager_t *manager, zbx_uin
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
-	zbx_activate_item_interface(ts, &item, &data, &data_alloc, &data_offset);
+	glb_state_interfaces_register_ok(itme.interface.interfaceid,"");
 	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
 
 	DCconfig_clean_items(&item, &errcode, 1);
@@ -674,7 +675,9 @@ static void	ipmi_manager_deactivate_interface(zbx_ipmi_manager_t *manager, zbx_u
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
-	zbx_deactivate_item_interface(ts, &item, &data, &data_alloc, &data_offset, error);
+	//zbx_deactivate_item_interface(ts, &item, &data, &data_alloc, &data_offset, error);
+	glb_state_interfaces_register_fail(item.interface.intefaceid);
+
 	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
 
 	DCconfig_clean_items(&item, &errcode, 1);

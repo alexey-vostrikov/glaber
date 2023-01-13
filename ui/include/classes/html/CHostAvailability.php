@@ -22,7 +22,7 @@
 class CHostAvailability extends CTag {
 
 	public const TYPES = [INTERFACE_TYPE_AGENT, INTERFACE_TYPE_SNMP, INTERFACE_TYPE_IPMI, INTERFACE_TYPE_JMX,
-		INTERFACE_TYPE_AGENT_ACTIVE, INTERFACE_TYPE_ICMP
+		INTERFACE_TYPE_AGENT_ACTIVE
 	];
 
 	public const LABELS = [
@@ -74,7 +74,7 @@ class CHostAvailability extends CTag {
 	 */
 	protected function getInterfaceHint(array $interfaces): CTableInfo {
 		$hint_table = (new CTableInfo())
-			->setHeader([_('Interface'), _('Status'), _('Error')])
+			->setHeader([_('Interface'), _('Status'), _('Time'),_('Error')])
 			->addStyle('max-width: 640px');
 		$status = [
 			INTERFACE_AVAILABLE_UNKNOWN => _('Unknown'),
@@ -94,7 +94,8 @@ class CHostAvailability extends CTag {
 				(new CSpan($status[$interface['available']]))
 					->addClass(static::COLORS[$interface['available']])
 					->addClass(ZBX_STYLE_NOWRAP),
-				(new CDiv($interface['error']))->addClass(ZBX_STYLE_RED)
+					$interface['lastchange'] > 0 ? zbx_date2age($interface['lastchange']) : "NEVER",
+					$interface['available'] == INTERFACE_AVAILABLE_FALSE ? (new CDiv($interface['error']))->addClass(ZBX_STYLE_RED) : $interface['error']
 			]);
 		}
 
