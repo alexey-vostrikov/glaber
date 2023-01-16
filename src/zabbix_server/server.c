@@ -1948,7 +1948,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			zbx_error("Couldn't set max open files to %d. Please set it manualy via ulimit -n. Exisiting now.",ZBX_DESIRED_OPEN_FILES);
 		exit(EXIT_FAILURE);
 	    } else {
-			zbx_error("Succesifully set max open files to %d. But it's better to set it manualy via ulimit -n. ",ZBX_DESIRED_OPEN_FILES);
+			zbx_error("Successifully set max open files to %d. But it's better to set it manualy via ulimit -n. ",ZBX_DESIRED_OPEN_FILES);
 	    }
 	}
 

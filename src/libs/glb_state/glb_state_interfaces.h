@@ -45,4 +45,6 @@ int    glb_state_interfaces_register_fail(u_int64_t interfaceid, const char *err
 int    glb_state_interfaces_register_ok(u_int64_t interfaceid, const char *error); 
 glb_state_interface_info_t *glb_state_interfaces_get_avail(u_int64_t id);
 
+int glb_state_interfaces_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json *json);
+
 #endif

@@ -65,8 +65,7 @@ class CHistoryManager {
 		{
 			if (!isset($result[$value['itemid']])) 
 					$result[$value['itemid']]=[];
-					
-			$result[$value['itemid']]  +=  $value['values'];
+			$result[$value['itemid']] +=  $value['values'];
 		}
 			
 		return $result;

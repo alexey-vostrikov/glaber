@@ -128,11 +128,6 @@ int worker_process_args(glb_worker_t *worker, const char *params_buf) {
     }
     int i = 0;
 
-    while (worker->args[i] != NULL) {
-        LOG_INF("Will start: args Parsed arg %d value %s", i, worker->args[i]);
-        i++;
-    }
-
 }
 
 glb_worker_t *glb_worker_init(const char *path, const char* args, int timeout, int max_calls, 

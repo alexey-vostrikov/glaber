@@ -71,7 +71,7 @@ function trigger_value2str($value = null) {
 	$triggerValues = [
 		TRIGGER_VALUE_FALSE => _('OK'),
 		TRIGGER_VALUE_TRUE => _('PROBLEM'),
-		TRIGGER_VALUE_UNKNOWN => _('UNKNWON')
+		TRIGGER_VALUE_UNKNOWN => _('UNKNOWN')
 	];
 
 	if ($value === null) {
@@ -1971,11 +1971,8 @@ function triggerIndicatorStyle($status, $state = null) {
  *
  * @return string
  */
-function triggerIndicatorByValue($status, $value = null) {
-    if ($status == TRIGGER_STATUS_ENABLED) {
-        return  _('Enabled');
-    }
-    return _('Disabled');
+function triggerAdminStatusStr($status) {
+	return ($status == TRIGGER_STATUS_ENABLED) ? _('Enabled') : _('Disabled');
 }
 
 function triggerValueClass($value) {
@@ -1984,7 +1981,7 @@ function triggerValueClass($value) {
 			return ZBX_STYLE_PROBLEM_UNACK_FG;
 		case TRIGGER_VALUE_FALSE:
 			return ZBX_STYLE_OK_UNACK_FG;
-		case TRIGGER_VALUE_UNKNWON:
+		case TRIGGER_VALUE_UNKNOWN:
 			return "";
 	}	
 } 

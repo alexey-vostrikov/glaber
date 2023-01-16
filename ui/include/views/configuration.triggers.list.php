@@ -279,7 +279,7 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 
 	// status
 	$status = (new CLink(
-		triggerIndicatorByValue($trigger['status'], $trigger['value']),
+		triggerAdminStatusStr($trigger['status']),
 		(new CUrl('triggers.php'))
 			->setArgument('g_triggerid', $triggerid)
 			->setArgument('action', ($trigger['status'] == TRIGGER_STATUS_DISABLED)

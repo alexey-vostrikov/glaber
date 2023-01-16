@@ -720,7 +720,7 @@ void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u
 		zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
 								  result, &ts, state, NULL);
 		
-		glb_state_interfaces_register_ok(poller_item->interfaceid, "Succesifully got data");
+		glb_state_interfaces_register_ok(poller_item->interfaceid, "Successifully got data");
 	}
 
 	if (ITEM_STATE_NOTSUPPORTED == state)

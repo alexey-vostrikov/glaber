@@ -251,7 +251,7 @@ zbx_uint64_t	CONFIG_CONF_CACHE_SIZE		= 8 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_HISTORY_CACHE_SIZE	= 16 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_HISTORY_INDEX_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 0;
-zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 0 * ZBX_MEBIBYTE;
+zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 64 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_EXPORT_FILE_SIZE;
 
@@ -325,7 +325,7 @@ static char	*CONFIG_SOCKET_PATH	= NULL;
 int SERVERS = 0;
 int CONFIG_EXT_SERVER_FORKS = 1;
 char	*CONFIG_WORKERS_DIR		= NULL;
-char	*CONFIG_SERVERS			= NULL;
+//char	*CONFIG_SERVERS			= NULL;
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
@@ -646,13 +646,22 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
+	if (0 != CONFIG_VALUE_CACHE_SIZE && 128 * ZBX_KIBIBYTE > CONFIG_VALUE_CACHE_SIZE)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "\"ValueCacheSize\" configuration parameter must be either 0"
+				" or greater than 128KB");
+		err = 1;
+	}
+
 	if (ZBX_PROXYMODE_ACTIVE == CONFIG_PROXYMODE)
 	{
+		zbx_error("Validate load 2.25");
 		if (NULL != strchr(CONFIG_SERVER, ','))
 		{
 			zabbix_log(LOG_LEVEL_CRIT, "\"Server\" configuration parameter must not contain comma");
 			err = 1;
 		}
+
 	}
 	else if (ZBX_PROXYMODE_PASSIVE == CONFIG_PROXYMODE && FAIL == zbx_validate_peer_list(CONFIG_SERVER, &ch_error))
 	{
@@ -730,10 +739,6 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	err |= (FAIL == check_cfg_feature_int("StartIPMIPollers", CONFIG_IPMIPOLLER_FORKS, "IPMI support"));
 #endif
 
-//	if ( SUCCEED != parse_servers() ) {
-//		err = 1;
-//	}
-
 	if ( 0 == CONFIG_PINGER_FORKS &&  ZBX_ICMP == CONFIG_ICMP_METHOD) {
 		zbx_error("Cannot use default ICMP method fping without any PINGER poller enabled, set StartPingers > 0 in the server config file");
 		exit(EXIT_FAILURE);
@@ -764,6 +769,8 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 	if (0 == CONFIG_PROXYCONFIG_FREQUENCY)
 		CONFIG_PROXYCONFIG_FREQUENCY = 10;
 
+
+
 	err |= (FAIL == zbx_db_validate_config_features());
 
 	if (0 != err)
@@ -793,6 +800,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
+		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
+			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"SnmpDisableSNMPV1Async",			&CONFIG_DISABLE_SNMPV1_ASYNC,			TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"StartGLBPreprocessors",		&CONFIG_GLB_PREPROCESSOR_FORKS,		TYPE_INT,
@@ -821,7 +830,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			8},	
 		{"ProxyMode",			&CONFIG_PROXYMODE,			TYPE_INT,
 			PARM_OPT,	ZBX_PROXYMODE_ACTIVE,	ZBX_PROXYMODE_PASSIVE},
-		{"Servers",			&CONFIG_SERVERS,				TYPE_STRING,
+		{"Server",			&CONFIG_SERVER,				TYPE_STRING,
 			PARM_MAND,	0,			0},
 		{"ServerPort",			&CONFIG_SERVER_PORT,			TYPE_INT,
 			PARM_OPT,	1024,			32767},
@@ -1033,7 +1042,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1000},
 		{NULL}
 	};
-
+	zbx_error("Config load 0");
 	/* initialize multistrings */
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
 
@@ -1042,23 +1051,24 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	zbx_set_defaults();
 
 	CONFIG_LOG_TYPE = zbx_get_log_type(CONFIG_LOG_TYPE_STR);
-
+	zbx_error("Config load 1");
 	zbx_validate_config(task);
-
+	zbx_error("Config load 1.1");
 	zbx_vector_ptr_create(&zbx_addrs);
 
 	if (ZBX_PROXYMODE_PASSIVE != CONFIG_PROXYMODE)
 	{
 		char	*error;
-
+		zbx_error("Config load 1.2");
 		if (FAIL == zbx_set_data_destination_hosts(CONFIG_SERVER, (unsigned short)CONFIG_SERVER_PORT, "Server",
 				proxy_add_serveractive_host_cb, NULL, NULL, &error))
 		{
+			zbx_error("Config load 1.3");
 			zbx_error("%s", error);
 			exit(EXIT_FAILURE);
 		}
 	}
-
+	zbx_error("Config load 2");
 #if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
 	zbx_db_validate_config();
 #endif
@@ -1195,7 +1205,7 @@ int	main(int argc, char **argv)
 				break;
 		}
 	}
-
+	zbx_error("Starting daemon0");
 	/* every option may be specified only once */
 	if (1 < opt_c || 1 < opt_r)
 	{
@@ -1218,15 +1228,15 @@ int	main(int argc, char **argv)
 
 		exit(EXIT_FAILURE);
 	}
-
+	zbx_error("Starting daemon0.5");
 	if (NULL == config_file)
 		config_file = zbx_strdup(NULL, DEFAULT_CONFIG_FILE);
 
 	/* required for simple checks */
 	zbx_init_metrics();
-
+		zbx_error("Starting daemon1.5");
 	zbx_load_config(&t);
-
+		zbx_error("Starting daemon1.7");
 	if (ZBX_TASK_RUNTIME_CONTROL == t.task)
 	{
 		int	ret;
@@ -1247,7 +1257,7 @@ int	main(int argc, char **argv)
 
 		exit(SUCCEED == ret ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
-
+	zbx_error("Starting daemon2");
 	return zbx_daemon_start(config_allow_root, CONFIG_USER, t.flags, get_pid_file_path, zbx_on_exit);
 }
 
@@ -1464,8 +1474,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 	
-	DC_set_debug_item(CONFIG_DEBUG_ITEM);
-
+	
 	if (SUCCEED != init_configuration_cache(&error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize configuration cache: %s", error);
@@ -1473,6 +1482,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
+	DC_set_debug_item(CONFIG_DEBUG_ITEM);
+	
 	if (SUCCEED != zbx_init_selfmon_collector(&error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize self-monitoring: %s", error);

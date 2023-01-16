@@ -2088,7 +2088,9 @@ static int	flush_events(ZBX_DC_HISTORY *history)
 	zbx_hashset_iter_t		iter;
 
 	ret = save_events(history);
+	//NO PROBLEMS: alter (add) cache problems creation here
 	save_problems();
+	//NO PROBLEMS: problems recovery code should be added here
 	save_event_recovery(history);
 	update_event_suppress_data();
 

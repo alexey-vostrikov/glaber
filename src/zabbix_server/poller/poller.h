@@ -39,7 +39,6 @@ extern int	CONFIG_UNREACHABLE_DELAY;
 
 ZBX_THREAD_ENTRY(poller_thread, args);
 
-/
 void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, unsigned char expand_macros);
 void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, zbx_vector_ptr_t *add_results,
 		unsigned char poller_type, const zbx_config_comms_args_t *zbx_config);

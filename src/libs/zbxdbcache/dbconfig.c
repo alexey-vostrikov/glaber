@@ -659,7 +659,7 @@ static int	DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *in
 }
 
 
-static void DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, int flags)
+  void DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, int flags)
 {
 	unsigned char poller_type;
 
@@ -697,7 +697,7 @@ static void DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *d
 	}
 }
 
-static void DCincrease_disable_until(ZBX_DC_INTERFACE *interface, int now)
+  void DCincrease_disable_until(ZBX_DC_INTERFACE *interface, int now)
 {
 	if (NULL != interface && 0 != interface->errors_from)
 		interface->disable_until = now + CONFIG_TIMEOUT;
@@ -875,7 +875,7 @@ int dc_strpool_replace(int found, const char **curr, const char *new_str)
 	return SUCCEED; /* indicate that the string has been replaced */
 }
 
-static void DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type)
+  void DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type)
 {
 	zbx_binary_heap_elem_t elem;
 	ZBX_DC_HOST *zbx_dc_host;
@@ -922,7 +922,7 @@ static void DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type
 
 extern int CONFIG_PROXYCONFIG_FREQUENCY;
 
-static void DCupdate_proxy_queue(ZBX_DC_PROXY *proxy)
+  void DCupdate_proxy_queue(ZBX_DC_PROXY *proxy)
 {
 	zbx_binary_heap_elem_t elem;
 
@@ -1200,7 +1200,7 @@ static time_t calculate_proxy_nextcheck(zbx_uint64_t hostid, unsigned int delay,
 	return nextcheck;
 }
 
-static void DCsync_autoreg_config(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_autoreg_config(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	/* sync this function with zbx_dbsync_compare_autoreg_psk() */
 	char **db_row;
@@ -1233,7 +1233,7 @@ static void DCsync_autoreg_config(zbx_dbsync_t *sync, zbx_uint64_t revision)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_autoreg_host(zbx_dbsync_t *sync)
+  void DCsync_autoreg_host(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -1272,7 +1272,7 @@ static void DCsync_autoreg_host(zbx_dbsync_t *sync)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_proxy_remove(ZBX_DC_PROXY *proxy)
+  void DCsync_proxy_remove(ZBX_DC_PROXY *proxy)
 {
 	if (ZBX_LOC_QUEUE == proxy->location)
 	{
@@ -1320,7 +1320,7 @@ static void dc_host_register_proxy(ZBX_DC_HOST *host, zbx_uint64_t proxy_hostid,
 	proxy->revision = revision;
 }
 
-static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_uint64_t *active_avail_diff,
+  void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_uint64_t *active_avail_diff,
 						 zbx_hashset_t *activated_hosts)
 {
 	char **row;
@@ -1928,7 +1928,7 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	ZBX_DC_HOST_INVENTORY *host_inventory, *host_inventory_auto;
 	zbx_uint64_t rowid, hostid;
@@ -2266,7 +2266,7 @@ static void dc_interface_snmp_remove(zbx_uint64_t interfaceid)
 	return;
 }
 
-static void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -3698,7 +3698,7 @@ static void	DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_item_discovery(zbx_dbsync_t *sync)
+  void DCsync_item_discovery(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid, itemid;
@@ -3736,7 +3736,7 @@ static void DCsync_item_discovery(zbx_dbsync_t *sync)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_template_items(zbx_dbsync_t *sync)
+  void DCsync_template_items(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid, itemid;
@@ -3772,7 +3772,7 @@ static void DCsync_template_items(zbx_dbsync_t *sync)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_prototype_items(zbx_dbsync_t *sync)
+  void DCsync_prototype_items(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid, itemid;
@@ -3808,7 +3808,7 @@ static void DCsync_prototype_items(zbx_dbsync_t *sync)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void DCsync_triggers(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_triggers(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4302,7 +4302,7 @@ static void dc_schedule_trigger_timers(zbx_hashset_t *trend_queue, int now)
 	}
 }
 
-static void DCsync_functions(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_functions(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4407,7 +4407,7 @@ static ZBX_DC_REGEXP *dc_regexp_remove_expression(const char *regexp_name, zbx_u
  * Parameters: result - [IN] the result of expressions database select        *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_expressions(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_expressions(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4511,7 +4511,7 @@ static void DCsync_expressions(zbx_dbsync_t *sync, zbx_uint64_t revision)
  *           3 - formula                                                      *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_actions(zbx_dbsync_t *sync)
+  void DCsync_actions(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4585,7 +4585,7 @@ static void DCsync_actions(zbx_dbsync_t *sync)
  *           1 - action operation class flags                                 *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_action_ops(zbx_dbsync_t *sync)
+  void DCsync_action_ops(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4639,7 +4639,7 @@ static int dc_compare_action_conditions_by_type(const void *d1, const void *d2)
  *           4 - value                                                        *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_action_conditions(zbx_dbsync_t *sync)
+  void DCsync_action_conditions(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4744,7 +4744,7 @@ static void DCsync_action_conditions(zbx_dbsync_t *sync)
  *           3 - formula                                                      *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_correlations(zbx_dbsync_t *sync)
+  void DCsync_correlations(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -4943,7 +4943,7 @@ static int dc_compare_corr_conditions_by_type(const void *d1, const void *d2)
  *          10 - corr_condition_tagpair.newtag                                *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_corr_conditions(zbx_dbsync_t *sync)
+  void DCsync_corr_conditions(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5051,7 +5051,7 @@ static void DCsync_corr_conditions(zbx_dbsync_t *sync)
  *           2 - type                                                         *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_corr_operations(zbx_dbsync_t *sync)
+  void DCsync_corr_operations(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5139,7 +5139,7 @@ static int dc_compare_hgroups(const void *d1, const void *d2)
  *           1 - name                                                         *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_hostgroups(zbx_dbsync_t *sync)
+  void DCsync_hostgroups(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5211,7 +5211,7 @@ static void DCsync_hostgroups(zbx_dbsync_t *sync)
  *           3 - value                                                        *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_trigger_tags(zbx_dbsync_t *sync)
+  void DCsync_trigger_tags(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5298,7 +5298,7 @@ static void DCsync_trigger_tags(zbx_dbsync_t *sync)
  *           3 - value                                                        *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_item_tags(zbx_dbsync_t *sync)
+  void DCsync_item_tags(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5381,7 +5381,7 @@ static void DCsync_item_tags(zbx_dbsync_t *sync)
  *           3 - value                                                        *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_host_tags(zbx_dbsync_t *sync)
+  void DCsync_host_tags(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5516,7 +5516,7 @@ static int dc_compare_preprocops_by_step(const void *d1, const void *d2)
  *           3 - params                                                       *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_item_preproc(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_item_preproc(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5636,7 +5636,7 @@ static void DCsync_item_preproc(zbx_dbsync_t *sync, zbx_uint64_t revision)
  *           3 - value                                                        *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_itemscript_param(zbx_dbsync_t *sync, zbx_uint64_t revision)
+  void DCsync_itemscript_param(zbx_dbsync_t *sync, zbx_uint64_t revision)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -5746,7 +5746,7 @@ static void DCsync_itemscript_param(zbx_dbsync_t *sync, zbx_uint64_t revision)
  *           1 - hostid                                                       *
  *                                                                            *
  ******************************************************************************/
-static void DCsync_hostgroup_hosts(zbx_dbsync_t *sync)
+  void DCsync_hostgroup_hosts(zbx_dbsync_t *sync)
 {
 	char **row;
 	zbx_uint64_t rowid;
@@ -8180,7 +8180,7 @@ int in_maintenance_without_data_collection(unsigned char maintenance_status, uns
 	return SUCCEED;
 }
 
-static void DCget_host(DC_HOST *dst_host, const ZBX_DC_HOST *src_host, unsigned int mode)
+  void DCget_host(DC_HOST *dst_host, const ZBX_DC_HOST *src_host, unsigned int mode)
 {
 	const ZBX_DC_IPMIHOST *ipmihost;
 	const ZBX_DC_HOST_INVENTORY *host_inventory;
@@ -8651,7 +8651,7 @@ void DCget_autoregistration_psk(char *psk_identity_buf, size_t psk_identity_buf_
 	UNLOCK_CACHE;
 }
 
-static void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE *src_interface)
+  void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE *src_interface)
 {
 	if (NULL != src_interface)
 	{
@@ -8686,7 +8686,7 @@ static void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE 
 	dst_interface->port = 0;
 }
 
-static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned int mode)
+  void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item, unsigned int mode)
 {
 	const ZBX_DC_NUMITEM *numitem;
 	const ZBX_DC_LOGITEM *logitem;
@@ -9088,7 +9088,7 @@ void DCconfig_clean_items(DC_ITEM *items, int *errcodes, size_t num)
 	}
 }
 
-static void DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src_function)
+  void DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src_function)
 {
 	size_t sz_function, sz_parameter;
 
@@ -9179,7 +9179,7 @@ void zbx_free_item_tag(zbx_item_tag_t *item_tag)
 	zbx_free(item_tag);
 }
 
-static void DCclean_trigger(DC_TRIGGER *trigger)
+  void DCclean_trigger(DC_TRIGGER *trigger)
 {
 	zbx_free(trigger->new_error);
 	zbx_free(trigger->error);
@@ -9478,7 +9478,6 @@ void DCconfig_get_items_by_itemids_partial(DC_ITEM *items, const zbx_uint64_t *i
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids[i])))
 		{
 			DEBUG_ITEM(itemids[i], "Failed to retrieve item config for history sync");
-		//	LOG_INF("Reason1, itemid is %ld",itemids[i]);
 			errcodes[i] = FAIL;
 			continue;
 		}
@@ -9490,7 +9489,6 @@ void DCconfig_get_items_by_itemids_partial(DC_ITEM *items, const zbx_uint64_t *i
 			if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			{
 				DEBUG_ITEM(itemids[i], "Host not found for the item, value will FAIL");
-				LOG_INF("Reason2");
 				errcodes[i] = FAIL;
 				continue;
 			}
@@ -11487,7 +11485,7 @@ void zbx_dc_requeue_unreachable_items(zbx_uint64_t *itemids, size_t itemids_num)
  * Comments: The configuration cache must be locked already.                  *
  *                                                                            *
  ******************************************************************************/
-static void DCinterface_get_agent_availability(const ZBX_DC_INTERFACE *dc_interface,
+  void DCinterface_get_agent_availability(const ZBX_DC_INTERFACE *dc_interface,
 											   zbx_agent_availability_t *agent)
 {
 
@@ -11499,7 +11497,7 @@ static void DCinterface_get_agent_availability(const ZBX_DC_INTERFACE *dc_interf
 	agent->disable_until = dc_interface->disable_until;
 }
 
-static void DCagent_set_availability(zbx_agent_availability_t *av, unsigned char *available, const char **error,
+  void DCagent_set_availability(zbx_agent_availability_t *av, unsigned char *available, const char **error,
 									 int *errors_from, int *disable_until)
 {
 #define AGENT_AVAILABILITY_ASSIGN(flags, mask, dst, src) \
