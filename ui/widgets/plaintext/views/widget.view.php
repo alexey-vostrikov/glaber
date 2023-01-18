@@ -59,7 +59,8 @@ else {
 
 	do {
 		$history_item = array_shift($data['histories']);
-
+		error_log(json_encode($history_item));
+		
 		if ($history_item !== null && !$names_at_top) {
 			$table_row = [
 				(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_item['clock'])))->addClass(ZBX_STYLE_NOWRAP)

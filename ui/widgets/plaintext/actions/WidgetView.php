@@ -88,16 +88,24 @@ class WidgetView extends CControllerDashboardWidgetView {
 				$error = _('No permissions to referred object or it does not exist!');
 			}
 			else {
-				$histories = Manager::History()->getLastValues($items, $this->fields_values['show_lines']);
+				$out_values=[];
+				$history = Manager::History()->getLastValues($items, $this->fields_values['show_lines']);
+			//	error_log("Requested ".$this->fields_values['show_lines']." got ". count($histories). " :".json_encode($histories) ."\n");
+				if ($history) {
+					//$histories = array_merge(...$histories);
 
-				if ($histories) {
-					$histories = array_merge(...$histories);
+					foreach ($history as $itemid => &$history_vals) {
+					//	error_log("Processing $itemid hist:". count($history_vals));
 
-					foreach ($histories as &$history) {
-						$history['value'] = formatHistoryValue($history['value'], $items[$history['itemid']], false);
-						$history['value'] = $this->fields_values['show_as_html']
-							? new CJsScript($history['value'])
-							: new CPre($history['value']);
+						foreach ($history_vals as $val) {
+							error_log("Processing $itemid val:". \json_encode($val));
+							$val['itemid'] = $itemid;
+							$val['value'] = formatHistoryValue($val['value'], $items[$itemid], false);
+							$val['value'] = $this->fields_values['show_as_html']
+								? new CJsScript($val['value'])
+								: new CPre($val['value']);
+							$out_values[]=$val;
+						}
 					}
 					unset($history);
 				}
@@ -137,7 +145,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$this->setResponse(new CControllerResponseData([
 			'name' => $this->getInput('name', $dynamic_widget_name),
 			'items' => $items,
-			'histories' => $histories,
+			'histories' => $out_values,
 			'style' => $this->fields_values['style'],
 			'same_host' => $same_host,
 			'show_lines' => $this->fields_values['show_lines'],
