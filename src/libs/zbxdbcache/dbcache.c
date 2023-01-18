@@ -2746,7 +2746,7 @@ static void DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		if (ITEM_STATUS_ACTIVE != item->status || HOST_STATUS_MONITORED != item->host.status)
 		{
 			DEBUG_ITEM(h->itemid, "Setting undefined value flag, due to item status");
-			LOG_INF("Item status is nonactive or nonmonitored");
+		//	LOG_INF("Item status is nonactive or nonmonitored");
 			h->flags |= ZBX_DC_FLAG_UNDEF;
 			continue;
 		}
