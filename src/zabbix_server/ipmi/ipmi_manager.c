@@ -642,7 +642,7 @@ static void	ipmi_manager_activate_interface(zbx_ipmi_manager_t *manager, zbx_uin
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
-	glb_state_interfaces_register_ok(itme.interface.interfaceid,"");
+	glb_state_interfaces_register_ok(item.interface.interfaceid,"");
 	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
 
 	DCconfig_clean_items(&item, &errcode, 1);
@@ -676,7 +676,7 @@ static void	ipmi_manager_deactivate_interface(zbx_ipmi_manager_t *manager, zbx_u
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
 	//zbx_deactivate_item_interface(ts, &item, &data, &data_alloc, &data_offset, error);
-	glb_state_interfaces_register_fail(item.interface.intefaceid);
+	glb_state_interfaces_register_fail(item.interface.interfaceid);
 
 	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
 
