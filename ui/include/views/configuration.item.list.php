@@ -58,7 +58,7 @@ if ($data['hostid'] != 0) {
 
 $html_page->addItem(new CPartial('configuration.filter.items', [
 	'filter_data' => $data['filter_data'],
-//	'subfilter' => $data['subfilter'],
+	//'subfilter' => $data['subfilter'],
 	'context' => $data['context']
 ]));
 
@@ -77,7 +77,7 @@ if (!empty($data['hostid'])) {
 }
 
 // create table
-$itemTable = (new CTableInfo())
+$itemTable = (new CDataTable('items'))
 	->setHeader([
 		(new CColHeader(
 			(new CCheckBox('all_items'))->onClick("checkAll('".$itemForm->getName()."', 'all_items', 'group_itemid');")
