@@ -243,8 +243,8 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 		event->trigger.correlation_tag = zbx_strdup(NULL, trigger_correlation_tag);
 		event->trigger.value = trigger_value;
 		event->trigger.opdata = zbx_strdup(NULL, trigger_opdata);
-		event->trigger.event_name = (NULL != event_name ? zbx_strdup(NULL, event_name) : NULL);
-		event->name = zbx_strdup(NULL, (NULL != event_name ? event_name : trigger_description));
+		event->trigger.event_name = ((NULL != event_name && event_name[0] != '\0' ) ? zbx_strdup(NULL, event_name) : NULL);
+		event->name = zbx_strdup(NULL, ((NULL != event_name && event_name[0] != '\0' ) ? event_name : trigger_description));
 		event->trigger.cache = NULL;
 		event->trigger.url = NULL;
 		event->trigger.url_name = NULL;
