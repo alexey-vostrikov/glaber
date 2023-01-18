@@ -1656,6 +1656,7 @@ define('SECTION_SEARCH_HOSTS',			'search_hosts');
 define('SECTION_SEARCH_HOSTGROUP',		'search_hostgroup');
 define('SECTION_SEARCH_TEMPLATES',		'search_templates');
 define('SECTION_SEARCH_TEMPLATEGROUP',	'search_templategroup');
+define('SECTION_SEARCH_MAPS',	'search_maps');
 
 // widget defaults
 define('ZBX_WIDGET_ROWS', 20);

@@ -285,11 +285,10 @@ if (isset($data['host_maps']) && is_array($data['host_maps']) && count($data['ho
      	$table->addRow([new CLink($maps['name'], 'zabbix.php?action=map.view&' . $link),]);
     }
 
-    $widgets[] = (new  CSectionCollapsible($table))
-		->setId(WIDGET_SEARCH_MAPS)
-		->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
-        ->setExpanded((bool)CProfile::get('web.search.hats.' . WIDGET_SEARCH_MAPS . '.state', true))
-        ->setHeader(_('Maps'), [], false, 'web.search.hats.' . WIDGET_SEARCH_MAPS . '.state')
+    $sections[] = (new  CSectionCollapsible($table))
+		->setId(SECTION_SEARCH_MAPS)
+		->setHeader(new CTag('h4', true, _('Maps')))
+	    ->setExpanded((bool)CProfile::get('web.search.hats.' . SECTION_SEARCH_MAPS . '.state', true))
         ->setFooter(new CList([_s('Displaying %1$s of %2$s found', count($data['host_maps']), $data['total_maps_cnt'])]));
 }	
 
