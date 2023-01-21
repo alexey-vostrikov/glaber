@@ -942,11 +942,14 @@ class CTrigger extends CTriggerGeneral {
 			do {
 				// Fetch all dependency records where "down" trigger IDs are in current iteration trigger IDs.
 				$dbResult = DBselect(
-					'SELECT d.triggerid_down,d.triggerid_up,t.value'.
+					'SELECT d.triggerid_down,d.triggerid_up'.
 					' FROM trigger_depends d,triggers t'.
 					' WHERE d.triggerid_up=t.triggerid'.
 					' AND '.dbConditionInt('d.triggerid_down', $triggerIds)
 				);
+
+				$triggerValues = $this->getTriggerValues($triggerIds);
+				$triggerValues = array_column($triggerValues, null, 'id');
 
 				// Add trigger IDs as keys and empty arrays as values.
 				$downToUpTriggerIds = $downToUpTriggerIds + array_fill_keys($triggerIds, []);
@@ -967,7 +970,9 @@ class CTrigger extends CTriggerGeneral {
 					$allUpTriggerIds[] = $upTriggerId;
 
 					// Remember value of this "up" trigger.
-					$upTriggerValues[$upTriggerId] = $dependency['value'];
+					$upTriggerValues[$upTriggerId] = array_key_exists($downTriggerId, $triggerValues)?
+						$triggerValues[$downTriggerId]['value']:
+						TRIGGER_VALUE_UNKNOWN;
 
 					// Add ID of this "up" trigger to the list of trigger IDs which should be mapped.
 					$triggerIds[] = $upTriggerId;
