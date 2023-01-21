@@ -345,7 +345,7 @@ class CProblem extends CApiService {
 	}
 
     public function get2($options = []) {
-        return [];
+        return $this->getProblemFromServer([], false);
     }
 
 	/**
