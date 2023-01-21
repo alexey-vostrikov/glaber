@@ -44,6 +44,8 @@ class CProblem extends CApiService {
 		$result = [];
 		$userType = self::$userData['type'];
 
+        $options = $this->processGetOptions($options);
+
 		$sqlParts = [
 			'select'	=> [$this->fieldId('eventid')],
 			'from'		=> ['p' => 'problem p'],
@@ -53,52 +55,12 @@ class CProblem extends CApiService {
 			'limit'		=> null
 		];
 
-		$defOptions = [
-			'eventids'					=> null,
-			'groupids'					=> null,
-			'hostids'					=> null,
-			'objectids'					=> null,
-
-			'editable'					=> false,
-			'source'					=> EVENT_SOURCE_TRIGGERS,
-			'object'					=> EVENT_OBJECT_TRIGGER,
-			'severities'				=> null,
-			'nopermissions'				=> null,
-			// filter
-			'time_from'					=> null,
-			'time_till'					=> null,
-			'eventid_from'				=> null,
-			'eventid_till'				=> null,
-			'acknowledged'				=> null,
-			'suppressed'				=> null,
-			'recent'					=> null,
-			'any'						=> null,	// (internal) true if need not filtered by r_eventid
-			'evaltype'					=> TAG_EVAL_TYPE_AND_OR,
-			'tags'						=> null,
-			'filter'					=> null,
-			'search'					=> null,
-			'searchByAny'				=> null,
-			'startSearch'				=> false,
-			'excludeSearch'				=> false,
-			'searchWildcardsEnabled'	=> null,
-			// output
-			'output'					=> API_OUTPUT_EXTEND,
-			'selectAcknowledges'		=> null,
-			'selectSuppressionData'		=> null,
-			'selectTags'				=> null,
-			'countOutput'				=> false,
-			'preservekeys'				=> false,
-			'sortfield'					=> '',
-			'sortorder'					=> '',
-			'limit'						=> null
-		];
-		$options = zbx_array_merge($defOptions, $options);
-
-		$this->validateGet($options);
 
 		// source and object
 		$sqlParts['where'][] = 'p.source='.zbx_dbstr($options['source']);
 		$sqlParts['where'][] = 'p.object='.zbx_dbstr($options['object']);
+
+        // ....
 
 		// editable + PERMISSION CHECK
 		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
@@ -325,8 +287,6 @@ class CProblem extends CApiService {
 			}
 		}
 
-        $result2 = $this->getProblemFromServer([], $options['countOutput']);
-
 		if ($options['countOutput']) {
 			return $result;
 		}
@@ -345,7 +305,79 @@ class CProblem extends CApiService {
 	}
 
     public function get2($options = []) {
-        return $this->getProblemFromServer([], false);
+        $options = $this->processGetOptions($options);
+
+        $filters = [
+            'source' => $options['source'],
+            'object' => $options['object'],
+        ];
+
+
+        $result = $this->getProblemFromServer($filters, $options);
+
+        return $result;
+    }
+
+    private function getOutputOptions(array $options): array {
+        return [
+            'output'					=> $options['output'],
+            'countOutput'				=> $options['countOutput'],
+            'sortfield'					=> $options['sortfield'],
+            'sortorder'					=> $options['sortorder'],
+            'limit'						=> $options['limit']
+        ];
+    }
+
+    /**
+     * @param array $inputOptions
+     * @return array valid options
+     * @throws APIException
+     */
+    function processGetOptions(array $inputOptions): array {
+        $defOptions = [
+            'eventids'					=> null,
+            'groupids'					=> null,
+            'hostids'					=> null,
+            'objectids'					=> null,
+
+            'editable'					=> false,
+            'source'					=> EVENT_SOURCE_TRIGGERS,
+            'object'					=> EVENT_OBJECT_TRIGGER,
+            'severities'				=> null,
+            'nopermissions'				=> null,
+            // filter
+            'time_from'					=> null,
+            'time_till'					=> null,
+            'eventid_from'				=> null,
+            'eventid_till'				=> null,
+            'acknowledged'				=> null,
+            'suppressed'				=> null,
+            'recent'					=> null,
+            'any'						=> null,	// (internal) true if need not filtered by r_eventid
+            'evaltype'					=> TAG_EVAL_TYPE_AND_OR,
+            'tags'						=> null,
+            'filter'					=> null,
+            'search'					=> null,
+            'searchByAny'				=> null,
+            'startSearch'				=> false,
+            'excludeSearch'				=> false,
+            'searchWildcardsEnabled'	=> null,
+            // output
+            'output'					=> API_OUTPUT_EXTEND,
+            'selectAcknowledges'		=> null,
+            'selectSuppressionData'		=> null,
+            'selectTags'				=> null,
+            'countOutput'				=> false,
+            'preservekeys'				=> false,
+            'sortfield'					=> '',
+            'sortorder'					=> '',
+            'limit'						=> null
+        ];
+        $options = zbx_array_merge($defOptions, $inputOptions);
+
+        $this->validateGet($options);
+
+        return $options;
     }
 
 	/**
@@ -641,10 +673,41 @@ class CProblem extends CApiService {
     /**
      * Get problems from server by limited set of filters
      * @param array $filters
-     * @param bool $iscount return count?
-     * @return array
+     * @param array $outputOptions
+     * @return array|int
      */
-    private function getProblemFromServer(array $filters, $iscount = false) {
-        return [];
+    private function getProblemFromServer(array $filters, array $outputOptions = []) {
+        $sqlParts = [
+            'select'	=> [$this->fieldId('eventid')],
+            'from'		=> ['p' => 'problem p'],
+            'where'		=> [],
+            'order'		=> [],
+            'group'		=> [],
+            'limit'		=> null
+        ];
+
+
+        // source and object
+        $sqlParts['where'][] = 'p.source='.zbx_dbstr($filters['source']);
+        $sqlParts['where'][] = 'p.object='.zbx_dbstr($filters['object']);
+
+        $sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $outputOptions, $sqlParts);
+        $sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $outputOptions, $sqlParts);
+        $res = DBselect(self::createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
+        while ($event = DBfetch($res)) {
+            if ($outputOptions['countOutput']) {
+                $result = $event['rowscount'];
+            }
+            else {
+                $result[$event['eventid']] = $event;
+            }
+        }
+
+        if ($outputOptions['countOutput']) {
+            return $result;
+        }
+
+
+        return $result;
     }
 }
