@@ -25,8 +25,9 @@
 class CProblem extends CApiService {
 
 	public const ACCESS_RULES = [
-		'get' => ['min_user_type' => USER_TYPE_ZABBIX_USER]
-	];
+		'get' => ['min_user_type' => USER_TYPE_ZABBIX_USER],
+        'get2' => ['min_user_type' => USER_TYPE_ZABBIX_USER]
+    ];
 
 	protected $tableName = 'problem';
 	protected $tableAlias = 'p';
@@ -324,6 +325,8 @@ class CProblem extends CApiService {
 			}
 		}
 
+        $result2 = $this->getProblemFromServer([], $options['countOutput']);
+
 		if ($options['countOutput']) {
 			return $result;
 		}
@@ -340,6 +343,10 @@ class CProblem extends CApiService {
 
 		return $result;
 	}
+
+    public function get2($options = []) {
+        return [];
+    }
 
 	/**
 	 * Validates the input parameters for the get() method.
@@ -630,4 +637,14 @@ class CProblem extends CApiService {
 
 		return $sqlParts;
 	}
+
+    /**
+     * Get problems from server by limited set of filters
+     * @param array $filters
+     * @param bool $iscount return count?
+     * @return array
+     */
+    private function getProblemFromServer(array $filters, $iscount = false) {
+        return [];
+    }
 }
