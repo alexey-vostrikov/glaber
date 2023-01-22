@@ -2833,19 +2833,7 @@ return [
 				'length' => 10,
 				'default' => '0'
 			],
-			'value' => [
-				'null' => false,
-				'type' => DB::FIELD_TYPE_INT,
-				'length' => 10,
-				'default' => '0'
-			],
 			'priority' => [
-				'null' => false,
-				'type' => DB::FIELD_TYPE_INT,
-				'length' => 10,
-				'default' => '0'
-			],
-			'lastchange' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
@@ -2854,12 +2842,6 @@ return [
 			'comments' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_TEXT,
-				'default' => ''
-			],
-			'error' => [
-				'null' => false,
-				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 2048,
 				'default' => ''
 			],
 			'templateid' => [

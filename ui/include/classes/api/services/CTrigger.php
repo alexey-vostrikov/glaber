@@ -920,6 +920,75 @@ class CTrigger extends CTriggerGeneral {
 	protected function applyPostSqlFiltering(array $triggers, array $options) {
 		$triggers = zbx_toHash($triggers, 'triggerid');
 
+		if ($this->needsTriggersStatusRequest($options)) {
+			foreach ($triggers as $triggerid => $trigger) {
+				$triggers[$triggerid]['state'] = TRIGGER_STATE_UNKNOWN;
+				$triggers[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
+				$triggers[$triggerid]['lastchange'] = 0;
+				$triggers[$triggerid]['lastvaluechange'] = 0;
+				$triggers[$triggerid]['error'] = "Server not return result";
+			}
+
+			$triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
+
+			foreach ($triggerValues as $tr_state) {
+				$triggers[$tr_state['id']]['state'] = $tr_state['value'] == TRIGGER_VALUE_UNKNOWN ? TRIGGER_STATE_UNKNOWN : TRIGGER_STATE_NORMAL;
+				$triggers[$tr_state['id']]['value'] = $tr_state['value'];
+				$triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
+				$triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
+
+				if (isset($tr_state['error']))
+					$triggers[$tr_state['id']]['error'] = $tr_state['error'];
+			}
+		}
+
+		// only_true
+		if ($options['only_true'] !== null) {
+			foreach ($triggers as $triggerId => $trigger) {
+				if ($trigger['value'] == TRIGGER_VALUE_FALSE) {
+					if ($trigger['lastchange'] > (time() - timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::OK_PERIOD)))) {
+						unset($triggers[$triggerId]);
+					}
+				}
+			}
+		}
+
+		// lastChangeSince
+		if ($options['lastChangeSince'] !== null) {
+			foreach ($triggers as $triggerId => $trigger) {
+				if ($trigger['lastchange'] <= $options['lastChangeSince']) {
+					unset($triggers[$triggerId]);
+				}
+			}
+		}
+
+		// lastChangeTill
+		if ($options['lastChangeTill'] !== null) {
+			foreach ($triggers as $triggerId => $trigger) {
+				if ($trigger['lastchange'] >= $options['lastChangeTill']) {
+					unset($triggers[$triggerId]);
+				}
+			}
+		}
+
+		// filter state
+		if (is_array($options['filterForServer']) && array_key_exists("state", $options['filterForServer'])){
+			foreach ($triggers as $triggerId => $trigger) {
+				if ($trigger['state'] != $options['filterForServer']['state']) {
+					unset($triggers[$triggerId]);
+				}
+			}
+		}
+
+		// filter value
+		if (is_array($options['filterForServer']) && array_key_exists("value", $options['filterForServer'])){
+			foreach ($triggers as $triggerId => $trigger) {
+				if ($trigger['value'] != $options['filterForServer']['value']) {
+					unset($triggers[$triggerId]);
+				}
+			}
+		}
+
 		// unset triggers which depend on at least one problem trigger upstream into dependency tree
 		if ($options['skipDependent'] !== null) {
 			// Result trigger IDs of all triggers in results.
@@ -948,9 +1017,6 @@ class CTrigger extends CTriggerGeneral {
 					' AND '.dbConditionInt('d.triggerid_down', $triggerIds)
 				);
 
-				$triggerValues = $this->getTriggerValues($triggerIds);
-				$triggerValues = array_column($triggerValues, null, 'id');
-
 				// Add trigger IDs as keys and empty arrays as values.
 				$downToUpTriggerIds = $downToUpTriggerIds + array_fill_keys($triggerIds, []);
 
@@ -970,12 +1036,18 @@ class CTrigger extends CTriggerGeneral {
 					$allUpTriggerIds[] = $upTriggerId;
 
 					// Remember value of this "up" trigger.
-					$upTriggerValues[$upTriggerId] = array_key_exists($downTriggerId, $triggerValues)?
-						$triggerValues[$downTriggerId]['value']:
-						TRIGGER_VALUE_UNKNOWN;
+					$upTriggerValues[$upTriggerId] = $dependency['value'];
 
 					// Add ID of this "up" trigger to the list of trigger IDs which should be mapped.
 					$triggerIds[] = $upTriggerId;
+				}
+
+				$triggerValues = $this->getTriggerValues($allUpTriggerIds);
+				$triggerValues = array_column($triggerValues, null, 'id');
+
+				// Remember value of "up" triggers.
+				foreach ($allUpTriggerIds as $tid) {
+					$upTriggerValues[$tid] = array_key_exists($tid, $triggerValues)?$triggerValues[$tid]['value']:TRIGGER_STATE_UNKNOWN;
 				}
 			} while ($triggerIds);
 
@@ -1034,14 +1106,12 @@ class CTrigger extends CTriggerGeneral {
 				} while ($triggerIds);
 			}
 
-            $upTriggerValues = $this->getTriggerValues($allUpTriggerIds);
-            $upTriggerValues = array_column($upTriggerValues, null, 'id');
-            // Clean result set.
+			// Clean result set.
 			foreach ($resultTriggerIds as $resultTriggerId) {
 				foreach ($downToUpTriggerIds[$resultTriggerId] as $upTriggerId) {
 					// If "up" trigger is in problem state, dependent trigger should not be returned and is removed
 					// from results.
-					if (isset($upTriggerValues[$upTriggerId]) && $upTriggerValues[$upTriggerId]['value'] == TRIGGER_VALUE_TRUE) {
+					if (isset($upTriggerValues[$upTriggerId]) && $upTriggerValues[$upTriggerId] == TRIGGER_VALUE_TRUE) {
 						unset($triggers[$resultTriggerId]);
 					}
 				}
@@ -1084,117 +1154,49 @@ class CTrigger extends CTriggerGeneral {
 			}
 		}
 
-        if ($this->needsTriggersStatusRequest($options)) {
-            foreach ($triggers as $triggerid => $trigger) {
-                $triggers[$triggerid]['state'] = TRIGGER_STATE_UNKNOWN;
-                $triggers[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
-                $triggers[$triggerid]['lastchange'] = 0;
-                $triggers[$triggerid]['lastvaluechange'] = 0;
-                $triggers[$triggerid]['error'] = "Server not return result";
-            }
 
-            $triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));
-
-            foreach ($triggerValues as $tr_state) {
-                $triggers[$tr_state['id']]['state'] = $tr_state['value'] == TRIGGER_VALUE_UNKNOWN ? TRIGGER_STATE_UNKNOWN : TRIGGER_STATE_NORMAL;
-                $triggers[$tr_state['id']]['value'] = $tr_state['value'];
-                $triggers[$tr_state['id']]['lastchange'] = $tr_state['lastcalc'];
-                $triggers[$tr_state['id']]['lastvaluechange'] = $tr_state['lastchange'];
-				
-				if (isset($tr_state['error']))
-					$triggers[$tr_state['id']]['error'] = $tr_state['error'];
-            }
-        }
-
-        // only_true
-        if ($options['only_true'] !== null) {
-            foreach ($triggers as $triggerId => $trigger) {
-                if ($trigger['value'] == TRIGGER_VALUE_FALSE) {
-                    if ($trigger['lastchange'] > (time() - timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::OK_PERIOD)))) {
-                        unset($triggers[$triggerId]);
-                    }
-                }
-            }
-        }
-
-        // lastChangeSince
-        if ($options['lastChangeSince'] !== null) {
-            foreach ($triggers as $triggerId => $trigger) {
-                if ($trigger['lastchange'] <= $options['lastChangeSince']) {
-                    unset($triggers[$triggerId]);
-                }
-            }
-        }
-
-        // lastChangeTill
-        if ($options['lastChangeTill'] !== null) {
-            foreach ($triggers as $triggerId => $trigger) {
-                if ($trigger['lastchange'] >= $options['lastChangeTill']) {
-                    unset($triggers[$triggerId]);
-                }
-            }
-        }
-
-        // filter state
-        if (is_array($options['filterForServer']) && array_key_exists("state", $options['filterForServer'])){
-            foreach ($triggers as $triggerId => $trigger) {
-                if ($trigger['state'] != $options['filterForServer']['state']) {
-                    unset($triggers[$triggerId]);
-                }
-            }
-        }
-
-        // filter value
-        if (is_array($options['filterForServer']) && array_key_exists("value", $options['filterForServer'])){
-            foreach ($triggers as $triggerId => $trigger) {
-                if ($trigger['value'] != $options['filterForServer']['value']) {
-                    unset($triggers[$triggerId]);
-                }
-            }
-        }
-
-        return $triggers;
+		return $triggers;
 	}
 
 	protected function needsTriggersStatusRequest($options) {
-        // fields from server exists in requested fields
-        if (!$options['countOutput']) {
-            if ($options['output'] === API_OUTPUT_EXTEND)
-                return true;
+		// fields from server exists in requested fields
+		if (!$options['countOutput']) {
+			if ($options['output'] === API_OUTPUT_EXTEND)
+				return true;
 
-            if (is_array($options['output'])) {
-                if (in_array('state', $options['output']))
-                    return true;
-                if (in_array('value', $options['output']))
-                    return true;
-                if (in_array('error', $options['output']))
-                    return true;
-                if (in_array('lastchange', $options['output']))
-                    return true;
-            }
-        }
+			if (is_array($options['output'])) {
+				if (in_array('state', $options['output']))
+					return true;
+				if (in_array('value', $options['output']))
+					return true;
+				if (in_array('error', $options['output']))
+					return true;
+				if (in_array('lastchange', $options['output']))
+					return true;
+			}
+		}
 
-        // fields from server exists in filters
-        if ($options['only_true'] !== null || $options['lastChangeSince'] !== null || $options['lastChangeTill'] !== null) {
-            return true;
-        }
+		// fields from server exists in filters
+		if ($options['only_true'] !== null || $options['lastChangeSince'] !== null || $options['lastChangeTill'] !== null) {
+			return true;
+		}
 
-        if (is_array($options['filterForServer']) && $options['filterForServer'] !== []) {
-                return true;
-        }
+		if (is_array($options['filterForServer']) && $options['filterForServer'] !== []) {
+				return true;
+		}
 
-        // fields from server exists in sorts
-        // Надо это обработать, но чуть позже
-//        if ($options['sortfield'] === 'lastchange') {
+		// fields from server exists in sorts
+		// Надо это обработать, но чуть позже
+//		if ($options['sortfield'] === 'lastchange') {
 //
-//        }
+//		}
 
 		return false;
 	}
 
-    protected function getTriggerValues($triggerIds)
-    {
-        return CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);;
-    }
+	protected function getTriggerValues($triggerIds)
+	{
+		return CZabbixServer::getTriggersValues(CSessionHelper::getId(), $triggerIds);;
+	}
 }
 
