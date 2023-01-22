@@ -1035,9 +1035,6 @@ class CTrigger extends CTriggerGeneral {
 					// Add ID of this "up" trigger to all known "up" triggers.
 					$allUpTriggerIds[] = $upTriggerId;
 
-					// Remember value of this "up" trigger.
-					$upTriggerValues[$upTriggerId] = $dependency['value'];
-
 					// Add ID of this "up" trigger to the list of trigger IDs which should be mapped.
 					$triggerIds[] = $upTriggerId;
 				}
