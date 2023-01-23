@@ -698,7 +698,7 @@ class CSvgGraphHelper {
 			}
 
 			$db_triggers = DBselect(
-				'SELECT DISTINCT h.host,tr.description,tr.triggerid,tr.expression,tr.priority,tr.value'.
+				'SELECT DISTINCT h.host,tr.description,tr.triggerid,tr.expression,tr.priority'.
 				' FROM triggers tr,functions f,items i,hosts h'.
 				' WHERE tr.triggerid=f.triggerid'.
 				" AND f.name IN ('last','min','avg','max')".

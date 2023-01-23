@@ -2019,7 +2019,7 @@ int	zbx_dbsync_compare_triggers(zbx_dbsync_t *sync)
 	int	ret = SUCCEED;
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select triggerid,description,expression,error,priority,type,value,state,lastchange,status,"
+			"select triggerid,description,expression,null,priority,type,null,null,null,status,"
 			"recovery_mode,recovery_expression,correlation_mode,correlation_tag,opdata,event_name,null,"
 			"null,null,flags"
 			" from triggers");

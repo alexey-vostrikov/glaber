@@ -7710,7 +7710,6 @@ static int __config_heap_elem_compare(const void *d1, const void *d2)
 	const ZBX_DC_ITEM *i2 = (const ZBX_DC_ITEM *)e2->data;
 
 	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_next_check, i2->queue_next_check);
-	//	glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
 	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_priority, i2->queue_priority);
 
 	if (ITEM_TYPE_SNMP != i1->type)
@@ -7769,7 +7768,7 @@ static int __config_java_elem_compare(const void *d1, const void *d2)
 	const ZBX_DC_ITEM *i1 = (const ZBX_DC_ITEM *)e1->data;
 	const ZBX_DC_ITEM *i2 = (const ZBX_DC_ITEM *)e2->data;
 
-	ZBX_RETURN_IF_NOT_EQUAL(glb_state_item_get_nextcheck(i1->itemid), glb_state_item_get_nextcheck(i2->itemid));
+	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_next_check, i2->queue_next_check);
 	ZBX_RETURN_IF_NOT_EQUAL(i1->queue_priority, i2->queue_priority);
 
 	return __config_java_item_compare(i1, i2);
@@ -10162,8 +10161,8 @@ void DCconfig_get_triggers_by_itemids(zbx_hashset_t *trigger_info, zbx_vector_pt
 			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
 				continue;
 
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding item %ld for trigger calc", dc_item->itemid);
-			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld calc", trigger->triggerid);
+			DEBUG_TRIGGER(dc_trigger->triggerid, "Adding item %ld to trigger calc", dc_item->itemid);
+			DEBUG_ITEM(dc_item->itemid, "Adding trigger %ld calc", dc_trigger->triggerid);
 
 			/* find trigger by id or create a new record in hashset if not found */
 			trigger = (DC_TRIGGER *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(DC_TRIGGER),
@@ -10808,8 +10807,8 @@ static int dc_config_get_queue_nextcheck(zbx_binary_heap_t *queue)
 	{
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (const ZBX_DC_ITEM *)min->data;
-	//	nextcheck = glb_state_item_get_nextcheck(dc_item->itemid);
 		nextcheck = dc_item->queue_next_check;
+		LOG_INF("Next check for the queue in %d sec", nextcheck-time(NULL));
 	}
 	else
 		nextcheck = FAIL;
@@ -10872,12 +10871,7 @@ static void dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, co
 static void dc_requeue_item_at(ZBX_DC_ITEM *dc_item, ZBX_DC_HOST *dc_host, int nextcheck)
 {
 	unsigned char old_poller_type;
-	// int		old_nextcheck;
-
 	dc_item->queue_priority = ZBX_QUEUE_PRIORITY_HIGH;
-
-	// old_nextcheck = dc_item->nextcheck;
-	// dc_item->nextcheck = nextcheck;
 
 	old_poller_type = dc_item->poller_type;
 	DCitem_poller_type_update(dc_item, dc_host, ZBX_ITEM_COLLECTED);
@@ -11180,10 +11174,7 @@ int DCconfig_get_ipmi_poller_items(int now, DC_ITEM *items, int items_num, int *
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 
-		// THIS_SHOULD_NEVER_HAPPEN;
-		// exit(-1);
-
-		if (glb_state_item_get_nextcheck(dc_item->itemid) > now)
+		if (dc_item->queue_next_check > now)
 			break;
 
 		zbx_binary_heap_remove_min(queue);

@@ -827,6 +827,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	if (0 == num)
 	{
 		*nextcheck = DCconfig_get_poller_nextcheck(poller_type);
+		//LOG_INF("No new data nextcheck calc");
 		goto exit;
 	}
 	
@@ -953,15 +954,15 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 {
 	zbx_thread_poller_args	*poller_args_in = (zbx_thread_poller_args *)(((zbx_thread_args_t *)args)->args);
 
-	int			nextcheck, sleeptime = -1, processed = 0, old_processed = 0;
-	double			sec, total_sec = 0.0, old_total_sec = 0.0;
-	time_t			last_stat_time;
+	int			nextcheck, sleeptime = -1, processed = 0;
+	double			sec;
 	unsigned char		poller_type;
 	zbx_ipc_async_socket_t	rtc;
 	const zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
 	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
 	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
+	int last_stat_time = time(NULL);
 
 #define	STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
@@ -1000,38 +1001,36 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 		sec = zbx_time();
 		zbx_update_env(sec);
 
-		if (0 != sleeptime)
+		if (STAT_INTERVAL <=( time(NULL) - last_stat_time) )
 		{
-			zbx_setproctitle("%s #%d [got %d values in " ZBX_FS_DBL " sec, getting values]",
-					get_process_type_string(process_type), process_num, old_processed,
-					old_total_sec);
-		}
+			LOG_INF("Recalc proc title stats, last stat time is %d, time is %d", last_stat_time, time(NULL));
+			static double last_sec = 0.0;
+			double proc_speed = 0.0, total_sec;
+			
+			total_sec = zbx_time() - last_sec;
 
-		processed += get_values(poller_type, &nextcheck, poller_args_in->zbx_config);
-		total_sec += zbx_time() - sec;
+			if (total_sec > 0)
+				proc_speed = processed/total_sec;
+			else 
+				proc_speed = 0.0;
 
-		sleeptime = zbx_calculate_sleeptime(nextcheck, POLLER_DELAY);
+			zbx_setproctitle("%s #%d [got %f val/s]",
+				get_process_type_string(process_type), process_num, proc_speed);
 
-		if (0 != sleeptime || STAT_INTERVAL <= time(NULL) - last_stat_time)
-		{
-			if (0 == sleeptime)
-			{
-				zbx_setproctitle("%s #%d [got %d values in " ZBX_FS_DBL " sec, getting values]",
-					get_process_type_string(process_type), process_num, processed, total_sec);
-			}
-			else
-			{
-				zbx_setproctitle("%s #%d [got %d values in " ZBX_FS_DBL " sec, idle %d sec]",
-					get_process_type_string(process_type), process_num, processed, total_sec,
-					sleeptime);
-				old_processed = processed;
-				old_total_sec = total_sec;
-			}
 			processed = 0;
-			total_sec = 0.0;
+			last_sec = zbx_time();
 			last_stat_time = time(NULL);
 		}
 
+
+		processed += get_values(poller_type, &nextcheck, poller_args_in->zbx_config);
+//		LOG_INF("Calculated nextcheck %d", nextcheck);
+
+		sleeptime = zbx_calculate_sleeptime(nextcheck, POLLER_DELAY);
+
+	//	LOG_INF("Calculated sleeptime %d", sleeptime);
+
+		
 		if (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
 		{
 #ifdef HAVE_NETSNMP

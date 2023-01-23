@@ -958,7 +958,7 @@ class CHostGroup extends CApiService {
 	private static function prepareInheritedTagFilters(array $group_links, array &$usrgrps,
 			array &$db_usrgrps): void {
 		$db_tag_filters = DBselect(
-			'SELECT t.usrgrpid,t.groupid,t.tag,t.value,g.name'.
+			'SELECT t.usrgrpid,t.groupid,t.tag,g.name'.
 			' FROM tag_filter t,usrgrp g'.
 			' WHERE t.usrgrpid=g.usrgrpid'.
 				' AND '.dbConditionInt('t.groupid', array_keys($group_links))

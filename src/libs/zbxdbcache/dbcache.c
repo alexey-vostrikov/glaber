@@ -1525,6 +1525,21 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, ZBX_FLAGS_TRIGGER_DIFF_UPDATE, trigger->new_value, 
 							trigger->timespec.sec, trigger->new_error);
 	
+	if (trigger->new_value == TRIGGER_VALUE_OK ||  trigger->new_value == TRIGGER_VALUE_PROBLEM) {
+		//creating recovery/problem event, to handle existing/not yet existing problems if they already are, the event will be discarede
+		
+		DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger %ld create for item %ld",
+			trigger->triggerid, history[trigger->history_idx].itemid );
+
+		zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
+			&trigger->timespec, trigger->new_value, trigger->description,
+			trigger->expression, trigger->recovery_expression,
+			trigger->priority, trigger->type, &trigger->tags,
+			trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
+			trigger->event_name, NULL, trigger->history_idx);
+	}
+
+
 	//if state hasn't changed, and not problem in multi-problem gen config, nothing to do
 	if (trigger->value == trigger->new_value) {
 		if ( TRIGGER_VALUE_PROBLEM != trigger->new_value || 
@@ -1544,15 +1559,6 @@ static int	zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *di
 	if (trigger->new_value == TRIGGER_VALUE_UNKNOWN)
 		return SUCCEED;
 
-	DEBUG_TRIGGER(trigger->triggerid,"Creating event for the trigger %ld create for item %ld",
-		trigger->triggerid, history[trigger->history_idx].itemid );
-
-	zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
-		&trigger->timespec, trigger->new_value, trigger->description,
-		trigger->expression, trigger->recovery_expression,
-		trigger->priority, trigger->type, &trigger->tags,
-		trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
-		trigger->event_name, NULL, trigger->history_idx);
 
 	return SUCCEED;
 }

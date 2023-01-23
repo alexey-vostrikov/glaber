@@ -21,6 +21,7 @@
 
 #include "zbxnum.h"
 #include "zbxexpr.h"
+#include "../../libs/glb_state/glb_state_triggers.h"
 
 /******************************************************************************
  *                                                                            *
@@ -168,7 +169,7 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 
 		result = DBselect(
 				"select triggerid,description,expression,priority,comments,url,url_name,recovery_expression,"
-					"recovery_mode,value,opdata,event_name"
+					"recovery_mode,null,opdata,event_name"
 				" from triggers"
 				" where%s",
 				sql);
@@ -197,7 +198,7 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 					event->trigger.url_name = zbx_strdup(NULL, row[6]);
 					event->trigger.recovery_expression = zbx_strdup(NULL, row[7]);
 					ZBX_STR2UCHAR(event->trigger.recovery_mode, row[8]);
-					ZBX_STR2UCHAR(event->trigger.value, row[9]);
+					event->trigger.value = glb_state_trigger_get_value(triggerid);
 					event->trigger.opdata = zbx_strdup(NULL, row[10]);
 					event->trigger.event_name = ('\0' != *row[11] ? zbx_strdup(NULL, row[11]) :
 							NULL);

@@ -2512,8 +2512,10 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 		
 		DEBUG_TRIGGER(event->trigger.triggerid, "Processing event %ld for the trigger", event->eventid);
 		
-		if (TRIGGER_VALUE_OK == event->value)
-			zbx_vector_uint64_append(&triggerids, event->objectid);
+		//if (TRIGGER_VALUE_OK == event->value) {
+		DEBUG_TRIGGER(event->objectid, "Added trigger to the triggerids for open problems fetch");
+		zbx_vector_uint64_append(&triggerids, event->trigger.triggerid);
+		//}
 	}
 
 	if (0 != triggerids.values_num)
@@ -2521,6 +2523,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 		zbx_vector_uint64_sort(&triggerids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 		get_open_problems(&triggerids, &problems);
 	}
+
 
 	/* get trigger dependency data */
 
@@ -2548,18 +2551,43 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 		}
 
 		diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
+		DEBUG_TRIGGER(diff->triggerid, "Found trigger with value %d in diff", diff->value);
+
 
 		if (FAIL == (event_check_dependency(event, &deps, trigger_diff)))
 		{
 			/* reset event data/trigger changeset if dependency check failed */
 			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 			diff->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
-			DEBUG_TRIGGER(diff->triggerid,"Unsetting event and trigger due to ddependancy check fail");
+			DEBUG_TRIGGER(diff->triggerid,"Unsetting event and trigger due to dependancy check fail");
 			continue;
 		}
 
+		DEBUG_TRIGGER(diff->triggerid, "Passed depndency check");
 		if (TRIGGER_VALUE_PROBLEM == event->value)
 		{
+			DEBUG_TRIGGER(diff->triggerid, "Trigger is in single-problem-creation mode"); 
+			/* Checking trigger has multiple event creation tag*/
+			if ( TRIGGER_TYPE_MULTIPLE_TRUE != event->trigger.type) {
+				//lets check if there are open problems exists for the trigger
+				for (j = 0; j < problems.values_num; j++)
+				{
+					problem = (zbx_event_problem_t *)problems.values[j];
+
+					if (problem->triggerid == diff->triggerid)	{
+						DEBUG_TRIGGER(diff->triggerid, "There is already at least one open PROBLEM (%ld) for the trigger, not creating anymore", problem->eventid);
+						event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
+						diff->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
+						break;
+					}
+				}
+
+				if (ZBX_FLAGS_DB_EVENT_UNSET == event->flags)  
+					continue;
+				else {
+					DEBUG_TRIGGER(diff->triggerid, "Hasn't found any open problems for the trigger, creating a new one");
+				}
+			}
 			/* Problem events always sets problem value to trigger.    */
 			/* if the trigger is affected by global correlation rules, */
 			/* its value is recalculated later.                        */
@@ -2769,9 +2797,10 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 
 			event->eventid = eventid++;
 			//now we know the event id
-
+			
 			if (EVENT_SOURCE_TRIGGERS == event->source)
 			{
+				DEBUG_TRIGGER(event->trigger.triggerid, "Addede trigger's event to the processing");
 				zbx_vector_ptr_append(&trigger_events, event);
 				continue;
 			}

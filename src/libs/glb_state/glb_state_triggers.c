@@ -209,7 +209,10 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 	for (i = 0; i < trigger_diff->values_num; i++)
 	{
 		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
-
+        
+        if (ZBX_FLAGS_TRIGGER_DIFF_UNSET == diff->flags)
+            continue;
+        
         bzero(&info, sizeof(info));
 		
 		info.id = diff->triggerid;
