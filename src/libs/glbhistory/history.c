@@ -219,7 +219,7 @@ int	glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int 
 
 	if (enabled_gets && ( get_runtime > GET_ACCOUNT_INTERVAL * 0.5 )) {
 		enabled_gets = 0;
-		//LOG_WRN("Suppressing getting history for %ld sec due to too long get time", next_account_time - time(NULL));
+		LOG_WRN("Suppressing getting history for %ld sec due to too long get time", next_account_time - time(NULL));
 	}
 
 	if ( !enabled_gets && GLB_HISTORY_GET_NON_INTERACTIVE == interactive   ) {

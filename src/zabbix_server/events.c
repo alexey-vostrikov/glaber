@@ -2598,10 +2598,14 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 			continue;
 		}
 
+		
 		if (TRIGGER_VALUE_OK != event->value)
 			continue;
 		
 		/* attempt to recover problem events/triggers */
+		
+		//in case of OK value, we don't need original event, but create recovery events if needed
+		event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 
 		if (ZBX_TRIGGER_CORRELATION_NONE == event->trigger.correlation_mode)
 		{
@@ -2623,6 +2627,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 			
 			diff->value = TRIGGER_VALUE_OK;
 			diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
+			//however we don't need the original event in OK case
 		}
 		else
 		{
@@ -2632,7 +2637,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 			/* problem events were recovered.                                  */
 
 			value = TRIGGER_VALUE_OK;
-			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
+		//	event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 
 			for (j = 0; j < problems.values_num; j++)
 			{
