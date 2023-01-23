@@ -5750,10 +5750,9 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 
 		if (SUCCEED != expand_trigger_macros(tr, &event, um_handle, &hostids, &error))
 		{
-			tr->new_error = zbx_dsprintf(tr->new_error, "Cannot evaluate expression: %s", error);
+			tr->new_error = zbx_dsprintf(tr->new_error, "Couldn't expand macro: %s", error);
 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
-			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value");
-			LOG_INF("Couldn't expand trigger %ld macro",tr->triggerid);
+			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value :%s", error);
 			zbx_free(error);
 		}
 
