@@ -1003,7 +1003,6 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 
 		if (STAT_INTERVAL <=( time(NULL) - last_stat_time) )
 		{
-			LOG_INF("Recalc proc title stats, last stat time is %d, time is %d", last_stat_time, time(NULL));
 			static double last_sec = 0.0;
 			double proc_speed = 0.0, total_sec;
 			
@@ -1024,13 +1023,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 
 
 		processed += get_values(poller_type, &nextcheck, poller_args_in->zbx_config);
-//		LOG_INF("Calculated nextcheck %d", nextcheck);
-
 		sleeptime = zbx_calculate_sleeptime(nextcheck, POLLER_DELAY);
 
-	//	LOG_INF("Calculated sleeptime %d", sleeptime);
-
-		
 		if (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
 		{
 #ifdef HAVE_NETSNMP

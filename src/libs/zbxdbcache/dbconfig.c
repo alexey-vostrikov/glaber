@@ -10808,7 +10808,6 @@ static int dc_config_get_queue_nextcheck(zbx_binary_heap_t *queue)
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (const ZBX_DC_ITEM *)min->data;
 		nextcheck = dc_item->queue_next_check;
-		LOG_INF("Next check for the queue in %d sec", nextcheck-time(NULL));
 	}
 	else
 		nextcheck = FAIL;
