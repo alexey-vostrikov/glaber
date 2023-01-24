@@ -1,17 +1,14 @@
-variables:
-  DEPLOY_REPO: "testing"
-
 workflow:
   rules:
     - if: '$CI_COMMIT_TAG != null'
       variables:
-        DEPLOY_REPO: "release"
+        REPO_DIR: "repo"
     - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
       variables:
-        DEPLOY_REPO: "testing"
+        REPO_DIR: "repo-testing"
     - if: $CI_COMMIT_REF_NAME =~ /experimental/
       variables:
-        DEPLOY_REPO: "experimental"
+        REPO_DIR: "repo-experimental"
     - when: never
 
 
@@ -68,13 +65,13 @@ workflow:
 
 .upload_packages: &upload_packages
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/${OS}/${OS_VER}
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/db --outdir /var/www/glaber.io/repo/${OS}/ includedeb ${OS_VER}  ~/${OS}/${OS_VER}/*.deb"
+  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/${OS}/${OS_VER}/*.deb"
 
 
 .upload_rpms: &upload_rpms
-  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/repo/rhel/${OS_VER}/RPMS/
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/repo/rhel/${OS_VER} && createrepo ."
+  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
+  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
 debian-buster:
   variables:
