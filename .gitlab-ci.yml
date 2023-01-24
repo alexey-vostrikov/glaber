@@ -1,3 +1,20 @@
+variables:
+  DEPLOY_REPO: "testing"
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG != null'
+      variables:
+        DEPLOY_REPO: "release"
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+      variables:
+        DEPLOY_REPO: "testing"
+    - if: $CI_COMMIT_REF_NAME =~ /experimental/
+      variables:
+        DEPLOY_REPO: "experimental"
+    - when: never
+
+
 .build_go: &build_go
     - wget --no-verbose "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
     - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
@@ -64,8 +81,6 @@ debian-buster:
     OS: debian
     OS_VER: buster  
   image: ${OS}:${OS_VER}
-  only:
-    - master
   script:
     - *install_common_apt 
     - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
@@ -80,8 +95,6 @@ debian-bullseye:
     OS: debian
     OS_VER: bullseye
   image: ${OS}:${OS_VER}
-  only:
-    - master
   script:
     - *install_common_apt 
     - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
@@ -96,8 +109,6 @@ ubuntu-focal:
     OS: ubuntu
     OS_VER: focal
   image: ${OS}:${OS_VER}
-  only:
-    - master
   script:
     - apt-get update
     - *install_common_apt
@@ -113,8 +124,6 @@ ubuntu-bionic:
     OS: ubuntu
     OS_VER: bionic
   image: ${OS}:${OS_VER}
-  only:
-    - master
   script:
     - *install_common_apt
     - apt-get --ignore-missing install -y default-libmysqlclient-dev libssh-dev sass
@@ -129,8 +138,6 @@ centos-8:
     OS: centos
     OS_VER: 8
   image: almalinux:${OS_VER}
-  only:
-    - master
   script:
     - dnf -y install dnf-plugins-core epel-release
     - dnf config-manager --set-enabled powertools
