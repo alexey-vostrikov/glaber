@@ -94,6 +94,7 @@ debian-bullseye:
     OS_VER: bullseye
   image: ${OS}:${OS_VER}
   script:
+    - *upload_packages
     - *install_common_apt 
     - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
     - *build_go
