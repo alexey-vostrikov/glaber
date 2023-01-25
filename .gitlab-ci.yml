@@ -48,7 +48,9 @@ workflow:
     - cd ..
     - cp -r glaber glaber-$GLABER_VERSION
     - cd glaber-$GLABER_VERSION
+    - pwd
     - ls -al
+    - rm -rf glbmap
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
     - mv src/zmap ../zmap &&  cd ..
