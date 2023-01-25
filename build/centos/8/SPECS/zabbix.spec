@@ -257,6 +257,8 @@ Japanese font configuration for Glaber web frontend
 %prep
 %setup0 -q -n %{name}-%{version}%{?alphatag}
 
+%if 0%{?build_frontend}
+
 ## remove font file
 # rm -f ui/assets/fonts/DejaVuSans.ttf
 
