@@ -27,7 +27,6 @@ SUBDIRS = \
 	reporter \
 	glb_poller \
 	tests \
-	reporter \
 	service \
 	rtc \
 	ha \
@@ -57,8 +56,6 @@ libzbxserver_a_CFLAGS = \
 zabbix_server_SOURCES = server.c
 
 zabbix_server_LDADD = \
-	$(top_builddir)/src/zabbix_server/tests/libservertests.a \
-	$(top_builddir)/src/libs/glb_state/tests/libstatetests.a \
 	dbsyncer/libzbxdbsyncer.a \
 	dbconfig/libzbxdbconfig.a \
 	diag/libzbxdiag_server.a \
@@ -147,7 +144,6 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
 	$(top_builddir)/src/libs/glb_conf/libglbconfig.a \
 	$(top_builddir)/src/libs/zbxalgo/libzbxalgo.a \
-	$(top_builddir)/src/libs/zbxalgo/tests/libalgotests.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
 	$(top_builddir)/src/libs/zbxavailability/libzbxavailability.a \
 	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
