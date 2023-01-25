@@ -18,7 +18,6 @@ Source15:	zabbix-tmpfiles.conf
 Source16:	zabbix-php-fpm.conf
 Source17:	zabbix-web-fcgi.conf
 Source18:	zabbix-nginx.conf
-Patch0:		config.patch
 
 
 
@@ -257,9 +256,6 @@ Japanese font configuration for Glaber web frontend
 
 %prep
 %setup0 -q -n %{name}-%{version}%{?alphatag}
-
-%if 0%{?build_frontend}
-%patch0 -p1
 
 ## remove font file
 # rm -f ui/assets/fonts/DejaVuSans.ttf

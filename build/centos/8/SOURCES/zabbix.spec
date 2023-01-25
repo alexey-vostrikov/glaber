@@ -26,7 +26,6 @@ Source19:	zabbix-agent2.service
 Source20:	zabbix-agent.sysconfig
 Source21:	zabbix-agent2.init
 Source22:	zabbix-agent2.sysconfig
-Patch0:		config.patch
 
 
 
@@ -259,9 +258,6 @@ Japanese font configuration for Zabbix web frontend
 
 %prep
 %setup0 -q -n %{name}-%{version}%{?alphatag}
-
-%if 0%{?build_frontend}
-%patch0 -p1
 
 ## remove font file
 rm -f ui/assets/fonts/DejaVuSans.ttf
