@@ -10,10 +10,10 @@ RESOURCE_RC = resource.rc
 DESC_H = $(PROJECTNAME)_desc.h
 RESOURCE_RES = $(PROJECTNAME).res
 
-INCS = /I $(PROJECTDIR) /I .\ /I ..\include  /I ..\include\common /I ..\..\..\include /I ..\..\..\include\common
+INCS = /I $(PROJECTDIR) /I .\ /I ..\include /I ..\..\..\include
 
 !IF "$(CPU)" == "i386" || "$(CPU)" == "x86"
-COMMON_FLAGS = /D _WIN32_WINNT=0x0502
+COMMON_FLAGS = /D _WIN32_WINNT=0x0501
 ADD_LFLAGS = $(ADD_LFLAGS) /SUBSYSTEM:"CONSOLE,5.01"
 !ELSEIF "$(CPU)" == "AMD64"
 COMMON_FLAGS = /D _WIN32_WINNT=0x0502
