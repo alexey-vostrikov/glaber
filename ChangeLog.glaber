@@ -1,3 +1,5 @@
+ver 2.18.1
+    - ci/cd fixes to build release/testing/experimental versions
 ver 2.18.0
     - introducing  poller connection contention library. It allow to control per-ip (not per-hostid) number of connections and supports control event in cases when host or ip is taken from the key, not from the interface configuration 
 ver 2.17.0
