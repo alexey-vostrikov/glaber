@@ -20,12 +20,11 @@
 #ifndef ZABBIX_LOGFILES_H
 #define ZABBIX_LOGFILES_H
 
-#include "zbxregexp.h"
-#include "md5.h"
 #include "../metrics.h"
 #include "persistent_state.h"
+#include "zbxcomms.h"
 
-#define ZBX_MD5_PRINT_BUF_LEN	((MD5_DIGEST_SIZE) * 2 + 1)	/* for MD5 sum representation with hex-digits */
+#define ZBX_MD5_PRINT_BUF_LEN	((ZBX_MD5_DIGEST_SIZE) * 2 + 1)	/* for MD5 sum representation with hex-digits */
 
 typedef enum
 {
@@ -53,20 +52,22 @@ struct	st_logfile
 	zbx_uint64_t	processed_size;	/* how far the Zabbix agent has analyzed the file */
 	int		md5_block_size;	/* size of the first and last blocks of file for which the md5 sum is */
 					/* calculated (in 'first_block_md5') */
-	md5_byte_t	first_block_md5[MD5_DIGEST_SIZE];	/* md5 sum of the initial part of the file */
+	md5_byte_t	first_block_md5[ZBX_MD5_DIGEST_SIZE];	/* md5 sum of the initial part of the file */
 	zbx_uint64_t	last_block_offset;		/* position of the last block from the beginning of file */
-	md5_byte_t	last_block_md5[MD5_DIGEST_SIZE];	/* md5 sum of the last block */
+	md5_byte_t	last_block_md5[ZBX_MD5_DIGEST_SIZE];	/* md5 sum of the last block */
 };
 
-typedef int 	(*zbx_process_value_func_t)(const char *server, unsigned short port, const char *host,
+typedef int 	(*zbx_process_value_func_t)(zbx_vector_ptr_t *addrs, zbx_vector_ptr_t *agent2_result, const char *host,
 		const char *key, const char *value, unsigned char state, zbx_uint64_t *lastlogsize, const int *mtime,
 		const unsigned long *timestamp, const char *source, const unsigned short *severity,
-		const unsigned long *logeventid, unsigned char flags);
+		const unsigned long *logeventid, unsigned char flags, const zbx_config_tls_t *zbx_config_tls);
 
 void	destroy_logfile_list(struct st_logfile **logfiles, int *logfiles_alloc, int *logfiles_num);
 
-int	process_log_check(char *server, unsigned short port, zbx_vector_ptr_t *regexps, ZBX_ACTIVE_METRIC *metric,
-		zbx_process_value_func_t process_value_cb, zbx_uint64_t *lastlogsize_sent, int *mtime_sent,
-		char **error, zbx_vector_pre_persistent_t *prep_vec);
+int	process_log_check(zbx_vector_ptr_t *addrs, zbx_vector_ptr_t *agent2_result, zbx_vector_ptr_t *regexps,
+		ZBX_ACTIVE_METRIC *metric, zbx_process_value_func_t process_value_cb, zbx_uint64_t *lastlogsize_sent,
+		int *mtime_sent, char **error, zbx_vector_pre_persistent_t *prep_vec,
+		const zbx_config_tls_t *zbx_config_tls);
+
 struct st_logfile	*find_last_processed_file_in_logfiles_list(struct st_logfile *logfiles, int logfiles_num);
 #endif

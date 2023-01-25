@@ -64,10 +64,10 @@
 			})
 			.dynamicRows({template: '#macro-row-tmpl'})
 			.on('afteradd.dynamicRows', function() {
-				$('.input-group', table).macroValue();
+				$('.macro-input-group', table).macroValue();
 				$('.<?= ZBX_STYLE_TEXTAREA_FLEXIBLE ?>', table).textareaFlexible();
 			})
-			.find('.input-group')
+			.find('.macro-input-group')
 			.macroValue();
 
 		table
@@ -83,7 +83,7 @@
 
 		$('#update').click(function() {
 			if (removed) {
-				return confirm(<?= json_encode(_('Are you sure you want to delete')) ?> + ' ' + removed + ' '
+				return confirm(<?= json_encode(_('Are you sure you want to delete?')) ?> + ' ' + removed + ' '
 					+ <?= json_encode(_('macro(s)')) ?> + '?'
 				);
 			}

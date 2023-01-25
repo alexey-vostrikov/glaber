@@ -17,16 +17,18 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "sysinfo.h"
+#include "zbxsysinfo.h"
+#include "../sysinfo.h"
+
 #include "log.h"
-#include "perfmon.h"
 #include "cfg.h"
+#include "zbxtime.h"
+
+#include "zbxwin32.h"
 
 #pragma comment(lib, "user32.lib")
 
 /******************************************************************************
- *                                                                            *
- * Function: read_registry_value                                              *
  *                                                                            *
  * Purpose: read value from Windows registry                                  *
  *                                                                            *
@@ -48,20 +50,17 @@ static wchar_t	*read_registry_value(HKEY hKey, LPCTSTR name)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_win_getversion                                               *
- *                                                                            *
  * Purpose: get Windows version information                                   *
  *                                                                            *
  ******************************************************************************/
 const OSVERSIONINFOEX		*zbx_win_getversion(void)
 {
-#	define ZBX_REGKEY_VERSION		"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
-#	define ZBX_REGVALUE_CURRENTVERSION	"CurrentVersion"
-#	define ZBX_REGVALUE_CURRENTBUILDNUMBER	"CurrentBuildNumber"
-#	define ZBX_REGVALUE_CSDVERSION		"CSDVersion"
-
-#	define ZBX_REGKEY_PRODUCT		"System\\CurrentControlSet\\Control\\ProductOptions"
-#	define ZBX_REGVALUE_PRODUCTTYPE		"ProductType"
+#define ZBX_REGKEY_VERSION		"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+#define ZBX_REGVALUE_CURRENTVERSION	"CurrentVersion"
+#define ZBX_REGVALUE_CURRENTBUILDNUMBER	"CurrentBuildNumber"
+#define ZBX_REGVALUE_CSDVERSION		"CSDVersion"
+#define ZBX_REGKEY_PRODUCT		"System\\CurrentControlSet\\Control\\ProductOptions"
+#define ZBX_REGVALUE_PRODUCTTYPE		"ProductType"
 
 	static OSVERSIONINFOEX	vi = {sizeof(OSVERSIONINFOEX)};
 
@@ -151,6 +150,12 @@ out:
 		RegCloseKey(h_key_registry);
 
 	return pvi;
+#undef ZBX_REGKEY_VERSION
+#undef ZBX_REGVALUE_CURRENTVERSION
+#undef ZBX_REGVALUE_CURRENTBUILDNUMBER
+#undef ZBX_REGVALUE_CSDVERSION
+#undef ZBX_REGKEY_PRODUCT
+#undef ZBX_REGVALUE_PRODUCTTYPE
 }
 
 static void	get_wmi_check_timeout(const char *wmi_namespace, const char *query, char **var,
@@ -165,7 +170,7 @@ static void	get_wmi_check_timeout(const char *wmi_namespace, const char *query, 
 	*time_previous_query_finished = zbx_time();
 }
 
-int	SYSTEM_UNAME(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	system_uname(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char	*os = NULL;
 	size_t	os_alloc = 0, os_offset = 0;

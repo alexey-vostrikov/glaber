@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -88,9 +88,9 @@ class CControllerUserTokenList extends CController {
 		];
 
 		$data = [
-			'uncheck' => $this->hasInput('uncheck'),
 			'sort' => $sort_field,
 			'sortorder' => $sort_order,
+			'uncheck' => $this->hasInput('uncheck'),
 			'filter' => $filter,
 			'profileIdx' => 'web.user.token.filter',
 			'active_tab' => CProfile::get('web.user.token.filter.active', 1)

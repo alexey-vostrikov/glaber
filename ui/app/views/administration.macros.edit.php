@@ -23,15 +23,11 @@
  * @var CView $this
  */
 
-$this->addJsFile('inputsecret.js');
-$this->addJsFile('textareaflexible.js');
-$this->addJsFile('macrovalue.js');
-
 $this->includeJsFile('administration.macros.edit.js.php');
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Macros'))
-	->setTitleSubmenu(getAdministrationGeneralSubmenu());
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_MACROS_EDIT));
 
 $table = (new CTable())
 	->setId('tbl_macros')
@@ -107,9 +103,9 @@ $form = (new CForm())
 	->setName('macrosForm')
 	->disablePasswordAutofill()
 	->setAction((new CUrl('zabbix.php'))->setArgument('action', 'macros.update')->getUrl())
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
+	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
 	->addItem($tab_view);
 
-$widget
+$html_page
 	->addItem($form)
 	->show();

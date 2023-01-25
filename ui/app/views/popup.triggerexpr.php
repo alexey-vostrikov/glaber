@@ -30,6 +30,7 @@ $expression_form = (new CForm())
 	->addVar('action', 'popup.triggerexpr')
 	->addVar('dstfrm', $data['dstfrm'])
 	->addVar('dstfld1', $data['dstfld1'])
+	->addVar('context', $data['context'])
 	->addItem((new CVar('hostid', $data['hostid']))->removeId())
 	->addVar('groupid', $data['groupid'])
 	->addVar('function', $data['function'])
@@ -47,22 +48,28 @@ $expression_form_list = new CFormList();
 
 // Append item to form list.
 $popup_options = [
-	'srctbl' => 'items',
+	'srctbl' => $data['context'] === 'host' ? 'items' : 'template_items',
 	'srcfld1' => 'itemid',
 	'srcfld2' => 'name',
 	'dstfrm' => $expression_form->getName(),
 	'dstfld1' => 'itemid',
 	'dstfld2' => 'item_description',
-	'with_webitems' => '1',
 	'writeonly' => '1'
 ];
 
-if ($data['hostid']) {
-	$popup_options['hostid'] = $data['hostid'];
-}
+if ($data['context'] === 'host') {
+	if ($data['hostid']) {
+		$popup_options['hostid'] = $data['hostid'];
+	}
 
-if ($data['parent_discoveryid'] !== '') {
-	$popup_options['normal_only'] = '1';
+	$popup_options['real_hosts'] = '1';
+
+	if ($data['parent_discoveryid'] !== '') {
+		$popup_options['normal_only'] = '1';
+	}
+}
+elseif ($data['hostid']) {
+	$popup_options['templateid'] = $data['hostid'];
 }
 
 if ($data['item_required']) {
@@ -75,24 +82,22 @@ if ($data['item_required']) {
 		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 		(new CButton('select', _('Select')))
 			->addClass(ZBX_STYLE_BTN_GREY)
-			->onClick('return PopUp("popup.generic",'.json_encode($popup_options).', null, this);')
+			->onClick('return PopUp("popup.generic", '.json_encode($popup_options).');')
 	];
 
 	if ($data['parent_discoveryid'] !== '') {
 		$item[] = (new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN);
 		$item[] = (new CButton('select', _('Select prototype')))
 			->addClass(ZBX_STYLE_BTN_GREY)
-			->onClick('return PopUp("popup.generic",'.
-				json_encode([
-					'srctbl' => 'item_prototypes',
-					'srcfld1' => 'itemid',
-					'srcfld2' => 'name',
-					'dstfrm' => $expression_form->getName(),
-					'dstfld1' => 'itemid',
-					'dstfld2' => 'item_description',
-					'parent_discoveryid' => $data['parent_discoveryid']
-				]).', null, this);'
-			)
+			->onClick('return PopUp("popup.generic", '.json_encode([
+				'srctbl' => 'item_prototypes',
+				'srcfld1' => 'itemid',
+				'srcfld2' => 'name',
+				'dstfrm' => $expression_form->getName(),
+				'dstfld1' => 'itemid',
+				'dstfld2' => 'item_description',
+				'parent_discoveryid' => $data['parent_discoveryid']
+			]).');')
 			->removeId();
 	}
 
@@ -102,6 +107,7 @@ if ($data['item_required']) {
 $function_select = (new CSelect('function_select'))
 	->setFocusableElementId('label-function')
 	->setId('function-select')
+	->setAttribute('autofocus', 'autofocus')
 	->setValue($data['function_type'].'_'.$data['function']);
 
 $function_types = [
@@ -138,8 +144,9 @@ if (array_key_exists('params', $data['functions'][$data['selectedFunction']])) {
 	$count_functions = [
 		'acos', 'ascii', 'asin', 'atan', 'atan2', 'between', 'bitand', 'bitlength', 'bitlshift', 'bitnot', 'bitor',
 		'bitrshift', 'bitxor', 'bytelength', 'cbrt', 'ceil', 'char', 'concat', 'cos', 'cosh', 'cot', 'degrees', 'exp',
-		'expm1', 'floor', 'in', 'insert', 'last', 'left', 'length', 'log', 'log10', 'ltrim', 'mid', 'mod', 'power', 'radians',
-		'repeat', 'replace', 'right', 'round', 'rtrim', 'signum', 'sin', 'sinh', 'sqrt', 'tan', 'trim', 'truncate'
+		'expm1', 'floor', 'in', 'insert', 'last', 'left', 'length', 'log', 'log10', 'ltrim', 'mid', 'mod', 'power',
+		'radians', 'rate', 'repeat', 'replace', 'right', 'round', 'rtrim', 'signum', 'sin', 'sinh', 'sqrt', 'tan',
+		'trim', 'truncate'
 	];
 
 	foreach ($data['functions'][$data['selectedFunction']]['params'] as $param_name => $param_function) {
@@ -180,7 +187,16 @@ if (array_key_exists('params', $data['functions'][$data['selectedFunction']])) {
 				$param_type_element = _('Period');
 			}
 
-			$param_field = (new CTextBox('params['.$param_name.']', $param_value))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
+			if (array_key_exists('options', $param_function)) {
+				$param_field = (new CSelect('params['.$param_name.']'))
+					->setValue($param_value)
+					->addOptions(CSelect::createOptionsFromArray($param_function['options']));
+			}
+			else {
+				$param_field = new CTextBox('params['.$param_name.']', $param_value);
+			}
+
+			$param_field->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
 
 			if ($param_name === 'period_shift') {
 				$param_field->setAttribute('placeholder', 'now/h');
@@ -196,9 +212,18 @@ if (array_key_exists('params', $data['functions'][$data['selectedFunction']])) {
 			]);
 		}
 		else {
-			$expression_form_list->addRow($label,
-				(new CTextBox('params['.$param_name.']', $param_value))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
-			);
+			if (array_key_exists('options', $param_function)) {
+				$param_field = (new CSelect('params['.$param_name.']'))
+					->setValue($param_value)
+					->addOptions(CSelect::createOptionsFromArray($param_function['options']));
+			}
+			else {
+				$param_field = new CTextBox('params['.$param_name.']', $param_value);
+			}
+
+			$param_field->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
+			$expression_form_list->addRow($label, $param_field);
+
 			if ($paramid === 0) {
 				$expression_form->addItem((new CVar('paramtype', PARAM_TYPE_TIME))->removeId());
 			}
@@ -232,7 +257,7 @@ $expression_form->addItem($expression_form_list);
 
 $output = [
 	'header' => $data['title'],
-	'body' => (new CDiv([$data['errors'], $expression_form]))->toString(),
+	'body' => (new CDiv([$data['messages'], $expression_form]))->toString(),
 	'buttons' => [
 		[
 			'title' => _('Insert'),

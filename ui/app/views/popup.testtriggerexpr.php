@@ -26,7 +26,7 @@
 $data_table = (new CTable())
 	->addStyle('width: 100%;')
 	->setHeader([
-		_('Expression Variable Elements'),
+		_('Expression variable elements'),
 		_('Result type'),
 		_('Value')
 	]);
@@ -108,7 +108,7 @@ $form_list->addRow(_('Result'),
 $output = [
 	'header' => $data['title'],
 	'body' => (new CDiv([
-		$data['message'],
+		$data['messages'],
 		(new CForm())
 			->cleanItems()
 			->setId('expression_testing_from')

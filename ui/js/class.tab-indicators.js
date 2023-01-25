@@ -33,8 +33,9 @@ const TAB_INDICATOR_UPDATE_EVENT = 'tab-indicator-update';
  */
 class TabIndicators {
 
-	constructor() {
+	constructor(tabs_id = 'tabs') {
 		try {
+			this.tabs_id = tabs_id;
 			this.form = this.getForm();
 			this.activateIndicators();
 		} catch (error) {
@@ -48,62 +49,65 @@ class TabIndicators {
 	 * @return {HTMLElement} Main form
 	 */
 	getForm() {
-		const TEMPLATE = document.querySelector('#templates-form');
-		const HOST = document.querySelector('#hosts-form');
+		const ACTION = document.querySelector('#action-form');
 		const AUTHENTICATION = document.querySelector('#authentication-form');
+		const GRAPH = document.querySelector('#widget-dialogue-form');
+		const HOST = document.querySelector('#host-form');
+		const HOST_DISCOVERY = document.querySelector('#host-discovery-form');
 		const HOST_PROTOTYPE = document.querySelector('#host-prototype-form');
 		const ITEM = document.querySelector('#item-form');
 		const ITEM_PROTOTYPE = document.querySelector('#item-prototype-form');
+		const MAP = document.querySelector('#sysmap-form');
+		const MEDIA_TYPE = document.querySelector('#media-type-form');
+		const PROXY = document.querySelector('#proxy-form');
+		const SERVICE = document.querySelector('#service-form');
+		const SLA = document.querySelector('#sla-form');
+		const TEMPLATE = document.querySelector('#templates-form');
 		const TRIGGER = document.querySelector('#triggers-form');
 		const TRIGGER_PROTOTYPE = document.querySelector('#triggers-prototype-form');
-		const HOST_DISCOVERY = document.querySelector('#host-discovery-form');
-		const WEB_SCENARIO = document.querySelector('#http-form');
-		const ACTION = document.querySelector('#action-form');
-		const SERVICE = document.querySelector('#services-form');
-		const PROXY = document.querySelector('#proxy-form');
-		const USER_GROUP = document.querySelector('#user-group-form');
 		const USER = document.querySelector('#user-form');
-		const MEDIA_TYPE = document.querySelector('#media-type-form');
-		const MAP = document.querySelector('#sysmap-form');
-		const GRAPH = document.querySelector('#widget-dialogue-form');
+		const USER_GROUP = document.querySelector('#user-group-form');
+		const WEB_SCENARIO = document.querySelector('#http-form');
 
 		switch (true) {
-			case !!TEMPLATE:
-				return TEMPLATE;
-			case !!HOST:
-				return HOST;
+			case !!ACTION:
+				return ACTION;
 			case !!AUTHENTICATION:
 				return AUTHENTICATION;
+			case !!GRAPH:
+				return GRAPH;
+			case !!HOST:
+				return HOST;
+			case !!HOST_DISCOVERY:
+				return HOST_DISCOVERY;
 			case !!HOST_PROTOTYPE:
 				return HOST_PROTOTYPE;
 			case !!ITEM:
 				return ITEM;
 			case !!ITEM_PROTOTYPE:
 				return ITEM_PROTOTYPE;
+			case !!MAP:
+				return MAP;
+			case !!MEDIA_TYPE:
+				return MEDIA_TYPE;
+			case !!PROXY:
+				return PROXY;
+			case !!SERVICE:
+				return SERVICE;
+			case !!SLA:
+				return SLA;
+			case !!TEMPLATE:
+				return TEMPLATE;
 			case !!TRIGGER:
 				return TRIGGER;
 			case !!TRIGGER_PROTOTYPE:
 				return TRIGGER_PROTOTYPE;
-			case !!HOST_DISCOVERY:
-				return HOST_DISCOVERY;
-			case !!WEB_SCENARIO:
-				return WEB_SCENARIO;
-			case !!ACTION:
-				return ACTION;
-			case !!SERVICE:
-				return SERVICE;
-			case !!PROXY:
-				return PROXY;
-			case !!USER_GROUP:
-				return USER_GROUP;
 			case !!USER:
 				return USER;
-			case !!MEDIA_TYPE:
-				return MEDIA_TYPE;
-			case !!MAP:
-				return MAP;
-			case !!GRAPH:
-				return GRAPH;
+			case !!USER_GROUP:
+				return USER_GROUP;
+			case !!WEB_SCENARIO:
+				return WEB_SCENARIO;
 			default:
 				throw 'Form not found.';
 		}
@@ -113,17 +117,16 @@ class TabIndicators {
 	 * Activate tab indicators.
 	 */
 	activateIndicators() {
-		const tabs = this.form.querySelectorAll('#tabs a');
-
-		Object.values(tabs).map((element) => {
+		for (const element of this.form.querySelectorAll('#' + this.tabs_id + ' a')) {
 			const indicator_item = this.getIndicatorItem(this.getIndicatorNameByElement(element));
 
 			if (indicator_item instanceof TabIndicatorItem) {
 				indicator_item
-					.addAttributes(element)
-					.initObserver(element);
+					.setElement(element)
+					.addAttributes()
+					.initObserver();
 			}
-		});
+		}
 	}
 
 	/**
@@ -136,7 +139,7 @@ class TabIndicators {
 	getIndicatorNameByElement(element) {
 		const attr = element.getAttribute('js-indicator');
 
-		if (attr) {
+		if (attr !== null) {
 			return attr
 				.split('-')
 				.map((value) => value[0].toUpperCase() + value.slice(1))
@@ -172,68 +175,76 @@ class TabIndicatorFactory {
 	 */
 	static createTabIndicator(name) {
 		switch (name) {
-			case 'Macros':
-				return new MacrosTabIndicatorItem;
-			case 'LinkedTemplate':
-				return new LinkedTemplateTabIndicatorItem;
-			case 'Tags':
-				return new TagsTabIndicatorItem;
-			case 'Http':
-				return new HttpTabIndicatorItem;
-			case 'Ldap':
-				return new LdapTabIndicatorItem;
-			case 'Saml':
-				return new SamlTabIndicatorItem;
-			case 'Inventory':
-				return new InventoryTabIndicatorItem;
-			case 'Encryption':
-				return new EncryptionTabIndicatorItem;
-			case 'Groups':
-				return new GroupsTabIndicatorItem;
-			case 'Preprocessing':
-				return new PreprocessingTabIndicatorItem;
+			case 'ChildServices':
+				return new ChildServicesTabIndicatorItem;
 			case 'Dependency':
 				return new DependencyTabIndicatorItem;
-			case 'LldMacros':
-				return new LldMacrosTabIndicatorItem;
+			case 'Encryption':
+				return new EncryptionTabIndicatorItem;
 			case 'Filters':
 				return new FiltersTabIndicatorItem;
-			case 'Overrides':
-				return new OverridesTabIndicatorItem;
-			case 'Steps':
-				return new StepsTabIndicatorItem;
-			case 'HttpAuth':
-				return new HttpAuthTabIndicatorItem;
-			case 'Operations':
-				return new OperationsTabIndicatorItem;
-			case 'ServiceDependency':
-				return new ServiceDependencyTabIndicatorItem;
-			case 'Time':
-				return new TimeTabIndicatorItem;
-			case 'TagFilter':
-				return new TagFilterTabIndicatorItem;
-			case 'Media':
-				return new MediaTabIndicatorItem;
-			case 'MessageTemplate':
-				return new MessageTemplateTabIndicatorItem;
 			case 'FrontendMessage':
 				return new FrontendMessageTabIndicatorItem;
-			case 'Sharing':
-				return new SharingTabIndicatorItem;
+			case 'GraphAxes':
+				return new GraphAxesTabIndicatorItem;
 			case 'GraphDataset':
 				return new GraphDatasetTabIndicatorItem;
-			case 'GraphOptions':
-				return new GraphOptionsTabIndicatorItem;
-			case 'GraphTime':
-				return new GraphTimeTabIndicatorItem;
 			case 'GraphLegend':
 				return new GraphLegendTabIndicatorItem;
-			case 'GraphProblems':
-				return new GraphProblemsTabIndicatorItem;
+			case 'GraphDisplayOptions':
+				return new GraphDisplayOptionsTabIndicatorItem;
 			case 'GraphOverrides':
 				return new GraphOverridesTabIndicatorItem;
-			case 'Permissions':
-				return new PermissionsTabIndicatorItem;
+			case 'GraphProblems':
+				return new GraphProblemsTabIndicatorItem;
+			case 'GraphTime':
+				return new GraphTimeTabIndicatorItem;
+			case 'HttpAuth':
+				return new HttpAuthTabIndicatorItem;
+			case 'Media':
+				return new MediaTabIndicatorItem;
+			case 'MediatypeOptions':
+				return new MediatypeOptionsTabIndicatorItem;
+			case 'MessageTemplate':
+				return new MessageTemplateTabIndicatorItem;
+			case 'Http':
+				return new HttpTabIndicatorItem;
+			case 'Inventory':
+				return new InventoryTabIndicatorItem;
+			case 'Ipmi':
+				return new IpmiTabIndicatorItem;
+			case 'Ldap':
+				return new LdapTabIndicatorItem;
+			case 'LldMacros':
+				return new LldMacrosTabIndicatorItem;
+			case 'Macros':
+				return new MacrosTabIndicatorItem;
+			case 'Overrides':
+				return new OverridesTabIndicatorItem;
+			case 'Operations':
+				return new OperationsTabIndicatorItem;
+			case 'TemplatePermissions':
+				return new TemplatePermissionsTabIndicatorItem;
+			case 'HostPermissions':
+				return new HostPermissionsTabIndicatorItem;
+			case 'Preprocessing':
+				return new PreprocessingTabIndicatorItem;
+			case 'ProxyEncryption':
+				return new ProxyEncryptionTabIndicatorItem;
+			case 'Saml':
+				return new SamlTabIndicatorItem;
+			case 'Sharing':
+				return new SharingTabIndicatorItem;
+			case 'ExcludedDowntimes':
+				return new ExcludedDowntimesTabIndicatorItem;
+			case 'Steps':
+				return new StepsTabIndicatorItem;
+			case 'TagFilter':
+				return new TagFilterTabIndicatorItem;
+			case 'Tags':
+				return new TagsTabIndicatorItem;
+			case 'Time':
+				return new TimeTabIndicatorItem;
 			case 'Valuemaps':
 				return new ValuemapsTabIndicatorItem;
 		}
@@ -249,6 +260,29 @@ class TabIndicatorItem {
 
 	constructor(type) {
 		this._type = type;
+		this._element = null;
+	}
+
+	/**
+	 * Get element
+	 *
+	 * @returns {HTMLElement} element  tab element
+	 */
+	getElement() {
+		return this._element;
+	}
+
+	/**
+	 * Set element
+	 *
+	 * @param {HTMLElement} element  tab element
+	 *
+	 * @return {TabIndicatorItem}
+	 */
+	setElement(element) {
+		this._element = element;
+
+		return this;
 	}
 
 	/**
@@ -266,34 +300,30 @@ class TabIndicatorItem {
 	 * @return {boolean|number} Boolean for mark indicator and number for count indicator
 	 */
 	getValue() {
-		throw 'Fatal error: can not call abstract method.';
+		throw 'Fatal error: cannot call abstract method.';
 	}
 
 	/**
 	 * Init observer for html changes.
-	 *
-	 * @param {HTMLElement} element
 	 */
-	initObserver(element) {
-		throw 'Fatal error: can not call abstract method.';
+	initObserver() {
+		throw 'Fatal error: cannot call abstract method.';
 	}
 
 	/**
 	 * Add tab indicator attribute to tab element.
 	 *
-	 * @param {HTMLElement} element  tab element
-	 *
 	 * @return {TabIndicatorItem}
 	 */
-	addAttributes(element) {
-		element.setAttribute(TAB_INDICATOR_ATTR_TYPE, this.getType());
+	addAttributes() {
+		this._element.setAttribute(TAB_INDICATOR_ATTR_TYPE, this.getType());
 
 		switch (this.getType()) {
 			case TAB_INDICATOR_TYPE_COUNT:
-				element.setAttribute(TAB_INDICATOR_ATTR_VALUE, this.getValue().toString());
+				this._element.setAttribute(TAB_INDICATOR_ATTR_VALUE, this.getValue().toString());
 				break;
 			case TAB_INDICATOR_TYPE_MARK:
-				element.setAttribute(TAB_INDICATOR_ATTR_VALUE, !!this.getValue() ? '1' : '0');
+				this._element.setAttribute(TAB_INDICATOR_ATTR_VALUE, !!this.getValue() ? '1' : '0');
 				break;
 		}
 
@@ -325,126 +355,61 @@ class MacrosTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	/**
-	 * @inheritdoc
-	 * This observer yet init in include\views\js\common.template.edit.js.php.
-	 *
-	 * @param {HTMLElement} element
-	 */
-	initObserver(element) {
-		const target_node = document.querySelector('#tbl_macros');
-		const observer_options = {
-			childList: true,
-			attributes: true,
-			attributeFilter: ['value', 'style'], // Use style because textarea don't have value attribute.
-			subtree: true
-		};
+	initObserver() {
+		const target_node = document.getElementById('macros_container');
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-					case 'attributes':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
-		}
-	}
-}
-
-class LinkedTemplateTabIndicatorItem extends TabIndicatorItem {
-
-	constructor() {
-		super(TAB_INDICATOR_TYPE_COUNT);
-	}
-
-	getValue() {
-		const target_node = document.querySelector('#linked-template');
-		const multiselect_node = document.querySelector('#add_templates_');
-		let count = 0;
-
-		// Count saved templates.
-		if (target_node) {
-			count += target_node
-				.querySelectorAll('tbody tr')
-				.length;
-		}
-
-		// Count new templates in multiselect.
-		if (multiselect_node) {
-			count += multiselect_node
-				.querySelectorAll('.selected li')
-				.length;
-		}
-
-		return isNaN(count) ? 0 : count;
-	}
-
-	initObserver(element) {
-		const target_node = document.querySelector('#add_templates_ .multiselect-list');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
-
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+			observer.observe(target_node, {
+				childList: true,
+				attributes: true,
+				attributeFilter: ['value', 'style'], // Use style because textarea don't have value attribute.
+				subtree: true
 			});
-		};
-
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
 		}
 	}
 }
 
 class TagsTabIndicatorItem extends TabIndicatorItem {
 
+	static ZBX_PROPERTY_INHERITED = 1;
+
 	constructor() {
 		super(TAB_INDICATOR_TYPE_COUNT);
 	}
 
 	getValue() {
-		return document
-			.querySelectorAll('#tags-table tr.form_row > td:first-child > textarea:not(:placeholder-shown):not([readonly])')
+		return [...document.querySelectorAll(this.getElement().getAttribute('href') + ' .tags-table .form_row')]
+			.filter((row) => {
+				const tag = row.querySelector('textarea[name$="[tag]"]');
+				const type = row.querySelector('input[name$="[type]"]');
+
+				if (type !== null && type.value == TagsTabIndicatorItem.ZBX_PROPERTY_INHERITED) {
+					return false;
+				}
+
+				return tag !== null && tag.value !== '';
+			})
 			.length;
 	}
 
-	initObserver(element) {
-		const target_node = document.querySelector('#tags-table');
-		const observer_options = {
-			childList: true,
-			attributes: true,
-			attributeFilter: ['value', 'style'], // Use style because textarea don't have value attribute.
-			subtree: true
-		};
+	initObserver() {
+		const target_node = document.querySelector(this.getElement().getAttribute('href') + ' .tags-table');
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-					case 'attributes':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				attributes: true,
+				attributeFilter: ['value', 'style'], // Use style because textarea don't have value attribute.
+				subtree: true
+			});
 		}
 	}
 }
@@ -458,19 +423,19 @@ class HttpTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('#http_auth_enabled');
 
-		if (element) {
+		if (element !== null) {
 			return element.checked;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#http_auth_enabled');
 
-		if (target_node) {
+		if (target_node !== null) {
 			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
+				this.addAttributes();
 			});
 		}
 	}
@@ -485,19 +450,19 @@ class LdapTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('#ldap_configured');
 
-		if (element) {
+		if (element !== null) {
 			return element.checked;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#ldap_configured');
 
-		if (target_node) {
+		if (target_node !== null) {
 			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
+				this.addAttributes();
 			});
 		}
 	}
@@ -512,19 +477,19 @@ class SamlTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('#saml_auth_enabled');
 
-		if (element) {
+		if (element !== null) {
 			return element.checked;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#saml_auth_enabled');
 
-		if (target_node) {
+		if (target_node !== null) {
 			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
+				this.addAttributes();
 			});
 		}
 	}
@@ -539,19 +504,62 @@ class InventoryTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('[name=inventory_mode]:checked');
 
-		if (element) {
+		if (element !== null) {
 			return (element.value === '0' || element.value === '1');
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
-		[...document.querySelectorAll('[name=inventory_mode]')].map((value) => {
-			value.addEventListener('click', () => {
-				this.addAttributes(element);
+	initObserver() {
+		for (const input of document.querySelectorAll('[name=inventory_mode]')) {
+			input.addEventListener('click', () => {
+				this.addAttributes();
 			});
-		});
+		}
+	}
+}
+
+class IpmiTabIndicatorItem extends TabIndicatorItem {
+
+	static IPMI_AUTHTYPE_DEFAULT = -1;
+	static IPMI_PRIVILEGE_USER = 2;
+
+	constructor() {
+		super(TAB_INDICATOR_TYPE_MARK);
+	}
+
+	getValue() {
+		const ipmi_authtype = document.getElementById('ipmi_authtype');
+
+		if (ipmi_authtype !== null
+				&& ipmi_authtype.value != IpmiTabIndicatorItem.IPMI_AUTHTYPE_DEFAULT) {
+			return true;
+		}
+
+		const ipmi_privilege = document.getElementById('ipmi_privilege');
+
+		if (ipmi_privilege !== null
+				&& ipmi_privilege.value != IpmiTabIndicatorItem.IPMI_PRIVILEGE_USER) {
+			return true;
+		}
+
+		for (const input of document.querySelectorAll('#ipmi_username, #ipmi_password')) {
+			if (input.value !== '') {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	initObserver() {
+		for (const input of document.querySelectorAll(
+				'#ipmi_authtype, #ipmi_privilege, #ipmi_username, #ipmi_password')) {
+			input.addEventListener('change', () => {
+				this.addAttributes();
+			});
+		}
 	}
 }
 
@@ -564,7 +572,7 @@ class EncryptionTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const tls_connect = document.querySelector('[name=tls_connect]:checked');
 
-		if (tls_connect && (tls_connect.value === '2' || tls_connect.value === '4')) {
+		if (tls_connect !== null && (tls_connect.value === '2' || tls_connect.value === '4')) {
 			return true;
 		}
 
@@ -574,62 +582,27 @@ class EncryptionTabIndicatorItem extends TabIndicatorItem {
 		return tls_in_psk || tls_in_cert;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const tls_in_psk_node = document.querySelector('[name=tls_in_psk]');
+
+		if (tls_in_psk_node !== null) {
+			['click', 'change'].forEach(event =>
+				tls_in_psk_node.addEventListener(event, () => this.addAttributes())
+			);
+		}
+
 		const tls_in_cert_node = document.querySelector('[name=tls_in_cert]');
 
-		[...document.querySelectorAll('[name=tls_connect]')].map((value) =>
-			value.addEventListener('click', () => {
-				this.addAttributes(element);
-			})
-		);
-
-		if (tls_in_psk_node) {
-			tls_in_psk_node.addEventListener('click', () => {
-				this.addAttributes(element);
-			});
+		if (tls_in_cert_node !== null) {
+			['click', 'change'].forEach(event =>
+				tls_in_cert_node.addEventListener(event, () => this.addAttributes())
+			);
 		}
 
-		if (tls_in_cert_node) {
-			tls_in_cert_node.addEventListener('click', () => {
-				this.addAttributes(element);
+		for (const input of document.querySelectorAll('[name=tls_connect]')) {
+			input.addEventListener('click', () => {
+				this.addAttributes();
 			});
-		}
-	}
-}
-
-class GroupsTabIndicatorItem extends TabIndicatorItem {
-
-	constructor() {
-		super(TAB_INDICATOR_TYPE_COUNT);
-	}
-
-	getValue() {
-		return document
-			.querySelectorAll('#group_links_ .multiselect-list li')
-			.length;
-	}
-
-	initObserver(element) {
-		const target_node = document.querySelector('#group_links_ .multiselect-list');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
-
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
-			});
-		};
-
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
 		}
 	}
 }
@@ -642,30 +615,49 @@ class PreprocessingTabIndicatorItem extends TabIndicatorItem {
 
 	getValue() {
 		return document
-			.querySelectorAll('#preprocessing .preprocessing-list-item')
+			.querySelectorAll('#preprocessing .preprocessing-list-item:not(.ui-sortable-placeholder)')
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#preprocessing');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
+		}
+	}
+}
+
+class ProxyEncryptionTabIndicatorItem extends TabIndicatorItem {
+
+	constructor() {
+		super(TAB_INDICATOR_TYPE_MARK);
+	}
+
+	getValue() {
+		const tls_connect = document.querySelector('[name="tls_connect"]:checked');
+
+		if (tls_connect !== null && (tls_connect.value === '2' || tls_connect.value === '4')) {
+			return true;
+		}
+
+		const tls_accept_psk = document.querySelector('[name="tls_accept_psk"]').checked;
+		const tls_accept_certificate = document.querySelector('[name="tls_accept_certificate"]').checked;
+
+		return tls_accept_psk || tls_accept_certificate;
+	}
+
+	initObserver(element) {
+		for (const _element of document.querySelectorAll(
+				'#tls_connect input, #tls_accept_psk, #tls_accept_certificate')) {
+			_element.addEventListener('change', () => this.addAttributes(element));
 		}
 	}
 }
@@ -682,26 +674,18 @@ class DependencyTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#dependency-table tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
@@ -714,33 +698,24 @@ class LldMacrosTabIndicatorItem extends TabIndicatorItem {
 
 	getValue() {
 		return document
-			.querySelectorAll('#lld_macro_paths tbody tr.form_row > td:first-child > textarea:not(:placeholder-shown):not([readonly])')
+			.querySelectorAll('#lld_macro_paths tbody tr.form_row > td:first-child > textarea:not(:placeholder-shown)')
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#lld_macro_paths');
-		const observer_options = {
-			childList: true,
-			attributes: true,
-			attributeFilter: ['value', 'style'], // Use style because textarea don't have value attribute.
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-					case 'attributes':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				attributes: true,
+				attributeFilter: ['value', 'style'], // Use style because textarea don't have value attribute.
+				subtree: true
+			});
 		}
 	}
 }
@@ -757,29 +732,20 @@ class FiltersTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#conditions');
-		const observer_options = {
-			childList: true,
-			attributes: true,
-			attributeFilter: ['value'],
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-					case 'attributes':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				attributes: true,
+				attributeFilter: ['value'],
+				subtree: true
+			});
 		}
 	}
 }
@@ -796,26 +762,18 @@ class OverridesTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('.lld-overrides-table tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
@@ -832,26 +790,18 @@ class StepsTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('.httpconf-steps-dynamic-row tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
@@ -876,26 +826,26 @@ class HttpAuthTabIndicatorItem extends TabIndicatorItem {
 			|| document.querySelector('#ssl_key_password').value !== '';
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const auth_node = document.querySelector('#authentication');
 
-		if (auth_node) {
+		if (auth_node !== null) {
 			auth_node.addEventListener('change', () => {
-				this.addAttributes(element);
+				this.addAttributes();
 			});
 		}
 
-		[...document.querySelectorAll('#verify_peer, #verify_host')].map((value) => {
-			value.addEventListener('click', () => {
-				this.addAttributes(element);
+		for (const input of document.querySelectorAll('#verify_peer, #verify_host')) {
+			input.addEventListener('click', () => {
+				this.addAttributes();
 			});
-		});
+		}
 
-		[...document.querySelectorAll('#ssl_cert_file, #ssl_key_file, #ssl_key_password')].map((value) => {
-			value.addEventListener('change', () => {
-				this.addAttributes(element);
+		for (const input of document.querySelectorAll('#ssl_cert_file, #ssl_key_file, #ssl_key_password')) {
+			input.addEventListener('change', () => {
+				this.addAttributes();
 			});
-		});
+		}
 	}
 }
 
@@ -911,53 +861,61 @@ class OperationsTabIndicatorItem extends TabIndicatorItem {
 		count += document
 			.querySelectorAll('#op-table tbody tr:not(:last-child)')
 			.length;
+
 		count += document
 			.querySelectorAll('#rec-table tbody tr:not(:last-child)')
 			.length;
+
 		count += document
-			.querySelectorAll('#ack-table tbody tr:not(:last-child)')
+			.querySelectorAll('#upd-table tbody tr:not(:last-child)')
 			.length;
 
 		return count;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node_op = document.querySelector('#op-table tbody');
-		const target_node_rec = document.querySelector('#rec-table tbody');
-		const target_node_ack = document.querySelector('#ack-table tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node_op !== null) {
+			const observer_op = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node_op) {
-			const observer_op = new MutationObserver(observer_callback);
-			observer_op.observe(target_node_op, observer_options);
+			observer_op.observe(target_node_op, {
+				childList: true,
+				subtree: true
+			});
 		}
 
-		if (target_node_rec) {
-			const observer_rec = new MutationObserver(observer_callback);
-			observer_rec.observe(target_node_rec, observer_options);
+		const target_node_rec = document.querySelector('#rec-table tbody');
+
+		if (target_node_rec !== null) {
+			const observer_rec = new MutationObserver(() => {
+				this.addAttributes();
+			});
+
+			observer_rec.observe(target_node_rec, {
+				childList: true,
+				subtree: true
+			});
 		}
 
-		if (target_node_ack) {
-			const observer_ack = new MutationObserver(observer_callback);
-			observer_ack.observe(target_node_ack, observer_options);
+		const target_node_upd = document.querySelector('#upd-table tbody');
+
+		if (target_node_upd !== null) {
+			const observer_upd = new MutationObserver(() => {
+				this.addAttributes();
+			});
+
+			observer_upd.observe(target_node_upd, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
 
-class ServiceDependencyTabIndicatorItem extends TabIndicatorItem {
+class ExcludedDowntimesTabIndicatorItem extends TabIndicatorItem {
 
 	constructor() {
 		super(TAB_INDICATOR_TYPE_COUNT);
@@ -965,30 +923,51 @@ class ServiceDependencyTabIndicatorItem extends TabIndicatorItem {
 
 	getValue() {
 		return document
-			.querySelectorAll('#service_children tbody tr')
+			.querySelectorAll('#excluded-downtimes tbody tr')
 			.length;
 	}
 
-	initObserver(element) {
-		const target_node = document.querySelector('#service_children tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
+	initObserver() {
+		const target_node = document.querySelector('#excluded-downtimes tbody');
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
+		}
+	}
+}
+
+class ChildServicesTabIndicatorItem extends TabIndicatorItem {
+
+	constructor() {
+		super(TAB_INDICATOR_TYPE_COUNT);
+	}
+
+	getValue() {
+		return document
+			.querySelector('#children')
+			.dataset
+			.tabIndicator;
+	}
+
+	initObserver() {
+		const target_node = document.querySelector('#children');
+
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
+			});
+
+			observer.observe(target_node, {
+				attributes: true,
+				attributeFilter: ['data-tab-indicator']
+			});
 		}
 	}
 }
@@ -1005,26 +984,18 @@ class TimeTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#time-table tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
@@ -1041,10 +1012,9 @@ class TagFilterTabIndicatorItem extends TabIndicatorItem {
 			.length > 0;
 	}
 
-	initObserver(element) {
-		// This event triggered in app/views/js/administration.usergroup.edit.js.php:179
+	initObserver() {
 		document.addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
-			this.addAttributes(element);
+			this.addAttributes();
 		});
 	}
 }
@@ -1056,31 +1026,65 @@ class MediaTabIndicatorItem extends TabIndicatorItem {
 	}
 
 	getValue() {
-		return document
-			.querySelectorAll('#media-table tbody tr')
-			.length;
+		return document.querySelectorAll('#media-table tbody tr').length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#media-table tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
+		}
+	}
+}
+
+class MediatypeOptionsTabIndicatorItem extends TabIndicatorItem {
+
+	static DEFAULT_MAXSESSIONS_TYPE = 'one';
+	static DEFAULT_MAXATTEMPTS = 3;
+	static DEFAULT_ATTEMPT_INTERVAL = '10s';
+
+	constructor() {
+		super(TAB_INDICATOR_TYPE_MARK);
+	}
+
+	getValue() {
+		const maxsessions_type = document.querySelector('[name="maxsessions_type"]:checked');
+
+		if (maxsessions_type !== null
+				&& maxsessions_type.value !== MediatypeOptionsTabIndicatorItem.DEFAULT_MAXSESSIONS_TYPE) {
+			return true;
+		}
+
+		const maxattempts = document.getElementById('maxattempts');
+
+		if (maxattempts !== null
+				&& maxattempts.value != MediatypeOptionsTabIndicatorItem.DEFAULT_MAXATTEMPTS) {
+			return true;
+		}
+
+		const attempt_interval = document.getElementById('attempt_interval');
+
+		if (attempt_interval !== null
+				&& attempt_interval.value !== MediatypeOptionsTabIndicatorItem.DEFAULT_ATTEMPT_INTERVAL) {
+			return true;
+		}
+
+		return false;
+	}
+
+	initObserver() {
+		for (const input of document.querySelectorAll('#maxsessions_type, #maxattempts, #attempt_interval')) {
+			input.addEventListener('change', () => {
+				this.addAttributes();
+			});
 		}
 	}
 }
@@ -1097,26 +1101,18 @@ class MessageTemplateTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#message-templates tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
@@ -1130,19 +1126,19 @@ class FrontendMessageTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('#messages_enabled');
 
-		if (element) {
+		if (element !== null) {
 			return element.checked;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#messages_enabled');
 
-		if (target_node) {
+		if (target_node !== null) {
 			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
+				this.addAttributes();
 			});
 		}
 	}
@@ -1157,7 +1153,7 @@ class SharingTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector("[name='private']:checked");
 
-		if (element && element.value > 0) {
+		if (element !== null && element.value == 0) {
 			return true;
 		}
 
@@ -1165,39 +1161,75 @@ class SharingTabIndicatorItem extends TabIndicatorItem {
 			|| document.querySelectorAll('#user-share-table tbody tr:not(:last-child)').length > 0;
 	}
 
-	initObserver(element) {
-		[...document.querySelectorAll('[name=private]')].map((value) => {
-			value.addEventListener('click', () => {
-				this.addAttributes(element);
+	initObserver() {
+		for (const input of document.querySelectorAll('[name=private]')) {
+			input.addEventListener('click', () => {
+				this.addAttributes();
 			});
-		});
+		}
 
 		const target_node_group = document.querySelector('#user-group-share-table tbody');
-		const target_node_user = document.querySelector('#user-share-table tbody');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node_group !== null) {
+			const observer_group = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node_group) {
-			const observer_group = new MutationObserver(observer_callback);
-			observer_group.observe(target_node_group, observer_options);
+			observer_group.observe(target_node_group, {
+				childList: true,
+				subtree: true
+			});
 		}
 
-		if (target_node_user) {
-			const observer_user = new MutationObserver(observer_callback);
-			observer_user.observe(target_node_user, observer_options);
+		const target_node_user = document.querySelector('#user-share-table tbody');
+
+		if (target_node_user !== null) {
+			const observer_user = new MutationObserver(() => {
+				this.addAttributes();
+			});
+
+			observer_user.observe(target_node_user, {
+				childList: true,
+				subtree: true
+			});
 		}
+	}
+}
+
+class GraphAxesTabIndicatorItem extends TabIndicatorItem {
+
+	static SVG_GRAPH_AXIS_UNITS_AUTO = 0;
+
+	constructor() {
+		super(TAB_INDICATOR_TYPE_MARK);
+	}
+
+	getValue() {
+		for (const checkbox of document.querySelectorAll('#lefty, #righty, #axisx')) {
+			if (!checkbox.checked) {
+				return true;
+			}
+		}
+
+		for (const input of document.querySelectorAll('#lefty_min, #lefty_max, #righty_min, #righty_max')) {
+			if (!input.disabled && input.value !== '') {
+				return true;
+			}
+		}
+
+		for (const input of document.querySelectorAll('#lefty_units, #righty_units')) {
+			if (!input.disabled && input.value != GraphAxesTabIndicatorItem.SVG_GRAPH_AXIS_UNITS_AUTO) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	initObserver() {
+		document.getElementById('tabs').addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
+			this.addAttributes();
+		});
 	}
 }
 
@@ -1209,55 +1241,48 @@ class GraphDatasetTabIndicatorItem extends TabIndicatorItem {
 
 	getValue() {
 		return document
-			.querySelectorAll('#data_sets .list-accordion-item')
+			.querySelectorAll('#data_set .list-accordion-item')
 			.length;
 	}
 
-	initObserver(element) {
-		const target_node = document.querySelector('#data_sets');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
+	initObserver() {
+		const target_node = document.querySelector('#data_set');
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
 
-class GraphOptionsTabIndicatorItem extends TabIndicatorItem {
+class GraphDisplayOptionsTabIndicatorItem extends TabIndicatorItem {
 
 	constructor() {
 		super(TAB_INDICATOR_TYPE_MARK);
 	}
 
 	getValue() {
-		const element = document.querySelector("[name='source']:checked");
+		const names = ['source', 'simple_triggers', 'working_time', 'percentile_left', 'percentile_right'];
 
-		if (element) {
-			return element.value > 0;
+		for (const name of names) {
+			const elem = document.querySelector("[name='" + name + "']:checked");
+			if (elem !== null && elem.value > 0) {
+				return true;
+			}
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
-		[...document.querySelectorAll("[name='source']")].map((value) => {
-			value.addEventListener('click', () => {
-				this.addAttributes(element);
-			});
+	initObserver() {
+		document.getElementById('tabs').addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
+			this.addAttributes();
 		});
 	}
 }
@@ -1271,48 +1296,62 @@ class GraphTimeTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('#graph_time');
 
-		if (element) {
+		if (element !== null) {
 			return element.checked;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
-		const target_node = document.querySelector('#graph_time');
-
-		if (target_node) {
-			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
-			});
-		}
+	initObserver() {
+		document.getElementById('tabs').addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
+			this.addAttributes();
+		});
 	}
 }
 
 class GraphLegendTabIndicatorItem extends TabIndicatorItem {
+
+	static SVG_GRAPH_LEGEND_LINES_MIN = 1;
+	static SVG_GRAPH_LEGEND_COLUMNS_MAX = 4;
 
 	constructor() {
 		super(TAB_INDICATOR_TYPE_MARK);
 	}
 
 	getValue() {
-		const element = document.querySelector('#legend');
+		const legend = document.getElementById('legend');
 
-		if (element) {
-			return element.checked;
+		if (legend !== null && !legend.checked) {
+			return true;
+		}
+
+		const legend_statistic = document.getElementById('legend_statistic');
+
+		if (legend_statistic !== null && legend_statistic.checked) {
+			return true;
+		}
+
+		const legend_lines = document.getElementById('legend_lines');
+
+		if (legend_lines !== null && legend_lines.value != GraphLegendTabIndicatorItem.SVG_GRAPH_LEGEND_LINES_MIN) {
+			return true;
+		}
+
+		const legend_columns = document.getElementById('legend_columns');
+
+		if (legend_columns !== null
+				&& legend_columns.value != GraphLegendTabIndicatorItem.SVG_GRAPH_LEGEND_COLUMNS_MAX) {
+			return true;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
-		const target_node = document.querySelector('#legend');
-
-		if (target_node) {
-			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
-			});
-		}
+	initObserver() {
+		document.getElementById('tabs').addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
+			this.addAttributes();
+		});
 	}
 }
 
@@ -1325,21 +1364,17 @@ class GraphProblemsTabIndicatorItem extends TabIndicatorItem {
 	getValue() {
 		const element = document.querySelector('#show_problems');
 
-		if (element) {
+		if (element !== null) {
 			return element.checked;
 		}
 
 		return false;
 	}
 
-	initObserver(element) {
-		const target_node = document.querySelector('#show_problems');
-
-		if (target_node) {
-			target_node.addEventListener('click', () => {
-				this.addAttributes(element);
-			});
-		}
+	initObserver() {
+		document.getElementById('tabs').addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
+			this.addAttributes();
+		});
 	}
 }
 
@@ -1355,31 +1390,42 @@ class GraphOverridesTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('.overrides-list');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }
 
-class PermissionsTabIndicatorItem extends TabIndicatorItem {
+class TemplatePermissionsTabIndicatorItem extends TabIndicatorItem {
+
+	constructor() {
+		super(TAB_INDICATOR_TYPE_MARK);
+	}
+
+	getValue() {
+		return document
+			.querySelectorAll('#templategroup-right-table tbody tr')
+			.length > 1;
+	}
+
+	initObserver(element) {
+		document.addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
+			this.addAttributes(element);
+		});
+	}
+}
+
+class HostPermissionsTabIndicatorItem extends TabIndicatorItem {
 
 	constructor() {
 		super(TAB_INDICATOR_TYPE_MARK);
@@ -1391,10 +1437,9 @@ class PermissionsTabIndicatorItem extends TabIndicatorItem {
 			.length > 1;
 	}
 
-	initObserver(element) {
-		// This event triggered in app/views/js/administration.usergroup.edit.js.php:164
+	initObserver() {
 		document.addEventListener(TAB_INDICATOR_UPDATE_EVENT, () => {
-			this.addAttributes(element);
+			this.addAttributes();
 		});
 	}
 }
@@ -1411,26 +1456,18 @@ class ValuemapsTabIndicatorItem extends TabIndicatorItem {
 			.length;
 	}
 
-	initObserver(element) {
+	initObserver() {
 		const target_node = document.querySelector('#valuemap-table');
-		const observer_options = {
-			childList: true,
-			subtree: true
-		};
 
-		const observer_callback = (mutationList, _observer) => {
-			mutationList.forEach((mutation) => {
-				switch (mutation.type) {
-					case 'childList':
-						this.addAttributes(element);
-						break;
-				}
+		if (target_node !== null) {
+			const observer = new MutationObserver(() => {
+				this.addAttributes();
 			});
-		};
 
-		if (target_node) {
-			const observer = new MutationObserver(observer_callback);
-			observer.observe(target_node, observer_options);
+			observer.observe(target_node, {
+				childList: true,
+				subtree: true
+			});
 		}
 	}
 }

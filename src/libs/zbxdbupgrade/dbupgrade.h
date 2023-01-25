@@ -20,6 +20,9 @@
 #ifndef ZABBIX_DBUPGRADE_H
 #define ZABBIX_DBUPGRADE_H
 
+#include "zbxcommon.h"
+#include "zbxdbschema.h"
+
 typedef struct
 {
 	int		(*function)(void);
@@ -28,6 +31,8 @@ typedef struct
 	unsigned char	mandatory;
 }
 zbx_dbpatch_t;
+
+#define ZBX_DBPATCH_FUNCTION_PARAM_LEN			255
 
 #define DBPATCH_VERSION(zabbix_version)			zbx_dbpatches_##zabbix_version
 
@@ -66,6 +71,14 @@ int	DBrename_index(const char *table_name, const char *old_name, const char *new
 int	DBadd_foreign_key(const char *table_name, int id, const ZBX_FIELD *field);
 int	DBdrop_foreign_key(const char *table_name, int id);
 
-#endif
+#	ifdef HAVE_ORACLE
+int	DBcreate_serial_sequence(const char *table_name);
+int	DBcreate_serial_trigger(const char *table_name, const char *field_name);
+#	endif
 
+int	DBcreate_changelog_insert_trigger(const char *table_name, const char *field_name);
+int	DBcreate_changelog_update_trigger(const char *table_name, const char *field_name);
+int	DBcreate_changelog_delete_trigger(const char *table_name, const char *field_name);
+
+#endif
 #endif

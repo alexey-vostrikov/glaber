@@ -17,12 +17,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "db.h"
 #include "dbupgrade.h"
+
+#include "zbxdbhigh.h"
 #include "zbxtasks.h"
 #include "zbxregexp.h"
 #include "log.h"
+#include "zbxexpr.h"
+#include "zbxnum.h"
 
 extern unsigned char	program_type;
 
@@ -59,7 +61,7 @@ static int	DBpatch_3050001(void)
 		int		index;
 		zbx_uint64_t	widget_fieldid;
 
-		if (NULL == (p = strrchr(row[1], '.')) || SUCCEED != is_uint31(p + 1, &index))
+		if (NULL == (p = strrchr(row[1], '.')) || SUCCEED != zbx_is_uint31(p + 1, &index))
 			continue;
 
 		widget_fieldid = DBget_maxid_num("widget_field", 1);
@@ -1160,7 +1162,7 @@ static int	DBpatch_3050118(void)
 	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		return SUCCEED;
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	result = DBselect(
 			"select e.eventid,t.priority"
@@ -1180,7 +1182,7 @@ static int	DBpatch_3050118(void)
 		if (SUCCEED != (ret = DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset)))
 			goto out;
 	}
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset && ZBX_DB_OK > DBexecute("%s", sql))
 		ret = FAIL;
@@ -1202,7 +1204,7 @@ static int	DBpatch_3050119(void)
 	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		return SUCCEED;
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	result = DBselect(
 			"select p.eventid,t.priority"
@@ -1222,7 +1224,7 @@ static int	DBpatch_3050119(void)
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset && ZBX_DB_OK > DBexecute("%s", sql))
 		ret = FAIL;
@@ -1249,7 +1251,7 @@ static int	DBpatch_3050120(void)
 	sql = zbx_malloc(NULL, sql_alloc);
 	zbx_hashset_create(&eventids, 1000, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	result = DBselect("select acknowledgeid,eventid,action from acknowledges order by clock");
 	while (NULL != (row = DBfetch(result)))
@@ -1276,7 +1278,7 @@ static int	DBpatch_3050120(void)
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset && ZBX_DB_OK > DBexecute("%s", sql))
 		ret = FAIL;
@@ -1326,7 +1328,7 @@ static int	DBpatch_3050122(void)
 	char		*sql = NULL;
 	size_t		sql_alloc = 0, sql_offset = 0;
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	result = DBselect("select functionid,parameter from functions where name='logsource'");
 
@@ -1374,19 +1376,19 @@ static int	DBpatch_3050122(void)
 		zbx_strncpy_alloc(&processed_parameter, &param_alloc, &param_offset, orig_param + param_pos + param_len,
 				sep_pos - param_pos - param_len + 1);
 
-		if (FUNCTION_PARAM_LEN < (current_len = zbx_strlen_utf8(processed_parameter)))
+		if (ZBX_DBPATCH_FUNCTION_PARAM_LEN < (current_len = zbx_strlen_utf8(processed_parameter)))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "Cannot convert parameter \"%s\" of trigger function logsource"
 					" (functionid: %s) to regexp during database upgrade. The converted"
 					" value is too long for field \"parameter\" - " ZBX_FS_SIZE_T " characters."
 					" Allowed length is %d characters.",
-					row[1], row[0], (zbx_fs_size_t)current_len, FUNCTION_PARAM_LEN);
+					row[1], row[0], (zbx_fs_size_t)current_len, ZBX_DBPATCH_FUNCTION_PARAM_LEN);
 
 			zbx_free(processed_parameter);
 			continue;
 		}
 
-		db_parameter_esc = DBdyn_escape_string_len(processed_parameter, FUNCTION_PARAM_LEN);
+		db_parameter_esc = DBdyn_escape_string_len(processed_parameter, ZBX_DBPATCH_FUNCTION_PARAM_LEN);
 		zbx_free(processed_parameter);
 
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
@@ -1399,7 +1401,7 @@ static int	DBpatch_3050122(void)
 			goto out;
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset)
 	{
@@ -1658,8 +1660,8 @@ static int	DBpatch_3050145(void)
 	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		return SUCCEED;
 
-	/* CONDITION_OPERATOR_IN (4) -> CONDITION_OPERATOR_YES (10) */
-	/* for conditiontype CONDITION_TYPE_SUPPRESSED (16)         */
+	/* ZBX_CONDITION_OPERATOR_IN (4) -> ZBX_CONDITION_OPERATOR_YES (10) */
+	/* for conditiontype ZBX_CONDITION_TYPE_SUPPRESSED (16)         */
 	ret = DBexecute("update conditions"
 			" set operator=10"
 			" where conditiontype=16"
@@ -1678,8 +1680,8 @@ static int	DBpatch_3050146(void)
 	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		return SUCCEED;
 
-	/* CONDITION_OPERATOR_NOT_IN (7) -> CONDITION_OPERATOR_NO (11) */
-	/* for conditiontype CONDITION_TYPE_SUPPRESSED (16)            */
+	/* ZBX_CONDITION_OPERATOR_NOT_IN (7) -> ZBX_CONDITION_OPERATOR_NO (11) */
+	/* for conditiontype ZBX_CONDITION_TYPE_SUPPRESSED (16)            */
 	ret = DBexecute("update conditions"
 			" set operator=11"
 			" where conditiontype=16"
@@ -2013,4 +2015,3 @@ DBPATCH_ADD(3050161, 0, 1)
 DBPATCH_ADD(3050162, 0, 1)
 
 DBPATCH_END()
-

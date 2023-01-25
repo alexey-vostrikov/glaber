@@ -20,7 +20,7 @@
 #ifndef GLABER_POLLER_H
 #define GLABER_POLLER_H
 #include "dbcache.h"
-#include "threads.h"
+#include "zbxthreads.h"
 
 #define GLB_ASYNC_POLLING_MAX_ITERATIONS 10000000
 
@@ -86,6 +86,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args);
 
 void poller_strpool_free(const char* str);
 const char *poller_strpool_add(const char * str);
+const char *poller_strpool_copy(const char * str);
 
 void poller_preprocess_error(poller_item_t *poller_item, const char *error);
 void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime);

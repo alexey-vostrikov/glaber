@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -26,13 +26,17 @@ class CFormGrid extends CTag {
 	 */
 	private const ZBX_STYLE_CLASS = 'form-grid';
 
-	public const ZBX_STYLE_FORM_GRID_OFFSET = 'form-grid-offset';
+	public const ZBX_STYLE_FIELDS_GROUP       = 'fields-group';
+	public const ZBX_STYLE_FIELDS_GROUP_LABEL = 'fields-group-label';
 
-	public const ZBX_STYLE_FORM_GRID_3_1 = 'form-grid-3-1';
 	public const ZBX_STYLE_FORM_GRID_1_1 = 'form-grid-1-1';
+	public const ZBX_STYLE_FORM_GRID_3_1 = 'form-grid-3-1';
 
-	public function __construct() {
-		parent::__construct('div', true);
+	// True label column width for use in filter forms.
+	public const ZBX_STYLE_FORM_GRID_LABEL_WIDTH_TRUE = 'label-width-true';
+
+	public function __construct($items = null) {
+		parent::__construct('div', true, $items);
 
 		$this->addClass(self::ZBX_STYLE_CLASS);
 	}

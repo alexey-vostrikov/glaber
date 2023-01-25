@@ -23,7 +23,7 @@
 #define GLB_WORKER_MAXCALLS 1000000
 
 
-void glb_worker_init(void);
+void glb_worker_poller_init(void);
 
 
 #endif

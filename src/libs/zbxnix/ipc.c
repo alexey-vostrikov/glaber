@@ -17,13 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "ipc.h"
+#include "zbxnix.h"
+
+#include "zbxcommon.h"
 #include "log.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_shm_create                                                   *
  *                                                                            *
  * Purpose: Create block of shared memory                                     *
  *                                                                            *
@@ -31,8 +30,6 @@
  *                                                                            *
  * Return value: If the function succeeds, then return SHM ID                 *
  *               -1 on an error                                               *
- *                                                                            *
- * Author: Alexei Vladishev                                                   *
  *                                                                            *
  ******************************************************************************/
 int	zbx_shm_create(size_t size)
@@ -51,16 +48,12 @@ int	zbx_shm_create(size_t size)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_shm_destroy                                                  *
- *                                                                            *
  * Purpose: Destroy block of shared memory                                    *
  *                                                                            *
  * Parameters:  shmid - Shared memory identifier                              *
  *                                                                            *
  * Return value: If the function succeeds, then return 0                      *
  *               -1 on an error                                               *
- *                                                                            *
- * Author: Andrea Biscuola                                                    *
  *                                                                            *
  ******************************************************************************/
 int	zbx_shm_destroy(int shmid)

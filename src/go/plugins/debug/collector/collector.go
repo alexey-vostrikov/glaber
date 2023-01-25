@@ -20,12 +20,13 @@
 package empty
 
 import (
-	"zabbix.com/pkg/conf"
-	"zabbix.com/pkg/plugin"
+	"git.zabbix.com/ap/plugin-support/conf"
+	"git.zabbix.com/ap/plugin-support/plugin"
 )
 
 type Options struct {
-	Interval int
+	plugin.SystemOptions `conf:"optional,name=System"`
+	Interval             int
 }
 
 // Plugin -

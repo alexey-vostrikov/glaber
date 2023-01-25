@@ -51,6 +51,7 @@ $font-selected-color: #ffffff !default;
 $font-alt-color: #768d99 !default;
 $body-bg-color: #ebeef0 !default;
 $overlay-bg-color: #ffffff !default;
+$overlay-border-color: #ccd5d9 !default;
 
 // Main menu
 $menu-main-color: #ebeef0 !default;
@@ -120,6 +121,7 @@ $action-shadow-color: rgba(#768d99, .5) !default;
 $table-border-color: #ebeef0 !default;
 
 $ui-tab-bg-selected-color: #0275b8 !default;
+$ui-tabfilter-item-border-color: #768d99 !default;
 
 // Forms
 $form-font-color: #1f2c33 !default;
@@ -127,6 +129,7 @@ $form-bg-color: #ffffff !default;
 $form-border-color: #acbbc2 !default;
 $form-border-focus-color: #02659f !default;
 $form-label-asterisk-color: $red;
+$form-fields-group-border-color: #ebeef0 !default;
 
 $form-disabled-font-color: #acbbc2 !default;
 $form-disabled-bg-color: #ebebeb !default;
@@ -146,6 +149,7 @@ $msg-warning-border-color: #ffd788 !default;
 $btn-font-color: #ffffff !default;
 $btn-bg-color: #0275b8 !default;
 $btn-border-color: #0275b8 !default;
+$btn-border-focus-color: rgba(#1e87e3, .35) !default;
 
 $btn-alt-font-color: #0275b8 !default;
 $btn-alt-bg-color: transparent !default;
@@ -219,3 +223,12 @@ $toc-title-color: #ffffff !default;
 $toc-title-bg-color: #768d99 !default;
 $diff-added-bg-color: $lighter-green !default;
 $diff-removed-bg-color: $lighter-red !default;
+
+// Text
+$text-placeholder-color: #ffffff !default;
+$text-placeholder-bg-color: $ui-bg-selected-color !default;
+
+// Change indicators.
+$arrow-fill-up: #3DC51D;
+$arrow-fill-down: #FC5A5A;
+$arrow-fill-up-down: #3DC51D;

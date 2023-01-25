@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -28,101 +28,84 @@
 // Item type and interface.
 (() => {
 	const item_interface_types = <?= json_encode(itemTypeInterface()) ?>;
-	const interface_ids_by_types = <?= json_encode($data['interfaceids']) ?>;
+	const interface_ids_by_types = <?= json_encode(interfaceIdsByType($data['interfaces'])) ?>;
 
-	const item_type_elem = document.querySelector('#type');
+	let item_type_element = document.getElementById('type');
 
-	if (!item_type_elem) {
+	if (item_type_element === null) {
 		return false;
 	}
 
-	let obj = item_type_elem;
-	if (item_type_elem.tagName === 'SPAN') {
-		obj = item_type_elem.originalObject;
+	if (item_type_element.tagName === 'SPAN') {
+		item_type_element = item_type_element.originalObject;
 	}
 
-	const cb = (event) => {
-		if (!document.querySelector('#visible_type').checked) {
-			return organizeInterfaces(interface_ids_by_types, item_interface_types, <?= json_encode($data['initial_item_type']) ?>);
+	const interface_change_handler = (e) => {
+		let item_type = parseInt(item_type_element.value, 10);
+
+		if (!document.getElementById('visible_type').checked) {
+			item_type = <?= json_encode($data['initial_item_type']) ?>;
 		}
 
-		return organizeInterfaces(interface_ids_by_types, item_interface_types, parseInt(obj.value));
+		return organizeInterfaces(interface_ids_by_types, item_interface_types, item_type);
 	};
 
-	obj.addEventListener('change', cb);
-	obj.dispatchEvent(new CustomEvent('change', {}));
+	item_type_element.addEventListener('change', interface_change_handler);
+	item_type_element.dispatchEvent(new CustomEvent('change'));
 
-	document.querySelector('#visible_type').addEventListener('click', cb);
+	document.getElementById('visible_type').addEventListener('click', interface_change_handler);
 
-	if (!!document.querySelector('#visible_interfaceid')) {
-		document.querySelector('#visible_interfaceid').addEventListener('click', cb);
+	if (document.getElementById('visible_interfaceid') !== null) {
+		document.getElementById('visible_interfaceid').addEventListener('click', interface_change_handler);
 	}
 })();
 
 // History mode.
 (() => {
-	const history_elem = document.querySelector('#history_div');
+	const history_toggle = document.getElementById('history_mode');
 
-	if (!history_elem) {
+	if (!history_toggle) {
 		return false;
 	}
 
-	let obj = history_elem;
-	if (history_elem.tagName === 'SPAN') {
-		obj = history_elem.originalObject;
-	}
+	history_toggle.addEventListener('change', () => {
+		const history_input = document.getElementById('history');
 
-	obj
-		.querySelector('#history_mode')
-		.addEventListener('change', (event) => {
-			const history_input = obj.querySelector('#history');
-			const state = obj.querySelector('#history_mode_<?= ITEM_STORAGE_OFF ?>').checked;
-			if (state) {
-				history_input.disabled = true;
-				history_input.style.display = 'none';
-			}
-			else {
-				history_input.disabled = false;
-				history_input.style.display = '';
-			}
-		});
+		if (document.getElementById('history_mode_<?= ITEM_STORAGE_OFF ?>').checked) {
+			history_input.style.display = 'none';
+			history_input.disabled = true;
+		}
+		else {
+			history_input.style.display = '';
+			history_input.disabled = false;
+		}
+	});
 
-	obj
-		.querySelector('#history_mode')
-		.dispatchEvent(new CustomEvent('change', {}));
+	history_toggle.dispatchEvent(new CustomEvent('change'));
 })();
 
 // Trends mode.
 (() => {
-	const trends_elem = document.querySelector('#trends_div');
+	const trends_toggle = document.getElementById('trends_mode');
 
-	if (!trends_elem) {
+	if (!trends_toggle) {
 		return false;
 	}
 
-	let obj = trends_elem;
-	if (trends_elem.tagName === 'SPAN') {
-		obj = trends_elem.originalObject;
-	}
+	trends_toggle.addEventListener('change', () => {
+		const trends_input = document.getElementById('trends');
 
-	obj
-		.querySelector('#trends_mode')
-		.addEventListener('change', (event) => {
-			const trends_input = obj.querySelector('#trends');
-			const state = obj.querySelector('#trends_mode_<?= ITEM_STORAGE_OFF ?>').checked;
-			if (state) {
-				trends_input.disabled = true;
-				trends_input.style.display = 'none';
-			}
-			else {
-				trends_input.disabled = false;
-				trends_input.style.display = '';
-			}
-		});
+		if (document.getElementById('trends_mode_<?= ITEM_STORAGE_OFF ?>').checked) {
+			trends_input.disabled = true;
+			trends_input.style.display = 'none';
+		}
+		else {
+			trends_input.disabled = false;
+			trends_input.style.display = '';
+		}
+	});
 
-	obj
-		.querySelector('#trends_mode')
-		.dispatchEvent(new CustomEvent('change', {}));
+	trends_toggle.dispatchEvent(new CustomEvent('change'));
 })();
 
 // Custom intervals.

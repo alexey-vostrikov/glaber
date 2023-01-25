@@ -37,13 +37,11 @@ jQuery(function ($) {
 			field_name = opt.makeName(option, opt.getId($override));
 
 		if (option === 'color') {
-			var id = field_name.replace(/\]/g, '_').replace(/\[/g, '_'),
-				input = $('<input>')
-					.attr({'name': field_name, 'type': 'text', 'maxlength': 6, 'id': id, 'placeholder': t('S_COLOR')})
-					.val(value);
+			const id = field_name.replace(/\]/g, '_').replace(/\[/g, '_');
+			const input = $('<input>', {'name': field_name, 'type': 'hidden', 'id': id}).val(value);
 
 			return $('<div>')
-				.addClass('input-color-picker')
+				.addClass('color-picker')
 				.append(input)
 				.append(close);
 		}
@@ -79,7 +77,7 @@ jQuery(function ($) {
 				.append(content)
 				.append(close);
 		}
-	};
+	}
 
 	function getMenu($obj, options, option_to_edit, trigger_elmnt) {
 		var sections = [],
@@ -170,7 +168,7 @@ jQuery(function ($) {
 		});
 
 		return sections;
-	};
+	}
 
 	var methods = {
 		/**

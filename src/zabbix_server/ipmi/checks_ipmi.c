@@ -17,9 +17,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "checks_ipmi.h"
+#include "zbxcommon.h"
 
 #ifdef HAVE_OPENIPMI
+
+#include "zbxtime.h"
+
+#include "checks_ipmi.h"
 
 /* Theoretically it should be enough max 16 bytes for sensor ID and terminating '\0' (see SDR record format in IPMI */
 /* v2 spec). OpenIPMI author Corey Minyard explained at	*/
@@ -189,8 +193,6 @@ static char	*zbx_sensor_id_to_str(char *str, size_t str_sz, const char *id, enum
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_get_ipmi_host                                                *
- *                                                                            *
  * Purpose: Find element in the global list 'hosts' using parameters as       *
  *          search criteria                                                   *
  *                                                                            *
@@ -224,8 +226,6 @@ static zbx_ipmi_host_t	*zbx_get_ipmi_host(const char *ip, const int port, int au
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_allocate_ipmi_host                                           *
  *                                                                            *
  * Purpose: create a new element in the global list 'hosts'                   *
  *                                                                            *
@@ -330,8 +330,6 @@ static zbx_ipmi_sensor_t	*zbx_get_ipmi_sensor_by_full_name(const zbx_ipmi_host_t
 
 /******************************************************************************
  *                                                                            *
- * Function: get_domain_offset                                                *
- *                                                                            *
  * Purpose: Check if an item name starts from domain name and find the domain *
  *          name length                                                       *
  *                                                                            *
@@ -355,8 +353,6 @@ static size_t	get_domain_offset(const zbx_ipmi_host_t *h, const char *full_name)
 	return offset;
 }
 /******************************************************************************
- *                                                                            *
- * Function: zbx_get_sensor_id                                                *
  *                                                                            *
  * Purpose:  Converts sensor id to printable string and return id_type        *
  *                                                                            *
@@ -848,8 +844,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_perform_openipmi_ops                                         *
- *                                                                            *
  * Purpose: Pass control to OpenIPMI library to process events                *
  *                                                                            *
  * Return value: SUCCEED - no errors                                          *
@@ -884,8 +878,6 @@ static int	zbx_perform_openipmi_ops(zbx_ipmi_host_t *h, const char *func_name)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_perform_all_openipmi_ops                                     *
  *                                                                            *
  * Purpose: Pass control to OpenIPMI library to process all internal events   *
  *                                                                            *
@@ -1683,8 +1675,6 @@ void	zbx_delete_inactive_ipmi_hosts(time_t last_check)
 
 /******************************************************************************
  *                                                                            *
- * Function: has_name_prefix                                                  *
- *                                                                            *
  * Purpose: Check if a string starts with one of predefined prefixes and      *
  *          set prefix length                                                 *
  *                                                                            *
@@ -1969,7 +1959,7 @@ int	get_discovery_ipmi(zbx_uint64_t itemid, const char *addr, unsigned short por
 	return SUCCEED;
 }
 
-/* function 'zbx_parse_ipmi_command' requires 'c_name' with size 'ITEM_IPMI_SENSOR_LEN_MAX' */
+/* function 'zbx_parse_ipmi_command' requires 'c_name' with size 'ZBX_ITEM_IPMI_SENSOR_LEN_MAX' */
 int	zbx_parse_ipmi_command(const char *command, char *c_name, int *val, char *error, size_t max_error_len)
 {
 	const char	*p;
@@ -1990,7 +1980,7 @@ int	zbx_parse_ipmi_command(const char *command, char *c_name, int *val, char *er
 		goto fail;
 	}
 
-	if (ITEM_IPMI_SENSOR_LEN_MAX <= sz_c_name)
+	if (ZBX_ITEM_IPMI_SENSOR_LEN_MAX <= sz_c_name)
 	{
 		zbx_snprintf(error, max_error_len, "IPMI command is too long [%.*s]", (int)sz_c_name, command);
 		goto fail;
@@ -2006,7 +1996,7 @@ int	zbx_parse_ipmi_command(const char *command, char *c_name, int *val, char *er
 		*val = 1;
 	else if (0 == strcasecmp(p, "off"))
 		*val = 0;
-	else if (SUCCEED != is_uint31(p, val))
+	else if (SUCCEED != zbx_is_uint31(p, val))
 	{
 		zbx_snprintf(error, max_error_len, "IPMI command value is not supported [%s]", p);
 		goto fail;

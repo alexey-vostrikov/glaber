@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -34,7 +34,7 @@ class CSelect extends CTag {
 	/**
 	 * @param string $name  Input field name.
 	 */
-	public function __construct(string $name) {
+	public function __construct(string $name = null) {
 		parent::__construct('z-select', true);
 
 		$this->name = $name;
@@ -200,6 +200,19 @@ class CSelect extends CTag {
 	}
 
 	/**
+	 * Set custom template for selected option.
+	 *
+	 * @param string $template
+	 *
+	 * @return self
+	 */
+	public function setSelectedOptionTemplate(string $template) {
+		$this->setAttribute('selected-option-template', $template);
+
+		return $this;
+	}
+
+	/**
 	 * @deprecated
 	 *
 	 * @param string $onchange
@@ -213,6 +226,22 @@ class CSelect extends CTag {
 	/**
 	 * Convert values in associative array to options object collection.
 	 *
+	 * Example:
+	 *
+	 * CSelect::createOptionsFromArray([
+	 * 	0 => 'Min',
+	 * 	1 => 'Avg',
+	 * 	2 => 'Max'
+	 * ])
+	 *
+	 * or
+	 *
+	 * CSelect::createOptionsFromArray([
+	 * 	0 => ['label' => 'Min', 'disabled' => true],
+	 * 	1 => ['label' => 'Avg', 'disabled' => false],
+	 * 	2 => 'Max'
+	 * ])
+	 *
 	 * @static
 	 *
 	 * @param array $values
@@ -223,10 +252,29 @@ class CSelect extends CTag {
 		$options = [];
 
 		foreach ($values as $value => $label) {
-			$options[] = new CSelectOption($value, (string) $label);
+			$disabled = false;
+
+			if (is_array($label)) {
+				$disabled = $label['disabled'];
+				$label = $label['label'];
+			}
+
+			$options[] = (new CSelectOption($value, (string) $label))->setDisabled($disabled);
 		}
 
 		return $options;
+	}
+
+	protected function startToString() {
+		$attributes = '';
+
+		foreach ($this->attributes as $key => $value) {
+			if ($value !== null) {
+				$attributes .= ' '.$key.'="'.$this->encode($value, $this->attrEncStrategy).'"';
+			}
+		}
+
+		return '<'.$this->tagname.$attributes.'>';
 	}
 
 	/**
@@ -247,8 +295,8 @@ class CSelect extends CTag {
 		$this->setAttribute('data-options', json_encode($this->toArray()));
 
 		/*
-		 * This attribute makes element "focusable", it match by jQuery(':focusable') queries and also browser would be
-		 * able to evaluate "autofocus" attribute correctly.
+		 * This attribute makes element "focusable", it is matched by jQuery(':focusable') queries and also browser
+		 * would be able to evaluate "autofocus" attribute correctly.
 		 */
 		$this->setAttribute('tabindex', '-1');
 

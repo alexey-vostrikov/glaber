@@ -17,19 +17,22 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "sysinfo.h"
+#include "zbxsysinfo.h"
+#include "../sysinfo.h"
+#include "software.h"
+
 #include "zbxalgo.h"
 #include "zbxexec.h"
 #include "cfg.h"
-#include "software.h"
 #include "zbxregexp.h"
 #include "log.h"
+#include "zbxstr.h"
 
 #ifdef HAVE_SYS_UTSNAME_H
 #       include <sys/utsname.h>
 #endif
 
-int	SYSTEM_SW_ARCH(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	system_sw_arch(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	struct utsname	name;
 
@@ -46,7 +49,7 @@ int	SYSTEM_SW_ARCH(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int     SYSTEM_SW_OS(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	system_sw_os(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char	*type, line[MAX_STRING_LEN], tmp_line[MAX_STRING_LEN];
 	int	ret = SYSINFO_RET_FAIL, line_read = FAIL;
@@ -179,7 +182,7 @@ static ZBX_PACKAGE_MANAGER	package_managers[] =
 	{NULL}
 };
 
-int	SYSTEM_SW_PACKAGES(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	system_sw_packages(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	size_t			offset = 0;
 	int			ret = SYSINFO_RET_FAIL, show_pm, i, check_regex, check_manager;
@@ -255,7 +258,8 @@ next:
 
 			if (1 == show_pm)
 			{
-				offset += print_packages(buffer + offset, sizeof(buffer) - offset, &packages, mng->name);
+				offset += print_packages(buffer + offset, sizeof(buffer) - offset, &packages,
+						mng->name);
 				offset += zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "\n");
 
 				zbx_vector_str_clear_ext(&packages, zbx_str_free);

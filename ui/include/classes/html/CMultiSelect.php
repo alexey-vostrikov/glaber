@@ -31,13 +31,6 @@ class CMultiSelect extends CTag {
 	const SEARCH_METHOD = 'multiselect.get';
 
 	/**
-	 * Supported preselect types.
-	 *
-	 * @param array
-	 */
-	protected $preselect_fields = ['hosts', 'hostgroups'];
-
-	/**
 	 * @param array $options['objectOptions']  An array of parameters to be added to the request URL.
 	 * @param bool  $options['multiple']       Allows multiple selections.
 	 * @param bool  $options['add_post_js']
@@ -97,15 +90,17 @@ class CMultiSelect extends CTag {
 			}
 		}
 
-		if (array_key_exists('autosuggest', $options)) {
-			if (array_key_exists('filter_preselect_fields', $options['autosuggest'])) {
-				$params['autosuggest']['filter_preselect_fields'] = $options['autosuggest']['filter_preselect_fields'];
-			}
+		if (array_key_exists('autosuggest', $options)
+				&& array_key_exists('filter_preselect', $options['autosuggest'])) {
+			$params['autosuggest']['filter_preselect'] = $options['autosuggest']['filter_preselect'];
 		}
 
-		if (array_key_exists('popup', $options)) {
-			if (array_key_exists('filter_preselect_fields', $options['popup'])) {
-				$params['popup']['filter_preselect_fields'] = $options['popup']['filter_preselect_fields'];
+		if (array_key_exists('custom_select', $options)) {
+			$params['custom_select'] = $options['custom_select'];
+		}
+		elseif (array_key_exists('popup', $options)) {
+			if (array_key_exists('filter_preselect', $options['popup'])) {
+				$params['popup']['filter_preselect'] = $options['popup']['filter_preselect'];
 			}
 
 			if (array_key_exists('parameters', $options['popup'])) {
@@ -150,7 +145,7 @@ class CMultiSelect extends CTag {
 	 */
 	protected function mapOptions(array $options) {
 		$valid_fields = ['name', 'object_name', 'multiple', 'disabled', 'default_value', 'data', 'add_new',
-			'add_post_js', 'styles', 'popup', 'placeholder', 'autosuggest'
+			'add_post_js', 'styles', 'popup', 'custom_select', 'placeholder', 'autosuggest'
 		];
 
 		foreach ($options as $field => $value) {
@@ -183,11 +178,8 @@ class CMultiSelect extends CTag {
 			$mapped_options['selectedLimit'] = '1';
 		}
 
-		$autocomplete_parameters = [];
-		$popup_parameters = [];
-
 		if (array_key_exists('autosuggest', $options)) {
-			$valid_fields = ['filter_preselect_fields'];
+			$valid_fields = ['filter_preselect'];
 
 			foreach (array_keys($options['autosuggest']) as $field) {
 				if (!in_array($field, $valid_fields)) {
@@ -195,58 +187,58 @@ class CMultiSelect extends CTag {
 				}
 			}
 
-			if (array_key_exists('filter_preselect_fields', $options['autosuggest'])) {
-				if (is_array($options['autosuggest']['filter_preselect_fields'])) {
-					foreach ($options['autosuggest']['filter_preselect_fields'] as $field => $value) {
-						if (in_array($field, $this->preselect_fields) && is_string($value) && $value !== '') {
-							$mapped_options['autosuggest']['filter_preselect_fields'][$field] = $value;
-						}
-						else {
-							error('invalid property: $options[\'autosuggest\'][\'filter_preselect_fields\'][\''.$field.'\']');
-						}
+			if (array_key_exists('filter_preselect', $options['autosuggest'])) {
+				if (is_array($options['autosuggest']['filter_preselect'])) {
+					if (self::validateFilterPreselect($options['autosuggest']['filter_preselect'],
+							'$options[\'autosuggest\'][\'filter_preselect\']')) {
+						$mapped_options['autosuggest']['filter_preselect']
+							= $options['autosuggest']['filter_preselect'];
 					}
 				}
 				else {
-					error('invalid property: $options[\'autosuggest\'][\'filter_preselect_fields\']');
+					error('invalid property: $options[\'autosuggest\'][\'filter_preselect\']');
 				}
 			}
 		}
 
-		if (array_key_exists('popup', $options)) {
-			$valid_fields = ['parameters', 'filter_preselect_fields'];
+		$autocomplete_parameters = [];
 
-			foreach ($options['popup'] as $field => $value) {
+		if (array_key_exists('custom_select', $options)) {
+			$mapped_options['custom_select'] = true;
+		}
+		elseif (array_key_exists('popup', $options)) {
+			$valid_fields = ['parameters', 'filter_preselect'];
+
+			foreach (array_keys($options['popup']) as $field) {
 				if (!in_array($field, $valid_fields)) {
 					error('unsupported option: $options[\'popup\'][\''.$field.'\']');
 				}
 			}
 
-			if (array_key_exists('filter_preselect_fields', $options['popup'])) {
-				if (is_array($options['popup']['filter_preselect_fields'])) {
-					foreach ($options['popup']['filter_preselect_fields'] as $field => $value) {
-						if (in_array($field, $this->preselect_fields) && is_string($value) && $value !== '') {
-							$mapped_options['popup']['filter_preselect_fields'][$field] = $value;
-						}
-						else {
-							error('invalid property: $options[\'popup\'][\'filter_preselect_fields\'][\''.$field.'\']');
-						}
+			if (array_key_exists('filter_preselect', $options['popup'])) {
+				if (is_array($options['popup']['filter_preselect'])) {
+					if (self::validateFilterPreselect($options['popup']['filter_preselect'],
+							'$options[\'popup\'][\'filter_preselect\']')) {
+						$mapped_options['popup']['filter_preselect'] = $options['popup']['filter_preselect'];
 					}
 				}
 				else {
-					error('invalid property: $options[\'popup\'][\'filter_preselect_fields\']');
+					error('invalid property: $options[\'popup\'][\'filter_preselect\']');
 				}
 			}
+
+			$popup_parameters = [];
 
 			if (array_key_exists('parameters', $options['popup'])) {
 				$parameters = $options['popup']['parameters'];
 
-				$valid_fields = ['srctbl', 'srcfld1', 'srcfld2', 'dstfrm', 'dstfld1', 'real_hosts', 'monitored_hosts',
-					'with_monitored_triggers', 'noempty', 'editable', 'templated_hosts', 'hostid', 'parent_discoveryid',
-					'webitems', 'normal_only', 'numeric', 'with_graphs', 'with_graph_prototypes', 'with_items',
-					'with_simple_graph_items', 'with_simple_graph_item_prototypes', 'with_triggers', 'value_types',
-					'excludeids', 'disableids', 'enrich_parent_groups', 'orig_names', 'with_monitored_items',
-					'with_httptests', 'with_hosts_and_templates', 'user_type', 'disable_selected', 'hostids',
-					'with_inherited', 'context'
+				$valid_fields = ['srctbl', 'srcfld1', 'srcfld2', 'dstfrm', 'dstfld1', 'real_hosts', 'with_hosts',
+					'monitored_hosts', 'with_monitored_triggers', 'editable', 'templated_hosts', 'with_templates',
+					'hostid', 'parent_discoveryid', 'normal_only', 'numeric', 'with_graphs', 'with_graph_prototypes',
+					'with_items', 'with_simple_graph_items', 'with_simple_graph_item_prototypes', 'with_triggers',
+					'value_types', 'excludeids', 'disableids', 'enrich_parent_groups', 'with_monitored_items',
+					'with_httptests', 'user_type', 'disable_selected', 'hostids', 'with_inherited', 'context',
+					'enabled_only'
 				];
 
 				foreach ($parameters as $field => $value) {
@@ -292,10 +284,6 @@ class CMultiSelect extends CTag {
 					$autocomplete_parameters['filter']['value_type'] = [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64];
 				}
 
-				if (array_key_exists('noempty', $parameters) && $parameters['noempty']) {
-					$popup_parameters['noempty'] = '1';
-				}
-
 				if (array_key_exists('normal_only', $parameters) && $parameters['normal_only']) {
 					$popup_parameters['normal_only'] = '1';
 					$autocomplete_parameters['filter']['flags'] = ZBX_FLAG_DISCOVERY_NORMAL;
@@ -311,14 +299,23 @@ class CMultiSelect extends CTag {
 					$autocomplete_parameters['real_hosts'] = true;
 				}
 
+				if (array_key_exists('with_hosts', $parameters) && $parameters['with_hosts']) {
+					$popup_parameters['real_hosts'] = '1';
+					$autocomplete_parameters['with_hosts'] = true;
+				}
+
 				if (array_key_exists('templated_hosts', $parameters) && $parameters['templated_hosts']) {
 					$popup_parameters['templated_hosts'] = '1';
 					$autocomplete_parameters['templated_hosts'] = true;
 				}
 
-				if (array_key_exists('with_hosts_and_templates', $parameters) && $parameters['with_hosts_and_templates']) {
-					$popup_parameters['with_hosts_and_templates'] = '1';
-					$autocomplete_parameters['with_hosts_and_templates'] = true;
+				if ($popup_parameters['srctbl'] == 'template_triggers') {
+					$autocomplete_parameters['templated'] = true;
+				}
+
+				if (array_key_exists('with_templates', $parameters) && $parameters['with_templates']) {
+					$popup_parameters['templated_hosts'] = '1';
+					$autocomplete_parameters['with_templates'] = true;
 				}
 
 				foreach (['with_graphs', 'with_graph_prototypes', 'with_simple_graph_items',
@@ -327,11 +324,6 @@ class CMultiSelect extends CTag {
 						$popup_parameters[$name] = '1';
 						$autocomplete_parameters[$name] = true;
 					}
-				}
-
-				if (array_key_exists('webitems', $parameters) && $parameters['webitems']) {
-					$popup_parameters['with_webitems'] = '1';
-					$autocomplete_parameters['webitems'] = true;
 				}
 
 				if (array_key_exists('editable', $parameters) && $parameters['editable']) {
@@ -383,10 +375,6 @@ class CMultiSelect extends CTag {
 					$autocomplete_parameters['enrich_parent_groups'] = true;
 				}
 
-				if (array_key_exists('orig_names', $parameters) && $parameters['orig_names']) {
-					$popup_parameters['orig_names'] = '1';
-				}
-
 				if (array_key_exists('user_type', $parameters) && $parameters['user_type']) {
 					$popup_parameters['user_type'] = (int) $parameters['user_type'];
 					$autocomplete_parameters['user_type'] = (int) $parameters['user_type'];
@@ -405,12 +393,52 @@ class CMultiSelect extends CTag {
 					$popup_parameters['context'] = $parameters['context'];
 					$autocomplete_parameters['context'] = $parameters['context'];
 				}
+
+				if (array_key_exists('enabled_only', $parameters) && $parameters['enabled_only']) {
+					$popup_parameters['enabled_only'] = '1';
+					$autocomplete_parameters['enabled_only'] = true;
+				}
 			}
+
+			$mapped_options['popup']['parameters'] = $popup_parameters;
 		}
 
-		$mapped_options['popup']['parameters'] = $popup_parameters;
 		$mapped_options['objectOptions'] = $autocomplete_parameters;
 
 		return $mapped_options;
+	}
+
+	protected static function validateFilterPreselect(array $field, string $path): bool {
+		$is_valid = true;
+
+		foreach (array_keys($field) as $option) {
+			if (!in_array($option, ['id', 'submit_as', 'submit_parameters', 'multiple'])) {
+				error('unsupported option: '.$path.'[\''.$option.'\']');
+				$is_valid = false;
+			}
+		}
+
+		if (!array_key_exists('id', $field) || !is_string($field['id']) || $field['id'] === '') {
+			error('invalid property: '.$path.'[\'id\']');
+			$is_valid = false;
+		}
+
+		if (array_key_exists('submit_as', $field)
+				&& (!is_string($field['submit_as']) || $field['submit_as'] === '')) {
+			error('invalid property: '.$path.'[\'submit_as\']');
+			$is_valid = false;
+		}
+
+		if (array_key_exists('submit_parameters', $field) && !is_array($field['submit_parameters'])) {
+			error('invalid property: '.$path.'[\'submit_parameters\']');
+			$is_valid = false;
+		}
+
+		if (array_key_exists('multiple', $field) && !is_bool($field['multiple'])) {
+			error('invalid property: '.$path.'[\'multiple\']');
+			$is_valid = false;
+		}
+
+		return $is_valid;
 	}
 }

@@ -1,5 +1,5 @@
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "log.h"
 #include "glb_trigger.h"
@@ -133,43 +133,6 @@ void glb_trigger_set_states( zbx_vector_ptr_t *trigger_diff ) {
 
 
 }
-
-zbx_trigger_diff_t
-/*
-void	DCconfig_triggers_apply_changes(zbx_vector_ptr_t *trigger_diff)
-{
-	int			i;
-	zbx_trigger_diff_t	*diff;
-	ZBX_DC_TRIGGER		*dc_trigger;
-
-	if (0 == trigger_diff->values_num)
-		return;
-
-	WRLOCK_CACHE;
-
-	for (i = 0; i < trigger_diff->values_num; i++)
-	{
-		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
-
-		if (NULL == (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &diff->triggerid)))
-			continue;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE))
-			dc_trigger->lastchange = diff->lastchange;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE))
-			dc_trigger->value = diff->value;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_STATE))
-			dc_trigger->state = diff->state;
-
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
-			DCstrpool_replace(1, &dc_trigger->error, diff->error);
-	}
-
-	UNLOCK_CACHE;
-}
-*/
 
 
 void glb_triggers_get_deps_list(const zbx_vector_uint64_t *triggerids, zbx_vector_ptr_t *deps) {

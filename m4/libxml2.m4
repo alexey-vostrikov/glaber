@@ -24,7 +24,7 @@ AC_DEFUN([LIBXML2_CHECK_CONFIG],
     AC_ARG_WITH(libxml2,
         [
 If you want to use XML library:
-AC_HELP_STRING([--with-libxml2@<:@=ARG@:>@],
+AS_HELP_STRING([--with-libxml2@<:@=ARG@:>@],
     [use libxml2 client library @<:@default=no@:>@, see PKG_CONFIG_PATH environment variable to specify .pc file location]
         )],
         [
@@ -50,7 +50,7 @@ AC_HELP_STRING([--with-libxml2@<:@=ARG@:>@],
 
     if test "$want_libxml2" = "yes"; then
         AC_REQUIRE([PKG_PROG_PKG_CONFIG])
-        PKG_PROG_PKG_CONFIG()
+        m4_ifdef([PKG_PROG_PKG_CONFIG], [PKG_PROG_PKG_CONFIG()], [:])
 
         if test -x "$PKG_CONFIG"; then
 

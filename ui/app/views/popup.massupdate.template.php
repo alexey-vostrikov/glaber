@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,14 +23,9 @@
  * @var CView $this
  */
 
-// Visibility box javascript is already added. It should not be added in popup response.
-define('CVISIBILITYBOX_JAVASCRIPT_INSERTED', 1);
-define('IS_TEXTAREA_MAXLENGTH_JS_INSERTED', 1);
-
 // Create form.
 $form = (new CForm())
 	->setId('massupdate-form')
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 	->addVar('action', 'popup.massupdate.template')
 	->addVar('update', '1')
 	->addVar('ids', $data['ids'])
@@ -40,50 +35,9 @@ $form = (new CForm())
 /*
  * Template tab
  */
-$template_form_list = new CFormList('template-form-list');
+$template_tab = new CFormList('template-form-list');
 
-$template_form_list
-	->addRow(
-		(new CVisibilityBox('visible[groups]', 'groups-div', _('Original')))
-			->setLabel(_('Host groups'))
-			->setAttribute('autofocus', 'autofocus'),
-		(new CDiv([
-			(new CRadioButtonList('mass_update_groups', ZBX_ACTION_ADD))
-				->addValue(_('Add'), ZBX_ACTION_ADD)
-				->addValue(_('Replace'), ZBX_ACTION_REPLACE)
-				->addValue(_('Remove'), ZBX_ACTION_REMOVE)
-				->setModern(true)
-				->addStyle('margin-bottom: 5px;'),
-			(new CMultiSelect([
-				'name' => 'groups[]',
-				'object_name' => 'hostGroup',
-				'add_new' => (CWebUser::getType() == USER_TYPE_SUPER_ADMIN),
-				'data' => [],
-				'popup' => [
-					'parameters' => [
-						'srctbl' => 'host_groups',
-						'srcfld1' => 'groupid',
-						'dstfrm' => $form->getName(),
-						'dstfld1' => 'groups_',
-						'editable' => true
-					]
-				]
-			]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-		]))->setId('groups-div')
-	)
-	->addRow(
-		(new CVisibilityBox('visible[description]', 'description', _('Original')))->setLabel(_('Description')),
-		(new CTextArea('description', ''))
-			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-			->setMaxlength(DB::getFieldLength('hosts', 'description'))
-	);
-
-/*
- * Linked templates tab
- */
-$linked_templates_form_list = new CFormList('linked-templates-form-list');
-
-$new_template_table = (new CTable())
+$link_templates = (new CTable())
 	->addRow(
 		(new CRadioButtonList('mass_action_tpls', ZBX_ACTION_ADD))
 			->addValue(_('Link'), ZBX_ACTION_ADD)
@@ -115,18 +69,51 @@ $new_template_table = (new CTable())
 			)
 	]);
 
-$linked_templates_form_list->addRow(
+$template_tab->addRow(
 	(new CVisibilityBox('visible[linked_templates]', 'linked-templates-div', _('Original')))
 		->setLabel(_('Link templates')),
-	(new CDiv($new_template_table))
+	(new CDiv($link_templates))
 		->setId('linked-templates-div')
 		->addStyle('min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 );
 
-/*
- * Tags tab
- */
-$tags_form_list = (new CFormList('tags-form-list'))
+$template_tab
+	->addRow(
+		(new CVisibilityBox('visible[groups]', 'groups-div', _('Original')))
+			->setLabel(_('Template groups'))
+			->setAttribute('autofocus', 'autofocus'),
+		(new CDiv([
+			(new CRadioButtonList('mass_update_groups', ZBX_ACTION_ADD))
+				->addValue(_('Add'), ZBX_ACTION_ADD)
+				->addValue(_('Replace'), ZBX_ACTION_REPLACE)
+				->addValue(_('Remove'), ZBX_ACTION_REMOVE)
+				->setModern(true)
+				->addStyle('margin-bottom: 5px;'),
+			(new CMultiSelect([
+				'name' => 'groups[]',
+				'object_name' => 'templateGroup',
+				'add_new' => (CWebUser::getType() == USER_TYPE_SUPER_ADMIN),
+				'data' => [],
+				'popup' => [
+					'parameters' => [
+						'srctbl' => 'template_groups',
+						'srcfld1' => 'groupid',
+						'dstfrm' => $form->getName(),
+						'dstfld1' => 'groups_',
+						'editable' => true
+					]
+				]
+			]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+		]))->setId('groups-div')
+	)
+	->addRow(
+		(new CVisibilityBox('visible[description]', 'description', _('Original')))->setLabel(_('Description')),
+		(new CTextArea('description', ''))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setMaxlength(DB::getFieldLength('hosts', 'description'))
+	);
+
+$tags_tab = (new CFormList('tags-form-list'))
 	->addRow(
 		(new CVisibilityBox('visible[tags]', 'tags-div', _('Original')))->setLabel(_('Tags')),
 		(new CDiv([
@@ -138,15 +125,14 @@ $tags_form_list = (new CFormList('tags-form-list'))
 				->addStyle('margin-bottom: 10px;'),
 			renderTagTable([['tag' => '', 'value' => '']])
 				->setHeader([_('Name'), _('Value'), _('Action')])
-				->setId('tags-table')
+				->addClass('tags-table')
 		]))->setId('tags-div')
 	);
 
 // Append tabs to the form.
 $tabs = (new CTabView())
-	->addTab('template_tab', _('Template'), $template_form_list)
-	->addTab('linked_templates_tab', _('Linked templates'), $linked_templates_form_list)
-	->addTab('tags_tab', _('Tags'), $tags_form_list)
+	->addTab('template_tab', _('Template'), $template_tab)
+	->addTab('tags_tab', _('Tags'), $tags_tab)
 	->setSelected(0);
 
 // Macros.
@@ -172,6 +158,7 @@ $form->addItem(new CJsScript($this->readJsFile('popup.massupdate.macros.js.php')
 
 $output = [
 	'header' => $data['title'],
+	'doc_url' => CDocHelper::getUrl(CDocHelper::POPUP_MASSUPDATE_TEMPLATE),
 	'body' => $form->toString(),
 	'buttons' => [
 		[

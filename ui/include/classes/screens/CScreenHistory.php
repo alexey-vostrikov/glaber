@@ -154,7 +154,7 @@ class CScreenHistory extends CScreenBase {
 			return;
 		}
 
-		$items = CMacrosResolverHelper::resolveItemNames($items);
+	///	$items = CMacrosResolverHelper::resolveItemNames($items);
 
 		$iv_string = [
 			ITEM_VALUE_TYPE_LOG => 1,
@@ -377,7 +377,7 @@ class CScreenHistory extends CScreenBase {
 					$row[] = $cell_clock;
 
 					if ($is_many_items) {
-						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name_expanded']))
+						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name']))
 							->addClass($color);
 					}
 
@@ -409,7 +409,7 @@ class CScreenHistory extends CScreenBase {
 						}
 					}
 
-					$row[] = (new CCol(new CPre(zbx_nl2br($data['value']))))->addClass(getSeverityStatusStyle($severity));
+					$row[] = (new CCol(new CPre(zbx_nl2br($data['value']))))->addClass(CSeverityHelper::getStatusStyle($severity));
 
 					$history_table->addRow($row);
 				}
@@ -492,9 +492,9 @@ class CScreenHistory extends CScreenBase {
 						['field' => 'ns', 'order' => ZBX_SORT_DOWN]
 					]);
 
-					$table_header[] = (new CColHeader($item['name_expanded']))
+					$table_header[] = (new CColHeader($item['name']))
 						->addClass('vertical_rotation')
-						->setTitle($item['name_expanded']);
+						->setTitle($item['name']);
 					$history_data_index = 0;
 
 					foreach ($item_data as $item_data_row) {

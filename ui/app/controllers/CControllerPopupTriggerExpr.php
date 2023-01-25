@@ -28,6 +28,7 @@ class CControllerPopupTriggerExpr extends CController {
 	private $param1Str = [];
 	private $param2SecCount = [];
 	private $param2SecMode = [];
+	private $param2SecCountMode = [];
 	private $param3SecVal = [];
 	private $param_find = [];
 	private $param3SecPercent = [];
@@ -41,6 +42,7 @@ class CControllerPopupTriggerExpr extends CController {
 	private $functions = [];
 	private $operators = ['=', '<>', '>', '<', '>=', '<='];
 	private $period_optional = [];
+	private $period_seasons = [];
 
 	protected function init() {
 		$this->disableSIDvalidation();
@@ -97,6 +99,36 @@ class CControllerPopupTriggerExpr extends CController {
 			]
 		];
 
+		$this->period_seasons = [
+			'last' => [
+				'C' => _('Period').' (T)',
+				'T' => T_ZBX_INT,
+				'A' => true
+			],
+			'period_shift' => [
+				'C' => _('Period shift'),
+				'T' => T_ZBX_INT,
+				'A' => true
+			],
+			'season_unit' => [
+				'C' => _('Season'),
+				'T' => T_ZBX_STR,
+				'A' => true,
+				'options' => [
+					'h' => _('Hour'),
+					'd' => _('Day'),
+					'w' => _('Week'),
+					'M' => _("Month"),
+					'y' => _('Year')
+				]
+			],
+			'num_seasons' => [
+				'C' => _('Number of seasons'),
+				'T' => T_ZBX_INT,
+				'A' => true
+			]
+		];
+
 		$this->param1Sec = [
 			'last' => [
 				'C' => _('Last of').' (T)',
@@ -132,6 +164,25 @@ class CControllerPopupTriggerExpr extends CController {
 				'C' => _('Last of').' (T)',
 				'T' => T_ZBX_INT,
 				'A' => true
+			],
+			'mode' => [
+				'C' => 'Mode',
+				'T' => T_ZBX_STR,
+				'A' => false
+			]
+		];
+
+		$this->param2SecCountMode = [
+			'last' => [
+				'C' => _('Last of').' (T)',
+				'T' => T_ZBX_INT,
+				'M' => $this->metrics,
+				'A' => true
+			],
+			'shift' => [
+				'C' => _('Time shift'),
+				'T' => T_ZBX_INT,
+				'A' => false
 			],
 			'mode' => [
 				'C' => 'Mode',
@@ -455,6 +506,13 @@ class CControllerPopupTriggerExpr extends CController {
 				'allowed_types' => $this->allowedTypesAny,
 				'operators' => $this->operators
 			],
+			'changecount' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('changecount() - Number of changes between adjacent values, Mode (all - all changes, inc - only increases, dec - only decreases)'),
+				'params' => $this->param2SecCountMode,
+				'allowed_types' => $this->allowedTypesAny,
+				'operators' => $this->operators
+			],
 			'char' => [
 				'types' => [ZBX_FUNCTION_TYPE_STRING],
 				'description' => _('char() - Returns the character which represents the given ASCII code'),
@@ -759,6 +817,20 @@ class CControllerPopupTriggerExpr extends CController {
 				'allowed_types' => $this->allowedTypesNumeric,
 				'operators' => $this->operators
 			],
+			'monodec' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('monodec() - Check for continuous item value decrease (1 - data is monotonic, 0 - otherwise), Mode (strict - require strict monotonicity)'),
+				'params' => $this->param2SecCountMode,
+				'allowed_types' => $this->allowedTypesNumeric,
+				'operators' => ['=', '<>']
+			],
+			'monoinc' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('monoinc() - Check for continuous item value increase (1 - data is monotonic, 0 - otherwise), Mode (strict - require strict monotonicity)'),
+				'params' => $this->param2SecCountMode,
+				'allowed_types' => $this->allowedTypesNumeric,
+				'operators' => ['=', '<>']
+			],
 			'nodata' => [
 				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
 				'description' => _('nodata() - No data received during period of time T (1 - true, 0 - false), Mode (strict - ignore proxy time delay in sending data)'),
@@ -808,6 +880,13 @@ class CControllerPopupTriggerExpr extends CController {
 				'types' => [ZBX_FUNCTION_TYPE_MATH],
 				'description' => _('rand() - A random integer value'),
 				'allowed_types' => $this->allowedTypesAny
+			],
+			'rate' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('rate() - Returns per-second average rate for monotonically increasing counters'),
+				'params' => $this->param1Sec + $this->period_optional,
+				'allowed_types' => $this->allowedTypesNumeric,
+				'operators' => $this->operators
 			],
 			'repeat' => [
 				'types' => [ZBX_FUNCTION_TYPE_STRING],
@@ -969,6 +1048,20 @@ class CControllerPopupTriggerExpr extends CController {
 				'allowed_types' => $this->allowedTypesNumeric,
 				'operators' => $this->operators
 			],
+			'baselinedev' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('baselinedev() - Returns the number of deviations between data periods in seasons and the last data period'),
+				'params' => $this->period_seasons,
+				'allowed_types' => $this->allowedTypesNumeric,
+				'operators' => $this->operators
+			],
+			'baselinewma' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('baselinewma() - Calculates baseline by averaging data periods in seasons'),
+				'params' => $this->period_seasons,
+				'allowed_types' => $this->allowedTypesNumeric,
+				'operators' => $this->operators
+			],
 			'trendcount' => [
 				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
 				'description' => _('trendcount() - Number of successfully retrieved values for period T'),
@@ -987,6 +1080,49 @@ class CControllerPopupTriggerExpr extends CController {
 				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
 				'description' => _('trendmin() - Minimum value for period T with exact period shift'),
 				'params' => $this->param1Period,
+				'allowed_types' => $this->allowedTypesNumeric,
+				'operators' => $this->operators
+			],
+			'trendstl' => [
+				'types' => [ZBX_FUNCTION_TYPE_HISTORY],
+				'description' => _('trendstl() - Anomaly detection for period T'),
+				'params' => [
+					'last' => [
+						'C' => _('Evaluation period').' (T)',
+						'T' => T_ZBX_INT,
+						'A' => true
+					],
+					'period_shift' => [
+						'C' => _('Period shift'),
+						'T' => T_ZBX_INT,
+						'A' => true
+					],
+					'detect_period' => [
+						'C' => _('Detection period'),
+						'T' => T_ZBX_STR,
+						'A' => true
+					],
+					'season' => [
+						'C' => _('Season'),
+						'T' => T_ZBX_INT,
+						'A' => true
+					],
+					'deviations' => [
+						'C' => _('Deviations'),
+						'T' => T_ZBX_DBL,
+						'A' => false
+					],
+					'algorithm' => [
+						'C' => _('Algorithm'),
+						'T' => T_ZBX_STR,
+						'A' => false
+					],
+					'season_window' => [
+						'C' => _('Season deviation window'),
+						'T' => T_ZBX_INT,
+						'A' => false
+					]
+				],
 				'allowed_types' => $this->allowedTypesNumeric,
 				'operators' => $this->operators
 			],
@@ -1046,6 +1182,7 @@ class CControllerPopupTriggerExpr extends CController {
 		$fields = [
 			'dstfrm' =>				'string|fatal',
 			'dstfld1' =>			'string|not_empty',
+			'context' =>			'required|string|in host,template',
 			'expression' =>			'string',
 			'itemid' =>				'db items.itemid',
 			'parent_discoveryid' =>	'db items.itemid',
@@ -1059,22 +1196,17 @@ class CControllerPopupTriggerExpr extends CController {
 			'add' =>				'in 1'
 		];
 
-		$ret = $this->validateInput($fields);
+		$ret = $this->validateInput($fields) || !$this->hasInput('add');
 
 		if (!$ret) {
-			$output = [];
-			if (($messages = getMessages()) !== null) {
-				$output['errors'] = $messages->toString();
-			}
-
-			if ($this->hasInput('add')) {
-				$this->setResponse(
-					(new CControllerResponseData(['main_block' => json_encode($output)]))->disableView()
-				);
-			}
-			else {
-				$ret = true;
-			}
+			$this->setResponse(
+				(new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'title' => _('Cannot insert trigger expression'),
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])]))->disableView()
+			);
 		}
 
 		return $ret;
@@ -1187,7 +1319,7 @@ class CControllerPopupTriggerExpr extends CController {
 						$key = $hist_function_token['data']['parameters'][0]['data']['item'];
 
 						$items = API::Item()->get([
-							'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type'],
+							'output' => ['itemid', 'name', 'key_', 'value_type'],
 							'selectHosts' => ['name'],
 							'webitems' => true,
 							'filter' => [
@@ -1198,7 +1330,7 @@ class CControllerPopupTriggerExpr extends CController {
 
 						if (!$items) {
 							$items = API::ItemPrototype()->get([
-								'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type'],
+								'output' => ['itemid', 'name', 'key_', 'value_type'],
 								'selectHosts' => ['name'],
 								'filter' => [
 									'host' => $host,
@@ -1252,7 +1384,7 @@ class CControllerPopupTriggerExpr extends CController {
 		// Opening an empty form or switching a function.
 		else {
 			$item = API::Item()->get([
-				'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type'],
+				'output' => ['itemid', 'name', 'key_', 'value_type'],
 				'selectHosts' => ['host', 'name'],
 				'itemids' => $itemid,
 				'webitems' => true,
@@ -1263,14 +1395,11 @@ class CControllerPopupTriggerExpr extends CController {
 		}
 
 		if ($item) {
-			$items = CMacrosResolverHelper::resolveItemNames([$item]);
-			$item = $items[0];
-
 			$itemid = $item['itemid'];
 			$item_value_type = $item['value_type'];
 			$item_key = $item['key_'];
 			$item_host_data = reset($item['hosts']);
-			$description = $item_host_data['name'].NAME_DELIMITER.$item['name_expanded'];
+			$description = $item_host_data['name'].NAME_DELIMITER.$item['name'];
 		}
 		else {
 			$item_key = '';
@@ -1293,6 +1422,7 @@ class CControllerPopupTriggerExpr extends CController {
 			'parent_discoveryid' => $this->getInput('parent_discoveryid', ''),
 			'dstfrm' => $this->getInput('dstfrm'),
 			'dstfld1' => $dstfld1,
+			'context' => $this->getInput('context'),
 			'itemid' => $itemid,
 			'value' => $value,
 			'params' => $params,
@@ -1352,14 +1482,23 @@ class CControllerPopupTriggerExpr extends CController {
 				}
 				elseif ($data['item_description']) {
 					// Quote function string parameters.
-					foreach ($data['params'] as $param_key => $param) {
-						if (!in_array($param_key, ['v', 'o', 'chars', 'fit', 'mode', 'pattern', 'replace', 'string'])
-								|| !array_key_exists($param_key, $data['params'])
-								|| $data['params'][$param_key] === '') {
-							continue;
-						}
+					$quote_params = [
+						'algorithm',
+						'chars',
+						'fit',
+						'mode',
+						'o',
+						'pattern',
+						'replace',
+						'season_unit',
+						'string',
+						'v'
+					];
+					$quote_params = array_intersect_key($data['params'], array_fill_keys($quote_params, ''));
+					$quote_params = array_filter($quote_params, 'strlen');
 
-						$data['params'][$param_key] = quoteFunctionParam($param, true);
+					foreach ($quote_params as $param_key => $param) {
+						$data['params'][$param_key] = CExpressionParser::quoteString($param);
 					}
 
 					// Combine sec|#num and <time_shift|period_shift> parameters into one.
@@ -1436,12 +1575,14 @@ class CControllerPopupTriggerExpr extends CController {
 			}
 			catch (Exception $e) {
 				error($e->getMessage());
-				error(_('Cannot insert trigger expression'));
 			}
 
-			if (($messages = getMessages()) !== null) {
+			if ($messages = get_and_clear_messages()) {
 				$output = [
-					'errors' => $messages->toString()
+					'error' => [
+						'title' => _('Cannot insert trigger expression'),
+						'messages' => array_column($messages, 'message')
+					]
 				];
 			}
 			else {
@@ -1460,7 +1601,7 @@ class CControllerPopupTriggerExpr extends CController {
 			$this->setResponse(new CControllerResponseData(
 				$data + [
 					'title' => _('Condition'),
-					'errors' => hasErrorMesssages() ? getMessages() : null,
+					'messages' => hasErrorMessages() ? getMessages() : null,
 					'user' => [
 						'debug_mode' => $this->getDebugMode()
 					]

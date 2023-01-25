@@ -21,21 +21,23 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
 require_once dirname(__FILE__).'/js/configuration.triggers.list.js.php';
 
-$hg_ms_params = ($data['context'] === 'host') ? ['real_hosts' => 1] : ['templated_hosts' => 1];
+$hg_ms_params = $data['context'] === 'host' ? ['with_hosts' => true] : ['with_templates' => true];
 
 $filter_column1 = (new CFormList())
-	->addRow((new CLabel(_('Host groups'), 'filter_groupids')),
+	->addRow(
+		new CLabel($data['context'] === 'host' ? _('Host groups') : _('Template groups'), 'filter_groupids__ms'),
 		(new CMultiSelect([
 			'name' => 'filter_groupids[]',
-			'object_name' => 'hostGroup',
+			'object_name' => $data['context'] === 'host' ? 'hostGroup' : 'templateGroup',
 			'data' => $data['filter_groupids_ms'],
 			'popup' => [
 				'parameters' => [
-					'srctbl' => 'host_groups',
+					'srctbl' =>  $data['context'] === 'host' ? 'host_groups' : 'template_groups',
 					'srcfld1' => 'groupid',
 					'dstfrm' => 'groupids',
 					'dstfld1' => 'filter_groupids_',
@@ -45,17 +47,19 @@ $filter_column1 = (new CFormList())
 			]
 		]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 	)
-	->addRow((new CLabel(($data['context'] === 'host') ? _('Hosts') : _('Templates'), 'filter_hostids')),
+	->addRow(
+		(new CLabel(($data['context'] === 'host') ? _('Hosts') : _('Templates'), 'filter_hostids__ms')),
 		(new CMultiSelect([
 			'name' => 'filter_hostids[]',
-			'object_name' => ($data['context'] === 'host') ? 'hosts' : 'templates',
+			'object_name' => $data['context'] === 'host' ? 'hosts' : 'templates',
 			'data' => $data['filter_hostids_ms'],
 			'popup' => [
-				'filter_preselect_fields' => [
-					'hostgroups' => 'filter_groupids_'
+				'filter_preselect' => [
+					'id' => 'filter_groupids_',
+					'submit_as' => 'groupid'
 				],
 				'parameters' => [
-					'srctbl' => ($data['context'] === 'host') ? 'hosts' : 'templates',
+					'srctbl' => $data['context'] === 'host' ? 'hosts' : 'templates',
 					'srcfld1' => 'hostid',
 					'dstfrm' => 'hostids',
 					'dstfld1' => 'filter_hostids_',
@@ -68,16 +72,6 @@ $filter_column1 = (new CFormList())
 		(new CTextBox('filter_name', $data['filter_name']))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 	)
 	->addRow(_('Severity'),	(new CSeverityCheckBoxList('filter_priority'))->setChecked($data['filter_priority']));
-
-if ($data['context'] === 'host') {
-	$filter_column1->addRow(_('State'),
-		(new CRadioButtonList('filter_state', (int) $data['filter_state']))
-			->addValue(_('all'), -1)
-			->addValue(_('Normal'), TRIGGER_STATE_NORMAL)
-			->addValue(_('Unknown'), TRIGGER_STATE_UNKNOWN)
-			->setModern(true)
-	);
-}
 
 $filter_column1->addRow(_('Status'),
 	(new CRadioButtonList('filter_status', (int) $data['filter_status']))
@@ -93,6 +87,7 @@ if ($data['context'] === 'host') {
 			->addValue(_('all'), -1)
 			->addValue(_('Ok'), TRIGGER_VALUE_FALSE)
 			->addValue(_('Problem'), TRIGGER_VALUE_TRUE)
+            ->addValue(_('UNKNOWN'), TRIGGER_VALUE_UNKNOWN)
 			->setModern(true)
 	);
 }
@@ -135,35 +130,44 @@ $filter_column2->addRow(_('With dependencies'),
 		->setModern(true)
 );
 
-$filter = (new CFilter((new CUrl('triggers.php'))->setArgument('context', $data['context'])))
+$filter = (new CFilter())
+	->setResetUrl((new CUrl('triggers.php'))->setArgument('context', $data['context']))
 	->setProfile($data['profileIdx'])
 	->setActiveTab($data['active_tab'])
-	->addvar('context', $data['context'])
+	->addvar('context', $data['context'], 'filter_context')
 	->addFilterTab(_('Filter'), [$filter_column1, $filter_column2]);
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Triggers'))
-	->setControls(new CList([
-		(new CTag('nav', true, ($data['single_selected_hostid'] != 0)
-			? new CRedirectButton(_('Create trigger'), (new CUrl('triggers.php'))
-				->setArgument('hostid', $data['single_selected_hostid'])
-				->setArgument('form', 'create')
-				->setArgument('context', $data['context'])
-				->getUrl()
-			)
-			: (new CButton('form',
-				($data['context'] === 'host')
-					? _('Create trigger (select host first)')
-					: _('Create trigger (select template first)')
-			))->setEnabled(false)
+	->setDocUrl(CDocHelper::getUrl($data['context'] === 'host'
+		? CDocHelper::DATA_COLLECTION_HOST_TRIGGERS_LIST
+		: CDocHelper::DATA_COLLECTION_TEMPLATE_TRIGGERS_LIST
+	))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(
+					$data['single_selected_hostid'] != 0
+						? new CRedirectButton(_('Create trigger'),
+							(new CUrl('triggers.php'))
+								->setArgument('hostid', $data['single_selected_hostid'])
+								->setArgument('form', 'create')
+								->setArgument('context', $data['context'])
+						)
+						: (new CButton('form',
+							$data['context'] === 'host'
+								? _('Create trigger (select host first)')
+								: _('Create trigger (select template first)')
+						))->setEnabled(false)
+				)
 		))->setAttribute('aria-label', _('Content controls'))
-	]));
+	);
 
 if ($data['single_selected_hostid'] != 0) {
-	$widget->setNavigation(getHostNavigation('triggers', $data['single_selected_hostid']));
+	$html_page->setNavigation(getHostNavigation('triggers', $data['single_selected_hostid']));
 }
 
-$widget->addItem($filter);
+$html_page->addItem($filter);
 
 $url = (new CUrl('triggers.php'))
 	->setArgument('context', $data['context'])
@@ -173,7 +177,7 @@ $url = (new CUrl('triggers.php'))
 $triggers_form = (new CForm('post', $url))
 	->setName('triggersForm')
 	->addVar('checkbox_hash', $data['checkbox_hash'])
-	->addVar('context', $data['context']);
+	->addVar('context', $data['context'], 'form_context');
 
 // create table
 $triggers_table = (new CTableInfo())->setHeader([
@@ -241,7 +245,7 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 			$dep_trigger = $data['dep_triggers'][$dependency['triggerid']];
 
 			$dep_trigger_desc = CHtml::encode(
-				implode(', ', zbx_objectValues($dep_trigger['hosts'], 'name')).NAME_DELIMITER.$dep_trigger['description']
+				implode(', ', array_column($dep_trigger['hosts'], 'name')).NAME_DELIMITER.$dep_trigger['description']
 			);
 
 			$trigger_deps[] = (new CLink($dep_trigger_desc,
@@ -275,7 +279,7 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 
 	// status
 	$status = (new CLink(
-		triggerIndicator($trigger['status'], $trigger['state']),
+		triggerAdminStatusStr($trigger['status']),
 		(new CUrl('triggers.php'))
 			->setArgument('g_triggerid', $triggerid)
 			->setArgument('action', ($trigger['status'] == TRIGGER_STATUS_DISABLED)
@@ -286,7 +290,7 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 			->getUrl()
 		))
 		->addClass(ZBX_STYLE_LINK_ACTION)
-		->addClass(triggerIndicatorStyle($trigger['status'], $trigger['state']))
+		->addClass(triggerIndicatorStyleByValue($trigger['status'], $trigger['value']))
 		->addSID();
 
 	// hosts
@@ -311,15 +315,15 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 	}
 
 	$host = reset($trigger['hosts']);
+	
 	$trigger_value = ($host['status'] == HOST_STATUS_MONITORED || $host['status'] == HOST_STATUS_NOT_MONITORED)
-		? (new CSpan(trigger_value2str($trigger['value'])))->addClass(
-			($trigger['value'] == TRIGGER_VALUE_TRUE) ? ZBX_STYLE_PROBLEM_UNACK_FG : ZBX_STYLE_OK_UNACK_FG
-		)
-		: '';
+		? (new CSpan(trigger_value2str($trigger['value'])))
+			->addClass(triggerValueClass($trigger['value']),
+		): '';
 
 	$triggers_table->addRow([
 		new CCheckBox('g_triggerid['.$triggerid.']', $triggerid),
-		getSeverityCell($trigger['priority']),
+		CSeverityHelper::makeSeverityCell((int) $trigger['priority']),
 		$data['show_value_column'] ? $trigger_value : null,
 		$hosts,
 		$description,
@@ -342,7 +346,12 @@ $triggers_form->addItem([
 			'trigger.masscopyto' => ['name' => _('Copy')],
 			'popup.massupdate.trigger' => [
 				'content' => (new CButton('', _('Mass update')))
-					->onClick("return openMassupdatePopup(this, 'popup.massupdate.trigger');")
+					->onClick(
+						"openMassupdatePopup('popup.massupdate.trigger', {}, {
+							dialogue_class: 'modal-popup-static',
+							trigger_element: this
+						});"
+					)
 					->addClass(ZBX_STYLE_BTN_ALT)
 					->removeAttribute('id')
 			],
@@ -352,7 +361,10 @@ $triggers_form->addItem([
 	)
 ]);
 
-// append form to widget
-$widget->addItem($triggers_form);
+$html_page
+	->addItem($triggers_form)
+	->show();
 
-$widget->show();
+(new CScriptTag('view.init();'))
+	->setOnDocumentReady()
+	->show();

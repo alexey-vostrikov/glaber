@@ -17,8 +17,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "comms.h"
+#include "zbxcommon.h"
+#include "zbxcomms.h"
+#include "zbxsysinfo.h"
 #include "log.h"
 #include "glb_poller.h"
 #include "poller_tcp.h"
@@ -27,11 +28,11 @@
 static void* item_init(poller_item_t* poller_item, DC_ITEM *dc_item) {
 
     AGENT_REQUEST	request;
-    init_request(&request);
+    zbx_init_agent_request(&request);
     u_int32_t port;
     char *ret = (char *)1;
 
-	if (SUCCEED != parse_item_key(dc_item->key, &request))
+	if (SUCCEED != zbx_parse_item_key(dc_item->key, &request))
 	{
 		poller_preprocess_error(poller_item,"Invalid item key format.");
         ret = NULL;
@@ -48,20 +49,20 @@ static void* item_init(poller_item_t* poller_item, DC_ITEM *dc_item) {
     
     DEBUG_ITEM(dc_item->itemid, "Setting new interface to %s, old was %s", ip_str, dc_item->interface.addr);
 	if (NULL != ip_str && '\0' != *ip_str) {
-    	zbx_snprintf(dc_item->interface.dns_orig, INTERFACE_DNS_LEN_MAX, "%s", ip_str);
+    	zbx_snprintf(dc_item->interface.dns_orig, ZBX_INTERFACE_DNS_LEN_MAX, "%s", ip_str);
         dc_item->interface.addr = dc_item->interface.dns_orig;
         dc_item->interface.useip = 0;
     }
 
     DEBUG_ITEM(dc_item->itemid, "Set new interface to %s:%s", ip_str, port_str);
 
-	if (NULL == port_str || '\0' == *port_str || SUCCEED != is_ushort(port_str, &dc_item->interface.port))
+	if (NULL == port_str || '\0' == *port_str || SUCCEED != zbx_is_ushort(port_str, &dc_item->interface.port))
 	{
 		poller_preprocess_error(poller_item,"Invalid number of parameters in key");
         ret = NULL;
 	}
 
-    free_request(&request);
+    zbx_free_agent_request(&request);
     return ret;   
 }
 

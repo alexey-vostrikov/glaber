@@ -61,7 +61,9 @@ CArrayHelper::sort($db_media_types, ['name']);
 
 $media_types = array_column($db_media_types, 'name', 'mediatypeid');
 
-$widget = (new CWidget())->setTitle(_('Notifications'));
+$html_page = (new CHtmlPage())
+	->setTitle(_('Notifications'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::REPORT4));
 
 if ($media_types) {
 	$table = (new CTableInfo())->makeVerticalRotation();
@@ -119,7 +121,7 @@ if ($media_types) {
 		]);
 	}
 
-	$widget->setControls((new CForm('get'))
+	$html_page->setControls((new CForm('get'))
 		->cleanItems()
 		->setAttribute('aria-label', _('Main filter'))
 		->addItem($controls)
@@ -256,7 +258,7 @@ else {
 	$table = new CTableInfo();
 }
 
-$widget
+$html_page
 	->addItem($table)
 	->show();
 

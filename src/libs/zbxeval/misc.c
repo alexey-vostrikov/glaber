@@ -17,21 +17,18 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "log.h"
+#include "eval.h"
 
+#include "zbxstr.h"
+#include "log.h"
 #include "zbxalgo.h"
-#include "../zbxalgo/vectorimpl.h"
 #include "zbxvariant.h"
 #include "zbxserialize.h"
-#include "zbxserver.h"
-#include "eval.h"
+#include "zbxnum.h"
 
 #define ZBX_EVAL_STATIC_BUFFER_SIZE	4096
 
 /******************************************************************************
- *                                                                            *
- * Function: reserve_buffer                                                   *
  *                                                                            *
  * Purpose: reserve number of bytes in the specified buffer, reallocating if  *
  *          necessary                                                         *
@@ -145,8 +142,6 @@ static zbx_uint32_t	deserialize_variant(const unsigned char *ptr,  zbx_variant_t
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_eval_serialize                                               *
- *                                                                            *
  * Purpose: serialize evaluation context into buffer                          *
  *                                                                            *
  * Parameters: ctx         - [IN] the evaluation context                      *
@@ -209,8 +204,6 @@ size_t	zbx_eval_serialize(const zbx_eval_context_t *ctx, zbx_mem_malloc_func_t m
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_eval_deserialize                                             *
- *                                                                            *
  * Purpose: deserialize evaluation context from buffer                        *
  *                                                                            *
  * Parameters: ctx        - [OUT] the evaluation context                      *
@@ -261,8 +254,6 @@ static int	compare_tokens_by_loc(const void *d1, const void *d2)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: eval_token_print_alloc                                           *
  *                                                                            *
  * Purpose: print token into string quoting/escaping if necessary             *
  *                                                                            *
@@ -349,8 +340,6 @@ static void	eval_token_print_alloc(const zbx_eval_context_t *ctx, char **str, si
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_eval_compose_expression                                      *
- *                                                                            *
  * Purpose: compose expression by replacing processed tokens (with values) in *
  *          the original expression                                           *
  *                                                                            *
@@ -406,8 +395,6 @@ void	zbx_eval_compose_expression(const zbx_eval_context_t *ctx, char **expressio
 
 /******************************************************************************
  *                                                                            *
- * Function: eval_has_usermacro                                               *
- *                                                                            *
  * Purpose: check if string has possible user macro                           *
  *                                                                            *
  * Parameters: str - [IN] the string to check                                 *
@@ -440,31 +427,25 @@ static int	eval_has_usermacro(const char *str, size_t len)
 
 /******************************************************************************
  *                                                                            *
- * Function: eval_query_expand_user_macros                                    *
- *                                                                            *
  * Purpose: expand user macros in item query                                  *
  *                                                                            *
- * Parameters: itemquery   - [IN] the evaluation context                      *
+ * Parameters: um_handle   - [IN] the user macro cache handle                 *
+ *             itemquery   - [IN] the evaluation context                      *
  *             len         - [IN] the item query length                       *
  *             hostids     - [IN] the linked hostids                          *
  *             hostids_num - [IN] the number of linked hostids                *
- *             resolver_cb - [IN] the resolver callback                       *
  *             out         - [OUT] the item query with expanded macros        *
  *             error       - [OUT] the error message, optional. If specified  *
  *                                 the function will return failure at the    *
  *                                 first failed macro expansion               *
  *                                                                            *
- * Return value: SUCCEED - the macros were expanded successfully              *
- *               FAIL    - error parameter was given and at least one of      *
- *                         macros was not expanded                            *
- *                                                                            *
  ******************************************************************************/
-static int	eval_query_expand_user_macros(const char *itemquery, size_t len, zbx_uint64_t *hostids, int hostids_num,
-		zbx_macro_resolve_func_t resolver_cb, char **out, char **error)
+static int	eval_query_expand_user_macros(const char *itemquery, size_t len, const zbx_uint64_t *hostids,
+		int hostids_num, zbx_macro_expand_func_t um_expand_cb, void *um_data, char **out, char **error)
 {
 	zbx_eval_context_t	ctx;
 	zbx_item_query_t	query;
-	int			i, ret = SUCCEED;
+	int			i, ret = FAIL;
 	char			*errmsg = NULL, *filter = NULL;
 
 	if (len != zbx_eval_parse_query(itemquery, len, &query))
@@ -478,16 +459,18 @@ static int	eval_query_expand_user_macros(const char *itemquery, size_t len, zbx_
 	}
 
 	if (NULL == query.filter)
+	{
+		ret = SUCCEED;
 		goto out;
+	}
 
 	if (SUCCEED != zbx_eval_parse_expression(&ctx, query.filter,
 			ZBX_EVAL_PARSE_QUERY_EXPRESSION | ZBX_EVAL_COMPOSE_QUOTE, &errmsg))
 	{
 		if (NULL != error)
-		{
-			ret = FAIL;
 			*error = zbx_dsprintf(NULL, "cannot parse item query filter: %s", errmsg);
-		}
+		else
+			ret = SUCCEED;
 
 		zbx_free(errmsg);
 		goto out;
@@ -496,13 +479,13 @@ static int	eval_query_expand_user_macros(const char *itemquery, size_t len, zbx_
 	for (i = 0; i < ctx.stack.values_num; i++)
 	{
 		zbx_eval_token_t	*token = &ctx.stack.values[i];
-		char			*value, *tmp;
+		char			*value = NULL;
 
 		switch (token->type)
 		{
 			case ZBX_EVAL_TOKEN_VAR_USERMACRO:
-				ret = resolver_cb(ctx.expression + token->loc.l, token->loc.r - token->loc.l + 1,
-						hostids, hostids_num, &value, error);
+				value = zbx_substr_unquote(ctx.expression, token->loc.l, token->loc.r);
+				ret = um_expand_cb(um_data, &value, hostids, hostids_num, error);
 				break;
 			case ZBX_EVAL_TOKEN_VAR_STR:
 				if (SUCCEED != eval_has_usermacro(ctx.expression + token->loc.l,
@@ -510,20 +493,21 @@ static int	eval_query_expand_user_macros(const char *itemquery, size_t len, zbx_
 				{
 					continue;
 				}
-				tmp = zbx_substr_unquote(ctx.expression, token->loc.l, token->loc.r);
-				ret = resolver_cb(tmp, strlen(tmp), hostids, hostids_num, &value, error);
-				zbx_free(tmp);
+				value = zbx_substr_unquote(ctx.expression, token->loc.l, token->loc.r);
+				ret = um_expand_cb(um_data, &value, hostids, hostids_num, error);
 				break;
 			default:
 				continue;
 		}
 
-		if (SUCCEED != ret)
+		if (FAIL == ret)
 		{
+			zbx_free(value);
 			zbx_eval_clear(&ctx);
 			goto out;
 		}
 
+		zbx_variant_clear(&token->value);
 		zbx_variant_set_str(&token->value, value);
 	}
 
@@ -531,7 +515,7 @@ static int	eval_query_expand_user_macros(const char *itemquery, size_t len, zbx_
 	zbx_eval_clear(&ctx);
 
 	*out = zbx_dsprintf(NULL, "/%s/%s?[%s]", ZBX_NULL2EMPTY_STR(query.host), query.key, filter);
-
+	ret = SUCCEED;
 out:
 	zbx_free(filter);
 	zbx_eval_clear_query(&query);
@@ -541,14 +525,13 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_eval_expand_user_macros                                      *
- *                                                                            *
  * Purpose: expand user macros in parsed expression                           *
  *                                                                            *
  * Parameters: ctx         - [IN] the evaluation context                      *
  *             hostids     - [IN] the linked hostids                          *
  *             hostids_num - [IN] the number of linked hostids                *
- *             resolver_cb - [IN] the resolver callback                       *
+ *             um_expand_cb- [IN] the resolver callback                       *
+ *             um_data     - [IN] the resolver callback data                  *
  *             error       - [OUT] the error message, optional. If specified  *
  *                                 the function will return failure at the    *
  *                                 first failed macro expansion               *
@@ -558,23 +541,40 @@ out:
  *                         macros was not expanded                            *
  *                                                                            *
  ******************************************************************************/
-int	zbx_eval_expand_user_macros(const zbx_eval_context_t *ctx, zbx_uint64_t *hostids, int hostids_num,
-		zbx_macro_resolve_func_t resolver_cb, char **error)
+int	zbx_eval_expand_user_macros(const zbx_eval_context_t *ctx, const zbx_uint64_t *hostids, int hostids_num,
+		zbx_macro_expand_func_t um_expand_cb, void *data, char **error)
 {
-	int	i, ret = SUCCEED;
+	int	i;
 
 	for (i = 0; i < ctx->stack.values_num; i++)
 	{
 		zbx_eval_token_t	*token = &ctx->stack.values[i];
-		char			*value = NULL, *tmp;
+		char			*value = NULL;
+		int			ret;
 
 		switch (token->type)
 		{
 			case ZBX_EVAL_TOKEN_VAR_USERMACRO:
-				ret = resolver_cb(ctx->expression + token->loc.l, token->loc.r - token->loc.l + 1,
-						hostids, hostids_num, &value, error);
+				value = zbx_substr_unquote(ctx->expression, token->loc.l, token->loc.r);
+				ret = um_expand_cb(data, &value, hostids, hostids_num, error);
 				break;
 			case ZBX_EVAL_TOKEN_VAR_STR:
+				if (SUCCEED != eval_has_usermacro(ctx->expression + token->loc.l,
+						token->loc.r - token->loc.l + 1))
+				{
+					continue;
+				}
+				if (ZBX_VARIANT_NONE != token->value.type)
+				{
+					zbx_variant_convert(&token->value, ZBX_VARIANT_STR);
+					value = token->value.data.str;
+					zbx_variant_set_none(&token->value);
+				}
+				else
+					value = zbx_substr_unquote(ctx->expression, token->loc.l, token->loc.r);
+
+				ret = um_expand_cb(data, &value, hostids, hostids_num, error);
+				break;
 			case ZBX_EVAL_TOKEN_VAR_NUM:
 			case ZBX_EVAL_TOKEN_ARG_PERIOD:
 				if (SUCCEED != eval_has_usermacro(ctx->expression + token->loc.l,
@@ -582,9 +582,8 @@ int	zbx_eval_expand_user_macros(const zbx_eval_context_t *ctx, zbx_uint64_t *hos
 				{
 					continue;
 				}
-				tmp = zbx_substr_unquote(ctx->expression, token->loc.l, token->loc.r);
-				ret = resolver_cb(tmp, strlen(tmp), hostids, hostids_num, &value, error);
-				zbx_free(tmp);
+				value = zbx_substr_unquote(ctx->expression, token->loc.l, token->loc.r);
+				ret = um_expand_cb(data, &value, hostids, hostids_num, error);
 				break;
 			case ZBX_EVAL_TOKEN_ARG_QUERY:
 				if (SUCCEED != eval_has_usermacro(ctx->expression + token->loc.l,
@@ -593,26 +592,30 @@ int	zbx_eval_expand_user_macros(const zbx_eval_context_t *ctx, zbx_uint64_t *hos
 					continue;
 				}
 				ret = eval_query_expand_user_macros(ctx->expression + token->loc.l,
-						token->loc.r - token->loc.l + 1, hostids, hostids_num, resolver_cb,
-						&value, error);
+						token->loc.r - token->loc.l + 1, hostids, hostids_num,
+						um_expand_cb, data, &value, error);
 				break;
 			default:
 				continue;
 		}
 
-		if (SUCCEED != ret)
+		if (FAIL == ret)
+		{
+			zbx_free(value);
 			return FAIL;
+		}
 
 		if (NULL != value)
+		{
+			zbx_variant_clear(&token->value);
 			zbx_variant_set_str(&token->value, value);
+		}
 	}
 
 	return SUCCEED;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_set_exception                                           *
  *                                                                            *
  * Purpose: set eval context to exception that will be returned when executed *
  *                                                                            *
@@ -639,8 +642,6 @@ void	zbx_eval_set_exception(zbx_eval_context_t *ctx, char *message)
 
 /******************************************************************************
  *                                                                            *
- * Function: expression_extract_functionid                                    *
- *                                                                            *
  * Purpose: extract functionid from token                                     *
  *                                                                            *
  * Parameters: expression - [IN] the original expression                      *
@@ -666,7 +667,7 @@ static int	expression_extract_functionid(const char *expression, zbx_eval_token_
 			*functionid = token->value.data.ui64;
 			return SUCCEED;
 		case ZBX_VARIANT_NONE:
-			if (SUCCEED != is_uint64_n(expression + token->loc.l + 1, token->loc.r - token->loc.l - 1,
+			if (SUCCEED != zbx_is_uint64_n(expression + token->loc.l + 1, token->loc.r - token->loc.l - 1,
 					functionid))
 			{
 				THIS_SHOULD_NEVER_HAPPEN;
@@ -680,8 +681,6 @@ static int	expression_extract_functionid(const char *expression, zbx_eval_token_
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_deserialize_dyn                                         *
  *                                                                            *
  * Purpose: deserialize expression and extract specified tokens into values   *
  *                                                                            *
@@ -730,6 +729,14 @@ zbx_eval_context_t	*zbx_eval_deserialize_dyn(const unsigned char *data, const ch
 					zbx_variant_set_str(&token->value, value);
 				}
 				break;
+			case ZBX_EVAL_TOKEN_VAR_USERMACRO:
+				if (0 != (mask & ZBX_EVAL_EXTRACT_VAR_USERMACRO) && ZBX_VARIANT_NONE == token->value.type)
+				{
+					/* extract macro for resolving */
+					value = zbx_substr_unquote(expression, token->loc.l, token->loc.r);
+					zbx_variant_set_str(&token->value, value);
+				}
+				break;
 		}
 	}
 
@@ -737,8 +744,6 @@ zbx_eval_context_t	*zbx_eval_deserialize_dyn(const unsigned char *data, const ch
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_get_functionids                                         *
  *                                                                            *
  * Purpose: get functionids from parsed expression                            *
  *                                                                            *
@@ -761,8 +766,6 @@ void	zbx_eval_get_functionids(zbx_eval_context_t *ctx, zbx_vector_uint64_t *func
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_get_functionids_ordered                                 *
  *                                                                            *
  * Purpose: get functionids from parsed expression in the order they are      *
  *          written                                                           *
@@ -799,8 +802,6 @@ void	zbx_eval_get_functionids_ordered(zbx_eval_context_t *ctx, zbx_vector_uint64
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_check_timer_functions                                   *
  *                                                                            *
  * Purpose: check if expression contains timer function calls (date, time,    *
  *          now, dayofweek, dayofmonth)                                       *
@@ -839,8 +840,6 @@ int	zbx_eval_check_timer_functions(const zbx_eval_context_t *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_get_serialized_expression_functionids                        *
- *                                                                            *
  * Purpose: extract functionids from serialized expression                    *
  *                                                                            *
  * Parameters: expression  - [IN] the original expression                     *
@@ -855,6 +854,9 @@ void	zbx_get_serialized_expression_functionids(const char *expression, const uns
 	zbx_token_type_t	type;
 	zbx_uint64_t		functionid;
 	unsigned char		var_type;
+	
+	if (NULL == data) 
+		return;
 
 	data += zbx_deserialize_uint31_compact(data, &len);
 	data += zbx_deserialize_uint31_compact(data, &tokens_num);
@@ -888,7 +890,7 @@ void	zbx_get_serialized_expression_functionids(const char *expression, const uns
 
 		if (ZBX_EVAL_TOKEN_FUNCTIONID == type)
 		{
-			if (SUCCEED == is_uint64_n(expression + loc_l + 1, loc_r - loc_l - 1, &functionid))
+			if (SUCCEED == zbx_is_uint64_n(expression + loc_l + 1, loc_r - loc_l - 1, &functionid))
 				zbx_vector_uint64_append(functionids, functionid);
 			else
 				THIS_SHOULD_NEVER_HAPPEN;
@@ -900,8 +902,6 @@ void	zbx_get_serialized_expression_functionids(const char *expression, const uns
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_get_constant                                            *
  *                                                                            *
  * Purpose: the Nth constant in expression                                    *
  *                                                                            *
@@ -939,8 +939,6 @@ void	zbx_eval_get_constant(const zbx_eval_context_t *ctx, int index, char **valu
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_eval_replace_functionid                                      *
- *                                                                            *
  * Purpose: replace functionid in parsed expression with new functionid macro *
  *                                                                            *
  * Parameters: ctx            - [IN] the evaluation context                   *
@@ -965,7 +963,7 @@ void	zbx_eval_replace_functionid(zbx_eval_context_t *ctx, zbx_uint64_t old_funct
 			if (ZBX_VARIANT_NONE != token->value.type)
 				continue;
 
-			if (SUCCEED != is_uint64_n(ctx->expression + token->loc.l + 1, token->loc.r - token->loc.l - 1,
+			if (SUCCEED != zbx_is_uint64_n(ctx->expression + token->loc.l + 1, token->loc.r - token->loc.l - 1,
 					&token_functionid))
 			{
 				THIS_SHOULD_NEVER_HAPPEN;
@@ -985,8 +983,6 @@ void	zbx_eval_replace_functionid(zbx_eval_context_t *ctx, zbx_uint64_t old_funct
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_validate_replaced_functionids                           *
  *                                                                            *
  * Purpose: validate parsed expression to check if all functionids were       *
  *          replaced                                                          *
@@ -1019,8 +1015,6 @@ int	zbx_eval_validate_replaced_functionids(zbx_eval_context_t *ctx, char **error
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_eval_copy                                                    *
- *                                                                            *
  * Purpose: copy parsed expression                                            *
  *                                                                            *
  * Parameters: dst        - [OUT] the destination evaluation context          *
@@ -1035,7 +1029,7 @@ void	zbx_eval_copy(zbx_eval_context_t *dst, const zbx_eval_context_t *src, const
 	dst->expression = expression;
 	dst->rules = src->rules;
 	zbx_vector_eval_token_create(&dst->stack);
-	zbx_vector_eval_token_reserve(&dst->stack, src->stack.values_num);
+	zbx_vector_eval_token_reserve(&dst->stack, (size_t)src->stack.values_num);
 
 	zbx_vector_eval_token_append_array(&dst->stack, src->stack.values, src->stack.values_num);
 	for (i = 0; i < dst->stack.values_num; i++)
@@ -1046,8 +1040,6 @@ void	zbx_eval_copy(zbx_eval_context_t *dst, const zbx_eval_context_t *src, const
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_format_function_error                                   *
  *                                                                            *
  * Purpose: format function evaluation error message                          *
  *                                                                            *
@@ -1083,8 +1075,6 @@ char	*zbx_eval_format_function_error(const char *function, const char *host, con
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_eval_extract_history_queries                                 *
  *                                                                            *
  * Purpose: copy history query into vector and replace it with vector index   *
  *                                                                            *

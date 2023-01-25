@@ -74,14 +74,14 @@ if (array_key_exists('problems', $data)) {
 			_('Status'),
 			_('Duration'),
 			_('Ack'),
-			($data['show_tags'] != PROBLEMS_SHOW_TAGS_NONE) ? _('Tags') : null
+			($data['show_tags'] != SHOW_TAGS_NONE) ? _('Tags') : null
 		]));
 
 	$today = strtotime('today');
 	$last_clock = 0;
 
-	if ($data['problems'] && $data['show_tags'] != PROBLEMS_SHOW_TAGS_NONE) {
-		$tags = makeTags($data['problems'], true, 'eventid', $data['show_tags'], $data['filter_tags'],
+	if ($data['problems'] && $data['show_tags'] != SHOW_TAGS_NONE) {
+		$tags = makeTags($data['problems'], true, 'eventid', $data['show_tags'], $data['filter_tags'], null,
 			$data['tag_name_format'], $data['tag_priority']
 		);
 	}
@@ -174,14 +174,14 @@ if (array_key_exists('problems', $data)) {
 
 		// Create acknowledge link.
 		$problem_update_link = ($data['allowed_add_comments'] || $data['allowed_change_severity']
-			|| $data['allowed_acknowledge'] || $can_be_closed)
+				|| $data['allowed_acknowledge'] || $can_be_closed || $data['allowed_suppress'])
 			? (new CLink($is_acknowledged ? _('Yes') : _('No')))
 				->addClass($is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED)
 				->addClass(ZBX_STYLE_LINK_ALT)
-				->onClick('acknowledgePopUp('.json_encode(['eventids' => [$problem['eventid']]]).', this);')
-			: (new CSpan($is_acknowledged ? _('Yes') : _('No')))->addClass(
-				$is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED
-			);
+				->setAttribute('data-eventid', $problem['eventid'])
+				->onClick('acknowledgePopUp({eventids: [this.dataset.eventid]}, this);')
+			: (new CSpan($is_acknowledged ? _('Yes') : _('No')))
+				->addClass($is_acknowledged ? ZBX_STYLE_GREEN : ZBX_STYLE_RED);
 
 		$table->addRow(array_merge($row, [
 			$cell_r_clock,
@@ -193,7 +193,7 @@ if (array_key_exists('problems', $data)) {
 			))
 				->addClass(ZBX_STYLE_NOWRAP),
 			$problem_update_link,
-			($data['show_tags'] != PROBLEMS_SHOW_TAGS_NONE) ? $tags[$problem['eventid']] : null
+			($data['show_tags'] != SHOW_TAGS_NONE) ? $tags[$problem['eventid']] : null
 		]));
 	}
 

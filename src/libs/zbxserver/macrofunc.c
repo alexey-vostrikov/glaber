@@ -17,14 +17,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "zbxregexp.h"
 #include "macrofunc.h"
+
+#include "zbxregexp.h"
 #include "log.h"
+#include "zbxnum.h"
+#include "zbxstr.h"
+#include "zbxtime.h"
+#include "zbxexpr.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: macrofunc_regsub                                                 *
  *                                                                            *
  * Purpose: calculates regular expression substitution                        *
  *                                                                            *
@@ -57,8 +59,6 @@ static int	macrofunc_regsub(char **params, size_t nparam, char **out)
 
 /******************************************************************************
  *                                                                            *
- * Function: macrofunc_iregsub                                                *
- *                                                                            *
  * Purpose: calculates case insensitive regular expression substitution       *
  *                                                                            *
  * Parameters: params - [IN] the function parameters                          *
@@ -89,8 +89,6 @@ static int	macrofunc_iregsub(char **params, size_t nparam, char **out)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: macrofunc_fmttime                                                *
  *                                                                            *
  * Purpose: time formatting macro function                                    *
  *                                                                            *
@@ -181,8 +179,6 @@ static int	macrofunc_fmttime(char **params, size_t nparam, char **out)
 
 /******************************************************************************
  *                                                                            *
- * Function: macrofunc_fmtnum                                                 *
- *                                                                            *
  * Purpose: number formatting macro function                                  *
  *                                                                            *
  * Parameters: params - [IN] the function data                                *
@@ -201,16 +197,16 @@ static int	macrofunc_fmtnum(char **params, size_t nparam, char **out)
 	if (1 != nparam)
 		return FAIL;
 
-	if (SUCCEED == is_uint32(*out, &value))
+	if (SUCCEED == zbx_is_uint32(*out, &value))
 		return SUCCEED;
 
-	if (FAIL == is_double(*out, &value))
+	if (FAIL == zbx_is_double(*out, &value))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "macro \"%s\" is not a number", *out);
 		return FAIL;
 	}
 
-	if (FAIL == is_uint32(params[0], &precision))
+	if (FAIL == zbx_is_uint32(params[0], &precision))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "invalid parameter \"%s\"", params[0]);
 		return FAIL;
@@ -222,8 +218,6 @@ static int	macrofunc_fmtnum(char **params, size_t nparam, char **out)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_calculate_macro_function                                     *
  *                                                                            *
  * Purpose: calculates macro function value                                   *
  *                                                                            *

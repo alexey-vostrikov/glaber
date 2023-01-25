@@ -27,6 +27,7 @@ class CScript extends CApiService {
 	public const ACCESS_RULES = [
 		'get' => ['min_user_type' => USER_TYPE_ZABBIX_USER],
 		'getscriptsbyhosts' => ['min_user_type' => USER_TYPE_ZABBIX_USER],
+		'getscriptsbyevents' => ['min_user_type' => USER_TYPE_ZABBIX_USER],
 		'create' => ['min_user_type' => USER_TYPE_SUPER_ADMIN],
 		'update' => ['min_user_type' => USER_TYPE_SUPER_ADMIN],
 		'delete' => ['min_user_type' => USER_TYPE_SUPER_ADMIN],
@@ -40,7 +41,9 @@ class CScript extends CApiService {
 	/**
 	 * Fields from "actions" table. Used in get() validation and addRelatedObjects() when selecting action fields.
 	 */
-	private $action_fields = ['actionid', 'name', 'eventsource', 'status', 'esc_period', 'pause_suppressed'];
+	private $action_fields = ['actionid', 'name', 'eventsource', 'status', 'esc_period', 'pause_suppressed',
+		'notify_if_canceled'
+	];
 
 	/**
 	 * This property, if filled out, will contain all hostrgroup ids
@@ -61,9 +64,9 @@ class CScript extends CApiService {
 	public function get(array $options) {
 		$script_fields = ['scriptid', 'name', 'command', 'host_access', 'usrgrpid', 'groupid', 'description',
 			'confirmation', 'type', 'execute_on', 'timeout', 'parameters', 'scope', 'port', 'authtype', 'username',
-			'password', 'publickey', 'privatekey', 'menu_path'
+			'password', 'publickey', 'privatekey', 'menu_path', 'url', 'new_window'
 		];
-		$group_fields = ['groupid', 'name', 'flags', 'internal'];
+		$group_fields = ['groupid', 'name', 'flags', 'uuid'];
 		$host_fields = ['hostid', 'host', 'name', 'description', 'status', 'proxy_hostid', 'inventory_mode', 'flags',
 			'ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'maintenanceid', 'maintenance_status',
 			'maintenance_type', 'maintenance_from', 'tls_connect', 'tls_accept', 'tls_issuer', 'tls_subject'
@@ -75,34 +78,16 @@ class CScript extends CApiService {
 			'hostids' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'default' => null],
 			'groupids' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'default' => null],
 			'usrgrpids' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'default' => null],
-			'filter' =>					['type' => API_OBJECT, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => [
-				'scriptid' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'name' =>					['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'command' =>				['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'host_access' =>			['type' => API_INTS32, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'in' => implode(',', [PERM_READ, PERM_READ_WRITE])],
-				'usrgrpid' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'groupid' =>				['type' => API_IDS, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'confirmation' =>			['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'type' =>					['type' => API_INTS32, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'in' => implode(',', [ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT, ZBX_SCRIPT_TYPE_IPMI, ZBX_SCRIPT_TYPE_SSH, ZBX_SCRIPT_TYPE_TELNET, ZBX_SCRIPT_TYPE_WEBHOOK])],
-				'execute_on' =>				['type' => API_INTS32, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'in' => implode(',', [ZBX_SCRIPT_EXECUTE_ON_AGENT, ZBX_SCRIPT_EXECUTE_ON_SERVER, ZBX_SCRIPT_EXECUTE_ON_PROXY])],
-				'scope' =>					['type' => API_INTS32, 'flags' => API_ALLOW_NULL | API_NORMALIZE, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
-				'menu_path' =>				['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE]
-			]],
-			'search' =>					['type' => API_OBJECT, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => [
-				'name' =>					['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'command' =>				['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'description' =>			['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'confirmation' =>			['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'username' =>				['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE],
-				'menu_path' =>				['type' => API_STRINGS_UTF8, 'flags' => API_ALLOW_NULL | API_NORMALIZE]
-			]],
+			'filter' =>					['type' => API_FILTER, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => ['scriptid', 'name', 'command', 'host_access', 'usrgrpid', 'groupid', 'confirmation', 'type', 'url', 'new_window', 'execute_on', 'scope', 'menu_path']],
+			'search' =>					['type' => API_FILTER, 'flags' => API_ALLOW_NULL, 'default' => null, 'fields' => ['name', 'command', 'url', 'description', 'confirmation', 'username', 'menu_path']],
 			'searchByAny' =>			['type' => API_BOOLEAN, 'default' => false],
 			'startSearch' =>			['type' => API_FLAG, 'default' => false],
 			'excludeSearch' =>			['type' => API_FLAG, 'default' => false],
 			'searchWildcardsEnabled' =>	['type' => API_BOOLEAN, 'default' => false],
 			// output
 			'output' =>					['type' => API_OUTPUT, 'in' => implode(',', $script_fields), 'default' => API_OUTPUT_EXTEND],
-			'selectGroups' =>			['type' => API_OUTPUT, 'flags' => API_ALLOW_NULL, 'in' => implode(',', $group_fields), 'default' => null],
+			'selectGroups' =>			['type' => API_OUTPUT, 'flags' => API_ALLOW_NULL | API_DEPRECATED, 'in' => implode(',', $group_fields), 'default' => null],
+			'selectHostGroups' =>		['type' => API_OUTPUT, 'flags' => API_ALLOW_NULL, 'in' => implode(',', $group_fields), 'default' => null],
 			'selectHosts' =>			['type' => API_OUTPUT, 'flags' => API_ALLOW_NULL, 'in' => implode(',', $host_fields), 'default' => null],
 			'selectActions' =>			['type' => API_OUTPUT, 'flags' => API_ALLOW_NULL, 'in' => implode(',', $this->action_fields), 'default' => null],
 			'countOutput' =>			['type' => API_FLAG, 'default' => false],
@@ -114,15 +99,16 @@ class CScript extends CApiService {
 			'editable' =>				['type' => API_BOOLEAN, 'default' => false],
 			'preservekeys' =>			['type' => API_BOOLEAN, 'default' => false]
 		]];
+
 		if (!CApiInputValidator::validate($api_input_rules, $options, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
 
 		$sql_parts = [
-			'select'	=> ['scripts' => 's.scriptid'],
-			'from'		=> ['scripts' => 'scripts s'],
-			'where'		=> [],
-			'order'		=> []
+			'select' =>	['scripts' => 's.scriptid'],
+			'from' =>	['scripts' => 'scripts s'],
+			'where' =>	[],
+			'order' =>	[]
 		];
 
 		// editable + permission check
@@ -234,27 +220,24 @@ class CScript extends CApiService {
 	 * @return array
 	 */
 	public function create(array $scripts) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS,
+				_s('No permissions to call "%1$s.%2$s".', 'script', __FUNCTION__)
+			);
+		}
+
 		$this->validateCreate($scripts);
 
 		$scriptids = DB::insert('scripts', $scripts);
-		$scripts_params = [];
 
 		foreach ($scripts as $index => &$script) {
 			$script['scriptid'] = $scriptids[$index];
-
-			if ($script['type'] == ZBX_SCRIPT_TYPE_WEBHOOK && array_key_exists('parameters', $script)) {
-				foreach ($script['parameters'] as $param) {
-					$scripts_params[] = ['scriptid' => $script['scriptid']] + $param;
-				}
-			}
 		}
 		unset($script);
 
-		if ($scripts_params) {
-			DB::insertBatch('script_param', $scripts_params);
-		}
+		self::updateParams($scripts, __FUNCTION__);
 
-		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_SCRIPT, $scripts);
+		self::addAuditLog(CAudit::ACTION_ADD, CAudit::RESOURCE_SCRIPT, $scripts);
 
 		return ['scriptids' => $scriptids];
 	}
@@ -265,13 +248,9 @@ class CScript extends CApiService {
 	 * @throws APIException if the input is invalid
 	 */
 	protected function validateCreate(array &$scripts) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-		}
-
 		/*
 		 * Get general validation rules and firstly validate name uniqueness and all the possible fields, so that there
-		 * are no invalid fields for any of the script types. Unfortunaly there is also a drawback, since field types
+		 * are no invalid fields for any of the script types. Unfortunately there is also a drawback, since field types
 		 * validated before we know what rules belong to each script type.
 		 */
 		$api_input_rules = $this->getValidationRules('create', $common_fields);
@@ -284,18 +263,28 @@ class CScript extends CApiService {
 		 * Then validate each script separately. Depending on script type, each script may have different set of allowed
 		 * fields. Then in case the type is SSH and authtype is set, validate parameters again.
 		 */
-		$i = 0;
-		$check_names = [];
-
-		foreach ($scripts as $script) {
-			$path = '/'.++$i;
-
+		foreach ($scripts as $index => $script) {
 			$type_rules = $this->getTypeValidationRules($script['type'], 'create', $type_fields);
-			$this->getScopeValidationRules($script['scope'], $scope_fields);
+			$scope_rules = $this->getScopeValidationRules($script['scope'], $scope_fields);
 
-			$type_rules['fields'] += $common_fields + $scope_fields;
+			// Temporary remove scope fields from script to validate type fields.
+			$tmp = $script;
+			$tmp_fields = array_intersect_key($scope_rules['fields'], $script);
 
-			if (!CApiInputValidator::validate($type_rules, $script, $path, $error)) {
+			foreach ($tmp_fields as $field => $rules) {
+				unset($tmp[$field]);
+			}
+
+			$type_rules['fields'] += $common_fields + $type_fields;
+
+			if (!CApiInputValidator::validate($type_rules, $tmp, '/'.($index + 1), $error)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+			}
+
+			// Validate all fields together.
+			$scope_rules['fields'] += $type_rules['fields'] + $common_fields + $scope_fields;
+
+			if (!CApiInputValidator::validate($scope_rules, $script, '/'.($index + 1), $error)) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 			}
 
@@ -303,22 +292,13 @@ class CScript extends CApiService {
 				$ssh_rules = $this->getAuthTypeValidationRules($script['authtype'], 'create');
 				$ssh_rules['fields'] += $common_fields + $type_fields + $scope_fields;
 
-				if (!CApiInputValidator::validate($ssh_rules, $script, $path, $error)) {
+				if (!CApiInputValidator::validate($ssh_rules, $script, '/'.($index + 1), $error)) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
 			}
-
-			$check_names[$script['name']] = true;
 		}
 
-		$db_script_names = API::getApiService()->select('scripts', [
-			'output' => ['scriptid'],
-			'filter' => ['name' => array_keys($check_names)]
-		]);
-
-		if ($db_script_names) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _s('Script "%1$s" already exists.', $script['name']));
-		}
+		self::checkDuplicates($scripts);
 
 		// Finally check User and Host IDs.
 		$this->checkUserGroups($scripts);
@@ -331,115 +311,23 @@ class CScript extends CApiService {
 	 * @return array
 	 */
 	public function update(array $scripts) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS,
+				_s('No permissions to call "%1$s.%2$s".', 'script', __FUNCTION__)
+			);
+		}
+
 		$this->validateUpdate($scripts, $db_scripts);
 
 		$upd_scripts = [];
-		$scripts_params = [];
 
 		foreach ($scripts as $script) {
-			$scriptid = $script['scriptid'];
-			$db_script = $db_scripts[$scriptid];
-			$db_type = $db_script['type'];
-			$db_authtype = $db_script['authtype'];
-			$db_scope = $db_script['scope'];
-			$type = array_key_exists('type', $script) ? $script['type'] : $db_type;
-			$authtype = array_key_exists('authtype', $script) ? $script['authtype'] : $db_authtype;
-			$scope = array_key_exists('scope', $script) ? $script['scope'] : $db_scope;
-
-			$upd_script = [];
-
-			// strings
-			foreach (['name', 'command', 'description', 'confirmation', 'timeout', 'menu_path', 'username', 'publickey',
-					'privatekey', 'password'] as $field_name) {
-				if (array_key_exists($field_name, $script) && $script[$field_name] !== $db_script[$field_name]) {
-					$upd_script[$field_name] = $script[$field_name];
-				}
-			}
-
-			// integers
-			foreach (['type', 'execute_on', 'usrgrpid', 'groupid', 'host_access', 'scope', 'port', 'authtype']
-					as $field_name) {
-				if (array_key_exists($field_name, $script) && $script[$field_name] != $db_script[$field_name]) {
-					$upd_script[$field_name] = $script[$field_name];
-				}
-			}
-
-			// No mattter what the old type was, clear and reset all unnecessary fields from any other types.
-			if ($type != $db_type) {
-				switch ($type) {
-					case ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT:
-						$upd_script['port'] = '';
-						$upd_script['authtype'] = DB::getDefault('scripts', 'authtype');
-						$upd_script['username'] = '';
-						$upd_script['password'] = '';
-						$upd_script['publickey'] = '';
-						$upd_script['privatekey'] = '';
-						break;
-
-					case ZBX_SCRIPT_TYPE_IPMI:
-						$upd_script['port'] = '';
-						$upd_script['authtype'] = DB::getDefault('scripts', 'authtype');
-						$upd_script['username'] = '';
-						$upd_script['password'] = '';
-						$upd_script['publickey'] = '';
-						$upd_script['privatekey'] = '';
-						$upd_script['execute_on'] = DB::getDefault('scripts', 'execute_on');
-						break;
-
-					case ZBX_SCRIPT_TYPE_SSH:
-						$upd_script['execute_on'] = DB::getDefault('scripts', 'execute_on');
-						break;
-
-					case ZBX_SCRIPT_TYPE_TELNET:
-						$upd_script['authtype'] = DB::getDefault('scripts', 'authtype');
-						$upd_script['publickey'] = '';
-						$upd_script['privatekey'] = '';
-						$upd_script['execute_on'] = DB::getDefault('scripts', 'execute_on');
-						break;
-
-					case ZBX_SCRIPT_TYPE_WEBHOOK:
-						$upd_script['port'] = '';
-						$upd_script['authtype'] = DB::getDefault('scripts', 'authtype');
-						$upd_script['username'] = '';
-						$upd_script['password'] = '';
-						$upd_script['publickey'] = '';
-						$upd_script['privatekey'] = '';
-						$upd_script['execute_on'] = DB::getDefault('scripts', 'execute_on');
-						break;
-				}
-			}
-			elseif ($type == ZBX_SCRIPT_TYPE_SSH && $authtype != $db_authtype && $authtype == ITEM_AUTHTYPE_PASSWORD) {
-				$upd_script['publickey'] = '';
-				$upd_script['privatekey'] = '';
-			}
-
-			if ($scope != $db_scope && $scope == ZBX_SCRIPT_SCOPE_ACTION) {
-				$upd_script['menu_path'] = '';
-				$upd_script['usrgrpid'] = 0;
-				$upd_script['host_access'] = DB::getDefault('scripts', 'host_access');;
-				$upd_script['confirmation'] = '';
-			}
-
-			if ($type == ZBX_SCRIPT_TYPE_WEBHOOK && array_key_exists('parameters', $script)) {
-				$params = [];
-
-				foreach ($script['parameters'] as $param) {
-					$params[$param['name']] = $param['value'];
-				}
-
-				$scripts_params[$scriptid] = $params;
-				unset($script['parameters']);
-			}
-
-			if ($type != $db_type && $db_type == ZBX_SCRIPT_TYPE_WEBHOOK) {
-				$upd_script['timeout'] = DB::getDefault('scripts', 'timeout');
-				$scripts_params[$scriptid] = [];
-			}
+			$upd_script = DB::getUpdatedValues('scripts', $script, $db_scripts[$script['scriptid']]);
 
 			if ($upd_script) {
 				$upd_scripts[] = [
 					'values' => $upd_script,
-					'where' => ['scriptid' => $scriptid]
+					'where' => ['scriptid' => $script['scriptid']]
 				];
 			}
 		}
@@ -448,57 +336,11 @@ class CScript extends CApiService {
 			DB::update('scripts', $upd_scripts);
 		}
 
-		if ($scripts_params) {
-			$insert_script_param = [];
-			$delete_script_param = [];
-			$update_script_param = [];
-			$db_scripts_params = DB::select('script_param', [
-				'output' => ['script_paramid', 'scriptid', 'name', 'value'],
-				'filter' => ['scriptid' => array_keys($scripts_params)]
-			]);
+		self::updateParams($scripts, __FUNCTION__, $db_scripts);
 
-			foreach ($db_scripts_params as $param) {
-				$scriptid = $param['scriptid'];
+		self::addAuditLog(CAudit::ACTION_UPDATE, CAudit::RESOURCE_SCRIPT, $scripts, $db_scripts);
 
-				if (!array_key_exists($param['name'], $scripts_params[$scriptid])) {
-					$delete_script_param[] = $param['script_paramid'];
-				}
-				elseif ($scripts_params[$scriptid][$param['name']] !== $param['value']) {
-					$update_script_param[] = [
-						'values' => ['value' => $scripts_params[$scriptid][$param['name']]],
-						'where' => ['script_paramid' => $param['script_paramid']]
-					];
-					unset($scripts_params[$scriptid][$param['name']]);
-				}
-				else {
-					unset($scripts_params[$scriptid][$param['name']]);
-				}
-			}
-
-			$scripts_params = array_filter($scripts_params);
-
-			foreach ($scripts_params as $scriptid => $params) {
-				foreach ($params as $name => $value) {
-					$insert_script_param[] = compact('scriptid', 'name', 'value');
-				}
-			}
-
-			if ($delete_script_param) {
-				DB::delete('script_param', ['script_paramid' => array_keys(array_flip($delete_script_param))]);
-			}
-
-			if ($update_script_param) {
-				DB::update('script_param', $update_script_param);
-			}
-
-			if ($insert_script_param) {
-				DB::insert('script_param', $insert_script_param);
-			}
-		}
-
-		$this->addAuditBulk(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_SCRIPT, $scripts, $db_scripts);
-
-		return ['scriptids' => zbx_objectValues($scripts, 'scriptid')];
+		return ['scriptids' => array_column($scripts, 'scriptid')];
 	}
 
 	/**
@@ -508,13 +350,9 @@ class CScript extends CApiService {
 	 * @throws APIException if the input is invalid
 	 */
 	protected function validateUpdate(array &$scripts, array &$db_scripts = null) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-		}
-
 		/*
 		 * Get general validation rules and firstly validate name uniqueness and all the possible fields, so that there
-		 * are no invalid fields for any of the script types. Unfortunaly there is also a drawback, since field types
+		 * are no invalid fields for any of the script types. Unfortunately there is also a drawback, since field types
 		 * validated before we know what rules belong to each script type.
 		 */
 		$api_input_rules = $this->getValidationRules('update', $common_fields);
@@ -527,42 +365,19 @@ class CScript extends CApiService {
 		$db_scripts = DB::select('scripts', [
 			'output' => ['scriptid', 'name', 'command', 'host_access', 'usrgrpid', 'groupid', 'description',
 				'confirmation', 'type', 'execute_on', 'timeout', 'scope', 'port', 'authtype', 'username', 'password',
-				'publickey', 'privatekey', 'menu_path'
+				'publickey', 'privatekey', 'menu_path', 'url', 'new_window'
 			],
-			'scriptids' => zbx_objectValues($scripts, 'scriptid'),
+			'scriptids' => array_column($scripts, 'scriptid'),
 			'preservekeys' => true
 		]);
 
-		$check_names = [];
-		foreach ($scripts as $script) {
-			if (!array_key_exists($script['scriptid'], $db_scripts)) {
-				self::exception(ZBX_API_ERROR_PERMISSIONS,
-					_('No permissions to referred object or it does not exist!')
-				);
-			}
-
-			if (array_key_exists('name', $script)) {
-				$check_names[$script['name']] = true;
-			}
+		if (count($db_scripts) != count($scripts)) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
-		if ($check_names) {
-			$db_script_names = API::getApiService()->select('scripts', [
-				'output' => ['scriptid', 'name'],
-				'filter' => ['name' => array_keys($check_names)]
-			]);
-			$db_script_names = zbx_toHash($db_script_names, 'name');
+		self::checkDuplicates($scripts, $db_scripts);
 
-			foreach ($scripts as $script) {
-				if (array_key_exists('name', $script)
-						&& array_key_exists($script['name'], $db_script_names)
-						&& !idcmp($db_script_names[$script['name']]['scriptid'], $script['scriptid'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS,
-						_s('Script "%1$s" already exists.', $script['name'])
-					);
-				}
-			}
-		}
+		self::addAffectedObjects($scripts, $db_scripts);
 
 		// Validate if scripts belong to actions and scope can be changed.
 		$action_scriptids = [];
@@ -579,10 +394,10 @@ class CScript extends CApiService {
 		if ($action_scriptids) {
 			$actions = API::Action()->get([
 				'output' => ['actionid', 'name'],
-				'scriptids' => array_keys($action_scriptids),
 				'selectOperations' => ['opcommand'],
 				'selectRecoveryOperations' => ['opcommand'],
-				'selectAcknowledgeOperations' => ['opcommand']
+				'selectUpdateOperations' => ['opcommand'],
+				'scriptids' => array_keys($action_scriptids)
 			]);
 
 			if ($actions) {
@@ -607,8 +422,8 @@ class CScript extends CApiService {
 								}
 							}
 
-							if ($action['recoveryOperations']) {
-								foreach ($action['recoveryOperations'] as $operation) {
+							if ($action['recovery_operations']) {
+								foreach ($action['recovery_operations'] as $operation) {
 									if (array_key_exists('opcommand', $operation)
 											&& bccomp($operation['opcommand']['scriptid'], $script['scriptid']) == 0) {
 										self::exception(ZBX_API_ERROR_PARAMETERS,
@@ -620,8 +435,8 @@ class CScript extends CApiService {
 								}
 							}
 
-							if ($action['acknowledgeOperations']) {
-								foreach ($action['acknowledgeOperations'] as $operation) {
+							if ($action['update_operations']) {
+								foreach ($action['update_operations'] as $operation) {
 									if (array_key_exists('opcommand', $operation)
 											&& bccomp($operation['opcommand']['scriptid'], $script['scriptid']) == 0) {
 										self::exception(ZBX_API_ERROR_PARAMETERS,
@@ -639,16 +454,16 @@ class CScript extends CApiService {
 		}
 
 		// Populate common and mandatory fields.
-		$scripts = zbx_toHash($scripts, 'scriptid');
-		$scripts = $this->extendFromObjects($scripts, $db_scripts, ['name', 'type', 'command', 'scope']);
+		$scripts = $this->extendObjectsByKey($scripts, $db_scripts, 'scriptid', ['name', 'type', 'scope']);
 
-		$i = 0;
-		foreach ($scripts as &$script) {
-			$path = '/'.++$i;
+		foreach ($scripts as $index => &$script) {
 			$db_script = $db_scripts[$script['scriptid']];
 			$method = 'update';
 
-			if (array_key_exists('type', $script) && $script['type'] != $db_script['type']) {
+			if (array_key_exists('type', $script) && $script['type'] != $db_script['type']
+					|| array_key_exists('scope', $script) && $script['scope'] == ZBX_SCRIPT_SCOPE_ACTION
+						&& $db_script['scope'] != ZBX_SCRIPT_SCOPE_ACTION
+						&& $db_script['type'] == ZBX_SCRIPT_TYPE_URL) {
 				// This means that all other fields are now required just like create method.
 				$method = 'create';
 
@@ -662,11 +477,26 @@ class CScript extends CApiService {
 			}
 
 			$type_rules = $this->getTypeValidationRules($script['type'], $method, $type_fields);
-			$this->getScopeValidationRules($script['scope'], $scope_fields);
+			$scope_rules = $this->getScopeValidationRules($script['scope'], $scope_fields);
 
-			$type_rules['fields'] += $common_fields + $scope_fields;
+			// Temporary remove scope fields from script to validate type fields.
+			$tmp = $script;
+			$tmp_fields = array_intersect_key($scope_rules['fields'], $script);
 
-			if (!CApiInputValidator::validate($type_rules, $script, $path, $error)) {
+			foreach ($tmp_fields as $field => $rules) {
+				unset($tmp[$field]);
+			}
+
+			$type_rules['fields'] += $common_fields + $type_fields;
+
+			if (!CApiInputValidator::validate($type_rules, $tmp, '/'.($index + 1), $error)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+			}
+
+			// Validate all fields together.
+			$scope_rules['fields'] += $type_rules['fields'] + $common_fields + $scope_fields;
+
+			if (!CApiInputValidator::validate($scope_rules, $script, '/'.($index + 1), $error)) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 			}
 
@@ -677,15 +507,101 @@ class CScript extends CApiService {
 					$method = 'create';
 				}
 
-				$script = $this->extendFromObjects([$script], [$db_script], ['authtype'])[0];
+				$script += ['authtype' => $db_script['authtype']];
 
 				$ssh_rules = $this->getAuthTypeValidationRules($script['authtype'], $method);
 				$ssh_rules['fields'] += $common_fields + $type_fields + $scope_fields;
 
-				if (!CApiInputValidator::validate($ssh_rules, $script, $path, $error)) {
+				if (!CApiInputValidator::validate($ssh_rules, $script, '/'.($index + 1), $error)) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
 			}
+		}
+		unset($script);
+
+		// Clear and reset all unnecessary fields.
+		foreach ($scripts as &$script) {
+			$db_script = $db_scripts[$script['scriptid']];
+
+			if ($script['type'] != $db_script['type']) {
+				switch ($script['type']) {
+					case ZBX_SCRIPT_TYPE_IPMI:
+						$script['execute_on'] = DB::getDefault('scripts', 'execute_on');
+						$script['url'] = '';
+						$script['new_window'] = DB::getDefault('scripts', 'new_window');
+						// break; is not missing here
+
+					case ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT:
+						$script['port'] = '';
+						$script['authtype'] = DB::getDefault('scripts', 'authtype');
+						$script['username'] = '';
+						$script['password'] = '';
+						$script['publickey'] = '';
+						$script['privatekey'] = '';
+						$script['parameters'] = [];
+						$script['timeout'] = DB::getDefault('scripts', 'timeout');
+						$script['url'] = '';
+						$script['new_window'] = DB::getDefault('scripts', 'new_window');
+						break;
+
+					case ZBX_SCRIPT_TYPE_SSH:
+						$script['execute_on'] = DB::getDefault('scripts', 'execute_on');
+						$script['parameters'] = [];
+						$script['timeout'] = DB::getDefault('scripts', 'timeout');
+						$script['url'] = '';
+						$script['new_window'] = DB::getDefault('scripts', 'new_window');
+						break;
+
+					case ZBX_SCRIPT_TYPE_TELNET:
+						$script['authtype'] = DB::getDefault('scripts', 'authtype');
+						$script['publickey'] = '';
+						$script['privatekey'] = '';
+						$script['execute_on'] = DB::getDefault('scripts', 'execute_on');
+						$script['parameters'] = [];
+						$script['timeout'] = DB::getDefault('scripts', 'timeout');
+						$script['url'] = '';
+						$script['new_window'] = DB::getDefault('scripts', 'new_window');
+						break;
+
+					case ZBX_SCRIPT_TYPE_WEBHOOK:
+						$script['port'] = '';
+						$script['authtype'] = DB::getDefault('scripts', 'authtype');
+						$script['username'] = '';
+						$script['password'] = '';
+						$script['publickey'] = '';
+						$script['privatekey'] = '';
+						$script['execute_on'] = DB::getDefault('scripts', 'execute_on');
+						$script['url'] = '';
+						$script['new_window'] = DB::getDefault('scripts', 'new_window');
+						break;
+
+					case ZBX_SCRIPT_TYPE_URL:
+						$script['command'] = '';
+						$script['parameters'] = [];
+						$script['timeout'] = DB::getDefault('scripts', 'timeout');
+						$script['port'] = '';
+						$script['authtype'] = DB::getDefault('scripts', 'authtype');
+						$script['username'] = '';
+						$script['password'] = '';
+						$script['publickey'] = '';
+						$script['privatekey'] = '';
+						$script['execute_on'] = DB::getDefault('scripts', 'execute_on');
+						break;
+				}
+			}
+			elseif ($script['type'] == ZBX_SCRIPT_TYPE_SSH && $script['authtype'] != $db_script['authtype']
+					&& $script['authtype'] == ITEM_AUTHTYPE_PASSWORD) {
+				$script['publickey'] = '';
+				$script['privatekey'] = '';
+			}
+
+			if ($script['scope'] != $db_script['scope'] && $script['scope'] == ZBX_SCRIPT_SCOPE_ACTION) {
+				$script['menu_path'] = '';
+				$script['usrgrpid'] = 0;
+				$script['host_access'] = DB::getDefault('scripts', 'host_access');
+				$script['confirmation'] = '';
+			}
+
 		}
 		unset($script);
 
@@ -706,22 +622,20 @@ class CScript extends CApiService {
 
 		$common_fields = [
 			'name' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'name')],
-			'type' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT, ZBX_SCRIPT_TYPE_IPMI, ZBX_SCRIPT_TYPE_SSH, ZBX_SCRIPT_TYPE_TELNET, ZBX_SCRIPT_TYPE_WEBHOOK])],
-			'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
-			'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')],
+			'type' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT, ZBX_SCRIPT_TYPE_IPMI, ZBX_SCRIPT_TYPE_SSH, ZBX_SCRIPT_TYPE_TELNET, ZBX_SCRIPT_TYPE_WEBHOOK, ZBX_SCRIPT_TYPE_URL])],
+			'scope' =>			['type' => API_INT32],
 			'groupid' =>		['type' => API_ID],
 			'description' =>	['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('scripts', 'description')]
 		];
 
 		if ($method === 'create') {
-			$common_fields['scope']['default'] = ZBX_SCRIPT_SCOPE_ACTION;
 			$api_input_rules['uniq'] = [['name']];
 			$common_fields['name']['flags'] |= API_REQUIRED;
 			$common_fields['type']['flags'] = API_REQUIRED;
-			$common_fields['command']['flags'] |= API_REQUIRED;
+			$common_fields['scope']['flags'] = API_REQUIRED;
 		}
 		else {
-			$api_input_rules['uniq'] =  [['scriptid'], ['name']];
+			$api_input_rules['uniq'] = [['scriptid'], ['name']];
 			$common_fields += ['scriptid' => ['type' => API_ID, 'flags' => API_REQUIRED]];
 		}
 
@@ -730,6 +644,7 @@ class CScript extends CApiService {
 		 * script types. Set only type for now. Unique parameter names, lengths and other flags are set later.
 		 */
 		$api_input_rules['fields'] += $common_fields + [
+			'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')],
 			'execute_on' =>		['type' => API_INT32],
 			'menu_path' =>		['type' => API_STRING_UTF8],
 			'usrgrpid' =>		['type' => API_ID],
@@ -745,7 +660,9 @@ class CScript extends CApiService {
 			'parameters' =>			['type' => API_OBJECTS, 'fields' => [
 				'name' =>				['type' => API_STRING_UTF8],
 				'value' =>				['type' => API_STRING_UTF8]
-			]]
+			]],
+			'url' =>			['type' => API_URL],
+			'new_window' =>		['type' => API_INT32]
 		];
 
 		return $api_input_rules;
@@ -793,12 +710,33 @@ class CScript extends CApiService {
 		switch ($type) {
 			case ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT:
 				$api_input_rules['fields'] += [
+					'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
+					'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')],
 					'execute_on' =>		['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_EXECUTE_ON_AGENT, ZBX_SCRIPT_EXECUTE_ON_SERVER, ZBX_SCRIPT_EXECUTE_ON_PROXY])]
 				];
+
+				if ($method === 'create') {
+					$api_input_rules['fields']['scope']['flags'] = API_REQUIRED;
+					$api_input_rules['fields']['command']['flags'] |= API_REQUIRED;
+				}
+				break;
+
+			case ZBX_SCRIPT_TYPE_IPMI:
+				$api_input_rules['fields'] += [
+					'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
+					'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')]
+				];
+
+				if ($method === 'create') {
+					$api_input_rules['fields']['scope']['flags'] = API_REQUIRED;
+					$api_input_rules['fields']['command']['flags'] |= API_REQUIRED;
+				}
 				break;
 
 			case ZBX_SCRIPT_TYPE_SSH:
 				$common_fields = [
+					'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
+					'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')],
 					'port' =>			['type' => API_PORT, 'flags' => API_ALLOW_USER_MACRO],
 					'authtype' =>		['type' => API_INT32, 'in' => implode(',', [ITEM_AUTHTYPE_PASSWORD, ITEM_AUTHTYPE_PUBLICKEY])],
 					'username' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'username')],
@@ -806,6 +744,8 @@ class CScript extends CApiService {
 				];
 
 				if ($method === 'create') {
+					$common_fields['scope']['flags'] = API_REQUIRED;
+					$common_fields['command']['flags'] |= API_REQUIRED;
 					$common_fields['username']['flags'] |= API_REQUIRED;
 				}
 
@@ -817,24 +757,48 @@ class CScript extends CApiService {
 
 			case ZBX_SCRIPT_TYPE_TELNET:
 				$api_input_rules['fields'] += [
+					'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
+					'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')],
 					'port' =>			['type' => API_PORT, 'flags' => API_ALLOW_USER_MACRO],
 					'username' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'username')],
 					'password' =>		['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('scripts', 'password')]
 				];
 
 				if ($method === 'create') {
+					$api_input_rules['fields']['scope']['flags'] = API_REQUIRED;
+					$api_input_rules['fields']['command']['flags'] |= API_REQUIRED;
 					$api_input_rules['fields']['username']['flags'] |= API_REQUIRED;
 				}
 				break;
 
 			case ZBX_SCRIPT_TYPE_WEBHOOK:
 				$api_input_rules['fields'] += [
-					'timeout' =>		['type' => API_TIME_UNIT, 'in' => '1:'.SEC_PER_MIN],
+					'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_ACTION, ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
+					'command' =>		['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('scripts', 'command')],
+					'timeout' =>		['type' => API_TIME_UNIT, 'flags' => API_NOT_EMPTY, 'in' => '1:'.SEC_PER_MIN],
 					'parameters' =>			['type' => API_OBJECTS, 'uniq' => [['name']], 'fields' => [
 						'name' =>				['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('script_param', 'name')],
 						'value' =>				['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'length' => DB::getFieldLength('script_param', 'value')]
 					]]
 				];
+
+				if ($method === 'create') {
+					$api_input_rules['fields']['scope']['flags'] = API_REQUIRED;
+					$api_input_rules['fields']['command']['flags'] |= API_REQUIRED;
+				}
+				break;
+
+			case ZBX_SCRIPT_TYPE_URL:
+				$api_input_rules['fields'] += [
+					'scope' =>			['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_SCOPE_HOST, ZBX_SCRIPT_SCOPE_EVENT])],
+					'url' =>			['type' => API_URL, 'flags' => API_NOT_EMPTY | API_ALLOW_USER_MACRO | API_ALLOW_MACRO, 'length' => DB::getFieldLength('scripts', 'url')],
+					'new_window' =>		['type' => API_INT32, 'in' => implode(',', [ZBX_SCRIPT_URL_NEW_WINDOW_NO, ZBX_SCRIPT_URL_NEW_WINDOW_YES]), 'default' => DB::getDefault('scripts', 'new_window')]
+				];
+
+				if ($method === 'create') {
+					$api_input_rules['fields']['scope']['flags'] = API_REQUIRED;
+					$api_input_rules['fields']['url']['flags'] |= API_REQUIRED;
+				}
 				break;
 		}
 
@@ -926,7 +890,7 @@ class CScript extends CApiService {
 
 		$groupids = array_keys($groupids);
 
-		$db_groups = DB::select('hstgrp', [
+		$db_groups = API::HostGroup()->get([
 			'output' => [],
 			'groupids' => $groupids,
 			'preservekeys' => true
@@ -945,27 +909,32 @@ class CScript extends CApiService {
 	 * @return array
 	 */
 	public function delete(array $scriptids) {
-		$this->validateDelete($scriptids, $db_scripts);
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS,
+				_s('No permissions to call "%1$s.%2$s".', 'script', __FUNCTION__)
+			);
+		}
+
+		self::validateDelete($scriptids, $db_scripts);
 
 		DB::delete('scripts', ['scriptid' => $scriptids]);
 
-		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_SCRIPT, $db_scripts);
+		self::addAuditLog(CAudit::ACTION_DELETE, CAudit::RESOURCE_SCRIPT, $db_scripts);
 
 		return ['scriptids' => $scriptids];
 	}
 
 	/**
-	 * @param array $scriptids
-	 * @param array $db_scripts
+	 * Validates parameters for script.delete method.
+	 *
+	 * @param array      $scriptids
+	 * @param array|null $db_scripts
 	 *
 	 * @throws APIException if the input is invalid
 	 */
-	protected function validateDelete(array &$scriptids, array &$db_scripts = null) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-		}
-
+	private static function validateDelete(array &$scriptids, array &$db_scripts = null) {
 		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+
 		if (!CApiInputValidator::validate($api_input_rules, $scriptids, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
@@ -976,12 +945,8 @@ class CScript extends CApiService {
 			'preservekeys' => true
 		]);
 
-		foreach ($scriptids as $scriptid) {
-			if (!array_key_exists($scriptid, $db_scripts)) {
-				self::exception(ZBX_API_ERROR_PERMISSIONS,
-					_('No permissions to referred object or it does not exist!')
-				);
-			}
+		if (count($db_scripts) != count($scriptids)) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
 		// Check if deleted scripts used in actions.
@@ -1016,6 +981,7 @@ class CScript extends CApiService {
 			'hostid' =>		['type' => API_ID],
 			'eventid' =>	['type' => API_ID]
 		]];
+
 		if (!CApiInputValidator::validate($api_input_rules, $data, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
@@ -1063,12 +1029,17 @@ class CScript extends CApiService {
 		}
 
 		$db_scripts = $this->get([
-			'output' => [],
+			'output' => ['type'],
 			'hostids' => $hostids,
 			'scriptids' => $data['scriptid']
 		]);
+
 		if (!$db_scripts) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
+		}
+
+		if ($db_scripts[0]['type'] == ZBX_SCRIPT_TYPE_URL) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Cannot execute URL type script.'));
 		}
 
 		// execute script
@@ -1095,7 +1066,8 @@ class CScript extends CApiService {
 	}
 
 	/**
-	 * Returns all the scripts that are available on each given host.
+	 * Returns all the scripts that are available on each given host. Automatically resolves macros in
+	 * confirmation and URL fields.
 	 *
 	 * @param $hostids
 	 *
@@ -1114,8 +1086,16 @@ class CScript extends CApiService {
 			$scripts_by_host[$hostid] = [];
 		}
 
+		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+		if (!CApiInputValidator::validate($api_input_rules, $hostids, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
+
 		$scripts = $this->get([
-			'output' => API_OUTPUT_EXTEND,
+			'output' => ['scriptid', 'name', 'command', 'host_access', 'usrgrpid', 'groupid', 'description',
+				'confirmation', 'type', 'execute_on', 'timeout', 'scope', 'port', 'authtype', 'username', 'password',
+				'publickey', 'privatekey', 'menu_path', 'url', 'new_window'
+			],
 			'hostids' => $hostids,
 			'sortfield' => 'name',
 			'preservekeys' => true
@@ -1123,42 +1103,55 @@ class CScript extends CApiService {
 
 		$scripts = $this->addRelatedGroupsAndHosts([
 			'selectGroups' => null,
+			'selectHostGroups' => null,
 			'selectHosts' => ['hostid']
 		], $scripts, $hostids);
 
 		if ($scripts) {
-			// resolve macros
 			$macros_data = [];
+
 			foreach ($scripts as $scriptid => $script) {
-				if (!empty($script['confirmation'])) {
-					foreach ($script['hosts'] as $host) {
-						if (isset($scripts_by_host[$host['hostid']])) {
-							$macros_data[$host['hostid']][$scriptid] = $script['confirmation'];
+				foreach ($script['hosts'] as $host) {
+					$hostid = $host['hostid'];
+
+					if (array_key_exists($hostid, $scripts_by_host)) {
+						if (strpos($script['confirmation'], '{') !== false) {
+							$macros_data[$hostid][$scriptid]['confirmation'] = $script['confirmation'];
+						}
+
+						if (strpos($script['url'], '{') !== false) {
+							$macros_data[$hostid][$scriptid]['url'] = $script['url'];
 						}
 					}
 				}
 			}
-			if ($macros_data) {
-				$macros_data = CMacrosResolverHelper::resolve([
-					'config' => 'scriptConfirmation',
-					'data' => $macros_data
-				]);
-			}
+
+			$macros_data = CMacrosResolverHelper::resolveManualHostActionScripts($macros_data);
 
 			foreach ($scripts as $scriptid => $script) {
 				$hosts = $script['hosts'];
 				unset($script['hosts']);
-				// set script to host
+
+				// Set script to host.
 				foreach ($hosts as $host) {
 					$hostid = $host['hostid'];
 
-					if (isset($scripts_by_host[$hostid])) {
+					if (array_key_exists($hostid, $scripts_by_host)) {
 						$size = count($scripts_by_host[$hostid]);
 						$scripts_by_host[$hostid][$size] = $script;
 
-						// set confirmation text with resolved macros
-						if (isset($macros_data[$hostid][$scriptid]) && $script['confirmation']) {
-							$scripts_by_host[$hostid][$size]['confirmation'] = $macros_data[$hostid][$scriptid];
+						// Set confirmation and URL with resolved macros.
+						if (array_key_exists($hostid, $macros_data)
+								&& array_key_exists($scriptid, $macros_data[$hostid])) {
+							$macro_values = $macros_data[$hostid][$scriptid];
+
+							if (strpos($script['confirmation'], '{') !== false) {
+								$scripts_by_host[$hostid][$size]['confirmation'] = $macro_values['confirmation'];
+							}
+
+							if (strpos($script['url'], '{') !== false) {
+								$scripts_by_host[$hostid][$size]['url'] = $macro_values['url'];
+							}
 						}
 					}
 				}
@@ -1168,10 +1161,141 @@ class CScript extends CApiService {
 		return $scripts_by_host;
 	}
 
+	/**
+	 * Returns all the scripts that are available on each given event. Automatically resolves macros in
+	 * confirmation and URL fields.
+	 *
+	 * @param $eventids
+	 *
+	 * @return array
+	 */
+	public function getScriptsByEvents($eventids) {
+		zbx_value2array($eventids);
+
+		$scripts_by_events = [];
+
+		if (!$eventids) {
+			return $scripts_by_events;
+		}
+
+		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+		if (!CApiInputValidator::validate($api_input_rules, $eventids, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
+
+		foreach ($eventids as $eventid) {
+			$scripts_by_events[$eventid] = [];
+		}
+
+		$events = API::Event()->get([
+			'output' => ['objectid', 'value', 'name', 'severity'],
+			'selectHosts' => ['hostid'],
+			'object' => EVENT_OBJECT_TRIGGER,
+			'source' => EVENT_SOURCE_TRIGGERS,
+			'eventids' => $eventids,
+			'preservekeys' => true
+		]);
+
+		if (!$events) {
+			return $scripts_by_events;
+		}
+
+		$hostids = [];
+		foreach ($events as $event) {
+			foreach ($event['hosts'] as $host) {
+				$hostids[$host['hostid']] = true;
+			}
+		}
+
+		$scripts = $this->get([
+			'output' => ['scriptid', 'name', 'command', 'host_access', 'usrgrpid', 'groupid', 'description',
+				'confirmation', 'type', 'execute_on', 'timeout', 'scope', 'port', 'authtype', 'username', 'password',
+				'publickey', 'privatekey', 'menu_path', 'url', 'new_window'
+			],
+			'hostids' => array_keys($hostids),
+			'sortfield' => 'name',
+			'preservekeys' => true
+		]);
+
+		$scripts = $this->addRelatedGroupsAndHosts([
+			'selectGroups' => null,
+			'selectHostGroups' => null,
+			'selectHosts' => ['hostid']
+		], $scripts, array_keys($hostids));
+
+		if ($scripts) {
+			$macros_data = [];
+			$processed_scripts_per_event = [];
+
+			foreach ($scripts as $scriptid => $script) {
+				foreach ($events as $eventid => $event) {
+					foreach ($event['hosts'] as $event_host) {
+						foreach ($script['hosts'] as $host) {
+							if (bccomp($host['hostid'], $event_host['hostid']) == 0
+									&& array_key_exists($eventid, $scripts_by_events)) {
+								if (strpos($script['confirmation'], '{') !== false) {
+									$macros_data[$eventid][$scriptid]['confirmation'] = $script['confirmation'];
+								}
+
+								if (strpos($script['url'], '{') !== false) {
+									$macros_data[$eventid][$scriptid]['url'] = $script['url'];
+								}
+							}
+						}
+					}
+				}
+			}
+
+			$macros_data = CMacrosResolverHelper::resolveManualEventActionScripts($macros_data, $events);
+
+			foreach ($scripts as $scriptid => $script) {
+				$hosts = $script['hosts'];
+				unset($script['hosts']);
+
+				foreach ($events as $eventid => $event) {
+					if (!array_key_exists($eventid, $processed_scripts_per_event)) {
+						$processed_scripts_per_event[$eventid] = [];
+					}
+
+					foreach ($event['hosts'] as $event_host) {
+						foreach ($hosts as $host) {
+							if (bccomp($host['hostid'], $event_host['hostid']) == 0
+									&& array_key_exists($eventid, $scripts_by_events)
+									&& !array_key_exists($scriptid, $processed_scripts_per_event[$eventid])) {
+								$size = count($scripts_by_events[$eventid]);
+								$scripts_by_events[$eventid][$size] = $script;
+
+								// Set confirmation and URL with resolved macros.
+								if (array_key_exists($eventid, $macros_data)
+										&& array_key_exists($scriptid, $macros_data[$eventid])) {
+									$macro_values = $macros_data[$eventid][$scriptid];
+
+									if (strpos($script['confirmation'], '{') !== false) {
+										$scripts_by_events[$eventid][$size]['confirmation'] =
+											$macro_values['confirmation'];
+									}
+
+									if (strpos($script['url'], '{') !== false) {
+										$scripts_by_events[$eventid][$size]['url'] = $macro_values['url'];
+									}
+								}
+
+								$processed_scripts_per_event[$eventid][$scriptid] = true;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return $scripts_by_events;
+	}
+
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ($options['selectGroups'] !== null || $options['selectHosts'] !== null) {
+		if ($options['selectGroups'] !== null || $options['selectHostGroups'] !== null
+				|| $options['selectHosts'] !== null) {
 			$sqlParts = $this->addQuerySelect($this->fieldId('groupid'), $sqlParts);
 			$sqlParts = $this->addQuerySelect($this->fieldId('host_access'), $sqlParts);
 		}
@@ -1218,6 +1342,9 @@ class CScript extends CApiService {
 						$action_scriptids[] = $scriptid;
 					}
 				}
+
+				// Remove scope from output, since it's not requested.
+				$result = $this->unsetExtraFields($result, ['scope']);
 			}
 
 			if ($action_scriptids) {
@@ -1267,15 +1394,16 @@ class CScript extends CApiService {
 				$result[$scriptid]['parameters'] = [];
 			}
 
-			$parameters = DB::select('script_param', [
-				'output' => ['scriptid', 'name', 'value'],
+			$param_options = [
+				'output' => ['script_paramid', 'scriptid', 'name', 'value'],
 				'filter' => ['scriptid' => array_keys($result)]
-			]);
+			];
+			$db_parameters = DBselect(DB::makeSql('script_param', $param_options));
 
-			foreach ($parameters as $parameter) {
-				$result[$parameter['scriptid']]['parameters'][] = [
-					'name' => $parameter['name'],
-					'value' => $parameter['value']
+			while ($db_param = DBfetch($db_parameters)) {
+				$result[$db_param['scriptid']]['parameters'][] = [
+					'name' => $db_param['name'],
+					'value' => $db_param['value']
 				];
 			}
 		}
@@ -1287,7 +1415,7 @@ class CScript extends CApiService {
 	 * Applies relational subselect onto already fetched result.
 	 *
 	 * @param  array $options
-	 * @param  mixed $options['selectGroups']
+	 * @param  mixed $options['selectHostGroups']
 	 * @param  mixed $options['selectHosts']
 	 * @param  array $result
 	 * @param  array $hostids                  An additional filter by hostids, which will be added to "hosts" key.
@@ -1295,10 +1423,11 @@ class CScript extends CApiService {
 	 * @return array $result
 	 */
 	private function addRelatedGroupsAndHosts(array $options, array $result, array $hostids = null) {
-		$is_groups_select = $options['selectGroups'] !== null && $options['selectGroups'];
-		$is_hosts_select = $options['selectHosts'] !== null && $options['selectHosts'];
+		$is_groups_select = $options['selectGroups'] !== null;
+		$is_hostgroups_select = $options['selectHostGroups'] !== null;
+		$is_hosts_select = $options['selectHosts'] !== null;
 
-		if (!$is_groups_select && !$is_hosts_select) {
+		if (!$is_groups_select && !$is_hostgroups_select && !$is_hosts_select) {
 			return $result;
 		}
 
@@ -1307,7 +1436,9 @@ class CScript extends CApiService {
 
 		$group_search_names = [];
 		foreach ($result as $script) {
-			$has_write_access_level |= ($script['host_access'] == PERM_READ_WRITE);
+			if ($script['host_access'] == PERM_READ_WRITE) {
+				$has_write_access_level = true;
+			}
 
 			// If any script belongs to all host groups.
 			if ($script['groupid'] == 0) {
@@ -1326,8 +1457,17 @@ class CScript extends CApiService {
 			}
 		}
 
-		$select_groups = ['name', 'groupid'];
-		$select_groups = $this->outputExtend($options['selectGroups'], $select_groups);
+		if ($options['selectGroups'] === API_OUTPUT_EXTEND || $options['selectHostGroups'] === API_OUTPUT_EXTEND) {
+			$select_groups = API_OUTPUT_EXTEND;
+		}
+		else {
+			$select_groups = array_unique(array_merge(
+				is_array($options['selectGroups']) ? $options['selectGroups'] : [],
+				is_array($options['selectHostGroups']) ? $options['selectHostGroups'] : []
+			));
+		}
+
+		$select_groups = $this->outputExtend($select_groups, ['groupid', 'name']);
 
 		$host_groups = API::HostGroup()->get([
 			'output' => $select_groups,
@@ -1340,7 +1480,7 @@ class CScript extends CApiService {
 		if ($has_write_access_level && $host_groups) {
 			$host_groups_with_write_access = API::HostGroup()->get([
 				'output' => $select_groups,
-				'groupid' => array_keys($host_groups),
+				'groupids' => array_keys($host_groups),
 				'preservekeys' => true,
 				'editable' => true
 			]);
@@ -1394,11 +1534,6 @@ class CScript extends CApiService {
 			]);
 		}
 
-		$host_groups = $this->unsetExtraFields($host_groups, ['name', 'groupid'], $options['selectGroups']);
-		$host_groups_with_write_access = $this->unsetExtraFields(
-			$host_groups_with_write_access, ['name', 'groupid'], $options['selectGroups']
-		);
-
 		foreach ($result as &$script) {
 			if ($script['groupid'] == 0) {
 				$script_groups = ($script['host_access'] == PERM_READ_WRITE)
@@ -1412,7 +1547,15 @@ class CScript extends CApiService {
 			}
 
 			if ($is_groups_select) {
-				$script['groups'] = array_values($script_groups);
+				$script['groups'] = array_values($this->unsetExtraFields($script_groups,
+					['groupid', 'name', 'flags', 'uuid'], $options['selectGroups']
+				));
+			}
+
+			if ($is_hostgroups_select) {
+				$script['hostgroups'] = array_values($this->unsetExtraFields($script_groups,
+					['groupid', 'name', 'flags', 'uuid'], $options['selectHostGroups']
+				));
 			}
 
 			if ($is_hosts_select) {
@@ -1428,5 +1571,144 @@ class CScript extends CApiService {
 		unset($script);
 
 		return $result;
+	}
+
+	/**
+	 * Check for unique script names.
+	 *
+	 * @param array      $scripts
+	 * @param array|null $db_scripts
+	 *
+	 * @throws APIException if script names are not unique.
+	 */
+	private static function checkDuplicates(array $scripts, array $db_scripts = null): void {
+		$names = [];
+
+		foreach ($scripts as $script) {
+			if (!array_key_exists('name', $script)) {
+				continue;
+			}
+
+			if ($db_scripts === null || $script['name'] !== $db_scripts[$script['scriptid']]['name']) {
+				$names[] = $script['name'];
+			}
+		}
+
+		if (!$names) {
+			return;
+		}
+
+		$duplicates = DB::select('scripts', [
+			'output' => ['name'],
+			'filter' => ['name' => $names],
+			'limit' => 1
+		]);
+
+		if ($duplicates) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s('Script "%1$s" already exists.', $duplicates[0]['name']));
+		}
+	}
+
+	/**
+	 * Update "script_param" table and populate script.parameters by "script_paramid" property.
+	 *
+	 * @param array      $scripts
+	 * @param string     $method
+	 * @param array|null $db_scripts
+	 */
+	private static function updateParams(array &$scripts, string $method, array $db_scripts = null): void {
+		$ins_params = [];
+		$upd_params = [];
+		$del_paramids = [];
+
+		foreach ($scripts as &$script) {
+			if (!array_key_exists('parameters', $script)) {
+				continue;
+			}
+
+			$db_params = ($method === 'update')
+				? array_column($db_scripts[$script['scriptid']]['parameters'], null, 'name')
+				: [];
+
+			foreach ($script['parameters'] as &$param) {
+				if (array_key_exists($param['name'], $db_params)) {
+					$db_param = $db_params[$param['name']];
+					$param['script_paramid'] = $db_param['script_paramid'];
+					unset($db_params[$param['name']]);
+
+					$upd_param = DB::getUpdatedValues('script_param', $param, $db_param);
+
+					if ($upd_param) {
+						$upd_params[] = [
+							'values' => $upd_param,
+							'where' => ['script_paramid' => $db_param['script_paramid']]
+						];
+					}
+				}
+				else {
+					$ins_params[] = ['scriptid' => $script['scriptid']] + $param;
+				}
+			}
+			unset($param);
+
+			$del_paramids = array_merge($del_paramids, array_column($db_params, 'script_paramid'));
+		}
+		unset($script);
+
+		if ($ins_params) {
+			$script_paramids = DB::insertBatch('script_param', $ins_params);
+		}
+
+		if ($upd_params) {
+			DB::update('script_param', $upd_params);
+		}
+
+		if ($del_paramids) {
+			DB::delete('script_param', ['script_paramid' => $del_paramids]);
+		}
+
+		foreach ($scripts as &$script) {
+			if (!array_key_exists('parameters', $script)) {
+				continue;
+			}
+
+			foreach ($script['parameters'] as &$param) {
+				if (!array_key_exists('script_paramid', $param)) {
+					$param['script_paramid'] = array_shift($script_paramids);
+				}
+			}
+			unset($param);
+		}
+		unset($script);
+	}
+
+	/**
+	 * Add the existing parameters to $db_scripts whether these are affected by the update.
+	 *
+	 * @param array $scripts
+	 * @param array $db_scripts
+	 */
+	private static function addAffectedObjects(array $scripts, array &$db_scripts): void {
+		$scriptids = [];
+
+		foreach ($scripts as $script) {
+			$scriptids[] = $script['scriptid'];
+			$db_scripts[$script['scriptid']]['parameters'] = [];
+		}
+
+		if (!$scriptids) {
+			return;
+		}
+
+		$options = [
+			'output' => ['script_paramid', 'scriptid', 'name', 'value'],
+			'filter' => ['scriptid' => $scriptids]
+		];
+		$db_parameters = DBselect(DB::makeSql('script_param', $options));
+
+		while ($db_parameter = DBfetch($db_parameters)) {
+			$db_scripts[$db_parameter['scriptid']]['parameters'][$db_parameter['script_paramid']] =
+				array_diff_key($db_parameter, array_flip(['scriptid']));
+		}
 	}
 }

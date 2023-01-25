@@ -27,9 +27,9 @@ class CControllerDashboardPrint extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'dashboardid' => 'required|db dashboard.dashboardid',
-			'from' => 'range_time',
-			'to' => 'range_time'
+			'dashboardid' =>	'required|db dashboard.dashboardid',
+			'from' =>			'range_time',
+			'to' =>				'range_time'
 		];
 
 		$ret = $this->validateInput($fields) && $this->validateTimeSelectorPeriod();
@@ -63,7 +63,7 @@ class CControllerDashboardPrint extends CController {
 
 		$data = [
 			'dashboard' => $dashboard,
-			'widget_defaults' => CWidgetConfig::getDefaults(CWidgetConfig::CONTEXT_DASHBOARD),
+			'widget_defaults' => APP::ModuleManager()->getWidgetsDefaults(),
 			'time_period' => getTimeSelectorPeriod($time_selector_options)
 		];
 

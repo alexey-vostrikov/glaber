@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -21,6 +21,7 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
 $inline_js = '';
@@ -29,7 +30,6 @@ $form = (new CForm())
 	->cleanItems()
 	->setId('popup.condition')
 	->setName('popup.condition')
-	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 	->addVar('action', $data['action'])
 	->addVar('type', $data['type']);
 
@@ -37,20 +37,18 @@ if (array_key_exists('source', $data)) {
 	$form->addVar('source', $data['source']);
 }
 
-$condition_type = $data['last_type'];
+$condition_type = (int) $data['last_type'];
 
 $form_list = (new CFormList())->cleanItems();
 
 switch ($data['type']) {
 	case ZBX_POPUP_CONDITION_TYPE_EVENT_CORR:
-		require_once dirname(__FILE__).'/../../include/correlation.inc.php';
-
 		// Type select.
 		$form_list->addRow(new CLabel(_('Type'), 'label-condition-type'), (new CSelect('condition_type'))
 			->setFocusableElementId('label-condition-type')
 			->setValue($condition_type)
 			->setId('condition-type')
-			->addOptions(CSelect::createOptionsFromArray(corrConditionTypes()))
+			->addOptions(CSelect::createOptionsFromArray(CCorrelationHelper::getConditionTypes()))
 		);
 
 		$inline_js .= '$(() => $("#condition-type").on("change",'
@@ -62,23 +60,24 @@ switch ($data['type']) {
 			case ZBX_CORR_CONDITION_NEW_EVENT_TAG:
 				$operator = (new CRadioButtonList('', CONDITION_OPERATOR_EQUAL))
 					->setModern(true)
-					->addValue(corrConditionOperatorToString(
-						getOperatorsByCorrConditionType(ZBX_CORR_CONDITION_OLD_EVENT_TAG)[0]
-					), getOperatorsByCorrConditionType(ZBX_CORR_CONDITION_OLD_EVENT_TAG)[0]);
+					->addValue(CCorrelationHelper::getLabelByOperator(
+						CCorrelationHelper::getOperatorsByConditionType(ZBX_CORR_CONDITION_OLD_EVENT_TAG)[0]
+					), CCorrelationHelper::getOperatorsByConditionType(ZBX_CORR_CONDITION_OLD_EVENT_TAG)[0]);
 				$new_condition_tag = (new CTextAreaFlexible('tag'))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
 
 				$inline_js .= $new_condition_tag->getPostJS();
 
 				$form_list
 					->addRow(_('Operator'), [$operator, new CVar('operator', CONDITION_OPERATOR_EQUAL)])
-					->addRow(_('Tag'), $new_condition_tag);
+					->addRow(new CLabel(_('Tag'), 'tag'), $new_condition_tag);
 				break;
 
 			// New event host group form elements.
 			case ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP:
 				$operator = (new CRadioButtonList('operator', CONDITION_OPERATOR_EQUAL))->setModern(true);
-				foreach (getOperatorsByCorrConditionType(ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP) as $value) {
-					$operator->addValue(corrConditionOperatorToString($value), $value);
+				foreach (CCorrelationHelper::getOperatorsByConditionType(ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP)
+						as $value) {
+					$operator->addValue(CCorrelationHelper::getLabelByOperator($value), $value);
 				}
 
 				$hostgroup_multiselect = (new CMultiSelect([
@@ -99,16 +98,16 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Host groups'), $hostgroup_multiselect);
+					->addRow(new CLabel(_('Host groups'), 'groupids__ms'), $hostgroup_multiselect);
 				break;
 
 			// Event tag pair form elements.
 			case ZBX_CORR_CONDITION_EVENT_TAG_PAIR:
 				$operator = (new CRadioButtonList('', CONDITION_OPERATOR_EQUAL))
 					->setModern(true)
-					->addValue(corrConditionOperatorToString(
-						getOperatorsByCorrConditionType(ZBX_CORR_CONDITION_EVENT_TAG_PAIR)[0]
-					), getOperatorsByCorrConditionType(ZBX_CORR_CONDITION_EVENT_TAG_PAIR)[0]);
+					->addValue(CCorrelationHelper::getLabelByOperator(
+						CCorrelationHelper::getOperatorsByConditionType(ZBX_CORR_CONDITION_EVENT_TAG_PAIR)[0]
+					), CCorrelationHelper::getOperatorsByConditionType(ZBX_CORR_CONDITION_EVENT_TAG_PAIR)[0]);
 				$new_condition_oldtag = (new CTextAreaFlexible('oldtag'))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
 				$new_condition_newtag = (new CTextAreaFlexible('newtag'))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
 
@@ -116,17 +115,17 @@ switch ($data['type']) {
 				$inline_js .= $new_condition_newtag->getPostJS();
 
 				$form_list
-					->addRow(_('Old tag name'), $new_condition_oldtag)
+					->addRow(new CLabel(_('Old tag name'), 'oldtag'), $new_condition_oldtag)
 					->addRow(_('Operator'), [$operator, new CVar('operator', CONDITION_OPERATOR_EQUAL)])
-					->addRow(_('New tag name'), $new_condition_newtag);
+					->addRow(new CLabel(_('New tag name'), 'newtag'), $new_condition_newtag);
 				break;
 
 			// Old|New event tag value form elements.
 			case ZBX_CORR_CONDITION_OLD_EVENT_TAG_VALUE:
 			case ZBX_CORR_CONDITION_NEW_EVENT_TAG_VALUE:
 				$operator = (new CRadioButtonList('operator', CONDITION_OPERATOR_EQUAL))->setModern(true);
-				foreach (getOperatorsByCorrConditionType($condition_type) as $value) {
-					$operator->addValue(corrConditionOperatorToString($value), $value);
+				foreach (CCorrelationHelper::getOperatorsByConditionType($condition_type) as $value) {
+					$operator->addValue(CCorrelationHelper::getLabelByOperator($value), $value);
 				}
 
 				$new_condition_tag = (new CTextAreaFlexible('tag'))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
@@ -136,9 +135,9 @@ switch ($data['type']) {
 				$inline_js .= $new_condition_value->getPostJS();
 
 				$form_list
-					->addRow(_('Tag'), $new_condition_tag)
+					->addRow(new CLabel(_('Tag'), 'tag'), $new_condition_tag)
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Value'), $new_condition_value);
+					->addRow(new CLabel(_('Value'), 'value'), $new_condition_value);
 				break;
 		}
 		break;
@@ -150,7 +149,15 @@ switch ($data['type']) {
 		$operators_by_condition = [];
 		$action_conditions = [];
 		foreach ($data['allowed_conditions'] as $type) {
-			$action_conditions[$type] = condition_type2str($type);
+			if ($data['source'] == EVENT_SOURCE_SERVICE && $type == CONDITION_TYPE_EVENT_TAG) {
+				$action_conditions[$type] = _('Service tag name');
+			}
+			elseif ($data['source'] == EVENT_SOURCE_SERVICE && $type == CONDITION_TYPE_EVENT_TAG_VALUE) {
+				$action_conditions[$type] = _('Service tag value');
+			}
+			else {
+				$action_conditions[$type] = condition_type2str($type);
+			}
 
 			foreach (get_operators_by_conditiontype($type) as $value) {
 				$operators_by_condition[$type][$value] = condition_operator2str($value);
@@ -176,29 +183,57 @@ switch ($data['type']) {
 					$operator->addValue($value, $key);
 				}
 
-				$trigger_multiselect = (new CMultiSelect([
-					'name' => 'value[]',
-					'object_name' => 'triggers',
-					'default_value' => 0,
-					'popup' => [
-						'parameters' => [
-							'srctbl' => 'triggers',
-							'srcfld1' => 'triggerid',
-							'dstfrm' => $form->getName(),
-							'dstfld1' => 'trigger_new_condition',
-							'editable' => true,
-							'noempty' => true
+				$trigger_multiselect = $data['trigger_context'] === 'host'
+					? (new CMultiSelect([
+						'name' => 'value[]',
+						'object_name' => 'triggers',
+						'default_value' => 0,
+						'popup' => [
+							'parameters' => [
+								'srctbl' => 'triggers',
+								'srcfld1' => 'triggerid',
+								'dstfrm' => $form->getName(),
+								'dstfld1' => 'trigger_new_condition',
+								'with_triggers' => true,
+								'real_hosts' => true,
+								'editable' => true
+							]
 						]
-					]
-				]))
-					->setId('trigger_new_condition')
-					->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
+					]))
+						->setId('trigger_new_condition')
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+					: (new CMultiSelect([
+						'name' => 'value[]',
+						'object_name' => 'triggers',
+						'default_value' => 0,
+						'popup' => [
+							'parameters' => [
+								'srctbl' => 'template_triggers',
+								'srcfld1' => 'triggerid',
+								'dstfrm' => $form->getName(),
+								'dstfld1' => 'trigger_new_condition',
+								'with_triggers' => true,
+								'editable' => true
+							]
+						]
+					]))
+						->setId('trigger_new_condition')
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
 
 				$inline_js .= $trigger_multiselect->getPostJS();
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Triggers'), $trigger_multiselect);
+					->addRow(_('Trigger source'),
+						(new CRadioButtonList('trigger_context', $data['trigger_context']))
+							->addValue(_('Host'), 'host')
+							->addValue(_('Template'), 'template')
+							->setModern(true)
+					)
+					->addRow(new CLabel(_('Triggers'), 'trigger_new_condition_ms'), $trigger_multiselect);
+
+				$inline_js .= '$(() => $("#trigger_context").on("change",'
+					.'(e) => reloadPopup($(e.target).closest("form").get(0), "popup.condition.actions")));';
 				break;
 
 			// Trigger severity form elements.
@@ -210,9 +245,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Severity'), new CSeverity([
-						'name' => 'value', 'value' => TRIGGER_SEVERITY_NOT_CLASSIFIED
-					]));
+					->addRow(_('Severity'), new CSeverity('value', TRIGGER_SEVERITY_NOT_CLASSIFIED));
 				break;
 
 			// Host form elements.
@@ -243,7 +276,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Hosts'), $host_multiselect);
+					->addRow(new CLabel(_('Hosts'), 'host_new_condition_ms'), $host_multiselect);
 				break;
 
 			// Host group form elements.
@@ -274,7 +307,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Host groups'), $hostgroup_multiselect);
+					->addRow(new CLabel(_('Host groups'), 'hostgroup_new_condition_ms'), $hostgroup_multiselect);
 				break;
 
 			// Problem is suppressed form elements.
@@ -299,7 +332,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Tag'), $new_condition_value);
+					->addRow((new CLabel(_('Tag'), 'value'))->setAsteriskMark(), $new_condition_value);
 				break;
 
 			// Tag value form elements.
@@ -315,9 +348,9 @@ switch ($data['type']) {
 				$inline_js .= $new_condition_value->getPostJS();
 
 				$form_list
-					->addRow(_('Tag'), $new_condition_value2)
+					->addRow((new CLabel(_('Tag'), 'value2'))->setAsteriskMark(), $new_condition_value2)
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Value'), $new_condition_value);
+					->addRow(new CLabel(_('Value'), 'value'), $new_condition_value);
 				break;
 
 			// Template form elements.
@@ -349,7 +382,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Templates'), $template_multiselect);
+					->addRow(new CLabel(_('Templates'), 'template_new_condition_ms'), $template_multiselect);
 				break;
 
 			// Time period form elements.
@@ -397,8 +430,8 @@ switch ($data['type']) {
 					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 					(new CButton('btn1', _('Select')))
 						->addClass(ZBX_STYLE_BTN_GREY)
-						->onClick('return PopUp("popup.generic",'.
-							json_encode([
+						->onClick(
+							'return PopUp("popup.generic", '. json_encode([
 								'srctbl' => 'dchecks',
 								'srcfld1' => 'dcheckid',
 								'srcfld2' => 'name',
@@ -406,7 +439,7 @@ switch ($data['type']) {
 								'dstfld1' => 'dcheck_new_condition_value',
 								'dstfld2' => 'dcheck',
 								'writeonly' => '1'
-							]).', null, this);'
+							]).', {dialogue_class: "modal-popup-generic"});'
 						)
 				];
 
@@ -460,7 +493,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Discovery rules'), $drule_multiselect);
+					->addRow(new CLabel(_('Discovery rules'), 'drule_new_condition_ms'), $drule_multiselect);
 				break;
 
 			// Discovery status form elements.
@@ -512,7 +545,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Proxy'), $proxy_multiselect);
+					->addRow(new CLabel(_('Proxy'), 'proxy_new_condition_ms'), $proxy_multiselect);
 				break;
 
 			// Received value form elements.
@@ -527,7 +560,7 @@ switch ($data['type']) {
 						->setFocusableElementId('label-operator')
 						->addOptions(CSelect::createOptionsFromArray($operators_by_condition[CONDITION_TYPE_DVALUE]))
 					)
-					->addRow(_('Value'), $new_condition_value);
+					->addRow(new CLabel(_('Value'), 'value'), $new_condition_value);
 				break;
 
 			// Service port form elements.
@@ -581,6 +614,8 @@ switch ($data['type']) {
 			case CONDITION_TYPE_HOST_NAME:
 			// Host metadata form elements.
 			case CONDITION_TYPE_HOST_METADATA:
+			// Service name form elements.
+			case CONDITION_TYPE_SERVICE_NAME:
 				$operator = (new CRadioButtonList('operator', CONDITION_OPERATOR_LIKE))->setModern(true);
 				foreach ($operators_by_condition[$condition_type] as $key => $value) {
 					$operator->addValue($value, $key);
@@ -591,7 +626,7 @@ switch ($data['type']) {
 
 				$form_list
 					->addRow(_('Operator'), $operator)
-					->addRow(_('Value'), $new_condition_value);
+					->addRow((new CLabel(_('Value'), 'value'))->setAsteriskMark(), $new_condition_value);
 				break;
 
 			// Event type form elements.
@@ -608,6 +643,31 @@ switch ($data['type']) {
 						->setFocusableElementId('label-condition-event-type')
 						->addOptions(CSelect::createOptionsFromArray(eventType()))
 					);
+				break;
+
+			// Service form elements.
+			case CONDITION_TYPE_SERVICE:
+				$operator = (new CRadioButtonList('operator', CONDITION_OPERATOR_EQUAL))->setModern(true);
+				foreach ($operators_by_condition[CONDITION_TYPE_SERVICE] as $key => $value) {
+					$operator->addValue($value, $key);
+				}
+
+				$service_multiselect = (new CMultiSelect([
+					'name' => 'value[]',
+					'object_name' => 'services',
+					'custom_select' => true
+				]))
+					->setId('service-new-condition')
+					->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH);
+
+				$inline_js .= $service_multiselect->getPostJS().
+					'$("#service-new-condition")
+						.multiSelect("getSelectButton")
+						.addEventListener("click", selectServices);';
+
+				$form_list
+					->addRow(_('Operator'), $operator)
+					->addRow((new CLabel(_('Services')))->setAsteriskMark(), $service_multiselect);
 				break;
 		}
 		break;

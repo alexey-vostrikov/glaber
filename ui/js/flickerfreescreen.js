@@ -106,14 +106,12 @@
 			 * 21   SCREEN_RESOURCE_HTTPTEST_DETAILS
 			 * 22   SCREEN_RESOURCE_DISCOVERY
 			 * 23   SCREEN_RESOURCE_HTTPTEST
-			 * 24   SCREEN_RESOURCE_PROBLEM
 			 */
 			var type_params = {
 					'17': ['mode', 'resourcetype', 'pageFile', 'page'],
 					'21': ['mode', 'resourcetype', 'profileIdx2'],
 					'22': ['mode', 'resourcetype', 'data'],
 					'23': ['mode', 'resourcetype', 'data', 'page'],
-					'24': ['mode', 'resourcetype', 'data', 'page'],
 					'default': ['mode', 'screenid', 'groupid', 'hostid', 'pageFile', 'profileIdx', 'profileIdx2',
 						'screenitemid'
 					]
@@ -225,8 +223,8 @@
 						to_ts: time_object.to_ts
 					});
 
-					// Reset pager on time range update (SCREEN_RESOURCE_HISTORY, SCREEN_RESOURCE_PROBLEM).
-					if ($.inArray(screen.resourcetype, [17, 24]) !== -1) {
+					// Reset pager on time range update (SCREEN_RESOURCE_HISTORY).
+					if (screen.resourcetype == 17) {
 						screen.page = 1;
 					}
 
@@ -263,9 +261,9 @@
 							screen.timestamp = request_start;
 							screen.isRefreshing = false;
 
-							$('.wrapper .msg-bad').remove();
+							$('.wrapper > .msg-bad').remove();
 							$('#flickerfreescreen_' + id).replaceWith(html);
-							$('.wrapper .msg-bad').insertBefore('.wrapper main');
+							html.filter('.msg-bad').insertBefore('.wrapper main');
 
 							window.flickerfreeScreen.setElementProgressState(id, false);
 						}
@@ -290,7 +288,7 @@
 		},
 
 		refreshMap: function(id) {
-			var screen = this.screens[id], self = this;
+			var screen = this.screens[id];
 
 			if (screen.isRefreshing) {
 				this.calculateReRefresh(id);
@@ -356,7 +354,7 @@
 
 					// Create temp image in buffer.
 					var	img = $('<img>', {
-							'class': domImg.attr('class'),
+							class: domImg.attr('class'),
 							id: domImg.attr('id'),
 							name: domImg.attr('name'),
 							border: domImg.attr('border'),

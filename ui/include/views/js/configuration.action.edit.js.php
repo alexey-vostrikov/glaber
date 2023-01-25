@@ -117,7 +117,7 @@
 			var row = jQuery('#recovery_operations_' + index);
 		}
 		else {
-			var row = jQuery('#ack_operations_' + index);
+			var row = jQuery('#update_operations_' + index);
 		}
 
 		var rowParent = row.parent();
@@ -152,9 +152,9 @@
 
 	jQuery(document).ready(function() {
 		var remove_operationid = function() {
-			var operationid_RegExp = /^(operations|recovery_operations|ack_operations)\[\d+\]\[operationid\]$/;
+			var operationid_RegExp = /^(operations|recovery_operations|update_operations)\[\d+\]\[operationid\]$/;
 
-			jQuery('input[name^=operations], input[name^=recovery_operations], input[name^=ack_operations]')
+			jQuery('input[name^=operations], input[name^=recovery_operations], input[name^=update_operations]')
 				.each(function() {
 					if ($(this).attr('name').match(operationid_RegExp)) {
 						$(this).remove();
@@ -249,7 +249,7 @@
 		this.operation_steps.attach(this.$wrapper);
 
 		if (this.props.cmd !== null && (this.props.cmd == operation_details.OPERATION_TYPE_MESSAGE
-				|| this.props.cmd == operation_details.OPERATION_TYPE_ACK_MESSAGE
+				|| this.props.cmd == operation_details.OPERATION_TYPE_UPDATE_MESSAGE
 				|| this.props.cmd == operation_details.OPERATION_TYPE_RECOVERY_MESSAGE)) {
 			this.operation_message.attach(this.$wrapper, this.props);
 		}
@@ -345,9 +345,9 @@
 	}
 
 	/**
-	 * @param {Node} return_focus
+	 * @param {Node} trigger_element
 	 */
-	OperationViewMessage.prototype.showUserPopup = function(return_focus) {
+	OperationViewMessage.prototype.showUserPopup = function(trigger_element) {
 		PopUp('popup.generic', {
 			'srctbl': 'users',
 			'srcfld1': 'userid',
@@ -355,13 +355,13 @@
 			'dstfrm': 'popup.operation',
 			'dstfld1': 'operation-message-users-footer',
 			'multiselect': '1'
-		}, null, return_focus);
+		}, {dialogue_class: 'modal-popup-generic', trigger_element});
 	};
 
 	/**
-	 * @param {Node} return_focus
+	 * @param {Node} trigger_element
 	 */
-	OperationViewMessage.prototype.showUserGroupPopup = function(return_focus) {
+	OperationViewMessage.prototype.showUserGroupPopup = function(trigger_element) {
 		PopUp('popup.generic', {
 			'srctbl': 'usrgrp',
 			'srcfld1': 'usrgrpid',
@@ -369,7 +369,7 @@
 			'dstfrm': 'popup.operation',
 			'dstfld1': 'operation-message-user-groups-footer',
 			'multiselect': '1'
-		}, null, return_focus);
+		}, {dialogue_class: 'modal-popup-generic', trigger_element});
 	};
 
 	/**
@@ -478,11 +478,11 @@
 			this.$users.appendTo($wrapper);
 			this.$mediatype_only.appendTo($wrapper);
 		}
-		else if (props.cmd !== null && props.cmd == operation_details.OPERATION_TYPE_ACK_MESSAGE) {
+		else if (props.cmd !== null && props.cmd == operation_details.OPERATION_TYPE_UPDATE_MESSAGE) {
 			this.$mediatype_default.appendTo($wrapper);
 		}
 		else if (props.recovery_phase == operation_details.ACTION_OPERATION
-				|| props.recovery_phase == operation_details.ACTION_ACKNOWLEDGE_OPERATION) {
+				|| props.recovery_phase == operation_details.ACTION_UPDATE_OPERATION) {
 			this.$mediatype_only.appendTo($wrapper);
 		}
 
@@ -787,13 +787,16 @@
 		overlay.xhr
 			.fail(({statusText}) => {
 				overlay.$dialogue.$body.find('output.msg-bad').remove();
-				overlay.$dialogue.$body.prepend(makeMessageBox('bad', statusText));
+				overlay.$dialogue.$body.prepend(makeMessageBox('bad', [statusText]));
 				overlay.unsetLoading();
 			})
 			.then((res) => {
-				if (res.errors) {
+				if ('error' in res) {
 					overlay.$dialogue.$body.find('output.msg-bad').remove();
-					overlay.$dialogue.$body.prepend(res.errors);
+
+					const message_box = makeMessageBox('bad', res.error.messages, res.error.title);
+
+					overlay.$dialogue.$body.prepend(message_box);
 
 					return overlay.unsetLoading();
 				}
@@ -829,13 +832,13 @@
 	};
 
 	/**
-	 * @param {Node} return_focus
+	 * @param {Node} trigger_element
 	 */
-	OperationViewCondition.prototype.showConditionsPopup = function(return_focus) {
+	OperationViewCondition.prototype.showConditionsPopup = function(trigger_element) {
 		PopUp('popup.condition.operations', {
 			'type': operation_details.ZBX_POPUP_CONDITION_TYPE_ACTION_OPERATION,
 			'source': operation_details.EVENT_SOURCE_TRIGGERS
-		}, null, return_focus);
+		}, {dialogue_class: 'modal-popup-medium', trigger_element: trigger_element});
 	};
 
 	/**
@@ -958,13 +961,13 @@
 	};
 
 	/**
-	 * @param {Node}   return_focus  The node a popup returns focus to when it closes.
+	 * @param {Node}   trigger_element  The node a popup returns focus to when it closes.
 	 * @param {number} eventsource
 	 * @param {number} recovery_phase
 	 * @param {number} actionid
 	 */
-	function OperationPopup(return_focus, eventsource, recovery_phase, actionid) {
-		this.return_focus = return_focus;
+	function OperationPopup(trigger_element, eventsource, recovery_phase, actionid) {
+		this.trigger_element = trigger_element;
 		this.eventsource = eventsource;
 		this.recovery_phase = recovery_phase;
 		this.actionid = actionid;
@@ -1044,16 +1047,20 @@
 		this.overlay.xhr
 			.fail(({statusText}) => {
 				this.overlay.$dialogue.$body.find('output.msg-bad').remove();
-				this.overlay.$dialogue.$body.prepend(makeMessageBox('bad', statusText));
+				this.overlay.$dialogue.$body.prepend(makeMessageBox('bad', [statusText]));
 				this.overlay.unsetLoading();
 			})
 			.done((res) => {
-				if (res.errors) {
+				if ('error' in res) {
 					this.overlay.$dialogue.$body.find('output.msg-bad').remove();
-					this.overlay.$dialogue.$body.prepend(res.errors);
+
+					const message_box = makeMessageBox('bad', res.error.messages, res.error.title);
+
+					this.overlay.$dialogue.$body.prepend(message_box);
 
 					return this.overlay.unsetLoading();
 				}
+
 				// We keep overlay opened and in loading state during the full page reload.
 				this.submit(form_data);
 			});
@@ -1079,7 +1086,7 @@
 			title: t('Cancel'),
 			class: 'btn-alt',
 			cancel: true,
-			action: () => this.return_focus.focus()
+			action: () => this.trigger_element.focus()
 		}];
 
 		this.view.setConfig(res.popup_config);
@@ -1109,8 +1116,18 @@
 
 		this.overlay.xhr = $.post(url.getUrl(), {operation});
 		this.overlay.xhr
-			.done(res => this.onload(res))
-			.fail(({statusText}) => this.overlay.setProperties({content: makeMessageBox('bad', statusText)}));
+			.done((res) => {
+				if ('error' in res) {
+					const message_box = makeMessageBox('bad', res.error.messages, res.error.title, false);
+
+					this.overlay.setProperties({content: message_box});
+
+					return;
+				}
+
+				this.onload(res);
+			})
+			.fail(({statusText}) => this.overlay.setProperties({content: makeMessageBox('bad', [statusText])}));
 	};
 
 	/**
@@ -1123,8 +1140,8 @@
 		if (this.recovery_phase == operation_details.ACTION_RECOVERY_OPERATION) {
 			recovery_prefix = 'recovery_';
 		}
-		else if (this.recovery_phase == operation_details.ACTION_ACKNOWLEDGE_OPERATION) {
-			recovery_prefix = 'ack_';
+		else if (this.recovery_phase == operation_details.ACTION_UPDATE_OPERATION) {
+			recovery_prefix = 'update_';
 		}
 
 		const form = document.forms['action.edit'];
@@ -1152,9 +1169,8 @@
 		 * @param {Node}   target          Popup opener the focus will be returned to.
 		 * @param {number} actionid        Current actionid.
 		 * @param {string} eventsource     One of: EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_DISCOVERY,
-		 *                                 EVENT_SOURCE_AUTOREGISTRATION, EVENT_SOURCE_INTERNAL.
-		 * @param {string} recovery_phase  One of: ACTION_OPERATION, ACTION_RECOVERY_OPERATION,
-		 *                                 ACTION_ACKNOWLEDGE_OPERATION.
+		 *                                 EVENT_SOURCE_AUTOREGISTRATION, EVENT_SOURCE_INTERNAL, EVENT_SOURCE_SERVICE.
+		 * @param {string} recovery_phase  One of: ACTION_OPERATION, ACTION_RECOVERY_OPERATION, ACTION_UPDATE_OPERATION.
 		 * @param {object} operation       (optional) Current operation object.
 		 */
 		open(target, actionid, eventsource, recovery_phase, operation) {
@@ -1169,7 +1185,7 @@
 		}
 	}
 
-	window.operation_details.OPERATION_TYPE_ACK_MESSAGE                = <?= OPERATION_TYPE_ACK_MESSAGE ?>;
+	window.operation_details.OPERATION_TYPE_UPDATE_MESSAGE             = <?= OPERATION_TYPE_UPDATE_MESSAGE ?>;
 	window.operation_details.OPERATION_TYPE_RECOVERY_MESSAGE           = <?= OPERATION_TYPE_RECOVERY_MESSAGE ?>;
 	window.operation_details.OPERATION_TYPE_HOST_INVENTORY             = <?= OPERATION_TYPE_HOST_INVENTORY ?>;
 	window.operation_details.OPERATION_TYPE_TEMPLATE_REMOVE            = <?= OPERATION_TYPE_TEMPLATE_REMOVE ?>;
@@ -1178,7 +1194,7 @@
 	window.operation_details.OPERATION_TYPE_GROUP_ADD                  = <?= OPERATION_TYPE_GROUP_ADD ?>;
 	window.operation_details.OPERATION_TYPE_COMMAND                    = <?= OPERATION_TYPE_COMMAND ?>;
 	window.operation_details.OPERATION_TYPE_MESSAGE                    = <?= OPERATION_TYPE_MESSAGE ?>;
-	window.operation_details.ACTION_ACKNOWLEDGE_OPERATION              = <?= ACTION_ACKNOWLEDGE_OPERATION ?>;
+	window.operation_details.ACTION_UPDATE_OPERATION                   = <?= ACTION_UPDATE_OPERATION ?>;
 	window.operation_details.ACTION_RECOVERY_OPERATION                 = <?= ACTION_RECOVERY_OPERATION ?>;
 	window.operation_details.ACTION_OPERATION                          = <?= ACTION_OPERATION ?>;
 	window.operation_details.ZBX_POPUP_CONDITION_TYPE_ACTION_OPERATION = <?= ZBX_POPUP_CONDITION_TYPE_ACTION_OPERATION ?>;

@@ -20,12 +20,11 @@
 #ifndef ZABBIX_STATS_H
 #define ZABBIX_STATS_H
 
-#include "threads.h"
-#include "mutexs.h"
+#include "zbxthreads.h"
 
 #ifndef _WINDOWS
 #	include "diskdevices.h"
-#	include "ipc.h"
+#	include "zbxnix.h"
 #endif
 
 #include "cpustat.h"

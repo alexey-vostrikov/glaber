@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -23,7 +23,7 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Queue details'))
 	->setTitleSubmenu([
 		'main_section' => [
@@ -39,7 +39,8 @@ $widget = (new CWidget())
 					->getUrl() => _('Queue details')
 			]
 		]
-	]);
+	])
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::QUEUE_DETAILS));
 
 $table = (new CTableInfo())->setHeader([
 	_('Scheduled check'),
@@ -61,7 +62,7 @@ foreach ($data['queue_data'] as $itemid => $item_queue_data) {
 		zbx_date2str(DATE_TIME_FORMAT_SECONDS, $item_queue_data['nextcheck']),
 		zbx_date2age($item_queue_data['nextcheck']),
 		$host['name'],
-		$item['name_expanded'],
+		$item['name'],
 		array_key_exists($data['hosts'][$item['hostid']]['proxy_hostid'], $data['proxies'])
 			? $data['proxies'][$data['hosts'][$item['hostid']]['proxy_hostid']]['host']
 			: ''
@@ -74,7 +75,7 @@ if (CWebUser::getRefresh()) {
 		->show();
 }
 
-$widget
+$html_page
 	->addItem($table)
 	->addItem((new CDiv())
 		->addClass(ZBX_STYLE_TABLE_PAGING)

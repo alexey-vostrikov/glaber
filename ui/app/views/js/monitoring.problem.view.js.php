@@ -23,79 +23,260 @@
  * @var CView $this
  */
 
-if (array_key_exists('filter_options', $data)) { ?>
-	<script type="text/javascript">
-	$(function() {
-		var options = <?= json_encode($data['filter_options']) ?>,
-			filter = new CTabFilter($('#monitoring_problem_filter')[0], options),
-			refresh_interval = <?= $data['refresh_interval'] ?>,
-			refresh_timer,
-			filter_item,
-			filter_counter_fetch,
-			active_filter = filter._active_item,
-			global_timerange = {
-				from: options.timeselector.from,
-				to: options.timeselector.to
-			};
+?>
+<script>
+	const view = {
+		refresh_url: null,
+		refresh_simple_url: null,
+		refresh_interval: null,
+		filter_defaults: null,
+		filter: null,
+		global_timerange: null,
+		active_filter: null,
+		refresh_timer: null,
+		filter_counter_fetch: null,
+		running: false,
+		timeout: null,
+		deferred: null,
 
-		const url = new Curl('zabbix.php', false);
-		url.setArgument('action', 'problem.view.refresh');
-		const refresh_url = url.getUrl();
+		init({filter_options, refresh_url, refresh_interval, filter_defaults}) {
+			this.refresh_url = new Curl(refresh_url, false);
+			this.refresh_interval = refresh_interval;
+			this.filter_defaults = filter_defaults;
 
-		/**
-		 * Update on filter changes.
-		 */
-		filter.on(TABFILTER_EVENT_URLSET, () => {
-			let url = new Curl();
+			const url = new Curl('zabbix.php', false);
+			url.setArgument('action', 'problem.view.refresh');
+			this.refresh_simple_url = url.getUrl();
 
-			url.setArgument('action', 'problem.view.csv');
-			$('#export_csv').attr('data-url', url.getUrl());
-			refreshResults();
-			refreshCounters();
+			this.initFilter(filter_options);
+			this.initAcknowledge();
 
-			if (active_filter !== filter._active_item) {
-				active_filter = filter._active_item;
-				chkbxRange.checkObjectAll(chkbxRange.pageGoName, false);
-				chkbxRange.clearSelectedOnFilterChange();
+			if (this.refresh_interval != 0) {
+				this.running = true;
+				this.scheduleRefresh();
 			}
-		});
 
-		/**
-		 * Update filter item counter when filter settings updated.
-		 */
-		filter.on(TABFILTER_EVENT_UPDATE, (ev) => {
-			if (!filter._active_item.hasCounter() || ev.detail.filter_property !== 'properties') {
+			$(document).on({
+				mouseenter: function() {
+					if ($(this)[0].scrollWidth > $(this)[0].offsetWidth) {
+						$(this).attr({title: $(this).text()});
+					}
+				},
+				mouseleave: function() {
+					if ($(this).is('[title]')) {
+						$(this).removeAttr('title');
+					}
+				}
+			}, 'table.<?= ZBX_STYLE_COMPACT_VIEW ?> a.<?= ZBX_STYLE_LINK_ACTION ?>');
+
+			// Activate blinking.
+			jqBlink.blink();
+		},
+
+		initFilter(filter_options) {
+			if (!filter_options) {
 				return;
 			}
 
-			if (filter_counter_fetch) {
-				filter_counter_fetch.abort();
+			this.filter = new CTabFilter($('#monitoring_problem_filter')[0], filter_options);
+			this.active_filter = this.filter._active_item;
+			this.global_timerange = {
+				from: filter_options.timeselector.from,
+				to: filter_options.timeselector.to
+			};
+
+			/**
+			 * Update on filter changes.
+			 */
+			this.filter.on(TABFILTER_EVENT_URLSET, () => {
+				const url = new Curl();
+				url.setArgument('action', 'problem.view.csv');
+				$('#export_csv').attr('data-url', url.getUrl());
+
+				this.refreshResults();
+				this.refreshCounters();
+				chkbxRange.clearSelectedOnFilterChange();
+
+				if (this.active_filter !== this.filter._active_item) {
+					this.active_filter = this.filter._active_item;
+					chkbxRange.checkObjectAll(chkbxRange.pageGoName, false);
+				}
+			});
+
+			/**
+			 * Update filter item counter when filter settings updated.
+			 */
+			this.filter.on(TABFILTER_EVENT_UPDATE, (e) => {
+				if (!this.filter._active_item.hasCounter() || e.detail.filter_property !== 'properties') {
+					return;
+				}
+
+				if (this.filter_counter_fetch) {
+					this.filter_counter_fetch.abort();
+				}
+
+				this.filter_counter_fetch = new AbortController();
+				const filter_item = this.filter._active_item;
+
+				fetch(this.refresh_simple_url, {
+					method: 'POST',
+					signal: this.filter_counter_fetch.signal,
+					body: new URLSearchParams({filter_counters: 1, counter_index: filter_item._index})
+				})
+					.then(response => response.json())
+					.then(response => {
+						filter_item.updateCounter(response.filter_counters.pop());
+					});
+			});
+
+			this.refreshCounters();
+
+			// Keep timeselector changes in global_timerange.
+			$.subscribe('timeselector.rangeupdate', (e, data) => {
+				if (data.idx === '<?= CControllerProblem::FILTER_IDX ?>') {
+					this.global_timerange.from = data.from;
+					this.global_timerange.to = data.to;
+				}
+
+				this.refresh_url.setArgument('page', 1);
+				this.refreshResults();
+			});
+		},
+
+		initAcknowledge() {
+			$.subscribe('acknowledge.create', function(event, response) {
+				// Clear all selected checkboxes in Monitoring->Problems.
+				if (chkbxRange.prefix === 'problem') {
+					chkbxRange.checkObjectAll(chkbxRange.pageGoName, false);
+					chkbxRange.clearSelectedOnFilterChange();
+				}
+
+				view.refreshNow();
+
+				clearMessages();
+				addMessage(makeMessageBox('good', [], response.message));
+			});
+
+			$(document).on('submit', '#problem_form', function(e) {
+				e.preventDefault();
+
+				acknowledgePopUp({eventids: Object.keys(chkbxRange.getSelectedIds())}, this);
+			});
+		},
+
+		getCurrentResultsTable() {
+			return document.getElementById('flickerfreescreen_problem');
+		},
+
+		getCurrentDebugBlock() {
+			return document.querySelector('.wrapper > .debug-output');
+		},
+
+		setLoading() {
+			this.getCurrentResultsTable().classList.add('is-loading', 'is-loading-fadein', 'delayed-15s');
+		},
+
+		clearLoading() {
+			this.getCurrentResultsTable().classList.remove('is-loading', 'is-loading-fadein', 'delayed-15s');
+		},
+
+		refreshBody(body) {
+			this.getCurrentResultsTable().replaceWith(
+				new DOMParser().parseFromString(body, 'text/html').body.firstElementChild
+			);
+			chkbxRange.init();
+		},
+
+		refreshDebug(debug) {
+			this.getCurrentDebugBlock().replaceWith(
+				new DOMParser().parseFromString(debug, 'text/html').body.firstElementChild
+			);
+		},
+
+		refresh() {
+			this.setLoading();
+
+			const params = this.refresh_url.getArgumentsObject();
+			const exclude = ['action', 'filter_src', 'filter_show_counter', 'filter_custom_time', 'filter_name'];
+			const post_data = Object.keys(params)
+				.filter(key => !exclude.includes(key))
+				.reduce((post_data, key) => {
+					post_data[key] = (typeof params[key] === 'object')
+						? [...params[key]].filter(i => i)
+						: params[key];
+					return post_data;
+				}, {});
+
+			this.deferred = $.ajax({
+				url: this.refresh_simple_url,
+				data: post_data,
+				type: 'post',
+				dataType: 'json'
+			});
+
+			return this.bindDataEvents(this.deferred);
+		},
+
+		refreshNow() {
+			this.unscheduleRefresh();
+			this.refresh();
+		},
+
+		scheduleRefresh() {
+			this.unscheduleRefresh();
+			this.timeout = setTimeout((function () {
+				this.timeout = null;
+				this.refresh();
+			}).bind(this), this.refresh_interval);
+		},
+
+		unscheduleRefresh() {
+			if (this.timeout !== null) {
+				clearTimeout(this.timeout);
+				this.timeout = null;
+			}
+		},
+
+		bindDataEvents(deferred) {
+			const that = this;
+
+			deferred
+				.done(function(response) {
+					that.onDataDone.call(that, response);
+				})
+				.always(this.onDataAlways.bind(this));
+
+			return deferred;
+		},
+
+		onDataAlways() {
+			if (this.running) {
+				this.deferred = null;
+				this.scheduleRefresh();
+			}
+		},
+
+		onDataDone(response) {
+			this.clearLoading();
+			this.refreshBody(response.body);
+
+			if ('messages' in response) {
+				clearMessages();
+				addMessage(makeMessageBox('good', [], response.messages, true, false));
 			}
 
-			filter_counter_fetch = new AbortController();
-			filter_item = filter._active_item;
-
-			fetch(refresh_url, {
-				method: 'POST',
-				signal: filter_counter_fetch.signal,
-				body: new URLSearchParams({filter_counters: 1, counter_index: filter_item._index})
-			})
-				.then(response => response.json())
-				.then(response => {
-					filter_item.updateCounter(response.filter_counters.pop());
-				});
-		});
+			('debug' in response) && this.refreshDebug(response.debug);
+		},
 
 		/**
-		 * Refresh results table via window.flickerfreeScreen.refresh call.
+		 * Refresh results table.
 		 */
-		function refreshResults() {
-			let url = new Curl(),
-				screen = window.flickerfreeScreen.screens['problem'],
-				data = $.extend(<?= json_encode($data['filter_defaults']) ?>,
-					global_timerange, url.getArgumentsObject()
-				);
+		refreshResults() {
+			const url = new Curl();
+			const refresh_url = new Curl('zabbix.php', false);
+			const data = Object.assign({}, this.filter_defaults, this.global_timerange, url.getArgumentsObject());
 
+			// Modify filter data.
 			data.inventory = data.inventory
 				? data.inventory.filter(inventory => 'value' in inventory && inventory.value !== '')
 				: data.inventory;
@@ -105,28 +286,16 @@ if (array_key_exists('filter_options', $data)) { ?>
 			data.severities = data.severities
 				? data.severities.filter((value, key) => value == key)
 				: data.severities;
+			data.page = this.refresh_url.getArgument('page') ?? 1;
 
-			// Modify filter data of flickerfreeScreen object with id 'problem'.
-			if (data.page === null) {
-				delete data.page;
+			if (!data.filter_custom_time) {
+				data.from = this.global_timerange.from;
+				data.to = this.global_timerange.to;
 			}
 
-			if (data.filter_custom_time) {
-				screen.timeline.from = data.from;
-				screen.timeline.to = data.to;
-			}
-			else {
-				screen.timeline.from = global_timerange.from;
-				screen.timeline.to = global_timerange.to;
-			}
-
-			screen.data.filter = data;
-			screen.data.sort = data.sort;
-			screen.data.sortorder = data.sortorder;
-
-			// Close all opened hint boxes otherwise flicker free screen will not refresh it content.
-			for (var i = overlays_stack.length - 1; i >= 0; i--) {
-				let hintbox = overlays_stack.getById(overlays_stack.stack[i]);
+			// Close all opened hint boxes, otherwise their contents will not be updated after autorefresh.
+			for (let i = overlays_stack.length - 1; i >= 0; i--) {
+				const hintbox = overlays_stack.getById(overlays_stack.stack[i]);
 
 				if (hintbox.type === 'hintbox') {
 					hintBox.hideHint(hintbox.element, true);
@@ -134,24 +303,34 @@ if (array_key_exists('filter_options', $data)) { ?>
 				}
 			}
 
-			window.flickerfreeScreen.refresh(screen.id);
-		}
+			Object.entries(data).forEach(([key, value]) => {
+				if (['filter_show_counter', 'filter_custom_time', 'action'].indexOf(key) !== -1) {
+					return;
+				}
 
-		function refreshCounters() {
-			clearTimeout(refresh_timer);
+				refresh_url.setArgument(key, value);
+			});
 
-			fetch(refresh_url, {
+			refresh_url.setArgument('action', 'problem.view.refresh');
+			this.refresh_url = refresh_url;
+			this.refreshNow();
+		},
+
+		refreshCounters() {
+			clearTimeout(this.refresh_timer);
+
+			fetch(this.refresh_simple_url, {
 				method: 'POST',
 				body: new URLSearchParams({filter_counters: 1})
 			})
 				.then(response => response.json())
 				.then(response => {
 					if (response.filter_counters) {
-						filter.updateCounters(response.filter_counters);
+						this.filter.updateCounters(response.filter_counters);
 					}
 
-					if (refresh_interval > 0) {
-						refresh_timer = setTimeout(refreshCounters, refresh_interval);
+					if (this.refresh_interval > 0) {
+						this.refresh_timer = setTimeout(() => this.refreshCounters(), this.refresh_interval);
 					}
 				})
 				.catch(() => {
@@ -159,56 +338,71 @@ if (array_key_exists('filter_options', $data)) { ?>
 					 * On error restart refresh timer.
 					 * If refresh interval is set to 0 (no refresh) schedule initialization request after 5 sec.
 					 */
-					refresh_timer = setTimeout(refreshCounters, refresh_interval > 0 ? refresh_interval : 5000);
+					this.refresh_timer = setTimeout(() => this.refreshCounters(),
+						this.refresh_interval > 0 ? this.refresh_interval : 5000
+					);
 				});
-		}
+		},
 
-		refreshCounters();
+		editHost(hostid) {
+			this.openHostPopup({hostid});
+		},
 
-		// Keep timeselector changes in global_timerange.
-		$.subscribe('timeselector.rangeupdate', (e, data) => {
-			if (data.idx === '<?= CControllerProblem::FILTER_IDX ?>') {
-				global_timerange.from = data.from;
-				global_timerange.to = data.to;
-			}
-		});
-	});
-	</script>
-<?php
-}
-?>
-<script type="text/javascript">
-	jQuery(function($) {
-		$(document).on({
-			mouseenter: function() {
-				if ($(this)[0].scrollWidth > $(this)[0].offsetWidth) {
-					$(this).attr({title: $(this).text()});
-				}
-			},
-			mouseleave: function() {
-				if ($(this).is('[title]')) {
-					$(this).removeAttr('title');
-				}
-			}
-		}, 'table.<?= ZBX_STYLE_COMPACT_VIEW ?> a.<?= ZBX_STYLE_LINK_ACTION ?>');
-
-		$.subscribe('acknowledge.create', function(event, response) {
-			// Clear all selected checkboxes in Monitoring->Problems.
-			if (chkbxRange.prefix === 'problem') {
-				chkbxRange.checkObjectAll(chkbxRange.pageGoName, false);
-				chkbxRange.clearSelectedOnFilterChange();
-			}
-
-			window.flickerfreeScreen.refresh('problem');
-
+		openHostPopup(host_data) {
 			clearMessages();
-			addMessage(makeMessageBox('good', [], response.message, true, false));
-		});
 
-		$(document).on('submit', '#problem_form', function(e) {
-			e.preventDefault();
+			const original_url = location.href;
+			const overlay = PopUp('popup.host.edit', host_data, {
+				dialogueid: 'host_edit',
+				dialogue_class: 'modal-popup-large',
+				prevent_navigation: true
+			});
 
-			acknowledgePopUp({eventids: chkbxRange.selectedIds}, this);
-		});
-	});
+			overlay.$dialogue[0].addEventListener('dialogue.create', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('dialogue.update', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('dialogue.delete', this.events.hostDelete, {once: true});
+			overlay.$dialogue[0].addEventListener('overlay.close', () => {
+				history.replaceState({}, '', original_url);
+			}, {once: true});
+		},
+
+		events: {
+			hostSuccess(e) {
+				const data = e.detail;
+
+				if ('success' in data) {
+					const title = data.success.title;
+					let messages = [];
+
+					if ('messages' in data.success) {
+						messages = data.success.messages;
+					}
+
+					addMessage(makeMessageBox('good', messages, title));
+				}
+
+				view.refreshResults();
+				view.refreshCounters();
+			},
+
+			hostDelete(e) {
+				const data = e.detail;
+
+				if ('success' in data) {
+					const title = data.success.title;
+					let messages = [];
+
+					if ('messages' in data.success) {
+						messages = data.success.messages;
+					}
+
+					addMessage(makeMessageBox('good', messages, title));
+				}
+
+				uncheckTableRows('problem');
+				view.refreshResults();
+				view.refreshCounters();
+			}
+		}
+	};
 </script>

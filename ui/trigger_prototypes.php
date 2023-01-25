@@ -26,7 +26,6 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = _('Configuration of trigger prototypes');
 $page['file'] = 'trigger_prototypes.php';
-$page['scripts'] = ['multiselect.js', 'textareaflexible.js', 'class.tab-indicators.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -43,6 +42,7 @@ $fields = [
 	'recovery_mode' =>							[T_ZBX_INT, O_OPT, null,	IN(ZBX_RECOVERY_MODE_EXPRESSION.','.ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION.','.ZBX_RECOVERY_MODE_NONE),	null],
 	'priority' =>								[T_ZBX_INT, O_OPT, null,	IN('0,1,2,3,4,5'), 'isset({add}) || isset({update})'],
 	'comments' =>								[T_ZBX_STR, O_OPT, null,	null,		'isset({add}) || isset({update})'],
+	'url_name' =>								[T_ZBX_STR, O_OPT, null,	null,		'isset({add}) || isset({update})'],
 	'url' =>									[T_ZBX_STR, O_OPT, null,	null,		'isset({add}) || isset({update})'],
 	'correlation_mode' =>						[T_ZBX_STR, O_OPT, null,	IN(ZBX_TRIGGER_CORRELATION_NONE.','.ZBX_TRIGGER_CORRELATION_TAG),	null],
 	'correlation_tag' =>						[T_ZBX_STR, O_OPT, null,	null,			'isset({add}) || isset({update})'],
@@ -100,6 +100,7 @@ $fields = [
 	'cancel' =>									[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
 	'form' =>									[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
 	'form_refresh' =>							[T_ZBX_INT, O_OPT, null,	null,		null],
+	'backurl' =>								[T_ZBX_STR, O_OPT, null,	null,		null],
 	// sort and sortorder
 	'sort' =>									[T_ZBX_STR, O_OPT, P_SYS, IN('"description","priority","status","discover"'),		null],
 	'sortorder' =>								[T_ZBX_STR, O_OPT, P_SYS, IN('"'.ZBX_SORT_DOWN.'","'.ZBX_SORT_UP.'"'),	null]
@@ -131,6 +132,11 @@ if (hasRequest('triggerid')) {
 	if (!$triggerPrototypes) {
 		access_deny();
 	}
+}
+
+// Validate backurl.
+if (hasRequest('backurl') && !CHtmlUrlValidator::validateSameSite(getRequest('backurl'))) {
+	access_deny();
 }
 
 $tags = getRequest('tags', []);
@@ -204,6 +210,7 @@ elseif (hasRequest('add') || hasRequest('update')) {
 	$recovery_mode = getRequest('recovery_mode', ZBX_RECOVERY_MODE_EXPRESSION);
 	$recovery_expression = getRequest('recovery_expression', '');
 	$type = getRequest('type', 0);
+	$url_name = getRequest('url_name', '');
 	$url = getRequest('url', '');
 	$priority = getRequest('priority', TRIGGER_SEVERITY_NOT_CLASSIFIED);
 	$comments = getRequest('comments', '');
@@ -221,6 +228,7 @@ elseif (hasRequest('add') || hasRequest('update')) {
 			'expression' => $expression,
 			'recovery_mode' => $recovery_mode,
 			'type' => $type,
+			'url_name' => $url_name,
 			'url' => $url,
 			'priority' => $priority,
 			'comments' => $comments,
@@ -245,13 +253,18 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 		$result = (bool) API::TriggerPrototype()->create($trigger_prototype);
 
-		show_messages($result, _('Trigger prototype added'), _('Cannot add trigger prototype'));
+		if ($result) {
+			CMessageHelper::setSuccessTitle(_('Trigger prototype added'));
+		}
+		else {
+			CMessageHelper::setErrorTitle(_('Cannot add trigger prototype'));
+		}
 	}
 	else {
 		$db_trigger_prototypes = API::TriggerPrototype()->get([
-			'output' => ['expression', 'description', 'url', 'status', 'priority', 'comments', 'templateid', 'type',
-				'recovery_mode', 'recovery_expression', 'correlation_mode', 'correlation_tag', 'manual_close', 'opdata',
-				'discover', 'event_name'
+			'output' => ['expression', 'description', 'url_name', 'url', 'status', 'priority', 'comments', 'templateid',
+				'type', 'recovery_mode', 'recovery_expression', 'correlation_mode', 'correlation_tag', 'manual_close',
+				'opdata', 'discover', 'event_name'
 			],
 			'selectDependencies' => ['triggerid'],
 			'selectTags' => ['tag', 'value'],
@@ -304,6 +317,9 @@ elseif (hasRequest('add') || hasRequest('update')) {
 		if ($db_trigger_prototype['type'] != $type) {
 			$trigger_prototype['type'] = $type;
 		}
+		if ($db_trigger_prototype['url_name'] !== $url_name) {
+			$trigger_prototype['url_name'] = $url_name;
+		}
 		if ($db_trigger_prototype['url'] !== $url) {
 			$trigger_prototype['url'] = $url;
 		}
@@ -348,22 +364,40 @@ elseif (hasRequest('add') || hasRequest('update')) {
 			$result = true;
 		}
 
-		show_messages($result, _('Trigger prototype updated'), _('Cannot update trigger prototype'));
+		if ($result) {
+			CMessageHelper::setSuccessTitle(_('Trigger prototype updated'));
+		}
+		else {
+			CMessageHelper::setErrorTitle(_('Cannot update trigger prototype'));
+		}
 	}
 
 	if ($result) {
 		unset($_REQUEST['form']);
 		uncheckTableRows(getRequest('parent_discoveryid'));
+
+		if (hasRequest('backurl')) {
+			$response = new CControllerResponseRedirect(getRequest('backurl'));
+			$response->redirect();
+		}
 	}
 }
 elseif (hasRequest('delete') && hasRequest('triggerid')) {
 	$result = API::TriggerPrototype()->delete([getRequest('triggerid')]);
 
 	if ($result) {
+		CMessageHelper::setSuccessTitle(_('Trigger prototype deleted'));
 		unset($_REQUEST['form'], $_REQUEST['triggerid']);
 		uncheckTableRows(getRequest('parent_discoveryid'));
+
+		if (hasRequest('backurl')) {
+			$response = new CControllerResponseRedirect(getRequest('backurl'));
+			$response->redirect();
+		}
 	}
-	show_messages($result, _('Trigger prototype deleted'), _('Cannot delete trigger prototype'));
+	else {
+		CMessageHelper::setErrorTitle(_('Cannot delete trigger prototype'));
+	}
 }
 elseif (hasRequest('add_dependency') && hasRequest('new_dependency')) {
 	if (!hasRequest('dependencies')) {
@@ -486,6 +520,7 @@ if (isset($_REQUEST['form'])) {
 		'status' => getRequest('status', TRIGGER_STATUS_ENABLED),
 		'discover' => getRequest('discover', DB::getDefault('triggers', 'discover')),
 		'comments' => getRequest('comments', ''),
+		'url_name' => getRequest('url_name', ''),
 		'url' => getRequest('url', ''),
 		'expression_constructor' => getRequest('expression_constructor', IM_ESTABLISHED),
 		'recovery_expression_constructor' => getRequest('recovery_expression_constructor', IM_ESTABLISHED),
@@ -500,7 +535,8 @@ if (isset($_REQUEST['form'])) {
 		'correlation_mode' => getRequest('correlation_mode', ZBX_TRIGGER_CORRELATION_NONE),
 		'correlation_tag' => getRequest('correlation_tag', ''),
 		'manual_close' => getRequest('manual_close', ZBX_TRIGGER_MANUAL_CLOSE_NOT_ALLOWED),
-		'context' => getRequest('context')
+		'context' => getRequest('context'),
+		'backurl' => getRequest('backurl')
 	]);
 
 	// render view

@@ -19,10 +19,14 @@
 
 #ifndef ZABBIX_EVENTS_H
 #define ZABBIX_EVENTS_H
-#include  "dbcache.h"
+
+#include "zbxdbhigh.h"
+#include "zbxtime.h"
+#include "dbcache.h"
+
 void	zbx_initialize_events(void);
 void	zbx_uninitialize_events(void);
-DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t objectid,
+ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t objectid,
 		const zbx_timespec_t *timespec, int value, const char *trigger_description,
 		const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
 		unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
@@ -37,5 +41,6 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 void	zbx_clean_events(void);
 void	zbx_reset_event_recovery(void);
 void	zbx_export_events(void);
+void	zbx_events_update_itservices(void);
 
 #endif

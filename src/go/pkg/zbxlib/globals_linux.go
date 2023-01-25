@@ -24,10 +24,16 @@ package zbxlib
 /*
 #cgo LDFLAGS: -Wl,--start-group
 #cgo LDFLAGS: ${SRCDIR}/../../../zabbix_agent/logfiles/libzbxlogfiles.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxnum/libzbxnum.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxstr/libzbxstr.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxparam/libzbxparam.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxexpr/libzbxexpr.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxip/libzbxip.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxcomms/libzbxcomms.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxcommon/libzbxcommon.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxcrypto/libzbxcrypto.a
-#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxsys/libzbxsys.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxthreads/libzbxthreads.a
+#cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxmutexs/libzbxmutexs.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxnix/libzbxnix.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxconf/libzbxconf.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxhttp/libzbxhttp.a
@@ -41,12 +47,12 @@ package zbxlib
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxexec/libzbxexec.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxalgo/libzbxalgo.a
 #cgo LDFLAGS: ${SRCDIR}/../../../libs/zbxjson/libzbxjson.a
-#cgo LDFLAGS: -lz -lpcre -lresolv
+#cgo pcre  LDFLAGS: -lz -lpcre -lresolv
+#cgo pcre2 LDFLAGS: -lz -lpcre2-8 -lresolv
 #cgo LDFLAGS: -Wl,--end-group
 
-#include "common.h"
-#include "sysinfo.h"
-#include "comms.h"
+#include "zbxsysinfo.h"
+#include "zbxcomms.h"
 #include "log.h"
 #include "../src/zabbix_agent/metrics.h"
 #include "../src/zabbix_agent/logfiles/logfiles.h"
@@ -61,29 +67,6 @@ int	CONFIG_ENABLE_REMOTE_COMMANDS= 0;
 int	CONFIG_LOG_REMOTE_COMMANDS= 0;
 char	*CONFIG_SOURCE_IP= NULL;
 
-unsigned int	configured_tls_connect_mode = ZBX_TCP_SEC_UNENCRYPTED;
-unsigned int	configured_tls_accept_modes = ZBX_TCP_SEC_UNENCRYPTED;
-
-char *CONFIG_TLS_CONNECT= NULL;
-char *CONFIG_TLS_ACCEPT	= NULL;
-char *CONFIG_TLS_CA_FILE = NULL;
-char *CONFIG_TLS_CRL_FILE = NULL;
-char *CONFIG_TLS_SERVER_CERT_ISSUER	= NULL;
-char *CONFIG_TLS_SERVER_CERT_SUBJECT = NULL;
-char *CONFIG_TLS_CERT_FILE = NULL;
-char *CONFIG_TLS_KEY_FILE = NULL;
-char *CONFIG_TLS_PSK_IDENTITY = NULL;
-char *CONFIG_TLS_PSK_FILE = NULL;
-
-char *CONFIG_TLS_CIPHER_CERT13 = NULL;
-char *CONFIG_TLS_CIPHER_CERT = NULL;
-char *CONFIG_TLS_CIPHER_PSK13 = NULL;
-char *CONFIG_TLS_CIPHER_PSK = NULL;
-char *CONFIG_TLS_CIPHER_ALL13 = NULL;
-char *CONFIG_TLS_CIPHER_ALL = NULL;
-char *CONFIG_TLS_CIPHER_CMD13 = NULL;
-char *CONFIG_TLS_CIPHER_CMD = NULL;
-
 int	CONFIG_PASSIVE_FORKS = 0;
 int	CONFIG_ACTIVE_FORKS = 0;
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
@@ -97,10 +80,6 @@ const char	*help_message[] = {};
 
 ZBX_METRIC	parameters_agent[] = {NULL};
 ZBX_METRIC	parameters_specific[] = {NULL};
-
-void zbx_on_exit(int ret)
-{
-}
 
 int	zbx_procstat_collector_started(void)
 {

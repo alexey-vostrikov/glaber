@@ -27,21 +27,21 @@ class CControllerDashboardPagePropertiesEdit extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'name' => 'db dashboard_page.name',
-			'dashboard_display_period' => 'required|db dashboard.display_period|in '.
-				implode(',', DASHBOARD_DISPLAY_PERIODS),
-			'display_period' => 'db dashboard_page.display_period|in '.
-				implode(',', array_merge([0], DASHBOARD_DISPLAY_PERIODS)),
-			'unique_id' => 'string'
+			'name' =>						'db dashboard_page.name',
+			'dashboard_display_period' =>	'required|db dashboard.display_period|in '.implode(',', DASHBOARD_DISPLAY_PERIODS),
+			'display_period' =>				'db dashboard_page.display_period|in '.implode(',', array_merge([0], DASHBOARD_DISPLAY_PERIODS)),
+			'unique_id' =>					'string'
 		];
 
 		$ret = $this->validateInput($fields);
 
 		if (!$ret) {
 			$this->setResponse(
-				(new CControllerResponseData([
-					'main_block' => json_encode(['errors' => getMessages()->toString()])
-				]))->disableView()
+				(new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])]))->disableView()
 			);
 		}
 

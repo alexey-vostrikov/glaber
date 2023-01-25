@@ -17,28 +17,24 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
 #include "listener.h"
 
-#include "comms.h"
-#include "cfg.h"
 #include "zbxconf.h"
-#include "stats.h"
-#include "sysinfo.h"
+#include "zbxsysinfo.h"
 #include "log.h"
-
-extern unsigned char			program_type;
-extern ZBX_THREAD_LOCAL unsigned char	process_type;
-extern ZBX_THREAD_LOCAL int		server_num, process_num;
+#include "zbxstr.h"
+#include "zbxtime.h"
+#include "zbx_rtc_constants.h"
 
 #if defined(ZABBIX_SERVICE)
-#	include "service.h"
+#	include "zbxwinservice.h"
 #elif defined(ZABBIX_DAEMON)
-#	include "daemon.h"
+#	include "zbxnix.h"
 #endif
 
-#include "zbxcrypto.h"
-#include "../libs/zbxcrypto/tls_tcp_active.h"
+#ifndef _WINDOWS
+static volatile sig_atomic_t	need_update_userparam;
+#endif
 
 static void	process_listener(zbx_socket_t *s)
 {
@@ -52,11 +48,11 @@ static void	process_listener(zbx_socket_t *s)
 
 		zabbix_log(LOG_LEVEL_DEBUG, "Requested [%s]", s->buffer);
 
-		init_result(&result);
+		zbx_init_agent_result(&result);
 
-		if (SUCCEED == process(s->buffer, PROCESS_WITH_ALIAS, &result))
+		if (SUCCEED == zbx_execute_agent_check(s->buffer, ZBX_PROCESS_WITH_ALIAS, &result))
 		{
-			if (NULL != (value = GET_TEXT_RESULT(&result)))
+			if (NULL != (value = ZBX_GET_TEXT_RESULT(&result)))
 			{
 				zabbix_log(LOG_LEVEL_DEBUG, "Sending back [%s]", *value);
 				ret = zbx_tcp_send_to(s, *value, CONFIG_TIMEOUT);
@@ -64,7 +60,7 @@ static void	process_listener(zbx_socket_t *s)
 		}
 		else
 		{
-			value = GET_MSG_RESULT(&result);
+			value = ZBX_GET_MSG_RESULT(&result);
 
 			if (NULL != value)
 			{
@@ -92,42 +88,64 @@ static void	process_listener(zbx_socket_t *s)
 			}
 		}
 
-		free_result(&result);
+		zbx_free_agent_result(&result);
 	}
 
 	if (FAIL == ret)
 		zabbix_log(LOG_LEVEL_DEBUG, "Process listener error: %s", zbx_socket_strerror());
 }
 
+#ifndef _WINDOWS
+static void	zbx_listener_sigusr_handler(int flags)
+{
+	if (ZBX_RTC_USER_PARAMETERS_RELOAD == ZBX_RTC_GET_MSG(flags))
+		need_update_userparam = 1;
+}
+#endif
+
 ZBX_THREAD_ENTRY(listener_thread, args)
 {
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
-	char		*msg = NULL;
+	char				*msg = NULL;
 #endif
-	int		ret;
-	zbx_socket_t	s;
+	int				ret;
+	zbx_socket_t			s;
+	zbx_thread_listener_args	*init_child_args_in;
+	unsigned char			process_type = ((zbx_thread_args_t *)args)->info.process_type;
+	int				server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int				process_num = ((zbx_thread_args_t *)args)->info.process_num;
 
-	assert(args);
-	assert(((zbx_thread_args_t *)args)->args);
+	init_child_args_in = (zbx_thread_listener_args *)((((zbx_thread_args_t *)args))->args);
 
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]",
+			get_program_type_string(init_child_args_in->zbx_get_program_type_cb_arg()),
 			server_num, get_process_type_string(process_type), process_num);
 
-	memcpy(&s, (zbx_socket_t *)((zbx_thread_args_t *)args)->args, sizeof(zbx_socket_t));
+	memcpy(&s, init_child_args_in->listen_sock, sizeof(zbx_socket_t));
 
 	zbx_free(args);
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
-	zbx_tls_init_child();
+	zbx_tls_init_child(init_child_args_in->zbx_config_tls, init_child_args_in->zbx_get_program_type_cb_arg);
 #endif
+
+#ifndef _WINDOWS
+	zbx_set_sigusr_handler(zbx_listener_sigusr_handler);
+#endif
+
 	while (ZBX_IS_RUNNING())
 	{
+#ifndef _WINDOWS
+		if (1 == need_update_userparam)
+		{
+			zbx_setproctitle("listener #%d [reloading user parameters]", process_num);
+			reload_user_parameters(process_type, process_num, init_child_args_in->config_file);
+			need_update_userparam = 0;
+		}
+#endif
+
 		zbx_setproctitle("listener #%d [waiting for connection]", process_num);
-		ret = zbx_tcp_accept(&s, configured_tls_accept_modes);
+		ret = zbx_tcp_accept(&s, init_child_args_in->zbx_config_tls->accept_modes);
 		zbx_update_env(zbx_time());
 
 		if (SUCCEED == ret)
@@ -139,7 +157,10 @@ ZBX_THREAD_ENTRY(listener_thread, args)
 			{
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 				if (ZBX_TCP_SEC_TLS_CERT != s.connection_type ||
-						SUCCEED == (ret = zbx_check_server_issuer_subject(&s, &msg)))
+						SUCCEED == (ret = zbx_check_server_issuer_subject(&s,
+						init_child_args_in->zbx_config_tls->server_cert_issuer,
+						init_child_args_in->zbx_config_tls->server_cert_subject,
+						&msg)))
 #endif
 				{
 					process_listener(&s);

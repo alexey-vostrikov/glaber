@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "dbcache.h"
 #include "preproc.h"
 
@@ -37,10 +37,11 @@
 
 extern char *CONFIG_SOURCE_IP;
 extern int CONFIG_GLB_AGENT_FORKS;
+
 struct tcp_item_t
 {
-	char *interface_addr;
-	char *ipaddr;
+	const char *interface_addr;
+	const char *ipaddr;
 	unsigned char useip;
 	unsigned int interface_port;
 	unsigned char poll_type;
@@ -158,8 +159,6 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 		async_tcp_destroy_session(poller_item);
 		return;
 	}
-
-	// 	HALT_HERE("Implement");
 }
 
 
@@ -259,8 +258,6 @@ static int tcp_bev_request(poller_item_t *poller_item, const char *request, int 
 		return FAIL;
 	}
 
-	//	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &true, sizeof(int));
-
 	if (NULL != CONFIG_SOURCE_IP)
 	{
 		ZBX_SOCKADDR source_addr;
@@ -316,15 +313,12 @@ static int tcp_bev_request(poller_item_t *poller_item, const char *request, int 
 
 static int tcp_send_request(poller_item_t *poller_item)
 {
-
 	DEBUG_ITEM(poller_get_item_id(poller_item), "Starting TCP connection");
 
 	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
 
 	void *request = NULL;
 	size_t request_size = 0;
-
-//	LOG_INF("Host %s has %d active connections, polling", tcp_item->ipaddr, n);
 
 	if (NULL != conf[tcp_item->poll_type].create_request)
 		conf[tcp_item->poll_type].create_request(poller_item, tcp_item->proto_ctx, &request, &request_size);
@@ -337,7 +331,6 @@ static int tcp_send_request(poller_item_t *poller_item)
 
 	poller_contention_add_session(tcp_item->ipaddr);
 	poller_inc_requests();
-
 	return SUCCEED;
 }
 
@@ -347,8 +340,8 @@ void resolve_ready_func_cb(poller_item_t *poller_item, const char *addr)
 	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
 	DEBUG_ITEM(poller_get_item_id(poller_item), "Item ip %s resolved to '%s'", tcp_item->interface_addr, addr);
 
-	zbx_free(tcp_item->ipaddr);
-	tcp_item->ipaddr = zbx_strdup(NULL, addr);
+	poller_strpool_free(tcp_item->ipaddr);
+	tcp_item->ipaddr = poller_strpool_add(addr);
 	
 	tcp_item->next_resolve = time(NULL) + DNS_TTL + rand() % 15;
 	tcp_send_request(poller_item);
@@ -375,16 +368,13 @@ static void tcp_start_connection(poller_item_t *poller_item)
 	u_int64_t itemid = poller_get_item_id(poller_item);
 	int n;
 
-
-	if (3 < (n = poller_contention_get_sessions(tcp_item->interface_addr)))
+	if (DEFAULT_TCP_HOST_CONTENTION <= (n = poller_contention_get_sessions(tcp_item->interface_addr)))
 	{
-	
-	//	LOG_INF("There are already %d connections for the %s host, delaying poll", n, tcp_item->ipaddr);
-		DEBUG_ITEM(poller_get_item_id(poller_item), "There are already %d connections for the %s host, delaying poll", n, tcp_item->interface_addr);
-		poller_return_delayed_item_to_queue(poller_item);
-		return;
+	 	DEBUG_ITEM(poller_get_item_id(poller_item), "There are already %d connections for the %s host, delaying poll", n, tcp_item->interface_addr);
+	 	poller_return_delayed_item_to_queue(poller_item);
+	 	return;
 	}
-	
+		
 	if (1 == tcp_item->useip) {
 	//	LOG_INF("This is ip item, no need to resolve, addr is %s", tcp_item->ipaddr);
 		tcp_send_request(poller_item);
@@ -397,10 +387,9 @@ static void tcp_start_connection(poller_item_t *poller_item)
 	{
 		//LOG_INF("This is dns name item, resolving Resolving %s", tcp_item->interface_addr);
 		DEBUG_ITEM(poller_get_item_id(poller_item), "Need to resolve %s", tcp_item->interface_addr);
-
+	
 		if (FAIL == poller_async_resolve(poller_item, tcp_item->interface_addr))
 		{
-
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Cannot resolve item's interface addr: '%s'", tcp_item->interface_addr);
 			poller_preprocess_error(poller_item, "Cannot resolve item's interface hostname");
 			poller_return_item_to_queue(poller_item);
@@ -426,10 +415,10 @@ static void tcp_free_item(poller_item_t *poller_item)
 		conf[tcp_item->poll_type].item_destroy(tcp_item->proto_ctx);
 	}
 
-	zbx_free(tcp_item->ipaddr);
+	poller_strpool_free(tcp_item->ipaddr);
 	
 	if (0 == tcp_item->useip)
-		zbx_free(tcp_item->interface_addr);
+		poller_strpool_free(tcp_item->interface_addr);
 
 	zbx_free(tcp_item);
 }
@@ -466,10 +455,10 @@ static int tcp_init_item(DC_ITEM *dc_item, poller_item_t *poller_item)
 	
 	if (1 == tcp_item->useip || ip_str_version(dc_item->interface.addr) >0 ) {
 		tcp_item->useip = 1;
-		tcp_item->ipaddr = zbx_strdup(NULL, dc_item->interface.ip_orig);
-		tcp_item->interface_addr = tcp_item->ipaddr;
+		tcp_item->ipaddr = poller_strpool_add(dc_item->interface.ip_orig);
+		tcp_item->interface_addr = poller_strpool_copy(tcp_item->ipaddr);
 	} else {
-		tcp_item->interface_addr = zbx_strdup(NULL, dc_item->interface.addr);
+		tcp_item->interface_addr = poller_strpool_add(dc_item->interface.addr);
 	}
 
 	tcp_item->interface_port = dc_item->interface.port;

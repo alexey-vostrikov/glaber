@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -166,7 +166,7 @@ class CTabFilterProfile {
 	 * Update selected tab filter properties from $input array. Active filter selection:
 	 * - If no filter_name passed in input select last opened filter.
 	 * - If filter_name is empty select home filter (is used for hotlinking from other pages to home filter)
-	 * - If filter_name does not exists in stored filters, select home filer
+	 * - If filter_name does not exists in stored filters, select home filter
 	 * - If filter_name exists and is not unique among stored filters, select last opened filter if it name match else
 	 *   select first filter from matched filters list.
 	 *
@@ -303,6 +303,18 @@ class CTabFilterProfile {
 		CProfile::updateArray($this->namespace.'.properties', array_map('json_encode', $tabfilters), PROFILE_TYPE_STR);
 		CProfile::update($this->namespace.'.selected', $this->selected, PROFILE_TYPE_INT);
 		CProfile::update($this->namespace.'.expanded', (int) $this->expanded, PROFILE_TYPE_INT);
+
+		return $this;
+	}
+
+	/**
+	 * Reset default filter profile.
+	 */
+	public function reset(): CTabFilterProfile {
+		if ($this->selected == 0) {
+			$this->setTabFilter($this->selected, ['filter_name' => '']);
+			$this->update();
+		}
 
 		return $this;
 	}

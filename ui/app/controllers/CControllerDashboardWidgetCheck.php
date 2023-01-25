@@ -19,30 +19,56 @@
 **/
 
 
+use Zabbix\Core\{
+	CModule,
+	CWidget
+};
+
 class CControllerDashboardWidgetCheck extends CController {
 
-	private $context;
+	private ?CWidget $widget = null;
+
+	protected function init() {
+		$this->setPostContentType(self::POST_CONTENT_TYPE_JSON);
+	}
 
 	protected function checkInput() {
 		$fields = [
-			'templateid' => 'db dashboard.templateid',
-			'type' => 'required|string',
-			'name' => 'required|string',
-			'fields' => 'json'
+			'type' =>		'required|string',
+			'fields' =>		'array',
+			'templateid' =>	'db dashboard.templateid',
+			'name' =>		'required|string'
 		];
 
 		$ret = $this->validateInput($fields);
 
 		if ($ret) {
-			$this->context = $this->hasInput('templateid')
-				? CWidgetConfig::CONTEXT_TEMPLATE_DASHBOARD
-				: CWidgetConfig::CONTEXT_DASHBOARD;
+			$widget = APP::ModuleManager()->getModule($this->getInput('type'));
 
-			$ret = CWidgetConfig::isWidgetTypeSupportedInContext($this->getInput('type'), $this->context);
+			if ($widget !== null && $widget->getType() === CModule::TYPE_WIDGET) {
+				$this->widget = $widget;
+			}
+			else {
+				error(_('Inaccessible widget type.'));
+
+				$ret = false;
+			}
+		}
+
+		if ($ret && $this->hasInput('templateid') && !$this->widget->hasTemplateSupport()) {
+			error(_('Widget type is not supported in this context.'));
+
+			$ret = false;
 		}
 
 		if (!$ret) {
-			$this->setResponse(new CControllerResponseFatal());
+			$this->setResponse(
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])])
+			);
 		}
 
 		return $ret;
@@ -53,20 +79,20 @@ class CControllerDashboardWidgetCheck extends CController {
 	}
 
 	protected function doAction() {
-		$form = CWidgetConfig::getForm($this->getInput('type'), $this->getInput('fields', '{}'),
-			($this->context === CWidgetConfig::CONTEXT_TEMPLATE_DASHBOARD) ? $this->getInput('templateid') : null
+		$form = $this->widget->getForm($this->getInput('fields', []),
+			$this->hasInput('templateid') ? $this->getInput('templateid') : null
 		);
 
-		$data = [];
+		$output = [];
 
 		if ($errors = $form->validate(true)) {
-			foreach ($errors as $msg) {
-				error($msg);
+			foreach ($errors as $error) {
+				error($error);
 			}
 
-			$data['errors'] = getMessages()->toString();
+			$output['error']['messages'] = array_column(get_and_clear_messages(), 'message');
 		}
 
-		$this->setResponse(new CControllerResponseData(['main_block' => json_encode($data)]));
+		$this->setResponse(new CControllerResponseData(['main_block' => json_encode($output)]));
 	}
 }

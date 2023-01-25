@@ -17,10 +17,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "sysinfo.h"
+#include "zbxsysinfo.h"
+#include "../sysinfo.h"
+
 #include "zbxjson.h"
 #include "log.h"
+#include "zbxcomms.h"
+#include "zbxnum.h"
+#include "zbxip.h"
 
 typedef struct
 {
@@ -42,6 +46,18 @@ typedef struct
 	zbx_uint64_t ocompressed;
 }
 net_stat_t;
+
+typedef struct
+{
+	struct addrinfo	*ai;
+	unsigned short	port;
+	unsigned int	prefix_sz;
+	unsigned char	mapped;
+}
+net_count_info_t;
+
+#define NET_CONN_TYPE_TCP	0
+#define NET_CONN_TYPE_UDP	1
 
 #if HAVE_INET_DIAG
 #	include <sys/socket.h>
@@ -278,8 +294,6 @@ static int	get_net_stat(const char *if_name, net_stat_t *result, char **error)
 
 /******************************************************************************
  *                                                                            *
- * Function: proc_read_tcp_listen                                             *
- *                                                                            *
  * Purpose: reads /proc/net/tcp(6) file by chunks until the last line in      *
  *          in buffer has non-listening socket state                          *
  *                                                                            *
@@ -363,8 +377,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: proc_read_file                                                   *
- *                                                                            *
  * Purpose: reads whole file into a buffer in a single read operation         *
  *                                                                            *
  * Parameters: filename     - [IN] the file to read                           *
@@ -404,7 +416,7 @@ out:
 	return ret;
 }
 
-int	NET_IF_IN(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_if_in(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	net_stat_t	ns;
 	char		*if_name, *mode, *error;
@@ -449,7 +461,7 @@ int	NET_IF_IN(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int	NET_IF_OUT(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_if_out(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	net_stat_t	ns;
 	char		*if_name, *mode, *error;
@@ -494,7 +506,7 @@ int	NET_IF_OUT(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int	NET_IF_TOTAL(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_if_total(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	net_stat_t	ns;
 	char		*if_name, *mode, *error;
@@ -535,7 +547,7 @@ int	NET_IF_TOTAL(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int	NET_IF_COLLISIONS(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_if_collisions(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	net_stat_t	ns;
 	char		*if_name, *error;
@@ -559,7 +571,7 @@ int	NET_IF_COLLISIONS(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int	NET_IF_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_if_discovery(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char		line[MAX_STRING_LEN], *p;
 	FILE		*f;
@@ -602,7 +614,7 @@ int	NET_IF_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-int	NET_TCP_LISTEN(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_tcp_listen(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char		pattern[64], *port_str, *buffer = NULL;
 	unsigned short	port;
@@ -619,7 +631,7 @@ int	NET_TCP_LISTEN(AGENT_REQUEST *request, AGENT_RESULT *result)
 
 	port_str = get_rparam(request, 0);
 
-	if (NULL == port_str || SUCCEED != is_ushort(port_str, &port))
+	if (NULL == port_str || SUCCEED != zbx_is_ushort(port_str, &port))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid first parameter."));
 		return SYSINFO_RET_FAIL;
@@ -703,7 +715,7 @@ out:
 	return ret;
 }
 
-int	NET_UDP_LISTEN(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	net_udp_listen(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char		pattern[64], *port_str, *buffer = NULL;
 	unsigned short	port;
@@ -718,7 +730,7 @@ int	NET_UDP_LISTEN(AGENT_REQUEST *request, AGENT_RESULT *result)
 
 	port_str = get_rparam(request, 0);
 
-	if (NULL == port_str || SUCCEED != is_ushort(port_str, &port))
+	if (NULL == port_str || SUCCEED != zbx_is_ushort(port_str, &port))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid first parameter."));
 		return SYSINFO_RET_FAIL;
@@ -759,4 +771,402 @@ out:
 	SET_UI64_RESULT(result, listen);
 
 	return ret;
+}
+
+static unsigned char	get_connection_state_tcp(const char *name)
+{
+	unsigned char	state;
+
+	if (0 == strcmp(name, "established"))
+		state = 1;
+	else if (0 == strcmp(name, "syn_sent"))
+		state = 2;
+	else if (0 == strcmp(name, "syn_recv"))
+		state = 3;
+	else if (0 == strcmp(name, "fin_wait1"))
+		state = 4;
+	else if (0 == strcmp(name, "fin_wait2"))
+		state = 5;
+	else if (0 == strcmp(name, "time_wait"))
+		state = 6;
+	else if (0 == strcmp(name, "close"))
+		state = 7;
+	else if (0 == strcmp(name, "close_wait"))
+		state = 8;
+	else if (0 == strcmp(name, "last_ack"))
+		state = 9;
+	else if (0 == strcmp(name, "listen"))
+		state = 10;
+	else if (0 == strcmp(name, "closing"))
+		state = 11;
+	else
+		state = 0;
+
+	return state;
+}
+
+static unsigned char	get_connection_state_udp(const char *name)
+{
+	unsigned char	state;
+
+	if (0 == strcmp(name, "established"))
+		state = 1;
+	else if (0 == strcmp(name, "unconn"))
+		state = 7;
+	else
+		state = 0;
+
+	return state;
+}
+
+#ifdef HAVE_IPV6
+static int	scan_ipv6_addr(const char *addr, struct sockaddr_in6 *sa6)
+{
+	int	i, k;
+
+	for (i = 0; i < 16; i += 4)
+	{
+		for (k = 0; k < 4; k++)
+		{
+			if (1 != sscanf(addr + i * 2 + k * 2, "%2hhx", &sa6->sin6_addr.s6_addr[i + 3 - k]))
+				return FAIL;
+		}
+	}
+
+	return SUCCEED;
+}
+
+static int	get_proc_net_count_ipv6(const char *filename, unsigned char state, net_count_info_t *exp_l,
+		net_count_info_t *exp_r, zbx_uint64_t *count, char **error)
+{
+	char			line[MAX_STRING_LEN], *p;
+	unsigned short		lport, rport;
+	unsigned char		state_f;
+	FILE			*f;
+	ZBX_SOCKADDR		sockaddr_l, sockaddr_r;
+	struct sockaddr_in6	*sa_l, *sa_r;
+
+	if (NULL == (f = fopen(filename, "r")))
+	{
+		*error = zbx_dsprintf(NULL, "Cannot open %s: %s", filename, zbx_strerror(errno));
+		return FAIL;
+	}
+
+	sa_l = (struct sockaddr_in6 *)&sockaddr_l;
+	sa_r = (struct sockaddr_in6 *)&sockaddr_r;
+
+#ifdef HAVE_SOCKADDR_STORAGE_SS_FAMILY
+	sockaddr_l.ss_family = sockaddr_r.ss_family = AF_INET6;
+#else
+	sockaddr_l.__ss_family = sockaddr_r.__ss_family = AF_INET6;
+#endif
+
+	while (NULL != fgets(line, sizeof(line), f))
+	{
+		if (NULL == (p = strchr(line, ':')))
+			continue;
+
+		if (80 > strlen(p))
+			continue;
+
+		p += 2;
+
+		if (SUCCEED != scan_ipv6_addr(p, sa_l))
+			continue;
+
+		p += 32;
+
+		if (1 != sscanf(p, ":%hx", &lport))
+			continue;
+
+		p += 6;
+
+		if (SUCCEED != scan_ipv6_addr(p, sa_r))
+			continue;
+
+		p += 32;
+
+		if (2 != sscanf(p, ":%hx %hhx", &rport, &state_f))
+			continue;
+
+		if ((0 != exp_l->port && exp_l->port != lport) ||
+				(0 != exp_r->port && exp_r->port != rport) ||
+				(0 != state && state != state_f) ||
+				(NULL != exp_l->ai &&
+				FAIL == zbx_ip_cmp(exp_l->prefix_sz, exp_l->ai, sockaddr_l,
+				1 == exp_l->mapped && 0 != exp_l->prefix_sz ? 0 : 1)) ||
+				(NULL != exp_r->ai &&
+				FAIL == zbx_ip_cmp(exp_r->prefix_sz, exp_r->ai, sockaddr_r,
+				1 == exp_r->mapped && 0 != exp_r->prefix_sz ? 0 : 1)))
+		{
+			continue;
+		}
+
+		(*count)++;
+	}
+
+	zbx_fclose(f);
+
+	return SUCCEED;
+}
+#endif
+
+static int	get_proc_net_count_ipv4(const char *filename, unsigned char state, net_count_info_t *exp_l,
+		net_count_info_t *exp_r, zbx_uint64_t *count, char **error)
+{
+	char			line[MAX_STRING_LEN], *p;
+	unsigned short		lport, rport;
+	unsigned char		state_f;
+	FILE			*f;
+	ZBX_SOCKADDR		sockaddr_l, sockaddr_r;
+	struct sockaddr_in	*sa_l, *sa_r;
+
+	if (NULL == (f = fopen(filename, "r")))
+	{
+		*error = zbx_dsprintf(NULL, "Cannot open %s: %s", filename, zbx_strerror(errno));
+		return FAIL;
+	}
+
+	sa_l = (struct sockaddr_in *)&sockaddr_l;
+	sa_r = (struct sockaddr_in *)&sockaddr_r;
+
+#ifdef HAVE_IPV6
+#ifdef HAVE_SOCKADDR_STORAGE_SS_FAMILY
+	sockaddr_l.ss_family = sockaddr_r.ss_family = AF_INET;
+#else
+	sockaddr_l.__ss_family = sockaddr_r.__ss_family = AF_INET;
+#endif
+#endif
+
+	while (NULL != fgets(line, sizeof(line), f))
+	{
+		if (NULL == (p = strchr(line, ':')))
+			continue;
+
+		if (5 != sscanf(p, ": %x:%hx %x:%hx %hhx", &sa_l->sin_addr.s_addr, &lport, &sa_r->sin_addr.s_addr,
+				&rport, &state_f))
+		{
+			continue;
+		}
+
+		if ((0 != exp_l->port && exp_l->port != lport) ||
+				(0 != exp_r->port && exp_r->port != rport) ||
+				(0 != state && state != state_f) ||
+				(NULL != exp_l->ai &&
+				FAIL == zbx_ip_cmp(exp_l->prefix_sz, exp_l->ai, sockaddr_l,
+				1 == exp_l->mapped && 0 != exp_l->prefix_sz ? 0 : 1)) ||
+				(NULL != exp_r->ai &&
+				FAIL == zbx_ip_cmp(exp_r->prefix_sz, exp_r->ai, sockaddr_r,
+				1 == exp_r->mapped && 0 != exp_r->prefix_sz ? 0 : 1)))
+		{
+			continue;
+		}
+
+		(*count)++;
+	}
+
+	zbx_fclose(f);
+
+	return SUCCEED;
+}
+
+static int	get_addr_info(const char *addr_in, const char *port_in, struct addrinfo *hints, net_count_info_t *info,
+		char **error)
+{
+	char		*cidr_sep, *addr;
+	const char	*service = NULL;
+	int		ret = FAIL, res, prefix_sz_local;
+
+	if (NULL != addr_in && '\0' != *addr_in)
+	{
+		prefix_sz_local = -1;
+		addr = zbx_strdup(NULL, addr_in);
+
+		if (NULL != (cidr_sep = strchr(addr, '/')))
+		{
+			*cidr_sep = '\0';
+
+			if (FAIL == validate_cidr(addr, cidr_sep + 1, &prefix_sz_local))
+			{
+				*error = zbx_dsprintf(*error, "Cannot validate CIDR \"%s/%s\"", addr, cidr_sep + 1);
+				goto err;
+			}
+		}
+		else if (FAIL == zbx_is_supported_ip(addr))
+		{
+			*error = zbx_dsprintf(*error, "IP is not supported: \"%s\"", addr_in);
+			goto err;
+		}
+	}
+	else
+		addr = NULL;
+
+	if (NULL != port_in && '\0' != *port_in)
+	{
+		if (SUCCEED != zbx_is_ushort(port_in, &info->port))
+		{
+			if (0 != atoi(port_in))
+			{
+				*error = zbx_dsprintf(*error, "Invalid port number: %s", port_in);
+				goto err;
+			}
+
+			service = port_in;
+		}
+	}
+
+	if (NULL == addr && NULL == service)
+		return SUCCEED;
+
+	if (EAI_SERVICE == (res = getaddrinfo(addr, service, hints, &info->ai)))
+	{
+		*error = zbx_dsprintf(*error, "The service \"%s\" is not available for the requested socket type.",
+				port_in);
+		goto err;
+	}
+	else if (0 != res)
+	{
+		*error = zbx_dsprintf(*error, "IP is not supported: \"%s\"", addr_in);
+		goto err;
+	}
+#ifdef HAVE_IPV6
+	if (info->ai->ai_family == AF_INET6)
+	{
+		const unsigned char	ipv6_mapped[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255};
+
+		if (NULL != addr)
+		{
+			if (-1 == prefix_sz_local)
+				prefix_sz_local = ZBX_IPV6_MAX_CIDR_PREFIX;
+
+			if (0 == memcmp(((struct sockaddr_in6*)info->ai->ai_addr)->sin6_addr.s6_addr, ipv6_mapped, 12))
+				info->mapped = 1;
+		}
+
+		if (NULL != service)
+			info->port = ntohs(((struct sockaddr_in6*)info->ai->ai_addr)->sin6_port);
+	}
+	else
+#endif
+	{
+		if (NULL != addr && -1 == prefix_sz_local)
+			prefix_sz_local = ZBX_IPV4_MAX_CIDR_PREFIX;
+
+		if (NULL != service)
+			info->port = ntohs(((struct sockaddr_in*)info->ai->ai_addr)->sin_port);
+	}
+
+	if (NULL == addr)
+	{
+		freeaddrinfo(info->ai);
+		info->ai = NULL;
+	}
+	else
+		info->prefix_sz = (unsigned int)prefix_sz_local;
+
+	ret = SUCCEED;
+err:
+	zbx_free(addr);
+
+	return ret;
+}
+
+static int	net_socket_count(int conn_type, AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	int			ret = SYSINFO_RET_FAIL;
+	net_count_info_t	info_l, info_r;
+	char			*error = NULL, *laddr, *raddr, *lport, *rport, *state;
+	unsigned char		state_num = 0;
+	zbx_uint64_t		count = 0;
+	struct addrinfo		hints;
+
+	if (5 < request->nparam)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Too many parameters."));
+		return SYSINFO_RET_FAIL;
+	}
+
+	laddr = get_rparam(request, 0);
+	lport = get_rparam(request, 1);
+	raddr = get_rparam(request, 2);
+	rport = get_rparam(request, 3);
+	state = get_rparam(request, 4);
+
+	memset(&info_l, 0, sizeof(info_l));
+	memset(&info_r, 0, sizeof(info_r));
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_flags = AI_NUMERICHOST;
+
+	if (NET_CONN_TYPE_TCP == conn_type)
+	{
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+	}
+	else
+	{
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+	}
+
+	/* local address and port */
+	if (SUCCEED != get_addr_info(laddr, lport, &hints, &info_l, &error))
+	{
+		SET_MSG_RESULT(result, error);
+		goto err;
+	}
+
+	/* remote address and port */
+	if (SUCCEED != get_addr_info(raddr, rport, &hints, &info_r, &error))
+	{
+		SET_MSG_RESULT(result, error);
+		goto err;
+	}
+
+	/* connection state */
+	if (NULL != state && '\0' != *state && 0 == (state_num = (NET_CONN_TYPE_TCP ==
+			conn_type ? get_connection_state_tcp(state) : get_connection_state_udp(state))))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifth parameter."));
+		goto err;
+	}
+
+	if (SUCCEED != get_proc_net_count_ipv4(NET_CONN_TYPE_TCP == conn_type ? "/proc/net/tcp" : "/proc/net/udp",
+			state_num, &info_l, &info_r, &count, &error))
+	{
+		SET_MSG_RESULT(result, error);
+		goto err;
+	}
+
+#ifdef HAVE_IPV6
+	if (SUCCEED != get_proc_net_count_ipv6(NET_CONN_TYPE_TCP == conn_type ? "/proc/net/tcp6" : "/proc/net/udp6",
+			state_num, &info_l, &info_r,  &count, &error))
+	{
+		SET_MSG_RESULT(result, error);
+		goto err;
+	}
+#endif
+
+	SET_UI64_RESULT(result, count);
+
+	ret = SYSINFO_RET_OK;
+err:
+	if (NULL != info_l.ai)
+		freeaddrinfo(info_l.ai);
+
+	if (NULL != info_r.ai)
+		freeaddrinfo(info_r.ai);
+
+	return ret;
+}
+
+int	net_tcp_socket_count(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	return net_socket_count(NET_CONN_TYPE_TCP, request, result);
+}
+
+int	net_udp_socket_count(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	return net_socket_count(NET_CONN_TYPE_UDP, request, result);
 }

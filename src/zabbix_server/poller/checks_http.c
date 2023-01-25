@@ -21,6 +21,8 @@
 #include "zbxhttp.h"
 #include "zbxjson.h"
 #include "log.h"
+#include "dbcache.h"
+
 #ifdef HAVE_LIBCURL
 
 #define HTTP_REQUEST_GET	0
@@ -183,13 +185,14 @@ int	get_value_http(const DC_ITEM *item, AGENT_RESULT *result)
 {
 	CURL			*easyhandle;
 	CURLcode		err;
-	char			url[ITEM_URL_LEN_MAX], errbuf[CURL_ERROR_SIZE], *error = NULL, *headers, *line, *buffer;
+	char			url[ZBX_ITEM_URL_LEN_MAX], errbuf[CURL_ERROR_SIZE], *headers, *line, *buffer,
+				*error = NULL;
 	int			ret = NOTSUPPORTED, timeout_seconds, found = FAIL;
 	long			response_code;
 	struct curl_slist	*headers_slist = NULL;
 	struct zbx_json		json;
 	zbx_http_response_t	body = {0}, header = {0};
-	size_t			(*curl_body_cb)(void *ptr, size_t size, size_t nmemb, void *userdata);
+	zbx_curl_cb_t		curl_body_cb;
 	char			application_json[] = {"Content-Type: application/json"};
 	char			application_xml[] = {"Content-Type: application/xml"};
 
@@ -246,7 +249,7 @@ int	get_value_http(const DC_ITEM *item, AGENT_RESULT *result)
 		goto clean;
 	}
 
-	if (FAIL == is_time_suffix(item->timeout, &timeout_seconds, strlen(item->timeout)))
+	if (FAIL == zbx_is_time_suffix(item->timeout, &timeout_seconds, strlen(item->timeout)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Invalid timeout: %s", item->timeout));
 		goto clean;
@@ -318,6 +321,13 @@ int	get_value_http(const DC_ITEM *item, AGENT_RESULT *result)
 		goto clean;
 	}
 
+	if (CURLE_OK != (err = curl_easy_setopt(easyhandle, ZBX_CURLOPT_ACCEPT_ENCODING, "")))
+	{
+		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot set cURL encoding option: %s",
+				curl_easy_strerror(err)));
+		goto clean;
+	}
+
 	*errbuf = '\0';
 
 	if (CURLE_OK != (err = curl_easy_perform(easyhandle)))
@@ -340,7 +350,7 @@ int	get_value_http(const DC_ITEM *item, AGENT_RESULT *result)
 		goto clean;
 	}
 
-	if ('\0' != *item->status_codes && FAIL == int_in_list(item->status_codes, response_code))
+	if ('\0' != *item->status_codes && FAIL == zbx_int_in_list(item->status_codes, response_code))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Response code \"%ld\" did not match any of the"
 				" required status codes \"%s\"", response_code, item->status_codes));

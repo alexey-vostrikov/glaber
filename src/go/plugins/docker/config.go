@@ -23,14 +23,15 @@ import (
 	"errors"
 	"strings"
 
-	"zabbix.com/pkg/conf"
-	"zabbix.com/pkg/plugin"
+	"git.zabbix.com/ap/plugin-support/conf"
+	"git.zabbix.com/ap/plugin-support/plugin"
 )
 
 // Options is a plugin configuration
 type Options struct {
-	Endpoint string `conf:"default=unix:///var/run/docker.sock"`
-	Timeout  int    `conf:"optional,range=1:30"`
+	plugin.SystemOptions `conf:"optional"`
+	Endpoint             string `conf:"default=unix:///var/run/docker.sock"`
+	Timeout              int    `conf:"optional,range=1:30"`
 }
 
 // Configure implements the Configurator interface.

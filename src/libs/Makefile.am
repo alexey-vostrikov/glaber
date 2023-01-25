@@ -2,41 +2,64 @@
 
 DIST_SUBDIRS = \
 	glb_conf \
-	zbxdbcache \
-	zbxdbhigh \
-	zbxdb \
-	zbxdbupgrade \
-	zbxmemory \
 	zbxalgo \
-	zbxmedia \
-	zbxcrypto \
+	zbxaudit \
+	zbxavailability \
 	zbxcommon \
 	zbxcomms \
 	zbxcommshigh \
-	zbxlog \
-	zbxnix \
-	zbxconf \
-	zbxsysinfo \
-	zbxsys \
-	zbxjson \
-	zbxserver \
-	zbxicmpping \
-	zbxexec \
-	zbxself \
-	zbxmodules \
-	zbxregexp \
-	zbxtasks \
-	zbxhttp \
-	zbxipcservice \
-	zbxhistory \
 	zbxcompress \
-	zbxembed \
-	zbxprometheus \
-	zbxvault \
+	zbxconf \
+	zbxcrypto \
+	zbxcyberark \
+	zbxdb \
+	zbxdbcache \
+	zbxdbhigh \
+	zbxdbwrap \
+	zbxdbschema \
+	zbxdbupgrade \
 	zbxdiag \
-	zbxtrends \
-	zbxavailability \
+	zbxdiscovery \
+	zbxembed \
 	zbxeval \
+	zbxexec \
+	zbxexport \
+	zbxexpr \
+	zbxgetopt \
+	zbxha \
+	zbxhash \
+	zbxhashicorp \
+	glbhistory \
+	zbxhttp \
+	zbxicmpping \
+	zbxip \
+	zbxipcservice \
+	zbxjson \
+	zbxkvs \
+	zbxlog \
+	zbxmedia \
+	zbxmodules \
+	zbxmutexs \
+	zbxnix \
+	zbxnum \
+	zbxparam \
+	zbxprometheus \
+	zbxregexp \
+	zbxrtc \
+	zbxself \
+	zbxserialize \
+	zbxserver \
+	zbxservice \
+	zbxshmem \
+	zbxsysinfo \
+	zbxstr \
+	zbxtasks \
+	zbxthreads \
+	zbxtime \
+	zbxtrends \
+	zbxvariant \
+	zbxvault \
+	zbxversion \
 	glb_state \
 	zbxxml \
 	apm
@@ -44,80 +67,132 @@ DIST_SUBDIRS = \
 if SERVER
 SERVER_SUBDIRS = \
 	glb_conf \
-	zbxcommshigh \
+	zbxaudit \
+	zbxavailability \
+	zbxcompress \
+	zbxcyberark \
 	zbxdb \
-	zbxdbupgrade \
 	zbxdbcache \
 	zbxdbhigh \
-	zbxhttp \
-	zbxmemory \
-	zbxserver \
-	zbxicmpping \
-	zbxmedia \
-	zbxself \
-	zbxtasks \
-	zbxhistory \
-	zbxcompress \
-	zbxxml \
-	zbxembed \
-	zbxprometheus \
-	zbxvault \
+	zbxdbwrap \
+	zbxdbschema \
+	zbxdbupgrade \
 	zbxdiag \
+	zbxembed \
+	zbxeval \
+	zbxexport \
+	zbxexpr \
+	zbxha \
+	zbxhashicorp \
+	glbhistory \
+	zbxhttp \
+	zbxicmpping \
+	zbxip \
+	zbxkvs \
+	zbxmedia \
+	zbxnum \
+	zbxparam \
+	zbxprometheus \
+	zbxrtc \
+	zbxself \
+	zbxserialize \
+	zbxserver \
+	zbxservice \
+	zbxshmem \
+	zbxstr \
+	zbxtasks \
+	zbxtime \
 	zbxtrends \
-	zbxavailability \
+	zbxvariant \
+	zbxvault \
+	zbxversion \
+	zbxxml \
 	glb_state \
 	apm \
 	zbxeval \
-	zbxalgo/tests
+	zbxalgo/tests 
 else
 if PROXY
 PROXY_SUBDIRS = \
-	zbxcommshigh \
+	zbxaudit \
+	zbxavailability \
+	zbxcompress \
+	zbxcyberark \
 	zbxdb \
-	zbxdbupgrade \
 	zbxdbcache \
 	zbxdbhigh \
-	zbxhttp \
-	zbxmemory \
-	zbxserver \
-	zbxicmpping \
-	zbxself \
-	zbxtasks \
-	zbxhistory \
-	zbxcompress \
-	zbxxml \
-	zbxembed \
-	zbxprometheus \
-	zbxvault \
+	zbxdbwrap \
+	zbxdbschema \
+	zbxdbupgrade \
 	zbxdiag \
+	zbxembed \
+	zbxeval \
+	zbxexport \
+	zbxhashicorp \
+	glbhistory \
+	zbxhttp \
+	zbxicmpping \
+	zbxip \
+	zbxkvs \
+	zbxnum \
+	zbxparam \
+	zbxprometheus \
+	zbxrtc \
+	zbxself \
+	zbxserialize \
+	zbxserver \
+	zbxshmem \
+	zbxstr \
+	zbxtasks \
+	zbxtime \
 	zbxtrends \
-	zbxavailability \
+	zbxvariant \
+	zbxvault \
+	zbxversion \
 	glb_state \
 	glb_conf \
 	apm \
-	zbxeval
+	zbxxml
 endif
 endif
 
 SUBDIRS = \
-	zbxcrypto \
-	zbxcommon \
-	zbxlog \
 	zbxalgo \
-	zbxnix \
-	zbxconf \
-	zbxhttp \
-	zbxsysinfo \
-	zbxsys \
+	zbxcommon \
 	zbxcomms \
-	zbxjson \
-	zbxexec \
-	zbxmodules \
-	zbxregexp \
-	zbxipcservice \
+	zbxcommshigh \
 	zbxcompress \
+	zbxconf \
+	zbxcrypto \
+	zbxdbschema \
+	zbxdiscovery \
+	zbxexec \
+	zbxexpr \
+	zbxgetopt \
+	zbxhash \
+	zbxhttp \
+	zbxip \
+	zbxipcservice \
+	zbxjson \
+	zbxlog \
+	zbxmodules \
+	zbxmutexs \
+	zbxnix \
+	zbxnum \
+	zbxparam \
+	zbxregexp \
+	zbxsysinfo \
+	zbxstr \
+	zbxthreads \
+	zbxtime \
+	zbxvariant \
+	zbxversion \
+	zbxxml \
 	$(PROXY_SUBDIRS) \
 	$(SERVER_SUBDIRS) \
 	$(AGENT_SUBDIRS)
 
-EXTRA_DIST = zbxwin32
+EXTRA_DIST = \
+	zbxsymbols \
+	zbxwin32 \
+	zbxwinservice

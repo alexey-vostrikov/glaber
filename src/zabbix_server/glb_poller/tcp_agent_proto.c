@@ -18,8 +18,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "comms.h"
+#include "zbxcommon.h"
+//#include "comms.h"
 #include "log.h"
 #include "glb_poller.h"
 #include "poller_tcp.h"
@@ -153,7 +153,6 @@ static void process_payload_response(poller_item_t *poller_item, const char* buf
 
 /*returns success if buffer has been processed and there is no need to wait for more data*/
 static int process_response(poller_item_t *poller_item, const char *buffer, size_t buffer_size) {
-
     #define PAYLOAD_OFFSET 5 
     
     if (buffer_size < AGENT_HEADERS_SIZE) 
@@ -178,13 +177,9 @@ static int process_response(poller_item_t *poller_item, const char *buffer, size
 
     DEBUG_ITEM(poller_get_item_id(poller_item), "Got payload of size %d", payload_len);
     
-    if (0 == payload_len && buffer_size == AGENT_HEADERS_SIZE) {
-        poller_preprocess_error(poller_item, "Zero length response is arrived");
-        return SUCCEED;
-    } 
-
-    if (payload_len + AGENT_HEADERS_SIZE > buffer_size)
+    if (payload_len + AGENT_HEADERS_SIZE > buffer_size) {
         return FAIL; 
+    }
 
     process_payload_response(poller_item, buffer + AGENT_HEADERS_SIZE, payload_len);
     

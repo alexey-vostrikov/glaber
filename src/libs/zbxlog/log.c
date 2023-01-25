@@ -17,15 +17,17 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
 #include "log.h"
-#include "mutexs.h"
-#include "threads.h"
+
+#include "zbxmutexs.h"
+#include "zbxthreads.h"
 #include "cfg.h"
+#include "zbxstr.h"
+#include "zbxtime.h"
 #ifdef _WINDOWS
 #	include "messages.h"
-#	include "service.h"
-#	include "sysinfo.h"
+#	include "zbxwinservice.h"
+#	include "zbxsysinfo.h"
 static HANDLE		system_log_handle = INVALID_HANDLE_VALUE;
 #endif
 
@@ -161,7 +163,7 @@ static void	rotate_log(const char *filename)
 	{
 		char	filename_old[MAX_STRING_LEN];
 
-		strscpy(filename_old, filename);
+		zbx_strscpy(filename_old, filename);
 		zbx_strlcat(filename_old, ".old", MAX_STRING_LEN);
 		remove(filename_old);
 #ifdef _WINDOWS
@@ -263,7 +265,7 @@ static void	unlock_log(void)
 static void	lock_log(void)
 {
 #ifdef ZABBIX_AGENT
-	if (0 == (ZBX_MUTEX_LOGGING_DENIED & get_thread_global_mutex_flag()))
+	if (0 == (ZBX_MUTEX_LOGGING_DENIED & zbx_get_thread_global_mutex_flag()))
 #endif
 		LOCK_LOG;
 }
@@ -271,7 +273,7 @@ static void	lock_log(void)
 static void	unlock_log(void)
 {
 #ifdef ZABBIX_AGENT
-	if (0 == (ZBX_MUTEX_LOGGING_DENIED & get_thread_global_mutex_flag()))
+	if (0 == (ZBX_MUTEX_LOGGING_DENIED & zbx_get_thread_global_mutex_flag()))
 #endif
 		UNLOCK_LOG;
 }
@@ -325,7 +327,7 @@ int	zabbix_open_log(int type, int level, const char *filename, char **error)
 			return FAIL;
 		}
 
-		strscpy(log_filename, filename);
+		zbx_strscpy(log_filename, filename);
 		zbx_fclose(log_file);
 	}
 	else if (LOG_TYPE_CONSOLE == type || LOG_TYPE_UNDEFINED == type)
@@ -678,3 +680,51 @@ char	*strerror_from_module(unsigned long error, const wchar_t *module)
 	return utf8_string;
 }
 #endif	/* _WINDOWS */
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: log the message optionally appending to a string buffer           *
+ *                                                                            *
+ * Parameters: level      - [IN] the log level                                *
+ *             out        - [OUT] the output buffer (optional)                *
+ *             out_alloc  - [OUT] the output buffer size                      *
+ *             out_offset - [OUT] the output buffer offset                    *
+ *             format     - [IN] the format string                            *
+ *                                                                            *
+ * Return value: SUCCEED - the socket was successfully opened                 *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_strlog_alloc(int level, char **out, size_t *out_alloc, size_t *out_offset, const char *format, ...)
+{
+	va_list	args;
+	size_t	len;
+	char	*buf;
+
+	if (SUCCEED != ZBX_CHECK_LOG_LEVEL(level) && NULL == out)
+		return;
+
+	va_start(args, format);
+	len = (size_t)vsnprintf(NULL, 0, format, args) + 2;
+	va_end(args);
+
+	buf = (char *)zbx_malloc(NULL, len);
+
+	va_start(args, format);
+	len = (size_t)vsnprintf(buf, len, format, args);
+	va_end(args);
+
+	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(level))
+		zabbix_log(level, "%s", buf);
+
+	if (NULL != out)
+	{
+		buf[0] = (char)toupper((unsigned char)buf[0]);
+		buf[len++] = '\n';
+		buf[len] = '\0';
+
+		zbx_strcpy_alloc(out, out_alloc, out_offset, buf);
+	}
+
+	zbx_free(buf);
+}

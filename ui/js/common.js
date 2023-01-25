@@ -190,7 +190,6 @@ function checkAll(form_name, chkMain, shkName) {
 
 	chkbxRange.checkObjectAll(shkName, value);
 	chkbxRange.update(shkName);
-	chkbxRange.saveSessionStorage(shkName);
 
 	return true;
 }
@@ -234,7 +233,7 @@ function removeVarsBySelector(form_name, selector) {
 function create_var(form_name, var_name, var_value, doSubmit) {
 	var objForm = is_string(form_name) ? document.forms[form_name] : form_name;
 	if (!objForm) {
-		return false;
+		return;
 	}
 
 	var objVar = (typeof(objForm[var_name]) != 'undefined') ? objForm[var_name] : null;
@@ -242,7 +241,7 @@ function create_var(form_name, var_name, var_value, doSubmit) {
 		objVar = document.createElement('input');
 		objVar.setAttribute('type', 'hidden');
 		if (!objVar) {
-			return false;
+			return;
 		}
 		objVar.setAttribute('name', var_name);
 		objVar.setAttribute('id', var_name.replace(']', '').replace('[', '_'));
@@ -259,8 +258,6 @@ function create_var(form_name, var_name, var_value, doSubmit) {
 	if (doSubmit) {
 		objForm.submit();
 	}
-
-	return false;
 }
 
 function getDimensions(obj) {
@@ -326,61 +323,54 @@ function getPosition(obj) {
 /**
  * Opens popup content in overlay dialogue.
  *
- * @param {string} action          Popup controller related action.
- * @param {array|object}  options  (optional) Array with key/value pairs that will be used as query for popup request.
- * @param {string} dialogueid      (optional) id of overlay dialogue.
- * @param {object} trigger_elmnt   (optional) UI element which was clicked to open overlay dialogue.
+ * @param {string}           action              Popup controller related action.
+ * @param {array|object}     parameters          Array with key/value pairs that will be used as query for popup
+ *                                               request.
+ *
+ * @param {string}           dialogue_class      CSS class, usually based on .modal-popup and .modal-popup-{size}.
+ * @param {string|null}      dialogueid          ID of overlay dialogue.
+ * @param {HTMLElement|null} trigger_element     UI element which was clicked to open overlay dialogue.
+ * @param {bool}             prevent_navigation  Show warning when navigating away from an active dialogue.
  *
  * @returns {Overlay}
  */
-function PopUp(action, options, dialogueid, trigger_elmnt) {
+function PopUp(action, parameters, {
+	dialogueid = null,
+	dialogue_class = '',
+	trigger_element = document.activeElement,
+	prevent_navigation = false
+} = {}) {
 	var overlay = overlays_stack.getById(dialogueid);
+
 	if (!overlay) {
-		var wide_popup_actions = ['popup.generic', 'dashboard.share.edit', 'dashboard.page.properties.edit',
-			'dashboard.properties.edit', 'dashboard.widget.edit', 'popup.services', 'popup.media', 'popup.lldoperation',
-				'popup.lldoverride', 'popup.preproctest.edit', 'popup.triggerexpr', 'popup.httpstep',
-				'popup.testtriggerexpr', 'popup.triggerwizard'
-			],
-			medium_popup_actions = ['popup.maintenance.period', 'popup.condition.actions', 'popup.condition.operations',
-				'popup.condition.event.corr', 'popup.discovery.check', 'popup.mediatypetest.edit',
-				'popup.mediatype.message', 'popup.scriptexec', 'popup.scheduledreport.test'
-			],
-			static_popup_actions = ['popup.massupdate.template', 'popup.massupdate.host', 'popup.massupdate.trigger',
-				'popup.massupdate.triggerprototype'
-			],
-			preprocessing_popup_actions = ['popup.massupdate.item', 'popup.massupdate.itemprototype'],
-			dialogue_class = '';
-
-		if (wide_popup_actions.indexOf(action) !== -1) {
-			dialogue_class = ' modal-popup-generic';
-		}
-		else if (medium_popup_actions.indexOf(action) !== -1) {
-			dialogue_class = ' modal-popup-medium';
-		}
-		else if (static_popup_actions.indexOf(action) !== -1) {
-			dialogue_class = ' modal-popup-static';
-		}
-		else if (preprocessing_popup_actions.indexOf(action) !== -1) {
-			dialogue_class = ' modal-popup-preprocessing';
-		}
-
 		overlay = overlayDialogue({
-			'dialogueid': dialogueid,
-			'title': '',
-			'content': jQuery('<div>', {'height': '68px', class: 'is-loading'}),
-			'class': 'modal-popup' + dialogue_class,
-			'buttons': [],
-			'element': trigger_elmnt,
-			'type': 'popup'
+			dialogueid,
+			title: '',
+			doc_url: '',
+			content: jQuery('<div>', {'height': '68px', class: 'is-loading'}),
+			class: 'modal-popup ' + dialogue_class,
+			buttons: [],
+			element: trigger_element,
+			type: 'popup',
+			prevent_navigation
 		});
 	}
 
 	overlay
-		.load(action, options)
+		.load(action, parameters)
 		.then(function(resp) {
-			if (typeof resp.errors !== 'undefined') {
+			if ('error' in resp) {
 				overlay.setProperties({
-					content: resp.errors
+					title: resp.header !== undefined ? resp.header : '',
+					content: makeMessageBox('bad', resp.error.messages, resp.error.title, false),
+					buttons: [
+						{
+							'title': t('Cancel'),
+							'class': 'btn-alt js-cancel',
+							'cancel': true,
+							'action': function() {}
+						}
+					]
 				});
 			}
 			else {
@@ -400,7 +390,7 @@ function PopUp(action, options, dialogueid, trigger_elmnt) {
 					default:
 						buttons.push({
 							'title': t('Cancel'),
-							'class': 'btn-alt',
+							'class': 'btn-alt js-cancel',
 							'cancel': true,
 							'action': (typeof resp.cancel_action !== 'undefined') ? resp.cancel_action : function() {}
 						});
@@ -408,14 +398,35 @@ function PopUp(action, options, dialogueid, trigger_elmnt) {
 
 				overlay.setProperties({
 					title: resp.header,
+					doc_url: resp.doc_url,
 					content: resp.body,
 					controls: resp.controls,
-					buttons: buttons,
+					buttons,
 					debug: resp.debug,
 					script_inline: resp.script_inline,
 					data: resp.data || null
 				});
 			}
+
+			overlay.recoverFocus();
+			overlay.containFocus();
+		})
+		.fail((resp) => {
+			const error = resp.responseJSON !== undefined && resp.responseJSON.error !== undefined
+				? resp.responseJSON.error
+				: {title: t('Unexpected server error.')};
+
+			overlay.setProperties({
+				content: makeMessageBox('bad', error.messages, error.title, false),
+				buttons: [
+					{
+						'title': t('Cancel'),
+						'class': 'btn-alt js-cancel',
+						'cancel': true,
+						'action': function() {}
+					}
+				]
+			});
 
 			overlay.recoverFocus();
 			overlay.containFocus();
@@ -429,35 +440,30 @@ function PopUp(action, options, dialogueid, trigger_elmnt) {
 /**
  * Open "Update problem" dialog and manage URL change.
  *
- * @param {array}  options
- * @param {array}  options['eventids']  Eventids to update.
- * @param {object} trigger_elmnt        (optional) UI element which was clicked to open overlay dialogue.
+ * @param {Object} parameters
+ * @param {array}  parameters['eventids']  Eventids to update.
+ * @param {object} trigger_element        (optional) UI element which was clicked to open overlay dialogue.
  *
  * @returns {Overlay}
  */
-function acknowledgePopUp(options, trigger_elmnt) {
-	var overlay = PopUp('popup.acknowledge.edit', options, null, trigger_elmnt),
+function acknowledgePopUp(parameters, trigger_element) {
+	var overlay = PopUp('popup.acknowledge.edit', parameters, {trigger_element}),
 		backurl = location.href;
 
-	overlay.trigger_parents = $(trigger_elmnt).parents();
+	overlay.trigger_parents = $(trigger_element).parents();
 
 	overlay.xhr.then(function() {
 		var url = new Curl('zabbix.php', false);
 		url.setArgument('action', 'popup');
 		url.setArgument('popup_action', 'acknowledge.edit');
-		url.setArgument('eventids', options.eventids);
+		url.setArgument('eventids', parameters.eventids);
 
 		history.replaceState({}, '', url.getUrl());
 	});
 
-	var close = function(e, dialogue) {
-		if (dialogue.dialogueid === overlay.dialogueid) {
-			history.replaceState({}, '', backurl);
-			$.unsubscribe('overlay.close', close);
-		}
-	};
-
-	$.subscribe('overlay.close', close);
+	overlay.$dialogue[0].addEventListener('overlay.close', () => {
+		history.replaceState({}, '', backurl);
+	}, {once: true});
 
 	return overlay;
 }
@@ -545,16 +551,18 @@ function closeDialogHandler(event) {
  * @return {object|undefined|null}  Overlay object, if found.
  */
 function removeFromOverlaysStack(dialogueid, return_focus) {
-	var overlay = null,
-		index;
-
 	if (return_focus !== false) {
 		return_focus = true;
 	}
 
-	overlay = overlays_stack.removeById(dialogueid);
+	const overlay = overlays_stack.removeById(dialogueid);
+
 	if (overlay && return_focus) {
-		jQuery(overlay.element).focus();
+		if (overlay.element !== undefined) {
+			const element = overlay.element instanceof jQuery ? overlay.element[0] : overlay.element;
+
+			element.focus({preventScroll: true});
+		}
 	}
 
 	// Remove event listener.
@@ -572,15 +580,13 @@ function removeFromOverlaysStack(dialogueid, return_focus) {
  * @param {string} action	(optional) action value that is used in CRouter. Default value is 'popup.generic'.
  */
 function reloadPopup(form, action) {
-	var dialogueid = jQuery(form).closest('[data-dialogueid]').attr('data-dialogueid'),
-		action = action || 'popup.generic',
-		options = {};
+	const dialogueid = form.closest('[data-dialogueid]').dataset.dialogueid;
+	const dialogue_class = jQuery(form).closest('[data-dialogueid]').prop('class');
+	const parameters = getFormFields(form);
 
-	jQuery(form.elements).each(function() {
-		options[this.name] = this.value;
-	});
+	action = action || 'popup.generic';
 
-	PopUp(action, options, dialogueid);
+	PopUp(action, parameters, {dialogueid, dialogue_class});
 }
 
 /**
@@ -618,11 +624,9 @@ function addValue(object, single_value, parentid) {
  *
  * @param {string} frame			refers to destination form
  * @param {object} values			values added to destination form
- * @param {boolean} submit_parent	indicates that after adding values, form must be submitted
  */
-function addValues(frame, values, submit_parent) {
+function addValues(frame, values) {
 	var forms = document.getElementsByTagName('FORM')[frame],
-		submit_parent = submit_parent || false,
 		frm_storage = null;
 
 	for (var key in values) {
@@ -637,16 +641,12 @@ function addValues(frame, values, submit_parent) {
 			frm_storage = document.getElementById(key);
 		}
 
-		if (jQuery(frm_storage).is('span')) {
-			jQuery(frm_storage).html(values[key]);
-		}
-		else {
+		if (jQuery(frm_storage).is(':input')) {
 			jQuery(frm_storage).val(values[key]).change();
 		}
-	}
-
-	if (frm_storage !== null && submit_parent) {
-		frm_storage.form.submit();
+		else {
+			jQuery(frm_storage).html(values[key]);
+		}
 	}
 }
 
@@ -729,24 +729,27 @@ function validate_trigger_expression(overlay) {
 		success: function(ret) {
 			overlay.$dialogue.find('.msg-bad, .msg-good').remove();
 
-			if (typeof ret.errors !== 'undefined') {
-				jQuery(ret.errors).insertBefore($form);
+			if ('error' in ret) {
+				const message_box = makeMessageBox('bad', ret.error.messages, ret.error.title);
+
+				message_box.insertBefore($form);
+
+				return;
+			}
+
+			var form = window.document.forms[ret.dstfrm];
+			var obj = (typeof form !== 'undefined')
+				? jQuery(form).find('#' + ret.dstfld1).get(0)
+				: document.getElementById(ret.dstfld1);
+
+			if (ret.dstfld1 === 'expression' || ret.dstfld1 === 'recovery_expression') {
+				jQuery(obj).val(jQuery(obj).val() + ret.expression);
 			}
 			else {
-				var form = window.document.forms[ret.dstfrm];
-				var obj = (typeof form !== 'undefined')
-					? jQuery(form).find('#' + ret.dstfld1).get(0)
-					: document.getElementById(ret.dstfld1);
-
-				if (ret.dstfld1 === 'expression' || ret.dstfld1 === 'recovery_expression') {
-					jQuery(obj).val(jQuery(obj).val() + ret.expression);
-				}
-				else {
-					jQuery(obj).val(ret.expression);
-				}
-
-				overlayDialogueDestroy(overlay.dialogueid);
+				jQuery(obj).val(ret.expression);
 			}
+
+			overlayDialogueDestroy(overlay.dialogueid);
 		},
 		dataType: 'json',
 		type: 'POST'
@@ -814,6 +817,63 @@ function redirect(uri, method, needle, invert_needle, add_sid, allow_empty) {
 	}
 
 	return false;
+}
+
+/**
+ * Send parameters to given url using natural HTML form submission.
+ *
+ * @param {string} url
+ * @param {Object} params
+ * @param {boolean} allow_empty
+ *
+ * @return {boolean}
+ */
+function post(url, params) {
+	function addVars(post_form, name, value) {
+		if (Array.isArray(value)) {
+			for (let i = 0; i < value.length; i++) {
+				addVars(post_form, `${name}[]`, value[i]);
+			}
+		}
+		else if (typeof value === 'object' && value !== null) {
+			for (const [key, _value] of Object.entries(value)) {
+				addVars(post_form, `${name}[${key}]`, _value);
+			}
+		}
+		else {
+			addVar(post_form, name, value);
+		}
+	}
+
+	function addVar(post_form, name, value) {
+		const is_multiline = /\r|\n/.exec(value);
+		let input;
+
+		if (is_multiline) {
+			input = document.createElement('textarea');
+		}
+		else {
+			input = document.createElement('input');
+			input.type = 'hidden';
+		}
+
+		input.name = name;
+		input.value = value;
+		post_form.appendChild(input);
+	}
+
+	const dom_body = document.getElementsByTagName('body')[0];
+	const post_form = document.createElement('form');
+	post_form.setAttribute('action', url);
+	post_form.setAttribute('method', 'post');
+	post_form.style.display = 'none';
+
+	for (const [key, value] of Object.entries(params)) {
+		addVars(post_form, key, value);
+	}
+
+	dom_body.appendChild(post_form);
+	post_form.submit();
 }
 
 function showHide(obj) {
@@ -971,29 +1031,101 @@ Function.prototype.bindAsEventListener = function (context) {
 	};
 };
 
-function openMassupdatePopup(elem, popup_name) {
-	const data = {};
-	const form = elem.closest('form');
+function openMassupdatePopup(action, parameters = {}, {
+	dialogue_class = '',
+	trigger_element = document.activeElement
+}) {
+	const form = trigger_element.closest('form');
 
-	data.ids = chkbxRange.selectedIds;
+	switch (action) {
+		case 'popup.massupdate.host':
+			parameters.hostids = Object.keys(chkbxRange.getSelectedIds());
+			break;
 
-	switch (popup_name) {
+		default:
+			parameters.ids = Object.keys(chkbxRange.getSelectedIds());
+	}
+
+	switch (action) {
 		case 'popup.massupdate.item':
-			data['context'] = form.querySelector('#context').value;
-			data['prototype'] = 0;
+			parameters.context = form.querySelector('#form_context').value;
+			parameters.prototype = 0;
 			break;
 
 		case 'popup.massupdate.trigger':
-			data['context'] = form.querySelector('#context').value;
+			parameters.context = form.querySelector('#form_context').value;
 			break;
 
 		case 'popup.massupdate.itemprototype':
 		case 'popup.massupdate.triggerprototype':
-			data['parent_discoveryid'] = form.querySelector('#parent_discoveryid').value;
-			data['context'] = form.querySelector('#context').value;
-			data['prototype'] = 1;
+			parameters.parent_discoveryid = form.querySelector('#form_parent_discoveryid').value;
+			parameters.context = form.querySelector('#form_context').value;
+			parameters.prototype = 1;
 			break;
 	}
 
-	return PopUp(popup_name, data, null, this);
+	return PopUp(action, parameters, {dialogue_class, trigger_element});
+}
+
+/**
+ * @param {boolean} value
+ * @param {string} objectid
+ * @param {string} replace_to
+ */
+function visibilityStatusChanges(value, objectid, replace_to) {
+	const obj = document.getElementById(objectid);
+
+	if (obj === null) {
+		throw `Cannot find objects with name [${objectid}]`;
+	}
+
+	if (replace_to && replace_to != '') {
+		if (obj.originalObject) {
+			const old_obj = obj.originalObject;
+			old_obj.originalObject = obj;
+
+			obj.parentNode.replaceChild(old_obj, obj);
+		}
+		else if (!value) {
+			const new_obj = document.createElement('span');
+			new_obj.setAttribute('name', obj.name);
+			new_obj.setAttribute('id', obj.id);
+			new_obj.innerHTML = replace_to;
+			new_obj.originalObject = obj;
+
+			obj.parentNode.replaceChild(new_obj, obj);
+		}
+		else {
+			throw 'Missing originalObject for restoring';
+		}
+	}
+	else {
+		obj.style.visibility = value ? 'visible' : 'hidden';
+	}
+}
+
+/**
+ * Clears session storage from markers of checked table rows.
+ * Or keeps only accessible IDs in the list of checked rows.
+ *
+ * @param {string}       page
+ * @param {array|Object} keepids
+ * @param {boolean}      mvc
+ */
+function uncheckTableRows(page, keepids = [], mvc = true) {
+	const key = mvc ? 'cb_zabbix_'+page : 'cb_'+page;
+
+	if (keepids.length) {
+		let keepids_formatted = {};
+		const current = chkbxRange.getSelectedIds();
+
+		for (const id of Object.values(keepids)) {
+			keepids_formatted[id.toString()] = (id in current) ? current[id] : '';
+		}
+
+		sessionStorage.setItem(key, JSON.stringify(keepids_formatted));
+	}
+	else {
+		sessionStorage.removeItem(key);
+	}
 }

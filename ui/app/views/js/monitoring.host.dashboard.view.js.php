@@ -25,9 +25,8 @@
 ?>
 
 <script>
-	function initializeView(host, dashboard, widget_defaults, time_period, web_layout_mode) {
-
-		const init = () => {
+	const view = {
+		init({host, dashboard, widget_defaults, configuration_hash, time_period, web_layout_mode}) {
 			timeControl.refreshPage = false;
 
 			ZABBIX.Dashboard = new CDashboard(document.querySelector('.<?= ZBX_STYLE_DASHBOARD ?>'), {
@@ -62,7 +61,8 @@
 				max_rows: <?= DASHBOARD_MAX_ROWS ?>,
 				widget_min_rows: <?= DASHBOARD_WIDGET_MIN_ROWS ?>,
 				widget_max_rows: <?= DASHBOARD_WIDGET_MAX_ROWS ?>,
-				widget_defaults: widget_defaults,
+				widget_defaults,
+				configuration_hash,
 				is_editable: false,
 				is_edit_mode: false,
 				can_edit_dashboards: false,
@@ -74,7 +74,6 @@
 			for (const page of dashboard.pages) {
 				for (const widget of page.widgets) {
 					widget.fields = (typeof widget.fields === 'object') ? widget.fields : {};
-					widget.configuration = (typeof widget.configuration === 'object') ? widget.configuration : {};
 				}
 
 				ZABBIX.Dashboard.addDashboardPage(page);
@@ -82,19 +81,23 @@
 
 			ZABBIX.Dashboard.activate();
 
+			ZABBIX.Dashboard.on(DASHBOARD_EVENT_CONFIGURATION_OUTDATED, this.events.configurationOutdated);
+
 			if (web_layout_mode == <?= ZBX_LAYOUT_NORMAL ?>) {
-				document.getElementById('dashboardid').addEventListener('change', events.dashboardChange);
+				document.getElementById('dashboardid').addEventListener('change', this.events.dashboardChange);
 			}
 
 			jqBlink.blink();
-		};
+		},
 
-		const events = {
-			dashboardChange: (e) => {
+		events: {
+			configurationOutdated() {
+				location.href = location.href;
+			},
+
+			dashboardChange(e) {
 				e.target.closest('form').submit();
 			}
-		};
-
-		init();
+		}
 	}
 </script>

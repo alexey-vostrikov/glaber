@@ -20,10 +20,16 @@
 #ifndef ZABBIX_ESCALATOR_H
 #define ZABBIX_ESCALATOR_H
 
-#include "threads.h"
+#include "zbxthreads.h"
+#include "zbxcomms.h"
+
+typedef struct
+{
+	zbx_config_tls_t	*zbx_config_tls;
+	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
+}
+zbx_thread_escalator_args;
 
 ZBX_THREAD_ENTRY(escalator_thread, args);
-
-
 
 #endif

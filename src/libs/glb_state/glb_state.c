@@ -20,10 +20,12 @@
 
 #include "zbxvariant.h"
 #include "log.h"
-#include "memalloc.h"
+#include "zbxshmem.h"
 #include "glb_state.h"
 #include "discovery.h"
 #include "glb_state_items.h"
+#include "glb_state_triggers.h"
+#include "glb_state_interfaces.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
@@ -32,7 +34,7 @@
 
 extern u_int64_t CONFIG_VALUE_CACHE_SIZE;
 
-static  zbx_mem_info_t	*cache_mem;
+static  zbx_shmem_info_t	*cache_mem;
 
 typedef struct {
     glb_state_stats_t stats;
@@ -42,45 +44,48 @@ typedef struct {
 static glb_state_t *glb_cache;
 
 
-ZBX_MEM_FUNC_IMPL(__cache, cache_mem);
+ZBX_SHMEM_FUNC_IMPL(__cache, cache_mem);
 
 
 int glb_state_init() {
    
     char *error = NULL;
 	
-	if (SUCCEED != zbx_mem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "Items values cache size", "ValueCacheSize", 0, &error)) {
+	if (SUCCEED != zbx_shmem_create(&cache_mem, CONFIG_VALUE_CACHE_SIZE, "Items values cache size", "ValueCacheSize", 0, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	return FAIL;
     }
  
-	if (NULL == (glb_cache = (glb_state_t *)zbx_mem_malloc(cache_mem, NULL, sizeof(glb_state_t)))) {	
+	if (NULL == (glb_cache = (glb_state_t *)zbx_shmem_malloc(cache_mem, NULL, sizeof(glb_state_t)))) {	
 		zabbix_log(LOG_LEVEL_CRIT,"Cannot allocate Cache structures, exiting");
 		return FAIL;
 	}
     
     memset((void *)glb_cache, 0, sizeof(glb_state_t));
 	
-	glb_cache->memf.free_func = __cache_mem_free_func;
-	glb_cache->memf.malloc_func = __cache_mem_malloc_func;
-	glb_cache->memf.realloc_func = __cache_mem_realloc_func;
+	glb_cache->memf.free_func = __cache_shmem_free_func;
+	glb_cache->memf.malloc_func = __cache_shmem_malloc_func;
+	glb_cache->memf.realloc_func = __cache_shmem_realloc_func;
 
 	if (SUCCEED != glb_state_items_init(&glb_cache->memf) )
 		return FAIL;
 	
-	if (SUCCEED != discovery_init(&glb_cache->memf) )
+	if (SUCCEED != discovery_init(&glb_cache->memf) ||
+		SUCCEED != glb_state_triggers_init(&glb_cache->memf) ||
+		SUCCEED != glb_state_interfaces_init(&glb_cache->memf) )
+		
 		return FAIL;
-	
+
 	zabbix_log(LOG_LEVEL_DEBUG, "%s:finished", __func__);
 	return SUCCEED;
 }
 
 
 
-int glb_state_get_mem_stats(zbx_mem_stats_t *mem_stats) {
+int glb_state_get_mem_stats(zbx_shmem_stats_t *mem_stats) {
     
-    memset(&mem_stats, 0, sizeof(zbx_mem_stats_t));
-	zbx_mem_get_stats(cache_mem, mem_stats);
+    memset(&mem_stats, 0, sizeof(zbx_shmem_stats_t));
+	zbx_shmem_get_stats(cache_mem, mem_stats);
   
 }
 
@@ -96,17 +101,36 @@ int glb_state_get_statistics(glb_state_stats_t *stats) {
 }
 
 
-//that's pretty strange destroy proc yet written, the cache is in the SHM which will be destroyed
-//just after the process dies
 void	glb_state_destroy(void)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-   
+	glb_state_triggers_destroy();
+	glb_state_interfaces_destroy();
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 int glb_state_housekeep() {
+	LOG_INF("Running state housekeep");
+	glb_state_items_housekeep();
+	glb_state_triggers_housekeep(300);
+	LOG_INF("Finished state housekeep");
+
+	LOG_INF("Starting state dump");
+	LOG_INF("Dumping items");
+	glb_state_items_dump();
+	LOG_INF("Dumping triggers");
+	glb_state_triggers_dump();
+	LOG_INF("Finish state dump");
 
 } 
+
+int glb_state_load() {
+	if (FAIL == glb_state_items_load())
+		return FAIL;
+	if (FAIL == glb_state_triggers_load())
+		return FAIL;
+	
+	return SUCCEED;
+}
 
 #endif

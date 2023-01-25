@@ -25,7 +25,7 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 
 //TODO idea for improvement - implement a kind of a buffer pool to avoid alloc cluttering
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "log.h"
 

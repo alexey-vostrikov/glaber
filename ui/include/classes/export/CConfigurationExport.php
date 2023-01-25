@@ -56,14 +56,16 @@ class CConfigurationExport {
 		$this->options = array_merge([
 			'hosts' => [],
 			'templates' => [],
-			'groups' => [],
+			'template_groups' => [],
+			'host_groups' => [],
 			'images' => [],
 			'maps' => [],
 			'mediaTypes' => []
 		], $options);
 
 		$this->data = [
-			'groups' => [],
+			'template_groups' => [],
+			'host_groups' => [],
 			'templates' => [],
 			'hosts' => [],
 			'triggers' => [],
@@ -79,26 +81,26 @@ class CConfigurationExport {
 			'item' => ['hostid', 'type', 'snmp_oid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
 				'value_type', 'trapper_hosts', 'units', 'valuemapid', 'params', 'ipmi_sensor', 'authtype', 'username',
 				'password', 'publickey', 'privatekey', 'interfaceid', 'description', 'inventory_link', 'flags',
-				'logtimefmt', 'jmx_endpoint', 'master_itemid', 'timeout', 'url', 'query_fields', 'parameters', 'posts',
-				'status_codes', 'follow_redirects', 'post_type', 'http_proxy', 'headers', 'retrieve_mode',
-				'request_method', 'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password', 'verify_peer',
-				'verify_host', 'allow_traps', 'uuid'
+				'logtimefmt', 'jmx_endpoint', 'master_itemid', 'timeout', 'url_name', 'url', 'query_fields',
+				'parameters', 'posts', 'status_codes', 'follow_redirects', 'post_type', 'http_proxy', 'headers',
+				'retrieve_mode', 'request_method', 'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password',
+				'verify_peer', 'verify_host', 'allow_traps', 'uuid'
 			],
 			'drule' => ['itemid', 'hostid', 'type', 'snmp_oid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
 				'value_type', 'trapper_hosts', 'units', 'formula', 'valuemapid', 'params', 'ipmi_sensor', 'authtype',
 				'username', 'password', 'publickey', 'privatekey', 'interfaceid', 'description', 'inventory_link',
-				'flags', 'filter', 'lifetime', 'jmx_endpoint', 'master_itemid', 'timeout', 'url', 'query_fields',
-				'posts', 'status_codes', 'follow_redirects', 'post_type', 'http_proxy', 'headers', 'retrieve_mode',
-				'request_method', 'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password', 'verify_peer',
-				'verify_host', 'allow_traps', 'parameters', 'uuid'
+				'flags', 'filter', 'lifetime', 'jmx_endpoint', 'master_itemid', 'timeout', 'url_name', 'url',
+				'query_fields', 'posts', 'status_codes', 'follow_redirects', 'post_type', 'http_proxy', 'headers',
+				'retrieve_mode', 'request_method', 'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password',
+				'verify_peer', 'verify_host', 'allow_traps', 'parameters', 'uuid'
 			],
 			'item_prototype' => ['hostid', 'type', 'snmp_oid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
 				'value_type', 'trapper_hosts', 'units', 'valuemapid', 'params', 'ipmi_sensor', 'authtype', 'username',
 				'password', 'publickey', 'privatekey', 'interfaceid', 'description', 'inventory_link', 'flags',
-				'logtimefmt', 'jmx_endpoint', 'master_itemid', 'timeout', 'url', 'query_fields', 'parameters', 'posts',
-				'status_codes', 'follow_redirects', 'post_type', 'http_proxy', 'headers', 'retrieve_mode',
-				'request_method', 'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password', 'verify_peer',
-				'verify_host', 'allow_traps', 'discover', 'uuid'
+				'logtimefmt', 'jmx_endpoint', 'master_itemid', 'timeout', 'url_name', 'url', 'query_fields',
+				'parameters', 'posts', 'status_codes', 'follow_redirects', 'post_type', 'http_proxy', 'headers',
+				'retrieve_mode', 'request_method', 'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password',
+				'verify_peer', 'verify_host', 'allow_traps', 'discover', 'uuid'
 			]
 		];
 	}
@@ -142,8 +144,14 @@ class CConfigurationExport {
 				$simple_triggers = $this->builder->extractSimpleTriggers($this->data['triggers']);
 			}
 
-			if ($this->data['groups']) {
-				$this->builder->buildGroups($schema['rules']['groups'], $this->data['groups']);
+			if ($this->data['template_groups']) {
+				$this->builder->buildTemplateGroups($schema['rules']['template_groups'],
+					$this->data['template_groups']
+				);
+			}
+
+			if ($this->data['host_groups']) {
+				$this->builder->buildHostGroups($schema['rules']['host_groups'], $this->data['host_groups']);
 			}
 
 			if ($this->data['templates']) {
@@ -189,8 +197,12 @@ class CConfigurationExport {
 	protected function gatherData() {
 		$options = $this->filterOptions($this->options);
 
-		if ($options['groups']) {
-			$this->gatherGroups($options['groups']);
+		if ($options['host_groups']) {
+			$this->gatherHostGroups($options['host_groups']);
+		}
+
+		if ($options['template_groups']) {
+			$this->gatherTemplateGroups($options['template_groups']);
 		}
 
 		if ($options['templates']) {
@@ -268,14 +280,27 @@ class CConfigurationExport {
 	}
 
 	/**
-	 * Get groups for export from database.
+	 * Get host groups for export from database.
 	 *
-	 * @param array $groupIds
+	 * @param array $groupids
 	 */
-	protected function gatherGroups(array $groupIds) {
-		$this->data['groups'] = API::HostGroup()->get([
+	protected function gatherHostGroups(array $groupids) {
+		$this->data['host_groups'] = API::HostGroup()->get([
 			'output' => ['name', 'uuid'],
-			'groupids' => $groupIds,
+			'groupids' => $groupids,
+			'preservekeys' => true
+		]);
+	}
+
+	/**
+	 * Get template groups for export from database.
+	 *
+	 * @param array $groupids
+	 */
+	protected function gatherTemplateGroups(array $groupids) {
+		$this->data['template_groups'] = API::TemplateGroup()->get([
+			'output' => ['name', 'uuid'],
+			'groupids' => $groupids,
 			'preservekeys' => true
 		]);
 	}
@@ -288,7 +313,7 @@ class CConfigurationExport {
 	protected function gatherTemplates(array $templateids) {
 		$templates = API::Template()->get([
 			'output' => ['host', 'name', 'description', 'uuid'],
-			'selectGroups' => ['groupid', 'name', 'uuid'],
+			'selectTemplateGroups' => ['groupid', 'name', 'uuid'],
 			'selectParentTemplates' => API_OUTPUT_EXTEND,
 			'selectMacros' => API_OUTPUT_EXTEND,
 			'selectDashboards' => API_OUTPUT_EXTEND,
@@ -300,7 +325,7 @@ class CConfigurationExport {
 
 		foreach ($templates as &$template) {
 			// merge host groups with all groups
-			$this->data['groups'] += zbx_toHash($template['groups'], 'groupid');
+			$this->data['template_groups'] += array_column($template['templategroups'], null, 'groupid');
 
 			$template['dashboards'] = [];
 			$template['discoveryRules'] = [];
@@ -333,7 +358,7 @@ class CConfigurationExport {
 			'selectInterfaces' => API_OUTPUT_EXTEND,
 			'selectInventory' => API_OUTPUT_EXTEND,
 			'selectMacros' => API_OUTPUT_EXTEND,
-			'selectGroups' => ['groupid', 'name', 'uuid'],
+			'selectHostGroups' => ['groupid', 'name', 'uuid'],
 			'selectParentTemplates' => API_OUTPUT_EXTEND,
 			'selectTags' => ['tag', 'value'],
 			'selectValueMaps' => ['valuemapid', 'name', 'mappings'],
@@ -343,7 +368,7 @@ class CConfigurationExport {
 
 		foreach ($hosts as &$host) {
 			// merge host groups with all groups
-			$this->data['groups'] += zbx_toHash($host['groups'], 'groupid');
+			$this->data['host_groups'] += array_column($host['hostgroups'], null, 'groupid');
 
 			$host['discoveryRules'] = [];
 			$host['items'] = [];
@@ -815,7 +840,7 @@ class CConfigurationExport {
 
 		// gather trigger prototypes
 		$triggers = API::TriggerPrototype()->get([
-			'output' => ['expression', 'description', 'url', 'status', 'priority', 'comments', 'type', 'flags',
+			'output' => ['expression', 'description', 'url_name', 'url', 'status', 'priority', 'comments', 'type', 'flags',
 				'recovery_mode', 'recovery_expression', 'correlation_mode', 'correlation_tag', 'manual_close', 'opdata',
 				'discover', 'event_name', 'uuid'
 			],
@@ -836,11 +861,11 @@ class CConfigurationExport {
 		}
 
 		// gather host prototypes
-		$hostPrototypes = API::HostPrototype()->get([
+		$host_prototypes = API::HostPrototype()->get([
 			'discoveryids' => zbx_objectValues($items, 'itemid'),
 			'output' => API_OUTPUT_EXTEND,
-			'selectGroupLinks' => API_OUTPUT_EXTEND,
-			'selectGroupPrototypes' => API_OUTPUT_EXTEND,
+			'selectGroupLinks' => ['groupid'],
+			'selectGroupPrototypes' => ['name'],
 			'selectDiscoveryRule' => API_OUTPUT_EXTEND,
 			'selectTemplates' => API_OUTPUT_EXTEND,
 			'selectMacros' => API_OUTPUT_EXTEND,
@@ -850,27 +875,25 @@ class CConfigurationExport {
 			'preservekeys' => true
 		]);
 
-		// replace group prototype group IDs with references
-		$groupIds = [];
+		// Replace group prototype group IDs with references.
+		$groupids = [];
 
-		foreach ($hostPrototypes as $hostPrototype) {
-			foreach ($hostPrototype['groupLinks'] as $groupLink) {
-				$groupIds[$groupLink['groupid']] = true;
-			}
+		foreach ($host_prototypes as $host_prototype) {
+			$groupids += array_flip(array_column($host_prototype['groupLinks'], 'groupid'));
 		}
 
-		$groups = $this->getGroupsReferences(array_keys($groupIds));
+		$groups = $this->getGroupsReferences(array_keys($groupids));
 
-		// export the groups used in group prototypes
-		$this->data['groups'] += $groups;
+		// Export the groups used in group prototypes.
+		$this->data['host_groups'] += $groups;
 
-		foreach ($hostPrototypes as $hostPrototype) {
-			foreach ($hostPrototype['groupLinks'] as &$groupLink) {
-				$groupLink['groupid'] = $groups[$groupLink['groupid']];
+		foreach ($host_prototypes as $host_prototype) {
+			foreach ($host_prototype['groupLinks'] as &$group_link) {
+				$group_link = $groups[$group_link['groupid']];
 			}
-			unset($groupLink);
+			unset($group_link);
 
-			$items[$hostPrototype['discoveryRule']['itemid']]['hostPrototypes'][] = $hostPrototype;
+			$items[$host_prototype['discoveryRule']['itemid']]['hostPrototypes'][] = $host_prototype;
 		}
 
 		return $items;
@@ -1023,7 +1046,7 @@ class CConfigurationExport {
 		$hostIds = array_merge($hostIds, $templateIds);
 
 		$triggers = API::Trigger()->get([
-			'output' => ['expression', 'description', 'url', 'status', 'priority', 'comments', 'type', 'flags',
+			'output' => ['expression', 'description', 'url_name', 'url', 'status', 'priority', 'comments', 'type', 'flags',
 				'recovery_mode', 'recovery_expression', 'correlation_mode', 'correlation_tag', 'manual_close', 'opdata',
 				'event_name', 'uuid'
 			],
@@ -1118,7 +1141,7 @@ class CConfigurationExport {
 				'smtp_verify_peer', 'smtp_verify_host', 'smtp_authentication', 'username', 'passwd', 'content_type',
 				'exec_path', 'exec_params', 'gsm_modem', 'status', 'maxsessions', 'maxattempts', 'attempt_interval',
 				'script', 'timeout', 'process_tags', 'show_event_menu', 'event_menu_url', 'event_menu_name',
-				'description', 'parameters'
+				'description', 'parameters', 'provider'
 			],
 			'selectMessageTemplates' => ['eventsource', 'recovery', 'subject', 'message'],
 			'mediatypeids' => $mediatypeids,

@@ -21,16 +21,18 @@ package resultcache
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"git.zabbix.com/ap/plugin-support/log"
+	"git.zabbix.com/ap/plugin-support/plugin"
 	"zabbix.com/internal/agent"
 	"zabbix.com/internal/monitor"
 	"zabbix.com/pkg/itemutil"
-	"zabbix.com/pkg/log"
-	"zabbix.com/pkg/plugin"
 	"zabbix.com/pkg/version"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -171,6 +173,7 @@ func (c *DiskCache) resultsGet() (results []*AgentData, maxDataId uint64, maxLog
 		c.Errf("cannot select from data table: %s", err.Error())
 		return nil, 0, 0, err
 	}
+
 	for rows.Next() {
 		if result, err = c.resultFetch(rows); err != nil {
 			rows.Close()
@@ -216,11 +219,17 @@ func (c *DiskCache) resultsGet() (results []*AgentData, maxDataId uint64, maxLog
 func (c *DiskCache) upload(u Uploader) (err error) {
 	var results []*AgentData
 	var maxDataId, maxLogId uint64
+	var errs []error
 
 	defer func() {
-		if err != nil && (c.lastError == nil || err.Error() != c.lastError.Error()) {
+		if nil == err || errs != nil { // report errors not related to Write
+			return
+		}
+
+		errs = append(errs, err)
+		if !reflect.DeepEqual(errs, c.lastErrors) {
 			c.Warningf("cannot upload history data: %s", err)
-			c.lastError = err
+			c.lastErrors = errs
 		}
 	}()
 
@@ -235,7 +244,7 @@ func (c *DiskCache) upload(u Uploader) (err error) {
 	request := AgentDataRequest{
 		Request: "agent data",
 		Data:    results,
-		Session: c.token,
+		Session: u.Session(),
 		Host:    u.Hostname(),
 		Version: version.Short(),
 	}
@@ -251,17 +260,21 @@ func (c *DiskCache) upload(u Uploader) (err error) {
 	if timeout > 60 {
 		timeout = 60
 	}
-	if err = u.Write(data, time.Duration(timeout)*time.Second); err != nil {
-		if c.lastError == nil || err.Error() != c.lastError.Error() {
-			c.Warningf("history upload to [%s %s] started to fail: %s", u.Addr(), u.Hostname(), err)
-			c.lastError = err
+	if errs = u.Write(data, time.Duration(timeout)*time.Second); errs != nil {
+		if !reflect.DeepEqual(errs, c.lastErrors) {
+			for i := 0; i < len(errs); i++ {
+				c.Warningf("%s", errs[i])
+			}
+			c.Warningf("history upload to [%s] [%s] started to fail", u.Addr(), u.Hostname())
+			c.lastErrors = errs
 		}
+		err = errors.New("history upload failed")
 		return
 	}
 
-	if c.lastError != nil {
-		c.Warningf("history upload to [%s %s] is working again", u.Addr(), u.Hostname())
-		c.lastError = nil
+	if c.lastErrors != nil {
+		c.Warningf("history upload to [%s] [%s] is working again", u.Addr(), u.Hostname())
+		c.lastErrors = nil
 	}
 	cacheLock.Lock()
 	defer cacheLock.Unlock()

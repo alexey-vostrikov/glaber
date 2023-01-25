@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxserver.h"
 #include "../../libs/zbxexec/worker.h"
 #include "glb_pinger.h"
@@ -26,6 +26,10 @@
 #include "preproc.h"
 #include "zbxjson.h"
 #include "poller_async_io.h"
+#include "zbxsysinfo.h"
+#include "zbxip.h"
+
+#define PINGER_FLOAT_PRECISION	0.0001
 
 typedef struct
 {
@@ -57,7 +61,7 @@ typedef struct {
 
 typedef struct {
     u_int64_t async_delay; //time between async calls to detect and properly handle timeouts
-    ext_worker_t *worker;
+    glb_worker_t *worker;
     u_int64_t sent_packets;
     poller_event_t *worker_event;
 
@@ -109,7 +113,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
     poller_disable_event(pinger_item->timeout_event);
     //pinger_item->time_event = NULL;
     
-    init_result(&result);
+    zbx_init_agent_result(&result);
         
     LOG_DBG("In %s: Starting, itemid is %ld, status is %d, error is '%s', mstime is %ld", __func__,
                 poller_get_item_id(poller_item), status, error, mstime);
@@ -144,8 +148,8 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
                     //but zabbix expects seconds
                     value_dbl = value_dbl/1000;
 
-					if (0 < value_dbl && ZBX_FLOAT_PRECISION > value_dbl)
-						value_dbl = ZBX_FLOAT_PRECISION;
+					if (0 < value_dbl && PINGER_FLOAT_PRECISION > value_dbl)
+						value_dbl = PINGER_FLOAT_PRECISION;
                         SET_DBL_RESULT(&result, value_dbl);
                         //zabbix_log(LOG_LEVEL_DEBUG,"For item %ld submitting  min/max/avg value %f",poller_item->itemid,value_dbl);
                         poller_preprocess_value(poller_item, &result , mstime, ITEM_STATE_NORMAL, NULL);
@@ -163,7 +167,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
                     exit(-1);
 			}
 
-            free_result(&result);
+            zbx_free_agent_result(&result);
             break;
          }
         default:
@@ -227,7 +231,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     poller_item_t *poller_item;
 
     //reading all the responses we have so far from the worker
-    while (SUCCEED == async_buffered_responce(conf.worker, &worker_response)) {
+    while (SUCCEED == glb_worker_get_async_buffered_responce(conf.worker, &worker_response)) {
         
         if ( NULL == worker_response) //read succesifull, no data yet
             break;
@@ -320,7 +324,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     zbx_snprintf(request,MAX_STRING_LEN,"%s %d %ld",pinger_item->ip, pinger_item->size, poller_get_item_id(poller_item) );
    // LOG_INF("Sending request for ping: %s, worker is %p", request, conf->worker);
     
-    if (SUCCEED != glb_worker_request(conf.worker, request) ) {
+    if (SUCCEED != glb_worker_send_request(conf.worker, request) ) {
         //sending config error status for the item
         DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't send request for ping: %s",request);
         finish_icmp_poll(poller_item, CONFIG_ERROR ,"Couldn't start or pass request to glbmap", now);
@@ -330,9 +334,9 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     pinger_item->sent++;
  //   pinger_item->lastpacket_sent = now;
 
-    if (last_worker_pid != worker_get_pid(conf.worker)) {
-        LOG_INF("glbmap worker's PID is changed, subscibing the new FD");
-        last_worker_pid = worker_get_pid(conf.worker);
+    if (last_worker_pid != glb_worker_get_pid(conf.worker)) {
+        LOG_INF("glbmap worker's PID (%d) is changed, subscibing the new FD (%d)", last_worker_pid, glb_worker_get_pid(conf.worker));
+        last_worker_pid = glb_worker_get_pid(conf.worker);
         subscribe_worker_fd(worker_get_fd_from_worker(conf.worker));
     }
     
@@ -385,11 +389,11 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     
     ZBX_STRDUP(parsed_key, dc_item->key_orig);
     
-	if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
+	if (SUCCEED != zbx_substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
 				sizeof(error)))
         return FAIL;
 
-    if (SUCCEED != parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
+    if (SUCCEED != zbx_parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
 					&interval, &size, &timeout, &type, error, sizeof(error))) 
 	    return FAIL;
 
@@ -450,7 +454,7 @@ int needs_resolve(pinger_item_t *pinger_item) {
   //  if (pinger_item->lastresolve + GLB_DNS_CACHE_TIME > now) 
   //      return FAIL;
     
-    if (SUCCEED == is_ip4(pinger_item->addr)) {
+    if (SUCCEED == zbx_is_ip4(pinger_item->addr)) {
         //    pinger_item->lastresolve = now;
             pinger_item->ip = zbx_strdup(pinger_item->ip, pinger_item->addr);
             return FAIL;
@@ -549,10 +553,7 @@ static int forks_count(void) {
  * ***************************************************************************/
 void glb_pinger_init(void) {
 
-	int i;
-	char init_string[MAX_STRING_LEN];
-    char full_path[MAX_STRING_LEN];
-    char add_params[MAX_STRING_LEN];
+	char args[MAX_STRING_LEN], add_params[MAX_STRING_LEN];
 	
     bzero(&conf, sizeof(pinger_conf_t));
 	conf.sent_packets = 0;
@@ -568,7 +569,7 @@ void glb_pinger_init(void) {
 		exit(-1);
 	};
 
-    if ( NULL != CONFIG_SOURCE_IP && SUCCEED == is_ip4(CONFIG_SOURCE_IP) ) {
+    if ( NULL != CONFIG_SOURCE_IP && SUCCEED == zbx_is_ip4(CONFIG_SOURCE_IP) ) {
         zbx_snprintf(add_params,MAX_STRING_LEN,"-S %s ",CONFIG_SOURCE_IP);
     } 
 
@@ -576,18 +577,19 @@ void glb_pinger_init(void) {
          zbx_snprintf(add_params,MAX_STRING_LEN,"%s ",CONFIG_GLBMAP_OPTIONS);
     }
     
-    zbx_snprintf(init_string,MAX_STRING_LEN,"{\"path\":\"%s\", \"params\":\"%s-v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=saddr,rtt,itemid,success\"}\n",
-        CONFIG_GLBMAP_LOCATION, add_params);
+    zbx_snprintf(args, MAX_STRING_LEN, "%s-v 0 -q -Z -r 100000 --probe-module=glb_icmp --output-module=json --output-fields=saddr,rtt,itemid,success",
+         add_params);
 
-	conf.worker = glb_init_worker(init_string);
+	conf.worker = glb_worker_init(CONFIG_GLBMAP_LOCATION, args, 60, 0, 0, 0);
+    
     if (NULL == conf.worker) {
-        zabbix_log(LOG_LEVEL_WARNING,"Cannot create pinger woker, check the coniguration: '%s'",init_string);
+        zabbix_log(LOG_LEVEL_WARNING,"Cannot create pinger woker, check the coniguration: path '%s', args %s",CONFIG_GLBMAP_LOCATION, args);
         exit(-1);
     }
 
     worker_set_mode_to_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
     worker_set_mode_from_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
-    worker_set_async_mode(conf.worker, 1);
+    //worker_set_async_mode(conf.worker, 1);
     
     conf.worker_event = NULL; //poller_create_event(NULL, process_worker_results_cb, NULL);
 

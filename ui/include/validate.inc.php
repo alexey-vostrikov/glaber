@@ -168,7 +168,7 @@ function check_type(&$field, $flags, &$var, $type, $caption = null) {
 		}
 	}
 	elseif ($type == T_ZBX_DBL) {
-		$number_parser = new CNumberParser(['with_suffix' => false]);
+		$number_parser = new CNumberParser();
 
 		if ($number_parser->parse($var) != CParser::PARSE_SUCCESS) {
 			$error = true;
@@ -378,7 +378,7 @@ function invalid_url($msg = null) {
 	unset_all();
 	show_error_message($msg);
 
-	(new CWidget())->show();
+	(new CHtmlPage())->show();
 	require_once dirname(__FILE__).'/page_footer.php';
 }
 

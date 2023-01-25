@@ -17,17 +17,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "lld.h"
 #include "log.h"
-#include "db.h"
+#include "zbxdbhigh.h"
 
-/******************************************************************************
- *                                                                            *
- * Function: lld_field_str_rollback                                           *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
- *                                                                            *
- ******************************************************************************/
+#include "audit/zbxaudit.h"
+#include "audit/zbxaudit_item.h"
+#include "audit/zbxaudit_graph.h"
+#include "audit/zbxaudit_trigger.h"
+
 void	lld_field_str_rollback(char **field, char **field_orig, zbx_uint64_t *flags, zbx_uint64_t flag)
 {
 	if (0 == (*flags & flag))
@@ -41,8 +38,6 @@ void	lld_field_str_rollback(char **field, char **field_orig, zbx_uint64_t *flags
 
 /******************************************************************************
  *                                                                            *
- * Function: lld_end_of_life                                                  *
- *                                                                            *
  * Purpose: calculate when to delete lost resources in an overflow-safe way   *
  *                                                                            *
  ******************************************************************************/
@@ -52,8 +47,6 @@ int	lld_end_of_life(int lastcheck, int lifetime)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: lld_remove_lost_objects                                          *
  *                                                                            *
  * Purpose: updates lastcheck and ts_delete fields; removes lost resources    *
  *                                                                            *
@@ -81,8 +74,9 @@ void	lld_remove_lost_objects(const char *table, const char *id_name, const zbx_v
 	{
 		zbx_uint64_t	id;
 		int		discovery_flag, object_lastcheck, object_ts_delete;
+		const char	*name;
 
-		cb_info(objects->values[i], &id, &discovery_flag, &object_lastcheck, &object_ts_delete);
+		cb_info(objects->values[i], &id, &discovery_flag, &object_lastcheck, &object_ts_delete, &name);
 
 		if (0 == id)
 			continue;
@@ -94,6 +88,22 @@ void	lld_remove_lost_objects(const char *table, const char *id_name, const zbx_v
 			if (lastcheck > ts_delete)
 			{
 				zbx_vector_uint64_append(&del_ids, id);
+
+				if (0 == strcmp(table, "item_discovery"))
+				{
+					zbx_audit_item_create_entry_for_delete(id, name,
+							(int)ZBX_FLAG_DISCOVERY_CREATED);
+				}
+				else if (0 == strcmp(table, "graph_discovery"))
+				{
+					zbx_audit_graph_create_entry(ZBX_AUDIT_ACTION_DELETE, id, name,
+							(int)ZBX_FLAG_DISCOVERY_CREATED);
+				}
+				else if (0 == strcmp(table, "trigger_discovery"))
+				{
+					zbx_audit_trigger_create_entry(ZBX_AUDIT_ACTION_DELETE, id, name,
+							ZBX_FLAG_DISCOVERY_CREATED);
+				}
 			}
 			else if (object_ts_delete != ts_delete)
 			{
@@ -122,7 +132,7 @@ void	lld_remove_lost_objects(const char *table, const char *id_name, const zbx_v
 
 	DBbegin();
 
-	DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	for (i = 0; i < discovery_ts.values_num; i++)
 	{
@@ -157,7 +167,7 @@ void	lld_remove_lost_objects(const char *table, const char *id_name, const zbx_v
 		DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
 	}
 
-	DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
 		DBexecute("%s", sql);
@@ -168,6 +178,7 @@ void	lld_remove_lost_objects(const char *table, const char *id_name, const zbx_v
 	if (0 != del_ids.values_num)
 	{
 		zbx_vector_uint64_sort(&del_ids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
 		cb(&del_ids);
 	}
 

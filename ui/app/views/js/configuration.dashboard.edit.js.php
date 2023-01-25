@@ -25,9 +25,14 @@
 ?>
 
 <script>
-	function initializeView(dashboard, widget_defaults, time_period, page) {
+	const view = {
+		is_busy: false,
+		is_busy_saving: false,
 
-		const init = () => {
+		init({dashboard, widget_defaults, widget_last_type, time_period, page}) {
+			this.dashboard = dashboard;
+			this.page = page;
+
 			ZABBIX.Dashboard = new CDashboard(document.querySelector('.<?= ZBX_STYLE_DASHBOARD ?>'), {
 				containers: {
 					grid: document.querySelector('.<?= ZBX_STYLE_DASHBOARD_GRID ?>'),
@@ -53,19 +58,19 @@
 				max_rows: <?= DASHBOARD_MAX_ROWS ?>,
 				widget_min_rows: <?= DASHBOARD_WIDGET_MIN_ROWS ?>,
 				widget_max_rows: <?= DASHBOARD_WIDGET_MAX_ROWS ?>,
-				widget_defaults: widget_defaults,
+				widget_defaults,
+				widget_last_type,
 				is_editable: true,
 				is_edit_mode: true,
 				can_edit_dashboards: true,
 				is_kiosk_mode: false,
-				time_period: time_period,
+				time_period,
 				dynamic_hostid: null
 			});
 
 			for (const page of dashboard.pages) {
 				for (const widget of page.widgets) {
 					widget.fields = (typeof widget.fields === 'object') ? widget.fields : {};
-					widget.configuration = (typeof widget.configuration === 'object') ? widget.configuration : {};
 				}
 
 				ZABBIX.Dashboard.addDashboardPage(page);
@@ -83,39 +88,35 @@
 
 			document
 				.getElementById('dashboard-add')
-				.addEventListener('click', events.addClick);
+				.addEventListener('click', this.events.addClick);
 
 			document
 				.getElementById('dashboard-save')
-				.addEventListener('click', () => save());
+				.addEventListener('click', () => this.save());
 
 			document
 				.getElementById('dashboard-cancel')
 				.addEventListener('click', (e) => {
-					cancelEditing();
+					this.cancelEditing();
 					e.preventDefault();
 				}
 			);
 
-			ZABBIX.Dashboard.on(DASHBOARD_EVENT_BUSY, events.busy);
-			ZABBIX.Dashboard.on(DASHBOARD_EVENT_IDLE, events.idle);
+			ZABBIX.Dashboard.on(DASHBOARD_EVENT_BUSY, this.events.busy);
+			ZABBIX.Dashboard.on(DASHBOARD_EVENT_IDLE, this.events.idle);
 
-			enableNavigationWarning();
+			this.enableNavigationWarning();
 
 			if (dashboard.dashboardid === null) {
 				ZABBIX.Dashboard.editProperties();
 			}
-		};
+		},
 
-		const save = () => {
-			clearMessages();
-
-			is_busy_saving = true;
-			updateBusy();
+		save() {
+			this.is_busy_saving = true;
+			this.updateBusy();
 
 			const request_data = ZABBIX.Dashboard.save();
-
-			request_data.sharing = dashboard.sharing;
 
 			const curl = new Curl('zabbix.php');
 
@@ -123,69 +124,77 @@
 
 			fetch(curl.getUrl(), {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-				},
-				body: urlEncodeData(request_data)
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(request_data)
 			})
 				.then((response) => response.json())
 				.then((response) => {
-					if ('errors' in response) {
-						throw {html_string: response.errors};
+					if ('error' in response) {
+						throw {error: response.error};
 					}
 
-					if ('system-message-ok' in response) {
-						postMessageOk(response['system-message-ok']);
+					postMessageOk(response.success.title);
+
+					if ('messages' in response.success) {
+						postMessageDetails('success', response.success.messages);
 					}
 
-					disableNavigationWarning();
-					cancelEditing();
+					this.disableNavigationWarning();
+					this.cancelEditing();
 				})
-				.catch((error) => {
-					if (typeof error === 'object' && 'html_string' in error) {
-						addMessage(error.html_string);
+				.catch((exception) => {
+					clearMessages();
+
+					let title;
+					let messages = [];
+
+					if (typeof exception === 'object' && 'error' in exception) {
+						title = exception.error.title;
+						messages = exception.error.messages;
 					}
 					else {
-						const message = dashboard.dashboardid === null
+						title = this.dashboard.dashboardid === null
 							? <?= json_encode(_('Failed to create dashboard')) ?>
 							: <?= json_encode(_('Failed to update dashboard')) ?>;
-
-						addMessage(makeMessageBox('bad', [], message, true, false));
 					}
+
+					const message_box = makeMessageBox('bad', messages, title);
+
+					addMessage(message_box);
 				})
 				.finally(() => {
-					is_busy_saving = false;
-					updateBusy();
+					this.is_busy_saving = false;
+					this.updateBusy();
 				});
-		};
+		},
 
-		const updateBusy = () => {
-			document.getElementById('dashboard-save').disabled = is_busy || is_busy_saving;
-		};
+		updateBusy() {
+			document.getElementById('dashboard-save').disabled = this.is_busy || this.is_busy_saving;
+		},
 
-		const cancelEditing = () => {
+		cancelEditing() {
 			const curl = new Curl('zabbix.php', false);
 
 			curl.setArgument('action', 'template.dashboard.list');
-			curl.setArgument('templateid', dashboard.templateid);
+			curl.setArgument('templateid', this.dashboard.templateid);
 
-			if (page !== null) {
-				curl.setArgument('page', page);
+			if (this.page !== null) {
+				curl.setArgument('page', this.page);
 			}
 
 			location.replace(curl.getUrl());
-		};
+		},
 
-		const enableNavigationWarning = () => {
-			window.addEventListener('beforeunload', events.beforeUnload, {passive: false});
-		};
+		enableNavigationWarning() {
+			window.addEventListener('beforeunload', this.events.beforeUnload, {passive: false});
+		},
 
-		const disableNavigationWarning = () => {
-			window.removeEventListener('beforeunload', events.beforeUnload);
-		};
+		disableNavigationWarning() {
+			window.removeEventListener('beforeunload', this.events.beforeUnload);
+		},
 
-		const events = {
-			addClick: (e) => {
+		events: {
+			addClick(e) {
 				const menu = [
 					{
 						items: [
@@ -219,7 +228,7 @@
 					}
 				];
 
-				$(e.target).menuPopup(menu, new jQuery.Event(e), {
+				jQuery(e.target).menuPopup(menu, new jQuery.Event(e), {
 					position: {
 						of: e.target,
 						my: 'left top',
@@ -229,7 +238,7 @@
 				});
 			},
 
-			beforeUnload: (e) => {
+			beforeUnload(e) {
 				if (ZABBIX.Dashboard.isUnsaved()) {
 					// Display confirmation message.
 					e.preventDefault();
@@ -237,20 +246,15 @@
 				}
 			},
 
-			busy: () => {
-				is_busy = true;
-				updateBusy();
+			busy() {
+				view.is_busy = true;
+				view.updateBusy();
 			},
 
-			idle: () => {
-				is_busy = false;
-				updateBusy();
+			idle() {
+				view.is_busy = false;
+				view.updateBusy();
 			}
-		};
-
-		let is_busy = false;
-		let is_busy_saving = false;
-
-		init();
+		}
 	}
 </script>

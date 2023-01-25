@@ -19,7 +19,7 @@
 **/
 
 
-require_once dirname(__FILE__).'/include/classes/core/APP.php';
+require_once __DIR__.'/include/classes/core/APP.php';
 
 $page['file'] = 'setup.php';
 
@@ -53,13 +53,15 @@ $fields = [
 	'cert_file' =>			[T_ZBX_STR, O_OPT, null,	null, 				null],
 	'ca_file' =>			[T_ZBX_STR, O_OPT, null,	null, 				null],
 	'cipher_list' =>		[T_ZBX_STR, O_OPT, null,	null, 				null],
-	'creds_storage' =>		[T_ZBX_INT, O_OPT, null,	IN([DB_STORE_CREDS_CONFIG, DB_STORE_CREDS_VAULT]),			null],
+	'creds_storage' =>		[T_ZBX_INT, O_OPT, null,	IN([DB_STORE_CREDS_CONFIG, DB_STORE_CREDS_VAULT_HASHICORP, DB_STORE_CREDS_VAULT_CYBERARK]), null],
 	'vault_url' =>			[T_ZBX_STR, O_OPT, null,	null,				null],
 	'vault_db_path' =>		[T_ZBX_STR, O_OPT, null,	null,				null],
+	'vault_query_string' =>	[T_ZBX_STR, O_OPT, null,	null,				null],
 	'vault_token' =>		[T_ZBX_STR, O_OPT, null,	null,				null],
-	'zbx_server' =>			[T_ZBX_STR, O_OPT, null,	null,				null],
+	'vault_certificates' =>	[T_ZBX_INT, O_OPT, null,	IN([0,1]),			null],
+	'vault_cert_file' =>	[T_ZBX_STR, O_OPT, null,	null,				null],
+	'vault_key_file' =>		[T_ZBX_STR, O_OPT, null,	null,				null],
 	'zbx_server_name' =>	[T_ZBX_STR, O_OPT, null,	null,				null],
-	'zbx_server_port' =>	[T_ZBX_INT, O_OPT, null,	BETWEEN(0, 65535),	null, _('Port')],
 	'default_timezone' =>	[T_ZBX_STR, O_OPT, null,	null,				null],
 	'default_theme' =>		[T_ZBX_STR, O_OPT, null,	null,				null],
 	// actions
@@ -78,7 +80,7 @@ if (hasRequest('cancel') || hasRequest('finish')) {
 }
 
 if (CWebUser::$data && CWebUser::getType() < USER_TYPE_SUPER_ADMIN
-		&& CSessionHelper::get('step') != 6) {
+		&& CSessionHelper::get('step') != CSetupWizard::STAGE_INSTALL) {
 	access_deny(ACCESS_DENY_PAGE);
 }
 
@@ -126,8 +128,7 @@ elseif (CWebUser::$data) {
 
 $default_timezone = getRequest('default_timezone', $default_timezone);
 
-if ($default_timezone !== ZBX_DEFAULT_TIMEZONE
-		&& !array_key_exists($default_timezone, (new CDateTimeZoneHelper())->getAllDateTimeZones())) {
+if ($default_timezone !== ZBX_DEFAULT_TIMEZONE && !CTimezoneHelper::isSupported($default_timezone)) {
 	$default_timezone = ZBX_DEFAULT_TIMEZONE;
 }
 
@@ -145,7 +146,7 @@ elseif (CWebUser::$data) {
 
 $default_theme = getRequest('default_theme', $default_theme);
 
-if (!in_array($default_theme, array_keys(APP::getThemes()))) {
+if (!array_key_exists($default_theme, APP::getThemes())) {
 	$default_theme = ZBX_DEFAULT_THEME;
 }
 
@@ -156,11 +157,14 @@ DBclose();
 /*
  * Setup wizard
  */
-$ZBX_SETUP_WIZARD = new CSetupWizard();
+$setup_wizard = new CSetupWizard();
 
 // page title
-(new CPageHeader(_('Installation')))
-	->addCssFile('assets/styles/'.CHtml::encode($default_theme).'.css')
+$page_header = (new CHtmlPageHeader(_('Installation'), substr($default_lang, 0, strpos($default_lang, '_'))));
+
+$page_header
+	->setTheme($default_theme)
+	->addCssFile('assets/styles/'.$page_header->getTheme().'.css')
 	->addJsFile((new CUrl('js/browsers.js'))->getUrl())
 	->addJsFile((new CUrl('jsLoader.php'))
 		->setArgument('ver', ZABBIX_VERSION)
@@ -173,7 +177,7 @@ $ZBX_SETUP_WIZARD = new CSetupWizard();
 		->setArgument('files', ['setup.js'])
 		->getUrl()
 	)
-	->display();
+	->show();
 
 /*
  * Displaying
@@ -186,10 +190,19 @@ $sub_footer = (new CDiv([_('Licensed under'), ' ', $link]))->addClass(ZBX_STYLE_
 
 (new CTag('body', true,
 	(new CDiv([
-		(new CTag('main', true, [$ZBX_SETUP_WIZARD, $sub_footer])), makePageFooter()])
-	)->addClass(ZBX_STYLE_LAYOUT_WRAPPER)
-))
-	->setAttribute('lang', substr($default_lang, 0, strpos($default_lang, '_')))
+		(new CTag('main', true, [$setup_wizard, $sub_footer])),
+		makePageFooter()
+	]))->addClass(ZBX_STYLE_LAYOUT_WRAPPER)
+))->show();
+
+(new CScriptTag('
+	view.init('.json_encode([
+		'step' => $setup_wizard->getStep(),
+		'hashicorp_endpoint_default' => CVaultHashiCorp::API_ENDPOINT_DEFAULT,
+		'cyberark_endpoint_default' => CVaultCyberArk::API_ENDPOINT_DEFAULT
+	]).');
+'))
+	->setOnDocumentReady()
 	->show();
 ?>
 </html>

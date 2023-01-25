@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -34,7 +34,7 @@ class CDiscoveryRuleManager {
 		$parent_itemids = $ruleids;
 		$child_ruleids = [];
 		do {
-			$db_items = DBselect('SELECT i.itemid FROM items i WHERE '.dbConditionInt('i.templateid', $parent_itemids));
+			$db_items = DBselect('SELECT i.itemid FROM items i WHERE '.dbConditionId('i.templateid', $parent_itemids));
 			$parent_itemids = [];
 			while ($db_item = DBfetch($db_items)) {
 				$parent_itemids[$db_item['itemid']] = $db_item['itemid'];
@@ -45,34 +45,40 @@ class CDiscoveryRuleManager {
 		$ruleids = array_merge($ruleids, $child_ruleids);
 
 		// Delete item prototypes.
-		$iprototypeids = [];
-		$db_items = DBselect(
-			'SELECT i.itemid'.
+		$db_items = DBfetchArrayAssoc(DBselect(
+			'SELECT id.itemid,i.name'.
 			' FROM item_discovery id,items i'.
-			' WHERE i.itemid=id.itemid'.
-				' AND '.dbConditionInt('parent_itemid', $ruleids)
-		);
-		while ($item = DBfetch($db_items)) {
-			$iprototypeids[$item['itemid']] = $item['itemid'];
-		}
-		if ($iprototypeids) {
-			CItemPrototypeManager::delete($iprototypeids);
+			' WHERE id.itemid=i.itemid'.
+				' AND '.dbConditionId('parent_itemid', $ruleids)
+		), 'itemid');
+
+		if ($db_items) {
+			CItemPrototype::deleteForce($db_items);
 		}
 
 		// Delete host prototypes.
-		$host_prototypeids = DBfetchColumn(DBselect(
-			'SELECT hd.hostid'.
-			' FROM host_discovery hd'.
-			' WHERE '.dbConditionInt('hd.parent_itemid', $ruleids)
+		$db_host_prototypes = DBfetchArrayAssoc(DBselect(
+			'SELECT hd.hostid,h.host'.
+			' FROM host_discovery hd,hosts h'.
+			' WHERE hd.hostid=h.hostid'.
+				' AND '.dbConditionId('hd.parent_itemid', $ruleids)
 		), 'hostid');
-		if ($host_prototypeids) {
-			API::HostPrototype()->delete($host_prototypeids, true);
+
+		if ($db_host_prototypes) {
+			CHostPrototype::deleteForce($db_host_prototypes);
 		}
 
 		// Delete LLD rules.
+		DB::delete('item_tag', ['itemid' => $ruleids]);
+		DB::delete('item_preproc', ['itemid' => $ruleids]);
+		DB::update('items', [
+			'values' => ['templateid' => 0],
+			'where' => ['itemid' => $ruleids]
+		]);
 		DB::delete('items', ['itemid' => $ruleids]);
 
 		$insert = [];
+
 		foreach ($ruleids as $ruleid) {
 			$insert[] = [
 				'tablename' => 'events',
@@ -80,6 +86,7 @@ class CDiscoveryRuleManager {
 				'value' => $ruleid
 			];
 		}
+
 		DB::insertBatch('housekeeper', $insert);
 	}
 }

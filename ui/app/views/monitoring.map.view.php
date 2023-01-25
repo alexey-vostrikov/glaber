@@ -33,8 +33,9 @@ $this->includeJsFile('monitoring.map.view.js.php');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-(new CWidget())
+(new CHtmlPage())
 	->setTitle(_('Maps'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_MAP_VIEW))
 	->setWebLayoutMode($web_layout_mode)
 	->setControls(new CList([
 		(new CForm('get'))
@@ -61,7 +62,7 @@ $web_layout_mode = $this->getLayoutMode();
 				))->setEnabled($data['allowed_edit'])
 				: null
 			)
-			->addItem(get_icon('favourite', [
+			->addItem(get_icon('favorite', [
 				'fav' => 'web.favorite.sysmapids',
 				'elname' => 'sysmapid',
 				'elid' => $data['map']['sysmapid']
@@ -91,4 +92,8 @@ $web_layout_mode = $this->getLayoutMode();
 				])->get()
 			)
 	)
+	->show();
+
+(new CScriptTag('view.init();'))
+	->setOnDocumentReady()
 	->show();

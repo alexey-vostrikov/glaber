@@ -195,6 +195,18 @@ class CHostInterface extends CApiService {
 			$result = $this->unsetExtraFields($result, ['hostid'], $options['output']);
 		}
 
+		if ($this->needsStateInfo($options)) {
+
+			$ifaceids = array_keys($result);	
+			$states = CZabbixServer::getInterfacesAvail(CSessionHelper::getId(), $ifaceids);;
+			
+			foreach ($states as $state) {
+				$result[$state['id']]['available'] = $state['avail'];
+				$result[$state['id']]['error'] =  $state['error'];
+				$result[$state['id']]['lastchange'] = $state['lastchange'];
+			}
+		}
+
 		// removing keys (hash -> array)
 		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
@@ -1237,5 +1249,22 @@ class CHostInterface extends CApiService {
 		}
 
 		return $result;
+	}
+
+	protected function needsStateInfo($options) {
+		if (isset($options['countOutput']) && true == $options['countOutput'] ) 
+			return false;
+		
+		if ($options['output'] === API_OUTPUT_EXTEND) 
+       		return true;
+		
+        if (is_array($options['output'])) {
+            if (in_array('available', $options['output'])) 
+				return true;
+			
+            if (in_array('error', $options['output'])) 
+				return true;	
+        }
+		return false;
 	}
 }

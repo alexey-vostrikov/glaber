@@ -5,7 +5,7 @@
 #define ASN1_INT     0x2
 #define ASN1_BIT_STR 0x3
 #define ASN1_OCT_STR 0x4
-#define ASN1_NULL    0x5
+//#define ASN1_NULL    0x5
 #define ASN1_OID     0x6
 #define ASN1_SEQ     0x10
 #define ASN1_SET     0x11

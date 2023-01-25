@@ -27,16 +27,19 @@ if ($data['uncheck']) {
 	uncheckTableRows('userrole');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('User roles'))
-	->setControls((new CTag('nav', true,
-		(new CList())
-			->addItem(new CRedirectButton(_('Create user role'),
-				(new CUrl('zabbix.php'))->setArgument('action', 'userrole.edit'))
-			)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::USERS_USERROLE_LIST))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(new CRedirectButton(_('Create user role'),
+					(new CUrl('zabbix.php'))->setArgument('action', 'userrole.edit')
+				))
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'userrole.list')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'userrole.list'))
 		->addVar('action', 'userrole.list')
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
@@ -127,5 +130,6 @@ $form->addItem([
 	], 'userrole')
 ]);
 
-$widget->addItem($form);
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

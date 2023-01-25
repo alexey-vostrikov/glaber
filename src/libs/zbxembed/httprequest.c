@@ -17,13 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "log.h"
-#include "zbxjson.h"
-#include "zbxhttp.h"
-#include "zbxembed.h"
 #include "httprequest.h"
 #include "embed.h"
+
+#include "zbxstr.h"
+#include "zbxjson.h"
+#include "zbxhttp.h"
 #include "duktape.h"
 #include "zbxalgo.h"
 
@@ -72,7 +71,7 @@ static size_t	curl_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata
 	size_t			r_size = size * nmemb;
 	zbx_es_httprequest_t	*request = (zbx_es_httprequest_t *)userdata;
 
-	zbx_strncpy_alloc(&request->data, &request->data_alloc, &request->data_offset, (const char *)ptr, r_size);
+	zbx_str_memcpy_alloc(&request->data, &request->data_alloc, &request->data_offset, (const char *)ptr, r_size);
 
 	return r_size;
 }
@@ -89,9 +88,7 @@ static size_t	curl_header_cb(void *ptr, size_t size, size_t nmemb, void *userdat
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest                                                   *
- *                                                                            *
- * Purpose: return backing C structure embedded in CurlHttpRequest object     *
+ * Purpose: return backing C structure embedded in HttpRequest object         *
  *                                                                            *
  ******************************************************************************/
 static zbx_es_httprequest_t *es_httprequest(duk_context *ctx)
@@ -108,9 +105,7 @@ static zbx_es_httprequest_t *es_httprequest(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_dtor                                              *
- *                                                                            *
- * Purpose: CurlHttpRequest destructor                                        *
+ * Purpose: HttpRequest destructor                                            *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_dtor(duk_context *ctx)
@@ -138,9 +133,7 @@ static duk_ret_t	es_httprequest_dtor(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_ctor                                              *
- *                                                                            *
- * Purpose: CurlHttpRequest constructor                                       *
+ * Purpose: HttpRequest constructor                                           *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_ctor(duk_context *ctx)
@@ -194,9 +187,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_add_header                                        *
- *                                                                            *
- * Purpose: CurlHttpRequest.SetHeader method                                  *
+ * Purpose: HttpRequest.SetHeader method                                      *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_add_header(duk_context *ctx)
@@ -209,7 +200,7 @@ static duk_ret_t	es_httprequest_add_header(duk_context *ctx)
 	if (NULL == (request = es_httprequest(ctx)))
 		return duk_error(ctx, DUK_RET_EVAL_ERROR, "internal scripting error: null object");
 
-	if (SUCCEED != zbx_cesu8_to_utf8(duk_to_string(ctx, 0), &utf8))
+	if (SUCCEED != es_duktape_string_decode(duk_to_string(ctx, 0), &utf8))
 	{
 		err_index = duk_push_error_object(ctx, DUK_RET_TYPE_ERROR, "cannot convert header to utf8");
 		goto out;
@@ -229,9 +220,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_clear_header                                      *
- *                                                                            *
- * Purpose: CurlHttpRequest.ClearHeader method                                *
+ * Purpose: HttpRequest.ClearHeader method                                    *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_clear_header(duk_context *ctx)
@@ -250,9 +239,7 @@ static duk_ret_t	es_httprequest_clear_header(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_query                                             *
- *                                                                            *
- * Purpose: CurlHttpRequest HTTP request implementation                       *
+ * Purpose: HttpRequest HTTP request implementation                           *
  *                                                                            *
  * Parameters: ctx          - [IN] the scripting engine context               *
  *             http_request - [IN] the HTTP request (GET, PUT, POST, DELETE)  *
@@ -279,7 +266,7 @@ static duk_ret_t	es_httprequest_query(duk_context *ctx, const char *http_request
 		goto out;
 	}
 
-	if (SUCCEED != zbx_cesu8_to_utf8(duk_to_string(ctx, 0), &url))
+	if (SUCCEED != es_duktape_string_decode(duk_to_string(ctx, 0), &url))
 	{
 		err_index = duk_push_error_object(ctx, DUK_RET_TYPE_ERROR, "cannot convert URL to utf8");
 		goto out;
@@ -287,7 +274,7 @@ static duk_ret_t	es_httprequest_query(duk_context *ctx, const char *http_request
 
 	if (0 == duk_is_null_or_undefined(ctx, 1))
 	{
-		if (SUCCEED != zbx_cesu8_to_utf8(duk_to_string(ctx, 1), &contents))
+		if (SUCCEED != es_duktape_string_decode(duk_to_string(ctx, 1), &contents))
 		{
 			err_index = duk_push_error_object(ctx, DUK_RET_TYPE_ERROR,
 					"cannot convert request contents to utf8");
@@ -326,6 +313,7 @@ static duk_ret_t	es_httprequest_query(duk_context *ctx, const char *http_request
 	ZBX_CURL_SETOPT(ctx, request->handle, CURLOPT_CUSTOMREQUEST, http_request, err);
 	ZBX_CURL_SETOPT(ctx, request->handle, CURLOPT_TIMEOUT_MS, timeout_ms - elapsed_ms, err);
 	ZBX_CURL_SETOPT(ctx, request->handle, CURLOPT_POSTFIELDS, ZBX_NULL2EMPTY_STR(contents), err);
+	ZBX_CURL_SETOPT(ctx, request->handle, ZBX_CURLOPT_ACCEPT_ENCODING, "", err);
 
 	request->data_offset = 0;
 	request->headers_in_offset = 0;
@@ -343,16 +331,14 @@ out:
 	if (-1 != err_index)
 		return duk_throw(ctx);
 
-	duk_push_string(ctx, request->data);
+	duk_push_lstring(ctx, request->data, request->data_offset);
 
 	return 1;
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_get                                               *
- *                                                                            *
- * Purpose: CurlHttpRequest.Get method                                        *
+ * Purpose: HttpRequest.Get method                                            *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_get(duk_context *ctx)
@@ -362,9 +348,7 @@ static duk_ret_t	es_httprequest_get(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_put                                               *
- *                                                                            *
- * Purpose: CurlHttpRequest.Put method                                        *
+ * Purpose: HttpRequest.Put method                                            *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_put(duk_context *ctx)
@@ -374,9 +358,7 @@ static duk_ret_t	es_httprequest_put(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_post                                              *
- *                                                                            *
- * Purpose: CurlHttpRequest.Post method                                       *
+ * Purpose: HttpRequest.Post method                                           *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_post(duk_context *ctx)
@@ -386,9 +368,7 @@ static duk_ret_t	es_httprequest_post(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_delete                                            *
- *                                                                            *
- * Purpose: CurlHttpRequest.Delete method                                     *
+ * Purpose: HttpRequest.Delete method                                         *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_delete(duk_context *ctx)
@@ -398,9 +378,75 @@ static duk_ret_t	es_httprequest_delete(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_set_proxy                                         *
+ * Purpose: HttpRequest.head method                                           *
  *                                                                            *
- * Purpose: CurlHttpRequest.SetProxy method                                   *
+ ******************************************************************************/
+static duk_ret_t	es_httprequest_head(duk_context *ctx)
+{
+	return es_httprequest_query(ctx, "HEAD");
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: HttpRequest.patch method                                          *
+ *                                                                            *
+ ******************************************************************************/
+static duk_ret_t	es_httprequest_patch(duk_context *ctx)
+{
+	return es_httprequest_query(ctx, "PATCH");
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: HttpRequest.options method                                        *
+ *                                                                            *
+ ******************************************************************************/
+static duk_ret_t	es_httprequest_options(duk_context *ctx)
+{
+	return es_httprequest_query(ctx, "OPTIONS");
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: HttpRequest.trace method                                          *
+ *                                                                            *
+ ******************************************************************************/
+static duk_ret_t	es_httprequest_trace(duk_context *ctx)
+{
+	return es_httprequest_query(ctx, "TRACE");
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: HttpRequest.connect method                                        *
+ *                                                                            *
+ ******************************************************************************/
+static duk_ret_t	es_httprequest_connect(duk_context *ctx)
+{
+	return es_httprequest_query(ctx, "CONNECT");
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: HttpRequest.customRequest method                                  *
+ *                                                                            *
+ ******************************************************************************/
+static duk_ret_t	es_httprequest_customrequest(duk_context *ctx)
+{
+	const char	*method;
+
+	if (0 != duk_is_null_or_undefined(ctx, 0))
+		return duk_error(ctx, DUK_RET_EVAL_ERROR, "HTTP method cannot be undefined or null");
+
+	method = duk_to_string(ctx, 0);
+	duk_remove(ctx, 0);
+
+	return es_httprequest_query(ctx, method);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: HttpRequest.SetProxy method                                       *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_set_proxy(duk_context *ctx)
@@ -422,9 +468,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_status                                            *
- *                                                                            *
- * Purpose: CurlHttpRequest.Status method                                     *
+ * Purpose: HttpRequest.Status method                                         *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_status(duk_context *ctx)
@@ -445,8 +489,6 @@ static duk_ret_t	es_httprequest_status(duk_context *ctx)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: parse_header                                                     *
  *                                                                            *
  * Purpose: retrieves value of a header                                       *
  *                                                                            *
@@ -472,8 +514,6 @@ static int	parse_header(char *header, char **value_out)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_obj_put_http_header                                           *
- *                                                                            *
  * Purpose: puts http header <field>: <value> as object property/value        *
  *                                                                            *
  * Parameters: ctx    - [IN] the duktape context                              *
@@ -495,8 +535,6 @@ static void	es_put_header(duk_context *ctx, int idx, char *header)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: get_headers_as_strings                                           *
  *                                                                            *
  * Purpose: retrieve headers from request in form of strings                  *
  *                                                                            *
@@ -539,8 +577,6 @@ static void	cached_headers_free(zbx_cached_header_t *header)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: get_headers_as_arrays                                            *
  *                                                                            *
  * Purpose: retrieve headers from request in form of arrays                   *
  *                                                                            *
@@ -623,9 +659,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_get_headers                                       *
- *                                                                            *
- * Purpose: CurlHttpRequest.GetHeaders method                                 *
+ * Purpose: HttpRequest.getHeaders method                                     *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_get_headers(duk_context *ctx)
@@ -650,9 +684,7 @@ static duk_ret_t	es_httprequest_get_headers(duk_context *ctx)
 
 /******************************************************************************
  *                                                                            *
- * Function: es_httprequest_set_httpauth                                      *
- *                                                                            *
- * Purpose: CurlHttpRequest.SetHttpAuth method                                *
+ * Purpose: HttpRequest.SetHttpAuth method                                    *
  *                                                                            *
  ******************************************************************************/
 static duk_ret_t	es_httprequest_set_httpauth(duk_context *ctx)
@@ -672,7 +704,7 @@ static duk_ret_t	es_httprequest_set_httpauth(duk_context *ctx)
 
 	if (0 == duk_is_null_or_undefined(ctx, 1))
 	{
-		if (SUCCEED != zbx_cesu8_to_utf8(duk_to_string(ctx, 1), &username))
+		if (SUCCEED != es_duktape_string_decode(duk_to_string(ctx, 1), &username))
 		{
 			err_index = duk_push_error_object(ctx, DUK_RET_TYPE_ERROR, "cannot convert username to utf8");
 			goto out;
@@ -681,7 +713,7 @@ static duk_ret_t	es_httprequest_set_httpauth(duk_context *ctx)
 
 	if (0 == duk_is_null_or_undefined(ctx, 2))
 	{
-		if (SUCCEED != zbx_cesu8_to_utf8(duk_to_string(ctx, 2), &password))
+		if (SUCCEED != es_duktape_string_decode(duk_to_string(ctx, 2), &password))
 		{
 			err_index = duk_push_error_object(ctx, DUK_RET_TYPE_ERROR, "cannot convert username to utf8");
 			goto out;
@@ -706,20 +738,6 @@ out:
 	return 0;
 }
 
-static const duk_function_list_entry	curlhttprequest_methods[] = {
-	{"AddHeader", es_httprequest_add_header, 1},
-	{"ClearHeader", es_httprequest_clear_header, 0},
-	{"Get", es_httprequest_get, 2},
-	{"Put", es_httprequest_put, 2},
-	{"Post", es_httprequest_post, 2},
-	{"Delete", es_httprequest_delete, 2},
-	{"Status", es_httprequest_status, 0},
-	{"SetProxy", es_httprequest_set_proxy, 1},
-	{"GetHeaders", es_httprequest_get_headers, 1},
-	{"SetHttpAuth", es_httprequest_set_httpauth, 3},
-	{NULL, NULL, 0}
-};
-
 static const duk_function_list_entry	httprequest_methods[] = {
 	{"addHeader", es_httprequest_add_header, 1},
 	{"clearHeader", es_httprequest_clear_header, 0},
@@ -727,10 +745,16 @@ static const duk_function_list_entry	httprequest_methods[] = {
 	{"put", es_httprequest_put, 2},
 	{"post", es_httprequest_post, 2},
 	{"delete", es_httprequest_delete, 2},
+	{"head", es_httprequest_head, 2},
+	{"patch", es_httprequest_patch, 2},
+	{"options", es_httprequest_options, 2},
+	{"trace", es_httprequest_trace, 2},
+	{"connect", es_httprequest_connect, 2},
 	{"getStatus", es_httprequest_status, 0},
 	{"setProxy", es_httprequest_set_proxy, 1},
 	{"getHeaders", es_httprequest_get_headers, 1},
 	{"setHttpAuth", es_httprequest_set_httpauth, 3},
+	{"customRequest", es_httprequest_customrequest, 3},
 	{NULL, NULL, 0}
 };
 
@@ -747,8 +771,6 @@ static duk_ret_t	es_httprequest_ctor(duk_context *ctx)
 static const duk_function_list_entry	httprequest_methods[] = {
 	{NULL, NULL, 0}
 };
-
-static const duk_function_list_entry	*curlhttprequest_methods = httprequest_methods;
 #endif
 
 static int	es_httprequest_create_prototype(duk_context *ctx, const char *obj_name,
@@ -776,8 +798,7 @@ int	zbx_es_init_httprequest(zbx_es_t *es, char **error)
 		return FAIL;
 	}
 
-	if (FAIL == es_httprequest_create_prototype(es->env->ctx, "CurlHttpRequest", curlhttprequest_methods) ||
-			FAIL == es_httprequest_create_prototype(es->env->ctx, "HttpRequest", httprequest_methods))
+	if (FAIL == es_httprequest_create_prototype(es->env->ctx, "HttpRequest", httprequest_methods))
 	{
 		*error = zbx_strdup(*error, duk_safe_to_string(es->env->ctx, -1));
 		duk_pop(es->env->ctx);

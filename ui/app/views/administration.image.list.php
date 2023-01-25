@@ -26,9 +26,10 @@
 $this->includeJsFile('administration.image.list.js.php');
 
 $page_url = (new CUrl('zabbix.php'))->setArgument('action', 'image.list');
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Images'))
 	->setTitleSubmenu(getAdministrationGeneralSubmenu())
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_IMAGE_LIST))
 	->setControls((new CTag('nav', true,
 		(new CForm())
 			->cleanItems()
@@ -71,7 +72,7 @@ $widget = (new CWidget())
 	);
 
 if (!$data['images']) {
-	$widget->addItem(new CTableInfo());
+	$html_page->addItem(new CTableInfo());
 }
 else {
 	$image_table = (new CDiv())
@@ -85,16 +86,20 @@ else {
 	foreach ($data['images'] as $image) {
 		$img = ($image['imagetype'] == IMAGE_TYPE_BACKGROUND)
 			? new CLink(
-				new CImg('imgstore.php?width=200&height=200&iconid='.$image['imageid'], 'no image'),
+				(new CImg('#', 'no image'))
+					->setAttribute('data-src', 'imgstore.php?width=200&height=200&iconid='.$image['imageid'])
+					->addStyle('display: none;'),
 				'image.php?imageid='.$image['imageid']
 			)
-			: new CImg('imgstore.php?iconid='.$image['imageid'], 'no image');
+			: (new CImg('#', 'no image'))->setAttribute('data-src', 'imgstore.php?iconid='.$image['imageid'])
+				->addStyle('display: none;');
 
 		$edit_url->setArgument('imageid', $image['imageid']);
 
 		$image_row->addItem(
 			(new CDiv())
 				->addClass(ZBX_STYLE_CELL)
+				->addClass('lazyload-image')
 				->addItem([$img, BR(), new CLink($image['name'], $edit_url->getUrl())])
 		);
 
@@ -108,11 +113,19 @@ else {
 		$image_table->addItem($image_row);
 	}
 
-	$widget->addItem(
+	$html_page->addItem(
 		(new CForm())->addItem(
 			(new CTabView())->addTab('image', null, $image_table)
 		)
 	);
 }
 
-$widget->show();
+$html_page->show();
+
+(new CScriptTag('
+	view.init('.json_encode([
+		'load_images' => count($data['images'])
+	]).');
+'))
+	->setOnDocumentReady()
+	->show();

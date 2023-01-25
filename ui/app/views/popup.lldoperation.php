@@ -23,9 +23,6 @@
  * @var CView $this
  */
 
-// Visibility box javascript is already added in main page. It should not be added in popup response.
-define('CVISIBILITYBOX_JAVASCRIPT_INSERTED', 1);
-
 $output = [
 	'header' => $data['title']
 ];
@@ -228,10 +225,8 @@ $operations_popup_form_list
 			->setChecked(array_key_exists('opseverity', $options))
 			->setReadonly($options['templated']),
 		(new CDiv(
-			(new CSeverity([
-				'name' => 'opseverity[severity]',
-				'value' => (int) $field_values['opseverity']['severity']
-			]))->setReadonly($options['templated'])
+			(new CSeverity('opseverity[severity]', (int) $field_values['opseverity']['severity']))
+				->setReadonly($options['templated'])
 		))->setId('opseverity_div'),
 		'opseverity_row'
 	)
@@ -269,7 +264,7 @@ $operations_popup_form_list
 					['field_name' => 'optag', 'add_post_js' => false])
 				->setHeader([_('Name'), _('Value'), _('Action')])
 				->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
-				->setId('tags-table')
+				->addClass('tags-table')
 		))->setId('optag_div'),
 		'optag_row'
 	)

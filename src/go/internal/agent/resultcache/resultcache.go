@@ -40,18 +40,15 @@
 package resultcache
 
 import (
-	"crypto/md5"
 	"database/sql"
-	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"git.zabbix.com/ap/plugin-support/log"
+	"git.zabbix.com/ap/plugin-support/plugin"
 	"zabbix.com/internal/agent"
-	"zabbix.com/pkg/log"
-	"zabbix.com/pkg/plugin"
 )
 
 const (
@@ -91,10 +88,11 @@ type AgentDataRequest struct {
 }
 
 type Uploader interface {
-	Write(data []byte, timeout time.Duration) (err error)
+	Write(data []byte, timeout time.Duration) (err []error)
 	Addr() (s string)
 	Hostname() (s string)
 	CanRetry() (enabled bool)
+	Session() (s string)
 }
 
 // common cache data
@@ -103,9 +101,8 @@ type cacheData struct {
 	input      chan interface{}
 	uploader   Uploader
 	clientID   uint64
-	token      string
 	lastDataID uint64
-	lastError  error
+	lastErrors []error
 	retry      *time.Timer
 	timeout    int
 }
@@ -136,12 +133,6 @@ func (c *cacheData) Flush() {
 	c.Upload(nil)
 }
 
-func newToken() string {
-	h := md5.New()
-	_ = binary.Write(h, binary.LittleEndian, time.Now().UnixNano())
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 func tableName(prefix string, index int) string {
 	return fmt.Sprintf("%s_%d", prefix, index)
 }
@@ -163,7 +154,6 @@ func New(options *agent.AgentOptions, clientid uint64, output Uploader) ResultCa
 		clientID: clientid,
 		input:    make(chan interface{}, 100),
 		uploader: output,
-		token:    newToken(),
 	}
 
 	if options.EnablePersistentBuffer == 0 {
@@ -201,7 +191,7 @@ func createTableQuery(table string, id int) string {
 		table, id)
 }
 
-func prepareDiskCache(options *agent.AgentOptions, addresses []string, hostnames []string) (err error) {
+func prepareDiskCache(options *agent.AgentOptions, addresses [][]string, hostnames []string) (err error) {
 	type activeCombination struct {
 		address  string
 		hostname string
@@ -234,7 +224,7 @@ func prepareDiskCache(options *agent.AgentOptions, addresses []string, hostnames
 
 	for _, addr := range addresses {
 		for _, host := range hostnames {
-			combinations = append(combinations, activeCombination{address: addr, hostname: host})
+			combinations = append(combinations, activeCombination{address: addr[0], hostname: host})
 		}
 	}
 
@@ -329,7 +319,7 @@ addressCheck:
 	return nil
 }
 
-func Prepare(options *agent.AgentOptions, addresses []string, hostnames []string) (err error) {
+func Prepare(options *agent.AgentOptions, addresses [][]string, hostnames []string) (err error) {
 	if options.EnablePersistentBuffer == 1 && options.PersistentBufferFile == "" {
 		return errors.New("\"EnablePersistentBuffer\" parameter misconfiguration: \"PersistentBufferFile\" parameter is not set")
 	}

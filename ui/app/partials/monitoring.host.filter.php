@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -91,7 +91,7 @@ $left_column = (new CFormList())
 					'srcfld1' => 'groupid',
 					'dstfrm' => 'zbx_filter',
 					'dstfld1' => 'groupids_',
-					'real_hosts' => true,
+					'with_hosts' => true,
 					'enrich_parent_groups' => true
 				]
 			],
@@ -178,12 +178,12 @@ if (array_key_exists('render_html', $data)) {
 	return;
 }
 
-(new CScriptTemplate('filter-monitoring-hosts'))
+(new CTemplateTag('filter-monitoring-hosts'))
 	->setAttribute('data-template', 'monitoring.host.filter')
 	->addItem($template)
 	->show();
 
-(new CScriptTemplate('filter-tag-row-tmpl'))
+(new CTemplateTag('filter-tag-row-tmpl'))
 	->addItem(
 		(new CRow([
 			(new CTextBox('tags[#{rowNum}][tag]', '#{tag}'))
@@ -232,13 +232,12 @@ if (array_key_exists('render_html', $data)) {
 			name: 'groupids[]',
 			data: data.filter_view_data.groups_multiselect || [],
 			objectOptions: {
-				real_hosts: 1,
+				with_hosts: 1,
 				enrich_parent_groups: 1
 			},
 			popup: {
 				parameters: {
 					multiselect: '1',
-					noempty: '1',
 					srctbl: 'host_groups',
 					srcfld1: 'groupid',
 					dstfrm: 'zbx_filter',
@@ -248,16 +247,6 @@ if (array_key_exists('render_html', $data)) {
 				}
 			}
 		});
-
-		// Show hosts in maintenance events.
-		let maintenance_checkbox = $('[name="maintenance_status"]', container).click(function () {
-			$('[name="show_suppressed"]', container).prop('disabled', !this.checked);
-		});
-
-		if (maintenance_checkbox.attr('unchecked-value') === data['maintenance_status']) {
-			maintenance_checkbox.removeAttr('checked');
-			$('[name="show_suppressed"]', container).prop('disabled', true);
-		}
 
 		// Tags table
 		if (data.tags.length == 0) {

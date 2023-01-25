@@ -86,7 +86,8 @@ foreach ($data['macros'] as $macro_name => $macro_value) {
 	]);
 }
 
-$form_grid = (new CFormGrid())->addClass(CFormGrid::ZBX_STYLE_FORM_GRID_3_1);
+$form_grid = (new CFormGrid())
+	->addClass(CFormGrid::ZBX_STYLE_FORM_GRID_3_1);
 
 if ($data['is_item_testable']) {
 	$form_grid->addItem([
@@ -273,7 +274,7 @@ $form_grid->addItem([
 			->setId('time')
 	),
 
-	($data['preproc_item'] instanceof CDiscoveryRule)
+	($data['test_type'] == CControllerPopupItemTestEdit::ZBX_TEST_TYPE_LLD)
 		? null
 		: (new CFormField((new CCheckBox('not_supported'))->setLabel(_('Not supported'))))
 			->addClass(CFormField::ZBX_STYLE_FORM_FIELD_FLUID),
@@ -423,6 +424,7 @@ $warning_box = $data['show_warning']
 
 $output = [
 	'header' => $data['title'],
+	'doc_url' => CDocHelper::getUrl(CDocHelper::POPUP_TEST_EDIT),
 	'script_inline' => $this->readJsFile('popup.itemtestedit.view.js.php'),
 	'body' => (new CDiv([$warning_box, $form, $templates]))->toString(),
 	'cancel_action' => 'return saveItemTestInputs();',

@@ -26,7 +26,6 @@ var chkbxRange = {
 	chkboxes:			{},		// ckbx list
 	prefix:				null,	// prefix for session storage variable name
 	pageGoName:			null,	// which checkboxes should be counted by Go button and saved to session storage
-	selectedIds:		{},		// ids of selected objects
 	footerButtons:		{},		// action buttons at the bottom of page
 	sessionStorageName:	null,
 
@@ -50,13 +49,11 @@ var chkbxRange = {
 
 		// load selected checkboxes from session storage or cache
 		if (this.pageGoName != null) {
-			this.selectedIds = sessionStorage.getItem(this.sessionStorageName) === null
-				? {}
-				: JSON.parse(sessionStorage.getItem(this.sessionStorageName));
+			const selected_ids = this.getSelectedIds();
 
 			// check if checkboxes should be selected from session storage
-			if (!jQuery.isEmptyObject(this.selectedIds)) {
-				var objectIds = jQuery.map(this.selectedIds, function(id) { return id });
+			if (!jQuery.isEmptyObject(selected_ids)) {
+				var objectIds = jQuery.map(selected_ids, function(id) { return id });
 			}
 			// no checkboxes selected, check browser cache if checkboxes are still checked and update state
 			else {
@@ -70,7 +67,7 @@ var chkbxRange = {
 			this.update(this.pageGoName);
 		}
 
-		this.footerButtons = jQuery('#action_buttons button');
+		this.footerButtons = jQuery('#action_buttons button:not(.no-chkbxrange)');
 		var thisChkbxRange = this;
 		this.footerButtons.each(function() {
 			addListener(this, 'click', thisChkbxRange.submitFooterButton.bindAsEventListener(thisChkbxRange), false);
@@ -94,10 +91,16 @@ var chkbxRange = {
 
 		if (objName == this.pageGoName) {
 			var objId = jQuery(obj).val();
-			if (isset(objId, this.selectedIds)) {
+			if (isset(objId, this.getSelectedIds())) {
 				obj.checked = true;
 			}
 		}
+	},
+
+	getSelectedIds() {
+		const session_selected_ids = sessionStorage.getItem(this.sessionStorageName);
+
+		return session_selected_ids === null ? {} : JSON.parse(session_selected_ids);
 	},
 
 	/**
@@ -124,7 +127,6 @@ var chkbxRange = {
 		}
 
 		this.update(object);
-		this.saveSessionStorage(object);
 
 		this.startbox = checkbox;
 	},
@@ -170,11 +172,13 @@ var chkbxRange = {
 	 *
 	 * Checks all of the checkboxes that belong to these objects and highlights the table row.
 	 *
-	 * @param {string}  object
-	 * @param {Array}   objectIds     array of objects IDs as integers
-	 * @param {bool}    checked
+	 * @param {string}   object
+	 * @param {Array}    objectIds     array of objects IDs as integers
+	 * @param {boolean}  checked
 	 */
 	checkObjects: function(object, objectIds, checked) {
+		const selected_ids = this.getSelectedIds();
+
 		jQuery.each(this.getObjectCheckboxes(object), jQuery.proxy(function(i, checkbox) {
 			var objectId = this.getObjectIdFromName(checkbox.name);
 
@@ -182,17 +186,20 @@ var chkbxRange = {
 				checkbox.checked = checked;
 
 				jQuery(checkbox).closest('tr').toggleClass('row-selected', checked);
-				// Remove class attribute if it's empty
+				// Remove class attribute if it's empty.
 				jQuery(checkbox).closest('tr').filter('*[class=""]').removeAttr('class');
 
 				if (checked) {
-					this.selectedIds[objectId] = objectId;
+					const actions = document.getElementById(object + '_' + objectId).getAttribute('data-actions');
+					selected_ids[objectId] = (actions === null) ? '' : actions;
 				}
 				else {
-					delete this.selectedIds[objectId];
+					delete selected_ids[objectId];
 				}
 			}
 		}, this));
+
+		this.saveSessionStorage(object, selected_ids);
 	},
 
 	/**
@@ -223,7 +230,7 @@ var chkbxRange = {
 	 *
 	 * @param {string} object
 	 *
-	 * @param {bool} checked
+	 * @param {boolean} checked
 	 */
 	checkObjectAll: function(object, checked) {
 		// main checkbox exists and is clickable, but other checkboxes may not exist and object may be empty
@@ -252,19 +259,51 @@ var chkbxRange = {
 	 * Update the state of the "Go" controls.
 	 */
 	updateGoButton: function() {
-		var count = 0;
-		jQuery.each(this.selectedIds, function() {
-			count++;
-		});
+		const object = this.pageGoName;
+		let selected_count = 0;
+		let actions = [];
 
-		var selectedCountSpan = jQuery('#selected_count');
-		selectedCountSpan.text(count + ' ' + selectedCountSpan.text().split(' ')[1]);
+		Object
+			.values(this.getSelectedIds())
+			.forEach(value => {
+				selected_count++;
 
-		jQuery('#action_buttons button').each((_, val) => {
-			const $val = jQuery(val);
+				// Count the special attributes for checkboxes.
+				if (value !== null) {
+					const action_list = value.split(' ');
 
-			if (!$val.data('disabled')) {
-				$val.prop('disabled', count == 0);
+					for (const action of action_list) {
+						if (!actions.hasOwnProperty(action)) {
+							actions[action] = 0;
+						}
+						actions[action]++;
+					}
+				}
+			});
+
+		// Replace the selected count text.
+		const selected_count_span = document.getElementById('selected_count');
+		selected_count_span.innerHTML = selected_count + ' ' + selected_count_span.innerHTML.split(' ')[1];
+
+		document.querySelectorAll('#action_buttons button').forEach((button) => {
+			// In case button is not permanently disabled by view, enable it depending on attributes and count.
+			if (!button.dataset.disabled) {
+				// First disabled the button and then check if it can be enabled.
+				button.disabled = true;
+
+				// Check if a special attribute is required to enable the button.
+				if (button.dataset.required) {
+					for (const [action, count] of Object.entries(actions)) {
+						// Checkbox data-actions attribute must match the button attribute.
+						if (button.dataset.required === action) {
+							button.disabled = (count == 0);
+						}
+					}
+				}
+				else {
+					// No special attributes required, enable the button depending only on selected count.
+					button.disabled = (selected_count == 0);
+				}
 			}
 		});
 	},
@@ -303,10 +342,16 @@ var chkbxRange = {
 	 * Save the state of the checkboxes belonging to the given object group in SessionStorage.
 	 *
 	 * @param {string} object
+	 * @param {Object} selected_ids  key/value pairs of selected ids.
 	 */
-	saveSessionStorage: function(object) {
-		if (this.pageGoName == object) {
-			sessionStorage.setItem(this.sessionStorageName, JSON.stringify(this.selectedIds));
+	saveSessionStorage: function(object, selected_ids) {
+		if (Object.keys(selected_ids).length > 0) {
+			if (this.pageGoName == object) {
+				sessionStorage.setItem(this.sessionStorageName, JSON.stringify(selected_ids));
+			}
+		}
+		else {
+			sessionStorage.removeItem(this.sessionStorageName);
 		}
 	},
 
@@ -342,8 +387,9 @@ var chkbxRange = {
 			return false;
 		}
 
-		for (var key in this.selectedIds) {
-			if (this.selectedIds.hasOwnProperty(key) && this.selectedIds[key] !== null) {
+		const selected_ids = this.getSelectedIds();
+		for (let key in selected_ids) {
+			if (selected_ids.hasOwnProperty(key) && selected_ids[key] !== null) {
 				create_var(form.attr('name'), this.pageGoName + '[' + key + ']', key, false);
 			}
 		}

@@ -20,7 +20,8 @@
 #ifndef ZABBIX_SYSINFO_COMMON_DNS_H
 #define ZABBIX_SYSINFO_COMMON_DNS_H
 
-#include "sysinfo.h"
+#include "module.h"
+#include "config.h"
 
 #if defined(HAVE_RES_QUERY) || defined(_WINDOWS) || defined(__MINGW32__)
 
@@ -89,7 +90,7 @@
 
 #endif /* defined(HAVE_RES_QUERY) || defined(_WINDOWS) || defined(__MINGW32__) */
 
-int	NET_DNS(AGENT_REQUEST *request, AGENT_RESULT *result);
-int	NET_DNS_RECORD(AGENT_REQUEST *request, AGENT_RESULT *result);
+int	net_dns(AGENT_REQUEST *request, AGENT_RESULT *result);
+int	net_dns_record(AGENT_REQUEST *request, AGENT_RESULT *result);
 
 #endif /* ZABBIX_SYSINFO_COMMON_NET_H */

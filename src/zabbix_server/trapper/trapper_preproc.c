@@ -17,20 +17,17 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "zbxjson.h"
-#include "zbxalgo.h"
-#include "preproc.h"
-#include "../preprocessor/preproc_history.h"
-
-#include "trapper_auth.h"
 #include "trapper_preproc.h"
 
+#include "preproc.h"
+#include "../preprocessor/preproc_history.h"
+#include "trapper_auth.h"
+#include "zbxcommshigh.h"
+
 #define ZBX_STATE_NOT_SUPPORTED	1
+extern int CONFIG_DOUBLE_PRECISION;
 
 /******************************************************************************
- *                                                                            *
- * Function: trapper_parse_preproc_test                                       *
  *                                                                            *
  * Purpose: parses preprocessing test request                                 *
  *                                                                            *
@@ -61,6 +58,8 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 	struct zbx_json_parse	jp_data, jp_history, jp_steps, jp_step;
 	size_t			size;
 	zbx_timespec_t		ts_now;
+
+	zbx_user_init(&user);
 
 	if (FAIL == zbx_get_user_from_json(jp, &user, NULL) || USER_TYPE_ZABBIX_ADMIN > user.type)
 	{
@@ -120,7 +119,7 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 		{
 			int	delay;
 
-			if ('-' != *ptr || FAIL == is_time_suffix(ptr + 1, &delay, strlen(ptr + 1)))
+			if ('-' != *ptr || FAIL == zbx_is_time_suffix(ptr + 1, &delay, strlen(ptr + 1)))
 			{
 				*error = zbx_dsprintf(NULL, "invalid history value timestamp: %s", buffer);
 				goto out;
@@ -218,12 +217,12 @@ out:
 	zbx_free(step_params);
 	zbx_free(error_handler_params);
 
+	zbx_user_free(&user);
+
 	return ret;
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: trapper_preproc_test_run                                         *
  *                                                                            *
  * Purpose: executes preprocessing test request                               *
  *                                                                            *
@@ -301,7 +300,7 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 		{
 			result = (zbx_preproc_result_t *)results.values[results.values_num - 1];
 			if (ZBX_VARIANT_NONE != result->value.type && FAIL == zbx_variant_to_value_type(&result->value,
-					value_type, &preproc_error))
+					value_type, CONFIG_DOUBLE_PRECISION,  &preproc_error))
 			{
 				break;
 			}
@@ -393,8 +392,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_trapper_preproc_test                                         *
  *                                                                            *
  * Purpose: processes preprocessing test request                              *
  *                                                                            *

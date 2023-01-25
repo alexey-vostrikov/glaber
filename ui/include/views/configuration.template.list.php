@@ -35,26 +35,26 @@ $filter_tags_table = CTagFilterFieldHelper::getTagFilterField([
 	'tags' => $filter_tags
 ]);
 
-$filter = new CFilter(new CUrl('templates.php'));
-$filter
+$filter = (new CFilter())
+	->setResetUrl(new CUrl('templates.php'))
 	->setProfile($data['profileIdx'])
 	->setActiveTab($data['active_tab'])
 	->addFilterTab(_('Filter'), [
 		(new CFormList())
 			->addRow(
-				(new CLabel(_('Host groups'), 'filter_groups__ms')),
+				(new CLabel(_('Template groups'), 'filter_groups__ms')),
 				(new CMultiSelect([
 					'name' => 'filter_groups[]',
-					'object_name' => 'hostGroup',
+					'object_name' => 'templateGroup',
 					'data' => $data['filter']['groups'],
 					'popup' => [
 						'parameters' => [
-							'srctbl' => 'host_groups',
+							'srctbl' => 'template_groups',
 							'srcfld1' => 'groupid',
-							'dstfrm' => $filter->getName(),
+							'dstfrm' => 'zbx_filter',
 							'dstfld1' => 'filter_groups_',
-							'templated_hosts' => 1,
-							'editable' => 1,
+							'with_templates' => true,
+							'editable' => true,
 							'enrich_parent_groups' => true
 						]
 					]
@@ -71,7 +71,7 @@ $filter
 							'srctbl' => 'templates',
 							'srcfld1' => 'hostid',
 							'srcfld2' => 'host',
-							'dstfrm' => $filter->getName(),
+							'dstfrm' => 'zbx_filter',
 							'dstfld1' => 'filter_templates_'
 						]
 					]
@@ -83,20 +83,22 @@ $filter
 		(new CFormList())->addRow(_('Tags'), $filter_tags_table)
 	]);
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Templates'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_TEMPLATES_LIST))
 	->setControls((new CTag('nav', true,
 		(new CList())
 			->addItem(new CRedirectButton(_('Create template'),
 				(new CUrl('templates.php'))
 					->setArgument('groupids', array_keys($data['filter']['groups']))
 					->setArgument('form', 'create')
-					->getUrl()
 				)
 			)
 			->addItem(
 				(new CButton('form', _('Import')))
-					->onClick('return PopUp("popup.import", {rules_preset: "template"}, null, this);')
+					->onClick('return PopUp("popup.import", {rules_preset: "template"},
+						{dialogue_class: "modal-popup-generic"}
+					);')
 					->removeId()
 			)
 		))->setAttribute('aria-label', _('Content controls'))
@@ -195,7 +197,8 @@ foreach ($data['templates'] as $template) {
 		[
 			$data['allowed_ui_conf_hosts']
 				? new CLink(_('Hosts'),
-					(new CUrl('hosts.php'))
+					(new CUrl('zabbix.php'))
+						->setArgument('action', 'host.list')
 						->setArgument('filter_set', '1')
 						->setArgument('filter_templates', [$template['templateid']])
 				)
@@ -276,7 +279,12 @@ $form->addItem([
 			],
 			'popup.massupdate.template' => [
 				'content' => (new CButton('', _('Mass update')))
-					->onClick("return openMassupdatePopup(this, 'popup.massupdate.template');")
+					->onClick(
+						"openMassupdatePopup('popup.massupdate.template', {}, {
+							dialogue_class: 'modal-popup-static',
+							trigger_element: this
+						});"
+					)
 					->addClass(ZBX_STYLE_BTN_ALT)
 					->removeAttribute('id')
 			],
@@ -288,6 +296,6 @@ $form->addItem([
 	)
 ]);
 
-$widget->addItem($form);
-
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

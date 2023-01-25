@@ -17,23 +17,21 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "ipmi.h"
+
+#include "config.h"
 
 #ifdef HAVE_OPENIPMI
 
-#include "log.h"
-#include "zbxserialize.h"
-#include "dbcache.h"
+#include "zbxserver.h"
 
+#include "log.h"
 #include "zbxipcservice.h"
 #include "ipmi_protocol.h"
 #include "checks_ipmi.h"
-#include "zbxserver.h"
-#include "ipmi.h"
+#include "zbxnum.h"
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_ipmi_port_expand_macros                                      *
  *                                                                            *
  * Purpose: expands user macros in IPMI port value and converts the result to *
  *          to unsigned short value                                           *
@@ -53,10 +51,10 @@ int	zbx_ipmi_port_expand_macros(zbx_uint64_t hostid, const char *port_orig, unsi
 	int	ret = SUCCEED;
 
 	tmp = zbx_strdup(NULL, port_orig);
-	substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL,
+	zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&tmp, MACRO_TYPE_COMMON, NULL, 0);
 
-	if (FAIL == is_ushort(tmp, port) || 0 == *port)
+	if (FAIL == zbx_is_ushort(tmp, port) || 0 == *port)
 	{
 		*error = zbx_dsprintf(*error, "Invalid port value \"%s\"", port_orig);
 		ret = FAIL;
@@ -68,8 +66,6 @@ int	zbx_ipmi_port_expand_macros(zbx_uint64_t hostid, const char *port_orig, unsi
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_ipmi_execute_command                                         *
  *                                                                            *
  * Purpose: executes IPMI command                                             *
  *                                                                            *
@@ -86,7 +82,7 @@ int	zbx_ipmi_execute_command(const DC_HOST *host, const char *command, char *err
 {
 	zbx_ipc_socket_t	ipmi_socket;
 	zbx_ipc_message_t	message;
-	char			*errmsg = NULL, sensor[ITEM_IPMI_SENSOR_LEN_MAX], *value = NULL;
+	char			*errmsg = NULL, sensor[ZBX_ITEM_IPMI_SENSOR_LEN_MAX], *value = NULL;
 	zbx_uint32_t		data_len;
 	unsigned char		*data = NULL;
 	int			ret = FAIL, op;
@@ -160,8 +156,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_ipmi_test_item                                               *
  *                                                                            *
  * Purpose: test IPMI item                                                    *
  *                                                                            *

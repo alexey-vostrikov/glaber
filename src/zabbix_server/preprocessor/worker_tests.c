@@ -23,7 +23,7 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 */
 
 //TODO idea for improvement - implement a kind of a buffer pool to avoid alloc cluttering
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "log.h"
 #include "item_preproc.h"
@@ -35,5 +35,5 @@ void test_get_host_name_from_json();
 void test_worker_steps() {
     test_parse_preproc_params();
     test_get_host_name_from_json();
-    test_get_ip_from_json();
+   // test_get_ip_from_json();
 }

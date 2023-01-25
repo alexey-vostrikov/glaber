@@ -18,7 +18,7 @@
 **/
 
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include "zbxalgo.h"
@@ -29,6 +29,7 @@
 #include "snmp_walk.h"
 #include "snmp_util.h"
 #include "poller_sessions.h"
+#include "zbxsysinfo.h"
 
 /*most of this code is from chkecs_snmp.c */
 
@@ -94,12 +95,12 @@ static int	snmp_ddata_init(poller_item_t *poller_item)
 	snmp_ddata_t *data = zbx_calloc(NULL, 0, sizeof(snmp_ddata_t));
 	int	i, j, ret = CONFIG_ERROR;
 
-	init_request(&data->request);
+	zbx_init_agent_request(&data->request);
 
-	if (SUCCEED != parse_item_key(snmp_item->oid, &data->request))
+	if (SUCCEED !=zbx_parse_item_key(snmp_item->oid, &data->request))
 	{
 		poller_preprocess_error(poller_item, "Invalid SNMP OID: cannot parse expression.");
-		free_request(&data->request);
+		zbx_free_agent_request(&data->request);
 		zbx_free(data);
 
 		return FAIL;
@@ -108,17 +109,17 @@ static int	snmp_ddata_init(poller_item_t *poller_item)
 	if (0 == data->request.nparam || 0 != (data->request.nparam & 1))
 	{
 		poller_preprocess_error(poller_item,"Invalid SNMP OID: pairs of macro and OID are expected.");
-		free_request(&data->request);
+		zbx_free_agent_request(&data->request);
 		zbx_free(data);
 		return FAIL;
 	}
 
 	for (i = 0; i < data->request.nparam; i += 2)
 	{
-		if (SUCCEED != is_discovery_macro(data->request.params[i]))
+		if (SUCCEED != zbx_is_discovery_macro(data->request.params[i]))
 		{
 			poller_preprocess_error(poller_item, "Invalid SNMP OID: macro is invalid");
-			free_request(&data->request);
+			zbx_free_agent_request(&data->request);
 			zbx_free(data);
 			return FAIL;
 
@@ -127,7 +128,7 @@ static int	snmp_ddata_init(poller_item_t *poller_item)
 		if (0 == strcmp(data->request.params[i], "{#SNMPINDEX}"))
 		{
 			poller_preprocess_error(poller_item, "Invalid SNMP OID: macro \"{#SNMPINDEX}\" is not allowed.");
-			free_request(&data->request);
+			zbx_free_agent_request(&data->request);
 			zbx_free(data);
 			return FAIL;
 		}
@@ -140,7 +141,7 @@ static int	snmp_ddata_init(poller_item_t *poller_item)
 			if (0 == strcmp(data->request.params[i], data->request.params[j]))
 			{
 				poller_preprocess_error(poller_item, "Invalid SNMP OID: unique macros are expected.");
-				free_request(&data->request);
+				zbx_free_agent_request(&data->request);
 				zbx_free(data);
 				return FAIL;
 			}
@@ -184,7 +185,7 @@ static void	snmp_ddata_clean(poller_item_t *poller_item)
 	}
 
 	zbx_hashset_destroy(&ddata->objects);
-	free_request(&ddata->request);
+	zbx_free_agent_request(&ddata->request);
 	asn1_free_oid(&ddata->last_oid);
 	asn1_free_oid(&ddata->root_oid);
 	zbx_free(ddata);
@@ -234,12 +235,12 @@ static int snmp_walk_submit_result(poller_item_t *poller_item) {
 	
 	AGENT_RESULT result = {0};
 
-	init_result(&result);
+	zbx_init_agent_result(&result);
 	result.type = AR_TEXT;
 	result.text = zbx_strdup(NULL, js.buffer);
 	poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
 	
-	free_result(&result);
+	zbx_free_agent_result(&result);
 	zbx_json_free(&js);
 
 	return ret;
@@ -466,13 +467,13 @@ int snmp_walk_process_var(poller_item_t *poller_item, csnmp_var_t *var) {
 	}
 
 	AGENT_RESULT result = {0};
-	init_result(&result);
+	zbx_init_agent_result(&result);
 
 	/*note: result absence is OK, not adding to indexes, but continue walking */
  	if (SUCCEED == snmp_set_result(poller_item, var, &result)) {
 		//if (ISSET_TEXT(&result) && ZBX_SNMP_STR_HEX == val_type)
 		//				zbx_remove_chars(snmp_result.text, "\r\n");
-		char **text_result = GET_TEXT_RESULT(&result);
+		char **text_result = ZBX_GET_TEXT_RESULT(&result);
 		
 		DEBUG_ITEM(poller_get_item_id(poller_item),"Saving walk responce '%s'", *text_result);
 
@@ -480,7 +481,7 @@ int snmp_walk_process_var(poller_item_t *poller_item, csnmp_var_t *var) {
 			snmp_walk_save_result_value(ddata, ddata->request.params[ddata->num * 2 + 1], oid_index, *text_result );
 	}
 
-	free_result(&result);
+	zbx_free_agent_result(&result);
 	return SUCCEED;
 }
 

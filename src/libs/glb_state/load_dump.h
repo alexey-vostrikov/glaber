@@ -14,32 +14,23 @@
 #define GLB_CACHE_READWRITE_H
 
 
-#include "common.h"
+#include "zbxcommon.h"
+#include "zbxalgo.h"
+#include "zbxjson.h"
 #include <zlib.h>
 
 
-typedef struct {
-    //char *id;
-    
-    char *buf;
-	size_t alloc_len;
-    size_t alloc_offset;
-   	
-    gzFile gzfile;
-} state_loader_t;
+#define DUMPER_TO_JSON(name) \
+        static int name(u_int64_t id, void *data, struct zbx_json *json)
 
-typedef struct {
-    char *resource_id;
-    gzFile gzfile;
-    
-} state_dumper_t;
 
-int state_loader_create(state_loader_t *loader, char *resource_id);
-char *state_loader_get_line(state_loader_t *loader);
-int state_loader_destroy(state_loader_t *loader);
+#define DUMPER_FROM_JSON(name) \
+        static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, struct zbx_json_parse *jp)
+        
+typedef int	(*state_dumper_to_json_cb)(u_int64_t id, void *data, struct zbx_json *json);
+typedef int	(*state_dumper_from_json_cb)(elems_hash_elem_t *elem, mem_funcs_t *memf, struct zbx_json_parse *jp);
 
-int state_dumper_create(state_dumper_t *dumper, char *resource_id);
-int state_dumper_write_line(state_dumper_t *dumper, char *buffer, int len);
-int state_dumper_destroy(state_dumper_t *dumper);
+int state_load_objects(elems_hash_t *elems, char *table_name, char *id_name, state_dumper_from_json_cb cb_func);
+int state_dump_objects(elems_hash_t *elems, char *table_name, state_dumper_to_json_cb cb_func);
 
 #endif

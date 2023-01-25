@@ -17,29 +17,25 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxcommon.h"
 
 #ifdef HAVE_OPENIPMI
 
-#include "dbcache.h"
-#include "daemon.h"
+#include "ipmi_poller.h"
+
+#include "zbxnix.h"
 #include "zbxself.h"
 #include "log.h"
 #include "zbxipcservice.h"
-
-#include "ipmi_manager.h"
 #include "ipmi_protocol.h"
 #include "checks_ipmi.h"
-#include "ipmi_poller.h"
+#include "zbxtime.h"
 
 #define ZBX_IPMI_MANAGER_CLEANUP_DELAY		SEC_PER_DAY
 
-extern unsigned char	process_type, program_type;
-extern int		server_num, process_num;
+extern unsigned char			program_type;
 
 /******************************************************************************
- *                                                                            *
- * Function: ipmi_poller_register                                             *
  *                                                                            *
  * Purpose: registers IPMI poller with IPMI manager                           *
  *                                                                            *
@@ -56,8 +52,6 @@ static void	ipmi_poller_register(zbx_ipc_async_socket_t *socket)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: ipmi_poller_send_result                                          *
  *                                                                            *
  * Purpose: sends IPMI poll result to manager                                 *
  *                                                                            *
@@ -82,8 +76,6 @@ static void	ipmi_poller_send_result(zbx_ipc_async_socket_t *socket, zbx_uint32_t
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: ipmi_poller_process_value_request                                *
  *                                                                            *
  * Purpose: gets IPMI sensor value from the specified host                    *
  *                                                                            *
@@ -134,8 +126,6 @@ static void	ipmi_poller_process_value_request(zbx_ipc_async_socket_t *socket, zb
 
 /******************************************************************************
  *                                                                            *
- * Function: ipmi_poller_process_command_request                              *
- *                                                                            *
  * Purpose:sets IPMI sensor value                                             *
  *                                                                            *
  * Parameters: socket  - [IN] the connections socket                          *
@@ -181,21 +171,20 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 	zbx_ipc_async_socket_t	ipmi_socket;
 	int			polled_num = 0;
 	double			time_stat, time_idle = 0, time_now, time_read;
+	const zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
+	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
+	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
+	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
 #define	STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
-
-	process_type = ((zbx_thread_args_t *)args)->process_type;
-
-	server_num = ((zbx_thread_args_t *)args)->server_num;
-	process_num = ((zbx_thread_args_t *)args)->process_num;
 
 	zbx_setproctitle("%s #%d starting", get_process_type_string(process_type), process_num);
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 	if (FAIL == zbx_ipc_async_socket_open(&ipmi_socket, ZBX_IPC_SERVICE_IPMI, SEC_PER_MIN, &error))
 	{
@@ -229,7 +218,7 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 			polled_num = 0;
 		}
 
-		update_selfmon_counter(ZBX_PROCESS_STATE_IDLE);
+		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_IDLE);
 
 		while (ZBX_IS_RUNNING())
 		{
@@ -248,7 +237,7 @@ ZBX_THREAD_ENTRY(ipmi_poller_thread, args)
 			zbx_perform_all_openipmi_ops(ipmi_timeout);
 		}
 
-		update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
 		if (NULL == message)
 			break;

@@ -128,7 +128,7 @@ class CHostImporter extends CImporter {
 				// Make new template linkages.
 				if ($this->options['templateLinkage']['createMissing']
 						&& array_key_exists($host['host'], $template_linkage)) {
-					API::Template()->massAdd([
+					API::Host()->massAdd([
 						'hosts' => $host,
 						'templates' => $template_linkage[$host['host']]
 					]);
@@ -205,8 +205,8 @@ class CHostImporter extends CImporter {
 				$this->processedHostIds[$host['host']] = $hostid;
 
 				if ($this->options['templateLinkage']['createMissing']
-					&& array_key_exists($host['host'], $template_linkage)) {
-					API::Template()->massAdd([
+						&& array_key_exists($host['host'], $template_linkage)) {
+					API::Host()->massAdd([
 						'hosts' => ['hostid' => $hostid],
 						'templates' => $template_linkage[$host['host']]
 					]);
@@ -293,7 +293,7 @@ class CHostImporter extends CImporter {
 	 */
 	protected function resolveHostReferences(array $host): array {
 		foreach ($host['groups'] as $index => $group) {
-			$groupid = $this->referencer->findGroupidByName($group['name']);
+			$groupid = $this->referencer->findHostGroupidByName($group['name']);
 
 			if ($groupid === null) {
 				throw new Exception(_s('Group "%1$s" for host "%2$s" does not exist.', $group['name'], $host['host']));

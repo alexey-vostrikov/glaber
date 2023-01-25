@@ -17,10 +17,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "log.h"
-
 #include "zbxalgo.h"
+#include "algodefs.h"
+
+#include "zbxcommon.h"
 
 static void	__hashmap_ensure_free_entry(zbx_hashmap_t *hm, ZBX_HASHMAP_SLOT_T *slot);
 
@@ -39,12 +39,14 @@ static void	__hashmap_ensure_free_entry(zbx_hashmap_t *hm, ZBX_HASHMAP_SLOT_T *s
 	{
 		slot->entries_num = 0;
 		slot->entries_alloc = 6;
-		slot->entries = (ZBX_HASHMAP_ENTRY_T *)hm->mem_malloc_func(NULL, slot->entries_alloc * sizeof(ZBX_HASHMAP_ENTRY_T));
+		slot->entries = (ZBX_HASHMAP_ENTRY_T *)hm->mem_malloc_func(NULL, slot->entries_alloc *
+				sizeof(ZBX_HASHMAP_ENTRY_T));
 	}
 	else if (slot->entries_num == slot->entries_alloc)
 	{
 		slot->entries_alloc = slot->entries_alloc * ARRAY_GROWTH_FACTOR;
-		slot->entries = (ZBX_HASHMAP_ENTRY_T *)hm->mem_realloc_func(slot->entries, slot->entries_alloc * sizeof(ZBX_HASHMAP_ENTRY_T));
+		slot->entries = (ZBX_HASHMAP_ENTRY_T *)hm->mem_realloc_func(slot->entries, slot->entries_alloc *
+				sizeof(ZBX_HASHMAP_ENTRY_T));
 	}
 }
 

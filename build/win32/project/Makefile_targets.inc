@@ -22,6 +22,27 @@ $(RESOURCE_RES): $(RESOURCE_RC) $(RESOURCE_H) $(DESC_H)
 {..\..\..\src\libs\zbxcommon}.c{..\..\..\src\libs\zbxcommon}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
+{..\..\..\src\libs\zbxnum}.c{..\..\..\src\libs\zbxnum}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxstr}.c{..\..\..\src\libs\zbxstr}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxparam}.c{..\..\..\src\libs\zbxparam}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxexpr}.c{..\..\..\src\libs\zbxexpr}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxip}.c{..\..\..\src\libs\zbxip}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxtime}.c{..\..\..\src\libs\zbxtime}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxcommshigh}.c{..\..\..\src\libs\zbxcommshigh}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
 {..\..\..\src\libs\zbxcomms}.c{..\..\..\src\libs\zbxcomms}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
@@ -34,16 +55,31 @@ $(RESOURCE_RES): $(RESOURCE_RC) $(RESOURCE_H) $(DESC_H)
 {..\..\..\src\libs\zbxcrypto}.c{..\..\..\src\libs\zbxcrypto}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
+{..\..\..\src\libs\zbxgetopt}.c{..\..\..\src\libs\zbxgetopt}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxhash}.c{..\..\..\src\libs\zbxhash}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
 {..\..\..\src\libs\zbxjson}.c{..\..\..\src\libs\zbxjson}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
 {..\..\..\src\libs\zbxlog}.c{..\..\..\src\libs\zbxlog}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
+{..\..\..\src\libs\zbxxml}.c{..\..\..\src\libs\zbxxml}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
 {..\..\..\src\libs\zbxregexp}.c{..\..\..\src\libs\zbxregexp}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
-{..\..\..\src\libs\zbxsys}.c{..\..\..\src\libs\zbxsys}.o:
+{..\..\..\src\libs\zbxthreads}.c{..\..\..\src\libs\zbxthreads}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxmutexs}.c{..\..\..\src\libs\zbxmutexs}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxsymbols}.c{..\..\..\src\libs\zbxsymbols}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
 {..\..\..\src\libs\zbxexec}.c{..\..\..\src\libs\zbxexec}.o:
@@ -70,7 +106,19 @@ $(RESOURCE_RES): $(RESOURCE_RC) $(RESOURCE_H) $(DESC_H)
 {..\..\..\src\libs\zbxsysinfo\win32}.cpp{..\..\..\src\libs\zbxsysinfo\win32}.o:
 	$(CC) $? /Fo"$@" $(CPPFLAGS)
 
+{..\..\..\src\libs\zbxsysinfo\alias}.c{..\..\..\src\libs\zbxsysinfo\alias}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxvariant}.c{..\..\..\src\libs\zbxvariant}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxversion}.c{..\..\..\src\libs\zbxversion}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
 {..\..\..\src\libs\zbxwin32}.c{..\..\..\src\libs\zbxwin32}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxwinservice}.c{..\..\..\src\libs\zbxwinservice}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
 {..\..\..\src\zabbix_agent\logfiles}.c{..\..\..\src\zabbix_agent\logfiles}.o:

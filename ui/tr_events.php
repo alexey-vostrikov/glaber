@@ -29,7 +29,7 @@ require_once dirname(__FILE__).'/include/html.inc.php';
 $page['title'] = _('Event details');
 $page['file'] = 'tr_events.php';
 $page['type'] = detect_page_type();
-$page['scripts'] = ['layout.mode.js'];
+$page['scripts'] = ['layout.mode.js', 'class.calendar.js'];
 $page['web_layout_mode'] = CViewHelper::loadLayoutMode();
 
 require_once dirname(__FILE__).'/include/page_header.php';
@@ -37,19 +37,9 @@ require_once dirname(__FILE__).'/include/page_header.php';
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
 	'triggerid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		PAGE_TYPE_HTML.'=='.$page['type']],
-	'eventid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		PAGE_TYPE_HTML.'=='.$page['type']],
-	// Ajax
-	'widget' =>		[T_ZBX_STR, O_OPT, P_ACT,	IN('"'.WIDGET_HAT_EVENTACTIONS.'","'.WIDGET_HAT_EVENTLIST.'"'), null],
-	'state' =>		[T_ZBX_INT, O_OPT, P_ACT,	IN('0,1'), null]
+	'eventid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		PAGE_TYPE_HTML.'=='.$page['type']]
 ];
 check_fields($fields);
-
-/*
- * Ajax
- */
-if (hasRequest('widget') && hasRequest('state')) {
-	CProfile::update('web.tr_events.hats.'.getRequest('widget').'.state', getRequest('state'), PROFILE_TYPE_INT);
-}
 
 if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
 	require_once dirname(__FILE__).'/include/page_footer.php';
@@ -60,6 +50,7 @@ if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
 $triggers = API::Trigger()->get([
 	'output' => API_OUTPUT_EXTEND,
 	'selectHosts' => API_OUTPUT_EXTEND,
+    'selectItems' => ["name", "lastvalue", "state", "value_type"],
 	'triggerids' => getRequest('triggerid')
 ]);
 
@@ -72,7 +63,9 @@ $trigger = reset($triggers);
 $events = API::Event()->get([
 	'output' => ['eventid', 'r_eventid', 'clock', 'ns', 'objectid', 'name', 'acknowledged', 'severity'],
 	'selectTags' => ['tag', 'value'],
-	'select_acknowledges' => ['clock', 'message', 'action', 'userid', 'old_severity', 'new_severity'],
+	'select_acknowledges' => ['clock', 'message', 'action', 'userid', 'old_severity', 'new_severity',
+		'suppress_until'
+	],
 	'source' => EVENT_SOURCE_TRIGGERS,
 	'object' => EVENT_OBJECT_TRIGGER,
 	'eventids' => getRequest('eventid'),
@@ -128,17 +121,14 @@ if ($trigger['opdata'] !== '') {
 			'events' => true,
 			'html' => true
 		]
-	)))
-		->addClass('opdata')
-		->addClass(ZBX_STYLE_WORDWRAP);
+	)))->addClass('opdata');
 }
 else {
 	$db_items = API::Item()->get([
-		'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'units'],
+		'output' => ['itemid', 'name', 'value_type', 'units'],
 		'selectValueMap' => ['mappings'],
 		'triggerids' => $event['objectid']
 	]);
-	$db_items = CMacrosResolverHelper::resolveItemNames($db_items);
 	$event['opdata'] = (new CCol(CScreenProblem::getLatestValues($db_items)))->addClass('latest-values');
 }
 
@@ -159,6 +149,7 @@ $allowed = [
 	'add_comments' => CWebUser::checkAccess(CRoleHelper::ACTIONS_ADD_PROBLEM_COMMENTS),
 	'change_severity' => CWebUser::checkAccess(CRoleHelper::ACTIONS_CHANGE_SEVERITY),
 	'acknowledge' => CWebUser::checkAccess(CRoleHelper::ACTIONS_ACKNOWLEDGE_PROBLEMS),
+	'suppress_problems' => CWebUser::checkAccess(CRoleHelper::ACTIONS_SUPPRESS_PROBLEMS),
 	'close' => ($trigger['manual_close'] == ZBX_TRIGGER_MANUAL_CLOSE_ALLOWED
 			&& CWebUser::checkAccess(CRoleHelper::ACTIONS_CLOSE_PROBLEMS)
 	)
@@ -167,47 +158,50 @@ $allowed = [
 /*
  * Display
  */
+require_once dirname(__FILE__).'/include/views/js/tr_events.js.php';
+
 $event_tab = (new CDiv([
 	new CDiv([
-		(new CUiWidget(WIDGET_HAT_TRIGGERDETAILS, make_trigger_details($trigger, $event['eventid'])))
-			->setHeader(_('Trigger details')),
-		(new CUiWidget(WIDGET_HAT_EVENTDETAILS, make_event_details($event, $allowed)))
-			->setHeader(_('Event details'))
-	]),
+        (new CSection(make_trigger_opdata($trigger, $event)))
+            ->setId(SECTION_HAT_TRIGGEROPDATA)
+            ->setHeader(new CTag('h4', true, _('Operational data'))),
+		(new CSection(make_trigger_details($trigger, $event['eventid'])))
+			->setId(SECTION_HAT_TRIGGERDETAILS)
+			->setHeader(new CTag('h4', true, _('Trigger details'))),
+		(new CSection(make_event_details($event, $allowed)))
+			->setId(SECTION_HAT_EVENTDETAILS)
+			->setHeader(new CTag('h4', true, _('Event details'))),
+    ]),
 	new CDiv([
-		(new CCollapsibleUiWidget(WIDGET_HAT_EVENTACTIONS,
-			makeEventDetailsActionsTable($actions, $users, $mediatypes)
-		))
-			->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTACTIONS.'.state', true))
-			->setHeader(_('Actions'), [], 'web.tr_events.hats.'.WIDGET_HAT_EVENTACTIONS.'.state')
-			->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID),
-		(new CCollapsibleUiWidget(WIDGET_HAT_EVENTLIST, make_small_eventlist($event, $allowed)))
-			->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTLIST.'.state', true))
-			->setHeader(_('Event list [previous 20]'), [], 'web.tr_events.hats.'.WIDGET_HAT_EVENTLIST.'.state')
-			->addClass(ZBX_STYLE_DASHBOARD_WIDGET_FLUID)
+		(new CSectionCollapsible(makeEventDetailsActionsTable($actions, $users, $mediatypes)))
+			->setId(SECTION_HAT_EVENTACTIONS)
+			->setHeader(new CTag('h4', true, _('Actions')))
+			->setProfileIdx('web.tr_events.hats.'.SECTION_HAT_EVENTACTIONS.'.state')
+			->setExpanded((bool) CProfile::get('web.tr_events.hats.'.SECTION_HAT_EVENTACTIONS.'.state', true)),
+		(new CSectionCollapsible(make_small_eventlist($event, $allowed)))
+			->setId(SECTION_HAT_EVENTLIST)
+			->setHeader(new CTag('h4', true, _('Event list [previous 20]')))
+			->setProfileIdx('web.tr_events.hats.'.SECTION_HAT_EVENTLIST.'.state')
+			->setExpanded((bool) CProfile::get('web.tr_events.hats.'.SECTION_HAT_EVENTLIST.'.state', true))
 	])
 ]))
 	->addClass(ZBX_STYLE_COLUMNS)
 	->addClass(ZBX_STYLE_COLUMNS_2);
 
-$script = (new CScriptTag(
-	'$.subscribe("acknowledge.create", function(event, response, overlay) {'.
-		'postMessageOk(response.message);'.
-		'location.href = location.href;'.
-	'});'
-))->setOnDocumentReady();
-
-(new CWidget())
+(new CHtmlPage())
 	->setTitle(_('Event details'))
 	->setWebLayoutMode($page['web_layout_mode'])
-	->setControls((new CTag('nav', true,
-		(new CList())
-			->addItem(get_icon('kioskmode', ['mode' => $page['web_layout_mode']]))
-		))
-		->setAttribute('aria-label', _('Content controls'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::TR_EVENTS))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())->addItem(get_icon('kioskmode', ['mode' => $page['web_layout_mode']]))
+		))->setAttribute('aria-label', _('Content controls'))
 	)
 	->addItem($event_tab)
-	->addItem($script)
+	->show();
+
+(new CScriptTag('view.init();'))
+	->setOnDocumentReady()
 	->show();
 
 require_once dirname(__FILE__).'/include/page_footer.php';

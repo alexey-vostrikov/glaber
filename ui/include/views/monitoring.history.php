@@ -26,7 +26,7 @@ $this->includeJsFile('monitoring.history.js.php');
 
 $web_layout_mode = CViewHelper::loadLayoutMode();
 
-$historyWidget = (new CWidget())->setWebLayoutMode($web_layout_mode);
+$html_page = (new CHtmlPage())->setWebLayoutMode($web_layout_mode);
 
 $header = [
 	'left' => _n('%1$s item', '%1$s items', count($data['items'])),
@@ -52,13 +52,8 @@ if ($data['items']) {
 }
 
 if ((count($data['items']) == 1 || $same_host) && $data['itemids']) {
-	$header['left'] = [
-		$host_name,
-		NAME_DELIMITER,
-		count($data['items']) == 1 ? $item['name_expanded'] : $header['left']
-	];
-	$header_row[] = implode('', $header['left']);
-	$historyWidget->setNavigation(getHostNavigation($item,$item['hostid']));
+	$header['left'] = $host_name.NAME_DELIMITER.(count($data['items']) == 1 ? $item['name'] : $header['left']);
+	$header_row[] = $header['left'];
 }
 else {
 	$header_row[] = $header['left'];
@@ -134,7 +129,7 @@ if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
 				$items_data[] = [
 					'id' => $itemid,
 					'prefix' => $item['hosts'][0]['name'].NAME_DELIMITER,
-					'name' => $item['name_expanded']
+					'name' => $item['name']
 				];
 			}
 			CArrayHelper::sort($items_data, ['prefix', 'name']);
@@ -263,7 +258,7 @@ if ($data['itemids']) {
 // append plaintext to widget
 if ($data['plaintext']) {
 	foreach ($header_row as $text) {
-		$historyWidget->addItem([new CSpan($text), BR()]);
+		$html_page->addItem([new CSpan($text), BR()]);
 	}
 
 	if ($data['itemids']) {
@@ -276,11 +271,11 @@ if ($data['plaintext']) {
 			}
 		}
 
-		$historyWidget->addItem($pre);
+		$html_page->addItem($pre);
 	}
 }
 else {
-	$historyWidget
+	$html_page
 		->setTitle($header['left'])
 		->setControls((new CTag('nav', true, $header['right']))->setAttribute('aria-label', _('Content controls')));
 
@@ -319,7 +314,7 @@ else {
 
 	if ($data['itemids']) {
 		if ($data['action'] !== HISTORY_LATEST) {
-			$historyWidget->addItem($filter_form);
+			$html_page->addItem($filter_form);
 		}
 
 		//need to create a separate screen for each group of data
@@ -327,7 +322,7 @@ else {
 			if (!isset($screens[$typename])) 
 				continue;
 		
-			$historyWidget->addItem($screens[$typename]->get());
+			$html_page->addItem($screens[$typename]->get());
 	
 			if ($data['action'] !== HISTORY_LATEST ) {
 				CScreenBuilder::insertScreenStandardJs($screens[$typename]->timeline);
@@ -337,10 +332,10 @@ else {
 	}
 	else {
 		if ($filter_tab) {
-			$historyWidget->addItem($filter_form);
+			$html_page->addItem($filter_form);
 		}
 
-		$historyWidget->addItem(
+		$html_page->addItem(
 			(new CTableInfo())
 				->setHeader([
 					(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH),
@@ -352,4 +347,4 @@ else {
 	}
 }
 
-$historyWidget->show();
+$html_page->show();

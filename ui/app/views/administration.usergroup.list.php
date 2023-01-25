@@ -27,16 +27,19 @@ if ($data['uncheck']) {
 	uncheckTableRows('usergroup');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('User groups'))
-	->setControls((new CTag('nav', true,
-		(new CList())
-			->addItem(new CRedirectButton(_('Create user group'),
-				(new CUrl('zabbix.php'))->setArgument('action', 'usergroup.edit'))
-			)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::USERS_USERGROUP_LIST))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(new CRedirectButton(_('Create user group'),
+					(new CUrl('zabbix.php'))->setArgument('action', 'usergroup.edit')
+				))
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'usergroup.list')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'usergroup.list'))
 		->addVar('action', 'usergroup.list')
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
@@ -237,5 +240,6 @@ $form->addItem([
 	], 'usergroup')
 ]);
 
-$widget->addItem($form);
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

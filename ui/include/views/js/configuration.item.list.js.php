@@ -24,72 +24,170 @@
  */
 ?>
 
-<script type="text/javascript">
-	jQuery(function($) {
-		// Disable the status filter when using the state filter.
-		$('#filter_state')
-			.on('change', function() {
-				$('input[name=filter_status]').prop('disabled', $('input[name=filter_state]:checked').val() != -1);
-			})
-			.trigger('change');
+<script type="text/x-jquery-tmpl" id="filter-tag-row-tmpl">
+	<?= CTagFilterFieldHelper::getTemplate() ?>
+</script>
 
-		$('#filter-tags')
-			.dynamicRows({template: '#filter-tag-row-tmpl'})
-			.on('afteradd.dynamicRows', function() {
-				var rows = this.querySelectorAll('.form_row');
-				new CTagFilterItem(rows[rows.length - 1]);
+<script>
+	const view = {
+		checkbox_object: null,
+		checkbox_hash: null,
+
+		init({checkbox_hash, checkbox_object}) {
+			this.checkbox_hash = checkbox_hash;
+			this.checkbox_object = checkbox_object;
+
+			// Disable the status filter when using the state filter.
+			$('#filter_state')
+				.on('change', function() {
+					$('input[name=filter_status]').prop('disabled', $('input[name=filter_state]:checked').val() != -1);
+				})
+				.trigger('change');
+
+			$('#filter-tags')
+				.dynamicRows({template: '#filter-tag-row-tmpl'})
+				.on('afteradd.dynamicRows', function() {
+					const rows = this.querySelectorAll('.form_row');
+					new CTagFilterItem(rows[rows.length - 1]);
+				});
+
+			// Init existing fields once loaded.
+			document.querySelectorAll('#filter-tags .form_row').forEach(row => {
+				new CTagFilterItem(row);
+			});
+		},
+
+		editHost(e, hostid) {
+			e.preventDefault();
+			const host_data = {hostid};
+
+			this.openHostPopup(host_data);
+		},
+
+		openHostPopup(host_data) {
+			const original_url = location.href;
+			const overlay = PopUp('popup.host.edit', host_data, {
+				dialogueid: 'host_edit',
+				dialogue_class: 'modal-popup-large',
+				prevent_navigation: true
 			});
 
-		// Init existing fields once loaded.
-		document.querySelectorAll('#filter-tags .form_row').forEach(row => {
-			new CTagFilterItem(row);
-		});
-	});
-</script>
+			overlay.$dialogue[0].addEventListener('dialogue.create', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('dialogue.update', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('dialogue.delete', this.events.hostDelete, {once: true});
+			overlay.$dialogue[0].addEventListener('overlay.close', () => {
+				history.replaceState({}, '', original_url);
+			}, {once: true});
+		},
 
-<script type="text/x-jquery-tmpl" id="tmpl_expressions_list_row">
-<?=
-	(new CRow([
-		(new CCol([
-			(new CDiv())
-				->addClass(ZBX_STYLE_DRAG_ICON)
-				->addStyle('top: 0px;'),
-			(new CSpan())->addClass('ui-icon ui-icon-arrowthick-2-n-s move '.ZBX_STYLE_TD_DRAG_ICON)
-		]))->addClass(ZBX_STYLE_TD_DRAG_ICON),
-		(new CDiv('#{expression}'))
-			->addStyle('max-width:'.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
-			->addClass(ZBX_STYLE_OVERFLOW_ELLIPSIS)
-			->setHint('#{expression}'),
-		new CDiv('#{type_label}'),
-		(new CCol([
-			(new CVar('expressions[][value]', '#{expression}')),
-			(new CVar('expressions[][type]', '#{type}')),
-			(new CButton(null, _('Remove')))->addClass(ZBX_STYLE_BTN_LINK)
-		]))->addClass(ZBX_STYLE_NOWRAP)
-	]))
-		->addClass('sortable form_row')
-?>
-</script>
+		massCheckNow(button) {
+			button.classList.add('is-loading');
 
-<script type="text/x-jquery-tmpl" id="tmpl_expressions_part_list_row">
-<?=
-	(new CRow([
-		(new CDiv('#{keyword}'))
-			->addStyle('max-width:'.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
-			->addClass(ZBX_STYLE_OVERFLOW_ELLIPSIS)
-			->setHint('#{keyword}'),
-		new CDiv('#{type_label}'),
-		(new CCol([
-			(new CVar('keys[][value]', '#{keyword}')),
-			(new CVar('keys[][type]', '#{type_label}')),
-			(new CButton(null, _('Remove')))->addClass(ZBX_STYLE_BTN_LINK)
-		]))->addClass(ZBX_STYLE_NOWRAP)
-	]))
-		->addClass('form_row')
-?>
-</script>
+			const curl = new Curl('zabbix.php');
+			curl.setArgument('action', 'item.masscheck_now');
 
-<script type="text/x-jquery-tmpl" id="filter-tag-row-tmpl">
-	<?= CTagFilterFieldHelper::getTemplate(); ?>
-</script>
+			fetch(curl.getUrl(), {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({itemids: Object.keys(chkbxRange.getSelectedIds())})
+			})
+				.then((response) => response.json())
+				.then((response) => {
+					clearMessages();
 
+					if ('error' in response) {
+						addMessage(makeMessageBox('bad', [response.error.messages], response.error.title, true, true));
+					}
+					else if('success' in response) {
+						addMessage(makeMessageBox('good', [], response.success.title, true, false));
+
+						const uncheckids = Object.keys(chkbxRange.getSelectedIds());
+						uncheckTableRows('items_' + this.checkbox_hash, [], false);
+						chkbxRange.checkObjects(this.checkbox_object, uncheckids, false);
+						chkbxRange.update(this.checkbox_object);
+					}
+				})
+				.catch(() => {
+					const title = <?= json_encode(_('Unexpected server error.')) ?>;
+					const message_box = makeMessageBox('bad', [], title)[0];
+
+					clearMessages();
+					addMessage(message_box);
+				})
+				.finally(() => {
+					button.classList.remove('is-loading');
+
+					// Deselect the "Execute now" button in both success and error cases, since there is no page reload.
+					button.blur();
+				});
+		},
+
+		checkNow(itemid) {
+			const curl = new Curl('zabbix.php');
+			curl.setArgument('action', 'item.masscheck_now');
+
+			fetch(curl.getUrl(), {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({itemids: [itemid]})
+			})
+				.then((response) => response.json())
+				.then((response) => {
+					clearMessages();
+
+					/*
+					 * Using postMessageError or postMessageOk would mean that those messages are stored in session
+					 * messages and that would mean to reload the page and show them. Also postMessageError would be
+					 * displayed right after header is loaded. Meaning message is not inside the page form like that is
+					 * in postMessageOk case. Instead show message directly that comes from controller.
+					 */
+					if ('error' in response) {
+						addMessage(makeMessageBox('bad', [response.error.messages], response.error.title, true, true));
+					}
+					else if('success' in response) {
+						addMessage(makeMessageBox('good', [], response.success.title, true, false));
+					}
+				})
+				.catch(() => {
+					const title = <?= json_encode(_('Unexpected server error.')) ?>;
+					const message_box = makeMessageBox('bad', [], title)[0];
+
+					clearMessages();
+					addMessage(message_box);
+				});
+		},
+
+		events: {
+			hostSuccess(e) {
+				const data = e.detail;
+
+				if ('success' in data) {
+					postMessageOk(data.success.title);
+
+					if ('messages' in data.success) {
+						postMessageDetails('success', data.success.messages);
+					}
+				}
+
+				location.href = location.href;
+			},
+
+			hostDelete(e) {
+				const data = e.detail;
+
+				if ('success' in data) {
+					postMessageOk(data.success.title);
+
+					if ('messages' in data.success) {
+						postMessageDetails('success', data.success.messages);
+					}
+				}
+
+				const curl = new Curl('zabbix.php', false);
+				curl.setArgument('action', 'host.list');
+
+				location.href = curl.getUrl();
+			}
+		}
+	};
+</script>

@@ -31,21 +31,16 @@ if (array_key_exists('error', $data)) {
 
 $this->addJsFile('flickerfreescreen.js');
 $this->addJsFile('gtlc.js');
+$this->addJsFile('leaflet.js');
+$this->addJsFile('leaflet.markercluster.js');
 $this->addJsFile('class.dashboard.js');
 $this->addJsFile('class.dashboard.page.js');
 $this->addJsFile('class.dashboard.widget.placeholder.js');
+$this->addJsFile('class.geomaps.js');
 $this->addJsFile('class.widget.js');
+$this->addJsFile('class.widget.inaccessible.js');
 $this->addJsFile('class.widget.iterator.js');
-$this->addJsFile('class.widget.clock.js');
-$this->addJsFile('class.widget.graph.js');
-$this->addJsFile('class.widget.graph-prototype.js');
-$this->addJsFile('class.widget.map.js');
-$this->addJsFile('class.widget.navtree.js');
 $this->addJsFile('class.widget.paste-placeholder.js');
-$this->addJsFile('class.widget.problems.js');
-$this->addJsFile('class.widget.problemsbysv.js');
-$this->addJsFile('class.widget.svggraph.js');
-$this->addJsFile('class.widget.trigerover.js');
 $this->addJsFile('class.csvggraph.js');
 $this->addJsFile('class.svg.canvas.js');
 $this->addJsFile('class.svg.map.js');
@@ -53,10 +48,12 @@ $this->addJsFile('class.sortable.js');
 
 $this->includeJsFile('monitoring.dashboard.print.js.php');
 
+$this->addCssFile('assets/styles/vendors/Leaflet/Leaflet/leaflet.css');
+
 $this->enableLayoutModes();
 $this->setLayoutMode(ZBX_LAYOUT_KIOSKMODE);
 
-(new CWidget())
+(new CHtmlPage())
 	->addItem(
 		(new CDiv())
 			->addClass(ZBX_STYLE_DASHBOARD)
@@ -65,11 +62,11 @@ $this->setLayoutMode(ZBX_LAYOUT_KIOSKMODE);
 	->show();
 
 (new CScriptTag('
-	initializeView(
-		'.json_encode($data['dashboard']).',
-		'.json_encode($data['widget_defaults']).',
-		'.json_encode($data['time_period']).'
-	);
+	view.init('.json_encode([
+		'dashboard' => $data['dashboard'],
+		'widget_defaults' => $data['widget_defaults'],
+		'time_period' => $data['time_period']
+	]).');
 '))
 	->setOnDocumentReady()
 	->show();

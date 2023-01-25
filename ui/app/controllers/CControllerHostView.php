@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types = 0);
 
 /*
 ** Zabbix
@@ -29,7 +29,7 @@ class CControllerHostView extends CControllerHost {
 	protected function checkInput(): bool {
 		$fields = [
 			'name' =>					'string',
-			'groupids' =>				'array_id',
+			'groupids' =>				'array_db hosts_groups.groupid',
 			'ip' =>						'string',
 			'dns' =>					'string',
 			'port' =>					'string',
@@ -86,9 +86,14 @@ class CControllerHostView extends CControllerHost {
 
 	protected function doAction(): void {
 		$filter_tabs = [];
-		$profile = (new CTabFilterProfile(static::FILTER_IDX, static::FILTER_FIELDS_DEFAULT))
-			->read()
-			->setInput($this->cleanInput($this->getInputAll()));
+		$profile = (new CTabFilterProfile(static::FILTER_IDX, static::FILTER_FIELDS_DEFAULT))->read();
+
+		if ($this->hasInput('filter_reset')) {
+			$profile->reset();
+		}
+		else {
+			$profile->setInput($this->cleanInput($this->getInputAll()));
+		}
 
 		foreach ($profile->getTabsWithDefaults() as $index => $filter_tab) {
 			if ($index == $profile->selected) {
@@ -109,7 +114,9 @@ class CControllerHostView extends CControllerHost {
 			'refresh_interval' => CWebUser::getRefresh() * 1000,
 			'filter_view' => 'monitoring.host.filter',
 			'filter_defaults' => $profile->filter_defaults,
+			'filter_groupids' => $this->getInput('groupids', []),
 			'filter_tabs' => $filter_tabs,
+			'can_create_hosts' => $this->checkAccess(CRoleHelper::UI_CONFIGURATION_HOSTS),
 			'tabfilter_options' => [
 				'idx' => static::FILTER_IDX,
 				'selected' => $profile->selected,

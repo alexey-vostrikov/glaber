@@ -20,6 +20,7 @@
 #define GLABER_TCP_POLL_H
 
 #include "glb_poller.h"
+#define DEFAULT_TCP_HOST_CONTENTION 4
 
 typedef void *(*tcp_poll_item_init_func)(poller_item_t *poller_item, DC_ITEM *dc_item);
 typedef void (*tcp_poll_type_destroy_func)(void * proto_data);

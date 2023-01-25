@@ -3,6 +3,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = \
+	include \
 	src \
 	database \
 	man \
@@ -52,8 +53,8 @@ dist-hook:
 	mv $(top_distdir)/src/go/pkg/version/version.go.new $(top_distdir)/src/go/pkg/version/version.go
 
 	rm -rf `find $(top_distdir) -name ".gitignore" -o -name ".gitattributes"`
-	rm -f $(top_distdir)/include/config.h
-	rm -f $(top_distdir)/include/config.h.in~
+	rm -f $(top_distdir)/include/common/config.h
+	rm -f $(top_distdir)/include/common/config.h.in~
 	rm -f $(top_distdir)/ui/conf/zabbix.conf.php
 	rm -rf $(top_distdir)/ui/tests
 	rm -rf $(top_distdir)/sass/img_source
@@ -62,18 +63,34 @@ if DBSCHEMA
 dbschema_mysql:
 	cd database/mysql && \
 	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
-	$(MAKE) $(AM_MAKEFLAGS) schema.sql
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) history_pk_prepare.sql
 
 dbschema_oracle:
 	cd database/oracle && \
 	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
-	$(MAKE) $(AM_MAKEFLAGS) schema.sql
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) history_pk_prepare.sql
+
+export tsdb_wcompr_dir = tsdb_history_pk_upgrade_with_compression
+export tsdb_nocompr_dir = tsdb_history_pk_upgrade_no_compression
 
 dbschema_postgresql:
 	cd database/postgresql && \
 	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
 	$(MAKE) $(AM_MAKEFLAGS) schema.sql && \
-	$(MAKE) $(AM_MAKEFLAGS) timescaledb.sql
+	$(MAKE) $(AM_MAKEFLAGS) timescaledb.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_wcompr_dir)/history_pk.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_wcompr_dir)/history_pk_uint.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_wcompr_dir)/history_pk_log.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_wcompr_dir)/history_pk_str.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_wcompr_dir)/history_pk_text.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_nocompr_dir)/history_pk.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_nocompr_dir)/history_pk_uint.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_nocompr_dir)/history_pk_log.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_nocompr_dir)/history_pk_str.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) $(tsdb_nocompr_dir)/history_pk_text.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) history_pk_prepare.sql
 
 dbschema_sqlite3:
 	cd database/sqlite3 && \
@@ -81,7 +98,7 @@ dbschema_sqlite3:
 	$(MAKE) $(AM_MAKEFLAGS) schema.sql
 
 dbschema_c:
-	cd src/libs/zbxdbhigh && \
+	cd src/libs/zbxdbschema && \
 	$(MAKE) $(AM_MAKEFLAGS) dbschema.c
 
 dbschema: dbschema_mysql dbschema_oracle dbschema_postgresql dbschema_sqlite3 dbschema_c
@@ -140,9 +157,9 @@ WRAP_IO_FUNCS = \
 WRAP_FS_FUNCS = \
 	-Wl,--wrap=opendir \
 	-Wl,--wrap=readdir \
-	-Wl,--wrap=stat \
 	-Wl,--wrap=__xstat \
-	-Wl,--wrap=__fxstat
+	-Wl,--wrap=__fxstat \
+	-Wl,--wrap=stat
 
 WRAP_EXIT = \
 	-Wl,--wrap=exit

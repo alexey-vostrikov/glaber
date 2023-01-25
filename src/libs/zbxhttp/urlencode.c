@@ -17,13 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "log.h"
 #include "zbxhttp.h"
 
+#include "zbxnum.h"
+#include "log.h"
+
 /******************************************************************************
- *                                                                            *
- * Function: zbx_http_url_encode                                              *
  *                                                                            *
  * Purpose: replaces unsafe characters with a '%' followed by two hexadecimal *
  *          digits (the only allowed exception is a space character that can  *
@@ -63,8 +62,6 @@ void	zbx_http_url_encode(const char *source, char **result)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_http_url_decode                                              *
- *                                                                            *
  * Purpose: replaces URL escape sequences ('+' or '%' followed by two         *
  *          hexadecimal digits) with matching characters.                     *
  *                                                                            *
@@ -87,7 +84,7 @@ int	zbx_http_url_decode(const char *source, char **result)
 		if ('%' == *source)
 		{
 			/* Percent-decoding */
-			if (FAIL == is_hex_n_range(source + 1, 2, target, sizeof(char), 0, 0xff))
+			if (FAIL == zbx_is_hex_n_range(source + 1, 2, target, sizeof(char), 0, 0xff))
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "cannot perform URL decode of '%s' part of string '%s'",
 						source, url);

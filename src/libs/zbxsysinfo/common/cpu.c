@@ -17,10 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "sysinfo.h"
+#include "cpu.h"
+
 #include "zbxalgo.h"
 #include "zbxjson.h"
 #include "cpustat.h"
+#include "module.h"
 
 static const char	*get_cpu_status_string(int status)
 {
@@ -37,7 +39,7 @@ static const char	*get_cpu_status_string(int status)
 	return NULL;
 }
 
-int	SYSTEM_CPU_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	system_cpu_discovery(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	zbx_vector_uint64_pair_t	cpus;
 	struct zbx_json			json;

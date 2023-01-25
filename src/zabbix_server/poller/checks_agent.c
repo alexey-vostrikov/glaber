@@ -17,20 +17,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "comms.h"
-#include "log.h"
-#include "../../libs/zbxcrypto/tls_tcp_active.h"
-
 #include "checks_agent.h"
+
+#include "log.h"
+#include "zbxsysinfo.h"
 
 #if !(defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL))
 extern unsigned char	program_type;
 #endif
 
 /******************************************************************************
- *                                                                            *
- * Function: get_value_agent                                                  *
  *                                                                            *
  * Purpose: retrieve data from Zabbix agent                                   *
  *                                                                            *
@@ -42,8 +38,6 @@ extern unsigned char	program_type;
  *               NOTSUPPORTED - item not supported by the agent               *
  *               AGENT_ERROR - uncritical error on agent side occurred        *
  *               FAIL - otherwise                                             *
- *                                                                            *
- * Author: Alexei Vladishev                                                   *
  *                                                                            *
  * Comments: error will contain error message                                 *
  *                                                                            *
@@ -133,7 +127,7 @@ int	get_value_agent(const DC_ITEM *item, AGENT_RESULT *result)
 			ret = NETWORK_ERROR;
 		}
 		else
-			set_result_type(result, ITEM_VALUE_TYPE_TEXT, s.buffer);
+			zbx_set_agent_result_type(result, ITEM_VALUE_TYPE_TEXT, s.buffer);
 	}
 	else
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Get value from agent failed: %s", zbx_socket_strerror()));

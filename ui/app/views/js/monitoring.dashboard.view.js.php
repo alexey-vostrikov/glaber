@@ -24,58 +24,28 @@
  */
 ?>
 
-<script type="text/x-jquery-tmpl" id="user_group_row_tpl">
-<?= (new CRow([
-	new CCol([
-		(new CTextBox('userGroups[#{usrgrpid}][usrgrpid]', '#{usrgrpid}'))->setAttribute('type', 'hidden'),
-		'#{name}'
-	]),
-	new CCol(
-		(new CRadioButtonList('userGroups[#{usrgrpid}][permission]', PERM_READ))
-			->addValue(_('Read-only'), PERM_READ, 'user_group_#{usrgrpid}_permission_'.PERM_READ)
-			->addValue(_('Read-write'), PERM_READ_WRITE, 'user_group_#{usrgrpid}_permission_'.PERM_READ_WRITE)
-			->setModern(true)
-	),
-	(new CCol(
-		(new CButton('remove', _('Remove')))
-			->addClass(ZBX_STYLE_BTN_LINK)
-			->onClick('window.dashboard_share.removeUserGroupShares("#{usrgrpid}");')
-			->removeId()
-	))->addClass(ZBX_STYLE_NOWRAP)
-]))
-	->setId('user_group_shares_#{usrgrpid}')
-	->toString()
-?>
-</script>
-
-<script type="text/x-jquery-tmpl" id="user_row_tpl">
-<?= (new CRow([
-	new CCol([
-		(new CTextBox('users[#{id}][userid]', '#{id}'))->setAttribute('type', 'hidden'),
-		'#{name}'
-	]),
-	new CCol(
-		(new CRadioButtonList('users[#{id}][permission]', PERM_READ))
-			->addValue(_('Read-only'), PERM_READ, 'user_#{id}_permission_'.PERM_READ)
-			->addValue(_('Read-write'), PERM_READ_WRITE, 'user_#{id}_permission_'.PERM_READ_WRITE)
-			->setModern(true)
-	),
-	(new CCol(
-		(new CButton('remove', _('Remove')))
-			->addClass(ZBX_STYLE_BTN_LINK)
-			->onClick('window.dashboard_share.removeUserShares("#{id}");')
-			->removeId()
-	))->addClass(ZBX_STYLE_NOWRAP)
-]))
-	->setId('user_shares_#{id}')
-	->toString()
-?>
-</script>
-
 <script>
-	function initializeView(dashboard, widget_defaults, has_time_selector, time_period, dynamic, web_layout_mode) {
+	const view = {
+		is_busy: false,
+		is_busy_saving: false,
 
-		const init = () => {
+		init({
+			dashboard,
+			widget_defaults,
+			widget_last_type,
+			configuration_hash,
+			has_time_selector,
+			time_period,
+			dynamic,
+			web_layout_mode,
+			clone
+		}) {
+			this.dashboard = dashboard;
+			this.has_time_selector = has_time_selector;
+			this.time_period = time_period;
+			this.dynamic = dynamic;
+			this.clone = clone;
+
 			timeControl.refreshPage = false;
 
 			ZABBIX.Dashboard = new CDashboard(document.querySelector('.<?= ZBX_STYLE_DASHBOARD ?>'), {
@@ -110,20 +80,21 @@
 				max_rows: <?= DASHBOARD_MAX_ROWS ?>,
 				widget_min_rows: <?= DASHBOARD_WIDGET_MIN_ROWS ?>,
 				widget_max_rows: <?= DASHBOARD_WIDGET_MAX_ROWS ?>,
-				widget_defaults: widget_defaults,
+				widget_defaults,
+				widget_last_type,
+				configuration_hash,
 				is_editable: dashboard.can_edit_dashboards && dashboard.editable
 					&& web_layout_mode != <?= ZBX_LAYOUT_KIOSKMODE ?>,
-				is_edit_mode: dashboard.dashboardid === null,
+				is_edit_mode: dashboard.dashboardid === null || clone,
 				can_edit_dashboards: dashboard.can_edit_dashboards,
 				is_kiosk_mode: web_layout_mode == <?= ZBX_LAYOUT_KIOSKMODE ?>,
-				time_period: time_period,
+				time_period,
 				dynamic_hostid: dynamic.host ? dynamic.host.id : null
 			});
 
 			for (const page of dashboard.pages) {
 				for (const widget of page.widgets) {
 					widget.fields = (typeof widget.fields === 'object') ? widget.fields : {};
-					widget.configuration = (typeof widget.configuration === 'object') ? widget.configuration : {};
 				}
 
 				ZABBIX.Dashboard.addDashboardPage(page);
@@ -132,15 +103,15 @@
 			ZABBIX.Dashboard.activate();
 
 			if (web_layout_mode != <?= ZBX_LAYOUT_KIOSKMODE ?>) {
-				ZABBIX.Dashboard.on(DASHBOARD_EVENT_EDIT, edit);
-				ZABBIX.Dashboard.on(DASHBOARD_EVENT_APPLY_PROPERTIES, events.applyProperties);
+				ZABBIX.Dashboard.on(DASHBOARD_EVENT_EDIT, () => this.edit());
+				ZABBIX.Dashboard.on(DASHBOARD_EVENT_APPLY_PROPERTIES, this.events.applyProperties);
 
 				if (dynamic.has_dynamic_widgets) {
-					$('#dynamic_hostid').on('change', events.dynamicHostChange);
+					jQuery('#dynamic_hostid').on('change', this.events.dynamicHostChange);
 				}
 
-				if (dashboard.dashboardid === null) {
-					edit();
+				if (dashboard.dashboardid === null || clone) {
+					this.edit();
 					ZABBIX.Dashboard.editProperties();
 				}
 				else {
@@ -148,24 +119,26 @@
 						.getElementById('dashboard-edit')
 						.addEventListener('click', () => {
 							ZABBIX.Dashboard.setEditMode();
-							edit();
+							this.edit();
 						});
 				}
 			}
 
+			ZABBIX.Dashboard.on(DASHBOARD_EVENT_CONFIGURATION_OUTDATED, this.events.configurationOutdated);
+
 			if (dynamic.has_dynamic_widgets) {
 				// Perform dynamic host switch when browser back/previous buttons are pressed.
-				window.addEventListener('popstate', events.popState);
+				window.addEventListener('popstate', this.events.popState);
 			}
 
 			jqBlink.blink();
-		};
+		},
 
-		const edit = () => {
+		edit() {
 			timeControl.disableAllSBox();
 
-			if (dynamic.has_dynamic_widgets) {
-				$('#dynamic_hostid').off('change', events.dynamicHostChange);
+			if (this.dynamic.has_dynamic_widgets) {
+				jQuery('#dynamic_hostid').off('change', this.events.dynamicHostChange);
 			}
 
 			document
@@ -192,35 +165,37 @@
 
 			document
 				.getElementById('dashboard-add')
-				.addEventListener('click', events.addClick);
+				.addEventListener('click', this.events.addClick);
 
 			document
 				.getElementById('dashboard-save')
-				.addEventListener('click', () => save());
+				.addEventListener('click', () => this.save());
 
 			document
 				.getElementById('dashboard-cancel')
 				.addEventListener('click', (e) => {
-					cancelEditing();
+					this.cancelEditing();
 					e.preventDefault();
 				}
 			);
 
-			ZABBIX.Dashboard.on(DASHBOARD_EVENT_BUSY, events.busy);
-			ZABBIX.Dashboard.on(DASHBOARD_EVENT_IDLE, events.idle);
+			ZABBIX.Dashboard.on(DASHBOARD_EVENT_BUSY, this.events.busy);
+			ZABBIX.Dashboard.on(DASHBOARD_EVENT_IDLE, this.events.idle);
 
-			enableNavigationWarning();
-		};
+			this.enableNavigationWarning();
+		},
 
-		const save = () => {
-			clearMessages();
-
-			is_busy_saving = true;
-			updateBusy();
+		save() {
+			this.is_busy_saving = true;
+			this.updateBusy();
 
 			const request_data = ZABBIX.Dashboard.save();
 
-			request_data.sharing = dashboard.sharing;
+			request_data.sharing = this.dashboard.sharing;
+
+			if (this.clone) {
+				request_data.clone = '1';
+			}
 
 			const curl = new Curl('zabbix.php');
 
@@ -228,74 +203,108 @@
 
 			fetch(curl.getUrl(), {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-				},
-				body: urlEncodeData(request_data)
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(request_data)
 			})
 				.then((response) => response.json())
 				.then((response) => {
-					if ('errors' in response) {
-						throw {html_string: response.errors};
+					if ('error' in response) {
+						throw {error: response.error};
 					}
 
-					if ('redirect' in response) {
-						if ('system-message-ok' in response) {
-							postMessageOk(response['system-message-ok']);
-						}
+					postMessageOk(response.success.title);
 
-						disableNavigationWarning();
-
-						location.replace(response.redirect);
+					if ('messages' in response.success) {
+						postMessageDetails('success', response.success.messages);
 					}
+
+					this.disableNavigationWarning();
+
+					const curl = new Curl('zabbix.php', false);
+
+					curl.setArgument('action', 'dashboard.view');
+					curl.setArgument('dashboardid', response.dashboardid);
+
+					location.replace(curl.getUrl());
 				})
-				.catch((error) => {
-					if (typeof error === 'object' && 'html_string' in error) {
-						addMessage(error.html_string);
+				.catch((exception) => {
+					clearMessages();
+
+					let title;
+					let messages = [];
+
+					if (typeof exception === 'object' && 'error' in exception) {
+						title = exception.error.title;
+						messages = exception.error.messages;
 					}
 					else {
-						const message = dashboard.dashboardid === null
+						title = this.dashboard.dashboardid === null || this.clone
 							? <?= json_encode(_('Failed to create dashboard')) ?>
 							: <?= json_encode(_('Failed to update dashboard')) ?>;
-
-						addMessage(makeMessageBox('bad', [], message, true, false));
 					}
+
+					const message_box = makeMessageBox('bad', messages, title);
+
+					addMessage(message_box);
 				})
 				.finally(() => {
-					is_busy_saving = false;
-					updateBusy();
+					this.is_busy_saving = false;
+					this.updateBusy();
 				});
-		};
+		},
 
-		const updateBusy = () => {
-			document.getElementById('dashboard-save').disabled = is_busy || is_busy_saving;
-		};
+		updateBusy() {
+			document.getElementById('dashboard-save').disabled = this.is_busy || this.is_busy_saving;
+		},
 
-		const cancelEditing = () => {
+		cancelEditing() {
 			const curl = new Curl('zabbix.php', false);
 
 			curl.setArgument('action', 'dashboard.view');
 
-			if (dashboard.dashboardid !== null) {
-				curl.setArgument('dashboardid', dashboard.dashboardid);
+			if (this.dashboard.dashboardid !== null) {
+				curl.setArgument('dashboardid', this.dashboard.dashboardid);
 			}
 			else {
 				curl.setArgument('cancel', '1');
 			}
 
 			location.replace(curl.getUrl());
-		};
+		},
 
-		const enableNavigationWarning = () => {
-			window.addEventListener('beforeunload', events.beforeUnload, {passive: false});
-		};
+		enableNavigationWarning() {
+			window.addEventListener('beforeunload', this.events.beforeUnload, {passive: false});
+		},
 
-		const disableNavigationWarning = () => {
-			window.removeEventListener('beforeunload', events.beforeUnload);
-		};
+		disableNavigationWarning() {
+			window.removeEventListener('beforeunload', this.events.beforeUnload);
+		},
 
-		const events = {
-			addClick: (e) => {
+		editHost(hostid) {
+			const host_data = {hostid};
+
+			this.openHostPopup(host_data);
+		},
+
+		openHostPopup(host_data) {
+			const original_url = location.href;
+
+			const overlay = PopUp('popup.host.edit', host_data, {
+				dialogueid: 'host_edit',
+				dialogue_class: 'modal-popup-large',
+				prevent_navigation: true
+			});
+
+			overlay.$dialogue[0].addEventListener('dialogue.create', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('dialogue.update', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('dialogue.delete', this.events.hostSuccess, {once: true});
+			overlay.$dialogue[0].addEventListener('overlay.close', () => {
+				history.replaceState({}, '', original_url);
+			}, {once: true});
+		},
+
+		events: {
+			addClick(e) {
 				const menu = [
 					{
 						items: [
@@ -316,20 +325,20 @@
 								clickCallback: () => ZABBIX.Dashboard.pasteWidget(
 									ZABBIX.Dashboard.getStoredWidgetDataCopy()
 								),
-								disabled: (ZABBIX.Dashboard.getStoredWidgetDataCopy() === null)
+								disabled: ZABBIX.Dashboard.getStoredWidgetDataCopy() === null
 							},
 							{
 								label: <?= json_encode(_('Paste page')) ?>,
 								clickCallback: () => ZABBIX.Dashboard.pasteDashboardPage(
 									ZABBIX.Dashboard.getStoredDashboardPageDataCopy()
 								),
-								disabled: (ZABBIX.Dashboard.getStoredDashboardPageDataCopy() === null)
+								disabled: ZABBIX.Dashboard.getStoredDashboardPageDataCopy() === null
 							}
 						]
 					}
 				];
 
-				$(e.target).menuPopup(menu, new jQuery.Event(e), {
+				jQuery(e.target).menuPopup(menu, new jQuery.Event(e), {
 					position: {
 						of: e.target,
 						my: 'left top',
@@ -339,7 +348,7 @@
 				});
 			},
 
-			beforeUnload: (e) => {
+			beforeUnload(e) {
 				if (ZABBIX.Dashboard.isUnsaved()) {
 					// Display confirmation message.
 					e.preventDefault();
@@ -347,28 +356,28 @@
 				}
 			},
 
-			popState: (e) => {
+			popState(e) {
 				const host = (e.state !== null && 'host' in e.state) ? e.state.host : null;
 
-				$('#dynamic_hostid').multiSelect('addData', host ? [host] : [], false);
+				jQuery('#dynamic_hostid').multiSelect('addData', host ? [host] : [], false);
 
 				ZABBIX.Dashboard.setDynamicHost(host ? host.id : null);
 			},
 
-			dynamicHostChange: () => {
-				const hosts = $('#dynamic_hostid').multiSelect('getData');
+			dynamicHostChange() {
+				const hosts = jQuery('#dynamic_hostid').multiSelect('getData');
 				const host = hosts.length ? hosts[0] : null;
 				const curl = new Curl('zabbix.php', false);
 
 				curl.setArgument('action', 'dashboard.view');
 
-				if (dashboard.dashboardid !== null) {
-					curl.setArgument('dashboardid', dashboard.dashboardid);
+				if (view.dashboard.dashboardid !== null) {
+					curl.setArgument('dashboardid', view.dashboard.dashboardid);
 				}
 
-				if (has_time_selector) {
-					curl.setArgument('from', time_period.from);
-					curl.setArgument('to', time_period.to);
+				if (view.has_time_selector) {
+					curl.setArgument('from', view.time_period.from);
+					curl.setArgument('to', view.time_period.to);
 				}
 
 				if (host !== null) {
@@ -382,166 +391,40 @@
 				updateUserProfile('web.dashboard.hostid', host ? host.id : 1);
 			},
 
-			applyProperties: () => {
+			applyProperties() {
 				const dashboard_data = ZABBIX.Dashboard.getData();
 
-				document.getElementById('<?= ZBX_STYLE_PAGE_TITLE ?>').textContent = dashboard_data.name;
+				document.getElementById('<?= CHtmlPage::PAGE_TITLE_ID ?>').textContent = dashboard_data.name;
 				document.getElementById('dashboard-direct-link').textContent = dashboard_data.name;
 			},
 
-			busy: () => {
-				is_busy = true;
-				updateBusy();
+			configurationOutdated() {
+				location.href = location.href;
 			},
 
-			idle: () => {
-				is_busy = false;
-				updateBusy();
-			}
-		};
-
-		let is_busy = false;
-		let is_busy_saving = false;
-
-		init();
-	}
-
-	function initializeDashboardShare(data) {
-
-		window.dashboard_share = {
-			submit: (overlay) => {
-				clearMessages();
-
-				const form = overlay.$dialogue.$body[0].querySelector('form');
-
-				const curl = new Curl('zabbix.php', false);
-
-				curl.setArgument('action', 'dashboard.share.update');
-
-				overlay.setLoading();
-
-				fetch(curl.getUrl(), {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-					},
-					body: urlEncodeData(getFormFields(form))
-				})
-					.then((response) => response.json())
-					.then((response) => {
-						if ('errors' in response) {
-							throw {html_string: response.errors};
-						}
-
-						overlay.unsetLoading();
-
-						addMessage(response.messages);
-						overlayDialogueDestroy(overlay.dialogueid);
-
-						delete window.dashboard_share;
-					})
-					.catch((error) => {
-						overlay.unsetLoading();
-
-						for (const el of form.parentNode.children) {
-							if (el.matches('.msg-good, .msg-bad, .msg-warning')) {
-								el.parentNode.removeChild(el);
-							}
-						}
-
-						const title = <?= json_encode(_('Failed to update dashboard sharing.')) ?>;
-						const message_box = (typeof error === 'object' && 'html_string' in error)
-							? new DOMParser().parseFromString(error.html_string, 'text/html').body.firstElementChild
-							: makeMessageBox('bad', [], title)[0];
-
-						form.parentNode.insertBefore(message_box, form);
-					});
+			busy() {
+				view.is_busy = true;
+				view.updateBusy();
 			},
 
-			removeUserGroupShares: (usrgrpid) => {
-				const element = document.getElementById(`user_group_shares_${usrgrpid}`);
-
-				if (element !== null) {
-					element.remove();
-				}
+			idle() {
+				view.is_busy = false;
+				view.updateBusy();
 			},
 
-			removeUserShares: (userid) => {
-				const element = document.getElementById(`user_shares_${userid}`);
+			hostSuccess(e) {
+				const data = e.detail;
 
-				if (element !== null) {
-					element.remove();
-				}
-			},
+				if ('success' in data) {
+					postMessageOk(data.success.title);
 
-			addPopupValues: (list) => {
-				for (let i = 0; i < list.values.length; i++) {
-					const value = list.values[i];
-
-					if (list.object === 'usrgrpid' || list.object === 'userid') {
-						if (value.permission === undefined) {
-							if (document.querySelector('input[name="private"]:checked').value == <?= PRIVATE_SHARING ?>) {
-								value.permission = <?= PERM_READ ?>;
-							}
-							else {
-								value.permission = <?= PERM_READ_WRITE ?>;
-							}
-						}
-					}
-
-					switch (list.object) {
-						case 'private':
-							document
-								.querySelector(`input[name="private"][value="${value}"]`)
-								.checked = true;
-
-							break;
-
-						case 'usrgrpid':
-							if (document.getElementById(`user_group_shares_${value.usrgrpid}`) !== null) {
-								continue;
-							}
-
-							template = new Template(document.getElementById('user_group_row_tpl').innerHTML);
-
-							document.getElementById('user_group_list_footer')
-								.insertAdjacentHTML('beforebegin', template.evaluate(value));
-
-							document
-								.getElementById(`user_group_${value.usrgrpid}_permission_${value.permission}`)
-								.checked = true;
-
-							break;
-
-						case 'userid':
-							if (document.getElementById(`user_shares_${value.id}`) !== null) {
-								continue;
-							}
-
-							template = new Template(document.getElementById('user_row_tpl').innerHTML);
-
-							document.getElementById('user_list_footer')
-								.insertAdjacentHTML('beforebegin', template.evaluate(value));
-
-							document
-								.getElementById(`user_${value.id}_permission_${value.permission}`)
-								.checked = true;
-
-							break;
+					if ('messages' in data.success) {
+						postMessageDetails('success', data.success.messages);
 					}
 				}
+
+				location.href = location.href;
 			}
-		};
-
-		window.dashboard_share.addPopupValues({'object': 'private', 'values': [data.private]});
-		window.dashboard_share.addPopupValues({'object': 'userid', 'values': data.users});
-		window.dashboard_share.addPopupValues({'object': 'usrgrpid', 'values': data.userGroups});
-
-		/**
-		 * @see init.js add.popup event
-		 */
-		window.addPopupValues = (list) => {
-			window.dashboard_share.addPopupValues(list);
-		};
+		}
 	}
 </script>

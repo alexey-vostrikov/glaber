@@ -18,8 +18,9 @@
 **/
 
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
+#include "zbxsysinfo.h"
 #include "glb_poller.h"
 #include "csnmp.h"
 #include "snmp.h"
@@ -93,7 +94,7 @@ void snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu)
 		for (i = 0; i < pdu->vars_len; i++) {
 
 			AGENT_RESULT result = {0};
-			init_result(&result);
+			zbx_init_agent_result(&result);
 
  			if (SUCCEED == snmp_set_result(poller_item, &pdu->vars[i], &result)) {
 				DEBUG_ITEM(poller_get_item_id(poller_item),"Async SNMP SUCCEED RESULT processing for the item, type is %d", result.type);
@@ -104,7 +105,7 @@ void snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu)
 				poller_preprocess_value(poller_item, NULL, mstime,ITEM_STATE_NOTSUPPORTED, result.msg);
  			}
 
-			free_result(&result);
+			zbx_free_agent_result(&result);
 		}	
  	} else 
  			poller_preprocess_value(poller_item, NULL, mstime, ITEM_STATE_NOTSUPPORTED, "Got responce PDU with error indication");

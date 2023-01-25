@@ -44,6 +44,8 @@ jQuery(document).ready(function($) {
 				$('#mediatype_email_send_to').hide();
 			}
 
+			$('.focusable', $(this)).toggleClass('red', $(`li[value="${mediatypeid}"]`, $(this)).hasClass('red'));
+
 		})
 		.trigger("change");
 
@@ -67,8 +69,11 @@ function validateMedia(overlay) {
 		success: function(ret) {
 			overlay.$dialogue.find('.msg-bad, .msg-good').remove();
 
-			if (typeof ret.errors !== 'undefined') {
-				jQuery(ret.errors).insertBefore($form);
+			if ('error' in ret) {
+				const message_box = makeMessageBox('bad', ret.error.messages, ret.error.title);
+
+				message_box.insertBefore($form);
+
 				overlay.unsetLoading();
 			}
 			else {

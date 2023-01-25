@@ -26,9 +26,7 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = _('Configuration of discovery rules');
 $page['file'] = 'host_discovery.php';
-$page['scripts'] = ['class.cviewswitcher.js', 'multilineinput.js', 'multiselect.js', 'items.js', 'textareaflexible.js',
-	'class.tab-indicators.js'
-];
+$page['scripts'] = ['multilineinput.js', 'items.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -198,7 +196,7 @@ $fields = [
 	// actions
 	'action' =>					[T_ZBX_STR, O_OPT, P_SYS|P_ACT,
 									IN('"discoveryrule.massdelete","discoveryrule.massdisable",'.
-										'"discoveryrule.massenable","discoveryrule.masscheck_now"'
+										'"discoveryrule.massenable"'
 									),
 									null
 								],
@@ -208,7 +206,6 @@ $fields = [
 	'clone' =>					[T_ZBX_STR, O_OPT, P_SYS|P_ACT, null,	null],
 	'delete' =>					[T_ZBX_STR, O_OPT, P_SYS|P_ACT, null,	null],
 	'cancel' =>					[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
-	'check_now' =>				[T_ZBX_STR, O_OPT, P_SYS|P_ACT,	null,	null],
 	'form' =>					[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
 	'form_refresh' =>			[T_ZBX_INT, O_OPT, null,	null,		null],
 	// filter
@@ -235,10 +232,12 @@ $fields = [
 	'filter_status' =>			[T_ZBX_INT, O_OPT, null,	IN([-1, ITEM_STATUS_ACTIVE, ITEM_STATUS_DISABLED]),
 									null
 								],
+	'backurl' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	// sort and sortorder
 	'sort' =>					[T_ZBX_STR, O_OPT, P_SYS, IN('"delay","key_","name","status","type"'),	null],
 	'sortorder' =>				[T_ZBX_STR, O_OPT, P_SYS, IN('"'.ZBX_SORT_DOWN.'","'.ZBX_SORT_UP.'"'),	null]
 ];
+
 check_fields($fields);
 
 $_REQUEST['params'] = getRequest($paramsFieldName, '');
@@ -296,6 +295,11 @@ elseif ($hostid) {
 	}
 }
 
+// Validate backurl.
+if (hasRequest('backurl') && !CHtmlUrlValidator::validateSameSite(getRequest('backurl'))) {
+	access_deny();
+}
+
 $prefix = (getRequest('context') === 'host') ? 'web.hosts.' : 'web.templates.';
 
 /**
@@ -337,8 +341,8 @@ elseif (hasRequest('filter_rst')) {
 }
 
 $filter = [
-	'groups' => CProfile::getArray($prefix.'host_discovery.filter.groupids', []),
-	'hosts' => CProfile::getArray($prefix.'host_discovery.filter.hostids', []),
+	'groups' => [],
+	'hosts' => [],
 	'name' => CProfile::get($prefix.'host_discovery.filter.name', ''),
 	'key' => CProfile::get($prefix.'host_discovery.filter.key', ''),
 	'type' => CProfile::get($prefix.'host_discovery.filter.type', -1),
@@ -349,44 +353,37 @@ $filter = [
 	'status' => CProfile::get($prefix.'host_discovery.filter.status', -1)
 ];
 
-$filter_groupids = [];
-$filter_hostids = [];
+$filter_groupids = CProfile::getArray($prefix.'host_discovery.filter.groupids', []);
+$filter_hostids = CProfile::getArray($prefix.'host_discovery.filter.hostids', []);
 
 // Get host groups.
-if ($filter['groups']) {
-	$filter['groups'] = CArrayHelper::renameObjectsKeys(API::HostGroup()->get([
-		'output' => ['groupid', 'name'],
-		'groupids' => $filter['groups'],
-		'editable' => true,
-		'preservekeys' => true
-	]), ['groupid' => 'id']);
-
-	$filter_groupids = getSubGroups(array_keys($filter['groups']));
-}
+$filter_groupids = getSubGroups($filter_groupids, $filter['groups'], ['editable' => true], getRequest('context'));
 
 // Get hosts.
-if ($filter['hosts']) {
-	if (getRequest('context') === 'host') {
-		$filter['hosts'] = CArrayHelper::renameObjectsKeys(API::Host()->get([
+if (getRequest('context') === 'host') {
+	$filter['hosts'] = $filter_hostids
+		? CArrayHelper::renameObjectsKeys(API::Host()->get([
 			'output' => ['hostid', 'name'],
-			'hostids' => $filter['hosts'],
+			'hostids' => $filter_hostids,
 			'editable' => true,
 			'preservekeys' => true
-		]), ['hostid' => 'id']);
-	}
-	else {
-		$filter['hosts'] = CArrayHelper::renameObjectsKeys(API::Template()->get([
-			'output' => ['templateid', 'name'],
-			'templateids' => $filter['hosts'],
-			'editable' => true,
-			'preservekeys' => true
-		]), ['templateid' => 'id']);
-	}
-
-	$filter_hostids = array_keys($filter['hosts']);
-
-	sort($filter_hostids);
+		]), ['hostid' => 'id'])
+		: [];
 }
+else {
+	$filter['hosts'] = $filter_hostids
+		? CArrayHelper::renameObjectsKeys(API::Template()->get([
+			'output' => ['templateid', 'name'],
+			'templateids' => $filter_hostids,
+			'editable' => true,
+			'preservekeys' => true
+		]), ['templateid' => 'id'])
+		: [];
+}
+
+$filter_hostids = array_keys($filter['hosts']);
+
+sort($filter_hostids);
 
 $checkbox_hash = crc32(implode('', $filter_hostids));
 
@@ -413,28 +410,26 @@ if (hasRequest('delete') && hasRequest('itemid')) {
 
 	unset($_REQUEST['itemid'], $_REQUEST['form']);
 }
-elseif (hasRequest('check_now') && hasRequest('itemid')) {
-	$result = (bool) API::Task()->create([
-		'type' => ZBX_TM_DATA_TYPE_CHECK_NOW,
-		'request' => [
-			'itemid' => getRequest('itemid')
-		]
-	]);
-
-	show_messages($result, _('Request sent successfully'), _('Cannot send request'));
-}
 elseif (hasRequest('add') || hasRequest('update')) {
 	$result = true;
 
 	$delay = getRequest('delay', DB::getDefault('items', 'delay'));
 	$type = getRequest('type', ITEM_TYPE_ZABBIX);
+	$item_key = getRequest('key', '');
+
+	if (($type == ITEM_TYPE_DB_MONITOR && $item_key === ZBX_DEFAULT_KEY_DB_MONITOR)
+			|| ($type == ITEM_TYPE_SSH && $item_key === ZBX_DEFAULT_KEY_SSH)
+			|| ($type == ITEM_TYPE_TELNET && $item_key === ZBX_DEFAULT_KEY_TELNET)) {
+		error(_('Check the key, please. Default example was passed.'));
+		$result = false;
+	}
 
 	/*
 	 * "delay_flex" is a temporary field that collects flexible and scheduling intervals separated by a semicolon.
 	 * In the end, custom intervals together with "delay" are stored in the "delay" variable.
 	 */
-	if ($type != ITEM_TYPE_TRAPPER && $type != ITEM_TYPE_SNMPTRAP
-			&& ($type != ITEM_TYPE_ZABBIX_ACTIVE || strncmp(getRequest('key'), 'mqtt.get', 8) !== 0)
+	if ($result && $type != ITEM_TYPE_TRAPPER && $type != ITEM_TYPE_SNMPTRAP
+			&& ($type != ITEM_TYPE_ZABBIX_ACTIVE || strncmp($item_key, 'mqtt.get', 8) !== 0)
 			&& hasRequest('delay_flex')) {
 		$intervals = [];
 		$simple_interval_parser = new CSimpleIntervalParser(['usermacros' => true]);
@@ -449,13 +444,13 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 				if ($simple_interval_parser->parse($interval['delay']) != CParser::PARSE_SUCCESS) {
 					$result = false;
-					info(_s('Invalid interval "%1$s".', $interval['delay']));
+					error(_s('Invalid interval "%1$s".', $interval['delay']));
 					break;
 				}
 
 				if ($time_period_parser->parse($interval['period']) != CParser::PARSE_SUCCESS) {
 					$result = false;
-					info(_s('Invalid interval "%1$s".', $interval['period']));
+					error(_s('Invalid interval "%1$s".', $interval['period']));
 					break;
 				}
 
@@ -468,7 +463,7 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 				if ($scheduling_interval_parser->parse($interval['schedule']) != CParser::PARSE_SUCCESS) {
 					$result = false;
-					info(_s('Invalid interval "%1$s".', $interval['schedule']));
+					error(_s('Invalid interval "%1$s".', $interval['schedule']));
 					break;
 				}
 
@@ -483,55 +478,14 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 	if ($result) {
 		$preprocessing = getRequest('preprocessing', []);
-
-		foreach ($preprocessing as &$step) {
-			switch ($step['type']) {
-				case ZBX_PREPROC_PROMETHEUS_TO_JSON:
-					$step['params'] = trim($step['params'][0]);
-					break;
-
-				case ZBX_PREPROC_XPATH:
-				case ZBX_PREPROC_JSONPATH:
-				case ZBX_PREPROC_VALIDATE_NOT_REGEX:
-				case ZBX_PREPROC_ERROR_FIELD_JSON:
-				case ZBX_PREPROC_ERROR_FIELD_XML:
-				case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
-				case ZBX_PREPROC_SCRIPT:
-					$step['params'] = $step['params'][0];
-					break;
-
-				case ZBX_PREPROC_REGSUB:
-				case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
-				case ZBX_PREPROC_STR_REPLACE:
-				case GLB_PREPROC_DISPATCH_ITEM:
-					$step['params'] = implode("\n", $step['params']);
-					break;
-
-				// ZBX-16642
-				case ZBX_PREPROC_CSV_TO_JSON:
-					if (!array_key_exists(2, $step['params'])) {
-						$step['params'][2] = ZBX_PREPROC_CSV_NO_HEADER;
-					}
-					$step['params'] = implode("\n", $step['params']);
-					break;
-
-				default:
-					$step['params'] = '';
-			}
-
-			$step += [
-				'error_handler' => ZBX_PREPROC_FAIL_DEFAULT,
-				'error_handler_params' => ''
-			];
-		}
-		unset($step);
+		$preprocessing = normalizeItemPreprocessingSteps($preprocessing);
 
 		$newItem = [
 			'itemid' => getRequest('itemid'),
-			'interfaceid' => getRequest('interfaceid'),
+			'interfaceid' => getRequest('interfaceid', 0),
 			'name' => getRequest('name'),
 			'description' => getRequest('description'),
-			'key_' => getRequest('key'),
+			'key_' => $item_key,
 			'hostid' => getRequest('hostid'),
 			'delay' => $delay,
 			'status' => getRequest('status', ITEM_STATUS_DISABLED),
@@ -587,11 +541,16 @@ elseif (hasRequest('add') || hasRequest('update')) {
 		if ($newItem['type'] == ITEM_TYPE_JMX) {
 			$newItem['jmx_endpoint'] = getRequest('jmx_endpoint', '');
 		}
+		
+		if ($newItem['type'] == ITEM_TYPE_WORKER_SERVER ) {
+			$newItem['params'] = getRequest('params');
+			$newItem['timeout'] = getRequest('timeout', DB::getDefault('items', 'timeout'));
+		}
 
 		if (getRequest('type') == ITEM_TYPE_DEPENDENT) {
 			$newItem['master_itemid'] = getRequest('master_itemid');
 		}
-
+		
 		// add macros; ignore empty new macros
 		$lld_rule_filter = [
 			'evaltype' => getRequest('evaltype'),
@@ -716,15 +675,30 @@ elseif (hasRequest('add') || hasRequest('update')) {
 	}
 
 	if (hasRequest('add')) {
-		show_messages($result, _('Discovery rule created'), _('Cannot add discovery rule'));
+		if ($result) {
+			CMessageHelper::setSuccessTitle(_('Discovery rule created'));
+		}
+		else {
+			CMessageHelper::setErrorTitle(_('Cannot add discovery rule'));
+		}
 	}
 	else {
-		show_messages($result, _('Discovery rule updated'), _('Cannot update discovery rule'));
+		if ($result) {
+			CMessageHelper::setSuccessTitle(_('Discovery rule updated'));
+		}
+		else {
+			CMessageHelper::setErrorTitle(_('Cannot update discovery rule'));
+		}
 	}
 
 	if ($result) {
 		unset($_REQUEST['itemid'], $_REQUEST['form']);
 		uncheckTableRows($checkbox_hash);
+
+		if (hasRequest('backurl')) {
+			$response = new CControllerResponseRedirect(getRequest('backurl'));
+			$response->redirect();
+		}
 	}
 }
 elseif (hasRequest('action') && str_in_array(getRequest('action'), ['discoveryrule.massenable', 'discoveryrule.massdisable']) && hasRequest('g_hostdruleid')) {
@@ -760,26 +734,6 @@ elseif (hasRequest('action') && getRequest('action') === 'discoveryrule.massdele
 		uncheckTableRows($checkbox_hash);
 	}
 	show_messages($result, _('Discovery rules deleted'), _('Cannot delete discovery rules'));
-}
-elseif (hasRequest('action') && getRequest('action') === 'discoveryrule.masscheck_now' && hasRequest('g_hostdruleid')) {
-	$tasks = [];
-
-	foreach (getRequest('g_hostdruleid') as $taskid) {
-		$tasks[] = [
-			'type' => ZBX_TM_DATA_TYPE_CHECK_NOW,
-			'request' => [
-				'itemid' => $taskid
-			]
-		];
-	}
-
-	$result = (bool) API::Task()->create($tasks);
-
-	if ($result) {
-		uncheckTableRows($checkbox_hash);
-	}
-
-	show_messages($result, _('Request sent successfully'), _('Cannot send request'));
 }
 
 if (hasRequest('action') && hasRequest('g_hostdruleid') && !$result) {
@@ -830,8 +784,10 @@ if (hasRequest('form')) {
 	$data['display_interfaces'] = ($host['status'] == HOST_STATUS_MONITORED
 		|| $host['status'] == HOST_STATUS_NOT_MONITORED
 	);
+	$data['backurl'] = getRequest('backurl');
 
 	if (!hasRequest('form_refresh')) {
+		$i = 0;
 		foreach ($data['preprocessing'] as &$step) {
 			if ($step['type'] == ZBX_PREPROC_SCRIPT) {
 				$step['params'] = [$step['params'], ''];
@@ -839,9 +795,12 @@ if (hasRequest('form')) {
 			else {
 				$step['params'] = explode("\n", $step['params']);
 			}
+			$step['sortorder'] = $i++;
 		}
 		unset($step);
 	}
+
+	CArrayHelper::sort($data['preprocessing'], ['sortorder']);
 
 	// update form
 	if (hasRequest('itemid') && !getRequest('form_refresh')) {
@@ -864,6 +823,13 @@ if (hasRequest('form')) {
 		$data['jmx_endpoint'] = ZBX_DEFAULT_JMX_ENDPOINT;
 	}
 
+	$data['counter'] = null;
+	if (hasRequest('conditions')) {
+		$conditions = getRequest('conditions');
+		krsort($conditions);
+		$data['counter'] = key($conditions) + 1;
+	}
+
 	// render view
 	if (!$has_errors) {
 		echo (new CView('configuration.host.discovery.edit', $data))->getOutput();
@@ -878,7 +844,6 @@ else {
 		'profileIdx' => $prefix.'host_discovery.filter',
 		'active_tab' => CProfile::get($prefix.'host_discovery.filter.active', 1),
 		'checkbox_hash' => $checkbox_hash,
-		'is_template' => true,
 		'context' => getRequest('context')
 	];
 
@@ -959,7 +924,6 @@ else {
 	}
 
 	$data['discoveries'] = API::DiscoveryRule()->get($options);
-	$data['discoveries'] = CMacrosResolverHelper::resolveItemNames($data['discoveries']);
 
 	switch ($sort_field) {
 		case 'delay':
@@ -975,20 +939,6 @@ else {
 	}
 
 	$data['discoveries'] = expandItemNamesWithMasterItems($data['discoveries'], 'items');
-
-	// Set is_template false, when one of hosts is not template.
-	if ($data['discoveries']) {
-		$hosts_status = [];
-		foreach ($data['discoveries'] as $discovery) {
-			$hosts_status[$discovery['hosts'][0]['status']] = true;
-		}
-		foreach ($hosts_status as $key => $value) {
-			if ($key != HOST_STATUS_TEMPLATE) {
-				$data['is_template'] = false;
-				break;
-			}
-		}
-	}
 
 	// pager
 	if (hasRequest('page')) {

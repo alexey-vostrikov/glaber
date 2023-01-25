@@ -19,7 +19,7 @@
 
 #include "glb_poller.h"
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/types.h>
@@ -80,6 +80,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 	char error_str[1024];
 
 	LOG_DBG("In %s: starting", __func__);
+	//LOG_INF("SNMP Item creating");	
 	snmp_item = zbx_calloc(NULL, 0, sizeof(snmp_item_t));
 
     poller_set_item_specific_data(poller_item, snmp_item);
@@ -110,7 +111,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 		snmp_item->snmp_req_type = SNMP_CMD_GET_NEXT;
 	else 
 		snmp_item->snmp_req_type = SNMP_CMD_GET;
-		
+	//LOG_INF("SNMP Item has been created");	
 	return SUCCEED;
 }
 
@@ -330,4 +331,5 @@ void snmp_async_init(void) {
 	poller_run_fd_event(conf.socket_event);
 	
 	poller_sessions_init();
+	LOG_INF("Finished snmp init");
 }

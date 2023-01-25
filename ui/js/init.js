@@ -151,7 +151,7 @@ jQuery(function($) {
 				break;
 
 			case 'item':
-				sections = getMenuPopupItem(data, $obj);
+				sections = getMenuPopupItem(data);
 				break;
 
 			case 'item_prototype':
@@ -164,10 +164,6 @@ jQuery(function($) {
 
 			case 'submenu':
 				sections = getMenuPopupSubmenu(data);
-				break;
-
-			case 'widget_actions':
-				sections = getMenuPopupWidgetActions(data);
 				break;
 
 			default:
@@ -211,7 +207,6 @@ jQuery(function($) {
 			case 'dashboard':
 			case 'dropdown':
 			case 'submenu':
-			case 'widget_actions':
 				return false;
 
 			default:
@@ -314,6 +309,17 @@ jQuery(function($) {
 
 			xhr.done(function(resp) {
 				overlayPreloaderDestroy($preloader.prop('id'));
+
+				if ('error' in resp) {
+					clearMessages();
+
+					const message_box = makeMessageBox('bad', resp.error.messages, resp.error.title);
+
+					addMessage(message_box);
+
+					return;
+				}
+
 				showMenuPopup($obj, jQuery.extend({context: data.context}, resp.data), event, options);
 			});
 
@@ -363,6 +369,9 @@ jQuery(function($) {
 		else if (typeof window.addPopupValues !== 'undefined') {
 			// execute function if they exist
 			window.addPopupValues(data);
+		}
+		else if (typeof view.addPopupValues !== 'undefined') {
+			view.addPopupValues(data);
 		}
 		else {
 			$('#' + data.parentId).val(data.values[0].name);

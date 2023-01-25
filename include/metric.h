@@ -21,7 +21,7 @@
 #ifndef METRIC_H
 #define METRIC_H
 
-#include "common.h"
+#include "zbxcommon.h"
 //#include "log.h"
 #include "zbxvariant.h"
 #include "metric.h"

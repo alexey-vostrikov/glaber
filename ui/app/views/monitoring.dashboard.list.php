@@ -31,9 +31,10 @@ $this->addJsFile('layout.mode.js');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Dashboards'))
 	->setWebLayoutMode($web_layout_mode)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::DASHBOARDS_LIST))
 	->setControls(
 		(new CTag('nav', true,
 			(new CList())
@@ -51,23 +52,24 @@ $widget = (new CWidget())
 	);
 
 if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
-	$widget
-		->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'dashboard.list')))
-		->setProfile($data['profileIdx'])
-		->setActiveTab($data['active_tab'])
-		->addFilterTab(_('Filter'), [
-			(new CFormList())->addRow(_('Name'),
-				(new CTextBox('filter_name', $data['filter']['name']))->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-			),
-			(new CFormList())->addRow(_('Show'),
-				(new CRadioButtonList('filter_show', (int) $data['filter']['show']))
-					->addValue(_('All'), DASHBOARD_FILTER_SHOW_ALL)
-					->addValue(_('Created by me'), DASHBOARD_FILTER_SHOW_MY)
-					->setModern(true)
-			)
-		])
-		->addVar('action', 'dashboard.list')
-	);
+	$html_page
+		->addItem((new CFilter())
+			->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'dashboard.list'))
+			->setProfile($data['profileIdx'])
+			->setActiveTab($data['active_tab'])
+			->addFilterTab(_('Filter'), [
+				(new CFormList())->addRow(_('Name'),
+					(new CTextBox('filter_name', $data['filter']['name']))->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+				),
+				(new CFormList())->addRow(_('Show'),
+					(new CRadioButtonList('filter_show', (int) $data['filter']['show']))
+						->addValue(_('All'), DASHBOARD_FILTER_SHOW_ALL)
+						->addValue(_('Created by me'), DASHBOARD_FILTER_SHOW_MY)
+						->setModern(true)
+				)
+			])
+			->addVar('action', 'dashboard.list')
+		);
 }
 
 $form = (new CForm())->setName('dashboardForm');
@@ -126,5 +128,6 @@ $form->addItem([
 	], 'dashboard')
 ]);
 
-$widget->addItem($form);
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

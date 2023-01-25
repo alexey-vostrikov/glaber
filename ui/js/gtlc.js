@@ -389,7 +389,7 @@ jQuery(function($) {
 			.insertAfter(parent);
 
 		selection = {
-			dom: $('<div class="graph-selection">')
+			dom: $('<div>', {class: 'graph-selection'})
 				.css({
 					position: 'absolute',
 					top: data.top,
@@ -655,7 +655,7 @@ var timeControl = {
 		var container = jQuery('#' + obj.containerid),
 			clone = jQuery('<img>', {
 				id: img.attr('id'),
-				'class': img.attr('class')
+				class: img.attr('class')
 			})
 			.one('load', function() {
 				img.closest('.dashboard-grid-widget').trigger('load.image', {imageid: img.attr('id')});

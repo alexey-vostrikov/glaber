@@ -17,44 +17,55 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "zbxjson.h"
+#include "zbxstats.h"
+
+#include "zbxcommon.h"
 #include "dbcache.h"
 #include "zbxself.h"
-//#include "glb_cache.h"
 #include "../../zabbix_server/vmware/vmware.h"
 #include "preproc.h"
-#include "zbxtrends.h"
-
-#include "zabbix_stats.h"
+#include "zbxcomms.h"
 
 extern unsigned char	program_type;
+extern int	CONFIG_SERVER_STARTUP_TIME;
+
+static zbx_zabbix_stats_ext_get_func_t	stats_ex_cb;
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_send_zabbix_stats                                            *
+ * Purpose: sets stats callback function                                      *
+ *                                                                            *
+ * Parameters: cb   - [IN] callback function                                  *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_zabbix_stats_init(zbx_zabbix_stats_ext_get_func_t cb)
+{
+	stats_ex_cb = cb;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: collects all metrics required for Zabbix stats request            *
  *                                                                            *
- * Parameters: json - [OUT] the json data                                     *
+ * Parameters: json       - [OUT] the json data                               *
+ *             zbx_config - [IN] Zabbix server/proxy config                   *
  *                                                                            *
  ******************************************************************************/
-void	zbx_get_zabbix_stats(struct zbx_json *json)
+void	zbx_zabbix_stats_get(struct zbx_json *json, const zbx_config_comms_args_t *zbx_config)
 {
 	zbx_config_cache_info_t	count_stats;
 	zbx_vmware_stats_t	vmware_stats;
 	zbx_wcache_info_t	wcache_info;
 	zbx_process_info_t	process_stats[ZBX_PROCESS_TYPE_COUNT];
-	zbx_tfc_stats_t		tcache_stats;
 	int			proc_type;
 
 	DCget_count_stats_all(&count_stats);
 
 	/* zabbix[boottime] */
-	zbx_json_adduint64(json, "boottime", CONFIG_SERVER_STARTUP_TIME);
+	zbx_json_addint64(json, "boottime", CONFIG_SERVER_STARTUP_TIME);
 
 	/* zabbix[uptime] */
-	zbx_json_adduint64(json, "uptime", time(NULL) - CONFIG_SERVER_STARTUP_TIME);
+	zbx_json_addint64(json, "uptime", time(NULL) - CONFIG_SERVER_STARTUP_TIME);
 
 	/* zabbix[hosts] */
 	zbx_json_adduint64(json, "hosts", count_stats.hosts);
@@ -62,8 +73,8 @@ void	zbx_get_zabbix_stats(struct zbx_json *json)
 	/* zabbix[items] */
 	zbx_json_adduint64(json, "items", count_stats.items);
 
-	/* zabbix[item_unsupported] */
-	zbx_json_adduint64(json, "item_unsupported", count_stats.items_unsupported);
+	/* zabbix[items_unsupported] */
+	zbx_json_adduint64(json, "items_unsupported", count_stats.items_unsupported);
 
 	/* zabbix[requiredperformance] */
 	zbx_json_addfloat(json, "requiredperformance", count_stats.requiredperformance);
@@ -71,7 +82,7 @@ void	zbx_get_zabbix_stats(struct zbx_json *json)
 	/* zabbix[preprocessing_queue] */
 	zbx_json_adduint64(json, "preprocessing_queue", zbx_preprocessor_get_queue_size());
 
-	zbx_get_zabbix_stats_ext(json);
+	stats_ex_cb(json, zbx_config);
 
 	/* zabbix[rcache,<cache>,<mode>] */
 	zbx_json_addobject(json, "rcache");
@@ -165,35 +176,12 @@ void	zbx_get_zabbix_stats(struct zbx_json *json)
 			zbx_json_addfloat(json, "max", process_stats[proc_type].idle_max);
 			zbx_json_addfloat(json, "min", process_stats[proc_type].idle_min);
 			zbx_json_close(json);
-			zbx_json_adduint64(json, "count", process_stats[proc_type].count);
+			zbx_json_addint64(json, "count", process_stats[proc_type].count);
 			zbx_json_close(json);
 		}
 	}
 
 	zbx_json_close(json);
 
-	/* zabbix[tcache,cache,<parameters>] */
-	if (SUCCEED == zbx_tfc_get_stats(&tcache_stats, NULL))
-	{
-		zbx_uint64_t	total;
-
-		zbx_json_addobject(json, "tcache");
-
-		total = tcache_stats.hits + tcache_stats.misses;
-		zbx_json_adduint64(json, "hits", tcache_stats.hits);
-		zbx_json_adduint64(json, "misses", tcache_stats.misses);
-		zbx_json_adduint64(json, "all", total);
-		zbx_json_addfloat(json, "phits", (0 == total ? 0 : (double)tcache_stats.hits / total * 100));
-		zbx_json_addfloat(json, "pmisses", (0 == total ? 0 : (double)tcache_stats.misses / total * 100));
-
-		total = tcache_stats.items_num + tcache_stats.requests_num;
-		zbx_json_adduint64(json, "items", tcache_stats.items_num);
-		zbx_json_adduint64(json, "requests", tcache_stats.requests_num);
-		zbx_json_addfloat(json, "pitems", (0 == total ? 0 : (double)tcache_stats.items_num / total * 100));
-
-		zbx_json_close(json);
-	}
-
 	zbx_json_close(json);
 }
-

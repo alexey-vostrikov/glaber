@@ -18,7 +18,7 @@
 **/
 
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "glb_poller.h"
 
 #define SNMP_WALK_MAX_OIDS 100000

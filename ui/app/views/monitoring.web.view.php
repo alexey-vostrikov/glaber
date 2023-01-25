@@ -26,7 +26,6 @@
 $this->addJsFile('gtlc.js');
 $this->addJsFile('flickerfreescreen.js');
 $this->addJsFile('layout.mode.js');
-$this->addJsFile('multiselect.js');
 $this->addJsFile('class.tagfilteritem.js');
 
 $this->includeJsFile('monitoring.web.view.js.php');
@@ -34,14 +33,18 @@ $this->includeJsFile('monitoring.web.view.js.php');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-(new CWidget())
+(new CHtmlPage())
 	->setTitle(_('Web monitoring'))
 	->setWebLayoutMode($web_layout_mode)
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_WEB_VIEW))
 	->setControls(
-		(new CTag('nav', true, get_icon('kioskmode', ['mode' => $web_layout_mode])))
-			->setAttribute('aria-label', _('Content controls'))
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))
+		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'web.view')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'web.view'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFormItem((new CVar('action', 'web.view'))->removeId())
@@ -60,7 +63,6 @@ $web_layout_mode = $this->getLayoutMode();
 								'dstfrm' => 'zbx_filter',
 								'dstfld1' => 'filter_groupids_',
 								'with_httptests' => true,
-								'real_hosts' => true,
 								'enrich_parent_groups' => true
 							]
 						]
@@ -93,4 +95,8 @@ $web_layout_mode = $this->getLayoutMode();
 		])
 	)
 	->addItem($data['screen_view'])
+	->show();
+
+(new CScriptTag('view.init();'))
+	->setOnDocumentReady()
 	->show();

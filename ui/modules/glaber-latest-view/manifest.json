@@ -1,0 +1,21 @@
+{
+    "manifest_version": 2.0,
+    "id": "latest-data",
+    "name": "Latest data",
+    "version": "0.0.1",
+    "namespace": "GlaberLatestView",
+    "author": "Mikhail Makurov",
+    "url": "https://gitlab.com/mikler/glaber",
+    "description": "Latest data alternative with support of discovery items grouping and graphs preview",
+    
+    "actions": {
+        "latest.view": {
+            "class":    "CControllerGlaberLatestView",
+            "view" :    "module.glaber.latest.view"
+        },
+        "latest.view.refresh": {
+            "class":    "CControllerGlaberLatestViewRefresh",
+            "view" :    "module.glaber.latest.view.refresh"
+        }
+    }
+}

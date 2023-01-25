@@ -17,21 +17,23 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxstr.h"
+#include "zbxip.h"
+#include "zbxnum.h"
+
 #include "modbtype.h"
-#include "mutexs.h"
-#include "comms.h"
 
 #ifdef HAVE_LIBMODBUS
+#include "zbxmutexs.h"
 
+/* this block must be defined before <modbus.h> include */
 #ifdef _WINDOWS
 #	include "inttypes.h"
 #	ifdef HAVE_LIBMODBUS_STATIC
 #		define DLLBUILD
 #	endif
 #endif
-
-#include "modbus.h"
+#include <modbus.h>
 
 zbx_mutex_t	modbus_lock = ZBX_MUTEX_NULL;
 
@@ -118,7 +120,6 @@ static uint8_t	read_reg_8_less(uint16_t *reg16, modbus_endianness_t endianness)
 			MODBUS_GET_LOW_BYTE(*reg16) : MODBUS_GET_HIGH_BYTE(*reg16));
 }
 
-
 static void	set_serial_params_default(zbx_modbus_connection_serial *serial_params)
 {
 	serial_params->data_bits = 8;
@@ -127,8 +128,6 @@ static void	set_serial_params_default(zbx_modbus_connection_serial *serial_param
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: result_to_str                                                    *
  *                                                                            *
  * Purpose: converts result to a string                                       *
  *                                                                            *
@@ -228,8 +227,6 @@ end:
 
 /******************************************************************************
  *                                                                            *
- * Function: result_to_str_bit                                                *
- *                                                                            *
  * Purpose: converts bits result to a string                                  *
  *                                                                            *
  * Parameters: buf8       - [IN] modbus data                                  *
@@ -254,8 +251,6 @@ static char	*result_to_str_bit(uint8_t *buf8, unsigned short count)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: set_result                                                       *
  *                                                                            *
  * Purpose: set result                                                        *
  *                                                                            *
@@ -312,8 +307,6 @@ static void	set_result(uint16_t *buf, modbus_datatype_t type, modbus_endianness_
 
 /******************************************************************************
  *                                                                            *
- * Function: get_total_count                                                  *
- *                                                                            *
  * Purpose: get total count of bits/registers plus offset                     *
  *                                                                            *
  * Parameters: count  - [IN] count of sequenced same data type values to      *
@@ -355,8 +348,6 @@ static unsigned int	get_total_count(unsigned short count, unsigned short offset,
 
 /******************************************************************************
  *                                                                            *
- * Function: parse_params                                                     *
- *                                                                            *
  * Purpose: parse serial connection parameters                                *
  *                                                                            *
  * Parameters: params        - [IN] string holding parameters                 *
@@ -395,8 +386,6 @@ static int	parse_params(char *params, zbx_modbus_connection_serial *serial_param
 
 /******************************************************************************
  *                                                                            *
- * Function: endpoint_parse                                                   *
- *                                                                            *
  * Purpose: parse endpoint                                                    *
  *                                                                            *
  * Parameters: endpoint_str - [IN] string holding endpoint                    *
@@ -421,7 +410,7 @@ static int	endpoint_parse(char *endpoint_str, zbx_modbus_endpoint_t *endpoint)
 		endpoint->protocol = ZBX_MODBUS_PROTOCOL_TCP;
 		ptr = endpoint_str + ZBX_CONST_STRLEN(ZBX_MODBUS_PROTOCOL_PREFIX_TCP);
 
-		if (SUCCEED == (ret = parse_serveractive_element(ptr, &tmp, &port, ZBX_MODBUS_TCP_PORT_DEFAULT)))
+		if (SUCCEED == (ret = zbx_parse_serveractive_element(ptr, &tmp, &port, ZBX_MODBUS_TCP_PORT_DEFAULT)))
 		{
 			endpoint->conn_info.tcp.ip = tmp;
 			endpoint->conn_info.tcp.port = zbx_dsprintf(NULL, "%u", port);
@@ -440,7 +429,7 @@ static int	endpoint_parse(char *endpoint_str, zbx_modbus_endpoint_t *endpoint)
 
 			endpoint->conn_info.serial.port = NULL;
 			zbx_strncpy_alloc(&endpoint->conn_info.serial.port, &alloc_len, &offset, ptr, tmp - ptr);
-			zbx_strsplit(++tmp, ':', &baudrate_str, &ptr);
+			zbx_strsplit_first(++tmp, ':', &baudrate_str, &ptr);
 			endpoint->conn_info.serial.baudrate = atoi(baudrate_str);
 			zbx_free(baudrate_str);
 
@@ -483,8 +472,6 @@ static int	endpoint_parse(char *endpoint_str, zbx_modbus_endpoint_t *endpoint)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: modbus_read_data                                                 *
  *                                                                            *
  * Purpose: request and read modbus data                                      *
  *                                                                            *
@@ -558,7 +545,6 @@ static int	modbus_read_data(zbx_modbus_endpoint_t *endpoint, unsigned char slave
 	else
 		dst16 = zbx_malloc(NULL, sizeof(uint16_t) * total_count);
 
-
 	LOCK_MODBUS;
 
 	if (0 !=  modbus_connect(mdb_ctx))
@@ -621,7 +607,7 @@ out:
 }
 #endif /* HAVE_LIBMODBUS */
 
-int	MODBUS_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	modbus_get(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 #ifdef HAVE_LIBMODBUS
 	char			*tmp, *err = NULL;
@@ -656,7 +642,7 @@ int	MODBUS_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
 	{
 		slaveid = ZBX_MODBUS_PROTOCOL_TCP == endpoint.protocol ? 255 : 1;
 	}
-	else if (FAIL == is_uint_n_range(tmp, ZBX_SIZE_T_MAX, &slaveid, sizeof(unsigned char),
+	else if (FAIL == zbx_is_uint_n_range(tmp, ZBX_SIZE_T_MAX, &slaveid, sizeof(unsigned char),
 			ZBX_MODBUS_PROTOCOL_TCP == endpoint.protocol ? 0 : 1,
 			ZBX_MODBUS_PROTOCOL_TCP == endpoint.protocol ? 255 : 247))
 	{
@@ -669,7 +655,7 @@ int	MODBUS_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
 	{
 		function = ZBX_MODBUS_FUNCTION_EMPTY;
 	}
-	else if (FAIL == is_uint_n_range(tmp, ZBX_SIZE_T_MAX, &function, sizeof(unsigned char), 1, 4))
+	else if (FAIL == zbx_is_uint_n_range(tmp, ZBX_SIZE_T_MAX, &function, sizeof(unsigned char), 1, 4))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
 		goto err;
@@ -683,7 +669,7 @@ int	MODBUS_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
 		if (ZBX_MODBUS_FUNCTION_EMPTY == function)
 			function = ZBX_MODBUS_FUNCTION_COIL;
 	}
-	else if (FAIL == is_ushort(tmp, &address))
+	else if (FAIL == zbx_is_ushort(tmp, &address))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
 		goto err;
@@ -722,7 +708,7 @@ int	MODBUS_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
 	{
 		count = 1;
 	}
-	else if (FAIL == is_ushort(tmp, &count) || 0 == count)
+	else if (FAIL == zbx_is_ushort(tmp, &count) || 0 == count)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifth parameter."));
 		goto err;
@@ -818,7 +804,7 @@ int	MODBUS_GET(AGENT_REQUEST *request, AGENT_RESULT *result)
 	{
 		offset = 0;
 	}
-	else if (FAIL == is_ushort(tmp, &offset))
+	else if (FAIL == zbx_is_ushort(tmp, &offset))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid eighth parameter."));
 		goto err;
@@ -857,8 +843,6 @@ err:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_init_modbus                                                  *
  *                                                                            *
  * Purpose: create modbus mutex                                               *
  *                                                                            *

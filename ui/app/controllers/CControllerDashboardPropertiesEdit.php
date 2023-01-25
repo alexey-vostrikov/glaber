@@ -27,11 +27,11 @@ class CControllerDashboardPropertiesEdit extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'template' => 'in 1',
-			'userid' => 'db users.userid',
-			'name' => 'required|db dashboard.name',
-			'display_period' => 'required|db dashboard.display_period|in '.implode(',', DASHBOARD_DISPLAY_PERIODS),
-			'auto_start' => 'required|db dashboard.auto_start|in 0,1'
+			'template' =>		'in 1',
+			'userid' =>			'db users.userid',
+			'name' =>			'required|db dashboard.name',
+			'display_period' =>	'required|db dashboard.display_period|in '.implode(',', DASHBOARD_DISPLAY_PERIODS),
+			'auto_start' =>		'required|db dashboard.auto_start|in 0,1'
 		];
 
 		$ret = $this->validateInput($fields);
@@ -44,9 +44,11 @@ class CControllerDashboardPropertiesEdit extends CController {
 
 		if (!$ret) {
 			$this->setResponse(
-				(new CControllerResponseData([
-					'main_block' => json_encode(['errors' => getMessages()->toString()])
-				]))->disableView()
+				(new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])]))->disableView()
 			);
 		}
 

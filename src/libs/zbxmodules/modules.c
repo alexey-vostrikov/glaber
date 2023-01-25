@@ -17,12 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
-#include "module.h"
 #include "zbxmodules.h"
+#include "module.h"
 
+#include "zbxstr.h"
 #include "log.h"
-#include "sysinfo.h"
+#include "zbxsysinfo.h"
 #include "zbxalgo.h"
 
 #define ZBX_MODULE_FUNC_INIT			"zbx_module_init"
@@ -50,60 +50,7 @@ zbx_history_string_cb_t		*history_string_cbs = NULL;
 zbx_history_text_cb_t		*history_text_cbs = NULL;
 zbx_history_log_cb_t		*history_log_cbs = NULL;
 
-/******************************************************************************
- *                                                                            *
- * Function: zbx_register_module_items                                        *
- *                                                                            *
- * Purpose: add items supported by module                                     *
- *                                                                            *
- * Parameters: metrics       - list of items supported by module              *
- *             error         - error buffer                                   *
- *             max_error_len - error buffer size                              *
- *                                                                            *
- * Return value: SUCCEED - all module items were added or there were none     *
- *               FAIL    - otherwise                                          *
- *                                                                            *
- ******************************************************************************/
-static int	zbx_register_module_items(ZBX_METRIC *metrics, char *error, size_t max_error_len)
-{
-	int	i;
-
-	for (i = 0; NULL != metrics[i].key; i++)
-	{
-		/* accept only CF_HAVEPARAMS flag from module items */
-		metrics[i].flags &= CF_HAVEPARAMS;
-		/* the flag means that the items comes from a loadable module */
-		metrics[i].flags |= CF_MODULE;
-
-		if (SUCCEED != add_metric(&metrics[i], error, max_error_len))
-			return FAIL;
-	}
-
-	return SUCCEED;
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: zbx_register_module                                              *
- *                                                                            *
- * Purpose: add module to the list of successfully loaded modules             *
- *                                                                            *
- ******************************************************************************/
-static zbx_module_t	*zbx_register_module(void *lib, char *name)
-{
-	zbx_module_t	*module;
-
-	module = (zbx_module_t *)zbx_malloc(NULL, sizeof(zbx_module_t));
-	module->lib = lib;
-	module->name = zbx_strdup(NULL, name);
-	zbx_vector_ptr_append(&modules, module);
-
-	return module;
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: zbx_register_callback			                                  *
+/* Function: register_callback			                                  *
  *                                                                            *
  * Purpose: adds callnack function and it's data to callback of a type        *
  *                                                                            *
@@ -127,9 +74,10 @@ int  glb_register_callback(u_int16_t cb_type, void (*cb_cb)(void), void * cb_dat
 
 	return SUCCEED;
 }
+
 /******************************************************************************
  *                                                                            *
- * Function: zbx_register_module_functions                                    *
+ * Function: register_module_functions                                    *
  *                                                                            *
  * Purpose: registers callback functions whatever present int the lib         *
  *                                                                            *
@@ -177,7 +125,52 @@ static void glb_register_module_functions(void *lib, char *name, void *data_ptr,
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_register_history_write_cbs                                   *
+ * Purpose: add items supported by module                                     *
+ *                                                                            *
+ * Parameters: metrics       - list of items supported by module              *
+ *             error         - error buffer                                   *
+ *             max_error_len - error buffer size                              *
+ *                                                                            *
+ * Return value: SUCCEED - all module items were added or there were none     *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ ******************************************************************************/
+static int	zbx_register_module_items(ZBX_METRIC *metrics, char *error, size_t max_error_len)
+{
+	int	i;
+
+	for (i = 0; NULL != metrics[i].key; i++)
+	{
+		/* accept only CF_HAVEPARAMS flag from module items */
+		metrics[i].flags &= CF_HAVEPARAMS;
+		/* the flag means that the items comes from a loadable module */
+		metrics[i].flags |= CF_MODULE;
+
+		if (SUCCEED != zbx_add_metric(&metrics[i], error, max_error_len))
+			return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: add module to the list of successfully loaded modules             *
+ *                                                                            *
+ ******************************************************************************/
+static zbx_module_t	*zbx_register_module(void *lib, char *name)
+{
+	zbx_module_t	*module;
+
+	module = (zbx_module_t *)zbx_malloc(NULL, sizeof(zbx_module_t));
+	module->lib = lib;
+	module->name = zbx_strdup(NULL, name);
+	zbx_vector_ptr_append(&modules, module);
+
+	return module;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: registers callback functions for history export                   *
  *                                                                            *
@@ -193,14 +186,16 @@ static void	zbx_register_history_write_cbs(zbx_module_t *module, ZBX_HISTORY_WRI
 
 		if (NULL == history_float_cbs)
 		{
-			history_float_cbs = (zbx_history_float_cb_t *)zbx_malloc(history_float_cbs, sizeof(zbx_history_float_cb_t));
+			history_float_cbs = (zbx_history_float_cb_t *)zbx_malloc(history_float_cbs,
+					sizeof(zbx_history_float_cb_t));
 			history_float_cbs[0].module = NULL;
 		}
 
 		while (NULL != history_float_cbs[j].module)
 			j++;
 
-		history_float_cbs = (zbx_history_float_cb_t *)zbx_realloc(history_float_cbs, (j + 2) * sizeof(zbx_history_float_cb_t));
+		history_float_cbs = (zbx_history_float_cb_t *)zbx_realloc(history_float_cbs, (j + 2) *
+				sizeof(zbx_history_float_cb_t));
 		history_float_cbs[j].module = module;
 		history_float_cbs[j].history_float_cb = history_write_cbs.history_float_cb;
 		history_float_cbs[j + 1].module = NULL;
@@ -212,14 +207,16 @@ static void	zbx_register_history_write_cbs(zbx_module_t *module, ZBX_HISTORY_WRI
 
 		if (NULL == history_integer_cbs)
 		{
-			history_integer_cbs = (zbx_history_integer_cb_t *)zbx_malloc(history_integer_cbs, sizeof(zbx_history_integer_cb_t));
+			history_integer_cbs = (zbx_history_integer_cb_t *)zbx_malloc(history_integer_cbs,
+					sizeof(zbx_history_integer_cb_t));
 			history_integer_cbs[0].module = NULL;
 		}
 
 		while (NULL != history_integer_cbs[j].module)
 			j++;
 
-		history_integer_cbs = (zbx_history_integer_cb_t *)zbx_realloc(history_integer_cbs, (j + 2) * sizeof(zbx_history_integer_cb_t));
+		history_integer_cbs = (zbx_history_integer_cb_t *)zbx_realloc(history_integer_cbs, (j + 2) *
+				sizeof(zbx_history_integer_cb_t));
 		history_integer_cbs[j].module = module;
 		history_integer_cbs[j].history_integer_cb = history_write_cbs.history_integer_cb;
 		history_integer_cbs[j + 1].module = NULL;
@@ -231,14 +228,16 @@ static void	zbx_register_history_write_cbs(zbx_module_t *module, ZBX_HISTORY_WRI
 
 		if (NULL == history_string_cbs)
 		{
-			history_string_cbs = (zbx_history_string_cb_t *)zbx_malloc(history_string_cbs, sizeof(zbx_history_string_cb_t));
+			history_string_cbs = (zbx_history_string_cb_t *)zbx_malloc(history_string_cbs,
+					sizeof(zbx_history_string_cb_t));
 			history_string_cbs[0].module = NULL;
 		}
 
 		while (NULL != history_string_cbs[j].module)
 			j++;
 
-		history_string_cbs = (zbx_history_string_cb_t *)zbx_realloc(history_string_cbs, (j + 2) * sizeof(zbx_history_string_cb_t));
+		history_string_cbs = (zbx_history_string_cb_t *)zbx_realloc(history_string_cbs, (j + 2) *
+				sizeof(zbx_history_string_cb_t));
 		history_string_cbs[j].module = module;
 		history_string_cbs[j].history_string_cb = history_write_cbs.history_string_cb;
 		history_string_cbs[j + 1].module = NULL;
@@ -250,14 +249,16 @@ static void	zbx_register_history_write_cbs(zbx_module_t *module, ZBX_HISTORY_WRI
 
 		if (NULL == history_text_cbs)
 		{
-			history_text_cbs = (zbx_history_text_cb_t *)zbx_malloc(history_text_cbs, sizeof(zbx_history_text_cb_t));
+			history_text_cbs = (zbx_history_text_cb_t *)zbx_malloc(history_text_cbs,
+					sizeof(zbx_history_text_cb_t));
 			history_text_cbs[0].module = NULL;
 		}
 
 		while (NULL != history_text_cbs[j].module)
 			j++;
 
-		history_text_cbs = (zbx_history_text_cb_t *)zbx_realloc(history_text_cbs, (j + 2) * sizeof(zbx_history_text_cb_t));
+		history_text_cbs = (zbx_history_text_cb_t *)zbx_realloc(history_text_cbs, (j + 2) *
+				sizeof(zbx_history_text_cb_t));
 		history_text_cbs[j].module = module;
 		history_text_cbs[j].history_text_cb = history_write_cbs.history_text_cb;
 		history_text_cbs[j + 1].module = NULL;
@@ -269,14 +270,16 @@ static void	zbx_register_history_write_cbs(zbx_module_t *module, ZBX_HISTORY_WRI
 
 		if (NULL == history_log_cbs)
 		{
-			history_log_cbs = (zbx_history_log_cb_t *)zbx_malloc(history_log_cbs, sizeof(zbx_history_log_cb_t));
+			history_log_cbs = (zbx_history_log_cb_t *)zbx_malloc(history_log_cbs,
+					sizeof(zbx_history_log_cb_t));
 			history_log_cbs[0].module = NULL;
 		}
 
 		while (NULL != history_log_cbs[j].module)
 			j++;
 
-		history_log_cbs = (zbx_history_log_cb_t *)zbx_realloc(history_log_cbs, (j + 2) * sizeof(zbx_history_log_cb_t));
+		history_log_cbs = (zbx_history_log_cb_t *)zbx_realloc(history_log_cbs, (j + 2) *
+				sizeof(zbx_history_log_cb_t));
 		history_log_cbs[j].module = module;
 		history_log_cbs[j].history_log_cb = history_write_cbs.history_log_cb;
 		history_log_cbs[j + 1].module = NULL;
@@ -294,8 +297,6 @@ static int	zbx_module_compare_func(const void *d1, const void *d2)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_load_module                                                  *
  *                                                                            *
  * Purpose: load loadable module                                              *
  *                                                                            *
@@ -347,7 +348,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 		return SUCCEED;
 	}
 
-	if (NULL == (func_version = (int (*)(void))dlsym(lib, ZBX_MODULE_FUNC_API_VERSION)))
+	if (NULL == (*(void **)(&func_version) = dlsym(lib, ZBX_MODULE_FUNC_API_VERSION)))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot find \"" ZBX_MODULE_FUNC_API_VERSION "()\""
 				" function in module \"%s\": %s", name, dlerror());
@@ -385,7 +386,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 		return SUCCEED;
 	}
 
-	if (NULL == (func_init = (int (*)(void))dlsym(lib, ZBX_MODULE_FUNC_INIT)))
+	if (NULL == (*(void **)(&func_init) = dlsym(lib, ZBX_MODULE_FUNC_INIT)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot find \"" ZBX_MODULE_FUNC_INIT "()\""
 				" function in module \"%s\": %s", name, dlerror());
@@ -396,8 +397,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 		goto fail;
 	}
 
-	
-	if (NULL == (func_list = (ZBX_METRIC *(*)(void))dlsym(lib, ZBX_MODULE_FUNC_ITEM_LIST)))
+	if (NULL == (*(void **)(&func_list) = dlsym(lib, ZBX_MODULE_FUNC_ITEM_LIST)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot find \"" ZBX_MODULE_FUNC_ITEM_LIST "()\""
 				" function in module \"%s\": %s", name, dlerror());
@@ -410,7 +410,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 			goto fail;
 		}
 
-		if (NULL == (func_timeout = (void (*)(int))dlsym(lib, ZBX_MODULE_FUNC_ITEM_TIMEOUT)))
+		if (NULL == (*(void **)(&func_timeout) = dlsym(lib, ZBX_MODULE_FUNC_ITEM_TIMEOUT)))
 		{
 			zabbix_log(LOG_LEVEL_DEBUG, "cannot find \"" ZBX_MODULE_FUNC_ITEM_TIMEOUT "()\""
 					" function in module \"%s\": %s", name, dlerror());
@@ -422,8 +422,7 @@ static int	zbx_load_module(const char *path, char *name, int timeout)
 	/* module passed validation and can now be registered */
 	module = zbx_register_module(lib, name);
 
-	if (NULL == (func_history_write_cbs = (ZBX_HISTORY_WRITE_CBS (*)(void))dlsym(lib,
-			ZBX_MODULE_FUNC_HISTORY_WRITE_CBS)))
+	if (NULL == (*(void **)(&func_history_write_cbs) = dlsym(lib, ZBX_MODULE_FUNC_HISTORY_WRITE_CBS)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot find \"" ZBX_MODULE_FUNC_HISTORY_WRITE_CBS "()\""
 				" function in module \"%s\": %s", name, dlerror());
@@ -439,8 +438,6 @@ fail:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_load_modules                                                 *
  *                                                                            *
  * Purpose: load loadable modules (dynamic libraries)                         *
  *                                                                            *
@@ -496,8 +493,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_unload_module                                                *
- *                                                                            *
  * Purpose: unload module and free allocated resources                        *
  *                                                                            *
  ******************************************************************************/
@@ -506,7 +501,7 @@ static void	zbx_unload_module(void *data)
 	zbx_module_t	*module = (zbx_module_t *)data;
 	int		(*func_uninit)(void);
 
-	if (NULL == (func_uninit = (int (*)(void))dlsym(module->lib, ZBX_MODULE_FUNC_UNINIT)))
+	if (NULL == (*(void **)(&func_uninit) = dlsym(module->lib, ZBX_MODULE_FUNC_UNINIT)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "cannot find \"" ZBX_MODULE_FUNC_UNINIT "()\""
 				" function in module \"%s\": %s", module->name, dlerror());
@@ -520,8 +515,6 @@ static void	zbx_unload_module(void *data)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_unload_modules                                               *
  *                                                                            *
  * Purpose: Unload already loaded loadable modules (dynamic libraries).       *
  *          It is called on process shutdown.                                 *

@@ -21,18 +21,23 @@
 
 /**
  * @var CView $this
+ * @var array $data
  */
 
-$pageHeader = (new CPageHeader(_('Fatal error, please report to the Glaber team')))
-	->addCssFile('assets/styles/'.CHtml::encode($data['theme']).'.css')
-	->display();
+$page_header = (new CHtmlPageHeader(_('Fatal error, please report to the Glaber team'), CWebUser::getLang()));
+
+$page_header
+	->setTheme($data['theme'])
+	->addCssFile('assets/styles/'.$page_header->getTheme().'.css')
+	->show();
 
 $buttons = [
 	(new CButton('back', _s('Go to "%1$s"', CMenuHelper::getFirstLabel())))
-		->onClick('javascript: document.location = "'.CMenuHelper::getFirstUrl().'"'
-)];
+		->setAttribute('data-url', CMenuHelper::getFirstUrl())
+		->onClick('document.location = this.dataset.url;')
+];
 
-echo '<body lang="'.CWebUser::getLang().'">';
+echo '<body';
 
 (new CDiv((new CTag('main', true,
 	new CWarning(_('Fatal error, please report to the Glaber issues'), $data['messages'], $buttons)

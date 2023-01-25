@@ -161,11 +161,12 @@ class CLocalApiClient extends CApiClient {
 	 */
 	protected function authenticate($auth) {
 		if (zbx_empty($auth)) {
-			throw new APIException(ZBX_API_ERROR_NO_AUTH, _('Not authorised.'));
+			throw new APIException(ZBX_API_ERROR_NO_AUTH, _('Not authorized.'));
 		}
 
 		if (strlen($auth) == 64) {
-			return $this->tokenAuthentication($auth);
+			$this->tokenAuthentication($auth);
+			return;
 		}
 
 		$user = $this->serviceFactory->getObject('user')->checkAuthentication(['sessionid' => $auth]);
@@ -189,7 +190,7 @@ class CLocalApiClient extends CApiClient {
 
 		if (!$api_tokens) {
 			usleep(10000);
-			throw new APIException(ZBX_API_ERROR_NO_AUTH, _('Not authorised.'));
+			throw new APIException(ZBX_API_ERROR_NO_AUTH, _('Not authorized.'));
 		}
 
 		[['expires_at' => $expires_at, 'userid' => $userid, 'tokenid' => $tokenid]] = $api_tokens;
@@ -198,8 +199,8 @@ class CLocalApiClient extends CApiClient {
 			throw new APIException(ZBX_API_ERROR_PERMISSIONS, _('API token expired.'));
 		}
 
-		[['roleid' => $roleid, 'username' => $username]] = DB::select('users', [
-			'output' => ['roleid', 'username'],
+		[['roleid' => $roleid, 'username' => $username, 'name' => $name, 'surname' => $surname]] = DB::select('users', [
+			'output' => ['roleid', 'username', 'name', 'surname'],
 			'userids' => $userid
 		]);
 
@@ -215,7 +216,7 @@ class CLocalApiClient extends CApiClient {
 		$debug_mode = GROUP_DEBUG_MODE_DISABLED;
 		while ($db_usrgrp = DBfetch($db_usrgrps)) {
 			if ($db_usrgrp['users_status'] == GROUP_STATUS_DISABLED) {
-				throw new APIException(ZBX_API_ERROR_NO_AUTH, _('Not authorised.'));
+				throw new APIException(ZBX_API_ERROR_NO_AUTH, _('Not authorized.'));
 			}
 
 			if ($db_usrgrp['debug_mode'] == GROUP_DEBUG_MODE_ENABLED) {
@@ -227,6 +228,8 @@ class CLocalApiClient extends CApiClient {
 		CApiService::$userData = [
 			'userid' => $userid,
 			'username' => $username,
+			'name' => $name,
+			'surname' => $surname,
 			'type' => $type,
 			'roleid' => $roleid,
 			'userip' => CWebUser::getIp(),
@@ -303,12 +306,12 @@ class CLocalApiClient extends CApiClient {
 
 		$exists_action_rule = array_key_exists('action', $method_rules);
 
-		$name_conditions = 'name LIKE '.zbx_dbstr(CRoleHelper::SECTION_API.'%');
+		$name_conditions = 'name LIKE '.zbx_dbstr('api%');
 		if ($exists_action_rule) {
 			$name_conditions = '('.
 				$name_conditions.
 				' OR name='.zbx_dbstr($method_rules['action']).
-				' OR name='.zbx_dbstr(CRoleHelper::ACTIONS_DEFAULT_ACCESS).
+				' OR name='.zbx_dbstr('actions.default_access').
 			')';
 		}
 
@@ -320,31 +323,31 @@ class CLocalApiClient extends CApiClient {
 			' ORDER by name'
 		);
 
-		$api_access_mode = (bool) CRoleHelper::API_MODE_DENY;
+		$api_access_mode = false;
 		$api_methods = [];
-		$actions_default_access = (bool) CRoleHelper::DEFAULT_ACCESS_ENABLED;
+		$actions_default_access = true;
 		$is_action_allowed = null;
 
 		while ($db_rule = DBfetch($db_rules)) {
-			$rule_value = $db_rule[CRole::RULE_VALUE_TYPES[$db_rule['type']]];
+			$rule_value = $db_rule[CRole::RULE_TYPE_FIELDS[$db_rule['type']]];
 
 			switch ($db_rule['name']) {
-				case CRoleHelper::API_ACCESS:
-					if ($rule_value == CRoleHelper::API_ACCESS_DISABLED) {
+				case 'api.access':
+					if ($rule_value == 0) {
 						return false;
 					}
 					break;
 
-				case CRoleHelper::API_MODE:
+				case 'api.mode':
 					$api_access_mode = (bool) $rule_value;
 					break;
 
-				case CRoleHelper::ACTIONS_DEFAULT_ACCESS:
+				case 'actions.default_access':
 					$actions_default_access = (bool) $rule_value;
 					break;
 
 				default:
-					if (strpos($db_rule['name'], CRoleHelper::API_METHOD) === 0) {
+					if (strpos($db_rule['name'], 'api.method.') === 0) {
 						$api_methods[] = $rule_value;
 					}
 					elseif ($exists_action_rule && $db_rule['name'] === $method_rules['action']) {
@@ -366,7 +369,7 @@ class CLocalApiClient extends CApiClient {
 		}
 
 		$api_method_masks = [
-			CRoleHelper::API_WILDCARD, CRoleHelper::API_WILDCARD_ALIAS, CRoleHelper::API_ANY_SERVICE.$method,
+			ZBX_ROLE_RULE_API_WILDCARD, ZBX_ROLE_RULE_API_WILDCARD_ALIAS, CRoleHelper::API_ANY_SERVICE.$method,
 			$api.CRoleHelper::API_ANY_METHOD
 		];
 		foreach ($api_methods as $api_method) {

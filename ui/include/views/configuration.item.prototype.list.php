@@ -23,17 +23,25 @@
  * @var CView $this
  */
 
-$widget = (new CWidget())
+require_once dirname(__FILE__).'/js/configuration.item.prototype.list.js.php';
+
+$html_page = (new CHtmlPage())
 	->setTitle(_('Item prototypes'))
+	->setDocUrl(CDocHelper::getUrl($data['context'] === 'host'
+		? CDocHelper::DATA_COLLECTION_HOST_ITEM_PROTOTYPE_LIST
+		: CDocHelper::DATA_COLLECTION_TEMPLATES_ITEM_PROTOTYPE_LIST
+	))
 	->setControls(
 		(new CTag('nav', true,
-			(new CList())->addItem(new CRedirectButton(_('Create item prototype'),
-				(new CUrl('disc_prototypes.php'))
-					->setArgument('form', 'create')
-					->setArgument('parent_discoveryid', $data['parent_discoveryid'])
-					->setArgument('context', $data['context'])
-					->getUrl()
-			))
+			(new CList())
+				->addItem(
+					new CRedirectButton(_('Create item prototype'),
+						(new CUrl('disc_prototypes.php'))
+							->setArgument('form', 'create')
+							->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+							->setArgument('context', $data['context'])
+					)
+				)
 		))->setAttribute('aria-label', _('Content controls'))
 	)
 	->setNavigation(getHostNavigation('items', $data['hostid'], $data['parent_discoveryid']));
@@ -46,8 +54,8 @@ $url = (new CUrl('disc_prototypes.php'))
 // create form
 $itemForm = (new CForm('post', $url))
 	->setName('items')
-	->addVar('parent_discoveryid', $data['parent_discoveryid'])
-	->addVar('context', $data['context']);
+	->addVar('parent_discoveryid', $data['parent_discoveryid'], 'form_parent_discoveryid')
+	->addVar('context', $data['context'], 'form_context');
 
 // create table
 $itemTable = (new CTableInfo())
@@ -55,7 +63,7 @@ $itemTable = (new CTableInfo())
 		(new CColHeader(
 			(new CCheckBox('all_items'))->onClick("checkAll('".$itemForm->getName()."', 'all_items', 'group_itemid');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
-		_('Wizard'),
+		'',
 		make_sorting_header(_('Name'),'name', $data['sort'], $data['sortorder'], $url),
 		make_sorting_header(_('Key'), 'key_', $data['sort'], $data['sortorder'], $url),
 		make_sorting_header(_('Interval'), 'delay', $data['sort'], $data['sortorder'], $url),
@@ -77,7 +85,7 @@ foreach ($data['items'] as $item) {
 
 	if ($item['type'] == ITEM_TYPE_DEPENDENT) {
 		if ($item['master_item']['type'] == ITEM_TYPE_HTTPTEST) {
-			$description[] = CHtml::encode($item['master_item']['name_expanded']);
+			$description[] = CHtml::encode($item['master_item']['name']);
 		}
 		else {
 			$link = ($item['master_item']['source'] === 'itemprototypes')
@@ -89,7 +97,7 @@ foreach ($data['items'] as $item) {
 					->setArgument('filter_hostids', [$item['hostid']])
 					->setArgument('context', $data['context']);
 
-			$description[] = (new CLink(CHtml::encode($item['master_item']['name_expanded']),
+			$description[] = (new CLink(CHtml::encode($item['master_item']['name']),
 				$link
 					->setArgument('form', 'update')
 					->setArgument('itemid', $item['master_item']['itemid'])
@@ -104,7 +112,7 @@ foreach ($data['items'] as $item) {
 	}
 
 	$description[] = new CLink(
-		$item['name_expanded'],
+		$item['name'],
 		(new CUrl('disc_prototypes.php'))
 			->setArgument('form', 'update')
 			->setArgument('parent_discoveryid', $data['parent_discoveryid'])
@@ -143,11 +151,18 @@ foreach ($data['items'] as $item) {
 		$item['delay'] = $update_interval_parser->getDelay();
 	}
 
-	$item_menu = CMenuPopupHelper::getItemPrototype(['itemid' => $item['itemid'], 'context' => $data['context']]);
+	$item_menu = CMenuPopupHelper::getItemPrototype([
+		'itemid' => $item['itemid'],
+		'context' => $data['context'],
+		'backurl' => (new CUrl('disc_prototypes.php'))
+			->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+			->setArgument('context', $data['context'])
+			->getUrl()
+	]);
 
-	$wizard = (new CSpan(
-		(new CButton(null))->addClass(ZBX_STYLE_ICON_WZRD_ACTION)->setMenuPopup($item_menu)
-	))->addClass(ZBX_STYLE_REL_CONTAINER);
+	$wizard = (new CButton(null))
+		->addClass(ZBX_STYLE_ICON_WIZARD_ACTION)
+		->setMenuPopup($item_menu);
 
 	$nodiscover = ($item['discover'] == ZBX_PROTOTYPE_NO_DISCOVER);
 	$discover = (new CLink($nodiscover ? _('No') : _('Yes'),
@@ -171,8 +186,16 @@ foreach ($data['items'] as $item) {
 		$description,
 		(new CDiv(CHtml::encode($item['key_'])))->addClass(ZBX_STYLE_WORDWRAP),
 		$item['delay'],
-		$item['history'],
-		$item['trends'],
+		$item['history'] > 0 ?
+			(new CSpan(""))
+		  		->setAttribute("data-indicator","mark")
+		  		->setAttribute("data-indicator-value",1)
+				: " ",
+		$item['trends'] > 0 ?
+			(new CSpan(""))
+				->setAttribute("data-indicator","mark")
+				->setAttribute("data-indicator-value",1)
+				: " ",
 		item_type2str($item['type']),
 		$status,
 		$discover,
@@ -194,7 +217,12 @@ $itemForm->addItem([
 			],
 			'popup.massupdate.itemprototype' => [
 				'content' => (new CButton('', _('Mass update')))
-					->onClick("return openMassupdatePopup(this, 'popup.massupdate.itemprototype');")
+					->onClick(
+						"openMassupdatePopup('popup.massupdate.itemprototype', {}, {
+							dialogue_class: 'modal-popup-preprocessing',
+							trigger_element: this
+						});"
+					)
 					->addClass(ZBX_STYLE_BTN_ALT)
 					->removeAttribute('id')
 			],
@@ -206,7 +234,6 @@ $itemForm->addItem([
 	)
 ]);
 
-// append form to widget
-$widget->addItem($itemForm);
-
-$widget->show();
+$html_page
+	->addItem($itemForm)
+	->show();

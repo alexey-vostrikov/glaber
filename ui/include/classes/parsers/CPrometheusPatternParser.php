@@ -31,6 +31,7 @@ class CPrometheusPatternParser extends CParser {
 
 	private $user_macro_parser;
 	private $lld_macro_parser;
+	private $lld_macro_function_parser;
 
 	public function __construct($options = []) {
 		if (array_key_exists('usermacros', $options)) {
@@ -45,6 +46,7 @@ class CPrometheusPatternParser extends CParser {
 		}
 		if ($this->options['lldmacros']) {
 			$this->lld_macro_parser = new CLLDMacroParser();
+			$this->lld_macro_function_parser = new CLLDMacroFunctionParser();
 		}
 	}
 
@@ -138,6 +140,12 @@ class CPrometheusPatternParser extends CParser {
 
 			return true;
 		}
+		elseif ($this->options['lldmacros']
+				&& $this->lld_macro_function_parser->parse($source, $pos) != self::PARSE_FAIL) {
+			$pos += $this->lld_macro_function_parser->getLength();
+
+			return true;
+		}
 
 		return false;
 	}
@@ -176,6 +184,10 @@ class CPrometheusPatternParser extends CParser {
 		elseif ($this->options['lldmacros'] && $this->lld_macro_parser->parse($source, $pos) != self::PARSE_FAIL) {
 			$p += $this->lld_macro_parser->getLength();
 		}
+		elseif ($this->options['lldmacros']
+				&& $this->lld_macro_function_parser->parse($source, $pos) != self::PARSE_FAIL) {
+			$p += $this->lld_macro_function_parser->getLength();
+		}
 		else {
 			return false;
 		}
@@ -183,13 +195,26 @@ class CPrometheusPatternParser extends CParser {
 		self::skipWhitespaces($source, $p);
 
 		// Parse operator.
-		if (!isset($source[$p]) || $source[$p] !== '=') {
+		if (!isset($source[$p]) || !isset($source[$p + 1])) {
+			// Even if $p + 1 is not part of the operator, we still must have a character there
 			return false;
 		}
-		$p++;
 
-		if (isset($source[$p]) && $source[$p] === '~') {
-			$p++;
+		if ($source[$p] === '=') {
+			if ($source[$p + 1] === '~') {
+				$p += 2; // =~
+			} else {
+				$p += 1; // =
+			}
+		}
+		elseif ($source[$p] === '!') {
+			if ($source[$p + 1] !== '=' && $source[$p + 1] !== '~') {
+				return false;
+			}
+			$p += 2; // != or !~
+		}
+		else {
+			return false;
 		}
 
 		self::skipWhitespaces($source, $p);
@@ -305,6 +330,12 @@ class CPrometheusPatternParser extends CParser {
 		}
 		elseif ($this->options['lldmacros'] && $this->lld_macro_parser->parse($source, $pos) != self::PARSE_FAIL) {
 			$pos += $this->lld_macro_parser->getLength();
+
+			return true;
+		}
+		elseif ($this->options['lldmacros']
+				&& $this->lld_macro_function_parser->parse($source, $pos) != self::PARSE_FAIL) {
+			$pos += $this->lld_macro_function_parser->getLength();
 
 			return true;
 		}

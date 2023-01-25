@@ -19,13 +19,19 @@
 **/
 
 
+/**
+ * @var CView $this
+ * @var array $data
+ */
+
 if ($data['uncheck']) {
 	uncheckTableRows('modules');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Modules'))
 	->setTitleSubmenu(getAdministrationGeneralSubmenu())
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_MODULE_LIST))
 	->setControls(
 		(new CTag('nav', true,
 			(new CForm())
@@ -36,7 +42,8 @@ $widget = (new CWidget())
 		))->setAttribute('aria-label', _('Content controls'))
 	)
 	->addItem(
-		(new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'module.list')))
+		(new CFilter())
+			->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'module.list'))
 			->addVar('action', 'module.list')
 			->setProfile($data['filter_profile'])
 			->setActiveTab($data['filter_active_tab'])
@@ -125,6 +132,6 @@ $form->addItem([
 ]);
 
 // append form to widget
-$widget->addItem($form);
+$html_page->addItem($form);
 
-$widget->show();
+$html_page->show();

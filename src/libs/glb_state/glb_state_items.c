@@ -16,7 +16,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "zbxcommon.h"
 
 #include "zbxalgo.h"
 #include "glb_state.h"
@@ -1220,21 +1220,16 @@ static int parse_json_item_values(struct zbx_json_parse *jp, elems_hash_elem_t *
         if (SUCCEED == zbx_json_brackets_open(value_ptr, &jp_value) &&
             SUCCEED == json_to_hist_record(&jp_value, elm->value_type, &h))
         {
-
             add_value_cb(elem, memf,  &h);
             i++;
         }
-
     }
     return i;
 }
 
-static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
+DUMPER_FROM_JSON(unmarshall_item_cb)
 {
-
-    struct zbx_json_parse *jp = (struct zbx_json_parse *)data,
-                          jp_state, jp_demand, jp_values;
-
+    struct zbx_json_parse jp_state, jp_demand, jp_values;
     item_elem_t *elm = (item_elem_t *)elem->data;
     
     if (SUCCEED != parse_json_item_fields(jp, elm))
@@ -1242,13 +1237,11 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         LOG_INF("Couldn't parse item fields %s", jp->start);
         return FAIL;
     }
-    
 
     if (SUCCEED != zbx_json_brackets_by_name(jp, "item_metadata", &jp_state) ||
         SUCCEED != zbx_json_brackets_by_name(jp, "demand", &jp_demand) ||
         SUCCEED != zbx_json_brackets_by_name(jp, "values", &jp_values))
     {
-
         LOG_INF("Couldn't find either state or demand or values objects in the buffer: %s", jp->start);
         return FAIL;
     }
@@ -1264,11 +1257,12 @@ static int items_umarshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  
         LOG_INF("Couldn't parse item demand %s", jp->start);
         return FAIL;
     }
+
     DEBUG_ITEM(elem->id, "Loaded item value type %d", elm->value_type);
 
     return parse_json_item_values(&jp_values, elem, memf);
-    
 }
+
 int  glb_state_item_add_lld_value(ZBX_DC_HISTORY *h) {
     DEBUG_ITEM(h->itemid,"Adding LLD value to the history");
     return elems_hash_process(state->items, h->itemid, add_value_lld_cb, h, 0);
@@ -1387,11 +1381,11 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
     
     int i;
     zbx_json_addarray(json,ZBX_PROTO_TAG_DATA);
+    
     glb_state_meta_udpate_req_t req;
 
     for (i=0; i < itemids->values_num; i++) {
 
-      //  zabbix_log(LOG_LEVEL_INFORMATION, "%s: processing item %ld", __func__,itemids->values[i]);
         if ( FAIL != elems_hash_process(state->items, itemids->values[i], item_get_meta_cb, &req, ELEM_FLAG_DO_NOT_CREATE) ) {
 
             zbx_json_addobject(json,NULL);
@@ -1437,68 +1431,17 @@ int glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx
 
 
 int glb_state_items_load() {
-
-	//char *json_buffer = NULL;
-	int items = 0, vals = 0;
-	int lcnt = 0;
-	
-	struct zbx_json_parse jp;
-
-	zbx_json_type_t j_type;
-	char id_str[MAX_ID_LEN];
-    
-    state_loader_t ldr;
-    char *buffer;
-	
-    if (FAIL == state_loader_create(&ldr,"items") ) 
-        return FAIL;
-    
-    while (NULL != (buffer = state_loader_get_line(&ldr))) {
-
-        lcnt++;
-        if (SUCCEED != zbx_json_open(buffer, &jp)) {
-            LOG_INF("Warning: reading items cache: broken line on line %d", lcnt);
-        }
-
-		if (SUCCEED != zbx_json_value_by_name(&jp, "itemid", id_str, MAX_ID_LEN, &j_type)) {
-        	LOG_INF("Couldn't parse line %d: cannot find id in the JSON '%s':", lcnt, buffer);
-        	continue;
-    	}
-	
-		u_int64_t id = strtol(id_str,NULL,10);
-
-		if (id == 0) {
-			LOG_INF("Couldn't convert itemid or 0 in line %d find id in the JSON", lcnt);
-        }
-        items++;
-		//and calling unmarshall callback for it
-		vals += elems_hash_process(state->items, id, items_umarshall_item_cb, &jp, 0);
-
-
-    }
-
-	state_loader_destroy(&ldr);
-
-	LOG_INF("STATE: finished loading item data, loaded %d items; %d values",items,vals);
+    state_load_objects(state->items, "items", "itemid", unmarshall_item_cb );
     return SUCCEED;
- 
 }
 
 
 /*****************************************************************
- * dumps valuecache to a file stated in the configuration 
- * 
- * the dump will hold read lock on the hash during the dump
- * in most situations this should be harmless, unless
- * dumps takes too long time AND there are lots of 
- * changes (adding new or removing old elems) are 
- * happening at the same time, in this case some operations
- * would wait
+    element to json for dumping and api
 *****************************************************************/
-#define BUFFER_ITEMS 1024*1024
-
-int item_to_json(u_int64_t id, item_elem_t *elm, struct zbx_json *json)
+DUMPER_TO_JSON(item_to_json_cb)
 {   int head_idx;
+    item_elem_t *elm = data;
 
     zbx_json_addint64(json, "itemid", id);
     zbx_json_addint64(json, "value_type", elm->value_type);
@@ -1546,44 +1489,9 @@ int item_to_json(u_int64_t id, item_elem_t *elm, struct zbx_json *json)
     return (glb_tsbuff_get_count(&elm->tsbuff));
 }
 
-typedef struct {
-    struct zbx_json *json;
-    int records;
-    int items;
-    state_dumper_t *dumper;
-} marshall_data_t;
-
-
-int marshall_item_cb(elems_hash_elem_t *elem, mem_funcs_t* memf, void *data) {
-    marshall_data_t *req = data;
-    
-    zbx_json_clean(req->json);
-    req->records += item_to_json(elem->id, (item_elem_t*)elem->data, req->json);
-    req->items++;
-    state_dumper_write_line(req->dumper, req->json->buffer, req->json->buffer_offset + 1);
-
-}
 
 int glb_state_items_dump() {
-
-	zbx_hashset_iter_t iter;
-	elems_hash_elem_t *elem;
-	struct zbx_json	json;
-	int items=0, vals=0;
-	char new_file[MAX_STRING_LEN], tmp[MAX_STRING_LEN];
-    state_dumper_t dumper;
-
-	zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
-    zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
-    marshall_data_t mdata = {.dumper = &dumper, .json = &json, .records = 0, .items = 0};
-
-    state_dumper_create(&dumper, "items");
-    elems_hash_iterate(state->items, marshall_item_cb, &mdata, ELEMS_HASH_READ_ONLY);
-    state_dumper_destroy(&dumper);
-
-	zbx_json_free(&json);
-
-	LOG_INF("In %s: finished, total %d items, %d values dumped", __func__, items, vals);
+    state_dump_objects(state->items, "items", item_to_json_cb );
 	return SUCCEED;
 }
 
@@ -1594,4 +1502,12 @@ ELEMS_CALLBACK(get_valuetype_cb) {
 
 int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+void	zbx_vc_remove_items_by_ids(zbx_vector_uint64_t *itemids) {
+    
+}
+
+void glb_state_items_housekeep() {
+
 }

@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -21,16 +21,25 @@
 
 class CControllerTokenDelete extends CController {
 
+	protected function init() {
+		$this->setPostContentType(self::POST_CONTENT_TYPE_JSON);
+	}
+
 	protected function checkInput() {
 		$fields = [
-			'tokenids'   => 'required|array_db token.tokenid',
-			'action_src' => 'required|in token.list,user.token.list'
+			'tokenids'   => 'required|array_db token.tokenid'
 		];
 
 		$ret = $this->validateInput($fields);
 
 		if (!$ret) {
-			$this->setResponse(new CControllerResponseFatal());
+			$this->setResponse(
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])])
+			);
 		}
 
 		return $ret;
@@ -49,21 +58,30 @@ class CControllerTokenDelete extends CController {
 
 		$result = API::Token()->delete($tokenids);
 
-		$deleted = count($tokenids);
-
-		$response = new CControllerResponseRedirect((new CUrl('zabbix.php'))
-			->setArgument('action', $this->getInput('action_src'))
-			->setArgument('page', CPagerHelper::loadPage($this->getInput('action_src'), null))
-		);
+		$output = [];
 
 		if ($result) {
-			$response->setFormData(['uncheck' => '1']);
-			CMessageHelper::setSuccessTitle(_n('API token deleted', 'API tokens deleted', $deleted));
+			$output['success']['title'] = _n('API token deleted', 'API tokens deleted', count($tokenids));
+
+			if ($messages = get_and_clear_messages()) {
+				$output['success']['messages'] = array_column($messages, 'message');
+			}
 		}
 		else {
-			CMessageHelper::setErrorTitle(_n('Cannot delete API token', 'Cannot delete API tokens', $deleted));
+			$output['error'] = [
+				'title' => _n('Cannot delete API token', 'Cannot delete API tokens', count($tokenids)),
+				'messages' => array_column(get_and_clear_messages(), 'message')
+			];
+
+			$tokens = API::Token()->get([
+				'output' => [],
+				'tokenids' => $tokenids,
+				'preservekeys' => true
+			]);
+
+			$output['keepids'] = array_keys($tokens);
 		}
 
-		$this->setResponse($response);
+		$this->setResponse(new CControllerResponseData(['main_block' => json_encode($output)]));
 	}
 }

@@ -493,6 +493,10 @@ function getHostInterface(?array $interface): string {
 		return '';
 	}
 
+	if ($interface['type'] == INTERFACE_TYPE_AGENT_ACTIVE) {
+		return _('Active checks');
+	}
+
 	if ($interface['useip'] == INTERFACE_USE_IP) {
 		$ip_or_dns = (filter_var($interface['ip'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false)
 			? '['.$interface['ip'].']'
@@ -503,18 +507,6 @@ function getHostInterface(?array $interface): string {
 	}
 
 	return $ip_or_dns.':'.$interface['port'];
-}
-
-function get_hostgroup_by_groupid($groupid) {
-	$groups = DBfetch(DBselect('SELECT g.* FROM hstgrp g WHERE g.groupid='.zbx_dbstr($groupid)));
-
-	if ($groups) {
-		return $groups;
-	}
-
-	error(_s('No host groups with groupid "%1$s".', $groupid));
-
-	return false;
 }
 
 function get_host_by_itemid($itemids) {
@@ -555,7 +547,7 @@ function get_host_by_hostid($hostid, $no_error_message = 0) {
 	}
 
 	if ($no_error_message == 0) {
-		error(_s('No host with hostid "%1$s".', $hostid));
+		error(_s('No host with host ID "%1$s".', $hostid));
 	}
 
 	return false;
@@ -739,73 +731,6 @@ function makeHostPrototypeTemplatesHtml($host_prototypeid, array $parent_templat
 	}
 
 	return $list;
-}
-
-/**
- * Get host ids of hosts which $groupids can be unlinked from.
- * if $hostids is passed, function will check only these hosts.
- *
- * @param array $groupids
- * @param array $hostids
- *
- * @return array
- */
-function getUnlinkableHostIds(array $groupIds, array $hostIds) {
-	if (!$hostIds) {
-		return [];
-	}
-
-	$dbResult = DBselect(
-		'SELECT hg.hostid'.
-		' FROM hosts_groups hg'.
-		' WHERE '.dbConditionInt('hg.groupid', $groupIds, true).
-			' AND '.dbConditionInt('hg.hostid', $hostIds).
-		' GROUP BY hg.hostid'
-	);
-
-	$unlinkableHostIds = [];
-	while ($dbRow = DBfetch($dbResult)) {
-		$unlinkableHostIds[] = $dbRow['hostid'];
-	}
-
-	return $unlinkableHostIds;
-}
-
-function getDeletableHostGroupIds(array $groupIds) {
-	// selecting the list of hosts linked to the host groups
-	$dbResult = DBselect(
-		'SELECT hg.hostid'.
-		' FROM hosts_groups hg'.
-		' WHERE '.dbConditionInt('hg.groupid', $groupIds)
-	);
-
-	$linkedHostIds = [];
-	while ($dbRow = DBfetch($dbResult)) {
-		$linkedHostIds[] = $dbRow['hostid'];
-	}
-
-	// the list of hosts which can be unlinked from the host groups
-	$hostIds = getUnlinkableHostIds($groupIds, $linkedHostIds);
-
-	$dbResult = DBselect(
-		'SELECT g.groupid'.
-		' FROM hstgrp g'.
-		' WHERE g.internal='.ZBX_NOT_INTERNAL_GROUP.
-			' AND '.dbConditionInt('g.groupid', $groupIds).
-			' AND NOT EXISTS ('.
-				'SELECT NULL'.
-				' FROM hosts_groups hg'.
-				' WHERE g.groupid=hg.groupid'.
-					($hostIds ? ' AND '.dbConditionInt('hg.hostid', $hostIds, true) : '').
-			')'
-	);
-
-	$deletableGroupIds = [];
-	while ($dbRow = DBfetch($dbResult)) {
-		$deletableGroupIds[$dbRow['groupid']] = $dbRow['groupid'];
-	}
-
-	return $deletableGroupIds;
 }
 
 function isTemplate($hostId) {

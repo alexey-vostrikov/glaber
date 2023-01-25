@@ -134,6 +134,9 @@ abstract class CGraphGeneral extends CApiService {
 		$this->updateReal($graphs);
 		$this->inherit($graphs);
 
+		$resource = ($this instanceof CGraph) ? CAudit::RESOURCE_GRAPH : CAudit::RESOURCE_GRAPH_PROTOTYPE;
+		$this->addAuditBulk(CAudit::ACTION_UPDATE, $resource, $graphs, $db_graphs);
+
 		return ['graphids' => $graphids];
 	}
 
@@ -165,6 +168,9 @@ abstract class CGraphGeneral extends CApiService {
 
 		$this->createReal($graphs);
 		$this->inherit($graphs);
+
+		$resource = ($this instanceof CGraph) ? CAudit::RESOURCE_GRAPH : CAudit::RESOURCE_GRAPH_PROTOTYPE;
+		$this->addAuditBulk(CAudit::ACTION_ADD, $resource, $graphs);
 
 		return ['graphids' => array_column($graphs, 'graphid')];
 	}
@@ -288,24 +294,30 @@ abstract class CGraphGeneral extends CApiService {
 	 *
 	 * @param array $graph
 	 * @param bool  $tpl
+	 * @param array $db_graph
 	 */
-	protected function checkAxisItems(array $graph, $tpl = false) {
+	protected function checkAxisItems(array $graph, $tpl = false, array $db_graph = null) {
 		$axisItems = [];
-		if (isset($graph['ymin_type']) && $graph['ymin_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
-			$axisItems[$graph['ymin_itemid']] = $graph['ymin_itemid'];
+		if (array_key_exists('ymin_type', $graph) && $graph['ymin_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
+			if ($db_graph === null || $graph['ymin_itemid'] != $db_graph['ymin_itemid']) {
+				$axisItems[$graph['ymin_itemid']] = 1;
+			}
 		}
-		if (isset($graph['ymax_type']) && $graph['ymax_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
-			$axisItems[$graph['ymax_itemid']] = $graph['ymax_itemid'];
+		if (array_key_exists('ymax_type', $graph) && $graph['ymax_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
+			if ($db_graph === null || $graph['ymax_itemid'] != $db_graph['ymax_itemid']) {
+				$axisItems[$graph['ymax_itemid']] = 1;
+			}
 		}
 
-		if (!empty($axisItems)) {
+		if (count($axisItems)) {
 			$options = [
-				'itemids' => $axisItems,
 				'output' => ['itemid'],
-				'countOutput' => true,
+				'filter' => ['flags' => null, 'value_type' => [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]],
+				'itemids' => array_keys($axisItems),
 				'webitems' => true,
-				'filter' => ['flags' => null, 'value_type' => [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]]
+				'countOutput' => true
 			];
+
 			if ($tpl) {
 				$options['hostids'] = $tpl;
 			}
@@ -364,28 +376,9 @@ abstract class CGraphGeneral extends CApiService {
 		}
 
 		// adding HostGroups
-		if ($options['selectGroups'] !== null && $options['selectGroups'] !== API_OUTPUT_COUNT) {
-			$relationMap = new CRelationMap();
-			// discovered items
-			$dbRules = DBselect(
-				'SELECT gi.graphid,hg.groupid'.
-				' FROM graphs_items gi,items i,hosts_groups hg'.
-				' WHERE '.dbConditionInt('gi.graphid', $graphids).
-				' AND gi.itemid=i.itemid'.
-				' AND i.hostid=hg.hostid'
-			);
-			while ($relation = DBfetch($dbRules)) {
-				$relationMap->addRelation($relation['graphid'], $relation['groupid']);
-			}
-
-			$groups = API::HostGroup()->get([
-				'output' => $options['selectGroups'],
-				'groupids' => $relationMap->getRelatedIds(),
-				'nopermissions' => true,
-				'preservekeys' => true
-			]);
-			$result = $relationMap->mapMany($result, $groups, 'groups');
-		}
+		$this->addRelatedGroups($options, $result, 'selectGroups');
+		$this->addRelatedGroups($options, $result, 'selectHostGroups');
+		$this->addRelatedGroups($options, $result, 'selectTemplateGroups');
 
 		// adding Hosts
 		if ($options['selectHosts'] !== null && $options['selectHosts'] !== API_OUTPUT_COUNT) {
@@ -450,6 +443,65 @@ abstract class CGraphGeneral extends CApiService {
 	}
 
 	/**
+	 * Adds related host groups and template groups requested by "select*" options to the resulting object set.
+	 *
+	 * @param array  $options  [IN] Original input options.
+	 * @param array  $result   [IN/OUT] Result output.
+	 * @param string $option   [IN] Possible values:
+	 *                                - "selectGroups" (deprecated);
+	 *                                - "selectHostGroups";
+	 *                                - "selectTemplateGroups".
+	 */
+	private function addRelatedGroups(array $options, array &$result, string $option): void {
+		if ($options[$option] === null || $options[$option] === API_OUTPUT_COUNT) {
+			return;
+		}
+
+		$relationMap = new CRelationMap();
+
+		// discovered items
+		$dbRules = DBselect(
+			'SELECT gi.graphid,hg.groupid'.
+			' FROM graphs_items gi,items i,hosts_groups hg'.
+			' WHERE '.dbConditionInt('gi.graphid', array_keys($result)).
+				' AND gi.itemid=i.itemid'.
+				' AND i.hostid=hg.hostid'
+		);
+		while ($relation = DBfetch($dbRules)) {
+			$relationMap->addRelation($relation['graphid'], $relation['groupid']);
+		}
+
+		switch ($option) {
+			case 'selectGroups':
+				$output_tag = 'groups';
+				$entities = [API::HostGroup(), API::TemplateGroup()];
+				break;
+
+			case 'selectHostGroups':
+				$entities = [API::HostGroup()];
+				$output_tag = 'hostgroups';
+				break;
+
+			case 'selectTemplateGroups':
+				$entities = [API::TemplateGroup()];
+				$output_tag = 'templategroups';
+				break;
+		}
+
+		$groups = [];
+		foreach ($entities as $entity) {
+			$groups += $entity->get([
+				'output' => $options[$option],
+				'groupids' => $relationMap->getRelatedIds(),
+				'nopermissions' => true,
+				'preservekeys' => true
+			]);
+		}
+
+		$result = $relationMap->mapMany($result, $groups, $output_tag);
+	}
+
+	/**
 	 * Validate graph name and graph items including Y axis item ID's and graph item fields on Create method
 	 * and return valid item ID's on success or trow an error on failure.
 	 *
@@ -459,7 +511,7 @@ abstract class CGraphGeneral extends CApiService {
 	 */
 	protected function validateItemsCreate(array $graphs) {
 		$itemIds = [];
-		$itemid_rules = ['type' => API_ID, 'flags' => API_NOT_EMPTY];
+		$itemid_rules = ['type' => API_ID];
 
 		foreach ($graphs as $graph) {
 			// validate graph name
@@ -647,12 +699,13 @@ abstract class CGraphGeneral extends CApiService {
 	 * and return valid item ID's on success or trow an error on failure.
 	 *
 	 * @param array $graphs
+	 * @param array $db_graphs
 	 *
 	 * @return array
 	 */
-	protected function validateItemsUpdate(array $graphs) {
+	protected function validateItemsUpdate(array $graphs, array $db_graphs) {
 		$dbFields = ['itemid' => null];
-		$itemid_rules = ['type' => API_ID, 'flags' => API_NOT_EMPTY];
+		$itemid_rules = ['type' => API_ID];
 
 		foreach ($graphs as $graph) {
 			// graph items are optional
@@ -680,7 +733,8 @@ abstract class CGraphGeneral extends CApiService {
 				if (!CApiInputValidator::validate($itemid_rules, $graph['ymin_itemid'], 'ymin_itemid', $error)) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
-				else {
+				// Skip itemid if ymin_itemid stay the same.
+				elseif ($graph['ymin_itemid'] != $db_graphs[$graph['graphid']]['ymin_itemid']) {
 					$itemIds[$graph['ymin_itemid']] = $graph['ymin_itemid'];
 				}
 			}
@@ -690,7 +744,8 @@ abstract class CGraphGeneral extends CApiService {
 				if (!CApiInputValidator::validate($itemid_rules, $graph['ymax_itemid'], 'ymax_itemid', $error)) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
-				else {
+				// Skip itemid if ymax_itemid stay the same.
+				elseif ($graph['ymax_itemid'] != $db_graphs[$graph['graphid']]['ymax_itemid']) {
 					$itemIds[$graph['ymax_itemid']] = $graph['ymax_itemid'];
 				}
 			}
@@ -800,7 +855,7 @@ abstract class CGraphGeneral extends CApiService {
 			}
 
 			// check ymin, ymax items
-			$this->checkAxisItems($graph, $templatedGraph);
+			$this->checkAxisItems($graph, $templatedGraph, $dbGraphs[$graph['graphid']]);
 		}
 
 		$this->validateHostsAndTemplates($graphs);
@@ -1273,7 +1328,8 @@ abstract class CGraphGeneral extends CApiService {
 			'output' => $output,
 			'selectGraphItems' => ['itemid', 'drawtype', 'sortorder', 'color', 'yaxisside', 'calc_fnc', 'type'],
 			'hostids' => $data['templateids'],
-			'preservekeys' => true
+			'preservekeys' => true,
+			'nopermissions' => true
 		]);
 
 		if ($graphs) {

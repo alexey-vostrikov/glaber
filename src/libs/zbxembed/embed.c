@@ -17,15 +17,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "log.h"
 #include "zbxembed.h"
+#include "embed_xml.h"
+#include "embed.h"
 
+#include "log.h"
 #include "httprequest.h"
 #include "zabbix.h"
 #include "global.h"
 #include "console.h"
-#include "xml.h"
-#include "embed.h"
+#include "zbxstr.h"
 
 #define ZBX_ES_MEMORY_LIMIT	(1024 * 1024 * 64)
 #define ZBX_ES_TIMEOUT		10
@@ -39,8 +40,6 @@
 #define ZBX_ES_SCRIPT_FOOTER	"\n}"
 
 /******************************************************************************
- *                                                                            *
- * Function: es_handle_error                                                  *
  *                                                                            *
  * Purpose: fatal error handler                                               *
  *                                                                            *
@@ -123,7 +122,126 @@ static void	es_free(void *udata, void *ptr)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_es_check_timeout                                             *
+ * Purpose: decodes 3-byte utf-8 sequence                                     *
+ *                                                                            *
+ * Parameters: ptr - [IN] pointer to the 3 byte sequence                      *
+ *             out - [OUT] the decoded value                                  *
+ *                                                                            *
+ * Return value: SUCCEED                                                      *
+ *               FAIL                                                         *
+ *                                                                            *
+ ******************************************************************************/
+static int	utf8_decode_3byte_sequence(const char *ptr, zbx_uint32_t *out)
+{
+	*out = ((unsigned char)*ptr++ & 0xFu) << 12;
+	if (0x80 != (*ptr & 0xC0))
+		return FAIL;
+
+	*out |= ((unsigned char)*ptr++ & 0x3Fu) << 6;
+	if (0x80 != (*ptr & 0xC0))
+		return FAIL;
+
+	*out |= ((unsigned char)*ptr & 0x3Fu);
+
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: decodes duktape string into utf-8                                 *
+ *                                                                            *
+ * Parameters: duk_str - [IN] pointer to the first char of NULL terminated    *
+ *                       Duktape string                                       *
+ *             out_str - [OUT] on success, pointer to pointer to the first    *
+ *                       char of allocated NULL terminated UTF8 string        *
+ *                                                                            *
+ * Return value: SUCCEED                                                      *
+ *               FAIL                                                         *
+ *                                                                            *
+ ******************************************************************************/
+int	es_duktape_string_decode(const char *duk_str, char **out_str)
+{
+	const char	*in, *end;
+	char		*out;
+	size_t		len;
+
+	len = strlen(duk_str);
+	out = *out_str = zbx_malloc(*out_str, len + 1);
+	end = duk_str + len;
+
+	for (in = duk_str; in < end;)
+	{
+		if (0x7f >= (unsigned char)*in)
+		{
+			*out++ = *in++;
+			continue;
+		}
+
+		if (0xdf >= (unsigned char)*in)
+		{
+			if (2 > end - in)
+				goto fail;
+
+			*out++ = *in++;
+			*out++ = *in++;
+			continue;
+		}
+
+		if (0xef >= (unsigned char)*in)
+		{
+			zbx_uint32_t	c1, c2, u;
+
+			if (3 > end - in || FAIL == utf8_decode_3byte_sequence(in, &c1))
+				goto fail;
+
+			if (0xd800 > c1 || 0xdbff < c1)
+			{
+				/* normal 3-byte sequence */
+				*out++ = *in++;
+				*out++ = *in++;
+				*out++ = *in++;
+				continue;
+			}
+
+			/* decode unicode supplementary character represented as surrogate pair */
+			in += 3;
+			if (3 > end - in || FAIL == utf8_decode_3byte_sequence(in, &c2) || 0xdc00 > c2 || 0xdfff < c2)
+				goto fail;
+
+			u = 0x10000 + ((((zbx_uint32_t)c1 & 0x3ff) << 10) | (c2 & 0x3ff));
+			*out++ = (char)(0xf0 |  u >> 18);
+			*out++ = (char)(0x80 | (u >> 12 & 0x3f));
+			*out++ = (char)(0x80 | (u >> 6 & 0x3f));
+			*out++ = (char)(0x80 | (u & 0x3f));
+			in += 3;
+			continue;
+		}
+
+		/* duktape can use the four-byte UTF-8 style supplementary character sequence */
+		if (0xf0 >= (unsigned char)*in)
+		{
+			if (4 > end - in)
+				goto fail;
+
+			*out++ = *in++;
+			*out++ = *in++;
+			*out++ = *in++;
+			*out++ = *in++;
+			continue;
+		}
+
+		goto fail;
+	}
+	*out = '\0';
+
+	return SUCCEED;
+fail:
+	zbx_free(*out_str);
+
+	return FAIL;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: timeout checking callback                                         *
  *                                                                            *
@@ -140,8 +258,6 @@ int	zbx_es_check_timeout(void *udata)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_es_init                                                      *
- *                                                                            *
  * Purpose: initializes embedded scripting engine                             *
  *                                                                            *
  ******************************************************************************/
@@ -151,8 +267,6 @@ void	zbx_es_init(zbx_es_t *es)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_es_destroy                                                   *
  *                                                                            *
  * Purpose: destroys embedded scripting engine                                *
  *                                                                            *
@@ -168,8 +282,6 @@ void	zbx_es_destroy(zbx_es_t *es)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_es_init_env                                                  *
  *                                                                            *
  * Purpose: initializes embedded scripting engine environment                 *
  *                                                                            *
@@ -224,7 +336,7 @@ int	zbx_es_init_env(zbx_es_t *es, char **error)
 		return FAIL;
 	}
 
-	/* initialize HttpRequest and CurlHttpRequest prototypes */
+	/* initialize HttpRequest prototype */
 	if (FAIL == zbx_es_init_httprequest(es, error))
 		goto out;
 
@@ -248,8 +360,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_es_destroy_env                                               *
  *                                                                            *
  * Purpose: destroys initialized embedded scripting engine environment        *
  *                                                                            *
@@ -288,8 +398,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_es_ready                                                     *
- *                                                                            *
  * Purpose: checks if the scripting engine environment is initialized         *
  *                                                                            *
  * Parameters: es    - [IN] the embedded scripting engine                     *
@@ -304,8 +412,6 @@ int	zbx_es_is_env_initialized(zbx_es_t *es)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_es_fatal_error                                               *
  *                                                                            *
  * Purpose: checks if fatal error has occurred                                *
  *                                                                            *
@@ -330,8 +436,6 @@ int	zbx_es_fatal_error(zbx_es_t *es)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_es_compile                                                   *
- *                                                                            *
  * Purpose: compiles script into bytecode                                     *
  *                                                                            *
  * Parameters: es     - [IN] the embedded scripting engine                    *
@@ -343,7 +447,7 @@ int	zbx_es_fatal_error(zbx_es_t *es)
  * Return value: SUCCEED                                                      *
  *               FAIL                                                         *
  *                                                                            *
- * Comments: The this function allocates the bytecode array, which must be    *
+ * Comments: this function allocates the bytecode array, which must be        *
  *           freed by the caller after being used.                            *
  *                                                                            *
  ******************************************************************************/
@@ -414,8 +518,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_es_execute                                                   *
- *                                                                            *
  * Purpose: executes script                                                   *
  *                                                                            *
  * Parameters: es         - [IN] the embedded scripting engine                *
@@ -435,8 +537,8 @@ out:
  *           bytecode parameters.                                             *
  *                                                                            *
  ******************************************************************************/
-int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size, const char *param, char **script_ret,
-	char **error)
+int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size, const char *param,
+	char **script_ret, char **error)
 {
 	void		*buffer;
 	volatile int	ret = FAIL;
@@ -512,8 +614,11 @@ int	zbx_es_execute(zbx_es_t *es, const char *script, const char *code, int size,
 			{
 				char	*output = NULL;
 
-				if (SUCCEED != (ret = zbx_cesu8_to_utf8(duk_safe_to_string(es->env->ctx, -1), &output)))
+				if (SUCCEED != (ret = es_duktape_string_decode(
+						duk_safe_to_string(es->env->ctx, -1), &output)))
+				{
 					*error = zbx_strdup(*error, "could not convert return value to utf8");
+				}
 				else
 					zabbix_log(LOG_LEVEL_DEBUG, "%s() output:'%s'", __func__, output);
 
@@ -553,8 +658,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_es_set_timeout                                               *
- *                                                                            *
  * Purpose: sets script execution timeout                                     *
  *                                                                            *
  * Parameters: es      - [IN] the embedded scripting engine                   *
@@ -593,8 +696,6 @@ void	zbx_es_debug_disable(zbx_es_t *es)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_es_execute_command                                           *
  *                                                                            *
  * Purpose: executes command (script in form of a text)                       *
  *                                                                            *

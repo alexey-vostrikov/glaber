@@ -27,20 +27,19 @@ if ($data['uncheck']) {
 	uncheckTableRows('correlation');
 }
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Event correlation'))
-	->setControls((new CTag('nav', true,
-		(new CForm('get'))
-			->cleanItems()
-			->addItem((new CList())
-				->addItem(new CRedirectButton(_('Create correlation'), (new CUrl('zabbix.php'))
-					->setArgument('action', 'correlation.edit'))
-				)
-			)
-		))
-			->setAttribute('aria-label', _('Content controls'))
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_CORRELATION_LIST))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem(new CRedirectButton(_('Create correlation'),
+					(new CUrl('zabbix.php'))->setArgument('action', 'correlation.edit')
+				))
+		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'correlation.list')))
+	->addItem((new CFilter())
+		->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'correlation.list'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addFilterTab(_('Filter'), [
@@ -92,14 +91,14 @@ if ($data['correlations']) {
 				$condition['operator'] = CONDITION_OPERATOR_EQUAL;
 			}
 
-			$conditions[] = getCorrConditionDescription($condition, $data['group_names']);
+			$conditions[] = CCorrelationHelper::getConditionDescription($condition, $data['group_names']);
 			$conditions[] = BR();
 		}
 
 		CArrayHelper::sort($correlation['operations'], ['type']);
 
 		foreach ($correlation['operations'] as $operation) {
-			$operations[] = getCorrOperationDescription($operation);
+			$operations[] = CCorrelationHelper::getOperationTypes()[$operation['type']];
 			$operations[] = BR();
 		}
 
@@ -149,6 +148,6 @@ $form->addItem([
 	], 'correlation')
 ]);
 
-$widget->addItem($form);
-
-$widget->show();
+$html_page
+	->addItem($form)
+	->show();

@@ -3,13 +3,14 @@
     supports async and sync flow
  ***********************************************************************/
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxserver.h"
 #include "../../libs/zbxexec/worker.h"
 #include "glb_worker.h"
 #include "module.h"
 #include "preproc.h"
 #include "zbxjson.h"
+#include "zbxsysinfo.h"
 
 extern int CONFIG_GLB_WORKER_FORKS;
 typedef struct {
@@ -24,7 +25,7 @@ static worker_conf_t conf = {0};
 typedef struct {
 	u_int64_t workerid;
 	u_int64_t lastrequest; //to shutdown and cleanup idle workers
-	ext_worker_t *worker;
+	glb_worker_t *worker;
 } worker_t;
 
 typedef struct {
@@ -80,14 +81,14 @@ static int worker_submit_result(char *response) {
 
     worker_item = poller_get_item_specific_data(poller_item);      
            
-    init_result(&result);
+    zbx_init_agent_result(&result);
     zbx_rtrim(value, ZBX_WHITESPACE);
     
-    set_result_type(&result, ITEM_VALUE_TYPE_TEXT, value);
+    zbx_set_agent_result_type(&result, ITEM_VALUE_TYPE_TEXT, value);
     
 	poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
     
-    free_result(&result);
+    zbx_free_agent_result(&result);
     
      
     poller_return_item_to_queue(poller_item);
@@ -117,21 +118,21 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
         
     poller_set_item_specific_data(poller_item, worker_item);
     
-    init_request(&request);
+    zbx_init_agent_request(&request);
 
     cmd = (char *)zbx_malloc(cmd, cmd_alloc);
     ZBX_STRDUP(parsed_key, dc_item->key_orig);
     
     //translating dynamic params
     //for worker params we will use parsed parameters, cache them to config cache reload time
-    if (SUCCEED != substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
+    if (SUCCEED != zbx_substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
 				sizeof(error))) {
         zabbix_log(LOG_LEVEL_INFORMATION,"Failed to apply macroses to dynamic params %s",parsed_key);
         ret = FAIL;
         goto out;
     }
     
-    if (SUCCEED != parse_item_key(parsed_key, &request)) {
+    if (SUCCEED !=zbx_parse_item_key(parsed_key, &request)) {
 	    zabbix_log(LOG_LEVEL_INFORMATION,"Failed to parse item key %s",parsed_key);
         ret = FAIL;
         goto out;
@@ -165,14 +166,14 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
         zbx_free(key_dyn);
     
     worker_item->params_dyn = key_dyn;
-  //  free_request(&request);
+  //  zbx_free_agent_request(&request);
 
     ret = SUCCEED;
 out:
     zbx_free(parsed_key);
     zbx_free(params_stat);
     zbx_free(cmd);
-    free_request(&request);
+    zbx_free_agent_request(&request);
     return ret;
 }
 /*****************************************************************
@@ -188,7 +189,8 @@ static worker_t * worker_create_worker(worker_item_t *worker_item) {
     bzero(&worker, sizeof(worker_t));
 
     worker.workerid = worker_item->workerid;
-    worker.worker = worker_init(worker_item->full_cmd, GLB_WORKER_MAXCALLS, 1, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE, CONFIG_TIMEOUT  );
+    worker.worker = glb_worker_init(worker_item->full_cmd, worker_item->params_dyn , CONFIG_TIMEOUT, GLB_WORKER_MAXCALLS, 
+            GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE);
       
     retworker = (worker_t*)zbx_hashset_insert(&conf.workers,&worker,sizeof(worker_t));
     zabbix_log(LOG_LEVEL_INFORMATION, "In %s() Finished worker id is %ld", __func__, retworker->workerid);
@@ -219,7 +221,7 @@ static void send_request(poller_item_t *poller_item) {
     }
     
     zabbix_log(LOG_LEVEL_DEBUG, "Will do request: %s to worker %s",worker_item->params_dyn, worker_item->full_cmd);
-    if (NULL == worker_item->params_dyn ||  SUCCEED != glb_worker_request(worker->worker, worker_item->params_dyn) ) {
+    if (NULL == worker_item->params_dyn ||  SUCCEED != glb_worker_send_request(worker->worker, worker_item->params_dyn) ) {
         //sending config error status for the item
         zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request %s",request);
         
@@ -312,9 +314,9 @@ static void worker_process_results() {
     while (NULL != (worker = zbx_hashset_iter_next(&iter))) {
         //we only query alive workers
         zabbix_log(LOG_LEVEL_DEBUG,"Will read data from worker %s", worker_get_path(worker->worker));
-        if (SUCCEED == worker_is_alive(worker->worker)) { //only read from alive workers
+        if (SUCCEED == glb_worker_is_alive(worker->worker)) { //only read from alive workers
             zabbix_log(LOG_LEVEL_DEBUG,"Calling async read");
-            while (SUCCEED == async_buffered_responce(worker->worker, &worker_response)) {
+            while (SUCCEED == glb_worker_get_async_buffered_responce(worker->worker, &worker_response)) {
               
                 LOG_DBG("Parsing line %s from worker %s", worker_response, worker_get_path(worker->worker));
                 worker_submit_result(worker_response);
@@ -368,8 +370,18 @@ static int forks_count(void) {
 /******************************************************************************
  * inits async structures - static connection pool							  *
  * ***************************************************************************/
-void glb_worker_init(void) {
+void glb_worker_poller_init(void) {
+    
+    sigset_t	mask, orig_mask;
 	
+    sigemptyset(&mask);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGQUIT);
+    sigaddset(&mask, SIGCHLD);
+
+    if (0 > sigprocmask(SIG_BLOCK, &mask, &orig_mask))
+		zbx_error("cannot set sigprocmask to block the user signal");
+
     zbx_hashset_create(&conf.workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, send_request, worker_shutdown, forks_count, NULL);
 

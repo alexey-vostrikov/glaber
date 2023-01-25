@@ -19,7 +19,7 @@
 
 //#include "glb_poller.h"
 #include "log.h"
-#include "common.h"
+#include "zbxcommon.h"
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include "csnmp.h"
@@ -83,8 +83,8 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 			pdu->version = SNMP_VERSION_2c;
 		break;
 		default:
-			LOG_INF("Unsupported SNMP version in async code");
-			//THIS_SHOULD_NEVER_HAPPEN;
+			LOG_INF("Unsupported SNMP version in async code itemid %ld", poller_get_item_id(poller_item));
+			THIS_SHOULD_NEVER_HAPPEN;
 			//exit(EXIT_FAILURE);
 			
 	}

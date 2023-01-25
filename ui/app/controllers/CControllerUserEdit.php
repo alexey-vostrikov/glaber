@@ -64,7 +64,7 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 		return $ret;
 	}
 
-	protected function checkPermissions() {
+	protected function checkPermissions(): bool {
 		if (!$this->checkAccess(CRoleHelper::UI_ADMINISTRATION_USERS)) {
 			return false;
 		}
@@ -76,7 +76,6 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 				],
 				'selectMedias' => ['mediatypeid', 'period', 'sendto', 'severity', 'active'],
 				'selectUsrgrps' => ['usrgrpid'],
-				'selectRole' => ['name', 'type'],
 				'userids' => $this->getInput('userid'),
 				'editable' => true
 			]);
@@ -91,7 +90,7 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 		return true;
 	}
 
-	protected function doAction() {
+	protected function doAction(): void {
 		$db_defaults = DB::getDefaults('users');
 
 		$data = [
@@ -114,6 +113,7 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 			'new_media' => [],
 			'roleid' => '',
 			'role' => [],
+			'modules_rules' => [],
 			'user_type' => '',
 			'sid' => $this->getUserSID(),
 			'form_refresh' => 0,
@@ -144,8 +144,6 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 
 			if (!$this->getInput('form_refresh', 0)) {
 				$data['roleid'] = $this->user['roleid'];
-				$data['user_type'] = $this->user['role']['type'];
-				$data['role'] = [['id' => $data['roleid'], 'name' => $this->user['role']['name']]];
 			}
 		}
 		else {
@@ -162,6 +160,7 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 			$data['medias'] = $this->getInput('medias', []);
 		}
 
+		$data['password_requirements'] = $this->getPasswordRequirements();
 		$data = $this->setUserMedias($data);
 
 		$data['groups'] = $user_groups
@@ -173,15 +172,56 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 		CArrayHelper::sort($data['groups'], ['name']);
 		$data['groups'] = CArrayHelper::renameObjectsKeys($data['groups'], ['usrgrpid' => 'id']);
 
-		if ($data['form_refresh'] && $this->hasInput('roleid')) {
+		if ($data['roleid']) {
 			$roles = API::Role()->get([
 				'output' => ['name', 'type'],
+				'selectRules' => ['services.read.mode', 'services.read.list', 'services.read.tag',
+					'services.write.mode', 'services.write.list', 'services.write.tag', 'modules'
+				],
 				'roleids' => $data['roleid']
 			]);
 
 			if ($roles) {
-				$data['role'] = [['id' => $data['roleid'], 'name' => $roles[0]['name']]];
-				$data['user_type'] = $roles[0]['type'];
+				$role = $roles[0];
+
+				$data['role'] = [['id' => $data['roleid'], 'name' => $role['name']]];
+				$data['user_type'] = $role['type'];
+
+				if ($role['rules']['services.read.mode'] == ZBX_ROLE_RULE_SERVICES_ACCESS_ALL) {
+					$data['service_read_access'] = CRoleHelper::SERVICES_ACCESS_ALL;
+				}
+				elseif ($role['rules']['services.read.list'] || $role['rules']['services.read.tag']['tag'] !== '') {
+					$data['service_read_access'] = CRoleHelper::SERVICES_ACCESS_LIST;
+				}
+				else {
+					$data['service_read_access'] = CRoleHelper::SERVICES_ACCESS_NONE;
+				}
+
+				$data['service_read_list'] = API::Service()->get([
+					'output' => ['serviceid', 'name'],
+					'serviceids' => array_column($role['rules']['services.read.list'], 'serviceid')
+				]);
+				$data['service_read_tag'] = $role['rules']['services.read.tag'];
+
+				if ($role['rules']['services.write.mode'] == ZBX_ROLE_RULE_SERVICES_ACCESS_ALL) {
+					$data['service_write_access'] = CRoleHelper::SERVICES_ACCESS_ALL;
+				}
+				elseif ($role['rules']['services.write.list'] || $role['rules']['services.write.tag']['tag'] !== '') {
+					$data['service_write_access'] = CRoleHelper::SERVICES_ACCESS_LIST;
+				}
+				else {
+					$data['service_write_access'] = CRoleHelper::SERVICES_ACCESS_NONE;
+				}
+
+				$data['service_write_list'] = API::Service()->get([
+					'output' => ['serviceid', 'name'],
+					'serviceids' => array_column($role['rules']['services.write.list'], 'serviceid')
+				]);
+				$data['service_write_tag'] = $role['rules']['services.write.tag'];
+
+				foreach ($role['rules']['modules'] as $rule) {
+					$data['modules_rules'][$rule['moduleid']] = $rule['status'];
+				}
 			}
 		}
 
@@ -193,14 +233,49 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 					'grouped' => '1'
 				]
 			];
+			$data['templategroups_rights'] = [
+				'0' => [
+					'permission' => PERM_READ_WRITE,
+					'name' => '',
+					'grouped' => '1'
+				]
+			];
 		}
 		else {
-			$data['groups_rights'] = collapseHostGroupRights(getHostGroupsRights($user_groups));
+			$data['groups_rights'] = collapseGroupRights(getHostGroupsRights($user_groups));
+			$data['templategroups_rights'] = collapseGroupRights(getTemplateGroupsRights($user_groups));
 		}
 
-		$data['modules'] = API::Module()->get([
-			'output' => ['id'],
-			'filter' => ['status' => MODULE_STATUS_ENABLED],
+		$data['modules'] = [];
+
+		$db_modules = API::Module()->get([
+			'output' => ['moduleid', 'relative_path', 'status']
+		]);
+
+		if ($db_modules) {
+			$module_manager = new CModuleManager(APP::getRootDir());
+
+			foreach ($db_modules as $db_module) {
+				$manifest = $module_manager->addModule($db_module['relative_path']);
+
+				if ($manifest !== null) {
+					$data['modules'][$db_module['moduleid']] = $manifest['name'];
+				}
+			}
+		}
+
+		natcasesort($data['modules']);
+
+		$disabled_modules = array_filter($db_modules,
+			static function(array $db_module): bool {
+				return $db_module['status'] == MODULE_STATUS_DISABLED;
+			}
+		);
+
+		$data['disabled_moduleids'] = array_column($disabled_modules, 'moduleid', 'moduleid');
+
+		$data['mediatypes'] = API::MediaType()->get([
+			'output' => ['status'],
 			'preservekeys' => true
 		]);
 

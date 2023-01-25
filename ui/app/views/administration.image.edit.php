@@ -25,15 +25,16 @@
 
 $this->includeJsFile('administration.image.edit.js.php');
 
-$widget = (new CWidget())
+$html_page = (new CHtmlPage())
 	->setTitle(_('Images'))
-	->setTitleSubmenu(getAdministrationGeneralSubmenu());
+	->setTitleSubmenu(getAdministrationGeneralSubmenu())
+	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_IMAGE_EDIT));
 
 $form = (new CForm('post', (new CUrl('zabbix.php'))
 		->setArgument('action', ($data['imageid'] == 0) ? 'image.create' : 'image.update')
 		->getUrl(), 'multipart/form-data')
 	)
-		->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
+		->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
 		->addVar('imagetype', $data['imagetype']);
 
 if ($data['imageid'] != 0) {
@@ -49,7 +50,7 @@ $form_list = (new CFormList('imageFormList'))
 			->setAriaRequired()
 	)
 	->addRow(
-		(new CLabel(_('Upload'), 'image'))->setAsteriskMark(),
+		(new CLabel(_('Upload'), 'image'))->setAsteriskMark($data['imageid'] == 0),
 		(new CFile('image'))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 			->setAriaRequired()
@@ -102,4 +103,4 @@ else {
 	));
 }
 
-$widget->addItem($form->addItem($tab_view))->show();
+$html_page->addItem($form->addItem($tab_view))->show();

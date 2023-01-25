@@ -20,9 +20,18 @@
 #ifndef ZABBIX_PROXYCONFIG_H
 #define ZABBIX_PROXYCONFIG_H
 
-#include "threads.h"
+#include "zbxthreads.h"
+
+#include "zbxcomms.h"
 
 extern int	CONFIG_PROXYCONFIG_FREQUENCY;
+
+typedef struct
+{
+	zbx_config_tls_t	*zbx_config_tls;
+	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
+}
+zbx_thread_proxyconfig_args;
 
 ZBX_THREAD_ENTRY(proxyconfig_thread, args);
 

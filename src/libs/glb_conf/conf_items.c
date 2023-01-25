@@ -1,7 +1,7 @@
 
 
 
-#include "common.h"
+#include "zbxcommon.h"
 #include "zbxalgo.h"
 
 typedef struct {

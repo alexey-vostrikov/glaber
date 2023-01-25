@@ -22,16 +22,16 @@
 class CControllerDashboardPropertiesCheck extends CController {
 
 	protected function init() {
-		$this->disableSIDValidation();
+		$this->setPostContentType(self::POST_CONTENT_TYPE_JSON);
 	}
 
 	protected function checkInput() {
 		$fields = [
-			'template' => 'in 1',
-			'userid' => 'db users.userid',
-			'name' => 'required|db dashboard.name|not_empty',
-			'display_period' => 'required|db dashboard.display_period|in '.implode(',', DASHBOARD_DISPLAY_PERIODS),
-			'auto_start' => 'in 1'
+			'template' =>		'in 1',
+			'userid' =>			'db users.userid',
+			'name' =>			'required|db dashboard.name|not_empty',
+			'display_period' =>	'required|db dashboard.display_period|in '.implode(',', DASHBOARD_DISPLAY_PERIODS),
+			'auto_start' =>		'in 1'
 		];
 
 		$ret = $this->validateInput($fields);
@@ -43,9 +43,13 @@ class CControllerDashboardPropertiesCheck extends CController {
 		}
 
 		if (!$ret) {
-			$this->setResponse(new CControllerResponseData([
-				'main_block' => json_encode(['errors' => getMessages()->toString()])
-			]));
+			$this->setResponse(
+				new CControllerResponseData(['main_block' => json_encode([
+					'error' => [
+						'messages' => array_column(get_and_clear_messages(), 'message')
+					]
+				])])
+			);
 		}
 
 		return $ret;

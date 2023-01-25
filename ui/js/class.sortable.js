@@ -159,7 +159,7 @@ class CSortable extends CBaseComponent {
 	 * @returns {CSortable}
 	 */
 	removeItem(item) {
-		if (item.parentNode != this._list) {
+		if (item.parentNode !== this._list) {
 			throw RangeError('Item does not belong to the list.');
 		}
 
@@ -177,7 +177,7 @@ class CSortable extends CBaseComponent {
 	 * @returns {CSortable}
 	 */
 	scrollItemIntoView(item) {
-		if (item.parentNode != this._list) {
+		if (item.parentNode !== this._list) {
 			throw RangeError('Item does not belong to the list.');
 		}
 
@@ -221,7 +221,9 @@ class CSortable extends CBaseComponent {
 	 * @param {number}        pos        Starting axis position.
 	 */
 	_startDragging(drag_item, pos) {
-		this._drag_item_index = [...this._list.children].indexOf(drag_item);
+		this._drag_item_index_original = [...this._list.children].indexOf(drag_item);
+
+		this._drag_item_index = this._drag_item_index_original;
 
 		const target_rect = this._target.getBoundingClientRect();
 		const target_loc = this._getRectLoc(target_rect);
@@ -242,7 +244,7 @@ class CSortable extends CBaseComponent {
 		this._item_loc = [];
 
 		for (const item of this._list.children) {
-			if (item == drag_item) {
+			if (item === drag_item) {
 				continue;
 			}
 
@@ -256,6 +258,8 @@ class CSortable extends CBaseComponent {
 
 			item.style.left = `${item_rect.x - list_rect.x}px`;
 			item.style.top = `${item_rect.y - list_rect.y}px`;
+			item.style.width = `${item_rect.width}px`;
+			item.style.height = `${item_rect.height}px`;
 		}
 
 		this._target.classList.add(ZBX_STYLE_SORTABLE_DRAGGING);
@@ -263,15 +267,18 @@ class CSortable extends CBaseComponent {
 		this._list.style.height = `${list_rect.height}px`;
 
 		// Clone the dragging item not to disturb the original order while dragging.
-		this._drag_item = drag_item.cloneNode(true);
+		this._drag_item = drag_item;
 		this._drag_item.style.left = `${drag_item_rect.x - target_rect.x}px`;
 		this._drag_item.style.top = `${drag_item_rect.y - target_rect.y}px`;
+		this._drag_item.style.width = `${drag_item_rect.width}px`;
+		this._drag_item.style.height = `${drag_item_rect.height}px`;
+
 		this._target.appendChild(this._drag_item);
 
 		// Hide the actual dragging item.
 		drag_item.classList.add(ZBX_STYLE_SORTABLE_DRAGGING);
 
-		this.fire(SORTABLE_EVENT_DRAG_START, {item: this._drag_item});
+		this.fire(SORTABLE_EVENT_DRAG_START, {item: drag_item});
 	}
 
 	/**
@@ -314,10 +321,10 @@ class CSortable extends CBaseComponent {
 			items[index].style[this._is_vertical ? 'top' : 'left'] = `${this._item_loc[index].pos}px`;
 		}
 
-		if (this._drag_item_loc.pos == 0) {
+		if (this._drag_item_loc.pos === 0) {
 			this._startDragScrolling(-1);
 		}
-		else if (this._drag_item_loc.pos == drag_item_max_pos) {
+		else if (this._drag_item_loc.pos === drag_item_max_pos) {
 			this._startDragScrolling(1);
 		}
 		else {
@@ -344,18 +351,17 @@ class CSortable extends CBaseComponent {
 	_endDraggingAfterTransitions() {
 		const items = this._getNonDraggingItems();
 
-		const drag_item = this._list.querySelector(`.${ZBX_STYLE_SORTABLE_DRAGGING}`);
+		const drag_item = this._drag_item;
 
-		if (drag_item !== null) {
-			this._list.insertBefore(drag_item,
-				(this._drag_item_index < items.length) ? items[this._drag_item_index] : null
-			);
+		this._list.insertBefore(drag_item,
+			(this._drag_item_index < items.length) ? items[this._drag_item_index] : null
+		);
 
-			drag_item.classList.remove(ZBX_STYLE_SORTABLE_DRAGGING);
-		}
-
-		this._target.removeChild(this._drag_item);
-		this._drag_item = null;
+		drag_item.classList.remove(ZBX_STYLE_SORTABLE_DRAGGING);
+		drag_item.style.left = '';
+		drag_item.style.top = '';
+		drag_item.style.width = '';
+		drag_item.style.height = '';
 
 		this._target.classList.remove(ZBX_STYLE_SORTABLE_DRAGGING);
 		this._list.style.width = '';
@@ -364,14 +370,16 @@ class CSortable extends CBaseComponent {
 		for (const item of items) {
 			item.style.left = '';
 			item.style.top = '';
+			item.style.width = '';
+			item.style.height = '';
 		}
 
-		if (drag_item !== null) {
-			// Re-focus the dragged item.
-			drag_item.focus();
+		// Re-focus the dragged item.
+		drag_item.focus();
 
-			this.fire(SORTABLE_EVENT_DRAG_END, {item: drag_item});
-		}
+		this._drag_item = null;
+
+		this.fire(SORTABLE_EVENT_DRAG_END, {item: drag_item});
 	}
 
 	/**
@@ -401,7 +409,7 @@ class CSortable extends CBaseComponent {
 			? prev_item_pos + this._item_loc[this._drag_item_index - 1].dim
 			: 0;
 
-		if (direction == -1) {
+		if (direction === -1) {
 			if (this._drag_item_index > 0) {
 				this._drag_item_index--;
 
@@ -465,19 +473,17 @@ class CSortable extends CBaseComponent {
 	 * @returns {number}
 	 */
 	_getDragScrollDelay(iteration) {
-		return (iteration == 0 || iteration > 2) ? this._drag_scroll_delay_short : this._drag_scroll_delay_long;
+		return (iteration === 0 || iteration > 2) ? this._drag_scroll_delay_short : this._drag_scroll_delay_long;
 	}
 
 	/**
-	 * Cancel item dragging and return the item to it's original position.
+	 * Cancel item dragging and return the item to its original position.
 	 */
 	_cancelDragging() {
 		if (this._drag_item !== null) {
 			// Simulate dropping the item at it's original position.
 
-			this._drag_item_index = [...this._list.children].indexOf(
-				this._list.querySelector(`.${ZBX_STYLE_SORTABLE_DRAGGING}`)
-			);
+			this._drag_item_index = this._drag_item_index_original;
 
 			this.fire('_dragcancel');
 		}
@@ -557,7 +563,7 @@ class CSortable extends CBaseComponent {
 		const list_loc = this._getRectLoc(this._list.getBoundingClientRect());
 
 		if (this._drag_item === null) {
-			if (items.length == 0) {
+			if (items.length === 0) {
 				return 0;
 			}
 
@@ -566,7 +572,7 @@ class CSortable extends CBaseComponent {
 			return Math.max(0, last_item_loc.pos + last_item_loc.dim - list_loc.pos - list_loc.dim);
 		}
 		else {
-			if (items.length == 0) {
+			if (items.length === 0) {
 				return Math.max(0, this._drag_item_loc.dim - list_loc.dim);
 			}
 
@@ -643,8 +649,6 @@ class CSortable extends CBaseComponent {
 			},
 
 			wheel: (e) => {
-				e.preventDefault();
-
 				if (mouse_down_item !== null) {
 					this._startDragging(mouse_down_item, mouse_down_pos);
 
@@ -654,7 +658,11 @@ class CSortable extends CBaseComponent {
 					prevent_clicks = true;
 				}
 
-				wheel_direction = (e.deltaY != 0) ? Math.sign(e.deltaY) : Math.sign(e.deltaX);
+				if (this._drag_item !== null) {
+					e.preventDefault();
+				}
+
+				wheel_direction = (e.deltaY !== 0) ? Math.sign(e.deltaY) : Math.sign(e.deltaX);
 				wheel_pos = this._is_vertical ? e.clientY : e.clientX;
 
 				if (wheel_request === null) {
@@ -666,7 +674,7 @@ class CSortable extends CBaseComponent {
 			},
 
 			listMouseDown: (e) => {
-				if (e.button != 0) {
+				if (e.button !== 0) {
 					return;
 				}
 
@@ -686,6 +694,7 @@ class CSortable extends CBaseComponent {
 					return;
 				}
 
+
 				// Scroll item into view if it is partially visible.
 				this.scrollItemIntoView(mouse_down_item);
 
@@ -696,6 +705,8 @@ class CSortable extends CBaseComponent {
 
 					return;
 				}
+
+				e.preventDefault();
 
 				// Save initial mouse position.
 				mouse_down_pos = this._is_vertical ? e.clientY : e.clientX;
@@ -763,7 +774,7 @@ class CSortable extends CBaseComponent {
 					return;
 				}
 
-				if (e.target.parentNode != this._list) {
+				if (e.target.parentNode !== this._list) {
 					return;
 				}
 
@@ -807,18 +818,18 @@ class CSortable extends CBaseComponent {
 
 				// Delete outdated targets.
 				for (const target of transitions_set) {
-					if (target == this._list) {
+					if (target === this._list) {
 						continue;
 					}
 
 					const item = target.closest(`.${ZBX_STYLE_SORTABLE_ITEM}`);
 
-					if (item === null || item.parentNode != this._list) {
+					if (item === null || item.parentNode !== this._list) {
 						transitions_set.delete(target);
 					}
 				}
 
-				if (end_dragging_after_transitions && transitions_set.size == 0) {
+				if (end_dragging_after_transitions && transitions_set.size === 0) {
 					this._endDraggingAfterTransitions();
 					end_dragging_after_transitions = false;
 				}

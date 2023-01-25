@@ -181,7 +181,7 @@ $graph_time->insertFlickerfreeJs();
 CScreenBuilder::insertScreenStandardJs($graph_in->timeline);
 
 // Create graphs widget.
-$widget = (new CWidget())
+(new CHtmlPage())
 	->setTitle(_('Details of web scenario').': '.$http_test_name)
 	->setWebLayoutMode($page['web_layout_mode'])
 	->setControls((new CTag('nav', true,
@@ -194,7 +194,7 @@ $widget = (new CWidget())
 	->addItem($details_screen->get())
 	->addItem(new CTag('br'))
 	->addItem(
-		(new CFilter(new CUrl()))
+		(new CFilter())
 			->setProfile($timeline['profileIdx'], $timeline['profileIdx2'])
 			->setActiveTab(CProfile::get($timeline['profileIdx'].'.active', 1))
 			->addTimeSelector($timeline['from'], $timeline['to'], $page['web_layout_mode'] != ZBX_LAYOUT_KIOSKMODE)

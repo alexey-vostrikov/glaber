@@ -25,7 +25,7 @@ require_once dirname(__FILE__).'/include/graphs.inc.php';
 
 $page['file'] = 'history.php';
 $page['title'] = _('History');
-$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'flickerfreescreen.js', 'multiselect.js', 'layout.mode.js'];
+$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'flickerfreescreen.js', 'layout.mode.js'];
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
 $page['web_layout_mode'] = CViewHelper::loadLayoutMode();
 
@@ -46,7 +46,7 @@ $fields = [
 	'mark_color' =>		[T_ZBX_STR,			O_OPT, null,	IN(MARK_COLOR_RED.','.MARK_COLOR_GREEN.','.MARK_COLOR_BLUE), null],
 	'plaintext' =>		[T_ZBX_STR,			O_OPT, null,	null,	null],
 	'action' =>			[T_ZBX_STR,			O_OPT, P_SYS,	IN('"'.HISTORY_GRAPH.'","'.HISTORY_VALUES.'","'.HISTORY_LATEST.'","'.HISTORY_BATCH_GRAPH.'"'), null],
-	'graphtype' =>		[T_ZBX_INT,			O_OPT, null,   IN([GRAPH_TYPE_NORMAL, GRAPH_TYPE_STACKED]), null],
+	'graphtype' =>		[T_ZBX_INT,			O_OPT, null,   IN([GRAPH_TYPE_NORMAL, GRAPH_TYPE_STACKED, GRAPH_TYPE_SEPARATED]), null],
 	// filter
 	'filter_rst' =>		[T_ZBX_STR,			O_OPT, P_SYS,	null,	null]
 ];
@@ -73,7 +73,7 @@ $value_type = '';
 
 if ($itemids) {
 	$items = API::Item()->get([
-		'output' => ['itemid', 'key_', 'name', 'value_type', 'hostid', 'valuemapid', 'history', 'trends'],
+		'output' => ['itemid', 'name', 'value_type'],
 		'selectHosts' => ['name'],
 		'itemids' => $itemids,
 		'preservekeys' => true,
@@ -81,13 +81,25 @@ if ($itemids) {
 		'webitems' => true
 	]);
 
-	foreach ($itemids as $itemid) {
-		if (!array_key_exists($itemid, $items)) {
+	if (getRequest('action') == HISTORY_BATCH_GRAPH) {
+
+		// Keep only item IDs that are applicable to graphs.
+		$itemids = array_keys($items);
+
+		// If there are none left and all of the selected did not exist or were not numeric, display error.
+		if (!$itemids) {
 			access_deny();
 		}
 	}
+	else {
+		// If other mode is selected, retain original functionality where all given items are checked if they exist.
+		foreach ($itemids as $itemid) {
+			if (!array_key_exists($itemid, $items)) {
+				access_deny();
+			}
+		}
+	}
 
-	$items = CMacrosResolverHelper::resolveItemNames($items);
 	$item = reset($items);
 	$value_type = $item['value_type'];
 }
