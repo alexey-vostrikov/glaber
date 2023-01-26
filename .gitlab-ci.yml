@@ -94,7 +94,7 @@ debian-buster:
 
 astra:
   variables:
-    OS: atra
+    OS: astra
     OS_VER: orel
   image: ${OS}:${OS_VER}
   script:
