@@ -85,7 +85,7 @@ debian-buster:
   image: ${OS}:${OS_VER}
   script:
     - *install_common_apt 
-    - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
+    - apt-get install -y libmysqldb-dev default-libmysqlclient-dev libssh-dev sass
     - *build_go
     - *prepare_sources
     - *build_glbmap
@@ -98,6 +98,7 @@ astra:
     OS_VER: orel
   image: ${OS}:${OS_VER}
   script:
+    - apt-get search mariadb
     - *install_common_apt 
     - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
     - *build_go
