@@ -98,7 +98,7 @@ astra:
     OS_VER: orel
   image: ${OS}:${OS_VER}
   script:
-    - apt-get search mariadb
+    - apt search mariadb
     - *install_common_apt 
     - apt-get install -y libmariadb-dev default-libmysqlclient-dev libssh-dev sass
     - *build_go
