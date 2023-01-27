@@ -26,7 +26,6 @@ SUBDIRS = \
 	lld \
 	reporter \
 	glb_poller \
-	tests \
 	service \
 	rtc \
 	ha \
