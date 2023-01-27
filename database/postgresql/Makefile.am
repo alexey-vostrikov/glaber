@@ -75,6 +75,6 @@ EXTRA_DIST = \
 	$(tsdb_nocompr_dir)/history_pk_text.sql \
 	$(tsdb_nocompr_dir)/history_pk_uint.sql
 
-clean:
-	rm -f schema.sql data.sql timescaledb.sql history_pk_prepare.sql
-	rm -rf tsdb_history_pk_upgrade_with_compression tsdb_history_pk_upgrade_no_compression
+#clean:
+#	rm -f schema.sql data.sql timescaledb.sql history_pk_prepare.sql
+#	rm -rf tsdb_history_pk_upgrade_with_compression tsdb_history_pk_upgrade_no_compression
