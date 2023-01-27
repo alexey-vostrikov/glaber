@@ -2055,7 +2055,6 @@ AC_CONFIG_FILES([
 	src/zabbix_server/poller/Makefile
 	src/zabbix_server/preprocessor/Makefile
 	src/zabbix_server/glb_poller/Makefile
-	src/zabbix_server/tests/Makefile
 	src/zabbix_server/proxyconfigread/Makefile
 	src/zabbix_server/proxypoller/Makefile
 	src/zabbix_server/reporter/Makefile
