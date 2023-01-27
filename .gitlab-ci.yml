@@ -23,7 +23,7 @@ workflow:
     - git clone https://gitlab.com/mikler/glbmap.git
     - cd glbmap && cmake . && make -j4
     - mv src/zmap src/glbmap && chmod +s src/glbmap
-    - cd ${CI_PROJECT_DIR}
+    - cd /home/user/${CI_PROJECT_DIR}
     
 .set_glb_version: &set_glb_version
     - export GLABER_VERSION=`cat include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)"`
