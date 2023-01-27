@@ -98,6 +98,7 @@ astra:
     OS_VER: orel
   tags: ["virtbox"]
   script:
+    - *build_go
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
