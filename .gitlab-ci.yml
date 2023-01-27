@@ -96,11 +96,8 @@ astra:
   variables:
     OS: astra
     OS_VER: orel
-  image: ${OS}:${OS_VER}
+  tags: ["virtbox"]
   script:
-    - *install_common_apt 
-    - apt-get install -y libmariadbd-dev default-libmysqlclient-dev libssh-dev sass
-    - *build_go
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
