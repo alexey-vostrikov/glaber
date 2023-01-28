@@ -68,10 +68,10 @@ workflow:
 
 .upload_packages: &upload_packages
   - echo "Will upload to '$REPO_DIR' repo"
-  - echo " ${CI_BUILDS_DIR}   ${CI_PROJECT_DIR}"
+  - echo "${CI_BUILDS_DIR}"
+  - echo "${CI_PROJECT_DIR}"
   - pwd
-  - ls -al ${CI_BUILDS_DIR}
-  - ls -al ../$CI_BUILDS_DIR
+  - ls -al ../$CI_PROJECT_DIR
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r ~/${CI_BUILDS_DIR}/glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
