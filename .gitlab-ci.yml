@@ -25,7 +25,7 @@ workflow:
     - mv src/zmap src/glbmap && chmod +s src/glbmap
     - pwd
     - ls -al
-    - cd ..
+    - cd ../..
     - ls -al
     
 .set_glb_version: &set_glb_version
