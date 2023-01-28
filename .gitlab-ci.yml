@@ -67,11 +67,6 @@ workflow:
     - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev curl libssl-dev
 
 .upload_packages: &upload_packages
-  - echo "Will upload to '$REPO_DIR' repo"
-  - echo "${CI_BUILDS_DIR}"
-  - echo "${CI_PROJECT_DIR}"
-  - pwd
-  - ls -al ../$CI_PROJECT_DIR
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r ~/${CI_BUILDS_DIR}/glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
@@ -106,6 +101,8 @@ astra:
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
+    - cd /builds/mikler
+    - ls -al
     - *upload_packages
 
 debian-bullseye:
