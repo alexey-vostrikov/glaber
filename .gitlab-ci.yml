@@ -101,7 +101,7 @@ astra:
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
-    - cd /builds/mikler
+    - cd /root/builds/mikler
     - ls -al
     - *upload_packages
 
