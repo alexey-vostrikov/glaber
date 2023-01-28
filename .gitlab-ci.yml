@@ -99,7 +99,7 @@ debian-buster:
 astra:
   variables:
     OS: astra
-    OS_VER: smolensk
+    OS_VER: orel
   tags: ["virtbox"]
   script:
     - *build_go
