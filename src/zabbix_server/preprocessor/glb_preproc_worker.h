@@ -21,7 +21,6 @@
 #define REPROCESSING_WORKER_H
 
 #include "zbxcommon.h"
-#include "threads.h"
 
 ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args);
 
