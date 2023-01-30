@@ -89,7 +89,7 @@ debian-buster:
   image: ${OS}:${OS_VER}
   script:
     - *install_common_apt 
-    - apt-get install -y libmysqldb-dev default-libmysqlclient-dev libssh-dev sass
+    - apt-get install -y default-libmysqlclient-dev libssh-dev sass
     - *build_go
     - *prepare_sources
     - *build_glbmap
