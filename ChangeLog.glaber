@@ -1,3 +1,5 @@
+ver 3.0.6
+    - fixed CI/CD build to buld older ubuntu versions and astra linux deb files
 ver 3.0.5
     - refactored trigger expression code to avoid puzzling flags, fixed triger status return (error field is always returned, even if empty), fixed missing error field in trigger API
 ver 3.0.4
