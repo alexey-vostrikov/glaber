@@ -1,3 +1,5 @@
+ve 3.0.7
+    - fix "unknown request method error on host duplication", maximum interval skip time is set to 30 seconds
 ver 3.0.6
     - fixed CI/CD build to buld older ubuntu versions and astra linux deb files
 ver 3.0.5

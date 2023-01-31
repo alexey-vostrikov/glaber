@@ -434,7 +434,7 @@ abstract class CItemType {
 			// HTTP Agent item type specific fields.
 			'url' =>				['type' => API_STRING_UTF8, 'in' => DB::getDefault('items', 'url')],
 			'query_fields' =>		['type' => API_OBJECTS, 'length' => 0],
-			'request_method' =>		['type' => API_INT32, 'in' => DB::getDefault('items', 'request_method')],
+			'request_method' =>		['type' => API_INT32, 'flags'=> API_ALLOW_UNEXPECTED ], //'in' => DB::getDefault('items', 'request_method') - to fix host duplication
 			'post_type' =>			['type' => API_INT32, 'in' => DB::getDefault('items', 'post_type')],
 			'posts' =>				['type' => API_STRING_UTF8, 'in' => DB::getDefault('items', 'posts')],
 			'headers' =>			['type' => API_OBJECT, 'fields' => []],

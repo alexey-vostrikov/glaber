@@ -1520,7 +1520,7 @@ int	zbx_calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int simple_in
 				nextcheck = current_delay * (int)(t / (time_t)current_delay) +
 						(int)(seed % (zbx_uint64_t)current_delay);
 				
-				int min_delay = current_delay / 4;
+				int min_delay = MIN(current_delay / 4, 30);
 
 				if (0 == attempt)
 				{
