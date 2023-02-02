@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #if defined(HAVE_LIBXML2) && defined(HAVE_LIBCURL)
 #include "module.h"
 #include "zbxalgo.h"
-#include "dbcache.h"
+#include "zbxcacheconfig.h"
 
 int	check_vcenter_cluster_alarms_get(AGENT_REQUEST *request, const char *username, const char *password,
 		AGENT_RESULT *result);

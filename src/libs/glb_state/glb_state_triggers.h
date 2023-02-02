@@ -19,6 +19,7 @@
 #ifndef GLB_STATE_TRIGGERS_H
 #define GLB_STATE_TRIGGERS_H
 #include "glb_state.h"
+#include "zbxjson.h"
 
 typedef struct {
     u_int64_t id; 

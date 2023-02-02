@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -71,7 +71,13 @@ $filter_column1 = (new CFormList())
 	->addRow(_('Name'),
 		(new CTextBox('filter_name', $data['filter_name']))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 	)
-	->addRow(_('Severity'),	(new CSeverityCheckBoxList('filter_priority'))->setChecked($data['filter_priority']));
+	->addRow(_('Severity'),
+		(new CCheckBoxList('filter_priority'))
+			->setOptions(CSeverityHelper::getSeverities())
+			->setChecked($data['filter_priority'])
+			->setColumns(3)
+			->setVertical(true)
+	);
 
 $filter_column1->addRow(_('Status'),
 	(new CRadioButtonList('filter_status', (int) $data['filter_status']))
@@ -281,11 +287,11 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 	$status = (new CLink(
 		triggerAdminStatusStr($trigger['status']),
 		(new CUrl('triggers.php'))
-			->setArgument('g_triggerid', $triggerid)
 			->setArgument('action', ($trigger['status'] == TRIGGER_STATUS_DISABLED)
 				? 'trigger.massenable'
 				: 'trigger.massdisable'
 			)
+			->setArgument('g_triggerid[]', $triggerid)
 			->setArgument('context', $data['context'])
 			->getUrl()
 		))
@@ -343,7 +349,12 @@ $triggers_form->addItem([
 		[
 			'trigger.massenable' => ['name' => _('Enable'), 'confirm' => _('Enable selected triggers?')],
 			'trigger.massdisable' => ['name' => _('Disable'), 'confirm' => _('Disable selected triggers?')],
-			'trigger.masscopyto' => ['name' => _('Copy')],
+			'trigger.masscopyto' => [
+				'content' => (new CSimpleButton(_('Copy')))
+					->addClass('js-copy')
+					->addClass(ZBX_STYLE_BTN_ALT)
+					->removeId()
+			],
 			'popup.massupdate.trigger' => [
 				'content' => (new CButton('', _('Mass update')))
 					->onClick(
@@ -365,6 +376,11 @@ $html_page
 	->addItem($triggers_form)
 	->show();
 
-(new CScriptTag('view.init();'))
+(new CScriptTag('
+	view.init('.json_encode([
+		'checkbox_hash' => $data['checkbox_hash'],
+		'checkbox_object' => 'g_triggerid'
+	]).');
+'))
 	->setOnDocumentReady()
 	->show();

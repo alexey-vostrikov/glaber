@@ -11,9 +11,10 @@ DIST_SUBDIRS = \
 	zbxcompress \
 	zbxconf \
 	zbxcrypto \
-	zbxcyberark \
 	zbxdb \
-	zbxdbcache \
+	zbxcacheconfig \
+	zbxcachehistory \
+	glb_state \
 	zbxdbhigh \
 	zbxdbwrap \
 	zbxdbschema \
@@ -28,8 +29,7 @@ DIST_SUBDIRS = \
 	zbxgetopt \
 	zbxha \
 	zbxhash \
-	zbxhashicorp \
-	glbhistory \
+	glb_history \
 	zbxhttp \
 	zbxicmpping \
 	zbxip \
@@ -52,6 +52,7 @@ DIST_SUBDIRS = \
 	zbxservice \
 	zbxshmem \
 	zbxsysinfo \
+	zbxstats \
 	zbxstr \
 	zbxtasks \
 	zbxthreads \
@@ -60,19 +61,18 @@ DIST_SUBDIRS = \
 	zbxvariant \
 	zbxvault \
 	zbxversion \
-	glb_state \
-	zbxxml \
-	apm
+	zbxprof \
+	zbxxml
 
 if SERVER
 SERVER_SUBDIRS = \
-	glb_conf \
 	zbxaudit \
 	zbxavailability \
 	zbxcompress \
-	zbxcyberark \
 	zbxdb \
-	zbxdbcache \
+	zbxcacheconfig \
+	zbxcachehistory \
+	glb_state \
 	zbxdbhigh \
 	zbxdbwrap \
 	zbxdbschema \
@@ -83,8 +83,7 @@ SERVER_SUBDIRS = \
 	zbxexport \
 	zbxexpr \
 	zbxha \
-	zbxhashicorp \
-	glbhistory \
+	glb_history \
 	zbxhttp \
 	zbxicmpping \
 	zbxip \
@@ -99,6 +98,7 @@ SERVER_SUBDIRS = \
 	zbxserver \
 	zbxservice \
 	zbxshmem \
+	zbxstats \
 	zbxstr \
 	zbxtasks \
 	zbxtime \
@@ -117,9 +117,9 @@ PROXY_SUBDIRS = \
 	zbxaudit \
 	zbxavailability \
 	zbxcompress \
-	zbxcyberark \
 	zbxdb \
-	zbxdbcache \
+	zbxcacheconfig \
+	zbxcachehistory \
 	zbxdbhigh \
 	zbxdbwrap \
 	zbxdbschema \
@@ -128,8 +128,7 @@ PROXY_SUBDIRS = \
 	zbxembed \
 	zbxeval \
 	zbxexport \
-	zbxhashicorp \
-	glbhistory \
+	glb_history \
 	zbxhttp \
 	zbxicmpping \
 	zbxip \
@@ -142,6 +141,7 @@ PROXY_SUBDIRS = \
 	zbxserialize \
 	zbxserver \
 	zbxshmem \
+	zbxstats \
 	zbxstr \
 	zbxtasks \
 	zbxtime \
@@ -177,6 +177,7 @@ SUBDIRS = \
 	zbxlog \
 	zbxmodules \
 	zbxmutexs \
+	zbxprof \
 	zbxnix \
 	zbxnum \
 	zbxparam \
@@ -196,3 +197,9 @@ EXTRA_DIST = \
 	zbxsymbols \
 	zbxwin32 \
 	zbxwinservice
+
+## hashicorp and cyberark used to be a separate libraries, remove them at some point in the future
+clean: clean-recursive
+	rm -rf hashicorp && \
+	rm -rf cyberark
+.PHONY: clean

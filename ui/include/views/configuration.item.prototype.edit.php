@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@ $url = (new CUrl('disc_prototypes.php'))
 	->getUrl();
 
 $form = (new CForm('post', $url))
+	->addItem((new CVar('form_refresh', $data['form_refresh'] + 1))->removeId())
 	->setId('item-prototype-form')
 	->setName('itemForm')
 	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
@@ -819,15 +820,16 @@ $item_tab
 if ($data['host']['flags'] != ZBX_FLAG_DISCOVERY_CREATED) {
 	$item_tab->addItem([
 		(new CLabel(_('Value mapping'), 'valuemapid_ms'))->setId('js-item-value-map-label'),
-		(new CFormField((new CMultiSelect([
+		(new CFormField(
+			(new CMultiSelect([
 				'name' => 'valuemapid',
-				'object_name' => 'valuemaps',
+				'object_name' => $data['context'] === 'host' ? 'valuemaps' : 'template_valuemaps',
 				'disabled' => $readonly,
 				'multiple' => false,
 				'data' => $data['valuemap'],
 				'popup' => [
 					'parameters' => [
-						'srctbl' => 'valuemaps',
+						'srctbl' => $data['context'] === 'host' ? 'valuemaps' : 'template_valuemaps',
 						'srcfld1' => 'valuemapid',
 						'dstfrm' => $form->getName(),
 						'dstfld1' => 'valuemapid',
@@ -836,8 +838,7 @@ if ($data['host']['flags'] != ZBX_FLAG_DISCOVERY_CREATED) {
 						'editable' => true
 					]
 				]
-			]))
-				->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 		))->setId('js-item-value-map-field')
 	]);
 }
@@ -896,7 +897,7 @@ $item_tabs = (new CTabView())
 			->addItem([
 				new CLabel(_('Preprocessing steps')),
 				new CFormField(
-					getItemPreprocessing($form, $data['preprocessing'], $readonly, $data['preprocessing_types'])
+					getItemPreprocessing($data['preprocessing'], $readonly, $data['preprocessing_types'])
 				)
 			])
 			->addItem([
@@ -912,7 +913,7 @@ $item_tabs = (new CTabView())
 		TAB_INDICATOR_PREPROCESSING
 	);
 
-if (!hasRequest('form_refresh')) {
+if ($data['form_refresh'] == 0) {
 	$item_tabs->setSelected(0);
 }
 

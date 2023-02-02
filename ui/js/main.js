@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -653,6 +653,31 @@ var hintBox = {
 		return hintboxid;
 	}
 };
+
+/**
+ * Perform JSON-RPC Zabbix API call.
+ *
+ * @param {string} method
+ * @param {object} params
+ * @param {int}    id
+ *
+ * @returns {Promise<any>}
+ */
+function ApiCall(method, params, id = 1) {
+	return fetch(new Curl('api_jsonrpc.php', false).getUrl(), {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		credentials: 'same-origin',
+		body: JSON.stringify({
+			jsonrpc: '2.0',
+			method,
+			params,
+			id
+		}),
+	}).then((response) => response.json());
+}
 
 /**
  * Add object to the list of favorites.

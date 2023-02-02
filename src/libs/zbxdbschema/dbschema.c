@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -59,7 +59,9 @@ const ZBX_TABLE	tables[] = {
 		{"attempt_clock",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"rows_per_page",	"50",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"timezone",	"default",	NULL,	NULL,	50,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"roleid",	NULL,	"role",	"roleid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"roleid",	"NULL",	"role",	"roleid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
+		{"userdirectoryid",	"NULL",	"userdirectory",	"userdirectoryid",	0,	ZBX_TYPE_ID,	0,	0},
+		{"ts_provisioned",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		"username"
@@ -106,6 +108,7 @@ const ZBX_TABLE	tables[] = {
 		{"discover",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"custom_interfaces",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"uuid",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"name_upper",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -301,6 +304,7 @@ const ZBX_TABLE	tables[] = {
 		{"allow_traps",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL | ZBX_PROXY,	0},
 		{"discover",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"uuid",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"name_upper",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -451,6 +455,7 @@ const ZBX_TABLE	tables[] = {
 		{"formula",	"",	NULL,	NULL,	1024,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"pause_suppressed",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"notify_if_canceled",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"pause_symptoms",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		"name"
@@ -622,7 +627,7 @@ const ZBX_TABLE	tables[] = {
 		{"http_login_form",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"http_strip_domains",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"http_case_sensitive",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"ldap_configured",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"ldap_auth_enabled",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"ldap_case_sensitive",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"db_extension",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"autoreg_tls_accept",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL | ZBX_PROXY,	0},
@@ -630,19 +635,6 @@ const ZBX_TABLE	tables[] = {
 		{"compress_older",	"7d",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"instanceid",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"saml_auth_enabled",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_idp_entityid",	"",	NULL,	NULL,	1024,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"saml_sso_url",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"saml_slo_url",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"saml_username_attribute",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"saml_sp_entityid",	"",	NULL,	NULL,	1024,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"saml_nameid_format",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"saml_sign_messages",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_sign_assertions",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_sign_authn_requests",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_sign_logout_requests",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_sign_logout_responses",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_encrypt_nameid",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"saml_encrypt_assertions",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"saml_case_sensitive",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"default_lang",	"en_US",	NULL,	NULL,	5,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"default_timezone",	"system",	NULL,	NULL,	50,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
@@ -679,6 +671,10 @@ const ZBX_TABLE	tables[] = {
 		{"vault_provider",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"ldap_userdirectoryid",	"NULL ",	"userdirectory",	"userdirectoryid",	0,	ZBX_TYPE_ID,	0,	0},
 		{"server_status",	"",	NULL,	NULL,	ZBX_TYPE_SHORTTEXT_LEN,	ZBX_TYPE_SHORTTEXT,	ZBX_NOTNULL,	0},
+		{"jit_provision_interval",	"1h",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"saml_jit_status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"ldap_jit_status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"disabled_usrgrpid",	"NULL",	"usrgrp",	"usrgrpid",	0,	ZBX_TYPE_ID,	0,	0},
 		{0}
 		},
 		NULL
@@ -1246,6 +1242,14 @@ const ZBX_TABLE	tables[] = {
 		},
 		NULL
 	},
+	{"event_symptom",	"eventid",	0,
+		{
+		{"eventid",	NULL,	"events",	"eventid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"cause_eventid",	NULL,	"events",	"eventid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
 	{"trends",	"itemid,clock",	0,
 		{
 		{"itemid",	NULL,	"items",	"itemid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
@@ -1281,6 +1285,7 @@ const ZBX_TABLE	tables[] = {
 		{"old_severity",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"new_severity",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"suppress_until",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"taskid",	NULL,	"task",	"taskid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
 		{0}
 		},
 		NULL
@@ -1637,6 +1642,7 @@ const ZBX_TABLE	tables[] = {
 		{"name",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"acknowledged",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"severity",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"cause_eventid",	NULL,	"events",	"eventid",	0,	ZBX_TYPE_ID,	0,	0},
 		{0}
 		},
 		NULL
@@ -1816,7 +1822,7 @@ const ZBX_TABLE	tables[] = {
 		{"taskid",	NULL,	"task",	"taskid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
 		{"status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"parent_taskid",	NULL,	"task",	"taskid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
-		{"info",	"",	NULL,	NULL,	ZBX_TYPE_TEXT_LEN,	ZBX_TYPE_TEXT,	ZBX_NOTNULL,	0},
+		{"info",	"",	NULL,	NULL,	ZBX_TYPE_LONGTEXT_LEN,	ZBX_TYPE_LONGTEXT,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -1959,6 +1965,9 @@ const ZBX_TABLE	tables[] = {
 		{"value_sysmapid",	NULL,	"sysmaps",	"sysmapid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
 		{"value_serviceid",	NULL,	"services",	"serviceid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
 		{"value_slaid",	NULL,	"sla",	"slaid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
+		{"value_userid",	NULL,	"users",	"userid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
+		{"value_actionid",	NULL,	"actions",	"actionid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
+		{"value_mediatypeid",	NULL,	"media_type",	"mediatypeid",	0,	ZBX_TYPE_ID,	0,	ZBX_FK_CASCADE_DELETE},
 		{0}
 		},
 		NULL
@@ -2047,6 +2056,7 @@ const ZBX_TABLE	tables[] = {
 		{"authprotocol",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL | ZBX_PROXY,	0},
 		{"privprotocol",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL | ZBX_PROXY,	0},
 		{"contextname",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL | ZBX_PROXY,	0},
+		{"max_repetitions",	"10",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL | ZBX_PROXY,	0},
 		{0}
 		},
 		NULL
@@ -2413,14 +2423,85 @@ const ZBX_TABLE	tables[] = {
 		{"userdirectoryid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
 		{"name",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"description",	"",	NULL,	NULL,	ZBX_TYPE_SHORTTEXT_LEN,	ZBX_TYPE_SHORTTEXT,	ZBX_NOTNULL,	0},
+		{"idp_type",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"provision_status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
+	{"userdirectory_ldap",	"userdirectoryid",	0,
+		{
+		{"userdirectoryid",	NULL,	"userdirectory",	"userdirectoryid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
 		{"host",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"port",	"389",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"base_dn",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"search_attribute",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"bind_dn",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"bind_password",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"search_attribute",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"start_tls",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"search_filter",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"group_basedn",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"group_name",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"group_member",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"user_ref_attr",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"group_filter",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"group_membership",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"user_username",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"user_lastname",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
+	{"userdirectory_saml",	"userdirectoryid",	0,
+		{
+		{"userdirectoryid",	NULL,	"userdirectory",	"userdirectoryid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"idp_entityid",	"",	NULL,	NULL,	1024,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"sso_url",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"slo_url",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"username_attribute",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"sp_entityid",	"",	NULL,	NULL,	1024,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"nameid_format",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"sign_messages",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"sign_assertions",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"sign_authn_requests",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"sign_logout_requests",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"sign_logout_responses",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"encrypt_nameid",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"encrypt_assertions",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"group_name",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"user_username",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"user_lastname",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"scim_status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
+	{"userdirectory_media",	"userdirectory_mediaid",	0,
+		{
+		{"userdirectory_mediaid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"userdirectoryid",	NULL,	"userdirectory",	"userdirectoryid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"mediatypeid",	NULL,	"media_type",	"mediatypeid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"name",	"",	NULL,	NULL,	64,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"attribute",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
+	{"userdirectory_usrgrp",	"userdirectory_usrgrpid",	0,
+		{
+		{"userdirectory_usrgrpid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"userdirectory_idpgroupid",	NULL,	"userdirectory_idpgroup",	"userdirectory_idpgroupid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"usrgrpid",	NULL,	"usrgrp",	"usrgrpid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{0}
+		},
+		"userdirectory_idpgroupid,usrgrpid"
+	},
+	{"userdirectory_idpgroup",	"userdirectory_idpgroupid",	0,
+		{
+		{"userdirectory_idpgroupid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"userdirectoryid",	NULL,	"userdirectory",	"userdirectoryid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"roleid",	NULL,	"role",	"roleid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"name",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -2432,6 +2513,23 @@ const ZBX_TABLE	tables[] = {
 		{"objectid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
 		{"operation",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"clock",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
+	{"scim_group",	"scim_groupid",	0,
+		{
+		{"scim_groupid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"name",	"",	NULL,	NULL,	64,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		"name"
+	},
+	{"user_scim_group",	"user_scim_groupid",	0,
+		{
+		{"user_scim_groupid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"userid",	NULL,	"users",	"userid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
+		{"scim_groupid",	NULL,	"scim_group",	"scim_groupid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
 		{0}
 		},
 		NULL
@@ -2454,21 +2552,21 @@ const ZBX_TABLE	tables[] = {
 
 const zbx_db_table_changelog_t	changelog_tables[] = {
 	{"httpstepitem", 16},
-	{"httpstep", 14},
-	{"triggers", 5},
-	{"drules", 9},
-	{"host_tag", 2},
 	{"hosts", 1},
-	{"item_preproc", 8},
-	{"functions", 7},
+	{"trigger_tag", 6},
 	{"httpstep_field", 15},
-	{"items", 3},
-	{"httptest_field", 12},
-	{"dchecks", 10},
-	{"item_tag", 4},
 	{"httptest", 11},
 	{"httptestitem", 13},
-	{"trigger_tag", 6},
+	{"dchecks", 10},
+	{"triggers", 5},
+	{"item_preproc", 8},
+	{"item_tag", 4},
+	{"functions", 7},
+	{"items", 3},
+	{"httptest_field", 12},
+	{"host_tag", 2},
+	{"drules", 9},
+	{"httpstep", 14},
 	{0}
 };
 #if defined(HAVE_SQLITE3)
@@ -2498,10 +2596,13 @@ attempt_ip varchar(39) DEFAULT '' NOT NULL,\n\
 attempt_clock integer DEFAULT 0 NOT NULL,\n\
 rows_per_page integer DEFAULT 50 NOT NULL,\n\
 timezone varchar(50) DEFAULT 'default' NOT NULL,\n\
-roleid bigint  NOT NULL REFERENCES role (roleid) ON DELETE CASCADE,\n\
+roleid bigint DEFAULT NULL NULL REFERENCES role (roleid) ON DELETE CASCADE,\n\
+userdirectoryid bigint DEFAULT NULL NULL REFERENCES userdirectory (userdirectoryid),\n\
+ts_provisioned integer DEFAULT '0' NOT NULL,\n\
 PRIMARY KEY (userid)\n\
 );\n\
 CREATE UNIQUE INDEX users_1 ON users (username);\n\
+CREATE INDEX users_2 ON users (userdirectoryid);\n\
 CREATE TABLE maintenances (\n\
 maintenanceid bigint  NOT NULL,\n\
 name varchar(128) DEFAULT '' NOT NULL,\n\
@@ -2542,6 +2643,7 @@ auto_compress integer DEFAULT '1' NOT NULL,\n\
 discover integer DEFAULT '0' NOT NULL,\n\
 custom_interfaces integer DEFAULT '0' NOT NULL,\n\
 uuid varchar(32) DEFAULT '' NOT NULL,\n\
+name_upper varchar(128) DEFAULT '' NOT NULL,\n\
 PRIMARY KEY (hostid)\n\
 );\n\
 CREATE INDEX hosts_1 ON hosts (host);\n\
@@ -2549,6 +2651,7 @@ CREATE INDEX hosts_2 ON hosts (status);\n\
 CREATE INDEX hosts_3 ON hosts (proxy_hostid);\n\
 CREATE INDEX hosts_4 ON hosts (name);\n\
 CREATE INDEX hosts_5 ON hosts (maintenanceid);\n\
+CREATE INDEX hosts_6 ON hosts (name_upper);\n\
 CREATE TABLE hstgrp (\n\
 groupid bigint  NOT NULL,\n\
 name varchar(255) DEFAULT '' NOT NULL,\n\
@@ -2725,6 +2828,7 @@ verify_host integer DEFAULT '0' NOT NULL,\n\
 allow_traps integer DEFAULT '0' NOT NULL,\n\
 discover integer DEFAULT '0' NOT NULL,\n\
 uuid varchar(32) DEFAULT '' NOT NULL,\n\
+name_upper varchar(255) DEFAULT '' NOT NULL,\n\
 PRIMARY KEY (itemid)\n\
 );\n\
 CREATE INDEX items_1 ON items (hostid,key_);\n\
@@ -2734,6 +2838,7 @@ CREATE INDEX items_5 ON items (valuemapid);\n\
 CREATE INDEX items_6 ON items (interfaceid);\n\
 CREATE INDEX items_7 ON items (master_itemid);\n\
 CREATE INDEX items_8 ON items (key_);\n\
+CREATE INDEX items_9 ON items (hostid,name_upper);\n\
 CREATE TABLE httpstepitem (\n\
 httpstepitemid bigint  NOT NULL,\n\
 httpstepid bigint  NOT NULL REFERENCES httpstep (httpstepid),\n\
@@ -2867,6 +2972,7 @@ esc_period varchar(255) DEFAULT '1h' NOT NULL,\n\
 formula varchar(1024) DEFAULT '' NOT NULL,\n\
 pause_suppressed integer DEFAULT '1' NOT NULL,\n\
 notify_if_canceled integer DEFAULT '1' NOT NULL,\n\
+pause_symptoms integer DEFAULT '1' NOT NULL,\n\
 PRIMARY KEY (actionid)\n\
 );\n\
 CREATE INDEX actions_1 ON actions (eventsource,status);\n\
@@ -3021,7 +3127,7 @@ http_auth_enabled integer DEFAULT '0' NOT NULL,\n\
 http_login_form integer DEFAULT '0' NOT NULL,\n\
 http_strip_domains varchar(2048) DEFAULT '' NOT NULL,\n\
 http_case_sensitive integer DEFAULT '1' NOT NULL,\n\
-ldap_configured integer DEFAULT '0' NOT NULL,\n\
+ldap_auth_enabled integer DEFAULT '0' NOT NULL,\n\
 ldap_case_sensitive integer DEFAULT '1' NOT NULL,\n\
 db_extension varchar(32) DEFAULT '' NOT NULL,\n\
 autoreg_tls_accept integer DEFAULT '1' NOT NULL,\n\
@@ -3029,19 +3135,6 @@ compression_status integer DEFAULT '0' NOT NULL,\n\
 compress_older varchar(32) DEFAULT '7d' NOT NULL,\n\
 instanceid varchar(32) DEFAULT '' NOT NULL,\n\
 saml_auth_enabled integer DEFAULT '0' NOT NULL,\n\
-saml_idp_entityid varchar(1024) DEFAULT '' NOT NULL,\n\
-saml_sso_url varchar(2048) DEFAULT '' NOT NULL,\n\
-saml_slo_url varchar(2048) DEFAULT '' NOT NULL,\n\
-saml_username_attribute varchar(128) DEFAULT '' NOT NULL,\n\
-saml_sp_entityid varchar(1024) DEFAULT '' NOT NULL,\n\
-saml_nameid_format varchar(2048) DEFAULT '' NOT NULL,\n\
-saml_sign_messages integer DEFAULT '0' NOT NULL,\n\
-saml_sign_assertions integer DEFAULT '0' NOT NULL,\n\
-saml_sign_authn_requests integer DEFAULT '0' NOT NULL,\n\
-saml_sign_logout_requests integer DEFAULT '0' NOT NULL,\n\
-saml_sign_logout_responses integer DEFAULT '0' NOT NULL,\n\
-saml_encrypt_nameid integer DEFAULT '0' NOT NULL,\n\
-saml_encrypt_assertions integer DEFAULT '0' NOT NULL,\n\
 saml_case_sensitive integer DEFAULT '0' NOT NULL,\n\
 default_lang varchar(5) DEFAULT 'en_US' NOT NULL,\n\
 default_timezone varchar(50) DEFAULT 'system' NOT NULL,\n\
@@ -3078,11 +3171,16 @@ geomaps_attribution varchar(1024) DEFAULT '' NOT NULL,\n\
 vault_provider integer DEFAULT '0' NOT NULL,\n\
 ldap_userdirectoryid bigint DEFAULT NULL  NULL REFERENCES userdirectory (userdirectoryid),\n\
 server_status text DEFAULT '' NOT NULL,\n\
+jit_provision_interval varchar(32) DEFAULT '1h' NOT NULL,\n\
+saml_jit_status integer DEFAULT '0' NOT NULL,\n\
+ldap_jit_status integer DEFAULT '0' NOT NULL,\n\
+disabled_usrgrpid bigint DEFAULT NULL NULL REFERENCES usrgrp (usrgrpid),\n\
 PRIMARY KEY (configid)\n\
 );\n\
 CREATE INDEX config_1 ON config (alert_usrgrpid);\n\
 CREATE INDEX config_2 ON config (discovery_groupid);\n\
 CREATE INDEX config_3 ON config (ldap_userdirectoryid);\n\
+CREATE INDEX config_4 ON config (disabled_usrgrpid);\n\
 CREATE TABLE triggers (\n\
 triggerid bigint  NOT NULL,\n\
 expression varchar(2048) DEFAULT '' NOT NULL,\n\
@@ -3505,6 +3603,7 @@ CREATE INDEX alerts_4 ON alerts (status);\n\
 CREATE INDEX alerts_5 ON alerts (mediatypeid);\n\
 CREATE INDEX alerts_6 ON alerts (userid);\n\
 CREATE INDEX alerts_7 ON alerts (p_eventid);\n\
+CREATE INDEX alerts_8 ON alerts (acknowledgeid);\n\
 CREATE TABLE history (\n\
 itemid bigint  NOT NULL,\n\
 clock integer DEFAULT '0' NOT NULL,\n\
@@ -3589,6 +3688,12 @@ PRIMARY KEY (eventid)\n\
 );\n\
 CREATE INDEX events_1 ON events (source,object,objectid,clock);\n\
 CREATE INDEX events_2 ON events (source,object,clock);\n\
+CREATE TABLE event_symptom (\n\
+eventid bigint  NOT NULL REFERENCES events (eventid) ON DELETE CASCADE,\n\
+cause_eventid bigint  NOT NULL REFERENCES events (eventid),\n\
+PRIMARY KEY (eventid)\n\
+);\n\
+CREATE INDEX event_symptom_1 ON event_symptom (cause_eventid);\n\
 CREATE TABLE trends (\n\
 itemid bigint  NOT NULL,\n\
 clock integer DEFAULT '0' NOT NULL,\n\
@@ -3617,6 +3722,7 @@ action integer DEFAULT '0' NOT NULL,\n\
 old_severity integer DEFAULT '0' NOT NULL,\n\
 new_severity integer DEFAULT '0' NOT NULL,\n\
 suppress_until integer DEFAULT '0' NOT NULL,\n\
+taskid bigint  NULL,\n\
 PRIMARY KEY (acknowledgeid)\n\
 );\n\
 CREATE INDEX acknowledges_1 ON acknowledges (userid);\n\
@@ -3928,6 +4034,7 @@ userid bigint  NULL,\n\
 name varchar(2048) DEFAULT '' NOT NULL,\n\
 acknowledged integer DEFAULT '0' NOT NULL,\n\
 severity integer DEFAULT '0' NOT NULL,\n\
+cause_eventid bigint  NULL REFERENCES events (eventid),\n\
 PRIMARY KEY (eventid)\n\
 );\n\
 CREATE INDEX problem_1 ON problem (source,object,objectid);\n\
@@ -4190,6 +4297,9 @@ value_graphid bigint  NULL REFERENCES graphs (graphid) ON DELETE CASCADE,\n\
 value_sysmapid bigint  NULL REFERENCES sysmaps (sysmapid) ON DELETE CASCADE,\n\
 value_serviceid bigint  NULL REFERENCES services (serviceid) ON DELETE CASCADE,\n\
 value_slaid bigint  NULL REFERENCES sla (slaid) ON DELETE CASCADE,\n\
+value_userid bigint  NULL REFERENCES users (userid) ON DELETE CASCADE,\n\
+value_actionid bigint  NULL REFERENCES actions (actionid) ON DELETE CASCADE,\n\
+value_mediatypeid bigint  NULL REFERENCES media_type (mediatypeid) ON DELETE CASCADE,\n\
 PRIMARY KEY (widget_fieldid)\n\
 );\n\
 CREATE INDEX widget_field_1 ON widget_field (widgetid);\n\
@@ -4200,6 +4310,9 @@ CREATE INDEX widget_field_5 ON widget_field (value_graphid);\n\
 CREATE INDEX widget_field_6 ON widget_field (value_sysmapid);\n\
 CREATE INDEX widget_field_7 ON widget_field (value_serviceid);\n\
 CREATE INDEX widget_field_8 ON widget_field (value_slaid);\n\
+CREATE INDEX widget_field_9 ON widget_field (value_userid);\n\
+CREATE INDEX widget_field_10 ON widget_field (value_actionid);\n\
+CREATE INDEX widget_field_11 ON widget_field (value_mediatypeid);\n\
 CREATE TABLE task_check_now (\n\
 taskid bigint  NOT NULL REFERENCES task (taskid) ON DELETE CASCADE,\n\
 itemid bigint  NOT NULL,\n\
@@ -4269,6 +4382,7 @@ privpassphrase varchar(64) DEFAULT '' NOT NULL,\n\
 authprotocol integer DEFAULT '0' NOT NULL,\n\
 privprotocol integer DEFAULT '0' NOT NULL,\n\
 contextname varchar(255) DEFAULT '' NOT NULL,\n\
+max_repetitions integer DEFAULT '10' NOT NULL,\n\
 PRIMARY KEY (interfaceid)\n\
 );\n\
 CREATE TABLE lld_override (\n\
@@ -4565,16 +4679,80 @@ CREATE TABLE userdirectory (\n\
 userdirectoryid bigint  NOT NULL,\n\
 name varchar(128) DEFAULT '' NOT NULL,\n\
 description text DEFAULT '' NOT NULL,\n\
+idp_type integer DEFAULT '1' NOT NULL,\n\
+provision_status integer DEFAULT '0' NOT NULL,\n\
+PRIMARY KEY (userdirectoryid)\n\
+);\n\
+CREATE INDEX userdirectory_1 ON userdirectory (idp_type);\n\
+CREATE TABLE userdirectory_ldap (\n\
+userdirectoryid bigint  NOT NULL REFERENCES userdirectory (userdirectoryid) ON DELETE CASCADE,\n\
 host varchar(255) DEFAULT '' NOT NULL,\n\
 port integer DEFAULT '389' NOT NULL,\n\
 base_dn varchar(255) DEFAULT '' NOT NULL,\n\
+search_attribute varchar(128) DEFAULT '' NOT NULL,\n\
 bind_dn varchar(255) DEFAULT '' NOT NULL,\n\
 bind_password varchar(128) DEFAULT '' NOT NULL,\n\
-search_attribute varchar(128) DEFAULT '' NOT NULL,\n\
 start_tls integer DEFAULT '0' NOT NULL,\n\
 search_filter varchar(255) DEFAULT '' NOT NULL,\n\
+group_basedn varchar(255) DEFAULT '' NOT NULL,\n\
+group_name varchar(255) DEFAULT '' NOT NULL,\n\
+group_member varchar(255) DEFAULT '' NOT NULL,\n\
+user_ref_attr varchar(255) DEFAULT '' NOT NULL,\n\
+group_filter varchar(255) DEFAULT '' NOT NULL,\n\
+group_membership varchar(255) DEFAULT '' NOT NULL,\n\
+user_username varchar(255) DEFAULT '' NOT NULL,\n\
+user_lastname varchar(255) DEFAULT '' NOT NULL,\n\
 PRIMARY KEY (userdirectoryid)\n\
 );\n\
+CREATE TABLE userdirectory_saml (\n\
+userdirectoryid bigint  NOT NULL REFERENCES userdirectory (userdirectoryid) ON DELETE CASCADE,\n\
+idp_entityid varchar(1024) DEFAULT '' NOT NULL,\n\
+sso_url varchar(2048) DEFAULT '' NOT NULL,\n\
+slo_url varchar(2048) DEFAULT '' NOT NULL,\n\
+username_attribute varchar(128) DEFAULT '' NOT NULL,\n\
+sp_entityid varchar(1024) DEFAULT '' NOT NULL,\n\
+nameid_format varchar(2048) DEFAULT '' NOT NULL,\n\
+sign_messages integer DEFAULT '0' NOT NULL,\n\
+sign_assertions integer DEFAULT '0' NOT NULL,\n\
+sign_authn_requests integer DEFAULT '0' NOT NULL,\n\
+sign_logout_requests integer DEFAULT '0' NOT NULL,\n\
+sign_logout_responses integer DEFAULT '0' NOT NULL,\n\
+encrypt_nameid integer DEFAULT '0' NOT NULL,\n\
+encrypt_assertions integer DEFAULT '0' NOT NULL,\n\
+group_name varchar(255) DEFAULT '' NOT NULL,\n\
+user_username varchar(255) DEFAULT '' NOT NULL,\n\
+user_lastname varchar(255) DEFAULT '' NOT NULL,\n\
+scim_status integer DEFAULT '0' NOT NULL,\n\
+PRIMARY KEY (userdirectoryid)\n\
+);\n\
+CREATE TABLE userdirectory_media (\n\
+userdirectory_mediaid bigint  NOT NULL,\n\
+userdirectoryid bigint  NOT NULL REFERENCES userdirectory (userdirectoryid) ON DELETE CASCADE,\n\
+mediatypeid bigint  NOT NULL REFERENCES media_type (mediatypeid) ON DELETE CASCADE,\n\
+name varchar(64) DEFAULT '' NOT NULL,\n\
+attribute varchar(255) DEFAULT '' NOT NULL,\n\
+PRIMARY KEY (userdirectory_mediaid)\n\
+);\n\
+CREATE INDEX userdirectory_media_1 ON userdirectory_media (userdirectoryid);\n\
+CREATE INDEX userdirectory_media_2 ON userdirectory_media (mediatypeid);\n\
+CREATE TABLE userdirectory_usrgrp (\n\
+userdirectory_usrgrpid bigint  NOT NULL,\n\
+userdirectory_idpgroupid bigint  NOT NULL REFERENCES userdirectory_idpgroup (userdirectory_idpgroupid) ON DELETE CASCADE,\n\
+usrgrpid bigint  NOT NULL REFERENCES usrgrp (usrgrpid) ON DELETE CASCADE,\n\
+PRIMARY KEY (userdirectory_usrgrpid)\n\
+);\n\
+CREATE UNIQUE INDEX userdirectory_usrgrp_1 ON userdirectory_usrgrp (userdirectory_idpgroupid,usrgrpid);\n\
+CREATE INDEX userdirectory_usrgrp_2 ON userdirectory_usrgrp (usrgrpid);\n\
+CREATE INDEX userdirectory_usrgrp_3 ON userdirectory_usrgrp (userdirectory_idpgroupid);\n\
+CREATE TABLE userdirectory_idpgroup (\n\
+userdirectory_idpgroupid bigint  NOT NULL,\n\
+userdirectoryid bigint  NOT NULL REFERENCES userdirectory (userdirectoryid) ON DELETE CASCADE,\n\
+roleid bigint  NOT NULL REFERENCES role (roleid) ON DELETE CASCADE,\n\
+name varchar(255) DEFAULT '' NOT NULL,\n\
+PRIMARY KEY (userdirectory_idpgroupid)\n\
+);\n\
+CREATE INDEX userdirectory_idpgroup_1 ON userdirectory_idpgroup (userdirectoryid);\n\
+CREATE INDEX userdirectory_idpgroup_2 ON userdirectory_idpgroup (roleid);\n\
 CREATE TABLE changelog (\n\
 changelogid integer  NOT NULL PRIMARY KEY AUTOINCREMENT,\n\
 object integer DEFAULT '0' NOT NULL,\n\
@@ -4583,13 +4761,27 @@ operation integer DEFAULT '0' NOT NULL,\n\
 clock integer DEFAULT '0' NOT NULL\n\
 );\n\
 CREATE INDEX changelog_1 ON changelog (clock);\n\
+CREATE TABLE scim_group (\n\
+scim_groupid bigint  NOT NULL,\n\
+name varchar(64) DEFAULT '' NOT NULL,\n\
+PRIMARY KEY (scim_groupid)\n\
+);\n\
+CREATE UNIQUE INDEX scim_group_1 ON scim_group (name);\n\
+CREATE TABLE user_scim_group (\n\
+user_scim_groupid bigint  NOT NULL,\n\
+userid bigint  NOT NULL REFERENCES users (userid) ON DELETE CASCADE,\n\
+scim_groupid bigint  NOT NULL REFERENCES scim_group (scim_groupid) ON DELETE CASCADE,\n\
+PRIMARY KEY (user_scim_groupid)\n\
+);\n\
+CREATE INDEX user_scim_group_1 ON user_scim_group (userid);\n\
+CREATE INDEX user_scim_group_2 ON user_scim_group (scim_groupid);\n\
 CREATE TABLE dbversion (\n\
 dbversionid bigint  NOT NULL,\n\
 mandatory integer DEFAULT '0' NOT NULL,\n\
 optional integer DEFAULT '0' NOT NULL,\n\
 PRIMARY KEY (dbversionid)\n\
 );\n\
-INSERT INTO dbversion VALUES ('1','6030063','6030063');\n\
+INSERT INTO dbversion VALUES ('1','6030159','6030159');\n\
 create trigger hosts_insert after insert on hosts\n\
 for each row\n\
 begin\n\

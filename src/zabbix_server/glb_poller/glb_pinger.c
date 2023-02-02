@@ -19,6 +19,7 @@
 #include "log.h"
 #include "zbxcommon.h"
 #include "zbxserver.h"
+#include "zbx_item_constants.h"
 #include "../../libs/zbxexec/worker.h"
 #include "glb_pinger.h"
 #include "../pinger/pinger.h"
@@ -28,6 +29,8 @@
 #include "poller_async_io.h"
 #include "zbxsysinfo.h"
 #include "zbxip.h"
+
+extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 #define PINGER_FLOAT_PRECISION	0.0001
 
@@ -69,8 +72,6 @@ typedef struct {
 
 static pinger_conf_t conf;
 
-extern int CONFIG_GLB_PINGER_FORKS;
-extern int CONFIG_PINGER_FORKS;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_GLBMAP_LOCATION;
 extern char *CONFIG_GLBMAP_OPTIONS;
@@ -546,7 +547,7 @@ static void pings_shutdown(void) {
 }
 
 static int forks_count(void) {
-	return CONFIG_GLB_PINGER_FORKS;
+	return CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER];
 }
 /******************************************************************************
  * inits async structures - static connection pool							  *

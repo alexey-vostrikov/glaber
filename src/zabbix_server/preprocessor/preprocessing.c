@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,22 +24,22 @@
 #include "preproc_history.h"
 #include "item_preproc.h"
 #include "zbxsysinfo.h"
+#include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_items.h"
-
-
 
 #define PACKED_FIELD_RAW	0
 #define PACKED_FIELD_STRING	1
 #define MAX_VALUES_LOCAL	1024
 
-extern int CONFIG_PREPROCMAN_FORKS;
+static zbx_ipc_message_t	*cached_messages={0};
+static int			cached_values=0;
+static zbx_ipc_socket_t	*sockets = NULL;
 
 #define PACKED_FIELD(value, size)	\
 		(zbx_packed_field_t){(value), (size), (0 == (size) ? PACKED_FIELD_STRING : PACKED_FIELD_RAW)};
 
-static zbx_ipc_message_t	*cached_messages={0};
-static int			cached_values=0;
-static zbx_ipc_socket_t	*sockets = NULL;
+static zbx_ipc_message_t	cached_message;
+static int			cached_values;
 
 ZBX_PTR_VECTOR_IMPL(ipcmsg, zbx_ipc_message_t *)
 
@@ -1031,19 +1031,21 @@ zbx_uint32_t	zbx_preprocessor_unpack_value(zbx_preproc_item_value_t *value, unsi
 	return (int)(offset - data);
 }
 
+extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
+
 void glb_preprocessing_init() {
 	int 	i;
 	char 	service[MAX_STRING_LEN];
 	char	*error = NULL;
 	
 	
-	if (NULL == (sockets = zbx_malloc( NULL, sizeof(zbx_ipc_socket_t) * CONFIG_PREPROCMAN_FORKS))) {
+	if (NULL == (sockets = zbx_malloc( NULL, sizeof(zbx_ipc_socket_t) * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))) {
 			zabbix_log(LOG_LEVEL_CRIT, "Allocate mem for IPC to preprocessing managers");
 			exit(EXIT_FAILURE);
 	};
 	
 	/* each process has a permanent connection to preprocessing manager */
-	for (i = 0; i < CONFIG_PREPROCMAN_FORKS; i++ ) {
+	for (i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++ ) {
 	
 		zbx_snprintf(service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,i);
 		
@@ -1054,13 +1056,13 @@ void glb_preprocessing_init() {
 		}
 	}
 
-	if (NULL == (cached_messages=zbx_malloc(NULL, sizeof(zbx_ipc_message_t) * CONFIG_PREPROCMAN_FORKS))) {
+	if (NULL == (cached_messages=zbx_malloc(NULL, sizeof(zbx_ipc_message_t) * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))) {
 		
 		zabbix_log(LOG_LEVEL_CRIT,"Couldn't allocate memory for IPC messages");
 		exit(EXIT_FAILURE);	
 	};
 
-	memset(cached_messages,0,sizeof(zbx_ipc_message_t) * CONFIG_PREPROCMAN_FORKS);
+	memset(cached_messages,0,sizeof(zbx_ipc_message_t) * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]);
 	cached_values=0;
 }
 
@@ -1567,7 +1569,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigne
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	int manager_num = ( hostid % CONFIG_PREPROCMAN_FORKS );
+	int manager_num = ( hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN] );
 	DEBUG_ITEM(itemid,"Preparing item to send to preprocessing");
 
 	if (ITEM_STATE_NORMAL == state)
@@ -1622,7 +1624,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigne
 void	zbx_preprocessor_flush(void)
 {	int i;
 	if(!cached_messages) return ;
-	for ( i = 0; i < CONFIG_PREPROCMAN_FORKS; i++ ) {
+	for ( i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++ ) {
 		if (0 < cached_messages[i].size)
 		{
 			preprocessor_send(ZBX_IPC_PREPROCESSOR_REQUEST, cached_messages[i].data, cached_messages[i].size, NULL, i);
@@ -1647,7 +1649,7 @@ zbx_uint64_t	zbx_preprocessor_get_queue_size(void)
 	zbx_ipc_message_t	message;
 	int i;
 
-	for (i = 0; i < CONFIG_PREPROCMAN_FORKS; i++) {
+	for (i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++) {
 	
 		zbx_ipc_message_init(&message);
 		preprocessor_send(ZBX_IPC_PREPROCESSOR_QUEUE, NULL, 0, &message, i );

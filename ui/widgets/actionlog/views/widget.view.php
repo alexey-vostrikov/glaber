@@ -1,7 +1,7 @@
 <?php declare(strict_types = 0);
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -37,8 +37,8 @@ $table = (new CTableInfo())
 			: _x('Time', 'compact table header'),
 		_x('Action', 'compact table header'),
 		($data['sortfield'] === 'mediatypeid')
-			? [_x('Type', 'compact table header'), $sort_div]
-			: _x('Type', 'compact table header'),
+			? [_x('Media type', 'compact table header'), $sort_div]
+			: _x('Media type', 'compact table header'),
 		($data['sortfield'] === 'sendto')
 			? [_x('Recipient', 'compact table header'), $sort_div]
 			: _x('Recipient', 'compact table header'),
@@ -63,7 +63,7 @@ foreach ($data['alerts'] as $alert) {
 		$info_icons = [];
 	}
 
-	$message = ($alert['alerttype'] == ALERT_TYPE_MESSAGE)
+	$message = $alert['alerttype'] == ALERT_TYPE_MESSAGE
 		? [
 			bold($alert['subject']),
 			BR(),

@@ -1,7 +1,7 @@
 <?php declare(strict_types = 0);
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,10 +27,13 @@ class CWidgetFieldSeveritiesView extends CWidgetFieldView {
 		$this->field = $field;
 	}
 
-	public function getView(): CSeverityCheckBoxList {
-		return (new CSeverityCheckBoxList($this->field->getName()))
+	public function getView(): CCheckBoxList {
+		return (new CCheckBoxList($this->field->getName()))
+			->setOptions(CSeverityHelper::getSeverities())
 			->setChecked($this->field->getValue())
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-			->setEnabled(!$this->isDisabled());
+			->setEnabled(!$this->isDisabled())
+			->setColumns(3)
+			->setVertical();
 	}
 }

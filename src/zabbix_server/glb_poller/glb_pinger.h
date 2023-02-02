@@ -22,9 +22,6 @@
 #include "zbxicmpping.h"
 #include "glb_poller.h"
 
-#define GLB_ICMP 20
-#define ZBX_ICMP 21
-
 #define GLB_ICMP_NAME "glbmap"
 #define ZBX_ICMP_NAME "fping"
 

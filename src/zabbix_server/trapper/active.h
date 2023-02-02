@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,10 +24,8 @@
 #include "zbxjson.h"
 #include "zbxdbhigh.h"
 
-extern int	CONFIG_TIMEOUT;
-
-int	send_list_of_active_checks(zbx_socket_t *sock, char *request);
-int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *jp);
+int	send_list_of_active_checks(zbx_socket_t *sock, char *request, int config_timeout);
+int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *jp, int config_timeout);
 void	db_register_host(const char *host, const char *ip, unsigned short port, unsigned int connection_type,
-		const char *host_metadata, zbx_conn_flags_t flag, const char *interface);
+		const char *host_metadata, zbx_conn_flags_t flag, const char *interface, int config_timeout);
 #endif

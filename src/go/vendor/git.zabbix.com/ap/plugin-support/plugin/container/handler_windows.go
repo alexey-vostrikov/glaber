@@ -20,10 +20,9 @@
 package container
 
 import (
+	"github.com/Microsoft/go-winio"
 	"net"
 	"time"
-
-	"github.com/natefinch/npipe"
 )
 
 func (h *handler) setConnection(path string, timeout time.Duration) (err error) {
@@ -37,7 +36,7 @@ func (h *handler) setConnection(path string, timeout time.Duration) (err error) 
 		}
 
 		var conn net.Conn
-		if conn, err = npipe.DialTimeout(path, timeout); err != nil {
+		if conn, err = winio.DialPipe(path, &timeout); err != nil {
 			return
 		}
 

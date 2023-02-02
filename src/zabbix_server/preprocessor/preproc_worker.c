@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,10 +28,8 @@
 #include "zbxembed.h"
 #include "item_preproc.h"
 #include "preproc_history.h"
+#include "preproc_snmp.h"
 #include "zbxtime.h"
-
-extern unsigned char			program_type;
-extern int CONFIG_PREPROCMAN_FORKS;
 
 #define ZBX_PREPROC_VALUE_PREVIEW_LEN		100
 
@@ -660,6 +658,8 @@ static void	worker_process_dep_request_cont(zbx_ipc_socket_t *socket, zbx_ipc_me
 	worker_preprocess_dep_items(socket, request);
 }
 
+extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
+
 ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 {
 	pid_t				ppid;
@@ -680,7 +680,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	zbx_ipc_message_init(&message);
 	glb_preprocessing_init();
 	
-	zbx_snprintf(service, MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING_WORKER, (process_num-1) % CONFIG_PREPROCMAN_FORKS);
+	zbx_snprintf(service, MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING_WORKER, (process_num-1) % CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]);
 
 	if (FAIL == zbx_ipc_socket_open(&socket, service, SEC_PER_MIN, &error))
 	{
@@ -692,7 +692,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	ppid = getppid();
 	zbx_ipc_socket_write(&socket, ZBX_IPC_PREPROCESSOR_WORKER, (unsigned char *)&ppid, sizeof(ppid));
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
@@ -713,7 +713,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 		}
 
 		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
-		zbx_update_env(zbx_time());
+		zbx_update_env(get_process_type_string(process_type), zbx_time());
 
 		switch (message.code)
 		{
@@ -741,4 +741,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 		zbx_sleep(SEC_PER_MIN);
 
 	zbx_es_destroy(&es_engine);
+#ifdef HAVE_NETSNMP
+	zbx_preproc_shutdown_snmp();
+#endif
 }

@@ -148,9 +148,12 @@ static void handle_async_io(void)
     poller_items_iterate(check_workers_data_cb, NULL);
 }
 
+
+extern int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
+
 static int forks_count(void)
 {
-    return CONFIG_EXT_SERVER_FORKS;
+    return CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER];
 }
 
 int glb_worker_server_init(void)

@@ -21,16 +21,18 @@
 #include "../../../include/zbxcommon.h"
 #include "worker.h"
 #include "log.h"
+#include "../zbxsysinfo/sysinfo.h"
 #include <sys/types.h>
 #include <string.h>
 #include <signal.h>
-#include "dbcache.h"
+//#include "dbcache.h"
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
 #define GLB_DEFAULT_WORKER_MAX_CALLS 1000000000 //how many reqeusts process by a runner befeore terminate it and start a new one
 #define WORKER_RESTART_TIMEOUT 15 //time to wait between restarts
+#define  GLB_WORKER_ARGS_MAX 64
 
 struct glb_worker_t {
 	char *path;       //path to executable to run
@@ -50,7 +52,6 @@ struct glb_worker_t {
     struct evbuffer *out_buffer; 
 };
 
-extern int CONFIG_TIMEOUT;
 
 #define DEFAULT_PIPE_SIZE 65536
 
@@ -150,7 +151,7 @@ glb_worker_t *glb_worker_init(const char *path, const char* args, int timeout, i
     worker_process_args(worker, args);   
 
     if ( 0 == timeout )   
-        worker->timeout = CONFIG_TIMEOUT;
+        worker->timeout = sysinfo_get_config_timeout();
 
     if (0 == worker->max_calls)
         worker->max_calls = GLB_DEFAULT_WORKER_MAX_CALLS;
@@ -177,7 +178,7 @@ int glb_worker_restart(glb_worker_t *worker, char *reason)
     static unsigned int count_rst_time=0, restarts=0;
     unsigned int now=time(NULL);
     
-    if (worker->last_start + CONFIG_TIMEOUT > now) 
+    if (worker->last_start + sysinfo_get_config_timeout() > now) 
         return FAIL;
    
 
@@ -313,15 +314,11 @@ int glb_worker_is_alive(glb_worker_t *worker)
     LOG_INF("Alive check: the process pid %d (worker's pid is %d) has stopped", n_pid, worker->pid);
     
     if (worker->last_start + WORKER_RESTART_TIMEOUT > time(NULL))
-        LOG_INF("Next restart attempt in %d seconds", worker->last_start + CONFIG_TIMEOUT - time(NULL));
+        LOG_INF("Next restart attempt in %d seconds", worker->last_start + sysinfo_get_config_timeout() - time(NULL));
     
     worker->pid = 0; 
     return FAIL;
 }
-
-//static int worker_is_changed(glb_worker_t *worker) {
-//    return FAIL;
-//}
 
 static void worker_cleanup(glb_worker_t *worker)
 {

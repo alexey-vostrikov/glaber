@@ -18,6 +18,8 @@
 
 #include "glb_state.h"
 #include "glb_state_interfaces.h"
+#include "zbxjson.h"
+#include "zbxavailability.h"
 
 #define INTERFACE_FAILS_TO_FAIL 3
 

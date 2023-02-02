@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,18 +21,18 @@
 #define ZABBIX_POLLER_H
 
 #include "zbxthreads.h"
-#include "dbcache.h"
+#include "zbxcacheconfig.h"
 #include "zbxcomms.h"
 
 typedef struct
 {
-	zbx_config_comms_args_t	*zbx_config;
+	zbx_config_comms_args_t	*config_comms;
 	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
 	unsigned char		poller_type;
+	int			config_startup_time;
 }
 zbx_thread_poller_args;
 
-extern int	CONFIG_TIMEOUT;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 extern int	CONFIG_UNREACHABLE_PERIOD;
 extern int	CONFIG_UNREACHABLE_DELAY;
@@ -41,7 +41,7 @@ ZBX_THREAD_ENTRY(poller_thread, args);
 
 void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, unsigned char expand_macros);
 void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, zbx_vector_ptr_t *add_results,
-		unsigned char poller_type, const zbx_config_comms_args_t *zbx_config);
+		unsigned char poller_type, const zbx_config_comms_args_t *config_comms, int config_startup_time);
 void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results);
 void	zbx_free_agent_result_ptr(AGENT_RESULT *result);
 

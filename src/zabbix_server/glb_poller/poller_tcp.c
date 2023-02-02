@@ -18,8 +18,9 @@
 **/
 #include "log.h"
 #include "zbxcommon.h"
-#include "dbcache.h"
+#include "../../libs/zbxsysinfo/sysinfo.h"
 #include "preproc.h"
+
 
 #include "glb_poller.h"
 #include "poller_tcp.h"
@@ -35,8 +36,8 @@
 
 #define DNS_TTL	120
 
+extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 extern char *CONFIG_SOURCE_IP;
-extern int CONFIG_GLB_AGENT_FORKS;
 
 struct tcp_item_t
 {
@@ -278,7 +279,7 @@ static int tcp_bev_request(poller_item_t *poller_item, const char *request, int 
 	}
 #endif
 
-	const struct timeval timeout = {.tv_sec = CONFIG_TIMEOUT, .tv_usec = 0};
+	const struct timeval timeout = {.tv_sec = sysinfo_get_config_timeout(), .tv_usec = 0};
 	evutil_make_socket_nonblocking(sock);
 	evutil_make_listen_socket_reuseable(sock);
 	evutil_make_listen_socket_reuseable_port(sock);
@@ -469,7 +470,7 @@ static int tcp_init_item(DC_ITEM *dc_item, poller_item_t *poller_item)
 
 static int forks_count(void)
 {
-	return CONFIG_GLB_AGENT_FORKS;
+	return CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT];
 }
 
 static void async_io(void) {

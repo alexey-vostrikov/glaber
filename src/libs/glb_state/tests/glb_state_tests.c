@@ -16,7 +16,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "zbxcommon.h"
-
+#include "zbx_trigger_constants.h"
+#include "zbxavailability.h"
 #include "../glb_state_triggers.h"
 #include "../glb_state_interfaces.h"
 

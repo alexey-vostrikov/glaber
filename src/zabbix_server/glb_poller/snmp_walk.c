@@ -30,6 +30,7 @@
 #include "snmp_util.h"
 #include "poller_sessions.h"
 #include "zbxsysinfo.h"
+#include "zbx_item_constants.h"
 
 /*most of this code is from chkecs_snmp.c */
 

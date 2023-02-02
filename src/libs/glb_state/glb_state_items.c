@@ -19,6 +19,11 @@
 #include "zbxcommon.h"
 
 #include "zbxalgo.h"
+#include "zbxvariant.h"
+#include "zbx_item_constants.h"
+#include "glb_history.h"
+#include "zbxcacheconfig.h"
+
 #include "glb_state.h"
 #include "glb_state_items.h"
 #include <zlib.h>
@@ -125,32 +130,10 @@ ELEMS_CREATE(item_create_cb)
     return SUCCEED;
 }
 
-ELEMS_FREE(item_free_cb) {
-    item_elem_t *elm = elem->data;
-    THIS_SHOULD_NEVER_HAPPEN;
-    exit(-1);
-    //add complete item release code before freeng the buffer
-    glb_tsbuff_destroy(&elm->tsbuff, memf->free_func);
-}
 
-
-int glb_state_items_init(mem_funcs_t *memf)
-{
-    if (NULL == (state = memf->malloc_func(NULL, sizeof(items_state_t)))) {
-        LOG_WRN("Cannot allocate memory for cache struct");
-        exit(-1);
-    };
-    
-    state->items = elems_hash_init(memf,item_create_cb, item_free_cb );
-    state->memf = *memf;
-    strpool_init(&state->strpool, memf);
-    
-  return SUCCEED;
-}
 
 static void item_variant_clear(zbx_variant_t *value)
 {
-
     switch (value->type)
     {
     case ZBX_VARIANT_STR:
@@ -170,6 +153,35 @@ static void item_variant_clear(zbx_variant_t *value)
     value->type = ZBX_VARIANT_NONE;
 }
 
+
+ELEMS_FREE(item_free_cb) {
+    item_elem_t *elm = elem->data;
+    strpool_free(&state->strpool, elm->meta.error);
+    
+    while(glb_tsbuff_get_count(&elm->tsbuff) > 0 ){
+        glb_state_item_value_t *c_val = glb_tsbuff_get_value_tail(&elm->tsbuff);
+        item_variant_clear(&c_val->value);
+        glb_tsbuff_free_tail(&elm->tsbuff);
+    }
+
+    glb_tsbuff_destroy(&elm->tsbuff, memf->free_func);
+    return SUCCEED;
+}
+
+
+int glb_state_items_init(mem_funcs_t *memf)
+{
+    if (NULL == (state = memf->malloc_func(NULL, sizeof(items_state_t)))) {
+        LOG_WRN("Cannot allocate memory for cache struct");
+        exit(-1);
+    };
+    
+    state->items = elems_hash_init(memf,item_create_cb, item_free_cb );
+    state->memf = *memf;
+    strpool_init(&state->strpool, memf);
+    
+  return SUCCEED;
+}
 /*******************************************************
  * cleans and marks unused outdated items
  * that exceeds the demand
@@ -230,7 +242,7 @@ static int glb_state_value_to_hist_copy(zbx_history_record_t *record,
     record->timestamp.sec = c_val->time_sec;
 }
 
-int hist_val_to_value(glb_state_item_value_t *cache_val, history_value_t *hist_val, int time_sec, unsigned char value_type)
+int hist_val_to_value(glb_state_item_value_t *cache_val, zbx_history_value_t *hist_val, int time_sec, unsigned char value_type)
 {
 
     item_variant_clear(&cache_val->value);
@@ -447,7 +459,7 @@ static int fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, int count,
             elm->db_fetched_time = MIN(elm->db_fetched_time, values.values[0].timestamp.sec);
 
             zbx_vector_history_record_sort(&values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
-            history_value_t hist_v;
+            zbx_history_value_t hist_v;
 
             for (i = 0; i < values.values_num; i++)
             {
@@ -520,6 +532,7 @@ static int ensure_tsbuff_has_space(item_elem_t *elm)
     return SUCCEED;
 }
 
+
 static int glb_state_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, int seconds, int head_time, int now)
 {
     int ret = FAIL, i;
@@ -554,7 +567,7 @@ static int glb_state_fetch_from_db_by_time(u_int64_t itemid, item_elem_t *elm, i
         {
             // adding the fetched items to the tail of the cache
             zbx_vector_history_record_sort(&values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
-            history_value_t hist_v;
+            zbx_history_value_t hist_v;
 
             for (i = 0; i < values.values_num; i++)
             {
@@ -1296,14 +1309,14 @@ int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
 };
 
 
-int	zbx_vc_get_values(zbx_uint64_t hostid, zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
+int	zbx_vc_get_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
 		int count, const zbx_timespec_t *ts) {
      
     DEBUG_ITEM(itemid, "Cache request: multiple items reqeuest: secodns:%d, count:%d, start:%d ", seconds, count, ts->sec);
 	return glb_state_item_get_values(itemid, value_type, values, seconds, count, ts->sec);
 }
 
-int	zbx_vc_get_value(u_int64_t hostid, zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value) {
+int	zbx_vc_get_value(zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value) {
 	zbx_vector_history_record_t	values;
 
 	zbx_history_record_vector_create(&values);
@@ -1332,6 +1345,24 @@ int  glb_state_item_update_meta(u_int64_t itemid, glb_state_item_meta_t *meta, u
 
 	return elems_hash_process(state->items, itemid, item_update_meta_cb, &req, 0);
 }
+
+ELEMS_CALLBACK(item_set_error_cb) {
+    item_elem_t *elm = (item_elem_t *)elem->data;
+    const char *error = (const char *)data;
+
+    if (NULL == error)
+        return FAIL;
+    
+    elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, error);
+    elm->meta.state = ITEM_STATE_NOTSUPPORTED;
+   
+    return SUCCEED;
+}
+
+int  glb_state_item_set_error(u_int64_t itemid, const char *error) {
+	return elems_hash_process(state->items, itemid, item_set_error_cb, (void *)error, 0);
+}
+
 
 int glb_state_item_get_state(u_int64_t itemid) {
 	int st;
@@ -1504,8 +1535,16 @@ int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-void	zbx_vc_remove_items_by_ids(zbx_vector_uint64_t *itemids) {
-    
+
+
+int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
+	int i;
+	
+    for (i = 0; i< deleted_itemids->values_num; i++) {
+        LOG_INF("Deleting item %ld from the cache", deleted_itemids->values[i]);
+        DEBUG_ITEM(deleted_itemids->values[i],"Deleting item from the value cache");
+    	elems_hash_delete(state->items, deleted_itemids->values[i]);
+	}
 }
 
 void glb_state_items_housekeep() {

@@ -1,7 +1,7 @@
 <?php declare(strict_types = 0);
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -82,10 +82,6 @@ class CLegacyAction extends CAction {
 			]);
 		}
 
-		if ($user_type != USER_TYPE_SUPER_ADMIN) {
-			$denied = array_merge($denied, ['auditacts.php']);
-		}
-
 		if (in_array($action, $denied)) {
 			return false;
 		}
@@ -132,12 +128,6 @@ class CLegacyAction extends CAction {
 						break;
 				}
 			}
-		}
-
-		if ($user_type == USER_TYPE_SUPER_ADMIN) {
-			$rule_actions += [
-				CRoleHelper::UI_REPORTS_ACTION_LOG => ['auditacts.php']
-			];
 		}
 
 		foreach ($rule_actions as $rule_name => $actions) {

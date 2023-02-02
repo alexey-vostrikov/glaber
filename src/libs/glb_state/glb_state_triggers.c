@@ -19,8 +19,12 @@
 #include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "glb_state.h"
+#include "zbx_trigger_constants.h"
+#include "zbx_item_constants.h"
 #include "glb_state_triggers.h"
 #include "load_dump.h"
+#include "zbxdbhigh.h"
+#include "zbxjson.h"
 
 typedef struct {
     elems_hash_t *triggers;

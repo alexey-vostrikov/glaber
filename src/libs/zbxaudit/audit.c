@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 
 #include "log.h"
 #include "zbxjson.h"
-#include "dbcache.h"
+#include "zbxcacheconfig.h"
 #include "zbxnum.h"
 
 #define AUDIT_USERID		__UINT64_C(0)

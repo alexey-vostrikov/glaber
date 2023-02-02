@@ -20,6 +20,7 @@
 #define GLB_CACHE_INTERFACES_H
 
 #include "glb_state.h"
+#include "zbxjson.h"
 
 
 

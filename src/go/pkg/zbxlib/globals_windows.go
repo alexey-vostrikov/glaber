@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@ package zbxlib
 #cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/interval.o
 #cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/common_str.o
 #cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/components_strings_representations.o
+#cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/libc_wrappers.o
 #cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/file.o
 #cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/time.o
 #cgo LDFLAGS: ${SRCDIR}/../../../../build/mingw/output/expr.o
@@ -73,7 +74,6 @@ package zbxlib
 #cgo openssl LDFLAGS: -lssl -lcrypto
 #cgo LDFLAGS: -Wl,--end-group
 
-int CONFIG_TIMEOUT = 3;
 int CONFIG_MAX_LINES_PER_SECOND = 20;
 int CONFIG_EVENTLOG_MAX_LINES_PER_SECOND = 20;
 char ZBX_THREAD_LOCAL *CONFIG_HOSTNAME = NULL;
