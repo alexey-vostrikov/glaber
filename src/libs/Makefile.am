@@ -1,7 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
 DIST_SUBDIRS = \
-	glb_conf \
 	zbxalgo \
 	zbxaudit \
 	zbxavailability \
@@ -109,7 +108,6 @@ SERVER_SUBDIRS = \
 	zbxvault \
 	zbxversion \
 	zbxxml \
-	glb_state \
 	apm \
 	zbxeval \
 	zbxalgo/tests 
