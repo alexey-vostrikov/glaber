@@ -4,6 +4,7 @@
 #include "zbxalgo.h"
 #include "zbxhistory.h"
 #include "log.h"
+#include "zbxshmem.h"
 
 
 #define STATE_STRPOOL_INIT_SIZE	(1000)

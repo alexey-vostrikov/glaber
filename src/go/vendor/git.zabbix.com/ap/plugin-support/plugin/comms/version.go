@@ -23,18 +23,9 @@ import (
 	"fmt"
 )
 
-const (
-	MajorVersion = 1
-	MinorVersion = 1
-)
-
-func PrintVersion(pluginName, copyrightMessage string, pluginVersion int) {
+func PrintVersion(pluginName, copyrightMessage string, majorVersion int, minorVersion int, patchVersion int, alphatag string) {
 	fmt.Printf("Zabbix %s plugin\n", pluginName)
-	fmt.Printf("Version %d.%d.%d plugin\n", MajorVersion, MinorVersion, pluginVersion)
+	fmt.Printf("Version %d.%d.%d%s\n", majorVersion, minorVersion, patchVersion, alphatag)
 	fmt.Println()
 	fmt.Println(copyrightMessage)
-}
-
-func GetPluginVersionMessage() string {
-	return fmt.Sprintf("Plugin support version %d.%d", MajorVersion, MinorVersion)
 }

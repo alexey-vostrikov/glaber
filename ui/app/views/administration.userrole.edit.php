@@ -1,7 +1,7 @@
 <?php declare(strict_types = 0);
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ $html_page = (new CHtmlPage())
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::USERS_USERROLE_EDIT));
 
 $form = (new CForm())
+	->addItem((new CVar('form_refresh', $data['form_refresh'] + 1))->removeId())
 	->setId('userrole-form')
 	->setName('user_role_form')
 	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID);
@@ -104,26 +105,24 @@ foreach ($data['labels']['sections'] as $section_key => $section_label) {
 	} else {
 		$ui = [];
 		foreach ($data['labels']['rules'][$section_key] as $rule_key => $rule_label) {
-			$ui[] = new CDiv(
-				(new CCheckBox(str_replace('.', '_', $rule_key), 1))
-					->setId($rule_key)
-					->setChecked(
-						array_key_exists($rule_key, $data['rules']['ui'])
-						&& $data['rules']['ui'][$rule_key]
-					)
-					->setReadonly($data['readonly'])
-					->setLabel($rule_label)
-					->setUncheckedValue(0)
-			);
+			$ui[] = [
+				'id' => $rule_key,
+				'name' => str_replace('.', '_', $rule_key),
+				'label' => $rule_label,
+				'value' => 1,
+				'checked' => array_key_exists($rule_key, $data['rules']['ui']) && $data['rules']['ui'][$rule_key],
+				'unchecked_value' => 0
+			];
 		}
 		$form_grid->addItem([
 			new CLabel($section_label, $section_key),
 			new CFormField(
-				(new CDiv(
-					(new CDiv($ui))
-						->addClass(ZBX_STYLE_COLUMNS)
-						->addClass(ZBX_STYLE_COLUMNS_3)
-				))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+				(new CCheckBoxList())
+					->setWidth(ZBX_TEXTAREA_BIG_WIDTH)
+					->setOptions($ui)
+					->setVertical()
+					->setColumns(3)
+					->setEnabled(!$data['readonly'])
 			)
 		]);
 	}

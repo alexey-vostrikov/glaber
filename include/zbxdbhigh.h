@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -40,7 +40,6 @@ extern char	*CONFIG_DB_TLS_CA_FILE;
 extern char	*CONFIG_DB_TLS_CIPHER;
 extern char	*CONFIG_DB_TLS_CIPHER_13;
 extern int	CONFIG_DBPORT;
-extern int	CONFIG_HISTSYNCER_FORKS;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 
 #define ZBX_DB_CONNECT_NORMAL	0
@@ -195,6 +194,14 @@ typedef zbx_uint64_t	(*zbx_dc_get_nextid_func_t)(const char *table_name, int num
 
 #define ZBX_DB_MAX_ID	(zbx_uint64_t)__UINT64_C(0x7fffffffffffffff)
 
+#ifdef HAVE_MYSQL
+#	define ZBX_SQL_SORT_ASC(field)	field " asc"
+#	define ZBX_SQL_SORT_DESC(field)	field " desc"
+#else
+#	define ZBX_SQL_SORT_ASC(field)	field " asc nulls first"
+#	define ZBX_SQL_SORT_DESC(field)	field " desc nulls last"
+#endif
+
 typedef struct
 {
 	zbx_uint64_t	druleid;
@@ -270,9 +277,67 @@ typedef struct
 #define ZBX_FLAGS_DB_EVENT_CREATE		0x0001
 #define ZBX_FLAGS_DB_EVENT_NO_ACTION		0x0002
 #define ZBX_FLAGS_DB_EVENT_RECOVER		0x0004
+/* flags to indicate data retrieved from DB, used for cause event macros */
+#define ZBX_FLAGS_DB_EVENT_RETRIEVED_CORE	0x0008
+#define ZBX_FLAGS_DB_EVENT_RETRIEVED_TAGS	0x0010
+#define ZBX_FLAGS_DB_EVENT_RETRIEVED_TRIGGERS	0x0020
 	zbx_uint64_t		flags;
 }
 ZBX_DB_EVENT;
+
+/* media types */
+typedef enum
+{
+	MEDIA_TYPE_EMAIL = 0,
+	MEDIA_TYPE_EXEC,
+	MEDIA_TYPE_SMS,
+	MEDIA_TYPE_WEBHOOK = 4
+}
+zbx_media_type_t;
+
+/* alert statuses */
+typedef enum
+{
+	ALERT_STATUS_NOT_SENT = 0,
+	ALERT_STATUS_SENT,
+	ALERT_STATUS_FAILED,
+	ALERT_STATUS_NEW
+}
+zbx_alert_status_t;
+
+/* escalation statuses */
+typedef enum
+{
+	ESCALATION_STATUS_ACTIVE = 0,
+	ESCALATION_STATUS_RECOVERY,	/* only in server code, never in DB, deprecated */
+	ESCALATION_STATUS_SLEEP,
+	ESCALATION_STATUS_COMPLETED	/* only in server code, never in DB */
+}
+zbx_escalation_status_t;
+
+/* alert types */
+typedef enum
+{
+	ALERT_TYPE_MESSAGE = 0,
+	ALERT_TYPE_COMMAND
+}
+zbx_alert_type_t;
+
+typedef enum
+{
+	ZBX_PROTOTYPE_STATUS_ENABLED,
+	ZBX_PROTOTYPE_STATUS_DISABLED,
+	ZBX_PROTOTYPE_STATUS_COUNT
+}
+zbx_prototype_status_t;
+
+typedef enum
+{
+	ZBX_PROTOTYPE_DISCOVER,
+	ZBX_PROTOTYPE_NO_DISCOVER,
+	ZBX_PROTOTYPE_DISCOVER_COUNT
+}
+zbx_prototype_discover_t;
 
 typedef struct ZBX_DB_MEDIATYPE
 {
@@ -388,6 +453,7 @@ typedef struct
 	int		esc_period;
 	unsigned char	eventsource;
 	unsigned char	pause_suppressed;
+	unsigned char	pause_symptoms;
 	unsigned char	recovery;
 	unsigned char	status;
 	unsigned char	notify_if_canceled;
@@ -423,7 +489,7 @@ void	DBinit_autoincrement_options(void);
 int	DBconnect(int flag);
 void	DBclose(void);
 
-int	zbx_db_validate_config_features(void);
+int	zbx_db_validate_config_features(unsigned char program_type);
 #if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
 void	zbx_db_validate_config(void);
 #endif
@@ -553,6 +619,7 @@ const char	*DBget_inventory_field(unsigned char inventory_link);
 int	DBtable_exists(const char *table_name);
 int	DBfield_exists(const char *table_name, const char *field_name);
 #ifndef HAVE_SQLITE3
+int	DBtrigger_exists(const char *table_name, const char *trigger_name);
 int	DBindex_exists(const char *table_name, const char *index_name);
 int	DBpk_exists(const char *table_name);
 #endif
@@ -565,6 +632,7 @@ int	DBlock_records(const char *table, const zbx_vector_uint64_t *ids);
 int	DBlock_ids(const char *table_name, const char *field_name, zbx_vector_uint64_t *ids);
 
 #define DBlock_hostid(id)			DBlock_record("hosts", id, NULL, 0)
+#define DBlock_triggerid(id)			DBlock_record("triggers", id, NULL, 0)
 #define DBlock_druleid(id)			DBlock_record("drules", id, NULL, 0)
 #define DBlock_dcheckid(dcheckid, druleid)	DBlock_record("dchecks", dcheckid, "druleid", druleid)
 #define DBlock_graphid(id)			DBlock_record("graphs", id, NULL, 0)
@@ -622,34 +690,6 @@ void	zbx_user_free(zbx_user_t *user);
 
 typedef struct
 {
-	zbx_uint64_t	itemid;
-	zbx_uint64_t	lastlogsize;
-	unsigned char	state;
-	int		mtime;
-	const char	*error;
-	zbx_uint64_t	flags;
-	unsigned int value_type;
-	u_int64_t hostid;
-	history_value_t value;
-#define ZBX_FLAGS_ITEM_DIFF_UNSET			__UINT64_C(0x0000)
-#define ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE		__UINT64_C(0x0001)
-#define ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR		__UINT64_C(0x0002)
-#define ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME		__UINT64_C(0x0004)
-#define ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE		__UINT64_C(0x0008)
-#define ZBX_FLAGS_ITEM_DIFF_UPDATE_VALUE		__UINT64_C(0x0010)
-
-#define ZBX_FLAGS_ITEM_DIFF_UPDATE_DB			\
-	(ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE | ZBX_FLAGS_ITEM_DIFF_UPDATE_ERROR |\
-	ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME | ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE)
-}
-zbx_item_diff_t;
-
-void	zbx_db_trigger_get_expression(const ZBX_DB_TRIGGER *trigger, char **expression);
-void	zbx_db_trigger_get_recovery_expression(const ZBX_DB_TRIGGER *trigger, char **expression);
-void	zbx_db_trigger_clean(ZBX_DB_TRIGGER *trigger);
-
-typedef struct
-{
 	zbx_uint64_t			hostid;
 	unsigned char			compress;
 	char				*version_str;
@@ -690,8 +730,8 @@ zbx_proxy_diff_t;
 
 int	zbx_db_lock_maintenanceids(zbx_vector_uint64_t *maintenanceids);
 
-void	zbx_db_save_item_changes(char **sql, size_t *sql_alloc, size_t *sql_offset, const zbx_vector_ptr_t *item_diff,
-		zbx_uint64_t mask);
+//void	zbx_db_save_item_changes(char **sql, size_t *sql_alloc, size_t *sql_offset, const zbx_vector_ptr_t *item_diff,
+//		zbx_uint64_t mask);
 
 int	zbx_db_check_instanceid(void);
 
@@ -790,14 +830,8 @@ void	zbx_load_lld_override_operations(const zbx_vector_uint64_t *overrideids, ch
 
 #define ZBX_TIMEZONE_DEFAULT_VALUE	"default"
 
-void	zbx_db_trigger_get_all_functionids(const ZBX_DB_TRIGGER *trigger, zbx_vector_uint64_t *functionids);
-void	zbx_db_trigger_get_functionids(const ZBX_DB_TRIGGER *trigger, zbx_vector_uint64_t *functionids);
-int	zbx_db_trigger_get_all_hostids(const ZBX_DB_TRIGGER *trigger, const zbx_vector_uint64_t **hostids);
-int	zbx_db_trigger_get_constant(const ZBX_DB_TRIGGER *trigger, int index, char **out);
-int	zbx_db_trigger_get_itemid(const ZBX_DB_TRIGGER *trigger, int index, zbx_uint64_t *itemid);
-void	zbx_db_trigger_get_itemids(const ZBX_DB_TRIGGER *trigger, zbx_vector_uint64_t *itemids);
-
-int	zbx_db_check_version_info(struct zbx_db_version_info_t *info, int allow_unsupported);
+int	zbx_db_check_version_info(struct zbx_db_version_info_t *info, int allow_unsupported,
+		unsigned char program_type);
 void	zbx_db_version_info_clear(struct zbx_db_version_info_t *version_info);
 
 #define ZBX_MAX_HRECORDS	1000
@@ -812,10 +846,10 @@ char	*zbx_get_proxy_protocol_version_str(const struct zbx_json_parse *jp);
 int	zbx_get_proxy_protocol_version_int(const char *version_str);
 
 /* condition evaluation types */
-#define ZBX_ACTION_CONDITION_EVAL_TYPE_AND_OR			0
-#define ZBX_ACTION_CONDITION_EVAL_TYPE_AND			1
-#define ZBX_ACTION_CONDITION_EVAL_TYPE_OR			2
-#define ZBX_ACTION_CONDITION_EVAL_TYPE_EXPRESSION		3
+#define ZBX_CONDITION_EVAL_TYPE_AND_OR			0
+#define ZBX_CONDITION_EVAL_TYPE_AND			1
+#define ZBX_CONDITION_EVAL_TYPE_OR			2
+#define ZBX_CONDITION_EVAL_TYPE_EXPRESSION		3
 
 /* condition types */
 #define ZBX_CONDITION_TYPE_HOST_GROUP			0
@@ -846,5 +880,20 @@ int	zbx_get_proxy_protocol_version_int(const char *version_str);
 #define ZBX_CONDITION_TYPE_EVENT_TAG_VALUE		26
 #define ZBX_CONDITION_TYPE_SERVICE			27
 #define ZBX_CONDITION_TYPE_SERVICE_NAME			28
+
+typedef struct
+{
+	zbx_uint64_t	autoreg_hostid;
+	zbx_uint64_t	hostid;
+	char		*host;
+	char		*ip;
+	char		*dns;
+	char		*host_metadata;
+	int		now;
+	unsigned short	port;
+	unsigned short	flag;
+	unsigned int	connection_type;
+}
+zbx_autoreg_host_t;
 
 #endif /* ZABBIX_DBHIGH_H */

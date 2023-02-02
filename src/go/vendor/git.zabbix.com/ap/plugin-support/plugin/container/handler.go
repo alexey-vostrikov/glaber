@@ -55,7 +55,7 @@ type handler struct {
 	connection    net.Conn
 }
 
-var pluginMajorVersion int
+var agentProtocolVersion string
 
 func NewHandler(name string) (h handler, err error) {
 	h.name = name
@@ -191,7 +191,7 @@ func (h *handler) register(data []byte) error {
 
 	response := createEmptyRegisterResponse(req.Id)
 
-	err = checkVersion(req.Version)
+	err = checkVersion(req.ProtocolVersion)
 	if err != nil {
 		response.Error = err.Error()
 
@@ -213,17 +213,12 @@ func (h *handler) register(data []byte) error {
 	return comms.Write(h.connection, response)
 }
 
-func checkVersion(agentPluginVersion string) error {
-	v, err := strconv.Atoi(agentPluginVersion)
-	if err != nil {
-		return fmt.Errorf("failed to parse agent version %s", err.Error())
-	}
-
-	if pluginMajorVersion != v {
+func checkVersion(pluginProtocolVersion string) error {
+	if agentProtocolVersion != pluginProtocolVersion {
 		return fmt.Errorf(
-			"plugin cannot be loaded by agent using protocol version %s, the supported versions are %d.*",
-			agentPluginVersion,
-			pluginMajorVersion,
+			"plugin cannot be loaded by agent using protocol version %s, the supported version is %s",
+			pluginProtocolVersion,
+			agentProtocolVersion,
 		)
 	}
 
@@ -384,5 +379,5 @@ func ignoreSIGINTandSIGTERM() {
 }
 
 func init() {
-	pluginMajorVersion = comms.MajorVersion
+	agentProtocolVersion = comms.ProtocolVersion
 }

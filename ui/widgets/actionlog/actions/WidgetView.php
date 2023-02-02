@@ -1,7 +1,7 @@
 <?php declare(strict_types = 0);
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,44 +23,124 @@ namespace Widgets\ActionLog\Actions;
 
 use API,
 	CControllerDashboardWidgetView,
-	CControllerResponseData;
+	CControllerResponseData,
+	CArrayHelper,
+	CRangeTimeParser,
+	CSettingsHelper;
 
 class WidgetView extends CControllerDashboardWidgetView {
 
+	protected function init(): void {
+		parent::init();
+
+		$this->addValidationRules([
+			'from' => 'string',
+			'to' => 'string'
+		]);
+	}
+
 	protected function doAction(): void {
 		[$sortfield, $sortorder] = self::getSorting($this->fields_values['sort_triggers']);
-		$alerts = $this->getAlerts($sortfield, $sortorder, $this->fields_values['show_lines']);
-		$db_users = $this->getDbUsers($alerts);
 
-		$actions = API::Action()->get([
-			'output' => ['actionid', 'name'],
-			'actionids' => array_unique(array_column($alerts, 'actionid')),
-			'preservekeys' => true
-		]);
-
-		$this->setResponse(new CControllerResponseData([
+		$data = [
 			'name' => $this->getInput('name', $this->widget->getDefaultName()),
-			'actions' => $actions,
-			'alerts'  => $alerts,
-			'db_users' => $db_users,
+			'userids' => $this->fields_values['userids'],
+			'users' => [],
+			'actionids' => $this->fields_values['actionids'],
+			'actions' => [],
+			'mediatypeids' => $this->fields_values['mediatypeids'],
+			'media_types' => [],
+			'statuses' => $this->fields_values['statuses'],
+			'message' => $this->fields_values['message'],
 			'sortfield' => $sortfield,
 			'sortorder' => $sortorder,
 			'user' => [
 				'debug_mode' => $this->getDebugMode()
 			]
-		]));
-	}
+		];
 
-	private function getAlerts(string $sortfield, string $sortorder, $show_lines): array {
-		$alerts = API::Alert()->get([
-			'output' => ['clock', 'sendto', 'subject', 'message', 'status', 'retries', 'error', 'userid', 'actionid',
-				'mediatypeid', 'alerttype'
-			],
-			'selectMediatypes' => ['name', 'maxattempts'],
-			'sortfield' => $sortfield,
-			'sortorder' => $sortorder,
-			'limit' => $show_lines
-		]);
+		$userids = [];
+
+		if ($data['userids']) {
+			$data['users'] = API::User()->get([
+				'output' => ['userid', 'username', 'name', 'surname'],
+				'userids' => $data['userids'],
+				'preservekeys' => true
+			]);
+
+			$userids = array_keys($data['users']);
+			$data['userids'] = $this->prepareDataForMultiselect($data['users'], 'users');
+		}
+
+		$actionids = [];
+
+		if ($data['actionids']) {
+			$data['actions'] = API::Action()->get([
+				'output' => ['actionid', 'name'],
+				'actionids' => $data['actionids'],
+				'preservekeys' => true
+			]);
+
+			$actionids = array_keys($data['actions']);
+			$data['actionids'] = $this->prepareDataForMultiselect($data['actions'], 'actions');
+		}
+
+		$mediatypeids = [];
+
+		if ($data['mediatypeids']) {
+			$data['media_types'] = API::MediaType()->get([
+				'output' => ['mediatypeid', 'name', 'maxattempts'],
+				'mediatypeids' => $data['mediatypeids'],
+				'preservekeys' => true
+			]);
+
+			$mediatypeids = array_keys($data['media_types']);
+			$data['mediatypeids'] = $this->prepareDataForMultiselect($data['media_types'], 'media_types');
+		}
+
+		$search_strings = [];
+
+		if ($data['message']) {
+			$search_strings = explode(' ', $data['message']);
+		}
+
+		$range_time_parser = new CRangeTimeParser();
+
+		$range_time_parser->parse($this->getInput('from'));
+		$time_from = $range_time_parser->getDateTime(true)->getTimestamp();
+
+		$range_time_parser->parse($this->getInput('to'));
+		$time_to = $range_time_parser->getDateTime(false)->getTimestamp();
+		$alerts = [];
+		$limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT);
+
+		foreach (eventSourceObjects() as $eventSource) {
+			$alerts = array_merge($alerts, API::Alert()->get([
+				'output' => ['actionid', 'userid', 'clock', 'mediatypeid', 'sendto', 'subject', 'message', 'status',
+					'retries', 'error', 'alerttype'
+				],
+				'selectMediatypes' => ['name', 'maxattempts'],
+				'eventsource' => $eventSource['source'],
+				'eventobject' => $eventSource['object'],
+				'userids' => $userids ?: null,
+				'actionids' => $actionids ?: null,
+				'mediatypeids' => $mediatypeids ?: null,
+				'filter' => ['status' => $data['statuses']],
+				'search' => [
+					'subject' => $search_strings,
+					'message' => $search_strings
+				],
+				'searchByAny' => true,
+				'time_from' => $time_from - 1,
+				'time_till' => $time_to + 1,
+				'sortfield' => 'alertid',
+				'sortorder' => ZBX_SORT_DOWN,
+				'limit' => $limit
+			]));
+		}
+
+		CArrayHelper::sort($alerts, [['field' => $sortfield, 'order' => $sortorder]]);
+		$alerts = array_slice($alerts, 0, $this->fields_values['show_lines'], true);
 
 		foreach ($alerts as &$alert) {
 			$alert['description'] = '';
@@ -75,7 +155,17 @@ class WidgetView extends CControllerDashboardWidgetView {
 		}
 		unset($alert);
 
-		return $alerts;
+		$data['alerts'] = $alerts;
+
+		$data['db_users'] = $this->getDbUsers($data['alerts']);
+
+		$data['actions'] = API::Action()->get([
+			'output' => ['actionid', 'name'],
+			'actionids' => array_unique(array_column($data['alerts'], 'actionid')),
+			'preservekeys' => true
+		]);
+
+		$this->setResponse(new CControllerResponseData($data));
 	}
 
 	private function getDbUsers(array $alerts): array {
@@ -104,10 +194,10 @@ class WidgetView extends CControllerDashboardWidgetView {
 			default:
 				return ['clock', ZBX_SORT_DOWN];
 
-			case SCREEN_SORT_TRIGGERS_TYPE_ASC:
+			case SCREEN_SORT_TRIGGERS_MEDIA_TYPE_ASC:
 				return ['mediatypeid', ZBX_SORT_UP];
 
-			case SCREEN_SORT_TRIGGERS_TYPE_DESC:
+			case SCREEN_SORT_TRIGGERS_MEDIA_TYPE_DESC:
 				return ['mediatypeid', ZBX_SORT_DOWN];
 
 			case SCREEN_SORT_TRIGGERS_STATUS_ASC:
@@ -122,5 +212,46 @@ class WidgetView extends CControllerDashboardWidgetView {
 			case SCREEN_SORT_TRIGGERS_RECIPIENT_DESC:
 				return ['sendto', ZBX_SORT_DOWN];
 		}
+	}
+
+	/**
+	 * Prepare data for multiselect fields.
+	 *
+	 * @param array $data
+	 * @param string $type  Defines data type ('users', 'actions', 'media_types').
+	 *
+	 * @return array
+	 */
+
+	private function prepareDataForMultiselect(array $data, string $type): array {
+		$prepared_data = [];
+
+		foreach ($data as $value) {
+			switch ($type) {
+				case 'users':
+					$prepared_data[$value['userid']] = [
+						'id' => $value['userid'],
+						'name' => getUserFullname($value)
+					];
+					break;
+				case 'actions':
+					$prepared_data[$value['actionid']] = [
+						'id' => $value['actionid'],
+						'name' => $value['name']
+					];
+					break;
+				case 'media_types':
+					$prepared_data[$value['mediatypeid']] = [
+						'id' => $value['mediatypeid'],
+						'name' => $value['name'],
+						'maxattempts' => $value['maxattempts']
+					];
+					break;
+			}
+		}
+
+		CArrayHelper::sort($prepared_data, ['name']);
+
+		return $prepared_data;
 	}
 }

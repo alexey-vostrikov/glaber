@@ -6,13 +6,15 @@
 #include "zbxcommon.h"
 #include "zbxserver.h"
 #include "../../libs/zbxexec/worker.h"
+#include "../../libs/zbxsysinfo/sysinfo.h"
 #include "glb_worker.h"
 #include "module.h"
 #include "preproc.h"
 #include "zbxjson.h"
 #include "zbxsysinfo.h"
+#include "zbx_item_constants.h"
 
-extern int CONFIG_GLB_WORKER_FORKS;
+extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 typedef struct {
     u_int64_t async_delay; //time between async calls to detect and properly handle timeouts
     zbx_binary_heap_t events;
@@ -41,8 +43,6 @@ typedef struct {
 
 } worker_item_t;
 
-
-extern int CONFIG_GLB_WORKER_FORKS;
 extern char  *CONFIG_WORKERS_DIR;
 
 /************************************************************************
@@ -189,7 +189,7 @@ static worker_t * worker_create_worker(worker_item_t *worker_item) {
     bzero(&worker, sizeof(worker_t));
 
     worker.workerid = worker_item->workerid;
-    worker.worker = glb_worker_init(worker_item->full_cmd, worker_item->params_dyn , CONFIG_TIMEOUT, GLB_WORKER_MAXCALLS, 
+    worker.worker = glb_worker_init(worker_item->full_cmd, worker_item->params_dyn , sysinfo_get_config_timeout(), GLB_WORKER_MAXCALLS, 
             GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE);
       
     retworker = (worker_t*)zbx_hashset_insert(&conf.workers,&worker,sizeof(worker_t));
@@ -364,7 +364,7 @@ static void  worker_shutdown(void) {
     zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
 }
 static int forks_count(void) {
-	return CONFIG_GLB_WORKER_FORKS;
+	return CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER];
 }
 
 /******************************************************************************

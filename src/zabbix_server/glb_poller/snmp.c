@@ -17,9 +17,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+
+
 #include "glb_poller.h"
 #include "log.h"
 #include "zbxcommon.h"
+#include "zbx_item_constants.h"
+#include "../../libs/zbxsysinfo/sysinfo.h"
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/types.h>
@@ -197,7 +201,7 @@ void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
 	pdu->req_id = snmp_item->sessid;
 
 	csnmp_send_pdu(conf.socket, pdu);
-	poller_run_timer_event(snmp_item->tm_event, CONFIG_TIMEOUT * 1000);
+	poller_run_timer_event(snmp_item->tm_event, sysinfo_get_config_timeout() * 1000);
 	poller_inc_requests();
 
 }
@@ -293,8 +297,10 @@ void snmp_async_shutdown(void) {
 	close(conf.socket);
 }
 
+extern int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
+
 static int forks_count(void) {
-	return CONFIG_GLB_SNMP_FORKS;
+	return CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP];
 }
 
 void snmp_async_init(void) {

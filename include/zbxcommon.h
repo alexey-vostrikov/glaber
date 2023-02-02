@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include "zbxsysinc.h"
 #include "module.h"
 #include "version.h"
+#include "glb_common.h"
 
 #if defined(__MINGW32__)
 #	define __try
@@ -268,92 +269,12 @@ const char	*zbx_item_value_type_string(zbx_item_value_type_t value_type);
 typedef struct
 {
 	int	timestamp;
-	u_int64_t	logeventid; // both are
-//u_int64_t 	objectid; //used to pass reference to the log triggering data for links/colorisation
+	u_int64_t	logeventid; 
 	int	severity;
 	char	*source;
 	char	*value;
 }
 zbx_log_value_t;
-
-typedef union
-{
-	double		dbl;
-	zbx_uint64_t	ui64;
-	char		*str;
-	char		*err;
-	zbx_log_value_t	*log;
-}
-history_value_t;
-
-/* item data types */
-typedef enum
-{
-	ITEM_DATA_TYPE_DECIMAL = 0,
-	ITEM_DATA_TYPE_OCTAL,
-	ITEM_DATA_TYPE_HEXADECIMAL,
-	ITEM_DATA_TYPE_BOOLEAN
-}
-zbx_item_data_type_t;
-
-/* service supported by discoverer */
-typedef enum
-{
-	SVC_SSH = 0,
-	SVC_LDAP,
-	SVC_SMTP,
-	SVC_FTP,
-	SVC_HTTP,
-	SVC_POP,
-	SVC_NNTP,
-	SVC_IMAP,
-	SVC_TCP,
-	SVC_AGENT,
-	SVC_SNMPv1,
-	SVC_SNMPv2c,
-	SVC_ICMPPING,
-	SVC_SNMPv3,
-	SVC_HTTPS,
-	SVC_TELNET
-}
-zbx_dservice_type_t;
-
-typedef enum
-{
-	SYSMAP_ELEMENT_TYPE_HOST = 0,
-	SYSMAP_ELEMENT_TYPE_MAP,
-	SYSMAP_ELEMENT_TYPE_TRIGGER,
-	SYSMAP_ELEMENT_TYPE_HOST_GROUP,
-	SYSMAP_ELEMENT_TYPE_IMAGE
-}
-zbx_sysmap_element_types_t;
-
-typedef enum
-{
-	GRAPH_YAXIS_TYPE_CALCULATED = 0,
-	GRAPH_YAXIS_TYPE_FIXED,
-	GRAPH_YAXIS_TYPE_ITEM_VALUE
-}
-zbx_graph_yaxis_types_t;
-
-/* item key to distinguish extrnal calls */
-#define SERVER_EXTERNAL_KEY	"script"
-
-/* runtime control options */
-#define ZBX_CONFIG_CACHE_RELOAD		"config_cache_reload"
-#define ZBX_SERVICE_CACHE_RELOAD	"service_cache_reload"
-#define ZBX_SECRETS_RELOAD		"secrets_reload"
-#define ZBX_HOUSEKEEPER_EXECUTE		"housekeeper_execute"
-#define ZBX_LOG_LEVEL_INCREASE		"log_level_increase"
-#define ZBX_LOG_LEVEL_DECREASE		"log_level_decrease"
-#define ZBX_SNMP_CACHE_RELOAD		"snmp_cache_reload"
-#define ZBX_DIAGINFO			"diaginfo"
-#define ZBX_TRIGGER_HOUSEKEEPER_EXECUTE "trigger_housekeeper_execute"
-#define ZBX_HA_STATUS			"ha_status"
-#define ZBX_HA_REMOVE_NODE		"ha_remove_node"
-#define ZBX_HA_SET_FAILOVER_DELAY	"ha_set_failover_delay"
-#define ZBX_USER_PARAMETERS_RELOAD	"userparameter_reload"
-#define ZBX_PROXY_CONFIG_CACHE_RELOAD	"proxy_config_cache_reload"
 
 /* value for not supported items */
 #define ZBX_NOTSUPPORTED	"ZBX_NOTSUPPORTED"
@@ -363,61 +284,6 @@ zbx_graph_yaxis_types_t;
 /* Zabbix Agent non-critical error (agents older than 2.0) */
 #define ZBX_ERROR		"ZBX_ERROR"
 
-/* media types */
-typedef enum
-{
-	MEDIA_TYPE_EMAIL = 0,
-	MEDIA_TYPE_EXEC,
-	MEDIA_TYPE_SMS,
-	MEDIA_TYPE_WEBHOOK = 4
-}
-zbx_media_type_t;
-
-/* alert statuses */
-typedef enum
-{
-	ALERT_STATUS_NOT_SENT = 0,
-	ALERT_STATUS_SENT,
-	ALERT_STATUS_FAILED,
-	ALERT_STATUS_NEW
-}
-zbx_alert_status_t;
-
-/* escalation statuses */
-typedef enum
-{
-	ESCALATION_STATUS_ACTIVE = 0,
-	ESCALATION_STATUS_RECOVERY,	/* only in server code, never in DB, deprecated */
-	ESCALATION_STATUS_SLEEP,
-	ESCALATION_STATUS_COMPLETED	/* only in server code, never in DB */
-}
-zbx_escalation_status_t;
-
-/* alert types */
-typedef enum
-{
-	ALERT_TYPE_MESSAGE = 0,
-	ALERT_TYPE_COMMAND
-}
-zbx_alert_type_t;
-
-/* item statuses */
-#define ITEM_STATUS_ACTIVE		0
-#define ITEM_STATUS_DISABLED		1
-
-
-/* item states */
-#define ITEM_STATE_NORMAL		0
-#define ITEM_STATE_NOTSUPPORTED	1
-#define ITEM_STATE_UNKNOWN	2
-
-/* group statuses */
-typedef enum
-{
-	GROUP_STATUS_ACTIVE = 0,
-	GROUP_STATUS_DISABLED
-}
-zbx_group_status_type_t;
 
 /* program type */
 #define ZBX_PROGRAM_TYPE_SERVER		0x01
@@ -487,255 +353,6 @@ const char	*get_program_type_string(unsigned char program_type);
 
 const char	*get_process_type_string(unsigned char proc_type);
 int		get_process_type_by_name(const char *proc_type_str);
-
-/* maintenance */
-typedef enum
-{
-	TIMEPERIOD_TYPE_ONETIME = 0,
-/*	TIMEPERIOD_TYPE_HOURLY,*/
-	TIMEPERIOD_TYPE_DAILY = 2,
-	TIMEPERIOD_TYPE_WEEKLY,
-	TIMEPERIOD_TYPE_MONTHLY
-}
-zbx_timeperiod_type_t;
-
-typedef enum
-{
-	MAINTENANCE_TYPE_NORMAL = 0,
-	MAINTENANCE_TYPE_NODATA
-}
-zbx_maintenance_type_t;
-
-typedef enum
-{
-	ZBX_PROTOTYPE_STATUS_ENABLED,
-	ZBX_PROTOTYPE_STATUS_DISABLED,
-	ZBX_PROTOTYPE_STATUS_COUNT
-}
-zbx_prototype_status_t;
-
-typedef enum
-{
-	ZBX_PROTOTYPE_DISCOVER,
-	ZBX_PROTOTYPE_NO_DISCOVER,
-	ZBX_PROTOTYPE_DISCOVER_COUNT
-}
-zbx_prototype_discover_t;
-
-/* regular expressions */
-#define EXPRESSION_TYPE_INCLUDED	0
-#define EXPRESSION_TYPE_ANY_INCLUDED	1
-#define EXPRESSION_TYPE_NOT_INCLUDED	2
-#define EXPRESSION_TYPE_TRUE		3
-#define EXPRESSION_TYPE_FALSE		4
-
-#define ZBX_IGNORE_CASE			0
-#define ZBX_CASE_SENSITIVE		1
-
-/* HTTP tests statuses */
-#define HTTPTEST_STATUS_MONITORED	0
-#define HTTPTEST_STATUS_NOT_MONITORED	1
-
-/* discovery rule */
-#define DRULE_STATUS_MONITORED		0
-#define DRULE_STATUS_NOT_MONITORED	1
-
-/* host statuses */
-#define HOST_STATUS_MONITORED		0
-#define HOST_STATUS_NOT_MONITORED	1
-/*#define HOST_STATUS_UNREACHABLE	2*/
-#define HOST_STATUS_TEMPLATE		3
-/*#define HOST_STATUS_DELETED		4*/
-#define HOST_STATUS_PROXY_ACTIVE	5
-#define HOST_STATUS_PROXY_PASSIVE	6
-#define HOST_STATUS_DOMAIN			7
-#define	HOST_STATUS_SERVER			8
-
-/* host group types */
-#define HOSTGROUP_TYPE_HOST		0
-#define HOSTGROUP_TYPE_TEMPLATE		1
-
-/* host maintenance status */
-#define HOST_MAINTENANCE_STATUS_OFF	0
-#define HOST_MAINTENANCE_STATUS_ON	1
-
-/* host inventory mode */
-#define HOST_INVENTORY_DISABLED		-1	/* the host has no record in host_inventory */
-						/* only in server code, never in DB */
-#define HOST_INVENTORY_MANUAL		0
-#define HOST_INVENTORY_AUTOMATIC	1
-#define HOST_INVENTORY_COUNT		2
-
-#define HOST_INVENTORY_FIELD_COUNT	70
-
-/* interface availability */
-#define INTERFACE_AVAILABLE_UNKNOWN		0
-#define INTERFACE_AVAILABLE_TRUE		1
-#define INTERFACE_AVAILABLE_FALSE		2
-
-/* trigger statuses */
-#define TRIGGER_STATUS_ENABLED		0
-#define TRIGGER_STATUS_DISABLED		1
-
-/* trigger types */
-#define TRIGGER_TYPE_NORMAL		0
-#define TRIGGER_TYPE_MULTIPLE_TRUE	1
-
-/* trigger values */
-#define TRIGGER_VALUE_OK		0
-#define TRIGGER_VALUE_PROBLEM		1
-#define TRIGGER_VALUE_UNKNOWN		2	/* only in server code, never in DB */
-#define TRIGGER_VALUE_NONE		3	/* only in server code, never in DB */
-
-/* trigger states */
-//#define TRIGGER_STATE_NORMAL		0
-//#define TRIGGER_STATE_UNKNOWN		1
-
-/* trigger severity */
-#define TRIGGER_SEVERITY_NOT_CLASSIFIED	0
-#define TRIGGER_SEVERITY_INFORMATION	1
-#define TRIGGER_SEVERITY_WARNING	2
-#define TRIGGER_SEVERITY_AVERAGE	3
-#define TRIGGER_SEVERITY_HIGH		4
-#define TRIGGER_SEVERITY_DISASTER	5
-#define TRIGGER_SEVERITY_COUNT		6	/* number of trigger severities */
-#define TRIGGER_SEVERITY_UNDEFINED	255
-		
-/* trigger recovery mode */
-#define TRIGGER_RECOVERY_MODE_EXPRESSION		0
-#define TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION	1
-#define TRIGGER_RECOVERY_MODE_NONE			2
-
-/* business service values */
-#define SERVICE_VALUE_OK		0
-#define SERVICE_VALUE_PROBLEM		1
-
-#define ITEM_LOGTYPE_INFORMATION	1
-#define ITEM_LOGTYPE_WARNING		2
-#define ITEM_LOGTYPE_ERROR		4
-#define ITEM_LOGTYPE_FAILURE_AUDIT	7
-#define ITEM_LOGTYPE_SUCCESS_AUDIT	8
-#define ITEM_LOGTYPE_CRITICAL		9
-#define ITEM_LOGTYPE_VERBOSE		10
-
-/* media statuses */
-#define MEDIA_STATUS_ACTIVE	0
-#define MEDIA_STATUS_DISABLED	1
-
-/* action statuses */
-#define ACTION_STATUS_ACTIVE	0
-#define ACTION_STATUS_DISABLED	1
-
-/* action escalation processing mode */
-#define ACTION_PAUSE_SUPPRESSED_FALSE	0	/* process escalation for suppressed events */
-#define ACTION_PAUSE_SUPPRESSED_TRUE	1	/* pause escalation for suppressed events */
-
-/* action escalation canceled notification mode */
-#define ACTION_NOTIFY_IF_CANCELED_TRUE	1	/* notify about canceled escalations for action (default) */
-#define ACTION_NOTIFY_IF_CANCELED_FALSE	0	/* do not notify about canceled escalations for action */
-
-/* max number of retries for alerts */
-#define ALERT_MAX_RETRIES	3
-
-/* media type statuses */
-#define MEDIA_TYPE_STATUS_ACTIVE	0
-#define MEDIA_TYPE_STATUS_DISABLED	1
-
-/* SMTP security options */
-#define SMTP_SECURITY_NONE	0
-#define SMTP_SECURITY_STARTTLS	1
-#define SMTP_SECURITY_SSL	2
-
-/* SMTP authentication options */
-#define SMTP_AUTHENTICATION_NONE		0
-#define SMTP_AUTHENTICATION_NORMAL_PASSWORD	1
-
-/* operation types */
-#define OPERATION_TYPE_MESSAGE		0
-#define OPERATION_TYPE_COMMAND		1
-#define OPERATION_TYPE_HOST_ADD		2
-#define OPERATION_TYPE_HOST_REMOVE	3
-#define OPERATION_TYPE_GROUP_ADD	4
-#define OPERATION_TYPE_GROUP_REMOVE	5
-#define OPERATION_TYPE_TEMPLATE_ADD	6
-#define OPERATION_TYPE_TEMPLATE_REMOVE	7
-#define OPERATION_TYPE_HOST_ENABLE	8
-#define OPERATION_TYPE_HOST_DISABLE	9
-#define OPERATION_TYPE_HOST_INVENTORY	10
-#define OPERATION_TYPE_RECOVERY_MESSAGE	11
-#define OPERATION_TYPE_UPDATE_MESSAGE	12
-
-/* normal and recovery operations */
-#define ZBX_OPERATION_MODE_NORMAL	0
-#define ZBX_OPERATION_MODE_RECOVERY	1
-#define ZBX_OPERATION_MODE_UPDATE	2
-
-/* algorithms for service status calculation */
-#define ZBX_SERVICE_STATUS_CALC_SET_OK			0
-#define ZBX_SERVICE_STATUS_CALC_MOST_CRITICAL_ALL	1
-#define ZBX_SERVICE_STATUS_CALC_MOST_CRITICAL_ONE	2
-
-/* HTTP item types */
-#define ZBX_HTTPITEM_TYPE_RSPCODE	0
-#define ZBX_HTTPITEM_TYPE_TIME		1
-#define ZBX_HTTPITEM_TYPE_SPEED		2
-#define ZBX_HTTPITEM_TYPE_LASTSTEP	3
-#define ZBX_HTTPITEM_TYPE_LASTERROR	4
-
-/* proxy_history flags */
-#define PROXY_HISTORY_FLAG_META		0x01
-#define PROXY_HISTORY_FLAG_NOVALUE	0x02
-
-#define PROXY_HISTORY_MASK_NOVALUE	(PROXY_HISTORY_FLAG_META | PROXY_HISTORY_FLAG_NOVALUE)
-
-/* global correlation constants */
-#define ZBX_CORRELATION_ENABLED				0
-#define ZBX_CORRELATION_DISABLED			1
-
-#define ZBX_CORR_CONDITION_OLD_EVENT_TAG		0
-#define ZBX_CORR_CONDITION_NEW_EVENT_TAG		1
-#define ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP		2
-#define ZBX_CORR_CONDITION_EVENT_TAG_PAIR		3
-#define ZBX_CORR_CONDITION_OLD_EVENT_TAG_VALUE		4
-#define ZBX_CORR_CONDITION_NEW_EVENT_TAG_VALUE		5
-
-#define ZBX_CORR_OPERATION_CLOSE_OLD			0
-#define ZBX_CORR_OPERATION_CLOSE_NEW			1
-
-/* trigger correlation modes */
-#define ZBX_TRIGGER_CORRELATION_NONE	0
-#define ZBX_TRIGGER_CORRELATION_TAG	1
-
-/* acknowledgment actions (flags) */
-#define ZBX_PROBLEM_UPDATE_CLOSE		0x0001
-#define ZBX_PROBLEM_UPDATE_ACKNOWLEDGE		0x0002
-#define ZBX_PROBLEM_UPDATE_MESSAGE		0x0004
-#define ZBX_PROBLEM_UPDATE_SEVERITY		0x0008
-#define ZBX_PROBLEM_UPDATE_UNACKNOWLEDGE	0x0010
-#define ZBX_PROBLEM_UPDATE_SUPPRESS		0x0020
-#define ZBX_PROBLEM_UPDATE_UNSUPPRESS		0x0040
-
-#define ZBX_PROBLEM_UPDATE_ACTION_COUNT	7
-
-/* database double precision upgrade states */
-#define ZBX_DB_DBL_PRECISION_DISABLED	0
-#define ZBX_DB_DBL_PRECISION_ENABLED	1
-
-#define ZBX_USER_ONLINE_TIME	600
-
-/* user role permissions */
-typedef enum
-{
-	ROLE_PERM_DENY = 0,
-	ROLE_PERM_ALLOW = 1,
-}
-zbx_user_role_permission_t;
-
-#define ZBX_USER_ROLE_PERMISSION_ACTIONS_DEFAULT_ACCESS		"actions.default_access"
-#define ZBX_USER_ROLE_PERMISSION_ACTIONS_EXECUTE_SCRIPTS	"actions.execute_scripts"
-
-#define ZBX_USER_ROLE_PERMISSION_UI_DEFAULT_ACCESS		"ui.default_access"
-#define ZBX_USER_ROLE_PERMISSION_UI_MONITORING_SERVICES		"ui.monitoring.services"
 
 /* user permissions */
 typedef enum
@@ -882,6 +499,9 @@ void	zbx_version(void);
 const char	*get_program_name(const char *path);
 typedef unsigned char	(*zbx_get_program_type_f)(void);
 typedef const char	*(*zbx_get_progname_f)(void);
+typedef int		(*zbx_get_config_forks_f)(unsigned char process_type);
+typedef const char	*(*zbx_get_config_str_f)(void);
+typedef int		(*zbx_get_config_int_f)(void);
 
 typedef enum
 {
@@ -1041,12 +661,10 @@ const OSVERSIONINFOEX	*zbx_win_getversion(void);
 void	zbx_wmi_get(const char *wmi_namespace, const char *wmi_query, double timeout, char **utf8_value);
 #endif
 
-#if defined(_WINDOWS)
+#if defined(_WINDOWS) || defined(__MINGW32__)
 typedef struct __stat64	zbx_stat_t;
 int	__zbx_stat(const char *path, zbx_stat_t *buf);
 int	__zbx_open(const char *pathname, int flags);
-#elif defined(__MINGW32__)
-typedef struct _stat64	zbx_stat_t;
 #else
 typedef struct stat	zbx_stat_t;
 #endif	/* _WINDOWS */
@@ -1139,12 +757,15 @@ int	zbx_alarm_timed_out(void);
 #define ZBX_PREPROC_STR_REPLACE			25
 #define ZBX_PREPROC_VALIDATE_NOT_SUPPORTED	26
 #define ZBX_PREPROC_XML_TO_JSON			27
-#define GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG	126
+#define ZBX_PREPROC_SNMP_WALK_TO_VALUE		28
+#define ZBX_PREPROC_SNMP_WALK_TO_JSON		29
 
+#define GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG	126
 #define GLB_PREPROC_DISPATCH_ITEM_BY_IP	125
 #define GLB_PREPROC_DISPATCH_ITEM	127
 #define GLB_PREPROC_JSON_FILTER 	128
 #define GLB_PREPROC_DISCOVERY_PREPARE  129
+
 
 /* custom on fail actions */
 #define ZBX_PREPROC_FAIL_DEFAULT	0
@@ -1169,7 +790,27 @@ int	zbx_alarm_timed_out(void);
 #define ZBX_RETRIEVE_MODE_HEADERS	1
 #define ZBX_RETRIEVE_MODE_BOTH		2
 
-void	zbx_update_env(double time_now);
+void	__zbx_update_env(double time_now);
+
+#ifdef _WINDOWS
+#define zbx_update_env(info, time_now)			\
+							\
+do							\
+{							\
+	__zbx_update_env(time_now);			\
+	ZBX_UNUSED(info);				\
+}							\
+while (0)
+#else
+#define zbx_update_env(info, time_now)			\
+							\
+do							\
+{							\
+	__zbx_update_env(time_now);			\
+	zbx_prof_update(info, time_now);		\
+}							\
+while (0)
+#endif
 
 #define ZBX_PROBLEM_SUPPRESSED_FALSE	0
 #define ZBX_PROBLEM_SUPPRESSED_TRUE	1
@@ -1195,64 +836,14 @@ void	zbx_free_tag(zbx_tag_t *tag);
 /* time and memory size suffixes */
 zbx_uint64_t	suffix2factor(char c);
 
-#define DEBUG_MESSAGE_HOST 
+/******************************************************************************
+ *                                                                            *
+ * CODE BELOW IS LIBC WRAPPERS WHICH COULD BE LATER MOVED TO SEPARATE LIBRARY *
+ *                                                                            *
+ ******************************************************************************/
 
-#ifndef DEBUG_ITEM
-u_int64_t DC_get_debug_item();
-#define DEBUG_ITEM(id, message,...) {if ( DC_get_debug_item() == id && id > 0 )\
-		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_item:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__);}
-#endif
+#define ZBX_MESSAGE_BUF_SIZE	1024
 
-#ifndef DEBUG_TRIGGER
-u_int64_t DC_get_debug_trigger();
-#define DEBUG_TRIGGER(id, message,...) if ( DC_get_debug_trigger() == id && id > 0 )\
-		zabbix_log(LOG_LEVEL_INFORMATION,  "In %s:%d, debug_trigger:%ld, " message, __FILE__, __LINE__, id, ##__VA_ARGS__);
-#endif
-
-#ifndef HALT_HERE
-#define HALT_HERE(message,...) { zabbix_log(LOG_LEVEL_WARNING, "In %s:%d, intentional halt: " message, __FILE__, __LINE__, ##__VA_ARGS__); zbx_backtrace(); exit(-1); }
-#endif
-
-#ifndef RUN_ONCE_IN
-
-#define RUN_ONCE_IN(freq) { \
-        static int __lastcall= 0; \
-        int __now = time(NULL); \
-        if (__lastcall + freq > __now) \
-            return; \
-        __lastcall = __now; \
-        }
-
-#define RUN_ONCE_IN_WITH_RET(freq, ret) { \
-        static int __lastcall= 0; \
-        int __now = time(NULL); \
-        if (__lastcall + freq > __now) \
-            return ret; \
-        __lastcall = __now; \
-        }
-#endif
-
-#ifndef TIME_MEASURE
-#define TIME_MEASURE
-/*usage:
- { //something that happens frequently, might be module-wise
-	INIT_MEASURE(some_usefull_name); // vars will be static
-
-	START_MEASURE(some_usefull_name);
-	some_long_procedure;
-	STOP_MEASURE(some_usefull_name);
- }
-*/
-#define INIT_MEASURE(name) double __time_start_##name; \
-	static double __time_summ_##name = 0;\
-	static u_int64_t __time_count_##name = 0;\
-	static int __time_report_##name = 0; \
-	if (time(NULL) > __time_report_##name + 10) {\
-		LOG_INF("Time spent in "#name": %f sec, calls: %ld", __time_summ_##name, __time_count_##name);\
-		__time_report_##name = time(NULL);\
-	}
-#define START_MEASURE(name) __time_start_##name = zbx_time(); 
-#define STOP_MEASURE(name) __time_summ_##name += zbx_time() - __time_start_##name;__time_count_##name++;
-#endif
+char	*zbx_strerror(int errnum);
 
 #endif

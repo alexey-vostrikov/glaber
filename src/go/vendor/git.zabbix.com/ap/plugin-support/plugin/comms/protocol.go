@@ -21,7 +21,7 @@ package comms
 
 import "git.zabbix.com/ap/plugin-support/plugin"
 
-const Version = "1.0"
+const ProtocolVersion = "6.4.0"
 
 const NonRequiredID = 0
 
@@ -92,7 +92,7 @@ type LogRequest struct {
 
 type RegisterRequest struct {
 	Common
-	Version string `json:"version"`
+	ProtocolVersion string `json:"version"`
 }
 
 type RegisterResponse struct {

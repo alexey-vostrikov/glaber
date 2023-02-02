@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include "module.h"
 
 #if defined(HAVE_SSH2) || defined(HAVE_SSH)
-#include "dbcache.h"
+#include "zbxcacheconfig.h"
 
 int	ssh_run(DC_ITEM *item, AGENT_RESULT *result, const char *encoding);
 #endif	/* defined(HAVE_SSH2) || defined(HAVE_SSH)*/

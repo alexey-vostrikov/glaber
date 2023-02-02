@@ -26,6 +26,7 @@
 #include "snmp.h"
 #include "poller_async_io.h"
 #include "snmp_util.h"
+#include "zbx_item_constants.h"
 
 #define MAX_ITEM_SNMP_GET_FREQUENCY	15
 

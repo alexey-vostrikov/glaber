@@ -20,15 +20,9 @@
 #include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "zbxshmem.h"
-#include "../zbxipcservice/glb_ipc.h"
+#include "../../libs/zbxipcservice/glb_ipc.h"
 
-
-extern int CONFIG_EXT_SERVER_FORKS;
-extern int CONFIG_GLB_AGENT_FORKS;
-extern int CONFIG_GLB_SNMP_FORKS;
-extern int CONFIG_GLB_PINGER_FORKS;
-extern int CONFIG_GLB_WORKER_FORKS;
-extern int CONFIG_HISTORYPOLLER_FORKS;
+extern int	CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 static zbx_shmem_info_t	*poller_ipc_notify = NULL;
 
@@ -56,12 +50,12 @@ int poller_notify_ipc_init(size_t mem_size) {
 
 	bzero(ipc_poller_notify, sizeof(ipc_conf_t*) * ZBX_PROCESS_TYPE_COUNT);
 	
-	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SERVER, CONFIG_EXT_SERVER_FORKS, &ipc_memf);
-	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_AGENT, CONFIG_GLB_AGENT_FORKS, &ipc_memf);
-	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP, CONFIG_GLB_SNMP_FORKS, &ipc_memf);
-	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_PINGER, CONFIG_GLB_PINGER_FORKS, &ipc_memf);
-	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_WORKER, CONFIG_GLB_WORKER_FORKS, &ipc_memf);
-	poller_init_ipc_type(ipc_poller_notify, ZBX_PROCESS_TYPE_HISTORYPOLLER, CONFIG_HISTORYPOLLER_FORKS, &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SERVER, CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_AGENT, CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP, CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_PINGER, CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_WORKER, CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, ZBX_PROCESS_TYPE_HISTORYPOLLER, CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTORYPOLLER], &ipc_memf);
 	
 	return SUCCEED;
 }
@@ -95,7 +89,9 @@ int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t
 	int process_type = process_by_item_type[item_type];
 
 	if (item_type >= ITEM_TYPE_MAX || 0 > item_type  || 0 == process_type) {
+		
 		THIS_SHOULD_NEVER_HAPPEN;
+		HALT_HERE("Item type is %d, process_type is %d", item_type, process_type);
 		return FAIL;
 	}
 

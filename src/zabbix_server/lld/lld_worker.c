@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,12 +24,12 @@
 #include "log.h"
 #include "zbxipcservice.h"
 #include "zbxself.h"
-#include "../events.h"
+#include "../glb_events.h"
 #include "lld_protocol.h"
 #include "zbxtime.h"
 #include "zbxdbwrap.h"
+#include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_items.h"
-extern unsigned char			program_type;
 
 /******************************************************************************
  *                                                                            *
@@ -86,23 +86,25 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			state = ITEM_STATE_NORMAL;
 		else
 			state = ITEM_STATE_NOTSUPPORTED;
-		
+
 		if (state != item.state)
 		{
 			hist.state = state;
+
 			if (ITEM_STATE_NORMAL == state)
 			{
-				LOG_DBG("discovery rule \"%s:%s\" became supported",
+				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became supported",
 						item.host.host, item.key_orig);
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NORMAL, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL,
-						NULL, NULL, 0);				
+						NULL, NULL, 0);
 			}
 			else
 			{
-				LOG_DBG("discovery rule \"%s:%s\" became not supported: %s",
+				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became not supported: %s",
 						item.host.host, item.key_orig, error);
+
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
 						ITEM_STATE_NOTSUPPORTED, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0,
 						NULL, NULL, error, -1);
@@ -111,27 +113,29 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			zbx_process_events(NULL, NULL, NULL);
 			zbx_clean_events();
 		}
-
-		/* with successful LLD processing LLD error will be set to empty string */
-		cache_state.state = state;
-		cache_state.lastdata = time(NULL);
-		cache_state.error = error;
-
-		glb_state_item_update_meta(itemid, &cache_state, 
-				GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG , ITEM_VALUE_TYPE_STR );	
-		/* with successful LLD processing LLD error will be set to empty string */
-		if (NULL != error)
-				hist.value.err = error;
-		DCconfig_clean_items(&item, &errcode, 1);
-	
-		if (NULL != value )	 {
-			hist.value_type = ITEM_VALUE_TYPE_TEXT;
-			hist.value.str = value;
-			hist.ts = ts;
-			hist.itemid = itemid;
-			glb_state_item_add_lld_value(&hist);
- 		}
 	}
+
+	
+	cache_state.state = state;
+	cache_state.lastdata = time(NULL);
+	cache_state.error = error;
+		
+	glb_state_item_update_meta(itemid, &cache_state, 
+			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG , ITEM_VALUE_TYPE_STR );	
+	/* with successful LLD processing LLD error will be set to empty string */
+		
+	if (NULL != error)
+		hist.value.err = error;
+			
+	if (NULL != value )	 {
+		hist.value_type = ITEM_VALUE_TYPE_TEXT;
+		hist.value.str = value;
+		hist.ts = ts;
+		hist.itemid = itemid;
+		glb_state_item_add_lld_value(&hist);
+ 	}
+
+	DCconfig_clean_items(&item, &errcode, 1);
 
 out:
 	zbx_free(value);
@@ -155,7 +159,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
 	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
@@ -204,7 +208,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 
 		time_read = zbx_time();
 		time_idle += time_read - time_now;
-		zbx_update_env(time_read);
+		zbx_update_env(get_process_type_string(process_type), time_read);
 
 		switch (message.code)
 		{

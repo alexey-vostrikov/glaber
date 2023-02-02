@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,13 +23,31 @@
 #include "zbxnix.h"
 #include "zbxself.h"
 #include "zbxtime.h"
-#include "dbcache.h"
+#include "zbxcachehistory.h"
 #include "zbxexport.h"
+#include "zbxprof.h"
 #include "../../libs/apm/apm.h"
 
 extern int				CONFIG_HISTSYNCER_FREQUENCY;
-extern unsigned char			program_type;
 static sigset_t				orig_mask;
+
+static zbx_export_file_t	*problems_export = NULL;
+static zbx_export_file_t	*get_problems_export(void)
+{
+	return problems_export;
+}
+
+static zbx_export_file_t	*history_export = NULL;
+static zbx_export_file_t	*get_history_export(void)
+{
+	return history_export;
+}
+
+static zbx_export_file_t	*trends_export = NULL;
+static zbx_export_file_t	*get_trends_export(void)
+{
+	return trends_export;
+}
 
 /******************************************************************************
  *                                                                            *
@@ -94,8 +112,8 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
 	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type), server_num,
-			(process_name = get_process_type_string(process_type)), process_num);
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
+			server_num, (process_name = get_process_type_string(process_type)), process_num);
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
@@ -117,19 +135,21 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	zbx_unblock_signals(&orig_mask);
 
 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_HISTORY))
-		zbx_history_export_init("history-syncer", process_num);
+		history_export = zbx_history_export_init(get_history_export, "history-syncer", process_num);
 
 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_TRENDS))
-		zbx_trends_export_init("history-syncer", process_num);
+		trends_export = zbx_trends_export_init(get_trends_export, "history-syncer", process_num);
 
 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
-		zbx_problems_export_init("history-syncer", process_num);
+		problems_export = zbx_problems_export_init(get_problems_export, "history-syncer", process_num);
 
 	apm_add_heap_usage();
 	
 	for (;;)
 	{
 		sec = zbx_time();
+
+		zbx_prof_update(get_process_type_string(process_type), sec);
 
 		if (0 != sleeptime)
 			zbx_setproctitle("%s #%d [%s, syncing history]", process_name, process_num, stats);
@@ -140,7 +160,9 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 		/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 		zbx_block_signals(&orig_mask);
+		zbx_prof_start(__func__, ZBX_PROF_PROCESSING);
 		zbx_sync_history_cache(&values_num, &triggers_num, &more);
+		zbx_prof_end();
 
 		if (!ZBX_IS_RUNNING() && SUCCEED != zbx_db_trigger_queue_locked())
 			zbx_db_flush_timer_queue();
@@ -156,12 +178,12 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		if (0 != sleeptime || STAT_INTERVAL <= time(NULL) - last_stat_time)
 		{
 			stats_offset = 0;
-			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "process %d val/s", total_values_num/STAT_INTERVAL);
+			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, "processed %d values", total_values_num);
 
-			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
+			if (0 != (info->program_type & ZBX_PROGRAM_TYPE_SERVER))
 			{
-				zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, ", %d triggers/s",
-						total_triggers_num/STAT_INTERVAL);
+				zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, ", %d triggers",
+						total_triggers_num);
 			}
 
 			zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, " in " ZBX_FS_DBL " sec", total_sec);
@@ -198,6 +220,15 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	zbx_unblock_signals(&orig_mask);
 
 	zbx_log_sync_history_cache_progress();
+
+	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_HISTORY))
+		zbx_export_deinit(history_export);
+
+	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_TRENDS))
+		zbx_export_deinit(trends_export);
+
+	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
+		zbx_export_deinit(problems_export);
 
 	zbx_free(stats);
 

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,10 +27,11 @@
 #include "zbxnum.h"
 #include "zbxtime.h"
 #include "zbx_rtc_constants.h"
+#include "zbx_host_constants.h"
 #include "../../libs/glb_state/glb_state.h"
 
-
 static struct zbx_db_version_info_t	*db_version_info;
+
 
 static int	hk_period;
 
@@ -208,6 +209,316 @@ static int	hk_item_update_cache_compare(const void *d1, const void *d2)
 	return 0;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Purpose: add item to the delete queue if necessary                         *
+ *                                                                            *
+ * Parameters: rule        - [IN/OUT] the history housekeeping rule           *
+ *             now         - [IN] the current timestamp                       *
+ *             item_record - [IN/OUT] the record from item cache containing   *
+ *                           item to process and its oldest record timestamp  *
+ *             history     - [IN] a number of seconds the history data for    *
+ *                           item_record must be kept.                        *
+ *                                                                            *
+ * Comments: If item is added to delete queue, its oldest record timestamp    *
+ *           (min_clock) is updated to the calculated 'cutoff' value.         *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_delete_queue_append(zbx_hk_history_rule_t *rule, int now,
+		zbx_hk_item_cache_t *item_record, int history)
+{
+	int	keep_from;
+
+	if (history > now)
+		return;	/* there shouldn't be any records with negative timestamps, nothing to do */
+
+	keep_from = now - history;
+
+	if (keep_from > item_record->min_clock)
+	{
+		zbx_hk_delete_queue_t	*update_record;
+
+		/* update oldest timestamp in item cache */
+		item_record->min_clock = MIN(keep_from, item_record->min_clock + HK_MAX_DELETE_PERIODS * hk_period);
+
+		update_record = (zbx_hk_delete_queue_t *)zbx_malloc(NULL, sizeof(zbx_hk_delete_queue_t));
+		update_record->itemid = item_record->itemid;
+		update_record->min_clock = item_record->min_clock;
+		zbx_vector_ptr_append(&rule->delete_queue, update_record);
+	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: prepares history housekeeping rule                                *
+ *                                                                            *
+ * Parameters: rule        - [IN/OUT] the history housekeeping rule           *
+ *                                                                            *
+ * Comments: This function is called to initialize history rule data either   *
+ *           at start or when housekeeping is enabled for this rule.          *
+ *           It caches item history data and also prepares delete queue to be *
+ *           processed during the first run.                                  *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_prepare(zbx_hk_history_rule_t *rule)
+{
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	zbx_hashset_create(&rule->item_cache, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+	zbx_vector_ptr_create(&rule->delete_queue);
+	zbx_vector_ptr_reserve(&rule->delete_queue, HK_INITIAL_DELETE_QUEUE_SIZE);
+
+	result = DBselect("select itemid,min(clock) from %s group by itemid", rule->table);
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t		itemid;
+		int			min_clock;
+		zbx_hk_item_cache_t	item_record;
+
+		ZBX_STR2UINT64(itemid, row[0]);
+		min_clock = atoi(row[1]);
+
+		item_record.itemid = itemid;
+		item_record.min_clock = min_clock;
+
+		zbx_hashset_insert(&rule->item_cache, &item_record, sizeof(zbx_hk_item_cache_t));
+	}
+
+	zbx_db_free_result(result);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: releases history housekeeping rule                                *
+ *                                                                            *
+ * Parameters: rule  - [IN/OUT] the history housekeeping rule                 *
+ *                                                                            *
+ * Comments: This function is called to release resources allocated by        *
+ *           history housekeeping rule after housekeeping was disabled        *
+ *           for the table referred by this rule.                             *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_release(zbx_hk_history_rule_t *rule)
+{
+	if (0 == rule->item_cache.num_slots)
+		return;
+
+	zbx_hashset_destroy(&rule->item_cache);
+	zbx_vector_ptr_destroy(&rule->delete_queue);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: updates history housekeeping rule with item history setting and   *
+ *          adds item to the delete queue if necessary                        *
+ *                                                                            *
+ * Parameters: rule    - [IN/OUT] the history housekeeping rule               *
+ *             now     - [IN] the current timestamp                           *
+ *             itemid  - [IN] the item to update                              *
+ *             history - [IN] the number of seconds the item data             *
+ *                       should be kept in history                            *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_item_update(zbx_hk_history_rule_t *rules, zbx_hk_history_rule_t *rule_add, int count,
+		int now, zbx_uint64_t itemid, int history)
+{
+	zbx_hk_history_rule_t	*rule;
+
+	/* item can be cached in multiple rules when value type has been changed */
+	for (rule = rules; rule - rules < count; rule++)
+	{
+		zbx_hk_item_cache_t	*item_record;
+
+		if (0 == rule->item_cache.num_slots)
+			continue;
+
+		if (NULL == (item_record = (zbx_hk_item_cache_t *)zbx_hashset_search(&rule->item_cache, &itemid)))
+		{
+			zbx_hk_item_cache_t	item_data = {itemid, now};
+
+			if (rule_add != rule)
+				continue;
+
+			if (NULL == (item_record = (zbx_hk_item_cache_t *)zbx_hashset_insert(&rule->item_cache,
+					&item_data, sizeof(zbx_hk_item_cache_t))))
+			{
+				continue;
+			}
+		}
+
+		hk_history_delete_queue_append(rule, now, item_record, history);
+	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: updates history housekeeping rule with the latest item history    *
+ *          settings and prepares delete queue                                *
+ *                                                                            *
+ * Parameters: rule  - [IN/OUT] the history housekeeping rule                 *
+ *             now   - [IN] the current timestamp                             *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_update(zbx_hk_history_rule_t *rules, int now)
+{
+	DB_RESULT		result;
+	DB_ROW			row;
+	char			*tmp = NULL;
+	zbx_dc_um_handle_t	*um_handle;
+
+	result = DBselect(
+			"select i.itemid,i.value_type,i.history,i.trends,h.hostid"
+			" from items i,hosts h"
+			" where i.flags in (%d,%d)"
+				" and i.hostid=h.hostid"
+				" and h.status in (%d,%d)",
+			ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED,
+			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED);
+
+	um_handle = zbx_dc_open_user_macros();
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t		itemid, hostid;
+		int			history, trends, value_type;
+		zbx_hk_history_rule_t	*rule;
+
+		ZBX_STR2UINT64(itemid, row[0]);
+		value_type = atoi(row[1]);
+		ZBX_STR2UINT64(hostid, row[4]);
+
+		if (value_type < ITEM_VALUE_TYPE_MAX &&
+				ZBX_HK_MODE_REGULAR == *(rule = rules + value_type)->poption_mode)
+		{
+			tmp = zbx_strdup(tmp, row[2]);
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+					NULL, &tmp, MACRO_TYPE_COMMON, NULL, 0);
+
+			if (SUCCEED != zbx_is_time_suffix(tmp, &history, ZBX_LENGTH_UNLIMITED))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "invalid history storage period '%s' for itemid '%s'",
+						tmp, row[0]);
+				continue;
+			}
+
+			if (0 != history && (ZBX_HK_HISTORY_MIN > history || ZBX_HK_PERIOD_MAX < history))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "invalid history storage period for itemid '%s'", row[0]);
+				continue;
+			}
+
+			if (0 != history && ZBX_HK_OPTION_DISABLED != *rule->poption_global)
+				history = *rule->poption;
+
+			hk_history_item_update(rules, rule, ITEM_VALUE_TYPE_MAX, now, itemid, history);
+		}
+
+		if (ITEM_VALUE_TYPE_FLOAT == value_type || ITEM_VALUE_TYPE_UINT64 == value_type)
+		{
+			rule = rules + (value_type == ITEM_VALUE_TYPE_FLOAT ?
+					HK_UPDATE_CACHE_OFFSET_TREND_FLOAT : HK_UPDATE_CACHE_OFFSET_TREND_UINT);
+
+			if (ZBX_HK_MODE_REGULAR != *rule->poption_mode)
+				continue;
+
+			tmp = zbx_strdup(tmp, row[3]);
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+					NULL, &tmp, MACRO_TYPE_COMMON, NULL, 0);
+
+			if (SUCCEED != zbx_is_time_suffix(tmp, &trends, ZBX_LENGTH_UNLIMITED))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "invalid trends storage period '%s' for itemid '%s'",
+						tmp, row[0]);
+				continue;
+			}
+			else if (0 != trends && (ZBX_HK_TRENDS_MIN > trends || ZBX_HK_PERIOD_MAX < trends))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "invalid trends storage period for itemid '%s'", row[0]);
+				continue;
+			}
+
+			if (0 != trends && ZBX_HK_OPTION_DISABLED != *rule->poption_global)
+				trends = *rule->poption;
+
+			hk_history_item_update(rules + HK_UPDATE_CACHE_OFFSET_TREND_FLOAT, rule,
+					HK_UPDATE_CACHE_TREND_COUNT, now, itemid, trends);
+		}
+	}
+	zbx_db_free_result(result);
+
+	zbx_dc_close_user_macros(um_handle);
+
+	zbx_free(tmp);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: prepares history housekeeping delete queues for all defined       *
+ *          history rules.                                                    *
+ *                                                                            *
+ * Parameters: rules  - [IN/OUT] the history housekeeping rules               *
+ *             now    - [IN] the current timestamp                            *
+ *                                                                            *
+ * Comments: This function also handles history rule initializing/releasing   *
+ *           when the rule just became enabled/disabled.                      *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_delete_queue_prepare_all(zbx_hk_history_rule_t *rules, int now)
+{
+	zbx_hk_history_rule_t	*rule;
+	unsigned char		items_update = 0;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	/* prepare history item cache (hashset containing itemid:min_clock values) */
+	for (rule = rules; NULL != rule->table; rule++)
+	{
+		if (ZBX_HK_MODE_REGULAR == *rule->poption_mode)
+		{
+			if (0 == rule->item_cache.num_slots)
+				hk_history_prepare(rule);
+
+			items_update = 1;
+		}
+		else if (0 != rule->item_cache.num_slots)
+			hk_history_release(rule);
+	}
+
+	/* Since we maintain two separate global period settings - for history and for trends */
+	/* we need to scan items table if either of these is off. Thus setting both global periods */
+	/* to override is very beneficial for performance. */
+	if (0 != items_update)
+		hk_history_update(rules, now);	/* scan items and update min_clock using per item settings */
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: clears the history housekeeping delete queue                      *
+ *                                                                            *
+ * Parameters: rule   - [IN/OUT] the history housekeeping rule                *
+ *             now    - [IN] the current timestamp                            *
+ *                                                                            *
+ ******************************************************************************/
+static void	hk_history_delete_queue_clear(zbx_hk_history_rule_t *rule)
+{
+	zbx_vector_ptr_clear_ext(&rule->delete_queue, zbx_ptr_free);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: drop appropriate partitions from the history and trends tables    *
+ *                                                                            *
+ * Parameters: rules - [IN/OUT] history housekeeping rules                    *
+ *             now   - [IN] the current timestamp                             *
+ *                                                                            *
+ ******************************************************************************/
+
+#if defined(HAVE_POSTGRESQL)
 
 static void 	hk_update_dbversion_status(void)
 {
@@ -215,15 +526,13 @@ static void 	hk_update_dbversion_status(void)
 
 	zbx_json_initarray(&db_version_json, ZBX_JSON_STAT_BUF_LEN);
 
-	zbx_tsdb_extract_compressed_chunk_flags(db_version_info);
-
 	zbx_db_version_json_create(&db_version_json, db_version_info);
 	zbx_db_flush_version_requirements(db_version_json.buffer);
 
 	zbx_json_free(&db_version_json);
 }
 
-
+#endif
 
 /******************************************************************************
  *                                                                            *
@@ -261,7 +570,7 @@ static int	housekeeping_process_rule(int now, zbx_hk_rule_t *rule)
 		else
 			rule->min_clock = now;
 
-		DBfree_result(result);
+		zbx_db_free_result(result);
 	}
 
 	/* Delete the old records from database. Don't remove more than 4 x housekeeping */
@@ -313,7 +622,7 @@ static int	housekeeping_process_rule(int now, zbx_hk_rule_t *rule)
 					zbx_vector_str_append(&ids_str, zbx_strdup(NULL, row[0]));
 			}
 
-			DBfree_result(result);
+			zbx_db_free_result(result);
 
 			if (0 == id_field_str_type)
 			{
@@ -568,7 +877,7 @@ static int	housekeeping_cleanup(void)
 		if (0 == more)
 			zbx_vector_uint64_append(&housekeeperids, housekeeperid);
 	}
-	DBfree_result(result);
+	zbx_db_free_result(result);
 
 	if (0 != housekeeperids.values_num)
 	{
@@ -631,13 +940,26 @@ static int	housekeeping_audit(int now)
 
 static int	housekeeping_events(int now)
 {
-#define ZBX_HK_EVENT_RULE	" and not exists (select null from problem where events.eventid=problem.eventid)" \
-				" and not exists (select null from problem where events.eventid=problem.r_eventid)"
+#define ZBX_HK_EVENT_RULE		" and not exists(" \
+						"select null" \
+						" from problem" \
+						" where events.eventid=problem.eventid" \
+					")" \
+					" and not exists(" \
+						"select null" \
+						" from problem" \
+						" where events.eventid=problem.r_eventid" \
+					")"
+#define ZBX_HK_TRIGGER_EVENT_RULE	" and not exists(" \
+						"select null" \
+						" from event_symptom" \
+						" where events.eventid=event_symptom.cause_eventid" \
+					")"
 
 	static zbx_hk_rule_t	rules[] = {
 		{"events", "eventid", "events.source=" ZBX_STR(EVENT_SOURCE_TRIGGERS)
 			" and events.object=" ZBX_STR(EVENT_OBJECT_TRIGGER)
-			ZBX_HK_EVENT_RULE, 0, &cfg.hk.events_trigger},
+			ZBX_HK_EVENT_RULE ZBX_HK_TRIGGER_EVENT_RULE, 0, &cfg.hk.events_trigger},
 		{"events", "eventid", "events.source=" ZBX_STR(EVENT_SOURCE_INTERNAL)
 			" and events.object=" ZBX_STR(EVENT_OBJECT_TRIGGER)
 			ZBX_HK_EVENT_RULE, 0, &cfg.hk.events_internal},
@@ -670,18 +992,69 @@ static int	housekeeping_events(int now)
 
 	return deleted;
 #undef ZBX_HK_EVENT_RULE
+#undef ZBX_HK_TRIGGER_EVENT_RULE
 }
 
 static int	housekeeping_problems(int now)
 {
-	int	deleted = 0, rc;
+	int			deleted = 0, rc;
+	DB_RESULT		result;
+	DB_ROW			row;
+	zbx_vector_uint64_t	ids_uint64;
+	size_t			sql_alloc = 0, sql_offset;
+	char			*sql = NULL;
+	char			buffer[MAX_STRING_LEN];
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() now:%d", __func__, now);
 
-	rc = DBexecute("delete from problem where r_clock<>0 and r_clock<%d", now - SEC_PER_DAY);
+	zbx_vector_uint64_create(&ids_uint64);
 
-	if (ZBX_DB_OK <= rc)
-		deleted = rc;
+	zbx_snprintf(buffer, sizeof(buffer),
+		"select p1.eventid from problem p1"
+		" where p1.r_clock<>0 and p1.r_clock<%d and p1.eventid not in ("
+			" select cause_eventid"
+			" from problem p2"
+			" where p1.eventid=p2.cause_eventid"
+		")", now - SEC_PER_DAY);
+
+	while (1)
+	{
+		if (0 == CONFIG_MAX_HOUSEKEEPER_DELETE)
+			result = DBselect("%s", buffer);
+		else
+			result = DBselectN(buffer, CONFIG_MAX_HOUSEKEEPER_DELETE);
+
+		while (NULL != (row = DBfetch(result)))
+		{
+			zbx_uint64_t	id;
+
+			ZBX_STR2UINT64(id, row[0]);
+			zbx_vector_uint64_append(&ids_uint64, id);
+		}
+
+		zbx_db_free_result(result);
+
+		if (0 == ids_uint64.values_num)
+			break;
+
+		sql_offset = 0;
+		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "delete from problem where");
+		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", ids_uint64.values,
+				ids_uint64.values_num);
+
+		rc = DBexecute("%s", sql);
+
+		zbx_vector_uint64_clear(&ids_uint64);
+
+		if (ZBX_DB_OK > rc)
+			break;
+
+		deleted += rc;
+	}
+
+	zbx_free(sql);
+
+	zbx_vector_uint64_destroy(&ids_uint64);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, deleted);
 
@@ -723,7 +1096,6 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 	double				sec, time_slept, time_now;
 	char				sleeptext[25];
 	zbx_ipc_async_socket_t		rtc;
-	unsigned char			program_type;
 	const zbx_thread_info_t	*info = &((zbx_thread_args_t *)args)->info;
 	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
@@ -731,9 +1103,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 	db_version_info = housekeeper_args_in->db_version_info;
 
-	program_type = housekeeper_args_in->zbx_get_program_type_cb_arg();
-
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
@@ -752,7 +1122,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		zbx_snprintf(sleeptext, sizeof(sleeptext), "idle for %d hour(s)", CONFIG_HOUSEKEEPING_FREQUENCY);
 	}
 
-	zbx_rtc_subscribe(&rtc, process_type, process_num);
+	zbx_rtc_subscribe(process_type, process_num, housekeeper_args_in->config_timeout, &rtc);
 
 #if defined(HAVE_POSTGRESQL)
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
@@ -802,7 +1172,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 		time_now = zbx_time();
 		time_slept = time_now - sec;
-		zbx_update_env(time_now);
+		zbx_update_env(get_process_type_string(process_type), time_now);
 
 		hk_period = get_housekeeping_period(time_slept);
 

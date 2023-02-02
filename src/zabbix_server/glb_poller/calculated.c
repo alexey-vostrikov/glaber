@@ -20,7 +20,10 @@
 #include "zbxcommon.h"
 #include "glb_poller.h"
 #include "zbxsysinfo.h"
+#include "zbx_item_constants.h"
 #include "../poller/checks_calculated.h"
+
+extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 typedef struct {
     strpool_t strpool;
@@ -107,7 +110,7 @@ void poll_item(poller_item_t *poller_item) {
 }
 
 int forks_count(void) {
-    return CONFIG_HISTORYPOLLER_FORKS;
+    return CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTORYPOLLER];
 }
 
 void poller_shutdown(void) {

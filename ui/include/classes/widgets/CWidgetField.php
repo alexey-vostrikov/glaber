@@ -1,7 +1,7 @@
 <?php declare(strict_types = 0);
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -206,6 +206,9 @@ abstract class CWidgetField {
 			case ZBX_WIDGET_FIELD_TYPE_GRAPH_PROTOTYPE:
 			case ZBX_WIDGET_FIELD_TYPE_SERVICE:
 			case ZBX_WIDGET_FIELD_TYPE_SLA:
+			case ZBX_WIDGET_FIELD_TYPE_USER:
+			case ZBX_WIDGET_FIELD_TYPE_ACTION:
+			case ZBX_WIDGET_FIELD_TYPE_MEDIA_TYPE:
 				$this->validation_rules = ['type' => API_IDS];
 				break;
 

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -137,6 +137,8 @@ static unsigned char	get_program_type(void)
 	return program_type;
 }
 
+static int	config_timeout = 3;
+
 static int	CONFIG_SENDER_TIMEOUT = GET_SENDER_TIMEOUT;
 
 #define CONFIG_SENDER_TIMEOUT_MIN	1
@@ -272,9 +274,6 @@ const char	*help_message[] = {
 };
 
 static zbx_config_tls_t	*zbx_config_tls = NULL;
-
-int	CONFIG_PASSIVE_FORKS		= 0;	/* not used in zabbix_sender, just for linking with tls.c */
-int	CONFIG_ACTIVE_FORKS		= 0;	/* not used in zabbix_sender, just for linking with tls.c */
 
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
 
@@ -702,7 +701,7 @@ static	ZBX_THREAD_ENTRY(send_value, args)
 	}
 #endif
 	if (SUCCEED == zbx_connect_to_server(&sock, CONFIG_SOURCE_IP, sendval_args->addrs, CONFIG_SENDER_TIMEOUT,
-			CONFIG_TIMEOUT, 0, LOG_LEVEL_DEBUG, sendval_args->zbx_config_tls))
+			config_timeout, 0, LOG_LEVEL_DEBUG, sendval_args->zbx_config_tls))
 	{
 		if (1 == sendval_args->sync_timestamp)
 		{
@@ -1497,10 +1496,13 @@ int	main(int argc, char **argv)
 	char			*error = NULL;
 	int			total_count = 0, succeed_count = 0, ret = FAIL, timestamp, ns;
 	zbx_thread_sendval_args	*sendval_args = NULL;
+	zbx_config_log_t	log_file_cfg = {NULL, NULL, LOG_TYPE_UNDEFINED, 0};
 
 	zbx_config_tls = zbx_config_tls_new();
 
 	progname = get_program_name(argv[0]);
+
+	zbx_init_library_cfg(program_type);
 
 	parse_commandline(argc, argv);
 
@@ -1514,7 +1516,7 @@ int	main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 #endif
-	if (SUCCEED != zabbix_open_log(LOG_TYPE_UNDEFINED, CONFIG_LOG_LEVEL, NULL, &error))
+	if (SUCCEED != zabbix_open_log(&log_file_cfg, CONFIG_LOG_LEVEL, &error))
 	{
 		zbx_error("cannot open log: %s", error);
 		zbx_free(error);
@@ -1565,7 +1567,7 @@ int	main(int argc, char **argv)
 			NULL != zbx_config_tls->cipher_cmd)
 	{
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
-		zbx_tls_validate_config(zbx_config_tls, CONFIG_ACTIVE_FORKS, CONFIG_PASSIVE_FORKS, get_program_type);
+		zbx_tls_validate_config(zbx_config_tls, 0, 0, get_program_type);
 
 		if (ZBX_TCP_SEC_UNENCRYPTED != zbx_config_tls->connect_mode)
 		{

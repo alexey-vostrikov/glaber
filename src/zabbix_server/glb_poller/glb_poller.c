@@ -18,7 +18,8 @@
 **/
 
 #include "zbxcommon.h"
-#include "dbcache.h"
+#include "zbx_item_constants.h"
+//#include "dbcache.h"
 #include "zbxcomms.h"
 #include "zbxnix.h"
 #include "zbxserver.h"
@@ -27,7 +28,7 @@
 #include "glb_preproc.h"
 #include "metric.h"
 
-#include "../events.h"
+#include "../glb_events.h"
 #include "log.h"
 #include "glb_poller.h"
 #include "glb_pinger.h"

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 #include "zbxnix.h"
 #include "zbxself.h"
 #include "log.h"
-#include "dbcache.h"
+#include "zbxcachehistory.h"
 #include "zbxrtc.h"
 #include "zbxtime.h"
 #include "zbx_rtc_constants.h"
@@ -32,7 +32,6 @@
 
 
 extern int		CONFIG_CONFSYNCER_FREQUENCY;
-extern unsigned char			program_type;
 
 /******************************************************************************
  *                                                                            *
@@ -51,12 +50,15 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
 	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
+	zbx_thread_dbconfig_args	*dbconfig_args_in = (zbx_thread_dbconfig_args *)
+			(((zbx_thread_args_t *)args)->args);
+
+	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 
-	zbx_rtc_subscribe(&rtc, process_type, process_num);
+	zbx_rtc_subscribe(process_type, process_num, dbconfig_args_in->config_timeout, &rtc);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
@@ -64,12 +66,12 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 
 	sec = zbx_time();
 	zbx_setproctitle("%s [syncing configuration]", get_process_type_string(process_type));
-	DCsync_configuration(ZBX_DBSYNC_INIT, ZBX_SYNCED_NEW_CONFIG_NO, NULL);
-	DCsync_kvs_paths(NULL);
+	DCsync_configuration(ZBX_DBSYNC_INIT, ZBX_SYNCED_NEW_CONFIG_NO, NULL, dbconfig_args_in->config_vault);
+	DCsync_kvs_paths(NULL, dbconfig_args_in->config_vault);
 	zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
 			get_process_type_string(process_type), (sec = zbx_time() - sec), CONFIG_CONFSYNCER_FREQUENCY);
 
-	zbx_rtc_notify_config_sync(&rtc);
+	zbx_rtc_notify_config_sync(dbconfig_args_in->config_timeout, &rtc);
 
 	nextcheck = (int)time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 
@@ -112,7 +114,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 				get_process_type_string(process_type), sec);
 
 		sec = zbx_time();
-		zbx_update_env(sec);
+		zbx_update_env(get_process_type_string(process_type), sec);
 
 		apm_update_heap_usage();
 		apm_flush();
@@ -123,14 +125,16 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 
 			zbx_vector_uint64_create(&deleted_itemids);
 
-			DCsync_configuration(ZBX_DBSYNC_UPDATE, ZBX_SYNCED_NEW_CONFIG_YES, &deleted_itemids);
-			DCsync_kvs_paths(NULL);
+			DCsync_configuration(ZBX_DBSYNC_UPDATE, ZBX_SYNCED_NEW_CONFIG_YES, &deleted_itemids,
+					dbconfig_args_in->config_vault);
+			DCsync_kvs_paths(NULL, dbconfig_args_in->config_vault);
 			DCupdate_interfaces_availability();
+
 			nextcheck = (int)time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
-
-			zbx_vc_remove_items_by_ids(&deleted_itemids);
+				
+			glb_state_items_remove(&deleted_itemids);
 			zbx_vector_uint64_destroy(&deleted_itemids);
-
+			
 			if (0 != cache_reload)
 			{
 				cache_reload = 0;
@@ -139,11 +143,10 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		}
 		else
 		{
-			DCsync_kvs_paths(NULL);
+			DCsync_kvs_paths(NULL, dbconfig_args_in->config_vault);
 			secrets_reload = 0;
 			zabbix_log(LOG_LEVEL_WARNING, "finished forced reloading of the secrets");
 		}
-
 		sec = zbx_time() - sec;
 
 		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",

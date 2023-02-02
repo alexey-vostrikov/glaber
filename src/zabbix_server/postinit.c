@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2023 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 #include "zbxtasks.h"
 #include "log.h"
 #include "zbxnum.h"
+#include "zbxdbwrap.h"
 
 #define ZBX_HIST_MACRO_NONE		(-1)
 #define ZBX_HIST_MACRO_ITEM_VALUE	0
@@ -49,7 +50,7 @@ static int	get_trigger_count(void)
 		triggers_num = atoi(row[0]);
 	else
 		triggers_num = 0;
-	DBfree_result(result);
+	zbx_db_free_result(result);
 
 	return triggers_num;
 }
@@ -334,7 +335,7 @@ static int	process_event_update(const ZBX_DB_TRIGGER *trigger, char **sql, size_
 		zbx_free(name);
 	}
 
-	DBfree_result(result);
+	zbx_db_free_result(result);
 
 	return ret;
 }
@@ -417,7 +418,7 @@ static int	update_event_names(void)
 			ret = FAIL;
 	}
 
-	DBfree_result(result);
+	zbx_db_free_result(result);
 
 	zbx_free(sql);
 out:
@@ -461,7 +462,7 @@ int	zbx_check_postinit_tasks(char **error)
 			DBrollback();
 	}
 
-	DBfree_result(result);
+	zbx_db_free_result(result);
 
 	if (SUCCEED != ret)
 		*error = zbx_strdup(*error, "cannot update event names");

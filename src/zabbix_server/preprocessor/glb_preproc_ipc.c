@@ -31,6 +31,8 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 #include "zbxshmem.h"
 #include "metric.h"
 
+extern int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
+
 #define CONFIG_PREPROC_IPC_SIZE     128 * ZBX_MEBIBYTE
 #define PREPROC_IPC_METRICS_BUFFER  2048
 
@@ -101,8 +103,8 @@ int preproc_ipc_init(size_t ipc_size) {
     conf.memf.malloc_func = _preprocipc_shmem_malloc_func;
     conf.memf.realloc_func = _preprocipc_shmem_realloc_func;
 
-    conf.ipc = glb_ipc_init(PREPROC_IPC_METRICS_BUFFER * CONFIG_GLB_PREPROCESSOR_FORKS, sizeof(metric_t), 
-    CONFIG_GLB_PREPROCESSOR_FORKS , &conf.memf, preproc_ipc_metric_create_cb,
+    conf.ipc = glb_ipc_init(PREPROC_IPC_METRICS_BUFFER * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
+        CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf.memf, preproc_ipc_metric_create_cb,
          preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME);
       // LOG_INF("doing preproc ipc init3");
 
@@ -117,7 +119,7 @@ void preproc_ipc_destroy() {
 
 
 int preprocess_send_metric(metric_t *metric) {
-    glb_ipc_send(conf.ipc, metric->hostid % CONFIG_GLB_PREPROCESSOR_FORKS, metric, IPC_LOCK_WAIT);
+    glb_ipc_send(conf.ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], metric, IPC_LOCK_WAIT);
     glb_ipc_flush(conf.ipc);
 }
 

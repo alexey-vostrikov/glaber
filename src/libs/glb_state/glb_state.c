@@ -70,7 +70,8 @@ int glb_state_init() {
 	if (SUCCEED != glb_state_items_init(&glb_cache->memf) )
 		return FAIL;
 	
-	if (SUCCEED != discovery_init(&glb_cache->memf) ||
+	if (
+		//SUCCEED != discovery_init(&glb_cache->memf) ||
 		SUCCEED != glb_state_triggers_init(&glb_cache->memf) ||
 		SUCCEED != glb_state_interfaces_init(&glb_cache->memf) )
 		
@@ -80,13 +81,9 @@ int glb_state_init() {
 	return SUCCEED;
 }
 
-
-
 int glb_state_get_mem_stats(zbx_shmem_stats_t *mem_stats) {
-    
     memset(&mem_stats, 0, sizeof(zbx_shmem_stats_t));
 	zbx_shmem_get_stats(cache_mem, mem_stats);
-  
 }
 
 int glb_state_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode) {
