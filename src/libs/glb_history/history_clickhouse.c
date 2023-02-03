@@ -59,7 +59,6 @@ typedef struct {
 } 
 glb_clickhouse_buffer_t;
 
-
 static char *trend_tables[] = {"trends_dbl", "", "", "trends_uint",""};
 static char *hist_tables[] = {"history_dbl", "history_str", "history_log", "history_uint", "history_str"};
 
@@ -515,7 +514,10 @@ static int	get_history_aggregates_json(void *data, int value_type, zbx_uint64_t 
 	LOG_DBG("In %s()", __func__);
 	
 	if (0 == conf->read_aggregate_types[value_type])	
-			return SUCCEED;
+		return SUCCEED;
+	
+	if ( value_type != ITEM_VALUE_TYPE_FLOAT && value_type != ITEM_VALUE_TYPE_UINT64)
+		return FAIL;
 
 	if (end < start || steps <1 ) {
 		LOG_WRN("%s: wrong params requested: start:%d end:%d, aggregates: %ld",__func__,start,end, steps);

@@ -1,7 +1,6 @@
 <?php
 /*
-** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2038 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -66,52 +65,29 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 
 	protected function doAction() {
 
+		
 		if ($this->hasInput('filter_set')) {
-			\CProfile::updateArray('web.latest.filter.groupids', $this->getInput('filter_groupids', []),
-				PROFILE_TYPE_ID
-			);
+			//user has set the filter fields, remembering all of them
+			
+			\CProfile::update('web.latest.filter.show_without_data', $this->getInput('filter_show_without_data', 0), PROFILE_TYPE_INT);
+			\CProfile::update('web.latest.filter.group_by_discovery', $this->getInput('filter_group_by_discovery', 0), PROFILE_TYPE_INT );
+			\CProfile::update('web.latest.filter.show_details', $this->getInput('filter_show_details', 0), PROFILE_TYPE_INT);
+
+		} 
+		
+		if ($this->hasInput('filter_hostids') || $this->hasInput('filter_groupids')) {
+			//the page has been also opened via external link having host/group fields
+			//setting host and group filters
+
+			\CProfile::updateArray('web.latest.filter.groupids', $this->getInput('filter_groupids', []),PROFILE_TYPE_ID	);
 			\CProfile::updateArray('web.latest.filter.hostids', $this->getInput('filter_hostids', []), PROFILE_TYPE_ID);
-			\CProfile::update('web.latest.filter.select', trim($this->getInput('filter_select', '')), PROFILE_TYPE_STR);
-			
-			if ($this->hasInput('filter_show_without_data'))			
-				\CProfile::update('web.latest.filter.show_without_data', $this->getInput('filter_show_without_data', 1),
-					PROFILE_TYPE_INT);
-			
-			if ($this->hasInput('filter_group_by_discovery'))
-				\CProfile::update('web.latest.filter.group_by_discovery', $this->getInput('filter_group_by_discovery'),
-					PROFILE_TYPE_INT );
-					
-			if ($this->hasInput('filter_show_details'))
-				\CProfile::update('web.latest.filter.show_details', $this->getInput('filter_show_details', 0),
-					PROFILE_TYPE_INT);
-
-			// tags
-			$evaltype = $this->getInput('filter_evaltype', TAG_EVAL_TYPE_AND_OR);
-			\CProfile::update('web.latest.filter.evaltype', $evaltype, PROFILE_TYPE_INT);
-
-			$filter_tags = ['tags' => [], 'values' => [], 'operators' => []];
-			foreach ($this->getInput('filter_tags', []) as $tag) {
-				if ($tag['tag'] === '' && $tag['value'] === '') {
-					continue;
-				}
-				$filter_tags['tags'][] = $tag['tag'];
-				$filter_tags['values'][] = $tag['value'];
-				$filter_tags['operators'][] = $tag['operator'];
-			}
-			\CProfile::updateArray('web.latest.filter.tags.tag', $filter_tags['tags'], PROFILE_TYPE_STR);
-			\CProfile::updateArray('web.latest.filter.tags.value', $filter_tags['values'], PROFILE_TYPE_STR);
-			\CProfile::updateArray('web.latest.filter.tags.operator', $filter_tags['operators'], PROFILE_TYPE_INT);
 		}
-		elseif ($this->hasInput('filter_rst')) {
+		if ($this->hasInput('filter_rst')) {
 			\CProfile::deleteIdx('web.latest.filter.groupids');
 			\CProfile::deleteIdx('web.latest.filter.hostids');
 			\CProfile::delete('web.latest.filter.select');
 			\CProfile::delete('web.latest.filter.show_without_data');
 			\CProfile::delete('web.latest.filter.show_details');
-			\CProfile::deleteIdx('web.latest.filter.evaltype');
-			\CProfile::deleteIdx('web.latest.filter.tags.tag');
-			\CProfile::deleteIdx('web.latest.filter.tags.value');
-			\CProfile::deleteIdx('web.latest.filter.tags.operator');
 		}
 
 		// Force-check "Show items without data" if there are no hosts selected.
@@ -124,26 +100,11 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 			'select' => \CProfile::get('web.latest.filter.select', ''),
 			'show_without_data' => $filter_show_without_data,
 			'show_details' => \CProfile::get('web.latest.filter.show_details', 0),
-			'group_by_discovery' => \CProfile::get('web.latest.filter.group_by_discovery', 0),
-			'evaltype' => \CProfile::get('web.latest.filter.evaltype', TAG_EVAL_TYPE_AND_OR),
+			'group_by_discovery' => \CProfile::get('web.latest.filter.group_by_discovery', 1),
 			'tags' => []
 		];
 
-		// Tags filters.
-		foreach (\CProfile::getArray('web.latest.filter.tags.tag', []) as $i => $tag) {
-			$filter['tags'][] = [
-				'tag' => $tag,
-				'value' => \CProfile::get('web.latest.filter.tags.value', null, $i),
-				'operator' => \CProfile::get('web.latest.filter.tags.operator', null, $i)
-			];
-		}
-
-		$sort_field = $this->getInput('sort', \CProfile::get('web.latest.sort', 'name'));
-		$sort_order = $this->getInput('sortorder', \CProfile::get('web.latest.sortorder', ZBX_SORT_UP));
-
-		\CProfile::update('web.latest.sort', $sort_field, PROFILE_TYPE_STR);
-		\CProfile::update('web.latest.sortorder', $sort_order, PROFILE_TYPE_STR);
-
+	
 		$view_curl = (new \CUrl('zabbix.php'))->setArgument('action', 'latest.view');
 
 		$refresh_curl = (new \CUrl('zabbix.php'))->setArgument('action', 'latest.view.refresh');
@@ -154,23 +115,16 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 			'filter_show_without_data' => $filter['show_without_data'] ? 1 : null,
 			'filter_group_by_discovery' => $filter['group_by_discovery'] ? 1 : null,
 			'filter_show_details' => $filter['show_details'] ? 1 : null,
-			'filter_evaltype' => $filter['evaltype'],
-			'filter_tags' => $filter['tags'],
-			'sort' => $sort_field,
-			'sortorder' => $sort_order,
-			'page' => $this->hasInput('page') ? $this->getInput('page') : null
 		]);
 
 		// data sort and pager
-		$prepared_data = $this->prepareData($filter, $sort_field, $sort_order);
+		$prepared_data = $this->prepareData($filter, "", "");
 		
-		//if (!isset($prepared_data['error']))
-		$this->extendData($prepared_data);
+		if (!isset($prepared_data['error']))
+			$this->extendData($prepared_data);
 
 		$data = [
 			'filter' => $filter,
-			'sort_field' => $sort_field,
-			'sort_order' => $sort_order,
 			'view_curl' => $view_curl,
 			'refresh_url' => $refresh_curl->getUrl(),
 			'refresh_data' => $refresh_data,
@@ -185,13 +139,6 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 			 'tags' => isset($prepared_data['items']) ? makeTags($prepared_data['items'], true, 'itemid', ZBX_TAG_COUNT_DEFAULT, $filter['tags']): null,
 		] + $prepared_data;
 
-		if (!$data['filter']['tags']) {
-			$data['filter']['tags'] = [[
-				'tag' => '',
-				'operator' => TAG_OPERATOR_LIKE,
-				'value' => ''
-			]];
-		}
 
 		$response = new \CControllerResponseData($data);
 		$response->setTitle(_('Latest data'));

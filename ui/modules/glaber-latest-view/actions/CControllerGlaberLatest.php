@@ -1,7 +1,6 @@
 <?php
 /*
-** Zabbix
-** Copyright (C) 2001-2022 Zabbix SIA
+** Copyright (C) 2001-2038 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,15 +29,7 @@ abstract class CControllerGlaberLatest extends \CController {
 	 * @param array  $filter                       Item filter options.
 	 * @param array  $filter['groupids']           Filter items by host groups.
 	 * @param array  $filter['hostids']            Filter items by hosts.
-	 * @param string $filter['select']             Filter items by name.
-	 * @param int    $filter['evaltype']           Filter evaltype.
-	 * @param array  $filter['tags']               Filter tags.
-	 * @param string $filter['tags'][]['tag']
-	 * @param string $filter['tags'][]['value']
-	 * @param int    $filter['tags'][]['operator']
 	 * @param int    $filter['show_without_data']  Include items with empty history.
-	 * @param string $sort_field                   Sorting field.
-	 * @param string $sort_order                   Sorting order.
 	 *
 	 * @return array
 	 */
@@ -73,8 +64,6 @@ abstract class CControllerGlaberLatest extends \CController {
 			'selectValueMap' => ['mappings'],
 			'hostids' => array_column($hosts,'hostid'),
 			'webitems' => true,
-			'evaltype' => $filter['evaltype'],
-			'tags' => $filter['tags'] ? $filter['tags'] : null,
 			'filter' => [ 'status' => [ITEM_STATUS_ACTIVE]	],
 			'search' => ($filter['select'] === '') ? null : ['name' => $filter['select']],
 			'preservekeys' => true,
@@ -121,7 +110,6 @@ abstract class CControllerGlaberLatest extends \CController {
 	 */
 	protected function extendData(array &$prepared_data) {
 		$items = \CMacrosResolverHelper::resolveItemKeys($prepared_data['items']);
-//		$items = \CMacrosResolverHelper::resolveItemNames($items);
 		$items = \CMacrosResolverHelper::resolveItemDescriptions($items);
 		$items = \CMacrosResolverHelper::resolveTimeUnitMacros($items, ['delay', 'history', 'trends']);
 		
