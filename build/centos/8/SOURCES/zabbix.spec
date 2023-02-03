@@ -297,7 +297,6 @@ cat database/postgresql/schema.sql > database/postgresql/create.sql
 cat database/postgresql/images.sql >> database/postgresql/create.sql
 cat database/postgresql/data.sql >> database/postgresql/create.sql
 gzip database/postgresql/create.sql
-gzip database/postgresql/timescaledb.sql
 %endif
 
 %if 0%{?build_proxy}
@@ -658,7 +657,6 @@ fi
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc database/mysql/create.sql.gz
-%doc database/mysql/double.sql
 %attr(0600,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_server.conf
 %dir /usr/lib/zabbix/alertscripts
 %dir /usr/lib/zabbix/externalscripts
@@ -702,8 +700,6 @@ fi
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc database/postgresql/create.sql.gz
-%doc database/postgresql/double.sql
-%doc database/postgresql/timescaledb.sql.gz
 %attr(0600,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_server.conf
 %dir /usr/lib/zabbix/alertscripts
 %dir /usr/lib/zabbix/externalscripts
