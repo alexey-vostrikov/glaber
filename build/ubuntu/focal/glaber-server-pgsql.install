@@ -5,5 +5,5 @@ debian/tmp.build-postgresql/src/glapi/glb_hist_victoria usr/sbin
 debian/glbmap/src/glbmap usr/sbin
 debian/conf/zabbix_server.conf etc/zabbix
 database/postgresql/create.sql usr/share/doc/zabbix-server-pgsql
-database/postgresql/timescaledb.sql usr/share/doc/zabbix-server-pgsql
+
 
