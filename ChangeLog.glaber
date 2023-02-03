@@ -1,3 +1,5 @@
+ver 3.0.9
+    - fix bug on detecting proper number of pingers if using fping
 ver 3.0.8
     - fix removing of redundant problems is impelmented
 ver 3.0.7
