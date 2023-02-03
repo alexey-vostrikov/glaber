@@ -1,4 +1,6 @@
 ver 3.0.10
+    - fix: agent wasn't starting 
+ver 3.0.10
     - fix aggregate responses for non numeric types are blocked in history module, latest view module updated
 ver 3.0.9
     - fix bug on detecting proper number of pingers if using fping
