@@ -602,6 +602,10 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = GLB_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER];
+	}else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT]))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_AGENT;
+		*local_process_num = local_server_num - server_count + CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT];
 	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER]))
 	{
