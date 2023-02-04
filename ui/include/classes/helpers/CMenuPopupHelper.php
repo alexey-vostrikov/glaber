@@ -59,7 +59,8 @@ class CMenuPopupHelper {
 		return [
 			'type' => 'history',
 			'data' => [
-				'itemid' => $itemid
+				'itemid' => $itemid,
+				'backurl' => (isset($data['backurl']) ? $data['backurl']:'')
 			]
 		];
 	}
