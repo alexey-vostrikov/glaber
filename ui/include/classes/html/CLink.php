@@ -51,6 +51,12 @@ class CLink extends CTag {
 		return $this;
 	}
 
+	public function setIcon(string $icon_class): self {
+		$this->addClass = $icon_class;
+
+		return $this;
+	}
+
 	/**
 	 * Set URL target. If target is "_blank", add "rel" tag and tag values "noopener" and "noreferrer". The "noreferrer"
 	 * depends if it is set to true in defines.inc.php.
@@ -97,4 +103,6 @@ class CLink extends CTag {
 
 		return parent::toString($destroy);
 	}
+
+
 }

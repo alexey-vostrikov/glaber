@@ -2236,6 +2236,7 @@ define('ZBX_STYLE_HOST_INTERFACE_BTN_MAIN_INTERFACE', 'interface-btn-main-interf
 define('ZBX_STYLE_HOST_INTERFACE_INPUT_EXPAND', 'interface-input-expand');
 
 define('ZBX_STYLE_ZSELECT_HOST_INTERFACE', 'z-select-host-interface');
+define('GLB_STYLE_GRAPH_PREVIEW', 'graph-preview');
 
 // Dashboard list table classes.
 define('ZBX_STYLE_DASHBOARD_LIST', 'dashboard-list');

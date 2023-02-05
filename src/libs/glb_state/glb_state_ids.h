@@ -16,13 +16,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#ifdef HAVE_GLB_TESTS
-#ifndef GLB_TEST_STATE_TRIGGERS_H
-#define GLB_TEST_STATE_TRIGGERS_H
+#ifndef GLB_STATE_IDGEN_H
+#define GLB_STATE_IDGEN_H
 
-#include "../glb_state.h"
+#include "zbxcommon.h"
 
-void glb_state_run_tests(void);
-     
-#endif
+typedef enum {
+    GLB_ID_TYPE_PROBLEMS = 1,
+} glb_id_type_t;
+
+u_int64_t glb_gen_id(glb_id_type_t type);
+
+
 #endif

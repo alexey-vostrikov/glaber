@@ -2911,7 +2911,6 @@ int zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const 
 
 #ifdef HAVE_GLB_TESTS
 #include "item_preproc_test.c"
-
 #endif
 
 #ifdef HAVE_TESTS

@@ -22,10 +22,10 @@
 #include "zbxalgo.h"
 
 static  zbx_shmem_info_t	*shmtest_mem;
-ZBX_SHMEM_FUNC_IMPL(__shmtest, shmtest_mem);
+ZBX_SHMEM_FUNC_IMPL(__shmtest1, shmtest_mem);
 
 #define TEST_MEM_SIZE 1 * ZBX_GIBIBYTE
-#define TEST_RECORDS 1000
+#define TEST_OBJ_RECORDS 1000
 #define TEST_ELEMS 50
 
 static int test_shm_leak(void) {
@@ -36,9 +36,9 @@ static int test_shm_leak(void) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	exit(EXIT_FAILURE);
     }
-    mem_funcs_t memf = {.free_func = __shmtest_shmem_free_func, 
-        .malloc_func= __shmtest_shmem_malloc_func,
-        .realloc_func = __shmtest_shmem_realloc_func};
+    mem_funcs_t memf = {.free_func = __shmtest1_shmem_free_func, 
+        .malloc_func= __shmtest1_shmem_malloc_func,
+        .realloc_func = __shmtest1_shmem_realloc_func};
     
     unsigned long was_free = shmtest_mem->free_size;
     
@@ -46,12 +46,12 @@ static int test_shm_leak(void) {
     
     obj_index_t *idx = obj_index_init(&memf);
    
-    LOG_INF("Adding %d records", TEST_RECORDS); 
+    LOG_INF("Adding %d records", TEST_OBJ_RECORDS); 
     
     int i;
     
-    for (i = 0; i< TEST_RECORDS; i++) {
-        obj_index_add_ref(idx, i, (rand()+1) % (TEST_RECORDS+2) );
+    for (i = 0; i< TEST_OBJ_RECORDS; i++) {
+        obj_index_add_ref(idx, i, (rand()+1) % (TEST_OBJ_RECORDS+2) );
     }
    
    LOG_INF("After adding records free space is %ld", shmtest_mem->free_size);
@@ -70,17 +70,17 @@ static int test_shm_leak(void) {
 
     idx = obj_index_init(&memf);
    
-    LOG_INF("Adding1 %d records", TEST_RECORDS); 
+    LOG_INF("Adding1 %d records", TEST_OBJ_RECORDS); 
     
-    for (i = 0; i< TEST_RECORDS; i++) {
+    for (i = 0; i< TEST_OBJ_RECORDS; i++) {
         obj_index_add_ref(idx,i,i);
     }    
 
     obj_index_t *idx2 = obj_index_init(&memf);
    
-    LOG_INF("Adding2 %d records", TEST_RECORDS); 
+    LOG_INF("Adding2 %d records", TEST_OBJ_RECORDS); 
     
-    for (i = TEST_RECORDS; i< TEST_RECORDS*2; i++) {
+    for (i = TEST_OBJ_RECORDS; i< TEST_OBJ_RECORDS*2; i++) {
         obj_index_add_ref(idx2,i,i);
     }    
     obj_index_replace(idx,idx2);
@@ -99,7 +99,7 @@ static int test_shm_leak(void) {
     obj_index_t *idx_shmem = obj_index_init(&memf);
     obj_index_t *idx_local = obj_index_init(NULL);
     
-    for (i = 0; i< TEST_RECORDS; i++) {
+    for (i = 0; i< TEST_OBJ_RECORDS; i++) {
         obj_index_add_ref(idx_local,i,i*23);
     }    
     LOG_INF("Updating 1");
@@ -113,7 +113,7 @@ static int test_shm_leak(void) {
     obj_index_destroy(idx_local);
     idx_local = obj_index_init(NULL);
 
-    for (i = 0; i< TEST_RECORDS; i++) {
+    for (i = 0; i< TEST_OBJ_RECORDS; i++) {
         obj_index_add_ref(idx_local,i,i*2);
     }    
     LOG_INF("Updating 2");

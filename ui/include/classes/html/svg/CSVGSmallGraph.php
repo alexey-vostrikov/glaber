@@ -32,10 +32,10 @@ class CSVGSmallGraph extends CSvgTag {
 			$min_clock = min(array_column($history,'clock'));
 		
 			$max_value = max(array_column($history,'value'));
-			$min_value = min(array_column($history,'value'));
-			
+			$min_value = 0 ;//min(array_column($history,'value'));
+	
 			if ($max_value != $min_value ) {
-				$k_x = $max_height/($max_value - $min_value);
+				$k_x = $max_height/($max_value * 1.3);
 			}
 			else 
 				$k_x = 1;
@@ -49,17 +49,45 @@ class CSVGSmallGraph extends CSvgTag {
 				if (!is_numeric($point['value']))
 					continue;
 				$x = $max_height - ($point['value'] - $min_value) * $k_x;
-			
 				$y = ($point['clock'] - $min_clock) * $k_y;
 	
 				array_push($p,[$y,$x]);
-				$this->addItem(new CSvgCircle($y,$x,5));
 			}
+			
+			array_push($p, [0, $max_height]);
+			array_push($p, [$max_width,$max_height]);
+
+			$this->addItem((new CSvgPolygon($p))
+			  	 ->addStyle("fill:#009900; stroke:none;")
+			);
+			array_pop($p);
+			array_pop($p);
+	
+			foreach ($history as $point) {
+				if (!is_numeric($point['value']))
+					continue;
+				$x = $max_height - ($point['value'] - $min_value) * $k_x;
+				$y = ($point['clock'] - $min_clock) * $k_y;
+	
+				$this->addItem((new CSvgCircle($y,$x,2))
+					 ->addStyle("stroke:#00DD00; stroke-width:2;")
+				);
+			}
+	
 		}
-		$this->addItem(new CSvgPolyline($p))
-			->setSize($max_width,$max_height)
-			->addStyle("fill:none;stroke:green;stroke-width:3")
-			->setAttribute('viewBox',"-10 -10 ".($max_width+20).','.($max_height+20))
-			->setAttribute('preserveAspectRatio',"none");
+		
+		$this->addItem((new CSvgPolyline($p))
+		  	 ->addStyle("fill:none; stroke:#00DD00; stroke-width:2;")
+		);
+
+		$this->addItem((new CSvgRect(0,0,$max_width,$max_height))
+			->addStyle("fill:none; stroke:#009900; stroke-width:2;")
+		);
+		
+		$this->setAttribute('viewBox',"0 0 ".($max_width).','.($max_height))
+			 ->addStyle("stroke-width:2;")
+			 ->setSize($max_width,$max_height)
+			 ->setAttribute('preserveAspectRatio',"none");
+
 	}
 }
