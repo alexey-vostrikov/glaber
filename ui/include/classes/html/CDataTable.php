@@ -56,7 +56,10 @@ class CDataTable extends CTable {
 	}
 
 	protected function includeJSFile($path) {
-		?> <script type="text/javascript" src="<?=$path ?>"></script><?php
+		if (!defined('DataTablesLoadedJS'.$path)) {
+			?> <script type="text/javascript" src="<?=$path ?>"></script><?php
+			define('DataTablesLoadedJS'.$path, true);
+		}
 	}
 
 	protected function includeTableJS($tableid) {
@@ -82,12 +85,6 @@ class CDataTable extends CTable {
 		});
  		
 		</script> <?php
-	}
-
-	protected function includeDataTableJS() {
-		?><script type="text/javascript"><?php 
-		require_once dirname(__FILE__).'/js/datatables.min.js'; 
-		?></script><?php
 	}
 
 	protected function includeDataTableCSS() {
@@ -118,9 +115,7 @@ class CDataTable extends CTable {
 				true
 			);
 		}
-		
 	
-
 		return $string;
 	}
 

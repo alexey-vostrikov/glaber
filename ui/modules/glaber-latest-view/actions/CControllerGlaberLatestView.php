@@ -123,6 +123,8 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 		if (!isset($prepared_data['error']))
 			$this->extendData($prepared_data);
 
+		
+
 		$data = [
 			'filter' => $filter,
 			'view_curl' => $view_curl,
@@ -130,13 +132,7 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 			'refresh_data' => $refresh_data,
 			'refresh_interval' => \CWebUser::getRefresh() * 1000,
 			'active_tab' => \CProfile::get('web.latest.filter.active', 1),
-			// 'config' => [
-			// 	'hk_trends' => \CHousekeepingHelper::get(\CHousekeepingHelper::HK_TRENDS),
-			// 	'hk_trends_global' => \CHousekeepingHelper::get(\CHousekeepingHelper::HK_TRENDS_GLOBAL),
-			// 	'hk_history' => \CHousekeepingHelper::get(\CHousekeepingHelper::HK_HISTORY),
-			// 	'hk_history_global' => \CHousekeepingHelper::get(\CHousekeepingHelper::HK_HISTORY_GLOBAL)
-			// ],
-			 'tags' => isset($prepared_data['items']) ? makeTags($prepared_data['items'], true, 'itemid', ZBX_TAG_COUNT_DEFAULT, $filter['tags']): null,
+			'tags' => isset($prepared_data['items']) ? makeTags($prepared_data['items'], true, 'itemid', ZBX_TAG_COUNT_DEFAULT, $filter['tags']): null,
 		] + $prepared_data;
 
 

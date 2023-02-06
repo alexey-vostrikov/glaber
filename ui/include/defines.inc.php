@@ -22,7 +22,7 @@ define('ZABBIX_VERSION',		'6.4.0beta6');
 define('ZABBIX_API_VERSION',	'6.4.0');
 define('ZABBIX_EXPORT_VERSION',	'6.4');
 
-define('GLABER_VERSION',		'3.0.13');
+define('GLABER_VERSION',		'3.0.14');
 
 define('ZABBIX_DB_VERSION',		6030159);
 
@@ -2236,6 +2236,7 @@ define('ZBX_STYLE_HOST_INTERFACE_BTN_MAIN_INTERFACE', 'interface-btn-main-interf
 define('ZBX_STYLE_HOST_INTERFACE_INPUT_EXPAND', 'interface-input-expand');
 
 define('ZBX_STYLE_ZSELECT_HOST_INTERFACE', 'z-select-host-interface');
+define('GLB_STYLE_GRAPH_PREVIEW', 'graph-preview');
 
 // Dashboard list table classes.
 define('ZBX_STYLE_DASHBOARD_LIST', 'dashboard-list');

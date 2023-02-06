@@ -23,6 +23,9 @@
 #include "elems_hash_tests.h"
 #include "obj_index_tests.h"
 
+#include "elems_hash_tests.c"
+#include "obj_index_tests.c"
+
 void tests_algo_run() {
     LOG_INF("Running algo tests");
     sleep(1);

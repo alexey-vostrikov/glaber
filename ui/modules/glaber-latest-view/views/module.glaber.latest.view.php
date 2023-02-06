@@ -32,17 +32,35 @@ $this->includeJsFile('module.glaber.latest.view.js.php');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
+//error_log("Can create hosts: ". $data['can_create']. "\n");
+
 $widget = (new CHtmlPage())
 	->setTitle(_('Latest data'))
-	->setWebLayoutMode($web_layout_mode)
-	->setControls(
-		(new CTag('nav', true, (new CList())->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))))
-			->setAttribute('aria-label', _('Content controls'))
-	);
+	->setWebLayoutMode($web_layout_mode);
+	//->setControls((new CTag('nav', true, $nav_items )))
+	//->setAttribute('aria-label', _('Content controls'));
+
+
+
+$nav_items = (new CList()) ->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]));
 
 if (isset($data['hosts']) && 1 == count( $data['hosts']) ) {
-	$widget->setNavigation(getHostNavigation('latest data', array_keys($data['hosts'])[0]));
+	$hostid = array_keys($data['hosts'])[0];
+
+	$widget->setNavigation(getHostNavigation('latest data', $hostid));
+
+	if ($data['can_create']) {
+		$nav_items->addItem(
+			new CRedirectButton(_('Create item'),
+				(new CUrl('items.php'))
+					->setArgument('form', 'create')
+					->setArgument('hostid', $hostid)
+					->setArgument('context', 'host')
+		));
+	}
 }
+
+$widget->setControls(new CTag('nav', true, $nav_items));
 
 if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 
@@ -107,11 +125,5 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 }
 
 $widget->addItem(new CPartial('module.glaber.latest.view.html', $data));
-
-//array_intersect_key($data,
-//	array_flip(['filter', 'sort_field', 'sort_order', 'view_curl', 'paging', 'hosts', 'items', 'discoveryentities', 'history', 'config',
-//		'tags'
-//	])
-//)));
 
 $widget->show();

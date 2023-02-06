@@ -13,7 +13,8 @@ libglbstate_a_SOURCES = \
 	discovery.c \
 	glb_state_triggers.c \
 	glb_state_interfaces.c \
-	glb_state
+	glb_state.c \ 
+	glb_state_ids.c
 
 libglbstate_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxalgo

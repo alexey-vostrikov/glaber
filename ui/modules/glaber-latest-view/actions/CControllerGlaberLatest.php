@@ -99,7 +99,8 @@ abstract class CControllerGlaberLatest extends \CController {
 			'items' => $items,
 			'entities' => $discovery_entitites,
 			'multiselect_hostgroup_data' => $multiselect_hostgroup_data,
-			'multiselect_host_data' => \CArrayHelper::renameObjectsKeys($multiselect_host_data, ['hostid' => 'id'])
+			'multiselect_host_data' => \CArrayHelper::renameObjectsKeys($multiselect_host_data, ['hostid' => 'id']),
+			'can_create' => $this->checkAccess(\CRoleHelper::UI_CONFIGURATION_HOSTS),
 		];
 	}
 
