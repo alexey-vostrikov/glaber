@@ -374,6 +374,7 @@ static ZBX_DB_EVENT	*close_trigger_event(zbx_uint64_t eventid, zbx_uint64_t obje
 	recovery_local.c_eventid = c_eventid;
 	recovery_local.r_event = r_event;
 	recovery_local.userid = userid;
+	recovery_local.history_idx = -1;
 
 	zbx_hashset_insert(&event_recovery, &recovery_local, sizeof(recovery_local));
 

@@ -1,3 +1,5 @@
+ver 3.0.15
+    - fix periodical segv on history syncer 
 ver 3.0.14
     - added logging to config sync 
 ver 3.0.13
