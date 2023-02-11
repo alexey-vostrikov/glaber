@@ -425,8 +425,8 @@ static int	save_events(ZBX_DC_HISTORY *history)
 		//			event->eventid, event->severity, event->object, event->objectid, event->value, 
 		//			history[event->history_idx].itemid, event->history_idx );
 
-			history_update_log_enty_severity(&history[event->history_idx], event->severity, 
-					event->eventid, event->objectid, event->value);
+		//	history_update_log_enty_severity(&history[event->history_idx], event->severity, 
+		//			event->eventid, event->objectid, event->value);
 		}
 		
 		
@@ -606,8 +606,8 @@ static void	save_event_recovery(ZBX_DC_HISTORY *history)
 	{
 		if (NULL !=  history && 0 <= recovery->history_idx ) {
 			
-			history_update_log_enty_severity(&history[recovery->history_idx], 0 ,
-				recovery->eventid,  recovery->objectid, 0);
+		//	history_update_log_enty_severity(&history[recovery->history_idx], 0 ,
+		//		recovery->eventid,  recovery->objectid, 0);
 		}
 		
 		zbx_db_insert_add_values(&db_insert, recovery->eventid, recovery->r_event->eventid,

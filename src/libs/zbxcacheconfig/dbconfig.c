@@ -1809,8 +1809,9 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 
 		host->status = status;
 	}
-	
+	poller_item_notify_init();
 	conf_hosts_notify_changes(&changed_hosts_ids);
+	poller_item_notify_flush();
 	zbx_vector_uint64_destroy(&changed_hosts_ids);
 
 	for (i = 0; i < proxy_hosts.values_num; i++)
@@ -6908,7 +6909,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	DCsync_hosts(&hosts_sync, new_revision, &active_avail_diff, &activated_hosts, config_vault);
 	zbx_dbsync_clear_user_macros();
 	hsec2 = zbx_time() - sec;
-	LOG_INF("CONFIG reload phase2");
+
 	sec = zbx_time();
 	DCsync_host_inventory(&hi_sync, new_revision);
 	hisec2 = zbx_time() - sec;
