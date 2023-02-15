@@ -27,6 +27,7 @@
 #include "zbxexport.h"
 #include "zbxprof.h"
 #include "../../libs/apm/apm.h"
+#include "../../libs/glb_state/glb_state_ids.h"
 
 extern int				CONFIG_HISTSYNCER_FREQUENCY;
 static sigset_t				orig_mask;
@@ -144,7 +145,8 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		problems_export = zbx_problems_export_init(get_problems_export, "history-syncer", process_num);
 
 	apm_add_heap_usage();
-	
+	glb_state_ids_init(process_num);
+
 	for (;;)
 	{
 		sec = zbx_time();

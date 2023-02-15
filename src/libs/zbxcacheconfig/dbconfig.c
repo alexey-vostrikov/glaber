@@ -9058,6 +9058,8 @@ void DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, u
 	}
 
 	zbx_vector_uint64_create(&dst_trigger->itemids);
+	zbx_vector_uint64_create(&dst_trigger->hostids);
+
 
 	if (0 != (flags & ZBX_TRIGGER_GET_ITEMIDS) && NULL != src_trigger->itemids)
 	{
@@ -9107,6 +9109,7 @@ void DCclean_trigger(DC_TRIGGER *trigger)
 	}
 
 	zbx_vector_uint64_destroy(&trigger->itemids);
+	zbx_vector_uint64_destroy(&trigger->hostids);
 }
 
 int DCconfig_get_itemid_by_item_key_hostid(u_int64_t hostid, char *key, u_int64_t *itemid)
@@ -13964,6 +13967,35 @@ int DCget_host_inventory_value_by_hostid(zbx_uint64_t hostid, char **replace_to,
 
 	UNLOCK_CACHE;
 
+	return ret;
+}
+
+/* returns FAIL is any master triggers have problem or unknown state
+	check is done recursively*/
+int glb_check_trigger_has_value_ok_masters(u_int64_t triggerid) {
+	
+	int ret = SUCCEED, i ;
+
+	const ZBX_DC_TRIGGER_DEPLIST *masters, *master;
+	RDLOCK_CACHE;
+
+	if (NULL == (masters = (ZBX_DC_TRIGGER_DEPLIST *)zbx_hashset_search(&config->trigdeps, &triggerid))) {
+		UNLOCK_CACHE;
+		return SUCCEED;
+	}
+	//note: this doesn't do the job recursively. It's supposed that master trigger should 
+	//be recalculated by itself and we obey it's rules of recalculation
+	
+	for (i = 0; i < masters->dependencies.values_num; i ++) {
+		master = (const ZBX_DC_TRIGGER_DEPLIST *)masters->dependencies.values[i];
+		int master_val = glb_state_trigger_get_value(master->triggerid);
+		if (TRIGGER_VALUE_PROBLEM == master_val || TRIGGER_VALUE_UNKNOWN == master_val ) {
+			ret = FAIL;
+			break;
+		}
+	}
+	
+	UNLOCK_CACHE;
 	return ret;
 }
 

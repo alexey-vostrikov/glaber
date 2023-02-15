@@ -25,7 +25,9 @@ typedef enum {
     GLB_ID_TYPE_PROBLEMS = 1,
 } glb_id_type_t;
 
-u_int64_t glb_gen_id(glb_id_type_t type);
+int glb_state_ids_init(int proc_num);
 
+u_int64_t glb_state_id_gen_new();
+u_int64_t glb_state_id_get_time(u_int64_t id);
 
 #endif

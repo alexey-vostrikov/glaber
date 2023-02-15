@@ -25,6 +25,7 @@
 #include "discovery.h"
 #include "glb_state_items.h"
 #include "glb_state_triggers.h"
+#include "glb_state_problems.h"
 #include "glb_state_interfaces.h"
 
 #define GLB_VCDUMP_RECORD_TYPE_ITEM 1
@@ -73,7 +74,8 @@ int glb_state_init() {
 	if (
 		//SUCCEED != discovery_init(&glb_cache->memf) ||
 		SUCCEED != glb_state_triggers_init(&glb_cache->memf) ||
-		SUCCEED != glb_state_interfaces_init(&glb_cache->memf) )
+		SUCCEED != glb_state_interfaces_init(&glb_cache->memf) || 
+		SUCCEED != glb_state_problems_init(&glb_cache->memf) )
 		
 		return FAIL;
 
@@ -106,18 +108,24 @@ void	glb_state_destroy(void)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
+int glb_state_dump() {
+	LOG_INF("Dumping items");
+	glb_state_items_dump();
+	
+	LOG_INF("Dumping triggers");
+	glb_state_triggers_dump();
+	
+	LOG_INF("Dumping problems and problems indexes");
+	glb_state_problems_dump();
+
+}
+
 int glb_state_housekeep() {
 	LOG_INF("Running state housekeep");
 	glb_state_items_housekeep();
 	glb_state_triggers_housekeep(300);
+	glb_state_problems_housekeep();
 	LOG_INF("Finished state housekeep");
-
-	LOG_INF("Starting state dump");
-	LOG_INF("Dumping items");
-	glb_state_items_dump();
-	LOG_INF("Dumping triggers");
-	glb_state_triggers_dump();
-	LOG_INF("Finish state dump");
 
 } 
 

@@ -19,7 +19,7 @@
 
 #ifndef GLABER_POLLER_H
 #define GLABER_POLLER_H
-//#include "dbcache.h"
+
 #include "zbxthreads.h"
 #include "zbxcacheconfig.h"
 

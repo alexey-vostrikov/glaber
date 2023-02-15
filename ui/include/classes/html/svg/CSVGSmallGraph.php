@@ -34,7 +34,7 @@ class CSVGSmallGraph extends CSvgTag {
 			$max_value = max(array_column($history,'value'));
 			$min_value = 0 ;//min(array_column($history,'value'));
 	
-			if ($max_value != $min_value ) {
+			if ($max_value != $min_value && $max_value != 0 ) {
 				$k_x = $max_height/($max_value * 1.3);
 			}
 			else 

@@ -19,7 +19,7 @@
 #include "glb_state_ids.h"
 
 
-// | epoch /reserved 4 bits | timestamp 42 bit | sequence 10bit  | 8 bits (proc/server/datacenter id) |
+// | epoch/reserved 4 bits | timestamp 42 bit | sequence 10bit | 8 bits (proc/server/datacenter id) |
 
 //epoch/reserved: expected to be 0 in next 60 years
 //timestamp: _unsigned_ (no y2038 problem!) unix timestamp with milliseconds precision
@@ -40,36 +40,56 @@
 //in most cases 1-2 is sufficient
 
 #include "zbxtime.h"
+#include "log.h"
 
-u_int32_t proc_id = 0;
-u_int32_t sequence = 0;
-u_int64_t last_time = 0;
+static u_int32_t sequence = 0;
+static u_int64_t last_time = 0;
+static u_int64_t process_num = 0;
 
-int glb_id_init(u_int32_t id) {
-    if (id > 255) 
+int glb_state_ids_init(int proc_num) {
+
+    if (0 >= proc_num || 256 <= proc_num) { //
+        LOG_INF("Got wrong proc num %d", proc_num);
+        HALT_HERE("This is bug, proc num should be in 0..255");
         return FAIL;
-    proc_id = id;
+    }
+    
+    process_num = proc_num;
+    LOG_INF("Process num is set to %d", process_num);
+
+    return SUCCEED;
 }
 
-u_int64_t glb_id_gen_new(glb_id_type_t type) {
+u_int64_t glb_state_id_gen_new() {
 
     u_int64_t new_time;
     zbx_timespec_t ts;
-    zbx_timespec(&ts);
-
-    while (sequence > 999 ) {
-
-        new_time = ((u_int64_t)ts.sec * 1000 + (u_int64_t)ts.ns/1000000);
     
+    if (0 == process_num) {
+        THIS_SHOULD_NEVER_HAPPEN;
+        HALT_HERE("This is bug, run glb_state_ids_init first to set process id");
+    }
+    while (1) {
+       
+        zbx_timespec(&ts);
+        new_time = ((u_int64_t)ts.sec * 1000 + (u_int64_t)ts.ns/1000000);
+
         if (new_time != last_time) {
             last_time = new_time;
             sequence = 0;
             break;
         }
 
+        if (1000 > sequence ) {
+            sequence++;
+            break;
+        }
         usleep(10);
     }
        
-    sequence++;
-    return (new_time << 18) | proc_id;
+    return (u_int64_t)(new_time << 18) | (u_int64_t)sequence << 8 | (u_int64_t)process_num;
+}
+
+u_int64_t glb_state_id_get_time(u_int64_t id) {
+    return id >> 18;
 }

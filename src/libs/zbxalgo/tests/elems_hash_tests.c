@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C) 2018-2042 Glaber
+** Copyright (C) 2018-2023 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,13 +24,13 @@
 static  zbx_shmem_info_t	*shmtest_mem;
 ZBX_SHMEM_FUNC_IMPL(__shmtest, shmtest_mem);
 
-mem_funcs_t test_memf = {.free_func = __shmtest_shmem_free_func, 
+static mem_funcs_t test_memf = {.free_func = __shmtest_shmem_free_func, 
         .malloc_func= __shmtest_shmem_malloc_func,
         .realloc_func = __shmtest_shmem_realloc_func};
 
 #define TEST_MEM_SIZE 1 * ZBX_GIBIBYTE
 #define TEST_RECORDS 20
-void init(void) {
+static void init(void) {
     char *error = NULL;
     if (SUCCEED != zbx_shmem_create(&shmtest_mem, TEST_MEM_SIZE, "State cache size", "TestMemSize", 0, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
@@ -62,7 +62,7 @@ void test_create_delete_leak() {
     if (was_size != shmtest_mem->free_size) {
         HALT_HERE("Empty elems_hash create/remove test FAILED");
     }
-    LOG_INF("test %s SUCCEDED", __func__);
+    LOG_INF("test %s SUCCEED", __func__);
 }
 
 void test_records_create_del_leak() {
@@ -82,7 +82,7 @@ void test_records_create_del_leak() {
     if (was_size != shmtest_mem->free_size) {
         HALT_HERE("%s test FAILED: memory difference is %d", __func__, was_size - shmtest_mem->free_size);
     }
-    LOG_INF("test %s SUCCEDED", __func__);
+    LOG_INF("test %s SUCCEED", __func__);
 }
 
 

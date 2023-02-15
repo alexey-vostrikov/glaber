@@ -1116,7 +1116,8 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 	}
 	else
 	{
-		sleeptime = HOUSEKEEPER_STARTUP_DELAY * SEC_PER_MIN;
+		//sleeptime = HOUSEKEEPER_STARTUP_DELAY * SEC_PER_MIN;
+		sleeptime = 60;
 		zbx_setproctitle("%s [startup idle for %d minutes]", get_process_type_string(process_type),
 				HOUSEKEEPER_STARTUP_DELAY);
 		zbx_snprintf(sleeptext, sizeof(sleeptext), "idle for %d hour(s)", CONFIG_HOUSEKEEPING_FREQUENCY);
@@ -1168,8 +1169,8 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		if (0 == CONFIG_HOUSEKEEPING_FREQUENCY)
 			sleeptime = ZBX_IPC_WAIT_FOREVER;
 		else
-			sleeptime = CONFIG_HOUSEKEEPING_FREQUENCY * SEC_PER_HOUR;
-
+		//	sleeptime = CONFIG_HOUSEKEEPING_FREQUENCY * SEC_PER_HOUR;
+				sleeptime = CONFIG_HOUSEKEEPING_FREQUENCY * 60;
 		time_now = zbx_time();
 		time_slept = time_now - sec;
 		zbx_update_env(get_process_type_string(process_type), time_now);
@@ -1180,8 +1181,11 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 		now = time(NULL);
 
-		zbx_setproctitle("%s [Housekeeping state objects in memory]", get_process_type_string(process_type));
+		zbx_setproctitle("%s [Housekeeping objects in memory]", get_process_type_string(process_type));
 		glb_state_housekeep();
+		
+		zbx_setproctitle("%s [Dumping state to files]", get_process_type_string(process_type));
+		glb_state_dump();
 
 		zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 		DBconnect(ZBX_DB_CONNECT_NORMAL);

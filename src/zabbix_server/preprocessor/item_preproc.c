@@ -2762,10 +2762,10 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
 									   error);
 		break;
-	case GLB_PREPROC_DISCOVERY_PREPARE:
-		ret = item_preproc_json_discovery_prepare(itemid, value, ts, op->params, history_value, history_ts, value_type,
-												  error);
-		break;
+//	case GLB_PREPROC_DISCOVERY_PREPARE:
+//		ret = item_preproc_json_discovery_prepare(itemid, value, ts, op->params, history_value, history_ts, value_type,
+//												  error);
+//		break;
 	case ZBX_PREPROC_SCRIPT:
 		ret = item_preproc_script(value, op->params, history_value, error);
 		break;

@@ -42,14 +42,13 @@ function ShowGroupedItems(array &$data) {
     $all_div = new CDiv();
     $items = &$data['items'];
     
-    $discovery_out = (new CDiv());//->addItem(json_encode($data['entities']));
-    //$all_div->addItem(new CDiv(json_encode($data['entities'])));
-    //note: discovery is built first, it will remove items from the all items table
+    $discovery_out = (new CDiv());
+
     foreach ($data['entities'] as $discovery_id => $discovery_item_data) {
             $discovery_out->addItem(buildDiscoveryTable($items, $discovery_id, $discovery_item_data, $data));
             $discovery_out->addItem((new CDiv())->addItem(' '));
     }
-    //now building the rest of the data
+    
     $all_div->addItem((new CTag("h4", true, "Host-specific items"))
         ->addStyle("font-weight: bold;"))
         ->addItem( ShowItemsPlainTable($data));
@@ -74,9 +73,19 @@ function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_dat
         foreach($prototype_items as $prototype_itemid => $prototype_item) {
             if (isset($entity_items[$prototype_itemid])) {
                 $itemid = $entity_items[$prototype_itemid];
+                
+                $value = new CLatestValue( $items[$itemid] , 
+                    isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
+                    isset($items[$itemid]['triggers'])? $items[$itemid]['triggers'] : null,
+                    isset($data['can_create'])
+                );    
+                
+                $col = new CCol($value);
+                
+                if ($value->GetWorstSeverity() > 0) 
+                    $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
 
-                array_push($row, (new CLatestValue( $items[$itemid] , 
-                    isset($data['history'][$itemid])? $data['history'][$itemid] : null )));
+                array_push($row, $col);
                
                 unset($data['items'][$itemid]);
 		
@@ -113,7 +122,6 @@ function ShowItemsPlainTable(array &$data)
 		$context_host = 1;
 	}
 	
-
     $form = (new CForm('GET', 'history.php'))
         ->cleanItems()
         ->setName('items')
@@ -147,7 +155,7 @@ function ShowItemsPlainTable(array &$data)
             (new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search')->addClass('type-num'),
             (new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search')->addClass('type-num'),
             (new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3)->addClass('search'),
-            isset($data['can_create'])?(new CColHeader(_('Edit')))->addStyle('width: 50px'): null,
+ //           isset($data['can_create'])?(new CColHeader(_('Edit')))->addStyle('width: 50px'): null,
         ]);
     } else {
         $table->setHeader([
@@ -158,16 +166,15 @@ function ShowItemsPlainTable(array &$data)
             (new CColHeader(_('Last value')))->addStyle('width: 14%')->addClass('search')->addClass('type-num'),
             (new CColHeader(_x('Change', 'noun')))->addStyle('width: 10%')->addClass('search')->addClass('type-num'),
             (new CColHeader(_('Tags')))->addClass(ZBX_STYLE_COLUMN_TAGS_3)->addClass('search'),
-            isset($data['can_create'])?(new CColHeader(_('Edit')))->addStyle('width: 50px'): null,
+ //           isset($data['can_create'])?(new CColHeader(_('Edit')))->addStyle('width: 50px'): null,
         ]);
     }
 
 //Latest data rows.
     foreach ($data['items'] as $itemid => $item) {
-        $change_raw = '';
         $is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
 
-        $checkbox = (new CCheckBox('itemids[' . $itemid . ']', $itemid))->addClass('no-sort'); //->setEnabled($is_graph);
+        $checkbox = (new CCheckBox('itemids[' . $itemid . ']', $itemid))->addClass('no-sort');
         $state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
 
         $item_name = (new CDiv([
@@ -175,99 +182,9 @@ function ShowItemsPlainTable(array &$data)
             ($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null,
         ]))->addClass('action-container');
 
-        $item_config_url = (new CUrl('items.php'))
-            ->setArgument('form', 'update')
-            ->setArgument('itemid', $itemid)
-            ->setArgument('context', 'host');
-
         $item_history_url = (new CUrl('history.php'))
             ->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
             ->setArgument('itemids[]', $item['itemid']);
-
-        $item_hist = [];
-
-
-
-
-
-        $last_history = array_key_exists($itemid, $data['history'])
-        ? ((count($data['history'][$itemid]) > 0) ? $data['history'][$itemid][0] : null)
-        : null;
-
-        if ($last_history) {
-            $item_hist = $data['history'][$itemid];
-            $prev_history = (count($data['history'][$itemid]) > 1) ? $data['history'][$itemid][1] : null;
-            $last_check = zbx_date2age($last_history['clock']);
-            $last_check_raw = $last_history['clock'];
-
-            $last_value = formatHistoryValue($last_history['value'], $item, false);
-            if ((ITEM_VALUE_TYPE_TEXT == $item['value_type'] ||
-                ITEM_VALUE_TYPE_LOG == $item['value_type']) &&
-                mb_strlen($last_value) > 20) {
-                $last_value = (new CSpan($last_value))
-                    ->addClass(ZBX_STYLE_LINK_ACTION)
-                    ->setHint($last_history['value'], 'hintbox-wrap');
-            }
-            $change = '';
-            $last_value_raw = $last_history['value'];
-
-            if ($prev_history && in_array($item['value_type'], [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64])) {
-                $history_diff = $last_history['value'] - $prev_history['value'];
-
-                if ($history_diff != 0) {
-                    if ($history_diff > 0) {
-                        $change = '+';
-                    }
-                    $change_raw = $history_diff;
-                    // The change must be calculated as uptime for the 'unixtime'.
-                    $change .= convertUnits([
-                        'value' => $history_diff,
-                        'units' => ($item['units'] === 'unixtime') ? 'uptime' : $item['units'],
-                    ]);
-                }
-            }
-        } else {
-            $last_check = '';
-            $last_value = '';
-            $change = '';
-
-            $last_check_raw = '';
-            $last_value_raw = '';
-        }
-
-        if (isset($item['error']) && $item['state'] == ITEM_STATE_NOTSUPPORTED) {
-            if (strlen($last_value) < 1) {
-                $last_value = 'UNSUPPORTED';
-            }
-
-            if ($item['lastdata'] > 0) {
-                $last_check = zbx_date2age($item['lastdata']);
-                $last_check_raw = $item['lastdata'];
-            } else {
-                $last_check = '<UNKNOWN>';
-                $last_check_raw = '<UNKNOWN>';
-            }
-
-            $last_check = (new CSpan($last_check))
-                ->addClass(ZBX_STYLE_RED)
-                ->addClass(ZBX_STYLE_LINK_ACTION)
-                ->setHint($item['error'], 'hintbox-wrap');
-
-            $last_value = (new CSpan($item['error']))
-                ->addClass(ZBX_STYLE_RED)
-                ->addClass(ZBX_STYLE_LINK_ACTION)
-                ->setHint($item['error'], 'hintbox-wrap');
-
-            $last_value_raw = $item['error'];
-            $change = '';
-            $change_raw = '';
-        }
-        
-        if (isset($item['nextcheck']) && $item['nextcheck'] > 0) {
-            $last_check = (new CSpan($last_check))
-                ->addClass(ZBX_STYLE_LINK_ACTION)
-                ->setHint("Next request in: " . zbx_date2age(2 * time() - $item['nextcheck']), 'hintbox-wrap');
-        }
 
         // Other row data preparation.
         if ($simple_interval_parser->parse($item['history']) == \CParser::PARSE_SUCCESS) {
@@ -292,9 +209,16 @@ function ShowItemsPlainTable(array &$data)
         }
 
         $host = $data['hosts'][$item['hostid']];
+
         $host_name = (new CLinkAction($host['name']))
             ->addClass($host['status'] == HOST_STATUS_NOT_MONITORED ? ZBX_STYLE_RED : null)
             ->setMenuPopup(CMenuPopupHelper::getHost($item['hostid']));
+
+        $value = new CLatestValue( $item , 
+            isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
+            isset($item['triggers'])? $item['triggers'] : null,
+            isset($data['can_create'])
+        );    
 
         if ($data['filter']['show_details']) {
 
@@ -317,6 +241,12 @@ function ShowItemsPlainTable(array &$data)
                 $item_delay = (new CSpan($item['delay']))->addClass(ZBX_STYLE_RED);
             }
 
+           
+                
+        //    if ($value->GetWorstSeverity() > 0) 
+          //          $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
+
+
             $table_row = new CRow([
                 $checkbox,
                 0 == $context_host ? $host_name : null,
@@ -337,19 +267,17 @@ function ShowItemsPlainTable(array &$data)
 
                 ))->addClass($state_css),
                 (new CCol(item_type2str($item['type'])))->addClass($state_css),
-                (new CCol($last_check))->setAttribute('data-order', $last_check_raw)->addClass($state_css),
+                (new CCol($value->GetLastCheck()))->setAttribute('data-order', $value->GetLastCheckRaw())->addClass($state_css),
                 (new CCol())
-                    ->setAttribute('data-order', $last_value_raw)
-                    ->addClass($state_css)
-                    ->addItem(new CDiv($last_value)),
+                    ->setAttribute('data-order', $value->GetLastCheckRaw())
+                    ->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()))
+                    ->addItem(new CDiv($value)),
 
-                (new CCol($change))
-                    ->setAttribute('data-order', $change_raw)
+                (new CCol($value->GetValueChangeFormatted()))
+                    ->setAttribute('data-order', $value->GetValueChangeRaw())
                     ->addClass($state_css),
                 $data['tags'][$itemid],
-                isset($data['can_create'])? (new CCol())->addItem(new CLink(_('Edit'), $item_config_url)): null,
-
-            ]);
+             ]);
         } else {
             $table_row = new CRow([
                 $checkbox,
@@ -359,10 +287,13 @@ function ShowItemsPlainTable(array &$data)
                         ->addClass(ZBX_STYLE_LINK_ALT)))
                     ->addClass($state_css),
                 (new CCol($last_check))->setAttribute('data-order', $last_check_raw)->addClass($state_css),
-                (new CCol($last_value))->setAttribute('data-order', $last_value_raw)->addClass($state_css),
-                (new CCol($change))->setAttribute('data-order', $change_raw)->addClass($state_css),
+                (new CCol($value))
+                    ->setAttribute('data-order', $last_value_raw)
+                    ->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity())),
+                (new CCol($value->GetValueChangeFormatted()))
+                    ->setAttribute('data-order', $value->GetValueChangeRaw())->addClass($state_css),
                 $data['tags'][$itemid],
-                isset($data['can_create'])? (new CCol())->addItem(new CLink(_('Edit'), $item_config_url)): null,
+         //           isset($data['can_create'])? (new CCol())->addItem(new CLink(_('Edit'), $item_config_url)): null,
             ]);
         }
 

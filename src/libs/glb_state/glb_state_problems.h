@@ -18,26 +18,53 @@
 
 #ifndef GLB_STATE_PROBLEMS_H
 #define GLB_STATE_PROBLEMS_H
-
 #include "glb_state.h"
-
-
-
+#include "glb_state_problem.h"
+#include "zbxcacheconfig.h"
 
 int glb_state_problems_init(mem_funcs_t *memf);
 int glb_state_problems_destroy();
 
-typedef struct {
-     char *problem;
-     unsigned char avail;
-     int lastchange;
- } glb_state_problem_info_t;
 
 
-int    glb_state_create_problem(u_int64_t interfaceid, const char *error); 
-int    glb_state_update_problem(u_int64_t interfaceid, const char *error); 
-glb_state_problem_info_t *glb_state_get_problem(u_int64_t id);
+/* note: problem is created by the trigger id (it will be source id) 
+    for most of ui and api calls we'll need host->problems index. Since a problem might be 
+    calculated on several items/hosts, there might be several hosts pointing to the same problem
 
-int     glb_state_get_problems_json(zbx_vector_uint64_t *ids, struct zbx_json *json);
+    it is possible and likely, that other types of objects might create problems in the future, since it's a 
+    good idea to have a standard notification on other monitoring events like trigger calc fail or lld rule fail 
+    or whatever. 
+
+    all indexes are id-based meaning there is no strict reason to do linked cleaning, however it's possible
+    that for an existing index a problem might not exist anymore
+*/
+int         glb_state_problems_get_count();
+u_int64_t   glb_state_problem_create(u_int64_t problemid, glb_problem_source_t source, u_int64_t source_id,  
+                        const char *name, unsigned char severity, zbx_vector_uint64_t *hosts); 
+
+
+int     glb_state_problem_recover(u_int64_t problemid, u_int64_t userid);
+int     glb_state_problems_get_by_triggerid(u_int64_t triggerid, zbx_vector_ptr_t *problems);
+void    glb_state_problems_clean(zbx_vector_ptr_t *problems);
+int     glb_state_problems_get_by_hostid(u_int64_t triggerid, zbx_vector_ptr_t *problems);
+void    glb_state_problems_process_trigger_value(DC_TRIGGER *trigger);
+int     glb_state_problems_recover_by_trigger(u_int64_t triggerid, int leave_unrecovered);
+int     glb_state_problems_get_count_by_trigger(u_int64_t triggerid);
+int     glb_state_problems_get_by_hostid(u_int64_t hostid, zbx_vector_ptr_t *problems);
+
+
+
+//removes outdated resolved problems
+void     glb_state_problems_housekeep(); //UNFINISHED YET - does no cleanup
+int      glb_state_problems_dump();
+
+
+int glb_state_problems_get_by_hostids_json(zbx_vector_uint64_t *ids, struct zbx_json *response_json);
+int glb_state_problems_get_by_triggerids_json(zbx_vector_uint64_t *ids, struct zbx_json *response_json);
+int glb_state_problems_get_all_json(struct zbx_json *response_json);
+
+//todo: methods for setting problem state, acknowledge, etc statuses
+//todo: methods for load
+
 
 #endif

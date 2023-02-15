@@ -201,38 +201,38 @@ void glb_state_trigger_set_value(u_int64_t id, unsigned char value, int lastcalc
 
 }
 
-void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
-{
-	int i;
-	zbx_trigger_diff_t *diff;
-    state_trigger_info_t info;
+// void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
+// {
+// 	int i;
+// 	zbx_trigger_diff_t *diff;
+//     state_trigger_info_t info;
 	
-    if (0 == trigger_diff->values_num)
-		return;
+//     if (0 == trigger_diff->values_num)
+// 		return;
 
-	for (i = 0; i < trigger_diff->values_num; i++)
-	{
-		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
+// 	for (i = 0; i < trigger_diff->values_num; i++)
+// 	{
+// 		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
         
-        if (ZBX_FLAGS_TRIGGER_DIFF_UNSET == diff->flags)
-            continue;
+//         if (ZBX_FLAGS_TRIGGER_DIFF_UNSET == diff->flags)
+//             continue;
         
-        bzero(&info, sizeof(info));
+//         bzero(&info, sizeof(info));
 		
-		info.id = diff->triggerid;
-		info.value = diff->value;
-		info.lastcalc = diff->lastchange;   
+// 		info.id = diff->triggerid;
+// 		info.value = diff->value;
+// 		info.lastcalc = diff->lastchange;   
 
-        DEBUG_TRIGGER(diff->triggerid,"Saving trigger state to state cache: value %d, lastcalc: %d",
-            info.value, info.lastcalc);
+//         DEBUG_TRIGGER(diff->triggerid,"Saving trigger state to state cache: value %d, lastcalc: %d",
+//             info.value, info.lastcalc);
 
-		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
-			info.error = diff->error;		
+// 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
+// 			info.error = diff->error;		
 
-		if (FAIL == glb_state_trigger_set_info(&info))
-			THIS_SHOULD_NEVER_HAPPEN;
-	}
-}
+// 		if (FAIL == glb_state_trigger_set_info(&info))
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 	}
+// }
 
 DUMPER_TO_JSON(trigger_to_json)
 {

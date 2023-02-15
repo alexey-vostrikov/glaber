@@ -42,6 +42,7 @@
 #include "zbxdbwrap.h"
 #include "zbxserver.h"
 #include "../glb_poller/poller_ipc.h"
+#include "../../libs/glb_state/glb_state_problems.h"
 
 #define ZBX_TM_PROCESS_PERIOD		5
 #define ZBX_TM_CLEANUP_PERIOD		SEC_PER_HOUR
@@ -70,17 +71,21 @@ static zbx_export_file_t	*get_problems_export(void)
 static void	tm_execute_task_close_problem(zbx_uint64_t taskid, zbx_uint64_t triggerid, zbx_uint64_t eventid,
 		zbx_uint64_t userid)
 {
-	DB_RESULT	result;
+	//DB_RESULT	result;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() eventid:" ZBX_FS_UI64, __func__, eventid);
+	glb_state_problem_recover(eventid, userid);
 
-	result = DBselect("select null from problem where eventid=" ZBX_FS_UI64 " and r_eventid is null", eventid);
+	// zabbix_log(LOG_LEVEL_DEBUG, "In %s() eventid:" ZBX_FS_UI64, __func__, eventid);
 
-	/* check if the task hasn't been already closed by another process */
-	if (NULL != DBfetch(result))
-		zbx_close_problem(triggerid, eventid, userid);
+	// result = DBselect("select null from problem where eventid=" ZBX_FS_UI64 " and r_eventid is null", eventid);
 
-	zbx_db_free_result(result);
+	// /* check if the task hasn't been already closed by another process */
+	// if (NULL != DBfetch(result)) {
+	// 	zbx_close_problem(triggerid, eventid, userid);
+		
+	// }
+
+	// zbx_db_free_result(result);
 
 	DBexecute("update task set status=%d where taskid=" ZBX_FS_UI64, ZBX_TM_STATUS_DONE, taskid);
 

@@ -27,6 +27,7 @@
 #include "zbxself.h"
 
 #include "cfg.h"
+
 #include "zbxdbupgrade.h"
 #include "log.h"
 #include "zbxgetopt.h"
@@ -94,7 +95,7 @@
 #include "../libs/apm/apm.h"
 
 #ifdef HAVE_GLB_TESTS
-#include "./tests/server_tests.h"
+#include "tests/server_tests.h"
 #endif
 
 u_int64_t CONFIG_DEBUG_ITEM = 0;

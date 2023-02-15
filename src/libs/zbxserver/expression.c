@@ -5955,12 +5955,11 @@ static int	expand_expression_macros(zbx_eval_context_t *ctx, zbx_dc_um_handle_t 
 			(zbx_macro_expand_func_t)zbx_dc_expand_user_macros, um_handle, error);
 }
 
-static int	expand_trigger_macros(DC_TRIGGER *tr, ZBX_DB_EVENT *db_event, zbx_dc_um_handle_t *um_handle,
-		const zbx_vector_uint64_t *hostids, char **error)
+static int	expand_trigger_macros(DC_TRIGGER *tr, ZBX_DB_EVENT *db_event, zbx_dc_um_handle_t *um_handle, char **error)
 {
 	db_event->value = tr->value;
 
-	if (SUCCEED != expand_expression_macros(tr->eval_ctx, um_handle, db_event, hostids->values, hostids->values_num,
+	if (SUCCEED != expand_expression_macros(tr->eval_ctx, um_handle, db_event, tr->hostids.values, tr->hostids.values_num,
 			error))
 	{
 		return FAIL;
@@ -5968,8 +5967,8 @@ static int	expand_trigger_macros(DC_TRIGGER *tr, ZBX_DB_EVENT *db_event, zbx_dc_
 
 	if (TRIGGER_RECOVERY_MODE_RECOVERY_EXPRESSION == tr->recovery_mode)
 	{
-		return expand_expression_macros(tr->eval_ctx_r, um_handle, db_event, hostids->values,
-					hostids->values_num, error);
+		return expand_expression_macros(tr->eval_ctx_r, um_handle, db_event, tr->hostids.values,
+					tr->hostids.values_num, error);
 	}
 
 	return SUCCEED;
@@ -6001,13 +6000,13 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 	int			i, *items_err, items_num = 0;
 	double			expr_result;
 	zbx_dc_um_handle_t	*um_handle;
-	zbx_vector_uint64_t	hostids;
+	//zbx_vector_uint64_t	hostids;
 
 	LOG_DBG("In %s() tr_num:%d", __func__, triggers->values_num);
 
 	event.object = EVENT_OBJECT_TRIGGER;
 
-	zbx_vector_uint64_create(&hostids);
+	//zbx_vector_uint64_create(&hostids);
 	um_handle = zbx_dc_open_user_macros();
 
 	substitute_functions(triggers, history_itemids, history_items, history_errcodes, &items, &items_err,
@@ -6028,7 +6027,7 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 			{
 				if (SUCCEED != history_errcodes[k])
 					continue;
-				zbx_vector_uint64_append(&hostids, history_items[k].host.hostid);
+				zbx_vector_uint64_append(&tr->hostids, history_items[k].host.hostid);
 			}
 			else
 			{
@@ -6041,26 +6040,23 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 				if (NULL == item || SUCCEED != items_err[item - items])
 					continue;
 
-				zbx_vector_uint64_append(&hostids, item->host.hostid);
+				zbx_vector_uint64_append(&tr->hostids, item->host.hostid);
 			}
 		}
 
-		zbx_vector_uint64_sort(&hostids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-		zbx_vector_uint64_uniq(&hostids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+		zbx_vector_uint64_sort(&tr->hostids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+		zbx_vector_uint64_uniq(&tr->hostids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-		if (SUCCEED != expand_trigger_macros(tr, &event, um_handle, &hostids, &error))
+		if (SUCCEED != expand_trigger_macros(tr, &event, um_handle, &error))
 		{
 			tr->new_error = zbx_dsprintf(tr->new_error, "Couldn't expand macro: %s", error);
 			tr->new_value = TRIGGER_VALUE_UNKNOWN;
 			DEBUG_TRIGGER(tr->triggerid, "Couldn't expand trigger macro, set to UNKNOWN value :%s", error);
 			zbx_free(error);
 		}
-
-		zbx_vector_uint64_clear(&hostids);
 	}
 
 	zbx_dc_close_user_macros(um_handle);
-	zbx_vector_uint64_destroy(&hostids);
 
 	if (0 != items_num)
 	{

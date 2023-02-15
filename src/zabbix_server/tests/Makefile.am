@@ -1,7 +1,11 @@
 ## Process this file with automake to produce Makefile.in
 
-noinst_LIBRARIES = libservertests.a
+noinst_LIBRARIES = libglbtests.a
 
-libservertests_a_SOURCES = \
-	server_tests.c \
-	../preprocessor/worker_tests.c
+libglbtests_a_SOURCES = \
+	../../libs/glb_state/tests/state_test_problems.c \
+	../../libs/glb_state/tests/glb_state_tests.c \
+	../../libs/zbxalgo/tests/algo_tests.c \
+	../../libs/zbxalgo/tests/index_int64_test.c \
+	server_tests.c
+    

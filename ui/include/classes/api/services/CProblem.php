@@ -95,6 +95,7 @@ class CProblem extends CApiService {
 		$options = zbx_array_merge($defOptions, $options);
 
 		$this->validateGet($options);
+		show_error_message("Get problems is called for data:".json_encode($options));
 
 		// source and object
 		$sqlParts['where'][] = 'p.source='.zbx_dbstr($options['source']);

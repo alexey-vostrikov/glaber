@@ -1,0 +1,21 @@
+{
+    "manifest_version": 2.0,
+    "id": "problems-data",
+    "name": "Problems view",
+    "version": "0.0.1",
+    "namespace": "GlaberProblemsView",
+    "author": "Mikhail Makurov",
+    "url": "https://gitlab.com/mikler/glaber",
+    "description": "Problems view for glaber - dev alternative",
+    
+    "actions": {
+        "problem.view": {
+            "class":    "CControllerGlaberProblemsView",
+            "view" :    "module.glaber.problems.view"
+        },
+        "problem.view.refresh": {
+            "class":    "CControllerGlaberProblemsViewRefresh",
+            "view" :    "module.glaber.problems.view.refresh"
+        }
+    }
+}

@@ -61,16 +61,6 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 	return NULL;
 }
 
-int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t userid)
-{
-	ZBX_UNUSED(triggerid);
-	ZBX_UNUSED(eventid);
-	ZBX_UNUSED(userid);
-
-	THIS_SHOULD_NEVER_HAPPEN;
-	return 0;
-}
-
 int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock, ZBX_DC_HISTORY *history)
 {
 	ZBX_UNUSED(trigger_diff);

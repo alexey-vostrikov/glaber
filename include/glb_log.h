@@ -1,5 +1,4 @@
 /*
-** Zabbix
 ** Copyright (C) 2001-2023 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -20,6 +19,8 @@
 #ifndef GLABER_LOG_H
 #define GLABER_LOG_H
 
+#include "log.h"
+
 #define LOG_DBG(...) zabbix_log(LOG_LEVEL_DEBUG, __VA_ARGS__)
 #define LOG_INF(...) zabbix_log(LOG_LEVEL_INFORMATION, __VA_ARGS__)
 #define LOG_WRN(...) zabbix_log(LOG_LEVEL_WARNING, __VA_ARGS__)
@@ -38,7 +39,7 @@ u_int64_t DC_get_debug_trigger();
 #endif
 
 #ifndef HALT_HERE
-#define HALT_HERE(message,...) { zabbix_log(LOG_LEVEL_WARNING, "In %s:%d, intentional halt: " message, __FILE__, __LINE__, ##__VA_ARGS__); zbx_backtrace(); exit(-1); }
+#define HALT_HERE(message,...) { zabbix_log(LOG_LEVEL_WARNING, "In %s:%d, intentional halt: " message, __FILE__, __LINE__, ##__VA_ARGS__); zbx_backtrace();  if (time(NULL)) exit(-1); }
 #endif
 
 #ifndef RUN_ONCE_IN

@@ -16,6 +16,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 #include "zbxcommon.h"
+#include "glb_state_tests.h"
 #include "zbx_trigger_constants.h"
 #include "zbxavailability.h"
 #include "../glb_state_triggers.h"
@@ -23,7 +24,7 @@
 
 static void state_test_untyped_interfaces() {
     LOG_INF("Starting normal (untyped) interfaces tests");
-     mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
+    mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
             .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
     
     glb_state_interface_info_t *ifinfo;
@@ -39,9 +40,6 @@ static void state_test_untyped_interfaces() {
 
     sleep(2);
     HALT_HERE("Intentional halt on iface tests finish- SUCCESS");
-
-
-
 }
 
 
@@ -218,10 +216,9 @@ static void state_test_triggers(){
 
 #ifdef HAVE_GLB_TESTS
 void glb_state_run_tests(void) {
-    state_test_untyped_interfaces();
-    state_test_interfaces();
-    state_test_triggers();
-
-   
+  //  state_test_untyped_interfaces();
+  //  state_test_interfaces();
+  //  state_test_triggers();
+      state_test_problems();
 }
 #endif

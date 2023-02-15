@@ -17,4 +17,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-void tests_algo_run(void);
+#ifdef GLB_HAVE_TESTS
+void tests_algo_run();
+#endif

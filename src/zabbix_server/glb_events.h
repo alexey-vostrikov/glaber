@@ -34,7 +34,7 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error,
 		int history_idx);
 
-int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t userid);
+//int	zbx_close_problem(zbx_uint64_t triggerid, zbx_uint64_t eventid, zbx_uint64_t userid);
 
 int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock,
 		ZBX_DC_HISTORY *history);

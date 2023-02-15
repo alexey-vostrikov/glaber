@@ -117,7 +117,7 @@ int elems_hash_process(elems_hash_t *elems, uint64_t id, elems_hash_process_cb_t
 
 	ret = process_func(elem, &elems->memf, params);
         
-    if ( 1 == (elem->flags & ELEM_FLAG_DELETE)) {
+    if ( 0 < (elem->flags & ELEM_FLAG_DELETE)) {
 
         glb_rwlock_unlock(&elems->meta_lock);
         glb_rwlock_wrlock(&elems->meta_lock);
@@ -231,7 +231,8 @@ void elems_hash_replace(elems_hash_t *old_elems, elems_hash_t *new_elems) {
   
 }   
 
-int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params, u_int64_t flags ) {
+int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, void *params,
+     u_int64_t element_lock_flags ) {
    
     elems_hash_elem_t *elem;
     int last_ret = SUCCEED;
@@ -243,9 +244,20 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
     
     while ( (NULL !=(elem = (elems_hash_elem_t*) zbx_hashset_iter_next(&iter))) &&
             SUCCEED == last_ret ) {
-        elem_lock(elem, flags);
+        elem_lock(elem,  element_lock_flags);
         (*proc_func)(elem, &elems->memf, params);
         elem_unlock(elem);
+
+        if ( 0 < (elem->flags & ELEM_FLAG_DELETE)) {
+
+            glb_rwlock_unlock(&elems->meta_lock);
+            glb_rwlock_wrlock(&elems->meta_lock);
+        
+            delete_element(elems, elem);
+        
+            glb_rwlock_unlock(&elems->meta_lock);
+            glb_rwlock_rdlock(&elems->meta_lock);
+        }
     }
     
     glb_rwlock_unlock(&elems->meta_lock);

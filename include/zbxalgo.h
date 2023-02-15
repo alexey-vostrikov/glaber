@@ -7,7 +7,7 @@
 ** the Free Software Foundation; either version 2 of the License, or
 ** (at your option) any later version.
 **
-** This program is distributed in the hope that it will be useful,
+** This program is distributed i the hope that it will be useful,
 ** but WITHOUT ANY WARRANTY; without even the implied warranty of
 ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ** GNU General Public License for more details.
@@ -831,6 +831,31 @@ int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, 
 int 	elems_hash_get_num(elems_hash_t *elems);
 int 	elems_hash_id_exists(elems_hash_t *elems, u_int64_t id);
 int 	elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb);
+
+typedef struct index_uint64_t index_uint64_t;
+
+index_uint64_t *index_uint64_init(mem_funcs_t *memf);
+
+void index_uint64_destroy(index_uint64_t *index, mem_funcs_t *memf);
+int index_get_keys_num(index_uint64_t *index);
+
+int	index_uint64_add(index_uint64_t *index, u_int64_t key, u_int64_t value);
+int index_uint64_get(index_uint64_t *index, u_int64_t key, zbx_vector_uint64_t *values);
+int index_uint64_del(index_uint64_t *index, u_int64_t key, u_int64_t value);
+int index_uint64_del_key(index_uint64_t *index, u_int64_t key);
+int index_uint64_get_count_by_key(index_uint64_t *index, u_int64_t key);
+int index_uint64_get_keys_num(index_uint64_t *index);
+/******tested by here********/
+int index_uint64_sync_objects(index_uint64_t *index, elems_hash_t *objects);
+
+//int index_uint64_get_keys(index_uint64_t *index, zbx_vector_uint64_t *keys);
+
+//int  index_uint64_add_pair_values(index_uint64_t *index, u_int64_t key, zbx_vector_uint64_t *values);
+//int  index_uint64_add_keys_value(index_uint64_t *index, zbx_vector_uint64_t *keys, u_int64_t value );
+//int index_uint64_check_value_exists(index_uint64_t *index, u_int64_t key, u_int64_t value);
+
+
+
 
 typedef struct obj_index_t obj_index_t;
 obj_index_t* obj_index_init(mem_funcs_t *memf);

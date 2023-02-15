@@ -20,8 +20,6 @@
 #ifndef ZABBIX_COMMON_H
 #define ZABBIX_COMMON_H
 
-//#define HAVE_GLB_TESTS 1
-
 #include "zbxsysinc.h"
 #include "module.h"
 #include "version.h"

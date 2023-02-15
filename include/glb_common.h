@@ -18,10 +18,20 @@
 #ifndef GLB_COMMON_H
 #define GLB_COMMON_H
 
-//#include "glb_history.h"
-
-
 #define GLB_ICMP 20
 #define ZBX_ICMP 21
+
+/* severity */
+#define SEVERITY_NOT_CLASSIFIED	0
+#define SEVERITY_INFORMATION	1
+#define SEVERITY_WARNING	2
+#define SEVERITY_AVERAGE	3
+#define SEVERITY_HIGH		4
+#define SEVERITY_DISASTER	5
+#define SEVERITY_COUNT		6	/* number of trigger severities */
+
+#define TRIGGER_SEVERITY_UNDEFINED	255
+
+//#define HAVE_GLB_TESTS 1
 
 #endif

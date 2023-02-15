@@ -1001,11 +1001,12 @@ static int item_update_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void
     item_elem_t *elm = (item_elem_t *)elem->data;
     glb_state_meta_udpate_req_t *req = (glb_state_meta_udpate_req_t *)cb_data;
 
-    if ((req->flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) && elm->meta.lastdata < req->meta->lastdata)
-    {
+    //note: always update lastdata - time of item's state / values change
+   // if ((req->flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) && elm->meta.lastdata < req->meta->lastdata)
+    //{
         elm->meta.lastdata = req->meta->lastdata;
         DEBUG_ITEM(elem->id, "Updated metadata: lastdata");
-    }
+    //}
 
     if (req->flags & GLB_CACHE_ITEM_UPDATE_NEXTCHECK)
     {
@@ -1535,13 +1536,11 @@ int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-
-
 int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
 	int i;
 	
     for (i = 0; i< deleted_itemids->values_num; i++) {
-        LOG_INF("Deleting item %ld from the cache", deleted_itemids->values[i]);
+   //     LOG_INF("Deleting item %ld from the cache", deleted_itemids->values[i]);
         DEBUG_ITEM(deleted_itemids->values[i],"Deleting item from the value cache");
     	elems_hash_delete(state->items, deleted_itemids->values[i]);
 	}

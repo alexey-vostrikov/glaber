@@ -19,7 +19,6 @@
 
 #include "zbxcommon.h"
 #include "zbx_item_constants.h"
-//#include "dbcache.h"
 #include "zbxcomms.h"
 #include "zbxnix.h"
 #include "zbxserver.h"

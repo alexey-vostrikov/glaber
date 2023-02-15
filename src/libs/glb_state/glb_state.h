@@ -52,7 +52,7 @@ int glb_state_get_mem_stats(zbx_shmem_stats_t *mem_stats);
 int glb_state_get_diag_stats(u_int64_t *items_num, u_int64_t *values_num, int *mode);
 
 int glb_state_housekeep();
-
+int glb_state_dump(); 
 
 
 #endif

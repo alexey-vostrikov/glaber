@@ -56,7 +56,7 @@ abstract class CControllerGlaberLatest extends \CController {
 		$history_period = timeUnitToSeconds(\CSettingsHelper::get(\CSettingsHelper::HISTORY_PERIOD));
 		$select_items_cnt = 0;
 		$select_items = [];
-
+		
 		$fetch_options = [
 			'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
 					 'value_type', 'units', 'description', 'state', 'error'],
@@ -68,6 +68,7 @@ abstract class CControllerGlaberLatest extends \CController {
 			'search' => ($filter['select'] === '') ? null : ['name' => $filter['select']],
 			'preservekeys' => true,
 			'discovery_items' => true,
+			'selectTriggers' => ['triggerid', 'name', 'value', 'priority']
 		];
 
 		if (isset($group_by_entity)) {
@@ -75,6 +76,7 @@ abstract class CControllerGlaberLatest extends \CController {
 				'selectTemplates' => ['templateid','name'],
 				'selectDiscoveryRule' => ['itemid', 'name', 'templateid', 'key_'],
 				'selectItemDiscovery' => ['parent_itemid','itemdiscoveryid','itemid'],
+				
 			];
 		}
 		

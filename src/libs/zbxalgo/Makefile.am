@@ -18,5 +18,6 @@ libzbxalgo_a_SOURCES = \
 	elems_hash.c \
 	event_queue.c \
 	binpool.c \
-	strpool.c
+	strpool.c \
+	index.c
 

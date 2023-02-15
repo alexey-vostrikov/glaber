@@ -1118,14 +1118,14 @@ long int glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, i
 
     if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) {
         *errflag = 1;
-        return FAIL;
+        return 0;
     }
     
     long int value = strtol(temp_str, NULL, 10);
     
     if (EINVAL == errno)  {
         *errflag = 1;
-        return FAIL;
+        return 0;
     }
 
     return value;   

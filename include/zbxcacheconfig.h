@@ -329,6 +329,7 @@ typedef struct _DC_TRIGGER
 
 	zbx_vector_ptr_t	tags;
 	zbx_vector_uint64_t	itemids;
+	zbx_vector_uint64_t	hostids;
 
 	zbx_eval_context_t	*eval_ctx;
 	zbx_eval_context_t	*eval_ctx_r;
@@ -912,6 +913,7 @@ typedef struct
 zbx_trigger_dep_t;
 
 void	zbx_dc_get_trigger_dependencies(const zbx_vector_uint64_t *triggerids, zbx_vector_ptr_t *deps);
+int		glb_check_trigger_has_value_ok_masters(u_int64_t triggerid);
 
 void	zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, zbx_uint64_t *proxy_hostids);
 

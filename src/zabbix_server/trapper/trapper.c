@@ -47,6 +47,7 @@
 
 #include "../../libs/glb_state/glb_state_items.h"
 #include "../../libs/glb_state/glb_state_triggers.h"
+#include "../../libs/glb_state/glb_state_problems.h"
 #include "../../libs/glb_state/glb_state_interfaces.h"
 #include "preproc.h"
 
@@ -229,6 +230,31 @@ static int  get_interfaces_state(zbx_socket_t *sock, struct zbx_json_parse *jp) 
 	
 	if (0 < json_ids_to_vector(jp, &ids, "interfaceids") ) 
 		glb_state_interfaces_get_state_json(&ids, &response_json);
+		
+	zbx_vector_uint64_destroy(&ids);
+	zbx_json_close(&response_json);
+	
+	(void)zbx_tcp_send(sock, response_json.buffer);
+
+	zbx_json_free(&response_json);
+	return SUCCEED;
+}
+
+static int  get_problems(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+	zbx_vector_uint64_t ids;
+	struct zbx_json		response_json;
+		
+	zbx_json_init(&response_json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&response_json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	
+	zbx_vector_uint64_create(&ids);
+	
+	if (0 < json_ids_to_vector(jp, &ids, "hostids") ) 
+		glb_state_problems_get_by_hostids_json(&ids, &response_json);
+	else if (0 < json_ids_to_vector(jp, &ids, "triggerids") ) 
+		glb_state_problems_get_by_triggerids_json(&ids, &response_json);
+	else 
+		glb_state_problems_get_all_json(&response_json);
 		
 	zbx_vector_uint64_destroy(&ids);
 	zbx_json_close(&response_json);
@@ -1473,16 +1499,14 @@ static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx
 		else  if (0 ==strcmp(value, GLB_PROTO_VALUE_GET_TRIGGER_STATUS))
 			ret = get_triggers_state(sock,&jp);
 		else  if (0 ==strcmp(value, GLB_PROTO_VALUE_GET_INTERFACE_STATE))
-			ret = get_interfaces_state(sock,&jp);
+			get_interfaces_state(sock,&jp);
 		else if (0 == strcmp(value, "debug.set"))
-		{	
-			 glb_trapper_set_debug(sock, &jp);
-		} else if (0 == strcmp(value, "debug.get"))
-		{
-			 glb_trapper_get_debug(sock, &jp);
- 		}
-
-
+		    glb_trapper_set_debug(sock, &jp);
+		else if (0 == strcmp(value, "debug.get"))
+		    glb_trapper_get_debug(sock, &jp);
+ 		else if (0 == strcmp(value, "problems.get")) 
+			get_problems(sock, &jp);
+		
 		else if (0 == strcmp(value, ZBX_PROTO_VALUE_ACTIVE_CHECK_HEARTBEAT))
 		{
 			ret = process_active_check_heartbeat(&jp);

@@ -43,7 +43,7 @@ unsigned char glb_state_trigger_get_value(u_int64_t id);
 unsigned char glb_state_trigger_get_value_lastchange(u_int64_t id, unsigned char *value, int* lastchange);
 void    glb_state_trigger_set_value(u_int64_t id, unsigned char value, int lastcalc); //lastcalc might be 0 - then current time is used
 
-void    glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff);
+//void    glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff);
 int     glb_state_triggers_dump();
 
 int     glb_state_triggers_destroy();

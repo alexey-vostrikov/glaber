@@ -1949,11 +1949,9 @@ AC_CONFIG_FILES([
 	src/libs/Makefile
 	src/libs/glb_conf/Makefile
 	src/libs/zbxalgo/Makefile
-	src/libs/zbxalgo/tests/Makefile
 	src/libs/zbxaudit/Makefile
 	src/libs/zbxavailability/Makefile
 	src/libs/glb_state/Makefile
-	src/libs/glb_state/tests/Makefile
 	src/libs/apm/Makefile
 	src/libs/zbxcommon/Makefile
 	src/libs/zbxcomms/Makefile
@@ -1979,6 +1977,7 @@ AC_CONFIG_FILES([
 	src/libs/zbxha/Makefile
 	src/libs/zbxhash/Makefile
 	src/libs/glb_history/Makefile
+	src/libs/glb_events_log/Makefile
 	src/libs/zbxhttp/Makefile
 	src/libs/zbxicmpping/Makefile
 	src/libs/zbxip/Makefile
@@ -2071,6 +2070,7 @@ AC_CONFIG_FILES([
 	src/zabbix_server/timer/Makefile
 	src/zabbix_server/trapper/Makefile
 	src/zabbix_server/vmware/Makefile
+	src/zabbix_server/tests/Makefile
 	man/Makefile
 	])
 AC_OUTPUT

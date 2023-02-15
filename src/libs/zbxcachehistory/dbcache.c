@@ -36,6 +36,7 @@
 #include "zbx_item_constants.h"
 #include "../glb_state/glb_state_items.h"
 #include "../glb_state/glb_state_triggers.h"
+#include "../glb_state/glb_state_trigger.h"
 
 static zbx_shmem_info_t *hc_index_mem = NULL;
 static zbx_shmem_info_t *hc_mem = NULL;
@@ -934,23 +935,23 @@ static int zbx_trend_compare(const void *d1, const void *d2)
  *             trends_diff - [OUT] disable_from updates                       *
  *                                                                            *
  ******************************************************************************/
-static void DBmass_update_trends(const ZBX_DC_TREND *trends, int trends_num,
-								 zbx_vector_uint64_pair_t *trends_diff)
-{
-	ZBX_DC_TREND *trends_tmp;
+// static void DBmass_update_trends(const ZBX_DC_TREND *trends, int trends_num,
+// 								 zbx_vector_uint64_pair_t *trends_diff)
+// {
+// 	ZBX_DC_TREND *trends_tmp;
 
-	if (0 != trends_num)
-	{
-		trends_tmp = (ZBX_DC_TREND *)zbx_malloc(NULL, trends_num * sizeof(ZBX_DC_TREND));
-		memcpy(trends_tmp, trends, trends_num * sizeof(ZBX_DC_TREND));
-		qsort(trends_tmp, trends_num, sizeof(ZBX_DC_TREND), zbx_trend_compare);
+// 	if (0 != trends_num)
+// 	{
+// 		trends_tmp = (ZBX_DC_TREND *)zbx_malloc(NULL, trends_num * sizeof(ZBX_DC_TREND));
+// 		memcpy(trends_tmp, trends, trends_num * sizeof(ZBX_DC_TREND));
+// 		qsort(trends_tmp, trends_num, sizeof(ZBX_DC_TREND), zbx_trend_compare);
 
-		while (0 < trends_num)
-			DBflush_trends(trends_tmp, &trends_num, trends_diff);
+// 		while (0 < trends_num)
+// 			DBflush_trends(trends_tmp, &trends_num, trends_diff);
 
-		zbx_free(trends_tmp);
-	}
-}
+// 		zbx_free(trends_tmp);
+// 	}
+// }
 
 typedef struct
 {
@@ -1132,93 +1133,93 @@ static void zbx_item_info_clean(zbx_item_info_t *item_info)
  *             items_info - [IN] item names and tags                          *
  *                                                                            *
  ******************************************************************************/
-static void DCexport_trends(const ZBX_DC_TREND *trends, int trends_num, zbx_hashset_t *hosts_info,
-							zbx_hashset_t *items_info)
-{
-	struct zbx_json json;
-	const ZBX_DC_TREND *trend = NULL;
-	int i, j;
-	const zbx_history_sync_item_t *item;
-	zbx_host_info_t *host_info;
-	zbx_item_info_t *item_info;
-	zbx_uint128_t avg; /* calculate the trend average value */
+// static void DCexport_trends(const ZBX_DC_TREND *trends, int trends_num, zbx_hashset_t *hosts_info,
+// 							zbx_hashset_t *items_info)
+// {
+// 	struct zbx_json json;
+// 	const ZBX_DC_TREND *trend = NULL;
+// 	int i, j;
+// 	const zbx_history_sync_item_t *item;
+// 	zbx_host_info_t *host_info;
+// 	zbx_item_info_t *item_info;
+// 	zbx_uint128_t avg; /* calculate the trend average value */
 
-	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+// 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
-	for (i = 0; i < trends_num; i++)
-	{
-		trend = &trends[i];
+// 	for (i = 0; i < trends_num; i++)
+// 	{
+// 		trend = &trends[i];
 
-		if (NULL == (item_info = (zbx_item_info_t *)zbx_hashset_search(items_info, &trend->itemid)))
-			continue;
+// 		if (NULL == (item_info = (zbx_item_info_t *)zbx_hashset_search(items_info, &trend->itemid)))
+// 			continue;
 
-		item = item_info->item;
+// 		item = item_info->item;
 
-		if (NULL == (host_info = (zbx_host_info_t *)zbx_hashset_search(hosts_info, &item->host.hostid)))
-		{
-			THIS_SHOULD_NEVER_HAPPEN;
-			continue;
-		}
+// 		if (NULL == (host_info = (zbx_host_info_t *)zbx_hashset_search(hosts_info, &item->host.hostid)))
+// 		{
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 			continue;
+// 		}
 
-		zbx_json_clean(&json);
+// 		zbx_json_clean(&json);
 
-		zbx_json_addobject(&json, ZBX_PROTO_TAG_HOST);
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, item->host.host, ZBX_JSON_TYPE_STRING);
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item->host.name, ZBX_JSON_TYPE_STRING);
-		zbx_json_close(&json);
+// 		zbx_json_addobject(&json, ZBX_PROTO_TAG_HOST);
+// 		zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, item->host.host, ZBX_JSON_TYPE_STRING);
+// 		zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item->host.name, ZBX_JSON_TYPE_STRING);
+// 		zbx_json_close(&json);
 
-		zbx_json_addarray(&json, ZBX_PROTO_TAG_GROUPS);
+// 		zbx_json_addarray(&json, ZBX_PROTO_TAG_GROUPS);
 
-		for (j = 0; j < host_info->groups.values_num; j++)
-			zbx_json_addstring(&json, NULL, host_info->groups.values[j], ZBX_JSON_TYPE_STRING);
+// 		for (j = 0; j < host_info->groups.values_num; j++)
+// 			zbx_json_addstring(&json, NULL, host_info->groups.values[j], ZBX_JSON_TYPE_STRING);
 
-		zbx_json_close(&json);
+// 		zbx_json_close(&json);
 
-		zbx_json_addarray(&json, ZBX_PROTO_TAG_ITEM_TAGS);
+// 		zbx_json_addarray(&json, ZBX_PROTO_TAG_ITEM_TAGS);
 
-		for (j = 0; j < item_info->item_tags.values_num; j++)
-		{
-			zbx_tag_t item_tag = item_info->item_tags.values[j];
+// 		for (j = 0; j < item_info->item_tags.values_num; j++)
+// 		{
+// 			zbx_tag_t item_tag = item_info->item_tags.values[j];
 
-			zbx_json_addobject(&json, NULL);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
-			zbx_json_close(&json);
-		}
+// 			zbx_json_addobject(&json, NULL);
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
+// 			zbx_json_close(&json);
+// 		}
 
-		zbx_json_close(&json);
-		zbx_json_adduint64(&json, ZBX_PROTO_TAG_ITEMID, item->itemid);
+// 		zbx_json_close(&json);
+// 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_ITEMID, item->itemid);
 
-		if (NULL != item_info->name)
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item_info->name, ZBX_JSON_TYPE_STRING);
+// 		if (NULL != item_info->name)
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item_info->name, ZBX_JSON_TYPE_STRING);
 
-		zbx_json_addint64(&json, ZBX_PROTO_TAG_CLOCK, trend->clock);
-		zbx_json_addint64(&json, ZBX_PROTO_TAG_COUNT, trend->num);
+// 		zbx_json_addint64(&json, ZBX_PROTO_TAG_CLOCK, trend->clock);
+// 		zbx_json_addint64(&json, ZBX_PROTO_TAG_COUNT, trend->num);
 
-		switch (trend->value_type)
-		{
-		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_json_addfloat(&json, ZBX_PROTO_TAG_MIN, trend->value_min.dbl);
-			zbx_json_addfloat(&json, ZBX_PROTO_TAG_AVG, trend->value_avg.dbl);
-			zbx_json_addfloat(&json, ZBX_PROTO_TAG_MAX, trend->value_max.dbl);
-			break;
-		case ITEM_VALUE_TYPE_UINT64:
-			zbx_json_adduint64(&json, ZBX_PROTO_TAG_MIN, trend->value_min.ui64);
-			zbx_udiv128_64(&avg, &trend->value_avg.ui64, trend->num);
-			zbx_json_adduint64(&json, ZBX_PROTO_TAG_AVG, avg.lo);
-			zbx_json_adduint64(&json, ZBX_PROTO_TAG_MAX, trend->value_max.ui64);
-			break;
-		default:
-			THIS_SHOULD_NEVER_HAPPEN;
-		}
+// 		switch (trend->value_type)
+// 		{
+// 		case ITEM_VALUE_TYPE_FLOAT:
+// 			zbx_json_addfloat(&json, ZBX_PROTO_TAG_MIN, trend->value_min.dbl);
+// 			zbx_json_addfloat(&json, ZBX_PROTO_TAG_AVG, trend->value_avg.dbl);
+// 			zbx_json_addfloat(&json, ZBX_PROTO_TAG_MAX, trend->value_max.dbl);
+// 			break;
+// 		case ITEM_VALUE_TYPE_UINT64:
+// 			zbx_json_adduint64(&json, ZBX_PROTO_TAG_MIN, trend->value_min.ui64);
+// 			zbx_udiv128_64(&avg, &trend->value_avg.ui64, trend->num);
+// 			zbx_json_adduint64(&json, ZBX_PROTO_TAG_AVG, avg.lo);
+// 			zbx_json_adduint64(&json, ZBX_PROTO_TAG_MAX, trend->value_max.ui64);
+// 			break;
+// 		default:
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 		}
 
-		zbx_json_adduint64(&json, ZBX_PROTO_TAG_TYPE, trend->value_type);
-		zbx_trends_export_write(json.buffer, json.buffer_size);
-	}
+// 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_TYPE, trend->value_type);
+// 		zbx_trends_export_write(json.buffer, json.buffer_size);
+// 	}
 
-	zbx_trends_export_flush();
-	zbx_json_free(&json);
-}
+// 	zbx_trends_export_flush();
+// 	zbx_json_free(&json);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1230,108 +1231,108 @@ static void DCexport_trends(const ZBX_DC_TREND *trends, int trends_num, zbx_hash
  *             items_info  - [IN] item names and tags                         *
  *                                                                            *
  ******************************************************************************/
-static void DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx_hashset_t *hosts_info,
-							 zbx_hashset_t *items_info)
-{
-	const ZBX_DC_HISTORY *h;
-	const zbx_history_sync_item_t *item;
-	int i, j;
-	zbx_host_info_t *host_info;
-	zbx_item_info_t *item_info;
-	struct zbx_json json;
+// static void DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx_hashset_t *hosts_info,
+// 							 zbx_hashset_t *items_info)
+// {
+// 	const ZBX_DC_HISTORY *h;
+// 	const zbx_history_sync_item_t *item;
+// 	int i, j;
+// 	zbx_host_info_t *host_info;
+// 	zbx_item_info_t *item_info;
+// 	struct zbx_json json;
 
-	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+// 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
-	for (i = 0; i < history_num; i++)
-	{
-		h = &history[i];
+// 	for (i = 0; i < history_num; i++)
+// 	{
+// 		h = &history[i];
 
-		if (0 != (ZBX_DC_FLAGS_NOT_FOR_MODULES & h->flags))
-			continue;
+// 		if (0 != (ZBX_DC_FLAGS_NOT_FOR_MODULES & h->flags))
+// 			continue;
 
-		if (NULL == (item_info = (zbx_item_info_t *)zbx_hashset_search(items_info, &h->itemid)))
-		{
-			THIS_SHOULD_NEVER_HAPPEN;
-			continue;
-		}
+// 		if (NULL == (item_info = (zbx_item_info_t *)zbx_hashset_search(items_info, &h->itemid)))
+// 		{
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 			continue;
+// 		}
 
-		item = item_info->item;
+// 		item = item_info->item;
 
-		if (NULL == (host_info = (zbx_host_info_t *)zbx_hashset_search(hosts_info, &item->host.hostid)))
-		{
-			THIS_SHOULD_NEVER_HAPPEN;
-			continue;
-		}
+// 		if (NULL == (host_info = (zbx_host_info_t *)zbx_hashset_search(hosts_info, &item->host.hostid)))
+// 		{
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 			continue;
+// 		}
 
-		zbx_json_clean(&json);
+// 		zbx_json_clean(&json);
 
-		zbx_json_addobject(&json, ZBX_PROTO_TAG_HOST);
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, item->host.host, ZBX_JSON_TYPE_STRING);
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item->host.name, ZBX_JSON_TYPE_STRING);
-		zbx_json_close(&json);
+// 		zbx_json_addobject(&json, ZBX_PROTO_TAG_HOST);
+// 		zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, item->host.host, ZBX_JSON_TYPE_STRING);
+// 		zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item->host.name, ZBX_JSON_TYPE_STRING);
+// 		zbx_json_close(&json);
 
-		zbx_json_addarray(&json, ZBX_PROTO_TAG_GROUPS);
+// 		zbx_json_addarray(&json, ZBX_PROTO_TAG_GROUPS);
 
-		for (j = 0; j < host_info->groups.values_num; j++)
-			zbx_json_addstring(&json, NULL, host_info->groups.values[j], ZBX_JSON_TYPE_STRING);
+// 		for (j = 0; j < host_info->groups.values_num; j++)
+// 			zbx_json_addstring(&json, NULL, host_info->groups.values[j], ZBX_JSON_TYPE_STRING);
 
-		zbx_json_close(&json);
+// 		zbx_json_close(&json);
 
-		zbx_json_addarray(&json, ZBX_PROTO_TAG_ITEM_TAGS);
+// 		zbx_json_addarray(&json, ZBX_PROTO_TAG_ITEM_TAGS);
 
-		for (j = 0; j < item_info->item_tags.values_num; j++)
-		{
-			zbx_tag_t item_tag = item_info->item_tags.values[j];
+// 		for (j = 0; j < item_info->item_tags.values_num; j++)
+// 		{
+// 			zbx_tag_t item_tag = item_info->item_tags.values[j];
 
-			zbx_json_addobject(&json, NULL);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
-			zbx_json_close(&json);
-		}
+// 			zbx_json_addobject(&json, NULL);
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
+// 			zbx_json_close(&json);
+// 		}
 
-		zbx_json_close(&json);
-		zbx_json_adduint64(&json, ZBX_PROTO_TAG_ITEMID, item->itemid);
+// 		zbx_json_close(&json);
+// 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_ITEMID, item->itemid);
 
-		if (NULL != item_info->name)
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item_info->name, ZBX_JSON_TYPE_STRING);
+// 		if (NULL != item_info->name)
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item_info->name, ZBX_JSON_TYPE_STRING);
 
-		zbx_json_addint64(&json, ZBX_PROTO_TAG_CLOCK, h->ts.sec);
-		zbx_json_addint64(&json, ZBX_PROTO_TAG_NS, h->ts.ns);
+// 		zbx_json_addint64(&json, ZBX_PROTO_TAG_CLOCK, h->ts.sec);
+// 		zbx_json_addint64(&json, ZBX_PROTO_TAG_NS, h->ts.ns);
 
-		switch (h->value_type)
-		{
-		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_json_addfloat(&json, ZBX_PROTO_TAG_VALUE, h->value.dbl);
-			break;
-		case ITEM_VALUE_TYPE_UINT64:
-			zbx_json_adduint64(&json, ZBX_PROTO_TAG_VALUE, h->value.ui64);
-			break;
-		case ITEM_VALUE_TYPE_STR:
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
-			break;
-		case ITEM_VALUE_TYPE_TEXT:
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
-			break;
-		case ITEM_VALUE_TYPE_LOG:
-			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGTIMESTAMP, h->value.log->timestamp);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_LOGSOURCE,
-							   ZBX_NULL2EMPTY_STR(h->value.log->source), ZBX_JSON_TYPE_STRING);
-			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGSEVERITY, h->value.log->severity);
-			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGEVENTID, h->value.log->logeventid);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.log->value,
-							   ZBX_JSON_TYPE_STRING);
-			break;
-		default:
-			THIS_SHOULD_NEVER_HAPPEN;
-		}
+// 		switch (h->value_type)
+// 		{
+// 		case ITEM_VALUE_TYPE_FLOAT:
+// 			zbx_json_addfloat(&json, ZBX_PROTO_TAG_VALUE, h->value.dbl);
+// 			break;
+// 		case ITEM_VALUE_TYPE_UINT64:
+// 			zbx_json_adduint64(&json, ZBX_PROTO_TAG_VALUE, h->value.ui64);
+// 			break;
+// 		case ITEM_VALUE_TYPE_STR:
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
+// 			break;
+// 		case ITEM_VALUE_TYPE_TEXT:
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
+// 			break;
+// 		case ITEM_VALUE_TYPE_LOG:
+// 			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGTIMESTAMP, h->value.log->timestamp);
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_LOGSOURCE,
+// 							   ZBX_NULL2EMPTY_STR(h->value.log->source), ZBX_JSON_TYPE_STRING);
+// 			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGSEVERITY, h->value.log->severity);
+// 			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGEVENTID, h->value.log->logeventid);
+// 			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.log->value,
+// 							   ZBX_JSON_TYPE_STRING);
+// 			break;
+// 		default:
+// 			THIS_SHOULD_NEVER_HAPPEN;
+// 		}
 
-		zbx_json_adduint64(&json, ZBX_PROTO_TAG_TYPE, h->value_type);
-		zbx_history_export_write(json.buffer, json.buffer_size);
-	}
+// 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_TYPE, h->value_type);
+// 		zbx_history_export_write(json.buffer, json.buffer_size);
+// 	}
 
-	zbx_history_export_flush();
-	zbx_json_free(&json);
-}
+// 	zbx_history_export_flush();
+// 	zbx_json_free(&json);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1534,55 +1535,55 @@ static void DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
  *        '-' - should never happen                                           *
  *                                                                            *
  ******************************************************************************/
-static int zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *diffs, ZBX_DC_HISTORY *history)
-{
-	LOG_DBG("In %s() triggerid:" ZBX_FS_UI64 " value:%d new_value:%d",
-			__func__, trigger->triggerid, trigger->value, trigger->new_value);
+// static int zbx_process_trigger(struct _DC_TRIGGER *trigger, zbx_vector_ptr_t *diffs, ZBX_DC_HISTORY *history)
+// {
+// 	LOG_DBG("In %s() triggerid:" ZBX_FS_UI64 " value:%d new_value:%d",
+// 			__func__, trigger->triggerid, trigger->value, trigger->new_value);
 
-	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger, value is %d, new value is %d", trigger->value, trigger->new_value);
+// 	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger, value is %d, new value is %d", trigger->value, trigger->new_value);
 
-	// updating state anyway
-	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, ZBX_FLAGS_TRIGGER_DIFF_UPDATE, trigger->new_value,
-							trigger->timespec.sec, trigger->new_error);
+// 	// updating state anyway
+// 	zbx_append_trigger_diff(diffs, trigger->triggerid, trigger->priority, ZBX_FLAGS_TRIGGER_DIFF_UPDATE, trigger->new_value,
+// 							trigger->timespec.sec, trigger->new_error);
 
-	if (trigger->new_value == TRIGGER_VALUE_OK || trigger->new_value == TRIGGER_VALUE_PROBLEM)
-	{
-		// creating recovery/problem event, to handle existing/not yet existing problems if they already are, the event will be discarede
+// 	if (trigger->new_value == TRIGGER_VALUE_OK || trigger->new_value == TRIGGER_VALUE_PROBLEM)
+// 	{
+// 		// creating recovery/problem event, to handle existing/not yet existing problems if they already are, the event will be discarede
 
-		DEBUG_TRIGGER(trigger->triggerid, "Creating event for the trigger %ld create for item %ld",
-					  trigger->triggerid, history[trigger->history_idx].itemid);
+// 		DEBUG_TRIGGER(trigger->triggerid, "Creating event for the trigger %ld create for item %ld",
+// 					  trigger->triggerid, history[trigger->history_idx].itemid);
 
-		zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
-					  &trigger->timespec, trigger->new_value, trigger->description,
-					  trigger->expression, trigger->recovery_expression,
-					  trigger->priority, trigger->type, &trigger->tags,
-					  trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
-					  trigger->event_name, NULL, trigger->history_idx);
-	}
+// 		zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, trigger->triggerid,
+// 					  &trigger->timespec, trigger->new_value, trigger->description,
+// 					  trigger->expression, trigger->recovery_expression,
+// 					  trigger->priority, trigger->type, &trigger->tags,
+// 					  trigger->correlation_mode, trigger->correlation_tag, trigger->value, trigger->opdata,
+// 					  trigger->event_name, NULL, trigger->history_idx);
+// 	}
 
-	// if state hasn't changed, and not problem in multi-problem gen config, nothing to do
-	if (trigger->value == trigger->new_value)
-	{
-		if (TRIGGER_VALUE_PROBLEM != trigger->new_value ||
-			TRIGGER_TYPE_MULTIPLE_TRUE != trigger->type)
-			return SUCCEED;
-	}
+// 	// if state hasn't changed, and not problem in multi-problem gen config, nothing to do
+// 	if (trigger->value == trigger->new_value)
+// 	{
+// 		if (TRIGGER_VALUE_PROBLEM != trigger->new_value ||
+// 			TRIGGER_TYPE_MULTIPLE_TRUE != trigger->type)
+// 			return SUCCEED;
+// 	}
 
-	if (TRIGGER_VALUE_UNKNOWN == trigger->value || TRIGGER_VALUE_UNKNOWN == trigger->new_value)
-	{
-		DEBUG_TRIGGER(trigger->triggerid, "Creating internal event for the trigger");
+// 	if (TRIGGER_VALUE_UNKNOWN == trigger->value || TRIGGER_VALUE_UNKNOWN == trigger->new_value)
+// 	{
+// 		DEBUG_TRIGGER(trigger->triggerid, "Creating internal event for the trigger");
 
-		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
-					  &trigger->timespec, trigger->new_value, NULL, trigger->expression,
-					  trigger->recovery_expression, 0, 0, &trigger->tags, 0, NULL, 0, NULL, NULL,
-					  trigger->error, trigger->history_idx);
-	}
+// 		zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_TRIGGER, trigger->triggerid,
+// 					  &trigger->timespec, trigger->new_value, NULL, trigger->expression,
+// 					  trigger->recovery_expression, 0, 0, &trigger->tags, 0, NULL, 0, NULL, NULL,
+// 					  trigger->error, trigger->history_idx);
+// 	}
 
-	if (trigger->new_value == TRIGGER_VALUE_UNKNOWN)
-		return SUCCEED;
+// 	if (trigger->new_value == TRIGGER_VALUE_UNKNOWN)
+// 		return SUCCEED;
 
-	return SUCCEED;
-}
+// 	return SUCCEED;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1612,23 +1613,35 @@ static int zbx_trigger_topoindex_compare(const void *d1, const void *d2)
  *                              (zbx_clean_func_t)zbx_trigger_diff_free);     *
  *                                                                            *
  ******************************************************************************/
-static void zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_diff, ZBX_DC_HISTORY *history)
-{
+// static void zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_diff, ZBX_DC_HISTORY *history)
+// {
+// 	int i;
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() values_num:%d", __func__, triggers->values_num);
+
+// 	if (0 == triggers->values_num)
+// 		goto out;
+
+// 	zbx_vector_ptr_sort(triggers, zbx_trigger_topoindex_compare);
+
+// 	for (i = 0; i < triggers->values_num; i++)
+// 		glb_state_trigger_process_value(); 
+// 		zbx_process_trigger((struct _DC_TRIGGER *)triggers->values[i], trigger_diff, history);
+
+// 	zbx_vector_ptr_sort(trigger_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
+// out:
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
+
+void glb_process_triggers(zbx_vector_ptr_t *triggers) {
+	DC_TRIGGER		*tr;
 	int i;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() values_num:%d", __func__, triggers->values_num);
-
-	if (0 == triggers->values_num)
-		goto out;
-
-	zbx_vector_ptr_sort(triggers, zbx_trigger_topoindex_compare);
-
+	
 	for (i = 0; i < triggers->values_num; i++)
-		zbx_process_trigger((struct _DC_TRIGGER *)triggers->values[i], trigger_diff, history);
-
-	zbx_vector_ptr_sort(trigger_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	{
+		tr = (DC_TRIGGER *)triggers->values[i];
+		glb_trigger_register_calculation(tr);
+	}
 }
 
 /******************************************************************************
@@ -1648,7 +1661,7 @@ out:
 static void recalculate_triggers(ZBX_DC_HISTORY *history, int history_num,
 								 const zbx_vector_uint64_t *history_itemids, 
 								 const zbx_history_sync_item_t *history_items, const int *history_errcodes,
-								 const zbx_vector_ptr_t *timers, zbx_vector_ptr_t *trigger_diff)
+								 const zbx_vector_ptr_t *timers)
 {
 	int i, item_num = 0, timers_num = 0;
 	zbx_uint64_t *itemids = NULL;
@@ -1718,7 +1731,10 @@ static void recalculate_triggers(ZBX_DC_HISTORY *history, int history_num,
 
 	zbx_vector_ptr_sort(&trigger_order, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
 	zbx_evaluate_expressions(&trigger_order, history_itemids, history_items, history_errcodes);
-	zbx_process_triggers(&trigger_order, trigger_diff, history);
+	
+	glb_process_triggers(&trigger_order);
+	//trigger processing could ve done right after eval
+	//zbx_process_triggers(&trigger_order, trigger_diff, history);
 
 	DCfree_triggers(&trigger_order);
 
@@ -2846,14 +2862,14 @@ static void sync_server_history(int *values_num, int *triggers_num, int *more)
 	unsigned int item_retrieve_mode;
 	time_t sync_start;
 	zbx_vector_uint64_t triggerids;
-	zbx_vector_ptr_t history_items, trigger_diff, inventory_values, trigger_timers;
+	zbx_vector_ptr_t history_items, inventory_values, trigger_timers;
 	zbx_vector_uint64_pair_t trends_diff, proxy_subscribtions;
 	ZBX_DC_HISTORY history[ZBX_HC_SYNC_MAX];
 
 	item_retrieve_mode = 0 == zbx_has_export_dir() ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
 
 	zbx_vector_ptr_create(&inventory_values);
-	zbx_vector_ptr_create(&trigger_diff);
+	//zbx_vector_ptr_create(&trigger_diff);
 	zbx_vector_uint64_pair_create(&trends_diff);
 	zbx_vector_uint64_pair_create(&proxy_subscribtions);
 
@@ -2963,16 +2979,16 @@ static void sync_server_history(int *values_num, int *triggers_num, int *more)
 					DBbegin();
 
 					recalculate_triggers(history, history_num, &itemids, items, errcodes,
-										 &trigger_timers, &trigger_diff);
+										 &trigger_timers);
 
 					/* process trigger events generated by recalculate_triggers() */
-					zbx_process_events(&trigger_diff, &triggerids, history);
-					glb_state_triggers_apply_diffs(&trigger_diff);
+					//zbx_process_events(&trigger_diff, &triggerids, history);
+					
 
 					if (ZBX_DB_OK != (txn_error = DBcommit()))
 						zbx_clean_events();
 
-					zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);
+				//	zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);
 				} while (ZBX_DB_DOWN == txn_error);
 
 				// separate story, some kind of SLA and services calculation is
@@ -3026,12 +3042,12 @@ static void sync_server_history(int *values_num, int *triggers_num, int *more)
 			*values_num += history_num;
 		}
 
-		if (FAIL != ret)
-		{
+		// if (FAIL != ret)
+		// {
 
-			if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
-				zbx_export_events();
-		}
+		// 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
+		// 		zbx_export_events();
+		// }
 
 		if (0 != history_num || 0 != timers_num)
 			zbx_clean_events();
@@ -3091,7 +3107,7 @@ static void sync_server_history(int *values_num, int *triggers_num, int *more)
 
 	zbx_vector_ptr_destroy(&history_items);
 	zbx_vector_ptr_destroy(&inventory_values);
-	zbx_vector_ptr_destroy(&trigger_diff);
+	//zbx_vector_ptr_destroy(&trigger_diff);
 	zbx_vector_uint64_pair_destroy(&trends_diff);
 	zbx_vector_uint64_pair_destroy(&proxy_subscribtions);
 
