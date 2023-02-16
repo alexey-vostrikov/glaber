@@ -386,18 +386,34 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     
     pinger_item = (pinger_item_t *) zbx_calloc(NULL, 0, sizeof(pinger_item_t));
     
+    DEBUG_ITEM(poller_get_item_id(poller_item), "Doing item init in icmp async poller");
+    
     poller_set_item_specific_data(poller_item, pinger_item);
     
     ZBX_STRDUP(parsed_key, dc_item->key_orig);
     
 	if (SUCCEED != zbx_substitute_key_macros(&parsed_key, NULL, dc_item, NULL, NULL, MACRO_TYPE_ITEM_KEY, error,
-				sizeof(error)))
+				sizeof(error))) {
+        poller_preprocess_error(poller_item, error);
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't init in icmp poller: %s", error);
         return FAIL;
+    }
 
-    if (SUCCEED != zbx_parse_key_params(parsed_key, dc_item->interface.addr, &icmpping, &addr, &count,
-					&interval, &size, &timeout, &type, error, sizeof(error))) 
-	    return FAIL;
+    if (dc_item->interface.useip) 
+        addr = dc_item->interface.ip_orig;
+    else 
+        addr = dc_item->interface.dns_orig;
 
+    DEBUG_ITEM(poller_get_item_id(poller_item),"Interface host addr is %s ip %s dns %s addr %s", addr, dc_item->interface.ip_orig, dc_item->interface.dns_orig,
+            dc_item->interface.addr);
+
+    if (SUCCEED != zbx_parse_key_params(parsed_key, addr, &icmpping, &addr, &count,
+					&interval, &size, &timeout, &type, error, sizeof(error))) {
+        poller_preprocess_error(poller_item, error);
+        DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't parse icmp parameters: %s", error);
+        return FAIL;
+    }
+    
     pinger_item->ip = NULL;
     pinger_item->addr = addr;
     pinger_item->type = type;
@@ -429,6 +445,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     pinger_item->timeout_event = poller_create_event(poller_item, send_timeout_cb, 0, NULL, 0);
 
     zbx_free(parsed_key);
+    DEBUG_ITEM(poller_get_item_id(poller_item), "Succesifully finished item init in icmp async poller");
     return SUCCEED;
 }
 

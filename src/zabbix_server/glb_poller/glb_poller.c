@@ -662,7 +662,7 @@ void poller_preprocess_error(poller_item_t *poller_item, const char *error)
 
 	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
 							  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
-	
+	glb_state_item_set_error(poller_item->itemid, error);
 	glb_state_interfaces_register_fail(poller_item->interfaceid, error);
 }
 

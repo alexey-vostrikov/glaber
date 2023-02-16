@@ -8633,6 +8633,30 @@ void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE *src_in
 	dst_interface->port = 0;
 }
 
+static ZBX_DC_INTERFACE *DChost_get_default_interface(u_int64_t hostid) {
+	ZBX_DC_INTERFACE *iface = NULL;
+	ZBX_DC_HOST *host;
+	int i;
+
+	if (NULL ==(host = zbx_hashset_search(&config->hosts, &hostid))) 
+		return NULL;
+
+	zbx_vector_ptr_t* ifaces = &host->interfaces_v;
+	
+	if (NULL ==  &host->interfaces_v) {
+		return NULL;
+	}
+	
+	for (i = 0; i < host->interfaces_v.values_num; i++) {
+		iface = host->interfaces_v.values[i];
+	
+		if (iface->main) 
+			return iface;
+	}
+
+	return iface;
+}
+
 static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 {
 	const ZBX_DC_LOGITEM *logitem;
@@ -8679,8 +8703,14 @@ static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 		break;
 	}
 
-	dc_interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &src_item->interfaceid);
-
+	
+	if (0 == src_item->interfaceid ) {
+		DEBUG_ITEM(src_item->itemid, "Item has no interface set, finding default interface for the host %ld", src_item->hostid);
+		dc_interface = DChost_get_default_interface(src_item->hostid);
+	} else
+		dc_interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &src_item->interfaceid);
+	
+	DEBUG_ITEM(dst_item->itemid, "Found interface for the item %ld, ifaceid %ld: %p",src_item->itemid, src_item->interfaceid, dc_interface);
 	DCget_interface(&dst_item->interface, dc_interface);
 
 	switch (src_item->type)

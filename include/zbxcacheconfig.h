@@ -219,7 +219,6 @@ typedef struct
 	char			key_orig[ZBX_ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 	char			*units;
 	char			*history_period, *trends_period;
-	int			mtime;
 	int			history_sec;
 	int			trends_sec;
 	int			flags;

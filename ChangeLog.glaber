@@ -1,3 +1,5 @@
+ver 3.0.18
+    - fix: search link doesn't reset lataest data remembered filters, fix: default interface selection for items having no interface
 ver 3.0.17
     - new latest data view, fix workers, fix agent tcp pollers
 ver 3.0.16

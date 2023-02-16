@@ -696,9 +696,10 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
             req->ts_head, req->count, req->seconds  );
     
     int head_idx = -1, need_count = 0;
-
-    if (req->value_type != elm->value_type)
+    
+    if (req->value_type != elm->value_type && glb_tsbuff_get_count(&elm->tsbuff) > 0 )
     {
+        DEBUG_ITEM(elem->id,"Item type mismactch: current: %d, new %d, recreating the item", elm->value_type, req->value_type);
         free_item(elm);
         item_create_cb(elem, memf, NULL);
       
@@ -706,6 +707,7 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
         elm->value_type = req->value_type;
     }
 
+    elm->value_type = req->value_type;
     int cache_start = glb_tsbuff_get_time_head(&elm->tsbuff);
     int now = time(NULL);
 
@@ -1020,9 +1022,11 @@ static int item_update_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void
     if (req->flags & GLB_CACHE_ITEM_UPDATE_ERRORMSG)
     {
         DEBUG_ITEM(elem->id, "Updating metadata: errmsg");
-        DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", req->meta->error);
         DEBUG_ITEM(elem->id, "Updating metadata: errmsg old %s", elm->meta.error);
+        //DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", req->meta->error);
+       
         elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, req->meta->error);
+        DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", elm->meta.error);
     }
 
     return SUCCEED;
@@ -1407,7 +1411,6 @@ void	glb_state_get_item_stats(zbx_vector_ptr_t *stats)
 
 }
 
-
 int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json) {
     
     int i;
@@ -1430,12 +1433,12 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
 
             zbx_json_close(json);
             
-            DEBUG_ITEM(itemids->values[i], "Added info to the trapper status request");
+            DEBUG_ITEM(itemids->values[i], "Added info to the trapper status request: lastdata: %d, state %d, error %d",req.meta->lastdata,
+                     req.meta->state, req.meta->error);
         }
     }
     zbx_json_close(json); 
 }
-
 
 int glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) {
 	elems_hash_elem_t *elem;
@@ -1465,7 +1468,6 @@ int glb_state_items_load() {
     state_load_objects(state->items, "items", "itemid", unmarshall_item_cb );
     return SUCCEED;
 }
-
 
 /*****************************************************************
     element to json for dumping and api

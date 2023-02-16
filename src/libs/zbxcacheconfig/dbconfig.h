@@ -380,7 +380,6 @@ typedef struct
 							/* by a particular proxy. */
 							/* NOTE: On disabled hosts all items are counted as disabled. */
 	zbx_uint64_t	maintenanceid;
-	//zbx_hashset_t itemids; //id refs to items of this host
 
 	const char	*host;
 	const char	*name;
