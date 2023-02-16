@@ -180,6 +180,17 @@ class CZabbixServer {
 		$zabbix_server->syncConfiguration();
 	}
 
+	public static function  generalRequest($options) {
+		global $ZBX_SERVER, $ZBX_SERVER_PORT;
+	
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
+			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
+		);
+		
+		return $zabbix_server->request($options);
+	}
+
 	public static function  setDebugObjects($itemid, $triggerid) {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 	

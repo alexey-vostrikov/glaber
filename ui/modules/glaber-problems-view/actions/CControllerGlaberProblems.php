@@ -79,6 +79,7 @@ abstract class CControllerGlaberProblems extends \CController {
 		
 		\show_error_message("Will fetch problems here");
 		$problems = \API::Problem()->get([]);
+		
 		\show_error_message("Problems:".json_encode($problems));
 		$items = \API::Item()->get($fetch_options);
 	

@@ -28,6 +28,6 @@ typedef enum {
 int glb_state_ids_init(int proc_num);
 
 u_int64_t glb_state_id_gen_new();
-u_int64_t glb_state_id_get_time(u_int64_t id);
+u_int64_t glb_state_id_get_timestamp(u_int64_t id);
 
 #endif

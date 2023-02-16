@@ -831,6 +831,8 @@ int 	elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, 
 int 	elems_hash_get_num(elems_hash_t *elems);
 int 	elems_hash_id_exists(elems_hash_t *elems, u_int64_t id);
 int 	elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb);
+void	elems_hash_iterate_by_vector(elems_hash_t *elems, zbx_vector_uint64_t *ids, elems_hash_process_cb_t proc_func, void *param,
+     			u_int64_t element_lock_flags);
 
 typedef struct index_uint64_t index_uint64_t;
 
@@ -845,9 +847,9 @@ int index_uint64_del(index_uint64_t *index, u_int64_t key, u_int64_t value);
 int index_uint64_del_key(index_uint64_t *index, u_int64_t key);
 int index_uint64_get_count_by_key(index_uint64_t *index, u_int64_t key);
 int index_uint64_get_keys_num(index_uint64_t *index);
-/******tested by here********/
 int index_uint64_sync_objects(index_uint64_t *index, elems_hash_t *objects);
-
+/******tested by here********/
+int index_uint64_get_keys_values(index_uint64_t *index, zbx_vector_uint64_t *ids, zbx_vector_uint64_t *values);
 //int index_uint64_get_keys(index_uint64_t *index, zbx_vector_uint64_t *keys);
 
 //int  index_uint64_add_pair_values(index_uint64_t *index, u_int64_t key, zbx_vector_uint64_t *values);

@@ -36,54 +36,50 @@
 /* event recovery data */
 typedef struct
 {
-	zbx_uint64_t	eventid;
-	zbx_uint64_t	objectid;
-	ZBX_DB_EVENT	*r_event;
-	zbx_uint64_t    recovered_event_id;
-	zbx_uint64_t	correlationid;
-	zbx_uint64_t	c_eventid;
-	zbx_uint64_t	userid;
-	int history_idx; 
-	zbx_timespec_t	ts;
-}
-zbx_event_recovery_t;
+	zbx_uint64_t eventid;
+	zbx_uint64_t objectid;
+	ZBX_DB_EVENT *r_event;
+	zbx_uint64_t recovered_event_id;
+	zbx_uint64_t correlationid;
+	zbx_uint64_t c_eventid;
+	zbx_uint64_t userid;
+	int history_idx;
+	zbx_timespec_t ts;
+} zbx_event_recovery_t;
 
 /* problem event, used to cache open problems for recovery attempts */
 typedef struct
 {
-	zbx_uint64_t		eventid;
-	zbx_uint64_t		triggerid;
+	zbx_uint64_t eventid;
+	zbx_uint64_t triggerid;
 
-	zbx_vector_ptr_t	tags;
+	zbx_vector_ptr_t tags;
 	unsigned char is_recovered;
-}
-zbx_event_problem_t;
+} zbx_event_problem_t;
 
 typedef enum
 {
 	CORRELATION_MATCH = 0,
 	CORRELATION_NO_MATCH,
 	CORRELATION_MAY_MATCH
-}
-zbx_correlation_match_result_t;
+} zbx_correlation_match_result_t;
 
+#define ZBX_CORR_OPERATION_CLOSE_OLD 0
+#define ZBX_CORR_OPERATION_CLOSE_NEW 1
 
-#define ZBX_CORR_OPERATION_CLOSE_OLD	0
-#define ZBX_CORR_OPERATION_CLOSE_NEW	1
-
-static zbx_vector_ptr_t		events;
-static zbx_hashset_t		event_recovery;
-static zbx_hashset_t		correlation_cache;
-static zbx_correlation_rules_t	correlation_rules;
+static zbx_vector_ptr_t events;
+static zbx_hashset_t event_recovery;
+static zbx_hashset_t correlation_cache;
+static zbx_correlation_rules_t correlation_rules;
 
 /******************************************************************************
  *                                                                            *
  * Purpose: Check that tag name is not empty and that tag is not duplicate.   *
  *                                                                            *
  ******************************************************************************/
-static int	validate_event_tag(const ZBX_DB_EVENT* event, const zbx_tag_t *tag)
+static int validate_event_tag(const ZBX_DB_EVENT *event, const zbx_tag_t *tag)
 {
-	int	i;
+	int i;
 
 	if ('\0' == *tag->tag)
 		return FAIL;
@@ -91,7 +87,7 @@ static int	validate_event_tag(const ZBX_DB_EVENT* event, const zbx_tag_t *tag)
 	/* check for duplicated tags */
 	for (i = 0; i < event->tags.values_num; i++)
 	{
-		zbx_tag_t	*event_tag = (zbx_tag_t *)event->tags.values[i];
+		zbx_tag_t *event_tag = (zbx_tag_t *)event->tags.values[i];
 
 		if (0 == strcmp(event_tag->tag, tag->tag) && 0 == strcmp(event_tag->value, tag->value))
 			return FAIL;
@@ -100,9 +96,9 @@ static int	validate_event_tag(const ZBX_DB_EVENT* event, const zbx_tag_t *tag)
 	return SUCCEED;
 }
 
-static zbx_tag_t	*duplicate_tag(const zbx_tag_t *tag)
+static zbx_tag_t *duplicate_tag(const zbx_tag_t *tag)
 {
-	zbx_tag_t	*t;
+	zbx_tag_t *t;
 
 	t = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
 	t->tag = zbx_strdup(NULL, tag->tag);
@@ -111,7 +107,7 @@ static zbx_tag_t	*duplicate_tag(const zbx_tag_t *tag)
 	return t;
 }
 
-static void	validate_and_add_tag(ZBX_DB_EVENT* event, zbx_tag_t *tag)
+static void validate_and_add_tag(ZBX_DB_EVENT *event, zbx_tag_t *tag)
 {
 	zbx_ltrim(tag->tag, ZBX_WHITESPACE);
 	zbx_ltrim(tag->value, ZBX_WHITESPACE);
@@ -130,15 +126,15 @@ static void	validate_and_add_tag(ZBX_DB_EVENT* event, zbx_tag_t *tag)
 		zbx_free_tag(tag);
 }
 
-static void	substitute_trigger_tag_macro(const ZBX_DB_EVENT* event, char **str)
+static void substitute_trigger_tag_macro(const ZBX_DB_EVENT *event, char **str)
 {
 	zbx_substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL,
-			NULL, NULL, NULL, NULL, str, MACRO_TYPE_TRIGGER_TAG, NULL, 0);
+								 NULL, NULL, NULL, NULL, str, MACRO_TYPE_TRIGGER_TAG, NULL, 0);
 }
 
-static void	process_trigger_tag(ZBX_DB_EVENT* event, const zbx_tag_t *tag)
+static void process_trigger_tag(ZBX_DB_EVENT *event, const zbx_tag_t *tag)
 {
-	zbx_tag_t	*t;
+	zbx_tag_t *t;
 
 	t = duplicate_tag(tag);
 	substitute_trigger_tag_macro(event, &t->tag);
@@ -146,16 +142,16 @@ static void	process_trigger_tag(ZBX_DB_EVENT* event, const zbx_tag_t *tag)
 	validate_and_add_tag(event, t);
 }
 
-static void	substitute_item_tag_macro(const ZBX_DB_EVENT* event, const DC_ITEM *dc_item, char **str)
+static void substitute_item_tag_macro(const ZBX_DB_EVENT *event, const DC_ITEM *dc_item, char **str)
 {
 	zbx_substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, dc_item, NULL,
-			NULL, NULL, NULL, NULL, str, MACRO_TYPE_ITEM_TAG, NULL, 0);
+								 NULL, NULL, NULL, NULL, str, MACRO_TYPE_ITEM_TAG, NULL, 0);
 }
 
-static void	process_item_tag(ZBX_DB_EVENT* event, const zbx_item_tag_t *item_tag)
+static void process_item_tag(ZBX_DB_EVENT *event, const zbx_item_tag_t *item_tag)
 {
-	zbx_tag_t	*t;
-	DC_ITEM		dc_item; /* used to pass data into zbx_substitute_simple_macros() function */
+	zbx_tag_t *t;
+	DC_ITEM dc_item; /* used to pass data into zbx_substitute_simple_macros() function */
 
 	t = duplicate_tag(&item_tag->tag);
 
@@ -167,9 +163,9 @@ static void	process_item_tag(ZBX_DB_EVENT* event, const zbx_item_tag_t *item_tag
 	validate_and_add_tag(event, t);
 }
 
-static void	get_item_tags_by_expression(const ZBX_DB_TRIGGER *trigger, zbx_vector_ptr_t *item_tags)
+static void get_item_tags_by_expression(const ZBX_DB_TRIGGER *trigger, zbx_vector_ptr_t *item_tags)
 {
-	zbx_vector_uint64_t	functionids;
+	zbx_vector_uint64_t functionids;
 
 	zbx_vector_uint64_create(&functionids);
 	zbx_db_trigger_get_functionids(trigger, &functionids);
@@ -205,22 +201,22 @@ static void	get_item_tags_by_expression(const ZBX_DB_TRIGGER *trigger, zbx_vecto
  * Return value: The added event.                                             *
  *                                                                            *
  ******************************************************************************/
-ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t objectid,
-		const zbx_timespec_t *timespec, int value, const char *trigger_description,
-		const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
-		unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
-		unsigned char trigger_correlation_mode, const char *trigger_correlation_tag,
-		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error,
-		int history_idx)
+ZBX_DB_EVENT *zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t objectid,
+							const zbx_timespec_t *timespec, int value, const char *trigger_description,
+							const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
+							unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
+							unsigned char trigger_correlation_mode, const char *trigger_correlation_tag,
+							unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error,
+							int history_idx)
 {
-	zbx_vector_ptr_t	item_tags;
-	int			i;
-	ZBX_DB_EVENT		*event;
+	zbx_vector_ptr_t item_tags;
+	int i;
+	ZBX_DB_EVENT *event;
 
 	event = zbx_malloc(NULL, sizeof(ZBX_DB_EVENT));
 
 	event->eventid = 0;
-	event->history_idx  = history_idx;
+	event->history_idx = history_idx;
 	event->source = source;
 	event->object = object;
 	event->objectid = objectid;
@@ -235,8 +231,8 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 
 	if (EVENT_SOURCE_TRIGGERS == source)
 	{
-		char			err[256];
-		zbx_dc_um_handle_t	*um_handle;
+		char err[256];
+		zbx_dc_um_handle_t *um_handle;
 
 		um_handle = zbx_dc_open_user_macros();
 
@@ -253,18 +249,18 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 		event->trigger.correlation_tag = zbx_strdup(NULL, trigger_correlation_tag);
 		event->trigger.value = trigger_value;
 		event->trigger.opdata = zbx_strdup(NULL, trigger_opdata);
-		event->trigger.event_name = ((NULL != event_name && event_name[0] != '\0' ) ? zbx_strdup(NULL, event_name) : NULL);
-		event->name = zbx_strdup(NULL, ((NULL != event_name && event_name[0] != '\0' ) ? event_name : trigger_description));
+		event->trigger.event_name = ((NULL != event_name && event_name[0] != '\0') ? zbx_strdup(NULL, event_name) : NULL);
+		event->name = zbx_strdup(NULL, ((NULL != event_name && event_name[0] != '\0') ? event_name : trigger_description));
 		event->trigger.cache = NULL;
 		event->trigger.url = NULL;
 		event->trigger.url_name = NULL;
 		event->trigger.comments = NULL;
 
 		zbx_substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-				&event->trigger.correlation_tag, MACRO_TYPE_TRIGGER_TAG, err, sizeof(err));
+									 &event->trigger.correlation_tag, MACRO_TYPE_TRIGGER_TAG, err, sizeof(err));
 
 		zbx_substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-				&event->name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+									 &event->name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
 
 		zbx_vector_ptr_create(&event->tags);
 
@@ -289,7 +285,7 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 	}
 	else if (EVENT_SOURCE_INTERNAL == source)
 	{
-		zbx_dc_um_handle_t	*um_handle;
+		zbx_dc_um_handle_t *um_handle;
 
 		um_handle = zbx_dc_open_user_macros();
 
@@ -301,19 +297,19 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
 
 		switch (object)
 		{
-			case EVENT_OBJECT_TRIGGER:
-				memset(&event->trigger, 0, sizeof(ZBX_DB_TRIGGER));
+		case EVENT_OBJECT_TRIGGER:
+			memset(&event->trigger, 0, sizeof(ZBX_DB_TRIGGER));
 
-				event->trigger.expression = zbx_strdup(NULL, trigger_expression);
-				event->trigger.recovery_expression = zbx_strdup(NULL, trigger_recovery_expression);
+			event->trigger.expression = zbx_strdup(NULL, trigger_expression);
+			event->trigger.recovery_expression = zbx_strdup(NULL, trigger_recovery_expression);
 
-				for (i = 0; i < trigger_tags->values_num; i++)
-					process_trigger_tag(event, (const zbx_tag_t *)trigger_tags->values[i]);
+			for (i = 0; i < trigger_tags->values_num; i++)
+				process_trigger_tag(event, (const zbx_tag_t *)trigger_tags->values[i]);
 
-				get_item_tags_by_expression(&event->trigger, &item_tags);
-				break;
-			case EVENT_OBJECT_ITEM:
-				zbx_dc_get_item_tags(objectid, &item_tags);
+			get_item_tags_by_expression(&event->trigger, &item_tags);
+			break;
+		case EVENT_OBJECT_ITEM:
+			zbx_dc_get_item_tags(objectid, &item_tags);
 		}
 
 		for (i = 0; i < item_tags.values_num; i++)
@@ -354,19 +350,19 @@ ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint
  * Return value: Recovery event, created to close the specified event.        *
  *                                                                            *
  ******************************************************************************/
-static ZBX_DB_EVENT	*close_trigger_event(zbx_uint64_t eventid, zbx_uint64_t objectid, const zbx_timespec_t *ts,
-		zbx_uint64_t userid, zbx_uint64_t correlationid, zbx_uint64_t c_eventid,
-		const char *trigger_description, const char *trigger_expression,
-		const char *trigger_recovery_expression, unsigned char trigger_priority, unsigned char trigger_type,
-		const char *trigger_opdata, const char *event_name)
+static ZBX_DB_EVENT *close_trigger_event(zbx_uint64_t eventid, zbx_uint64_t objectid, const zbx_timespec_t *ts,
+										 zbx_uint64_t userid, zbx_uint64_t correlationid, zbx_uint64_t c_eventid,
+										 const char *trigger_description, const char *trigger_expression,
+										 const char *trigger_recovery_expression, unsigned char trigger_priority, unsigned char trigger_type,
+										 const char *trigger_opdata, const char *event_name)
 {
-	zbx_event_recovery_t	recovery_local={0};
-	ZBX_DB_EVENT		*r_event;
+	zbx_event_recovery_t recovery_local = {0};
+	ZBX_DB_EVENT *r_event;
 
 	r_event = zbx_add_event(EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, objectid, ts, TRIGGER_VALUE_OK,
-			trigger_description, trigger_expression, trigger_recovery_expression, trigger_priority,
-			trigger_type, NULL, ZBX_TRIGGER_CORRELATION_NONE, "", TRIGGER_VALUE_PROBLEM, trigger_opdata,
-			event_name, NULL, -1);
+							trigger_description, trigger_expression, trigger_recovery_expression, trigger_priority,
+							trigger_type, NULL, ZBX_TRIGGER_CORRELATION_NONE, "", TRIGGER_VALUE_PROBLEM, trigger_opdata,
+							event_name, NULL, -1);
 
 	recovery_local.eventid = eventid;
 	recovery_local.objectid = objectid;
@@ -385,13 +381,13 @@ static ZBX_DB_EVENT	*close_trigger_event(zbx_uint64_t eventid, zbx_uint64_t obje
  * Purpose: flushes the events into a database                                *
  *                                                                            *
  ******************************************************************************/
-static int	save_events(ZBX_DC_HISTORY *history)
+static int save_events(ZBX_DC_HISTORY *history)
 {
-	int			i;
-	zbx_db_insert_t		db_insert, db_insert_tags;
-	int			j, num = 0, insert_tags = 0;
-	zbx_uint64_t		eventid;
-	ZBX_DB_EVENT		*event;
+	int i;
+	zbx_db_insert_t db_insert, db_insert_tags;
+	int j, num = 0, insert_tags = 0;
+	zbx_uint64_t eventid;
+	ZBX_DB_EVENT *event;
 
 	for (i = 0; i < events.values_num; i++)
 	{
@@ -402,7 +398,7 @@ static int	save_events(ZBX_DC_HISTORY *history)
 	}
 
 	zbx_db_insert_prepare(&db_insert, "events", "eventid", "source", "object", "objectid", "clock", "ns", "value",
-			"name", "severity", NULL);
+						  "name", "severity", NULL);
 
 	eventid = DBget_maxid_num("events", num);
 
@@ -417,20 +413,21 @@ static int	save_events(ZBX_DC_HISTORY *history)
 
 		if (0 == event->eventid)
 			event->eventid = eventid++;
-		
-		if ( 0 <= event->history_idx && NULL != history && 1 == event->value ) {
-			
-		//	LOG_INF("Creating event %ld with severity %d object %d, objectid %ld, value %d created for item %ld idx is %d", 
-		//			event->eventid, event->severity, event->object, event->objectid, event->value, 
-		//			history[event->history_idx].itemid, event->history_idx );
 
-		//	history_update_log_enty_severity(&history[event->history_idx], event->severity, 
-		//			event->eventid, event->objectid, event->value);
+		if (0 <= event->history_idx && NULL != history && 1 == event->value)
+		{
+
+			//	LOG_INF("Creating event %ld with severity %d object %d, objectid %ld, value %d created for item %ld idx is %d",
+			//			event->eventid, event->severity, event->object, event->objectid, event->value,
+			//			history[event->history_idx].itemid, event->history_idx );
+
+			//	history_update_log_enty_severity(&history[event->history_idx], event->severity,
+			//			event->eventid, event->objectid, event->value);
 		}
-		
+
 		zbx_db_insert_add_values(&db_insert, event->eventid, event->source, event->object,
-				event->objectid, event->clock, event->ns, event->value,
-				ZBX_NULL2EMPTY_STR(event->name), event->severity);
+								 event->objectid, event->clock, event->ns, event->value,
+								 ZBX_NULL2EMPTY_STR(event->name), event->severity);
 
 		num++;
 
@@ -443,13 +440,13 @@ static int	save_events(ZBX_DC_HISTORY *history)
 		if (0 == insert_tags)
 		{
 			zbx_db_insert_prepare(&db_insert_tags, "event_tag", "eventtagid", "eventid", "tag", "value",
-					NULL);
+								  NULL);
 			insert_tags = 1;
 		}
 
 		for (j = 0; j < event->tags.values_num; j++)
 		{
-			zbx_tag_t	*tag = (zbx_tag_t *)event->tags.values[j];
+			zbx_tag_t *tag = (zbx_tag_t *)event->tags.values[j];
 
 			zbx_db_insert_add_values(&db_insert_tags, __UINT64_C(0), event->eventid, tag->tag, tag->value);
 		}
@@ -474,17 +471,17 @@ static int	save_events(ZBX_DC_HISTORY *history)
  *          event sources)                                                    *
  *                                                                            *
  ******************************************************************************/
-static void	save_problems(void)
+static void save_problems(void)
 {
-	int			i;
-	zbx_vector_ptr_t	problems;
-	int			j, tags_num = 0;
+	int i;
+	zbx_vector_ptr_t problems;
+	int j, tags_num = 0;
 
 	zbx_vector_ptr_create(&problems);
 
 	for (i = 0; i < events.values_num; i++)
 	{
-		ZBX_DB_EVENT	*event = events.values[i];
+		ZBX_DB_EVENT *event = events.values[i];
 
 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
 			continue;
@@ -500,24 +497,24 @@ static void	save_problems(void)
 		{
 			switch (event->object)
 			{
-				case EVENT_OBJECT_TRIGGER:
-					if (TRIGGER_VALUE_UNKNOWN != event->value)
-						continue;
-
-					tags_num += event->tags.values_num;
-					break;
-				case EVENT_OBJECT_ITEM:
-					if (ITEM_STATE_NOTSUPPORTED != event->value)
-						continue;
-
-					tags_num += event->tags.values_num;
-					break;
-				case EVENT_OBJECT_LLDRULE:
-					if (ITEM_STATE_NOTSUPPORTED != event->value)
-						continue;
-					break;
-				default:
+			case EVENT_OBJECT_TRIGGER:
+				if (TRIGGER_VALUE_UNKNOWN != event->value)
 					continue;
+
+				tags_num += event->tags.values_num;
+				break;
+			case EVENT_OBJECT_ITEM:
+				if (ITEM_STATE_NOTSUPPORTED != event->value)
+					continue;
+
+				tags_num += event->tags.values_num;
+				break;
+			case EVENT_OBJECT_LLDRULE:
+				if (ITEM_STATE_NOTSUPPORTED != event->value)
+					continue;
+				break;
+			default:
+				continue;
 			}
 		}
 		else
@@ -528,18 +525,18 @@ static void	save_problems(void)
 
 	if (0 != problems.values_num)
 	{
-		zbx_db_insert_t	db_insert;
+		zbx_db_insert_t db_insert;
 
 		zbx_db_insert_prepare(&db_insert, "problem", "eventid", "source", "object", "objectid", "clock", "ns",
-				"name", "severity", NULL);
+							  "name", "severity", NULL);
 
 		for (j = 0; j < problems.values_num; j++)
 		{
-			const ZBX_DB_EVENT	*event = (const ZBX_DB_EVENT *)problems.values[j];
+			const ZBX_DB_EVENT *event = (const ZBX_DB_EVENT *)problems.values[j];
 
 			zbx_db_insert_add_values(&db_insert, event->eventid, event->source, event->object,
-					event->objectid, event->clock, event->ns, ZBX_NULL2EMPTY_STR(event->name),
-					event->severity);
+									 event->objectid, event->clock, event->ns, ZBX_NULL2EMPTY_STR(event->name),
+									 event->severity);
 		}
 
 		zbx_db_insert_execute(&db_insert);
@@ -547,24 +544,24 @@ static void	save_problems(void)
 
 		if (0 != tags_num)
 		{
-			int	k;
+			int k;
 
 			zbx_db_insert_prepare(&db_insert, "problem_tag", "problemtagid", "eventid", "tag", "value",
-					NULL);
+								  NULL);
 
 			for (j = 0; j < problems.values_num; j++)
 			{
-				const ZBX_DB_EVENT	*event = (const ZBX_DB_EVENT *)problems.values[j];
+				const ZBX_DB_EVENT *event = (const ZBX_DB_EVENT *)problems.values[j];
 
 				if (EVENT_SOURCE_TRIGGERS != event->source && EVENT_SOURCE_INTERNAL != event->source)
 					continue;
 
 				for (k = 0; k < event->tags.values_num; k++)
 				{
-					zbx_tag_t	*tag = (zbx_tag_t *)event->tags.values[k];
+					zbx_tag_t *tag = (zbx_tag_t *)event->tags.values[k];
 
 					zbx_db_insert_add_values(&db_insert, __UINT64_C(0), event->eventid, tag->tag,
-							tag->value);
+											 tag->value);
 				}
 			}
 
@@ -583,13 +580,13 @@ static void	save_problems(void)
  *          problem table                                                     *
  *                                                                            *
  ******************************************************************************/
-static void	save_event_recovery(ZBX_DC_HISTORY *history)
+static void save_event_recovery(ZBX_DC_HISTORY *history)
 {
-	zbx_db_insert_t		db_insert;
-	zbx_event_recovery_t	*recovery;
-	char			*sql = NULL;
-	size_t			sql_alloc = 0, sql_offset = 0;
-	zbx_hashset_iter_t	iter;
+	zbx_db_insert_t db_insert;
+	zbx_event_recovery_t *recovery;
+	char *sql = NULL;
+	size_t sql_alloc = 0, sql_offset = 0;
+	zbx_hashset_iter_t iter;
 
 	if (0 == event_recovery.num_data)
 		return;
@@ -597,39 +594,40 @@ static void	save_event_recovery(ZBX_DC_HISTORY *history)
 	zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
 	zbx_db_insert_prepare(&db_insert, "event_recovery", "eventid", "r_eventid", "correlationid", "c_eventid",
-			"userid", NULL);
+						  "userid", NULL);
 
 	zbx_hashset_iter_reset(&event_recovery, &iter);
 	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
 	{
-		if (NULL !=  history && 0 <= recovery->history_idx ) {
-			
-	//		history_update_log_enty_severity(&history[recovery->history_idx], 0 ,
-	//			recovery->eventid,  recovery->objectid, 0);
+		if (NULL != history && 0 <= recovery->history_idx)
+		{
+
+			//		history_update_log_enty_severity(&history[recovery->history_idx], 0 ,
+			//			recovery->eventid,  recovery->objectid, 0);
 		}
-		
+
 		zbx_db_insert_add_values(&db_insert, recovery->eventid, recovery->r_event->eventid,
-				recovery->correlationid, recovery->c_eventid, recovery->userid);
+								 recovery->correlationid, recovery->c_eventid, recovery->userid);
 
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"update problem set"
-			" r_eventid=" ZBX_FS_UI64
-			",r_clock=%d"
-			",r_ns=%d"
-			",userid=" ZBX_FS_UI64,
-			recovery->r_event->eventid,
-			recovery->r_event->clock,
-			recovery->r_event->ns,
-			recovery->userid);
+						   "update problem set"
+						   " r_eventid=" ZBX_FS_UI64
+						   ",r_clock=%d"
+						   ",r_ns=%d"
+						   ",userid=" ZBX_FS_UI64,
+						   recovery->r_event->eventid,
+						   recovery->r_event->clock,
+						   recovery->r_event->ns,
+						   recovery->userid);
 
 		if (0 != recovery->correlationid)
 		{
 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, ",correlationid=" ZBX_FS_UI64,
-					recovery->correlationid);
+							   recovery->correlationid);
 		}
 
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " where eventid=" ZBX_FS_UI64 ";\n",
-				recovery->eventid);
+						   recovery->eventid);
 
 		DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
 	}
@@ -639,7 +637,7 @@ static void	save_event_recovery(ZBX_DC_HISTORY *history)
 
 	zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
-	if (16 < sql_offset)	/* in ORACLE always present begin..end; */
+	if (16 < sql_offset) /* in ORACLE always present begin..end; */
 		DBexecute("%s", sql);
 
 	zbx_free(sql);
@@ -656,10 +654,10 @@ static void	save_event_recovery(ZBX_DC_HISTORY *history)
  * Return value: the event or NULL                                            *
  *                                                                            *
  ******************************************************************************/
-static ZBX_DB_EVENT	*get_event_by_source_object_id(int source, int object, zbx_uint64_t objectid)
+static ZBX_DB_EVENT *get_event_by_source_object_id(int source, int object, zbx_uint64_t objectid)
 {
-	int		i;
-	ZBX_DB_EVENT	*event;
+	int i;
+	ZBX_DB_EVENT *event;
 
 	for (i = 0; i < events.values_num; i++)
 	{
@@ -684,28 +682,28 @@ static ZBX_DB_EVENT	*get_event_by_source_object_id(int source, int object, zbx_u
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	correlation_match_event_hostgroup(const ZBX_DB_EVENT *event, zbx_uint64_t groupid)
+static int correlation_match_event_hostgroup(const ZBX_DB_EVENT *event, zbx_uint64_t groupid)
 {
-	DB_RESULT		result;
-	int			ret = FAIL;
-	zbx_vector_uint64_t	groupids;
-	char			*sql = NULL;
-	size_t			sql_alloc = 0, sql_offset = 0;
+	DB_RESULT result;
+	int ret = FAIL;
+	zbx_vector_uint64_t groupids;
+	char *sql = NULL;
+	size_t sql_alloc = 0, sql_offset = 0;
 
 	zbx_vector_uint64_create(&groupids);
 	zbx_dc_get_nested_hostgroupids(&groupid, 1, &groupids);
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select hg.groupid"
-				" from hstgrp g,hosts_groups hg,items i,functions f"
-				" where f.triggerid=" ZBX_FS_UI64
-				" and i.itemid=f.itemid"
-				" and hg.hostid=i.hostid"
-				" and",
-				event->objectid);
+					   "select hg.groupid"
+					   " from hstgrp g,hosts_groups hg,items i,functions f"
+					   " where f.triggerid=" ZBX_FS_UI64
+					   " and i.itemid=f.itemid"
+					   " and hg.hostid=i.hostid"
+					   " and",
+					   event->objectid);
 
 	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "hg.groupid", groupids.values,
-			groupids.values_num);
+						  groupids.values_num);
 
 	result = DBselect("%s", sql);
 
@@ -736,64 +734,64 @@ static int	correlation_match_event_hostgroup(const ZBX_DB_EVENT *event, zbx_uint
  *                                depending on old events                     *
  *                                                                            *
  ******************************************************************************/
-static const char	*correlation_condition_match_new_event(zbx_corr_condition_t *condition,
-		const ZBX_DB_EVENT *event, int old_value)
+static const char *correlation_condition_match_new_event(zbx_corr_condition_t *condition,
+														 const ZBX_DB_EVENT *event, int old_value)
 {
-	int		i, ret;
-	zbx_tag_t	*tag;
+	int i, ret;
+	zbx_tag_t *tag;
 
 	/* return SUCCEED for conditions using old events */
 	switch (condition->type)
 	{
-		case ZBX_CORR_CONDITION_OLD_EVENT_TAG:
-		case ZBX_CORR_CONDITION_OLD_EVENT_TAG_VALUE:
-			return (SUCCEED == old_value) ? ZBX_UNKNOWN_STR "0" : "0";
+	case ZBX_CORR_CONDITION_OLD_EVENT_TAG:
+	case ZBX_CORR_CONDITION_OLD_EVENT_TAG_VALUE:
+		return (SUCCEED == old_value) ? ZBX_UNKNOWN_STR "0" : "0";
 	}
 
 	switch (condition->type)
 	{
-		case ZBX_CORR_CONDITION_NEW_EVENT_TAG:
-			for (i = 0; i < event->tags.values_num; i++)
+	case ZBX_CORR_CONDITION_NEW_EVENT_TAG:
+		for (i = 0; i < event->tags.values_num; i++)
+		{
+			tag = (zbx_tag_t *)event->tags.values[i];
+
+			if (0 == strcmp(tag->tag, condition->data.tag.tag))
+				return "1";
+		}
+		break;
+
+	case ZBX_CORR_CONDITION_NEW_EVENT_TAG_VALUE:
+		for (i = 0; i < event->tags.values_num; i++)
+		{
+			zbx_corr_condition_tag_value_t *cond = &condition->data.tag_value;
+
+			tag = (zbx_tag_t *)event->tags.values[i];
+
+			if (0 == strcmp(tag->tag, cond->tag) &&
+				SUCCEED == zbx_strmatch_condition(tag->value, cond->value, cond->op))
 			{
-				tag = (zbx_tag_t *)event->tags.values[i];
-
-				if (0 == strcmp(tag->tag, condition->data.tag.tag))
-					return "1";
+				return "1";
 			}
-			break;
+		}
+		break;
 
-		case ZBX_CORR_CONDITION_NEW_EVENT_TAG_VALUE:
-			for (i = 0; i < event->tags.values_num; i++)
-			{
-				zbx_corr_condition_tag_value_t	*cond = &condition->data.tag_value;
+	case ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP:
+		ret = correlation_match_event_hostgroup(event, condition->data.group.groupid);
 
-				tag = (zbx_tag_t *)event->tags.values[i];
+		if (ZBX_CONDITION_OPERATOR_NOT_EQUAL == condition->data.group.op)
+			return (SUCCEED == ret ? "0" : "1");
 
-				if (0 == strcmp(tag->tag, cond->tag) &&
-					SUCCEED == zbx_strmatch_condition(tag->value, cond->value, cond->op))
-				{
-					return "1";
-				}
-			}
-			break;
+		return (SUCCEED == ret ? "1" : "0");
 
-		case ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP:
-			ret =  correlation_match_event_hostgroup(event, condition->data.group.groupid);
+	case ZBX_CORR_CONDITION_EVENT_TAG_PAIR:
+		for (i = 0; i < event->tags.values_num; i++)
+		{
+			tag = (zbx_tag_t *)event->tags.values[i];
 
-			if (ZBX_CONDITION_OPERATOR_NOT_EQUAL == condition->data.group.op)
-				return (SUCCEED == ret ? "0" : "1");
-
-			return (SUCCEED == ret ? "1" : "0");
-
-		case ZBX_CORR_CONDITION_EVENT_TAG_PAIR:
-			for (i = 0; i < event->tags.values_num; i++)
-			{
-				tag = (zbx_tag_t *)event->tags.values[i];
-
-				if (0 == strcmp(tag->tag, condition->data.tag_pair.newtag))
-					return (SUCCEED == old_value) ? ZBX_UNKNOWN_STR "0" : "0";
-			}
-			break;
+			if (0 == strcmp(tag->tag, condition->data.tag_pair.newtag))
+				return (SUCCEED == old_value) ? ZBX_UNKNOWN_STR "0" : "0";
+		}
+		break;
 	}
 
 	return "0";
@@ -816,18 +814,18 @@ static const char	*correlation_condition_match_new_event(zbx_corr_condition_t *c
  *               CORRELATION_NO_MATCH  - the correlation rule doesn't match   *
  *                                                                            *
  ******************************************************************************/
-static zbx_correlation_match_result_t	correlation_match_new_event(zbx_correlation_t *correlation,
-		const ZBX_DB_EVENT *event, int old_value)
+static zbx_correlation_match_result_t correlation_match_new_event(zbx_correlation_t *correlation,
+																  const ZBX_DB_EVENT *event, int old_value)
 {
-	char				*expression, error[256];
-	const char			*value;
-	zbx_token_t			token;
-	int				pos = 0;
-	zbx_uint64_t			conditionid;
-	zbx_strloc_t			*loc;
-	zbx_corr_condition_t		*condition;
-	double				result;
-	zbx_correlation_match_result_t	ret = CORRELATION_NO_MATCH;
+	char *expression, error[256];
+	const char *value;
+	zbx_token_t token;
+	int pos = 0;
+	zbx_uint64_t conditionid;
+	zbx_strloc_t *loc;
+	zbx_corr_condition_t *condition;
+	double result;
+	zbx_correlation_match_result_t ret = CORRELATION_NO_MATCH;
 
 	if ('\0' == *correlation->formula)
 		return CORRELATION_MAY_MATCH;
@@ -845,7 +843,7 @@ static zbx_correlation_match_result_t	correlation_match_new_event(zbx_correlatio
 			continue;
 
 		if (NULL == (condition = (zbx_corr_condition_t *)zbx_hashset_search(&correlation_rules.conditions,
-				&conditionid)))
+																			&conditionid)))
 			goto out;
 
 		value = correlation_condition_match_new_event(condition, event, old_value);
@@ -878,10 +876,10 @@ out:
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	correlation_has_old_event_operation(const zbx_correlation_t *correlation)
+static int correlation_has_old_event_operation(const zbx_correlation_t *correlation)
 {
-	int				i;
-	const zbx_corr_operation_t	*operation;
+	int i;
+	const zbx_corr_operation_t *operation;
 
 	for (i = 0; i < correlation->operations.values_num; i++)
 	{
@@ -889,8 +887,8 @@ static int	correlation_has_old_event_operation(const zbx_correlation_t *correlat
 
 		switch (operation->type)
 		{
-			case ZBX_CORR_OPERATION_CLOSE_OLD:
-				return SUCCEED;
+		case ZBX_CORR_OPERATION_CLOSE_OLD:
+			return SUCCEED;
 		}
 	}
 
@@ -910,37 +908,37 @@ static int	correlation_has_old_event_operation(const zbx_correlation_t *correlat
  *             op          - [IN] the matching operation (ZBX_CONDITION_OPERATOR_) *
  *                                                                                 *
  ***********************************************************************************/
-static void	correlation_condition_add_tag_match(char **sql, size_t *sql_alloc, size_t *sql_offset, const char *tag,
-		const char *value, unsigned char op)
+static void correlation_condition_add_tag_match(char **sql, size_t *sql_alloc, size_t *sql_offset, const char *tag,
+												const char *value, unsigned char op)
 {
-	char	*tag_esc, *value_esc;
+	char *tag_esc, *value_esc;
 
 	tag_esc = DBdyn_escape_string(tag);
 	value_esc = DBdyn_escape_string(value);
 
 	switch (op)
 	{
-		case ZBX_CONDITION_OPERATOR_NOT_EQUAL:
-		case ZBX_CONDITION_OPERATOR_NOT_LIKE:
-			zbx_strcpy_alloc(sql, sql_alloc, sql_offset, "not ");
-			break;
+	case ZBX_CONDITION_OPERATOR_NOT_EQUAL:
+	case ZBX_CONDITION_OPERATOR_NOT_LIKE:
+		zbx_strcpy_alloc(sql, sql_alloc, sql_offset, "not ");
+		break;
 	}
 
 	zbx_strcpy_alloc(sql, sql_alloc, sql_offset,
-			"exists (select null from problem_tag pt where p.eventid=pt.eventid and ");
+					 "exists (select null from problem_tag pt where p.eventid=pt.eventid and ");
 
 	switch (op)
 	{
-		case ZBX_CONDITION_OPERATOR_EQUAL:
-		case ZBX_CONDITION_OPERATOR_NOT_EQUAL:
-			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "pt.tag='%s' and pt.value" ZBX_SQL_STRCMP,
-					tag_esc, ZBX_SQL_STRVAL_EQ(value_esc));
-			break;
-		case ZBX_CONDITION_OPERATOR_LIKE:
-		case ZBX_CONDITION_OPERATOR_NOT_LIKE:
-			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "pt.tag='%s' and pt.value like '%%%s%%'",
-					tag_esc, value_esc);
-			break;
+	case ZBX_CONDITION_OPERATOR_EQUAL:
+	case ZBX_CONDITION_OPERATOR_NOT_EQUAL:
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "pt.tag='%s' and pt.value" ZBX_SQL_STRCMP,
+						   tag_esc, ZBX_SQL_STRVAL_EQ(value_esc));
+		break;
+	case ZBX_CONDITION_OPERATOR_LIKE:
+	case ZBX_CONDITION_OPERATOR_NOT_LIKE:
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "pt.tag='%s' and pt.value like '%%%s%%'",
+						   tag_esc, value_esc);
+		break;
 	}
 
 	zbx_chrcpy_alloc(sql, sql_alloc, sql_offset, ')');
@@ -960,80 +958,80 @@ static void	correlation_condition_add_tag_match(char **sql, size_t *sql_alloc, s
  * Return value: the created filter or NULL                                   *
  *                                                                            *
  ******************************************************************************/
-static char	*correlation_condition_get_event_filter(zbx_corr_condition_t *condition, const ZBX_DB_EVENT *event)
+static char *correlation_condition_get_event_filter(zbx_corr_condition_t *condition, const ZBX_DB_EVENT *event)
 {
-	int			i;
-	zbx_tag_t		*tag;
-	char			*tag_esc, *filter = NULL;
-	size_t			filter_alloc = 0, filter_offset = 0;
-	zbx_vector_str_t	values;
+	int i;
+	zbx_tag_t *tag;
+	char *tag_esc, *filter = NULL;
+	size_t filter_alloc = 0, filter_offset = 0;
+	zbx_vector_str_t values;
 
 	/* replace new event dependent condition with precalculated value */
 	switch (condition->type)
 	{
-		case ZBX_CORR_CONDITION_NEW_EVENT_TAG:
-		case ZBX_CORR_CONDITION_NEW_EVENT_TAG_VALUE:
-		case ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP:
-			return zbx_dsprintf(NULL, "%s=1",
-					correlation_condition_match_new_event(condition, event, SUCCEED));
+	case ZBX_CORR_CONDITION_NEW_EVENT_TAG:
+	case ZBX_CORR_CONDITION_NEW_EVENT_TAG_VALUE:
+	case ZBX_CORR_CONDITION_NEW_EVENT_HOSTGROUP:
+		return zbx_dsprintf(NULL, "%s=1",
+							correlation_condition_match_new_event(condition, event, SUCCEED));
 	}
 
 	/* replace old event dependent condition with sql filter on problem_tag pt table */
 	switch (condition->type)
 	{
-		case ZBX_CORR_CONDITION_OLD_EVENT_TAG:
-			tag_esc = DBdyn_escape_string(condition->data.tag.tag);
+	case ZBX_CORR_CONDITION_OLD_EVENT_TAG:
+		tag_esc = DBdyn_escape_string(condition->data.tag.tag);
+		zbx_snprintf_alloc(&filter, &filter_alloc, &filter_offset,
+						   "exists (select null from problem_tag pt"
+						   " where p.eventid=pt.eventid"
+						   " and pt.tag='%s')",
+						   tag_esc);
+		zbx_free(tag_esc);
+		return filter;
+
+	case ZBX_CORR_CONDITION_EVENT_TAG_PAIR:
+		zbx_vector_str_create(&values);
+
+		for (i = 0; i < event->tags.values_num; i++)
+		{
+			tag = (zbx_tag_t *)event->tags.values[i];
+			if (0 == strcmp(tag->tag, condition->data.tag_pair.newtag))
+				zbx_vector_str_append(&values, zbx_strdup(NULL, tag->value));
+		}
+
+		if (0 == values.values_num)
+		{
+			/* no new tag found, substitute condition with failure expression */
+			filter = zbx_strdup(NULL, "1=0");
+		}
+		else
+		{
+			tag_esc = DBdyn_escape_string(condition->data.tag_pair.oldtag);
+
 			zbx_snprintf_alloc(&filter, &filter_alloc, &filter_offset,
-					"exists (select null from problem_tag pt"
-						" where p.eventid=pt.eventid"
-							" and pt.tag='%s')",
-					tag_esc);
+							   "exists (select null from problem_tag pt"
+							   " where p.eventid=pt.eventid"
+							   " and pt.tag='%s'"
+							   " and",
+							   tag_esc);
+
+			DBadd_str_condition_alloc(&filter, &filter_alloc, &filter_offset, "pt.value",
+									  (const char **)values.values, values.values_num);
+
+			zbx_chrcpy_alloc(&filter, &filter_alloc, &filter_offset, ')');
+
 			zbx_free(tag_esc);
-			return filter;
+			zbx_vector_str_clear_ext(&values, zbx_str_free);
+		}
 
-		case ZBX_CORR_CONDITION_EVENT_TAG_PAIR:
-			zbx_vector_str_create(&values);
+		zbx_vector_str_destroy(&values);
+		return filter;
 
-			for (i = 0; i < event->tags.values_num; i++)
-			{
-				tag = (zbx_tag_t *)event->tags.values[i];
-				if (0 == strcmp(tag->tag, condition->data.tag_pair.newtag))
-					zbx_vector_str_append(&values, zbx_strdup(NULL, tag->value));
-			}
-
-			if (0 == values.values_num)
-			{
-				/* no new tag found, substitute condition with failure expression */
-				filter = zbx_strdup(NULL, "1=0");
-			}
-			else
-			{
-				tag_esc = DBdyn_escape_string(condition->data.tag_pair.oldtag);
-
-				zbx_snprintf_alloc(&filter, &filter_alloc, &filter_offset,
-						"exists (select null from problem_tag pt"
-							" where p.eventid=pt.eventid"
-								" and pt.tag='%s'"
-								" and",
-						tag_esc);
-
-				DBadd_str_condition_alloc(&filter, &filter_alloc, &filter_offset, "pt.value",
-						(const char **)values.values, values.values_num);
-
-				zbx_chrcpy_alloc(&filter, &filter_alloc, &filter_offset, ')');
-
-				zbx_free(tag_esc);
-				zbx_vector_str_clear_ext(&values, zbx_str_free);
-			}
-
-			zbx_vector_str_destroy(&values);
-			return filter;
-
-		case ZBX_CORR_CONDITION_OLD_EVENT_TAG_VALUE:
-			correlation_condition_add_tag_match(&filter, &filter_alloc, &filter_offset,
-					condition->data.tag_value.tag, condition->data.tag_value.value,
-					condition->data.tag_value.op);
-			return filter;
+	case ZBX_CORR_CONDITION_OLD_EVENT_TAG_VALUE:
+		correlation_condition_add_tag_match(&filter, &filter_alloc, &filter_offset,
+											condition->data.tag_value.tag, condition->data.tag_value.value,
+											condition->data.tag_value.op);
+		return filter;
 	}
 
 	return NULL;
@@ -1054,15 +1052,15 @@ static char	*correlation_condition_get_event_filter(zbx_corr_condition_t *condit
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	correlation_add_event_filter(char **sql, size_t *sql_alloc, size_t *sql_offset,
-		zbx_correlation_t *correlation, const ZBX_DB_EVENT *event)
+static int correlation_add_event_filter(char **sql, size_t *sql_alloc, size_t *sql_offset,
+										zbx_correlation_t *correlation, const ZBX_DB_EVENT *event)
 {
-	char			*expression, *filter;
-	zbx_token_t		token;
-	int			pos = 0, ret = FAIL;
-	zbx_uint64_t		conditionid;
-	zbx_strloc_t		*loc;
-	zbx_corr_condition_t	*condition;
+	char *expression, *filter;
+	zbx_token_t token;
+	int pos = 0, ret = FAIL;
+	zbx_uint64_t conditionid;
+	zbx_strloc_t *loc;
+	zbx_corr_condition_t *condition;
 
 	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "c.correlationid=" ZBX_FS_UI64, correlation->correlationid);
 
@@ -1113,14 +1111,14 @@ out:
  *             old_objectid - [IN] the old event source objectid (triggerid)  *
  *                                                                            *
  ******************************************************************************/
-static void	correlation_execute_operations(zbx_correlation_t *correlation, ZBX_DB_EVENT *event,
-		zbx_uint64_t old_eventid, zbx_uint64_t old_objectid)
+static void correlation_execute_operations(zbx_correlation_t *correlation, ZBX_DB_EVENT *event,
+										   zbx_uint64_t old_eventid, zbx_uint64_t old_objectid)
 {
-	int			i;
-	zbx_corr_operation_t	*operation;
-	zbx_event_recovery_t	recovery_local;
-	zbx_timespec_t		ts;
-	ZBX_DB_EVENT		*r_event;
+	int i;
+	zbx_corr_operation_t *operation;
+	zbx_event_recovery_t recovery_local;
+	zbx_timespec_t ts;
+	ZBX_DB_EVENT *r_event;
 
 	for (i = 0; i < correlation->operations.values_num; i++)
 	{
@@ -1128,41 +1126,41 @@ static void	correlation_execute_operations(zbx_correlation_t *correlation, ZBX_D
 
 		switch (operation->type)
 		{
-			case ZBX_CORR_OPERATION_CLOSE_NEW:
-				/* generate OK event to close the new event */
+		case ZBX_CORR_OPERATION_CLOSE_NEW:
+			/* generate OK event to close the new event */
 
-				/* check if this event has not been closed by another correlation rule */
-				if (NULL != zbx_hashset_search(&event_recovery, &event->eventid))
-					break;
-
-				ts.sec = event->clock;
-				ts.ns = event->ns;
-
-				r_event = close_trigger_event(event->eventid, event->objectid, &ts, 0,
-						correlation->correlationid, event->eventid, event->trigger.description,
-						event->trigger.expression, event->trigger.recovery_expression,
-						event->trigger.priority, event->trigger.type, event->trigger.opdata,
-						event->trigger.event_name);
-
-				event->flags |= ZBX_FLAGS_DB_EVENT_NO_ACTION;
-				r_event->flags |= ZBX_FLAGS_DB_EVENT_NO_ACTION;
-
+			/* check if this event has not been closed by another correlation rule */
+			if (NULL != zbx_hashset_search(&event_recovery, &event->eventid))
 				break;
-			case ZBX_CORR_OPERATION_CLOSE_OLD:
-				/* queue closing of old events to lock them by triggerids */
-				if (0 != old_eventid)
-				{
-					recovery_local.eventid = old_eventid;
-					recovery_local.c_eventid = event->eventid;
-					recovery_local.correlationid = correlation->correlationid;
-					recovery_local.objectid = old_objectid;
-					recovery_local.ts.sec = event->clock;
-					recovery_local.ts.ns = event->ns;
-					recovery_local.history_idx = -1;
 
-					zbx_hashset_insert(&correlation_cache, &recovery_local, sizeof(recovery_local));
-				}
-				break;
+			ts.sec = event->clock;
+			ts.ns = event->ns;
+
+			r_event = close_trigger_event(event->eventid, event->objectid, &ts, 0,
+										  correlation->correlationid, event->eventid, event->trigger.description,
+										  event->trigger.expression, event->trigger.recovery_expression,
+										  event->trigger.priority, event->trigger.type, event->trigger.opdata,
+										  event->trigger.event_name);
+
+			event->flags |= ZBX_FLAGS_DB_EVENT_NO_ACTION;
+			r_event->flags |= ZBX_FLAGS_DB_EVENT_NO_ACTION;
+
+			break;
+		case ZBX_CORR_OPERATION_CLOSE_OLD:
+			/* queue closing of old events to lock them by triggerids */
+			if (0 != old_eventid)
+			{
+				recovery_local.eventid = old_eventid;
+				recovery_local.c_eventid = event->eventid;
+				recovery_local.correlationid = correlation->correlationid;
+				recovery_local.objectid = old_objectid;
+				recovery_local.ts.sec = event->clock;
+				recovery_local.ts.ns = event->ns;
+				recovery_local.history_idx = -1;
+
+				zbx_hashset_insert(&correlation_cache, &recovery_local, sizeof(recovery_local));
+			}
+			break;
 		}
 	}
 }
@@ -1172,8 +1170,7 @@ typedef enum
 {
 	ZBX_CHECK_NEW_EVENTS,
 	ZBX_CHECK_OLD_EVENTS
-}
-zbx_correlation_scope_t;
+} zbx_correlation_scope_t;
 
 /* flag to cache state of problem table during event correlation */
 typedef enum
@@ -1184,8 +1181,7 @@ typedef enum
 	ZBX_PROBLEM_STATE_RESOLVED,
 	/* at least one open problem exists */
 	ZBX_PROBLEM_STATE_OPEN
-}
-zbx_problem_state_t;
+} zbx_problem_state_t;
 
 /******************************************************************************
  *                                                                            *
@@ -1205,49 +1201,49 @@ zbx_problem_state_t;
  *                based on the rest correlation conditions                    *
  *                                                                            *
  ******************************************************************************/
-static void	correlate_event_by_global_rules(ZBX_DB_EVENT *event, zbx_problem_state_t *problem_state)
+static void correlate_event_by_global_rules(ZBX_DB_EVENT *event, zbx_problem_state_t *problem_state)
 {
-	int			i;
-	zbx_correlation_t	*correlation;
-	zbx_vector_ptr_t	corr_old, corr_new;
-	char			*sql = NULL;
-	const char		*delim = "";
-	size_t			sql_alloc = 0, sql_offset = 0;
-	zbx_uint64_t		eventid, correlationid, objectid;
+	int i;
+	zbx_correlation_t *correlation;
+	zbx_vector_ptr_t corr_old, corr_new;
+	char *sql = NULL;
+	const char *delim = "";
+	size_t sql_alloc = 0, sql_offset = 0;
+	zbx_uint64_t eventid, correlationid, objectid;
 
 	zbx_vector_ptr_create(&corr_old);
 	zbx_vector_ptr_create(&corr_new);
 
 	for (i = 0; i < correlation_rules.correlations.values_num; i++)
 	{
-		zbx_correlation_scope_t	scope;
+		zbx_correlation_scope_t scope;
 
 		correlation = (zbx_correlation_t *)correlation_rules.correlations.values[i];
 
 		switch (correlation_match_new_event(correlation, event, SUCCEED))
 		{
-			case CORRELATION_MATCH:
-				if (SUCCEED == correlation_has_old_event_operation(correlation))
-					scope = ZBX_CHECK_OLD_EVENTS;
-				else
-					scope = ZBX_CHECK_NEW_EVENTS;
-				break;
-			case CORRELATION_NO_MATCH:	/* proceed with next rule */
-				continue;
-			case CORRELATION_MAY_MATCH:	/* might match depending on old events */
+		case CORRELATION_MATCH:
+			if (SUCCEED == correlation_has_old_event_operation(correlation))
 				scope = ZBX_CHECK_OLD_EVENTS;
-				break;
+			else
+				scope = ZBX_CHECK_NEW_EVENTS;
+			break;
+		case CORRELATION_NO_MATCH: /* proceed with next rule */
+			continue;
+		case CORRELATION_MAY_MATCH: /* might match depending on old events */
+			scope = ZBX_CHECK_OLD_EVENTS;
+			break;
 		}
 
 		if (ZBX_CHECK_OLD_EVENTS == scope)
 		{
 			if (ZBX_PROBLEM_STATE_UNKNOWN == *problem_state)
 			{
-				DB_RESULT	result;
+				DB_RESULT result;
 
 				result = DBselectN("select eventid from problem"
-						" where r_eventid is null and source="
-						ZBX_STR(EVENT_SOURCE_TRIGGERS), 1);
+								   " where r_eventid is null and source=" ZBX_STR(EVENT_SOURCE_TRIGGERS),
+								   1);
 
 				if (NULL == DBfetch(result))
 					*problem_state = ZBX_PROBLEM_STATE_RESOLVED;
@@ -1281,17 +1277,16 @@ static void	correlate_event_by_global_rules(ZBX_DB_EVENT *event, zbx_problem_sta
 
 	if (0 != corr_old.values_num)
 	{
-		DB_RESULT	result;
-		DB_ROW		row;
+		DB_RESULT result;
+		DB_ROW row;
 
 		/* Process correlations that matches new event and either uses old events in conditions */
 		/* or has operations involving old events.                                              */
 
 		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "select p.eventid,p.objectid,c.correlationid"
-								" from correlation c,problem p"
-								" where p.r_eventid is null"
-								" and p.source=" ZBX_STR(EVENT_SOURCE_TRIGGERS)
-								" and (");
+														" from correlation c,problem p"
+														" where p.r_eventid is null"
+														" and p.source=" ZBX_STR(EVENT_SOURCE_TRIGGERS) " and (");
 
 		for (i = 0; i < corr_old.values_num; i++)
 		{
@@ -1316,7 +1311,7 @@ static void	correlate_event_by_global_rules(ZBX_DB_EVENT *event, zbx_problem_sta
 			ZBX_STR2UINT64(correlationid, row[2]);
 
 			if (FAIL == (i = zbx_vector_ptr_bsearch(&corr_old, &correlationid,
-					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+													ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 			{
 				THIS_SHOULD_NEVER_HAPPEN;
 				continue;
@@ -1340,11 +1335,11 @@ static void	correlate_event_by_global_rules(ZBX_DB_EVENT *event, zbx_problem_sta
  *          rules                                                             *
  *                                                                            *
  ******************************************************************************/
-static void	correlate_events_by_global_rules(zbx_vector_ptr_t *trigger_events, zbx_vector_ptr_t *trigger_diff)
+static void correlate_events_by_global_rules(zbx_vector_ptr_t *trigger_events, zbx_vector_ptr_t *trigger_diff)
 {
-	int			i, index;
-	zbx_trigger_diff_t	*diff;
-	zbx_problem_state_t	problem_state = ZBX_PROBLEM_STATE_UNKNOWN;
+	int i, index;
+	zbx_trigger_diff_t *diff;
+	zbx_problem_state_t problem_state = ZBX_PROBLEM_STATE_UNKNOWN;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() events:%d", __func__, correlation_cache.num_data);
 
@@ -1356,7 +1351,7 @@ static void	correlate_events_by_global_rules(zbx_vector_ptr_t *trigger_events, z
 	/* process global correlation and queue the events that must be closed */
 	for (i = 0; i < trigger_events->values_num; i++)
 	{
-		ZBX_DB_EVENT	*event = (ZBX_DB_EVENT *)trigger_events->values[i];
+		ZBX_DB_EVENT *event = (ZBX_DB_EVENT *)trigger_events->values[i];
 
 		if (0 == (ZBX_FLAGS_DB_EVENT_CREATE & event->flags))
 			continue;
@@ -1368,7 +1363,7 @@ static void	correlate_events_by_global_rules(zbx_vector_ptr_t *trigger_events, z
 		if (0 != (event->flags & ZBX_FLAGS_DB_EVENT_NO_ACTION))
 		{
 			if (FAIL != (index = zbx_vector_ptr_bsearch(trigger_diff, &event->objectid,
-					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+														ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 			{
 				diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
 				diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT;
@@ -1386,12 +1381,12 @@ out:
  *          correlation rules                                                 *
  *                                                                            *
  ******************************************************************************/
-static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock)
+static void flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock)
 {
-	zbx_vector_uint64_t	triggerids, lockids, eventids;
-	zbx_hashset_iter_t	iter;
-	zbx_event_recovery_t	*recovery;
-	int			i, closed_num = 0;
+	zbx_vector_uint64_t triggerids, lockids, eventids;
+	zbx_hashset_iter_t iter;
+	zbx_event_recovery_t *recovery;
+	int i, closed_num = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() events:%d", __func__, correlation_cache.num_data);
 
@@ -1411,7 +1406,7 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
 	{
 		if (FAIL != zbx_vector_uint64_bsearch(triggerids_lock, recovery->objectid,
-				ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+											  ZBX_DEFAULT_UINT64_COMPARE_FUNC))
 		{
 			/* trigger already locked by this process, add to locked triggerids */
 			zbx_vector_uint64_append(&triggerids, recovery->objectid);
@@ -1422,7 +1417,7 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 
 	if (0 != lockids.values_num)
 	{
-		int	num = triggerids_lock->values_num;
+		int num = triggerids_lock->values_num;
 
 		zbx_vector_uint64_sort(&lockids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 		zbx_vector_uint64_uniq(&lockids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -1437,11 +1432,11 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 	/* process global correlation actions if we have successfully locked trigger(s) */
 	if (0 != triggerids.values_num)
 	{
-		DC_TRIGGER		*triggers, *trigger;
-		int			*errcodes, index;
-		char			*sql = NULL;
-		size_t			sql_alloc = 0, sql_offset = 0;
-		zbx_trigger_diff_t	*diff;
+		DC_TRIGGER *triggers, *trigger;
+		int *errcodes, index;
+		char *sql = NULL;
+		size_t sql_alloc = 0, sql_offset = 0;
+		zbx_trigger_diff_t *diff;
 
 		/* get locked trigger data - needed for trigger diff and event generation */
 
@@ -1462,10 +1457,10 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 			trigger = &triggers[i];
 
 			if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &triggerids.values[i],
-					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+														ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 			{
 				zbx_append_trigger_diff(trigger_diff, trigger->triggerid, trigger->priority,
-						ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT, trigger->value, 0, NULL);
+										ZBX_FLAGS_TRIGGER_DIFF_RECALCULATE_PROBLEM_COUNT, trigger->value, 0, NULL);
 
 				/* TODO: should we store trigger diffs in hashset rather than vector? */
 				zbx_vector_ptr_sort(trigger_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
@@ -1484,7 +1479,7 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 		{
 			/* close event only if its source trigger has been locked */
 			if (FAIL == (index = zbx_vector_uint64_bsearch(&triggerids, recovery->objectid,
-					ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
+														   ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
 			{
 				continue;
 			}
@@ -1497,7 +1492,7 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 
 		zbx_vector_uint64_sort(&eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "select eventid from problem"
-								" where r_eventid is null and");
+														" where r_eventid is null and");
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids.values, eventids.values_num);
 		zbx_vector_uint64_clear(&eventids);
 		DBselect_uint64(sql, &eventids);
@@ -1508,21 +1503,21 @@ static void	flush_correlation_queue(zbx_vector_ptr_t *trigger_diff, zbx_vector_u
 		while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
 		{
 			if (FAIL == (index = zbx_vector_uint64_bsearch(&triggerids, recovery->objectid,
-					ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
+														   ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
 			{
 				continue;
 			}
 
 			/* close the old problem only if it's still open and trigger is not removed */
 			if (SUCCEED == errcodes[index] && FAIL != zbx_vector_uint64_bsearch(&eventids, recovery->eventid,
-					ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+																				ZBX_DEFAULT_UINT64_COMPARE_FUNC))
 			{
 				trigger = &triggers[index];
 
 				close_trigger_event(recovery->eventid, recovery->objectid, &recovery->ts, 0,
-						recovery->correlationid, recovery->c_eventid, trigger->description,
-						trigger->expression, trigger->recovery_expression,
-						trigger->priority, trigger->type, trigger->opdata, trigger->event_name);
+									recovery->correlationid, recovery->c_eventid, trigger->description,
+									trigger->expression, trigger->recovery_expression,
+									trigger->priority, trigger->type, trigger->opdata, trigger->event_name);
 
 				closed_num++;
 			}
@@ -1554,16 +1549,16 @@ out:
  *           correctly calculate new trigger value.                           *
  *                                                                            *
  ******************************************************************************/
-static void	update_trigger_problem_count(zbx_vector_ptr_t *trigger_diff)
+static void update_trigger_problem_count(zbx_vector_ptr_t *trigger_diff)
 {
-	DB_RESULT		result;
-	DB_ROW			row;
-	zbx_vector_uint64_t	triggerids;
-	zbx_trigger_diff_t	*diff;
-	int			i, index;
-	char			*sql = NULL;
-	size_t			sql_alloc = 0, sql_offset = 0;
-	zbx_uint64_t		triggerid;
+	DB_RESULT result;
+	DB_ROW row;
+	zbx_vector_uint64_t triggerids;
+	zbx_trigger_diff_t *diff;
+	int i, index;
+	char *sql = NULL;
+	size_t sql_alloc = 0, sql_offset = 0;
+	zbx_uint64_t triggerid;
 
 	zbx_vector_uint64_create(&triggerids);
 
@@ -1585,12 +1580,12 @@ static void	update_trigger_problem_count(zbx_vector_ptr_t *trigger_diff)
 		goto out;
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select objectid,count(objectid) from problem"
-			" where r_eventid is null"
-				" and source=%d"
-				" and object=%d"
-				" and",
-			EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
+					   "select objectid,count(objectid) from problem"
+					   " where r_eventid is null"
+					   " and source=%d"
+					   " and object=%d"
+					   " and",
+					   EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
 
 	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "objectid", triggerids.values, triggerids.values_num);
 	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, " group by objectid");
@@ -1602,7 +1597,7 @@ static void	update_trigger_problem_count(zbx_vector_ptr_t *trigger_diff)
 		ZBX_STR2UINT64(triggerid, row[0]);
 
 		if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &triggerid,
-				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+													ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
 			continue;
@@ -1625,25 +1620,25 @@ out:
  *          and recovered events                                              *
  *                                                                            *
  ******************************************************************************/
-static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
+static void update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 {
-	int			i;
-	int			index, j, new_value;
-	zbx_trigger_diff_t	*diff;
+	int i;
+	int index, j, new_value;
+	zbx_trigger_diff_t *diff;
 
 	update_trigger_problem_count(trigger_diff);
 
 	/* update trigger problem_count for new problem events */
 	for (i = 0; i < events.values_num; i++)
 	{
-		ZBX_DB_EVENT	*event = (ZBX_DB_EVENT *)events.values[i];
-		DEBUG_TRIGGER(event->objectid,"Updating changed trigger");
+		ZBX_DB_EVENT *event = (ZBX_DB_EVENT *)events.values[i];
+		DEBUG_TRIGGER(event->objectid, "Updating changed trigger");
 
 		if (EVENT_SOURCE_TRIGGERS != event->source || EVENT_OBJECT_TRIGGER != event->object)
 			continue;
 
 		if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &event->objectid,
-				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+													ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
 			continue;
@@ -1654,7 +1649,7 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 		if (0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
 		{
 			diff->flags &= ~(zbx_uint64_t)(ZBX_FLAGS_TRIGGER_DIFF_UPDATE_PROBLEM_COUNT |
-					ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE);
+										   ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE);
 			continue;
 		}
 
@@ -1675,8 +1670,8 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
 
 		if (new_value != diff->value)
 		{
-			//LOG_INF("Set1 new value for trigger %ld to %d", diff->triggerid, new_value);
-			
+			// LOG_INF("Set1 new value for trigger %ld to %d", diff->triggerid, new_value);
+
 			diff->value = new_value;
 			diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
 		}
@@ -1688,7 +1683,7 @@ static void	update_trigger_changes(zbx_vector_ptr_t *trigger_diff)
  * Purpose: initializes the data structures required for event processing     *
  *                                                                            *
  ******************************************************************************/
-void	zbx_initialize_events(void)
+void zbx_initialize_events(void)
 {
 	zbx_vector_ptr_create(&events);
 	zbx_hashset_create(&event_recovery, 0, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -1702,7 +1697,7 @@ void	zbx_initialize_events(void)
  * Purpose: uninitializes the data structures required for event processing   *
  *                                                                            *
  ******************************************************************************/
-void	zbx_uninitialize_events(void)
+void zbx_uninitialize_events(void)
 {
 	zbx_vector_ptr_destroy(&events);
 	zbx_hashset_destroy(&event_recovery);
@@ -1716,7 +1711,7 @@ void	zbx_uninitialize_events(void)
  * Purpose: reset event_recovery data                                         *
  *                                                                            *
  ******************************************************************************/
-void	zbx_reset_event_recovery(void)
+void zbx_reset_event_recovery(void)
 {
 	zbx_hashset_clear(&event_recovery);
 }
@@ -1726,7 +1721,7 @@ void	zbx_reset_event_recovery(void)
  * Purpose: cleans single event                                               *
  *                                                                            *
  ******************************************************************************/
-static void	zbx_clean_event(ZBX_DB_EVENT *event)
+static void zbx_clean_event(ZBX_DB_EVENT *event)
 {
 	zbx_free(event->name);
 
@@ -1750,7 +1745,7 @@ static void	zbx_clean_event(ZBX_DB_EVENT *event)
  * Purpose: cleans all events and events recoveries                           *
  *                                                                            *
  ******************************************************************************/
-void	zbx_clean_events(void)
+void zbx_clean_events(void)
 {
 	zbx_vector_ptr_clear_ext(&events, (zbx_clean_func_t)zbx_clean_event);
 
@@ -1763,9 +1758,9 @@ void	zbx_clean_events(void)
  *           expression                                                       *
  *                                                                            *
  ******************************************************************************/
-static void	db_trigger_get_hosts(zbx_hashset_t *hosts, ZBX_DB_TRIGGER *trigger)
+static void db_trigger_get_hosts(zbx_hashset_t *hosts, ZBX_DB_TRIGGER *trigger)
 {
-	zbx_vector_uint64_t	functionids;
+	zbx_vector_uint64_t functionids;
 
 	zbx_vector_uint64_create(&functionids);
 	zbx_db_trigger_get_all_functionids(trigger, &functionids);
@@ -1904,18 +1899,18 @@ static void	db_trigger_get_hosts(zbx_hashset_t *hosts, ZBX_DB_TRIGGER *trigger)
 // 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 // }
 
-void	zbx_events_update_itservices(void)
+void zbx_events_update_itservices(void)
 {
-	unsigned char		*data = NULL;
-	size_t			data_alloc = 0, data_offset = 0;
-	int			i;
-	zbx_hashset_iter_t	iter;
-	zbx_event_recovery_t	*recovery;
+	unsigned char *data = NULL;
+	size_t data_alloc = 0, data_offset = 0;
+	int i;
+	zbx_hashset_iter_t iter;
+	zbx_event_recovery_t *recovery;
 
 	zbx_hashset_iter_reset(&event_recovery, &iter);
 	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
 	{
-		int	values_num;
+		int values_num;
 
 		if (EVENT_SOURCE_TRIGGERS != recovery->r_event->source)
 			continue;
@@ -1924,15 +1919,15 @@ void	zbx_events_update_itservices(void)
 		recovery->r_event->tags.values_num = 0;
 
 		zbx_service_serialize(&data, &data_alloc, &data_offset, recovery->eventid, recovery->r_event->clock,
-				recovery->r_event->ns, recovery->r_event->value, recovery->r_event->severity,
-				&recovery->r_event->tags);
+							  recovery->r_event->ns, recovery->r_event->value, recovery->r_event->severity,
+							  &recovery->r_event->tags);
 
 		recovery->r_event->tags.values_num = values_num;
 	}
 
 	for (i = 0; i < events.values_num; i++)
 	{
-		ZBX_DB_EVENT	*event = events.values[i];
+		ZBX_DB_EVENT *event = events.values[i];
 
 		if (EVENT_SOURCE_TRIGGERS != event->source || 0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
 			continue;
@@ -1941,7 +1936,7 @@ void	zbx_events_update_itservices(void)
 			continue;
 
 		zbx_service_serialize(&data, &data_alloc, &data_offset, event->eventid, event->clock, event->ns,
-				event->value, event->severity, &event->tags);
+							  event->value, event->severity, &event->tags);
 	}
 
 	if (NULL == data)
@@ -1957,11 +1952,11 @@ void	zbx_events_update_itservices(void)
  *          maintenance periods                                               *
  *                                                                            *
  ******************************************************************************/
-static void	add_event_suppress_data(zbx_vector_ptr_t *event_refs, zbx_vector_uint64_t *maintenanceids)
+static void add_event_suppress_data(zbx_vector_ptr_t *event_refs, zbx_vector_uint64_t *maintenanceids)
 {
-	zbx_vector_ptr_t		event_queries;
-	int				i, j;
-	zbx_event_suppress_query_t	*query;
+	zbx_vector_ptr_t event_queries;
+	int i, j;
+	zbx_event_suppress_query_t *query;
 
 	/* prepare query data  */
 
@@ -1969,7 +1964,7 @@ static void	add_event_suppress_data(zbx_vector_ptr_t *event_refs, zbx_vector_uin
 
 	for (i = 0; i < event_refs->values_num; i++)
 	{
-		ZBX_DB_EVENT	*event = (ZBX_DB_EVENT *)event_refs->values[i];
+		ZBX_DB_EVENT *event = (ZBX_DB_EVENT *)event_refs->values[i];
 
 		query = (zbx_event_suppress_query_t *)zbx_malloc(NULL, sizeof(zbx_event_suppress_query_t));
 		query->eventid = event->eventid;
@@ -1988,14 +1983,14 @@ static void	add_event_suppress_data(zbx_vector_ptr_t *event_refs, zbx_vector_uin
 
 	if (0 != event_queries.values_num)
 	{
-		zbx_db_insert_t	db_insert;
+		zbx_db_insert_t db_insert;
 
 		/* get maintenance data and save it in database */
 		if (SUCCEED == zbx_dc_get_event_maintenances(&event_queries, maintenanceids) &&
-				SUCCEED == zbx_db_lock_maintenanceids(maintenanceids))
+			SUCCEED == zbx_db_lock_maintenanceids(maintenanceids))
 		{
 			zbx_db_insert_prepare(&db_insert, "event_suppress", "event_suppressid", "eventid",
-					"maintenanceid", "suppress_until", NULL);
+								  "maintenanceid", "suppress_until", NULL);
 
 			for (j = 0; j < event_queries.values_num; j++)
 			{
@@ -2006,18 +2001,18 @@ static void	add_event_suppress_data(zbx_vector_ptr_t *event_refs, zbx_vector_uin
 					/* when locking maintenances not-locked (deleted) maintenance ids */
 					/* are removed from the maintenanceids vector                   */
 					if (FAIL == zbx_vector_uint64_bsearch(maintenanceids,
-							query->maintenances.values[i].first,
-							ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+														  query->maintenances.values[i].first,
+														  ZBX_DEFAULT_UINT64_COMPARE_FUNC))
 					{
 						continue;
 					}
 
 					zbx_db_insert_add_values(&db_insert, __UINT64_C(0), query->eventid,
-							query->maintenances.values[i].first,
-							(int)query->maintenances.values[i].second);
+											 query->maintenances.values[i].first,
+											 (int)query->maintenances.values[i].second);
 
 					((ZBX_DB_EVENT *)event_refs->values[j])->suppressed =
-							ZBX_PROBLEM_SUPPRESSED_TRUE;
+						ZBX_PROBLEM_SUPPRESSED_TRUE;
 				}
 			}
 
@@ -2044,12 +2039,12 @@ static void	add_event_suppress_data(zbx_vector_ptr_t *event_refs, zbx_vector_uin
  *          event_suppress table                                              *
  *                                                                            *
  ******************************************************************************/
-static void	update_event_suppress_data(void)
+static void update_event_suppress_data(void)
 {
-	zbx_vector_ptr_t	event_refs;
-	zbx_vector_uint64_t	maintenanceids;
-	int			i;
-	ZBX_DB_EVENT		*event;
+	zbx_vector_ptr_t event_refs;
+	zbx_vector_uint64_t maintenanceids;
+	int i;
+	ZBX_DB_EVENT *event;
 
 	zbx_vector_uint64_create(&maintenanceids);
 	zbx_vector_ptr_create(&event_refs);
@@ -2088,26 +2083,26 @@ out:
  * Purpose: flushes local event cache to database                             *
  *                                                                            *
  ******************************************************************************/
-static int	flush_events(ZBX_DC_HISTORY *history)
+static int flush_events(ZBX_DC_HISTORY *history)
 {
-	int				ret;
-	zbx_event_recovery_t		*recovery;
-	zbx_vector_uint64_pair_t	closed_events;
-	zbx_hashset_iter_t		iter;
-	
+	int ret;
+	zbx_event_recovery_t *recovery;
+	zbx_vector_uint64_pair_t closed_events;
+	zbx_hashset_iter_t iter;
+
 	ret = save_events(history);
-	//NO PROBLEMS: alter (add) cache problems creation here
+	// NO PROBLEMS: alter (add) cache problems creation here
 	save_problems();
-	//NO PROBLEMS: problems recovery code should be added here
+	// NO PROBLEMS: problems recovery code should be added here
 	save_event_recovery(history);
 	update_event_suppress_data();
 
 	zbx_vector_uint64_pair_create(&closed_events);
-	
+
 	zbx_hashset_iter_reset(&event_recovery, &iter);
 	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
 	{
-		zbx_uint64_pair_t	pair = {recovery->eventid, recovery->r_event->eventid};
+		zbx_uint64_pair_t pair = {recovery->eventid, recovery->r_event->eventid};
 
 		zbx_vector_uint64_pair_append_ptr(&closed_events, &pair);
 	}
@@ -2116,7 +2111,7 @@ static int	flush_events(ZBX_DC_HISTORY *history)
 
 	process_actions(&events, &closed_events);
 	zbx_vector_uint64_pair_destroy(&closed_events);
-	
+
 	return ret;
 }
 
@@ -2130,11 +2125,11 @@ static int	flush_events(ZBX_DC_HISTORY *history)
  *             objectid  - [IN] the recovery event object id                  *
  *                                                                            *
  ******************************************************************************/
-static void	recover_event(zbx_uint64_t eventid, int source, int object, 
-			zbx_uint64_t objectid, int history_idx)
+static void recover_event(zbx_uint64_t eventid, int source, int object,
+						  zbx_uint64_t objectid, int history_idx)
 {
-	ZBX_DB_EVENT		*event;
-	zbx_event_recovery_t	recovery_local;
+	ZBX_DB_EVENT *event;
+	zbx_event_recovery_t recovery_local;
 
 	if (NULL == (event = get_event_by_source_object_id(source, object, objectid)))
 	{
@@ -2170,17 +2165,17 @@ static void	recover_event(zbx_uint64_t eventid, int source, int object,
  * Parameters: ok_events - [IN] the recovery events to process                *
  *                                                                            *
  ******************************************************************************/
-static void	process_internal_ok_events(zbx_vector_ptr_t *ok_events)
+static void process_internal_ok_events(zbx_vector_ptr_t *ok_events)
 {
-	int			i, object;
-	zbx_uint64_t		objectid, eventid;
-	char			*sql = NULL;
-	const char		*separator = "";
-	size_t			sql_alloc = 0, sql_offset = 0;
-	zbx_vector_uint64_t	triggerids, itemids, lldruleids;
-	DB_RESULT		result;
-	DB_ROW			row;
-	ZBX_DB_EVENT		*event;
+	int i, object;
+	zbx_uint64_t objectid, eventid;
+	char *sql = NULL;
+	const char *separator = "";
+	size_t sql_alloc = 0, sql_offset = 0;
+	zbx_vector_uint64_t triggerids, itemids, lldruleids;
+	DB_RESULT result;
+	DB_ROW row;
+	ZBX_DB_EVENT *event;
 
 	zbx_vector_uint64_create(&triggerids);
 	zbx_vector_uint64_create(&itemids);
@@ -2195,15 +2190,15 @@ static void	process_internal_ok_events(zbx_vector_ptr_t *ok_events)
 
 		switch (event->object)
 		{
-			case EVENT_OBJECT_TRIGGER:
-				zbx_vector_uint64_append(&triggerids, event->objectid);
-				break;
-			case EVENT_OBJECT_ITEM:
-				zbx_vector_uint64_append(&itemids, event->objectid);
-				break;
-			case EVENT_OBJECT_LLDRULE:
-				zbx_vector_uint64_append(&lldruleids, event->objectid);
-				break;
+		case EVENT_OBJECT_TRIGGER:
+			zbx_vector_uint64_append(&triggerids, event->objectid);
+			break;
+		case EVENT_OBJECT_ITEM:
+			zbx_vector_uint64_append(&itemids, event->objectid);
+			break;
+		case EVENT_OBJECT_LLDRULE:
+			zbx_vector_uint64_append(&lldruleids, event->objectid);
+			break;
 		}
 	}
 
@@ -2211,37 +2206,38 @@ static void	process_internal_ok_events(zbx_vector_ptr_t *ok_events)
 		goto out;
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select eventid,object,objectid from problem"
-			" where r_eventid is null"
-				" and source=%d"
-			" and (", EVENT_SOURCE_INTERNAL);
+					   "select eventid,object,objectid from problem"
+					   " where r_eventid is null"
+					   " and source=%d"
+					   " and (",
+					   EVENT_SOURCE_INTERNAL);
 
 	if (0 != triggerids.values_num)
 	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%s (object=%d and",
-				separator, EVENT_OBJECT_TRIGGER);
+						   separator, EVENT_OBJECT_TRIGGER);
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "objectid", triggerids.values,
-				triggerids.values_num);
+							  triggerids.values_num);
 		zbx_chrcpy_alloc(&sql, &sql_alloc, &sql_offset, ')');
-		separator=" or";
+		separator = " or";
 	}
 
 	if (0 != itemids.values_num)
 	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%s (object=%d and",
-				separator, EVENT_OBJECT_ITEM);
+						   separator, EVENT_OBJECT_ITEM);
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "objectid", itemids.values,
-				itemids.values_num);
+							  itemids.values_num);
 		zbx_chrcpy_alloc(&sql, &sql_alloc, &sql_offset, ')');
-		separator=" or";
+		separator = " or";
 	}
 
 	if (0 != lldruleids.values_num)
 	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "%s (object=%d and",
-				separator, EVENT_OBJECT_LLDRULE);
+						   separator, EVENT_OBJECT_LLDRULE);
 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "objectid", lldruleids.values,
-				lldruleids.values_num);
+							  lldruleids.values_num);
 		zbx_chrcpy_alloc(&sql, &sql_alloc, &sql_offset, ')');
 	}
 
@@ -2276,11 +2272,11 @@ out:
  * Parameters: internal_ok_events      - [IN/OUT] recovery events to process  *
  *                                                                            *
  ******************************************************************************/
-static void	process_internal_events_without_actions(zbx_vector_ptr_t *internal_problem_events,
-		zbx_vector_ptr_t *internal_ok_events)
+static void process_internal_events_without_actions(zbx_vector_ptr_t *internal_problem_events,
+													zbx_vector_ptr_t *internal_ok_events)
 {
-	ZBX_DB_EVENT	*event;
-	int		i;
+	ZBX_DB_EVENT *event;
+	int i;
 
 	if (0 != DCget_internal_action_count())
 		return;
@@ -2305,23 +2301,23 @@ static void	process_internal_events_without_actions(zbx_vector_ptr_t *internal_p
  *             problems   - [OUT] the problems                                *
  *                                                                            *
  ******************************************************************************/
-static void	get_open_problems(const zbx_vector_uint64_t *triggerids, zbx_vector_ptr_t *problems)
+static void get_open_problems(const zbx_vector_uint64_t *triggerids, zbx_vector_ptr_t *problems)
 {
-	DB_RESULT		result;
-	DB_ROW			row;
-	char			*sql = NULL;
-	size_t			sql_alloc = 0, sql_offset = 0;
-	zbx_event_problem_t	*problem;
-	zbx_tag_t		*tag;
-	zbx_uint64_t		eventid;
-	int			index;
-	zbx_vector_uint64_t	eventids;
+	DB_RESULT result;
+	DB_ROW row;
+	char *sql = NULL;
+	size_t sql_alloc = 0, sql_offset = 0;
+	zbx_event_problem_t *problem;
+	zbx_tag_t *tag;
+	zbx_uint64_t eventid;
+	int index;
+	zbx_vector_uint64_t eventids;
 
 	zbx_vector_uint64_create(&eventids);
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select eventid,objectid from problem where source=%d and object=%d and",
-			EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
+					   "select eventid,objectid from problem where source=%d and object=%d and",
+					   EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
 	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "objectid", triggerids->values, triggerids->values_num);
 	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, " and r_eventid is null");
 
@@ -2336,7 +2332,6 @@ static void	get_open_problems(const zbx_vector_uint64_t *triggerids, zbx_vector_
 		zbx_vector_ptr_create(&problem->tags);
 		problem->is_recovered = 0;
 		zbx_vector_ptr_append(problems, problem);
-		
 
 		zbx_vector_uint64_append(&eventids, problem->eventid);
 	}
@@ -2357,7 +2352,7 @@ static void	get_open_problems(const zbx_vector_uint64_t *triggerids, zbx_vector_
 		{
 			ZBX_STR2UINT64(eventid, row[0]);
 			if (FAIL == (index = zbx_vector_ptr_bsearch(problems, &eventid,
-					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+														ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 			{
 				THIS_SHOULD_NEVER_HAPPEN;
 				continue;
@@ -2383,7 +2378,7 @@ static void	get_open_problems(const zbx_vector_uint64_t *triggerids, zbx_vector_
  * Purpose: frees cached problem event                                        *
  *                                                                            *
  ******************************************************************************/
-static void	event_problem_free(zbx_event_problem_t *problem)
+static void event_problem_free(zbx_event_problem_t *problem)
 {
 	zbx_vector_ptr_clear_ext(&problem->tags, (zbx_clean_func_t)zbx_free_tag);
 	zbx_vector_ptr_destroy(&problem->tags);
@@ -2396,7 +2391,7 @@ static void	event_problem_free(zbx_event_problem_t *problem)
  *                                                                            *
  ******************************************************************************/
 
-static void	trigger_dep_free(zbx_trigger_dep_t *dep)
+static void trigger_dep_free(zbx_trigger_dep_t *dep)
 {
 	zbx_vector_uint64_destroy(&dep->masterids);
 	zbx_free(dep);
@@ -2413,12 +2408,12 @@ static void	trigger_dep_free(zbx_trigger_dep_t *dep)
  *                                 trigger values (sorted by triggerid)       *
  *                                                                            *
  ******************************************************************************/
-static int	event_check_dependency(const ZBX_DB_EVENT *event, const zbx_vector_ptr_t *deps,
-		const zbx_vector_ptr_t *trigger_diff)
+static int event_check_dependency(const ZBX_DB_EVENT *event, const zbx_vector_ptr_t *deps,
+								  const zbx_vector_ptr_t *trigger_diff)
 {
-	int			i, index;
-	zbx_trigger_dep_t	*dep;
-	zbx_trigger_diff_t	*diff;
+	int i, index;
+	zbx_trigger_dep_t *dep;
+	zbx_trigger_diff_t *diff;
 
 	if (FAIL == (index = zbx_vector_ptr_bsearch(deps, &event->objectid, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		return SUCCEED;
@@ -2431,12 +2426,12 @@ static int	event_check_dependency(const ZBX_DB_EVENT *event, const zbx_vector_pt
 	/* check the trigger dependency based on actual (currently being processed) trigger values */
 	for (i = 0; i < dep->masterids.values_num; i++)
 	{
-//		if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &dep->masterids.values[i],
-//				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
-//		{
-//			THIS_SHOULD_NEVER_HAPPEN;
-//			continue;
-//		}
+		//		if (FAIL == (index = zbx_vector_ptr_bsearch(trigger_diff, &dep->masterids.values[i],
+		//				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+		//		{
+		//			THIS_SHOULD_NEVER_HAPPEN;
+		//			continue;
+		//		}
 
 		diff = (zbx_trigger_diff_t *)trigger_diff->values[index];
 
@@ -2463,10 +2458,10 @@ static int	event_check_dependency(const ZBX_DB_EVENT *event, const zbx_vector_pt
  *               FAIL    - otherwise.                                         *
  *                                                                            *
  ******************************************************************************/
-static int	match_tag(const char *name, const zbx_vector_ptr_t *tags1, const zbx_vector_ptr_t *tags2)
+static int match_tag(const char *name, const zbx_vector_ptr_t *tags1, const zbx_vector_ptr_t *tags2)
 {
-	int		i, j;
-	zbx_tag_t	*tag1, *tag2;
+	int i, j;
+	zbx_tag_t *tag1, *tag2;
 
 	for (i = 0; i < tags1->values_num; i++)
 	{
@@ -2487,37 +2482,39 @@ static int	match_tag(const char *name, const zbx_vector_ptr_t *tags1, const zbx_
 	return FAIL;
 }
 
-void recover_redundand_problem(zbx_event_problem_t *problem, ZBX_DB_EVENT *event) {
+void recover_redundand_problem(zbx_event_problem_t *problem, ZBX_DB_EVENT *event)
+{
 
 	zbx_timespec_t ts;
 	zbx_timespec(&ts);
-	close_trigger_event(problem->eventid, problem->triggerid, &ts, 0,0,0, event->trigger.description, event->trigger.expression,
-			event->trigger.recovery_expression, event->severity, event->trigger.type, event->trigger.opdata, event->trigger.event_name );
+	close_trigger_event(problem->eventid, problem->triggerid, &ts, 0, 0, 0, event->trigger.description, event->trigger.expression,
+						event->trigger.recovery_expression, event->severity, event->trigger.type, event->trigger.opdata, event->trigger.event_name);
 
-//	LOG_INF("Added recovery event");
+	//	LOG_INF("Added recovery event");
 }
 
-void recover_redundand_problems(zbx_vector_ptr_t *problems, ZBX_DB_EVENT *event) {
+void recover_redundand_problems(zbx_vector_ptr_t *problems, ZBX_DB_EVENT *event)
+{
 	int i, count = 1;
-	zbx_event_problem_t	*problem;
+	zbx_event_problem_t *problem;
 	u_int64_t triggerid = event->trigger.triggerid;
 	zbx_timespec_t ts;
 	zbx_timespec(&ts);
-	
-	if (problems->values_num < 2) 
+
+	if (problems->values_num < 2)
 		return;
 
 	for (i = 0; i < problems->values_num; i++)
-	{ 
+	{
 		problem = (zbx_event_problem_t *)problems->values[i];
 
-		if (problem->triggerid == triggerid && 0 == problem->is_recovered && 1 < count++)	{
+		if (problem->triggerid == triggerid && 0 == problem->is_recovered && 1 < count++)
+		{
 			DEBUG_TRIGGER(triggerid, "There is already %d open PROBLEM(s) (%ld) for the trigger %ld, closing event and the problem", count, problem->eventid, triggerid);
-	
-			
-			close_trigger_event(problem->eventid, problem->triggerid, &ts, 0,0,0, event->trigger.description, event->trigger.expression,
-						event->trigger.recovery_expression, event->severity, event->trigger.type, event->trigger.opdata, event->trigger.event_name );
-			
+
+			close_trigger_event(problem->eventid, problem->triggerid, &ts, 0, 0, 0, event->trigger.description, event->trigger.expression,
+								event->trigger.recovery_expression, event->severity, event->trigger.type, event->trigger.opdata, event->trigger.event_name);
+
 			recover_redundand_problem(problem, event);
 			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 		}
@@ -2532,15 +2529,15 @@ void recover_redundand_problems(zbx_vector_ptr_t *problems, ZBX_DB_EVENT *event)
  *             trigger_diff   - [IN] the trigger changeset                    *
  *                                                                            *
  ******************************************************************************/
-static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_ptr_t *trigger_diff)
+static void process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_ptr_t *trigger_diff)
 {
-	int			i, j, index;
-	zbx_vector_uint64_t	triggerids;
-	zbx_vector_ptr_t	problems, deps;
-	ZBX_DB_EVENT		*event;
-	zbx_event_problem_t	*problem;
-	zbx_trigger_diff_t	*diff;
-	unsigned char		value;
+	int i, j, index;
+	zbx_vector_uint64_t triggerids;
+	zbx_vector_ptr_t problems, deps;
+	ZBX_DB_EVENT *event;
+	zbx_event_problem_t *problem;
+	zbx_trigger_diff_t *diff;
+	unsigned char value;
 
 	zbx_vector_uint64_create(&triggerids);
 	zbx_vector_uint64_reserve(&triggerids, trigger_events->values_num);
@@ -2556,11 +2553,10 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 	for (i = 0; i < trigger_events->values_num; i++)
 	{
 		event = (ZBX_DB_EVENT *)trigger_events->values[i];
-		
+
 		DEBUG_TRIGGER(event->trigger.triggerid, "Processing event %ld for the trigger", event->eventid);
 		DEBUG_TRIGGER(event->objectid, "Added trigger to the triggerids for open problems fetch");
 		zbx_vector_uint64_append(&triggerids, event->trigger.triggerid);
-
 	}
 
 	if (0 != triggerids.values_num)
@@ -2568,7 +2564,6 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 		zbx_vector_uint64_sort(&triggerids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 		get_open_problems(&triggerids, &problems);
 	}
-
 
 	/* get trigger dependency data */
 
@@ -2589,7 +2584,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 		event = (ZBX_DB_EVENT *)trigger_events->values[i];
 
 		if (FAIL == (index = zbx_vector_ptr_search(trigger_diff, &event->objectid,
-				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+												   ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
 			continue;
@@ -2606,23 +2601,25 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 			/* reset event data/trigger changeset if dependency check failed */
 			event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 			diff->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
-			DEBUG_TRIGGER(diff->triggerid,"Unsetting event and trigger due to dependancy check fail");
+			DEBUG_TRIGGER(diff->triggerid, "Unsetting event and trigger due to dependancy check fail");
 			continue;
 		}
 
 		DEBUG_TRIGGER(diff->triggerid, "Passed depndency check");
 		if (TRIGGER_VALUE_PROBLEM == event->value)
 		{
-			DEBUG_TRIGGER(diff->triggerid, "Trigger has PROBLEM value"); 
+			DEBUG_TRIGGER(diff->triggerid, "Trigger has PROBLEM value");
 			/* Checking trigger has multiple event creation tag*/
-			if ( TRIGGER_TYPE_MULTIPLE_TRUE != event->trigger.type) {
-				DEBUG_TRIGGER(diff->triggerid, "Trigger is in single-problem-creation mode"); 
-				//lets check if there are open problems exists for the trigger
+			if (TRIGGER_TYPE_MULTIPLE_TRUE != event->trigger.type)
+			{
+				DEBUG_TRIGGER(diff->triggerid, "Trigger is in single-problem-creation mode");
+				// lets check if there are open problems exists for the trigger
 				for (j = 0; j < problems.values_num; j++)
 				{
 					problem = (zbx_event_problem_t *)problems.values[j];
 
-					if (problem->triggerid == diff->triggerid)	{
+					if (problem->triggerid == diff->triggerid)
+					{
 						DEBUG_TRIGGER(diff->triggerid, "There is already at least one open PROBLEM (%ld) for the trigger, not creating anymore", problem->eventid);
 						event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 						diff->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
@@ -2630,12 +2627,13 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 					}
 				}
 
-				if (event->flags == ZBX_FLAGS_DB_EVENT_UNSET) {
-					DEBUG_TRIGGER(diff->triggerid,"There is/are open problem(s) for the trigger, no need to create a new one");
+				if (event->flags == ZBX_FLAGS_DB_EVENT_UNSET)
+				{
+					DEBUG_TRIGGER(diff->triggerid, "There is/are open problem(s) for the trigger, no need to create a new one");
 					continue;
 				}
 			}
-			
+
 			DEBUG_TRIGGER(diff->triggerid, "Hasn't found any open problems for the trigger, creating a new one");
 			/* Problem events always sets problem value to trigger.    */
 			/* if the trigger is affected by global correlation rules, */
@@ -2643,28 +2641,27 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 			diff->value = TRIGGER_VALUE_PROBLEM;
 			diff->lastchange = event->clock;
 			diff->flags |= (ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE | ZBX_FLAGS_TRIGGER_DIFF_UPDATE_LASTCHANGE);
-			DEBUG_TRIGGER(diff->triggerid,"Setting event and trigger to problem with timestamp %ld",diff->lastchange);
+			DEBUG_TRIGGER(diff->triggerid, "Setting event and trigger to problem with timestamp %ld", diff->lastchange);
 			continue;
 		}
-	
-		
+
 		if (TRIGGER_VALUE_OK != event->value)
 			continue;
-		
+
 		/* attempt to recover problem events/triggers */
-		
-		//in case of OK value, we only need original event, if there is something to recover
-		
+
+		// in case of OK value, we only need original event, if there is something to recover
+
 		event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
-		
-		DEBUG_TRIGGER(diff->triggerid,"Processing OK value for the trigger");
+
+		DEBUG_TRIGGER(diff->triggerid, "Processing OK value for the trigger");
 
 		if (ZBX_TRIGGER_CORRELATION_NONE == event->trigger.correlation_mode)
 		{
 			/* with trigger correlation disabled the recovery event recovers */
 			/* all problem events generated by the same trigger and sets     */
 			/* trigger value to OK                                           */
-			DEBUG_TRIGGER(diff->triggerid,"Processing trrigger's events recovery");
+			DEBUG_TRIGGER(diff->triggerid, "Processing trrigger's events recovery");
 
 			for (j = 0; j < problems.values_num; j++)
 			{
@@ -2673,14 +2670,14 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 				if (problem->triggerid == event->objectid)
 				{
 					recover_event(problem->eventid, EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER,
-							event->objectid, event->history_idx);
+								  event->objectid, event->history_idx);
 					problem->is_recovered = 1;
 
-					DEBUG_TRIGGER(diff->triggerid,"Recovering event %ld", problem->eventid);
+					DEBUG_TRIGGER(diff->triggerid, "Recovering event %ld", problem->eventid);
 					event->flags = ZBX_FLAGS_DB_EVENT_CREATE;
 				}
 			}
-			
+
 			diff->value = TRIGGER_VALUE_OK;
 			diff->flags |= ZBX_FLAGS_TRIGGER_DIFF_UPDATE_VALUE;
 		}
@@ -2698,22 +2695,21 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 				if (problem->triggerid == event->objectid)
 				{
 					if (SUCCEED == match_tag(event->trigger.correlation_tag,
-							&problem->tags, &event->tags))
+											 &problem->tags, &event->tags))
 					{
-						DEBUG_TRIGGER(diff->triggerid,"Recovering event %ld by correlation rule", problem->eventid);
+						DEBUG_TRIGGER(diff->triggerid, "Recovering event %ld by correlation rule", problem->eventid);
 
 						recover_event(problem->eventid, EVENT_SOURCE_TRIGGERS,
-								EVENT_OBJECT_TRIGGER, event->objectid, event->history_idx);
+									  EVENT_OBJECT_TRIGGER, event->objectid, event->history_idx);
 						event->flags = ZBX_FLAGS_DB_EVENT_CREATE;
 						problem->is_recovered = 1;
 					}
-		
 				}
 			}
-		
 		}
-		if (event->flags == ZBX_FLAGS_DB_EVENT_UNSET) {
-			DEBUG_TRIGGER(diff->triggerid,"There no open problem(s) for the OK trigger, event will not be created");
+		if (event->flags == ZBX_FLAGS_DB_EVENT_UNSET)
+		{
+			DEBUG_TRIGGER(diff->triggerid, "There no open problem(s) for the OK trigger, event will not be created");
 		}
 	}
 
@@ -2736,14 +2732,14 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
  *             trigger_diff   -  [IN] the trigger changeset                   *
  *                                                                            *
  ******************************************************************************/
-static void	process_internal_events_dependency(zbx_vector_ptr_t *internal_events, zbx_vector_ptr_t *trigger_events,
-		zbx_vector_ptr_t *trigger_diff)
+static void process_internal_events_dependency(zbx_vector_ptr_t *internal_events, zbx_vector_ptr_t *trigger_events,
+											   zbx_vector_ptr_t *trigger_diff)
 {
-	int			i, index;
-	ZBX_DB_EVENT		*event;
-	zbx_vector_uint64_t	triggerids;
-	zbx_vector_ptr_t	deps;
-	zbx_trigger_diff_t	*diff;
+	int i, index;
+	ZBX_DB_EVENT *event;
+	zbx_vector_uint64_t triggerids;
+	zbx_vector_ptr_t deps;
+	zbx_trigger_diff_t *diff;
 
 	zbx_vector_uint64_create(&triggerids);
 	zbx_vector_uint64_reserve(&triggerids, internal_events->values_num + trigger_events->values_num);
@@ -2772,7 +2768,7 @@ static void	process_internal_events_dependency(zbx_vector_ptr_t *internal_events
 		event = (ZBX_DB_EVENT *)internal_events->values[i];
 
 		if (FAIL == (index = zbx_vector_ptr_search(trigger_diff, &event->objectid,
-				ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
+												   ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 		{
 			THIS_SHOULD_NEVER_HAPPEN;
 			continue;
@@ -2815,12 +2811,12 @@ static void	process_internal_events_dependency(zbx_vector_ptr_t *internal_events
  * Return value: The number of processed events                               *
  *                                                                            *
  ******************************************************************************/
-int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock,
-	ZBX_DC_HISTORY *history)
+int zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock,
+					   ZBX_DC_HISTORY *history)
 {
-	int			i, processed_num = 0;
-	zbx_uint64_t		eventid;
-	zbx_vector_ptr_t	internal_problem_events, internal_ok_events, trigger_events, internal_events;
+	int i, processed_num = 0;
+	zbx_uint64_t eventid;
+	zbx_vector_ptr_t internal_problem_events, internal_ok_events, trigger_events, internal_events;
 
 	LOG_DBG("In %s() events_num:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)events.values_num);
 	if (NULL != trigger_diff && 0 != correlation_cache.num_data)
@@ -2842,18 +2838,18 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 		/* assign event identifiers - they are required to set correlation event ids */
 		/* there is a problem here - hense we won't use the events table anymore
 		/* an unique event id must be generated without help of DBget_maxid */
-        /* having a unique id within a cluster even bigger problem, so perhaps
-		some combination of time, server id, object id and the last known value used by this machine is a 
+		/* having a unique id within a cluster even bigger problem, so perhaps
+		some combination of time, server id, object id and the last known value used by this machine is a
 		good candidate for unique id */
 
 		eventid = DBget_maxid_num("events", events.values_num);
 		for (i = 0; i < events.values_num; i++)
 		{
-			ZBX_DB_EVENT	*event = (ZBX_DB_EVENT *)events.values[i];
+			ZBX_DB_EVENT *event = (ZBX_DB_EVENT *)events.values[i];
 
 			event->eventid = eventid++;
-			//now we know the event id
-			
+			// now we know the event id
+
 			if (EVENT_SOURCE_TRIGGERS == event->source)
 			{
 				DEBUG_TRIGGER(event->trigger.triggerid, "Added trigger's event to the processing");
@@ -2865,25 +2861,25 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 			{
 				switch (event->object)
 				{
-					case EVENT_OBJECT_TRIGGER:
-						if (TRIGGER_VALUE_OK == event->value|| TRIGGER_VALUE_PROBLEM == event->value)
-							zbx_vector_ptr_append(&internal_ok_events, event);
-						else
-							zbx_vector_ptr_append(&internal_problem_events, event);
-						zbx_vector_ptr_append(&internal_events, event);
-						break;
-					case EVENT_OBJECT_ITEM:
-						if (ITEM_STATE_NORMAL == event->value)
-							zbx_vector_ptr_append(&internal_ok_events, event);
-						else
-							zbx_vector_ptr_append(&internal_problem_events, event);
-						break;
-					case EVENT_OBJECT_LLDRULE:
-						if (ITEM_STATE_NORMAL == event->value)
-							zbx_vector_ptr_append(&internal_ok_events, event);
-						else
-							zbx_vector_ptr_append(&internal_problem_events, event);
-						break;
+				case EVENT_OBJECT_TRIGGER:
+					if (TRIGGER_VALUE_OK == event->value || TRIGGER_VALUE_PROBLEM == event->value)
+						zbx_vector_ptr_append(&internal_ok_events, event);
+					else
+						zbx_vector_ptr_append(&internal_problem_events, event);
+					zbx_vector_ptr_append(&internal_events, event);
+					break;
+				case EVENT_OBJECT_ITEM:
+					if (ITEM_STATE_NORMAL == event->value)
+						zbx_vector_ptr_append(&internal_ok_events, event);
+					else
+						zbx_vector_ptr_append(&internal_problem_events, event);
+					break;
+				case EVENT_OBJECT_LLDRULE:
+					if (ITEM_STATE_NORMAL == event->value)
+						zbx_vector_ptr_append(&internal_ok_events, event);
+					else
+						zbx_vector_ptr_append(&internal_problem_events, event);
+					break;
 				}
 			}
 		}
@@ -2913,7 +2909,6 @@ int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *trig
 		zbx_vector_ptr_destroy(&internal_ok_events);
 		zbx_vector_ptr_destroy(&internal_problem_events);
 		zbx_vector_ptr_destroy(&internal_events);
-
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() processed:%d", __func__, (int)processed_num);

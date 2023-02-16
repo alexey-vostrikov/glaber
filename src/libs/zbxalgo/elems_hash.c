@@ -264,6 +264,38 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
     
 }
 
+void elems_hash_iterate_by_vector(elems_hash_t *elems, zbx_vector_uint64_t *ids, elems_hash_process_cb_t proc_func, void *param,
+     u_int64_t element_lock_flags ) {
+   
+    elems_hash_elem_t *elem;
+    int i;
+
+    glb_rwlock_rdlock(&elems->meta_lock);
+
+    for (i = 0; i < ids->values_num; i++) {
+
+        if (NULL == (elem = (elems_hash_elem_t*) zbx_hashset_search(&elems->elems, &ids->values[i])))
+            continue;
+    
+        elem_lock(elem,  element_lock_flags);
+        (*proc_func)(elem, &elems->memf, param);
+        elem_unlock(elem);
+
+        if ( 0 < (elem->flags & ELEM_FLAG_DELETE)) {
+
+            glb_rwlock_unlock(&elems->meta_lock);
+            glb_rwlock_wrlock(&elems->meta_lock);
+        
+            delete_element(elems, elem);
+        
+            glb_rwlock_unlock(&elems->meta_lock);
+            glb_rwlock_rdlock(&elems->meta_lock);
+        }
+    }
+    
+    glb_rwlock_unlock(&elems->meta_lock);
+}
+
 int  elems_hash_get_num(elems_hash_t *elems) {
     int num_data = 0;
     glb_rwlock_rdlock(&elems->meta_lock);

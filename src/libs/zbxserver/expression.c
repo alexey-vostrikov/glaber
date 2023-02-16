@@ -6018,8 +6018,7 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 		int	j, k;
 
 		tr = (DC_TRIGGER *)triggers->values[i];
-		DEBUG_TRIGGER(tr->triggerid,"Evaluating trigger expressions");
-
+		
 		for (j = 0; j < tr->itemids.values_num; j++)
 		{
 			if (FAIL != (k = zbx_vector_uint64_bsearch(history_itemids, tr->itemids.values[j],
@@ -6072,6 +6071,8 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 
 		if (NULL != tr->new_error)
 			continue;
+		
+		DEBUG_TRIGGER(tr->triggerid,"Calculating trigger problem expression");
 
 		if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx, &tr->timespec, &expr_result, &tr->new_error)) {
 			LOG_DBG("Failed to eval %ld trigger expression",tr->triggerid);
@@ -6106,6 +6107,7 @@ void	zbx_evaluate_expressions(zbx_vector_ptr_t *triggers, const zbx_vector_uint6
 			continue;
 		}
 
+		DEBUG_TRIGGER(tr->triggerid,"Calculating trigger recovery expression");
 		/* processing recovery expression mode */
 		if (SUCCEED != evaluate_expression(tr->triggerid, tr->eval_ctx_r, &tr->timespec, &expr_result, &tr->new_error))
 		{

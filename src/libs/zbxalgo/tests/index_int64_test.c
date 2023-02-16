@@ -21,6 +21,8 @@
 #include "zbxshmem.h"
 #include "zbxalgo.h"
 
+#ifdef HAVE_GLB_TESTS
+
 static  zbx_shmem_info_t	*shmtest_mem;
 ZBX_SHMEM_FUNC_IMPL(__shmtest, shmtest_mem);
 
@@ -158,3 +160,4 @@ void   tests_index_uint64_run(void) {
 
     LOG_INF("Finished index tests");
 }
+#endif

@@ -58,13 +58,11 @@ int     glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num);
 int     glb_state_item_add_lld_value(ZBX_DC_HISTORY *h);
 
 int     glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
-int     glb_state_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
 void    glb_state_get_item_stats(zbx_vector_ptr_t *stats);
 int     glb_state_get_item_state(u_int64_t itemid);
 int     glb_state_get_values_by_count(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int count, int ts_end);
 int     glb_state_get_values_by_time(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds, int ts_end);
 
-int     glb_state_get_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
 
 glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);
 void glb_state_items_housekeep();

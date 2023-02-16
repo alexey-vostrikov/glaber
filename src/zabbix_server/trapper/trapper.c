@@ -243,7 +243,7 @@ static int  get_interfaces_state(zbx_socket_t *sock, struct zbx_json_parse *jp) 
 static int  get_problems(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_t ids;
 	struct zbx_json		response_json;
-		
+	//LOG_INF("Got problems request: %s", jp->start);	
 	zbx_json_init(&response_json, ZBX_JSON_STAT_BUF_LEN);
 	zbx_json_addstring(&response_json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
 	
@@ -259,6 +259,7 @@ static int  get_problems(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_destroy(&ids);
 	zbx_json_close(&response_json);
 	
+	//LOG_INF("Sending problems response: %s",  response_json.buffer);	
 	(void)zbx_tcp_send(sock, response_json.buffer);
 
 	zbx_json_free(&response_json);

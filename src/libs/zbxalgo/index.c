@@ -82,6 +82,12 @@ int index_uint64_get(index_uint64_t *index, u_int64_t key, zbx_vector_uint64_t *
     return elems_hash_process(index->index, key, index_get_values_cb, values, ELEM_FLAG_DO_NOT_CREATE);
 }
 
+int index_uint64_get_keys_values(index_uint64_t *index, zbx_vector_uint64_t *ids, zbx_vector_uint64_t *values) {
+    int i;
+    for (i = 0; i < ids->values_num; i++) 
+        elems_hash_process(index->index, ids->values[i], index_get_values_cb, values,  ELEM_FLAG_DO_NOT_CREATE);
+}
+
 ELEMS_CALLBACK(index_remove_value_cb) {
     int val_index;
     zbx_vector_uint64_t *values = elem->data;

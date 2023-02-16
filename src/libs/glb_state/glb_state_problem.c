@@ -165,5 +165,5 @@ int glb_problem_unmarshall_from_json(mem_funcs_t *memf, strpool_t *strpool, glb_
 }
 
 int glb_problem_get_create_time(glb_problem_t *problem) {
-    return glb_state_id_get_time(problem->id);
+    return glb_state_id_get_timestamp(problem->id);
 }

@@ -924,7 +924,6 @@ int add_value_lld_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data) {
   
     }
 
-
     if (NULL != (c_val = (glb_state_item_value_t *)glb_tsbuff_add_to_head(&elm->tsbuff, h->ts.sec)))
     {
         dc_hist_to_value(c_val, h);
@@ -1439,8 +1438,7 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
 
 
 int glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count) {
-	elems_hash_elem_t *elem;
-	int i, j, rcount;
+	int i;
 
 	if (count < 1 ) 
         count = GLB_CACHE_MIN_COUNT;

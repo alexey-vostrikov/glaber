@@ -1600,39 +1600,6 @@ static int zbx_trigger_topoindex_compare(const void *d1, const void *d2)
 	return 0;
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: process triggers - calculates property changeset and generates    *
- *          events                                                            *
- *                                                                            *
- * Parameters: triggers     - [IN] the triggers to process                    *
- *             trigger_diff - [OUT] the trigger changeset                     *
- *                                                                            *
- * Comments: The trigger_diff changeset must be cleaned by the caller:        *
- *                zbx_vector_ptr_clear_ext(trigger_diff,                      *
- *                              (zbx_clean_func_t)zbx_trigger_diff_free);     *
- *                                                                            *
- ******************************************************************************/
-// static void zbx_process_triggers(zbx_vector_ptr_t *triggers, zbx_vector_ptr_t *trigger_diff, ZBX_DC_HISTORY *history)
-// {
-// 	int i;
-
-// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() values_num:%d", __func__, triggers->values_num);
-
-// 	if (0 == triggers->values_num)
-// 		goto out;
-
-// 	zbx_vector_ptr_sort(triggers, zbx_trigger_topoindex_compare);
-
-// 	for (i = 0; i < triggers->values_num; i++)
-// 		glb_state_trigger_process_value(); 
-// 		zbx_process_trigger((struct _DC_TRIGGER *)triggers->values[i], trigger_diff, history);
-
-// 	zbx_vector_ptr_sort(trigger_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-// out:
-// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-// }
-
 void glb_process_triggers(zbx_vector_ptr_t *triggers) {
 	DC_TRIGGER		*tr;
 	int i;

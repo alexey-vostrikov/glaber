@@ -90,6 +90,6 @@ u_int64_t glb_state_id_gen_new() {
     return (u_int64_t)(new_time << 18) | (u_int64_t)sequence << 8 | (u_int64_t)process_num;
 }
 
-u_int64_t glb_state_id_get_time(u_int64_t id) {
-    return id >> 18;
+u_int64_t glb_state_id_get_timestamp(u_int64_t id) {
+    return (id >> 18)/1000;
 }

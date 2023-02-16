@@ -1810,7 +1810,10 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 		host->status = status;
 	}
 	
+	poller_item_notify_init();
 	conf_hosts_notify_changes(&changed_hosts_ids);
+	poller_item_notify_flush();
+	
 	zbx_vector_uint64_destroy(&changed_hosts_ids);
 
 	for (i = 0; i < proxy_hosts.values_num; i++)
