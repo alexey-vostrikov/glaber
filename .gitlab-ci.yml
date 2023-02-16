@@ -102,7 +102,7 @@ astra:
     OS_VER: smolensk
   tags: ["virtbox"]
   script:
-    - date
+    - date -s "$(wget --method=HEAD -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f2-7)"
     - update-ca-certificates
     - *build_go
     - *prepare_sources
