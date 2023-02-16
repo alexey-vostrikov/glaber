@@ -33,8 +33,8 @@ class CControllerGlaberLatestViewRefresh extends CControllerGlaberLatest {
 			'page' =>						'ge 1',
 
 			// filter inputs
-			'filter_groupids' =>			'array_id',
-			'filter_hostids' =>				'array_id',
+			'groupids' =>					'array_id',
+			'hostids' =>					'array_id',
 			'filter_select' =>				'string',
 			'filter_show_without_data' =>	'in 1',
 			'filter_group_by_discovery' =>	'in 1',
@@ -51,7 +51,7 @@ class CControllerGlaberLatestViewRefresh extends CControllerGlaberLatest {
 
 		if ($ret) {
 			// Hosts must have been selected as well if filtering items with data only.
-			if (!$this->getInput('filter_hostids', []) && !$this->getInput('filter_show_without_data', 0)) {
+			if (!$this->getInput('hostids', []) && !$this->getInput('filter_show_without_data', 0)) {
 				$ret = false;
 			}
 		}
@@ -70,8 +70,8 @@ class CControllerGlaberLatestViewRefresh extends CControllerGlaberLatest {
 	protected function doAction() {
 		// filter
 		$filter = [
-			'groupids' => $this->hasInput('filter_groupids') ? $this->getInput('filter_groupids') : null,
-			'hostids' => $this->hasInput('filter_hostids') ? $this->getInput('filter_hostids') : null,
+			'groupids' => $this->hasInput('groupids') ? $this->getInput('groupids') : null,
+			'hostids' => $this->hasInput('hostids') ? $this->getInput('hostids') : null,
 			'select' => $this->getInput('filter_select', ''),
 			'show_without_data' =>  $this->hasInput('filter_show_without_data') 
 						? $this->getInput('filter_show_without_data') : CProfile::get('filter_show_without_data', 0),
@@ -97,25 +97,9 @@ class CControllerGlaberLatestViewRefresh extends CControllerGlaberLatest {
 
 		$view_curl = (new CUrl('zabbix.php'))->setArgument('action', 'latest.view');
 
-		// data sort and pager
-		//$prepared_data = $this->prepareData($filter, $sort_field, $sort_order);
-		//$paging = CPagerHelper::paginate($this->getInput('page', 1), $prepared_data['items'], ZBX_SORT_UP, $view_curl);
-
-		//$this->extendData($prepared_data);
-
-		// display
 		$data = [
 			'filter' => $filter,
-//			'sort_field' => $sort_field,
-//			'sort_order' => $sort_order,
 			'view_curl' => $view_curl,
-//			'paging' => $paging,
-//			'config' => [
-//				'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS),
-//				'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
-//				'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
-//				'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)
-//			],
 			'tags' => makeTags($prepared_data['items'], true, 'itemid', ZBX_TAG_COUNT_DEFAULT, $filter['tags'])
 		] + $prepared_data;
 

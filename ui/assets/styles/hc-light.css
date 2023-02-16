@@ -5259,7 +5259,7 @@ section .section-toggle:hover, .filter-container.tabfilter-container .icon-edit:
       max-width: calc(100vw - 40px); }
   .overlay-dialogue .hintbox-wrap {
     overflow: auto;
-    max-height: 240px;
+    max-height: 400px;
     max-width: 800px;
     overflow-wrap: break-word; }
   .overlay-dialogue .msg-bad,

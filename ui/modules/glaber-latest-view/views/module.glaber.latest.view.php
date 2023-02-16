@@ -32,15 +32,9 @@ $this->includeJsFile('module.glaber.latest.view.js.php');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-//error_log("Can create hosts: ". $data['can_create']. "\n");
-
 $widget = (new CHtmlPage())
 	->setTitle(_('Latest data'))
 	->setWebLayoutMode($web_layout_mode);
-	//->setControls((new CTag('nav', true, $nav_items )))
-	//->setAttribute('aria-label', _('Content controls'));
-
-
 
 $nav_items = (new CList()) ->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]));
 
@@ -72,7 +66,7 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 			(new CFormList())
 				->addRow((new CLabel(_('Host groups'), 'filter_groupids__ms')),
 					(new CMultiSelect([
-						'name' => 'filter_groupids[]',
+						'name' => 'groupids[]',
 						'object_name' => 'hostGroup',
 						'data' => $data['multiselect_hostgroup_data'],
 						'popup' => [
@@ -89,7 +83,7 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 				)
 				->addRow((new CLabel(_('Hosts'), 'filter_hostids__ms')),
 					(new CMultiSelect([
-						'name' => 'filter_hostids[]',
+						'name' => 'hostids[]',
 						'object_name' => 'hosts',
 						'data' => $data['multiselect_host_data'],
 						'popup' => [

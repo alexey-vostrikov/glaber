@@ -84,9 +84,14 @@ int poller_item_notify_init() {
 int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t hostid) {
 	zbx_uint64_pair_t pair = {.first = hostid, .second = itemid};
 
-	DEBUG_ITEM(itemid,"Adding item to async polling notify for type iface %d", item_type);
-	
-	int process_type = process_by_item_type[item_type];
+	DEBUG_ITEM(itemid,"Adding item to async polling notify for item type %d", item_type);
+
+	if (ITEM_TYPE_SIMPLE == item_type && 0 == strncmp(key, "net.tcp.service[http", 19)) {
+		item_type = ITEM_TYPE_AGENT;
+		DEBUG_ITEM(itemid, "Set item type to %d, poller num is %d", item_type, process_by_item_type[item_type]);
+	}
+
+	int  process_type = process_by_item_type[item_type];
 
 	if (item_type >= ITEM_TYPE_MAX || 0 > item_type  || 0 == process_type) {
 		
@@ -95,14 +100,10 @@ int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t
 		return FAIL;
 	}
 
-	if (ITEM_TYPE_SIMPLE == item_type && 0 == strncmp(key, "net.tcp.service[http", 20))
-		item_type = ITEM_TYPE_AGENT;
-
 	if (NULL == ipc_poller_notify[process_type])
 		return FAIL;
 	
-
-	DEBUG_ITEM(itemid,"Adding item to async polling notify for type %d", item_type);
+	DEBUG_ITEM(itemid,"Adding item to async polling notify for type %d to process type %d", item_type, process_by_item_type[process_type]);
 	zbx_vector_uint64_pair_append(notify_buffer[process_type], pair);
 	
 	return SUCCEED;

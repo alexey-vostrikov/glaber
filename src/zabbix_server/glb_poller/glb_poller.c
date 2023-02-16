@@ -323,8 +323,8 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: deleting the old configuration");
 		glb_poller_delete_item(poller_item->itemid);
 	}
-	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
 
+	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
 	bzero(&local_glb_item, sizeof(poller_item_t));
 
 	local_glb_item.itemid = dc_item->itemid;
@@ -796,7 +796,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	if (SUCCEED != poller_init(args))
 		exit(-1);
 
-	LOG_INF("%s #%d started [%s #%d]", get_program_type_string(conf.procinfo.program_type),
+	LOG_INF("%s #%d started [%s  #%d]", get_program_type_string(conf.procinfo.program_type),
 			conf.procinfo.server_num, get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);
 
 	zbx_setproctitle("%s #%d [started]", get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);

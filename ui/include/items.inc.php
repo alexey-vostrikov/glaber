@@ -2560,8 +2560,8 @@ function getTypeItemFieldNames(array $input): array {
 				return ['delay'];
 			}
 		case ITEM_TYPE_WORKER_SERVER:
-			if ($input['templateid'] != 0) 
-				return ['delay'];
+		//	if ($input['templateid'] != 0) 
+		//		return ['delay'];
 			return ['params', 'delay'];
 	}
 }

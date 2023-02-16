@@ -86,7 +86,7 @@ static void response_cb(struct bufferevent *bev, void *ctx_ptr)
 	case ASYNC_IO_TCP_PROC_FINISH:
 		poller_register_item_succeed(poller_item);
 		async_tcp_destroy_session(poller_item);
-		poller_contention_remove_session(tcp_item->interface_addr);
+		poller_contention_remove_session(tcp_item->ipaddr);
 		break;
 
 	case ASYNC_IO_TCP_PROC_CONTINUE:
@@ -113,7 +113,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 
 			if (ASYNC_IO_TCP_PROC_FINISH == status)
 				async_tcp_destroy_session(poller_item);
-				poller_contention_remove_session(tcp_item->interface_addr);
+				poller_contention_remove_session(tcp_item->ipaddr);
 		}
 
 		return;
@@ -149,7 +149,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 		{ // agent answered and closed connection - this is fine!
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Connection closed, has %d byets to process", n);
 			response_cb(bev, ptr);
-			poller_contention_remove_session(tcp_item->interface_addr);
+			poller_contention_remove_session(tcp_item->ipaddr);
 		}
 		else
 		{
@@ -369,7 +369,7 @@ static void tcp_start_connection(poller_item_t *poller_item)
 	u_int64_t itemid = poller_get_item_id(poller_item);
 	int n;
 
-	if (DEFAULT_TCP_HOST_CONTENTION <= (n = poller_contention_get_sessions(tcp_item->interface_addr)))
+	if (DEFAULT_TCP_HOST_CONTENTION <= (n = poller_contention_get_sessions(tcp_item->ipaddr)))
 	{
 	 	DEBUG_ITEM(poller_get_item_id(poller_item), "There are already %d connections for the %s host, delaying poll", n, tcp_item->interface_addr);
 	 	poller_return_delayed_item_to_queue(poller_item);
@@ -377,16 +377,12 @@ static void tcp_start_connection(poller_item_t *poller_item)
 	}
 		
 	if (1 == tcp_item->useip) {
-	//	LOG_INF("This is ip item, no need to resolve, addr is %s", tcp_item->ipaddr);
 		tcp_send_request(poller_item);
 		return;
 	}
 
-//	LOG_INF("Befeore resolving: got %d connections for host %s", n, tcp_item->interface_addr);
-
 	if ( tcp_item->next_resolve < time(NULL))
 	{
-		//LOG_INF("This is dns name item, resolving Resolving %s", tcp_item->interface_addr);
 		DEBUG_ITEM(poller_get_item_id(poller_item), "Need to resolve %s", tcp_item->interface_addr);
 	
 		if (FAIL == poller_async_resolve(poller_item, tcp_item->interface_addr))
@@ -433,7 +429,7 @@ static int tcp_init_item(DC_ITEM *dc_item, poller_item_t *poller_item)
 
 	tcp_item_t *tcp_item;
 	tcp_item = zbx_calloc(NULL, 0, sizeof(tcp_item_t));
-
+	DEBUG_ITEM(poller_get_item_id(poller_item), "Doing tcp init of the item");
 	poller_set_item_specific_data(poller_item, tcp_item);
 
 	if (ITEM_TYPE_AGENT == dc_item->type)

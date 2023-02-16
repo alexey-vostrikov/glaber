@@ -34,9 +34,9 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 			'page' =>						'ge 1',
 
 			// filter inputs
-			'filter_groupids' =>			'array_id',
-			'filter_hostids' =>				'array_id',
-			'filter_select' =>				'string',
+			'groupids' =>			'array_id',
+			'hostids' =>				'array_id',
+			//'filter_select' =>				'string',
 			'filter_show_without_data' =>	'in 0,1',
 			'filter_group_by_discovery' =>	'in 0,1',
 			'filter_show_details' =>		'in 1',
@@ -75,12 +75,12 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 
 		} 
 		
-		if ($this->hasInput('filter_hostids') || $this->hasInput('filter_groupids')) {
+		if ($this->hasInput('groupids') || $this->hasInput('hostids')) {
 			//the page has been also opened via external link having host/group fields
 			//setting host and group filters
 
-			\CProfile::updateArray('web.latest.filter.groupids', $this->getInput('filter_groupids', []),PROFILE_TYPE_ID	);
-			\CProfile::updateArray('web.latest.filter.hostids', $this->getInput('filter_hostids', []), PROFILE_TYPE_ID);
+			\CProfile::updateArray('web.latest.filter.groupids', $this->getInput('groupids', []),PROFILE_TYPE_ID	);
+			\CProfile::updateArray('web.latest.filter.hostids', $this->getInput('hostids', []), PROFILE_TYPE_ID);
 		}
 		if ($this->hasInput('filter_rst')) {
 			\CProfile::deleteIdx('web.latest.filter.groupids');
@@ -91,12 +91,12 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 		}
 
 		// Force-check "Show items without data" if there are no hosts selected.
-		$filter_hostids = \CProfile::getArray('web.latest.filter.hostids');
-		$filter_show_without_data = $filter_hostids ? \CProfile::get('web.latest.filter.show_without_data', 1) : 1;
+		$hostids = \CProfile::getArray('web.latest.filter.hostids');
+		$filter_show_without_data = $hostids ? \CProfile::get('web.latest.filter.show_without_data', 1) : 1;
 
 		$filter = [
 			'groupids' => \CProfile::getArray('web.latest.filter.groupids'),
-			'hostids' => $filter_hostids,
+			'hostids' => $hostids,
 			'select' => \CProfile::get('web.latest.filter.select', ''),
 			'show_without_data' => $filter_show_without_data,
 			'show_details' => \CProfile::get('web.latest.filter.show_details', 0),
@@ -109,8 +109,8 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 
 		$refresh_curl = (new \CUrl('zabbix.php'))->setArgument('action', 'latest.view.refresh');
 		$refresh_data = array_filter([
-			'filter_groupids' => $filter['groupids'],
-			'filter_hostids' => $filter['hostids'],
+			'groupids' => $filter['groupids'],
+			'hostids' => $filter['hostids'],
 			'filter_select' => $filter['select'],
 			'filter_show_without_data' => $filter['show_without_data'] ? 1 : null,
 			'filter_group_by_discovery' => $filter['group_by_discovery'] ? 1 : null,

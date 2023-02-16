@@ -489,8 +489,10 @@ final class CItemData {
 			'for_type' => [
 				ITEM_TYPE_WORKER_SERVER => [
 					'params_worker',
-					'js-item-wokerpath-label',
-					'js-item-wokerpath-field',
+					'js-item-workerpath-label',
+					'js-item-workerpath-field',
+					'js-item-delay-label',
+					'js-item-delay-field',
 					'delay',
 					['id' => 'key', 'defaultValue' => ''],
 					['id' => 'value_type', 'defaultValue' => '']

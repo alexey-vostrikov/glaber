@@ -371,13 +371,12 @@ $item_tab
 	// Append worker server Params;
 	 
 	->addItem([
-		(new CLabel(_('Worker path'), 'path'))->setId('js-item-wokerpath-label'),
+		(new CLabel(_('Worker path'), 'path'))->setId('js-item-workerpath-label'),
 		(new CFormField((new CTextBox('path', $data['params']))
 		   	->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 		   	->setAriaRequired()
 		    ->setReadonly($readonly))
-		)->setId('js-item-wokerpath-field')
-	
+		)->setId('js-item-workerpath-field')
 	]);
 	error_log(json_encode($data)."\n");
 $headers_data = [];

@@ -8685,6 +8685,9 @@ static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 
 	switch (src_item->type)
 	{
+	case ITEM_TYPE_WORKER_SERVER:
+		dst_item->params = zbx_strdup(NULL, src_item->params);
+		break;
 	case ITEM_TYPE_SNMP:
 		snmpitem = (ZBX_DC_SNMPITEM *)zbx_hashset_search(&config->snmpitems, &src_item->itemid);
 		snmp = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp,
@@ -8982,8 +8985,11 @@ void DCconfig_clean_items(DC_ITEM *items, int *errcodes, size_t num)
 			zbx_free(items[i].params);
 			zbx_free(items[i].formula_bin);
 			break;
+		case ITEM_TYPE_WORKER_SERVER:
+			zbx_free(items[i].params);
+			break;
 		}
-
+	
 		zbx_free(items[i].delay);
 	}
 }
