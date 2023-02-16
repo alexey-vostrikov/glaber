@@ -102,6 +102,7 @@ astra:
     OS_VER: smolensk
   tags: ["virtbox"]
   script:
+    - update-ca-certificates
     - *build_go
     - *prepare_sources
     - *build_glbmap
