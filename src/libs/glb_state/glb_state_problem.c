@@ -57,6 +57,12 @@ glb_problem_t *glb_problem_create(mem_funcs_t *memf, strpool_t *strpool, glb_pro
     else 
         problem->name = zbx_strdup(NULL, info->name);
     
+    //		zbx_substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    //					 &event->name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+
+    
+    glb_translate_event_name_macro()
+
     problem->id = info->problemid;
     problem->objectid = info->objectid;
     problem->oper_state = GLB_PROBLEM_OPER_STATE_PROBLEM;
