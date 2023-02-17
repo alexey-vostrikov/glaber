@@ -252,7 +252,7 @@ static int tcp_bev_request(poller_item_t *poller_item, const char *request, int 
 	servaddr_in.sin_addr = ((struct sockaddr_in *)ai->ai_addr)->sin_addr;
 	servaddr_in.sin_port = htons(tcp_item->interface_port);
 
-	if (ZBX_SOCKET_ERROR == (sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0)))
+	if ( -1 == (sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0)))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't exec gettraddrinfo");
 		freeaddrinfo(ai);
