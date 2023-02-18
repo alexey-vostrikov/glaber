@@ -227,3 +227,4 @@ src/glapi/glb_hist_clickhouse
 include/config.h.in~
 build/config.log
 include/common/config.h
+*.orig
