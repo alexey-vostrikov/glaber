@@ -86,58 +86,49 @@ int glb_state_problems_destroy()
     strpool_destroy(&conf->strpool);
 }
 
-ELEMS_CALLBACK(problem_create_cb)
+ELEMS_CALLBACK(problem_save_cb)
 {
-    glb_problem_info_t *info = data;
-    glb_problem_t *problem;
+    //DC_TRIGGER *trigger = data;
+    glb_problem_t *problem = data;
 
     if (NULL != elem->data)
         return FAIL;
 
-    if (NULL == (problem = glb_problem_create(memf, &conf->strpool, info)))
-        return FAIL;
+   // if (NULL == (problem = glb_problem_create(memf, &conf->strpool, info)))
+    //    return FAIL;
 
     elem->data = problem;
 
     return SUCCEED;
 }
 
-u_int64_t glb_state_problem_create(u_int64_t problemid, glb_problem_source_t source, u_int64_t objectid,
-                                   const char *name, unsigned char severity, zbx_vector_uint64_t *hosts)
+u_int64_t glb_state_problems_create_by_trigger(DC_TRIGGER *trigger)
 {
     int i;
-    glb_problem_info_t info = {.name = name, .objectid = objectid, .severity = severity, .source = source};
+    glb_problem_t *problem;
 
-    if ((0 == problemid && 0 == (problemid = glb_state_id_gen_new())) || // no id, failed to gen a new one
-        source < 0 || source >= GLB_PROBLEM_SOURCE_COUNT ||
-        NULL == name ||
-        0 == objectid ||
-        0 > severity || SEVERITY_COUNT <= severity)
-    {
-        LOG_INF("Problem params check failed");
+    DEBUG_TRIGGER(trigger->triggerid, "Creating new PROBLEM for the trigger");
+    
+    if (NULL == (problem = glb_problem_create_by_trigger(&conf->memf, &conf->strpool, 0, trigger)))
         return 0;
-    }
 
-    info.problemid = problemid;
+    u_int64_t problemid = glb_problem_get_id(problem);
 
-    DEBUG_TRIGGER(objectid, "Creating new PROBLEM %ld", problemid);
+    DEBUG_TRIGGER(trigger->triggerid, "PROBLEM %ld created, adding to the problems table", problemid);
 
-    if (SUCCEED == elems_hash_process(conf->problems, problemid, problem_create_cb, &info, 0))
+    if (SUCCEED == elems_hash_process(conf->problems, problemid, problem_save_cb, problem, 0))
     {
-        DEBUG_TRIGGER(objectid, "PROBLEM %ld created", problemid);
+        index_uint64_add(conf->trigger_idx, trigger->triggerid, problemid);
 
-        if (GLB_PROBLEM_SOURCE_TRIGGER == source)
-            index_uint64_add(conf->trigger_idx, objectid, problemid);
-
-        if (NULL != hosts)
-            for (int i = 0; i < hosts->values_num; i++)
-            {
-                LOG_INF("Added host %lld -> problem %lld index", hosts->values[i], problemid);
-                index_uint64_add(conf->hosts_idx, hosts->values[i], problemid);
-            }
+        for ( i = 0; i < trigger->hostids.values_num; i++)
+            index_uint64_add(conf->hosts_idx, trigger->hostids.values[i], problemid);
 
         return problemid;
-    }
+    } 
+    
+    DEBUG_TRIGGER(trigger->triggerid, "Failed to add problem to problems table");
+    glb_problem_destroy(&conf->memf, &conf->strpool, problem);
+
     return 0;
 }
 
@@ -228,6 +219,8 @@ void glb_state_problems_clean(zbx_vector_ptr_t *problems)
     }
 }
 
+/* func to be called on the trigger recalc event*/
+/* note: there might be needed to pass history data along to alter it's severity value */
 void glb_state_problems_process_trigger_value(DC_TRIGGER *trigger)
 {
     int problems_count, total_count;
@@ -260,16 +253,15 @@ void glb_state_problems_process_trigger_value(DC_TRIGGER *trigger)
         DEBUG_TRIGGER(trigger->triggerid, "Handling PROBLEM value, now (%d) problems exist, trigger type is %d", problems_count, trigger->type);
         if (TRIGGER_TYPE_MULTIPLE_TRUE == trigger->type || 0 == problems_count)
         {
-
             char *problem_name;
+
             if (NULL != trigger->event_name && trigger->event_name[0] != '\0')
                 problem_name = trigger->event_name;
             else
                 problem_name = trigger->description;
 
             LOG_INF("Creating PROBLEM for trigger %ld: %s", trigger->triggerid, problem_name);
-            glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, trigger->triggerid, problem_name,
-                                     trigger->priority, &trigger->hostids);
+            glb_state_problems_create_by_trigger(trigger);
         }
         else
             DEBUG_TRIGGER(trigger->triggerid, "Handling PROBLEM value:  no need to create a new PROBLEM, already exists");

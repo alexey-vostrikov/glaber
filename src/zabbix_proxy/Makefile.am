@@ -60,6 +60,7 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxsysinfo/$(ARCH)/libspechostnamesysinfo.a \
 	$(top_builddir)/src/libs/zbxsysinfo/alias/libalias.a \
 	$(top_builddir)/src/libs/zbxlog/libzbxlog.a \
+	$(top_builddir)/src/libs/glb_state/libglbstate.a \
 	$(top_builddir)/src/libs/zbxserver/libzbxserver.a \
 	$(top_builddir)/src/libs/zbxcacheconfig/libzbxcacheconfig.a \
 	$(top_builddir)/src/libs/zbxcachehistory/libzbxcachehistory.a \
@@ -113,7 +114,6 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxcommon/libzbxcommon.a \
 	$(top_builddir)/src/libs/zbxversion/libzbxversion.a \
 	$(top_builddir)/src/libs/glb_conf/libglbconfig.a \
-	$(top_builddir)/src/libs/glb_state/libglbstate.a \
 	libzbxproxy.a\
 	$(top_builddir)/src/libs/glb_events_log/libglbeventlog.a
 

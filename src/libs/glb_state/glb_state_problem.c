@@ -20,6 +20,8 @@
 #include "glb_state_problem.h"
 #include "glb_state_ids.h"
 #include "load_dump.h"
+#include "../glb_macro/glb_macro.h"
+#include "zbxserver.h"
 
 static mem_funcs_t heap_memf = { .malloc_func = zbx_default_mem_malloc_func, 
               .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
@@ -40,34 +42,47 @@ struct glb_problem_t {
 
 };
 
-glb_problem_t *glb_problem_create(mem_funcs_t *memf, strpool_t *strpool, glb_problem_info_t *info) {
+glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, DC_TRIGGER *trigger) {
 
     if (NULL == memf)
         memf = &heap_memf;
+    
+    char problem_name[MAX_STRING_LEN];
 
+    if (0 == problemid && 0 == (problemid = glb_state_id_gen_new())) // no id, failed to gen a new one
+        return NULL;
+    
     glb_problem_t* problem = memf->malloc_func(NULL, sizeof(glb_problem_t));
-    if (NULL == problem || NULL == info->name)
+    
+    if (NULL == problem || NULL == trigger->event_name)
         return NULL;
     
     bzero(problem, sizeof(glb_problem_t));
 
+    if (FAIL == glb_macro_translate_event_name(trigger, problem_name, MAX_STRING_LEN))
+        return NULL;
 
     if (NULL != strpool) 
-        problem->name = strpool_add(strpool, info->name);
+        problem->name = strpool_add(strpool, problem_name);
     else 
-        problem->name = zbx_strdup(NULL, info->name);
+        problem->name = zbx_strdup(NULL, problem_name);
+ 
+    LOG_INF("Translated problem name '%s'", problem->name);
     
-    //		zbx_substitute_simple_macros(NULL, event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    //					 &event->name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+    //ZBX_DB_EVENT event = {0};
+    //char *err;
+    //event.trigger = trigger;
+    //zbx_substitute_simple_macros(NULL, &event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    //					 &event.name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+     
+    //glb_macro_translate_event_name();
+    //glb_macro_translate_event_name();
 
-    
-    glb_translate_event_name_macro()
-
-    problem->id = info->problemid;
-    problem->objectid = info->objectid;
+    problem->id = problemid;
+    problem->objectid = trigger->triggerid;
     problem->oper_state = GLB_PROBLEM_OPER_STATE_PROBLEM;
-    problem->severity = info->severity;
-    problem->source = info->source;
+    problem->severity = trigger->priority;
+    problem->source = GLB_PROBLEM_SOURCE_TRIGGER;
 
     return problem;
 }
@@ -111,6 +126,11 @@ glb_problem_source_t glb_problem_get_source(glb_problem_t *problem) {
 
 u_int64_t glb_problem_get_objectid(glb_problem_t *problem) {
     return problem->objectid;
+}
+
+
+u_int64_t glb_problem_get_id(glb_problem_t *problem) {
+    return problem->id;
 }
 
 int  glb_problem_set_oper_state(glb_problem_t *problem, glb_problem_oper_state_t oper_state) {

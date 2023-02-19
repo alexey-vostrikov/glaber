@@ -1948,6 +1948,7 @@ AC_CONFIG_FILES([
 	src/go/Makefile
 	src/libs/Makefile
 	src/libs/glb_conf/Makefile
+	src/libs/glb_macro/Makefile
 	src/libs/zbxalgo/Makefile
 	src/libs/zbxaudit/Makefile
 	src/libs/zbxavailability/Makefile

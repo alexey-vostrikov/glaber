@@ -14,6 +14,7 @@ DIST_SUBDIRS = \
 	zbxcacheconfig \
 	zbxcachehistory \
 	glb_state \
+	glb_macro \
 	glb_conf \
 	zbxdbhigh \
 	zbxdbwrap \
@@ -74,6 +75,7 @@ SERVER_SUBDIRS = \
 	zbxcachehistory \
 	glb_state \
 	glb_conf \
+	glb_macro \
 	zbxdbhigh \
 	zbxdbwrap \
 	zbxdbschema \

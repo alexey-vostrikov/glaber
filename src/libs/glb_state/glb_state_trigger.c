@@ -67,5 +67,4 @@ int glb_trigger_register_calculation(DC_TRIGGER *trigger) {
 	trigger_check_dependency(trigger);
 	trigger_write_events(trigger);
 	glb_state_problems_process_trigger_value(trigger);
-
 }

@@ -2551,22 +2551,22 @@ const ZBX_TABLE	tables[] = {
 };
 
 const zbx_db_table_changelog_t	changelog_tables[] = {
-	{"httpstep_field", 15},
-	{"dchecks", 10},
-	{"host_tag", 2},
-	{"triggers", 5},
 	{"drules", 9},
-	{"httptestitem", 13},
 	{"httptest", 11},
-	{"functions", 7},
-	{"items", 3},
-	{"httptest_field", 12},
-	{"hosts", 1},
-	{"httpstepitem", 16},
-	{"item_tag", 4},
-	{"httpstep", 14},
-	{"item_preproc", 8},
+	{"httptestitem", 13},
 	{"trigger_tag", 6},
+	{"httpstep_field", 15},
+	{"functions", 7},
+	{"dchecks", 10},
+	{"httptest_field", 12},
+	{"httpstepitem", 16},
+	{"host_tag", 2},
+	{"item_tag", 4},
+	{"items", 3},
+	{"item_preproc", 8},
+	{"httpstep", 14},
+	{"hosts", 1},
+	{"triggers", 5},
 	{0}
 };
 #if defined(HAVE_SQLITE3)

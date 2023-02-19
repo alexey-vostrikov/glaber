@@ -3078,6 +3078,21 @@ out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
+zbx_token_search_t set_token_search_flags(int macro_type) {
+	int flag = 0;
+
+	if (0 != (macro_type & (MACRO_TYPE_TRIGGER_DESCRIPTION | MACRO_TYPE_EVENT_NAME)))
+		flag |= ZBX_TOKEN_SEARCH_REFERENCES;
+
+	if (0 != (macro_type & (MACRO_TYPE_MESSAGE_NORMAL | MACRO_TYPE_MESSAGE_RECOVERY | MACRO_TYPE_MESSAGE_UPDATE |
+			MACRO_TYPE_EVENT_NAME)))
+	{
+		flag |= ZBX_TOKEN_SEARCH_EXPRESSION_MACRO;
+	}
+	
+	return flag;
+}
+
 /******************************************************************************
  *                                                                            *
  * Purpose: substitute simple macros in data string with real values          *
@@ -3112,15 +3127,8 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const ZBX
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() data:'%s'", __func__, *data);
 
-	if (0 != (macro_type & (MACRO_TYPE_TRIGGER_DESCRIPTION | MACRO_TYPE_EVENT_NAME)))
-		token_search |= ZBX_TOKEN_SEARCH_REFERENCES;
-
-	if (0 != (macro_type & (MACRO_TYPE_MESSAGE_NORMAL | MACRO_TYPE_MESSAGE_RECOVERY | MACRO_TYPE_MESSAGE_UPDATE |
-			MACRO_TYPE_EVENT_NAME)))
-	{
-		token_search |= ZBX_TOKEN_SEARCH_EXPRESSION_MACRO;
-	}
-
+	token_search |= set_token_search_flags(macro_type);
+	
 	if (SUCCEED != zbx_token_find(*data, pos, &token, token_search))
 		goto out;
 

@@ -6867,7 +6867,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_host_inventory(&hi_sync))
 		goto out;
 	hisec = zbx_time() - sec;
-	LOG_INF("CONFIG reload phase1");
+
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_host_groups(&hgroups_sync))
 		goto out;
@@ -6911,7 +6911,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	DCsync_hosts(&hosts_sync, new_revision, &active_avail_diff, &activated_hosts, config_vault);
 	zbx_dbsync_clear_user_macros();
 	hsec2 = zbx_time() - sec;
-	LOG_INF("CONFIG reload phase2");
+
 	sec = zbx_time();
 	DCsync_host_inventory(&hi_sync, new_revision);
 	hisec2 = zbx_time() - sec;
@@ -6943,7 +6943,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		dc_maintenance_precache_nested_groups();
 
 	FINISH_SYNC;
-	LOG_INF("CONFIG reload phase3");
+
 	zbx_dbsync_process_active_avail_diff(&active_avail_diff);
 	zbx_vector_uint64_destroy(&active_avail_diff);
 
@@ -7096,7 +7096,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	sec = zbx_time();
 	DCsync_actions(&action_sync);
 	action_sec2 = zbx_time() - sec;
-	LOG_INF("CONFIG reload phase4");
+
 	sec = zbx_time();
 	DCsync_action_ops(&action_op_sync);
 	action_op_sec2 = zbx_time() - sec;
@@ -7549,7 +7549,6 @@ clean:
 
 	poller_item_notify_flush();
 
-	LOG_INF("CONFIG reloaded");
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
