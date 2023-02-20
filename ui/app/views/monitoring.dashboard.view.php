@@ -30,6 +30,8 @@ if (array_key_exists('error', $data)) {
 	return;
 }
 
+$this->addCssFile('assets/styles/fontawesome.min.css');
+$this->addCssFile('assets/styles/solid.min.css');
 $this->addJsFile('flickerfreescreen.js');
 $this->addJsFile('gtlc.js');
 $this->addJsFile('leaflet.js');
@@ -90,6 +92,9 @@ if ($data['dynamic']['has_dynamic_widgets']) {
 		]);
 }
 
+$my_dash = makeDashBoardButton($data['my_dashboards'], _('My dashboards'), 'fa-solid fa-user');
+$public_dash = makeDashBoardButton($data['public_dashboards'], _('Public dashboards'), 'fa-solid fa-users');
+
 $html_page = (new CHtmlPage())
 	->setTitle($data['dashboard']['name'])
 	->setWebLayoutMode($web_layout_mode)
@@ -100,6 +105,8 @@ $html_page = (new CHtmlPage())
 			->addItem($main_filter_form)
 			->addItem((new CTag('nav', true,
 				(new CList())
+					->addItem( isset($my_dash) ? $my_dash : '')
+					->addItem( isset($public_dash) ? $public_dash : '')
 					->addItem(
 						(new CButton('dashboard-edit', _('Edit dashboard')))
 							->setEnabled($data['dashboard']['can_edit_dashboards'] && $data['dashboard']['editable'])
@@ -263,3 +270,35 @@ $html_page
 '))
 	->setOnDocumentReady()
 	->show();
+
+function cmp_dashes($a, $b)
+{
+	return strcmp($a["name"], $b["name"]);
+}
+	
+function makeDashBoardButton(array $dashboards, $name = 'Dashboards', $styleclass = '') {
+	
+	if ( 0 == count($dashboards ))
+		return NULL;
+	
+	usort($dashboards, "cmp_dashes");
+	
+	foreach ($dashboards as $dashboard)
+		$popup_data[]= ['label' => $dashboard['name'],
+						'url' => ((new CUrl('zabbix.php'))
+									->setArgument('action','dashboard.view') 
+									->setArgument('dashboardid',$dashboard['dashboardid']))->getUrl()
+						];
+
+	$form = new CForm('get', 'dashboard.view');
+	$dash_link = (new CButton('', ''))
+		->addItem((new CTag('i',true, '&nbsp;'))
+			->addClass($styleclass))
+		->addItem(new CSpan($name))
+		->setMenuPopup([
+			'type' => 'dropdown',
+			'data' => [
+			'items' => $popup_data]]);
+
+	return $form->addItem($dash_link);
+}

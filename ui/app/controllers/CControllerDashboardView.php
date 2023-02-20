@@ -124,9 +124,12 @@ class CControllerDashboardView extends CController {
 		updateTimeSelectorPeriod($time_selector_options);
 
 		$widget_defaults = APP::ModuleManager()->getWidgetsDefaults();
-
+		$all_dashboards =  $this->getDashboardsList();
+		
 		$data = [
 			'dashboard' => $dashboard,
+			'my_dashboards' => 		$this->getMyDashboards($all_dashboards),
+			'public_dashboards' =>	$this->getPublicDashboards($all_dashboards),
 			'widget_defaults' => $widget_defaults,
 			'widget_last_type' => CDashboardHelper::getWidgetLastType(),
 			'configuration_hash' => $dashboard['dashboardid'] !== null
@@ -163,6 +166,36 @@ class CControllerDashboardView extends CController {
 		$response = new CControllerResponseData($data);
 		$response->setTitle(_('Dashboard'));
 		$this->setResponse($response);
+	}
+
+	private function getDashboardsList(): array {
+		$list = API::Dashboard()->get([
+			'output' => ['dashboardid', 'name', 'userid', 'private']
+		]);
+
+		return $list;
+	}
+
+	private function getPublicDashboards(array $all_dashboards) {
+		$dashboards = [];
+		foreach($all_dashboards as $dashboard) {
+			if ($dashboard['private'] == '0')
+				$dashboards[] = $dashboard;
+		}
+		
+		return $dashboards;
+	}
+
+	private function getMyDashboards(array $all_dashboards) {
+		$dashboards = [];
+		$myuserid = CWebUser::$data['userid'];
+
+		foreach($all_dashboards as $dashboard) {
+			if ($dashboard['userid'] == $myuserid)
+				$dashboards[] = $dashboard;
+		}
+		
+		return $dashboards;
 	}
 
 	/**
