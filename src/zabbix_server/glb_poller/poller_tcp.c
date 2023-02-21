@@ -375,7 +375,8 @@ static void tcp_start_connection(poller_item_t *poller_item)
 	 	poller_return_delayed_item_to_queue(poller_item);
 	 	return;
 	}
-		
+	DEBUG_ITEM(poller_get_item_id(poller_item), "There are already %d connections for the %s host, doing poll", n, tcp_item->interface_addr);
+
 	if (1 == tcp_item->useip) {
 		tcp_send_request(poller_item);
 		return;
@@ -452,10 +453,12 @@ static int tcp_init_item(DC_ITEM *dc_item, poller_item_t *poller_item)
 	
 	if (1 == tcp_item->useip || ip_str_version(dc_item->interface.addr) >0 ) {
 		tcp_item->useip = 1;
-		tcp_item->ipaddr = poller_strpool_add(dc_item->interface.ip_orig);
+		tcp_item->ipaddr = poller_strpool_add(dc_item->interface.addr);
 		tcp_item->interface_addr = poller_strpool_copy(tcp_item->ipaddr);
+		DEBUG_ITEM(dc_item->itemid, "Set new tcp item interface to %s", tcp_item->interface_addr);
 	} else {
 		tcp_item->interface_addr = poller_strpool_add(dc_item->interface.addr);
+		DEBUG_ITEM(dc_item->itemid, "Set new tcp item interface to %s", tcp_item->interface_addr);
 	}
 
 	tcp_item->interface_port = dc_item->interface.port;

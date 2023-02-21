@@ -19,6 +19,7 @@
 #include "log.h"
 #include "zbxalgo.h"
 #include "conf_items_notify.h"
+#include "../../zabbix_server/glb_poller/poller_ipc.h"
 
 void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) ;
 
@@ -27,7 +28,7 @@ static void conf_hosts_get_host_items(u_int64_t hostid, zbx_vector_uint64_t *cha
 }
 
 
-static host_notify_changes(u_int64_t hostid) {
+static void host_notify_changes(u_int64_t hostid) {
     zbx_vector_uint64_t changed_items;
     
     zbx_vector_uint64_create(&changed_items);   

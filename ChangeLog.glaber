@@ -1,3 +1,5 @@
+ver 3.0.21
+    - fix: wrong ip address is set for http simple checks
 ver 3.0.20
     - fix: interface update not seen by async pollers
 ver 3.0.19
