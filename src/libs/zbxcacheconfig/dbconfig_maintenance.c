@@ -1151,12 +1151,9 @@ void	zbx_dc_flush_host_maintenance_updates(const zbx_vector_ptr_t *updates)
 	}
 
 	UNLOCK_CACHE;
-	
-	//notify poller with own queues to recalc item's polling statuses
-	poller_item_notify_init();
+		
 	conf_hosts_notify_changes(&changed_hostids);
-	poller_item_notify_flush();
-	
+		
 	zbx_vector_uint64_destroy(&changed_hostids);
 
 }

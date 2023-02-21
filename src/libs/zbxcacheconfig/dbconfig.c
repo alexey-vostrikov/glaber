@@ -1809,9 +1809,9 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 
 		host->status = status;
 	}
-	poller_item_notify_init();
+	
 	conf_hosts_notify_changes(&changed_hosts_ids);
-	poller_item_notify_flush();
+	
 	zbx_vector_uint64_destroy(&changed_hosts_ids);
 
 	for (i = 0; i < proxy_hosts.values_num; i++)
@@ -2266,6 +2266,7 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_ptr_create(&interfaces);
+	zbx_vector_uint64_create(&changed_hosts);
 
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
@@ -2283,6 +2284,8 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		/* This may be possible if the host was added after we synced config for hosts. */
 		if (NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &hostid)))
 			continue;
+
+		zbx_vector_uint64_append(&changed_hosts, hostid);
 
 		interface = (ZBX_DC_INTERFACE *)DCfind_id(&config->interfaces, interfaceid, sizeof(ZBX_DC_INTERFACE),
 												  &found);
@@ -2471,6 +2474,7 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 			}
 
 			dc_host_update_revision(host, revision);
+			zbx_vector_uint64_append(&changed_hosts, hostid);
 		}
 
 		if (INTERFACE_TYPE_SNMP == interface->type)
@@ -2500,6 +2504,9 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 
 		zbx_hashset_remove_direct(&config->interfaces, interface);
 	}
+
+	conf_hosts_notify_changes(&changed_hosts);
+	zbx_vector_uint64_destroy(&changed_hosts);
 
 	zbx_vector_ptr_destroy(&interfaces);
 

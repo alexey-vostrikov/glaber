@@ -19,3 +19,4 @@
 #include "zbxalgo.h"
 
 void conf_hosts_notify_changes(zbx_vector_uint64_t *changed_hosts);
+void conf_host_notify_changes(u_int64_t hostid);

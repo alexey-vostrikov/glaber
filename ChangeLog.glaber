@@ -1,3 +1,5 @@
+ver 3.0.20
+    - fix: interface update not seen by async pollers
 ver 3.0.19
     - feat: added dashboard quick navigation buttons
 ver 3.0.18
