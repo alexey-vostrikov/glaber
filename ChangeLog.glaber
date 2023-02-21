@@ -1,3 +1,5 @@
+ver 3.0.22
+    - feat: added host navigation to problems, host edit, several other panels
 ver 3.0.21
     - fix: wrong ip address is set for http simple checks
 ver 3.0.20

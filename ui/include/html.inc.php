@@ -325,8 +325,20 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		$latest_link = (new CLink(_('Latest data'),
 					(new CUrl('zabbix.php'))
 						->setArgument('action', 'latest.view')
-						->setArgument('filter_set', '1')
-						->setArgument('filter_hostids', [$db_host['hostid']]) ));
+		//				->setArgument('filter_set', '1')
+						->setArgument('hostids', [$db_host['hostid']]) ));
+		
+		$problems_link = (new CLink(_('Problems'),
+			(new CUrl('zabbix.php'))
+			->setArgument('action', 'problem.view')
+			//->setArgument('filter_set', '1')
+			->setArgument('hostids', [$db_host['hostid']]) ));
+
+		$charts_link = (new CLink(_('Graphs'),
+			(new CUrl('zabbix.php'))
+			->setArgument('action', 'charts.view')
+			//->setArgument('filter_set', '1')
+			->setArgument('filter_hostids', [$db_host['hostid']]) ));
 
 		$list
 			->addItem(new CBreadcrumbs(
@@ -334,7 +346,10 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 			]))
 			->addItem($status)
 			->addItem(getHostAvailabilityTable($db_host['interfaces']))
-			->addItem($latest_link);
+			->addItem(new CSpan($latest_link))
+			->addItem(new CSpan($problems_link))
+			->addItem(new CSpan($charts_link))
+			->addItem('&nbsp;&nbsp;'._('Config:'));
 
 		if ($db_host['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $db_host['hostDiscovery']['ts_delete'] != 0) {
 			$info_icons = [getHostLifetimeIndicator(time(), $db_host['hostDiscovery']['ts_delete'])];

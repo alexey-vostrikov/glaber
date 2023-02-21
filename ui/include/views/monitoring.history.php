@@ -37,6 +37,9 @@ $header = [
 ];
 $header_row = [];
 
+if (isset($data['hostids']) && count($data['hostids']) == 1 ) 
+	$html_page->setNavigation(getHostNavigation('Host', $data['hostids'][0]));
+
 $same_host = true;
 $items_numeric = true;
 $host_name = '';

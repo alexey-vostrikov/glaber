@@ -36,8 +36,10 @@ $this->includeJsFile('monitoring.charts.view.js.php');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
+
 $html_page = (new CHtmlPage())
 	->setTitle(_('Graphs'))
+	//->setNavigation(getHostNavigation('Host', $data['hostid']))
 	->setWebLayoutMode($web_layout_mode)
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_CHARTS_VIEW))
 	->setControls(
@@ -45,6 +47,9 @@ $html_page = (new CHtmlPage())
 			->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))
 		))->setAttribute('aria-label', _('Content controls'))
 	);
+
+if (isset($data['ms_hosts']) && count($data['ms_hosts']) == 1 ) 
+	$html_page->setNavigation(getHostNavigation('Host', $data['ms_hosts'][0]['id']));
 
 $filter = (new CFilter())
 	->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'charts.view'))

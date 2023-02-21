@@ -69,11 +69,12 @@ $_REQUEST['action'] = getRequest('action', HISTORY_GRAPH);
  */
 $itemids = getRequest('filter_rst') ? [] : getRequest('itemids', []);
 $items = [];
+$hostids = [];
 $value_type = '';
 
 if ($itemids) {
 	$items = API::Item()->get([
-		'output' => ['itemid', 'name', 'value_type'],
+		'output' => ['itemid', 'name', 'value_type', 'hostid'],
 		'selectHosts' => ['name'],
 		'itemids' => $itemids,
 		'preservekeys' => true,
@@ -81,10 +82,13 @@ if ($itemids) {
 		'webitems' => true
 	]);
 
+	$hostids = array_column($items,'hostid');
+	
 	if (getRequest('action') == HISTORY_BATCH_GRAPH) {
 
 		// Keep only item IDs that are applicable to graphs.
 		$itemids = array_keys($items);
+		
 
 		// If there are none left and all of the selected did not exist or were not numeric, display error.
 		if (!$itemids) {
@@ -106,6 +110,7 @@ if ($itemids) {
 
 $data = [
 	'itemids' => $itemids,
+	'hostids' => $hostids, 
 	'items' => $items,
 	'value_type' => $value_type,
 	'action' => getRequest('action'),
