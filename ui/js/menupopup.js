@@ -430,6 +430,14 @@ function getMenuPopupHostAdmin(options, trigger_element) {
 		});
 	}
 
+	// scripts
+	if ('scripts' in options) {
+		sections.push({
+			label: t('Scripts'),
+			items: getMenuPopupScriptData(options.scripts, trigger_element, options.hostid)
+		});
+	}
+
 	return sections;
 }
 

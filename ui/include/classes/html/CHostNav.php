@@ -59,13 +59,17 @@ class CHostNav extends CList {
             if ($data['dashboards']) {
                 $items[] = new CListItem($this->getDashboardsLink($data['hostid']));
             }else{
-                $items[] = new CListItem(new CSpan(_('Dashboards')));
+                $items[] = new CListItem(
+                    (new CSpan(_('Dashboards')))->addClass("grey")
+                );
             }
 
             if ($data['httpTests']) {
                 $items[] = new CListItem($this->getWebLink($data['hostid']));
             }else{
-                $items[] = new CListItem(new CSpan(_('Web')));
+                $items[] = new CListItem(
+                    (new CSpan(_('Web')))->addClass("grey")
+                );
             }
 
         }

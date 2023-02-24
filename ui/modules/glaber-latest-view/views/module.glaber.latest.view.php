@@ -27,9 +27,6 @@ $this->addJsFile('multiselect.js');
 $this->addJsFile('layout.mode.js');
 $this->addJsFile('class.tagfilteritem.js');
 
-$this->addCssFile('assets/styles/fontawesome.min.css');
-$this->addCssFile('assets/styles/solid.min.css');
-
 $this->includeJsFile('module.glaber.latest.view.js.php');
 
 $this->enableLayoutModes();

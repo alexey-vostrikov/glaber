@@ -326,6 +326,11 @@ class CControllerMenuPopup extends CController {
         if ($db_hosts) {
             $db_host = $db_hosts[0];
 
+            $all_scripts = CWebUser::checkAccess(CRoleHelper::ACTIONS_EXECUTE_SCRIPTS)
+                ? API::Script()->getScriptsByHosts([$data['hostid']])[$data['hostid']]
+                : [];
+
+            $scripts = [];
             $urls = [];
 
             if (array_key_exists('urls', $data)) {
@@ -342,10 +347,40 @@ class CControllerMenuPopup extends CController {
                 $urls = $data['urls'];
             }
 
+            if ($all_scripts) {
+                foreach ($all_scripts as $num => $script) {
+                    // Filter only host scope scripts, get rid of excess spaces and unify slashes in menu path.
+                    if ($script['scope'] != ZBX_SCRIPT_SCOPE_HOST) {
+                        unset($all_scripts[$num]);
+                        continue;
+                    }
+
+                    // Split scripts and URLs.
+                    if ($script['type'] == ZBX_SCRIPT_TYPE_URL) {
+                        $urls[] = $script;
+                    }
+                    else {
+                        $scripts[] = $script;
+                    }
+                }
+
+                $scripts = self::sortEntitiesByMenuPath($scripts);
+                $urls = self::sortEntitiesByMenuPath($urls);
+            }
+
             $menu_data = [
                 'type' => 'host_admin',
                 'hostid' => $data['hostid'],
             ];
+
+            foreach (array_values($scripts) as $script) {
+                $menu_data['scripts'][] = [
+                    'name' => $script['name'],
+                    'menu_path' => $script['menu_path'],
+                    'scriptid' => $script['scriptid'],
+                    'confirmation' => $script['confirmation']
+                ];
+            }
 
             foreach (array_values($urls) as $url) {
                 $menu_data['urls'][] = [

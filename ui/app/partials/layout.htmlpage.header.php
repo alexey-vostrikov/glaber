@@ -55,6 +55,8 @@ $show_gui_messaging = !defined('ZBX_PAGE_NO_MENU') || $data['web_layout_mode'] =
 $modules_assets = APP::ModuleManager()->getAssets();
 
 $page_header->addCssFile('assets/styles/'.$page_header->getTheme().'.css');
+$page_header->addCssFile('assets/styles/fontawesome.min.css');
+$page_header->addCssFile('assets/styles/solid.min.css');
 
 foreach ($modules_assets as $module_id => $assets) {
 	$module = APP::ModuleManager()->getModule($module_id);
