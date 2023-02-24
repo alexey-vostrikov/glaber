@@ -234,7 +234,7 @@ $browser-sprite-path: '../img/browser-sprite.png?20221026';
 		align-items: baseline;
 
 		& > li {
-			margin-right: 5px;
+			margin: 0 5px;
 			line-height: 24px;
 
 			> ul {
@@ -262,8 +262,6 @@ $browser-sprite-path: '../img/browser-sprite.png?20221026';
 
 		li > span {
 			display: inline-block;
-			padding: 2px 7px;
-			line-height: 18px;
 			white-space: nowrap;
 			vertical-align: top;
 			text-overflow: ellipsis;

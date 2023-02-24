@@ -27,6 +27,9 @@ $this->addJsFile('multiselect.js');
 $this->addJsFile('layout.mode.js');
 $this->addJsFile('class.tagfilteritem.js');
 
+$this->addCssFile('assets/styles/fontawesome.min.css');
+$this->addCssFile('assets/styles/solid.min.css');
+
 $this->includeJsFile('module.glaber.latest.view.js.php');
 
 $this->enableLayoutModes();
@@ -41,7 +44,8 @@ $nav_items = (new CList()) ->addItem(get_icon('kioskmode', ['mode' => $web_layou
 if (isset($data['hosts']) && 1 == count( $data['hosts']) ) {
 	$hostid = array_keys($data['hosts'])[0];
 
-	$widget->setNavigation(getHostNavigation('latest data', $hostid));
+	// $widget->setNavigation(getHostNavigation('latest data', $hostid));
+    $widget->setNavigation(new CHostNav(CHostNav::getData($hostid)));
 
 	if ($data['can_create']) {
 		$nav_items->addItem(
