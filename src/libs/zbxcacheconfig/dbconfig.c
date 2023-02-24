@@ -2118,7 +2118,7 @@ static void substitute_host_interface_macros(ZBX_DC_INTERFACE *interface)
 		if (0 != (macros & 0x01))
 		{
 			addr = zbx_strdup(NULL, interface->ip);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
 										 NULL, &addr, MACRO_TYPE_INTERFACE_ADDR, NULL, 0);
 			if (SUCCEED == zbx_is_ip(addr) || SUCCEED == zbx_validate_hostname(addr))
 				dc_strpool_replace(1, &interface->ip, addr);
@@ -2128,7 +2128,7 @@ static void substitute_host_interface_macros(ZBX_DC_INTERFACE *interface)
 		if (0 != (macros & 0x02))
 		{
 			addr = zbx_strdup(NULL, interface->dns);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
+			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
 										 NULL, &addr, MACRO_TYPE_INTERFACE_ADDR, NULL, 0);
 			if (SUCCEED == zbx_is_ip(addr) || SUCCEED == zbx_validate_hostname(addr))
 				dc_strpool_replace(1, &interface->dns, addr);
@@ -9006,7 +9006,7 @@ void DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src_functi
 	memcpy(dst_function->parameter, src_function->parameter, sz_parameter);
 }
 
-void DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, unsigned int flags)
+void DCget_trigger(CALC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, unsigned int flags)
 {
 	int i;
 
@@ -9082,7 +9082,7 @@ void zbx_free_item_tag(zbx_item_tag_t *item_tag)
 	zbx_free(item_tag);
 }
 
-void DCclean_trigger(DC_TRIGGER *trigger)
+void DCclean_trigger(CALC_TRIGGER *trigger)
 {
 	zbx_free(trigger->new_error);
 	zbx_free(trigger->error);
@@ -9674,7 +9674,7 @@ int DCconfig_trigger_exists(zbx_uint64_t triggerid)
 	return ret;
 }
 
-void DCconfig_get_triggers_by_triggerids(DC_TRIGGER *triggers, const zbx_uint64_t *triggerids, int *errcode,
+void DCconfig_get_triggers_by_triggerids(CALC_TRIGGER *triggers, const zbx_uint64_t *triggerids, int *errcode,
 										 size_t num)
 {
 	size_t i;
@@ -9744,7 +9744,7 @@ void DCconfig_clean_functions(DC_FUNCTION *functions, int *errcodes, size_t num)
 	}
 }
 
-void DCconfig_clean_triggers(DC_TRIGGER *triggers, int *errcodes, size_t num)
+void DCconfig_clean_triggers(CALC_TRIGGER *triggers, int *errcodes, size_t num)
 {
 	size_t i;
 
@@ -10005,7 +10005,7 @@ void zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 
 		if (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &timer->triggerid)))
 		{
-			DC_TRIGGER *trigger, trigger_local;
+			CALC_TRIGGER *trigger, trigger_local;
 			unsigned char flags;
 
 			if (SUCCEED == DCconfig_find_active_time_function(dc_trigger->expression,
@@ -10033,7 +10033,7 @@ void zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 
 			trigger_local.triggerid = dc_trigger->triggerid;
 			trigger_local.history_idx = -1;
-			trigger = (DC_TRIGGER *)zbx_hashset_insert(trigger_info, &trigger_local, sizeof(trigger_local));
+			trigger = (CALC_TRIGGER *)zbx_hashset_insert(trigger_info, &trigger_local, sizeof(trigger_local));
 			DCget_trigger(trigger, dc_trigger, ZBX_TRIGGER_GET_ALL);
 
 			trigger->timespec = timer->eval_ts;
@@ -10351,7 +10351,7 @@ void DCfree_triggers(zbx_vector_ptr_t *triggers)
 	int i;
 
 	for (i = 0; i < triggers->values_num; i++)
-		DCclean_trigger((DC_TRIGGER *)triggers->values[i]);
+		DCclean_trigger((CALC_TRIGGER *)triggers->values[i]);
 
 	zbx_vector_ptr_clear(triggers);
 }

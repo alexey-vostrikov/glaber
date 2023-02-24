@@ -24,8 +24,10 @@
 #include "zbx_trigger_constants.h"
 #include "../glb_events_log/glb_events_log.h"
 #include "zbxcacheconfig.h"
+//NOTE: look at db_trigger_expand_macros for macro expansion in conditions
 
-static void trigger_check_dependency(DC_TRIGGER *trigger) {
+
+static void trigger_check_dependency(CALC_TRIGGER *trigger) {
 	if (FAIL == glb_check_trigger_has_value_ok_masters(trigger->triggerid)) {
 		zbx_free(trigger->new_error);
 		trigger->new_error = zbx_strdup(NULL,"There are master trigger(s) in PROBLEM or UNKNOWN state");
@@ -36,7 +38,7 @@ static void trigger_check_dependency(DC_TRIGGER *trigger) {
 	DEBUG_TRIGGER(trigger->triggerid, "Dependency check not found master triggers in PROBLEM or UNKNOWN state, trigger value is not changed %d", trigger->value);
 }
 
-static int trigger_error_changed(DC_TRIGGER *trigger) {
+static int trigger_error_changed(CALC_TRIGGER *trigger) {
 	if (NULL == trigger->error && NULL != trigger->new_error)
 		return SUCCEED;
 	if (NULL == trigger->new_error && NULL != trigger->error)
@@ -45,7 +47,7 @@ static int trigger_error_changed(DC_TRIGGER *trigger) {
 	return strcmp(trigger->error, trigger->new_error);
 }
 
-static void trigger_write_events(DC_TRIGGER *trigger) {
+static void trigger_write_events(CALC_TRIGGER *trigger) {
 
 	if (trigger->value != trigger->new_value) {
 		DEBUG_TRIGGER(trigger->triggerid, "Will write value change %d->%d to events log", trigger->value, trigger->new_value  );
@@ -62,9 +64,47 @@ static void trigger_write_events(DC_TRIGGER *trigger) {
 	}
 }
 
-int glb_trigger_register_calculation(DC_TRIGGER *trigger) {
+int glb_trigger_register_calculation(CALC_TRIGGER *trigger) {
 	DEBUG_TRIGGER(trigger->triggerid, "Processing trigger value %d", trigger->new_value);
 	trigger_check_dependency(trigger);
 	trigger_write_events(trigger);
 	glb_state_problems_process_trigger_value(trigger);
+}
+
+static int	expression_extract_functionid(const char *expression, zbx_eval_token_t *token, zbx_uint64_t *functionid)
+{
+	if (ZBX_EVAL_TOKEN_FUNCTIONID != token->type)
+		return FAIL;
+
+	switch (token->value.type)
+	{
+		case ZBX_VARIANT_UI64:
+			*functionid = token->value.data.ui64;
+			return SUCCEED;
+		case ZBX_VARIANT_NONE:
+			if (SUCCEED != zbx_is_uint64_n(expression + token->loc.l + 1, token->loc.r - token->loc.l - 1,
+					functionid))
+			{
+				THIS_SHOULD_NEVER_HAPPEN;
+				break;
+			}
+			zbx_variant_set_ui64(&token->value, *functionid);
+			return SUCCEED;
+	}
+
+	return FAIL;
+}
+
+void	glb_trigger_get_functions_ids(CALC_TRIGGER *trigger, zbx_vector_uint64_t *functions_ids)
+{
+	int	i;
+
+	for (i = 0; i < trigger->eval_ctx->stack.values_num; i++)
+	{
+		zbx_eval_token_t	*token = &trigger->eval_ctx->stack.values[i];
+		zbx_uint64_t		functionid;
+
+		if (SUCCEED == expression_extract_functionid(trigger->eval_ctx->expression, token, &functionid))
+			zbx_vector_uint64_append(functions_ids, functionid);
+	}
 }

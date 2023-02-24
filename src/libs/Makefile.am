@@ -113,7 +113,8 @@ SERVER_SUBDIRS = \
 	apm \
 	zbxeval \
 	zbxalgo/tests \
-	glb_events_log
+	glb_events_log \
+	glb_actions
 else
 if PROXY
 PROXY_SUBDIRS = \

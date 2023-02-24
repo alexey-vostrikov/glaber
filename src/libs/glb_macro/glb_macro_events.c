@@ -25,25 +25,48 @@ having data needed */
 #include "log.h"
 #include "zbxserver.h"
 
+//a good example in static int	db_trigger_expand_macros(const ZBX_DB_TRIGGER *trigger, zbx_eval_context_t *ctx)
 
-convert_dc_trigger_2_event(ZBX_DB_EVENT *event, DC_TRIGGER *trigger) {
+// void convert_dc_trigger_2_event(ZBX_DB_EVENT *event, CALC_TRIGGER *trigger) {
 	
-}
+// 	event->value = trigger->value;
+// 	event->object = EVENT_OBJECT_TRIGGER;
 
-int glb_macro_translate_event_name(DC_TRIGGER *trigger, char *result, int max_len) {
-	char err[MAX_STRING_LEN];
+// 	event->trigger.correlation_mode = trigger->correlation_mode;
+// 	event->trigger.correlation_tag = trigger->correlation_tag;
+// 	event->trigger.description = trigger->description;
+// 	event->trigger.event_name = trigger->event_name;
+// 	event->trigger.expression = trigger->expression;
+// 	event->trigger.opdata = trigger->opdata;
+// 	event->trigger.priority = trigger->priority;
+// 	event->trigger.recovery_expression = trigger->recovery_expression;
+// 	event->trigger.recovery_mode = trigger->recovery_mode;
+// 	event->trigger.triggerid = trigger->triggerid;
+// 	event->trigger.type = trigger->type;
+// 	event->trigger.value = trigger->new_value;
+// 	//event->trigger.cache
+// }
+
+
+
+// int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name, int max_len) {
+// 	char err[MAX_STRING_LEN];
 		
-	//	zbx_substitute_simple_macros(NULL, trigger, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	//								 &event->trigger.correlation_tag, MACRO_TYPE_TRIGGER_TAG, err, sizeof(err));
+// 	//zbx_substitute_simple_macros(NULL, trigger, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+// 	//								 &event->trigger.correlation_tag, MACRO_TYPE_TRIGGER_TAG, err, sizeof(err));
 
-	ZBX_DB_EVENT event={0};
-	convert_dc_trigger_2_event(&event, trigger);
+// 	ZBX_DB_EVENT event={0};
+// 	convert_dc_trigger_2_event(&event, trigger);
 
-	zbx_substitute_simple_macros(NULL, &event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-			 &trigger->event_name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+// 	LOG_INF("Standalone version of translate: translating trigger event from '%s'", *event_name);
+// 	zbx_substitute_simple_macros(NULL, &event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+// 			event_name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
+// 	LOG_INF("Standalone version of translate: translated trigger event to '%s'", *event_name);
+// 	//HALT_HERE("Not implemented");
+// }
 
-    free_event(&event);
 
-	LOG_INF("Standalone version of translate: translat");
-	HALT_HERE("Not implemented");
-}
+
+
+
+

@@ -17,11 +17,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include "glb_common.h"
+
+#ifdef HAVE_GLB_TESTS
+
 #include "log.h"
 #include "zbxshmem.h"
 #include "zbxalgo.h"
-
-#ifdef HAVE_GLB_TESTS
 
 static  zbx_shmem_info_t	*shmtest_mem;
 ZBX_SHMEM_FUNC_IMPL(__shmtest, shmtest_mem);

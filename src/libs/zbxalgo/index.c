@@ -161,6 +161,7 @@ int index_uint64_sync_objects(index_uint64_t *index, elems_hash_t *objects) {
 }
 
 #ifdef HAVE_GLB_TESTS
+
 elems_hash_t * index_uint64_get_elem_hash(index_uint64_t *index) {
     return index->index;
 }

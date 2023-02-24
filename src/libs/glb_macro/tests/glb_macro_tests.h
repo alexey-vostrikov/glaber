@@ -1,5 +1,5 @@
 /*
-** Copyright Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,9 +16,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "zbxcommon.h"
-#include "zbxcacheconfig.h"
+#include "glb_common.h"
+#ifdef HAVE_GLB_TESTS
 
+void glb_macro_run_tests();
 
-int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name, int max_len);
-int glb_macro_translate_string(const char *expression, int token_type, char *result, int result_size);
+#endif

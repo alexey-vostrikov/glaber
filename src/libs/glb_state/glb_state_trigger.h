@@ -27,6 +27,6 @@ problems state and to create event log changes*/
 #ifndef GLB_TRIGGER_H
 #define GLB_TRIGGER_H
 
-int glb_trigger_register_calculation(DC_TRIGGER *trigger);
-
+int     glb_trigger_register_calculation(CALC_TRIGGER *trigger);
+void	glb_trigger_get_functions_ids(CALC_TRIGGER *trigger, zbx_vector_uint64_t *functions_ids);
 #endif

@@ -32,6 +32,6 @@
 
 #define TRIGGER_SEVERITY_UNDEFINED	255
 
-//#define HAVE_GLB_TESTS 1
+#define HAVE_GLB_TESTS 1
 
 #endif

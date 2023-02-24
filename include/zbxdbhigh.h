@@ -220,28 +220,28 @@ typedef struct
 }
 ZBX_DB_DHOST;
 
-typedef struct
-{
-	zbx_uint64_t	triggerid;
-	char		*description;
-	char		*expression;
-	char		*recovery_expression;
-	char		*url;
-	char		*url_name;
-	char		*comments;
-	char		*correlation_tag;
-	char		*opdata;
-	char		*event_name;
-	unsigned char	value;
-	unsigned char	priority;
-	unsigned char	type;
-	unsigned char	recovery_mode;
-	unsigned char	correlation_mode;
+// typedef struct
+// {
+// 	zbx_uint64_t	triggerid;
+// 	char		*description;
+// 	char		*expression;
+// 	char		*recovery_expression;
+// 	char		*url;
+// 	char		*url_name;
+// 	char		*comments;
+// 	char		*correlation_tag;
+// 	char		*opdata;
+// 	char		*event_name;
+// 	unsigned char	value;
+// 	unsigned char	priority;
+// 	unsigned char	type;
+// 	unsigned char	recovery_mode;
+// 	unsigned char	correlation_mode;
 
-	/* temporary trigger cache for related data */
-	void		*cache;
-}
-ZBX_DB_TRIGGER;
+// 	/* temporary trigger cache for related data */
+// 	void		*cache;
+// }
+// ZBX_DB_TRIGGER;
 
 /* temporary cache of trigger related data */
 typedef struct
@@ -255,35 +255,35 @@ typedef struct
 }
 ZBX_DB_SERVICE;
 
-typedef struct
-{
-	zbx_uint64_t		eventid;
-	ZBX_DB_TRIGGER		trigger;
-	zbx_uint64_t		objectid;
-	char			*name;
-	int			source;
-	int			object;
-	int			clock;
-	int			value;
-	int			acknowledged;
-	int			ns;
-	int			severity;
-	unsigned char		suppressed;
-	int 	history_idx;
+// typedef struct
+// {
+// 	zbx_uint64_t		eventid;
+// 	ZBX_DB_TRIGGER		trigger;
+// 	zbx_uint64_t		objectid;
+// 	char			*name;
+// 	int			source;
+// 	int			object;
+// 	int			clock;
+// 	int			value;
+// 	int			acknowledged;
+// 	int			ns;
+// 	int			severity;
+// 	unsigned char		suppressed;
+// 	int 	history_idx;
 
-	zbx_vector_ptr_t	tags;	/* used for both zbx_tag_t and zbx_host_tag_t */
+// 	zbx_vector_ptr_t	tags;	/* used for both zbx_tag_t and zbx_host_tag_t */
 
-#define ZBX_FLAGS_DB_EVENT_UNSET		0x0000
-#define ZBX_FLAGS_DB_EVENT_CREATE		0x0001
-#define ZBX_FLAGS_DB_EVENT_NO_ACTION		0x0002
-#define ZBX_FLAGS_DB_EVENT_RECOVER		0x0004
-/* flags to indicate data retrieved from DB, used for cause event macros */
-#define ZBX_FLAGS_DB_EVENT_RETRIEVED_CORE	0x0008
-#define ZBX_FLAGS_DB_EVENT_RETRIEVED_TAGS	0x0010
-#define ZBX_FLAGS_DB_EVENT_RETRIEVED_TRIGGERS	0x0020
-	zbx_uint64_t		flags;
-}
-ZBX_DB_EVENT;
+// #define ZBX_FLAGS_DB_EVENT_UNSET		0x0000
+// #define ZBX_FLAGS_DB_EVENT_CREATE		0x0001
+// #define ZBX_FLAGS_DB_EVENT_NO_ACTION		0x0002
+// #define ZBX_FLAGS_DB_EVENT_RECOVER		0x0004
+// /* flags to indicate data retrieved from DB, used for cause event macros */
+// #define ZBX_FLAGS_DB_EVENT_RETRIEVED_CORE	0x0008
+// #define ZBX_FLAGS_DB_EVENT_RETRIEVED_TAGS	0x0010
+// #define ZBX_FLAGS_DB_EVENT_RETRIEVED_TRIGGERS	0x0020
+// 	zbx_uint64_t		flags;
+// }
+// ZBX_DB_EVENT;
 
 /* media types */
 typedef enum

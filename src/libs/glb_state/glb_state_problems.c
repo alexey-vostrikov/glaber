@@ -88,7 +88,7 @@ int glb_state_problems_destroy()
 
 ELEMS_CALLBACK(problem_save_cb)
 {
-    //DC_TRIGGER *trigger = data;
+    //CALC_TRIGGER *trigger = data;
     glb_problem_t *problem = data;
 
     if (NULL != elem->data)
@@ -102,11 +102,11 @@ ELEMS_CALLBACK(problem_save_cb)
     return SUCCEED;
 }
 
-u_int64_t glb_state_problems_create_by_trigger(DC_TRIGGER *trigger)
+u_int64_t glb_state_problems_create_by_trigger(CALC_TRIGGER *trigger)
 {
     int i;
     glb_problem_t *problem;
-
+    
     DEBUG_TRIGGER(trigger->triggerid, "Creating new PROBLEM for the trigger");
     
     if (NULL == (problem = glb_problem_create_by_trigger(&conf->memf, &conf->strpool, 0, trigger)))
@@ -221,7 +221,7 @@ void glb_state_problems_clean(zbx_vector_ptr_t *problems)
 
 /* func to be called on the trigger recalc event*/
 /* note: there might be needed to pass history data along to alter it's severity value */
-void glb_state_problems_process_trigger_value(DC_TRIGGER *trigger)
+void glb_state_problems_process_trigger_value(CALC_TRIGGER *trigger)
 {
     int problems_count, total_count;
     glb_state_problems_housekeep();
@@ -253,14 +253,8 @@ void glb_state_problems_process_trigger_value(DC_TRIGGER *trigger)
         DEBUG_TRIGGER(trigger->triggerid, "Handling PROBLEM value, now (%d) problems exist, trigger type is %d", problems_count, trigger->type);
         if (TRIGGER_TYPE_MULTIPLE_TRUE == trigger->type || 0 == problems_count)
         {
-            char *problem_name;
-
-            if (NULL != trigger->event_name && trigger->event_name[0] != '\0')
-                problem_name = trigger->event_name;
-            else
-                problem_name = trigger->description;
-
-            LOG_INF("Creating PROBLEM for trigger %ld: %s", trigger->triggerid, problem_name);
+        
+            LOG_INF("Creating PROBLEM for trigger %ld", trigger->triggerid);
             glb_state_problems_create_by_trigger(trigger);
         }
         else

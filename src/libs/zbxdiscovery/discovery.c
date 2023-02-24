@@ -355,9 +355,12 @@ static void	discovery_update_service_status(ZBX_DB_DHOST *dhost, const DB_DSERVI
 		if (DOBJECT_STATUS_DOWN == dservice->status || 0 == dservice->lastup)
 		{
 			discovery_update_dservice(dservice->dserviceid, service_status, now, 0, value);
-			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
-					DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
-					NULL, -1);
+			
+			write_event_log(dservice->dserviceid, 0, EVENT_OBJECT_DSERVICE, "Discovery host service changed discovered state to UP");
+			glb_actions_process_discovery();
+//			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
+//					DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
+//					NULL, -1);
 
 			if (DOBJECT_STATUS_DOWN == dhost->status)
 			{
@@ -368,30 +371,41 @@ static void	discovery_update_service_status(ZBX_DB_DHOST *dhost, const DB_DSERVI
 				dhost->lastdown = 0;
 
 				discovery_update_dhost(dhost);
-				zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
-						DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL,
-						0, NULL, 0, NULL, NULL, NULL, -1);
+				write_event_log(dservice->dserviceid, 0, EVENT_OBJECT_DSERVICE, "Changing host status to UP");
+				//write_event_log(dservice->dserviceid, 0, EVENT_OBJECT_DSERVICE, "Discovery object changed state to DISCOVERED");
+				glb_actions_process_discovery();
+//				zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
+//						DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL,
+//						0, NULL, 0, NULL, NULL, NULL, -1);
+
 			}
 		}
 		else if (0 != strcmp(dservice->value, value))
 		{
 			discovery_update_dservice_value(dservice->dserviceid, value);
+			glb_actions_process_discovery();
 		}
 	}
 	else	/* DOBJECT_STATUS_DOWN */
 	{
 		if (DOBJECT_STATUS_UP == dservice->status || 0 == dservice->lastdown)
 		{
+			//discovery services should go to the mem!!!
 			discovery_update_dservice(dservice->dserviceid, service_status, 0, now, dservice->value);
-			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
-					DOBJECT_STATUS_LOST, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
-					NULL, -1);
+			write_event_log(dservice->dserviceid, 0, EVENT_OBJECT_DSERVICE, "Discovery host service changed discovered state to DOWN");
+			glb_actions_process_discovery();
+
+//			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
+//					DOBJECT_STATUS_LOST, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
+//					NULL, -1);
 
 			/* service went DOWN, no need to update host status here as other services may be UP */
 		}
 	}
-	zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts, service_status,
-			NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, NULL, -1);
+	write_event_log(dservice->dserviceid, 0, EVENT_OBJECT_DSERVICE, "Discovery host service changed discovered status to %d", service_status);
+	glb_actions_process_discovery();
+	//zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts, service_status,
+	//		NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, NULL, -1);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

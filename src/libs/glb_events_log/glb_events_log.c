@@ -1,4 +1,3 @@
-
 /*
 ** Copyright Glaber
 **
@@ -45,6 +44,7 @@ void write_event_log_str(u_int64_t objectid, u_int64_t eventid,  glb_event_log_s
     log_val.value = zbx_strdup(NULL, log);
     
     glb_history_add_history(&h, 1);
+    //glb_actions_process_event(eventid, objectid, source, )
 }
 
 void write_event_log_attr_int_change(u_int64_t objectid, u_int64_t eventid, glb_event_log_source_t source, const char *attr_name, int old_value, int new_value) {

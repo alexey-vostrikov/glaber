@@ -7,5 +7,6 @@ libglbtests_a_SOURCES = \
 	../../libs/glb_state/tests/glb_state_tests.c \
 	../../libs/zbxalgo/tests/algo_tests.c \
 	../../libs/zbxalgo/tests/index_int64_test.c \
+	../../libs/glb_macro/tests/glb_macro_tests.c \
 	server_tests.c
     

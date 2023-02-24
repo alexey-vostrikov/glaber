@@ -7,7 +7,7 @@
     c) all the triggers the trigger depends on are not in the incident state ( they might be unknown )
 */
 
-//DC_TRIGGER *triger
+//CALC_TRIGGER *triger
 
 typedef struct {
     const char		*error;

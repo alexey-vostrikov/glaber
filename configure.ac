@@ -1979,6 +1979,7 @@ AC_CONFIG_FILES([
 	src/libs/zbxhash/Makefile
 	src/libs/glb_history/Makefile
 	src/libs/glb_events_log/Makefile
+	src/libs/glb_actions/Makefile
 	src/libs/zbxhttp/Makefile
 	src/libs/zbxicmpping/Makefile
 	src/libs/zbxip/Makefile

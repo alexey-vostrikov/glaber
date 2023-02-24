@@ -29,37 +29,37 @@ void	zbx_uninitialize_events(void)
 	THIS_SHOULD_NEVER_HAPPEN;
 }
 
-ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t objectid,
-		const zbx_timespec_t *timespec, int value, const char *trigger_description,
-		const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
-		unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
-		unsigned char trigger_correlation_mode, const char *trigger_correlation_tag,
-		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error,
-		int history_idx)
-{
-	ZBX_UNUSED(source);
-	ZBX_UNUSED(object);
-	ZBX_UNUSED(objectid);
-	ZBX_UNUSED(history_idx);
-	ZBX_UNUSED(timespec);
-	ZBX_UNUSED(value);
-	ZBX_UNUSED(trigger_description);
-	ZBX_UNUSED(trigger_expression);
-	ZBX_UNUSED(trigger_recovery_expression);
-	ZBX_UNUSED(trigger_priority);
-	ZBX_UNUSED(trigger_type);
-	ZBX_UNUSED(trigger_tags);
-	ZBX_UNUSED(trigger_correlation_mode);
-	ZBX_UNUSED(trigger_correlation_tag);
-	ZBX_UNUSED(trigger_value);
-	ZBX_UNUSED(trigger_opdata);
-	ZBX_UNUSED(event_name);
-	ZBX_UNUSED(error);
+// ZBX_DB_EVENT	*zbx_add_event(unsigned char source, unsigned char object, zbx_uint64_t objectid,
+// 		const zbx_timespec_t *timespec, int value, const char *trigger_description,
+// 		const char *trigger_expression, const char *trigger_recovery_expression, unsigned char trigger_priority,
+// 		unsigned char trigger_type, const zbx_vector_ptr_t *trigger_tags,
+// 		unsigned char trigger_correlation_mode, const char *trigger_correlation_tag,
+// 		unsigned char trigger_value, const char *trigger_opdata, const char *event_name, const char *error,
+// 		int history_idx)
+// {
+// 	ZBX_UNUSED(source);
+// 	ZBX_UNUSED(object);
+// 	ZBX_UNUSED(objectid);
+// 	ZBX_UNUSED(history_idx);
+// 	ZBX_UNUSED(timespec);
+// 	ZBX_UNUSED(value);
+// 	ZBX_UNUSED(trigger_description);
+// 	ZBX_UNUSED(trigger_expression);
+// 	ZBX_UNUSED(trigger_recovery_expression);
+// 	ZBX_UNUSED(trigger_priority);
+// 	ZBX_UNUSED(trigger_type);
+// 	ZBX_UNUSED(trigger_tags);
+// 	ZBX_UNUSED(trigger_correlation_mode);
+// 	ZBX_UNUSED(trigger_correlation_tag);
+// 	ZBX_UNUSED(trigger_value);
+// 	ZBX_UNUSED(trigger_opdata);
+// 	ZBX_UNUSED(event_name);
+// 	ZBX_UNUSED(error);
 
-	THIS_SHOULD_NEVER_HAPPEN;
+// 	THIS_SHOULD_NEVER_HAPPEN;
 
-	return NULL;
-}
+// 	return NULL;
+// }
 
 int	zbx_process_events(zbx_vector_ptr_t *trigger_diff, zbx_vector_uint64_t *triggerids_lock, ZBX_DC_HISTORY *history)
 {

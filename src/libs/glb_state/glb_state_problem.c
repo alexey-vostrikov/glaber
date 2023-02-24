@@ -42,12 +42,12 @@ struct glb_problem_t {
 
 };
 
-glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, DC_TRIGGER *trigger) {
+glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, CALC_TRIGGER *trigger) {
 
     if (NULL == memf)
         memf = &heap_memf;
     
-    char problem_name[MAX_STRING_LEN];
+  //  char problem_name[MAX_STRING_LEN];
 
     if (0 == problemid && 0 == (problemid = glb_state_id_gen_new())) // no id, failed to gen a new one
         return NULL;
@@ -59,9 +59,19 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
     
     bzero(problem, sizeof(glb_problem_t));
 
-    if (FAIL == glb_macro_translate_event_name(trigger, problem_name, MAX_STRING_LEN))
-        return NULL;
+    char *problem_name;
+    
+    if (NULL != trigger->event_name && trigger->event_name[0] != '\0')
+        problem_name = zbx_strdup(NULL, trigger->event_name);
+    else
+        problem_name = zbx_strdup(NULL, trigger->description);
+    
+    LOG_INF("Problem name is %s", problem_name);
 
+//    if (FAIL == glb_macro_translate_event_name(trigger, &problem_name, MAX_STRING_LEN))
+//        return NULL;
+
+    HALT_HERE("Need to fully implement macro translation");
     if (NULL != strpool) 
         problem->name = strpool_add(strpool, problem_name);
     else 
@@ -69,14 +79,7 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
  
     LOG_INF("Translated problem name '%s'", problem->name);
     
-    //ZBX_DB_EVENT event = {0};
-    //char *err;
-    //event.trigger = trigger;
-    //zbx_substitute_simple_macros(NULL, &event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    //					 &event.name, MACRO_TYPE_EVENT_NAME, err, sizeof(err));
-     
-    //glb_macro_translate_event_name();
-    //glb_macro_translate_event_name();
+    zbx_free(problem_name);
 
     problem->id = problemid;
     problem->objectid = trigger->triggerid;

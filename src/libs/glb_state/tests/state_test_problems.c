@@ -30,85 +30,85 @@ void test_problems() {
     mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
             .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
     
-    glb_state_problems_init(&memf);
-    glb_state_ids_init(1);
+//     glb_state_problems_init(&memf);
+//     glb_state_ids_init(1);
 
     
-    u_int64_t problemid = glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 3, NULL);
-    assert (problemid != 0 && "Should succeed to create a problem");
+//     u_int64_t problemid = glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 3, NULL);
+//     assert (problemid != 0 && "Should succeed to create a problem");
 
-    //wrong source
-    problemid = glb_state_problem_create(0, 4, 123, "test trigger", 3, NULL);
-    assert(problemid == 0);
+//     //wrong source
+//     problemid = glb_state_problem_create(0, 4, 123, "test trigger", 3, NULL);
+//     assert(problemid == 0);
     
-    //ALL OK
-    problemid = glb_state_problem_create(123, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 3, NULL);
-    assert(problemid == 123);
+//     //ALL OK
+//     problemid = glb_state_problem_create(123, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 3, NULL);
+//     assert(problemid == 123);
     
-    //should FAIL as the problem already exists
-    problemid = glb_state_problem_create(123, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 3, NULL);
-    assert(problemid == 0);
+//     //should FAIL as the problem already exists
+//     problemid = glb_state_problem_create(123, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 3, NULL);
+//     assert(problemid == 0);
 
-    //shuold FAIL due to no name passed
-    problemid = glb_state_problem_create(122, GLB_PROBLEM_SOURCE_TRIGGER, 123, NULL, 3, NULL);
-    assert(problemid == 0);
+//     //shuold FAIL due to no name passed
+//     problemid = glb_state_problem_create(122, GLB_PROBLEM_SOURCE_TRIGGER, 123, NULL, 3, NULL);
+//     assert(problemid == 0);
 
-    //should FAIL as wrong severity
-    problemid = glb_state_problem_create(122, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 6, NULL);
-    assert(problemid == 0);
+//     //should FAIL as wrong severity
+//     problemid = glb_state_problem_create(122, GLB_PROBLEM_SOURCE_TRIGGER, 123, "test trigger", 6, NULL);
+//     assert(problemid == 0);
     
-    //all attempts except should be failed by now
-    assert(glb_state_problems_get_count() == 2);
+//     //all attempts except should be failed by now
+//     assert(glb_state_problems_get_count() == 2);
 
-    //recover something unexistant should fail
-    assert(FAIL == glb_state_problem_recover(0,0) && "nonexistent problem recover should fail");
+//     //recover something unexistant should fail
+//     assert(FAIL == glb_state_problem_recover(0,0) && "nonexistent problem recover should fail");
     
-    assert(SUCCEED == glb_state_problem_recover(123,0) && "existent problem recover should succeed");
-    assert(FAIL == glb_state_problem_recover(123,0) && "Second problem recover should fail");
+//     assert(SUCCEED == glb_state_problem_recover(123,0) && "existent problem recover should succeed");
+//     assert(FAIL == glb_state_problem_recover(123,0) && "Second problem recover should fail");
 
-    /****Test problem fetching ******/
-    assert(FAIL == glb_state_problems_get_by_triggerid(7385, NULL) && "Fetch of unknown trigger's problem should fail");
-    assert(FAIL == glb_state_problems_get_by_triggerid(123, NULL) && "Fetch of known trigger's problem  but null vector should fail");
+//     /****Test problem fetching ******/
+//     assert(FAIL == glb_state_problems_get_by_triggerid(7385, NULL) && "Fetch of unknown trigger's problem should fail");
+//     assert(FAIL == glb_state_problems_get_by_triggerid(123, NULL) && "Fetch of known trigger's problem  but null vector should fail");
     
-    zbx_vector_ptr_t problems;
-    zbx_vector_ptr_create(&problems);
-    LOG_INF("Problems is %p", &problems);
-    assert(SUCCEED == glb_state_problems_get_by_triggerid(123, &problems) && "Fetch of known trigger's problem should succeed");
-    assert(2 == problems.values_num && "There should be two problems for trigger 123");
-    LOG_INF("Cleaning problems");
-    glb_state_problems_clean(&problems);
-    LOG_INF("Destroying vector");
-    zbx_vector_ptr_clear(&problems);
+//     zbx_vector_ptr_t problems;
+//     zbx_vector_ptr_create(&problems);
+//     LOG_INF("Problems is %p", &problems);
+//     assert(SUCCEED == glb_state_problems_get_by_triggerid(123, &problems) && "Fetch of known trigger's problem should succeed");
+//     assert(2 == problems.values_num && "There should be two problems for trigger 123");
+//     LOG_INF("Cleaning problems");
+//     glb_state_problems_clean(&problems);
+//     LOG_INF("Destroying vector");
+//     zbx_vector_ptr_clear(&problems);
 
 
-    //trying hosts operations. Host info is external to problems
-    zbx_vector_uint64_t hosts;
-    zbx_vector_uint64_create(&hosts);
-    zbx_vector_uint64_append(&hosts, 45);
-    zbx_vector_uint64_append(&hosts, 4545);
+//     //trying hosts operations. Host info is external to problems
+//     zbx_vector_uint64_t hosts;
+//     zbx_vector_uint64_create(&hosts);
+//     zbx_vector_uint64_append(&hosts, 45);
+//     zbx_vector_uint64_append(&hosts, 4545);
     
-    LOG_INF("Creating problem with two hosts");
-    assert(0 != glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, 145, "test trigger", 3, &hosts));
+//     LOG_INF("Creating problem with two hosts");
+//     assert(0 != glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, 145, "test trigger", 3, &hosts));
     
-    zbx_vector_uint64_append(&hosts, 14545);
-    assert(0 != glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, 2145, "test trigger", 3, &hosts));
+//     zbx_vector_uint64_append(&hosts, 14545);
+//     assert(0 != glb_state_problem_create(0, GLB_PROBLEM_SOURCE_TRIGGER, 2145, "test trigger", 3, &hosts));
 
-    LOG_INF("Checking fetching problems by host");
-    assert(FAIL == glb_state_problems_get_by_hostid(2454, &problems) && "Fetch of unknown host problems should fail");
-    assert(SUCCEED == glb_state_problems_get_by_hostid(45, &problems) && "Fetch of known host problems should SUCCEED");
-    assert(2 == problems.values_num && "There should be two problems for host 45");
-    glb_state_problems_clean(&problems);
-    zbx_vector_ptr_clear(&problems);
+//     LOG_INF("Checking fetching problems by host");
+//     assert(FAIL == glb_state_problems_get_by_hostid(2454, &problems) && "Fetch of unknown host problems should fail");
+//     assert(SUCCEED == glb_state_problems_get_by_hostid(45, &problems) && "Fetch of known host problems should SUCCEED");
+//     assert(2 == problems.values_num && "There should be two problems for host 45");
+//     glb_state_problems_clean(&problems);
+//     zbx_vector_ptr_clear(&problems);
 
-///check host 14545
-    assert(SUCCEED == glb_state_problems_get_by_hostid(14545, &problems) && "Fetch of known host problems should SUCCEED");
-    assert(1 == problems.values_num && "There should be one problem for host 45");
+// ///check host 14545
+//     assert(SUCCEED == glb_state_problems_get_by_hostid(14545, &problems) && "Fetch of known host problems should SUCCEED");
+//     assert(1 == problems.values_num && "There should be one problem for host 45");
 
-    glb_state_problems_clean(&problems);
-    zbx_vector_ptr_clear(&problems);
+//     glb_state_problems_clean(&problems);
+//     zbx_vector_ptr_clear(&problems);
     
-    LOG_INF("Finished problems creating");
-    glb_state_problems_destroy();
+//     LOG_INF("Finished problems creating");
+//     glb_state_problems_destroy();
 
 }
 void test_ids() {

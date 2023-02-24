@@ -1592,8 +1592,8 @@ static void DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
  ******************************************************************************/
 static int zbx_trigger_topoindex_compare(const void *d1, const void *d2)
 {
-	const DC_TRIGGER *t1 = *(const DC_TRIGGER *const *)d1;
-	const DC_TRIGGER *t2 = *(const DC_TRIGGER *const *)d2;
+	const CALC_TRIGGER *t1 = *(const CALC_TRIGGER *const *)d1;
+	const CALC_TRIGGER *t2 = *(const CALC_TRIGGER *const *)d2;
 
 	ZBX_RETURN_IF_NOT_EQUAL(t1->topoindex, t2->topoindex);
 
@@ -1601,12 +1601,12 @@ static int zbx_trigger_topoindex_compare(const void *d1, const void *d2)
 }
 
 void glb_process_triggers(zbx_vector_ptr_t *triggers) {
-	DC_TRIGGER		*tr;
+	CALC_TRIGGER		*tr;
 	int i;
 	
 	for (i = 0; i < triggers->values_num; i++)
 	{
-		tr = (DC_TRIGGER *)triggers->values[i];
+		tr = (CALC_TRIGGER *)triggers->values[i];
 		glb_trigger_register_calculation(tr);
 	}
 }
@@ -1679,7 +1679,7 @@ static void recalculate_triggers(ZBX_DC_HISTORY *history, int history_num,
 	if (0 != item_num)
 	{
 		zbx_dc_config_history_sync_get_triggers_by_itemids(&trigger_info, &trigger_order, itemids, timespecs, item_num);
-		zbx_prepare_triggers((DC_TRIGGER **)trigger_order.values, trigger_order.values_num);
+		zbx_prepare_triggers((CALC_TRIGGER **)trigger_order.values, trigger_order.values_num);
 	//	zbx_determine_items_in_expressions(&trigger_order, itemids, item_num);
 	}
 
@@ -1691,7 +1691,7 @@ static void recalculate_triggers(ZBX_DC_HISTORY *history, int history_num,
 
 		if (offset != trigger_order.values_num)
 		{
-			zbx_prepare_triggers((DC_TRIGGER **)trigger_order.values + offset,
+			zbx_prepare_triggers((CALC_TRIGGER **)trigger_order.values + offset,
 								 trigger_order.values_num - offset);
 		}
 	}

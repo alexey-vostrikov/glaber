@@ -39,7 +39,7 @@ int glb_state_problems_destroy();
     that for an existing index a problem might not exist anymore
 */
 int         glb_state_problems_get_count();
-u_int64_t   glb_state_problems_create_by_trigger(DC_TRIGGER *trigger);
+u_int64_t   glb_state_problems_create_by_trigger(CALC_TRIGGER *trigger);
 
 int     glb_state_problem_recover(u_int64_t problemid, u_int64_t userid);
 
@@ -48,7 +48,7 @@ void    glb_state_problems_clean(zbx_vector_ptr_t *problems);
 int     glb_state_problems_get_by_triggerid(u_int64_t triggerid, zbx_vector_ptr_t *problems);
 int     glb_state_problems_get_by_hostid(u_int64_t triggerid, zbx_vector_ptr_t *problems);
 
-void    glb_state_problems_process_trigger_value(DC_TRIGGER *trigger);
+void    glb_state_problems_process_trigger_value(CALC_TRIGGER *trigger);
 int     glb_state_problems_recover_by_trigger(u_int64_t triggerid, int leave_unrecovered);
 int     glb_state_problems_get_count_by_trigger(u_int64_t triggerid);
 int     glb_state_problems_get_count_by_trigger_unresolved(u_int64_t triggerid);
