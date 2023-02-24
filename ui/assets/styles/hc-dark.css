@@ -4213,6 +4213,9 @@ pre, pre a, pre td, pre span {
 .header-navigation + .filter-space {
   margin-top: -29px;
 }
+.header-navigation + .filter-space.filter-container {
+  margin-top: 0;
+}
 
 form.is-loading {
   position: relative;
