@@ -53,10 +53,21 @@ class CHostNav extends CList {
             }
 
             $items[] = new CListItem($this->getLatestDataLink($data['hostid']));
-            $items[] = new CListItem($this->getGraphsLink($data['hostid']));
-            $items[] = new CListItem($this->getDashboardsLink($data['hostid']));
-            $items[] = new CListItem($this->getWebLink($data['hostid']));
             $items[] = new CListItem(new CHostProblemsStatus($data['hostid'], $data['problems']));
+            $items[] = new CListItem($this->getGraphsLink($data['hostid']));
+
+            if ($data['dashboards']) {
+                $items[] = new CListItem($this->getDashboardsLink($data['hostid']));
+            }else{
+                $items[] = new CListItem(new CSpan(_('Dashboards')));
+            }
+
+            if ($data['httpTests']) {
+                $items[] = new CListItem($this->getWebLink($data['hostid']));
+            }else{
+                $items[] = new CListItem(new CSpan(_('Web')));
+            }
+
         }
 
         parent::__construct($items);
@@ -81,6 +92,10 @@ class CHostNav extends CList {
             'hostids' => [$hostid],
             'editable' => true
         ];
+
+        if ($lld_ruleid != 0) {
+            $options['selectHttpTests'] = API_OUTPUT_COUNT;
+        }
 
         // get hosts
         $db_host = API::Host()->get($options);
@@ -147,6 +162,8 @@ class CHostNav extends CList {
             'output' => ['severity'],
             'hostids' => [$hostid],
         ]);
+
+        $db_host['dashboards'] = count(getHostDashboards($hostid));
 
         return $db_host;
     }
