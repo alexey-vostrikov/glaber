@@ -47,7 +47,6 @@ $nav_items = (new CList()) ->addItem(get_icon('kioskmode', ['mode' => $web_layou
 if (isset($data['hosts']) && 1 == count( $data['hosts']) ) {
 	$hostid = array_keys($data['hosts'])[0];
 
-	// $widget->setNavigation(getHostNavigation('latest data', $hostid));
     $widget->setNavigation(new CHostNav(CHostNav::getData($hostid)));
 
 	if ($data['can_create']) {

@@ -53,8 +53,9 @@ if ($data['action'] === 'problem.view') {
 			))->setAttribute('aria-label', _('Content controls'))
 		);
 
-	if (isset($data['filter']) && isset($data['filter']['filter_src'])  && count ($data['filter']['filter_src']['hostids']) == 1)
-		$html_page->setNavigation(getHostNavigation('Problems', $data['filter']['filter_src']['hostids'][0]));
+//	if (isset($data['filter']) && isset($data['filter']['filter_src'])  && count ($data['filter']['filter_src']['hostids']) == 1)
+//		$html_page->setNavigation(new CHostNav(CHostNav::getData($data['filter']['filter_src']['hostids'][0])));
+			//getHostNavigation('Problems', $data['filter']['filter_src']['hostids'][0]));
 
 	if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 		$filter = (new CTabFilter())

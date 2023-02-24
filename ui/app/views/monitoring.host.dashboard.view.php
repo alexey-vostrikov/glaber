@@ -30,6 +30,7 @@ if (array_key_exists('error', $data)) {
 if (array_key_exists('no_data', $data)) {
 	(new CHtmlPage())
 		->setTitle(_('Dashboards'))
+		->setNavigation(new CHostNav(CHostNav::getData($data['host']['hostid'])))
 		->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_HOST_DASHBOARD_VIEW))
 		->addItem(new CTableInfo())
 		->show();
@@ -58,6 +59,7 @@ $web_layout_mode = $this->getLayoutMode();
 $html_page = (new CHtmlPage())
 	->setTitle($data['dashboard']['name'])
 	->setWebLayoutMode($web_layout_mode)
+	->setNavigation(new CHostNav(CHostNav::getData($data['host']['hostid'])))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_HOST_DASHBOARD_VIEW))
 	->setControls((new CTag('nav', true,
 		(new CList())
