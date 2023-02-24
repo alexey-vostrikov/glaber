@@ -88,6 +88,24 @@ class CMenuPopupHelper {
 		return $data;
 	}
 
+    /**
+     * Prepare data for Ajax host admin menu popup.
+     *
+     * @param string $hostid
+     * @return array
+     */
+    public static function getHostAdmin($hostid) {
+        $data = [
+            'type' => 'host_admin',
+            'data' => [
+                'hostid' => $hostid
+            ]
+        ];
+
+        return $data;
+    }
+
+
 	/**
 	 * Prepare data for Ajax map element menu popup.
 	 *

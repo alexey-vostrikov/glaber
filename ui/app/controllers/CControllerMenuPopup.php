@@ -23,7 +23,7 @@ class CControllerMenuPopup extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'type' => 'required|in history,host,item,item_prototype,map_element,trigger,trigger_macro',
+			'type' => 'required|in history,host,host_admin,item,item_prototype,map_element,trigger,trigger_macro',
 			'data' => 'array'
 		];
 
@@ -53,7 +53,13 @@ class CControllerMenuPopup extends CController {
 				];
 				break;
 
-			case 'history':
+            case 'host_admin':
+                $rules = [
+                    'hostid' => 'required|db hosts.hostid',
+                ];
+                break;
+
+            case 'history':
 			case 'item':
 				$rules = [
 					'itemid' => 'required|db items.itemid',
@@ -295,7 +301,90 @@ class CControllerMenuPopup extends CController {
 		return null;
 	}
 
-	/**
+    /**
+     * Prepare data for host admin context menu popup.
+     *
+     * @param array  $data
+     * @param string $data['hostid']
+     * @param bool   $data['has_goto']           (optional) Can be used to hide "GO TO" menu section. Default: true.
+     * @param int    $data['severity_min']       (optional)
+     * @param bool   $data['show_suppressed']    (optional)
+     * @param array  $data['tags']               (optional)
+     * @param array  $data['evaltype']           (optional)
+     * @param array  $data['urls']               (optional)
+     * @param string $data['urls']['label']
+     * @param string $data['urls']['url']
+     *
+     * @return mixed
+     */
+    private static function getMenuDataHostAdmin(array $data) {
+        $db_hosts = API::Host()->get([
+                'output' => ['hostid'],
+                'hostids' => $data['hostid']
+            ]);
+
+        if ($db_hosts) {
+            $db_host = $db_hosts[0];
+
+            $urls = [];
+
+            if (array_key_exists('urls', $data)) {
+                foreach ($data['urls'] as &$url) {
+                    $url['new_window'] = ZBX_SCRIPT_URL_NEW_WINDOW_YES;
+                    $url['confirmation'] = '';
+                    $url['menu_path'] = '';
+                    $url['name'] = $url['label'];
+
+                    unset($url['label']);
+                }
+                unset($url);
+
+                $urls = $data['urls'];
+            }
+
+            $menu_data = [
+                'type' => 'host_admin',
+                'hostid' => $data['hostid'],
+            ];
+
+            foreach (array_values($urls) as $url) {
+                $menu_data['urls'][] = [
+                    'label' => $url['name'],
+                    'menu_path' => $url['menu_path'],
+                    'url' => $url['url'],
+                    'target' => $url['new_window'] == ZBX_SCRIPT_URL_NEW_WINDOW_YES ? '_blank' : '',
+                    'confirmation' => $url['confirmation'],
+                    'rel' => 'noopener'.(ZBX_NOREFERER ? ' noreferrer' : '')
+                ];
+            }
+
+            if (array_key_exists('urls', $menu_data)) {
+                foreach ($menu_data['urls'] as &$url) {
+                    if (!CHtmlUrlValidator::validate($url['url'], ['allow_user_macro' => false])) {
+                        $url['url'] = 'javascript: alert(\''.
+                            _s('Provided URL "%1$s" is invalid.', zbx_jsvalue($url['url'], false, false)).
+                            '\');';
+                        unset($url['target'], $url['rel']);
+                    }
+                }
+                unset($url);
+            }
+
+            if (array_key_exists('tags', $data)) {
+                $menu_data['tags'] = $data['tags'];
+                $menu_data['evaltype'] = $data['evaltype'];
+            }
+
+            return $menu_data;
+        }
+
+        error(_('No permissions to referred object or it does not exist!'));
+
+        return null;
+    }
+
+
+    /**
 	 * Prepare data for item latest data context menu popup.
 	 *
 	 * @param array  $data
@@ -963,6 +1052,10 @@ class CControllerMenuPopup extends CController {
 			case 'host':
 				$menu_data = self::getMenuDataHost($data);
 				break;
+
+            case 'host_admin':
+                $menu_data = self::getMenuDataHostAdmin($data);
+                break;
 
 			case 'item':
 				$menu_data = self::getMenuDataItem($data);
