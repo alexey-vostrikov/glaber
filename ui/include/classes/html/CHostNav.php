@@ -88,14 +88,11 @@ class CHostNav extends CList {
                 'hostid', 'status', 'name', 'maintenance_status', 'flags', 'active_available'
             ],
             'selectHostDiscovery' => ['ts_delete'],
+            'selectHttpTests' => API_OUTPUT_COUNT,
             'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error'],
             'hostids' => [$hostid],
             'editable' => true
         ];
-
-        if ($lld_ruleid != 0) {
-            $options['selectHttpTests'] = API_OUTPUT_COUNT;
-        }
 
         // get hosts
         $db_host = API::Host()->get($options);

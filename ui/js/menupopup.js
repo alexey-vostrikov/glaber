@@ -359,13 +359,7 @@ function getMenuPopupHostAdmin(options, trigger_element) {
 
 	configuration.push({
 		label: t('Host'),
-		url: url.getUrl(),
-		clickCallback: function(e) {
-			e.preventDefault();
-			jQuery(this).closest('.menu-popup').menuPopup('close', null);
-
-			view.editHost(options.hostid);
-		}
+		url: url.getUrl()
 	});
 
 	// items
