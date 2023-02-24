@@ -36,13 +36,17 @@ $widget = (new CHtmlPage())
 	->setTitle(_('Latest data'))
 	->setWebLayoutMode($web_layout_mode);
 
+$this->addCssFile('assets/styles/fontawesome.min.css');
+$this->addCssFile('assets/styles/solid.min.css');
+
 $nav_items = (new CList()) ->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]));
 
 if (isset($data['hosts']) && 1 == count( $data['hosts']) ) {
 	$hostid = array_keys($data['hosts'])[0];
 
-	$widget->setNavigation(getHostNavigation('latest data', $hostid));
-
+	//$widget->setNavigation(getHostNavigation('latest data', $hostid));
+	$widget->setNavigation(new CHostNav($hostid));
+ 
 	if ($data['can_create']) {
 		$nav_items->addItem(
 			new CRedirectButton(_('Create item'),
