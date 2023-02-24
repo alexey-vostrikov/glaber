@@ -3202,6 +3202,10 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const CAL
 		}
 
 		ret = SUCCEED;
+		
+			//by this moment we need to create replace_to string by processing macro
+		//identifed by the token and by looking the information in the object that has been passed
+		replace_to = macro_data_fetch_func_cb(&token, data);
 
 		if (0 != (macro_type & (MACRO_TYPE_MESSAGE_NORMAL | MACRO_TYPE_MESSAGE_RECOVERY |
 				MACRO_TYPE_MESSAGE_UPDATE |
@@ -3795,7 +3799,7 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const CAL
 				else if (0 == strcmp(m, MVAR_TRIGGER_NAME))
 				{
 					replace_to = zbx_strdup(replace_to, c_event->trigger.description);
-					substitute_simple_macros_impl(NULL, c_event, NULL, NULL, NULL, NULL, NULL, NULL,
+					substitute_simple_macros_impl(NULL, c_event, NULL, NULL, NULL, NULL, NULL,
 							NULL, NULL, NULL, tz, NULL, &replace_to,
 							MACRO_TYPE_TRIGGER_DESCRIPTION, error, maxerrlen);
 				}
@@ -5952,7 +5956,7 @@ static int	expand_trigger_expression_macros(CALC_TRIGGER *trigger, zbx_dc_um_han
 {
 	char	err[MAX_STRING_LEN];
 
-	if (SUCCEED != expand_normal_trigger_macros(ctx, db_event, err, sizeof(err)))
+	if (SUCCEED != expand_normal_trigger_macros(trigger, err, sizeof(err)))
 	{
 		*error = zbx_strdup(NULL, err);
 		return FAIL;
@@ -6740,7 +6744,7 @@ static int	replace_key_param_cb(const char *data, int key_type, int level, int n
 		zbx_unquote_key_param(*param);
 
 	if (NULL == jp_row)
-		substitute_simple_macros_impl(NULL, NULL, NULL, NULL, hostid, NULL, dc_item, NULL, NULL, NULL, NULL,
+		substitute_simple_macros_impl(NULL, NULL, hostid, NULL, dc_item, NULL, NULL, NULL, NULL,
 				NULL, NULL, param, macro_type, NULL, 0);
 	else
 		zbx_substitute_lld_macros(param, jp_row, lld_macros, ZBX_MACRO_ANY, NULL, 0);
@@ -7170,20 +7174,20 @@ exit:
  *          (default setting)                                                 *
  *                                                                            *
  ******************************************************************************/
-int	zbx_substitute_simple_macros(const zbx_uint64_t *actionid, const ZBX_DB_EVENT *event,
-		const ZBX_DB_EVENT *r_event, const zbx_uint64_t *userid, const zbx_uint64_t *hostid,
+int	zbx_substitute_simple_macros(const zbx_uint64_t *actionid, const CALC_TRIGGER *trigger,
+		const zbx_uint64_t *userid, const zbx_uint64_t *hostid,
 		const DC_HOST *dc_host, const DC_ITEM *dc_item, const DB_ALERT *alert, const DB_ACKNOWLEDGE *ack,
 		const zbx_service_alarm_t *service_alarm, const ZBX_DB_SERVICE *service, const char *tz,
 		char **data,
 		int macro_type, char *error, int maxerrlen)
 {
-	return substitute_simple_macros_impl(actionid, event, r_event, userid, hostid, dc_host, dc_item, alert, ack,
+	return substitute_simple_macros_impl(actionid, trigger, userid, hostid, dc_host, dc_item, alert, ack,
 			service_alarm, service, tz, NULL, data, macro_type, error, maxerrlen);
 }
 
 void	zbx_substitute_simple_macros_allowed_hosts(zbx_history_recv_item_t *item, char **allowed_peers)
 {
-	substitute_simple_macros_impl(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	substitute_simple_macros_impl(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			item, allowed_peers, MACRO_TYPE_ALLOWED_HOSTS, NULL, 0);
 }
 
