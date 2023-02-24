@@ -325,6 +325,121 @@ function getMenuPopupHost(options, trigger_element) {
 }
 
 /**
+ * Get menu popup host section data.
+ *
+ * @param {string} options['hostid']                  Host ID.
+ * @param {array}  options['scripts']                 Host scripts (optional).
+ * @param {string} options[]['name']                  Script name.
+ * @param {string} options[]['scriptid']              Script ID.
+ * @param {string} options[]['confirmation']          Confirmation text.
+ * @param {array}  options['severities']              (optional)
+ * @param {bool}   options['show_suppressed']         (optional)
+ * @param {array}  options['urls']                    (optional)
+ * @param {string} options['url'][]['label']
+ * @param {string} options['url'][]['url']
+ * @param {array}  options['tags']                    (optional)
+ * @param {string} options['tags'][]['tag']
+ * @param {string} options['tags'][]['value']
+ * @param {number} options['tags'][]['operator']
+ * @param {number} options['evaltype']                (optional)
+ * @param {Node}   trigger_element                    UI element which triggered opening of overlay dialogue.
+ *
+ * @return array
+ */
+function getMenuPopupHostAdmin(options, trigger_element) {
+	const sections = [];
+	const items = [];
+	const configuration = [];
+	let url;
+
+	// host
+	url = new Curl('zabbix.php', false);
+	url.setArgument('action', 'host.edit');
+	url.setArgument('hostid', options.hostid);
+
+	configuration.push({
+		label: t('Host'),
+		url: url.getUrl(),
+		clickCallback: function(e) {
+			e.preventDefault();
+			jQuery(this).closest('.menu-popup').menuPopup('close', null);
+
+			view.editHost(options.hostid);
+		}
+	});
+
+	// items
+	url = new Curl('items.php', false);
+	url.setArgument('filter_set', '1');
+	url.setArgument('filter_hostids[]', options.hostid);
+	url.setArgument('context', 'host');
+
+	configuration.push({
+		label: t('Items'),
+		url: url.getUrl()
+	});
+
+	// triggers
+	url = new Curl('triggers.php', false);
+	url.setArgument('filter_set', '1');
+	url.setArgument('filter_hostids[]', options.hostid);
+	url.setArgument('context', 'host');
+
+	configuration.push({
+		label: t('Triggers'),
+		url: url.getUrl()
+	});
+
+	// graphs
+	url = new Curl('graphs.php', false);
+	url.setArgument('filter_set', '1');
+	url.setArgument('filter_hostids[]', options.hostid);
+	url.setArgument('context', 'host');
+
+	configuration.push({
+		label: t('Graphs'),
+		url: url.getUrl()
+	});
+
+	// discovery
+	url = new Curl('host_discovery.php', false);
+	url.setArgument('filter_set', '1');
+	url.setArgument('filter_hostids[]', options.hostid);
+	url.setArgument('context', 'host');
+
+	configuration.push({
+		label: t('Discovery'),
+		url: url.getUrl()
+	});
+
+	// web scenario
+	url = new Curl('httpconf.php', false);
+	url.setArgument('filter_set', '1');
+	url.setArgument('filter_hostids[]', options.hostid);
+	url.setArgument('context', 'host');
+
+	configuration.push({
+		label: t('Web'),
+		url: url.getUrl()
+	});
+
+	sections.push({
+		label: t('Configuration'),
+		items: configuration
+	});
+
+	// urls
+	if ('urls' in options) {
+		sections.push({
+			label: t('Links'),
+			items: getMenuPopupURLData(options.urls, trigger_element)
+		});
+	}
+
+	return sections;
+}
+
+/**
  * Get menu popup submap map element section data.
  *
  * @param {array}  options['sysmapid']
