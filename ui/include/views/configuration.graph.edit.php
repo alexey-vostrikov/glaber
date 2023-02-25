@@ -29,13 +29,13 @@ if ($data['parent_discoveryid'] === null) {
 	$html_page
 		->setTitle(_('Graphs'))
 		->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_GRAPH_EDIT))
-		->setNavigation(getHostNavigation('graphs', $data['hostid']));
+		->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])));
 }
 else {
 	$html_page
 		->setTitle(_('Graph prototypes'))
 		->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_PROTOTYPE_GRAPH_EDIT))
-		->setNavigation(getHostNavigation('graphs', $data['hostid'], $data['parent_discoveryid']));
+		->setNavigation(new CHostNav(CHostNav::getData($data['hostid'], $data['parent_discoveryid'])));
 }
 
 $url = (new CUrl('graphs.php'))

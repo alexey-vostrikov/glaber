@@ -249,6 +249,11 @@ $browser-sprite-path: '../img/browser-sprite.png?20221026';
 				&.breadcrumbs > li {
 					margin-right: 0;
 
+					> span {
+						padding: 2px 7px;
+						line-height: 18px;
+					}
+
 					&:not(:last-child)::after {
 						content: "/";
 					}

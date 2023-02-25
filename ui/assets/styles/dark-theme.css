@@ -4213,6 +4213,10 @@ pre, pre a, pre td, pre span {
 .header-navigation > ul > li > ul.breadcrumbs > li {
   margin-right: 0;
 }
+.header-navigation > ul > li > ul.breadcrumbs > li > span {
+  padding: 2px 7px;
+  line-height: 18px;
+}
 .header-navigation > ul > li > ul.breadcrumbs > li:not(:last-child)::after {
   content: "/";
 }

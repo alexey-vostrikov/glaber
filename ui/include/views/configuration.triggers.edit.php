@@ -31,7 +31,7 @@ $html_page = (new CHtmlPage())
 
 // Append host summary to widget header.
 if ($data['hostid'] != 0) {
-	$html_page->setNavigation(getHostNavigation('triggers', $data['hostid']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])));
 }
 
 $url = (new CUrl('triggers.php'))

@@ -52,7 +52,7 @@ $html_page = (new CHtmlPage())
 	);
 
 if ($data['hostid'] != 0) {
-	$html_page->setNavigation(getHostNavigation('discoveries', $data['hostid']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])));
 }
 
 // Add filter tab.

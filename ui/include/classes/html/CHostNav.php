@@ -113,7 +113,7 @@ class CHostNav extends CList {
             $db_host = API::Template()->get($options);
 
             if ($db_host) {
-                $db_host['hostid'] = $db_host['templateid'];
+                $db_host[0]['hostid'] = $db_host[0]['templateid'];
                 $is_template = true;
             }
         }

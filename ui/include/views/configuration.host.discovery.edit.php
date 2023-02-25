@@ -27,9 +27,7 @@
 $html_page = (new CHtmlPage())
 	->setTitle(_('Discovery rules'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_HOST_DISCOVERY_EDIT))
-	->setNavigation(getHostNavigation('discoveries', $data['hostid'],
-		array_key_exists('itemid', $data) ? $data['itemid'] : 0
-	));
+	->setNavigation(new CHostNav(CHostNav::getData($data['hostid'], array_key_exists('itemid', $data) ? $data['itemid'] : 0)));
 
 $url = (new CUrl('host_discovery.php'))
 	->setArgument('context', $data['context'])
