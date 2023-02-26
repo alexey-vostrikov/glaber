@@ -46,7 +46,7 @@ if (!empty($this->data['parent_discoveryid'])) {
 					)
 			))->setAttribute('aria-label', _('Content controls'))
 		)
-		->setNavigation(getHostNavigation('graphs', $this->data['hostid'], $this->data['parent_discoveryid']));
+		->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'], $this->data['parent_discoveryid'])));
 }
 else {
 	$html_page = (new CHtmlPage())
@@ -76,7 +76,7 @@ else {
 		);
 
 	if (!empty($this->data['hostid'])) {
-		$html_page->setNavigation(getHostNavigation('graphs', $this->data['hostid']));
+		$html_page->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'])));
 	}
 
 	// Add filter tab.

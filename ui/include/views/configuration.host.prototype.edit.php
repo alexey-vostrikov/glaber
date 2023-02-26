@@ -32,7 +32,8 @@ $parent_host = $data['parent_host'];
 $html_page = (new CHtmlPage())
 	->setTitle(_('Host prototypes'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_HOST_PROTOTYPE_EDIT))
-	->setNavigation(getHostNavigation('hosts', $data['discovery_rule']['hostid'], $data['discovery_rule']['itemid']));
+	->setNavigation(new CHostNav(CHostNav::getData($data['discovery_rule']['hostid'])));  
+			//getHostNavigation('hosts', $data['discovery_rule']['hostid'], $data['discovery_rule']['itemid']));
 
 $tabs = new CTabView();
 

@@ -53,10 +53,25 @@ class CHostNav extends CList {
             }
 
             $items[] = new CListItem($this->getLatestDataLink($data['hostid']));
-            $items[] = new CListItem($this->getGraphsLink($data['hostid']));
-            $items[] = new CListItem($this->getDashboardsLink($data['hostid']));
-            $items[] = new CListItem($this->getWebLink($data['hostid']));
             $items[] = new CListItem(new CHostProblemsStatus($data['hostid'], $data['problems']));
+            $items[] = new CListItem($this->getGraphsLink($data['hostid']));
+
+            if ($data['dashboards']) {
+                $items[] = new CListItem($this->getDashboardsLink($data['hostid']));
+            }else{
+                $items[] = new CListItem(
+                    (new CSpan(_('Dashboards')))->addClass("grey")
+                );
+            }
+
+            if ($data['httpTests']) {
+                $items[] = new CListItem($this->getWebLink($data['hostid']));
+            }else{
+                $items[] = new CListItem(
+                    (new CSpan(_('Web')))->addClass("grey")
+                );
+            }
+
         }
 
         parent::__construct($items);
@@ -77,6 +92,7 @@ class CHostNav extends CList {
                 'hostid', 'status', 'name', 'maintenance_status', 'flags', 'active_available'
             ],
             'selectHostDiscovery' => ['ts_delete'],
+            'selectHttpTests' => API_OUTPUT_COUNT,
             'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error'],
             'hostids' => [$hostid],
             'editable' => true
@@ -97,7 +113,7 @@ class CHostNav extends CList {
             $db_host = API::Template()->get($options);
 
             if ($db_host) {
-                $db_host['hostid'] = $db_host['templateid'];
+                $db_host[0]['hostid'] = $db_host[0]['templateid'];
                 $is_template = true;
             }
         }
@@ -147,6 +163,8 @@ class CHostNav extends CList {
             'output' => ['severity'],
             'hostids' => [$hostid],
         ]);
+
+        $db_host['dashboards'] = count(getHostDashboards($hostid));
 
         return $db_host;
     }

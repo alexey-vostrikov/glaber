@@ -39,7 +39,6 @@ $web_layout_mode = $this->getLayoutMode();
 
 $html_page = (new CHtmlPage())
 	->setTitle(_('Graphs'))
-	//->setNavigation(getHostNavigation('Host', $data['hostid']))
 	->setWebLayoutMode($web_layout_mode)
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_CHARTS_VIEW))
 	->setControls(
@@ -49,7 +48,7 @@ $html_page = (new CHtmlPage())
 	);
 
 if (isset($data['ms_hosts']) && count($data['ms_hosts']) == 1 ) 
-	$html_page->setNavigation(getHostNavigation('Host', $data['ms_hosts'][0]['id']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['ms_hosts'][0]['id'])));
 
 $filter = (new CFilter())
 	->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'charts.view'))

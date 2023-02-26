@@ -4182,6 +4182,10 @@ pre, pre a, pre td, pre span {
 .header-navigation > ul > li > ul.breadcrumbs > li {
   margin-right: 0;
 }
+.header-navigation > ul > li > ul.breadcrumbs > li > span {
+  padding: 2px 7px;
+  line-height: 18px;
+}
 .header-navigation > ul > li > ul.breadcrumbs > li:not(:last-child)::after {
   content: "/";
 }
@@ -4212,6 +4216,9 @@ pre, pre a, pre td, pre span {
 }
 .header-navigation + .filter-space {
   margin-top: -29px;
+}
+.header-navigation + .filter-space.filter-container {
+  margin-top: 0;
 }
 
 form.is-loading {

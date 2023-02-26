@@ -67,7 +67,7 @@ class CControllerHostDashboardView extends CController {
 		$host_dashboards = $this->getSortedHostDashboards();
 
 		if (!$host_dashboards) {
-			$data = ['no_data' => true];
+			$data = ['no_data' => true, 'host' => $this->host];
 		}
 		else {
 			$dashboardid = $this->hasInput('dashboardid')

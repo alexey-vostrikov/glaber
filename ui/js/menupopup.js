@@ -359,13 +359,7 @@ function getMenuPopupHostAdmin(options, trigger_element) {
 
 	configuration.push({
 		label: t('Host'),
-		url: url.getUrl(),
-		clickCallback: function(e) {
-			e.preventDefault();
-			jQuery(this).closest('.menu-popup').menuPopup('close', null);
-
-			view.editHost(options.hostid);
-		}
+		url: url.getUrl()
 	});
 
 	// items
@@ -433,6 +427,14 @@ function getMenuPopupHostAdmin(options, trigger_element) {
 		sections.push({
 			label: t('Links'),
 			items: getMenuPopupURLData(options.urls, trigger_element)
+		});
+	}
+
+	// scripts
+	if ('scripts' in options) {
+		sections.push({
+			label: t('Scripts'),
+			items: getMenuPopupScriptData(options.scripts, trigger_element, options.hostid)
 		});
 	}
 

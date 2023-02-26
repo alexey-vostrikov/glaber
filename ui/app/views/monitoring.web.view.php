@@ -33,7 +33,7 @@ $this->includeJsFile('monitoring.web.view.js.php');
 $this->enableLayoutModes();
 $web_layout_mode = $this->getLayoutMode();
 
-(new CHtmlPage())
+$page = (new CHtmlPage())
 	->setTitle(_('Web monitoring'))
 	->setWebLayoutMode($web_layout_mode)
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_WEB_VIEW))
@@ -94,8 +94,12 @@ $web_layout_mode = $this->getLayoutMode();
 			)
 		])
 	)
-	->addItem($data['screen_view'])
-	->show();
+	->addItem($data['screen_view']);
+	//if (isset($data['filter_hostids'])) {
+		show_error_message(json_encode($data));
+	//}
+	
+	$page->show();
 
 (new CScriptTag('view.init();'))
 	->setOnDocumentReady()

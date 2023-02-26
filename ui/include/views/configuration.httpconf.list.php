@@ -115,7 +115,7 @@ $html_page = (new CHtmlPage())
 	);
 
 if (!empty($this->data['hostid'])) {
-	$html_page->setNavigation(getHostNavigation('web', $this->data['hostid']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'])));
 }
 
 $html_page->addItem($filter);
