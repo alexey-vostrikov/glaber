@@ -33,7 +33,11 @@ workflow:
     - export GLABER_VERSION=`cat include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)"`
     - echo $GLABER_VERSION
 
+.clean_old_dists: &clean_old_dists
+    - rm $FULL_PROJECT_PATH/*.deb
+
 .prepare_sources: &prepare_sources
+    - *clean_old_dists
     - *set_glb_version
     - ./bootstrap.sh
     - ./configure
