@@ -6685,7 +6685,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 						  const zbx_config_vault_t *config_vault)
 {
 	static int sync_status = ZBX_DBSYNC_STATUS_UNKNOWN;
-	LOG_INF("CONFIG reload started");
+
 	int i, flags, changelog_num, dberr = ZBX_DB_FAIL;
 	double sec, csec, hsec, hisec, htsec, gmsec, hmsec, ifsec, idsec, isec, tisec, pisec, tsec, dsec, fsec,
 		expr_sec, csec2, hsec2, hisec2, ifsec2, idsec2, isec2, tisec2, pisec2, tsec2, dsec2, fsec2,
@@ -6872,7 +6872,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_host_inventory(&hi_sync))
 		goto out;
 	hisec = zbx_time() - sec;
-	LOG_INF("CONFIG reload phase1");
+
 	sec = zbx_time();
 	if (FAIL == zbx_dbsync_compare_host_groups(&hgroups_sync))
 		goto out;
@@ -6948,7 +6948,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		dc_maintenance_precache_nested_groups();
 
 	FINISH_SYNC;
-	LOG_INF("CONFIG reload phase3");
+
 	zbx_dbsync_process_active_avail_diff(&active_avail_diff);
 	zbx_vector_uint64_destroy(&active_avail_diff);
 
@@ -7101,7 +7101,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	sec = zbx_time();
 	DCsync_actions(&action_sync);
 	action_sec2 = zbx_time() - sec;
-	LOG_INF("CONFIG reload phase4");
+
 	sec = zbx_time();
 	DCsync_action_ops(&action_op_sync);
 	action_op_sec2 = zbx_time() - sec;
@@ -7554,7 +7554,6 @@ clean:
 
 	poller_item_notify_flush();
 
-	LOG_INF("CONFIG reloaded");
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 

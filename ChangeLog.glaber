@@ -1,3 +1,5 @@
+ver 3.0.23
+    - fix: set default glaber-specific processes number to one 
 ver 3.0.22
     - feat: added host navigation to problems, host edit, several other panels
 ver 3.0.21

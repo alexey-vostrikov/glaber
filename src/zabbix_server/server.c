@@ -931,6 +931,17 @@ static void zbx_validate_config(ZBX_TASK_EX *task)
 		exit(EXIT_FAILURE);
 }
 
+static void set_config_defaults() {
+	
+	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_API_TRAPPER] = 3;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] =1;
+}
+
 /******************************************************************************
  *                                                                            *
  * Purpose: parse config file and update configuration parameters             *
@@ -1429,6 +1440,7 @@ int main(int argc, char **argv)
 
 	/* required for simple checks */
 	zbx_init_metrics();
+	set_config_defaults();
 	zbx_load_config(&t);
 
 	zbx_init_library_cfg(program_type);
