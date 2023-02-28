@@ -27,7 +27,6 @@
 #include "../actions.h"
 #include "../scripts/scripts.h"
 #include "zbxcrypto.h"
-#include "../../libs/zbxserver/get_host_from_event.h"
 #include "../../libs/zbxserver/zabbix_users.h"
 #include "zbxservice.h"
 #include "zbxnum.h"
@@ -653,7 +652,7 @@ out2:
 }
 
 static void	add_user_msg(zbx_uint64_t userid, zbx_uint64_t mediatypeid, ZBX_USER_MSG **user_msg, const char *subj,
-		const char *msg, zbx_uint64_t actionid, const ZBX_DB_EVENT *event, const ZBX_DB_EVENT *r_event,
+		const char *msg, zbx_uint64_t actionid, u_int64_t problemid,
 		const DB_ACKNOWLEDGE *ack, const zbx_service_alarm_t *service_alarm, const ZBX_DB_SERVICE *service,
 		int expand_macros, int macro_type, int err_type, const char *tz)
 {
@@ -728,7 +727,7 @@ static void	add_user_msg(zbx_uint64_t userid, zbx_uint64_t mediatypeid, ZBX_USER
 }
 
 static void	add_user_msgs(zbx_uint64_t userid, zbx_uint64_t operationid, zbx_uint64_t mediatypeid,
-		ZBX_USER_MSG **user_msg, zbx_uint64_t actionid, const ZBX_DB_EVENT *event, const ZBX_DB_EVENT *r_event,
+		ZBX_USER_MSG **user_msg, zbx_uint64_t actionid, u_int64_t problemid,
 		const DB_ACKNOWLEDGE *ack, const zbx_service_alarm_t *service_alarm, const ZBX_DB_SERVICE *service,
 		int macro_type, unsigned char evt_src, unsigned char op_mode, const char *default_timezone,
 		const char *user_timezone)
@@ -824,7 +823,7 @@ out:
 }
 
 static void	add_object_msg(zbx_uint64_t actionid, zbx_uint64_t operationid, ZBX_USER_MSG **user_msg,
-		const ZBX_DB_EVENT *event, const ZBX_DB_EVENT *r_event, const DB_ACKNOWLEDGE *ack,
+		u_int64_t problemid, const DB_ACKNOWLEDGE *ack,
 		const zbx_service_alarm_t *service_alarm, const ZBX_DB_SERVICE *service, int macro_type,
 		unsigned char evt_src, unsigned char op_mode, const char *default_timezone, zbx_hashset_t *roles)
 {
@@ -877,7 +876,7 @@ static void	add_object_msg(zbx_uint64_t actionid, zbx_uint64_t operationid, ZBX_
 				user_timezone = get_user_timezone(userid);
 		}
 
-		add_user_msgs(userid, operationid, 0, user_msg, actionid, event, r_event, ack, service_alarm, service,
+		add_user_msgs(userid, operationid, 0, user_msg, actionid, problemid, ack, service_alarm, service,
 				macro_type, evt_src, op_mode, default_timezone, user_timezone);
 clean:
 		zbx_free(user_timezone);
@@ -1166,7 +1165,7 @@ static void	flush_user_msg(ZBX_USER_MSG **user_msg, int esc_step, const ZBX_DB_E
 }
 
 static void	add_command_alert(zbx_db_insert_t *db_insert, int alerts_num, zbx_uint64_t alertid, const char *host,
-		const ZBX_DB_EVENT *event, const ZBX_DB_EVENT *r_event, zbx_uint64_t actionid, int esc_step,
+		u_int64_t problemid, zbx_uint64_t actionid, int esc_step,
 		const char *message, zbx_alert_status_t status, const char *error)
 {
 	int	now, alerttype = ALERT_TYPE_COMMAND, alert_status = status;
@@ -1185,17 +1184,9 @@ static void	add_command_alert(zbx_db_insert_t *db_insert, int alerts_num, zbx_ui
 
 	tmp = zbx_dsprintf(tmp, "%s:%s", host, message);
 
-	if (NULL == r_event)
-	{
-		zbx_db_insert_add_values(db_insert, alertid, actionid, event->eventid, now, tmp, alert_status,
+	zbx_db_insert_add_values(db_insert, alertid, actionid, problemid, now, tmp, alert_status,
 				error, esc_step, (int)alerttype);
-	}
-	else
-	{
-		zbx_db_insert_add_values(db_insert, alertid, actionid, r_event->eventid, now, tmp, alert_status,
-				error, esc_step, (int)alerttype, event->eventid);
-	}
-
+	
 	zbx_free(tmp);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -1625,7 +1616,7 @@ static void	get_mediatype_params(const ZBX_DB_EVENT *event, const ZBX_DB_EVENT *
 	zbx_json_free(&json);
 }
 
-static void	add_message_alert(const ZBX_DB_EVENT *event, const ZBX_DB_EVENT *r_event, zbx_uint64_t actionid,
+static void	add_message_alert(u_int64_t problemid, zbx_uint64_t actionid,
 		int esc_step, zbx_uint64_t userid, zbx_uint64_t mediatypeid, const char *subject, const char *message,
 		const DB_ACKNOWLEDGE *ack, const zbx_service_alarm_t *service_alarm, const ZBX_DB_SERVICE *service,
 		int err_type, const char *tz)

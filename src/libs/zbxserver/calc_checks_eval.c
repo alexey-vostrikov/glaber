@@ -1934,7 +1934,7 @@ void	zbx_expression_eval_resolve_filter_macros(zbx_expression_eval_t *eval, cons
 	{
 		zbx_expression_query_t	*query = (zbx_expression_query_t *)eval->queries.values[i];
 
-		zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, item, NULL, NULL, NULL, NULL, NULL,
+		zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, item, NULL, NULL, NULL, NULL, NULL,
 				&query->ref.filter, MACRO_TYPE_QUERY_FILTER, NULL, 0);
 	}
 
@@ -1962,7 +1962,7 @@ static void	macro_index_free(zbx_macro_index_t *index)
 	zbx_free(index);
 }
 
-static int	resolve_expression_query_macro(const ZBX_DB_TRIGGER *trigger, int request, int func_num,
+static int	resolve_expression_query_macro(const CALC_TRIGGER *trigger, int request, int func_num,
 		zbx_expression_query_t *query, char **entity, zbx_vector_ptr_t *indices)
 {
 	int			id;
@@ -2003,7 +2003,7 @@ static int	resolve_expression_query_macro(const ZBX_DB_TRIGGER *trigger, int req
 *             trigger - [IN] trigger which defines the evaluation expression  *
 *                                                                             *
 *******************************************************************************/
-void	zbx_expression_eval_resolve_trigger_hosts_items(zbx_expression_eval_t *eval, const ZBX_DB_TRIGGER *trigger)
+void	zbx_expression_eval_resolve_trigger_hosts_items(zbx_expression_eval_t *eval, const CALC_TRIGGER *trigger)
 {
 	int			i, func_num;
 	zbx_vector_ptr_t	hosts, item_keys;

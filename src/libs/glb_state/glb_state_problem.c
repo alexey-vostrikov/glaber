@@ -33,13 +33,10 @@ struct glb_problem_t {
     const char *name;
 	unsigned char acknowledged;
 	unsigned char severity; 
-
     glb_problem_oper_state_t oper_state;
 	u_int64_t cause_problem;
-
     u_int64_t recovery_time; 
     u_int64_t correlation_id;
-
 };
 
 glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, CALC_TRIGGER *trigger) {

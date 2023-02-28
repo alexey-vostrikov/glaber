@@ -35,11 +35,12 @@ typedef struct {
 
 int     glb_state_triggers_init(mem_funcs_t *memf);
 int     glb_state_trigger_get_info(state_trigger_info_t *info);
-int     glb_state_trigger_set_info(state_trigger_info_t *info);
 
+int  glb_state_trigger_get_error(u_int64_t id, char **error);
 unsigned char glb_state_trigger_get_value(u_int64_t id);
 unsigned char glb_state_trigger_get_value_lastchange(u_int64_t id, unsigned char *value, int* lastchange);
 
+int     glb_state_trigger_set_info(state_trigger_info_t *info);
 void    glb_state_trigger_set_value(u_int64_t id, unsigned char value, int lastcalc); //lastcalc might be 0 - then current time is used
 void    glb_state_trigger_set_error(u_int64_t id, char *error);
 

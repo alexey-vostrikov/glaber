@@ -34,6 +34,7 @@
 #include "zbxip.h"
 #include "zbxsysinfo.h"
 #include "zbx_rtc_constants.h"
+#include "../../libs/glb_macro/glb_macro.h"
 
 extern unsigned char			program_type;
 
@@ -261,11 +262,13 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, int con
 					item.snmp_community = strdup(dcheck->snmp_community);
 					item.snmp_oid = strdup(dcheck->key_);
 
-					zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-							NULL, NULL, NULL, NULL, NULL, &item.snmp_community,
-							MACRO_TYPE_COMMON, NULL, 0);
-					zbx_substitute_key_macros(&item.snmp_oid, NULL, NULL, NULL, NULL,
-							MACRO_TYPE_SNMP_OID, NULL, 0);
+					glb_macro_expand_common_unmasked(&item.snmp_community, NULL, 0);
+				//	zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+				//			NULL, NULL, NULL, NULL, NULL, &item.snmp_community,
+				//			MACRO_TYPE_COMMON, NULL, 0);
+					glb_macro_expand_item_key(&item.snmp_oid, MACRO_TYPE_SNMP_OID, NULL, 0);
+				//	zbx_substitute_key_macros(&item.snmp_oid, NULL, NULL, NULL, NULL,
+				//			MACRO_TYPE_SNMP_OID, NULL, 0);
 
 					if (ZBX_IF_SNMP_VERSION_3 == item.snmp_version)
 					{
@@ -280,19 +283,23 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, int con
 						item.snmpv3_privprotocol = dcheck->snmpv3_privprotocol;
 						item.snmpv3_contextname = zbx_strdup(NULL, dcheck->snmpv3_contextname);
 
-						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, NULL, NULL,
-								&item.snmpv3_securityname, MACRO_TYPE_COMMON, NULL, 0);
-						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, NULL, NULL,
-								&item.snmpv3_authpassphrase, MACRO_TYPE_COMMON, NULL,
-								0);
-						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, NULL, NULL,
-								&item.snmpv3_privpassphrase, MACRO_TYPE_COMMON, NULL, 0);
-						zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
-								NULL, NULL, NULL, NULL, NULL, NULL,
-								&item.snmpv3_contextname, MACRO_TYPE_COMMON, NULL, 0);
+						// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+						// 		NULL, NULL, NULL, NULL, NULL, NULL,
+						// 		&item.snmpv3_securityname, MACRO_TYPE_COMMON, NULL, 0);
+						glb_macro_expand_common_unmasked(&item.snmpv3_securityname, NULL, 0);		
+						// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+						// 		NULL, NULL, NULL, NULL, NULL, NULL,
+						// 		&item.snmpv3_authpassphrase, MACRO_TYPE_COMMON, NULL,
+						// 		0);
+						glb_macro_expand_common_unmasked(&item.snmpv3_authpassphrase, NULL, 0);	
+						// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+						// 		NULL, NULL, NULL, NULL, NULL, NULL,
+						// 		&item.snmpv3_privpassphrase, MACRO_TYPE_COMMON, NULL, 0);
+						glb_macro_expand_common_unmasked(&item.snmpv3_privpassphrase, NULL, 0);	
+						//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
+						//		NULL, NULL, NULL, NULL, NULL, NULL,
+						//		&item.snmpv3_contextname, MACRO_TYPE_COMMON, NULL, 0);
+						glb_macro_expand_common_unmasked(&item.snmpv3_contextname, NULL, 0);
 					}
 
 					if (SUCCEED == get_value_snmp(&item, &result, ZBX_NO_POLLER, config_timeout) &&
@@ -613,6 +620,7 @@ static void	process_rule(ZBX_DB_DRULE *drule, int config_timeout)
 
 			if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 			{
+				HALT_HERE("Do proper macro translation for actioning here");
 				zbx_discovery_update_host(&dhost, host_status, now);
 				zbx_process_events(NULL, NULL, NULL);
 				zbx_clean_events();
@@ -787,8 +795,9 @@ static int	process_discovery(time_t *nextcheck, int config_timeout)
 			rule_count++;
 
 			delay_str = zbx_strdup(delay_str, row[3]);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-					&delay_str, MACRO_TYPE_COMMON, NULL, 0);
+			//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+			//		&delay_str, MACRO_TYPE_COMMON, NULL, 0);
+			glb_macro_expand_common_unmasked(&delay_str, NULL, 0);
 
 			if (SUCCEED != zbx_is_time_suffix(delay_str, &delay, ZBX_LENGTH_UNLIMITED))
 			{

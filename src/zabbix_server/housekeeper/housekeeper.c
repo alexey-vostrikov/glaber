@@ -29,6 +29,7 @@
 #include "zbx_rtc_constants.h"
 #include "zbx_host_constants.h"
 #include "../../libs/glb_state/glb_state.h"
+#include "../../libs/glb_macro/glb_macro.h"
 
 static struct zbx_db_version_info_t	*db_version_info;
 
@@ -394,8 +395,9 @@ static void	hk_history_update(zbx_hk_history_rule_t *rules, int now)
 				ZBX_HK_MODE_REGULAR == *(rule = rules + value_type)->poption_mode)
 		{
 			tmp = zbx_strdup(tmp, row[2]);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL,
-					NULL, &tmp, MACRO_TYPE_COMMON, NULL, 0);
+			//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+			//		NULL, &tmp, MACRO_TYPE_COMMON, NULL, 0);
+			glb_macro_expand_common_by_hostid(&tmp, hostid, NULL, 0);
 
 			if (SUCCEED != zbx_is_time_suffix(tmp, &history, ZBX_LENGTH_UNLIMITED))
 			{
@@ -425,8 +427,9 @@ static void	hk_history_update(zbx_hk_history_rule_t *rules, int now)
 				continue;
 
 			tmp = zbx_strdup(tmp, row[3]);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL,
-					NULL, &tmp, MACRO_TYPE_COMMON, NULL, 0);
+			//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL,
+			//		NULL, &tmp, MACRO_TYPE_COMMON, NULL, 0);
+			glb_macro_expand_common_by_hostid(&tmp, hostid, NULL, 0 );
 
 			if (SUCCEED != zbx_is_time_suffix(tmp, &trends, ZBX_LENGTH_UNLIMITED))
 			{

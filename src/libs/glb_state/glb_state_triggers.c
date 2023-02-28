@@ -201,9 +201,9 @@ void glb_state_trigger_set_value(u_int64_t id, unsigned char value, int lastcalc
 
 }
 
-
 ELEMS_CALLBACK(set_error_cb){
     state_trigger_t *trigger = elem->data;
+
     trigger->value = TRIGGER_VALUE_UNKNOWN;
     strpool_free(&state->strpool, trigger->error);
     trigger->error = strpool_add(&state->strpool, (char *)data);
@@ -213,7 +213,22 @@ void glb_state_trigger_set_error(u_int64_t id, char *error) {
     elems_hash_process(state->triggers, id, set_error_cb, error, 0);
 }
 
+ELEMS_CALLBACK(get_error_cb){
+    state_trigger_t *trigger = elem->data;
+    char **error = data;
 
+    if (NULL == trigger->error)
+        *error = NULL;
+    else
+        *error = zbx_strdup(NULL, trigger->error);
+
+    return SUCCEED;
+}
+
+int  glb_state_trigger_get_error(u_int64_t id, char **error) {
+      
+    return elems_hash_process(state->triggers, id, get_error_cb, error, ELEM_FLAG_DO_NOT_CREATE);
+}
 
 DUMPER_TO_JSON(trigger_to_json)
 {

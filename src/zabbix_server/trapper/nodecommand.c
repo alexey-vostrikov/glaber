@@ -25,8 +25,9 @@
 
 #include "../scripts/scripts.h"
 #include "audit/zbxaudit.h"
-#include "../../libs/zbxserver/get_host_from_event.h"
+//#include "../../libs/zbxserver/get_host_from_event.h"
 #include "../../libs/zbxserver/zabbix_users.h"
+#include "../../libs/glb_state/glb_state_problems.h"
 #include "zbxdbwrap.h"
 #include "zbx_trigger_constants.h"
 
@@ -182,41 +183,6 @@ fail:
 	return ret;
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: check if the specified event id corresponds to a problem event    *
- *          caused by a trigger, find its recovery event (if it exists)       *
- *                                                                            *
- * Parameters:  eventid       - [IN] the id of event                          *
- *              r_eventid     - [OUT] the id of recovery event (0 if there is *
- *                              no recovery event                             *
- *              error         - [OUT] the error message buffer                *
- *              error_len     - [IN] the size of error message buffer         *
- *                                                                            *
- * Return value:  SUCCEED or FAIL (with 'error' message)                      *
- *                                                                            *
- ******************************************************************************/
-static int	zbx_check_event_end_recovery_event(zbx_uint64_t eventid, zbx_uint64_t *r_eventid, char *error,
-		size_t error_len)
-{
-	DB_RESULT	db_result;
-	DB_ROW		row;
-
-	if (NULL == (db_result = DBselect("select r_eventid from event_recovery where eventid="ZBX_FS_UI64, eventid)))
-	{
-		zbx_strlcpy(error, "Database error, cannot read from 'events' and 'event_recovery' tables.", error_len);
-		return FAIL;
-	}
-
-	if (NULL == (row = DBfetch(db_result)))
-		*r_eventid = 0;
-	else
-		ZBX_DBROW2UINT64(*r_eventid, row[0]);
-
-	zbx_db_free_result(db_result);
-
-	return SUCCEED;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -237,37 +203,30 @@ static int	zbx_check_event_end_recovery_event(zbx_uint64_t eventid, zbx_uint64_t
  * Comments: either 'hostid' or 'eventid' must be > 0, but not both           *
  *                                                                            *
  ******************************************************************************/
-static int	execute_script(zbx_uint64_t scriptid, zbx_uint64_t hostid, zbx_uint64_t eventid, zbx_user_t *user,
+static int	execute_script(zbx_uint64_t scriptid, zbx_uint64_t hostid, zbx_user_t *user,
 		const char *clientip, int config_timeout, char **result, char **debug)
 {
-	int			ret = FAIL, scope = 0, i, macro_type;
-	DC_HOST			host;
+	int			ret = FAIL, scope = 0, i;
+	DC_HOST			host = {0};
 	zbx_script_t		script;
 	zbx_uint64_t		usrgrpid, groupid;
-	zbx_vector_uint64_t	eventids;
-	zbx_vector_ptr_t	events;
 	zbx_vector_ptr_pair_t	webhook_params;
 	char			*user_timezone = NULL, *webhook_params_json = NULL, error[MAX_STRING_LEN];
-	ZBX_DB_EVENT		*problem_event = NULL, *recovery_event = NULL;
 	zbx_dc_um_handle_t	*um_handle = NULL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() scriptid:" ZBX_FS_UI64 " hostid:" ZBX_FS_UI64 " eventid:" ZBX_FS_UI64
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() scriptid:" ZBX_FS_UI64 " hostid:" ZBX_FS_UI64 
 			" userid:" ZBX_FS_UI64 " clientip:%s",
-			__func__, scriptid, hostid, eventid, user->userid, clientip);
+			__func__, scriptid, hostid, user->userid, clientip);
 
 	*error = '\0';
-	memset(&host, 0, sizeof(host));
-	zbx_vector_uint64_create(&eventids);
-	zbx_vector_ptr_create(&events);
-	zbx_vector_ptr_pair_create(&webhook_params);
 
+	zbx_vector_ptr_pair_create(&webhook_params);
 	zbx_script_init(&script);
 
 	if (SUCCEED != zbx_get_script_details(scriptid, &script, &scope, &usrgrpid, &groupid, error, sizeof(error)))
 		goto fail;
 
 	/* validate script permissions */
-
 	if (0 < usrgrpid &&
 			USER_TYPE_SUPER_ADMIN != user->type &&
 			SUCCEED != is_user_in_allowed_group(user->userid, usrgrpid, error, sizeof(error)))
@@ -275,105 +234,12 @@ static int	execute_script(zbx_uint64_t scriptid, zbx_uint64_t hostid, zbx_uint64
 		goto fail;
 	}
 
-	if (0 != hostid)
+	if ( 0 == hostid || SUCCEED != DCget_host_by_hostid(&host, hostid))
 	{
-		if (ZBX_SCRIPT_SCOPE_HOST != scope)
-		{
-			zbx_snprintf(error, sizeof(error), "Script is not allowed in manual host action: scope:%d",
-					scope);
-			goto fail;
-		}
-	}
-	else if (ZBX_SCRIPT_SCOPE_EVENT != scope)
-	{
-		zbx_snprintf(error, sizeof(error), "Script is not allowed in manual event action: scope:%d", scope);
+		zbx_snprintf(error, sizeof(error), "Unknown host identifier hostid:%lld",hostid);
 		goto fail;
 	}
-
-	/* get host or event details */
-
-	if (0 != hostid)
-	{
-		if (SUCCEED != DCget_host_by_hostid(&host, hostid))
-		{
-			zbx_strlcpy(error, "Unknown host identifier.", sizeof(error));
-			goto fail;
-		}
-	}
-	else /* eventid */
-	{
-		zbx_uint64_t	r_eventid;
-
-		if (SUCCEED != zbx_check_event_end_recovery_event(eventid, &r_eventid, error, sizeof(error)))
-			goto fail;
-
-		zbx_vector_uint64_reserve(&eventids, 2);
-		zbx_vector_ptr_reserve(&events, 2);
-
-		zbx_vector_uint64_append(&eventids, eventid);	/* problem event in element [0]*/
-
-		if (0 != r_eventid)				/* optional recovery event in element [1] */
-			zbx_vector_uint64_append(&eventids, r_eventid);
-
-		zbx_db_get_events_by_eventids(&eventids, &events);
-
-		if (events.values_num != eventids.values_num)
-		{
-			zbx_strlcpy(error, "Specified event data not found.", sizeof(error));
-			goto fail;
-		}
-
-		switch (events.values_num)
-		{
-			case 1:
-				if (eventid == ((ZBX_DB_EVENT *)(events.values[0]))->eventid)
-				{
-					problem_event = events.values[0];
-				}
-				else
-				{
-					zbx_strlcpy(error, "Specified event data not found.", sizeof(error));
-					goto fail;
-				}
-				break;
-			case 2:
-				if (r_eventid == ((ZBX_DB_EVENT *)(events.values[0]))->eventid)
-				{
-					problem_event = events.values[1];
-					recovery_event = events.values[0];
-				}
-				else
-				{
-					problem_event = events.values[0];
-					recovery_event = events.values[1];
-				}
-				break;
-			default:
-				THIS_SHOULD_NEVER_HAPPEN;
-				zbx_snprintf(error, sizeof(error), "Internal error in %s() events.values_num:%d",
-						__func__, events.values_num);
-				goto fail;
-		}
-
-		if (EVENT_SOURCE_TRIGGERS != problem_event->source)
-		{
-			zbx_strlcpy(error, "The source of specified event is not a trigger.", sizeof(error));
-			goto fail;
-		}
-
-		if (TRIGGER_VALUE_PROBLEM != problem_event->value)
-		{
-			zbx_strlcpy(error, "The specified event is not a problem event.", sizeof(error));
-			goto fail;
-		}
-
-		if (SUCCEED != get_host_from_event((NULL != recovery_event) ? recovery_event : problem_event,
-				&host, error, sizeof(error)))
-		{
-			goto fail;
-		}
-	}
-
+	
 	if (SUCCEED != zbx_check_script_permissions(groupid, host.hostid))
 	{
 		zbx_strlcpy(error, "Script does not have permission to be executed on the host.", sizeof(error));
@@ -391,45 +257,14 @@ static int	execute_script(zbx_uint64_t scriptid, zbx_uint64_t hostid, zbx_uint64
 
 	/* substitute macros in script body and webhook parameters */
 
-	if (0 != hostid)	/* script on host */
-		macro_type = MACRO_TYPE_SCRIPT;
-	else
-		macro_type = (NULL != recovery_event) ? MACRO_TYPE_SCRIPT_RECOVERY : MACRO_TYPE_SCRIPT_NORMAL;
-
+//	if (0 != hostid)	/* script on host */
+//		macro_type = MACRO_TYPE_SCRIPT;
+	
 	um_handle = zbx_dc_open_user_macros();
 
-	if (ZBX_SCRIPT_TYPE_WEBHOOK != script.type)
-	{
-		if (SUCCEED != zbx_substitute_simple_macros_unmasked(NULL, problem_event, recovery_event, &user->userid,
-				NULL, &host, NULL, NULL, NULL, NULL, NULL, user_timezone, &script.command, macro_type,
-				error, sizeof(error)))
-		{
+	 if ( ZBX_SCRIPT_TYPE_WEBHOOK == script.type) {
+	 	if (SUCCEED != DBfetch_webhook_params(script.scriptid, &webhook_params, error, sizeof(error)))
 			goto fail;
-		}
-
-		if (SUCCEED != zbx_substitute_simple_macros(NULL, problem_event, recovery_event, &user->userid, NULL, &host,
-				NULL, NULL, NULL, NULL, NULL, user_timezone, &script.command_orig, macro_type, error,
-				sizeof(error)))
-		{
-			THIS_SHOULD_NEVER_HAPPEN;
-			goto fail;
-		}
-	}
-	else
-	{
-		if (SUCCEED != DBfetch_webhook_params(script.scriptid, &webhook_params, error, sizeof(error)))
-			goto fail;
-
-		for (i = 0; i < webhook_params.values_num; i++)
-		{
-			if (SUCCEED != zbx_substitute_simple_macros_unmasked(NULL, problem_event, recovery_event,
-					&user->userid, NULL, &host, NULL, NULL, NULL, NULL, NULL, user_timezone,
-					(char **)&webhook_params.values[i].second, macro_type, error,
-					sizeof(error)))
-			{
-				goto fail;
-			}
-		}
 
 		zbx_webhook_params_pack_json(&webhook_params, &webhook_params_json);
 	}
@@ -454,7 +289,7 @@ static int	execute_script(zbx_uint64_t scriptid, zbx_uint64_t hostid, zbx_uint64
 			perror = error;
 
 		audit_res = zbx_auditlog_global_script(script.type, script.execute_on, script.command_orig, host.hostid,
-				host.name, eventid, host.proxy_hostid, user->userid, user->username, clientip, poutput,
+				host.name, 0, host.proxy_hostid, user->userid, user->username, clientip, poutput,
 				perror);
 
 		/* At the moment, there is no special processing of audit failures. */
@@ -480,10 +315,6 @@ fail:
 	}
 
 	zbx_vector_ptr_pair_destroy(&webhook_params);
-	zbx_vector_ptr_clear_ext(&events, (zbx_clean_func_t)zbx_db_free_event);
-	zbx_vector_ptr_destroy(&events);
-	zbx_vector_uint64_destroy(&eventids);
-
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
@@ -499,9 +330,9 @@ fail:
  ******************************************************************************/
 int	node_process_command(zbx_socket_t *sock, const char *data, const struct zbx_json_parse *jp, int config_timeout)
 {
-	char			*result = NULL, *send = NULL, *debug = NULL, tmp[64], tmp_hostid[64], tmp_eventid[64],
+	char			*result = NULL, *send = NULL, *debug = NULL, tmp[64], tmp_hostid[64],
 				clientip[MAX_STRING_LEN];
-	int			ret = FAIL, got_hostid = 0, got_eventid = 0;
+	int			ret = FAIL, got_hostid = 0;
 	zbx_uint64_t		scriptid, hostid = 0, eventid = 0;
 	struct zbx_json		j;
 	zbx_user_t		user;
@@ -541,61 +372,31 @@ int	node_process_command(zbx_socket_t *sock, const char *data, const struct zbx_
 		goto finish;
 	}
 
-	if (SUCCEED == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOSTID, tmp_hostid, sizeof(tmp_hostid), NULL))
+	if (SUCCEED != zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOSTID, tmp_hostid, sizeof(tmp_hostid), NULL)) {
 		got_hostid = 1;
 
-	if (SUCCEED == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_EVENTID, tmp_eventid, sizeof(tmp_eventid), NULL))
-		got_eventid = 1;
-
-	if (0 == got_hostid && 0 == got_eventid)
-	{
 		result = zbx_dsprintf(result, "Failed to parse command request tag %s or %s.",
 				ZBX_PROTO_TAG_HOSTID, ZBX_PROTO_TAG_EVENTID);
 		goto finish;
 	}
 
-	if (1 == got_hostid && 1 == got_eventid)
+	if (SUCCEED != zbx_is_uint64(tmp_hostid, &hostid))
 	{
-		result = zbx_dsprintf(result, "Command request tags %s and %s cannot be used together.",
-				ZBX_PROTO_TAG_HOSTID, ZBX_PROTO_TAG_EVENTID);
+		result = zbx_dsprintf(result, "Failed to parse value of command request tag %s.",
+				ZBX_PROTO_TAG_HOSTID);
+			goto finish;
+	}
+
+	if (0 == hostid)
+	{
+		result = zbx_dsprintf(result, "%s value cannot be 0.", ZBX_PROTO_TAG_HOSTID);
 		goto finish;
-	}
-
-	if (1 == got_hostid)
-	{
-		if (SUCCEED != zbx_is_uint64(tmp_hostid, &hostid))
-		{
-			result = zbx_dsprintf(result, "Failed to parse value of command request tag %s.",
-					ZBX_PROTO_TAG_HOSTID);
-			goto finish;
-		}
-
-		if (0 == hostid)
-		{
-			result = zbx_dsprintf(result, "%s value cannot be 0.", ZBX_PROTO_TAG_HOSTID);
-			goto finish;
-		}
-	}
-	else
-	{
-		if (SUCCEED != zbx_is_uint64(tmp_eventid, &eventid))
-		{
-			result = zbx_dsprintf(result, "Failed to parse value of command request tag %s.",
-					ZBX_PROTO_TAG_EVENTID);
-			goto finish;
-		}
-
-		if (0 == eventid)
-		{
-			result = zbx_dsprintf(result, "%s value cannot be 0.", ZBX_PROTO_TAG_EVENTID);
-			goto finish;
-		}
 	}
 
 	if (SUCCEED != zbx_json_value_by_name(jp, ZBX_PROTO_TAG_CLIENTIP, clientip, sizeof(clientip), NULL))
 		*clientip = '\0';
 
-	if (SUCCEED == (ret = execute_script(scriptid, hostid, eventid, &user, clientip, config_timeout, &result,
+	if (SUCCEED == (ret = execute_script(scriptid, hostid,  &user, clientip, config_timeout, &result,
 			&debug)))
 	{
 		zbx_json_addstring(&j, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);

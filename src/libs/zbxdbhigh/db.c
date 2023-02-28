@@ -27,6 +27,8 @@
 #include "zbxnum.h"
 #include "zbx_host_constants.h"
 #include "zbx_trigger_constants.h"
+#include "../glb_events_log/glb_events_log.h"
+#include "../glb_actions/glb_actions.h"
 
 #define ZBX_DB_WAIT_DOWN	10
 
@@ -1873,13 +1875,13 @@ void	DBregister_host_flush(zbx_vector_ptr_t *autoreg_hosts, zbx_uint64_t proxy_h
 
 		ts.sec = autoreg_host->now;
 		glb_actions_process_autoregister();
-		write_event_log();
+		write_event_log(autoreg_host->autoreg_hostid,0, EVENT_SOURCE_AUTOREGISTRATION, "Autoregistered host %ld", autoreg_host->autoreg_hostid);
 	//	zbx_add_event(EVENT_SOURCE_AUTOREGISTRATION, EVENT_OBJECT_ZABBIX_ACTIVE, autoreg_host->autoreg_hostid,
 	//			&ts, TRIGGER_VALUE_PROBLEM, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, NULL, 0);
 	}
 
-	zbx_process_events(NULL, NULL, NULL);
-	zbx_clean_events();
+	//zbx_process_events(NULL, NULL, NULL);
+	//zbx_clean_events();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

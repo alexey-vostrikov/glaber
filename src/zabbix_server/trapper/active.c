@@ -31,6 +31,7 @@
 #include "zbxversion.h"
 #include "zbx_host_constants.h"
 #include "zbx_item_constants.h"
+#include "../../libs/glb_macro/glb_macro.h"
 
 extern unsigned char	program_type;
 
@@ -320,8 +321,10 @@ int	send_list_of_active_checks(zbx_socket_t *sock, char *request, int config_tim
 			if (HOST_STATUS_MONITORED != dc_items[i].host.status)
 				continue;
 
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_items[i].host.hostid, NULL, NULL,
-					NULL, NULL, NULL, NULL, NULL, &dc_items[i].delay, MACRO_TYPE_COMMON, NULL, 0);
+			//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_items[i].host.hostid, NULL, NULL,
+			//		NULL, NULL, NULL, NULL, NULL, &dc_items[i].delay, MACRO_TYPE_COMMON, NULL, 0);
+			
+			glb_macro_expand_common_by_hostid(&dc_items[i].delay,dc_items[i].host.hostid, NULL, 0);
 
 			if (SUCCEED != zbx_interval_preproc(dc_items[i].delay, &delay, NULL, NULL))
 				continue;
@@ -586,8 +589,9 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 			if (HOST_STATUS_MONITORED != dc_items[i].host.status)
 				continue;
 
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_items[i].host.hostid, NULL, NULL,
-					NULL, NULL, NULL, NULL, NULL, &dc_items[i].delay, MACRO_TYPE_COMMON, NULL, 0);
+			//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_items[i].host.hostid, NULL, NULL,
+			//		NULL, NULL, NULL, NULL, NULL, &dc_items[i].delay, MACRO_TYPE_COMMON, NULL, 0);
+			glb_macro_expand_common_by_hostid(&dc_items[i].delay, dc_items[i].host.hostid, NULL, 0);
 
 			if (SUCCEED != zbx_interval_preproc(dc_items[i].delay, &delay, NULL, NULL))
 				continue;

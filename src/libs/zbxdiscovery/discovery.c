@@ -23,7 +23,8 @@
 #include "../../zabbix_server/glb_events.h"
 #include "zbxtime.h"
 #include "zbxnum.h"
-
+#include "../glb_events_log/glb_events_log.h"
+#include "../glb_actions/glb_actions.h"
 typedef struct
 {
 	zbx_uint64_t	dserviceid;
@@ -431,10 +432,13 @@ static void	discovery_update_host_status(ZBX_DB_DHOST *dhost, int status, int no
 			dhost->lastdown = 0;
 			dhost->lastup = now;
 
+			write_event_log(dhost->dhostid, 0, EVENT_SOURCE_DISCOVERY, "Host become Discovered UP");
+			glb_actions_process_discovery();
+
 			discovery_update_dhost(dhost);
-			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
-					DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
-					NULL, -1);
+//			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
+//					DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
+//					NULL, -1);
 		}
 	}
 	else	/* DOBJECT_STATUS_DOWN */
@@ -445,14 +449,18 @@ static void	discovery_update_host_status(ZBX_DB_DHOST *dhost, int status, int no
 			dhost->lastdown = now;
 			dhost->lastup = 0;
 
+			write_event_log(dhost->dhostid, 0, EVENT_SOURCE_DISCOVERY, "Host become Discovered DOWN");
+			glb_actions_process_discovery();
+
 			discovery_update_dhost(dhost);
-			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
-					DOBJECT_STATUS_LOST, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
-					NULL, 0);
+//			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
+//					DOBJECT_STATUS_LOST, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL,
+//					NULL, 0);
 		}
 	}
-	zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts, status, NULL, NULL, NULL, 0, 0,
-			NULL, 0, NULL, 0, NULL, NULL, NULL, -1);
+//	zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts, status, NULL, NULL, NULL, 0, 0,
+//			NULL, 0, NULL, 0, NULL, NULL, NULL, -1);
+	write_event_log(dhost->dhostid, 0, EVENT_SOURCE_DISCOVERY, "Host Discovery completed");
 }
 
 /******************************************************************************
