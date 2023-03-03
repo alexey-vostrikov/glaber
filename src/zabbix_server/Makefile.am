@@ -13,7 +13,7 @@ SUBDIRS = \
 	snmptrapper \
 	timer \
 	trapper \
-	escalator \
+	glb_escalator \
 	proxypoller \
 	vmware \
 	taskmanager \
@@ -38,8 +38,6 @@ noinst_LIBRARIES = libzbxserver.a
 
 libzbxserver_a_SOURCES = \
 	db_lengths.h \
-	actions.c \
-	actions.h \
 	glb_events.c \
 	events.h \
 	operations.c \
@@ -74,7 +72,7 @@ zabbix_server_LDADD = \
 	reporter/libzbxreporter.a \
 	snmptrapper/libzbxsnmptrapper.a \
 	httppoller/libzbxhttppoller.a \
-	escalator/libzbxescalator.a \
+	glb_escalator/libglbescalator.a \
 	proxypoller/libzbxproxypoller.a \
 	proxyconfigread/libzbxproxyconfigread.a \
 	vmware/libzbxvmware.a \
@@ -166,6 +164,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/glb_events_log/libglbeventlog.a \
 	$(top_builddir)/src/libs/glb_macro/libglbmacro.a \
 	$(top_builddir)/src/libs/glb_actions/libglbactions.a
+	
 
 if HAVE_IPMI
 zabbix_server_LDADD += ipmi/libipmi.a

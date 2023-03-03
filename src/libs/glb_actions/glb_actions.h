@@ -17,9 +17,35 @@
 **/
 #include "zbxcommon.h"
 
-int glb_actions_process_discovery();
-int glb_actions_process_autoregister();
+typedef struct
+{
+	zbx_uint64_t			conditionid;
+	zbx_uint64_t			actionid;
+	char				*value;
+	char				*value2;
+	unsigned char			conditiontype;
+	unsigned char			op;
+	zbx_vector_uint64_t		eventids;
+}
+zbx_condition_t;
 
+typedef struct
+{
+	zbx_uint64_t	eventid;
+	zbx_uint64_t	acknowledgeid;
+	zbx_uint64_t	taskid;
+	int		old_severity;
+	int		new_severity;
+}
+zbx_ack_task_t;
+
+int glb_actions_process_discovery_host();
+int glb_actions_process_lld_status();
+int glb_actions_process_autoregister();
+int glb_actions_process_problem_new();
+int glb_actions_process_problem_recovery();
+int glb_actions_process_by_acknowledgments();
+int glb_actions_process_discovery_service();
 /* old actions interface
 
 int		check_action_condition(const ZBX_DB_EVENT *event, zbx_condition_t *condition);

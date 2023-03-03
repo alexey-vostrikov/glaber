@@ -451,7 +451,7 @@ void lost_items_check_cb(poller_item_t *garbage, void *data)
 	{
 		if (poller_item->lastpolltime + ITEMS_REINIT_INTERVAL < mstime && POLL_POLLING == poller_item->state)
 		{
-			DEBUG_ITEM(poller_item->itemid, "Item has timeout in the poller, resetting the sate")
+			DEBUG_ITEM(poller_item->itemid, "Item has timed out in the poller, resetting the sate")
 			poller_item->state = POLL_QUEUED;
 		}
 	}

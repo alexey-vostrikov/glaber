@@ -35,6 +35,8 @@
 #include "zbxsysinfo.h"
 #include "zbx_rtc_constants.h"
 #include "../../libs/glb_macro/glb_macro.h"
+#include "../../libs/glb_actions/glb_actions.h"
+#include "../../libs/glb_events_log/glb_events_log.h"
 
 extern unsigned char			program_type;
 
@@ -622,8 +624,11 @@ static void	process_rule(ZBX_DB_DRULE *drule, int config_timeout)
 			{
 				HALT_HERE("Do proper macro translation for actioning here");
 				zbx_discovery_update_host(&dhost, host_status, now);
-				zbx_process_events(NULL, NULL, NULL);
-				zbx_clean_events();
+				
+				glb_actions_process_discovery_host();
+				write_event_log(dhost.dhostid, 0, EVENT_SOURCE_DISCOVERY, "host with ip %s dns name %s has been discoverd", ip, dns);
+				//zbx_process_events(NULL, NULL, NULL);
+				//zbx_clean_events();
 			}
 			else if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 				proxy_update_host(drule->druleid, ip, dns, host_status, now);

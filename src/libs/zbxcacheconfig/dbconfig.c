@@ -29,7 +29,7 @@
 #include "base64.h"
 #include "zbxdbhigh.h"
 #include "dbsync.h"
-#include "actions.h"
+//#include "actions.h"
 #include "zbxtrends.h"
 #include "zbxserialize.h"
 #include "user_macro.h"
@@ -2118,8 +2118,8 @@ static void substitute_host_interface_macros(ZBX_DC_INTERFACE *interface)
 		if (0 != (macros & 0x01))
 		{
 			addr = zbx_strdup(NULL, interface->ip);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
-										 NULL, &addr, MACRO_TYPE_INTERFACE_ADDR, NULL, 0);
+//			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
+//										 NULL, &addr, MACRO_TYPE_INTERFACE_ADDR, NULL, 0);
 			if (SUCCEED == zbx_is_ip(addr) || SUCCEED == zbx_validate_hostname(addr))
 				dc_strpool_replace(1, &interface->ip, addr);
 			zbx_free(addr);
@@ -2128,8 +2128,8 @@ static void substitute_host_interface_macros(ZBX_DC_INTERFACE *interface)
 		if (0 != (macros & 0x02))
 		{
 			addr = zbx_strdup(NULL, interface->dns);
-			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
-										 NULL, &addr, MACRO_TYPE_INTERFACE_ADDR, NULL, 0);
+//			zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &host, NULL, NULL, NULL, NULL, NULL,
+//										 NULL, &addr, MACRO_TYPE_INTERFACE_ADDR, NULL, 0);
 			if (SUCCEED == zbx_is_ip(addr) || SUCCEED == zbx_validate_hostname(addr))
 				dc_strpool_replace(1, &interface->dns, addr);
 			zbx_free(addr);

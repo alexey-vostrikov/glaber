@@ -1368,7 +1368,8 @@ static void 	lld_trigger_make(const zbx_lld_trigger_prototype_t *trigger_prototy
 		unsigned char	priority;
 
 		buffer = zbx_strdup(buffer, trigger_prototype->description);
-		zbx_substitute_lld_macros(&buffer, jp_row, lld_macros, ZBX_MACRO_FUNC, NULL, 0);
+		glb_macro_expand_lld();
+		//zbx_substitute_lld_macros(&buffer, jp_row, lld_macros, ZBX_MACRO_FUNC, NULL, 0);
 		zbx_lrtrim(buffer, ZBX_WHITESPACE);
 		priority = trigger_prototype->priority;
 

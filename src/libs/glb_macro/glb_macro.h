@@ -16,11 +16,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#ifndef GLB_MACRO_H
+#define GLB_MACRO_H
 #include "zbxcommon.h"
 #include "zbxcacheconfig.h"
 
-
-int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name, int max_len);
+int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name,  char *error, size_t errlen);
 int glb_macro_translate_string(const char *expression, int token_type, char *result, int result_size);
 
 int glb_macro_expand_common_unmasked(char **data, char *error, size_t errlen);
@@ -35,3 +36,9 @@ int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, int fiel
 
 int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int type, char *error, size_t errlen);	
 int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, int type, char *error, size_t errlen);	
+
+int glb_macro_expand_alert_data(DB_ALERT *db_alert, char *param);
+
+int glb_macro_expand_trigger_ctx_expression(CALC_TRIGGER *trigger, char **data, int token_type, char *error, size_t errlen);
+
+#endif

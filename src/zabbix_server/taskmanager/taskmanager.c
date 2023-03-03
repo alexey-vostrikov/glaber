@@ -26,7 +26,8 @@
 #include "zbxcacheconfig.h"
 #include "zbxtasks.h"
 #include "../glb_events.h"
-#include "../actions.h"
+//#include "../actions.h"
+#include "../../libs/glb_actions/glb_actions.h"
 #include "zbxexport.h"
 #include "zbxdiag.h"
 #include "zbxservice.h"
@@ -491,8 +492,9 @@ static void	tm_process_rank_event(zbx_uint64_t taskid, const char *data)
 		}
 
 		/* the event specified in task data by cause_eventid might be a symptom, find the actual target cause */
-		if (0 == (target_cause_eventid = zbx_db_get_cause_eventid(requested_cause_eventid)))
-			target_cause_eventid = requested_cause_eventid;
+		HALT_HERE("Fix cause- sypthom logic");
+		//if (0 == (target_cause_eventid = zbx_db_get_cause_eventid(requested_cause_eventid)))
+		target_cause_eventid = requested_cause_eventid;
 
 		if (target_cause_eventid == eventid)
 		{
@@ -504,10 +506,12 @@ static void	tm_process_rank_event(zbx_uint64_t taskid, const char *data)
 		else
 		{
 			should_swap = 0;
-			old_cause_eventid = zbx_db_get_cause_eventid(eventid);
+			HALT_HERE("Fix cause- sypthom logic");
+			//old_cause_eventid = zbx_db_get_cause_eventid(eventid);
 		}
-
-		if (0 == (target_cause_triggerid = zbx_get_objectid_by_eventid(target_cause_eventid)))
+		HALT_HERE("Need to change glb_problem_api to fetch problem");
+		
+		if (0 == (target_cause_triggerid = glb_problem_get_objectid(target_cause_eventid)))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "trigger id should never be '0' for target cause event (eventid: "
 					ZBX_FS_UI64 ")", target_cause_eventid);
@@ -644,7 +648,7 @@ static int	tm_process_acknowledgments(zbx_vector_uint64_t *ack_taskids)
 	if (0 < ack_tasks.values_num)
 	{
 		zbx_vector_ptr_sort(&ack_tasks, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-		processed_num = process_actions_by_acknowledgments(&ack_tasks);
+		processed_num = glb_actions_process_by_acknowledgments(&ack_tasks);
 
 		notify_service_manager(&ack_tasks);
 	}

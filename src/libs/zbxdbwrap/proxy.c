@@ -1952,7 +1952,7 @@ static int	sender_item_validator(zbx_history_recv_item_t *item, zbx_socket_t *so
 		int	ret;
 
 		allowed_peers = zbx_strdup(NULL, item->trapper_hosts);
-		zbx_substitute_simple_macros_allowed_hosts(item, &allowed_peers);
+//		zbx_substitute_simple_macros_allowed_hosts(item, &allowed_peers);
 		ret = zbx_tcp_check_allowed_peers(sock, allowed_peers);
 		zbx_free(allowed_peers);
 
@@ -2568,8 +2568,9 @@ json_parse_error:
 			}
 		}
 
-		zbx_process_events(NULL, NULL, NULL);
-		zbx_clean_events();
+//		zbx_process_events(NULL, NULL, NULL);
+//		zbx_clean_events();
+
 		DBcommit();
 	}
 json_parse_return:

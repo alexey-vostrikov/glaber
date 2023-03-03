@@ -50,7 +50,7 @@
 #include "timer/timer.h"
 #include "trapper/trapper.h"
 #include "snmptrapper/snmptrapper.h"
-#include "escalator/escalator.h"
+#include "glb_escalator/glb_escalator.h"
 #include "proxypoller/proxypoller.h"
 #include "vmware/vmware.h"
 #include "taskmanager/taskmanager.h"
@@ -1293,7 +1293,7 @@ static void zbx_on_exit(int ret)
 		zbx_free_selfmon_collector();
 	}
 
-	zbx_uninitialize_events();
+//	zbx_uninitialize_events();
 
 	zbx_unload_modules();
 
@@ -1560,7 +1560,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 											config_startup_time};
 	zbx_thread_trapper_args trapper_api_args = {&config_comms, &zbx_config_vault, get_program_type, api_listen_sock,
 											config_startup_time};
-	zbx_thread_escalator_args escalator_args = {zbx_config_tls, get_program_type, config_timeout};
+	glb_escalator_args escalator_args = {zbx_config_tls, get_program_type, config_timeout};
 	zbx_thread_proxy_poller_args proxy_poller_args = {zbx_config_tls, &zbx_config_vault, get_program_type,
 													  config_timeout};
 	zbx_thread_discoverer_args discoverer_args = {zbx_config_tls, get_program_type, config_timeout};
@@ -1755,16 +1755,16 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 
 			DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-			if (SUCCEED != zbx_check_postinit_tasks(&error))
-			{
-				zabbix_log(LOG_LEVEL_CRIT, "cannot complete post initialization tasks: %s",
-						   error);
-				zbx_free(error);
-				DBclose();
+			// if (SUCCEED != zbx_check_postinit_tasks(&error))
+			// {
+			// 	zabbix_log(LOG_LEVEL_CRIT, "cannot complete post initialization tasks: %s",
+			// 			   error);
+			// 	zbx_free(error);
+			// 	DBclose();
 
-				ret = FAIL;
-				goto out;
-			}
+			// 	ret = FAIL;
+			// 	goto out;
+			// }
 
 			/* update maintenance states */
 			zbx_dc_update_maintenances();
@@ -1812,7 +1812,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			break;
 		case ZBX_PROCESS_TYPE_ESCALATOR:
 			thread_args.args = &escalator_args;
-			zbx_thread_start(escalator_thread, &thread_args, &threads[i]);
+			zbx_thread_start(glb_escalator_thread, &thread_args, &threads[i]);
 			break;
 		case ZBX_PROCESS_TYPE_JAVAPOLLER:
 			poller_args.poller_type = ZBX_POLLER_TYPE_JAVA;
@@ -2115,7 +2115,7 @@ int MAIN_ZABBIX_ENTRY(int flags)
 		}
 	}
 
-	zbx_initialize_events();
+//	zbx_initialize_events();
 
 #ifdef HAVE_NETSNMP
 #define SNMP_FEATURE_STATUS "YES"
@@ -2193,7 +2193,7 @@ int MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 #endif
-	zbx_initialize_events();
+//	zbx_initialize_events();
 
 	if (FAIL == zbx_load_modules(CONFIG_LOAD_MODULE_PATH, CONFIG_LOAD_MODULE, config_timeout, 1))
 	{

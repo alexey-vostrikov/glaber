@@ -22,7 +22,7 @@
 
 #include "db_lengths.h"
 #include "log.h"
-#include "actions.h"
+#include "../../libs/glb_actions/glb_actions.h"
 #include "zbxexport.h"
 #include "zbxservice.h"
 #include "zbxnum.h"
@@ -1899,52 +1899,52 @@
 // 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 // }
 
-void zbx_events_update_itservices(void)
-{
-	unsigned char *data = NULL;
-	size_t data_alloc = 0, data_offset = 0;
-	int i;
-	zbx_hashset_iter_t iter;
-	zbx_event_recovery_t *recovery;
+// void zbx_events_update_itservices(void)
+// {
+// 	unsigned char *data = NULL;
+// 	size_t data_alloc = 0, data_offset = 0;
+// 	int i;
+// 	zbx_hashset_iter_t iter;
+// 	//zbx_event_recovery_t *recovery;
 
-	zbx_hashset_iter_reset(&event_recovery, &iter);
-	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
-	{
-		int values_num;
+// 	zbx_hashset_iter_reset(&event_recovery, &iter);
+// 	while (NULL != (recovery = (zbx_event_recovery_t *)zbx_hashset_iter_next(&iter)))
+// 	{
+// 		int values_num;
 
-		if (EVENT_SOURCE_TRIGGERS != recovery->r_event->source)
-			continue;
+// 		if (EVENT_SOURCE_TRIGGERS != recovery->r_event->source)
+// 			continue;
 
-		values_num = recovery->r_event->tags.values_num;
-		recovery->r_event->tags.values_num = 0;
+// 		values_num = recovery->r_event->tags.values_num;
+// 		recovery->r_event->tags.values_num = 0;
 
-		zbx_service_serialize(&data, &data_alloc, &data_offset, recovery->eventid, recovery->r_event->clock,
-							  recovery->r_event->ns, recovery->r_event->value, recovery->r_event->severity,
-							  &recovery->r_event->tags);
+// 		zbx_service_serialize(&data, &data_alloc, &data_offset, recovery->eventid, recovery->r_event->clock,
+// 							  recovery->r_event->ns, recovery->r_event->value, recovery->r_event->severity,
+// 							  &recovery->r_event->tags);
 
-		recovery->r_event->tags.values_num = values_num;
-	}
+// 		recovery->r_event->tags.values_num = values_num;
+// 	}
 
-	for (i = 0; i < events.values_num; i++)
-	{
-		ZBX_DB_EVENT *event = events.values[i];
+// 	for (i = 0; i < events.values_num; i++)
+// 	{
+// 		ZBX_DB_EVENT *event = events.values[i];
 
-		if (EVENT_SOURCE_TRIGGERS != event->source || 0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
-			continue;
+// 		if (EVENT_SOURCE_TRIGGERS != event->source || 0 == (event->flags & ZBX_FLAGS_DB_EVENT_CREATE))
+// 			continue;
 
-		if (TRIGGER_VALUE_PROBLEM != event->value)
-			continue;
+// 		if (TRIGGER_VALUE_PROBLEM != event->value)
+// 			continue;
 
-		zbx_service_serialize(&data, &data_alloc, &data_offset, event->eventid, event->clock, event->ns,
-							  event->value, event->severity, &event->tags);
-	}
+// 		zbx_service_serialize(&data, &data_alloc, &data_offset, event->eventid, event->clock, event->ns,
+// 							  event->value, event->severity, &event->tags);
+// 	}
 
-	if (NULL == data)
-		return;
+// 	if (NULL == data)
+// 		return;
 
-	zbx_service_flush(ZBX_IPC_SERVICE_SERVICE_PROBLEMS, data, (zbx_uint32_t)data_offset);
-	zbx_free(data);
-}
+// 	zbx_service_flush(ZBX_IPC_SERVICE_SERVICE_PROBLEMS, data, (zbx_uint32_t)data_offset);
+// 	zbx_free(data);
+// }
 
 /******************************************************************************
  *                                                                            *

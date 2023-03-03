@@ -1,5 +1,6 @@
 /*
-** Copyright (C) 2001-2023 Glaber
+** Glaber
+** Copyright (C) 2001-2030 Glaber JSC
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -15,23 +16,16 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#ifndef GLB_COMMON_H
-#define GLB_COMMON_H
 
-#define GLB_ICMP 20
-#define ZBX_ICMP 21
+#include "zbxcommon.h"
+#include "zbxthreads.h"
 
-/* severity */
-#define SEVERITY_NOT_CLASSIFIED	0
-#define SEVERITY_INFORMATION	1
-#define SEVERITY_WARNING	2
-#define SEVERITY_AVERAGE	3
-#define SEVERITY_HIGH		4
-#define SEVERITY_DISASTER	5
-#define SEVERITY_COUNT		6	/* number of trigger severities */
+typedef struct
+{
+	zbx_config_tls_t	*zbx_config_tls;
+	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
+	int			config_timeout;
+} glb_escalator_args;
 
-#define TRIGGER_SEVERITY_UNDEFINED	255
 
-//#define HAVE_GLB_TESTS 1
-
-#endif
+ZBX_THREAD_ENTRY(glb_escalator_thread, args);

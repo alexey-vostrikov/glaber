@@ -30,6 +30,7 @@
 #include "zbxdbwrap.h"
 #include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_items.h"
+#include "../../libs/glb_actions/glb_actions.h"
 
 /******************************************************************************
  *                                                                            *
@@ -96,22 +97,22 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became supported",
 						item.host.host, item.key_orig);
 
-				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
-						ITEM_STATE_NORMAL, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL,
-						NULL, NULL, 0);
+				//zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
+				//		ITEM_STATE_NORMAL, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL,
+				//		NULL, NULL, 0);
 			}
 			else
 			{
 				LOG_DBG("discovery rule \"%s:%s\" became not supported: %s",
 						item.host.host, item.key_orig, error);
 
-				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
-						ITEM_STATE_NOTSUPPORTED, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0,
-						NULL, NULL, error, -1);
+				//zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
+				//		ITEM_STATE_NOTSUPPORTED, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0,
+				//		NULL, NULL, error, -1);
 			}
-
-			zbx_process_events(NULL, NULL, NULL);
-			zbx_clean_events();
+			glb_actions_process_lld_status();
+			//zbx_process_events(NULL, NULL, NULL);
+			//zbx_clean_events();
 		}
 	}
 

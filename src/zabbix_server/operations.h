@@ -22,14 +22,14 @@
 
 #include "zbxcacheconfig.h"
 
-void	op_template_add(const ZBX_DB_EVENT *event, zbx_config_t *cfg, zbx_vector_uint64_t *lnk_templateids);
-void	op_template_del(const ZBX_DB_EVENT *event, zbx_vector_uint64_t *del_templateids);
-void	op_groups_add(const ZBX_DB_EVENT *event,  zbx_config_t *cfg, zbx_vector_uint64_t *groupids);
-void	op_groups_del(const ZBX_DB_EVENT *event, zbx_vector_uint64_t *groupids);
-void	op_host_add(const ZBX_DB_EVENT *event, zbx_config_t *cfg);
-void	op_host_del(const ZBX_DB_EVENT *event);
-void	op_host_enable(const ZBX_DB_EVENT *event, zbx_config_t *cfg);
-void	op_host_disable(const ZBX_DB_EVENT *event, zbx_config_t *cfg);
-void	op_host_inventory_mode(const ZBX_DB_EVENT *event, zbx_config_t *cfg, int inventory_mode);
+void	op_template_add(u_int64_t hostid, zbx_config_t *cfg, zbx_vector_uint64_t *lnk_templateids);
+void	op_template_del(u_int64_t hostid, zbx_vector_uint64_t *del_templateids);
+void	op_groups_add(u_int64_t hostid, zbx_config_t *cfg, unsigned char discovery_source, zbx_vector_uint64_t *groupids);
+void	op_groups_del(u_int64_t hostid, zbx_vector_uint64_t *groupids);
+void	op_host_add(u_int64_t hostid, unsigned char discovery_source,  zbx_config_t *cfg);
+void	op_host_del(u_int64_t hostid);
+void	op_host_enable(u_int64_t hostid, unsigned char discovery_source, zbx_config_t *cfg);
+void	op_host_disable(u_int64_t hostid, unsigned char discovery_source, zbx_config_t *cfg);
+void	op_host_set_inventory_mode(u_int64_t hostid, unsigned char discovery_source, zbx_config_t *cfg, int inventory_mode);
 
 #endif

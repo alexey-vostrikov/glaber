@@ -20,7 +20,8 @@
 #include "zbxcacheconfig.h"
 #include "dbconfig.h"
 #include "zbxserver.h"
-#include "actions.h"
+//#include "actions.h"
+#include "../glb_actions/glb_actions.h"
 #include "zbx_item_constants.h"
 
 static void	dc_get_history_sync_host(zbx_history_sync_host_t *dst_host, const ZBX_DC_HOST *src_host,
@@ -95,8 +96,8 @@ static void	dc_items_convert_hk_periods(const zbx_config_hk_t *config_hk, zbx_hi
 {
 	if (NULL != item->trends_period)
 	{
-		zbx_substitute_simple_macros(NULL, NULL, NULL, &item->host.hostid, NULL, NULL, NULL, NULL, NULL,
-				NULL, NULL, &item->trends_period, MACRO_TYPE_COMMON, NULL, 0);
+//		zbx_substitute_simple_macros(NULL, NULL, NULL, &item->host.hostid, NULL, NULL, NULL, NULL, NULL,
+//				NULL, NULL, &item->trends_period, MACRO_TYPE_COMMON, NULL, 0);
 
 		if (SUCCEED != zbx_is_time_suffix(item->trends_period, &item->trends_sec, ZBX_LENGTH_UNLIMITED))
 			item->trends_sec = ZBX_HK_PERIOD_MAX;
@@ -109,8 +110,8 @@ static void	dc_items_convert_hk_periods(const zbx_config_hk_t *config_hk, zbx_hi
 
 	if (NULL != item->history_period)
 	{
-		zbx_substitute_simple_macros(NULL, NULL, NULL, &item->host.hostid, NULL, NULL, NULL, NULL, NULL,
-				NULL, NULL, &item->history_period, MACRO_TYPE_COMMON, NULL, 0);
+	//	zbx_substitute_simple_macros(NULL, NULL, NULL, &item->host.hostid, NULL, NULL, NULL, NULL, NULL,
+	//			NULL, NULL, &item->history_period, MACRO_TYPE_COMMON, NULL, 0);
 
 		if (SUCCEED != zbx_is_time_suffix(item->history_period, &item->history_sec, ZBX_LENGTH_UNLIMITED))
 			item->history_sec = ZBX_HK_PERIOD_MAX;
