@@ -68,7 +68,6 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
     if (FAIL == glb_macro_translate_event_name(trigger, &problem_name, NULL, 0))
         return NULL;
 
-    HALT_HERE("Need to fully implement macro translation");
     if (NULL != strpool) 
         problem->name = strpool_add(strpool, problem_name);
     else 

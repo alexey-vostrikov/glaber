@@ -22,23 +22,23 @@ and so they shouldn't use DB as might be used on the data plane */
 #include "log.h"
 
 int glb_actions_process_discovery_host() {
-    HALT_HERE("Not implemented yet: %s", __func__ );
+  //  HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_lld_status() {
-    HALT_HERE("Not implemented yet: %s", __func__ );
+//    HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_autoregister() {
-    HALT_HERE("Not implemented yet: %s", __func__ );
+//    HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_problem_new() {
-    HALT_HERE("Not implemented yet: %s", __func__ );
+    //HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_problem_recovery() {
-    HALT_HERE("Not implemented yet: %s", __func__ );
+//    HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_by_acknowledgments() {
-    HALT_HERE("Not implemented yet: %s", __func__ );
+    //HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_discovery_service() {
-     HALT_HERE("Not implemented yet: %s", __func__ );
+//     HALT_HERE("Not implemented yet: %s", __func__ );
 }

@@ -52,7 +52,8 @@ static macroses_t item_macros =
                 }
     };
 static macroses_t trigger_macros = 
-   {"{TRIGGER.", 9,{ {"{TRIGGER.DESCRIPTION}", 21, MACRO_TRIGGER_DESCRIPTION, MACRO_OBJ_TRIGGER, 0},
+   {"{TRIGGER.", 9,{ {"{TRIGGER.COMMENT}", 17, MACRO_TRIGGER_DESCRIPTION, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.DESCRIPTION}", 21, MACRO_TRIGGER_DESCRIPTION, MACRO_OBJ_TRIGGER, 0},
                      {"{TRIGGER.ID}", 12, MACRO_TRIGGER_ID, MACRO_OBJ_TRIGGER, 0},
                      {"{TRIGGER.NAME}", 14, MACRO_TRIGGER_NAME, MACRO_OBJ_TRIGGER, 0},
                      {"{TRIGGER.NAME_ORIG}", 19, MACRO_TRIGGER_NAME_ORIG, MACRO_OBJ_TRIGGER, 0},
@@ -78,8 +79,6 @@ static macroses_t trigger_macros =
                      {"{TRIGGER.ERROR}", 15,   MACRO_TRIGGER_ERROR, MACRO_OBJ_TRIGGER, 0},
                      {NULL, 0,	0, 0}
                 }
-// #define MVAR_TRIGGER_COMMENT			"{TRIGGER.COMMENT}"		/* deprecated */
-// #define MVAR_STATUS				"{STATUS}"			/* deprecated */
 // #define MVAR_TRIGGER_NAME_ORIG			"{TRIGGER.NAME.ORIG}"
 
 };  
@@ -91,14 +90,16 @@ static macroses_t function_macros =
             }
     };
 
-static macroses_t time_macros =
-    { "{TIME}", 6 , {
+static macroses_t assorted_macros =
+    { "{", 1 , {
+                {"{HOSTNAME}", 10 , MACRO_HOST_NAME, MACRO_OBJ_HOST, 0},
                 {"{TIME}", 6 , MACRO_TIME_VALUE, MACRO_OBJ_SYSTEM, 0},
+                {"{STATUS}", 6 , MACRO_TRIGGER_ADMIN_STATE, MACRO_OBJ_TRIGGER, 0},
                 {NULL, 0,	0, 0}
             }
     };
 
-static macroses_t *macro_defs[] = {&host_macros, &item_macros, &trigger_macros, &function_macros, &time_macros, NULL};
+static macroses_t *macro_defs[] = {&host_macros, &item_macros, &trigger_macros, &function_macros, &assorted_macros,  NULL};
 
 static int set_data_by_suffix(macro_proc_data_t *macro_proc, macroses_t *obj_macro) {
     int idx = 0;
@@ -164,6 +165,7 @@ int builtin_expand_by_host(macro_proc_data_t *macro_proc, DC_HOST *host) {
             return SUCCEED;
         case MACRO_HOST_NAME:
             macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, host->host);
+            LOG_INF("Replaced macro with %s", macro_proc->replace_to);
             return SUCCEED;
         //TODO: fix if possible to avoid using DB
         case MACRO_HOST_METADATA:
@@ -239,7 +241,43 @@ int builtin_expand_by_interface(macro_proc_data_t *macro_proc, DC_INTERFACE *ifa
 
 int builtin_expand_by_calc_trigger(macro_proc_data_t *macro_proc, CALC_TRIGGER *tr) {
     switch (macro_proc->macro_type) {
+        case MACRO_TRIGGER_DESCRIPTION:
+            macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, tr->description);
+            
+// 					substitute_simple_macros_impl(NULL, c_event, NULL, NULL, NULL, NULL, NULL, NULL,
+// 							NULL, NULL, NULL, tz, NULL, &replace_to,
+// 							MACRO_TYPE_TRIGGER_COMMENTS, error, maxerrlen);
+            return;
     }
+
+            
+            /*
+                     {"{TRIGGER.ID}", 12, MACRO_TRIGGER_ID, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.NAME}", 14, MACRO_TRIGGER_NAME, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.NAME_ORIG}", 19, MACRO_TRIGGER_NAME_ORIG, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.EXPRESSION}", 20, MACRO_TRIGGER_EXPRESSION, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.EXPRESSION_RECOVERY}", 28, MACRO_TRIGGER_EXPRESSION_RECOVERY, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.SEVERITY}", 18,     MACRO_TRIGGER_SEVERITY, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.NSEVERITY}", 19,    MACRO_TRIGGER_NSEVERITY, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.STATUS}", 16,   MACRO_TRIGGER_VALUE, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.VALUE}", 15,    MACRO_TRIGGER_VALUE, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.STATE}", 15,        MACRO_TRIGGER_ADMIN_STATE, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.ADMIN.STATE}", 21,  MACRO_TRIGGER_ADMIN_STATE, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.TEMPLATE.NAME}", 23,    MACRO_TRIGGER_TEMPLATE_NAME, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.HOSTGROUP.NAME}", 24,   MACRO_TRIGGER_HOSTGROUP_NAME, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.EXPRESSION.EXPLAIN}", 28,   MACRO_TRIGGER_EXPRESSION_EXPLAIN, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.EXPRESSION.RECOVERY.EXPLAIN}", 37,   MACRO_TRIGGER_EXPRESSION_RECOVERY_EXPLAIN, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.URL}", 13,   MACRO_TRIGGER_URL, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.URL.NAME}", 18,   MACRO_TRIGGER_URL_NAME, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.EVENTS.ACK}", 20,   MACRO_TRIGGER_PROBLEMS_ACK, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.PROBLEMS.ACK}", 22,   MACRO_TRIGGER_PROBLEMS_ACK, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.EVENTS.UNACK}", 22,   MACRO_TRIGGER_PROBLEMS_UNACK, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.PROBLEMS.UNACK}", 24,   MACRO_TRIGGER_PROBLEMS_UNACK, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.STATE.ERROR}", 21,   MACRO_TRIGGER_ERROR, MACRO_OBJ_TRIGGER, 0},
+                     {"{TRIGGER.ERROR}", 15,   MACRO_TRIGGER_ERROR, MACRO_OBJ_TRIGGER, 0},
+    */
+
+    HALT_HERE("Not implemented");
 }
 
 int builtin_expand_by_hostid(macro_proc_data_t *macro_proc, u_int64_t hostid) {

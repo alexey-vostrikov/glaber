@@ -36,7 +36,8 @@ static int  expand_macros_impl(void *obj_data, char **replace_data,
 
 void macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
     u_int64_t hostid = (u_int64_t)obj_data;
-    
+    LOG_INF("In %s", __func__);
+
     if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type)
 	{
 	    if (0 != hostid)
@@ -49,7 +50,8 @@ void macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
 }
 
 void macro_proc_dchost(macro_proc_data_t *macro_proc, void *obj_data) {
-    DC_HOST *host =  obj_data;
+    LOG_INF("In %s", __func__);
+	DC_HOST *host =  obj_data;
 	LOG_INF("Looking for host data from dc_host object, macro is %s", macro_proc->macro);
 
     if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
@@ -71,6 +73,7 @@ void macro_expand_item(macro_proc_data_t *macro_proc, void *obj_data) {
 
 void macro_proc_hostid(macro_proc_data_t *macro_proc, void *obj_data) {
     u_int64_t hostid = (u_int64_t) obj_data;
+	LOG_INF("In %s", __func__);
 	LOG_INF("Looking for host data from hostid");
 
     if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
@@ -159,6 +162,7 @@ void macro_proc_trigger(macro_proc_data_t *macro_proc, void *obj_data)
 
 	if (ZBX_TOKEN_MACRO == macro_proc->token.type) {
 		glb_macro_builtin_expand_by_calc_trigger(macro_proc, tr);
+		return;
 	}
 
 	HALT_HERE("Not implemented: unexpended macro type %d",  macro_proc->token.type);
@@ -191,7 +195,7 @@ int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name, cha
 
 	expand_macros_impl(trigger, event_name, 0, macro_proc_trigger, error, errlen);
 	LOG_INF("Translated event name is %s", event_name);
-//    HALT_HERE("Not implemented: %s", __func__);
+
 }
 
 int glb_macro_translate_string(const char *expression, int token_type, char *result, int result_size) {
@@ -245,11 +249,16 @@ int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, int macr
 
 int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int macro_type, char *error, size_t errlen) {
     expand_macros_impl((void *)item, data, macro_type, macro_expand_item, error, errlen);
-    HALT_HERE("Not implemented: %s", __func__);
 }
 
 int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, int type, char *error, size_t errlen) {
-    HALT_HERE("Not implemented: %s", __func__);
+	zbx_dc_um_handle_t	*um_handle;
+   
+    um_handle = zbx_dc_open_user_macros_secure();
+
+	expand_macros_impl((void *)item, data, 0,  macro_expand_item, error, errlen);
+	
+	zbx_dc_close_user_macros(um_handle);
 }
 
 int glb_macro_expand_lld() {

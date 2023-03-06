@@ -1736,7 +1736,7 @@ static const char	*ex_macros[] =
 };
 
 /* macros that are supported in expression macro */
-//static const char	*expr_macros[] = {MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_ITEM_KEY, NULL};
+static const char	*expr_macros[] = {"{HOST.HOST}", "{HOST.NAME}", "{ITEM.KEY}", NULL};
 
 typedef struct
 {
@@ -7234,16 +7234,16 @@ int	zbx_substitute_key_macros_unmasked(char **data, zbx_uint64_t *hostid, DC_ITE
  *               macro                                                        *
  *                                                                            *
  ******************************************************************************/
-// int	zbx_expr_macro_index(const char *macro)
-// {
-// 	zbx_strloc_t	loc;
-// 	int		func_num;
+int	zbx_expr_macro_index(const char *macro)
+{
+	zbx_strloc_t	loc;
+	int		func_num;
 
-// 	loc.l = 0;
-// 	loc.r = strlen(macro) - 1;
+	loc.l = 0;
+	loc.r = strlen(macro) - 1;
 
-// 	if (NULL != macro_in_list(macro, loc, expr_macros, &func_num))
-// 		return func_num;
+	if (NULL != macro_in_list(macro, loc, expr_macros, &func_num))
+		return func_num;
 
-// 	return -1;
-// }
+	return -1;
+}
