@@ -28,7 +28,7 @@ class CHostProblemsStatus extends CDiv
         $icons = (new CDiv(''))->addClass(ZBX_STYLE_PROBLEM_ICON_LIST);
 
         if (count($problems) == 0) {
-            $icons->addItem($this->createLinkIcon($hostId, '0', ZBX_SEVERITY_OK));
+            $icons->addItem($this->createLinkIcon($hostId, '0', TRIGGER_SEVERITY_NOT_CLASSIFIED));
         }else{
             $counts = $this->calcCounts($problems);
             foreach ($counts as $severity => $cnt) {
