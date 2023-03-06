@@ -193,7 +193,7 @@ class CHostNav extends CList {
             (new CUrl('zabbix.php'))
                 ->setArgument('action', 'latest.view')
                 ->setArgument('filter_set', '1')
-                ->setArgument('filter_hostids', [$hostid])));
+                ->setArgument('hostids', [$hostid])));
     }
 
     /**
