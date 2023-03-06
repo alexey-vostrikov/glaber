@@ -32,6 +32,10 @@ class CHostNav extends CList {
     public function __construct(array $data = [])
     {
         $items = [];
+        if (!isset($data) || !is_array($data) || 0 == count($data) ) {
+            parent::__construct([]);
+            return;
+        }
 
         if ($data['is_template']) {
             $template = new CSpan(
@@ -44,10 +48,7 @@ class CHostNav extends CList {
             ]));
         } else {
             $items[] = new CListItem($this->getHostLink($data));
-            
-            if (isset($data['status'])) 
-                $items[] = new CListItem(new CHostStatus($data['status'], $data['maintenance_status']));
-            
+            $items[] = new CListItem(new CHostStatus($data['status'], $data['maintenance_status']));
             $items[] = new CListItem(getHostAvailabilityTable($data['interfaces']));
 
             if ($data['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $data['hostDiscovery']['ts_delete'] != 0) {
@@ -98,7 +99,7 @@ class CHostNav extends CList {
             'selectHttpTests' => API_OUTPUT_COUNT,
             'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error'],
             'hostids' => [$hostid],
-            'editable' => true
+        //    'editable' => true
         ];
 
         // get hosts

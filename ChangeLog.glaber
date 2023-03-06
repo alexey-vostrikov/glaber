@@ -1,3 +1,5 @@
+ver 3.0.27
+    - fix: removed requirement for edit permission to view host navigation panel
 ver 3.0.26
     - fix: latest data link in host nav
 ver 3.0.25
