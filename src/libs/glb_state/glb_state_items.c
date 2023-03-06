@@ -1534,6 +1534,24 @@ int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
+typedef struct {
+    size_t len;
+    char *str;
+} strlen_t;
+
+ELEMS_CALLBACK(get_error_cb) {
+     item_elem_t* item  = elem->data;    
+     strlen_t *str_len = data;
+     zbx_strlcpy(str_len->str, item->meta.error, str_len->len);
+     return SUCCEED;
+}
+
+int  glb_state_item_get_error(u_int64_t itemid, char *error, size_t maxlen) {
+    strlen_t str_len = {.str= error, .len = maxlen};
+    return elems_hash_process(state->items, itemid, get_error_cb, &str_len, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+
 int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
 	int i;
 	

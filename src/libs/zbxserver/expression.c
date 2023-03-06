@@ -1497,12 +1497,12 @@ static void	get_event_update_history(u_int64_t problemid, char **replace_to, con
 #define MVAR_ESC_HISTORY		"{ESC.HISTORY}"
 #define MVAR_PROXY_NAME			"{PROXY.NAME}"
 #define MVAR_PROXY_DESCRIPTION		"{PROXY.DESCRIPTION}"
-#define MVAR_HOST_DNS			"{HOST.DNS}"
-#define MVAR_HOST_CONN			"{HOST.CONN}"
-#define MVAR_HOST_HOST			"{HOST.HOST}"
-#define MVAR_HOST_ID			"{HOST.ID}"
-#define MVAR_HOST_IP			"{HOST.IP}"
-#define MVAR_IPADDRESS			"{IPADDRESS}"			/* deprecated */
+// #define MVAR_HOST_DNS			"{HOST.DNS}"
+// #define MVAR_HOST_CONN			"{HOST.CONN}"
+// #define MVAR_HOST_HOST			"{HOST.HOST}"
+// #define MVAR_HOST_ID			"{HOST.ID}"
+// #define MVAR_HOST_IP			"{HOST.IP}"
+//#define MVAR_IPADDRESS			"{IPADDRESS}"			/* deprecated */
 #define MVAR_HOST_METADATA		"{HOST.METADATA}"
 #define MVAR_HOST_NAME			"{HOST.NAME}"
 #define MVAR_HOSTNAME			"{HOSTNAME}"			/* deprecated */
@@ -1722,13 +1722,13 @@ static const char	*ex_macros[] =
 	MVAR_PROFILE_DEVICETYPE, MVAR_PROFILE_NAME, MVAR_PROFILE_OS, MVAR_PROFILE_SERIALNO,
 	MVAR_PROFILE_TAG, MVAR_PROFILE_MACADDRESS, MVAR_PROFILE_HARDWARE, MVAR_PROFILE_SOFTWARE,
 	MVAR_PROFILE_CONTACT, MVAR_PROFILE_LOCATION, MVAR_PROFILE_NOTES,
-	MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_HOST_NAME, MVAR_HOST_DESCRIPTION, MVAR_PROXY_NAME, MVAR_PROXY_DESCRIPTION,
-	MVAR_HOST_CONN, MVAR_HOST_DNS, MVAR_HOST_IP, MVAR_HOST_PORT, MVAR_IPADDRESS, MVAR_HOST_ID,
-	MVAR_ITEM_ID, MVAR_ITEM_NAME, MVAR_ITEM_NAME_ORIG, MVAR_ITEM_DESCRIPTION, MVAR_ITEM_DESCRIPTION_ORIG,
-	MVAR_ITEM_KEY, MVAR_ITEM_KEY_ORIG, MVAR_TRIGGER_KEY,
-	MVAR_ITEM_LASTVALUE,
-	MVAR_ITEM_STATE,
-	MVAR_ITEM_VALUE, MVAR_ITEM_VALUETYPE,
+	//MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_HOST_NAME, MVAR_HOST_DESCRIPTION, MVAR_PROXY_NAME, MVAR_PROXY_DESCRIPTION,
+	//MVAR_HOST_CONN, MVAR_HOST_DNS, MVAR_HOST_IP, MVAR_HOST_PORT, MVAR_IPADDRESS, MVAR_HOST_ID,
+	//MVAR_ITEM_ID, MVAR_ITEM_NAME, MVAR_ITEM_NAME_ORIG, MVAR_ITEM_DESCRIPTION, MVAR_ITEM_DESCRIPTION_ORIG,
+	//MVAR_ITEM_KEY, MVAR_ITEM_KEY_ORIG, MVAR_TRIGGER_KEY,
+	//MVAR_ITEM_LASTVALUE,
+	//MVAR_ITEM_STATE,
+	//MVAR_ITEM_VALUE, MVAR_ITEM_VALUETYPE,
 	MVAR_ITEM_LOG_DATE, MVAR_ITEM_LOG_TIME, MVAR_ITEM_LOG_AGE, MVAR_ITEM_LOG_SOURCE,
 	MVAR_ITEM_LOG_SEVERITY, MVAR_ITEM_LOG_NSEVERITY, MVAR_ITEM_LOG_EVENTID,
 	MVAR_FUNCTION_VALUE, MVAR_FUNCTION_RECOVERY_VALUE,
@@ -1736,7 +1736,7 @@ static const char	*ex_macros[] =
 };
 
 /* macros that are supported in expression macro */
-static const char	*expr_macros[] = {MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_ITEM_KEY, NULL};
+//static const char	*expr_macros[] = {MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_ITEM_KEY, NULL};
 
 typedef struct
 {
@@ -7234,16 +7234,16 @@ int	zbx_substitute_key_macros_unmasked(char **data, zbx_uint64_t *hostid, DC_ITE
  *               macro                                                        *
  *                                                                            *
  ******************************************************************************/
-int	zbx_expr_macro_index(const char *macro)
-{
-	zbx_strloc_t	loc;
-	int		func_num;
+// int	zbx_expr_macro_index(const char *macro)
+// {
+// 	zbx_strloc_t	loc;
+// 	int		func_num;
 
-	loc.l = 0;
-	loc.r = strlen(macro) - 1;
+// 	loc.l = 0;
+// 	loc.r = strlen(macro) - 1;
 
-	if (NULL != macro_in_list(macro, loc, expr_macros, &func_num))
-		return func_num;
+// 	if (NULL != macro_in_list(macro, loc, expr_macros, &func_num))
+// 		return func_num;
 
-	return -1;
-}
+// 	return -1;
+// }

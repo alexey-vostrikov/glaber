@@ -50,6 +50,7 @@ int     glb_state_item_update_nextcheck(u_int64_t itemid, int nextcheck);
 int     glb_state_item_get_state(u_int64_t itemid);
 int     glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
 int     glb_state_item_set_error(u_int64_t itemid, const char *error);
+int     glb_state_item_get_error(u_int64_t itemid, char *error, size_t maxlen);
 
 int     glb_state_items_load();
 int     glb_state_items_dump();

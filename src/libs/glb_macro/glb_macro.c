@@ -27,33 +27,14 @@ having data needed */
 #include "zbxcacheconfig.h"
 #include "zbxserver.h"
 #include "../zbxserver/macrofunc.h"
+#include "glb_macro_builtin.h"
 
-
-typedef struct {
-    int pos;
-    const char *macro;
-    int indexed_macro;
-    int Nfuncid;
-    char c;
-    int raw_value; 
-    zbx_token_t token;
-    zbx_token_t inner_token;
-    zbx_token_search_t token_search;
-    zbx_dc_um_handle_t	*um_handle;
-    int require_addr;
-    char * replace_to;
-    int ret;
-    size_t	data_alloc;
-    size_t  data_len;
-    int res;
-} macro_proc_data_t;
-
-typedef void *(*macro_proc_func_t)( macro_proc_data_t *macro_proc, void *obj_data);
+typedef void (*macro_proc_func_t)( macro_proc_data_t *macro_proc, void *obj_data);
 
 static int  expand_macros_impl(void *obj_data, char **replace_data, 
             int macro_proc_type, macro_proc_func_t macro_proc_func, char *error, int maxerrlen);
 
-void *macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
+void macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
     u_int64_t hostid = (u_int64_t)obj_data;
     
     if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type)
@@ -67,136 +48,127 @@ void *macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
     }
 }
 
-void *macro_proc_host(macro_proc_data_t *macro_proc, void *obj_data) {
-    
-    DC_HOST *dc_host = obj_data;
-    DC_INTERFACE interface;
-    LOG_INF("Looking for host data from dc_host object");
-//	LOG_INF("Token is %s", macro_proc->token.loc.l);
-  //  LOG_INF("Macro is %s", macro_proc->macro);
-    if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type)
-	{
-    	zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, &dc_host->hostid, 1, &macro_proc->replace_to);
-		macro_proc->pos = macro_proc->token.loc.r;
-	}
-	else if (0 == strcmp(macro_proc->macro, MVAR_HOST_HOST) || 0 == strcmp(macro_proc->macro, MVAR_HOSTNAME)) {
-        LOG_INF("Running strdup");
-    	macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, dc_host->host);
-        LOG_INF("Duplicated");
-    }
-	else if (0 == strcmp(macro_proc->macro, MVAR_HOST_NAME))
-		macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, dc_host->name);
-	else if (0 == strcmp(macro_proc->macro, MVAR_HOST_IP) || 0 == strcmp(macro_proc->macro, MVAR_IPADDRESS))
-	{
-		if (SUCCEED == (macro_proc->ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
-			macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, interface.ip_orig);
-	}
-	else if	(0 == strcmp(macro_proc->macro, MVAR_HOST_DNS))
-	{
-		if (SUCCEED == (macro_proc->ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
-			macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, interface.dns_orig);
-	}
-	else if (0 == strcmp(macro_proc->macro, MVAR_HOST_CONN))
-	{
-		if (SUCCEED == (macro_proc->ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
-			macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, interface.addr);
-	}
+void macro_proc_dchost(macro_proc_data_t *macro_proc, void *obj_data) {
+    DC_HOST *host =  obj_data;
+	LOG_INF("Looking for host data from dc_host object, macro is %s", macro_proc->macro);
+
+    if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
+		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, &host->hostid, 1, &macro_proc->replace_to);
+	else 
+		glb_macro_builtin_expand_by_host(macro_proc, host);
+	LOG_INF("Replaced to %s", macro_proc->replace_to);
 }
 
-/* parse event name, trigger message and comments */
-void *macro_proc_event_name(macro_proc_data_t *macro_proc, void *obj_data)
+void macro_expand_item(macro_proc_data_t *macro_proc, void *obj_data) {
+    DC_ITEM *item =  obj_data;
+
+    if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
+		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, 
+			&item->host.hostid, 1, &macro_proc->replace_to);
+	else 
+		glb_macro_builtin_expand_by_item(macro_proc, item);
+}
+
+void macro_proc_hostid(macro_proc_data_t *macro_proc, void *obj_data) {
+    u_int64_t hostid = (u_int64_t) obj_data;
+	LOG_INF("Looking for host data from hostid");
+
+    if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
+		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, &hostid, 1, &macro_proc->replace_to);
+	else 
+		glb_macro_builtin_expand_by_hostid(macro_proc, hostid);
+}
+
+static int	get_expression_macro_result(CALC_TRIGGER *tr, char *data, zbx_strloc_t *loc,
+ 		zbx_timespec_t *ts, char **replace_to, char **error)
+ {
+ 	int				ret = FAIL;
+ 	zbx_eval_context_t		ctx;
+ 	zbx_variant_t			value;
+ 	zbx_expression_eval_t		eval;
+ 	char				*expression = NULL;
+ 	size_t				exp_alloc = 0, exp_offset = 0;
+ 	zbx_dc_um_handle_t		*um_handle;
+
+ 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+ 	zbx_strncpy_alloc(&expression, &exp_alloc, &exp_offset, data + loc->l, loc->r - loc->l + 1);
+ 	zabbix_log(LOG_LEVEL_DEBUG, "%s() expression: '%s'", __func__, expression);
+
+ 	um_handle = zbx_dc_open_user_macros();
+
+ 	if (SUCCEED != zbx_eval_parse_expression(&ctx, expression, ZBX_EVAL_PARSE_EXPRESSION_MACRO, error))
+ 		goto out;
+
+ 	if (SUCCEED != zbx_eval_expand_user_macros(&ctx, tr->hostids.values, tr->hostids.values_num,
+ 			(zbx_macro_expand_func_t)zbx_dc_expand_user_macros, um_handle, NULL))
+ 	{
+ 		goto out;
+ 	}
+
+ 	zbx_expression_eval_init(&eval, ZBX_EXPRESSION_NORMAL, &ctx);
+ 	zbx_expression_eval_resolve_trigger_hosts_items(&eval, tr);
+
+ 	if (SUCCEED == (ret = zbx_expression_eval_execute(&eval, ts, &value, error)))
+ 	{
+ 		*replace_to = zbx_strdup(NULL, zbx_variant_value_desc(&value));
+ 		zbx_variant_clear(&value);
+ 	}
+
+ 	zbx_expression_eval_clear(&eval);
+out:
+ 	zbx_eval_clear(&ctx);
+ 	zbx_free(expression);
+
+ 	zbx_dc_close_user_macros(um_handle);
+
+ 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+ 	return ret;
+}
+
+/* parse event name, trigger message or comments */
+void macro_proc_trigger(macro_proc_data_t *macro_proc, void *obj_data)
 {
 	CALC_TRIGGER *tr = obj_data;
 
-	if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type)
+	if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) //{$MACRO_DEFINED_BY_A_USER}
 	{
 		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, tr->hostids.values,
 							  tr->hostids.values_num, &macro_proc->replace_to);
 
 		macro_proc->pos = macro_proc->token.loc.r;
+		return;
 	}
-	else if (ZBX_TOKEN_REFERENCE == macro_proc->token.type)
-	{
 
-		if (SUCCEED != zbx_db_trigger_get_constant(&event->trigger,
-												   token.data.reference.index, &replace_to))
-		{
-			/* expansion failed, reference substitution is impossible */
-			token_search &= ~ZBX_TOKEN_SEARCH_REFERENCES;
-			continue;
-		}
-	}
-	else if (ZBX_TOKEN_EXPRESSION_MACRO == macro_proc->inner_token.type)
+	if (ZBX_TOKEN_EXPRESSION_MACRO == macro_proc->token.type) //{?max(/{HOST.HOST}/{ITEM.KEY},#2)/100}
 	{
-		if (0 != (macro_proc->macro_type & MACRO_TYPE_EVENT_NAME))
-		{
+		HALT_HERE("Write and finish expression parsing and it's tests");
+		// char *expanded_expression = zbx_strdup(NULL, macro_proc->macro);
+		// //expanding expression based first
+		// if (SUCCEED == expand_macros_impl(tr, expanded_expression, 0, macro_proc_trigger, error, len)) {
+		// 	macro_proc->replace_to = glb_expression_calc(expanded_expression);
+		// 	zbx_free(expanded_expression);
+		// 	return;
+		// }
 
-			zbx_timespec_t ts;
-			char *errmsg = NULL;
+		// macro_proc->ret = glb_expression_calc_by_trigger(tr, macro_proc->macro, &macro_proc->replace_to);
+		// macro_proc->pos = macro_proc->token.loc.r;
+		return;
+	}
 
-			ts.sec = event->clock;
-			ts.ns = event->ns;
+	if (ZBX_TOKEN_MACRO == macro_proc->token.type) {
+		glb_macro_builtin_expand_by_calc_trigger(macro_proc, tr);
+	}
 
-			if (SUCCEED != (ret = get_expression_macro_result(event, *data,
-															  &inner_token.data.expression_macro.expression, &ts,
-															  &replace_to, &errmsg)))
-			{
-				*errmsg = tolower(*errmsg);
-				zabbix_log(LOG_LEVEL_DEBUG, "%s() cannot evaluate"
-											" expression macro: %s",
-						   __func__, errmsg);
-				zbx_strlcpy(error, errmsg, maxerrlen);
-				zbx_free(errmsg);
-			}
-		}
-	}
-	else if (0 == strcmp(macro_proc->macro, MVAR_HOST_HOST) || 0 == strcmp(macro_proc->macro, MVAR_HOSTNAME))
-	{
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_HOST);
-	}
-	else if (0 == strcmp(macro_proc->macro, MVAR_HOST_NAME))
-	{
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_NAME);
-	}
-	else if (0 == strcmp(m, MVAR_HOST_IP) || 0 == strcmp(m, MVAR_IPADDRESS))
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_IP);
-	else if (0 == strcmp(m, MVAR_HOST_DNS))
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_DNS);
-	else if (0 == strcmp(m, MVAR_HOST_CONN))
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_CONN);
-	else if (0 == strcmp(m, MVAR_HOST_PORT))
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_PORT);
-	else if (0 == strcmp(m, MVAR_HOST_DESCRIPTION))
-		ret = DBget_trigger_value(&event->trigger, &replace_to, N_functionid, ZBX_REQUEST_HOST_DESCRIPTION);
-	else if (0 == strcmp(m, MVAR_ITEM_VALUE))
-		ret = DBitem_value(&event->trigger, &replace_to, N_functionid, event->clock, event->ns, raw_value);
-	else if (0 == strncmp(m, MVAR_ITEM_LOG, ZBX_CONST_STRLEN(MVAR_ITEM_LOG)))
-		ret = get_history_log_value(m, &event->trigger, &replace_to, N_functionid, event->clock, event->ns, tz);
-	else if (0 == strcmp(m, MVAR_ITEM_LASTVALUE))
-		ret = DBitem_lastvalue(&event->trigger, &replace_to, N_functionid, raw_value);
-	else if (0 != (macro_type & MACRO_TYPE_EVENT_NAME))
-	{
-		if (0 == strcmp(m, MVAR_TIME))
-		{
-			replace_to = zbx_strdup(replace_to, zbx_time2str(time(NULL), tz));
-		}
-		else if (0 == strcmp(m, MVAR_TRIGGER_EXPRESSION_EXPLAIN))
-		{
-			zbx_db_trigger_explain_expression(&event->trigger, &replace_to, evaluate_function, 0);
-		}
-		else if (1 == indexed_macro && 0 == strcmp(m, MVAR_FUNCTION_VALUE))
-		{
-			zbx_db_trigger_get_function_value(&event->trigger, N_functionid,
-											  &replace_to, evaluate_function, 0);
-		}
-	}
+	HALT_HERE("Not implemented: unexpended macro type %d",  macro_proc->token.type);
 }
 
 zbx_token_search_t set_token_search_flags(int macro_type) {
 	int flag = 0;
 
-	if (0 != (macro_type & (MACRO_TYPE_TRIGGER_DESCRIPTION | MACRO_TYPE_EVENT_NAME)))
-		flag |= ZBX_TOKEN_SEARCH_REFERENCES;
+//	if (0 != (macro_type & (MACRO_TYPE_TRIGGER_DESCRIPTION | MACRO_TYPE_EVENT_NAME)))
+//		flag |= ZBX_TOKEN_SEARCH_REFERENCES;
 
 	if (0 != (macro_type & (MACRO_TYPE_MESSAGE_NORMAL | MACRO_TYPE_MESSAGE_RECOVERY | MACRO_TYPE_MESSAGE_UPDATE |
 			MACRO_TYPE_EVENT_NAME)))
@@ -217,8 +189,9 @@ int glb_macro_expand_trigger_expressions(CALC_TRIGGER *trigger) {
 
 int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name, char *error, size_t errlen) {
 
-
-    HALT_HERE("Not implemented: %s", __func__);
+	expand_macros_impl(trigger, event_name, 0, macro_proc_trigger, error, errlen);
+	LOG_INF("Translated event name is %s", event_name);
+//    HALT_HERE("Not implemented: %s", __func__);
 }
 
 int glb_macro_translate_string(const char *expression, int token_type, char *result, int result_size) {
@@ -256,7 +229,7 @@ int glb_macro_expand_common_by_hostid_unmasked(char **data, u_int64_t hostid, ch
 int glb_macro_expand_by_host(char **data, const DC_HOST *host, int field_type, char *error, size_t errlen) {
     LOG_INF("In host");
     LOG_INF("unExpanded macro: %s", *data);
-    expand_macros_impl((void *)host, data, MACRO_TYPE_HTTPTEST_FIELD, macro_proc_host, error, errlen);
+    expand_macros_impl((void *)host, data, MACRO_TYPE_HTTPTEST_FIELD, macro_proc_dchost , error, errlen);
     LOG_INF("Expanded macro: %s", *data);
 
 }
@@ -264,14 +237,14 @@ int glb_macro_expand_by_host(char **data, const DC_HOST *host, int field_type, c
 int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, int macro_type, char *error, size_t errlen) {
     zbx_dc_um_handle_t	*um_handle;
     um_handle = zbx_dc_open_user_macros_secure();
-     LOG_INF("In host");
-    LOG_INF("unExpanded macro: %s", *data);
-    expand_macros_impl((void *)host, data, macro_type, macro_proc_host, error, errlen);
-    LOG_INF("Expanded macro: %s", *data);
+
+    expand_macros_impl((void *)host, data, macro_type, macro_proc_dchost, error, errlen);
+
     zbx_dc_close_user_macros(um_handle);
 }
 
-int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int type, char *error, size_t errlen) {
+int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int macro_type, char *error, size_t errlen) {
+    expand_macros_impl((void *)item, data, macro_type, macro_expand_item, error, errlen);
     HALT_HERE("Not implemented: %s", __func__);
 }
 
@@ -364,7 +337,7 @@ static int	is_indexed_macro(const char *str, const zbx_token_t *token)
 }
 
 /* macros that are supported in expression macro */
-static const char	*expr_macros[] = {MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_ITEM_KEY, NULL};
+//static const char	*expr_macros[] = {MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_ITEM_KEY, NULL};
 
 typedef struct
 {
@@ -376,9 +349,9 @@ zbx_macro_functions_t;
 /* macros that can be modified using macro functions */
 static zbx_macro_functions_t	mod_macros[] =
 {
-	{MVAR_ITEM_VALUE, "regsub,iregsub,fmtnum"},
-	{MVAR_ITEM_LASTVALUE, "regsub,iregsub,fmtnum"},
-	{MVAR_TIME, "fmttime"},
+	{"{ITEM.LASTVALUE}", "regsub,iregsub,fmtnum"},
+	{"{ITEM.VALUE}", "regsub,iregsub,fmtnum"},
+	{"{TIME}", "fmttime"},
 	{"{?}", "fmtnum"},
 	{NULL, NULL}
 };
@@ -483,13 +456,15 @@ static int check_token_is_processable_type(macro_proc_data_t *macro_proc, char *
 			macro_proc->c = (data)[macro_proc->token.loc.r + 1];
 			(data)[macro_proc->token.loc.r + 1] = '\0';
 			return SUCCEED;
-			case ZBX_TOKEN_REFERENCE:
+		
+		case ZBX_TOKEN_REFERENCE:
 		case ZBX_TOKEN_EXPRESSION_MACRO:
 			/* These macros (and probably all other in the future) must be resolved using only */
 			/* information stored in token.data union. For now, force crash if they rely on m. */
 			macro_proc->macro = NULL;
 			return FAIL;
-			default:
+		
+		default:
 			THIS_SHOULD_NEVER_HAPPEN;
 			return FAIL;
 	}
@@ -571,6 +546,16 @@ static void macro_replace_calc_result(macro_proc_data_t *macro_proc, char **data
 	//LOG_INF("Wvfwef3");
 	macro_proc->pos++;
 }
+//overall general processing logic: whenever parsing is required there should be 
+//a way to pass a context of macro calculation. The context (defined by a function name) also
+//determines what kind of object(s) should be passed to the macro processing
+//to make the data parsable. 
+
+//only user macroses {$MACRO} and predefined context macroses {HOST.NAME} (also functions) also indexes {HOST.NAME1} are suppoted here
+//so depending on the object type macro translation proc should be able to fetch the required object data
+
+//to help functions to get the data required predefined macroses are preprocessed so that macro id and required object id is calculated
+//and this data is passed to the macro's processing functions.
 
 static int  expand_macros_impl(void *obj_data, char **replace_data, 
             int macro_proc_type, macro_proc_func_t macro_proc_func, char *error, int maxerrlen)
@@ -596,10 +581,15 @@ static int  expand_macros_impl(void *obj_data, char **replace_data,
 	for (found = SUCCEED; SUCCEED == res && SUCCEED == found;
 			found = zbx_token_find(*replace_data, pos, &macro_proc.token, macro_proc.token_search))
 	{
-        init_iter_macro_proc(&macro_proc);
-
+		init_iter_macro_proc(&macro_proc);
+		//after token processing we've got the token type, pointers to macro boundaries
+		//so depending on recognised token type either skip it or process
+		
 	    if (FAIL == check_token_is_processable_type(&macro_proc, *replace_data))
             continue;
+	
+		recognize_macro_type_and_object_type(&macro_proc);
+
         LOG_INF("Calling callback func, macro is %s", macro_proc.macro);
         macro_proc_func(&macro_proc, obj_data);
         LOG_INF("Escaping");
@@ -610,7 +600,7 @@ static int  expand_macros_impl(void *obj_data, char **replace_data,
         LOG_INF("Replacing result to %s", *replace_data);
 		macro_replace_calc_result(&macro_proc, replace_data);
     }
-
+	LOG_INF("After processing: %s", *replace_data);
     //zbx_free(user_username);
 	//zbx_free(user_name);
 	//zbx_free(user_surname);

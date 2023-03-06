@@ -1731,8 +1731,10 @@ static const char	*ex_macros[] =
 	MVAR_PROFILE_DEVICETYPE, MVAR_PROFILE_NAME, MVAR_PROFILE_OS, MVAR_PROFILE_SERIALNO,
 	MVAR_PROFILE_TAG, MVAR_PROFILE_MACADDRESS, MVAR_PROFILE_HARDWARE, MVAR_PROFILE_SOFTWARE,
 	MVAR_PROFILE_CONTACT, MVAR_PROFILE_LOCATION, MVAR_PROFILE_NOTES,
-	MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_HOST_NAME, MVAR_HOST_DESCRIPTION, MVAR_PROXY_NAME, MVAR_PROXY_DESCRIPTION,
-	MVAR_HOST_CONN, MVAR_HOST_DNS, MVAR_HOST_IP, MVAR_HOST_PORT, MVAR_IPADDRESS, MVAR_HOST_ID,
+	//MVAR_HOST_HOST, MVAR_HOSTNAME, MVAR_HOST_NAME, MVAR_HOST_DESCRIPTION, 
+	MVAR_PROXY_NAME, MVAR_PROXY_DESCRIPTION,
+	//MVAR_HOST_CONN, MVAR_HOST_DNS, MVAR_HOST_IP, MVAR_HOST_PORT, MVAR_IPADDRESS,
+	 //MVAR_HOST_ID,
 	MVAR_ITEM_ID, MVAR_ITEM_NAME, MVAR_ITEM_NAME_ORIG, MVAR_ITEM_DESCRIPTION, MVAR_ITEM_DESCRIPTION_ORIG,
 	MVAR_ITEM_KEY, MVAR_ITEM_KEY_ORIG, MVAR_TRIGGER_KEY,
 	MVAR_ITEM_LASTVALUE,
@@ -4925,28 +4927,28 @@ static int	substitute_simple_macros_impl(const zbx_uint64_t *actionid, const CAL
 				zbx_dc_get_user_macro(um_handle, m, &dc_host->hostid, 1, &replace_to);
 				pos = token.loc.r;
 			}
-			else if (0 == strcmp(m, MVAR_HOST_HOST) || 0 == strcmp(m, MVAR_HOSTNAME))
-			{
-				replace_to = zbx_strdup(replace_to, dc_host->host);
-			}
-			else if (0 == strcmp(m, MVAR_HOST_NAME))
-			{
-				replace_to = zbx_strdup(replace_to, dc_host->name);
-			}
-			else if (0 == strcmp(m, MVAR_HOST_IP) || 0 == strcmp(m, MVAR_IPADDRESS))
-			{
-				if (SUCCEED == (ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
-					replace_to = zbx_strdup(replace_to, interface.ip_orig);
-			}
-			else if	(0 == strcmp(m, MVAR_HOST_DNS))
-			{
-				if (SUCCEED == (ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
-					replace_to = zbx_strdup(replace_to, interface.dns_orig);
-			}
-			else if (0 == strcmp(m, MVAR_HOST_CONN))
-			{
-				if (SUCCEED == (ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
-					replace_to = zbx_strdup(replace_to, interface.addr);
+			// else if (0 == strcmp(m, MVAR_HOST_HOST) || 0 == strcmp(m, MVAR_HOSTNAME))
+			// {
+			// 	replace_to = zbx_strdup(replace_to, dc_host->host);
+			// }
+			// else if (0 == strcmp(m, MVAR_HOST_NAME))
+			// {
+			// 	replace_to = zbx_strdup(replace_to, dc_host->name);
+			// }
+			// else if (0 == strcmp(m, MVAR_HOST_IP) || 0 == strcmp(m, MVAR_IPADDRESS))
+			// {
+			// 	if (SUCCEED == (ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
+			// 		replace_to = zbx_strdup(replace_to, interface.ip_orig);
+			// }
+			// else if	(0 == strcmp(m, MVAR_HOST_DNS))
+			// {
+			// 	if (SUCCEED == (ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
+			// 		replace_to = zbx_strdup(replace_to, interface.dns_orig);
+			// }
+			// else if (0 == strcmp(m, MVAR_HOST_CONN))
+			// {
+			// 	if (SUCCEED == (ret = DCconfig_get_interface(&interface, dc_host->hostid, 0)))
+			// 		replace_to = zbx_strdup(replace_to, interface.addr);
 			}
 			else if (0 == strcmp(m, MVAR_ITEM_ID))
 			{
