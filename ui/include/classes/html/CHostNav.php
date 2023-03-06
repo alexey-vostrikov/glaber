@@ -44,7 +44,10 @@ class CHostNav extends CList {
             ]));
         } else {
             $items[] = new CListItem($this->getHostLink($data));
-            $items[] = new CListItem(new CHostStatus($data['status'], $data['maintenance_status']));
+            
+            if (isset($data['status'])) 
+                $items[] = new CListItem(new CHostStatus($data['status'], $data['maintenance_status']));
+            
             $items[] = new CListItem(getHostAvailabilityTable($data['interfaces']));
 
             if ($data['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $data['hostDiscovery']['ts_delete'] != 0) {
