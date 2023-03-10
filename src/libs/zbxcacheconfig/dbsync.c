@@ -24,6 +24,7 @@
 #include "base64.h"
 #include "zbxeval.h"
 #include "zbxnum.h"
+#include "../glb_conf/valuemaps/conf_valuemaps.h"
 
 /* global correlation constants */
 #define ZBX_CORRELATION_ENABLED				0
@@ -1723,7 +1724,7 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 				"i.master_itemid,i.timeout,i.url,i.query_fields,i.posts,i.status_codes,"
 				"i.follow_redirects,i.post_type,i.http_proxy,i.headers,i.retrieve_mode,"
 				"i.request_method,i.output_format,i.ssl_cert_file,i.ssl_key_file,i.ssl_key_password,"
-				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,null"
+				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,null,i.description"
 			" from items i"
 			" inner join hosts h on i.hostid=h.hostid"
 			" join item_rtdata ir on i.itemid=ir.itemid"
@@ -3012,6 +3013,116 @@ int	zbx_dbsync_compare_corr_operations(zbx_dbsync_t *sync)
 
 	return SUCCEED;
 }
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: compares valuemap tables with cached configuration   		      *
+ *          data                                                              *
+ *                                                                            *
+ * Parameter: sync - [OUT] the changeset                                      *
+ *                                                                            *
+ * Return value: SUCCEED - the changeset was successfully calculated          *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ ******************************************************************************/
+/*
+CREATE TABLE valuemap (
+	valuemapid               bigint                                    NOT NULL,
+	hostid                   bigint                                    NOT NULL,
+	name                     varchar(64)     DEFAULT ''                NOT NULL,
+	uuid                     varchar(32)     DEFAULT ''                NOT NULL,
+	PRIMARY KEY (valuemapid)
+);
+CREATE TABLE valuemap_mapping (
+	valuemap_mappingid       bigint                                    NOT NULL,
+	valuemapid               bigint                                    NOT NULL,
+	value                    varchar(64)     DEFAULT ''                NOT NULL,
+	newvalue                 varchar(64)     DEFAULT ''                NOT NULL,
+	type                     integer         DEFAULT '0'               NOT NULL,
+	sortorder                integer         DEFAULT '0'               NOT NULL,
+	PRIMARY KEY (valuemap_mappingid)
+);
+
+/*jsonrpc": "2.0",     "result": [  
+        
+		{           "valuemapid": "4",
+                    "name": "APC Battery Replacement Status",
+                    "mappings": [ 
+                        {  "type": "0",
+                            "value": "1",
+                            "newvalue": "unknown"
+                        }, 
+                        {   "type": "0",
+                            "value": "2",                     
+							"newvalue": "notInstalled"      
+                        .... */
+
+int	zbx_dbsync_compare_valuemaps(zbx_dbsync_t *sync)
+{
+	DB_ROW			dbrow;
+	DB_RESULT		result;
+	zbx_uint64_t		vmid, prev_id = 0;
+	struct zbx_json j;
+	
+	zbx_json_init(&j, MAX_BUFFER_LEN);
+
+	LOG_INF("Adding valuemaps data");
+
+	if (NULL == (result = DBselect(
+			"select v.valuemapid, m.value, m.newvalue, m.type"
+			" from valuemap v, valuemap_mapping m "
+			" where v.valuemapid = m.valuemapid"
+			" order by v.valuemapid" ))) {
+		HALT_HERE("Valuemap query failed");
+		return FAIL;
+	}
+	
+	dbsync_prepare(sync, 4, NULL);
+
+	zbx_json_addarray(&j, "result");
+
+	while (NULL != (dbrow = DBfetch(result)))
+	{	
+		unsigned char	tag = ZBX_DBSYNC_ROW_NONE;
+		char *valuemapid = dbrow[0];
+		char *value = dbrow[1];
+		char *newvalue = dbrow[2];
+		char *type = dbrow[3];
+
+		ZBX_STR2UINT64(vmid, dbrow[0]);
+		
+		if (vmid != prev_id) {
+
+			if (prev_id != 0) { //need to close the previos valuemap
+				zbx_json_close(&j); //close mappings array
+				zbx_json_close(&j); //close mapping object
+			}
+			
+			zbx_json_addobject(&j, NULL);  //opening the new valuemap object
+			zbx_json_addstring(&j, "valuemapid", valuemapid, ZBX_JSON_TYPE_STRING );
+			zbx_json_addarray(&j, "mappings");
+		}
+		prev_id = vmid;
+
+		zbx_json_addobject(&j, NULL);
+		zbx_json_addstring(&j, "type", type, ZBX_JSON_TYPE_STRING);
+		zbx_json_addstring(&j, "value", value, ZBX_JSON_TYPE_STRING);
+		zbx_json_addstring(&j, "newvalue", newvalue, ZBX_JSON_TYPE_STRING);
+		zbx_json_close(&j);
+	}
+
+	if (0 != prev_id) //there was at least one object opened
+		zbx_json_close(&j);
+
+	zbx_json_close(&j);
+
+	glb_conf_valuemaps_set_data(j.buffer);
+
+	zbx_json_free(&j);
+	return SUCCEED;
+}
+
+
 
 /******************************************************************************
  *                                                                            *

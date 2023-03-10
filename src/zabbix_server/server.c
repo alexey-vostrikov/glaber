@@ -92,6 +92,7 @@
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
 #include "../libs/glb_state/glb_state_items.h"
+#include "../libs/glb_conf/conf.h"
 #include "../libs/apm/apm.h"
 
 #ifdef HAVE_GLB_TESTS
@@ -1609,6 +1610,12 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 
 	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 	DC_set_debug_trigger(CONFIG_DEBUG_TRIGGER);
+
+	if (FAIL == glb_config_init())
+	{
+		zbx_error("Cannot initialize Glaber state CACHE");
+		exit(EXIT_FAILURE);
+	}
 
 	if (FAIL == glb_state_init())
 	{

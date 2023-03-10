@@ -34,7 +34,7 @@ typedef void (*macro_proc_func_t)( macro_proc_data_t *macro_proc, void *obj_data
 static int  expand_macros_impl(void *obj_data, char **replace_data, 
             int macro_proc_type, macro_proc_func_t macro_proc_func, char *error, int maxerrlen);
 
-void macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
+static void macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
     u_int64_t hostid = (u_int64_t)obj_data;
     LOG_INF("In %s", __func__);
 
@@ -49,7 +49,7 @@ void macro_proc_common( macro_proc_data_t *macro_proc, void *obj_data) {
     }
 }
 
-void macro_proc_dchost(macro_proc_data_t *macro_proc, void *obj_data) {
+static void macro_proc_dchost(macro_proc_data_t *macro_proc, void *obj_data) {
     LOG_INF("In %s", __func__);
 	DC_HOST *host =  obj_data;
 	LOG_INF("Looking for host data from dc_host object, macro is %s", macro_proc->macro);
@@ -61,19 +61,22 @@ void macro_proc_dchost(macro_proc_data_t *macro_proc, void *obj_data) {
 	LOG_INF("Replaced to %s", macro_proc->replace_to);
 }
 
-void macro_expand_item(macro_proc_data_t *macro_proc, void *obj_data) {
+static void macro_proc_item(macro_proc_data_t *macro_proc, void *obj_data) {
     DC_ITEM *item =  obj_data;
-
-    if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
+	
+	LOG_INF("In %s", __func__);
+    
+	if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
 		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, 
 			&item->host.hostid, 1, &macro_proc->replace_to);
 	else 
 		glb_macro_builtin_expand_by_item(macro_proc, item);
 }
 
-void macro_proc_hostid(macro_proc_data_t *macro_proc, void *obj_data) {
+static void macro_proc_hostid(macro_proc_data_t *macro_proc, void *obj_data) {
     u_int64_t hostid = (u_int64_t) obj_data;
 	LOG_INF("In %s", __func__);
+
 	LOG_INF("Looking for host data from hostid");
 
     if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
@@ -131,9 +134,12 @@ out:
 }
 
 /* parse event name, trigger message or comments */
-void macro_proc_trigger(macro_proc_data_t *macro_proc, void *obj_data)
+static void macro_proc_trigger(macro_proc_data_t *macro_proc, void *obj_data)
 {
 	CALC_TRIGGER *tr = obj_data;
+	LOG_INF("In %s", __func__);
+	LOG_INF("Trigger has %d hosts and %d items in the context", tr->hostids.values_num, tr->itemids.values_num);
+	LOG_INF("Trigger has expression: %s", tr->expression);
 
 	if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) //{$MACRO_DEFINED_BY_A_USER}
 	{
@@ -248,7 +254,7 @@ int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, int macr
 }
 
 int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int macro_type, char *error, size_t errlen) {
-    expand_macros_impl((void *)item, data, macro_type, macro_expand_item, error, errlen);
+    expand_macros_impl((void *)item, data, macro_type, macro_proc_item, error, errlen);
 }
 
 int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, int type, char *error, size_t errlen) {
@@ -256,7 +262,7 @@ int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, int type
    
     um_handle = zbx_dc_open_user_macros_secure();
 
-	expand_macros_impl((void *)item, data, 0,  macro_expand_item, error, errlen);
+	expand_macros_impl((void *)item, data, 0,  macro_proc_item, error, errlen);
 	
 	zbx_dc_close_user_macros(um_handle);
 }
@@ -437,10 +443,10 @@ static int check_token_is_processable_type(macro_proc_data_t *macro_proc, char *
 			}
 			else
 			{
-				LOG_INF("setting macro addr and sybol");
+			//	LOG_INF("setting macro addr and sybol");
 				macro_proc->macro = data + macro_proc->token.loc.l;
-				LOG_INF("setting macro addr and symbol: %s", data);
-				LOG_INF("setting macro addr and symbol: %s", macro_proc->macro);
+			//	LOG_INF("setting macro addr and symbol: %s", data);
+			//	LOG_INF("setting macro addr and symbol: %s", macro_proc->macro);
 				macro_proc->c = (data)[ (macro_proc->token.loc.r) + 1];
 				(data)[macro_proc->token.loc.r + 1] = '\0';
 			}
@@ -618,25 +624,4 @@ static int  expand_macros_impl(void *obj_data, char **replace_data,
 	zbx_dc_close_user_macros(macro_proc.um_handle);
     return macro_proc.res;
 }
-
-// static int macro_expand_common_by_hostid(char **replace_to, const char * macro, u_int64_t hostid, const zbx_dc_um_handle_t *um_handle) {
-	
-//     if (0 != hostid)
-// 		zbx_dc_get_user_macro(um_handle, macro, hostid, 1, &replace_to);
-// 	else
-// 		zbx_dc_get_user_macro(um_handle, macro, NULL, 0, &replace_to);
-
-// }
-
-
-
-
-// int process_macro(char *macro) {
-// 	return SUCCEED;
-// }
-
-// static add_non_macro_data(char *res, char *data, size_t start, size_t bytes) {
-// 	if ( bytes > 0 ) 
-// 		zbx_strlcpy(res, data+start, bytes + 1);
-// }
 

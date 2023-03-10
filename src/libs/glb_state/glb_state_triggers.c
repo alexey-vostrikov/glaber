@@ -282,15 +282,15 @@ DUMPER_FROM_JSON(unmarshall_trigger_cb) {
 
     int errflag = 0;
     
-    trigger->value = glb_json_get_int_value_by_name(jp, "value", &errflag);
+    trigger->value = glb_json_get_uint64_value_by_name(jp, "value", &errflag);
     if (1 == errflag) 
         trigger->value = TRIGGER_VALUE_UNKNOWN;
         
-    trigger->lastcalc = glb_json_get_int_value_by_name(jp, "lastcalc", &errflag);
+    trigger->lastcalc = glb_json_get_uint64_value_by_name(jp, "lastcalc", &errflag);
     if (1 == errflag) 
         trigger->lastcalc = 0;
 
-    trigger->lastchange = glb_json_get_int_value_by_name(jp, "lastchange", &errflag);
+    trigger->lastchange = glb_json_get_uint64_value_by_name(jp, "lastchange", &errflag);
     if (1 == errflag) 
         trigger->lastchange = 0;
 

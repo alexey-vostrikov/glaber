@@ -37,8 +37,10 @@ int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, int fiel
 int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int type, char *error, size_t errlen);	
 int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, int type, char *error, size_t errlen);	
 
-int glb_macro_expand_alert_data(DB_ALERT *db_alert, char *param);
+int glb_macro_expand_alert_data(DB_ALERT *db_alert, char **data);
 
 int glb_macro_expand_trigger_ctx_expression(CALC_TRIGGER *trigger, char **data, int token_type, char *error, size_t errlen);
+
+int glb_macro_expand_lld();
 
 #endif

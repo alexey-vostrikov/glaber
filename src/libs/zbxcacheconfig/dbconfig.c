@@ -2902,7 +2902,8 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		ZBX_DBROW2UINT64(interfaceid, row[19]);
 
 		dc_strpool_replace(found, &item->history_period, row[22]);
-
+		dc_strpool_replace(found, &item->description, row[50]);
+		
 		ZBX_STR2UCHAR(item->inventory_link, row[24]);
 		ZBX_DBROW2UINT64(item->valuemapid, row[25]);
 
@@ -3658,6 +3659,7 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		dc_strpool_release(item->key);
 		dc_strpool_release(item->delay);
 		dc_strpool_release(item->history_period);
+		dc_strpool_release(item->description);
 
 		if (NULL != item->delay_ex)
 			dc_strpool_release(item->delay_ex);
@@ -6690,7 +6692,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		corr_operation_sec2, hgroups_sec, hgroups_sec2, itempp_sec, itempp_sec2, itemscrp_sec,
 		itemscrp_sec2, total, total2, update_sec, maintenance_sec, maintenance_sec2, item_tag_sec,
 		item_tag_sec2, um_cache_sec, queues_sec, changelog_sec, drules_sec, drules_sec2, httptest_sec,
-		httptest_sec2;
+		httptest_sec2, valuemap_sec;
 
 	zbx_dbsync_t config_sync, hosts_sync, hi_sync, htmpl_sync, gmacro_sync, hmacro_sync, if_sync, items_sync,
 		template_items_sync, prototype_items_sync, item_discovery_sync, triggers_sync, tdep_sync,
@@ -6699,7 +6701,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		hgroups_sync, itempp_sync, itemscrp_sync, maintenance_sync, maintenance_period_sync,
 		maintenance_tag_sync, maintenance_group_sync, maintenance_host_sync, hgroup_host_sync,
 		drules_sync, dchecks_sync, httptest_sync, httptest_field_sync, httpstep_sync,
-		httpstep_field_sync, autoreg_host_sync;
+		httpstep_field_sync, autoreg_host_sync, valuemap_sync;
 
 	double autoreg_csec, autoreg_csec2, autoreg_host_csec, autoreg_host_csec2;
 	zbx_dbsync_t autoreg_config_sync;
@@ -6777,6 +6779,8 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	zbx_dbsync_init(&httptest_field_sync, changelog_sync_mode);
 	zbx_dbsync_init(&httpstep_sync, changelog_sync_mode);
 	zbx_dbsync_init(&httpstep_field_sync, changelog_sync_mode);
+	
+	zbx_dbsync_init(&valuemap_sync, mode);
 
 #ifdef HAVE_ORACLE
 	/* With Oracle fetch statements can fail before all data has been fetched. */
@@ -7079,6 +7083,11 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_corr_operations(&corr_operation_sync))
 		goto out;
 	corr_operation_sec = zbx_time() - sec;
+
+	sec = zbx_time();
+	if (FAIL == zbx_dbsync_compare_valuemaps(&valuemap_sync))
+		goto out;
+	valuemap_sec = zbx_time() - sec;
 
 	START_SYNC;
 
@@ -8149,6 +8158,33 @@ int in_maintenance_without_data_collection(unsigned char maintenance_status, uns
 	return SUCCEED;
 }
 
+int DCget_host_host(u_int64_t hostid, char **name) {
+	ZBX_DC_HOST *dchost;
+	int ret = FAIL;
+	RDLOCK_CACHE;
+		if (NULL!=(dchost = zbx_hashset_search(&config->hosts, &hostid))) {
+			*name = zbx_strdup(NULL, dchost->host);
+			ret = SUCCEED;
+		}
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int DCget_host_name(u_int64_t hostid, char **name) {
+	ZBX_DC_HOST *dchost;
+	int ret = FAIL;
+	RDLOCK_CACHE;
+	
+	if (NULL != ( dchost = zbx_hashset_search(&config->hosts, &hostid))) {
+		*name = zbx_strdup(NULL, dchost->name);
+		ret = SUCCEED;
+	}
+	
+	UNLOCK_CACHE;
+	return ret;
+}
+
+
 static void DCget_host(DC_HOST *dst_host, const ZBX_DC_HOST *src_host)
 {
 	const ZBX_DC_IPMIHOST *ipmihost;
@@ -8666,6 +8702,11 @@ static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 	dst_item->key = NULL;
 
 	dst_item->delay = zbx_strdup(NULL, src_item->delay); /* not used, should be initialized */
+	
+	if (NULL !=  src_item->description)
+		dst_item->description = zbx_strdup(NULL, src_item->description);
+	else 
+		dst_item->description = zbx_strdup(NULL, "");
 
 	switch (src_item->value_type)
 	{
@@ -8986,6 +9027,7 @@ void DCconfig_clean_items(DC_ITEM *items, int *errcodes, size_t num)
 		}
 
 		zbx_free(items[i].delay);
+		zbx_free(items[i].description);
 	}
 }
 

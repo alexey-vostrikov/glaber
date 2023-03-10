@@ -26,6 +26,7 @@
 #include "zbxnum.h"
 #include "zbxdbwrap.h"
 #include "zbx_trigger_constants.h"
+#include "../../libs/glb_macro/glb_macro.h"
 
 typedef struct
 {

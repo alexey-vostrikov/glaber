@@ -1949,6 +1949,7 @@ AC_CONFIG_FILES([
 	src/libs/Makefile
 	src/libs/glb_conf/Makefile
 	src/libs/glb_macro/Makefile
+	src/libs/glb_expression/Makefile
 	src/libs/zbxalgo/Makefile
 	src/libs/zbxaudit/Makefile
 	src/libs/zbxavailability/Makefile

@@ -316,3 +316,40 @@ int elems_hash_id_exists(elems_hash_t *elems, u_int64_t id) {
     glb_rwlock_unlock(&elems->meta_lock);
     return ret;
 }
+
+int elems_hash_remove_absent_in_vector(elems_hash_t *elems, zbx_vector_uint64_t *ids) {
+    zbx_vector_uint64_t del_ids;
+    zbx_hashset_iter_t iter;
+    elems_hash_elem_t *elem;
+    int count;
+
+    zbx_vector_uint64_create(&del_ids);
+    zbx_vector_uint64_sort(ids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+    glb_rwlock_rdlock(&elems->meta_lock);
+    zbx_hashset_iter_reset(&elems->elems, &iter);
+    
+    while (NULL != (elem = zbx_hashset_iter_next(&iter))) {
+        
+        if (FAIL == zbx_vector_uint64_bsearch(ids, elem->id, ZBX_DEFAULT_UINT64_COMPARE_FUNC))
+            continue;
+        
+        zbx_vector_uint64_append(&del_ids, elem->id);
+    }
+    glb_rwlock_unlock(&elems->meta_lock);
+
+    if (del_ids.values_num > 0) {
+        glb_rwlock_wrlock(&elems->meta_lock);
+        for (count = 0; count < del_ids.values_num; count++) {
+            
+            elem = zbx_hashset_search(&elems->elems, &del_ids.values[count]);
+            
+            if (NULL != elem)
+                 delete_element(elems, elem);    
+        }
+        glb_rwlock_unlock(&elems->meta_lock);
+    }   
+ 
+    zbx_vector_uint64_destroy(&del_ids);
+    return count;
+}

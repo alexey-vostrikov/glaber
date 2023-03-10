@@ -151,6 +151,7 @@ typedef struct
 	zbx_vector_ptr_t	tags;
 	u_int64_t			master_itemid;
 	const char 			*params;
+	const char 			*description;
 }
 ZBX_DC_ITEM;
 

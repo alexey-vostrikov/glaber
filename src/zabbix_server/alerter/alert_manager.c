@@ -37,6 +37,8 @@
 #include "zbxtime.h"
 #include "zbxtypes.h"
 #include "zbxxml.h"
+#include "../../libs/glb_actions/glb_actions.h"
+#include "../../libs/glb_macro/glb_macro.h"
 
 #define ZBX_AM_LOCATION_NOWHERE			0
 #define ZBX_AM_LOCATION_QUEUE			1

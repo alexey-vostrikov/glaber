@@ -26,6 +26,32 @@
 #include "zbxcacheconfig.h"
 //NOTE: look at db_trigger_expand_macros for macro expansion in conditions
 
+char* glb_trigger_get_severity_name(unsigned char priority)
+{
+	static zbx_config_t	cfg = {0};
+
+	if (TRIGGER_SEVERITY_COUNT <= priority)
+		return NULL;
+
+	//this will init once and never free cfg, but we most likely reuse it often
+	if ( NULL == cfg.severity_name) { 
+		zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_SEVERITY_NAME);
+	}
+	//zbx_config_clean(&cfg);
+	return cfg.severity_name[priority];
+}
+
+char      *glb_trigger_get_admin_state_name(unsigned char admin_state)
+ {
+ 	switch (admin_state)
+ 	{
+ 		case TRIGGER_STATUS_ENABLED:
+			return "Enabled";
+		case TRIGGER_STATUS_DISABLED:
+ 			return "Disabled";
+ 	}
+	HALT_HERE("Unknown admin state passed %d", admin_state)
+}
 
 static void trigger_check_dependency(CALC_TRIGGER *trigger) {
 	if (FAIL == glb_check_trigger_has_value_ok_masters(trigger->triggerid)) {

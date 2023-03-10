@@ -1218,115 +1218,115 @@ static const char	*alert_status_string(unsigned char type, unsigned char status)
  * Purpose: retrieve escalation history                                       *
  *                                                                            *
  ******************************************************************************/
-static void	get_escalation_history(zbx_uint64_t actionid, u_int64_t problemid, 
-			char **replace_to, const zbx_uint64_t *recipient_userid, const char *tz)
-{
-	DB_RESULT	result;
-	DB_ROW		row;
-	char		*buf = NULL, *p;
-	size_t		buf_alloc = ZBX_KIBIBYTE, buf_offset = 0;
-	int		esc_step;
-	unsigned char	type, status;
-	time_t		now, start_tm, end_tm;
-	zbx_uint64_t	userid;
+// static void	get_escalation_history(zbx_uint64_t actionid, u_int64_t problemid, 
+// 			char **replace_to, const zbx_uint64_t *recipient_userid, const char *tz)
+// {
+// 	DB_RESULT	result;
+// 	DB_ROW		row;
+// 	char		*buf = NULL, *p;
+// 	size_t		buf_alloc = ZBX_KIBIBYTE, buf_offset = 0;
+// 	int		esc_step;
+// 	unsigned char	type, status;
+// 	time_t		now, start_tm, end_tm;
+// 	zbx_uint64_t	userid;
 	
-	*replace_to = NULL;
+// 	*replace_to = NULL;
 
-	if (0 == (start_tm = glb_state_problems_get_problem_start(problemid)))
-		return;
+// 	if (0 == (start_tm = glb_state_problems_get_problem_start(problemid)))
+// 		return;
 	
-	end_tm = glb_state_problems_get_problem_end(problemid);
+// 	end_tm = glb_state_problems_get_problem_end(problemid);
 
-	buf = (char *)zbx_malloc(buf, buf_alloc);
+// 	buf = (char *)zbx_malloc(buf, buf_alloc);
 
-	zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "Problem started: %s %s Age: %s\n",
-			zbx_date2str(start_tm,  tz), zbx_time2str(start_tm, tz),
-			zbx_age2str(time(NULL) - start_tm));
+// 	zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "Problem started: %s %s Age: %s\n",
+// 			zbx_date2str(start_tm,  tz), zbx_time2str(start_tm, tz),
+// 			zbx_age2str(time(NULL) - start_tm));
 
-	result = DBselect("select a.clock,a.alerttype,a.status,mt.name,a.sendto,a.error,a.esc_step,a.userid,a.message"
-			" from alerts a"
-			" left join media_type mt"
-				" on mt.mediatypeid=a.mediatypeid"
-			" where a.eventid=" ZBX_FS_UI64
-				" and a.actionid=" ZBX_FS_UI64
-			" order by a.clock",
-			problemid, actionid);
+// 	result = DBselect("select a.clock,a.alerttype,a.status,mt.name,a.sendto,a.error,a.esc_step,a.userid,a.message"
+// 			" from alerts a"
+// 			" left join media_type mt"
+// 				" on mt.mediatypeid=a.mediatypeid"
+// 			" where a.eventid=" ZBX_FS_UI64
+// 				" and a.actionid=" ZBX_FS_UI64
+// 			" order by a.clock",
+// 			problemid, actionid);
 
-	while (NULL != (row = DBfetch(result)))
-	{
-		int	user_permit;
+// 	while (NULL != (row = DBfetch(result)))
+// 	{
+// 		int	user_permit;
 
-		now = atoi(row[0]);
-		type = (unsigned char)atoi(row[1]);
-		status = (unsigned char)atoi(row[2]);
-		esc_step = atoi(row[6]);
-		ZBX_DBROW2UINT64(userid, row[7]);
-		user_permit = zbx_check_user_permissions(&userid, recipient_userid);
+// 		now = atoi(row[0]);
+// 		type = (unsigned char)atoi(row[1]);
+// 		status = (unsigned char)atoi(row[2]);
+// 		esc_step = atoi(row[6]);
+// 		ZBX_DBROW2UINT64(userid, row[7]);
+// 		user_permit = zbx_check_user_permissions(&userid, recipient_userid);
 
-		if (0 != esc_step)
-			zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "%d. ", esc_step);
+// 		if (0 != esc_step)
+// 			zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "%d. ", esc_step);
 
-		zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "%s %s %-7s %-11s",
-				zbx_date2str(now, tz), zbx_time2str(now, tz),	/* date, time */
-				alert_type_string(type),		/* alert type */
-				alert_status_string(type, status));	/* alert status */
+// 		zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "%s %s %-7s %-11s",
+// 				zbx_date2str(now, tz), zbx_time2str(now, tz),	/* date, time */
+// 				alert_type_string(type),		/* alert type */
+// 				alert_status_string(type, status));	/* alert status */
 
-		if (ALERT_TYPE_COMMAND == type)
-		{
-			if (NULL != (p = strchr(row[8], ':')))
-			{
-				*p = '\0';
-				zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, " \"%s\"", row[8]);	/* host */
-				*p = ':';
-			}
-		}
-		else
-		{
-			const char	*media_type_name, *send_to, *user_name;
+// 		if (ALERT_TYPE_COMMAND == type)
+// 		{
+// 			if (NULL != (p = strchr(row[8], ':')))
+// 			{
+// 				*p = '\0';
+// 				zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, " \"%s\"", row[8]);	/* host */
+// 				*p = ':';
+// 			}
+// 		}
+// 		else
+// 		{
+// 			const char	*media_type_name, *send_to, *user_name;
 
-			media_type_name = (SUCCEED == DBis_null(row[3]) ? "" : row[3]);
+// 			media_type_name = (SUCCEED == DBis_null(row[3]) ? "" : row[3]);
 
-			if (SUCCEED == user_permit)
-			{
-				send_to = row[4];
-				user_name = zbx_user_string(userid);
-			}
-			else
-			{
-				send_to = "\"Inaccessible recipient details\"";
-				user_name = "Inaccessible user";
-			}
+// 			if (SUCCEED == user_permit)
+// 			{
+// 				send_to = row[4];
+// 				user_name = zbx_user_string(userid);
+// 			}
+// 			else
+// 			{
+// 				send_to = "\"Inaccessible recipient details\"";
+// 				user_name = "Inaccessible user";
+// 			}
 
-			zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, " %s %s \"%s\"",
-					media_type_name,
-					send_to,	/* historical recipient */
-					user_name);	/* alert user full name */
-		}
+// 			zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, " %s %s \"%s\"",
+// 					media_type_name,
+// 					send_to,	/* historical recipient */
+// 					user_name);	/* alert user full name */
+// 		}
 
-		if (ALERT_STATUS_FAILED == status)
-		{
-			/* alert error can be generated by SMTP Relay or other media and contain sensitive details */
-			if (SUCCEED == user_permit)
-				zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, " %s", row[5]);
-			else
-				zbx_strcpy_alloc(&buf, &buf_alloc, &buf_offset, " \"Inaccessible error message\"");
-		}
+// 		if (ALERT_STATUS_FAILED == status)
+// 		{
+// 			/* alert error can be generated by SMTP Relay or other media and contain sensitive details */
+// 			if (SUCCEED == user_permit)
+// 				zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, " %s", row[5]);
+// 			else
+// 				zbx_strcpy_alloc(&buf, &buf_alloc, &buf_offset, " \"Inaccessible error message\"");
+// 		}
 
-		zbx_chrcpy_alloc(&buf, &buf_alloc, &buf_offset, '\n');
-	}
-	zbx_db_free_result(result);
+// 		zbx_chrcpy_alloc(&buf, &buf_alloc, &buf_offset, '\n');
+// 	}
+// 	zbx_db_free_result(result);
 
-	if ( 0!= end_tm)
-	{
-		zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "Problem ended: %s %s\n",
-				zbx_date2str(end_tm, tz), zbx_time2str(end_tm, tz));
-	}
+// 	if ( 0!= end_tm)
+// 	{
+// 		zbx_snprintf_alloc(&buf, &buf_alloc, &buf_offset, "Problem ended: %s %s\n",
+// 				zbx_date2str(end_tm, tz), zbx_time2str(end_tm, tz));
+// 	}
 
-	if (0 != buf_offset)
-		buf[--buf_offset] = '\0';
+// 	if (0 != buf_offset)
+// 		buf[--buf_offset] = '\0';
 
-	*replace_to = buf;
-}
+// 	*replace_to = buf;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1978,39 +1978,39 @@ static int	compare_tags(const void *d1, const void *d2)
  *             replace_to - [OUT] replacement string                          *
  *                                                                            *
  ******************************************************************************/
-static void	get_problem_tags(u_int64_t problemid, char **replace_to)
-{
-	size_t			replace_to_offset = 0, replace_to_alloc = 0;
-	int			i;
-	zbx_vector_ptr_t	tags;
+// static void	get_problem_tags(u_int64_t problemid, char **replace_to)
+// {
+// 	size_t			replace_to_offset = 0, replace_to_alloc = 0;
+// 	int			i;
+// 	zbx_vector_ptr_t	tags;
 
-	zbx_vector_ptr_create(&tags);
+// 	zbx_vector_ptr_create(&tags);
 
-	if (FAIL == glb_problems_get_problem_tags(problemid, &tags)) {
-		*replace_to = zbx_strdup(NULL, *replace_to);
-		return;
-	}
+// 	if (FAIL == glb_problems_get_problem_tags(problemid, &tags)) {
+// 		*replace_to = zbx_strdup(NULL, *replace_to);
+// 		return;
+// 	}
 
-	zbx_vector_ptr_sort(&tags, compare_tags);
+// 	zbx_vector_ptr_sort(&tags, compare_tags);
 
-	for (i = 0; i < tags.values_num; i++)
-	{
-		const zbx_tag_t	*tag = (const zbx_tag_t *)tags.values[i];
+// 	for (i = 0; i < tags.values_num; i++)
+// 	{
+// 		const zbx_tag_t	*tag = (const zbx_tag_t *)tags.values[i];
 
-		if (0 != i)
-			zbx_strcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, ", ");
+// 		if (0 != i)
+// 			zbx_strcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, ", ");
 
-		zbx_strcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, tag->tag);
+// 		zbx_strcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, tag->tag);
 
-		if ('\0' != *tag->value)
-		{
-			zbx_chrcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, ':');
-			zbx_strcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, tag->value);
-		}
-	}
+// 		if ('\0' != *tag->value)
+// 		{
+// 			zbx_chrcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, ':');
+// 			zbx_strcpy_alloc(replace_to, &replace_to_alloc, &replace_to_offset, tag->value);
+// 		}
+// 	}
 
-	zbx_vector_ptr_destroy(&tags);
-}
+// 	zbx_vector_ptr_destroy(&tags);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -2020,17 +2020,17 @@ static void	get_problem_tags(u_int64_t problemid, char **replace_to)
  *             replace_to - [OUT] replacement string                          *
  *                                                                            *
  ******************************************************************************/
-static void	get_problem_tags_json(u_int64_t problemid, char **replace_to)
-{
-	struct zbx_json	json;
+// static void	get_problem_tags_json(u_int64_t problemid, char **replace_to)
+// {
+// 	struct zbx_json	json;
 
-	zbx_json_initarray(&json, ZBX_JSON_STAT_BUF_LEN);
+// 	zbx_json_initarray(&json, ZBX_JSON_STAT_BUF_LEN);
 
-	glb_problems_get_problem_tags_json(problemid, json);
+// 	glb_problems_get_problem_tags_json(problemid, json);
 
-	*replace_to = zbx_strdup(*replace_to, json.buffer);
-	zbx_json_free(&json);
-}
+// 	*replace_to = zbx_strdup(*replace_to, json.buffer);
+// 	zbx_json_free(&json);
+// }
 
 /******************************************************************************
  *                                                                            *

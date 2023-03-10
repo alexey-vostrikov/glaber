@@ -159,13 +159,13 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxip/libzbxip.a \
 	$(top_builddir)/src/libs/zbxexpr/libzbxexpr.a \
 	$(top_builddir)/src/libs/zbxcommon/libzbxcommon.a \
-	$(top_builddir)/src/libs/zbxversion/libzbxversion.a\
-	preprocessor/libpreprocessor.a\
+	$(top_builddir)/src/libs/zbxversion/libzbxversion.a \
+	preprocessor/libpreprocessor.a \
 	$(top_builddir)/src/libs/glb_events_log/libglbeventlog.a \
 	$(top_builddir)/src/libs/glb_macro/libglbmacro.a \
+	$(top_builddir)/src/libs/glb_expression/libglbexpression.a \
 	$(top_builddir)/src/libs/glb_actions/libglbactions.a
 	
-
 if HAVE_IPMI
 zabbix_server_LDADD += ipmi/libipmi.a
 endif

@@ -1,5 +1,5 @@
 /*
-** Copyright Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,7 +16,5 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-int glb_config_init();
-// mem_funcs_t *config_get_memf(); 
-int glb_conf_host_get_host(u_int64_t hostid, char **host);
-int glb_conf_host_get_name(u_int64_t hostid, char **name);
+void	glb_expression_get_by_trigger(const zbx_eval_context_t *ctx, char **expression);
+int     glb_expression_explain_by_trigger(const zbx_eval_context_t *ctx, char **expression);

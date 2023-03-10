@@ -20,11 +20,13 @@
 #include "zbxshmem.h"
 
 #include "conf_items.h"
+#include "./valuemaps/conf_valuemaps.h"
+
 
 #define CONFIG_GLB_CONFIG_SIZE ZBX_GIBIBYTE
-static  zbx_shmem_info_t	*config_mem;
+static  zbx_shmem_info_t	*glb_config_mem;
 
-ZBX_SHMEM_FUNC_IMPL(__config, config_mem);
+ZBX_SHMEM_FUNC_IMPL(__glb_conf, glb_config_mem);
 
 typedef struct {
     mem_funcs_t memf;
@@ -33,31 +35,27 @@ typedef struct {
 static config_t *conf;
 
 
-int config_init() {
+int glb_config_init() {
    
     char *error = NULL;
 	
-	if (SUCCEED != zbx_shmem_create(&config_mem, CONFIG_GLB_CONFIG_SIZE, "GLB Config size", "GLBConfigSize", 0, &error)) {
+	if (SUCCEED != zbx_shmem_create(&glb_config_mem, (u_int64_t)2*CONFIG_GLB_CONFIG_SIZE, "GLB Config size", "GLBConfigSize", 0, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	return FAIL;
-    }
- 
-	if (NULL == (conf = zbx_shmem_malloc(config_mem, NULL, sizeof(config_t)))) {	
+	}
+ 	
+	if (NULL == (conf = zbx_shmem_malloc(glb_config_mem, NULL, sizeof(config_t)))) {	
 		zabbix_log(LOG_LEVEL_CRIT,"Cannot allocate Cache structures, exiting");
 		return FAIL;
 	}
-    
-    memset((void *)config_mem, 0, sizeof(config_t));
-	
-	conf->memf.free_func = __config_shmem_free_func;
-	conf->memf.malloc_func = __config_shmem_malloc_func;
-	conf->memf.realloc_func = __config_shmem_realloc_func;
 
-    conf_items_init(&conf->memf);
+	//LOG_INF("Created mem segment for glb config of size %lld", CONFIG_GLB_CONFIG_SIZE);
+    memset((void *)conf, 0, sizeof(config_t));
 
+    conf->memf.free_func = __glb_conf_shmem_free_func;
+	conf->memf.malloc_func = __glb_conf_shmem_malloc_func;
+	conf->memf.realloc_func = __glb_conf_shmem_realloc_func;
+
+	glb_conf_valuemaps_init(&conf->memf);
 	return SUCCEED;
 }
-
-// mem_funcs_t *config_get_memf() {
-//     return &conf->memf;
-// }

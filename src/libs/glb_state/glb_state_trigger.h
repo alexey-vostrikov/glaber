@@ -27,6 +27,12 @@ problems state and to create event log changes*/
 #ifndef GLB_TRIGGER_H
 #define GLB_TRIGGER_H
 
+
+
+
 int     glb_trigger_register_calculation(CALC_TRIGGER *trigger);
 void	glb_trigger_get_functions_ids(CALC_TRIGGER *trigger, zbx_vector_uint64_t *functions_ids);
+
+char*   glb_trigger_get_severity_name(unsigned char priority);
+char*   glb_trigger_get_admin_state_name(unsigned char admin_state);
 #endif

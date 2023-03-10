@@ -169,14 +169,14 @@ int glb_problem_unmarshall_from_json(mem_funcs_t *memf, strpool_t *strpool, glb_
     zbx_json_type_t type;
 
     int errflag = 0;
-    if ( (0 == (problem->id = glb_json_get_int_value_by_name(jp, "id", &errflag)) && errflag == 1) ||
-         (0 == (problem->source = glb_json_get_int_value_by_name(jp, "source", &errflag)) && errflag == 1) || 
-         (0 == (problem->objectid = glb_json_get_int_value_by_name(jp, "objectid", &errflag)) && errflag == 1)||
-         (0 == (problem->acknowledged = glb_json_get_int_value_by_name(jp, "acknowledged", &errflag)) && errflag == 1) ||
-         (0 == (problem->severity = glb_json_get_int_value_by_name(jp, "severity", &errflag)) && errflag == 1) ||
-         (0 == (problem->oper_state = glb_json_get_int_value_by_name(jp, "oper_state", &errflag)) && errflag == 1) ||
-         (0 == (problem->recovery_time = glb_json_get_int_value_by_name(jp, "recovery_time", &errflag)) && errflag == 1) ||
-         (0 == (problem->correlation_id = glb_json_get_int_value_by_name(jp, "correlation_id", &errflag)) && errflag == 1)) 
+    if ( (0 == (problem->id = glb_json_get_uint64_value_by_name(jp, "id", &errflag)) && errflag == 1) ||
+         (0 == (problem->source = glb_json_get_uint64_value_by_name(jp, "source", &errflag)) && errflag == 1) || 
+         (0 == (problem->objectid = glb_json_get_uint64_value_by_name(jp, "objectid", &errflag)) && errflag == 1)||
+         (0 == (problem->acknowledged = glb_json_get_uint64_value_by_name(jp, "acknowledged", &errflag)) && errflag == 1) ||
+         (0 == (problem->severity = glb_json_get_uint64_value_by_name(jp, "severity", &errflag)) && errflag == 1) ||
+         (0 == (problem->oper_state = glb_json_get_uint64_value_by_name(jp, "oper_state", &errflag)) && errflag == 1) ||
+         (0 == (problem->recovery_time = glb_json_get_uint64_value_by_name(jp, "recovery_time", &errflag)) && errflag == 1) ||
+         (0 == (problem->correlation_id = glb_json_get_uint64_value_by_name(jp, "correlation_id", &errflag)) && errflag == 1)) 
     return FAIL;
 
     if (FAIL == zbx_json_value_by_name(jp, "name", name, MAX_STRING_LEN, &type)) 

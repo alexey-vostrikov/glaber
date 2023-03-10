@@ -1131,7 +1131,9 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
     int errflag = 0;
     zbx_json_type_t type;
 
-    if ( FAIL ==( elm->value_type = glb_json_get_int_value_by_name(jp, "value_type", &errflag) ))
+    elm->value_type = glb_json_get_uint64_value_by_name(jp, "value_type", &errflag);
+
+    if (errflag)
         return FAIL;
 
     if ((elm->value_type >= ITEM_VALUE_TYPE_MAX || elm->value_type < 0) && elm->value_type != ITEM_VALUE_TYPE_NONE) {
@@ -1147,9 +1149,9 @@ static int parse_json_item_state(struct zbx_json_parse *jp, glb_state_item_meta_
 {
     int errflag = 0;
 
-    meta->state = glb_json_get_int_value_by_name(jp, "state", &errflag);
-    meta->lastdata = glb_json_get_int_value_by_name(jp, "lastdata", &errflag);
-    meta->nextcheck = glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
+    meta->state = glb_json_get_uint64_value_by_name(jp, "state", &errflag);
+    meta->lastdata = glb_json_get_uint64_value_by_name(jp, "lastdata", &errflag);
+    meta->nextcheck = glb_json_get_uint64_value_by_name(jp, "nextcheck", &errflag);
 
     if (0 == errflag)
         return SUCCEED;
@@ -1161,10 +1163,10 @@ static int parse_json_item_demand(struct zbx_json_parse *jp, item_demand_t *dema
 {
     int errflag = 0;
 
-    demand->count = glb_json_get_int_value_by_name(jp, "count", &errflag);
-    demand->period = glb_json_get_int_value_by_name(jp, "period", &errflag);
-    demand->count_change = glb_json_get_int_value_by_name(jp, "count_change", &errflag);
-    demand->period_change = glb_json_get_int_value_by_name(jp, "period_change", &errflag);
+    demand->count = glb_json_get_uint64_value_by_name(jp, "count", &errflag);
+    demand->period = glb_json_get_uint64_value_by_name(jp, "period", &errflag);
+    demand->count_change = glb_json_get_uint64_value_by_name(jp, "count_change", &errflag);
+    demand->period_change = glb_json_get_uint64_value_by_name(jp, "period_change", &errflag);
 
     if (0 == errflag)
         return SUCCEED;
@@ -1181,7 +1183,7 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
     zbx_json_type_t type;
     bzero(hist, sizeof(ZBX_DC_HISTORY));
 
-    if (FAIL == (hist->ts.sec = glb_json_get_int_value_by_name(jp, "clock", &errflag)))
+    if (FAIL == (hist->ts.sec = glb_json_get_uint64_value_by_name(jp, "clock", &errflag)))
         return FAIL;
 
     hist->ts.ns = 0;
@@ -1190,7 +1192,7 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
     switch (value_type)
     {
     case ITEM_VALUE_TYPE_UINT64:
-        hist->value.ui64 = glb_json_get_int_value_by_name(jp, "value", &errflag);
+        hist->value.ui64 = glb_json_get_uint64_value_by_name(jp, "value", &errflag);
         break;
     case ITEM_VALUE_TYPE_FLOAT:
         hist->value.dbl = glb_json_get_dbl_value_by_name(jp, "value", &errflag);
@@ -1560,6 +1562,57 @@ int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
         DEBUG_ITEM(deleted_itemids->values[i],"Deleting item from the value cache");
     	elems_hash_delete(state->items, deleted_itemids->values[i]);
 	}
+}
+
+int	glb_state_items_get_lastvalue_raw(zbx_uint64_t itemid, char **lastvalue) {
+
+}
+
+int	glb_state_items_get_lastvalue_formatted(zbx_uint64_t itemid, char **lastvalue)
+{
+//	DB_RESULT	result;
+//	DB_ROW		row;
+	// int		ret = FAIL;
+
+	// zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+//	result = DBselect(
+//			"select value_type,valuemapid,units,hostid"
+//			" from items"
+//			" where itemid=" ZBX_FS_UI64,
+//			itemid);
+
+//	if (NULL != (row = DBfetch(result)))
+//	{
+// 	unsigned char		value_type;
+// 	zbx_uint64_t		valuemapid;
+// 	zbx_uint64_t 		hostid;
+// 	zbx_history_record_t	vc_value;
+
+// 	value_type = (unsigned char)atoi(row[0]);
+// 	ZBX_DBROW2UINT64(valuemapid, row[1]);
+// 	hostid = (unsigned char)atoi(row[3]);
+
+// 	if (SUCCEED == zbx_vc_get_value(itemid, value_type, ts, &vc_value))
+// 	{
+// 		char	tmp[MAX_BUFFER_LEN];
+
+// //			zbx_vc_flush_stats();
+// 		zbx_history_value_print(tmp, sizeof(tmp), &vc_value.value, value_type);
+// 		zbx_history_record_clear(&vc_value, value_type);
+
+// 		zbx_format_value(tmp, sizeof(tmp), valuemapid, units, value_type);
+
+// 			*lastvalue = zbx_strdup(*lastvalue, tmp);
+
+// 			ret = SUCCEED;
+// 		}
+// 	}
+// 	zbx_db_free_result(result);
+
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+
+// 	return ret;
 }
 
 void glb_state_items_housekeep() {

@@ -53,6 +53,9 @@ int     glb_state_problems_recover_by_trigger(u_int64_t triggerid, int leave_unr
 int     glb_state_problems_get_count_by_trigger(u_int64_t triggerid);
 int     glb_state_problems_get_count_by_trigger_unresolved(u_int64_t triggerid);
 
+int     glb_state_problems_get_count_by_trigger_acknowledged(u_int64_t triggerid);
+int     glb_state_problems_get_count_by_trigger_unacknowledged(u_int64_t triggerid);
+
 //removes outdated resolved problems
 void     glb_state_problems_housekeep(); //UNFINISHED YET - does no cleanup
 int      glb_state_problems_dump();

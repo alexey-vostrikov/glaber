@@ -784,13 +784,13 @@ int    glb_tsbuff_check_has_enough_count_data_idx(glb_tsbuff_t *tsbuff, int need
         static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
 
 #define ELEMS_CREATE(name) \
-        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
+        	static int name(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data) 
 			
 #define ELEMS_FREE(name) \
-        	int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
+        	static int name(elems_hash_elem_t *elem, mem_funcs_t *memf) 
 
 #define ELEMS_UPDATE(name) \
-        	int name(elems_hash_elem_t *elem, elems_hash_elem_t *elem_new, mem_funcs_t *memf) 
+        	static int name(elems_hash_elem_t *elem, elems_hash_elem_t *elem_new, mem_funcs_t *memf) 
 
 /*elements hash for fast and lockless access */
 #define ELEM_FLAG_DO_NOT_CREATE  1
@@ -833,6 +833,7 @@ int 	elems_hash_id_exists(elems_hash_t *elems, u_int64_t id);
 int 	elems_hash_update(elems_hash_t *elems, elems_hash_t *new_elems, elems_hash_update_cb_t update_func_cb);
 void	elems_hash_iterate_by_vector(elems_hash_t *elems, zbx_vector_uint64_t *ids, elems_hash_process_cb_t proc_func, void *param,
      			u_int64_t element_lock_flags);
+int		elems_hash_remove_absent_in_vector(elems_hash_t *elems, zbx_vector_uint64_t *ids);
 
 typedef struct index_uint64_t index_uint64_t;
 

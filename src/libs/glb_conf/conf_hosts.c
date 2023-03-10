@@ -21,6 +21,8 @@
 #include "conf_items_notify.h"
 
 void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) ;
+int DCget_host_name(u_int64_t hostid, char **name);
+int DCget_host_host(u_int64_t hostid, char **name);
 
 static void conf_hosts_get_host_items(u_int64_t hostid, zbx_vector_uint64_t *changed_items) {
     DCget_host_items(hostid, changed_items);
@@ -39,4 +41,12 @@ void conf_hosts_notify_changes(zbx_vector_uint64_t *changed_hosts) {
     
     conf_items_notify_changes(&changed_items);
     zbx_vector_uint64_destroy(&changed_items);
+}
+
+int glb_conf_host_get_host(u_int64_t hostid, char **host) {
+    return DCget_host_host(hostid, host);
+}
+
+int glb_conf_host_get_name(u_int64_t hostid, char **name) {
+    return DCget_host_name(hostid, name);
 }

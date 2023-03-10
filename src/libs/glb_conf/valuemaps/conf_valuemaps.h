@@ -16,7 +16,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-int glb_config_init();
-// mem_funcs_t *config_get_memf(); 
-int glb_conf_host_get_host(u_int64_t hostid, char **host);
-int glb_conf_host_get_name(u_int64_t hostid, char **name);
+#include "glb_common.h"
+
+int glb_conf_valuemaps_init(mem_funcs_t *memf);
+int glb_conf_valuemaps_set_data(char *json_buffer);
+    
