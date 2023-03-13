@@ -28,7 +28,7 @@ workflow:
 
 .install_packer: &install_packer
   - apk add --no-cache wget unzip
-  - wget -q https://releases.hashicorp.com/packer/1.8.5/packer_1.8.5_linux_amd64.zip
+  - wget -q https://glaber.io/misc/packer_1.8.5_linux_amd64.zip
   - unzip packer_1.8.5_linux_amd64.zip
   - mv packer /usr/local/bin/
 
