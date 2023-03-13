@@ -227,3 +227,13 @@ src/glapi/glb_log_listener
 src/glapi/glb_hist_clickhouse
 include/config.h.in~
 build/config.log
+include/common/config.h
+*.orig
+.tmp
+.zbxweb
+.passwords.created
+.hurl
+mysql_data
+clickhouse_data
+workers_script
+create.sql
