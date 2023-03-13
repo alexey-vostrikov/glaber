@@ -120,18 +120,18 @@ debian-buster:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-astra:
-  variables:
-    OS: astra
-    OS_VER: smolensk
-  tags: ["virtbox"]
-  script:
-    - update-ca-certificates
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
+#astra:
+#  variables:
+#    OS: astra
+#    OS_VER: smolensk
+#  tags: ["virtbox"]
+#  script:
+#    - update-ca-certificates
+#    - *build_go
+#    - *prepare_sources
+#    - *build_glbmap
+#    - dpkg-buildpackage -b --no-sign
+#    - *upload_packages
 
 debian-bullseye:
   variables:
