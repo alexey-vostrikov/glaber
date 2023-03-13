@@ -1,0 +1,117 @@
+version: "3.9"
+services:
+  mysql:
+    build:
+      context: ./mysql
+    cap_add:
+    - SYS_NICE
+    env_file:
+    - .env
+    healthcheck:
+      test:
+        - "CMD"
+        - "/usr/bin/mysql"
+        - "--user=$MYSQL_USER"
+        - "--password=$MYSQL_PASSWORD"
+        - "--database=$MYSQL_DATABASE"
+        - "--execute"
+        - 'SELECT count(*) from users;'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      zabbix:
+        aliases:
+        - mysql-server
+    ports:
+    - "3306"
+    volumes:
+    - type: bind
+      source: ./mysql/mysql_data/
+      target: /var/lib/mysql/
+    - type: bind
+      source: ./mysql/etc/my.cnf.d/innodb.conf
+      target: /etc/my.cnf.d/innodb.conf
+  clickhouse:
+    build:
+      context: ./clickhouse
+    healthcheck:
+      test:
+        - "CMD"
+        - "clickhouse-client"
+        - "--user"
+        - "$ZBX_CH_USER"
+        - "--password"
+        - "$ZBX_CH_PASS"
+        - "--database"
+        - "$ZBX_CH_DB"
+        - "--query"
+        - "select count(*) from history_str;"
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    env_file:
+    - .env
+    networks:
+      zabbix:
+        aliases:
+        - ch-server
+    ports:
+    - "8123"
+    - "9000"
+    volumes:
+    - type: bind
+      source: ./clickhouse/clickhouse_data/
+      target: /var/lib/clickhouse
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+  glaber-nginx:
+    image: registry.gitlab.com/mikler/glaber:glaber-nginx-${GLABER_VERSION}
+    healthcheck:
+      test:
+        - "CMD"
+        - "wget"
+        - "-q"
+        - "127.0.0.1"
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    depends_on:
+    - glaber-server
+    - mysql
+    - clickhouse
+    networks:
+      zabbix:
+        aliases:
+        - glaber-nginx
+    ports:
+    - "${ZBX_PORT:-80}:80"
+    env_file:
+    - .env
+  glaber-server:
+    image: registry.gitlab.com/mikler/glaber:glaber-server-${GLABER_VERSION}
+    volumes:
+    - type: bind
+      source: ./glaber-server/workers_script/
+      target: /usr/share/glaber/workers/
+    cap_add:
+    - NET_RAW
+    env_file:
+    - .env
+    ports:
+    - "10051"
+    depends_on:
+    - mysql
+    - clickhouse
+    networks:
+      zabbix:
+        aliases:
+        - glaber-server-1
+networks:
+  zabbix:

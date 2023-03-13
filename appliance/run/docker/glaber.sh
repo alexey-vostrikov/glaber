@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -e
+
+# functions
+apitest () {
+  info "Install hurl for testing glaber"
+  [ -d ".tmp/hurl-$HURL_VERSION" ] || \
+  curl -sL https://github.com/Orange-OpenSource/hurl/releases/download/\
+$HURL_VERSION/hurl-$HURL_VERSION-x86_64-linux.tar.gz | \
+  tar xvz -C .tmp/ 1>/dev/null
+  info "Testing that glaber-server is runing"
+  .tmp/hurl-$HURL_VERSION/hurl  -o .tmp/hurl.log \
+    --variables-file=../../test/.hurl \
+    --retry --retry-max-count 20 --retry-interval 15000 \
+    ../../test/glaber-runing.hurl
+}
+diag () {
+  info "Collect glaber logs"
+  docker-compose logs --no-color clickhouse > .tmp/diag/clickhouse.log || true
+  docker-compose logs --no-color mysql > .tmp/diag/mysql.log || true
+  docker-compose logs --no-color glaber-nginx > .tmp/diag/glaber-nginx.log || true
+  docker-compose logs --no-color glaber-server > .tmp/diag/glaber-server.log || true
+  docker-compose ps > .tmp/diag/ps.log
+  info "Collect geneal information about system and docker"
+  uname -a > .tmp/diag/uname.log
+  git log -1 --stat > .tmp/diag/last-commit.log
+  cat /etc/os-release > .tmp/diag/os-release
+  free -m > .tmp/diag/mem.log
+  df -h   > .tmp/diag/disk.log
+  docker-compose -version > .tmp/diag/docker-compose-version.log
+  docker --version > .tmp/diag/docker-version.log
+  docker info > .tmp/diag/docker-info.log
+  curl http://127.0.1.1:${ZBX_PORT:-80} > .tmp/diag/curl.log
+  info "Add diagnostic information to .tmp/diag/diag.zip"
+  zip -r .tmp/diag/diag.zip .tmp/diag/ 1>/dev/null
+  info "Fill free to create issue https://gitlab.com/mikler/glaber/-/issues"
+  info "And attach .tmp/diag/diag.zip to it"
+}
+git-reset-variables-files () {
+  git checkout HEAD -- clickhouse/users.xml
+  git checkout HEAD -- .env
+}
+info () {
+  local message=$1
+  echo $(date --rfc-3339=seconds) $message
+}
+wait () {
+  info "Waiting zabbix to start..."
+  apitest && info "Success" && info "$(cat .zbxweb)" && exit 0 || \
+  docker-compose logs --no-color && \
+  curl http://127.0.1.1:${ZBX_PORT:-80} || true && \
+  info "Please try to open zabbix url with credentials:" && \
+  info "$(cat .zbxweb)"  && \
+  info "If not success, please run diagnostics ./glaber.sh diag" && \
+  info "Zabbix start failed.Timeout 5 minutes reached" && \
+  exit 1
+}
+set-passwords() {
+  gen-password() {
+    < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c12
+  }
+  if [ ! -f .passwords.created ]; then
+    git-reset-variables-files
+    source .env
+    ZBX_CH_PASS=$(gen-password)
+    ZBX_WEB_ADMIN_PASS=$(gen-password)
+    sed -i -e "s/MYSQL_PASSWORD=.*/MYSQL_PASSWORD=$(gen-password)/" \
+           -e "s/ZBX_CH_PASS=.*/ZBX_CH_PASS=$ZBX_CH_PASS/" \
+           -e "s/MYSQL_ROOT_PASSWORD=.*/MYSQL_ROOT_PASSWORD=$(gen-password)/" \
+    .env  
+    [[ ! -f mysql/create.sql ]] && \
+    wget -q https://storage.yandexcloud.net/glaber/repo/$GLABER_VERSION-create-mysql.sql.tar.gz -O - | tar -xz && \
+    mv create.sql mysql/create.sql
+    echo "use MYSQL_DATABASE;" >> mysql/create.sql
+    echo "update users set passwd=md5('ZBX_WEB_ADMIN_PASS') where username='Admin';" >> mysql/create.sql
+    sed -i -e "s/MYSQL_DATABASE/$MYSQL_DATABASE/" \
+           -e "s/ZBX_WEB_ADMIN_PASS/$ZBX_WEB_ADMIN_PASS/" \
+    mysql/create.sql
+    sed -i -e "s/<password>.*<\/password>/<password>$ZBX_CH_PASS<\/password>/" \
+           -e "s/10000000000/$ZBX_CH_CONFIG_MAX_MEMORY_USAGE/" \
+           -e "s/defaultuser/$ZBX_CH_USER/" \
+    clickhouse/users.xml
+    sed -i -e "s/3G/$MYSQL_CONFIG_INNODB_BUFFER_POOL_SIZE/" \
+    mysql/etc/my.cnf.d/innodb.conf
+    echo "user=Admin" > ../../test/.hurl
+    echo "pass=$ZBX_WEB_ADMIN_PASS" >> ../../test/.hurl
+    echo "port=${ZBX_PORT:-80}" >> ../../test/.hurl
+    touch .passwords.created
+    echo "Zabbix web access http://127.0.1.1:${ZBX_PORT:-80} Admin $ZBX_WEB_ADMIN_PASS" > .zbxweb
+  fi
+}
+usage() {
+  echo "Usage: $0 <action>"
+  echo
+  echo "$0 build    - Build docker images"
+  echo "$0 start    - Build docker images and start glaber"
+  echo "$0 stop     - Stop glaber containers"
+  echo "$0 recreate - Completely remove glaber and start it again"
+  echo "$0 diag     - Collect glaber start and some base system info to the file"
+}
+build() {
+  [ -d "glaber-server/workers_script/" ] || mkdir -p glaber-server/workers_script/
+  [ -d ".tmp/diag/" ] || mkdir -p .tmp/diag/
+  [ -d ".mysql/mysql_data/" ] || \
+  sudo install -d -o 1001 -g 1001 mysql/mysql_data/
+  [ -d ".clickhouse/clickhouse_data/" ] || \
+  sudo install -d -o 101 -g 103 clickhouse/clickhouse_data
+  docker-compose pull 1>.tmp/diag/docker-build.log
+  docker-compose build $args 1>.tmp/diag/docker-build.log
+}
+start() {
+  set-passwords
+  build
+  docker-compose up -d
+  wait
+}
+stop() {
+  docker-compose down
+}
+remove() {
+  docker-compose down
+  read -p "Are you sure to completely remove glaber with database [y/n] ? " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]
+  then
+    rm .passwords.created .zbxweb ../../test/.hurl || true
+    sudo rm -rf  mysql/mysql_data/ clickhouse/clickhouse_data mysql/create.sql
+    git-reset-variables-files
+  fi
+}
+recreate() {
+  remove
+  start
+}
+
+# variables
+HURL_VERSION="1.8.0"
+# Getting latest tag on git repository (latest stable version of glaber)
+GLABER_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+git checkout tags/$GLABER_TAG -- ../../../include/version.h
+GLABER_VERSION=$(cat ../../../include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)")
+git checkout HEAD -- ../../../include/version.h
+# ZBX_PORT=8050
+
+# main part
+[ $# -ne 1 ] && (usage && exit 1)
+
+# Check whether docker-compose is installed
+command -v docker-compose >/dev/null 2>&1 || \
+{ echo >&2 "docker-compose is required, please install it and start over. Aborting."; exit 1; }
+
+case $1 in
+  build)
+    build
+    ;;
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  recreate)
+    recreate
+    ;;
+  remove)
+    remove
+    ;;
+  diag)
+    diag
+    ;;
+  test)
+    apitest
+    ;;
+  *)
+    echo -n "unknown command"
+    ;;
+esac
