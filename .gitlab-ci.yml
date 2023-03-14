@@ -191,9 +191,6 @@ centos-8:
     - *upload_rpms
 
 docker:
-  image: docker:23.0.1
-  services:
-    - docker:dind
   stage: deploy
   script:
     - export GLABER_VERSION=$(cat include/version.h | grep GLABER_VERSION | tr -dc 0-9.)
