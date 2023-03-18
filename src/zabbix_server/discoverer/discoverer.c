@@ -264,11 +264,11 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, int con
 					item.snmp_community = strdup(dcheck->snmp_community);
 					item.snmp_oid = strdup(dcheck->key_);
 
-					glb_macro_expand_common_unmasked(&item.snmp_community, NULL, 0);
+					glb_macro_expand_by_host_unmasked(&item.snmp_community, &item.host, NULL, 0);
 				//	zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 				//			NULL, NULL, NULL, NULL, NULL, &item.snmp_community,
 				//			MACRO_TYPE_COMMON, NULL, 0);
-					glb_macro_expand_item_key(&item.snmp_oid, MACRO_TYPE_SNMP_OID, NULL, 0);
+					glb_macro_expand_by_host(&item.snmp_oid, &item.host, NULL, 0);
 				//	zbx_substitute_key_macros(&item.snmp_oid, NULL, NULL, NULL, NULL,
 				//			MACRO_TYPE_SNMP_OID, NULL, 0);
 
@@ -288,20 +288,20 @@ static int	discover_service(const DB_DCHECK *dcheck, char *ip, int port, int con
 						// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
 						// 		NULL, NULL, NULL, NULL, NULL, NULL,
 						// 		&item.snmpv3_securityname, MACRO_TYPE_COMMON, NULL, 0);
-						glb_macro_expand_common_unmasked(&item.snmpv3_securityname, NULL, 0);		
+						glb_macro_expand_by_host(&item.snmpv3_securityname, &item.host, NULL, 0);		
 						// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
 						// 		NULL, NULL, NULL, NULL, NULL, NULL,
 						// 		&item.snmpv3_authpassphrase, MACRO_TYPE_COMMON, NULL,
 						// 		0);
-						glb_macro_expand_common_unmasked(&item.snmpv3_authpassphrase, NULL, 0);	
+						glb_macro_expand_by_host_unmasked(&item.snmpv3_authpassphrase, &item.host, NULL, 0);	
 						// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
 						// 		NULL, NULL, NULL, NULL, NULL, NULL,
 						// 		&item.snmpv3_privpassphrase, MACRO_TYPE_COMMON, NULL, 0);
-						glb_macro_expand_common_unmasked(&item.snmpv3_privpassphrase, NULL, 0);	
+						glb_macro_expand_by_host_unmasked(&item.snmpv3_privpassphrase, &item.host, NULL, 0);	
 						//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL,
 						//		NULL, NULL, NULL, NULL, NULL, NULL,
 						//		&item.snmpv3_contextname, MACRO_TYPE_COMMON, NULL, 0);
-						glb_macro_expand_common_unmasked(&item.snmpv3_contextname, NULL, 0);
+						glb_macro_expand_by_host_unmasked(&item.snmpv3_contextname, &item.host, NULL, 0);
 					}
 
 					if (SUCCEED == get_value_snmp(&item, &result, ZBX_NO_POLLER, config_timeout) &&
@@ -802,7 +802,7 @@ static int	process_discovery(time_t *nextcheck, int config_timeout)
 			delay_str = zbx_strdup(delay_str, row[3]);
 			//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			//		&delay_str, MACRO_TYPE_COMMON, NULL, 0);
-			glb_macro_expand_common_unmasked(&delay_str, NULL, 0);
+			glb_macro_expand_by_hostid_unmasked(&delay_str, 0,  NULL, 0);
 
 			if (SUCCEED != zbx_is_time_suffix(delay_str, &delay, ZBX_LENGTH_UNLIMITED))
 			{

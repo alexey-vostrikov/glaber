@@ -691,16 +691,15 @@ static int	expression_extract_functionid(const char *expression, zbx_eval_token_
  * Return value: Expression evaluation context.                               *
  *                                                                            *
  ******************************************************************************/
-zbx_eval_context_t	*zbx_eval_deserialize_dyn(const unsigned char *data, const char *expression,
-		zbx_uint64_t mask)
+void zbx_eval_extract_tokens(zbx_eval_context_t *ctx,  char* expression,  zbx_uint64_t mask)
 {
-	zbx_eval_context_t	*ctx;
+	
 	int			i;
 	zbx_uint64_t		functionid;
 	char			*value;
 
-	ctx = (zbx_eval_context_t *)zbx_malloc(NULL, sizeof(zbx_eval_context_t));
-	zbx_eval_deserialize(ctx, expression, ZBX_EVAL_TRIGGER_EXPRESSION, data);
+	//ctx = (zbx_eval_context_t *)zbx_malloc(NULL, sizeof(zbx_eval_context_t));
+	//zbx_eval_deserialize(ctx, expression, ZBX_EVAL_TRIGGER_EXPRESSION, data);
 
 	for (i = 0; i < ctx->stack.values_num; i++)
 	{
@@ -739,8 +738,6 @@ zbx_eval_context_t	*zbx_eval_deserialize_dyn(const unsigned char *data, const ch
 				break;
 		}
 	}
-
-	return ctx;
 }
 
 /******************************************************************************

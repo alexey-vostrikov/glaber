@@ -32,25 +32,25 @@
 #include "zbxparam.h"
 #include "glb_history.h"
 
-#define ZBX_VALUEMAP_STRING_LEN	64
+// #define ZBX_VALUEMAP_STRING_LEN	64
 
-#define ZBX_VALUEMAP_TYPE_MATCH			0
-#define ZBX_VALUEMAP_TYPE_GREATER_OR_EQUAL	1
-#define ZBX_VALUEMAP_TYPE_LESS_OR_EQUAL		2
-#define ZBX_VALUEMAP_TYPE_RANGE			3
-#define ZBX_VALUEMAP_TYPE_REGEX			4
-#define ZBX_VALUEMAP_TYPE_DEFAULT		5
+// #define ZBX_VALUEMAP_TYPE_MATCH			0
+// #define ZBX_VALUEMAP_TYPE_GREATER_OR_EQUAL	1
+// #define ZBX_VALUEMAP_TYPE_LESS_OR_EQUAL		2
+// #define ZBX_VALUEMAP_TYPE_RANGE			3
+// #define ZBX_VALUEMAP_TYPE_REGEX			4
+// #define ZBX_VALUEMAP_TYPE_DEFAULT		5
 
-typedef struct
-{
-	char	value[ZBX_VALUEMAP_STRING_LEN];
-	char	newvalue[ZBX_VALUEMAP_STRING_LEN];
-	int	type;
-}
-zbx_valuemaps_t;
+// typedef struct
+// {
+// 	char	value[ZBX_VALUEMAP_STRING_LEN];
+// 	char	newvalue[ZBX_VALUEMAP_STRING_LEN];
+// 	int	type;
+// }
+// zbx_valuemaps_t;
 
-ZBX_PTR_VECTOR_DECL(valuemaps_ptr, zbx_valuemaps_t *)
-ZBX_PTR_VECTOR_IMPL(valuemaps_ptr, zbx_valuemaps_t *)
+// ZBX_PTR_VECTOR_DECL(valuemaps_ptr, zbx_valuemaps_t *)
+// ZBX_PTR_VECTOR_IMPL(valuemaps_ptr, zbx_valuemaps_t *)
 
 /******************************************************************************
  *                                                                            *
@@ -181,28 +181,28 @@ clean:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose:  check if unit is blacklisted or not                              *
- *                                                                            *
- * Parameters: unit - unit to check                                           *
- *                                                                            *
- * Return value: SUCCEED - unit blacklisted                                   *
- *               FAIL - unit is not blacklisted                               *
- *                                                                            *
- ******************************************************************************/
-static int	is_blacklisted_unit(const char *unit)
-{
-	int	ret;
+// /******************************************************************************
+//  *                                                                            *
+//  * Purpose:  check if unit is blacklisted or not                              *
+//  *                                                                            *
+//  * Parameters: unit - unit to check                                           *
+//  *                                                                            *
+//  * Return value: SUCCEED - unit blacklisted                                   *
+//  *               FAIL - unit is not blacklisted                               *
+//  *                                                                            *
+//  ******************************************************************************/
+// static int	is_blacklisted_unit(const char *unit)
+// {
+// 	int	ret;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	ret = zbx_str_in_list("%,ms,rpm,RPM", unit, ',');
+// 	ret = zbx_str_in_list("%,ms,rpm,RPM", unit, ',');
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -240,70 +240,70 @@ static void	add_value_units_no_kmgt(char *value, size_t max_len, const char *uni
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: add units with K,M,G,T prefix to the value                        *
- *                                                                            *
- * Parameters: value - value for adjusting                                    *
- *             max_len - max len of the value                                 *
- *             units - units (bps, b, B, etc)                                 *
- *                                                                            *
- ******************************************************************************/
-static void	add_value_units_with_kmgt(char *value, size_t max_len, const char *units)
-{
-	const char	*minus = "";
-	char		kmgt[8];
-	char		tmp[64];
-	double		base;
-	double		value_double;
+// /******************************************************************************
+//  *                                                                            *
+//  * Purpose: add units with K,M,G,T prefix to the value                        *
+//  *                                                                            *
+//  * Parameters: value - value for adjusting                                    *
+//  *             max_len - max len of the value                                 *
+//  *             units - units (bps, b, B, etc)                                 *
+//  *                                                                            *
+//  ******************************************************************************/
+// static void	add_value_units_with_kmgt(char *value, size_t max_len, const char *units)
+// {
+// 	const char	*minus = "";
+// 	char		kmgt[8];
+// 	char		tmp[64];
+// 	double		base;
+// 	double		value_double;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	if (0 > (value_double = atof(value)))
-	{
-		minus = "-";
-		value_double = -value_double;
-	}
+// 	if (0 > (value_double = atof(value)))
+// 	{
+// 		minus = "-";
+// 		value_double = -value_double;
+// 	}
 
-	base = (0 == strcmp(units, "B") || 0 == strcmp(units, "Bps") ? 1024 : 1000);
+// 	base = (0 == strcmp(units, "B") || 0 == strcmp(units, "Bps") ? 1024 : 1000);
 
-	if (value_double < base)
-	{
-		zbx_strscpy(kmgt, "");
-	}
-	else if (value_double < base * base)
-	{
-		zbx_strscpy(kmgt, "K");
-		value_double /= base;
-	}
-	else if (value_double < base * base * base)
-	{
-		zbx_strscpy(kmgt, "M");
-		value_double /= base * base;
-	}
-	else if (value_double < base * base * base * base)
-	{
-		zbx_strscpy(kmgt, "G");
-		value_double /= base * base * base;
-	}
-	else
-	{
-		zbx_strscpy(kmgt, "T");
-		value_double /= base * base * base * base;
-	}
+// 	if (value_double < base)
+// 	{
+// 		zbx_strscpy(kmgt, "");
+// 	}
+// 	else if (value_double < base * base)
+// 	{
+// 		zbx_strscpy(kmgt, "K");
+// 		value_double /= base;
+// 	}
+// 	else if (value_double < base * base * base)
+// 	{
+// 		zbx_strscpy(kmgt, "M");
+// 		value_double /= base * base;
+// 	}
+// 	else if (value_double < base * base * base * base)
+// 	{
+// 		zbx_strscpy(kmgt, "G");
+// 		value_double /= base * base * base;
+// 	}
+// 	else
+// 	{
+// 		zbx_strscpy(kmgt, "T");
+// 		value_double /= base * base * base * base;
+// 	}
 
-	if (SUCCEED != zbx_double_compare(round(value_double), value_double))
-	{
-		zbx_snprintf(tmp, sizeof(tmp), ZBX_FS_DBL_EXT(2), value_double);
-		zbx_del_zeros(tmp);
-	}
-	else
-		zbx_snprintf(tmp, sizeof(tmp), ZBX_FS_DBL_EXT(0), value_double);
+// 	if (SUCCEED != zbx_double_compare(round(value_double), value_double))
+// 	{
+// 		zbx_snprintf(tmp, sizeof(tmp), ZBX_FS_DBL_EXT(2), value_double);
+// 		zbx_del_zeros(tmp);
+// 	}
+// 	else
+// 		zbx_snprintf(tmp, sizeof(tmp), ZBX_FS_DBL_EXT(0), value_double);
 
-	zbx_snprintf(value, max_len, "%s%s %s%s", minus, tmp, kmgt, units);
+// 	zbx_snprintf(value, max_len, "%s%s %s%s", minus, tmp, kmgt, units);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -315,48 +315,48 @@ static void	add_value_units_with_kmgt(char *value, size_t max_len, const char *u
  *               FAIL - adding failed, value contains old value               *
  *                                                                            *
  ******************************************************************************/
-static void	add_value_suffix(char *value, size_t max_len, const char *units, unsigned char value_type)
-{
-	struct tm	*local_time;
-	time_t		time;
+// static void	add_value_suffix(char *value, size_t max_len, const char *units, unsigned char value_type)
+// {
+// 	struct tm	*local_time;
+// 	time_t		time;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() value:'%s' units:'%s' value_type:%d",
-			__func__, value, units, (int)value_type);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() value:'%s' units:'%s' value_type:%d",
+// 			__func__, value, units, (int)value_type);
 
-	switch (value_type)
-	{
-		case ITEM_VALUE_TYPE_UINT64:
-			if (0 == strcmp(units, "unixtime"))
-			{
-				time = (time_t)atoi(value);
-				local_time = localtime(&time);
-				strftime(value, max_len, "%Y.%m.%d %H:%M:%S", local_time);
-				break;
-			}
-			ZBX_FALLTHROUGH;
-		case ITEM_VALUE_TYPE_FLOAT:
-			if (0 == strcmp(units, "s"))
-				add_value_suffix_s(value, max_len);
-			else if (0 == strcmp(units, "uptime"))
-				add_value_suffix_uptime(value, max_len);
-			else if ('!' == *units)
-				add_value_units_no_kmgt(value, max_len, (const char *)(units + 1));
-			else if (SUCCEED == is_blacklisted_unit(units))
-				add_value_units_no_kmgt(value, max_len, units);
-			else if ('\0' != *units)
-				add_value_units_with_kmgt(value, max_len, units);
-			break;
-		default:
-			;
-	}
+// 	switch (value_type)
+// 	{
+// 		case ITEM_VALUE_TYPE_UINT64:
+// 			if (0 == strcmp(units, "unixtime"))
+// 			{
+// 				time = (time_t)atoi(value);
+// 				local_time = localtime(&time);
+// 				strftime(value, max_len, "%Y.%m.%d %H:%M:%S", local_time);
+// 				break;
+// 			}
+// 			ZBX_FALLTHROUGH;
+// 		case ITEM_VALUE_TYPE_FLOAT:
+// 			if (0 == strcmp(units, "s"))
+// 				add_value_suffix_s(value, max_len);
+// 			else if (0 == strcmp(units, "uptime"))
+// 				add_value_suffix_uptime(value, max_len);
+// 			else if ('!' == *units)
+// 				add_value_units_no_kmgt(value, max_len, (const char *)(units + 1));
+// 			else if (SUCCEED == is_blacklisted_unit(units))
+// 				add_value_units_no_kmgt(value, max_len, units);
+// 			else if ('\0' != *units)
+// 				add_value_units_with_kmgt(value, max_len, units);
+// 			break;
+// 		default:
+// 			;
+// 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() value:'%s'", __func__, value);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() value:'%s'", __func__, value);
+// }
 
-static void	zbx_valuemaps_free(zbx_valuemaps_t *valuemap)
-{
-	zbx_free(valuemap);
-}
+// static void	zbx_valuemaps_free(zbx_valuemaps_t *valuemap)
+// {
+// 	zbx_free(valuemap);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -371,144 +371,144 @@ static void	zbx_valuemaps_free(zbx_valuemaps_t *valuemap)
  *               FAIL - evaluation failed, value contains old value           *
  *                                                                            *
  ******************************************************************************/
-static int	evaluate_value_by_map(char *value, size_t max_len, zbx_vector_valuemaps_ptr_t *valuemaps,
-		unsigned char value_type)
-{
-	char		*value_tmp;
-	int		i, ret = FAIL;
-	double		input_value;
-	zbx_valuemaps_t	*valuemap;
+// static int	evaluate_value_by_map(char *value, size_t max_len, zbx_vector_valuemaps_ptr_t *valuemaps,
+// 		unsigned char value_type)
+// {
+// 	char		*value_tmp;
+// 	int		i, ret = FAIL;
+// 	double		input_value;
+// 	zbx_valuemaps_t	*valuemap;
 
-	for (i = 0; i < valuemaps->values_num; i++)
-	{
-		char			*pattern;
-		int			match;
-		zbx_vector_expression_t	regexps;
+// 	for (i = 0; i < valuemaps->values_num; i++)
+// 	{
+// 		char			*pattern;
+// 		int			match;
+// 		zbx_vector_expression_t	regexps;
 
-		valuemap = (zbx_valuemaps_t *)valuemaps->values[i];
+// 		valuemap = (zbx_valuemaps_t *)valuemaps->values[i];
 
-		if (ZBX_VALUEMAP_TYPE_MATCH == valuemap->type)
-		{
-			if (ITEM_VALUE_TYPE_STR != value_type)
-			{
-				double	num1, num2;
+// 		if (ZBX_VALUEMAP_TYPE_MATCH == valuemap->type)
+// 		{
+// 			if (ITEM_VALUE_TYPE_STR != value_type)
+// 			{
+// 				double	num1, num2;
 
-				if (ZBX_INFINITY != (num1 = zbx_evaluate_string_to_double(value)) &&
-						ZBX_INFINITY != (num2 = zbx_evaluate_string_to_double(valuemap->value)) &&
-						SUCCEED == zbx_double_compare(num1, num2))
-				{
-					goto map_value;
-				}
-			}
-			else if (0 == strcmp(valuemap->value, value))
-				goto map_value;
-		}
+// 				if (ZBX_INFINITY != (num1 = zbx_evaluate_string_to_double(value)) &&
+// 						ZBX_INFINITY != (num2 = zbx_evaluate_string_to_double(valuemap->value)) &&
+// 						SUCCEED == zbx_double_compare(num1, num2))
+// 				{
+// 					goto map_value;
+// 				}
+// 			}
+// 			else if (0 == strcmp(valuemap->value, value))
+// 				goto map_value;
+// 		}
 
-		if (ITEM_VALUE_TYPE_STR == value_type && ZBX_VALUEMAP_TYPE_REGEX == valuemap->type)
-		{
-			zbx_vector_expression_create(&regexps);
+// 		if (ITEM_VALUE_TYPE_STR == value_type && ZBX_VALUEMAP_TYPE_REGEX == valuemap->type)
+// 		{
+// 			zbx_vector_expression_create(&regexps);
 
-			pattern = valuemap->value;
+// 			pattern = valuemap->value;
 
-			match = zbx_regexp_match_ex(&regexps, value, pattern, ZBX_CASE_SENSITIVE);
+// 			match = zbx_regexp_match_ex(&regexps, value, pattern, ZBX_CASE_SENSITIVE);
 
-			zbx_regexp_clean_expressions(&regexps);
-			zbx_vector_expression_destroy(&regexps);
+// 			zbx_regexp_clean_expressions(&regexps);
+// 			zbx_vector_expression_destroy(&regexps);
 
-			if (ZBX_REGEXP_MATCH == match)
-				goto map_value;
-		}
+// 			if (ZBX_REGEXP_MATCH == match)
+// 				goto map_value;
+// 		}
 
-		if (ITEM_VALUE_TYPE_STR != value_type &&
-				ZBX_INFINITY != (input_value = zbx_evaluate_string_to_double(value)))
-		{
-			double	min, max;
+// 		if (ITEM_VALUE_TYPE_STR != value_type &&
+// 				ZBX_INFINITY != (input_value = zbx_evaluate_string_to_double(value)))
+// 		{
+// 			double	min, max;
 
-			if (ZBX_VALUEMAP_TYPE_LESS_OR_EQUAL == valuemap->type &&
-					ZBX_INFINITY != (max = zbx_evaluate_string_to_double(valuemap->value)))
-			{
-				if (input_value <= max)
-					goto map_value;
-			}
-			else if (ZBX_VALUEMAP_TYPE_GREATER_OR_EQUAL == valuemap->type &&
-					ZBX_INFINITY != (min = zbx_evaluate_string_to_double(valuemap->value)))
-			{
-				if (input_value >= min)
-					goto map_value;
-			}
-			else if (ZBX_VALUEMAP_TYPE_RANGE == valuemap->type)
-			{
-				int	num, j;
-				char	*input_ptr;
+// 			if (ZBX_VALUEMAP_TYPE_LESS_OR_EQUAL == valuemap->type &&
+// 					ZBX_INFINITY != (max = zbx_evaluate_string_to_double(valuemap->value)))
+// 			{
+// 				if (input_value <= max)
+// 					goto map_value;
+// 			}
+// 			else if (ZBX_VALUEMAP_TYPE_GREATER_OR_EQUAL == valuemap->type &&
+// 					ZBX_INFINITY != (min = zbx_evaluate_string_to_double(valuemap->value)))
+// 			{
+// 				if (input_value >= min)
+// 					goto map_value;
+// 			}
+// 			else if (ZBX_VALUEMAP_TYPE_RANGE == valuemap->type)
+// 			{
+// 				int	num, j;
+// 				char	*input_ptr;
 
-				input_ptr = valuemap->value;
+// 				input_ptr = valuemap->value;
 
-				zbx_trim_str_list(input_ptr, ',');
-				zbx_trim_str_list(input_ptr, '-');
-				num = zbx_num_param(input_ptr);
+// 				zbx_trim_str_list(input_ptr, ',');
+// 				zbx_trim_str_list(input_ptr, '-');
+// 				num = zbx_num_param(input_ptr);
 
-				for (j = 0; j < num; j++)
-				{
-					int	found = 0;
-					char	*ptr, *range_str;
+// 				for (j = 0; j < num; j++)
+// 				{
+// 					int	found = 0;
+// 					char	*ptr, *range_str;
 
-					range_str = ptr = zbx_get_param_dyn(input_ptr, j + 1, NULL);
+// 					range_str = ptr = zbx_get_param_dyn(input_ptr, j + 1, NULL);
 
-					if (1 < strlen(ptr) && '-' == *ptr)
-						ptr++;
+// 					if (1 < strlen(ptr) && '-' == *ptr)
+// 						ptr++;
 
-					while (NULL != (ptr = strchr(ptr, '-')))
-					{
-						if (ptr > range_str && 'e' != ptr[-1] && 'E' != ptr[-1])
-							break;
-						ptr++;
-					}
+// 					while (NULL != (ptr = strchr(ptr, '-')))
+// 					{
+// 						if (ptr > range_str && 'e' != ptr[-1] && 'E' != ptr[-1])
+// 							break;
+// 						ptr++;
+// 					}
 
-					if (NULL == ptr)
-					{
-						min = zbx_evaluate_string_to_double(range_str);
-						found = ZBX_INFINITY != min && SUCCEED == zbx_double_compare(input_value, min);
-					}
-					else
-					{
-						*ptr = '\0';
-						min = zbx_evaluate_string_to_double(range_str);
-						max = zbx_evaluate_string_to_double(ptr + 1);
-						if (ZBX_INFINITY != min && ZBX_INFINITY != max &&
-								input_value >= min && input_value <= max)
-						{
-							found = 1;
-						}
-					}
+// 					if (NULL == ptr)
+// 					{
+// 						min = zbx_evaluate_string_to_double(range_str);
+// 						found = ZBX_INFINITY != min && SUCCEED == zbx_double_compare(input_value, min);
+// 					}
+// 					else
+// 					{
+// 						*ptr = '\0';
+// 						min = zbx_evaluate_string_to_double(range_str);
+// 						max = zbx_evaluate_string_to_double(ptr + 1);
+// 						if (ZBX_INFINITY != min && ZBX_INFINITY != max &&
+// 								input_value >= min && input_value <= max)
+// 						{
+// 							found = 1;
+// 						}
+// 					}
 
-					zbx_free(range_str);
+// 					zbx_free(range_str);
 
-					if (0 != found)
-						goto map_value;
-				}
-			}
-		}
-	}
+// 					if (0 != found)
+// 						goto map_value;
+// 				}
+// 			}
+// 		}
+// 	}
 
-	for (i = 0; i < valuemaps->values_num; i++)
-	{
-		valuemap = (zbx_valuemaps_t *)valuemaps->values[i];
+// 	for (i = 0; i < valuemaps->values_num; i++)
+// 	{
+// 		valuemap = (zbx_valuemaps_t *)valuemaps->values[i];
 
-		if (ZBX_VALUEMAP_TYPE_DEFAULT == valuemap->type)
-			goto map_value;
-	}
-map_value:
-	if (i < valuemaps->values_num)
-	{
-		value_tmp = zbx_dsprintf(NULL, "%s (%s)", valuemap->newvalue, value);
-		zbx_strlcpy_utf8(value, value_tmp, max_len);
-		zbx_free(value_tmp);
+// 		if (ZBX_VALUEMAP_TYPE_DEFAULT == valuemap->type)
+// 			goto map_value;
+// 	}
+// map_value:
+// 	if (i < valuemaps->values_num)
+// 	{
+// 		value_tmp = zbx_dsprintf(NULL, "%s (%s)", valuemap->newvalue, value);
+// 		zbx_strlcpy_utf8(value, value_tmp, max_len);
+// 		zbx_free(value_tmp);
 
-		ret = SUCCEED;
-	}
+// 		ret = SUCCEED;
+// 	}
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -523,50 +523,50 @@ map_value:
  *               FAIL - evaluation failed, value contains old value           *
  *                                                                            *
  ******************************************************************************/
-static int	replace_value_by_map(char *value, size_t max_len, zbx_uint64_t valuemapid, unsigned char value_type)
-{
-	int				ret = FAIL;
-	DB_RESULT			result;
-	DB_ROW				row;
-	zbx_valuemaps_t			*valuemap;
-	zbx_vector_valuemaps_ptr_t	valuemaps;
+// static int	replace_value_by_map(char *value, size_t max_len, zbx_uint64_t valuemapid, unsigned char value_type)
+// {
+// 	int				ret = FAIL;
+// 	DB_RESULT			result;
+// 	DB_ROW				row;
+// 	zbx_valuemaps_t			*valuemap;
+// 	zbx_vector_valuemaps_ptr_t	valuemaps;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() value:'%s' valuemapid:" ZBX_FS_UI64, __func__, value, valuemapid);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() value:'%s' valuemapid:" ZBX_FS_UI64, __func__, value, valuemapid);
 
-	if (0 == valuemapid)
-		goto clean;
+// 	if (0 == valuemapid)
+// 		goto clean;
 
-	zbx_vector_valuemaps_ptr_create(&valuemaps);
+// 	zbx_vector_valuemaps_ptr_create(&valuemaps);
 
-	result = DBselect(
-			"select value, newvalue, type"
-			" from valuemap_mapping"
-			" where valuemapid=" ZBX_FS_UI64
-			" order by sortorder asc",
-			valuemapid);
+// 	result = DBselect(
+// 			"select value, newvalue, type"
+// 			" from valuemap_mapping"
+// 			" where valuemapid=" ZBX_FS_UI64
+// 			" order by sortorder asc",
+// 			valuemapid);
 
-	while (NULL != (row = DBfetch(result)))
-	{
-		zbx_del_zeros(row[1]);
+// 	while (NULL != (row = DBfetch(result)))
+// 	{
+// 		zbx_del_zeros(row[1]);
 
-		valuemap = (zbx_valuemaps_t *)zbx_malloc(NULL, sizeof(zbx_valuemaps_t));
-		zbx_strlcpy_utf8(valuemap->value, row[0], ZBX_VALUEMAP_STRING_LEN);
-		zbx_strlcpy_utf8(valuemap->newvalue, row[1], ZBX_VALUEMAP_STRING_LEN);
-		valuemap->type = atoi(row[2]);
-		zbx_vector_valuemaps_ptr_append(&valuemaps, valuemap);
-	}
+// 		valuemap = (zbx_valuemaps_t *)zbx_malloc(NULL, sizeof(zbx_valuemaps_t));
+// 		zbx_strlcpy_utf8(valuemap->value, row[0], ZBX_VALUEMAP_STRING_LEN);
+// 		zbx_strlcpy_utf8(valuemap->newvalue, row[1], ZBX_VALUEMAP_STRING_LEN);
+// 		valuemap->type = atoi(row[2]);
+// 		zbx_vector_valuemaps_ptr_append(&valuemaps, valuemap);
+// 	}
 
-	zbx_db_free_result(result);
+// 	zbx_db_free_result(result);
 
-	ret = evaluate_value_by_map(value, max_len, &valuemaps, value_type);
+// 	ret = evaluate_value_by_map(value, max_len, &valuemaps, value_type);
 
-	zbx_vector_valuemaps_ptr_clear_ext(&valuemaps, zbx_valuemaps_free);
-	zbx_vector_valuemaps_ptr_destroy(&valuemaps);
-clean:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() value:'%s'", __func__, value);
+// 	zbx_vector_valuemaps_ptr_clear_ext(&valuemaps, zbx_valuemaps_free);
+// 	zbx_vector_valuemaps_ptr_destroy(&valuemaps);
+// clean:
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() value:'%s'", __func__, value);
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -578,29 +578,29 @@ clean:
  *             value_type - [IN] value type; ITEM_VALUE_TYPE_*                *
  *                                                                            *
  ******************************************************************************/
-void	zbx_format_value(char *value, size_t max_len, zbx_uint64_t valuemapid,
-		const char *units, unsigned char value_type)
-{
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// void	zbx_format_value(char *value, size_t max_len, zbx_uint64_t valuemapid,
+// 		const char *units, unsigned char value_type)
+// {
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	switch (value_type)
-	{
-		case ITEM_VALUE_TYPE_STR:
-			replace_value_by_map(value, max_len, valuemapid, value_type);
-			break;
-		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_del_zeros(value);
-			ZBX_FALLTHROUGH;
-		case ITEM_VALUE_TYPE_UINT64:
-			if (SUCCEED != replace_value_by_map(value, max_len, valuemapid, value_type))
-				add_value_suffix(value, max_len, units, value_type);
-			break;
-		default:
-			;
-	}
+// 	switch (value_type)
+// 	{
+// 		case ITEM_VALUE_TYPE_STR:
+// 			replace_value_by_map(value, max_len, valuemapid, value_type);
+// 			break;
+// 		case ITEM_VALUE_TYPE_FLOAT:
+// 			zbx_del_zeros(value);
+// 			ZBX_FALLTHROUGH;
+// 		case ITEM_VALUE_TYPE_UINT64:
+// 			if (SUCCEED != replace_value_by_map(value, max_len, valuemapid, value_type))
+// 				add_value_suffix(value, max_len, units, value_type);
+// 			break;
+// 		default:
+// 			;
+// 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 /******************************************************************************
  *                                                                            *

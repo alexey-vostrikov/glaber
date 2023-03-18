@@ -21,6 +21,7 @@
 
 //#include "glb_state.h"
 #include "glb_history.h"
+#include "glbstr.h"
 
 #define STATE_ITEMS_INIT_SIZE (1000)
 //TODO: avoid flags, they are brainfucking , do clear function calls instead
@@ -63,6 +64,8 @@ void    glb_state_get_item_stats(zbx_vector_ptr_t *stats);
 int     glb_state_get_item_state(u_int64_t itemid);
 int     glb_state_get_values_by_count(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int count, int ts_end);
 int     glb_state_get_values_by_time(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds, int ts_end);
+
+int     glb_state_items_get_lastvalue_str(u_int64_t itemid, strlen_t *val);
 
 
 glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);

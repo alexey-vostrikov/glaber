@@ -85,11 +85,49 @@ void test_records_create_del_leak() {
     LOG_INF("test %s SUCCEED", __func__);
 }
 
+//#define TEST_RECORDS 1000000
+void test_elem_hash_remove_unexistant() {
+    u_int64_t was_size = shmtest_mem->free_size;
+    zbx_vector_uint64_t ids;
+    zbx_vector_uint64_create(&ids);
+    zbx_vector_uint64_reserve(&ids, TEST_RECORDS);
+
+    elems_hash_t *ehash =  elems_hash_init(&test_memf,create_cb, free_cb); 
+    LOG_INF("Creating 1M hashset and array");
+
+    for(int i=0; i < TEST_RECORDS; i++) {
+        elems_hash_process(ehash, i,  test_cb, NULL, 0);
+        zbx_vector_uint64_append(&ids, i);
+    }
+    
+    LOG_INF("There are %d records in the hash, %d records in the vector", ehash->elems.num_data, ids.values_num);
+    LOG_INF("Mem used: %ld", was_size - shmtest_mem->free_size);
+    LOG_INF("Removing unexistent");
+
+    elems_hash_remove_absent_in_vector(ehash, &ids);
+    LOG_INF("There are %d records in the hash, %d records in the vector", ehash->elems.num_data, ids.values_num);
+    assert(ehash->elems.num_data == TEST_RECORDS && "All records should remain");
+
+    //now lets remove half of the records
+    zbx_vector_uint64_clear(&ids);
+    
+    for(int i=0; i < TEST_RECORDS / 2 ; i++)
+            zbx_vector_uint64_append(&ids, i);
+    LOG_INF("There are %d records in the hash, %d records in the vector", ehash->elems.num_data, ids.values_num);
+    
+    elems_hash_remove_absent_in_vector(ehash, &ids);
+    assert(ehash->elems.num_data == TEST_RECORDS / 2 && "All records should remain");
+    LOG_INF("There are %d records in the hash, %d records in the vector", ehash->elems.num_data, ids.values_num);
+    elems_hash_destroy(ehash);
+    assert(was_size == shmtest_mem->free_size && "Check no leak happened");
+}
 
 void   tests_elems_hash_run(void) {
     LOG_INF("%s Running TESTS", __func__);
     init();
+    test_elem_hash_remove_unexistant();
     test_create_delete_leak();
     test_records_create_del_leak();
+
     LOG_INF("Finished elems hash tests");
 }

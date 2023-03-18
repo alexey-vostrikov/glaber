@@ -415,8 +415,8 @@ static int	parse_query_fields(const DC_ITEM *item, char **query_fields, unsigned
 		{
 //			zbx_substitute_simple_macros(NULL, NULL, NULL,NULL, NULL, &item->host, item, NULL, NULL, NULL, NULL,
 //					NULL, &data, MACRO_TYPE_HTTP_RAW, NULL, 0);
-			glb_macro_expand_by_host(&data, &item->host, MACRO_TYPE_HTTP_RAW, NULL, 0);
-			glb_macro_expand_by_item(&data, item, MACRO_TYPE_HTTP_RAW, NULL, 0);
+			glb_macro_expand_by_host(&data, &item->host, NULL, 0);
+			glb_macro_expand_by_item(&data, item, NULL, 0);
 		}
 		zbx_http_url_encode(data, &data);
 		zbx_strcpy_alloc(&str, &alloc_len, &offset, data);
@@ -427,7 +427,7 @@ static int	parse_query_fields(const DC_ITEM *item, char **query_fields, unsigned
 		{
 			//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL,NULL, NULL, &item->host, item, NULL, NULL,
 			//		NULL, NULL, NULL, &data, MACRO_TYPE_HTTP_RAW, NULL, 0);
-			glb_macro_expand_by_host_unmasked(&data, &item->host, MACRO_TYPE_HTTP_RAW, NULL, 0);
+			glb_macro_expand_by_host_unmasked(&data, &item->host, NULL, 0);
 		}
 
 		zbx_http_url_encode(data, &data);
@@ -480,7 +480,7 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 					//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 					//		NULL, NULL, NULL, NULL, NULL, NULL, &port, MACRO_TYPE_COMMON,
 					//		NULL, 0);
-					glb_macro_expand_common_by_hostid(&port, items[i].host.hostid, NULL, 0);
+					glb_macro_expand_by_hostid(&port, items[i].host.hostid, NULL, 0);
 				}
 
 				if (FAIL == zbx_is_ushort(port, &items[i].interface.port))
@@ -510,23 +510,23 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 					//		NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 					//		&items[i].snmpv3_securityname, MACRO_TYPE_COMMON, NULL,
 					//		0);
-					glb_macro_expand_common_by_hostid_unmasked(&items[i].snmpv3_securityname, items[i].host.hostid, NULL, 0);
+					glb_macro_expand_by_hostid_unmasked(&items[i].snmpv3_securityname, items[i].host.hostid, NULL, 0);
 
 					// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid,
 					// 		NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 					// 		&items[i].snmpv3_authpassphrase, MACRO_TYPE_COMMON,
 					// 		NULL, 0);
-					glb_macro_expand_common_by_hostid_unmasked(&items[i].snmpv3_authpassphrase, items[i].host.hostid, NULL, 0);
+					glb_macro_expand_by_hostid_unmasked(&items[i].snmpv3_authpassphrase, items[i].host.hostid, NULL, 0);
 					// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid,
 					// 		NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 					// 		&items[i].snmpv3_privpassphrase, MACRO_TYPE_COMMON,
 					// 		NULL, 0);
-					glb_macro_expand_common_by_hostid_unmasked(&items[i].snmpv3_privpassphrase, items[i].host.hostid, NULL, 0);
+					glb_macro_expand_by_hostid_unmasked(&items[i].snmpv3_privpassphrase, items[i].host.hostid, NULL, 0);
 					// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid,
 					// 		NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 					// 		&items[i].snmpv3_contextname, MACRO_TYPE_COMMON, NULL,
 					// 		0);
-					glb_macro_expand_common_by_hostid_unmasked(&items[i].snmpv3_contextname, items[i].host.hostid, NULL, 0);
+					glb_macro_expand_by_hostid_unmasked(&items[i].snmpv3_contextname, items[i].host.hostid, NULL, 0);
 				}
 
 				ZBX_STRDUP(items[i].snmp_community, items[i].snmp_community_orig);
@@ -535,7 +535,7 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 				// zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				// 		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].snmp_community,
 				// 		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].snmp_community, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].snmp_community, items[i].host.hostid, NULL, 0);
 				if (SUCCEED != 
 					//zbx_substitute_key_macros(&items[i].snmp_oid, &items[i].host.hostid,
 					//	NULL, NULL, NULL, MACRO_TYPE_SNMP_OID, error, sizeof(error))
@@ -556,15 +556,15 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 				//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, &items[i].timeout, MACRO_TYPE_COMMON,
 				//		NULL, 0);
-				glb_macro_expand_common_by_hostid( &items[i].timeout, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid( &items[i].timeout, items[i].host.hostid, NULL, 0);
 			//	zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, &items[i], NULL,
 			//			NULL, NULL, NULL, NULL, &items[i].script_params,
 			//			MACRO_TYPE_SCRIPT_PARAMS_FIELD, NULL, 0);
-				glb_macro_expand_by_item(&items[i].script_params, &items[i], MACRO_TYPE_SCRIPT_PARAMS_FIELD, NULL, 0);
+				glb_macro_expand_by_item(&items[i].script_params, &items[i], NULL, 0);
 			//	zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 			//			NULL, NULL, NULL, NULL, NULL, NULL, &items[i].params, MACRO_TYPE_COMMON,
 			//			NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].params, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].params, items[i].host.hostid, NULL, 0);
 				break;
 			case ITEM_TYPE_SSH:
 				if (MACRO_EXPAND_NO == expand_macros)
@@ -576,11 +576,11 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 				//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, &items[i].publickey, MACRO_TYPE_COMMON,
 				//		NULL, 0);
-				glb_macro_expand_common_by_hostid(&items[i].publickey, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid(&items[i].publickey, items[i].host.hostid, NULL, 0);
 				
 				//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, &items[i].privatekey, MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid(&items[i].privatekey, items[i].host.hostid, NULL, 0);		
+				glb_macro_expand_by_hostid(&items[i].privatekey, items[i].host.hostid, NULL, 0);		
 				ZBX_FALLTHROUGH;
 			case ITEM_TYPE_TELNET:
 			case ITEM_TYPE_DB_MONITOR:
@@ -590,7 +590,7 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, NULL, &items[i], NULL,
 				//		NULL, NULL, NULL, NULL, &items[i].params, MACRO_TYPE_PARAMS_FIELD,
 				//		NULL, 0);
-				glb_macro_expand_by_item(&items[i].params, &items[i], MACRO_TYPE_PARAMS_FIELD, NULL, 0 );		
+				glb_macro_expand_by_item(&items[i].params, &items[i], NULL, 0 );		
 				ZBX_FALLTHROUGH;
 			case ITEM_TYPE_SIMPLE:
 				if (MACRO_EXPAND_NO == expand_macros)
@@ -602,11 +602,11 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].username,
 				//		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].username, items[i].host.hostid, NULL, 0);		
+				glb_macro_expand_by_hostid_unmasked(&items[i].username, items[i].host.hostid, NULL, 0);		
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].password,
 				//		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].password, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].password, items[i].host.hostid, NULL, 0);
 				break;
 			case ITEM_TYPE_JMX:
 				if (MACRO_EXPAND_NO == expand_macros)
@@ -619,17 +619,17 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].username,
 				//		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].username, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].username, items[i].host.hostid, NULL, 0);
 
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].password,
 				//		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].password, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].password, items[i].host.hostid, NULL, 0);
 
 				//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, NULL, NULL, &items[i],
 				//		NULL, NULL, NULL, NULL, NULL, &items[i].jmx_endpoint, MACRO_TYPE_JMX_ENDPOINT,
 				//		NULL, 0);
-				glb_macro_expand_by_item(&items[i].jmx_endpoint, &items[i], MACRO_TYPE_JMX_ENDPOINT, NULL, 0);
+				glb_macro_expand_by_item(&items[i].jmx_endpoint, &items[i], NULL, 0);
 
 				break;
 			case ITEM_TYPE_HTTPAGENT:
@@ -649,11 +649,11 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 					//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 					//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].timeout,
 					//		MACRO_TYPE_COMMON, NULL, 0);
-					glb_macro_expand_common_by_hostid(&items[i].timeout, items[i].host.hostid, NULL, 0);
+					glb_macro_expand_by_hostid(&items[i].timeout, items[i].host.hostid, NULL, 0);
 					//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, NULL, &items[i].host,
 					//		&items[i], NULL, NULL, NULL, NULL, NULL, &items[i].url,
 					//		MACRO_TYPE_HTTP_RAW, NULL, 0);
-					glb_macro_expand_by_host_unmasked(&items[i].url, &items[i].host, MACRO_TYPE_HTTP_RAW, NULL, 0);
+					glb_macro_expand_by_host_unmasked(&items[i].url, &items[i].host, NULL, 0);
 				}
 
 				if (SUCCEED != zbx_http_punycode_encode_url(&items[i].url))
@@ -688,57 +688,57 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 						//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL,NULL, NULL,
 						//		&items[i].host, &items[i], NULL, NULL, NULL, NULL, NULL,
 						//		&items[i].posts, MACRO_TYPE_HTTP_JSON, NULL, 0);
-						glb_macro_expand_by_host(&items[i].posts, &items[i].host, MACRO_TYPE_HTTP_JSON, NULL, 0);
-						glb_macro_expand_by_item(&items[i].posts, &items[i], MACRO_TYPE_HTTP_JSON, NULL, 0);
+						glb_macro_expand_by_host(&items[i].posts, &items[i].host, NULL, 0);
+						glb_macro_expand_by_item(&items[i].posts, &items[i], NULL, 0);
 						break;
 					default:
 						//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL,NULL, NULL,
 						//		&items[i].host, &items[i], NULL, NULL, NULL, NULL, NULL,
 						//		&items[i].posts, MACRO_TYPE_HTTP_RAW, NULL, 0);
-						glb_macro_expand_by_host(&items[i].posts, &items[i].host, MACRO_TYPE_HTTP_RAW, NULL, 0);
-						glb_macro_expand_by_item(&items[i].posts, &items[i], MACRO_TYPE_HTTP_RAW, NULL, 0);
+						glb_macro_expand_by_host(&items[i].posts, &items[i].host, NULL, 0);
+						glb_macro_expand_by_item(&items[i].posts, &items[i], NULL, 0);
 						break;
 				}
 
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL,NULL, NULL, &items[i].host,
 				//		&items[i], NULL, NULL, NULL, NULL, NULL, &items[i].headers,
 				//		MACRO_TYPE_HTTP_RAW, NULL, 0);
-				glb_macro_expand_by_host_unmasked(&items[i].headers, &items[i].host, MACRO_TYPE_HTTP_RAW, NULL, 0);
-				glb_macro_expand_by_item_unmasked(&items[i].headers, &items[i], MACRO_TYPE_HTTP_RAW, NULL, 0);
+				glb_macro_expand_by_host_unmasked(&items[i].headers, &items[i].host, NULL, 0);
+				glb_macro_expand_by_item_unmasked(&items[i].headers, &items[i], NULL, 0);
 				//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].status_codes,
 				//		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid(&items[i].status_codes, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid(&items[i].status_codes, items[i].host.hostid, NULL, 0);
 
 				//zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].http_proxy,
 				//		MACRO_TYPE_COMMON, NULL, 0);
 
-				glb_macro_expand_common_by_hostid(&items[i].http_proxy, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid(&items[i].http_proxy, items[i].host.hostid, NULL, 0);
 				//zbx_substitute_simple_macros(NULL, NULL, NULL,NULL, NULL, &items[i].host, &items[i], NULL,
 				//		NULL, NULL, NULL, NULL, &items[i].ssl_cert_file, MACRO_TYPE_HTTP_RAW,
 				//		NULL, 0);
-				glb_macro_expand_by_host(&items[i].ssl_cert_file, &items[i].host, MACRO_TYPE_HTTP_RAW, NULL, 0);
-				glb_macro_expand_by_item(&items[i].ssl_cert_file, &items[i], MACRO_TYPE_HTTP_RAW, NULL, 0);
+				glb_macro_expand_by_host(&items[i].ssl_cert_file, &items[i].host, NULL, 0);
+				glb_macro_expand_by_item(&items[i].ssl_cert_file, &items[i], NULL, 0);
 				//zbx_substitute_simple_macros(NULL, NULL, NULL,NULL, NULL, &items[i].host, &items[i], NULL,
 				//		NULL, NULL, NULL, NULL, &items[i].ssl_key_file, MACRO_TYPE_HTTP_RAW,
 				//		NULL, 0);
-				glb_macro_expand_by_host(&items[i].ssl_key_file,&items[i].host, MACRO_TYPE_HTTP_RAW, NULL, 0);		
-				glb_macro_expand_by_item(&items[i].ssl_key_file, &items[i], MACRO_TYPE_HTTP_RAW, NULL, 0);		
+				glb_macro_expand_by_host(&items[i].ssl_key_file,&items[i].host, NULL, 0);		
+				glb_macro_expand_by_item(&items[i].ssl_key_file, &items[i], NULL, 0);		
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].ssl_key_password,
 				//		MACRO_TYPE_COMMON, NULL, 0);
 
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].ssl_key_password, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].ssl_key_password, items[i].host.hostid, NULL, 0);
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].username,
 				//		MACRO_TYPE_COMMON, NULL, 0);
 
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].username, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].username, items[i].host.hostid, NULL, 0);
 				//zbx_substitute_simple_macros_unmasked(NULL, NULL, NULL, NULL, &items[i].host.hostid, NULL,
 				//		NULL, NULL, NULL, NULL, NULL, NULL, &items[i].password,
 				//		MACRO_TYPE_COMMON, NULL, 0);
-				glb_macro_expand_common_by_hostid_unmasked(&items[i].password, items[i].host.hostid, NULL, 0);
+				glb_macro_expand_by_hostid_unmasked(&items[i].password, items[i].host.hostid, NULL, 0);
 				break;
 		}
 	}

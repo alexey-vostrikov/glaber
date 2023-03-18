@@ -7,7 +7,7 @@
     c) all the triggers the trigger depends on are not in the incident state ( they might be unknown )
 */
 
-//CALC_TRIGGER *triger
+//calc_trigger_t *triger
 
 typedef struct {
     const char		*error;
@@ -20,7 +20,7 @@ typedef struct {
 } glb_trigger_meta_t;
 
 #define GLB_TRIGGER_MAX_DEP_LEVELS 32
-
+//TODO: move to state 
 /* trigger is functional unless its expression contains disabled or not monitored items */
 #define TRIGGER_FUNCTIONAL_TRUE		0
 #define TRIGGER_FUNCTIONAL_FALSE	1

@@ -31,17 +31,18 @@
 //#include "../../libs/zbxexec/tests/exec_tests.c"
 int tests_server_run(void) {
    LOG_INF("Running server tests");
-
-   LOG_INF("Running macro tests");
-   glb_macro_run_tests();
-
-  // LOG_INF("Running algo tests");
-  // tests_algo_run();
-   LOG_INF("Running state problem tests");
-   state_test_problems();
    
-   LOG_INF("Running glb_state tests");
-   glb_state_run_tests();
+   LOG_INF("Running algo tests");
+   tests_algo_run();
+
+//   LOG_INF("Running macro tests");
+//   glb_macro_run_tests();
+
+//   LOG_INF("Running state problem tests");
+//   state_test_problems();
+   
+//   LOG_INF("Running glb_state tests");
+//   glb_state_run_tests();
    
 
 //     LOG_INF("Running glb_exec tests");

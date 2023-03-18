@@ -1,5 +1,5 @@
 /*
-** Copyright Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,7 +17,9 @@
 **/
 
 #include "glb_common.h"
+#include "glbstr.h"
+#include "../items/conf_items.h"
 
 int glb_conf_valuemaps_init(mem_funcs_t *memf);
 int glb_conf_valuemaps_set_data(char *json_buffer);
-    
+void glb_conf_valuemaps_format_value(strlen_t *value, glb_conf_item_valuemap_info_t *vm_info);    

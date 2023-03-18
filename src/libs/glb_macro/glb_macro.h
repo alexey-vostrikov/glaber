@@ -1,5 +1,5 @@
 /*
-** Copyright Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 #include "zbxcommon.h"
 #include "zbxcacheconfig.h"
 
-int glb_macro_translate_event_name(CALC_TRIGGER *trigger, char **event_name,  char *error, size_t errlen);
+int glb_macro_translate_event_name(calc_trigger_t *trigger, char **event_name,  char *error, size_t errlen);
 int glb_macro_translate_string(const char *expression, int token_type, char *result, int result_size);
 
 int glb_macro_expand_common_unmasked(char **data, char *error, size_t errlen);
@@ -31,16 +31,20 @@ int glb_macro_expand_item_key_by_hostid(char **data, u_int64_t hostid, char *err
 int glb_macro_expand_common_by_hostid(char **data, u_int64_t hostid, char *error, size_t errlen);
 int glb_macro_expand_common_by_hostid_unmasked(char **data, u_int64_t hostid, char *error, size_t errlen);
 
-int glb_macro_expand_by_host(char **data, const DC_HOST *host, int field_type, char *error, size_t errlen);
-int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, int field_type, char *error, size_t errlen);
+int glb_macro_expand_by_host(char **data, const DC_HOST *host, char *error, size_t errlen);
+int glb_macro_expand_by_host_unmasked(char **data, const DC_HOST *host, char *error, size_t errlen);
 
-int glb_macro_expand_by_item(char **data, const DC_ITEM *item, int type, char *error, size_t errlen);	
-int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, int type, char *error, size_t errlen);	
+int glb_macro_expand_by_item(char **data, const DC_ITEM *item, char *error, size_t errlen);	
+int glb_macro_expand_by_item_unmasked(char **data, const DC_ITEM *item, char *error, size_t errlen);	
 
 int glb_macro_expand_alert_data(DB_ALERT *db_alert, char **data);
 
-int glb_macro_expand_trigger_ctx_expression(CALC_TRIGGER *trigger, char **data, int token_type, char *error, size_t errlen);
+int glb_macro_expand_by_trigger(calc_trigger_t *trigger, char **data, char *error, size_t errlen);
 
 int glb_macro_expand_lld();
+
+int glb_macro_expand_by_hostid(char **data, u_int64_t hostid, char *error, size_t errlen);
+int glb_macro_expand_by_hostid_unmasked(char **data, u_int64_t hostid, char *error, size_t errlen);
+int glb_macro_expand_by_hostids(char **data, zbx_vector_uint64_t *hostids, char *error, size_t errlen);
 
 #endif

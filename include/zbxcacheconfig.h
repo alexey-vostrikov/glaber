@@ -28,6 +28,8 @@
 #include "zbxvault.h"
 #include "zbxregexp.h"
 #include "glb_history.h"
+#include "../src/libs/glb_conf/triggers/conf_calc_trigger.h"
+
 
 #define	ZBX_NO_POLLER			255
 #define	ZBX_POLLER_TYPE_NORMAL		0
@@ -299,43 +301,44 @@ typedef struct
 }
 zbx_item_tag_t;
 
-typedef struct _DC_TRIGGER
-{
-	zbx_uint64_t		triggerid;
-	zbx_uint64_t		history_idx; //history idx if calculated for the history item
-	char			*description;
-	char			*expression;
-	char			*recovery_expression;
+// typedef struct _DC_TRIGGER
+// {
+// 	zbx_uint64_t		triggerid;
+// 	zbx_uint64_t		history_idx; //history idx if calculated for the history item
+// 	char			*description;
+// 	char			*expression;
+// 	char			*recovery_expression;
 
-	char			*error;
-	char			*new_error;
-	char			*correlation_tag;
-	char			*opdata;
-	char			*event_name;
-	unsigned char		*expression_bin;
-	unsigned char		*recovery_expression_bin;
-	zbx_timespec_t		timespec;
-	int			lastchange;
-	unsigned char		topoindex;
-	unsigned char		priority;
-	unsigned char		type;
-	unsigned char		value;
-	//unsigned char		state;
-	unsigned char		new_value;
-	unsigned char		status;
-	unsigned char		recovery_mode;
-	unsigned char		correlation_mode;
+// 	char			*error;
+// 	char			*new_error;
+// 	char			*correlation_tag;
+// 	char			*opdata;
+// 	char			*event_name;
+// 	unsigned char		*expression_bin;
+// 	unsigned char		*recovery_expression_bin;
+// 	zbx_timespec_t		timespec;
+// 	int			lastchange;
+// 	unsigned char		topoindex;
+// 	unsigned char		priority;
+// 	unsigned char		type;
+// 	unsigned char		value;
+// 	//unsigned char		state;
+// 	unsigned char		new_value;
+// 	unsigned char		status;
+// 	unsigned char		recovery_mode;
+// 	unsigned char		correlation_mode;
 
-	unsigned char		flags;
+// //	unsigned char		flags;
 
-	zbx_vector_ptr_t	tags;
-	zbx_vector_uint64_t	itemids;
-	zbx_vector_uint64_t	hostids;
+// 	zbx_vector_ptr_t	tags;
+// 	//zbx_vector_uint64_t	itemids;
+// 	//zbx_vector_uint64_t	hostids;
 
-	zbx_eval_context_t	*eval_ctx;
-	zbx_eval_context_t	*eval_ctx_r;
-}
-CALC_TRIGGER;
+// //	zbx_eval_context_t	*eval_ctx;
+// //	zbx_eval_context_t	*eval_ctx_r;
+// 	zbx_trigger_cache_t *cache;
+// }
+// calc_trigger_t;
 
 typedef struct
 {
@@ -656,8 +659,8 @@ void	DCsync_kvs_paths(const struct zbx_json_parse *jp_kvs_paths, const zbx_confi
 int	init_configuration_cache(char **error);
 void	free_configuration_cache(void);
 
-void	DCconfig_get_triggers_by_triggerids(CALC_TRIGGER *triggers, const zbx_uint64_t *triggerids, int *errcode,
-		size_t num);
+//void	DCconfig_get_triggers_by_triggerids(calc_trigger_t *triggers, const zbx_uint64_t *triggerids, int *errcode,
+//		size_t num);
 void	DCconfig_clean_items(DC_ITEM *items, int *errcodes, size_t num);
 int	DCget_host_by_hostid(DC_HOST *host, zbx_uint64_t hostid);
 int	DCconfig_get_hostid_by_name(const char *host, zbx_uint64_t *hostid);
@@ -687,7 +690,7 @@ void	DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 void	DCconfig_get_functions_by_functionids(DC_FUNCTION *functions,
 		zbx_uint64_t *functionids, int *errcodes, size_t num);
 void	DCconfig_clean_functions(DC_FUNCTION *functions, int *errcodes, size_t num);
-void	DCconfig_clean_triggers(CALC_TRIGGER *triggers, int *errcodes, size_t num);
+//void	DCconfig_clean_triggers(calc_trigger_t *triggers, int *errcodes, size_t num);
 int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids);
 void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zbx_vector_uint64_t *triggerids_out);
 void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids);

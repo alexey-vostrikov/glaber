@@ -65,6 +65,8 @@ void check_mass_add_remove_keys_leak() {
     assert(shmtest_mem->free_size == was_size && "Create/destroy shouldn't leak memory");
 }
 
+
+elems_hash_t* index_uint64_get_elem_hash(index_uint64_t *idx);
 void check_store_and_get() {
     u_int64_t was_size = shmtest_mem->free_size;
     index_uint64_t *index = index_uint64_init(&test_memf);
@@ -109,25 +111,38 @@ void check_store_and_get() {
     assert(FAIL == index_uint64_get_count_by_key(index, 3489539) && "there should be  FAIL on index count for non-existent key");
     assert(SUCCEED == index_uint64_del_key(index, 5678) && "Huge key delete should succeed");
     index_uint64_destroy(index, &test_memf);
+    
+    LOG_INF("Another test");
     index_uint64_t *index1, *index2;
     index1 = index_uint64_init(&test_memf);
+    LOG_INF("Another test 2.01 %p %p", index1, index_uint64_get_elem_hash(index1) );
     index2 = index_uint64_init(&test_memf);
     //use index 1 as object index 
     index_uint64_add(index1, 1, 2);
     index_uint64_add(index1, 101, 2);
+    LOG_INF("Another test 2.02 %p", index1);
 
     //now index 1 poins to both elemenths in the first index
     index_uint64_add(index2, 1, 1);
     index_uint64_add(index2, 1, 101);
     index_uint64_add(index2, 1, 105); //this element should be cleared
-    elems_hash_t *index1_ehash =  index_uint64_get_elem_hash(index1);
 
+    LOG_INF("Another test 2.03 %p", index1);
+    elems_hash_t *index1_ehash = index_uint64_get_elem_hash(index1);
+
+    LOG_INF("Another test 2.1 %p", index1_ehash);
     index_uint64_sync_objects(index2, index1_ehash);
+    
+    LOG_INF("Another test 2.2");
     assert( index_uint64_get_count_by_key(index2, 1) == 2 && "One value should be removed");
 
+    LOG_INF("Another test 2.3");
     index_uint64_sync_objects(index2, index1_ehash);
+    
+    LOG_INF("Another test 2.4");
     assert( index_uint64_get_count_by_key(index2, 1) == 2 && "Nothing should change after the second time");
-
+    
+    LOG_INF("Another test 3");
     index_uint64_destroy(index1,&test_memf);
     index_uint64_destroy(index2,&test_memf);
     assert(shmtest_mem->free_size == was_size && "All is deleted, there should be no memory leaks");

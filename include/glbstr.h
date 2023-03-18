@@ -1,6 +1,5 @@
- 
- /*
-** Copyright Glaber
+/*
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,17 +16,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "log.h"
-#include "zbxalgo.h"
+#ifndef GLB_STR_H
+#define GLB_STR_H
 
-void DC_notify_changed_items(zbx_vector_uint64_t *items);
+#include "zbxcommon.h"
 
-void conf_items_notify_changes(zbx_vector_uint64_t *changed_items) {
-    int i;
-    
-//    for (i = 0; i < changed_items->values_num; i++) {
-//        DEBUG_ITEM(changed_items->values[i],"Sending item change notification to the item");
-//    }
+typedef struct {
+    char *str;
+    size_t len;
+} strlen_t;
 
-    DC_notify_changed_items(changed_items);
-}
+#endif

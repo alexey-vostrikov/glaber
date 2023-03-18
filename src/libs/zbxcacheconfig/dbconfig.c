@@ -46,6 +46,7 @@
 #include "../glb_state/glb_state_interfaces.h"
 #include "../glb_state/glb_state_triggers.h"
 #include "../glb_conf/conf_hosts.h"
+#include "../glb_conf/items/conf_items.h"
 #include "../../zabbix_server/glb_poller/poller_ipc.h"
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
@@ -2900,10 +2901,9 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		item->hostid = hostid;
 		item->flags = (unsigned char)atoi(row[18]);
 		ZBX_DBROW2UINT64(interfaceid, row[19]);
-
 		dc_strpool_replace(found, &item->history_period, row[22]);
-		dc_strpool_replace(found, &item->description, row[50]);
-		
+		dc_strpool_replace(found, &item->description, row[49]);
+		dc_strpool_replace(found, &item->name, row[50]);
 		ZBX_STR2UCHAR(item->inventory_link, row[24]);
 		ZBX_DBROW2UINT64(item->valuemapid, row[25]);
 
@@ -3660,6 +3660,7 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		dc_strpool_release(item->delay);
 		dc_strpool_release(item->history_period);
 		dc_strpool_release(item->description);
+		dc_strpool_release(item->name);
 
 		if (NULL != item->delay_ex)
 			dc_strpool_release(item->delay_ex);
@@ -3838,9 +3839,6 @@ void DCsync_triggers(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		if (0 == found)
 		{
 			dc_strpool_replace(found, &trigger->error, "");
-			//	ZBX_STR2UCHAR(trigger->value, row[6]);
-			//	ZBX_STR2UCHAR(trigger->state, row[7]);
-			//	trigger->lastchange = 0;
 			trigger->locked = 0;
 			trigger->timer_revision = 0;
 
@@ -6701,7 +6699,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		hgroups_sync, itempp_sync, itemscrp_sync, maintenance_sync, maintenance_period_sync,
 		maintenance_tag_sync, maintenance_group_sync, maintenance_host_sync, hgroup_host_sync,
 		drules_sync, dchecks_sync, httptest_sync, httptest_field_sync, httpstep_sync,
-		httpstep_field_sync, autoreg_host_sync, valuemap_sync;
+		httpstep_field_sync, autoreg_host_sync;
 
 	double autoreg_csec, autoreg_csec2, autoreg_host_csec, autoreg_host_csec2;
 	zbx_dbsync_t autoreg_config_sync;
@@ -6779,8 +6777,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	zbx_dbsync_init(&httptest_field_sync, changelog_sync_mode);
 	zbx_dbsync_init(&httpstep_sync, changelog_sync_mode);
 	zbx_dbsync_init(&httpstep_field_sync, changelog_sync_mode);
-	
-	zbx_dbsync_init(&valuemap_sync, mode);
 
 #ifdef HAVE_ORACLE
 	/* With Oracle fetch statements can fail before all data has been fetched. */
@@ -7085,7 +7081,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	corr_operation_sec = zbx_time() - sec;
 
 	sec = zbx_time();
-	if (FAIL == zbx_dbsync_compare_valuemaps(&valuemap_sync))
+	if (FAIL == zbx_dbsync_compare_valuemaps())
 		goto out;
 	valuemap_sec = zbx_time() - sec;
 
@@ -9048,7 +9044,7 @@ void DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src_functi
 	memcpy(dst_function->parameter, src_function->parameter, sz_parameter);
 }
 
-void DCget_trigger(CALC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, unsigned int flags)
+void DCget_trigger(calc_trigger_t *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, unsigned int flags)
 {
 	int i;
 
@@ -9064,22 +9060,22 @@ void DCget_trigger(CALC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger,
 	dst_trigger->new_value = TRIGGER_VALUE_UNKNOWN;
 	// dst_trigger->lastchange = src_trigger->lastchange;
 	glb_state_trigger_get_value_lastchange(src_trigger->triggerid, &dst_trigger->value, &dst_trigger->lastchange);
-	dst_trigger->topoindex = src_trigger->topoindex;
+	//dst_trigger->topoindex = src_trigger->topoindex;
 	dst_trigger->status = src_trigger->status;
 	dst_trigger->recovery_mode = src_trigger->recovery_mode;
 	dst_trigger->correlation_mode = src_trigger->correlation_mode;
 	dst_trigger->correlation_tag = strdup_null_safe(src_trigger->correlation_tag);
 	dst_trigger->opdata = strdup_null_safe(src_trigger->opdata);
 	dst_trigger->event_name = strdup_null_safe(src_trigger->event_name);
-	dst_trigger->flags = 0;
+	//dst_trigger->flags = 0;
 	dst_trigger->new_error = NULL;
 	dst_trigger->expression = strdup_null_safe(src_trigger->expression);
 	dst_trigger->recovery_expression = strdup_null_safe(src_trigger->recovery_expression);
 	dst_trigger->expression_bin = dup_serialized_expression(src_trigger->expression_bin);
 	dst_trigger->recovery_expression_bin = dup_serialized_expression(src_trigger->recovery_expression_bin);
 
-	dst_trigger->eval_ctx = NULL;
-	dst_trigger->eval_ctx_r = NULL;
+	//dst_trigger->eval_ctx = NULL;
+	//dst_trigger->eval_ctx_r = NULL;
 
 	zbx_vector_ptr_create(&dst_trigger->tags);
 
@@ -9101,8 +9097,8 @@ void DCget_trigger(CALC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger,
 		}
 	}
 
-	zbx_vector_uint64_create(&dst_trigger->itemids);
-	zbx_vector_uint64_create(&dst_trigger->hostids);
+//	zbx_vector_uint64_create(&dst_trigger->itemids);
+//	zbx_vector_uint64_create(&dst_trigger->hostids);
 
 
 	if (0 != (flags & ZBX_TRIGGER_GET_ITEMIDS) && NULL != src_trigger->itemids)
@@ -9112,8 +9108,8 @@ void DCget_trigger(CALC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger,
 		for (itemid = src_trigger->itemids; 0 != *itemid; itemid++)
 			;
 
-		zbx_vector_uint64_append_array(&dst_trigger->itemids, src_trigger->itemids,
-									   (int)(itemid - src_trigger->itemids));
+//		zbx_vector_uint64_append_array(&dst_trigger->itemids, src_trigger->itemids,
+//									   (int)(itemid - src_trigger->itemids));
 	}
 }
 
@@ -9124,37 +9120,7 @@ void zbx_free_item_tag(zbx_item_tag_t *item_tag)
 	zbx_free(item_tag);
 }
 
-void DCclean_trigger(CALC_TRIGGER *trigger)
-{
-	zbx_free(trigger->new_error);
-	zbx_free(trigger->error);
-	zbx_free(trigger->expression);
-	zbx_free(trigger->recovery_expression);
-	zbx_free(trigger->description);
-	zbx_free(trigger->correlation_tag);
-	zbx_free(trigger->opdata);
-	zbx_free(trigger->event_name);
-	zbx_free(trigger->expression_bin);
-	zbx_free(trigger->recovery_expression_bin);
 
-	zbx_vector_ptr_clear_ext(&trigger->tags, (zbx_clean_func_t)zbx_free_tag);
-	zbx_vector_ptr_destroy(&trigger->tags);
-
-	if (NULL != trigger->eval_ctx)
-	{
-		zbx_eval_clear(trigger->eval_ctx);
-		zbx_free(trigger->eval_ctx);
-	}
-
-	if (NULL != trigger->eval_ctx_r)
-	{
-		zbx_eval_clear(trigger->eval_ctx_r);
-		zbx_free(trigger->eval_ctx_r);
-	}
-
-	zbx_vector_uint64_destroy(&trigger->itemids);
-	zbx_vector_uint64_destroy(&trigger->hostids);
-}
 
 int DCconfig_get_itemid_by_item_key_hostid(u_int64_t hostid, char *key, u_int64_t *itemid)
 {
@@ -9716,7 +9682,7 @@ int DCconfig_trigger_exists(zbx_uint64_t triggerid)
 	return ret;
 }
 
-void DCconfig_get_triggers_by_triggerids(CALC_TRIGGER *triggers, const zbx_uint64_t *triggerids, int *errcode,
+void DCconfig_get_triggers_by_triggerids(calc_trigger_t *triggers, const zbx_uint64_t *triggerids, int *errcode,
 										 size_t num)
 {
 	size_t i;
@@ -9738,6 +9704,27 @@ void DCconfig_get_triggers_by_triggerids(CALC_TRIGGER *triggers, const zbx_uint6
 	}
 
 	UNLOCK_CACHE;
+}
+
+int  DCget_calc_trigger_by_id(calc_trigger_t *trigger, const zbx_uint64_t *triggerid)
+{
+	
+	int ret = FAIL;
+	const ZBX_DC_TRIGGER *dc_trigger;
+
+	RDLOCK_CACHE;
+
+	if (NULL != (dc_trigger = (const ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerid)) &&
+		TRIGGER_STATUS_ENABLED == dc_trigger->status )
+	
+	{
+		DCget_trigger(trigger, dc_trigger, ZBX_TRIGGER_GET_ALL);
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	
+	return ret;
 }
 
 /******************************************************************************
@@ -9786,18 +9773,6 @@ void DCconfig_clean_functions(DC_FUNCTION *functions, int *errcodes, size_t num)
 	}
 }
 
-void DCconfig_clean_triggers(CALC_TRIGGER *triggers, int *errcodes, size_t num)
-{
-	size_t i;
-
-	for (i = 0; i < num; i++)
-	{
-		if (SUCCEED != errcodes[i])
-			continue;
-
-		DCclean_trigger(&triggers[i]);
-	}
-}
 
 /******************************************************************************
  *                                                                            *
@@ -10047,7 +10022,7 @@ void zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 
 		if (NULL != (dc_trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &timer->triggerid)))
 		{
-			CALC_TRIGGER *trigger, trigger_local;
+			calc_trigger_t *trigger, trigger_local;
 			unsigned char flags;
 
 			if (SUCCEED == DCconfig_find_active_time_function(dc_trigger->expression,
@@ -10074,12 +10049,11 @@ void zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 			}
 
 			trigger_local.triggerid = dc_trigger->triggerid;
-			trigger_local.history_idx = -1;
-			trigger = (CALC_TRIGGER *)zbx_hashset_insert(trigger_info, &trigger_local, sizeof(trigger_local));
+			trigger = (calc_trigger_t *)zbx_hashset_insert(trigger_info, &trigger_local, sizeof(trigger_local));
 			DCget_trigger(trigger, dc_trigger, ZBX_TRIGGER_GET_ALL);
 
 			trigger->timespec = timer->eval_ts;
-			trigger->flags = flags;
+		//	trigger->flags = flags;
 
 			zbx_vector_ptr_append(trigger_order, trigger);
 		}
@@ -10388,15 +10362,7 @@ void zbx_dc_free_timers(zbx_vector_ptr_t *timers)
 	UNLOCK_CACHE;
 }
 
-void DCfree_triggers(zbx_vector_ptr_t *triggers)
-{
-	int i;
 
-	for (i = 0; i < triggers->values_num; i++)
-		DCclean_trigger((CALC_TRIGGER *)triggers->values[i]);
-
-	zbx_vector_ptr_clear(triggers);
-}
 
 void DCconfig_update_interface_snmp_stats(zbx_uint64_t interfaceid, int max_snmp_succeed, int min_snmp_fail)
 {
@@ -15892,6 +15858,96 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items)
 	UNLOCK_CACHE;
 }
 
+ int DC_conf_items_get_valuemap_info(u_int64_t itemid, glb_conf_item_valuemap_info_t *vm_info) {
+	int ret = FAIL;
+	ZBX_DC_ITEM *item;
+
+	RDLOCK_CACHE;
+
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) {
+		if (item->valuemapid > 0) {
+			vm_info->valuemapid = item->valuemapid;
+			vm_info->value_type = item->value_type;
+			vm_info->units[0] = '\0';
+			
+			if (ITEM_VALUE_TYPE_FLOAT == item->value_type || ITEM_VALUE_TYPE_UINT64 == item->value_type) {
+				ZBX_DC_NUMITEM *numitem;
+				if (NULL != (numitem = zbx_hashset_search(&config->numitems, &itemid))) {
+					zbx_strlcpy(vm_info->units, numitem->units, MAX_ID_LEN);
+				}
+			}
+			ret = SUCCEED;
+		}
+	} 
+
+	UNLOCK_CACHE;
+	
+	return ret;
+ }
+
+int DC_conf_items_get_valuetype(u_int64_t itemid) {
+	ZBX_DC_ITEM *item;
+	int value_type = FAIL;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) 
+		value_type = item->value_type;
+	
+	UNLOCK_CACHE;
+
+	return value_type;
+}
+
+u_int64_t DC_conf_item_get_hostid(u_int64_t itemid) {
+	ZBX_DC_ITEM *item;
+	u_int64_t hostid = 0;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) 
+		hostid = item->hostid;
+	
+	UNLOCK_CACHE;
+
+	return hostid;
+}
+
+char * DC_conf_item_get_key(u_int64_t itemid) {
+	ZBX_DC_ITEM *item;
+	char *key = NULL;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) 
+		key = zbx_strdup(NULL, item->key);
+	
+	UNLOCK_CACHE;
+
+	if (NULL != key)
+		return key;
+
+	return zbx_strdup(NULL, "");
+}
+ 
+char * DC_conf_item_get_name(u_int64_t itemid) {
+	ZBX_DC_ITEM *item;
+	char *name = NULL;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) 
+		name = zbx_strdup(NULL, item->name);
+	
+	UNLOCK_CACHE;
+
+	if (NULL != name)
+		return name;
+
+	return zbx_strdup(NULL, "");
+}
+
+ 
 #ifdef HAVE_TESTS
 #include "../../../tests/libs/zbxdbcache/dc_item_poller_type_update_test.c"
 #include "../../../tests/libs/zbxdbcache/dc_function_calculate_nextcheck_test.c"

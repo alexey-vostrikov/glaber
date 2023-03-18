@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C) 2018-2042 Glaber
+** Copyright (C) 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
     
-    elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
+    elems_hash_t *e_hash = memf->malloc_func(NULL, sizeof(elems_hash_t));  
     
     zbx_hashset_create_ext(&e_hash->elems, 0, ZBX_DEFAULT_UINT64_HASH_FUNC,
             ZBX_DEFAULT_UINT64_COMPARE_FUNC, NULL, 
@@ -39,7 +39,7 @@ elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_f
     
     glb_rwlock_init(&e_hash->meta_lock);
     e_hash->memf = *memf;
-     return e_hash;
+    return e_hash;
 }
 
 static int delete_element(elems_hash_t *elems, elems_hash_elem_t *elem) {
@@ -330,13 +330,13 @@ int elems_hash_remove_absent_in_vector(elems_hash_t *elems, zbx_vector_uint64_t 
     zbx_hashset_iter_reset(&elems->elems, &iter);
     
     while (NULL != (elem = zbx_hashset_iter_next(&iter))) {
-        
-        if (FAIL == zbx_vector_uint64_bsearch(ids, elem->id, ZBX_DEFAULT_UINT64_COMPARE_FUNC))
-            continue;
-        
-        zbx_vector_uint64_append(&del_ids, elem->id);
+        if (FAIL == zbx_vector_uint64_bsearch(ids, elem->id, ZBX_DEFAULT_UINT64_COMPARE_FUNC)) 
+            zbx_vector_uint64_append(&del_ids, elem->id);
     }
+
     glb_rwlock_unlock(&elems->meta_lock);
+    
+   // LOG_INF("Preparing %d records to delete", del_ids.values_num);
 
     if (del_ids.values_num > 0) {
         glb_rwlock_wrlock(&elems->meta_lock);

@@ -299,6 +299,35 @@ void	zbx_dc_config_history_sync_get_item_tags_by_functionids(const zbx_uint64_t 
 }
 
 /******************************************************************************
+ * Purpose: get enabled triggers id for the specified item                    *
+ ******************************************************************************/
+void DC_conf_item_get_triggerids(u_int64_t itemid, zbx_vector_uint64_t *triggerids)
+{
+	int			i, j, found;
+	const ZBX_DC_ITEM	*dc_item;
+	const ZBX_DC_TRIGGER *dc_trigger;
+	
+	RDLOCK_CACHE_CONFIG_HISTORY;
+
+	if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)) ||
+				NULL == dc_item->triggers)
+	{
+		UNLOCK_CACHE_CONFIG_HISTORY;
+		return;
+	}
+
+	for (i = 0; NULL != (dc_trigger = dc_item->triggers[i]); i++)
+	{
+		if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
+			continue;
+
+		zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
+	}
+
+	UNLOCK_CACHE_CONFIG_HISTORY;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: get enabled triggers for specified items                          *
  *                                                                            *
@@ -316,7 +345,7 @@ void	zbx_dc_config_history_sync_get_triggers_by_itemids(zbx_hashset_t *trigger_i
 	int			i, j, found;
 	const ZBX_DC_ITEM	*dc_item;
 	const ZBX_DC_TRIGGER	*dc_trigger;
-	CALC_TRIGGER		*trigger;
+	calc_trigger_t		*trigger;
 
 	RDLOCK_CACHE_CONFIG_HISTORY;
 
@@ -338,8 +367,7 @@ void	zbx_dc_config_history_sync_get_triggers_by_itemids(zbx_hashset_t *trigger_i
 				continue;
 
 			/* find trigger by id or create a new record in hashset if not found */
-			trigger = (CALC_TRIGGER *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(CALC_TRIGGER),
-					&found);
+			trigger = (calc_trigger_t *)DCfind_id(trigger_info, dc_trigger->triggerid, sizeof(calc_trigger_t),	&found);
 
 			if (0 == found)
 			{

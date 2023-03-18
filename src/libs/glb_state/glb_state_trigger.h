@@ -1,7 +1,7 @@
 
 
 /*
-** Copyright Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,12 +27,9 @@ problems state and to create event log changes*/
 #ifndef GLB_TRIGGER_H
 #define GLB_TRIGGER_H
 
+//int     glb_trigger_register_calculation(calc_trigger_t *trigger);
+//void	glb_trigger_get_functions_ids(calc_trigger_t *trigger, zbx_vector_uint64_t *functions_ids);
 
-
-
-int     glb_trigger_register_calculation(CALC_TRIGGER *trigger);
-void	glb_trigger_get_functions_ids(CALC_TRIGGER *trigger, zbx_vector_uint64_t *functions_ids);
-
-char*   glb_trigger_get_severity_name(unsigned char priority);
+//char*   glb_trigger_get_severity_name(unsigned char priority);
 char*   glb_trigger_get_admin_state_name(unsigned char admin_state);
 #endif

@@ -239,8 +239,9 @@ void	zbx_eval_set_exception(zbx_eval_context_t *ctx, char *message);
 #define ZBX_EVAL_EXTRACT_ALL	(ZBX_EVAL_EXTRACT_FUNCTIONID | ZBX_EVAL_EXTRACT_VAR_STR | ZBX_EVAL_EXTRACT_VAR_MACRO | \
 		ZBX_EVAL_EXTRACT_VAR_USERMACRO)
 
-zbx_eval_context_t *zbx_eval_deserialize_dyn(const unsigned char *data, const char *expression,
-		zbx_uint64_t mask);
+void zbx_eval_extract_tokens(zbx_eval_context_t *ctx,  char* expression,  zbx_uint64_t mask);
+//zbx_eval_context_t *zbx_eval_deserialize_dyn(const unsigned char *data, const char *expression,
+//		zbx_uint64_t mask);
 int	zbx_eval_check_timer_functions(const zbx_eval_context_t *ctx);
 void	zbx_get_serialized_expression_functionids(const char *expression, const unsigned char *data,
 		zbx_vector_uint64_t *functionids);

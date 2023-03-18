@@ -283,6 +283,25 @@ static int	variant_to_str(zbx_variant_t *value)
 	return SUCCEED;
 }
 
+/*prints variant's value to a buffer of a given size*/
+int	glb_variant_snprintf(char *buffer, size_t len, const zbx_variant_t *value)
+{
+	switch (value->type)
+	{
+		case ZBX_VARIANT_STR:
+			zbx_snprintf(buffer,len, "%s", value->data.str);
+			return SUCCEED;
+		case ZBX_VARIANT_DBL:
+			zbx_print_double(buffer, len, value->data.dbl);
+			return SUCCEED;
+		case ZBX_VARIANT_UI64:
+			zbx_snprintf(buffer, len, ZBX_FS_UI64, value->data.ui64);
+			break;
+		default:
+			return FAIL;
+	}
+}
+
 int	zbx_variant_convert(zbx_variant_t *value, int type)
 {
 	switch(type)

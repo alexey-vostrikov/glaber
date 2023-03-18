@@ -110,8 +110,8 @@ void	DBadd_interface_snmp(const zbx_uint64_t interfaceid, const unsigned char ve
 //void	zbx_db_trigger_get_functionids(const ZBX_DB_TRIGGER *trigger, zbx_vector_uint64_t *functionids);
 //int	zbx_db_trigger_get_constant(const ZBX_DB_TRIGGER *trigger, int index, char **out);
 //int	zbx_db_trigger_get_all_hostids(const ZBX_DB_TRIGGER *trigger, const zbx_vector_uint64_t **hostids);
-//int	zbx_db_trigger_get_itemid(const ZBX_DB_TRIGGER *trigger, int index, zbx_uint64_t *itemid);
-//void	zbx_db_trigger_get_itemids(const ZBX_DB_TRIGGER *trigger, zbx_vector_uint64_t *itemids);
+//int	zbx_db_trigger_get_itemid(const calc_trigger_t *trigger, int index, zbx_uint64_t *itemid);
+//void	zbx_db_trigger_get_itemids(const calc_trigger_t *trigger, zbx_vector_uint64_t *itemids);
 
 //void	zbx_db_trigger_get_expression(const ZBX_DB_TRIGGER *trigger, char **expression);
 //void	zbx_db_trigger_get_recovery_expression(const ZBX_DB_TRIGGER *trigger, char **expression);
@@ -120,6 +120,10 @@ void	DBadd_interface_snmp(const zbx_uint64_t interfaceid, const unsigned char ve
 typedef int (*zbx_trigger_func_t)(zbx_variant_t *, const DC_EVALUATE_ITEM *, const char *, const char *,
 		const zbx_timespec_t *, char **);
 
+void	conf_calc_trigger_explain_expression(calc_trigger_t *trigger, char **expression,
+		zbx_trigger_func_t eval_func_cb);
+void	conf_calc_trigger_explain__recovery_expression(calc_trigger_t *trigger, char **expression,
+		zbx_trigger_func_t eval_func_cb);
 //void	zbx_db_trigger_explain_expression(const ZBX_DB_TRIGGER *trigger, char **expression,
 //		zbx_trigger_func_t eval_func_cb, int recovery);
 //void	zbx_db_trigger_get_function_value(const ZBX_DB_TRIGGER *trigger, int index, char **value,

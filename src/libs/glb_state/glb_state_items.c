@@ -29,6 +29,7 @@
 #include <zlib.h>
 #include "glb_lock.h"
 #include "load_dump.h"
+#include "glbstr.h"
 
 extern char	*CONFIG_VCDUMP_LOCATION;
 
@@ -1536,11 +1537,6 @@ int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-typedef struct {
-    size_t len;
-    char *str;
-} strlen_t;
-
 ELEMS_CALLBACK(get_error_cb) {
      item_elem_t* item  = elem->data;    
      strlen_t *str_len = data;
@@ -1564,55 +1560,22 @@ int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
 	}
 }
 
-int	glb_state_items_get_lastvalue_raw(zbx_uint64_t itemid, char **lastvalue) {
+ELEMS_CALLBACK(get_last_cached_value) {
+    item_elem_t* item  = elem->data;    
+    strlen_t *val = data;
 
+    if (glb_tsbuff_get_count(&item->tsbuff) == 0)
+        return FAIL; 
+    
+    glb_state_item_value_t *c_val = glb_tsbuff_get_value_head(&item->tsbuff);
+
+   	return glb_variant_snprintf(val->str, val->len, &c_val->value);
 }
 
-int	glb_state_items_get_lastvalue_formatted(zbx_uint64_t itemid, char **lastvalue)
-{
-//	DB_RESULT	result;
-//	DB_ROW		row;
-	// int		ret = FAIL;
+int  glb_state_items_get_lastvalue_str(u_int64_t itemid, strlen_t *val) {
+    val->str[0]= '\0';
 
-	// zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-//	result = DBselect(
-//			"select value_type,valuemapid,units,hostid"
-//			" from items"
-//			" where itemid=" ZBX_FS_UI64,
-//			itemid);
-
-//	if (NULL != (row = DBfetch(result)))
-//	{
-// 	unsigned char		value_type;
-// 	zbx_uint64_t		valuemapid;
-// 	zbx_uint64_t 		hostid;
-// 	zbx_history_record_t	vc_value;
-
-// 	value_type = (unsigned char)atoi(row[0]);
-// 	ZBX_DBROW2UINT64(valuemapid, row[1]);
-// 	hostid = (unsigned char)atoi(row[3]);
-
-// 	if (SUCCEED == zbx_vc_get_value(itemid, value_type, ts, &vc_value))
-// 	{
-// 		char	tmp[MAX_BUFFER_LEN];
-
-// //			zbx_vc_flush_stats();
-// 		zbx_history_value_print(tmp, sizeof(tmp), &vc_value.value, value_type);
-// 		zbx_history_record_clear(&vc_value, value_type);
-
-// 		zbx_format_value(tmp, sizeof(tmp), valuemapid, units, value_type);
-
-// 			*lastvalue = zbx_strdup(*lastvalue, tmp);
-
-// 			ret = SUCCEED;
-// 		}
-// 	}
-// 	zbx_db_free_result(result);
-
-// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
-
-// 	return ret;
+    return elems_hash_process(state->items, itemid, get_last_cached_value, val, ELEM_FLAG_DO_NOT_CREATE);
 }
 
 void glb_state_items_housekeep() {

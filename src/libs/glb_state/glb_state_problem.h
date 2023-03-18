@@ -55,7 +55,7 @@ typedef struct
 typedef struct glb_problem_t glb_problem_t;
 
 //glb_problem_t *glb_problem_create(mem_funcs_t *memf, strpool_t *strpool, glb_problem_info_t *info);
-glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, CALC_TRIGGER *trigger);
+glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, calc_trigger_t *trigger);
 void glb_problem_destroy(mem_funcs_t *memf, strpool_t *strpool, glb_problem_t *problem);
 glb_problem_t *glb_problem_copy(mem_funcs_t *memf, strpool_t *strpool, glb_problem_t *src_problem);
 

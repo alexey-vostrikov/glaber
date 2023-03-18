@@ -146,6 +146,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxrtc/libzbxrtc.a \
 	$(top_builddir)/src/libs/zbxnix/libzbxnix.a \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
+	$(top_builddir)/src/libs/glb_macro/libglbmacro.a \
 	$(top_builddir)/src/libs/glb_conf/libglbconfig.a \
 	$(top_builddir)/src/libs/zbxalgo/libzbxalgo.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
@@ -162,8 +163,6 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxversion/libzbxversion.a \
 	preprocessor/libpreprocessor.a \
 	$(top_builddir)/src/libs/glb_events_log/libglbeventlog.a \
-	$(top_builddir)/src/libs/glb_macro/libglbmacro.a \
-	$(top_builddir)/src/libs/glb_expression/libglbexpression.a \
 	$(top_builddir)/src/libs/glb_actions/libglbactions.a
 	
 if HAVE_IPMI

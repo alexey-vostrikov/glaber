@@ -1724,14 +1724,14 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 				"i.master_itemid,i.timeout,i.url,i.query_fields,i.posts,i.status_codes,"
 				"i.follow_redirects,i.post_type,i.http_proxy,i.headers,i.retrieve_mode,"
 				"i.request_method,i.output_format,i.ssl_cert_file,i.ssl_key_file,i.ssl_key_password,"
-				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,null,i.description"
+				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,i.description,i.name"
 			" from items i"
 			" inner join hosts h on i.hostid=h.hostid"
 			" join item_rtdata ir on i.itemid=ir.itemid"
 			" where h.status in (%d,%d) and i.flags<>%d",
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE);
 
-	dbsync_prepare(sync, 50, dbsync_item_preproc_row);
+	dbsync_prepare(sync, 51, dbsync_item_preproc_row);
 
 	if (ZBX_DBSYNC_INIT == sync->mode)
 	{
@@ -3057,7 +3057,7 @@ CREATE TABLE valuemap_mapping (
 							"newvalue": "notInstalled"      
                         .... */
 
-int	zbx_dbsync_compare_valuemaps(zbx_dbsync_t *sync)
+int	zbx_dbsync_compare_valuemaps()
 {
 	DB_ROW			dbrow;
 	DB_RESULT		result;
@@ -3076,8 +3076,6 @@ int	zbx_dbsync_compare_valuemaps(zbx_dbsync_t *sync)
 		HALT_HERE("Valuemap query failed");
 		return FAIL;
 	}
-	
-	dbsync_prepare(sync, 4, NULL);
 
 	zbx_json_addarray(&j, "result");
 
@@ -3121,9 +3119,6 @@ int	zbx_dbsync_compare_valuemaps(zbx_dbsync_t *sync)
 	zbx_json_free(&j);
 	return SUCCEED;
 }
-
-
-
 /******************************************************************************
  *                                                                            *
  * Purpose: compares host group table row with cached configuration data      *

@@ -29,9 +29,14 @@
 void tests_algo_run() {
     LOG_INF("Running algo tests");
     sleep(1);
+    
+    LOG_INF("Running elem hash tests");
+    tests_elems_hash_run();
+    
+    LOG_INF("Running index tests");
     tests_index_uint64_run();\
     
-    tests_elems_hash_run();
+    LOG_INF("Running obj index tests");
     tests_obj_index_run();
     LOG_INF("Finished algo tests");
 }

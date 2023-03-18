@@ -31,6 +31,7 @@
 #include "zbxversion.h"
 #include "zbx_trigger_constants.h"
 #include "zbx_host_constants.h"
+#include "../glb_conf/triggers/conf_calc_trigger.h"
 
 #define ZBX_MAINTENANCE_IDLE		0
 #define ZBX_MAINTENANCE_RUNNING		1
@@ -125,6 +126,7 @@ typedef struct
 	zbx_uint64_t		interfaceid;
 	zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
+	const char 		*name;
 	const char		*key;
 	const char		*port;
 	const char		*delay;
@@ -1050,7 +1052,7 @@ void		DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE *src_i
 ZBX_DC_HOST	*DCfind_host(const char *host);
 ZBX_DC_ITEM	*DCfind_item(zbx_uint64_t hostid, const char *key);
 void		DCget_function(DC_FUNCTION *dst_function, const ZBX_DC_FUNCTION *src_function);
-void		DCget_trigger(CALC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, unsigned int flags);
+void		DCget_trigger(calc_trigger_t *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, unsigned int flags);
 int		DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface, int flags, int now,
 			char **error);
 

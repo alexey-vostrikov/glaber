@@ -1,5 +1,5 @@
 /*
-** Copyright Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 #include "log.h"
 #include "zbxalgo.h"
-#include "conf_items_notify.h"
+#include "./items/conf_items_notify.h"
 
 void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items) ;
 int DCget_host_name(u_int64_t hostid, char **name);

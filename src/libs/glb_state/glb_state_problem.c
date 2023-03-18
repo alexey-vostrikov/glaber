@@ -39,7 +39,7 @@ struct glb_problem_t {
     u_int64_t correlation_id;
 };
 
-glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, CALC_TRIGGER *trigger) {
+glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, calc_trigger_t *trigger) {
 
     if (NULL == memf)
         memf = &heap_memf;
@@ -65,7 +65,7 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
     
     LOG_INF("Problem name is %s", problem_name);
 
-    if (FAIL == glb_macro_translate_event_name(trigger, &problem_name, NULL, 0))
+    if (FAIL == glb_macro_expand_by_trigger(trigger, &problem_name, NULL, 0))
         return NULL;
 
     if (NULL != strpool) 

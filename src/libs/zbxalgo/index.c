@@ -20,7 +20,7 @@
 #include "../glb_state/load_dump.h"
 
 struct index_uint64_t {
-    elems_hash_t *index;
+    elems_hash_t *ehash;
 };
 
 ELEMS_CREATE(index_create_cb) {
@@ -40,17 +40,17 @@ ELEMS_FREE(index_free_cb) {
 
 index_uint64_t *index_uint64_init(mem_funcs_t *memf) {
     index_uint64_t *index = memf->malloc_func(NULL, sizeof(index_uint64_t));
-    index->index = elems_hash_init(memf, index_create_cb, index_free_cb);
+    index->ehash = elems_hash_init(memf, index_create_cb, index_free_cb);
     return index;
 }
 
 void index_uint64_destroy(index_uint64_t *index, mem_funcs_t *memf) {
-    elems_hash_destroy(index->index);
+    elems_hash_destroy(index->ehash);
     memf->free_func(index);
 }
 
 int index_get_keys_num(index_uint64_t *index) {
-    return elems_hash_get_num(index->index);
+    return elems_hash_get_num(index->ehash);
 }
 
 ELEMS_CALLBACK(index_add_key_value_cb) {
@@ -63,7 +63,7 @@ ELEMS_CALLBACK(index_add_key_value_cb) {
 int  index_uint64_add(index_uint64_t *index, u_int64_t key, u_int64_t value) {
     if ( 0 == value || 0 == key)
         return FAIL;
-    return elems_hash_process(index->index, key, index_add_key_value_cb, &value, 0);
+    return elems_hash_process(index->ehash, key, index_add_key_value_cb, &value, 0);
 }
 
 ELEMS_CALLBACK(index_get_values_cb) {
@@ -79,13 +79,13 @@ int index_uint64_get(index_uint64_t *index, u_int64_t key, zbx_vector_uint64_t *
     if (NULL == index || 0 == key || NULL == values)
         return FAIL;
     
-    return elems_hash_process(index->index, key, index_get_values_cb, values, ELEM_FLAG_DO_NOT_CREATE);
+    return elems_hash_process(index->ehash, key, index_get_values_cb, values, ELEM_FLAG_DO_NOT_CREATE);
 }
 
 int index_uint64_get_keys_values(index_uint64_t *index, zbx_vector_uint64_t *ids, zbx_vector_uint64_t *values) {
     int i;
     for (i = 0; i < ids->values_num; i++) 
-        elems_hash_process(index->index, ids->values[i], index_get_values_cb, values,  ELEM_FLAG_DO_NOT_CREATE);
+        elems_hash_process(index->ehash, ids->values[i], index_get_values_cb, values,  ELEM_FLAG_DO_NOT_CREATE);
 }
 
 ELEMS_CALLBACK(index_remove_value_cb) {
@@ -107,22 +107,22 @@ int index_uint64_del(index_uint64_t *index, u_int64_t key, u_int64_t value) {
     if (NULL == index || 0 == key || 0 == value)
         return FAIL;
     
-    return elems_hash_process(index->index, key, index_remove_value_cb, &value, ELEM_FLAG_DO_NOT_CREATE);
+    return elems_hash_process(index->ehash, key, index_remove_value_cb, &value, ELEM_FLAG_DO_NOT_CREATE);
 }
 
 int index_uint64_del_key(index_uint64_t *index, u_int64_t key) {
-    return elems_hash_delete(index->index, key);
+    return elems_hash_delete(index->ehash, key);
 }
 ELEMS_CALLBACK(index_get_keynum_cb) {
     return ((zbx_vector_uint64_t *)elem->data)->values_num;
 }
 
 int index_uint64_get_count_by_key(index_uint64_t *index, u_int64_t key) {
-    return elems_hash_process(index->index, key, index_get_keynum_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+    return elems_hash_process(index->ehash, key, index_get_keynum_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
 }
 
 int index_uint64_get_keys_num(index_uint64_t *index) {
-    return elems_hash_get_num(index->index);
+    return elems_hash_get_num(index->ehash);
 }
 
 DUMPER_TO_JSON(index_dump_cb) {
@@ -138,32 +138,35 @@ DUMPER_TO_JSON(index_dump_cb) {
 }
 
 int index_uint64_dump(index_uint64_t *index, char *filename) {
-    state_dump_objects(index->index, filename, index_dump_cb);
+    state_dump_objects(index->ehash, filename, index_dump_cb);
 }
 
 ELEMS_CALLBACK(check_values_present_cb) {
     int i = 0;
     zbx_vector_uint64_t *ids = elem->data;
     elems_hash_t *objects = data;
-
+    LOG_INF("Got %d values to process, %d values in elems", ids->values_num, objects->elems.num_data);
     while  ( i < ids->values_num ) {
+        LOG_INF("Processing id %lld", ids->values[i]);
         if (FAIL == elems_hash_id_exists(objects, ids->values[i])) {
             LOG_INF("Removing id %ld from the array of %d values", ids->values[i], ids->values_num);
             zbx_vector_uint64_remove(ids, i);
             continue;
-        }
+        } else 
+            LOG_INF("Id isn't exists");
         i++;
     }
 }
 
 int index_uint64_sync_objects(index_uint64_t *index, elems_hash_t *objects) {
-    return elems_hash_iterate(index->index, check_values_present_cb, objects, ELEM_FLAG_ITER_WRLOCK);
+    return elems_hash_iterate(index->ehash, check_values_present_cb, objects, ELEM_FLAG_ITER_WRLOCK);
 }
 
 #ifdef HAVE_GLB_TESTS
 
-elems_hash_t * index_uint64_get_elem_hash(index_uint64_t *index) {
-    return index->index;
+elems_hash_t* index_uint64_get_elem_hash(index_uint64_t *idx) {
+    LOG_INF("Ehash 2 is %p", idx->ehash);
+    return idx->ehash;
 }
 #endif
 

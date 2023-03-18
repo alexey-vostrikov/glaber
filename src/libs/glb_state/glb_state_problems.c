@@ -88,7 +88,7 @@ int glb_state_problems_destroy()
 
 ELEMS_CALLBACK(problem_save_cb)
 {
-    //CALC_TRIGGER *trigger = data;
+    //calc_trigger_t *trigger = data;
     glb_problem_t *problem = data;
 
     if (NULL != elem->data)
@@ -102,7 +102,7 @@ ELEMS_CALLBACK(problem_save_cb)
     return SUCCEED;
 }
 
-u_int64_t glb_state_problems_create_by_trigger(CALC_TRIGGER *trigger)
+u_int64_t glb_state_problems_create_by_trigger(calc_trigger_t *trigger)
 {
     int i;
     glb_problem_t *problem;
@@ -119,9 +119,12 @@ u_int64_t glb_state_problems_create_by_trigger(CALC_TRIGGER *trigger)
     if (SUCCEED == elems_hash_process(conf->problems, problemid, problem_save_cb, problem, 0))
     {
         index_uint64_add(conf->trigger_idx, trigger->triggerid, problemid);
-
-        for ( i = 0; i < trigger->hostids.values_num; i++)
-            index_uint64_add(conf->hosts_idx, trigger->hostids.values[i], problemid);
+        
+        zbx_vector_uint64_t *hostids;
+        
+        if (SUCCEED == conf_calc_trigger_get_all_hostids(trigger, &hostids))
+            for ( i = 0; i < hostids->values_num; i++)
+                index_uint64_add(conf->hosts_idx, hostids->values[i], problemid);
 
         return problemid;
     } 
@@ -220,8 +223,8 @@ void glb_state_problems_clean(zbx_vector_ptr_t *problems)
 }
 
 /* func to be called on the trigger recalc event*/
-/* note: there might be needed to pass history data along to alter it's severity value */
-void glb_state_problems_process_trigger_value(CALC_TRIGGER *trigger)
+/*note: sets the severity of the problem with the highest severity created*/
+void  glb_state_problems_process_trigger_value(calc_trigger_t *trigger, int *severity)
 {
     int problems_count, total_count;
     glb_state_problems_housekeep();

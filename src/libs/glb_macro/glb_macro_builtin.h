@@ -31,4 +31,4 @@ int glb_macro_builtin_expand_by_host(macro_proc_data_t *macro_proc, DC_HOST *hos
 int glb_macro_builtin_expand_by_itemid(macro_proc_data_t *macro_proc, u_int64_t itemid);
 int glb_macro_builtin_expand_by_item(macro_proc_data_t *macro_proc, DC_ITEM *item);
 
-int glb_macro_builtin_expand_by_calc_trigger(macro_proc_data_t *macro_proc, CALC_TRIGGER *tr);
+int glb_macro_builtin_expand_by_trigger(macro_proc_data_t *macro_proc, calc_trigger_t *tr);

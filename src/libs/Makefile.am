@@ -15,7 +15,6 @@ DIST_SUBDIRS = \
 	zbxcachehistory \
 	glb_state \
 	glb_macro \
-	glb_expression \
 	glb_conf \
 	zbxdbhigh \
 	zbxdbwrap \
@@ -115,8 +114,7 @@ SERVER_SUBDIRS = \
 	zbxeval \
 	zbxalgo/tests \
 	glb_events_log \
-	glb_actions \
-	glb_expression
+	glb_actions 
 else
 if PROXY
 PROXY_SUBDIRS = \
