@@ -9418,5 +9418,35 @@ return [
 				'default' => '0'
 			]
 		]
-	]
+	],
+    'hosts_depends' => [
+        'key' => 'depid',
+        'fields' => [
+            'depid' => [
+                'null' => false,
+                'type' => DB::FIELD_TYPE_ID,
+                'length' => 20
+            ],
+            'hostid_up' => [
+                'null' => true,
+                'type' => DB::FIELD_TYPE_ID,
+                'length' => 20,
+                'ref_table' => 'hosts',
+                'ref_field' => 'hostid'
+            ],
+            'hostid_down' => [
+                'null' => true,
+                'type' => DB::FIELD_TYPE_ID,
+                'length' => 20,
+                'ref_table' => 'hosts',
+                'ref_field' => 'hostid'
+            ],
+            'type' => [
+                'null' => false,
+                'type' => DB::FIELD_TYPE_CHAR,
+                'length' => 128,
+                'default' => ''
+            ]
+        ]
+    ]
 ];

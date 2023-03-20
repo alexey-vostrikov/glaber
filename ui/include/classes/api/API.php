@@ -491,4 +491,12 @@ class API {
 	public static function HttpTest() {
 		return self::getApi('httptest');
 	}
+
+    /**
+     * @return CHostDepends
+     */
+    public static function HostDepends() {
+        return self::getApi('hostdepends');
+    }
+
 }
