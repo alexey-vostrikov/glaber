@@ -31,7 +31,7 @@ workflow:
   # this code should work without PACKER_GITHUB_API_TOKEN,
   # but if packer init command failed, you must to set this vaiable in repo secrets
   # - export PACKER_GITHUB_API_TOKEN=${PACKER_GITHUB_API_TOKEN}
-  - cd appliance/build/docker
+  - cd build/appliance/build/docker
   - packer init .
   - packer validate .
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
@@ -223,7 +223,7 @@ docker:
     - if: '$CI_COMMIT_TAG != null'
       # and only we have some changes in build files or glaber version
       changes:
-        - appliance/build/docker/*
+        - build/appliance/build/docker/*
         - include/version.h
     # if we need to build for develop or in any other cases
     - when: manual
