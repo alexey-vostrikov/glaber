@@ -24,6 +24,7 @@
 #include "zbx_trigger_constants.h"
 #include "zbxcacheconfig.h"
 #include "../glb_events_log/glb_events_log.h"
+#include "../glb_actions/glb_actions.h"
 #include "load_dump.h"
 
 #define MAX_PROBLEMS 1000000
@@ -125,6 +126,8 @@ u_int64_t glb_state_problems_create_by_trigger(calc_trigger_t *trigger)
         if (SUCCEED == conf_calc_trigger_get_all_hostids(trigger, &hostids))
             for ( i = 0; i < hostids->values_num; i++)
                 index_uint64_add(conf->hosts_idx, hostids->values[i], problemid);
+
+        glb_actions_process_new_problem(problemid);
 
         return problemid;
     } 
@@ -256,7 +259,6 @@ void  glb_state_problems_process_trigger_value(calc_trigger_t *trigger, int *sev
         DEBUG_TRIGGER(trigger->triggerid, "Handling PROBLEM value, now (%d) problems exist, trigger type is %d", problems_count, trigger->type);
         if (TRIGGER_TYPE_MULTIPLE_TRUE == trigger->type || 0 == problems_count)
         {
-        
             LOG_INF("Creating PROBLEM for trigger %ld", trigger->triggerid);
             glb_state_problems_create_by_trigger(trigger);
         }

@@ -511,7 +511,7 @@ int	conf_calc_trigger_get_N_itemid(calc_trigger_t *trigger, int index, zbx_uint6
 	return ret;
 }
 
-int	conf_calc_trigger_get_all_hostids(calc_trigger_t *trigger, const zbx_vector_uint64_t **hostids) {
+int	conf_calc_trigger_get_all_hostids(calc_trigger_t *trigger, zbx_vector_uint64_t **hostids) {
   	trigger_cache_t	*cache;
 
   	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS)))
@@ -771,7 +771,7 @@ char* conf_calc_trigger_get_severity_name(unsigned char priority)
 	if ( NULL == cfg.severity_name) { 
 		zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_SEVERITY_NAME);
 	}
-	//zbx_config_clean(&cfg);
+
 	return cfg.severity_name[priority];
 }
 

@@ -67,7 +67,7 @@ void conf_calc_triggers_clean(calc_trigger_t *triggers, int *errcodes, size_t nu
 void conf_calc_triggers_free(zbx_vector_ptr_t *triggers);
 
 int	conf_calc_trigger_get_N_itemid(calc_trigger_t *trigger, int index, zbx_uint64_t *itemid);
-int	conf_calc_trigger_get_all_hostids(calc_trigger_t *trigger, const zbx_vector_uint64_t **hostids);
+int	conf_calc_trigger_get_all_hostids(calc_trigger_t *trigger, zbx_vector_uint64_t **hostids);
 
 void	conf_calc_triggers_prepare_expressions(calc_trigger_t **triggers, int triggers_num);
 //void	conf_calc_trigger_explain_expression(const calc_trigger_t *trigger, char **expression,

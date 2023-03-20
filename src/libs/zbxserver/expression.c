@@ -1073,7 +1073,6 @@ static int	DBitem_get_value(zbx_uint64_t itemid, char **lastvalue, int raw, zbx_
 	return FAIL;
 }
 
-/
 /******************************************************************************
  *                                                                            *
  * Purpose: formats full user name from name, surname and alias               *

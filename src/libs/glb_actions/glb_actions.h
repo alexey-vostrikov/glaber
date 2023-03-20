@@ -42,7 +42,7 @@ zbx_ack_task_t;
 int glb_actions_process_discovery_host();
 int glb_actions_process_lld_status();
 int glb_actions_process_autoregister();
-int glb_actions_process_problem_new();
+int glb_actions_process_new_problem(u_int64_t problemid);
 int glb_actions_process_problem_recovery();
 int glb_actions_process_by_acknowledgments();
 int glb_actions_process_discovery_service();
