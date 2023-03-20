@@ -81,7 +81,8 @@ class CApiServiceFactory extends CRegistryFactory {
 		'userdirectory' => CUserDirectory::class,
 		'usergroup' => CUserGroup::class,
 		'usermacro' => CUserMacro::class,
-		'valuemap' => CValueMap::class
+		'valuemap' => CValueMap::class,
+        'hostdepends' => CHostDepends::class,
 	];
 
 	public function __construct(array $objects = []) {
