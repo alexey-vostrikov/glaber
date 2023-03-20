@@ -89,7 +89,7 @@ class CHostNav extends CList {
      * @return array
      * @todo Убрать в пользу получения данных снаружи, или явного вызова метода снаружи
      */
-    public static function getData(int $hostid, int $lld_ruleid = 0): array
+    public static function getData($hostid, $lld_ruleid = 0 ): array
     {
         $options = [
             'output' => [

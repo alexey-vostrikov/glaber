@@ -1,3 +1,5 @@
+ver 3.0.29
+    - fix: chostnav failing on host discovery field
 ver 3.0.28
     - fix: trends non numeric data save problem on host clone
 ver 3.0.27
