@@ -21,7 +21,6 @@ This setup is enough for zabbix setup with 20k nvps performance.
 Linux operation system with internet access and software installed:
 - docker >=20.10.22 
 - docker-compose >=1.29.2
-- apache2-utils
 
 ## Components:
 
@@ -42,11 +41,13 @@ Linux operation system with internet access and software installed:
 ```bash
 cd /opt/
 git clone https://gitlab.com/mikler/glaber.git
-cd glaber/appliance/run/docker
+cd glaber/build/appliance/run/docker
 ./glaber.sh start (needs root access)
 ```
 
-This action create passwords for clickhouse ans mysql and docker-compose up all glaber components. This action needs sudo access.
+This action creates passwords for clickhouse and mysql and docker-compose up all glaber components.
+
+This action needs sudo access.
 
 # After success  build and start:
 - Zabbix web Admin password located in `.zbxweb` and displayed to stdout

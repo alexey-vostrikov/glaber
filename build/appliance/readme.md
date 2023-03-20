@@ -18,6 +18,6 @@ Fill free to create an issue https://gitlab.com/mikler/glaber/-/issues if you ne
 cd /opt/
 git clone https://gitlab.com/mikler/glaber.git
 # docker folder is an appliance type, possible variants virtualbox,yandex-cloud-vm,vagrant,helm-chart etc
-cd glaber/appliance/run/docker
+cd glaber/build/appliance/run/docker
 ./glaber.sh start (needs root access)
 ```
