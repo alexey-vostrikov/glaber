@@ -39,7 +39,7 @@ workflow:
 
 .install_packer: &install_packer
   - apk add --no-cache wget unzip
-  - wget -q https://releases.hashicorp.com/packer/1.8.5/packer_1.8.5_linux_amd64.zip
+  - wget -q https://glaber.io/misc/packer_1.8.5_linux_amd64.zip
   - unzip packer_1.8.5_linux_amd64.zip
   - mv packer /usr/local/bin/
 
@@ -63,6 +63,9 @@ workflow:
 .set_glb_version: &set_glb_version
   - export GLABER_VERSION=$(cat include/version.h | grep GLABER_VERSION | tr -dc 0-9.)
   - echo $GLABER_VERSION
+
+.clean_old_dists: &clean_old_dists
+    - rm $FULL_PROJECT_PATH/../glaber*.deb || true
 
 .prepare_sources: &prepare_sources
   - *clean_old_dists
@@ -103,12 +106,14 @@ workflow:
   - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev curl libssl-dev
 
 .upload_packages: &upload_packages
-  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /builds/mikler/glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
+  - cd $FULL_PROJECT_PATH; cd ..
+  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
+  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --waitforlock 120 --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
 
 
 .upload_rpms: &upload_rpms
+  - echo "Will upload to '$REPO_DIR' repo"
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
@@ -126,18 +131,18 @@ debian-buster:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-astra:
-  variables:
-    OS: astra
-    OS_VER: smolensk
-  tags: ["virtbox"]
-  script:
-    - update-ca-certificates
-    - *build_go
-    - *prepare_sources
-    - *build_glbmap
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
+#astra:
+#  variables:
+#    OS: astra
+#    OS_VER: smolensk
+#  tags: ["virtbox"]
+#  script:
+#    - update-ca-certificates
+#    - *build_go
+#    - *prepare_sources
+#    - *build_glbmap
+#    - dpkg-buildpackage -b --no-sign
+#    - *upload_packages
 
 debian-bullseye:
   variables:
