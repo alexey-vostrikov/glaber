@@ -40,8 +40,11 @@ Linux operation system with internet access and software installed:
 
 ```bash
 cd /opt/
-git clone https://gitlab.com/mikler/glaber.git
-cd glaber/build/appliance/run/docker
+sudo su
+git clone --depth 1 -b master https://gitlab.com/mikler/glaber.git
+cd glaber
+git fetch --depth=300
+cd build/appliance/run/docker
 ./glaber.sh start (needs root access)
 ```
 
