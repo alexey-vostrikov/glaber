@@ -138,9 +138,9 @@ HURL_VERSION="1.8.0"
 # Getting latest tag on git repository (latest stable version of glaber)
 GLABER_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
 git checkout tags/$GLABER_TAG -- ../../../../include/version.h
-GLABER_VERSION=$(cat ../../../../include/version.h | grep "GLABER_VERSION" | grep -Po "(\d+\.\d+\.\d+)")
+export GLABER_VERSION=$(cat ../../../../include/version.h | grep GLABER_VERSION | tr -dc 0-9.)
 git checkout HEAD -- ../../../../include/version.h
-# ZBX_PORT=8050
+# export ZBX_PORT=8050
 
 # main part
 [ $# -ne 1 ] && (usage && exit 1)
