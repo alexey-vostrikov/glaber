@@ -90,8 +90,8 @@ zbx_err_codes_t;
 zbx_err_codes_t	zbx_db_last_errcode(void);
 
 #ifdef HAVE_POSTGRESQL
-int	zbx_tsdb_get_version(void);
-#define ZBX_DB_TSDB_V1	(20000 > zbx_tsdb_get_version())
+//int	zbx_tsdb_get_version(void);
+//#define ZBX_DB_TSDB_V1	(20000 > zbx_tsdb_get_version())
 #endif
 
 #ifdef HAVE_ORACLE

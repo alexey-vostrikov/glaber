@@ -1,5 +1,7 @@
+ver 3.0.30
+    - fix: upgrade from previously enebled timescale DB goes wrong if timescale extension is missing
 ver 3.0.29
-    - fix: chostnav failing on host discovery field
+    - fix: hostnav failing on host discovery field
 ver 3.0.28
     - fix: trends non numeric data save problem on host clone
 ver 3.0.27
