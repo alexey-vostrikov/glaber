@@ -1663,33 +1663,36 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		thread_args.args = NULL;
 
 		switch (thread_args.info.process_type)
-		{	case GLB_PROCESS_TYPE_SNMP:
-				poller_args.poller_type = ITEM_TYPE_SNMP;
+		{	case ZBX_PROCESS_TYPE_HISTORYPOLLER:
 				thread_args.args = &poller_args;
-				zabbix_log(LOG_LEVEL_INFORMATION,"Starting ASYNC snmp poller");
+				LOG_INF("Starting  Calc glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
+			case GLB_PROCESS_TYPE_SNMP:
+				thread_args.args = &poller_args;
+				LOG_INF("Starting  SNMP glb poller of type %d", poller_args.poller_type);
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;
 			case GLB_PROCESS_TYPE_PINGER:
-				poller_args.poller_type = ITEM_TYPE_SIMPLE;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting ICMP glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
 			case GLB_PROCESS_TYPE_WORKER:
-				poller_args.poller_type = ITEM_TYPE_EXTERNAL;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting  WORKER glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
 			case GLB_PROCESS_TYPE_SERVER:
-				poller_args.poller_type = ITEM_TYPE_WORKER_SERVER;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting  WORKER glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
 			case GLB_PROCESS_TYPE_AGENT:
-				poller_args.poller_type = ITEM_TYPE_ZABBIX;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting AGENT glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
-
+				break;
 			case GLB_PROCESS_TYPE_PREPROCESSOR:
 				zbx_thread_start(glb_preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
