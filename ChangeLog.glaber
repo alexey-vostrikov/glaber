@@ -1,3 +1,5 @@
+ver 3.0.33
+    - fix: proxy failing on setting default ICMP method
 ver 3.0.32
     - fix: glbmap included to proxy package
 ver 3.0.31

@@ -360,7 +360,7 @@ char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
 
 char	*CONFIG_USER			= NULL;
-char 	*ICMP_METHOD_STR = "glbmap";
+char 	*ICMP_METHOD_STR = NULL;
 u_int64_t 		CONFIG_IPC_BUFFER_SIZE		= 128 * ZBX_MEBIBYTE;
 /* web monitoring */
 char	*CONFIG_SSL_CA_LOCATION		= NULL;
@@ -878,9 +878,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},	
 		{"StartWorkerServers",	&CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER],			TYPE_INT,
 			PARM_OPT,	0,			0},	
-		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
-			PARM_OPT,	0,			8},	
-
+		{"DefaultICMPMethod", &ICMP_METHOD_STR, TYPE_STRING,
+			 PARM_OPT, 0, 0},
 		{"ProxyMode",			&config_proxymode,			TYPE_INT,
 			PARM_OPT,	ZBX_PROXYMODE_ACTIVE,	ZBX_PROXYMODE_PASSIVE},
 		{"Server",			&CONFIG_SERVER,				TYPE_STRING,
