@@ -73,6 +73,8 @@
 #include "glb_preproc.h"
 #include "../libs/apm/apm.h"
 #include "../zabbix_server/glb_poller/poller_ipc.h"
+#include "../zabbix_server/preprocessor/glb_preproc_worker.h"
+
  
 
 
@@ -1085,8 +1087,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"StatsAllowedIP",		&CONFIG_STATS_ALLOWED_IP,		TYPE_STRING_LIST,
 			PARM_OPT,	0,			0},
-		{"StartPreprocessors",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],		TYPE_INT,
-			PARM_OPT,	1,			1000},
+//		{"StartPreprocessors",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],		TYPE_INT,
+//			PARM_OPT,	1,			1000},
+		{"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+			 PARM_OPT, 1, 1000},
 		{"ListenBacklog",		&CONFIG_TCP_MAX_BACKLOG_SIZE,		TYPE_INT,
 			PARM_OPT,	0,			INT_MAX},
 		{"StartODBCPollers",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_ODBCPOLLER],		TYPE_INT,
@@ -1118,6 +1122,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			exit(EXIT_FAILURE);
 		}
 	}
+
+CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR ] = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
 
 #if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
 	zbx_db_validate_config();
@@ -1523,8 +1529,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	DC_set_debug_item(CONFIG_DEBUG_ITEM);
-
 	zbx_free_config();
 
 	if (SUCCEED != zbx_rtc_init(&rtc, &error))
@@ -1555,6 +1559,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
+
+	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 
 	if (SUCCEED != zbx_init_selfmon_collector(get_config_forks, &error))
 	{
@@ -1686,7 +1692,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				break;	
 
 			case GLB_PROCESS_TYPE_PREPROCESSOR:
-				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
+				zbx_thread_start(glb_preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
 
 			case ZBX_PROCESS_TYPE_CONFSYNCER:
