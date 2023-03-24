@@ -60,7 +60,7 @@ function ShowGroupedItems(array &$data) {
 
 function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_data, &$data) {
     
-    $table = (new CDataTable('latest'.$discovery_id, ['compact'=> '1']))->addClass(ZBX_STYLE_OVERFLOW_ELLIPSIS);
+    $table = (new CDataTable('latest'.$discovery_id, ['compact'=> '1']));
     $prototype_items = $discovery_data['items'];
     $table->setHeader( array_merge( [_('Name')], array_column($prototype_items, 'name')));
     

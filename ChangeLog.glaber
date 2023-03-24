@@ -1,5 +1,17 @@
+ver 3.0.35
+    - fix: proper datatable sizing, map reloading with selected element
+ver 3.0.34
+    - fix: proxy async pollers init possibly causing crash
+ver 3.0.33
+    - fix: proxy failing on setting default ICMP method
+ver 3.0.32
+    - fix: glbmap included to proxy package
+ver 3.0.31
+    - fix: upgrade proxy init order leading crash on boot and improper glb_preporcessor init leading to preprocessing fail on start
+ver 3.0.30
+    - fix: upgrade from previously enabled timescale DB goes wrong if timescale extension is missing
 ver 3.0.29
-    - fix: chostnav failing on host discovery field
+    - fix: hostnav failing on host discovery field
 ver 3.0.28
     - fix: trends non numeric data save problem on host clone
 ver 3.0.27

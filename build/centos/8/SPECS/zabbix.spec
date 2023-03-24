@@ -456,6 +456,7 @@ cat conf/zabbix_proxy.conf | sed \
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|proxy|g' \
 	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-proxy
+install -m 0755 -p ./glbmap $RPM_BUILD_ROOT%{_sbindir}/
 install -Dm 0644 -p %{SOURCE12} $RPM_BUILD_ROOT%{_unitdir}/zabbix-proxy.service
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-proxy.conf
 %endif

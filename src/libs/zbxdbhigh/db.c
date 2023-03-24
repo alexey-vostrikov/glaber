@@ -797,7 +797,7 @@ void	zbx_db_extract_dbextension_info(struct zbx_db_version_info_t *version_info)
 
 	version_info->extension = zbx_strdup(NULL, row[0]);
 
-	zbx_tsdb_info_extract(version_info);
+//	zbx_tsdb_info_extract(version_info);
 clean:
 	zbx_db_free_result(result);
 out:

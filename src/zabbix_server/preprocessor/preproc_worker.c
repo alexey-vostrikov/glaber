@@ -690,6 +690,7 @@ ZBX_THREAD_ENTRY(preprocessing_worker_thread, args)
 	}
 
 	ppid = getppid();
+	LOG_INF("Sending worker registration request from %d", process_num);
 	zbx_ipc_socket_write(&socket, ZBX_IPC_PREPROCESSOR_WORKER, (unsigned char *)&ppid, sizeof(ppid));
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),

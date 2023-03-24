@@ -2903,59 +2903,59 @@ out:
 }
 
 #ifdef HAVE_POSTGRESQL
-static int	zbx_tsdb_table_has_compressed_chunks(const char *table_names)
-{
-	DB_RESULT	result;
-	int		ret;
+// static int	zbx_tsdb_table_has_compressed_chunks(const char *table_names)
+// {
+// 	DB_RESULT	result;
+// 	int		ret;
 
-	if (1 == ZBX_DB_TSDB_V1) {
-		result = zbx_db_select("select null from timescaledb_information.compressed_chunk_stats where hypertable_name in (%s) and "
-			"compression_status='Compressed'", table_names);
-	}
-	else
-	{
-		result = zbx_db_select("select null from timescaledb_information.chunks where hypertable_name in (%s) and "
-			"is_compressed='t'", table_names);
-	}
+// 	if (1 == ZBX_DB_TSDB_V1) {
+// 		result = zbx_db_select("select null from timescaledb_information.compressed_chunk_stats where hypertable_name in (%s) and "
+// 			"compression_status='Compressed'", table_names);
+// 	}
+// 	else
+// 	{
+// 		result = zbx_db_select("select null from timescaledb_information.chunks where hypertable_name in (%s) and "
+// 			"is_compressed='t'", table_names);
+// 	}
 
-	if ((DB_RESULT)ZBX_DB_DOWN == result)
-	{
-		ret = FAIL;
-		goto out;
-	}
+// 	if ((DB_RESULT)ZBX_DB_DOWN == result)
+// 	{
+// 		ret = FAIL;
+// 		goto out;
+// 	}
 
-	if (NULL != zbx_db_fetch(result))
-		ret = SUCCEED;
-	else
-		ret = FAIL;
-out:
-	zbx_db_free_result(result);
+// 	if (NULL != zbx_db_fetch(result))
+// 		ret = SUCCEED;
+// 	else
+// 		ret = FAIL;
+// out:
+// 	zbx_db_free_result(result);
 
-	return ret;
-}
+// 	return ret;
+// }
 
-void	zbx_tsdb_extract_compressed_chunk_flags(struct zbx_db_version_info_t *version_info)
-{
-#define ZBX_TSDB1_HISTORY_TABLES "'history_uint'::regclass,'history_log'::regclass,'history_str'::regclass,'history_text'::regclass,'history'::regclass"
-#define ZBX_TSDB2_HISTORY_TABLES "'history_uint','history_log','history_str','history_text','history'"
-#define ZBX_TSDB1_TRENDS_TABLES "'trends'::regclass,'trends_uint'::regclass"
-#define ZBX_TSDB2_TRENDS_TABLES "'trends','trends_uint'"
-	const char	*history_tables, *trends_tables;
+// void	zbx_tsdb_extract_compressed_chunk_flags(struct zbx_db_version_info_t *version_info)
+// {
+// #define ZBX_TSDB1_HISTORY_TABLES "'history_uint'::regclass,'history_log'::regclass,'history_str'::regclass,'history_text'::regclass,'history'::regclass"
+// #define ZBX_TSDB2_HISTORY_TABLES "'history_uint','history_log','history_str','history_text','history'"
+// #define ZBX_TSDB1_TRENDS_TABLES "'trends'::regclass,'trends_uint'::regclass"
+// #define ZBX_TSDB2_TRENDS_TABLES "'trends','trends_uint'"
+// 	const char	*history_tables, *trends_tables;
 
-	history_tables = (1 == ZBX_DB_TSDB_V1 ? ZBX_TSDB1_HISTORY_TABLES : ZBX_TSDB2_HISTORY_TABLES);
-	trends_tables = (1 == ZBX_DB_TSDB_V1 ? ZBX_TSDB1_TRENDS_TABLES : ZBX_TSDB2_TRENDS_TABLES);
+// 	history_tables = (1 == ZBX_DB_TSDB_V1 ? ZBX_TSDB1_HISTORY_TABLES : ZBX_TSDB2_HISTORY_TABLES);
+// 	trends_tables = (1 == ZBX_DB_TSDB_V1 ? ZBX_TSDB1_TRENDS_TABLES : ZBX_TSDB2_TRENDS_TABLES);
 
-	version_info->history_compressed_chunks = (SUCCEED == zbx_tsdb_table_has_compressed_chunks(history_tables)) ?
-			1 : 0;
+// 	version_info->history_compressed_chunks = (SUCCEED == zbx_tsdb_table_has_compressed_chunks(history_tables)) ?
+// 			1 : 0;
 
-	version_info->trends_compressed_chunks = (SUCCEED == zbx_tsdb_table_has_compressed_chunks(trends_tables)) ?
-			1 : 0;
+// 	version_info->trends_compressed_chunks = (SUCCEED == zbx_tsdb_table_has_compressed_chunks(trends_tables)) ?
+// 			1 : 0;
 
-#undef ZBX_TSDB1_HISTORY_TABLES
-#undef ZBX_TSDB2_HISTORY_TABLES
-#undef ZBX_TSDB1_TRENDS_TABLES
-#undef ZBX_TSDB2_TRENDS_TABLES
-}
+// #undef ZBX_TSDB1_HISTORY_TABLES
+// #undef ZBX_TSDB2_HISTORY_TABLES
+// #undef ZBX_TSDB1_TRENDS_TABLES
+// #undef ZBX_TSDB2_TRENDS_TABLES
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -2991,39 +2991,39 @@ static char	*zbx_tsdb_get_license(void)
  * Purpose: retrieves TimescaleDB extension info, including license string and numeric version value           *
  *                                                                                                             *
  **************************************************************************************************************/
-void	zbx_tsdb_info_extract(struct zbx_db_version_info_t *version_info)
-{
-	int		tsdb_ver;
+// void	zbx_tsdb_info_extract(struct zbx_db_version_info_t *version_info)
+// {
+// 	int		tsdb_ver;
 
-	if (0 != zbx_strcmp_null(version_info->extension, ZBX_DB_EXTENSION_TIMESCALEDB))
-		return;
+// 	if (0 != zbx_strcmp_null(version_info->extension, ZBX_DB_EXTENSION_TIMESCALEDB))
+// 		return;
 
-	tsdb_ver = zbx_tsdb_get_version();
+// 	tsdb_ver = zbx_tsdb_get_version();
 
-	version_info->ext_current_version = (zbx_uint32_t)tsdb_ver;
-	version_info->ext_min_version = ZBX_TIMESCALE_MIN_VERSION;
-	version_info->ext_max_version = ZBX_TIMESCALE_MAX_VERSION;
-	version_info->ext_min_supported_version = ZBX_TIMESCALE_MIN_SUPPORTED_VERSION;
+// 	version_info->ext_current_version = (zbx_uint32_t)tsdb_ver;
+// 	version_info->ext_min_version = ZBX_TIMESCALE_MIN_VERSION;
+// 	version_info->ext_max_version = ZBX_TIMESCALE_MAX_VERSION;
+// 	version_info->ext_min_supported_version = ZBX_TIMESCALE_MIN_SUPPORTED_VERSION;
 
-	version_info->ext_friendly_current_version = zbx_dsprintf(NULL, "%d.%d.%d", RIGHT2(tsdb_ver/10000),
-			RIGHT2(tsdb_ver/100), RIGHT2(tsdb_ver));
+// 	version_info->ext_friendly_current_version = zbx_dsprintf(NULL, "%d.%d.%d", RIGHT2(tsdb_ver/10000),
+// 			RIGHT2(tsdb_ver/100), RIGHT2(tsdb_ver));
 
-	version_info->ext_friendly_min_version = ZBX_TIMESCALE_MIN_VERSION_STR;
-	version_info->ext_friendly_max_version = ZBX_TIMESCALE_MAX_VERSION_STR;
-	version_info->ext_friendly_min_supported_version = ZBX_TIMESCALE_MIN_SUPPORTED_VERSION_STR;
+// 	version_info->ext_friendly_min_version = ZBX_TIMESCALE_MIN_VERSION_STR;
+// 	version_info->ext_friendly_max_version = ZBX_TIMESCALE_MAX_VERSION_STR;
+// 	version_info->ext_friendly_min_supported_version = ZBX_TIMESCALE_MIN_SUPPORTED_VERSION_STR;
 
-	version_info->ext_flag = zbx_db_version_check(version_info->extension, version_info->ext_current_version,
-			version_info->ext_min_version, version_info->ext_max_version,
-			version_info->ext_min_supported_version);
+// 	version_info->ext_flag = zbx_db_version_check(version_info->extension, version_info->ext_current_version,
+// 			version_info->ext_min_version, version_info->ext_max_version,
+// 			version_info->ext_min_supported_version);
 
-	if (ZBX_TIMESCALE_MIN_VERSION_WITH_LICENSE_PARAM_SUPPORT <= tsdb_ver)
-		version_info->ext_lic = zbx_tsdb_get_license();
+// 	if (ZBX_TIMESCALE_MIN_VERSION_WITH_LICENSE_PARAM_SUPPORT <= tsdb_ver)
+// 		version_info->ext_lic = zbx_tsdb_get_license();
 
-	zbx_tsdb_extract_compressed_chunk_flags(version_info);
+// 	//zbx_tsdb_extract_compressed_chunk_flags(version_info);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "TimescaleDB version: [%d], license: [%s]", tsdb_ver,
-		ZBX_NULL2EMPTY_STR(version_info->ext_lic));
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "TimescaleDB version: [%d], license: [%s]", tsdb_ver,
+// 		ZBX_NULL2EMPTY_STR(version_info->ext_lic));
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -3037,55 +3037,55 @@ void	zbx_tsdb_info_extract(struct zbx_db_version_info_t *version_info)
  * Return value: TSDB version or 0 if unknown or the extension not installed  *
  *                                                                            *
  ******************************************************************************/
-int	zbx_tsdb_get_version(void)
-{
-	int		ver, major, minor, patch;
-	DB_RESULT	result;
-	DB_ROW		row;
+// int	zbx_tsdb_get_version(void)
+// {
+// 	int		ver, major, minor, patch;
+// 	DB_RESULT	result;
+// 	DB_ROW		row;
 
-	if (-1 == ZBX_TSDB_VERSION)
-	{
-		/* catalog pg_extension not available */
-		if (90001 > ZBX_PG_SVERSION)
-		{
-			ver = ZBX_TSDB_VERSION = 0;
-			goto out;
-		}
+// 	if (-1 == ZBX_TSDB_VERSION)
+// 	{
+// 		/* catalog pg_extension not available */
+// 		if (90001 > ZBX_PG_SVERSION)
+// 		{
+// 			ver = ZBX_TSDB_VERSION = 0;
+// 			goto out;
+// 		}
 
-		result = zbx_db_select("select extversion from pg_extension where extname = 'timescaledb'");
+// 		result = zbx_db_select("select extversion from pg_extension where extname = 'timescaledb'");
 
-		/* database down, can re-query in the next call */
-		if ((DB_RESULT)ZBX_DB_DOWN == result)
-		{
-			ver = 0;
-			goto out;
-		}
+// 		/* database down, can re-query in the next call */
+// 		if ((DB_RESULT)ZBX_DB_DOWN == result)
+// 		{
+// 			ver = 0;
+// 			goto out;
+// 		}
 
-		/* extension is not installed */
-		if (NULL == result)
-		{
-			ver = ZBX_TSDB_VERSION = 0;
-			goto out;
-		}
+// 		/* extension is not installed */
+// 		if (NULL == result)
+// 		{
+// 			ver = ZBX_TSDB_VERSION = 0;
+// 			goto out;
+// 		}
 
-		if (NULL != (row = zbx_db_fetch(result)) &&
-				3 == sscanf((const char*)row[0], "%d.%d.%d", &major, &minor, &patch))
-		{
-			ver = major * 10000;
-			ver += minor * 100;
-			ver += patch;
-			ZBX_TSDB_VERSION = ver;
-		}
-		else
-			ver = ZBX_TSDB_VERSION = 0;
+// 		if (NULL != (row = zbx_db_fetch(result)) &&
+// 				3 == sscanf((const char*)row[0], "%d.%d.%d", &major, &minor, &patch))
+// 		{
+// 			ver = major * 10000;
+// 			ver += minor * 100;
+// 			ver += patch;
+// 			ZBX_TSDB_VERSION = ver;
+// 		}
+// 		else
+// 			ver = ZBX_TSDB_VERSION = 0;
 
-		zbx_db_free_result(result);
-	}
-	else
-		ver = ZBX_TSDB_VERSION;
-out:
-	return ver;
-}
+// 		zbx_db_free_result(result);
+// 	}
+// 	else
+// 		ver = ZBX_TSDB_VERSION;
+// out:
+// 	return ver;
+// }
 
 /******************************************************************************
  *                                                                            *

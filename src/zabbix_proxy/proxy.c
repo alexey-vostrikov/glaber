@@ -73,6 +73,8 @@
 #include "glb_preproc.h"
 #include "../libs/apm/apm.h"
 #include "../zabbix_server/glb_poller/poller_ipc.h"
+#include "../zabbix_server/preprocessor/glb_preproc_worker.h"
+
  
 
 
@@ -358,7 +360,7 @@ char	*CONFIG_LOAD_MODULE_PATH	= NULL;
 char	**CONFIG_LOAD_MODULE		= NULL;
 
 char	*CONFIG_USER			= NULL;
-char 	*ICMP_METHOD_STR = "glbmap";
+char 	*ICMP_METHOD_STR = NULL;
 u_int64_t 		CONFIG_IPC_BUFFER_SIZE		= 128 * ZBX_MEBIBYTE;
 /* web monitoring */
 char	*CONFIG_SSL_CA_LOCATION		= NULL;
@@ -856,8 +858,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"SnmpDisableSNMPV1Async",			&CONFIG_DISABLE_SNMPV1_ASYNC,			TYPE_INT,
 			PARM_OPT,	0,			1},
-		{"StartGLBPreprocessors",		&CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR],		TYPE_INT,
-			PARM_OPT,	1,			1000},
+		{"StartGLBPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN], TYPE_INT,
+			 PARM_OPT, 1, 1000},
 		{"IPCBufferSize",		&CONFIG_IPC_BUFFER_SIZE,		TYPE_UINT64,
 			PARM_OPT,	1024*1024,			__UINT64_C(64) * ZBX_GIBIBYTE},	
 		{"SnmpRetries",			&CONFIG_SNMP_RETRIES,			TYPE_INT,
@@ -876,9 +878,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},	
 		{"StartWorkerServers",	&CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER],			TYPE_INT,
 			PARM_OPT,	0,			0},	
-		{"DefaultICMPMethod",		&ICMP_METHOD_STR,			TYPE_STRING,
-			PARM_OPT,	0,			8},	
-
+		{"DefaultICMPMethod", &ICMP_METHOD_STR, TYPE_STRING,
+			 PARM_OPT, 0, 0},
 		{"ProxyMode",			&config_proxymode,			TYPE_INT,
 			PARM_OPT,	ZBX_PROXYMODE_ACTIVE,	ZBX_PROXYMODE_PASSIVE},
 		{"Server",			&CONFIG_SERVER,				TYPE_STRING,
@@ -1085,8 +1086,10 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"StatsAllowedIP",		&CONFIG_STATS_ALLOWED_IP,		TYPE_STRING_LIST,
 			PARM_OPT,	0,			0},
-		{"StartPreprocessors",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],		TYPE_INT,
-			PARM_OPT,	1,			1000},
+//		{"StartPreprocessors",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],		TYPE_INT,
+//			PARM_OPT,	1,			1000},
+		{"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+			 PARM_OPT, 1, 1000},
 		{"ListenBacklog",		&CONFIG_TCP_MAX_BACKLOG_SIZE,		TYPE_INT,
 			PARM_OPT,	0,			INT_MAX},
 		{"StartODBCPollers",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_ODBCPOLLER],		TYPE_INT,
@@ -1118,6 +1121,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			exit(EXIT_FAILURE);
 		}
 	}
+
+CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR ] = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
 
 #if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
 	zbx_db_validate_config();
@@ -1523,8 +1528,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
-	DC_set_debug_item(CONFIG_DEBUG_ITEM);
-
 	zbx_free_config();
 
 	if (SUCCEED != zbx_rtc_init(&rtc, &error))
@@ -1555,6 +1558,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
+
+	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 
 	if (SUCCEED != zbx_init_selfmon_collector(get_config_forks, &error))
 	{
@@ -1658,35 +1663,38 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		thread_args.args = NULL;
 
 		switch (thread_args.info.process_type)
-		{	case GLB_PROCESS_TYPE_SNMP:
-				poller_args.poller_type = ITEM_TYPE_SNMP;
+		{	case ZBX_PROCESS_TYPE_HISTORYPOLLER:
 				thread_args.args = &poller_args;
-				zabbix_log(LOG_LEVEL_INFORMATION,"Starting ASYNC snmp poller");
+				LOG_INF("Starting  Calc glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
+			case GLB_PROCESS_TYPE_SNMP:
+				thread_args.args = &poller_args;
+				LOG_INF("Starting  SNMP glb poller of type %d", poller_args.poller_type);
+				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+				break;
 			case GLB_PROCESS_TYPE_PINGER:
-				poller_args.poller_type = ITEM_TYPE_SIMPLE;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting ICMP glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
 			case GLB_PROCESS_TYPE_WORKER:
-				poller_args.poller_type = ITEM_TYPE_EXTERNAL;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting  WORKER glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
 			case GLB_PROCESS_TYPE_SERVER:
-				poller_args.poller_type = ITEM_TYPE_WORKER_SERVER;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting  WORKER glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
+				break;
 			case GLB_PROCESS_TYPE_AGENT:
-				poller_args.poller_type = ITEM_TYPE_ZABBIX;
 				thread_args.args = &poller_args;
+				LOG_INF("Starting AGENT glb poller of type %d", poller_args.poller_type);
 				zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-				break;	
-
+				break;
 			case GLB_PROCESS_TYPE_PREPROCESSOR:
-				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
+				zbx_thread_start(glb_preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
 
 			case ZBX_PROCESS_TYPE_CONFSYNCER:

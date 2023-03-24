@@ -2046,20 +2046,21 @@ static void preprocessor_register_worker(zbx_preprocessing_manager_t *manager, z
 	{
 		zbx_ipc_client_close(client);
 		zabbix_log(LOG_LEVEL_DEBUG, "refusing connection from foreign process");
+		return;
 	}
-	else
+	
+	LOG_INF("Processing registration request from worker %d", manager->worker_count );
+	if (CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] == manager->worker_count)
 	{
-		if (CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] == manager->worker_count)
-		{
-			THIS_SHOULD_NEVER_HAPPEN;
-			exit(EXIT_FAILURE);
-		}
-
-		worker = (zbx_preprocessing_worker_t *)&manager->workers[manager->worker_count++];
-		worker->client = client;
-
-		preprocessor_assign_tasks(manager);
+		LOG_INF("Has %d and %d", CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],  manager->worker_count);
+		THIS_SHOULD_NEVER_HAPPEN;
+		exit(EXIT_FAILURE);
 	}
+
+	worker = (zbx_preprocessing_worker_t *)&manager->workers[manager->worker_count++];
+	worker->client = client;
+
+	preprocessor_assign_tasks(manager);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

@@ -24,6 +24,7 @@ class CLatestValue extends CSpan {
     
     private $value_raw;
     private $value_formatted = " - ";
+    private $value_short = " - ";
     private $value_change;
     private $value_change_raw = 0;
     
@@ -49,11 +50,13 @@ class CLatestValue extends CSpan {
         $this->calcTimestamps();
 
        // error_log("Got trigger info:".json_encode($triggerinfo)."\n");
-
-        parent::__construct($this->value_formatted);
+        parent::__construct($this->value_short);
         
         if (!$this->isSupportedItem())
             $this->addClass(ZBX_STYLE_RED);
+        
+        if ($this->isNumericItem())
+            $this->addClass(ZBX_STYLE_NOWRAP);
         
         $this->makeHint();
 
@@ -132,14 +135,16 @@ class CLatestValue extends CSpan {
             return;
         
         $last_history = $this->history[0]['value'];
-        $this->value_raw = $last_history;
 
-        if ( $this->isNumericItem() && ITEM_VALUE_TYPE_STR != $this->itemdata['value_type'] && mb_strlen($last_history) > 20 ) {
-                $this->value_formatted = substr($last_value, 0, 20). '...';
+        $this->value_raw = $last_history;
+        $this->value_formatted = formatHistoryValue($last_history, $this->itemdata, false);
+
+        if ( !$this->isNumericItem() &&  mb_strlen($last_history) > 20 ) {
+                $this->value_short = substr($last_history, 0, 20). '...';
                 return;
         }     
-                          
-        $this->value_formatted = formatHistoryValue($last_history, $this->itemdata, false);
+        
+        $this->value_short = $this->value_formatted;
     }
 
     private function makeAdminLinks(){
@@ -160,7 +165,7 @@ class CLatestValue extends CSpan {
     private function addHintRow($name, $check_value, $object) {
         if (!isset($check_value))
             return;
-        $this->hintbox->addRow([(new CSpan($name))->addStyle(ZBX_STYLE_RIGHT), $object]);
+        $this->hintbox->addRow([(new CSpan($name))->addStyle(ZBX_STYLE_RIGHT)->addStyle(ZBX_STYLE_WORDWRAP), $object]);
     }
     
     private function makeHint() {
