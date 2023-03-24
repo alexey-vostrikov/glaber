@@ -1,3 +1,5 @@
+ver 3.0.35
+    - fix: proper datatable sizing, map reloading with selected element
 ver 3.0.34
     - fix: proxy async pollers init possibly causing crash
 ver 3.0.33
