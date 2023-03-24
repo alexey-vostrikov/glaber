@@ -59,6 +59,9 @@ set-passwords() {
   gen-password() {
     < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c12
   }
+  make-bcrypt-hash() {
+    htpasswd -bnBC 10 "" $1 | tail -c 55
+  }
   if [ ! -f .passwords.created ]; then
     git-reset-variables-files
     source .env
@@ -72,9 +75,10 @@ set-passwords() {
     wget -q https://storage.yandexcloud.net/glaber/repo/$GLABER_VERSION-create-mysql.sql.tar.gz -O - | tar -xz && \
     mv create.sql mysql/create.sql
     echo "use MYSQL_DATABASE;" >> mysql/create.sql
-    echo "update users set passwd=md5('ZBX_WEB_ADMIN_PASS') where username='Admin';" >> mysql/create.sql
+    echo "update users set passwd='\$2y\$10\$ZBX_WEB_ADMIN_PASS' where username='Admin';" >> mysql/create.sql
+    ZBX_WEB_ADMIN_PASS_HASH=$(make-bcrypt-hash $ZBX_WEB_ADMIN_PASS)
     sed -i -e "s/MYSQL_DATABASE/$MYSQL_DATABASE/" \
-           -e "s/ZBX_WEB_ADMIN_PASS/$ZBX_WEB_ADMIN_PASS/" \
+           -e "s/ZBX_WEB_ADMIN_PASS/$ZBX_WEB_ADMIN_PASS_HASH/" \
     mysql/create.sql
     sed -i -e "s/<password>.*<\/password>/<password>$ZBX_CH_PASS<\/password>/" \
            -e "s/10000000000/$ZBX_CH_CONFIG_MAX_MEMORY_USAGE/" \
@@ -135,19 +139,23 @@ recreate() {
 
 # variables
 HURL_VERSION="1.8.0"
-# Getting latest tag on git repository (latest stable version of glaber)
-GLABER_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
-git checkout tags/$GLABER_TAG -- ../../../../include/version.h
-export GLABER_VERSION=$(cat ../../../../include/version.h | grep GLABER_VERSION | tr -dc 0-9.)
-git checkout HEAD -- ../../../../include/version.h
+# Getting latest tag on git repository (latest stable 2 version of glaber)
+GLABER_TAG=$(git ls-remote --refs --sort='version:refname' --tags \
+             https://gitlab.com/mikler/glaber.git origin '2.*' | \
+             tail --lines=1 | cut --delimiter='/' --fields=3)
+export GLABER_VERSION=$(curl -s https://gitlab.com/mikler/glaber/-/raw/${GLABER_TAG}/include/version.h | \
+                        grep GLABER_VERSION | tr -dc 0-9.)
 # export ZBX_PORT=8050
 
 # main part
 [ $# -ne 1 ] && (usage && exit 1)
 
-# Check whether docker-compose is installed
+# Check whether docker-compose and apache2-utils is installed
 command -v docker-compose >/dev/null 2>&1 || \
 { echo >&2 "docker-compose is required, please install it and start over. Aborting."; exit 1; }
+
+command -v htpasswd >/dev/null 2>&1 || \
+{ echo >&2 "htpasswd is required, please install it apt-get install apache2-utils. And start over. Aborting."; exit 1; }
 
 case $1 in
   build)
