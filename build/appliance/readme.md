@@ -15,9 +15,20 @@ Fill free to create an issue https://gitlab.com/mikler/glaber/-/issues if you ne
 # Installation of any type of appliance:
 
 ```bash
+sudo su # needs root access
 cd /opt/
-git clone https://gitlab.com/mikler/glaber.git
+git clone --depth 1 --branch master https://gitlab.com/mikler/glaber.git
 # docker folder is an appliance type, possible variants virtualbox,yandex-cloud-vm,vagrant,helm-chart etc
 cd glaber/build/appliance/run/docker
-./glaber.sh start (needs root access)
+./glaber.sh start
+```
+
+# Update of any type of appliance:
+
+```bash
+sudo su # needs root access
+cd /opt/glaber
+git pull
+cd glaber/build/appliance/run/docker
+./glaber.sh start
 ```

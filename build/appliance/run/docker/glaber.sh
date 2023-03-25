@@ -141,7 +141,7 @@ recreate() {
 HURL_VERSION="1.8.0"
 # Getting latest tag on git repository (latest stable 2 version of glaber)
 GLABER_TAG=$(git ls-remote --refs --sort='version:refname' --tags \
-             git@gitlab.com:mikler/glaber.git origin '2.*' | \
+             https://gitlab.com/mikler/glaber.git origin '2.*' | \
              tail --lines=1 | cut --delimiter='/' --fields=3)
 export GLABER_VERSION=$(curl -s https://gitlab.com/mikler/glaber/-/raw/${GLABER_TAG}/include/version.h | \
                         grep GLABER_VERSION | tr -dc 0-9.)
