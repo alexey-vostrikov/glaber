@@ -28,8 +28,3 @@ variable "gitlab_repo" {
   type    = string
   default = "${env("CI_REGISTRY_IMAGE")}"
 }
-
-locals {
-  tag_glaber_server  = "glaber-server-${var.glaber_build_version}"
-  tag_glaber_nginx   = "glaber-nginx-${var.glaber_build_version}"
-}

@@ -71,7 +71,7 @@ services:
         soft: 262144
         hard: 262144
   glaber-nginx:
-    image: registry.gitlab.com/mikler/glaber:glaber-nginx-${GLABER_VERSION}
+    image: registry.gitlab.com/mikler/glaber-nginx:${GLABER_VERSION}
     healthcheck:
       test:
         - "CMD"
@@ -95,7 +95,7 @@ services:
     env_file:
     - .env
   glaber-server:
-    image: registry.gitlab.com/mikler/glaber:glaber-server-${GLABER_VERSION}
+    image: registry.gitlab.com/mikler/glaber-server:${GLABER_VERSION}
     volumes:
     - type: bind
       source: ./glaber-server/workers_script/
