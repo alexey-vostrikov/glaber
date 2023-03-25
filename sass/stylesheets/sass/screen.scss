@@ -1622,6 +1622,7 @@ form {
 	}
 
 	&.hor-list li {
+		display: inline-block;
 		margin-right: 15px;
 		padding: .3em 0 0;
 
@@ -5068,6 +5069,15 @@ svg {
 				justify-self: flex-end;
 			}
 		}
+	}
+}
+
+.depends-list {
+	max-width: 930px;
+	min-width: 800px;
+
+	.depends-list-head {
+		color: $font-alt-color;
 	}
 }
 

@@ -114,6 +114,10 @@ class CControllerHostCreate extends CControllerHostUpdateGeneral {
 				throw new Exception();
 			}
 
+            if ($result === false || !$this->createDepends($result['hostids'][0])) {
+                throw new Exception();
+            }
+
 			$result = DBend(true);
 		}
 		catch (Exception $e) {
@@ -259,4 +263,34 @@ class CControllerHostCreate extends CControllerHostUpdateGeneral {
 
 		return true;
 	}
+
+    private function createDepends($hostid)
+    {
+        $depends = $this->getInput('depends', []);
+
+        foreach ($depends as $id => $dep_input) {
+            $dep = $this->createDepFromInput($hostid, $dep_input);
+            if (!API::HostDepends()->create($dep)) {
+                return false;
+            };
+        }
+
+        return true;
+
+    }
+
+    private function createDepFromInput($hostid, array $input): array
+    {
+        $dep = ['name' => $input['name']];
+
+        if ($input['direction'] == 'Up') {
+            $dep['hostid_up'] = $input['hostid'];
+            $dep['hostid_down'] = $hostid;
+        } else {
+            $dep['hostid_up'] = $hostid;
+            $dep['hostid_down'] = $input['hostid'];
+        }
+
+        return $dep;
+    }
 }
