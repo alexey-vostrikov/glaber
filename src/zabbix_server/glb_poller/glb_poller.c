@@ -800,8 +800,7 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 			conf.procinfo.server_num, get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);
 
 	zbx_setproctitle("%s #%d [started]", get_process_type_string(conf.procinfo.process_type), conf.procinfo.process_num);
-	LOG_INF("Started async loop");
-
+c
 	poller_async_loop_run();
 
 	poll_shutdown(&conf);

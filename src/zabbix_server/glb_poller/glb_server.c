@@ -58,7 +58,7 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
     zbx_json_type_t type;
     char *path = NULL;
 
-    LOG_INF("In %s() Started", __func__);
+    //LOG_INF("In %s() Started", __func__);
 
     worker = (worker_t *)zbx_calloc(NULL, 0, sizeof(worker_t));
 
@@ -86,7 +86,7 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
     //it's a potential flaw here - until item updated server worker won't start
     if (NULL == (worker->worker = glb_worker_init(path, args, 60,   GLB_SERVER_MAXCALLS, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE))) {
         zbx_free(worker);
-        poller_preprocess_error(poller_item, "Couldn't create server worker, check if file exist");
+        poller_preprocess_error(poller_item, "Couldn't strart server worker, check if file exist");
         return FAIL;
     }
     worker->last_heard = time(NULL);
