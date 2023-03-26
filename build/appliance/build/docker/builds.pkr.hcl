@@ -33,7 +33,7 @@ build {
   }
   post-processors {
     post-processor "docker-tag" {
-      repository = "${var.gitlab_repo}-server"
+      repository = "${var.gitlab_repo}/glaber-server"
       tags       = ["${var.glaber_build_version}"]
     }
     post-processor "docker-push" {
@@ -84,7 +84,7 @@ build {
   }
   post-processors {
     post-processor "docker-tag" {
-      repository = "${var.gitlab_repo}-nginx"
+      repository = "${var.gitlab_repo}/glaber-nginx"
       tags       = ["${var.glaber_build_version}"]
     }
     post-processor "docker-push" {
