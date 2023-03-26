@@ -13,7 +13,7 @@ SUBDIRS = \
 	snmptrapper \
 	timer \
 	trapper \
-	glb_escalator \
+	glb_events_processor \
 	proxypoller \
 	vmware \
 	taskmanager \
@@ -72,7 +72,7 @@ zabbix_server_LDADD = \
 	reporter/libzbxreporter.a \
 	snmptrapper/libzbxsnmptrapper.a \
 	httppoller/libzbxhttppoller.a \
-	glb_escalator/libglbescalator.a \
+	glb_events_processor/libglbeventsprocessor.a \
 	proxypoller/libzbxproxypoller.a \
 	proxyconfigread/libzbxproxyconfigread.a \
 	vmware/libzbxvmware.a \

@@ -78,7 +78,7 @@ typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, 
 		static void name(mem_funcs_t *memf, void *ipc_data)
 
 #define IPC_PROCESS_CB(name) \
-		static void name(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data)
+		static void name(mem_funcs_t *memf, int i, void *ipc_data, void *local_data)
 
 typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
 typedef struct ipc_conf_t ipc_conf_t;

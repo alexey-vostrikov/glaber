@@ -50,7 +50,7 @@
 #include "timer/timer.h"
 #include "trapper/trapper.h"
 #include "snmptrapper/snmptrapper.h"
-#include "glb_escalator/glb_escalator.h"
+#include "glb_events_processor/glb_events_processor.h"
 #include "proxypoller/proxypoller.h"
 #include "vmware/vmware.h"
 #include "taskmanager/taskmanager.h"
@@ -87,6 +87,7 @@
 #include "zbxipcservice.h"
 #include "preprocessor/preproc_stats.h"
 #include "glb_preproc.h"
+#include "glb_events_processor/glb_events_processor.h"
 
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
@@ -1561,7 +1562,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 											config_startup_time};
 	zbx_thread_trapper_args trapper_api_args = {&config_comms, &zbx_config_vault, get_program_type, api_listen_sock,
 											config_startup_time};
-	glb_escalator_args escalator_args = {zbx_config_tls, get_program_type, config_timeout};
+	glb_events_processor_args escalator_args = {zbx_config_tls, get_program_type, config_timeout};
 	zbx_thread_proxy_poller_args proxy_poller_args = {zbx_config_tls, &zbx_config_vault, get_program_type,
 													  config_timeout};
 	zbx_thread_discoverer_args discoverer_args = {zbx_config_tls, get_program_type, config_timeout};
@@ -1641,6 +1642,11 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		exit(EXIT_FAILURE);
 	}
 
+	if (FAIL == glb_events_processing_init()) {
+		zbx_error("Cannot initialize events processing IPC");
+		exit(EXIT_FAILURE);
+	}
+		
 	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_load())
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions", CONFIG_VCDUMP_LOCATION);
@@ -1819,7 +1825,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			break;
 		case ZBX_PROCESS_TYPE_ESCALATOR:
 			thread_args.args = &escalator_args;
-			zbx_thread_start(glb_escalator_thread, &thread_args, &threads[i]);
+			zbx_thread_start(glb_events_processor_thread, &thread_args, &threads[i]);
 			break;
 		case ZBX_PROCESS_TYPE_JAVAPOLLER:
 			poller_args.poller_type = ZBX_POLLER_TYPE_JAVA;

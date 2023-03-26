@@ -338,7 +338,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_AGENT	41
 #define GLB_PROCESS_TYPE_API_TRAPPER	42
 #define GLB_PROCESS_TYPE_PREPROCESSOR	43
-#define ZBX_PROCESS_TYPE_COUNT		44	/* number of process types */
+#define GLB_PROCESS_TYPE_EVENTS_PROCESSOR	44
+#define ZBX_PROCESS_TYPE_COUNT		45	/* number of process types */
 
 
 /* special processes that are not present worker list */

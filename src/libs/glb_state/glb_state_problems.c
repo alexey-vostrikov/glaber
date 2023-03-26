@@ -127,7 +127,9 @@ u_int64_t glb_state_problems_create_by_trigger(calc_trigger_t *trigger)
             for ( i = 0; i < hostids->values_num; i++)
                 index_uint64_add(conf->hosts_idx, hostids->values[i], problemid);
 
-        glb_actions_process_new_problem(problemid);
+        //glb_actions_process_new_problem(problemid);
+        
+        glb_event_processing_send_problem_notify(problemid);
 
         return problemid;
     } 

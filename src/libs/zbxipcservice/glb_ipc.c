@@ -475,7 +475,7 @@ IPC_CREATE_CB(ipc_vector_uint64_create_cb) {
 }
 
 IPC_PROCESS_CB(ipc_vector_uint64_process_cb) {
-	zbx_vector_uint64_t *vec = cb_data;
+	zbx_vector_uint64_t *vec = local_data;
 	ipc_vector_t *ipc_arr = ipc_data;
 
 	if (0 == ipc_arr->values_num || NULL == ipc_arr->data) {
@@ -529,5 +529,7 @@ int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, un
 void ipc_vector_uint64_destroy(ipc_conf_t *ipc) {
 	glb_ipc_destroy(ipc);
 }
+
+
 
 #endif

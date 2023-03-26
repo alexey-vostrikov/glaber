@@ -2049,7 +2049,7 @@ AC_CONFIG_FILES([
 	src/zabbix_server/dbsyncer/Makefile
 	src/zabbix_server/diag/Makefile
 	src/zabbix_server/discoverer/Makefile
-	src/zabbix_server/glb_escalator/Makefile
+	src/zabbix_server/glb_events_processor/Makefile
 	src/zabbix_server/ha/Makefile
 	src/zabbix_server/housekeeper/Makefile
 	src/zabbix_server/httppoller/Makefile

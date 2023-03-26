@@ -34,7 +34,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 {
 	switch (proc_type)
 	{
-		
+		case GLB_PROCESS_TYPE_EVENTS_PROCESSOR:
+			return "glb_events_processor";
 		case GLB_PROCESS_TYPE_SNMP:
 			return "glb_snmp_poller";
 		case GLB_PROCESS_TYPE_PINGER:

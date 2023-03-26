@@ -31,6 +31,7 @@ int glb_actions_process_autoregister() {
 //    HALT_HERE("Not implemented yet: %s", __func__ );
 }
 int glb_actions_process_new_problem(u_int64_t problemid) {
+  
    HALT_HERE("Not implemented yet: %s", __func__ );
 
 // 	int				i;
@@ -57,11 +58,11 @@ int glb_actions_process_new_problem(u_int64_t problemid) {
 // 	zbx_vector_ptr_create(&actions);
 
 //THIS MOST LIKELY GETS ALL THE ACTIONS CONFIGURED
- 	zbx_dc_config_history_sync_get_actions_eval(&actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
- 	prepare_actions_conditions_eval(&actions, uniq_conditions);
+ 	//zbx_dc_config_history_sync_get_actions_eval(&actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
+ 	//prepare_actions_conditions_eval(&actions, uniq_conditions);
 
 //FORMAL CHECK IF THE event HAS proper attributes to be able to create an event
- 	get_escalation_events(events, esc_events);
+ 	//get_escalation_events(events, esc_events);
 
 
 //OK, ITERATING ON ALL sames soucre actions conditions on each problem
@@ -79,7 +80,7 @@ int glb_actions_process_new_problem(u_int64_t problemid) {
 // 		while (NULL != (condition = (zbx_condition_t *)zbx_hashset_iter_next(&iter)))
   
   //HERE IS A PROBLEM! EXTENSIVE SQL USAGE FOR CONDITIONS CHECK!
- 			check_events_condition(&esc_events[i], i, condition);
+ 		//	check_events_condition(&esc_events[i], i, condition);
 // 	}
 
 // 	zbx_dc_close_user_macros(um_handle);
