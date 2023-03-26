@@ -217,13 +217,5 @@ docker:
     - *set_glb_version
     - *install_packer
     - *build_docker
-    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE} -q)
-  rules:
-    # build docker images only for stable glaber versions
-    - if: '$CI_COMMIT_TAG != null'
-      # and only we have some changes in build files or glaber version
-      changes:
-        - build/appliance/build/docker/*
-        - include/version.h
-    # if we need to build for develop or in any other cases
-    - when: manual
+    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
+    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
