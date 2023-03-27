@@ -33,9 +33,9 @@ class CDataTable extends CTable {
 			$tableid = str_replace('.', '', $tableid);
 		}
 		
-		if (isset($options['compact'])) {
-			$this->dom = 'rt';
-		}
+	//	if (isset($options['compact'])) {
+	//		$this->dom = 'rt';
+	//	}
 
 		$this->includeDataTableCSS();
 		$this->rows_per_page = (int) CWebUser::$data['rows_per_page'];

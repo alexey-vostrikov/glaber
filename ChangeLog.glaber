@@ -1,3 +1,5 @@
+ver 3.0.37
+    - fix: fixed hanging on absent dump directory, removed compact table dispaly on latest data to be able to seatch and view pagination
 ver 3.0.36
     - fix: fixed sorting in the dynamic tables in latest data
 ver 3.0.35

@@ -213,15 +213,14 @@ int state_dump_objects(elems_hash_t *elems, char *table_name, state_dumper_to_js
 
 	zabbix_log(LOG_LEVEL_DEBUG,"In %s: starting", __func__);
 
-    zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
-
     marshall_data_t mdata = {.dumper = &dumper, .json = &json, .objects = 0, .cb_func = cb_func};
-    state_dumper_create(&dumper, table_name);
-
-    elems_hash_iterate(elems, dump_cb, &mdata, ELEMS_HASH_READ_ONLY);
-
-    state_dumper_destroy(&dumper);
-	zbx_json_free(&json);
+    
+    if (FAIL != state_dumper_create(&dumper, table_name)) {
+        zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+        elems_hash_iterate(elems, dump_cb, &mdata, ELEMS_HASH_READ_ONLY);
+        state_dumper_destroy(&dumper);
+	    zbx_json_free(&json);
+    }
 
 	return SUCCEED;
 }
