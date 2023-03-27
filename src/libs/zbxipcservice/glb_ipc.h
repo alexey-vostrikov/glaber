@@ -92,7 +92,7 @@ int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t
 
 int		glb_ipc_flush(ipc_conf_t *ipc_conf);
 
-void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
+void 	glb_ipc_dump_receiver_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);
 
 /* vector specific ipc functions to pass zbx_vector_uint64_t arrays */

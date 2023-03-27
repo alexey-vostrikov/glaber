@@ -3,5 +3,6 @@
 noinst_LIBRARIES = libglbeventsprocessor.a
 
 libglbeventsprocessor_a_SOURCES = \
-	glb_events_processor.c 
+	glb_events_processor.c \
+	process_problem_events.c
 	

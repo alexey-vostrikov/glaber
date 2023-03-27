@@ -91,14 +91,6 @@ static int  glb_ipc_init_sender(ipc_conf_t *ipc) {
 	return SUCCEED;
 }
 
-void glb_ipc_local_destroy(ipc_conf_t *ipc) {
-	int i;
-	
-	if (NULL != ipc->local_queues->send_queues)
-			zbx_free(ipc->local_queues->send_queues);
-
-}
-
 static int move_all_elements(ipc_queue_t *src, ipc_queue_t *dst) {
 
 	glb_lock_block(&src->lock);
@@ -303,18 +295,24 @@ int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char 
 	//flush_queues(ipc);
 	return SUCCEED;
 }
-
+/***************************************************************************************************
+ * Processes elements one by one in local queue, when empty - fetches 
+ * data from the SHM queue
+ * returns queue elements by batches of 64 to avoid contention on locking
+ * callback is safe to run for a long (IO) time - no locks are hold during the callback prcessing
+ * *************************************************************************************************/
 int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
 	int i = 0;
 	ipc_element_t *element;
 	static u_int64_t last_rcv_check = 0;
 	u_int64_t now = glb_ms_time();
 
-
 	ipc_queue_t *local_rcv_queue = &ipc->local_queues->rcv_queue,
 				*rcv_queue = &ipc->queues[consumerid],
 				*local_free_queue = &ipc->local_queues->free_rcv_queue;
-//	LOG_INF("Queue addr is %p", rcv_queue );
+	
+	//LOG_INF("Queue addr is %p", rcv_queue );
+	
 	if (consumerid < 0) {
 		LOG_WRN("got consumer ipc number less then 0, this is a bug");
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -336,7 +334,7 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		}
 
 		element = local_rcv_queue->first;
-	//	LOG_INF("Processing elemnt %p", element);
+//		LOG_INF("Processing element %p", element);
 		cb_func(&ipc->memf, i, (void *)(&element->data), cb_data);
 		
 		if (NULL != ipc->free_cb)
@@ -379,7 +377,7 @@ ipc_conf_t* glb_ipc_init(int elems_count, int elem_size, int consumers, mem_func
 
 	memset( (void *)ipc->queues, 0, sizeof(ipc_queue_t) * consumers);
 	
-	for (i=0; i< consumers; i++) {
+	for (i = 0; i< consumers; i++) {
 		glb_lock_init(&ipc->queues[i].lock);
 	}
 	
@@ -445,7 +443,7 @@ void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {
 	}
 }
 
-void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc, char *name, int queue_num) {
+void 	glb_ipc_dump_receiver_queues(ipc_conf_t *ipc, char *name, int queue_num) {
 	LOG_INF("QUEUE receiver dump at %s: local_free_queue: %d, global_free_queue: %d, global_snd_queue: %d, local_rcv_queue: %d", 
 		name, ipc->local_queues->free_rcv_queue.count, ipc->free_queue.count, ipc->queues[queue_num].count, 
 		ipc->local_queues->rcv_queue.count);
@@ -529,7 +527,5 @@ int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, un
 void ipc_vector_uint64_destroy(ipc_conf_t *ipc) {
 	glb_ipc_destroy(ipc);
 }
-
-
 
 #endif

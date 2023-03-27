@@ -260,8 +260,8 @@ IPC_PROCESS_CB(new_metrics_cb) {
 }
 
 void apm_recieve_new_metrics() {
-//    glb_ipc_dump_reciever_queues(conf.ipc, "APM queue 0", 0);
-//    glb_ipc_dump_reciever_queues(conf.ipc, "APM queue 1", 1);
+//    glb_ipc_dump_receiver_queues(conf.ipc, "APM queue 0", 0);
+//    glb_ipc_dump_receiver_queues(conf.ipc, "APM queue 1", 1);
     glb_ipc_process(conf.ipc, 0, new_metrics_cb, NULL, 0);
 }
 

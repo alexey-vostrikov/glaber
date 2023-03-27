@@ -464,7 +464,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 		{
 			case ZBX_PROCESS_TYPE_ALERTMANAGER:
 			case ZBX_PROCESS_TYPE_ALERTER:
-			case ZBX_PROCESS_TYPE_ESCALATOR:
+			case GLB_PROCESS_TYPE_EVENTS_PROCESSOR:
 			case ZBX_PROCESS_TYPE_PROXYPOLLER:
 			case ZBX_PROCESS_TYPE_TIMER:
 				if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))

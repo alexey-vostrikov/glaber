@@ -30,6 +30,7 @@
 #include "zbxshmem.h"
 #include "../../libs/zbxipcservice/glb_ipc.h"
 #include "../glb_poller/poller_async_io.h"
+#include "process_problem_events.h"
 
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
@@ -47,20 +48,22 @@ typedef struct {
 	u_int64_t requests;
 	zbx_hashset_t escalations;
 	ipc_conf_t *ipc;
+	int process_num;
 	
 } conf_t;
-
 
 static zbx_shmem_info_t	*events_proc_notify_shmem = NULL;
 
 ZBX_SHMEM_FUNC_IMPL(__events_proc_notify, events_proc_notify_shmem);
 
-static mem_funcs_t memf = {
+static mem_funcs_t ipc_memf = {
 		.free_func = __events_proc_notify_shmem_free_func, 
 		.malloc_func = __events_proc_notify_shmem_malloc_func, 
 		.realloc_func = __events_proc_notify_shmem_realloc_func};
 
-static conf_t *conf;
+static conf_t conf = {0};
+
+
 
 IPC_CREATE_CB(ipc_events_processing_send_cb) {
 	events_processor_event_t *event_local = local_data;
@@ -70,7 +73,7 @@ IPC_CREATE_CB(ipc_events_processing_send_cb) {
 	event_ipc->object_id = event_local->object_id;
 
 	switch (event_local->event_type) {
-		case EVENTS_PROC_NOTIFY_TYPE_PROBLEM: 
+		case EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM: 
 			return;
 		case EVENTS_PROC_NOTIFY_TYPE_LLD:
 			HALT_HERE("Not implemented");
@@ -79,36 +82,57 @@ IPC_CREATE_CB(ipc_events_processing_send_cb) {
 	HALT_HERE("Wrond event type");
 }
 
-void glb_event_processing_send_problem_notify(u_int64_t problemid) {
+IPC_FREE_CB(event_free_cb) {
 
-	HALT_HERE("Send catch rule");
-	glb_ipc_send(conf->ipc, 
-		problemid % CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR], &problemid, IPC_LOCK_WAIT);
-	
-	glb_ipc_flush(conf->ipc);
 }
 
 IPC_PROCESS_CB(ipc_events_processing_process_cb) {
-	events_processor_event_t *event_local = local_data;
-	events_processor_event_t *event_ipc = ipc_data;
+	events_processor_event_t *event = ipc_data;
+	LOG_INF("Recieved notify on objectid %ld", event->object_id);
 
+	switch (event->event_type) {
+		case EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM: 
+			process_problem_new_event(event->object_id);
+			return;
+		case EVENTS_PROC_NOTIFY_TYPE_LLD:
+			HALT_HERE("LLD actions is pending");
+			return;
+	}
 }
+
+void glb_event_processing_send_problem_notify(u_int64_t problemid) {
+	events_processor_event_t event ={.data = NULL, .event_type = EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM, .object_id = problemid};
+	//HALT_HERE("Send catch rule")
+	glb_ipc_send(conf.ipc, problemid % CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR], &event, IPC_LOCK_WAIT);
+	glb_ipc_flush(conf.ipc);
+	LOG_INF("Sent event escalation notify on problem %ld", problemid);
+	glb_ipc_dump_sender_queues(conf.ipc, "Problems events escalations");
+}
+
 
 static void new_escalations_check_cb(poller_item_t *garbage, void *data) {
+	events_processor_event_t  event;
+	LOG_INF("Checking for the new escalations, proc num is %d, %p",conf.args.info.process_num -1, &conf.ipc);
 
+	glb_ipc_process(conf.ipc, conf.args.info.process_num -1 , ipc_events_processing_process_cb, NULL, 1000 );
+	glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 0);
+	glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 1);
 }
 
-static void update_proc_title_cb(poller_item_t *garbage, void *data)
+static void update_proc_title_cb(poller_item_t *garbage, void *dat)
 {
 	static u_int64_t last_call = 0;
-	conf_t * conf = data;
+	//conf_t * conf = data;
 	u_int64_t now = glb_ms_time(), time_diff = now - last_call;
 
-	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld esc/sec, escalations: %d]",
-					get_process_type_string(conf->args.info.process_type), conf->args.info.process_num, (conf->requests * 1000) / (time_diff),
-					conf->escalations.num_data);
+	if (0 == time_diff)
+		return;
 
-	conf->requests = 0;
+	zbx_setproctitle("%s #%d [sent %ld chks/sec, got %ld esc/sec, escalations: %d]",
+					get_process_type_string(conf.args.info.process_type), conf.args.info.process_num, (conf.requests * 1000) / (time_diff),
+					conf.escalations.num_data);
+
+	conf.requests = 0;
 	
 	last_call = now;
 
@@ -116,17 +140,18 @@ static void update_proc_title_cb(poller_item_t *garbage, void *data)
 		poller_async_loop_stop();
 }
 
-static int events_processor_fork_init(conf_t *conf)
+static int events_processor_fork_init(zbx_thread_args_t *args)
 {
+    conf.args = *(zbx_thread_args_t *)args;
 
-	strpool_init(&conf->strpool, NULL);
+	strpool_init(&conf.strpool, NULL);
 	poller_async_loop_init();
 
-	conf->new_escalations_check = poller_create_event(NULL, new_escalations_check_cb, 0, conf, 1);
-	poller_run_timer_event(conf->new_escalations_check, NEW_ESCALATIONS_CHECK_INTERVAL);
+	conf.new_escalations_check = poller_create_event(NULL, new_escalations_check_cb, 0, NULL, 1);
+	poller_run_timer_event(conf.new_escalations_check, NEW_ESCALATIONS_CHECK_INTERVAL * 1000);
 	
-	conf->update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, conf, 1);
-	poller_run_timer_event(conf->update_proctitle, PROCTITLE_UPDATE_INTERVAL);
+	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, NULL, 1);
+	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL * 1000);
 
 	return SUCCEED;
 }
@@ -142,11 +167,11 @@ int glb_events_processing_init() {
     	return FAIL;
     }
     
-	conf = memf.malloc_func(NULL, sizeof(conf_t));
-	bzero(conf, sizeof(conf_t));
+//	conf = memf.malloc_func(NULL, sizeof(conf_t));
+//	bzero(conf, sizeof(conf_t));
 
-    conf->ipc = glb_ipc_init(1024, sizeof(events_processor_event_t), 1 , &memf, 
-								ipc_events_processing_send_cb, ipc_events_processing_process_cb,
+    conf.ipc = glb_ipc_init(1024, sizeof(events_processor_event_t), CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR] , &ipc_memf, 
+								ipc_events_processing_send_cb, event_free_cb,
 								IPC_LOW_LATENCY);
 
     return SUCCEED;
@@ -154,9 +179,7 @@ int glb_events_processing_init() {
 
 ZBX_THREAD_ENTRY(glb_events_processor_thread, args)
 {
-    conf_t conf = {.args = *(zbx_thread_args_t *)args};
-
-	if (SUCCEED != events_processor_fork_init(&conf))
+	if (SUCCEED != events_processor_fork_init(args))
 		exit(-1);
 
 	poller_async_loop_run();

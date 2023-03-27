@@ -68,8 +68,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "snmp trapper";
 		case ZBX_PROCESS_TYPE_PROXYPOLLER:
 			return "proxy poller";
-		case ZBX_PROCESS_TYPE_ESCALATOR:
-			return "escalator";
+		case 9:
+			return "deprecated_escalator";
 		case ZBX_PROCESS_TYPE_HISTSYNCER:
 			return "history syncer";
 		case ZBX_PROCESS_TYPE_DISCOVERER:

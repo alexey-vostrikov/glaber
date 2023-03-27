@@ -269,7 +269,7 @@ int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	5, /* ZBX_PROCESS_TYPE_TRAPPER */
 	0, /* ZBX_PROCESS_TYPE_SNMPTRAPPER */
 	1, /* ZBX_PROCESS_TYPE_PROXYPOLLER */
-	1, /* ZBX_PROCESS_TYPE_ESCALATOR */
+	1, /* ZBX_PROCESS_TYPE_ESCALATOR <- not exitst in glaber */
 	4, /* ZBX_PROCESS_TYPE_HISTSYNCER */
 	1, /* ZBX_PROCESS_TYPE_DISCOVERER */
 	3, /* ZBX_PROCESS_TYPE_ALERTER */
@@ -551,10 +551,10 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_HISTSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER];
 	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ESCALATOR]))
+	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR]))
 	{
-		*local_process_type = ZBX_PROCESS_TYPE_ESCALATOR;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ESCALATOR];
+		*local_process_type = GLB_PROCESS_TYPE_EVENTS_PROCESSOR;
+		*local_process_num = local_server_num - server_count + CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR];
 	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_IPMIPOLLER]))
 	{
@@ -686,6 +686,20 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 
 	return SUCCEED;
 }
+/**************************************
+ * sets defaults before cfg is parsed *
+ * ************************************/
+void glb_set_pre_config_defaults() {
+	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_API_TRAPPER] = 0;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 2;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 0;
+}
+
 
 /******************************************************************************
  *                                                                            *
@@ -778,6 +792,7 @@ static void zbx_set_defaults(void)
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "Setting ICMP method to Glaber ICMP (async + glbmap)");
 	}
+
 }
 
 /******************************************************************************
@@ -1003,7 +1018,7 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 1000},
 			{"StartJavaPollers", &CONFIG_FORKS[ZBX_PROCESS_TYPE_JAVAPOLLER], TYPE_INT,
 			 PARM_OPT, 0, 1000},
-			{"StartEscalators", &CONFIG_FORKS[ZBX_PROCESS_TYPE_ESCALATOR], TYPE_INT,
+			{"StartEventProcessors", &CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR], TYPE_INT,
 			 PARM_OPT, 1, 100},
 			{"JavaGateway", &CONFIG_JAVA_GATEWAY, TYPE_STRING,
 			 PARM_OPT, 0, 0},
@@ -1210,6 +1225,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			{NULL}};
 
 	/* initialize multistrings */
+	glb_set_pre_config_defaults();
+	
 	zbx_strarr_init(&CONFIG_LOAD_MODULE);
 	zbx_strarr_init(&CONFIG_HISTORY_MODULE);
 
@@ -1562,7 +1579,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 											config_startup_time};
 	zbx_thread_trapper_args trapper_api_args = {&config_comms, &zbx_config_vault, get_program_type, api_listen_sock,
 											config_startup_time};
-	glb_events_processor_args escalator_args = {zbx_config_tls, get_program_type, config_timeout};
+	glb_events_processor_args events_proc_args = {.zbx_get_program_type_cb_arg = get_program_type};
 	zbx_thread_proxy_poller_args proxy_poller_args = {zbx_config_tls, &zbx_config_vault, get_program_type,
 													  config_timeout};
 	zbx_thread_discoverer_args discoverer_args = {zbx_config_tls, get_program_type, config_timeout};
@@ -1823,8 +1840,8 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			threads_flags[i] = ZBX_THREAD_PRIORITY_FIRST;
 			zbx_thread_start(dbsyncer_thread, &thread_args, &threads[i]);
 			break;
-		case ZBX_PROCESS_TYPE_ESCALATOR:
-			thread_args.args = &escalator_args;
+		case GLB_PROCESS_TYPE_EVENTS_PROCESSOR:
+			thread_args.args = &events_proc_args;
 			zbx_thread_start(glb_events_processor_thread, &thread_args, &threads[i]);
 			break;
 		case ZBX_PROCESS_TYPE_JAVAPOLLER:
