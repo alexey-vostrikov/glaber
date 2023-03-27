@@ -5207,6 +5207,7 @@ form.is-loading {
   padding: 0.3em 0;
 }
 .list-check-radio.hor-list li {
+  display: inline-block;
   margin-right: 15px;
   padding: 0.3em 0 0;
 }
@@ -8108,6 +8109,14 @@ svg {
 .preprocessing-list .preprocessing-list-foot .step-action + .step-action:last-child {
   margin-left: auto;
   justify-self: flex-end;
+}
+
+.depends-list {
+  max-width: 930px;
+  min-width: 800px;
+}
+.depends-list .depends-list-head {
+  color: #333333;
 }
 
 @keyframes fadein {

@@ -69,6 +69,7 @@ abstract class CControllerHostUpdateGeneral extends CController {
 			'host_inventory'	=> 'array',
 			'macros'			=> 'array',
 			'valuemaps'			=> 'array',
+            'depends'			=> 'array',
 			'full_clone'		=> 'in 1',
 			'clone_hostid'		=> 'db hosts.hostid'
 		];
