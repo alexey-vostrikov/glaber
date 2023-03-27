@@ -1,3 +1,5 @@
+ver 3.0.36
+    - fix: fixed sorting in the dynamic tables in latest data
 ver 3.0.35
     - fix: proper datatable sizing, map reloading with selected element
 ver 3.0.34

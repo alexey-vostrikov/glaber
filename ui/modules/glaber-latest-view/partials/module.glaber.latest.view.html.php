@@ -80,7 +80,7 @@ function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_dat
                     isset($data['can_create'])
                 );    
                 
-                $col = new CCol($value);
+                $col = (new CCol($value))->setAttribute('data-order', $value->GetValueRaw());
                 
                 if ($value->GetWorstSeverity() > 0) 
                     $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
