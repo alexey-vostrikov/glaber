@@ -77,8 +77,8 @@ set-passwords() {
     echo "use MYSQL_DATABASE;" >> mysql/create.sql
     echo "update users set passwd='\$2y\$10\$ZBX_WEB_ADMIN_PASS' where username='Admin';" >> mysql/create.sql
     ZBX_WEB_ADMIN_PASS_HASH=$(make-bcrypt-hash $ZBX_WEB_ADMIN_PASS)
-    sed -i -e "s/MYSQL_DATABASE/$MYSQL_DATABASE/" \
-           -e "s/ZBX_WEB_ADMIN_PASS/$ZBX_WEB_ADMIN_PASS_HASH/" \
+    sed -i -e "s#MYSQL_DATABASE#$MYSQL_DATABASE#" \
+           -e "s#ZBX_WEB_ADMIN_PASS#$ZBX_WEB_ADMIN_PASS_HASH#" \
     mysql/create.sql
     sed -i -e "s/<password>.*<\/password>/<password>$ZBX_CH_PASS<\/password>/" \
            -e "s/10000000000/$ZBX_CH_CONFIG_MAX_MEMORY_USAGE/" \
