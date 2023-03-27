@@ -9441,7 +9441,7 @@ return [
                 'ref_table' => 'hosts',
                 'ref_field' => 'hostid'
             ],
-            'type' => [
+            'name' => [
                 'null' => false,
                 'type' => DB::FIELD_TYPE_CHAR,
                 'length' => 128,

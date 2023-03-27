@@ -506,6 +506,12 @@ if (!$host_is_discovered) {
 		]));
 }
 
+$depends_tab = new CPartial('configuration.hostdepends', [
+    'source' => 'host',
+    'form' => 'host',
+    'depends' => $data['host']['depends']
+]);
+
 // main output
 $tabs = (new CTabView(['id' => 'host-tabs']))
 	->setSelected(0)
@@ -519,6 +525,8 @@ $tabs = (new CTabView(['id' => 'host-tabs']))
 if (!$host_is_discovered) {
 	$tabs->addTab('valuemap-tab', _('Value mapping'), $value_mapping_tab, TAB_INDICATOR_VALUEMAPS);
 }
+
+$tabs->addTab('deps-tab', _('Dependency'), $depends_tab);
 
 // Add footer buttons.
 if (array_key_exists('buttons', $data)) {

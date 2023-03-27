@@ -136,7 +136,11 @@ class CControllerHostUpdate extends CControllerHostUpdateGeneral {
 				throw new Exception();
 			}
 
-			$result = DBend(true);
+            if ($hostids === false || !$this->processDepends($this->host['hostid'], $this->getInput('depends', []))) {
+                throw new Exception();
+            }
+
+            $result = DBend(true);
 		}
 		catch (Exception $e) {
 			DBend(false);
@@ -204,4 +208,63 @@ class CControllerHostUpdate extends CControllerHostUpdateGeneral {
 
 		return true;
 	}
+
+    private function processDepends($hostid, array $depends)
+    {
+        $db_depends = API::HostDepends()->get([
+            'output' => API_OUTPUT_EXTEND,
+            'hostids' => $hostid,
+            'preservekeys' => true
+        ]);
+
+        foreach ($depends as $id => $dep_input) {
+            if (strpos($id, 'new') !== 0) {
+                $dep = $this->createDepFromInput($id, $hostid, $dep_input);
+                if (!$this->eqDependency($db_depends[$id], $dep)) {
+                    if (!API::HostDepends()->update($dep)) {
+                        return false;
+                    };
+                }
+
+                unset($db_depends[$id]);
+            } else {
+                $dep = $this->createDepFromInput(null, $hostid, $dep_input);
+                if (!API::HostDepends()->create($dep)) {
+                    return false;
+                };
+            }
+        }
+
+        return API::HostDepends()->delete(array_keys($db_depends));
+    }
+
+    private function eqDependency(array $a, array $b): bool
+    {
+        $fields = ['depid', 'name', 'hostid_up', 'hostid_down'];
+        foreach ($fields as $name) {
+            if ($a[$name] != $b[$name]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function createDepFromInput(?int $id, $hostid, array $input): array
+    {
+        $dep = ['name' => $input['name']];
+
+        if ($id !== null) {
+            $dep['depid'] = $id;
+        }
+
+        if ($input['direction'] == 'Up') {
+            $dep['hostid_up'] = $input['hostid'];
+            $dep['hostid_down'] = $hostid;
+        } else {
+            $dep['hostid_up'] = $hostid;
+            $dep['hostid_down'] = $input['hostid'];
+        }
+
+        return $dep;
+    }
 }

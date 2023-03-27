@@ -80,7 +80,8 @@ class CControllerHostEdit extends CController {
 									]),
 			'host_inventory'	=> 'array',
 			'macros'			=> 'array',
-			'valuemaps'			=> 'array'
+			'valuemaps'			=> 'array',
+            'depends'			=> 'array',
 		];
 
 		$ret = ($this->validateInput($fields) && $this->checkCloneSourceHostId());
@@ -157,7 +158,9 @@ class CControllerHostEdit extends CController {
 				$this->host = $hosts[0];
 				$this->host['groups'] = $this->host['hostgroups'];
 				unset($this->host['hostgroups']);
-			}
+
+                $this->host['depends'] = $this->getHostDepends($this->host['hostid']);
+            }
 		}
 
 		if (array_key_exists('interfaces', (array) $this->host) && $this->host['interfaces']) {
@@ -291,6 +294,7 @@ class CControllerHostEdit extends CController {
 				'itemids' => $this->host['discoveryRule']['itemid'],
 				'editable' => true
 			]);
+
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle(_('Configuration of host'));
@@ -559,7 +563,25 @@ class CControllerHostEdit extends CController {
 			'macros' => [],
 			'inventory' => [],
 			'valuemaps' => [],
+            'depends' => [],
 			'inventory_mode' => CSettingsHelper::get(CSettingsHelper::DEFAULT_INVENTORY_MODE)
 		];
 	}
+
+    private function getHostDepends($hostid): array {
+        $depends = API::HostDepends()->get([
+            'hostId' => $this->host['hostid'],
+            'with_hostname' => true,
+        ]);
+
+        foreach ($depends as $i => $dep) {
+            if ($dep['hostid_up'] == $hostid){
+                $depends[$i]['direction'] = 'Down';
+            }else{
+                $depends[$i]['direction'] = 'Up';
+            }
+        }
+
+        return $depends;
+    }
 }
