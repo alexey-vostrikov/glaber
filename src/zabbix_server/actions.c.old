@@ -3277,7 +3277,7 @@ void glb_actions_process_autoregister() {
 // 		zbx_db_insert_prepare(&db_insert, "escalations", "escalationid", "actionid", "status", "triggerid",
 // 					"itemid", "eventid", "r_eventid", "acknowledgeid", NULL);
 
-// 		for (j = 0; j < new_escalations.values_num; j++)
+// 		for  (j = 0; j < new_escalations.values_num; j++)
 // 		{
 // 			zbx_uint64_t		triggerid = 0, itemid = 0;
 // 			zbx_escalation_new_t	*new_escalation;

@@ -39,6 +39,9 @@ typedef struct
 }
 zbx_ack_task_t;
 
+typedef struct glb_actions_t glb_actions_t;
+
+
 int glb_actions_process_discovery_host();
 int glb_actions_process_lld_status();
 int glb_actions_process_autoregister();

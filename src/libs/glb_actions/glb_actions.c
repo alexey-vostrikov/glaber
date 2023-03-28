@@ -19,7 +19,27 @@
 /* actions are action-object specific, actions are created during some processing events
 and so they shouldn't use DB as might be used on the data plane */
 #include "zbxcommon.h"
+#include "zbxalgo.h"
 #include "log.h"
+#include "glb_actions.h"
+#include "zbxcacheconfig.h"
+
+struct glb_actions_t {
+   zbx_vector_ptr_t		actions;
+};
+
+
+/*returns actions cache to process rules, rules are loaded to the heap*/
+glb_actions_t *glb_actions_load_rules(glb_actions_t *actions) {
+    if (NULL != actions) 
+      clear_actions(actions);
+    else 
+      actions = init_actions();
+  	
+    zbx_dc_config_history_sync_get_actions_eval(&actions->actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
+    
+    return actions;
+}
 
 int glb_actions_process_discovery_host() {
   //  HALT_HERE("Not implemented yet: %s", __func__ );
@@ -35,7 +55,7 @@ int glb_actions_process_new_problem(u_int64_t problemid) {
    HALT_HERE("Not implemented yet: %s", __func__ );
 
 // 	int				i;
-// 	zbx_vector_ptr_t		actions;
+// 	
 // 	zbx_vector_ptr_t 		new_escalations;
 // 	zbx_vector_uint64_pair_t	rec_escalations;
 // 	zbx_hashset_t			uniq_conditions[EVENT_SOURCE_COUNT];
@@ -84,7 +104,6 @@ int glb_actions_process_new_problem(u_int64_t problemid) {
 // 	}
 
 // 	zbx_dc_close_user_macros(um_handle);
-
 
 
 
