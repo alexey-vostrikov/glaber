@@ -1,3 +1,5 @@
+ver 3.0.38
+    - feat: added LLD filtering logging, returned host expire notification to UI
 ver 3.0.37
     - fix: fixed hanging on absent dump directory, removed compact table dispaly on latest data to be able to seatch and view pagination
 ver 3.0.36

@@ -149,6 +149,8 @@ static int	lld_filter_condition_add(zbx_vector_ptr_t *conditions, const char *id
 	zbx_vector_expression_create(&condition->regexps);
 
 	zbx_vector_ptr_append(conditions, condition);
+	DEBUG_ITEM(item->itemid, "Added LLD filter: condition macro: '%s', regexp: '%s', operation: %d ", 
+		condition->macro, condition->regexp, condition->op);
 
 	if ('@' == *condition->regexp)
 	{
@@ -185,7 +187,7 @@ static int	lld_filter_load(lld_filter_t *filter, zbx_uint64_t lld_ruleid, const 
 	DB_ROW		row;
 	int		ret = SUCCEED;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	DEBUG_ITEM(lld_ruleid, "Loading filters from the database");
 
 	result = DBselect(
 			"select item_conditionid,macro,value,operator"
@@ -196,6 +198,9 @@ static int	lld_filter_load(lld_filter_t *filter, zbx_uint64_t lld_ruleid, const 
 	while (NULL != (row = DBfetch(result)) && SUCCEED == (ret = lld_filter_condition_add(&filter->conditions,
 			row[0], row[1], row[2], row[3], item, error)))
 		;
+	
+	DEBUG_ITEM(lld_ruleid, "Loaded %d filters", filter->conditions.values_num);
+	
 	zbx_db_free_result(result);
 
 	if (ZBX_CONDITION_EVAL_TYPE_AND_OR == filter->evaltype)
@@ -1014,6 +1019,7 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	const char		*p;
 	zbx_lld_row_t		*lld_row;
 	int			ret = FAIL, i;
+	char row_str[MAX_STRING_LEN];
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 	
@@ -1038,15 +1044,21 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	while (NULL != (p = zbx_json_next(&jp_array, p)))
 	{
 		
+
 		if (FAIL == zbx_json_brackets_open(p, &jp_row))
 			continue;
 
-		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info))
+		zbx_snprintf(row_str, jp_row.end - jp_row.start, "%s", jp_row.start);
+		DEBUG_ITEM(discoveryid, "Evaluating row: '%s'", row_str);
+
+		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info)) {
+			DEBUG_ITEM(discoveryid, "Row '%s' has been filtered out", row_str);
 			continue;
-		
+		}
 		//if (SUCCEED != glb_state_discovery_if_row_needs_processing(discoveryid, &jp_row, lifetime))
 		//	continue;
-
+		
+		
 		lld_row = (zbx_lld_row_t *)zbx_malloc(NULL, sizeof(zbx_lld_row_t));
 		zbx_vector_ptr_append(lld_rows, lld_row);
 
@@ -1191,6 +1203,7 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		goto out;
 	}
 
+	
 	if (SUCCEED != lld_filter_load(&filter, lld_ruleid, &item, error))
 	{
 		ret = FAIL;

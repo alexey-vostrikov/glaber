@@ -136,9 +136,9 @@ class CControllerHostUpdate extends CControllerHostUpdateGeneral {
 				throw new Exception();
 			}
 
-            if ($hostids === false || !$this->processDepends($this->host['hostid'], $this->getInput('depends', []))) {
-                throw new Exception();
-            }
+         //   if ($hostids === false || !$this->processDepends($this->host['hostid'], $this->getInput('depends', []))) {
+           //     throw new Exception();
+            //}
 
             $result = DBend(true);
 		}

@@ -526,7 +526,7 @@ if (!$host_is_discovered) {
 	$tabs->addTab('valuemap-tab', _('Value mapping'), $value_mapping_tab, TAB_INDICATOR_VALUEMAPS);
 }
 
-$tabs->addTab('deps-tab', _('Dependency'), $depends_tab);
+//$tabs->addTab('deps-tab', _('Dependency'), $depends_tab);
 
 // Add footer buttons.
 if (array_key_exists('buttons', $data)) {

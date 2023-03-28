@@ -12,6 +12,35 @@ class CHostDepends extends CApiService
     protected $tableName = 'hosts_depends';
     protected $tableAlias = 'hd';
 
+/*
+until there are proper glaber-specific schema change handling, this is ddl for postgres
+
+CREATE TABLE zabbix.hosts_depends (
+    depid bigint NOT NULL,
+    hostid_up bigint,
+    hostid_down bigint,
+    name character varying(128) DEFAULT ''::character varying NOT NULL
+);
+
+ALTER TABLE zabbix.hosts_depends OWNER TO zabbix;
+
+ALTER TABLE ONLY zabbix.hosts_depends
+    ADD CONSTRAINT hosts_depends_pkey PRIMARY KEY (depid);
+
+CREATE INDEX zabbix_hosts_depends_hostid_down2_idx ON zabbix.hosts_depends USING btree (hostid_down);
+
+CREATE INDEX zabbix_hosts_depends_hostid_up1_idx ON zabbix.hosts_depends USING btree (hostid_up);
+
+CREATE INDEX zabbix_hosts_depends_name3_idx ON zabbix.hosts_depends USING btree (name);
+
+ALTER TABLE ONLY zabbix.hosts_depends
+    ADD CONSTRAINT hosts_depends_hostid_down_fkey FOREIGN KEY (hostid_down) REFERENCES zabbix.hosts(hostid) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+ALTER TABLE ONLY zabbix.hosts_depends
+    ADD CONSTRAINT hosts_depends_hostid_up_fkey FOREIGN KEY (hostid_up) REFERENCES zabbix.hosts(hostid) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+*/
+
     public function get($options = [])
     {
         $result = [];
