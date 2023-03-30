@@ -20,18 +20,19 @@ module.exports = {
         path: path.resolve(__dirname, "../ui/js"),
         publicPath: "/",
         filename: 'react.components.js'
-    },
-    optimization: {
-        minimize: true,
-        minimizer: [
-            new TerserPlugin({
-                extractComments: false,
-                terserOptions: {
-                    format: {
-                        comments: false,
-                    },
-                },
-            }),
-        ],
-    },
+    }
+//    ,
+    // optimization: {
+    //     minimize: true,
+    //     minimizer: [
+    //         new TerserPlugin({
+    //             extractComments: false,
+    //             // terserOptions: {
+    //             //     format: {
+    //             //         comments: false,
+    //             //     },
+    //             // },
+    //         }),
+    //     ],
+    // },
 };

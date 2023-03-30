@@ -1,3 +1,5 @@
+import React from "react";
+
 const HOST_STATUS_MONITORED = 0;
 const HOST_STATUS_NOT_MONITORED = 1;
 const HOST_MAINTENANCE_STATUS_OFF = 0;
