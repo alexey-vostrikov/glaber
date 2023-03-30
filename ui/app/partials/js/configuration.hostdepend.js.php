@@ -17,5 +17,4 @@
     $('#depends_list').dynamicRows({template: '#dependsRow'});
 })();
 </script>
-<script type="text/javascript">
-</script>
+

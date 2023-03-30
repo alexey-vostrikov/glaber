@@ -110,7 +110,8 @@ $available_js = [
 	'items.js' => 'pages/',
 	'report2.js' => 'pages/',
 	'report4.js' => 'pages/',
-	'setup.js' => 'pages/'
+	'setup.js' => 'pages/',
+    'react.components.js' => '',
 ];
 
 $translate_strings = [
@@ -437,7 +438,8 @@ if (empty($_GET['files'])) {
 		'hostinterfacemanager.js',
 		'hostmacrosmanager.js',
 		'textareaflexible.js',
-		'init.js'
+		'init.js',
+        'react.components.js',
 	];
 
 	if (CCookieHelper::has(ZBX_SESSION_NAME)) {
