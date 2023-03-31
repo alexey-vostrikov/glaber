@@ -13,7 +13,7 @@ class CHostStatus extends CTag
 
     public function toString($destroy = true) {
         zbx_add_post_js("const hs=document.getElementById('{$this->getId()}'); 
-            try {window.ReactDOM.createRoot(hs).render(window.React.createElement(window.HostStatus, hs.dataset));} 
+            try {ReactDOM.createRoot(hs).render(React.createElement(HostStatus, hs.dataset));} 
             catch(err) {console.log(err);}"
         );
 
