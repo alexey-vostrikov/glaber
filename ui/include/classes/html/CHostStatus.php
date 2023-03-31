@@ -4,22 +4,19 @@ class CHostStatus extends CTag
 {
     public function __construct(int $status, int $maintenance = 0)
     {
-        parent::__construct('span', true);
+        parent::__construct('glb-hoststatus', false);
 
-        switch ($status) {
-            case HOST_STATUS_MONITORED:
-                if ($maintenance == HOST_MAINTENANCE_STATUS_ON) {
-                    $this->addItem(_('In maintenance'))->addClass(ZBX_STYLE_ORANGE);
-                } else {
-                    $this->addItem(_('Enabled'))->addClass(ZBX_STYLE_GREEN);
-                }
-                break;
-            case HOST_STATUS_NOT_MONITORED:
-                $this->addItem(_('Disabled'))->addClass(ZBX_STYLE_RED);
-                break;
-            default:
-                $this->addItem(_('Unknown'))->addClass(ZBX_STYLE_GREY);
-                break;
-        }
+        $this->setId(uniqid("glbhs"))
+            ->setAttribute('data-status', $status)
+            ->setAttribute('data-maintenance', $maintenance);
+    }
+
+    public function toString($destroy = true) {
+        zbx_add_post_js("const hs=document.getElementById('{$this->getId()}'); 
+            try {window.ReactDOM.createRoot(hs).render(window.React.createElement(window.HostStatus, hs.dataset));} 
+            catch(err) {console.log(err);}"
+        );
+
+        return parent::toString($destroy);
     }
 }
