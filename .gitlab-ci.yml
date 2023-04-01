@@ -1,6 +1,9 @@
 ---
 workflow:
   rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /pre-build/'
+      variables:
+        PRE_BUILD: "true"
     - if: '$CI_COMMIT_MESSAGE =~ /no-build/'
       when: never
     - if: '$CI_COMMIT_TAG != null'
@@ -13,6 +16,11 @@ workflow:
       variables:
         REPO_DIR: "repo-experimental"
     - when: never
+
+stages:
+  - pre-build
+  - pkg-build
+  - docker-build
 
 .add_ssh_key: &add_ssh_key
   - apk add --update --no-cache openssh
@@ -113,13 +121,13 @@ workflow:
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --waitforlock 120 --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
 
-
 .upload_rpms: &upload_rpms
   - echo "Will upload to '$REPO_DIR' repo"
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
 debian-buster:
+  stage: pkg-build
   variables:
     OS: debian
     OS_VER: buster
@@ -133,7 +141,8 @@ debian-buster:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-#astra:
+# astra:
+#  stage: pkg-build
 #  variables:
 #    OS: astra
 #    OS_VER: smolensk
@@ -147,6 +156,7 @@ debian-buster:
 #    - *upload_packages
 
 debian-bullseye:
+  stage: pkg-build
   variables:
     OS: debian
     OS_VER: bullseye
@@ -161,6 +171,7 @@ debian-bullseye:
     - *upload_packages
 
 ubuntu-focal:
+  stage: pkg-build
   variables:
     OS: ubuntu
     OS_VER: focal
@@ -176,6 +187,7 @@ ubuntu-focal:
     - *upload_packages
 
 ubuntu-bionic:
+  stage: pkg-build
   variables:
     OS: ubuntu
     OS_VER: bionic
@@ -190,10 +202,11 @@ ubuntu-bionic:
     - *upload_packages
 
 centos-8:
+  stage: pkg-build
   variables:
-    OS: centos
+    OS: almalinux
     OS_VER: 8
-  image: almalinux:${OS_VER}
+  image: ${OS}:${OS_VER}
   script:
     - dnf -y install dnf-plugins-core epel-release
     - dnf config-manager --set-enabled powertools
@@ -209,8 +222,8 @@ centos-8:
     - *upload_rpms
 
 docker:
+  stage: docker-build
   image: alpine:3.17
-  stage: deploy
   before_script:
     - *add_ssh_key
     - apk add --update --no-cache docker-cli
@@ -221,3 +234,14 @@ docker:
     - *build_docker
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+
+debian-buster-pre-build:
+  stage: pre-build
+  variables:
+    OS: debian
+    OS_VER: buster
+  image: ${OS}:${OS_VER}
+  script:
+    - echo "Pre build stage for ${OS}:${OS_VER}"
+  rules:
+    - if: '$PRE_BUILD'
