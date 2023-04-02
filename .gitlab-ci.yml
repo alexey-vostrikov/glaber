@@ -3,7 +3,7 @@ workflow:
   rules:
     - if: '$CI_COMMIT_MESSAGE =~ /pre-build/'
       variables:
-        PRE_BUILD: "true"
+        PREBUILD: "true"
     - if: '$CI_COMMIT_MESSAGE =~ /no-build/'
       when: never
     - if: '$CI_COMMIT_TAG != null'
@@ -22,8 +22,15 @@ stages:
   - pkg-build
   - docker-build
 
+.kaniko_build: &kaniko_build
+  - /kaniko/executor
+    --context "${BUILD_DIR}"
+    --build-arg OS=${OS}
+    --build-arg OS_VER=${OS_VER}
+    --dockerfile "${BUILD_DIR}/Dockerfile"
+    --destination "${BUILD_IMG_NAME}"
+
 .add_ssh_key: &add_ssh_key
-  - apk add --update --no-cache openssh
   - eval $(ssh-agent -s)
   - echo "${SSH_PRIVATE_KEY_BASE64}" | base64 -d | ssh-add -
   - mkdir -p ~/.ssh
@@ -221,27 +228,30 @@ centos-8:
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
     - *upload_rpms
 
-docker:
+docker-debian-bullseye:
   stage: docker-build
-  image: alpine:3.17
+  image: ${CI_REGISTRY_IMAGE}/builder:1.0.1
   before_script:
     - *add_ssh_key
-    - apk add --update --no-cache docker-cli
     - export DOCKER_HOST=ssh://${SSH_USER}@${SERVER}
   script:
     - *set_glb_version
-    - *install_packer
     - *build_docker
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
 
-debian-buster-pre-build:
+builder:
   stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.9.2-debug
+    entrypoint: [""]
   variables:
-    OS: debian
-    OS_VER: buster
-  image: ${OS}:${OS_VER}
+    OS: alpine
+    OS_VER: "3.17"
+    SEMVER: "1.0.1"
+    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/appliance/docker"
+    BUILD_IMG_NAME: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}:${SEMVER}"
   script:
-    - echo "Pre build stage for ${OS}:${OS_VER}"
+    - *kaniko_build
   rules:
-    - if: '$PRE_BUILD'
+    - if: '$PREBUILD'
