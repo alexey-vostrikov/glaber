@@ -1,6 +1,11 @@
 ---
 workflow:
   rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /pre-build/'
+      variables:
+        PREBUILD: "true"
+    - if: '$CI_COMMIT_MESSAGE =~ /no-build/'
+      when: never
     - if: '$CI_COMMIT_TAG != null'
       variables:
         REPO_DIR: "repo"
@@ -12,8 +17,20 @@ workflow:
         REPO_DIR: "repo-experimental"
     - when: never
 
+stages:
+  - pre-build
+  - pkg-build
+  - docker-build
+
+.kaniko_build: &kaniko_build
+  - /kaniko/executor
+    --context "${BUILD_DIR}"
+    --build-arg OS=${OS}
+    --build-arg OS_VER=${OS_VER}
+    --dockerfile "${BUILD_DIR}/Dockerfile"
+    --destination "${BUILD_IMG_NAME}"
+
 .add_ssh_key: &add_ssh_key
-  - apk add --update --no-cache openssh
   - eval $(ssh-agent -s)
   - echo "${SSH_PRIVATE_KEY_BASE64}" | base64 -d | ssh-add -
   - mkdir -p ~/.ssh
@@ -111,13 +128,13 @@ workflow:
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --waitforlock 120 --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
 
-
 .upload_rpms: &upload_rpms
   - echo "Will upload to '$REPO_DIR' repo"
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
 debian-buster:
+  stage: pkg-build
   variables:
     OS: debian
     OS_VER: buster
@@ -131,7 +148,8 @@ debian-buster:
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
 
-#astra:
+# astra:
+#  stage: pkg-build
 #  variables:
 #    OS: astra
 #    OS_VER: smolensk
@@ -145,6 +163,7 @@ debian-buster:
 #    - *upload_packages
 
 debian-bullseye:
+  stage: pkg-build
   variables:
     OS: debian
     OS_VER: bullseye
@@ -159,6 +178,7 @@ debian-bullseye:
     - *upload_packages
 
 ubuntu-focal:
+  stage: pkg-build
   variables:
     OS: ubuntu
     OS_VER: focal
@@ -174,6 +194,7 @@ ubuntu-focal:
     - *upload_packages
 
 ubuntu-bionic:
+  stage: pkg-build
   variables:
     OS: ubuntu
     OS_VER: bionic
@@ -188,10 +209,11 @@ ubuntu-bionic:
     - *upload_packages
 
 centos-8:
+  stage: pkg-build
   variables:
-    OS: centos
+    OS: almalinux
     OS_VER: 8
-  image: almalinux:${OS_VER}
+  image: ${OS}:${OS_VER}
   script:
     - dnf -y install dnf-plugins-core epel-release
     - dnf config-manager --set-enabled powertools
@@ -206,16 +228,30 @@ centos-8:
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
     - *upload_rpms
 
-docker:
-  image: alpine:3.17
-  stage: deploy
+docker-debian-bullseye:
+  stage: docker-build
+  image: ${CI_REGISTRY_IMAGE}/builder:1.0.1
   before_script:
     - *add_ssh_key
-    - apk add --update --no-cache docker-cli
     - export DOCKER_HOST=ssh://${SSH_USER}@${SERVER}
   script:
     - *set_glb_version
-    - *install_packer
     - *build_docker
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+
+builder:
+  stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.9.2-debug
+    entrypoint: [""]
+  variables:
+    OS: alpine
+    OS_VER: "3.17"
+    SEMVER: "1.0.1"
+    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/appliance/docker"
+    BUILD_IMG_NAME: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}:${SEMVER}"
+  script:
+    - *kaniko_build
+  rules:
+    - if: '$PREBUILD'
