@@ -1,6 +1,5 @@
 /*
-** Glaber
-** Copyright (C) 2018-2042 Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,27 +16,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "log.h"
-#include "zbxshmem.h"
-#include "zbxalgo.h"
-#include "elems_hash_tests.h"
-#include "obj_index_tests.h"
-#include "index_int64_test.h"
-#include "elems_hash_tests.c"
-#include "obj_index_tests.c"
+#include "glb_common.h"
+#ifdef HAVE_GLB_TESTS 
 
-void tests_algo_run() {
-    LOG_INF("Running algo tests");
-    sleep(1);
-    
-    LOG_INF("Running elem hash tests");
-    tests_elems_hash_run();
-    
-    LOG_INF("Running index tests");
-    tests_index_uint64_run();
-    
-    LOG_INF("Running obj index tests");
-    tests_obj_index_run();
-    LOG_INF("Finished algo tests");
-}
+void glb_tags_tests_run();
 
+#endif

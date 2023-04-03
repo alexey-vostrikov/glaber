@@ -23,6 +23,7 @@
 #include "glb_state.h"
 #include "zbxjson.h"
 #include "zbxcacheconfig.h"
+#include "../glb_conf/tags/tags.h"
 
 #define GLB_PROBLEM_TTL_PROBLEM_STATE 2 * 30 * 86400 //problematic things alive for two month, then closed automatically
 #define GLB_PROBLEM_TTL_OK_STATE 5 * 60 //5 minutes for OK problems to be deleted
@@ -41,6 +42,12 @@ typedef enum
     GLB_PROBLEM_OPER_STATE_COUNT
 } glb_problem_oper_state_t;
 
+typedef enum
+{
+    GLB_PROBLEM_SUPPRESSED_TRUE = 0,
+    GLB_PROBLEM_SUPPRESSED_FALSE = 1
+} glb_problem_suppress_state_t;
+
 typedef struct
 {
     u_int64_t problemid;
@@ -57,7 +64,7 @@ typedef struct glb_problem_t glb_problem_t;
 //glb_problem_t *glb_problem_create(mem_funcs_t *memf, strpool_t *strpool, glb_problem_info_t *info);
 glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, calc_trigger_t *trigger);
 void glb_problem_destroy(mem_funcs_t *memf, strpool_t *strpool, glb_problem_t *problem);
-glb_problem_t *glb_problem_copy(mem_funcs_t *memf, strpool_t *strpool, glb_problem_t *src_problem);
+//glb_problem_t *glb_problem_copy(mem_funcs_t *memf, strpool_t *strpool, glb_problem_t *src_problem);
 
 /*data retrieval*/
 glb_problem_source_t        glb_problem_get_source(glb_problem_t *problem);
@@ -65,7 +72,15 @@ glb_problem_oper_state_t    glb_problem_get_oper_state(glb_problem_t *problem);
 u_int64_t                   glb_problem_get_objectid(glb_problem_t *problem);
 u_int64_t                   glb_problem_get_id(glb_problem_t *problem);
 int                         glb_problem_get_create_time(glb_problem_t *problem);
+void                        glb_problem_get_hostids(glb_problem_t *problem, zbx_vector_uint64_t *ids);
+int                         glb_problem_get_severity(glb_problem_t *problem);
+u_int64_t                   glb_problem_get_triggerid(glb_problem_t *problem);
+int                         glb_problem_is_acknowledged(glb_problem_t *problem);
+glb_problem_suppress_state_t glb_problem_get_suppressed(glb_problem_t *problem);
+void                        glb_problem_get_name(glb_problem_t *problem, char *name, size_t max_len);
 
+int                         glb_problem_check_tag_value(glb_problem_t *problem, tag_t *tag, unsigned char oper);
+int                         glb_problem_check_tag_name(glb_problem_t *problem, const char *pattern, unsigned char oper);
 /*set functions*/
 int         glb_problem_set_oper_state(glb_problem_t *problem, glb_problem_oper_state_t oper_state);
 

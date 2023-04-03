@@ -830,7 +830,7 @@ int	DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities)
 
 int	DCreset_interfaces_availability(zbx_vector_availability_ptr_t *interfaces);
 
-void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions, unsigned char opflags);
+void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions);
 
 int	DCget_interfaces_availability(zbx_vector_ptr_t *interfaces, int *ts);
 void	DCtouch_interfaces_availability(const zbx_vector_uint64_t *interfaceids);
@@ -843,6 +843,8 @@ void	zbx_dc_correlation_rules_free(zbx_correlation_rules_t *rules);
 void	zbx_dc_correlation_rules_get(zbx_correlation_rules_t *rules);
 
 void	zbx_dc_get_nested_hostgroupids(zbx_uint64_t *groupids, int groupids_num, zbx_vector_uint64_t *nested_groupids);
+void 	zbx_dc_get_nested_group_hostids(zbx_uint64_t groupid, zbx_vector_uint64_t *hostids);
+
 void	zbx_dc_get_hostids_by_group_name(const char *name, zbx_vector_uint64_t *hostids);
 
 void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num);

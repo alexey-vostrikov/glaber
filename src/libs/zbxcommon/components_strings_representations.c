@@ -251,6 +251,8 @@ const char	*zbx_result_string(int result)
 			return "SIG_ERROR";
 		case SYSINFO_RET_FAIL:
 			return "SYSINFO_RET_FAIL";
+		case UNKNOWN:
+			return "UNKNOWN";
 		default:
 			return "unknown";
 	}

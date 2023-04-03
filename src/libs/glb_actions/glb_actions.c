@@ -29,17 +29,17 @@ struct glb_actions_t {
 };
 
 
-/*returns actions cache to process rules, rules are loaded to the heap*/
-glb_actions_t *glb_actions_load_rules(glb_actions_t *actions) {
-    if (NULL != actions) 
-      clear_actions(actions);
-    else 
-      actions = init_actions();
+// /*returns actions cache to process rules, rules are loaded to the heap*/
+// glb_actions_t *glb_actions_load_rules(glb_actions_t *actions) {
+//     if (NULL != actions) 
+//       clear_actions(actions);
+//     else 
+//       actions = init_actions();
   	
-    zbx_dc_config_history_sync_get_actions_eval(&actions->actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
+//     zbx_dc_config_history_sync_get_actions_eval(&actions->actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
     
-    return actions;
-}
+//     return actions;
+// }
 
 int glb_actions_process_discovery_host() {
   //  HALT_HERE("Not implemented yet: %s", __func__ );

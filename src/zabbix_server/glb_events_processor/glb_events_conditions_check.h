@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C) 2018-2042 Glaber
+** Copyright (C) 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,27 +17,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "log.h"
-#include "zbxshmem.h"
-#include "zbxalgo.h"
-#include "elems_hash_tests.h"
-#include "obj_index_tests.h"
-#include "index_int64_test.h"
-#include "elems_hash_tests.c"
-#include "obj_index_tests.c"
+#ifndef GLB_EVENT_COND_CHECK_H
+#define GLB_EVENT_COND_CHECK_H
+#include "zbxcommon.h"
+#include "glb_events_processor.h"
 
-void tests_algo_run() {
-    LOG_INF("Running algo tests");
-    sleep(1);
-    
-    LOG_INF("Running elem hash tests");
-    tests_elems_hash_run();
-    
-    LOG_INF("Running index tests");
-    tests_index_uint64_run();
-    
-    LOG_INF("Running obj index tests");
-    tests_obj_index_run();
-    LOG_INF("Finished algo tests");
-}
+void	glb_event_condition_calc(events_processor_event_t *event, condition_t *condition);
 
+#endif

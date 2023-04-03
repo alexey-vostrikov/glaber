@@ -10,7 +10,8 @@ libglbconfig_a_SOURCES = \
     ./items/conf_items_notify.c \
     ./valuemaps/conf_valuemaps.c \
     ./valuemaps/conf_valuemap.c \
-    ./triggers/conf_calc_trigger.c
+    ./triggers/conf_calc_trigger.c \
+    ./tags/tags.c
     
 libglbconfig_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxalgo

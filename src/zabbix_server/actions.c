@@ -405,6 +405,11 @@ static void	check_object_hierarchy(int object, const zbx_vector_ptr_t *esc_event
  ******************************************************************************/
 static int	check_host_template_condition(const zbx_vector_ptr_t *esc_events, zbx_condition_t *condition)
 {
+
+
+
+
+
 	char				*sql = NULL;
 	size_t				sql_alloc = 0;
 	DB_RESULT			result;
@@ -2906,55 +2911,6 @@ static int	is_escalation_event(const ZBX_DB_EVENT *event)
 	return SUCCEED;
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: compare to find equal conditions                                  *
- *                                                                            *
- * Parameters: d1 - [IN] condition structure to compare to d2                 *
- *             d2 - [IN] condition structure to compare to d1                 *
- *                                                                            *
- * Return value: 0 - equal                                                    *
- *               not 0 - otherwise                                            *
- *                                                                            *
- ******************************************************************************/
-static int	uniq_conditions_compare_func(const void *d1, const void *d2)
-{
-	const zbx_condition_t	*condition1 = (const zbx_condition_t *)d1, *condition2 = (const zbx_condition_t *)d2;
-	int			ret;
-
-	ZBX_RETURN_IF_NOT_EQUAL(condition1->conditiontype, condition2->conditiontype);
-	ZBX_RETURN_IF_NOT_EQUAL(condition1->op, condition2->op);
-
-	if (0 != (ret = strcmp(condition1->value, condition2->value)))
-		return ret;
-
-	if (0 != (ret = strcmp(condition1->value2, condition2->value2)))
-		return ret;
-
-	return 0;
-}
-
-/******************************************************************************
- *                                                                            *
- * Purpose: generate hash based on condition values                           *
- *                                                                            *
- * Parameters: data - [IN] condition structure                                *
- *                                                                            *
- * Return value: hash is generated                                            *
- *                                                                            *
- ******************************************************************************/
-static zbx_hash_t	uniq_conditions_hash_func(const void *data)
-{
-	const zbx_condition_t	*condition = (const zbx_condition_t *)data;
-	zbx_hash_t		hash;
-
-	hash = ZBX_DEFAULT_STRING_HASH_ALGO(condition->value, strlen(condition->value), ZBX_DEFAULT_HASH_SEED);
-	hash = ZBX_DEFAULT_STRING_HASH_ALGO(condition->value2, strlen(condition->value2), hash);
-	hash = ZBX_DEFAULT_STRING_HASH_ALGO((char *)&condition->conditiontype, 1, hash);
-	hash = ZBX_DEFAULT_STRING_HASH_ALGO((char *)&condition->op, 1, hash);
-
-	return hash;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -3003,16 +2959,16 @@ static void	db_condition_clean(zbx_condition_t *condition)
  * Parameters: uniq_conditions - [IN] hashset with data structures to clean   *
  *                                                                            *
  ******************************************************************************/
-static void	conditions_eval_clean(zbx_hashset_t *uniq_conditions)
-{
-	zbx_hashset_iter_t	iter;
-	zbx_condition_t		*condition;
+// static void	conditions_eval_clean(zbx_hashset_t *uniq_conditions)
+// {
+// 	zbx_hashset_iter_t	iter;
+// 	zbx_condition_t		*condition;
 
-	zbx_hashset_iter_reset(uniq_conditions, &iter);
+// 	zbx_hashset_iter_reset(uniq_conditions, &iter);
 
-	while (NULL != (condition = (zbx_condition_t *)zbx_hashset_iter_next(&iter)))
-		db_condition_clean(condition);
-}
+// 	while (NULL != (condition = (zbx_condition_t *)zbx_hashset_iter_next(&iter)))
+// 		db_condition_clean(condition);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -3030,72 +2986,72 @@ static void	zbx_action_eval_free(zbx_action_eval_t *action)
 	zbx_free(action);
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: make actions to point, to conditions from hashset, where all      *
- *          conditions are unique, this ensures that we don't double check    *
- *          same conditions.                                                  *
- *                                                                            *
- * Parameters: actions         - [IN/OUT] all conditions are added to hashset *
- *                                        then cleaned, actions will now      *
- *                                        point to conditions from hashset.   *
- *                                        for custom expression also          *
- *                                        replaces formula                    *
- *             uniq_conditions - [OUT]    unique conditions that actions      *
- *                                        point to (several sources)          *
- *                                                                            *
- * Comments: The returned conditions must be freed with                       *
- *           conditions_eval_clean() function later.                          *
- *                                                                            *
- ******************************************************************************/
-static void	prepare_actions_conditions_eval(zbx_vector_ptr_t *actions, zbx_hashset_t *uniq_conditions)
-{
-	int	i, j;
+// /******************************************************************************
+//  *                                                                            *
+//  * Purpose: make actions to point, to conditions from hashset, where all      *
+//  *          conditions are unique, this ensures that we don't double check    *
+//  *          same conditions.                                                  *
+//  *                                                                            *
+//  * Parameters: actions         - [IN/OUT] all conditions are added to hashset *
+//  *                                        then cleaned, actions will now      *
+//  *                                        point to conditions from hashset.   *
+//  *                                        for custom expression also          *
+//  *                                        replaces formula                    *
+//  *             uniq_conditions - [OUT]    unique conditions that actions      *
+//  *                                        point to (several sources)          *
+//  *                                                                            *
+//  * Comments: The returned conditions must be freed with                       *
+//  *           conditions_eval_clean() function later.                          *
+//  *                                                                            *
+//  ******************************************************************************/
+// static void	prepare_actions_conditions_eval(zbx_vector_ptr_t *actions, zbx_hashset_t *uniq_conditions)
+// {
+// 	int	i, j;
 
-	for (i = 0; i < actions->values_num; i++)
-	{
-		zbx_action_eval_t	*action = actions->values[i];
+// 	for (i = 0; i < actions->values_num; i++)
+// 	{
+// 		zbx_action_eval_t	*action = actions->values[i];
 
-		for (j = 0; j < action->conditions.values_num; j++)
-		{
-			zbx_condition_t	*uniq_condition = NULL, *condition = action->conditions.values[j];
+// 		for (j = 0; j < action->conditions.values_num; j++)
+// 		{
+// 			zbx_condition_t	*uniq_condition = NULL, *condition = action->conditions.values[j];
 
-			if (EVENT_SOURCE_COUNT <= action->eventsource)
-			{
-				db_condition_clean(condition);
-			}
-			else if (NULL == (uniq_condition = zbx_hashset_search(&uniq_conditions[action->eventsource],
-					condition)))
-			{
-				uniq_condition = zbx_hashset_insert(&uniq_conditions[action->eventsource],
-						condition, sizeof(zbx_condition_t));
-			}
-			else
-			{
-				if (ZBX_CONDITION_EVAL_TYPE_EXPRESSION == action->evaltype)
-				{
-					char	search[ZBX_MAX_UINT64_LEN + 2];
-					char	replace[ZBX_MAX_UINT64_LEN + 2];
-					char	*old_formula;
+// 			if (EVENT_SOURCE_COUNT <= action->eventsource)
+// 			{
+// 				db_condition_clean(condition);
+// 			}
+// 			else if (NULL == (uniq_condition = zbx_hashset_search(&uniq_conditions[action->eventsource],
+// 					condition)))
+// 			{
+// 				uniq_condition = zbx_hashset_insert(&uniq_conditions[action->eventsource],
+// 						condition, sizeof(zbx_condition_t));
+// 			}
+// 			else
+// 			{
+// 				if (ZBX_CONDITION_EVAL_TYPE_EXPRESSION == action->evaltype)
+// 				{
+// 					char	search[ZBX_MAX_UINT64_LEN + 2];
+// 					char	replace[ZBX_MAX_UINT64_LEN + 2];
+// 					char	*old_formula;
 
-					zbx_snprintf(search, sizeof(search), "{" ZBX_FS_UI64 "}",
-							condition->conditionid);
-					zbx_snprintf(replace, sizeof(replace), "{" ZBX_FS_UI64 "}",
-							uniq_condition->conditionid);
+// 					zbx_snprintf(search, sizeof(search), "{" ZBX_FS_UI64 "}",
+// 							condition->conditionid);
+// 					zbx_snprintf(replace, sizeof(replace), "{" ZBX_FS_UI64 "}",
+// 							uniq_condition->conditionid);
 
-					old_formula = action->formula;
-					action->formula = zbx_string_replace(action->formula, search, replace);
-					zbx_free(old_formula);
-				}
+// 					old_formula = action->formula;
+// 					action->formula = zbx_string_replace(action->formula, search, replace);
+// 					zbx_free(old_formula);
+// 				}
 
-				db_condition_clean(condition);
-			}
+// 				db_condition_clean(condition);
+// 			}
 
-			zbx_free(action->conditions.values[j]);
-			action->conditions.values[j] = uniq_condition;
-		}
-	}
-}
+// 			zbx_free(action->conditions.values[j]);
+// 			action->conditions.values[j] = uniq_condition;
+// 		}
+// 	}
+// }
 
 void glb_actions_process_new_problem(u_int64_t problemid) {
 
@@ -3122,226 +3078,228 @@ void glb_actions_process_autoregister() {
  *                                  (PROBLEM eventid, OK eventid) pairs.      *
  *                                                                            *
  ******************************************************************************/
-// void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pair_t *closed_events)
-// {
-// 	int				i;
-// 	zbx_vector_ptr_t		actions;
-// 	zbx_vector_ptr_t 		new_escalations;
-// 	zbx_vector_uint64_pair_t	rec_escalations;
-// 	zbx_hashset_t			uniq_conditions[EVENT_SOURCE_COUNT];
-// 	zbx_vector_ptr_t		esc_events[EVENT_SOURCE_COUNT];
-// 	zbx_hashset_iter_t		iter;
-// 	zbx_condition_t			*condition;
-// 	zbx_dc_um_handle_t		*um_handle;
+void	process_actions(const zbx_vector_ptr_t *events, const zbx_vector_uint64_pair_t *closed_events)
+{
+	int				i;
+	zbx_vector_ptr_t		actions;
+	zbx_vector_ptr_t 		new_escalations;
+	zbx_vector_uint64_pair_t	rec_escalations;
+	zbx_hashset_t			uniq_conditions[EVENT_SOURCE_COUNT];
+	zbx_vector_ptr_t		esc_events[EVENT_SOURCE_COUNT];
+	zbx_hashset_iter_t		iter;
+	zbx_condition_t			*condition;
+	zbx_dc_um_handle_t		*um_handle;
 
-// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() events_num:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)events->values_num);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() events_num:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)events->values_num);
 
-// 	zbx_vector_ptr_create(&new_escalations);
-// 	zbx_vector_uint64_pair_create(&rec_escalations);
+	zbx_vector_ptr_create(&new_escalations);
+	zbx_vector_uint64_pair_create(&rec_escalations);
 
-// 	for (i = 0; i < EVENT_SOURCE_COUNT; i++)
-// 	{
-// 		zbx_hashset_create(&uniq_conditions[i], 0, uniq_conditions_hash_func, uniq_conditions_compare_func);
-// 		zbx_vector_ptr_create(&esc_events[i]);
-// 	}
+	for (i = 0; i < EVENT_SOURCE_COUNT; i++)
+	{
+		zbx_hashset_create(&uniq_conditions[i], 0, uniq_conditions_hash_func, uniq_conditions_compare_func);
+		zbx_vector_ptr_create(&esc_events[i]);
+	}
 
-// 	zbx_vector_ptr_create(&actions);
-// 	zbx_dc_config_history_sync_get_actions_eval(&actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
-// 	prepare_actions_conditions_eval(&actions, uniq_conditions);
-// 	get_escalation_events(events, esc_events);
+	zbx_vector_ptr_create(&actions);
 
-// 	um_handle = zbx_dc_open_user_macros();
+	zbx_dc_config_history_sync_get_actions_eval(&actions, ZBX_ACTION_OPCLASS_NORMAL | ZBX_ACTION_OPCLASS_RECOVERY);
+	prepare_actions_conditions_eval(&actions, uniq_conditions);
+	
+	get_escalation_events(events, esc_events);
 
-// 	for (i = 0; i < EVENT_SOURCE_COUNT; i++)
-// 	{
-// 		if (0 == esc_events[i].values_num)
-// 			continue;
+	um_handle = zbx_dc_open_user_macros();
 
-// 		zbx_vector_ptr_sort(&esc_events[i], compare_events);
+	for (i = 0; i < EVENT_SOURCE_COUNT; i++)
+	{
+		if (0 == esc_events[i].values_num)
+			continue;
 
-// 		zbx_hashset_iter_reset(&uniq_conditions[i], &iter);
+		zbx_vector_ptr_sort(&esc_events[i], compare_events);
 
-// 		while (NULL != (condition = (zbx_condition_t *)zbx_hashset_iter_next(&iter)))
-// 			check_events_condition(&esc_events[i], i, condition);
-// 	}
+		zbx_hashset_iter_reset(&uniq_conditions[i], &iter);
 
-// 	zbx_dc_close_user_macros(um_handle);
+		while (NULL != (condition = (zbx_condition_t *)zbx_hashset_iter_next(&iter)))
+			check_events_condition(&esc_events[i], i, condition);
+	}
 
-// 	/* 1. All event sources: match PROBLEM events to action conditions, add them to 'new_escalations' list.      */
-// 	/* 2. EVENT_SOURCE_DISCOVERY, EVENT_SOURCE_AUTOREGISTRATION: execute operations (except command and message  */
-// 	/*    operations) for events that match action conditions.                                                   */
-// 	for (i = 0; i < events->values_num; i++)
-// 	{
-// 		int		j;
-// 		const ZBX_DB_EVENT	*event;
+	zbx_dc_close_user_macros(um_handle);
 
-// 		if (FAIL == is_escalation_event((event = (const ZBX_DB_EVENT *)events->values[i])))
-// 			continue;
+	/* 1. All event sources: match PROBLEM events to action conditions, add them to 'new_escalations' list.      */
+	/* 2. EVENT_SOURCE_DISCOVERY, EVENT_SOURCE_AUTOREGISTRATION: execute operations (except command and message  */
+	/*    operations) for events that match action conditions.                                                   */
+	for (i = 0; i < events->values_num; i++)
+	{
+		int		j;
+		const ZBX_DB_EVENT	*event;
 
-// 		for (j = 0; j < actions.values_num; j++)
-// 		{
-// 			zbx_action_eval_t	*action = (zbx_action_eval_t *)actions.values[j];
+		if (FAIL == is_escalation_event((event = (const ZBX_DB_EVENT *)events->values[i])))
+			continue;
 
-// 			if (action->eventsource != event->source)
-// 				continue;
+		for (j = 0; j < actions.values_num; j++)
+		{
+			zbx_action_eval_t	*action = (zbx_action_eval_t *)actions.values[j];
 
-// 			if (SUCCEED == check_action_conditions(event->eventid, action))
-// 			{
-// 				zbx_escalation_new_t	*new_escalation;
-// 				/* command and message operations handled by escalators even for    */
-// 				/* EVENT_SOURCE_DISCOVERY and EVENT_SOURCE_AUTOREGISTRATION events  */
-// 				new_escalation = (zbx_escalation_new_t *)zbx_malloc(NULL, sizeof(zbx_escalation_new_t));
-// 				new_escalation->actionid = action->actionid;
-// 				new_escalation->event = event;
-// 				zbx_vector_ptr_append(&new_escalations, new_escalation);
+			if (action->eventsource != event->source)
+				continue;
 
-// 				if (EVENT_SOURCE_DISCOVERY == event->source ||
-// 						EVENT_SOURCE_AUTOREGISTRATION == event->source)
-// 				{
-// 					execute_operations(event, action->actionid);
-// 				}
-// 			}
-// 		}
-// 	}
+			if (SUCCEED == check_action_conditions(event->eventid, action))
+			{
+				zbx_escalation_new_t	*new_escalation;
+				/* command and message operations handled by escalators even for    */
+				/* EVENT_SOURCE_DISCOVERY and EVENT_SOURCE_AUTOREGISTRATION events  */
+				new_escalation = (zbx_escalation_new_t *)zbx_malloc(NULL, sizeof(zbx_escalation_new_t));
+				new_escalation->actionid = action->actionid;
+				new_escalation->event = event;
+				zbx_vector_ptr_append(&new_escalations, new_escalation);
 
-// 	for (i = 0; i < EVENT_SOURCE_COUNT; i++)
-// 	{
-// 		zbx_vector_ptr_destroy(&esc_events[i]);
-// 		conditions_eval_clean(&uniq_conditions[i]);
-// 		zbx_hashset_destroy(&uniq_conditions[i]);
-// 	}
+				if (EVENT_SOURCE_DISCOVERY == event->source ||
+						EVENT_SOURCE_AUTOREGISTRATION == event->source)
+				{
+					execute_operations(event, action->actionid);
+				}
+			}
+		}
+	}
 
-// 	zbx_vector_ptr_clear_ext(&actions, (zbx_clean_func_t)zbx_action_eval_free);
-// 	zbx_vector_ptr_destroy(&actions);
+	for (i = 0; i < EVENT_SOURCE_COUNT; i++)
+	{
+		zbx_vector_ptr_destroy(&esc_events[i]);
+		conditions_eval_clean(&uniq_conditions[i]);
+		zbx_hashset_destroy(&uniq_conditions[i]);
+	}
+
+	zbx_vector_ptr_clear_ext(&actions, (zbx_clean_func_t)zbx_action_eval_free);
+	zbx_vector_ptr_destroy(&actions);
 
 	
-// 	/* 3. Find recovered escalations and store escalationids in 'rec_escalation' by OK eventids. */
-// 	if (0 != closed_events->values_num)
-// 	{
-// 		char			*sql = NULL;
-// 		size_t			sql_alloc = 0, sql_offset = 0;
-// 		zbx_vector_uint64_t	eventids;
-// 		DB_ROW			row;
-// 		DB_RESULT		result;
-// 		int			j, index;
+	/* 3. Find recovered escalations and store escalationids in 'rec_escalation' by OK eventids. */
+	if (0 != closed_events->values_num)
+	{
+		char			*sql = NULL;
+		size_t			sql_alloc = 0, sql_offset = 0;
+		zbx_vector_uint64_t	eventids;
+		DB_ROW			row;
+		DB_RESULT		result;
+		int			j, index;
 
-// 		zbx_vector_uint64_create(&eventids);
+		zbx_vector_uint64_create(&eventids);
 
-// 		/* 3.1. Store PROBLEM eventids of recovered events in 'eventids'. */
-// 		for (j = 0; j < closed_events->values_num; j++)
-// 			zbx_vector_uint64_append(&eventids, closed_events->values[j].first);
+		/* 3.1. Store PROBLEM eventids of recovered events in 'eventids'. */
+		for (j = 0; j < closed_events->values_num; j++)
+			zbx_vector_uint64_append(&eventids, closed_events->values[j].first);
 
-// 		/* 3.2. Select escalations that must be recovered. */
-// 		zbx_vector_uint64_sort(&eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-// 		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset,
-// 				"select eventid,escalationid"
-// 				" from escalations"
-// 				" where");
+		/* 3.2. Select escalations that must be recovered. */
+		zbx_vector_uint64_sort(&eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+		zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset,
+				"select eventid,escalationid"
+				" from escalations"
+				" where");
 
-// 		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids.values, eventids.values_num);
-// 		result = DBselect("%s", sql);
+		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids.values, eventids.values_num);
+		result = DBselect("%s", sql);
 
-// 		zbx_vector_uint64_pair_reserve(&rec_escalations, eventids.values_num);
+		zbx_vector_uint64_pair_reserve(&rec_escalations, eventids.values_num);
 
-// 		/* 3.3. Store the escalationids corresponding to the OK events in 'rec_escalations'. */
-// 		while (NULL != (row = DBfetch(result)))
-// 		{
-// 			zbx_uint64_pair_t	pair;
+		/* 3.3. Store the escalationids corresponding to the OK events in 'rec_escalations'. */
+		while (NULL != (row = DBfetch(result)))
+		{
+			zbx_uint64_pair_t	pair;
 
-// 			ZBX_STR2UINT64(pair.first, row[0]);
+			ZBX_STR2UINT64(pair.first, row[0]);
 
-// 			if (FAIL == (index = zbx_vector_uint64_pair_bsearch(closed_events, pair,
-// 					ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
-// 			{
-// 				THIS_SHOULD_NEVER_HAPPEN;
-// 				continue;
-// 			}
+			if (FAIL == (index = zbx_vector_uint64_pair_bsearch(closed_events, pair,
+					ZBX_DEFAULT_UINT64_COMPARE_FUNC)))
+			{
+				THIS_SHOULD_NEVER_HAPPEN;
+				continue;
+			}
 
-// 			pair.second = closed_events->values[index].second;
-// 			ZBX_DBROW2UINT64(pair.first, row[1]);
-// 			zbx_vector_uint64_pair_append(&rec_escalations, pair);
-// 		}
+			pair.second = closed_events->values[index].second;
+			ZBX_DBROW2UINT64(pair.first, row[1]);
+			zbx_vector_uint64_pair_append(&rec_escalations, pair);
+		}
 
-// 		zbx_db_free_result(result);
-// 		zbx_free(sql);
-// 		zbx_vector_uint64_destroy(&eventids);
-// 	}
+		zbx_db_free_result(result);
+		zbx_free(sql);
+		zbx_vector_uint64_destroy(&eventids);
+	}
 	
-// 	/* 4. Create new escalations in DB. */
-// 	if (0 != new_escalations.values_num)
-// 	{
+	/* 4. Create new escalations in DB. */
+	if (0 != new_escalations.values_num)
+	{
 	
-// 		zbx_db_insert_t	db_insert;
-// 		int		j;
+		zbx_db_insert_t	db_insert;
+		int		j;
 
-// 		zbx_db_insert_prepare(&db_insert, "escalations", "escalationid", "actionid", "status", "triggerid",
-// 					"itemid", "eventid", "r_eventid", "acknowledgeid", NULL);
+		zbx_db_insert_prepare(&db_insert, "escalations", "escalationid", "actionid", "status", "triggerid",
+					"itemid", "eventid", "r_eventid", "acknowledgeid", NULL);
 
-// 		for  (j = 0; j < new_escalations.values_num; j++)
-// 		{
-// 			zbx_uint64_t		triggerid = 0, itemid = 0;
-// 			zbx_escalation_new_t	*new_escalation;
+		for  (j = 0; j < new_escalations.values_num; j++)
+		{
+			zbx_uint64_t		triggerid = 0, itemid = 0;
+			zbx_escalation_new_t	*new_escalation;
 
-// 			new_escalation = (zbx_escalation_new_t *)new_escalations.values[j];
+			new_escalation = (zbx_escalation_new_t *)new_escalations.values[j];
 
-// 			switch (new_escalation->event->object)
-// 			{
-// 				case EVENT_OBJECT_TRIGGER:
-// 					triggerid = new_escalation->event->objectid;
-// 					DEBUG_TRIGGER(triggerid, "Adding new escalation")
-// 					break;
-// 				case EVENT_OBJECT_ITEM:
-// 				case EVENT_OBJECT_LLDRULE:
-// 					itemid = new_escalation->event->objectid;
-// 					break;
-// 			}
+			switch (new_escalation->event->object)
+			{
+				case EVENT_OBJECT_TRIGGER:
+					triggerid = new_escalation->event->objectid;
+					DEBUG_TRIGGER(triggerid, "Adding new escalation")
+					break;
+				case EVENT_OBJECT_ITEM:
+				case EVENT_OBJECT_LLDRULE:
+					itemid = new_escalation->event->objectid;
+					break;
+			}
 
-// 			zbx_db_insert_add_values(&db_insert, __UINT64_C(0), new_escalation->actionid,
-// 					(int)ESCALATION_STATUS_ACTIVE, triggerid, itemid,
-// 					new_escalation->event->eventid, __UINT64_C(0), __UINT64_C(0));
+			zbx_db_insert_add_values(&db_insert, __UINT64_C(0), new_escalation->actionid,
+					(int)ESCALATION_STATUS_ACTIVE, triggerid, itemid,
+					new_escalation->event->eventid, __UINT64_C(0), __UINT64_C(0));
 
-// 			zbx_free(new_escalation);
-// 		}
+			zbx_free(new_escalation);
+		}
 
-// 		zbx_db_insert_autoincrement(&db_insert, "escalationid");
-// 		zbx_db_insert_execute(&db_insert);
-// 		zbx_db_insert_clean(&db_insert);
-// 	}
+		zbx_db_insert_autoincrement(&db_insert, "escalationid");
+		zbx_db_insert_execute(&db_insert);
+		zbx_db_insert_clean(&db_insert);
+	}
 	
-// 	/* 5. Modify recovered escalations in DB. */
-// 	if (0 != rec_escalations.values_num)
-// 	{
-// 		char	*sql = NULL;
-// 		size_t	sql_alloc = 0, sql_offset = 0;
-// 		int	j;
+	/* 5. Modify recovered escalations in DB. */
+	if (0 != rec_escalations.values_num)
+	{
+		char	*sql = NULL;
+		size_t	sql_alloc = 0, sql_offset = 0;
+		int	j;
 
-// 		zbx_vector_uint64_pair_sort(&rec_escalations, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+		zbx_vector_uint64_pair_sort(&rec_escalations, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-// 		zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+		zbx_DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
 
-// 		for (j = 0; j < rec_escalations.values_num; j++)
-// 		{
-// 			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-// 					"update escalations set r_eventid=" ZBX_FS_UI64 ",nextcheck=0"
-// 					" where escalationid=" ZBX_FS_UI64 ";\n",
-// 					rec_escalations.values[j].second, rec_escalations.values[j].first);
+		for (j = 0; j < rec_escalations.values_num; j++)
+		{
+			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
+					"update escalations set r_eventid=" ZBX_FS_UI64 ",nextcheck=0"
+					" where escalationid=" ZBX_FS_UI64 ";\n",
+					rec_escalations.values[j].second, rec_escalations.values[j].first);
 
-// 			DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
-// 		}
+			DBexecute_overflowed_sql(&sql, &sql_alloc, &sql_offset);
+		}
 
-// 		zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+		zbx_DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
 
-// 		if (16 < sql_offset)	/* in ORACLE always present begin..end; */
-// 			DBexecute("%s", sql);
+		if (16 < sql_offset)	/* in ORACLE always present begin..end; */
+			DBexecute("%s", sql);
 
-// 		zbx_free(sql);
-// 	}
+		zbx_free(sql);
+	}
 
-// 	zbx_vector_uint64_pair_destroy(&rec_escalations);
-// 	zbx_vector_ptr_destroy(&new_escalations);
+	zbx_vector_uint64_pair_destroy(&rec_escalations);
+	zbx_vector_ptr_destroy(&new_escalations);
 
-// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-// }
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
 
 /******************************************************************************
  *                                                                            *

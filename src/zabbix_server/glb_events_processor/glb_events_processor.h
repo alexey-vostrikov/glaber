@@ -34,16 +34,24 @@ typedef struct
 typedef enum { //internal run time only can change w/out harm
 	EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM = 1,
 	EVENTS_PROC_NOTIFY_TYPE_LLD
+} events_processor_object_type_t;
+
+typedef enum {
+	EVENTS_TYPE_NEW = 1,
+	EVENTS_TYPE_CHANGE, 
+	EVENTS_TYPE_RECOVER
 } events_processor_event_type_t;
 
 typedef struct {
+	events_processor_object_type_t object_type;
 	events_processor_event_type_t event_type;
 	u_int64_t object_id;
 	void *data;
 } events_processor_event_t;
 
 int glb_events_processing_init();
-void glb_event_processing_send_problem_notify(u_int64_t problemid);
+
+void glb_event_processing_send_problem_notify(u_int64_t problemid, events_processor_event_type_t event_type);
 
 ZBX_THREAD_ENTRY(glb_events_processor_thread, args);
 

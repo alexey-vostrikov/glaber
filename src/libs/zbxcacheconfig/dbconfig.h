@@ -32,6 +32,7 @@
 #include "zbx_trigger_constants.h"
 #include "zbx_host_constants.h"
 #include "../glb_conf/triggers/conf_calc_trigger.h"
+#include "../glb_conf/tags/tags.h"
 
 #define ZBX_MAINTENANCE_IDLE		0
 #define ZBX_MAINTENANCE_RUNNING		1
@@ -75,6 +76,7 @@ typedef struct
 	zbx_uint64_t		*itemids;
 
 	zbx_vector_ptr_t	tags;
+	//tags_t*				tags;
 }
 ZBX_DC_TRIGGER;
 

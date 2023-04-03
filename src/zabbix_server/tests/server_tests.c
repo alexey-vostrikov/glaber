@@ -27,10 +27,14 @@
 #include "../../libs/glb_state/tests/glb_state_tests.h"
 #include "../../libs/zbxalgo/tests/algo_tests.h"
 #include "../../libs/glb_macro/tests/glb_macro_tests.h"
+#include "../../libs/glb_conf/tags/tests/tag_tests.h"
+
 //#include "../preprocessor/worker_tests.c"
 //#include "../../libs/zbxexec/tests/exec_tests.c"
 int tests_server_run(void) {
    LOG_INF("Running server tests");
+   LOG_INF("Running tag tests");
+   glb_tags_tests_run();
    
    LOG_INF("Running algo tests");
    tests_algo_run();

@@ -21,8 +21,8 @@
 //whenever an actionable object is created it is passed to process_actions_xxxx, which in 
 //turn should notify escalator on object id and type
 //escalator uses actions-operations cache and schedules operations and performs them (or uses exec services, like alerter?)
-
 #include "glb_events_processor.h"
+#include "glb_events_actions.h"
 #include "zbxcommon.h"
 #include "zbxthreads.h"
 #include "zbxalgo.h"
@@ -31,6 +31,7 @@
 #include "../../libs/zbxipcservice/glb_ipc.h"
 #include "../glb_poller/poller_async_io.h"
 #include "process_problem_events.h"
+#include "glb_events_conditions_check.h"
 
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
@@ -39,17 +40,19 @@ extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 #define NEW_ESCALATIONS_CHECK_INTERVAL 1
 #define PROCTITLE_UPDATE_INTERVAL	5
+#define UPDATE_ACTIONS_AND_CONDITIONS 1 
 
 typedef struct {
     strpool_t strpool;
 	zbx_thread_args_t args;
 	poller_event_t *new_escalations_check;
 	poller_event_t *update_proctitle;
+	poller_event_t *update_actions_and_conditions;
 	u_int64_t requests;
 	zbx_hashset_t escalations;
 	ipc_conf_t *ipc;
 	int process_num;
-	
+	glb_actions_t *actions_conf;
 } conf_t;
 
 static zbx_shmem_info_t	*events_proc_notify_shmem = NULL;
@@ -63,16 +66,34 @@ static mem_funcs_t ipc_memf = {
 
 static conf_t conf = {0};
 
+static void escalate_event(events_processor_event_t *event) {
+	HALT_HERE("Not implemented");
+}
 
+// static void process_event(events_processor_event_t *event) {
+
+	
+// 	if (glb_actions_is_event_matches_conditions(event, conf.actions_conf))
+// 		escalate_event(event);
+// 	// switch (event->object_type) {
+// 	// case EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM: 
+// 	// 		process_problem_new_event(event->object_id);
+// 	// 		return;
+// 	// 	case EVENTS_PROC_NOTIFY_TYPE_LLD:
+// 	// 		HALT_HERE("LLD actions is pending");
+// 	// 		return;
+// 	// }
+// 	return;
+// }
 
 IPC_CREATE_CB(ipc_events_processing_send_cb) {
 	events_processor_event_t *event_local = local_data;
 	events_processor_event_t *event_ipc = ipc_data;
 
-	event_ipc->event_type = event_local->event_type;
-	event_ipc->object_id = event_local->object_id;
-
-	switch (event_local->event_type) {
+	*event_ipc = *event_local;
+	event_ipc->data = NULL;
+	
+	switch (event_local->object_type) {
 		case EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM: 
 			return;
 		case EVENTS_PROC_NOTIFY_TYPE_LLD:
@@ -90,25 +111,20 @@ IPC_PROCESS_CB(ipc_events_processing_process_cb) {
 	events_processor_event_t *event = ipc_data;
 	LOG_INF("Recieved notify on objectid %ld", event->object_id);
 
-	switch (event->event_type) {
-		case EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM: 
-			process_problem_new_event(event->object_id);
-			return;
-		case EVENTS_PROC_NOTIFY_TYPE_LLD:
-			HALT_HERE("LLD actions is pending");
-			return;
-	}
+	glb_actions_process_event(event, conf.actions_conf);
+	//process_event(event);
+
 }
 
-void glb_event_processing_send_problem_notify(u_int64_t problemid) {
-	events_processor_event_t event ={.data = NULL, .event_type = EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM, .object_id = problemid};
+void glb_event_processing_send_problem_notify(u_int64_t problemid, events_processor_event_type_t event_type) {
+	events_processor_event_t event ={.data = NULL, .object_type = EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM, 
+		.event_type = event_type, .object_id = problemid};
 	//HALT_HERE("Send catch rule")
 	glb_ipc_send(conf.ipc, problemid % CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR], &event, IPC_LOCK_WAIT);
 	glb_ipc_flush(conf.ipc);
 	LOG_INF("Sent event escalation notify on problem %ld", problemid);
 	glb_ipc_dump_sender_queues(conf.ipc, "Problems events escalations");
 }
-
 
 static void new_escalations_check_cb(poller_item_t *garbage, void *data) {
 	events_processor_event_t  event;
@@ -119,10 +135,17 @@ static void new_escalations_check_cb(poller_item_t *garbage, void *data) {
 	glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 1);
 }
 
+static void update_actions_and_conditions_cb(poller_item_t *garbage, void *data){
+	LOG_INF("Updating actions_conf");
+	glb_actions_update(conf.actions_conf);
+
+	LOG_INF("Finished actions and conditions update");
+}
+ 
 static void update_proc_title_cb(poller_item_t *garbage, void *dat)
 {
 	static u_int64_t last_call = 0;
-	//conf_t * conf = data;
+
 	u_int64_t now = glb_ms_time(), time_diff = now - last_call;
 
 	if (0 == time_diff)
@@ -145,6 +168,10 @@ static int events_processor_fork_init(zbx_thread_args_t *args)
     conf.args = *(zbx_thread_args_t *)args;
 
 	strpool_init(&conf.strpool, NULL);
+
+	conf.actions_conf = glb_actions_create();
+
+
 	poller_async_loop_init();
 
 	conf.new_escalations_check = poller_create_event(NULL, new_escalations_check_cb, 0, NULL, 1);
@@ -152,6 +179,9 @@ static int events_processor_fork_init(zbx_thread_args_t *args)
 	
 	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL * 1000);
+
+	conf.update_actions_and_conditions = poller_create_event(NULL, update_actions_and_conditions_cb, 0, NULL, 1);
+	poller_run_timer_event(conf.update_actions_and_conditions, UPDATE_ACTIONS_AND_CONDITIONS * 1000);
 
 	return SUCCEED;
 }

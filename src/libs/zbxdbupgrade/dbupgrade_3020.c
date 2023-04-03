@@ -41,7 +41,7 @@ int	DBpatch_3020001(void)
 	zbx_vector_uint64_t	eventids;
 	DB_ROW			row;
 	zbx_uint64_t		eventid;
-	int			sources[] = {EVENT_SOURCE_TRIGGERS, EVENT_SOURCE_INTERNAL};
+	int			sources[] = {EVENT_SOURCE_PROBLEM, EVENT_SOURCE_INTERNAL};
 	int			objects[] = {EVENT_OBJECT_ITEM, EVENT_OBJECT_LLDRULE}, i;
 
 	zbx_vector_uint64_create(&eventids);

@@ -21,6 +21,7 @@
 #include "glb_state_ids.h"
 #include "load_dump.h"
 #include "../glb_macro/glb_macro.h"
+#include "../glb_conf/tags/tags.h"
 #include "zbxserver.h"
 
 static mem_funcs_t heap_memf = { .malloc_func = zbx_default_mem_malloc_func, 
@@ -28,21 +29,24 @@ static mem_funcs_t heap_memf = { .malloc_func = zbx_default_mem_malloc_func,
 
 struct glb_problem_t {
     u_int64_t id;
-    glb_problem_source_t source;
-    u_int64_t objectid;
+    glb_problem_source_t source; //it looks like the only problem reason might be a trigger, not needed?
+    u_int64_t objectid; //this must be changed to triggerid ? 
     const char *name;
 	unsigned char acknowledged;
 	unsigned char severity; 
+    unsigned char suppressed;
     glb_problem_oper_state_t oper_state;
 	u_int64_t cause_problem;
     u_int64_t recovery_time; 
     u_int64_t correlation_id;
+    zbx_vector_uint64_t hostids;
+    tags_t* tags;
 };
 
 glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpool, u_int64_t problemid, calc_trigger_t *trigger) {
-
     if (NULL == memf)
         memf = &heap_memf;
+    int i;
     
   //  char problem_name[MAX_STRING_LEN];
 
@@ -53,9 +57,10 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
     
     if (NULL == problem || NULL == trigger->event_name)
         return NULL;
-    
-    bzero(problem, sizeof(glb_problem_t));
 
+    bzero(problem, sizeof(glb_problem_t));
+    zbx_vector_uint64_create_ext(&problem->hostids, memf->malloc_func, memf->realloc_func, memf->free_func);    
+    
     char *problem_name;
     
     if (NULL != trigger->event_name && trigger->event_name[0] != '\0')
@@ -82,7 +87,17 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
     problem->oper_state = GLB_PROBLEM_OPER_STATE_PROBLEM;
     problem->severity = trigger->priority;
     problem->source = GLB_PROBLEM_SOURCE_TRIGGER;
+    
+    zbx_vector_uint64_t *t_hostids;
 
+    HALT_HERE("Add triggers from hosts and items either");
+    
+    if (SUCCEED == conf_calc_trigger_get_all_hostids(trigger, &t_hostids))
+        zbx_vector_uint64_append_array(&problem->hostids, t_hostids->values, t_hostids->values_num);
+    
+    problem->tags = tags_create_ext(memf);
+    tags_add_tags(problem->tags, trigger->tags);
+   
     return problem;
 }
 
@@ -97,26 +112,28 @@ void glb_problem_destroy(mem_funcs_t *memf, strpool_t *strpool, glb_problem_t *p
         LOG_INF("name handling: freeing the name %p", problem->name);
         memf->free_func((char *)problem->name);
     }
+    zbx_vector_uint64_destroy(&problem->hostids);
+
     LOG_INF("Freeing the problem");
     memf->free_func(problem);
 }
 
-glb_problem_t * glb_problem_copy(mem_funcs_t *memf, strpool_t *strpool,  glb_problem_t *src_problem) {
-    if (NULL == memf)
-        memf = &heap_memf;
+// glb_problem_t * glb_problem_copy(mem_funcs_t *memf, strpool_t *strpool,  glb_problem_t *src_problem) {
+//     if (NULL == memf)
+//         memf = &heap_memf;
     
-    glb_problem_t* dst_problem = memf->malloc_func(NULL, sizeof(glb_problem_t));
-    bzero(dst_problem, sizeof(glb_problem_t));
+//     glb_problem_t* dst_problem = memf->malloc_func(NULL, sizeof(glb_problem_t));
+//     bzero(dst_problem, sizeof(glb_problem_t));
 
-    memcpy(dst_problem, src_problem, sizeof(glb_problem_t));
+//     memcpy(dst_problem, src_problem, sizeof(glb_problem_t));
 
-    if (NULL != strpool) 
-        dst_problem->name = strpool_add(strpool, src_problem->name);
-    else 
-        dst_problem->name = zbx_strdup(NULL, src_problem->name);
+//     if (NULL != strpool) 
+//         dst_problem->name = strpool_add(strpool, src_problem->name);
+//     else 
+//         dst_problem->name = zbx_strdup(NULL, src_problem->name);
     
-    return dst_problem;
-}
+//     return dst_problem;
+// }
 
 
 glb_problem_source_t glb_problem_get_source(glb_problem_t *problem) {
@@ -191,4 +208,36 @@ int glb_problem_unmarshall_from_json(mem_funcs_t *memf, strpool_t *strpool, glb_
 
 int glb_problem_get_create_time(glb_problem_t *problem) {
     return glb_state_id_get_timestamp(problem->id);
+}
+
+void glb_problem_get_hostids(glb_problem_t *problem, zbx_vector_uint64_t *ids) {
+    zbx_vector_uint64_append_array(ids, problem->hostids.values, problem->hostids.values_num);
+}
+
+int glb_problem_get_severity(glb_problem_t *problem) {
+    return problem->severity;
+}
+
+int glb_problem_is_acknowledged(glb_problem_t *problem) {
+    return problem->acknowledged;
+}
+
+u_int64_t glb_problem_get_triggerid(glb_problem_t *problem) {
+    return problem->objectid;
+}
+
+glb_problem_suppress_state_t glb_problem_get_suppressed(glb_problem_t *problem) {
+    return problem->suppressed;
+}
+
+void glb_problem_get_name(glb_problem_t *problem, char *name, size_t max_len) {
+    zbx_strlcpy(name, problem->name, max_len);
+}
+
+int glb_problem_check_tag_name(glb_problem_t *problem, const char *pattern, unsigned char oper) {
+    return tags_check_name(problem->tags, pattern, oper);
+}
+
+int glb_problem_check_tag_value(glb_problem_t *problem, tag_t *tag, unsigned char oper) {
+    return tags_check_value(problem->tags, tag, oper);
 }

@@ -21,7 +21,7 @@ typedef struct
 {
 	zbx_uint64_t			conditionid;
 	zbx_uint64_t			actionid;
-	char				*value;
+	char					*value;
 	char				*value2;
 	unsigned char			conditiontype;
 	unsigned char			op;

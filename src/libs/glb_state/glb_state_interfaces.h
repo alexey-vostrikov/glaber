@@ -22,9 +22,6 @@
 #include "glb_state.h"
 #include "zbxjson.h"
 
-
-
-
 int glb_state_interfaces_init(mem_funcs_t *memf);
 int glb_state_interfaces_destroy();
 

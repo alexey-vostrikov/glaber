@@ -57,21 +57,21 @@ static void macro_proc_hostids( macro_proc_data_t *macro_proc, void *obj_data) {
 
 
 static void macro_proc_dchost(macro_proc_data_t *macro_proc, void *obj_data) {
-    LOG_INF("In %s", __func__);
+ //   LOG_INF("In %s", __func__);
 	DC_HOST *host =  obj_data;
-	LOG_INF("Looking for host data from dc_host object, macro is %s", macro_proc->macro);
+//	LOG_INF("Looking for host data from dc_host object, macro is %s", macro_proc->macro);
 
     if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
 		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, &host->hostid, 1, &macro_proc->replace_to);
 	else 
 		glb_macro_builtin_expand_by_host(macro_proc, host);
-	LOG_INF("Replaced to %s", macro_proc->replace_to);
+//	LOG_INF("Replaced to %s", macro_proc->replace_to);
 }
 
 static void macro_proc_item(macro_proc_data_t *macro_proc, void *obj_data) {
     DC_ITEM *item =  obj_data;
 	
-	LOG_INF("In %s", __func__);
+	//LOG_INF("In %s", __func__);
     
 	if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) 
 		zbx_dc_get_user_macro(macro_proc->um_handle, macro_proc->macro, 
@@ -87,13 +87,13 @@ static void macro_proc_trigger(macro_proc_data_t *macro_proc, void *obj_data)
 {
 	calc_trigger_t *tr = obj_data;
 	
-	LOG_INF("In %s", __func__);
+	//LOG_INF("In %s", __func__);
 	//LOG_INF("Trigger has %d hosts in the context", hostids->values_num);
-	LOG_INF("Trigger has expression: %s", tr->expression);
+	//LOG_INF("Trigger has expression: %s", tr->expression);
 
 	if (ZBX_TOKEN_USER_MACRO == macro_proc->token.type) //{$MACRO_DEFINED_BY_A_USER}
 	{
-		const zbx_vector_uint64_t *hostids;
+		zbx_vector_uint64_t *hostids;
 		
 		if (SUCCEED == conf_calc_trigger_get_all_hostids(tr, &hostids) && hostids->values_num > 0)
 			macro_proc_hostids(macro_proc, obj_data);
@@ -150,6 +150,12 @@ int glb_macro_expand_by_hostid(char **data, u_int64_t hostid, char *error, size_
     return expand_macros_impl(&hostid, data, MACRO_TYPE_COMMON, macro_proc_hostid, error, errlen);
 }
 
+int glb_macro_expand_common(char **data, char *error, size_t errlen) {
+	u_int64_t id=0;
+    return expand_macros_impl(&id, data, MACRO_TYPE_COMMON, macro_proc_hostid, error, errlen);
+}
+
+
 int glb_macro_expand_by_hostids(char **data, zbx_vector_uint64_t *hostids, char *error, size_t errlen) {
     int ret = SUCCEED;
 
@@ -170,6 +176,13 @@ int glb_macro_expand_by_hostid_unmasked(char **data, u_int64_t hostid, char *err
 	expand_macros_impl(&hostid, data, MACRO_TYPE_COMMON, macro_proc_hostid, error, errlen);
     zbx_dc_close_user_macros(um_handle);
 }
+
+int glb_macro_expand_common_unmasked(char **data, char *error, size_t errlen) {
+	u_int64_t id=0;
+	
+    return glb_macro_expand_by_hostid_unmasked(data, id, error, errlen);
+}
+
 
 int glb_macro_expand_by_host(char **data, const DC_HOST *host, char *error, size_t errlen) {
 //    LOG_INF("In host");
@@ -468,8 +481,8 @@ static void macro_replace_calc_result(macro_proc_data_t *macro_proc, char **data
 	//LOG_INF("Wvfwef");
     if (FAIL == macro_proc->ret)
 	{
-		LOG_INF("cannot resolve macro '%.*s'",
-				(int)(macro_proc->token.loc.r - macro_proc->token.loc.l + 1), *data + macro_proc->token.loc.l);
+	//	LOG_INF("cannot resolve macro '%.*s'",
+	//			(int)(macro_proc->token.loc.r - macro_proc->token.loc.l + 1), *data + macro_proc->token.loc.l);
 		macro_proc->replace_to = zbx_strdup(macro_proc->replace_to, STR_UNKNOWN_VARIABLE);
 	}
 	//LOG_INF("Wvfwef1");
@@ -491,7 +504,7 @@ static void macro_replace_calc_result(macro_proc_data_t *macro_proc, char **data
 	}
 	//LOG_INF("Wvfwef3");
 	macro_proc->pos++;
-	LOG_INF("Pos is %d",macro_proc->pos);
+//	LOG_INF("Pos is %d",macro_proc->pos);
 }
 //overall general processing logic: whenever parsing is required there should be 
 //a way to pass a context of macro calculation. The context (defined by a function name) also
@@ -535,22 +548,22 @@ static int  expand_macros_impl(void *obj_data, char **replace_data,
 	    if (FAIL == check_token_is_processable_type(&macro_proc, *replace_data))
             continue;
 	
-		LOG_INF("Processing data %s, macro %s, token type %d, start %d, end %d, found is %d", 
-				*replace_data,  macro_proc.macro, macro_proc.token.type, macro_proc.token.loc.l, macro_proc.token.loc.r, found);
+	//	LOG_INF("Processing data %s, macro %s, token type %d, start %d, end %d, found is %d", 
+	//			*replace_data,  macro_proc.macro, macro_proc.token.type, macro_proc.token.loc.l, macro_proc.token.loc.r, found);
 
 		recognize_macro_type_and_object_type(&macro_proc);
 
-        LOG_INF("Calling callback func, data is %s macro is %s", *replace_data, macro_proc.macro);
+    //    LOG_INF("Calling callback func, data is %s macro is %s", *replace_data, macro_proc.macro);
         macro_proc_func(&macro_proc, obj_data);
-        LOG_INF("Escaping");
+    //    LOG_INF("Escaping");
         macro_escape_replace_to(macro_proc_type, &macro_proc.replace_to);
-        LOG_INF("Func calc");
+    //    LOG_INF("Func calc");
         macro_calc_token_function(&macro_proc, *replace_data);
         macro_check_has_address(&macro_proc, *replace_data, error, maxerrlen);
-        LOG_INF("Replacing result to %s", *replace_data);
+    //    LOG_INF("Replacing result to %s", *replace_data);
 		macro_replace_calc_result(&macro_proc, replace_data);
     }
-	LOG_INF("After processing: %s", *replace_data);
+	//LOG_INF("After processing: %s", *replace_data);
     //zbx_free(user_username);
 	//zbx_free(user_name);
 	//zbx_free(user_surname);

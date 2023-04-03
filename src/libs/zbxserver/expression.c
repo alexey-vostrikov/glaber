@@ -752,7 +752,7 @@ static int	DBget_trigger_event_count(zbx_uint64_t triggerid, char **replace_to, 
 				" and objectid=" ZBX_FS_UI64
 				" and value in (%s)"
 				" and acknowledged=%d",
-			EVENT_SOURCE_TRIGGERS,
+			EVENT_SOURCE_PROBLEM,
 			EVENT_OBJECT_TRIGGER,
 			triggerid,
 			value,
@@ -2000,7 +2000,7 @@ static const char	*item_state_string(unsigned char state)
 
 static const char	*event_value_string(unsigned char source, unsigned char object, unsigned char value)
 {
-	if (EVENT_SOURCE_TRIGGERS == source || EVENT_SOURCE_SERVICE == source)
+	if (EVENT_SOURCE_PROBLEM == source || EVENT_SOURCE_SERVICE == source)
 	{
 		switch (value)
 		{

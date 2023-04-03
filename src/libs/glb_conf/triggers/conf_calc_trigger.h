@@ -19,6 +19,7 @@
 #define CALC_TRIGGER_H
 
 #include "zbxcacheconfig.h"
+#include "../tags/tags.h"
 //typedef struct trigger_cache_t trigger_cache_t;
 //typedef int (*zbx_trigger_func_t)(zbx_variant_t *, const DC_EVALUATE_ITEM *, const char *, const char *,
 //		const zbx_timespec_t *, char **);
@@ -57,8 +58,8 @@ typedef struct calc_trigger
 	unsigned char		status;
 	unsigned char		recovery_mode;
 	unsigned char		correlation_mode;
-	
-	zbx_vector_ptr_t	tags;
+	tags_t 				*tags;
+	//zbx_vector_ptr_t	tags;
 	trigger_cache_t 	eval_cache;
 } calc_trigger_t;
 

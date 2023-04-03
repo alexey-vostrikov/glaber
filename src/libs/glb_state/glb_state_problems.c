@@ -25,7 +25,11 @@
 #include "zbxcacheconfig.h"
 #include "../glb_events_log/glb_events_log.h"
 #include "../glb_actions/glb_actions.h"
+#include "../glb_conf/tags/tags.h"
 #include "load_dump.h"
+#include "../../zabbix_server/glb_events_processor/glb_events_processor.h"
+#include "glbstr.h"
+
 
 #define MAX_PROBLEMS 1000000
 #define MAX_PROBLEMS_PER_TRIGGER 1024
@@ -89,14 +93,10 @@ int glb_state_problems_destroy()
 
 ELEMS_CALLBACK(problem_save_cb)
 {
-    //calc_trigger_t *trigger = data;
     glb_problem_t *problem = data;
 
     if (NULL != elem->data)
         return FAIL;
-
-   // if (NULL == (problem = glb_problem_create(memf, &conf->strpool, info)))
-    //    return FAIL;
 
     elem->data = problem;
 
@@ -129,7 +129,7 @@ u_int64_t glb_state_problems_create_by_trigger(calc_trigger_t *trigger)
 
         //glb_actions_process_new_problem(problemid);
         
-        glb_event_processing_send_problem_notify(problemid);
+        glb_event_processing_send_problem_notify(problemid, EVENTS_TYPE_NEW);
 
         return problemid;
     } 
@@ -168,53 +168,71 @@ int glb_state_problem_recover(u_int64_t problemid, u_int64_t userid)
     if (0 == problemid)
         return FAIL;
 
-    return elems_hash_process(conf->problems, problemid, problem_recover_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+    if (SUCCEED == elems_hash_process(conf->problems, problemid, problem_recover_cb, NULL, ELEM_FLAG_DO_NOT_CREATE)) {
+        glb_event_processing_send_problem_notify(problemid, EVENTS_TYPE_RECOVER);
+        return SUCCEED;
+    }
+    
+    return FAIL;
 }
 
-ELEMS_CALLBACK(fetch_problem_cb)
-{
-    glb_problem_t *new_problem = glb_problem_copy(NULL, NULL, (glb_problem_t *)elem->data);
-    *(void **)data = new_problem;
+// ELEMS_CALLBACK(fetch_problem_cb)
+// {
+//     glb_problem_t *new_problem = glb_problem_copy(NULL, NULL, (glb_problem_t *)elem->data);
+//     *(void **)data = new_problem;
 
+//     return SUCCEED;
+// }
+
+// static int fetch_problems_by_index(index_uint64_t *index, u_int64_t id, zbx_vector_ptr_t *problems)
+// {
+//     if (NULL == problems || NULL == index)
+//         return FAIL;
+
+//     zbx_vector_uint64_t problemids;
+//     zbx_vector_uint64_create(&problemids);
+
+//     if (FAIL == index_uint64_get(index, id, &problemids))
+//     {
+//         zbx_vector_uint64_destroy(&problemids);
+//         return FAIL;
+//     }
+
+//     for (int i = 0; i < problemids.values_num; i++)
+//     {
+
+//         glb_problem_t *problem;
+
+//         if (SUCCEED == elems_hash_process(conf->problems, problemids.values[i], fetch_problem_cb, &problem, ELEM_FLAG_DO_NOT_CREATE))
+//             zbx_vector_ptr_append(problems, problem);
+//     }
+
+//     zbx_vector_uint64_destroy(&problemids);
+//     return SUCCEED;
+// }
+
+// int glb_state_problems_get_by_triggerid(u_int64_t triggerid, zbx_vector_ptr_t *problems)
+// {
+//     return fetch_problems_by_index(conf->trigger_idx, triggerid, problems);
+// }
+
+// int glb_state_problems_get_by_hostid(u_int64_t hostid, zbx_vector_ptr_t *problems)
+// {
+//     return fetch_problems_by_index(conf->hosts_idx, hostid, problems);
+// }
+
+ELEMS_CALLBACK(problem_get_hostids) {
+    zbx_vector_uint64_t *ids = data;
+    glb_problem_t *problem = elem->data;
+    glb_problem_get_hostids(problem, ids);
     return SUCCEED;
 }
 
-static int fetch_problems_by_index(index_uint64_t *index, u_int64_t id, zbx_vector_ptr_t *problems)
+int glb_state_problems_get_hostids(u_int64_t problemid, zbx_vector_uint64_t *ids)
 {
-    if (NULL == problems || NULL == index)
-        return FAIL;
-
-    zbx_vector_uint64_t problemids;
-    zbx_vector_uint64_create(&problemids);
-
-    if (FAIL == index_uint64_get(index, id, &problemids))
-    {
-        zbx_vector_uint64_destroy(&problemids);
-        return FAIL;
-    }
-
-    for (int i = 0; i < problemids.values_num; i++)
-    {
-
-        glb_problem_t *problem;
-
-        if (SUCCEED == elems_hash_process(conf->problems, problemids.values[i], fetch_problem_cb, &problem, ELEM_FLAG_DO_NOT_CREATE))
-            zbx_vector_ptr_append(problems, problem);
-    }
-
-    zbx_vector_uint64_destroy(&problemids);
-    return SUCCEED;
+    return  elems_hash_process(conf->problems, problemid, problem_get_hostids, ids, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-int glb_state_problems_get_by_triggerid(u_int64_t triggerid, zbx_vector_ptr_t *problems)
-{
-    return fetch_problems_by_index(conf->trigger_idx, triggerid, problems);
-}
-
-int glb_state_problems_get_by_hostid(u_int64_t hostid, zbx_vector_ptr_t *problems)
-{
-    return fetch_problems_by_index(conf->hosts_idx, hostid, problems);
-}
 
 void glb_state_problems_clean(zbx_vector_ptr_t *problems)
 {
@@ -340,6 +358,7 @@ ELEMS_CALLBACK(remove_outdated_problems_cb)
                           elem->id, time(NULL) - (glb_problem_get_create_time(problem) + GLB_PROBLEM_TTL_PROBLEM_STATE));
         }
         break;
+
     case GLB_PROBLEM_OPER_STATE_OK:
         if (glb_problem_get_create_time(problem) + GLB_PROBLEM_TTL_OK_STATE < time(NULL))
         {
@@ -417,4 +436,93 @@ int glb_state_problems_get_all_json(struct zbx_json *json)
     zbx_json_addarray(json, ZBX_PROTO_TAG_DATA);
     elems_hash_iterate(conf->problems, problem_to_json_cb, json, ELEM_FLAG_ITER_WRLOCK);
     zbx_json_close(json);
+}
+
+ELEMS_CALLBACK(get_severity_cb) {
+    *(int*)data = glb_problem_get_severity((glb_problem_t*)elem->data);
+    return SUCCEED;
+}
+
+int glb_state_problems_get_severity(u_int64_t problemid, int *severity) {
+    return elems_hash_process(conf->problems, problemid, get_severity_cb, severity, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(get_ack_cb) {
+    *(int*)data = glb_problem_is_acknowledged((glb_problem_t*)elem->data);
+    return SUCCEED;
+}
+
+int glb_state_problems_is_acknowledged(u_int64_t problemid, int *is_ack) {
+    return elems_hash_process(conf->problems, problemid, get_ack_cb, is_ack, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(get_triggerid_cb) {
+    *(int*)data = glb_problem_get_triggerid((glb_problem_t*)elem->data);
+    return SUCCEED;
+}
+
+int glb_state_problems_get_triggerid(u_int64_t problemid, u_int64_t *triggerid) {
+    return elems_hash_process(conf->problems, problemid, get_triggerid_cb, triggerid, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(get_suppressed_cb) {
+    *(glb_problem_suppress_state_t*)data = glb_problem_get_suppressed((glb_problem_t*)elem->data);
+    return SUCCEED;
+}
+
+int glb_state_problems_get_suppressed(u_int64_t problemid, glb_problem_suppress_state_t *is_suppressed) {
+    return elems_hash_process(conf->problems, problemid, get_suppressed_cb, is_suppressed, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+int glb_state_problems_get_clock(u_int64_t problemid, int *clock) {
+    
+    if (FAIL == elems_hash_id_exists(conf->problems, problemid)) 
+        return FAIL;
+    
+    *clock = glb_state_id_get_timestamp(problemid);
+    return SUCCEED;
+}
+
+
+ELEMS_CALLBACK(get_problem_name_cb) {
+    strlen_t *name_s = data;
+    glb_problem_get_name((glb_problem_t *)elem->data, name_s->str, name_s->len);   
+}
+
+int glb_state_problems_get_name(u_int64_t problemid, char *name, size_t len) {
+    strlen_t name_s ={.str = name, .len = len };
+ 
+    return elems_hash_process(conf->problems, problemid, get_problem_name_cb, &name_s, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+typedef struct {
+    tag_t* tag;
+    int* result;
+    unsigned char oper;
+} tags_request_t;
+
+ELEMS_CALLBACK(check_tag_name_cb) {
+    
+    tags_request_t *t_req = data;
+    *t_req->result = glb_problem_check_tag_name((glb_problem_t *)elem->data, t_req->tag->tag, t_req->oper);
+    
+    return SUCCEED;
+}
+
+int glb_state_problems_check_tag_name(u_int64_t problemid, tag_t *tag, unsigned char operation, int *result) {
+    tags_request_t tags_request = {.oper = operation, .result = result, .tag = tag};
+    return elems_hash_process(conf->problems, problemid, check_tag_name_cb, &tags_request, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(check_tag_value_cb) {
+   
+    tags_request_t *t_req = data;
+    *t_req->result = glb_problem_check_tag_value((glb_problem_t *)elem->data, t_req->tag, t_req->oper);
+    
+    return SUCCEED;
+}
+
+int glb_state_problems_check_tag_value(u_int64_t problemid, tag_t *tag, unsigned char operation, int *result) {
+    tags_request_t tags_request = {.oper = operation, .result = result, .tag = tag};
+    return elems_hash_process(conf->problems, problemid, check_tag_value_cb, &tags_request, ELEM_FLAG_DO_NOT_CREATE);
 }

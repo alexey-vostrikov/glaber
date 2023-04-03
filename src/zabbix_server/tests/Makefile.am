@@ -8,5 +8,6 @@ libglbtests_a_SOURCES = \
 	../../libs/zbxalgo/tests/algo_tests.c \
 	../../libs/zbxalgo/tests/index_int64_test.c \
 	../../libs/glb_macro/tests/glb_macro_tests.c \
+	../../libs/glb_conf/tags/tests/tag_tests.c \
 	server_tests.c
     

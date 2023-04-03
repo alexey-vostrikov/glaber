@@ -454,9 +454,7 @@ void calc_trigger_clean(calc_trigger_t *trigger)
 	zbx_free(trigger->expression_bin);
 	zbx_free(trigger->recovery_expression_bin);
 
-	zbx_vector_ptr_clear_ext(&trigger->tags, (zbx_clean_func_t)zbx_free_tag);
-	zbx_vector_ptr_destroy(&trigger->tags);
-
+	tags_destroy(trigger->tags);
 	calc_trigger_free_eval_cache(&trigger->eval_cache);
 }
 
@@ -541,7 +539,7 @@ static int	substitute_expression_functions_results(zbx_eval_context_t *ctx, char
 	int			i;
 
 	zbx_variant_set_none(&func_value);
-	LOG_INF("Total %d functions in the stack",  ctx->stack.values_num );
+	//LOG_INF("Total %d functions in the stack",  ctx->stack.values_num );
 	for (i = 0; i < ctx->stack.values_num; i++)
 	{
 		zbx_eval_token_t	*token = &ctx->stack.values[i];
@@ -549,15 +547,15 @@ static int	substitute_expression_functions_results(zbx_eval_context_t *ctx, char
 		if (ZBX_EVAL_TOKEN_FUNCTIONID != token->type)
 			continue;
 
-		LOG_INF("Got token type %d, value type is %d, token value as ui is %ld", token->type, token->value.type, token->value.data.ui64);
+	//	LOG_INF("Got token type %d, value type is %d, token value as ui is %ld", token->type, token->value.type, token->value.data.ui64);
 		if (ZBX_VARIANT_UI64 != token->value.type)
 		{
 			/* functionids should be already extracted into uint64 vars */
 			THIS_SHOULD_NEVER_HAPPEN;
-			LOG_INF("Got function i %d, value type %d", i, token->value.type);
+	//		LOG_INF("Got function i %d, value type %d", i, token->value.type);
 			*error = zbx_dsprintf(*error, "Cannot parse function at: \"%s\"",
 					ctx->expression + token->loc.l);
-			LOG_INF("Cannot parse function at: \"%s\"",	ctx->expression + token->loc.l);
+	//		LOG_INF("Cannot parse function at: \"%s\"",	ctx->expression + token->loc.l);
 			return FAIL;
 		}
 

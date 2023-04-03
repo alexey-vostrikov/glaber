@@ -509,21 +509,21 @@ static void	tm_process_rank_event(zbx_uint64_t taskid, const char *data)
 			HALT_HERE("Fix cause- sypthom logic");
 			//old_cause_eventid = zbx_db_get_cause_eventid(eventid);
 		}
-		HALT_HERE("Need to change glb_problem_api to fetch problem");
+		HALT_HERE("Need to change glb_problem_api to fetch a cause problem");
 		
-		if (0 == (target_cause_triggerid = glb_problem_get_objectid(target_cause_eventid)))
-		{
-			zabbix_log(LOG_LEVEL_WARNING, "trigger id should never be '0' for target cause event (eventid: "
-					ZBX_FS_UI64 ")", target_cause_eventid);
-			goto fail;
-		}
-		else if (SUCCEED != DBlock_triggerid(target_cause_triggerid))
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "the trigger (triggerid: " ZBX_FS_UI64 "), which generated the"
-					" target cause event (eventid: " ZBX_FS_UI64 ") was deleted, skip ranking"
-					" events as symptoms", target_cause_triggerid, target_cause_eventid);
-			goto skip;
-		}
+		// if (0 == (target_cause_triggerid = glb_problem_get_cause_problemid(target_cause_eventid)))
+		// {
+		// 	zabbix_log(LOG_LEVEL_WARNING, "trigger id should never be '0' for target cause event (eventid: "
+		// 			ZBX_FS_UI64 ")", target_cause_eventid);
+		// 	goto fail;
+		// }
+		// else if (SUCCEED != DBlock_triggerid(target_cause_triggerid))
+		// {
+		// 	zabbix_log(LOG_LEVEL_DEBUG, "the trigger (triggerid: " ZBX_FS_UI64 "), which generated the"
+		// 			" target cause event (eventid: " ZBX_FS_UI64 ") was deleted, skip ranking"
+		// 			" events as symptoms", target_cause_triggerid, target_cause_eventid);
+		// 	goto skip;
+		// }
 
 		/* start swap by turning the symptom into a cause */
 		if (1 == should_swap && SUCCEED != tm_rank_event_as_cause(requested_cause_eventid))

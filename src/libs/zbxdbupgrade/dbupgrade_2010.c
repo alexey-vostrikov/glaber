@@ -375,7 +375,7 @@ static int	DBpatch_2010033(void)
 			" where source=%d"
 				" and object=%d"
 				" and (value=%d or value_changed=%d)",
-			EVENT_SOURCE_TRIGGERS,
+			EVENT_SOURCE_PROBLEM,
 			EVENT_OBJECT_TRIGGER,
 			TRIGGER_VALUE_UNKNOWN,
 			0))	/*TRIGGER_VALUE_CHANGED_NO*/

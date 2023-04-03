@@ -60,7 +60,7 @@ static int	housekeep_problems_without_triggers(void)
 			" where source=%d"
 				" and object=%d"
 				" and not exists (select NULL from triggers where triggerid=objectid)",
-				EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
+				EVENT_SOURCE_PROBLEM, EVENT_OBJECT_TRIGGER);
 
 	while (NULL != (row = DBfetch(result)))
 	{

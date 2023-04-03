@@ -462,8 +462,6 @@ static zbx_action_eval_t	*dc_action_eval_create(const zbx_dc_action_t *dc_action
  * Purpose: gets action evaluation data                                       *
  *                                                                            *
  * Parameters: actions         - [OUT] the action evaluation data             *
- *             uniq_conditions - [OUT] unique conditions that actions         *
- *                                     point to (several sources)             *
  *             opflags         - [IN] flags specifying which actions to get   *
  *                                    based on their operation classes        *
  *                                    (see ZBX_ACTION_OPCLASS_* defines)      *
@@ -472,7 +470,7 @@ static zbx_action_eval_t	*dc_action_eval_create(const zbx_dc_action_t *dc_action
  *           zbx_action_eval_free() function later.                           *
  *                                                                            *
  ******************************************************************************/
-void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions, unsigned char opflags)
+void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions)
 {
 	const zbx_dc_action_t		*dc_action;
 	zbx_hashset_iter_t		iter;
@@ -484,10 +482,7 @@ void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions, unsi
 	zbx_hashset_iter_reset(&config->actions, &iter);
 
 	while (NULL != (dc_action = (const zbx_dc_action_t *)zbx_hashset_iter_next(&iter)))
-	{
-		if (0 != (opflags & dc_action->opflags))
-			zbx_vector_ptr_append(actions, dc_action_eval_create(dc_action));
-	}
+		zbx_vector_ptr_append(actions, dc_action_eval_create(dc_action));
 
 	UNLOCK_CACHE_CONFIG_HISTORY;
 

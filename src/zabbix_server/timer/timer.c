@@ -260,7 +260,7 @@ static void	db_get_query_events(zbx_vector_ptr_t *event_queries, zbx_vector_ptr_
 				" and " ZBX_SQL_MOD(p.eventid, %d) "=%d"
 			" order by p.eventid",
 			tag_fields, tag_join,
-			EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER, CONFIG_FORKS[ZBX_PROCESS_TYPE_TIMER],
+			EVENT_SOURCE_PROBLEM, EVENT_OBJECT_TRIGGER, CONFIG_FORKS[ZBX_PROCESS_TYPE_TIMER],
 			process_num - 1);
 
 	event_queries_fetch(result, event_queries);

@@ -244,7 +244,7 @@ static void	db_get_events(zbx_hashset_t *problem_events)
 				" and p.object=%d"
 				" and r_eventid is null"
 			" order by p.eventid",
-			EVENT_SOURCE_TRIGGERS, EVENT_OBJECT_TRIGGER);
+			EVENT_SOURCE_PROBLEM, EVENT_OBJECT_TRIGGER);
 
 	while (NULL != (row = DBfetch(result)))
 	{

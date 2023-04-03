@@ -220,7 +220,7 @@ zbx_item_authtype_t;
 #define EVENT_STATUS_PROBLEM		1
 
 /* event sources */
-#define EVENT_SOURCE_TRIGGERS		0
+#define EVENT_SOURCE_PROBLEM		0
 #define EVENT_SOURCE_DISCOVERY		1
 #define EVENT_SOURCE_AUTOREGISTRATION	2
 #define EVENT_SOURCE_INTERNAL		3

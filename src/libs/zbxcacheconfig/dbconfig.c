@@ -47,6 +47,7 @@
 #include "../glb_state/glb_state_triggers.h"
 #include "../glb_conf/conf_hosts.h"
 #include "../glb_conf/items/conf_items.h"
+#include "../glb_conf/tags/tags.h"
 #include "../../zabbix_server/glb_poller/poller_ipc.h"
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
@@ -294,11 +295,9 @@ extern unsigned char program_type;
 
 ZBX_SHMEM_FUNC_IMPL(__config, config_mem)
 
-mem_funcs_t memf ={	.free_func = __config_shmem_free_func, 
+mem_funcs_t conf_memf ={	.free_func = __config_shmem_free_func, 
 					.malloc_func = __config_shmem_malloc_func, 
 					.realloc_func = __config_shmem_realloc_func};
-
-
 
 static void dc_maintenance_precache_nested_groups(void);
 static void dc_item_reset_triggers(ZBX_DC_ITEM *item, ZBX_DC_TRIGGER *trigger_exclude);
@@ -9077,23 +9076,25 @@ void DCget_trigger(calc_trigger_t *dst_trigger, const ZBX_DC_TRIGGER *src_trigge
 	//dst_trigger->eval_ctx = NULL;
 	//dst_trigger->eval_ctx_r = NULL;
 
-	zbx_vector_ptr_create(&dst_trigger->tags);
+	//zbx_vector_ptr_create(&dst_trigger->tags);
+	dst_trigger->tags = tags_create();
 
 	if (0 != src_trigger->tags.values_num)
 	{
-		zbx_vector_ptr_reserve(&dst_trigger->tags, src_trigger->tags.values_num);
+		tags_reserve(dst_trigger->tags, src_trigger->tags.values_num);
 
 		for (i = 0; i < src_trigger->tags.values_num; i++)
 		{
 			const zbx_dc_trigger_tag_t *dc_trigger_tag = (const zbx_dc_trigger_tag_t *)
 															 src_trigger->tags.values[i];
-			zbx_tag_t *tag;
+			tag_t tag;
 
-			tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
-			tag->tag = zbx_strdup(NULL, dc_trigger_tag->tag);
-			tag->value = zbx_strdup(NULL, dc_trigger_tag->value);
+			//tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
+			tag.tag = dc_trigger_tag->tag;
+			tag.value = dc_trigger_tag->value;
 
-			zbx_vector_ptr_append(&dst_trigger->tags, tag);
+			tags_add_tag_ext(dst_trigger->tags, &tag, &conf_memf);
+			//zbx_vector_ptr_append(&dst_trigger->tags, tag);
 		}
 	}
 
@@ -13581,6 +13582,67 @@ void zbx_dc_get_nested_hostgroupids(zbx_uint64_t *groupids, int groupids_num, zb
 	zbx_vector_uint64_sort(nested_groupids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_vector_uint64_uniq(nested_groupids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 }
+
+/********************************************************
+ * fetches hostids of the group and all it's nested 
+ * subgropups
+ * ******************************************************/
+void zbx_dc_get_nested_group_hostids(zbx_uint64_t groupid, zbx_vector_uint64_t *hostids)
+{
+	int i;
+	zbx_vector_uint64_t groupids;
+	zbx_vector_uint64_create(&groupids);
+
+	WRLOCK_CACHE;
+
+	dc_get_nested_hostgroupids(groupid, &groupids);
+
+	UNLOCK_CACHE;
+
+	RDLOCK_CACHE;
+
+	for (i = 0; i < groupids.values_num; i++)
+	{
+		zbx_dc_hostgroup_t *host_group;
+
+		if (NULL != (host_group = zbx_hashset_search(&config->hostgroups, &groupids.values[i])))
+		{
+			zbx_hashset_iter_t iter;
+			u_int64_t *hostid;
+
+			zbx_hashset_iter_reset(&host_group->hostids, &iter);
+
+			while (NULL != (hostid = zbx_hashset_iter_next(&iter)))
+				zbx_vector_uint64_append(hostids, *hostid);
+		}
+	}
+	UNLOCK_CACHE;
+
+	zbx_vector_uint64_destroy(&groupids);
+}
+/*******************************************************
+ * fetches templateids for the hosts given
+*/
+void zbx_dc_get_hosts_templateids(zbx_vector_uint64_t* hostids, zbx_vector_uint64_t* template_ids) {
+	int i;
+	
+	RDLOCK_CACHE;
+
+	for (i = 0; i < hostids->values_num; i++)
+	{
+		ZBX_DC_HOST *host;
+
+		if (NULL != (host = zbx_hashset_search(&config->hosts, &hostids->values[i])))
+		{
+			
+				zbx_vector_uint64_append(hostids, *hostid);
+		}
+	}
+	UNLOCK_CACHE;
+
+
+}
+
 
 /******************************************************************************
  *                                                                            *
