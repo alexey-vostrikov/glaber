@@ -2627,7 +2627,7 @@ static void	process_trigger_events(zbx_vector_ptr_t *trigger_events, zbx_vector_
 					if (problem->triggerid == diff->triggerid)	{
 						DEBUG_TRIGGER(diff->triggerid, "There is already at least one open PROBLEM (%ld) for the trigger, not creating anymore", problem->eventid);
 						event->flags = ZBX_FLAGS_DB_EVENT_UNSET;
-						diff->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
+						//diff->flags = ZBX_FLAGS_TRIGGER_DIFF_UNSET;
 						break;
 					}
 				}

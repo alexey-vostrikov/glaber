@@ -122,8 +122,7 @@ static int state_dumper_create(state_dumper_t *dumper, char *resource_id){
 	}
 
     dumper->resource_id = zbx_strdup(NULL, resource_id);
-
-
+    return SUCCEED;
 };
 
 static int state_dumper_write_line(state_dumper_t *dumper, char *buffer, int len) {
@@ -215,7 +214,7 @@ int state_dump_objects(elems_hash_t *elems, char *table_name, state_dumper_to_js
 
     marshall_data_t mdata = {.dumper = &dumper, .json = &json, .objects = 0, .cb_func = cb_func};
     
-    if (FAIL != state_dumper_create(&dumper, table_name)) {
+    if (SUCCEED == state_dumper_create(&dumper, table_name)) {
         zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
         elems_hash_iterate(elems, dump_cb, &mdata, ELEMS_HASH_READ_ONLY);
         state_dumper_destroy(&dumper);

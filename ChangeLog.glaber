@@ -1,3 +1,5 @@
+ver 3.0.39
+    - fix: trigger cache value update logic, file dumps fixes
 ver 3.0.38
     - feat: added LLD filtering logging, returned host expire notification to UI
 ver 3.0.37
