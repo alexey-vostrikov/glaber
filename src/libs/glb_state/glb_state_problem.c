@@ -90,13 +90,20 @@ glb_problem_t *glb_problem_create_by_trigger(mem_funcs_t *memf, strpool_t *strpo
     
     zbx_vector_uint64_t *t_hostids;
 
-    HALT_HERE("Add triggers from hosts and items either");
     
     if (SUCCEED == conf_calc_trigger_get_all_hostids(trigger, &t_hostids))
         zbx_vector_uint64_append_array(&problem->hostids, t_hostids->values, t_hostids->values_num);
     
+//    HALT_HERE("Add triggers from hosts and items either: has %d items and %d hosts", 
+//                            trigger->eval_cache.itemids.values_num, trigger->eval_cache.hostids.values_num);
+        
     problem->tags = tags_create_ext(memf);
-    tags_add_tags(problem->tags, trigger->tags);
+    tags_add_tags(problem->tags, trigger->tags); //note: trigger doesn't inherit tags
+
+    LOG_INF("Need to implement tag copy to problems");
+
+    //conf_calc_trigger_get_hosts_tags(trigger, problem->tags, memf); //problems inherits tags from hosts, items, triggers
+    //conf_calc_trigger_get_items_tags(trigger, problem->tags, memf);
    
     return problem;
 }

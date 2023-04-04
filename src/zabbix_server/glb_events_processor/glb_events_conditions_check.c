@@ -349,7 +349,7 @@ static void	check_problem_condition(u_int64_t problemid, condition_t *condition)
 			break;
 		default:
 			HALT_HERE("unsupported operator [%d] for condition id [" ZBX_FS_UI64 "]",
-				(int)condition->op, condition->conditionid);
+				(int)condition->conditiontype, condition->conditionid);
 
 	}
 }
@@ -357,12 +357,7 @@ static void	check_problem_condition(u_int64_t problemid, condition_t *condition)
 void	glb_event_condition_calc(events_processor_event_t *event, condition_t *condition)
 {
 
-//	HALT_HERE("Not implemented");
-	// zabbix_log(LOG_LEVEL_DEBUG, "In %s() actionid:" ZBX_FS_UI64 " conditionid:" ZBX_FS_UI64 " cond.value:'%s'"
-	// 		" cond.value2:'%s'", __func__, condition->actionid, condition->conditionid,
-	// 		condition->value, condition->value2);
-
-	 switch (event->object_type)
+	 switch (event->event_source)
 	 {
 	 	case EVENT_SOURCE_PROBLEM:
 			check_problem_condition(event->object_id, condition);

@@ -9054,29 +9054,20 @@ void DCget_trigger(calc_trigger_t *dst_trigger, const ZBX_DC_TRIGGER *src_trigge
 	dst_trigger->timespec.ns = 0;
 	dst_trigger->priority = src_trigger->priority;
 	dst_trigger->type = src_trigger->type;
-	// dst_trigger->value = glb_state_trigger_get_value(src_trigger->triggerid);//src_trigger->value;
-	// dst_trigger->state = src_trigger->state;
 	dst_trigger->new_value = TRIGGER_VALUE_UNKNOWN;
-	// dst_trigger->lastchange = src_trigger->lastchange;
 	glb_state_trigger_get_value_lastchange(src_trigger->triggerid, &dst_trigger->value, &dst_trigger->lastchange);
-	//dst_trigger->topoindex = src_trigger->topoindex;
 	dst_trigger->status = src_trigger->status;
 	dst_trigger->recovery_mode = src_trigger->recovery_mode;
 	dst_trigger->correlation_mode = src_trigger->correlation_mode;
 	dst_trigger->correlation_tag = strdup_null_safe(src_trigger->correlation_tag);
 	dst_trigger->opdata = strdup_null_safe(src_trigger->opdata);
 	dst_trigger->event_name = strdup_null_safe(src_trigger->event_name);
-	//dst_trigger->flags = 0;
 	dst_trigger->new_error = NULL;
 	dst_trigger->expression = strdup_null_safe(src_trigger->expression);
 	dst_trigger->recovery_expression = strdup_null_safe(src_trigger->recovery_expression);
 	dst_trigger->expression_bin = dup_serialized_expression(src_trigger->expression_bin);
 	dst_trigger->recovery_expression_bin = dup_serialized_expression(src_trigger->recovery_expression_bin);
 
-	//dst_trigger->eval_ctx = NULL;
-	//dst_trigger->eval_ctx_r = NULL;
-
-	//zbx_vector_ptr_create(&dst_trigger->tags);
 	dst_trigger->tags = tags_create();
 
 	if (0 != src_trigger->tags.values_num)
@@ -9087,20 +9078,9 @@ void DCget_trigger(calc_trigger_t *dst_trigger, const ZBX_DC_TRIGGER *src_trigge
 		{
 			const zbx_dc_trigger_tag_t *dc_trigger_tag = (const zbx_dc_trigger_tag_t *)
 															 src_trigger->tags.values[i];
-			tag_t tag;
-
-			//tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
-			tag.tag = dc_trigger_tag->tag;
-			tag.value = dc_trigger_tag->value;
-
-			tags_add_tag_ext(dst_trigger->tags, &tag, &conf_memf);
-			//zbx_vector_ptr_append(&dst_trigger->tags, tag);
+			tags_add_tag_str(dst_trigger->tags, dc_trigger_tag->tag, dc_trigger_tag->value);
 		}
 	}
-
-//	zbx_vector_uint64_create(&dst_trigger->itemids);
-//	zbx_vector_uint64_create(&dst_trigger->hostids);
-
 
 	if (0 != (flags & ZBX_TRIGGER_GET_ITEMIDS) && NULL != src_trigger->itemids)
 	{
@@ -12726,8 +12706,8 @@ unlock:
  * Comments: this function must be used only by configuration syncer          *
  *                                                                            *
  ******************************************************************************/
-void dc_get_hostids_by_functionids(const zbx_uint64_t *functionids, int functionids_num,
-								   zbx_vector_uint64_t *hostids)
+void dc_get_hostids_itemids_by_functionids(const zbx_uint64_t *functionids, int functionids_num,
+								   zbx_vector_uint64_t *hostids, zbx_vector_uint64_t *itemids)
 {
 	const ZBX_DC_FUNCTION *function;
 	const ZBX_DC_ITEM *item;
@@ -12741,8 +12721,11 @@ void dc_get_hostids_by_functionids(const zbx_uint64_t *functionids, int function
 			continue;
 		}
 
-		if (NULL != (item = (const ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &function->itemid)))
+		if (NULL != (item = (const ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &function->itemid))) 
+		{
 			zbx_vector_uint64_append(hostids, item->hostid);
+			zbx_vector_uint64_append(itemids, item->itemid);
+		}
 	}
 
 	zbx_vector_uint64_sort(hostids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -12757,13 +12740,13 @@ void dc_get_hostids_by_functionids(const zbx_uint64_t *functionids, int function
  *             hostids     - [OUT]                                            *
  *                                                                            *
  ******************************************************************************/
-void DCget_hostids_by_functionids(zbx_vector_uint64_t *functionids, zbx_vector_uint64_t *hostids)
+void DCget_hostids_itemids_by_functionids(zbx_vector_uint64_t *functionids, zbx_vector_uint64_t *hostids, zbx_vector_uint64_t *itemids)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	RDLOCK_CACHE;
 
-	dc_get_hostids_by_functionids(functionids->values, functionids->values_num, hostids);
+	dc_get_hostids_itemids_by_functionids(functionids->values, functionids->values_num, hostids, itemids);
 
 	UNLOCK_CACHE;
 
@@ -13625,21 +13608,20 @@ void zbx_dc_get_nested_group_hostids(zbx_uint64_t groupid, zbx_vector_uint64_t *
 */
 void zbx_dc_get_hosts_templateids(zbx_vector_uint64_t* hostids, zbx_vector_uint64_t* template_ids) {
 	int i;
-	
+	//TODO: don't use um_cache for fetching host->tmplate realation, it should be 
+	//independant fast cached storage not related either to macro or to any other function
+	//but keep it in UNCOUPLED lock free structures!
+
 	RDLOCK_CACHE;
 
 	for (i = 0; i < hostids->values_num; i++)
-	{
-		ZBX_DC_HOST *host;
-
-		if (NULL != (host = zbx_hashset_search(&config->hosts, &hostids->values[i])))
-		{
-			
-				zbx_vector_uint64_append(hostids, *hostid);
-		}
-	}
+		um_cache_get_host_templateids(config->um_cache,hostids->values[i], template_ids);
+	
 	UNLOCK_CACHE;
-
+	
+	zbx_vector_uint64_sort(template_ids,  ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	zbx_vector_uint64_uniq(template_ids,  ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+	
 
 }
 

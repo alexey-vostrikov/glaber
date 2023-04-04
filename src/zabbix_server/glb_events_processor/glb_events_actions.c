@@ -217,21 +217,21 @@ static int check_and_calc_action_conditions(events_processor_event_t *event, con
 
 	for (i = 0; i < action->conditions.values_num; i++)
 	{
+		if (action->eventsource != event->event_source) 
+			continue; 
+
 		condition = (condition_t *)action->conditions.values[i];
 
-		if (ZBX_CONDITION_EVAL_TYPE_AND_OR == action->evaltype &&
+		if (ZBX_CONDITION_EVAL_TYPE_AND_OR == action->evaltype && 
 				old_type == condition->conditiontype && SUCCEED == ret)
 		{
 			continue;	/* short-circuit true OR condition block to the next AND condition */
 		}
 
+
 		if (UNKNOWN == condition->result) 
 			glb_event_condition_calc(event, condition);
 		
-		zabbix_log(LOG_LEVEL_DEBUG, " conditionid:" ZBX_FS_UI64 " conditiontype:%d cond.value:'%s' "
-				"cond.value2:'%s' result:%s", condition->conditionid, (int)condition->conditiontype,
-				condition->value, condition->value2, zbx_result_string(condition->result));
-
 		switch (action->evaltype)
 		{
 			case ZBX_CONDITION_EVAL_TYPE_AND_OR:

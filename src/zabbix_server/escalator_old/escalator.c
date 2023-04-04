@@ -3421,7 +3421,7 @@ static int	process_escalations(int now, int *nextcheck, unsigned int escalation_
 				zbx_snprintf_alloc(&filter, &filter_alloc, &filter_offset,
 						" and " ZBX_SQL_MOD(escalationid, %d) "=%d",
 						CONFIG_FORKS[ZBX_PROCESS_TYPE_ESCALATOR], process_num - 1);
-			}
+	 		}
 			break;
 	}
 

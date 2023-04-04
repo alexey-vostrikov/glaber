@@ -820,7 +820,7 @@ static void	um_cache_sync_hosts(zbx_um_cache_t *cache, zbx_dbsync_t *sync)
 
 	/* handle removed host template links */
 	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
-	{
+ 	{
 		int	i;
 
 		ZBX_STR2UINT64(hostid, row[0]);
@@ -1259,6 +1259,16 @@ void	um_cache_dump(zbx_um_cache_t *cache)
 	zbx_vector_uint64_destroy(&ids);
 
 	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
+}
+
+void um_cache_get_host_templateids(const zbx_um_cache_t *cache, zbx_uint64_t hostid, zbx_vector_uint64_t *templateids) {
+	
+	const zbx_um_host_t	* const *phost;
+	if (NULL == (phost = (const zbx_um_host_t * const *)zbx_hashset_search(&cache->hosts, &hostid)))
+		return;
+	
+	zbx_vector_uint64_append_array(templateids, (*phost)->templateids.values, (*phost)->templateids.values_num);
+
 }
 
 int	um_cache_get_host_revision(const zbx_um_cache_t *cache, zbx_uint64_t hostid, zbx_uint64_t *revision)

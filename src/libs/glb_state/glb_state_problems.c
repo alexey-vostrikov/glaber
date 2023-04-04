@@ -129,7 +129,7 @@ u_int64_t glb_state_problems_create_by_trigger(calc_trigger_t *trigger)
 
         //glb_actions_process_new_problem(problemid);
         
-        glb_event_processing_send_problem_notify(problemid, EVENTS_TYPE_NEW);
+        glb_event_processing_send_notify(problemid, EVENT_SOURCE_PROBLEM, EVENTS_TYPE_NEW);
 
         return problemid;
     } 
@@ -169,7 +169,7 @@ int glb_state_problem_recover(u_int64_t problemid, u_int64_t userid)
         return FAIL;
 
     if (SUCCEED == elems_hash_process(conf->problems, problemid, problem_recover_cb, NULL, ELEM_FLAG_DO_NOT_CREATE)) {
-        glb_event_processing_send_problem_notify(problemid, EVENTS_TYPE_RECOVER);
+        glb_event_processing_send_notify(problemid, EVENT_SOURCE_PROBLEM, EVENTS_TYPE_RECOVER);
         return SUCCEED;
     }
     

@@ -43,6 +43,7 @@ int     tags_add_tag_ext(tags_t *t_set, tag_t *tag, mem_funcs_t *memf);
 void    tags_add_tags(tags_t *t_set_dst, tags_t *t_set_src);
 void    tags_add_tags_ext(tags_t *t_set_dst, tags_t *t_set_src, mem_funcs_t *memf);
 void    tags_reserve(tags_t *t_set, int count);
+int     tags_add_tag_str(tags_t *t_set, const char *tag, const char *value);
 
 int tags_del_tags_ext(tags_t *t_set, tag_t *tag, mem_funcs_t *memf);
 int tags_del_tags_by_tag_ext(tags_t *t_set, char *search_tag, mem_funcs_t *memf);

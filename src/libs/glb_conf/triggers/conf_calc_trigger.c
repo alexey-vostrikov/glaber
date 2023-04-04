@@ -18,7 +18,7 @@ typedef enum
 	TRIGGER_CACHE_EVAL_CTX_R,
 	TRIGGER_CACHE_EVAL_CTX_MACROS,
 	TRIGGER_CACHE_EVAL_CTX_R_MACROS,
-	TRIGGER_CACHE_HOSTIDS,
+	TRIGGER_CACHE_HOSTIDS_ITEMIDS,
 }
 zbx_trigger_cache_state_t;
 
@@ -34,7 +34,7 @@ static int	calc_trigger_expand_expression_macros(calc_trigger_t *trigger, zbx_ev
  	zbx_dc_um_handle_t	*um_handle;
  	trigger_cache_t	*cache;
 
- 	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS)))
+ 	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS_ITEMIDS)))
  		return FAIL;
 
  	um_handle = zbx_dc_open_user_macros();
@@ -160,13 +160,15 @@ static trigger_cache_t	*calc_trigger_get_cache(calc_trigger_t *trigger, zbx_trig
  				return NULL;
 
  			break;
- 		case TRIGGER_CACHE_HOSTIDS:
+ 		case TRIGGER_CACHE_HOSTIDS_ITEMIDS:
  			zbx_vector_uint64_create(&trigger->eval_cache.hostids);
+			zbx_vector_uint64_create(&trigger->eval_cache.itemids);
  			zbx_vector_uint64_create(&functionids);
  			calc_trigger_get_all_functionids(trigger, &functionids);
- 			DCget_hostids_by_functionids(&functionids, &trigger->eval_cache.hostids);
+ 			DCget_hostids_itemids_by_functionids(&functionids, &trigger->eval_cache.hostids, &trigger->eval_cache.itemids);
  			zbx_vector_uint64_destroy(&functionids);
  			break;
+		
  		default:
  			return NULL;
  	}
@@ -436,8 +438,10 @@ static void	calc_trigger_free_eval_cache(trigger_cache_t *cache)
  	if (0 != (cache->done & (1 << TRIGGER_CACHE_EVAL_CTX_R)))
  		zbx_eval_clear(&cache->eval_ctx_r);
 
- 	if (0 != (cache->done & (1 << TRIGGER_CACHE_HOSTIDS)))
+ 	if (0 != (cache->done & (1 << TRIGGER_CACHE_HOSTIDS_ITEMIDS))) {
  		zbx_vector_uint64_destroy(&cache->hostids);
+		zbx_vector_uint64_destroy(&cache->itemids);
+	}
 }
 
 
@@ -512,7 +516,7 @@ int	conf_calc_trigger_get_N_itemid(calc_trigger_t *trigger, int index, zbx_uint6
 int	conf_calc_trigger_get_all_hostids(calc_trigger_t *trigger, zbx_vector_uint64_t **hostids) {
   	trigger_cache_t	*cache;
 
-  	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS)))
+  	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS_ITEMIDS)))
   		return FAIL;
 
   	*hostids = &cache->hostids;
@@ -522,7 +526,7 @@ int	conf_calc_trigger_get_all_hostids(calc_trigger_t *trigger, zbx_vector_uint64
 int	conf_calc_trigger_get_N_hostid(calc_trigger_t *trigger, int index, u_int64_t *hostid) {
   	trigger_cache_t	*cache;
 
-  	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS)))
+  	if (NULL == (cache = calc_trigger_get_cache(trigger, TRIGGER_CACHE_HOSTIDS_ITEMIDS)))
   		return FAIL;
 
   	if (index > trigger->eval_cache.hostids.values_num || index < 1)
@@ -783,4 +787,12 @@ char      *conf_calc_trigger_get_admin_state_name(unsigned char admin_state)
  			return "Disabled";
  	}
 	HALT_HERE("Unknown admin state passed %d", admin_state)
+}
+
+int		conf_calc_trigger_get_hosts_tags(calc_trigger_t *trigger, tags_t *tags, mem_funcs_t *memf) {
+	
+}
+
+int		conf_calc_trigger_get_items_tags(calc_trigger_t *trigger, tags_t *tags, mem_funcs_t *memf) {
+
 }

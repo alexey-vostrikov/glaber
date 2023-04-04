@@ -43,7 +43,7 @@ typedef enum {
 } events_processor_event_type_t;
 
 typedef struct {
-	events_processor_object_type_t object_type;
+	events_processor_object_type_t event_source;
 	events_processor_event_type_t event_type;
 	u_int64_t object_id;
 	void *data;
@@ -51,7 +51,7 @@ typedef struct {
 
 int glb_events_processing_init();
 
-void glb_event_processing_send_problem_notify(u_int64_t problemid, events_processor_event_type_t event_type);
+void glb_event_processing_send_notify(u_int64_t problemid, unsigned char event_source, events_processor_event_type_t event_type);
 
 ZBX_THREAD_ENTRY(glb_events_processor_thread, args);
 

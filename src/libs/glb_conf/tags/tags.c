@@ -43,13 +43,15 @@ tags_t *tags_create(void) {
     return tags_create_ext(&heap_memf); 
 }
 
-void tag_free_data_ext(tags_t *t_set, tag_t *tag, mem_funcs_t *memf) {
-    LOG_INF("Free1");
+static void tag_free_data_ext(tags_t *t_set, tag_t *tag, mem_funcs_t *memf) {
+    //LOG_INF("Free1");
     strpool_free(&t_set->strpool, tag->tag);
-    LOG_INF("Free2");
+    //LOG_INF("Free2");
     strpool_free(&t_set->strpool, tag->value);
-    LOG_INF("Free3");
+    //LOG_INF("Free3");
+    //THIS_SHOULD_NEVER_HAPPEN;
     memf->free_func(tag);
+    //LOG_INF("Free4");
 }
 
 /*removes all tags from the set, but leaves the set initialized, memf version*/
@@ -181,6 +183,13 @@ int tags_add_tag(tags_t *t_set, tag_t *tag) {
     return tags_add_tag_ext(t_set, tag, &heap_memf);
 }
 
+int tags_add_tag_str(tags_t *t_set, const char *tag, const char *value) {
+    tag_t add_tag = {.tag =(char *) tag, .value = (char *)value};
+    return tags_add_tag_ext(t_set, &add_tag, &heap_memf);
+}
+
+
+
 int tags_del_tags_by_tag_ext(tags_t *t_set, char *search_tag, mem_funcs_t *memf) {
     int idx, i = 0;
     tag_t s_tag = {.tag = (char *)strpool_add(&t_set->strpool, search_tag), .value = NULL};
@@ -252,7 +261,6 @@ int tags_search(tags_t *t_set, tag_t *tag) {
     return SUCCEED;
 }
 
-
 void tags_add_tags_ext(tags_t *t_set_dst, tags_t *t_set_src, mem_funcs_t *memf) {
     int i; 
     
@@ -260,14 +268,13 @@ void tags_add_tags_ext(tags_t *t_set_dst, tags_t *t_set_src, mem_funcs_t *memf) 
 
     for (i = 0; i < t_set_src->tags.values_num; i++ ) {
         tag_t* s_tag = t_set_src->tags.values[i];
-        tags_add_tag_ext(&t_set_dst->tags, s_tag, memf);
+        tags_add_tag_ext(t_set_dst, s_tag, memf);
     }
 }
 
 void tags_add_tags(tags_t *t_set_dst, tags_t *t_set_src) {
     return tags_add_tags_ext(t_set_dst, t_set_src, &heap_memf);
 }
-
 
 void  tags_reserve(tags_t *t_set, int count) {
     zbx_vector_ptr_reserve(&t_set->tags, count);

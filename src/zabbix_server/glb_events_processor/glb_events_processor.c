@@ -93,8 +93,8 @@ IPC_CREATE_CB(ipc_events_processing_send_cb) {
 	*event_ipc = *event_local;
 	event_ipc->data = NULL;
 	
-	switch (event_local->object_type) {
-		case EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM: 
+	switch (event_local->event_source) {
+		case EVENT_SOURCE_PROBLEM: 
 			return;
 		case EVENTS_PROC_NOTIFY_TYPE_LLD:
 			HALT_HERE("Not implemented");
@@ -109,21 +109,21 @@ IPC_FREE_CB(event_free_cb) {
 
 IPC_PROCESS_CB(ipc_events_processing_process_cb) {
 	events_processor_event_t *event = ipc_data;
-	LOG_INF("Recieved notify on objectid %ld", event->object_id);
+	LOG_INF("Recieved notify on objectid %ld, event_source %d, event_type %d", event->object_id, event->event_source, event->event_type);
 
 	glb_actions_process_event(event, conf.actions_conf);
 	//process_event(event);
 
 }
 
-void glb_event_processing_send_problem_notify(u_int64_t problemid, events_processor_event_type_t event_type) {
-	events_processor_event_t event ={.data = NULL, .object_type = EVENTS_PROC_NOTIFY_TYPE_NEW_PROBLEM, 
-		.event_type = event_type, .object_id = problemid};
+void glb_event_processing_send_notify(u_int64_t problemid, unsigned char event_source, events_processor_event_type_t event_type) {
+	events_processor_event_t event ={.data = NULL, .event_source = event_source, 
+		.event_type = event_type, .object_id = problemid, .event_type = event_type};
 	//HALT_HERE("Send catch rule")
 	glb_ipc_send(conf.ipc, problemid % CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR], &event, IPC_LOCK_WAIT);
 	glb_ipc_flush(conf.ipc);
 	LOG_INF("Sent event escalation notify on problem %ld", problemid);
-	glb_ipc_dump_sender_queues(conf.ipc, "Problems events escalations");
+//	glb_ipc_dump_sender_queues(conf.ipc, "Problems events escalations");
 }
 
 static void new_escalations_check_cb(poller_item_t *garbage, void *data) {
@@ -131,8 +131,8 @@ static void new_escalations_check_cb(poller_item_t *garbage, void *data) {
 	LOG_INF("Checking for the new escalations, proc num is %d, %p",conf.args.info.process_num -1, &conf.ipc);
 
 	glb_ipc_process(conf.ipc, conf.args.info.process_num -1 , ipc_events_processing_process_cb, NULL, 1000 );
-	glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 0);
-	glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 1);
+	//glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 0);
+	//glb_ipc_dump_receiver_queues(conf.ipc, "Incoming events escalations", 1);
 }
 
 static void update_actions_and_conditions_cb(poller_item_t *garbage, void *data){

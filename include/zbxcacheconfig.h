@@ -809,7 +809,7 @@ void	DCget_expressions_by_name(zbx_vector_expression_t *expressions, const char 
 
 int	DCget_data_expected_from(zbx_uint64_t itemid, int *seconds);
 
-void	DCget_hostids_by_functionids(zbx_vector_uint64_t *functionids, zbx_vector_uint64_t *hostids);
+void	DCget_hostids_itemids_by_functionids(zbx_vector_uint64_t *functionids, zbx_vector_uint64_t *hostids, zbx_vector_uint64_t *itemids);
 void	DCget_hosts_by_functionids(const zbx_vector_uint64_t *functionids, zbx_hashset_t *hosts);
 
 int	DCget_proxy_nodata_win(zbx_uint64_t hostid, zbx_proxy_suppress_t *nodata_win, int *lastaccess);
@@ -844,6 +844,7 @@ void	zbx_dc_correlation_rules_get(zbx_correlation_rules_t *rules);
 
 void	zbx_dc_get_nested_hostgroupids(zbx_uint64_t *groupids, int groupids_num, zbx_vector_uint64_t *nested_groupids);
 void 	zbx_dc_get_nested_group_hostids(zbx_uint64_t groupid, zbx_vector_uint64_t *hostids);
+void 	zbx_dc_get_hosts_templateids(zbx_vector_uint64_t* hostids, zbx_vector_uint64_t* template_ids);
 
 void	zbx_dc_get_hostids_by_group_name(const char *name, zbx_vector_uint64_t *hostids);
 

@@ -31,6 +31,7 @@ typedef struct
 	zbx_eval_context_t	eval_ctx;
 	zbx_eval_context_t	eval_ctx_r;
 	zbx_vector_uint64_t	hostids;
+	zbx_vector_uint64_t	itemids;
 }
 trigger_cache_t;
 
