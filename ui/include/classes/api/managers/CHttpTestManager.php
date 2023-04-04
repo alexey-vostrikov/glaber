@@ -841,8 +841,8 @@ class CHttpTestManager {
 								if (!$step['posts']) {
 									$step['post_type'] = ZBX_POSTTYPE_RAW;
 								}
-
-								unset($step['posts']);
+								$step['posts'] = '';
+								//unset($step['posts']);
 							}
 						}
 						else {
@@ -851,7 +851,8 @@ class CHttpTestManager {
 								$db_steps[$step['httpstepid']]['posts'] = '';
 							}
 						}
-					}
+					} else 
+						$step['posts'] = ' ';
 
 					$upd_step = DB::getUpdatedValues('httpstep', $step, $db_steps[$step['httpstepid']]);
 
@@ -871,7 +872,7 @@ class CHttpTestManager {
 				else {
 					if (array_key_exists('posts', $step) && is_array($step['posts'])) {
 						$step['post_type'] = ZBX_POSTTYPE_FORM;
-						unset($step['posts']);
+						$step['posts'] = '';
 					}
 
 					$ins_steps[] = ['httptestid' => $httptest['httptestid']] + $step;
@@ -890,7 +891,7 @@ class CHttpTestManager {
 				}
 			}
 		}
-
+		
 		if ($del_stepids) {
 			if ($del_db_items) {
 				CItem::addInheritedItems($del_db_items);
@@ -909,6 +910,8 @@ class CHttpTestManager {
 		if ($update_step_items) {
 			self::updateStepItems($httptests, $db_httptests);
 		}
+
+		error_log("Insering steps:".json_encode($ins_steps));
 
 		if ($ins_steps) {
 			$stepids = DB::insert('httpstep', $ins_steps);
@@ -1625,6 +1628,7 @@ class CHttpTestManager {
 
 		foreach ($http_tests as $num => $http_test) {
 			if (array_key_exists('httptestid', $http_test)) {
+			
 				$http_tests_to_update[] = $http_test;
 			}
 			else {

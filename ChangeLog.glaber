@@ -1,3 +1,5 @@
+ver 3.0.40
+    - fix: extra debugging in the web panel, error on steps duplication
 ver 3.0.39
     - fix: trigger cache value update logic, file dumps fixes
 ver 3.0.38

@@ -95,10 +95,7 @@ $page = (new CHtmlPage())
 		])
 	)
 	->addItem($data['screen_view']);
-	//if (isset($data['filter_hostids'])) {
-		show_error_message(json_encode($data));
-	//}
-	
+
 	$page->show();
 
 (new CScriptTag('view.init();'))
