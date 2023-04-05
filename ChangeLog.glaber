@@ -1,3 +1,5 @@
+ver 3.0.42
+    - returned support of user auth by 'user'
 ver 3.0.41
     - fix: delay for workers is used as a timeout fixed
 ver 3.0.40

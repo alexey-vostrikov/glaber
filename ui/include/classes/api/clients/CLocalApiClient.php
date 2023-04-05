@@ -127,6 +127,11 @@ class CLocalApiClient extends CApiClient {
 				$newTransaction = true;
 			}
 
+			if ($params['user'] ?? null) {
+				$params['username'] = $params['user'];
+				unset($params['user']);
+			}
+
 			// call API method
 			$result = call_user_func_array([$this->serviceFactory->getObject($api), $method], [$params]);
 
