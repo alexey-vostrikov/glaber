@@ -34,6 +34,7 @@ typedef struct
     int last_heard;
     glb_worker_t *worker;
     int responses;
+    int delay;
 } worker_t;
 
 extern char *CONFIG_WORKERS_DIR;
@@ -58,9 +59,17 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
     zbx_json_type_t type;
     char *path = NULL;
 
-    //LOG_INF("In %s() Started", __func__);
+ 	zbx_custom_interval_t *custom_intervals;
+    char *error;
 
     worker = (worker_t *)zbx_calloc(NULL, 0, sizeof(worker_t));
+
+    if (SUCCEED != zbx_interval_preproc(dcitem->delay, &worker->delay, &custom_intervals, &error))
+	{
+		LOG_INF("Worker itemd %ld has wrong delay time set :%s", dcitem->itemid, dcitem->delay);
+		return FAIL;
+	}
+    DEBUG_ITEM(dcitem->itemid, "Set timeout of %d seconds for worker %s",worker->delay, dcitem->key);
 
     if (NULL == dcitem->params)
     {
@@ -84,7 +93,8 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
         args++;
     }
     //it's a potential flaw here - until item updated server worker won't start
-    if (NULL == (worker->worker = glb_worker_init(path, args, 60,   GLB_SERVER_MAXCALLS, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE))) {
+    if (NULL == (worker->worker = glb_worker_init(path, args, worker->delay, 
+                GLB_SERVER_MAXCALLS, GLB_WORKER_MODE_NEWLINE, GLB_WORKER_MODE_NEWLINE))) {
         zbx_free(worker);
         poller_preprocess_error(poller_item, "Couldn't strart server worker, check if file exist");
         return FAIL;
@@ -130,9 +140,9 @@ ITEMS_ITERATOR(check_workers_data_cb)
     }
     
     /*if worker is silent for too long, restarting it*/
-    if (worker->last_heard < time(NULL) - WORKER_SILENCE_TIMEOUT)
+    if (worker->last_heard < time(NULL) - worker->delay)
     {
-        LOG_INF("Worker has been silent for %d seconds, restarting", WORKER_SILENCE_TIMEOUT);
+        LOG_INF("Worker has been silent for %d seconds, restarting", worker->delay);
         glb_worker_restart(worker->worker, "Worker has been silent for too long");
         worker->last_heard = now + rand() % 10;
         

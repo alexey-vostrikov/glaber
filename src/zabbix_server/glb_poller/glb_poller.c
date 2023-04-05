@@ -19,7 +19,6 @@
 
 #include "zbxcommon.h"
 #include "zbx_item_constants.h"
-//#include "dbcache.h"
 #include "zbxcomms.h"
 #include "zbxnix.h"
 #include "zbxserver.h"
@@ -100,7 +99,6 @@ typedef struct
 	shutdown_cb shutdown;
 	forks_count_cb forks_count;
 	poller_resolve_cb resolve_callback;
-
 } poll_module_t;
 
 typedef struct
@@ -198,13 +196,6 @@ void item_poll_cb(poller_item_t *poller_item, void *data) {
 	u_int64_t mstime = glb_ms_time();
 
 	DEBUG_ITEM(poller_item->itemid, "Item poll event");
-
-	// if (SUCCEED == poller_if_host_is_failed(poller_item))
-	// {
-	// 	DEBUG_ITEM(poller_item->itemid, "Skipping item from polling, host is still down ");
-	// 	add_item_check_event(poller_item, mstime + 10 * 1000);
-	// 	return;
-	// }
 
 	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || poller_contention_sessions_count() > POLLER_MAX_SESSIONS) 
 	{
