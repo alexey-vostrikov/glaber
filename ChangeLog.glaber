@@ -23,7 +23,7 @@ ver 3.0.33
 ver 3.0.32
     - fix: glbmap included to proxy package
 ver 3.0.31
-    - fix: upgrade proxy init order leading crash on boot and improper glb_preporcessor init leading to preprocessing fail on start
+    - fix: upgrade proxy init order leading crash on boot and improper glb_preprocessor init leading to preprocessing fail on start
 ver 3.0.30
     - fix: upgrade from previously enabled timescale DB goes wrong if timescale extension is missing
 ver 3.0.29
