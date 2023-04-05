@@ -17,18 +17,31 @@ workflow:
         REPO_DIR: "repo-experimental"
     - when: never
 
+variables:
+  # used for build docker images
+  BUILDER_VERSION: 1.0.1
+  # used for build debian based apt
+  DEBIAN_BUILDER_VERSION: 1.0.4
+  KANIKO_VERSION: 1.9.2
+
 stages:
   - pre-build
   - pkg-build
   - docker-build
 
 .kaniko_build: &kaniko_build
+  # TO DO. Add image tag check
+  # Do not overrive image tag. Imported to follow semver workflow
+  # https://gitlab.com/api/v4/projects/11936575/registry/repositories/4037301/tags/
   - /kaniko/executor
     --context "${BUILD_DIR}"
     --build-arg OS=${OS}
     --build-arg OS_VER=${OS_VER}
     --dockerfile "${BUILD_DIR}/Dockerfile"
-    --destination "${BUILD_IMG_NAME}"
+    --destination "${BUILD_IMG}:${BUILD_TAG}"
+    --cache=true
+    --cache-repo="${CACHE_REPO}"
+    --cleanup
 
 .add_ssh_key: &add_ssh_key
   - eval $(ssh-agent -s)
@@ -54,11 +67,6 @@ stages:
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
   - packer build -color=false -timestamp-ui -warn-on-undeclared-var .
 
-.install_packer: &install_packer
-  - apk add --no-cache wget unzip
-  - wget -q https://glaber.io/misc/packer_1.8.5_linux_amd64.zip
-  - unzip packer_1.8.5_linux_amd64.zip
-  - mv packer /usr/local/bin/
 
 .build_go: &build_go
   - export FULL_PROJECT_PATH=$PWD
@@ -138,11 +146,9 @@ debian-buster:
   variables:
     OS: debian
     OS_VER: buster
-  image: ${OS}:${OS_VER}
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
   script:
-    - *install_common_apt
-    - apt-get install -y default-libmysqlclient-dev libssh-dev sass
-    - *build_go
+    - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
@@ -230,7 +236,7 @@ centos-8:
 
 docker-debian-bullseye:
   stage: docker-build
-  image: ${CI_REGISTRY_IMAGE}/builder:1.0.1
+  image: ${CI_REGISTRY_IMAGE}/builder:${BUILDER_VERSION}
   before_script:
     - *add_ssh_key
     - export DOCKER_HOST=ssh://${SSH_USER}@${SERVER}
@@ -243,14 +249,32 @@ docker-debian-bullseye:
 builder:
   stage: pre-build
   image:
-    name: gcr.io/kaniko-project/executor:v1.9.2-debug
+    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
     entrypoint: [""]
   variables:
     OS: alpine
     OS_VER: "3.17"
-    SEMVER: "1.0.1"
     BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/appliance/docker"
-    BUILD_IMG_NAME: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}:${SEMVER}"
+    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_TAG: "${BUILDER_VERSION}"
+    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
+  script:
+    - *kaniko_build
+  rules:
+    - if: '$PREBUILD'
+
+debian-buster-builder:
+  stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  variables:
+    OS: debian
+    OS_VER: buster
+    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
+    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_TAG: ${DEBIAN_BUILDER_VERSION}
+    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
   script:
     - *kaniko_build
   rules:
