@@ -1,3 +1,5 @@
+ver 3.0.44
+    - implemented parallel Glaber tables updating procedures, added automatic hosts dependancy table creation
 ver 3.0.43
     - removed go workers from rpms of server
 ver 3.0.42
