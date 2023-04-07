@@ -22,9 +22,16 @@
 
 #include "zbxcommon.h"
 
+
+typedef enum {
+	DB_UPDATE_COMMON_DATABASE = 1,
+	DB_UPDATE_GLABER_DATABASE
+} db_update_db_type_t;
+
+
 void	zbx_init_library_dbupgrade(zbx_get_program_type_f get_program_type_cb);
 
-int	DBcheck_version(void);
+int	DBcheck_version(db_update_db_type_t update_type);
 int	DBcheck_double_type(void);
 
 #endif

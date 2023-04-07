@@ -96,11 +96,12 @@ class WidgetView extends CControllerDashboardWidgetView {
 					$options = [
 						'countOutput' => true,
 						'filter' => ['cause_eventid' => $problem['eventid']]
-					];
-
-					$problem['symptom_count'] = ($this->fields_values['show'] == TRIGGERS_OPTION_ALL)
-						? API::Event()->get($options)
-						: API::Problem()->get($options + ['recent' => true]);
+					];	
+					//TODO: fetch sympthoms alongside with problems if needed, no need to call sparately
+					//do this in Glaber4
+					//$problem['symptom_count'] = ($this->fields_values['show'] == TRIGGERS_OPTION_ALL)
+					//	? API::Event()->get($options)
+					//	: API::Problem()->get($options + ['recent' => true]);
 
 					if ($problem['symptom_count'] > 0) {
 						$data['show_three_columns'] = true;

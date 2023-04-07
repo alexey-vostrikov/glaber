@@ -774,10 +774,10 @@ int	DBdrop_foreign_key(const char *table_name, int id)
 	return ret;
 }
 
-static int	DBcreate_dbversion_table(void)
+static int	DBcreate_dbversion_table(char *tablename)
 {
 	const ZBX_TABLE	table =
-			{"dbversion", "", 0,
+			{tablename, "", 0,
 				{
 					{"mandatory", "0", NULL, NULL, 0, ZBX_TYPE_INT, ZBX_NOTNULL, 0},
 					{"optional", "0", NULL, NULL, 0, ZBX_TYPE_INT, ZBX_NOTNULL, 0},
@@ -790,8 +790,8 @@ static int	DBcreate_dbversion_table(void)
 	DBbegin();
 	if (SUCCEED == (ret = DBcreate_table(&table)))
 	{
-		if (ZBX_DB_OK > DBexecute("insert into dbversion (mandatory,optional) values (%d,%d)",
-				ZBX_FIRST_DB_VERSION, ZBX_FIRST_DB_VERSION))
+		if (ZBX_DB_OK > DBexecute("insert into %s (mandatory,optional) values (%d,%d)",
+				tablename, ZBX_FIRST_DB_VERSION, ZBX_FIRST_DB_VERSION))
 		{
 			ret = FAIL;
 		}
@@ -800,12 +800,12 @@ static int	DBcreate_dbversion_table(void)
 	return DBend(ret);
 }
 
-static int	DBset_version(int version, unsigned char mandatory)
+static int	DBset_version(char *tablename, int version, unsigned char mandatory)
 {
 	char	sql[64];
 	size_t	offset;
 
-	offset = zbx_snprintf(sql, sizeof(sql),  "update dbversion set ");
+	offset = zbx_snprintf(sql, sizeof(sql),  "update %s set ", tablename);
 	if (0 != mandatory)
 		offset += zbx_snprintf(sql + offset, sizeof(sql) - offset, "mandatory=%d,", version);
 	zbx_snprintf(sql + offset, sizeof(sql) - offset, "optional=%d", version);
@@ -879,7 +879,14 @@ static zbx_db_version_t dbversions[] = {
 	{NULL}
 };
 
-static void	DBget_version(int *mandatory, int *optional)
+extern zbx_dbpatch_t	GLB_DBPATCH_VERSION(3000)[];
+
+static zbx_db_version_t glbdbversions[] = {
+	{GLB_DBPATCH_VERSION(3000), "3.0 Glaber updates"},
+	{NULL}
+};
+
+static void	DBget_version(char *tablename, int *mandatory, int *optional)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -887,7 +894,7 @@ static void	DBget_version(int *mandatory, int *optional)
 	*mandatory = -1;
 	*optional = -1;
 
-	result = DBselect("select mandatory,optional from dbversion");
+	result = DBselect("select mandatory,optional from %s", tablename);
 
 	if (NULL != (row = DBfetch(result)))
 	{
@@ -913,12 +920,57 @@ void	zbx_init_library_dbupgrade(zbx_get_program_type_f get_program_type_cb)
 	DBget_program_type_cb = get_program_type_cb;
 }
 
-int	DBcheck_version(void)
+static int check_create_dbversion_table(char *table_name) {
+
+	if (SUCCEED != DBtable_exists(table_name))
+	{
+#ifndef HAVE_SQLITE3
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() \"%s\" does not exist", __func__, table_name);
+
+		if (SUCCEED != DBfield_exists("config", "server_check_interval"))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "Cannot upgrade database: the database must"
+					" correspond to version 2.0 or later. Exiting ...");
+			return FAIL;
+		}
+
+		if (SUCCEED != DBcreate_dbversion_table(table_name))
+			return FAIL;	
+#else
+		zabbix_log(LOG_LEVEL_CRIT, "The %s does not match Glaber database."
+				" Current database version (mandatory/optional): UNKNOWN."
+				" Required mandatory version: %08d.",
+				get_program_type_string(DBget_program_type_cb()), required);
+		zabbix_log(LOG_LEVEL_CRIT, "Glaber does not support SQLite3 database upgrade.");
+	
+		return FAIL;
+#endif
+	}
+	
+	return SUCCEED;
+}
+
+int	DBcheck_version(db_update_db_type_t update_type)
 {
-	const char		*dbversion_table_name = "dbversion";
+	char*		table_name;
 	int			db_mandatory, db_optional, required, ret = FAIL, i;
-	zbx_db_version_t	*dbversion;
+	zbx_db_version_t	*dbversion,	*db_update_versions = dbversions;
 	zbx_dbpatch_t		*patches;
+	
+	switch(update_type) {
+		case DB_UPDATE_COMMON_DATABASE:
+			table_name = "dbversion";
+			db_update_versions = dbversions;
+			break;
+		case DB_UPDATE_GLABER_DATABASE:
+			db_update_versions = glbdbversions;
+			table_name = "glbdbversion";
+			break;
+		default: 
+			LOG_INF("Wrong db update type %d", update_type);
+			return FAIL;
+	}
+
 
 #ifndef HAVE_SQLITE3
 	int			total = 0, current = 0, completed, last_completed = -1, optional_num = 0;
@@ -929,7 +981,7 @@ int	DBcheck_version(void)
 
 	/* find out the required version number by getting the last mandatory version */
 	/* of the last version patch array                                            */
-	for (dbversion = dbversions; NULL != dbversion->patches; dbversion++)
+	for (dbversion = db_update_versions; NULL != dbversion->patches; dbversion++)
 		;
 
 	patches = (--dbversion)->patches;
@@ -942,36 +994,13 @@ int	DBcheck_version(void)
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	if (SUCCEED != DBtable_exists(dbversion_table_name))
-	{
-#ifndef HAVE_SQLITE3
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() \"%s\" does not exist", __func__, dbversion_table_name);
-
-		if (SUCCEED != DBfield_exists("config", "server_check_interval"))
-		{
-			zabbix_log(LOG_LEVEL_CRIT, "Cannot upgrade database: the database must"
-					" correspond to version 2.0 or later. Exiting ...");
-			goto out;
-		}
-
-		if (SUCCEED != DBcreate_dbversion_table())
-			goto out;
-#else
-		zabbix_log(LOG_LEVEL_CRIT, "The %s does not match Zabbix database."
-				" Current database version (mandatory/optional): UNKNOWN."
-				" Required mandatory version: %08d.",
-				get_program_type_string(DBget_program_type_cb()), required);
-		zabbix_log(LOG_LEVEL_CRIT, "Zabbix does not support SQLite3 database upgrade.");
-
-		ret = NOTSUPPORTED;
+	if (FAIL == check_create_dbversion_table(table_name))
 		goto out;
-#endif
-	}
 
-	DBget_version(&db_mandatory, &db_optional);
+	DBget_version(table_name, &db_mandatory, &db_optional);
 
 #ifndef HAVE_SQLITE3
-	for (dbversion = dbversions; NULL != (patches = dbversion->patches); dbversion++)
+	for (dbversion = db_update_versions; NULL != (patches = dbversion->patches); dbversion++)
 	{
 		for (i = 0; 0 != patches[i].version; i++)
 		{
@@ -990,14 +1019,14 @@ int	DBcheck_version(void)
 	if (required != db_mandatory)
 #endif
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "The %s does not match Zabbix database."
+		zabbix_log(LOG_LEVEL_CRIT, "The %s does not match Glaber database."
 				" Current database version (mandatory/optional): %08d/%08d."
 				" Required mandatory version: %08d.",
 				get_program_type_string(DBget_program_type_cb()), db_mandatory, db_optional,
 				required);
 #ifdef HAVE_SQLITE3
 		if (required > db_mandatory)
-			zabbix_log(LOG_LEVEL_WARNING, "Zabbix does not support SQLite3 database upgrade.");
+			zabbix_log(LOG_LEVEL_WARNING, "Glaber does not support SQLite3 database upgrade.");
 		else
 			ret = NOTSUPPORTED;
 #endif
@@ -1020,7 +1049,7 @@ int	DBcheck_version(void)
 
 	zabbix_log(LOG_LEVEL_WARNING, "starting automatic database upgrade");
 
-	for (dbversion = dbversions; NULL != dbversion->patches; dbversion++)
+	for (dbversion = db_update_versions; NULL != dbversion->patches; dbversion++)
 	{
 		patches = dbversion->patches;
 
@@ -1046,7 +1075,7 @@ int	DBcheck_version(void)
 			if ((0 != patches[i].duplicates && patches[i].duplicates <= db_optional) ||
 					SUCCEED == (ret = patches[i].function()))
 			{
-				ret = DBset_version(patches[i].version, patches[i].mandatory);
+				ret = DBset_version(table_name, patches[i].version, patches[i].mandatory);
 			}
 
 			ret = DBend(ret);

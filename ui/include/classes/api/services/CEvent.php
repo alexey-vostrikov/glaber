@@ -409,7 +409,7 @@ class CEvent extends CApiService {
 		}
 
 		// symptom
-		if ($options['symptom'] !== null) {
+		if ($options['symptom'] !== null && $options['symptom'] !== false) {
 			$sqlParts['where'][] = (!$options['symptom'] ? 'NOT ' : '').
 				'EXISTS ('.
 					'SELECT NULL'.

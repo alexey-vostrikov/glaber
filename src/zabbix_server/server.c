@@ -1491,11 +1491,14 @@ static void zbx_check_db(void)
 		zbx_db_extract_dbextension_info(&db_version_info);
 	}
 
-	if (SUCCEED == result && (
-#ifdef HAVE_POSTGRESQL
-//								 SUCCEED != zbx_db_check_tsdb_capabilities(&db_version_info, CONFIG_ALLOW_UNSUPPORTED_DB_VERSIONS) ||
-#endif
-								 SUCCEED != DBcheck_version()))
+	LOG_INF("Updating base database version");
+	if (SUCCEED == result && (SUCCEED != DBcheck_version(DB_UPDATE_COMMON_DATABASE)))
+	{
+		result = FAIL;
+	}
+	
+	LOG_INF("Updating Glaber specific database version");
+	if (SUCCEED == result && (SUCCEED != DBcheck_version(DB_UPDATE_GLABER_DATABASE)))
 	{
 		result = FAIL;
 	}
@@ -1506,12 +1509,7 @@ static void zbx_check_db(void)
 	{
 		zbx_json_initarray(&db_version_json, ZBX_JSON_STAT_BUF_LEN);
 
-#if defined(HAVE_POSTGRESQL)
-		// if (0 == zbx_strcmp_null(db_version_info.extension, ZBX_DB_EXTENSION_TIMESCALEDB))
-		// {
-		// 	zbx_tsdb_extract_compressed_chunk_flags(&db_version_info);
-		// }
-#endif
+
 		zbx_db_version_json_create(&db_version_json, &db_version_info);
 
 		zbx_db_flush_version_requirements(db_version_json.buffer);

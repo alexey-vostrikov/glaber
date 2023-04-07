@@ -3,6 +3,7 @@
 noinst_LIBRARIES = libzbxdbupgrade.a
 
 libzbxdbupgrade_a_SOURCES = \
+	glbdbupgrade_3000.c \
 	dbupgrade.c \
 	dbupgrade_2010.c \
 	dbupgrade_2020.c \

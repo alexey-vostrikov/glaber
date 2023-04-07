@@ -159,7 +159,7 @@ class CControllerHostEdit extends CController {
 				$this->host['groups'] = $this->host['hostgroups'];
 				unset($this->host['hostgroups']);
 
-               // $this->host['depends'] = $this->getHostDepends($this->host['hostid']);
+                $this->host['depends'] = $this->getHostDepends($this->host['hostid']);
             }
 		}
 

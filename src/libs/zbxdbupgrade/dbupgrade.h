@@ -34,9 +34,14 @@ zbx_dbpatch_t;
 
 #define ZBX_DBPATCH_FUNCTION_PARAM_LEN			255
 
-#define DBPATCH_VERSION(zabbix_version)			zbx_dbpatches_##zabbix_version
+#define GLB_DBPATCH_VERSION(glaber_version)			glb_dbpatches_##glaber_version
+#define GLB_DBPATCH_START(glaber_version)			zbx_dbpatch_t	GLB_DBPATCH_VERSION(glaber_version)[] = {
+#define GLB_DBPATCH_ADD(version, duplicates, mandatory)	{GLB_DBpatch_##version, version, duplicates, mandatory},
 
+
+#define DBPATCH_VERSION(zabbix_version)			zbx_dbpatches_##zabbix_version
 #define DBPATCH_START(zabbix_version)			zbx_dbpatch_t	DBPATCH_VERSION(zabbix_version)[] = {
+
 #define DBPATCH_END()					{NULL}};
 
 #ifdef HAVE_SQLITE3
