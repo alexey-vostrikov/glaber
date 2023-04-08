@@ -68,17 +68,19 @@ static int	GLB_DBpatch_3000006(void)
 	return DBadd_foreign_key("hosts_depends", 2, &field);
 }
 
-
 #endif
 
+
 GLB_DBPATCH_START(3000)
+
+#ifndef HAVE_SQLITE3
 
 GLB_DBPATCH_ADD(3000001, 0, 1)
 GLB_DBPATCH_ADD(3000002, 0, 1)
 GLB_DBPATCH_ADD(3000003, 0, 1)
 GLB_DBPATCH_ADD(3000004, 0, 1)
 GLB_DBPATCH_ADD(3000005, 0, 1)
+#endif
 
 DBPATCH_END()
 
-#endif

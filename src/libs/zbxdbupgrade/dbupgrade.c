@@ -940,7 +940,7 @@ static int check_create_dbversion_table(char *table_name) {
 		zabbix_log(LOG_LEVEL_CRIT, "The %s does not match Glaber database."
 				" Current database version (mandatory/optional): UNKNOWN."
 				" Required mandatory version: %08d.",
-				get_program_type_string(DBget_program_type_cb()), required);
+				get_program_type_string(DBget_program_type_cb()), ZBX_FIRST_DB_VERSION);
 		zabbix_log(LOG_LEVEL_CRIT, "Glaber does not support SQLite3 database upgrade.");
 	
 		return FAIL;
