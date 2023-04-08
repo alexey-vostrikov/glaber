@@ -24,11 +24,6 @@
 
 #ifndef HAVE_SQLITE3
 
-static int	GLB_DBpatch_3000000(void)
-{
-	return SUCCEED;
-}
-
 static int	GLB_DBpatch_3000001(void)
 {
 	const ZBX_TABLE table =
@@ -78,7 +73,6 @@ static int	GLB_DBpatch_3000006(void)
 
 GLB_DBPATCH_START(3000)
 
-GLB_DBPATCH_ADD(3000000, 0, 1)
 GLB_DBPATCH_ADD(3000001, 0, 1)
 GLB_DBPATCH_ADD(3000002, 0, 1)
 GLB_DBPATCH_ADD(3000003, 0, 1)
@@ -87,4 +81,4 @@ GLB_DBPATCH_ADD(3000005, 0, 1)
 
 DBPATCH_END()
 
-
+#endif
