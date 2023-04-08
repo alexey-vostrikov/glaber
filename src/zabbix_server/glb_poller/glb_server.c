@@ -69,6 +69,7 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
 		LOG_INF("Worker itemd %ld has wrong delay time set :%s", dcitem->itemid, dcitem->delay);
 		return FAIL;
 	}
+
     DEBUG_ITEM(dcitem->itemid, "Set timeout of %d seconds for worker %s",worker->delay, dcitem->key);
 
     if (NULL == dcitem->params)

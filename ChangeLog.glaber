@@ -1,3 +1,5 @@
+ver 3.0.45
+    - fix Sqlite3 build issues
 ver 3.0.44
     - implemented parallel Glaber tables updating procedures, added automatic hosts dependancy table creation
 ver 3.0.43
