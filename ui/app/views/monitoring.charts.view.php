@@ -47,8 +47,10 @@ $html_page = (new CHtmlPage())
 		))->setAttribute('aria-label', _('Content controls'))
 	);
 
-if (isset($data['ms_hosts']) && count($data['ms_hosts']) == 1 ) 
-	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['ms_hosts'][0]['id'])));
+if (isset($data['ms_hosts']) && count($data['ms_hosts']) == 1 ) {
+    $navdata = CHostNav::getData($data['ms_hosts'][0]['id']);
+    $html_page->setNavigation(new CHostNav($navdata));
+}
 
 $filter = (new CFilter())
 	->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', 'charts.view'))

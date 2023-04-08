@@ -1,0 +1,13 @@
+export const HOST_STATUS_MONITORED = 0;
+export const HOST_STATUS_NOT_MONITORED = 1;
+export const HOST_MAINTENANCE_STATUS_OFF = 0;
+export const HOST_MAINTENANCE_STATUS_ON = 1;
+
+export const GRAPH_FILTER_ALL = 0;
+export const GRAPH_FILTER_HOST = 1;
+export const GRAPH_FILTER_SIMPLE = 2;
+
+export const ZBX_FLAG_DISCOVERY_NORMAL = 0x0;
+export const ZBX_FLAG_DISCOVERY_RULE = 0x1;
+export const ZBX_FLAG_DISCOVERY_PROTOTYPE = 0x2;
+export const ZBX_FLAG_DISCOVERY_CREATED = 0x4;

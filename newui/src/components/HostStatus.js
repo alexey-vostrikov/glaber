@@ -1,10 +1,6 @@
 import React from "react";
 import { useTranslation } from 'react-i18next';
-
-const HOST_STATUS_MONITORED = 0;
-const HOST_STATUS_NOT_MONITORED = 1;
-const HOST_MAINTENANCE_STATUS_OFF = 0;
-const HOST_MAINTENANCE_STATUS_ON = 1;
+import { HOST_STATUS_MONITORED, HOST_MAINTENANCE_STATUS_ON, HOST_STATUS_NOT_MONITORED } from '../common/constants'
 
 function HostStatus({status, maintenance}){
     const { t } = useTranslation();

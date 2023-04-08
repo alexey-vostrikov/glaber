@@ -2,5 +2,13 @@
   "Unknown": "Не известно",
   "In maintenance": "В обслуживании",
   "Enabled": "Активировано",
-  "Disabled": "Деактивировано"
+  "Disabled": "Деактивировано",
+  "All templates": "Все шаблоны",
+  "Latest data": "Последние данные",
+  "Graphs": "Графики",
+  "Dashboards": "Панели",
+  "Web": "Веб",
+  "Problems": "Проблемы",
+  "The host is not discovered anymore and will be deleted the next time discovery rule is processed.": "Узел сети более не обнаруживается и будет удален при следующем выполнении правила обнаружения.",
+  "The host is not discovered anymore and will be deleted in {{seconds}} (on {{date}} at {{time}}).": "Узел сети более не обнаруживается и будет удален через {{seconds}} ({{date}} в {{time}})."
 }

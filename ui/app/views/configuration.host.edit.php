@@ -62,12 +62,22 @@ if ($data['warning']) {
 	$data['warning'] = null;
 }
 
-(new CHtmlPage())
+$page = (new CHtmlPage())
 	->setTitle(($data['hostid'] == 0) ? _('New host') : _('Host'))
-	->setNavigation(isset($data['hostid'])? (new CHostNav(CHostNav::getData($data['hostid']))) : null)
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_HOST_EDIT))
-	->addItem(new CPartial('configuration.host.edit.html', $data))
-	->show();
+	->addItem(new CPartial('configuration.host.edit.html', $data));
+
+if (isset($data['hostid'])) {
+    $navdata = CHostNav::getData($data['hostid']);
+    $navdata['flags'] = ZBX_FLAG_DISCOVERY_CREATED;
+    $navdata['hostDiscovery'] = [
+        'ts_delete' => time() + 10
+    ];
+    $page->setJsNavigation('HostNav', $navdata);
+}
+
+$page->show();
+
 
 (new CScriptTag('view.init('.json_encode([
 		'form_name' => $data['form_name'],

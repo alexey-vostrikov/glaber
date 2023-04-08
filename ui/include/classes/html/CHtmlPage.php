@@ -44,6 +44,11 @@ class CHtmlPage {
 	 */
 	private ?CList $navigation = null;
 
+    /**
+     * Navigation render in js, displayed exclusively in ZBX_LAYOUT_NORMAL mode.
+     */
+    private ?array $js_navigation = null;
+
 	/**
 	 * Layout mode (ZBX_LAYOUT_NORMAL|ZBX_LAYOUT_KIOSKMODE).
 	 */
@@ -86,12 +91,20 @@ class CHtmlPage {
 	}
 
 	public function setNavigation(?CList $navigation): self {
-		$this->navigation = $navigation;
+        $this->js_navigation = null;
+        $this->navigation = $navigation;
 
 		return $this;
 	}
 
-	public function addItem($value): self {
+    public function setJsNavigation(string $component, array $data): self {
+        $this->navigation = null;
+        $this->js_navigation = ['name' => $component, 'data' => $data];
+
+        return $this;
+    }
+
+    public function addItem($value): self {
 		if ($value !== null) {
 			$this->items[] = $value;
 		}
@@ -129,9 +142,26 @@ class CHtmlPage {
 			'with_current_messages' => true
 		]);
 
-		$navigation = ($this->navigation !== null && $this->web_layout_mode == ZBX_LAYOUT_NORMAL)
-			? (new CDiv($this->navigation))->addClass(self::ZBX_STYLE_HEADER_NAVIGATION)
-			: null;
+        $navigation = null;
+        if ($this->web_layout_mode == ZBX_LAYOUT_NORMAL) {
+            if ($this->navigation !== null) {
+                $navigation = (new CDiv($this->navigation))->addClass(self::ZBX_STYLE_HEADER_NAVIGATION);
+            } elseif ($this->js_navigation !== null) {
+                $navigation = (new CDiv())
+                    ->setId(uniqid("glbhn"))
+                    ->addClass(self::ZBX_STYLE_HEADER_NAVIGATION);
+
+                foreach ($this->js_navigation['data'] as $key => $value) {
+                    $navigation->setAttribute('data-'.$key, $value);
+                };
+
+                zbx_add_post_js("
+                    const hn=document.getElementById('{$navigation->getId()}'); 
+                    try {ReactDOM.createRoot(hn).render(React.createElement({$this->js_navigation['name']}, hn.dataset));} 
+                    catch(err) {console.log(err);}"
+                );
+            }
+        }
 
 		$items[] = new CTag('main', true, [$navigation, $this->items]);
 
