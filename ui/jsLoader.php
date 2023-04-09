@@ -110,7 +110,8 @@ $available_js = [
 	'items.js' => 'pages/',
 	'report2.js' => 'pages/',
 	'report4.js' => 'pages/',
-	'setup.js' => 'pages/'
+	'setup.js' => 'pages/',
+    'glaber.components.js' => ''
 ];
 
 $translate_strings = [
@@ -437,6 +438,7 @@ if (empty($_GET['files'])) {
 		'hostinterfacemanager.js',
 		'hostmacrosmanager.js',
 		'textareaflexible.js',
+        'glaber.components.js',
 		'init.js'
 	];
 

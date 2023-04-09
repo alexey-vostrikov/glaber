@@ -1,0 +1,8 @@
+{
+  "hoststatus": {
+    "unknown": "Не известно",
+    "maintenance": "В обслуживании",
+    "enabled": "Активировано",
+    "disabled": "Деактивировано"
+  }
+}

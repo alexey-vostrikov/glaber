@@ -1,0 +1,8 @@
+{
+  "hoststatus": {
+    "unknown": "Unknown",
+    "maintenance": "In maintenance",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  }
+}

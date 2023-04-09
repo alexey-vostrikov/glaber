@@ -3,6 +3,8 @@
 //   - Do not mix rules for dashboard view mode and dashboard edit mode.
 //   - Do not mix rules for widgets and iterators.
 
+@use "sass:math";
+
 .header-kioskmode-controls {
 	.dashboard-kioskmode-controls {
 		li {
@@ -248,7 +250,7 @@
 
 		position: absolute;
 		left: 0;
-		top: calc(50% - #{$icon-height / 2});
+		top: calc(50% - #{math.div($icon-height, 2)});
 		right: 0;
 		bottom: 0;
 		padding: ($icon-height + 10px) 5px 5px;

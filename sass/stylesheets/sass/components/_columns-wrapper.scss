@@ -30,8 +30,8 @@
 			div,
 			li {
 				display: block;
-				flex: 0 0 (100% / $count);
-				max-width: (100% / $count);
+				flex: 0 0 calc(100% / $count);
+				max-width: calc(100% / $count);
 			}
 		}
 	}

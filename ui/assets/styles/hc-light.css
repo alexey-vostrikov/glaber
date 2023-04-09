@@ -4020,6 +4020,13 @@ z-select[readonly] button:focus,
   border-color: #000000;
 }
 
+glb-host-status {
+  --enabled-color: #009900;
+  --disabled-color: #990000;
+  --maintenance-color: #ed3400;
+  --unknown-color: #333333;
+}
+
 .link-action {
   border-bottom: 1px dotted;
   cursor: pointer;
