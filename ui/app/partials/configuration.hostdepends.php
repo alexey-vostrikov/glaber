@@ -24,7 +24,6 @@ function getDependencyTable(array $depends): CTable
             (new CRow([
                 (new CCol(_('Name')))->addClass('dep-name'),
                 (new CCol(_('Direction')))->addClass('dep-direction'),
-                (new CCol(_('Host ID')))->addClass('dep-hostid'),
                 (new CCol(_('Hostname')))->addClass('dep-hostname'),
                 (new CCol(_('Actions')))->addClass('dep-action')
             ]))->addClass('depends-list-head')
@@ -64,22 +63,32 @@ function getDependencyRow(array $dep): CRow
         $hostname = $dep['hostname_down'];
     }
 
-    $hostname_link = (new CLink($hostname, (new CUrl('zabbix.php'))
+    $hostname_url = (new CUrl('zabbix.php'))
         ->setArgument('action', 'host.edit')
-        ->setArgument('hostid', $hostid)
-    ))->addClass(ZBX_STYLE_LINK_ALT);
+        ->setArgument('hostid', $hostid);
 
-    return new CRow([
+    $hostname_link = (new CLink($hostname, $hostname_url))
+        ->addClass(ZBX_STYLE_LINK_ALT)
+        ->setId("depends_{$dep['depid']}_hostlink");
+
+    $hostname_edit = (new CLink(new CAwesomeIcon('pen-to-square'), '#'))
+        ->addClass('js-dep-hostname')
+        ->setAttribute("data-depid", "{$dep['depid']}");
+
+    return (new CRow([
         (new CCol(new CInput('text', "depends[{$dep['depid']}][name]", $dep['name'])))->addClass('dep-name'),
         (new CCol($direction))->addClass('dep-direction'),
-        (new CCol(new CInput('text', "depends[{$dep['depid']}][hostid]", $hostid)))->addClass('dep-hostid'),
-        (new CCol($hostname_link))->addClass('dep-hostname'),
+        (new CCol([
+            $hostname_link,'&nbsp;',
+            $hostname_edit,
+            (new CInput('hidden', "depends[{$dep['depid']}][hostid]", $hostid))->addClass('js-dep-hostid')
+        ]))->addClass('dep-hostname'),
         (new CCol((new CButton("depends[{$dep['depid']}][remove]", _('Remove')))
             ->addClass(ZBX_STYLE_BTN_LINK)
             ->addClass('element-table-remove')
             ->removeId()
         ))->addClass('dep-action')
-    ]);
+    ]))->addClass('js-form_row');
 }
 
 
