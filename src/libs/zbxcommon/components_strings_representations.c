@@ -52,6 +52,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "api_trapper";	
 		case GLB_PROCESS_TYPE_PREPROCESSOR:
 			return "glb_preproc_worker";
+		case GLB_PROCESS_TYPE_ALERTER:
+			return "glb_alerter";
 		case ZBX_PROCESS_TYPE_UNREACHABLE:
 			return "unreachable poller";
 		case ZBX_PROCESS_TYPE_IPMIPOLLER:
@@ -74,8 +76,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "history syncer";
 		case ZBX_PROCESS_TYPE_DISCOVERER:
 			return "discoverer";
-		case ZBX_PROCESS_TYPE_ALERTER:
-			return "alerter";
+		case 12:
+			return "deprecated alerter";
 		case ZBX_PROCESS_TYPE_TIMER:
 			return "timer";
 		case ZBX_PROCESS_TYPE_HOUSEKEEPER:
@@ -98,8 +100,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "task manager";
 		case ZBX_PROCESS_TYPE_IPMIMANAGER:
 			return "ipmi manager";
-		case ZBX_PROCESS_TYPE_ALERTMANAGER:
-			return "alert manager";
+		case 24:
+			return "deprecated alert manager";
 		case ZBX_PROCESS_TYPE_PREPROCMAN:
 			return "preprocessing manager";
 		case ZBX_PROCESS_TYPE_PREPROCESSOR:
@@ -108,8 +110,8 @@ const char	*get_process_type_string(unsigned char proc_type)
 			return "lld manager";
 		case ZBX_PROCESS_TYPE_LLDWORKER:
 			return "lld worker";
-		case ZBX_PROCESS_TYPE_ALERTSYNCER:
-			return "alert syncer";
+		case 29:
+			return "deprecated alert syncer";
 		case ZBX_PROCESS_TYPE_HISTORYPOLLER:
 			return "glb_calc_poller";
 		case ZBX_PROCESS_TYPE_AVAILMAN:
@@ -251,8 +253,8 @@ const char	*zbx_result_string(int result)
 			return "SIG_ERROR";
 		case SYSINFO_RET_FAIL:
 			return "SYSINFO_RET_FAIL";
-		case UNKNOWN:
-			return "UNKNOWN";
+		case UNSET:
+			return "UNSET";
 		default:
 			return "unknown";
 	}

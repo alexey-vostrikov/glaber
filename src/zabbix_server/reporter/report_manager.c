@@ -27,7 +27,7 @@
 #include "base64.h"
 #include "../zbxreport.h"
 #include "zbxcrypto.h"
-#include "../alerter/alerter.h"
+//#include "../alerter/alerter.h"
 #include "report_protocol.h"
 #include "zbxnum.h"
 #include "zbxtime.h"
@@ -2117,9 +2117,9 @@ static void	rm_send_test_error_result(zbx_ipc_client_t *client, const char *erro
 	unsigned char	*data;
 	zbx_uint32_t	size;
 
-	size = report_serialize_response(&data, FAIL, error, NULL);
-	zbx_ipc_client_send(client, ZBX_IPC_REPORTER_TEST_RESULT, data, size);
-	zbx_free(data);
+//	size = report_serialize_response(&data, FAIL, error, NULL);
+//	zbx_ipc_client_send(client, ZBX_IPC_REPORTER_TEST_RESULT, data, size);
+//	zbx_free(data);
 }
 
 /******************************************************************************
@@ -2248,37 +2248,38 @@ static void	rm_process_result(zbx_rm_t *manager, zbx_ipc_client_t *client, zbx_i
 	}
 	else
 	{
-		zbx_vector_alerter_dispatch_result_t	results;
-		int					status, i, total_num = 0, sent_num = 0;
-		zbx_alerter_dispatch_result_t		*result;
-		char					*error;
+		//zbx_vector_alerter_dispatch_result_t	results;
+		// int					status, i, total_num = 0, sent_num = 0;
+		// zbx_alerter_dispatch_result_t		*result;
+		// char					*error;
 
-		zbx_vector_alerter_dispatch_result_create(&results);
+		// zbx_vector_alerter_dispatch_result_create(&results);
 
-		report_deserialize_response(message->data, &status, &error, &results);
+		// report_deserialize_response(message->data, &status, &error, &results);
 
-		for (i = 0; i < results.values_num; i++)
-		{
-			result = results.values[i];
+		// for (i = 0; i < results.values_num; i++)
+		// {
+		// 	result = results.values[i];
 
-			if (SUCCEED == result->status)
-			{
-				sent_num++;
-			}
-			else
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "failed to send report to \"%s\": %s", result->recipient,
-						result->info);
-			}
+		// 	if (SUCCEED == result->status)
+		// 	{
+		// 		sent_num++;
+		// 	}
+		// 	else
+		// 	{
+		// 		zabbix_log(LOG_LEVEL_DEBUG, "failed to send report to \"%s\": %s", result->recipient,
+		// 				result->info);
+		// 	}
 
-			total_num++;
-		}
+		// 	total_num++;
+		// }
 
-		rm_finish_job(manager, writer->job, status, error, sent_num, total_num);
-		zbx_free(error);
+		// rm_finish_job(manager, writer->job, status, error, sent_num, total_num);
+		// zbx_free(error);
 
-		zbx_vector_alerter_dispatch_result_clear_ext(&results, zbx_alerter_dispatch_result_free);
-		zbx_vector_alerter_dispatch_result_destroy(&results);
+		// zbx_vector_alerter_dispatch_result_clear_ext(&results, zbx_alerter_dispatch_result_free);
+		// zbx_vector_alerter_dispatch_result_destroy(&results);
+		HALT_HERE("Impelment alert sending");
 	}
 
 	writer->job = NULL;

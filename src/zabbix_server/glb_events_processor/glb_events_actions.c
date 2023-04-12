@@ -197,7 +197,7 @@ static void  event_actions_reset_conditions(events_processor_event_t *event, glb
 	
 	//calculating the conditions
 	while (NULL != (condition = zbx_hashset_iter_next(&iter))) 
-		condition->result = UNKNOWN;
+		condition->result = UNSET;
 	
 }
 
@@ -229,7 +229,7 @@ static int check_and_calc_action_conditions(events_processor_event_t *event, con
 		}
 
 
-		if (UNKNOWN == condition->result) 
+		if (UNSET == condition->result) 
 			glb_event_condition_calc(event, condition);
 		
 		switch (action->evaltype)

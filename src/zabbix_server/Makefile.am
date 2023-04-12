@@ -1,7 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
 SUBDIRS = \
-	alerter \
 	dbsyncer \
 	dbconfig \
 	diag \
@@ -13,6 +12,7 @@ SUBDIRS = \
 	snmptrapper \
 	timer \
 	trapper \
+	glb_alerter \
 	glb_events_processor \
 	proxypoller \
 	vmware \
@@ -60,7 +60,6 @@ zabbix_server_LDADD = \
 	dbsyncer/libzbxdbsyncer.a \
 	dbconfig/libzbxdbconfig.a \
 	diag/libzbxdiag_server.a \
-	alerter/libzbxalerter.a \
 	discoverer/libzbxdiscoverer.a \
 	pinger/libzbxpinger.a \
 	poller/libzbxpoller.a \
@@ -163,7 +162,8 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxversion/libzbxversion.a \
 	preprocessor/libpreprocessor.a \
 	$(top_builddir)/src/libs/glb_events_log/libglbeventlog.a \
-	$(top_builddir)/src/libs/glb_actions/libglbactions.a
+	$(top_builddir)/src/libs/glb_actions/libglbactions.a \
+	glb_alerter/libglbalerter.a 
 	
 if HAVE_IPMI
 zabbix_server_LDADD += ipmi/libipmi.a

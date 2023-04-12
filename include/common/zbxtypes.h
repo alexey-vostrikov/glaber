@@ -229,6 +229,6 @@ typedef struct zbx_variant variant_t;
 #define	GATEWAY_ERROR	-6
 #define	CONFIG_ERROR	-7
 #define	SIG_ERROR	-8
-#define	UNKNOWN		-117
+#define	UNSET		-117
 
 #endif

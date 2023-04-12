@@ -22,7 +22,7 @@
 #include "../../libs/glb_state/glb_state.h"
 #include "../../libs/glb_state/glb_state_items.h"
 #include "zbxlld.h"
-#include "../alerter/alerter.h"
+//#include "../alerter/alerter.h"
 #include "zbxtime.h"
 
 #define ZBX_DIAG_LLD_RULES		0x00000001
@@ -378,18 +378,18 @@ static void	diag_add_alerting_sources(struct zbx_json *json, const char *field, 
 
 	zbx_json_addarray(json, field);
 
-	for (i = 0; i < sources->values_num; i++)
-	{
-		const zbx_am_source_stats_t	*source = (const zbx_am_source_stats_t *)sources->values[i];
+	// for (i = 0; i < sources->values_num; i++)
+	// {
+	// 	const zbx_am_source_stats_t	*source = (const zbx_am_source_stats_t *)sources->values[i];
 
-		zbx_json_addobject(json, NULL);
-		zbx_json_adduint64(json, "source", source->source);
-		zbx_json_adduint64(json, "object", source->object);
-		zbx_json_adduint64(json, "objectid", source->objectid);
-		zbx_json_adduint64(json, "alerts", source->alerts_num);
-		zbx_json_close(json);
-	}
-
+	// 	zbx_json_addobject(json, NULL);
+	// 	zbx_json_adduint64(json, "source", source->source);
+	// 	zbx_json_adduint64(json, "object", source->object);
+	// 	zbx_json_adduint64(json, "objectid", source->objectid);
+	// 	zbx_json_adduint64(json, "alerts", source->alerts_num);
+	// 	zbx_json_close(json);
+	// }
+	HALT_HERE("Not implemented statistics for alerting, FIX");
 	zbx_json_close(json);
 }
 
@@ -422,80 +422,80 @@ static int	diag_add_alerting_info(const struct zbx_json_parse *jp, struct zbx_js
 	if (SUCCEED == (ret = zbx_diag_parse_request(jp, field_map, &fields, &tops, error)))
 	{
 		zbx_json_addobject(json, ZBX_DIAG_ALERTING);
+		HALT_HERE("Diag info from alerting isn't implemented");
+		// if (0 != (fields & ZBX_DIAG_ALERTING_SIMPLE))
+		// {
+		// 	zbx_uint64_t	alerts_num;
 
-		if (0 != (fields & ZBX_DIAG_ALERTING_SIMPLE))
-		{
-			zbx_uint64_t	alerts_num;
+		// 	time1 = zbx_time();
+		// 	if (FAIL == (ret = zbx_alerter_get_diag_stats(&alerts_num, error)))
+		// 		goto out;
+		// 	time2 = zbx_time();
+		// 	time_total += time2 - time1;
 
-			time1 = zbx_time();
-			if (FAIL == (ret = zbx_alerter_get_diag_stats(&alerts_num, error)))
-				goto out;
-			time2 = zbx_time();
-			time_total += time2 - time1;
+		// 	if (0 != (fields & ZBX_DIAG_ALERTING_ALERTS))
+		// 		zbx_json_addint64(json, "alerts", alerts_num);
+		// }
 
-			if (0 != (fields & ZBX_DIAG_ALERTING_ALERTS))
-				zbx_json_addint64(json, "alerts", alerts_num);
-		}
+		// if (0 != tops.values_num)
+		// {
+		// 	int	i;
 
-		if (0 != tops.values_num)
-		{
-			int	i;
+		// 	zbx_json_addobject(json, "top");
 
-			zbx_json_addobject(json, "top");
+		// 	for (i = 0; i < tops.values_num; i++)
+		// 	{
+		// 		zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
 
-			for (i = 0; i < tops.values_num; i++)
-			{
-				zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
+		// 		if (0 == strcmp(map->name, "media.alerts"))
+		// 		{
+		// 			zbx_vector_uint64_pair_t	mediatypes;
 
-				if (0 == strcmp(map->name, "media.alerts"))
-				{
-					zbx_vector_uint64_pair_t	mediatypes;
+		// 			zbx_vector_uint64_pair_create(&mediatypes);
 
-					zbx_vector_uint64_pair_create(&mediatypes);
+		// 			time1 = zbx_time();
+		// 			if (FAIL == (ret = zbx_alerter_get_top_mediatypes(map->value, &mediatypes,
+		// 					error)))
+		// 			{
+		// 				zbx_vector_uint64_pair_destroy(&mediatypes);
+		// 				goto out;
+		// 			}
+		// 			time2 = zbx_time();
+		// 			time_total += time2 - time1;
 
-					time1 = zbx_time();
-					if (FAIL == (ret = zbx_alerter_get_top_mediatypes(map->value, &mediatypes,
-							error)))
-					{
-						zbx_vector_uint64_pair_destroy(&mediatypes);
-						goto out;
-					}
-					time2 = zbx_time();
-					time_total += time2 - time1;
+		// 			diag_add_alerting_mediatypes(json, map->name, &mediatypes);
+		// 			zbx_vector_uint64_pair_destroy(&mediatypes);
+		// 		}
+		// 		else if (0 == strcmp(map->name, "source.alerts"))
+		// 		{
+		// 			zbx_vector_ptr_t	sources;
 
-					diag_add_alerting_mediatypes(json, map->name, &mediatypes);
-					zbx_vector_uint64_pair_destroy(&mediatypes);
-				}
-				else if (0 == strcmp(map->name, "source.alerts"))
-				{
-					zbx_vector_ptr_t	sources;
+		// 			zbx_vector_ptr_create(&sources);
 
-					zbx_vector_ptr_create(&sources);
+		// 			time1 = zbx_time();
+		// 			if (FAIL == (ret = zbx_alerter_get_top_sources(map->value, &sources, error)))
+		// 			{
+		// 				zbx_vector_ptr_clear_ext(&sources, zbx_ptr_free);
+		// 				zbx_vector_ptr_destroy(&sources);
+		// 				goto out;
+		// 			}
+		// 			time2 = zbx_time();
+		// 			time_total += time2 - time1;
 
-					time1 = zbx_time();
-					if (FAIL == (ret = zbx_alerter_get_top_sources(map->value, &sources, error)))
-					{
-						zbx_vector_ptr_clear_ext(&sources, zbx_ptr_free);
-						zbx_vector_ptr_destroy(&sources);
-						goto out;
-					}
-					time2 = zbx_time();
-					time_total += time2 - time1;
+		// 			diag_add_alerting_sources(json, map->name, &sources);
+		// 			zbx_vector_ptr_clear_ext(&sources, zbx_ptr_free);
+		// 			zbx_vector_ptr_destroy(&sources);
+		// 		}
+		// 		else
+		// 		{
+		// 			*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
+		// 			ret = FAIL;
+		// 			goto out;
+		// 		}
+		// 	}
 
-					diag_add_alerting_sources(json, map->name, &sources);
-					zbx_vector_ptr_clear_ext(&sources, zbx_ptr_free);
-					zbx_vector_ptr_destroy(&sources);
-				}
-				else
-				{
-					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
-					ret = FAIL;
-					goto out;
-				}
-			}
-
-			zbx_json_close(json);
-		}
+		// 	zbx_json_close(json);
+		// }
 
 		zbx_json_addfloat(json, "time", time_total);
 		zbx_json_close(json);

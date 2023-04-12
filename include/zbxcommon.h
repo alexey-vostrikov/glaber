@@ -306,7 +306,7 @@ const char	*get_program_type_string(unsigned char program_type);
 //#define ZBX_PROCESS_TYPE_ESCALATOR		9
 #define ZBX_PROCESS_TYPE_HISTSYNCER		10
 #define ZBX_PROCESS_TYPE_DISCOVERER		11
-#define ZBX_PROCESS_TYPE_ALERTER		12
+//#define ZBX_PROCESS_TYPE_ALERTER		12
 #define ZBX_PROCESS_TYPE_TIMER			13
 #define ZBX_PROCESS_TYPE_HOUSEKEEPER		14
 #define ZBX_PROCESS_TYPE_DATASENDER		15
@@ -318,12 +318,12 @@ const char	*get_program_type_string(unsigned char program_type);
 #define ZBX_PROCESS_TYPE_ACTIVE_CHECKS		21
 #define ZBX_PROCESS_TYPE_TASKMANAGER		22
 #define ZBX_PROCESS_TYPE_IPMIMANAGER		23
-#define ZBX_PROCESS_TYPE_ALERTMANAGER		24
+//#define ZBX_PROCESS_TYPE_ALERTMANAGER		24
 #define ZBX_PROCESS_TYPE_PREPROCMAN		25
 #define ZBX_PROCESS_TYPE_PREPROCESSOR		26
 #define ZBX_PROCESS_TYPE_LLDMANAGER		27
 #define ZBX_PROCESS_TYPE_LLDWORKER		28
-#define ZBX_PROCESS_TYPE_ALERTSYNCER		29
+//#define ZBX_PROCESS_TYPE_ALERTSYNCER		29
 #define ZBX_PROCESS_TYPE_HISTORYPOLLER		30
 #define ZBX_PROCESS_TYPE_AVAILMAN		31
 #define ZBX_PROCESS_TYPE_REPORTMANAGER		32
@@ -339,7 +339,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_API_TRAPPER	42
 #define GLB_PROCESS_TYPE_PREPROCESSOR	43
 #define GLB_PROCESS_TYPE_EVENTS_PROCESSOR	44
-#define ZBX_PROCESS_TYPE_COUNT		45	/* number of process types */
+#define GLB_PROCESS_TYPE_ALERTER	45
+#define ZBX_PROCESS_TYPE_COUNT		46	/* number of process types */
 
 
 /* special processes that are not present worker list */

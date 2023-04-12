@@ -36,7 +36,7 @@
 #include "zbxnix.h"
 #include "zbxcomms.h"
 
-#include "alerter/alerter.h"
+//#include "alerter/alerter.h"
 #include "dbsyncer/dbsyncer.h"
 #include "dbconfig/dbconfig.h"
 #include "discoverer/discoverer.h"
@@ -272,7 +272,7 @@ int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	1, /* ZBX_PROCESS_TYPE_ESCALATOR <- not exitst in glaber */
 	4, /* ZBX_PROCESS_TYPE_HISTSYNCER */
 	1, /* ZBX_PROCESS_TYPE_DISCOVERER */
-	3, /* ZBX_PROCESS_TYPE_ALERTER */
+	0, /* ZBX_PROCESS_TYPE_ALERTER  - deprecated */
 	1, /* ZBX_PROCESS_TYPE_TIMER */
 	1, /* ZBX_PROCESS_TYPE_HOUSEKEEPER */
 	0, /* ZBX_PROCESS_TYPE_DATASENDER */
@@ -284,12 +284,12 @@ int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	0, /* ZBX_PROCESS_TYPE_ACTIVE_CHECKS */
 	1, /* ZBX_PROCESS_TYPE_TASKMANAGER */
 	0, /* ZBX_PROCESS_TYPE_IPMIMANAGER */
-	1, /* ZBX_PROCESS_TYPE_ALERTMANAGER */
+	0, /* ZBX_PROCESS_TYPE_ALERTMANAGER - deprecated */
 	1, /* ZBX_PROCESS_TYPE_PREPROCMAN */
 	3, /* ZBX_PROCESS_TYPE_PREPROCESSOR */
 	1, /* ZBX_PROCESS_TYPE_LLDMANAGER */
 	2, /* ZBX_PROCESS_TYPE_LLDWORKER */
-	1, /* ZBX_PROCESS_TYPE_ALERTSYNCER */
+	0, /* ZBX_PROCESS_TYPE_ALERTSYNCER -deprecated */
 	5, /* ZBX_PROCESS_TYPE_HISTORYPOLLER */
 	1, /* ZBX_PROCESS_TYPE_AVAILMAN */
 	0, /* ZBX_PROCESS_TYPE_REPORTMANAGER */
@@ -485,17 +485,17 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_CONFSYNCER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_CONFSYNCER];
 	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTMANAGER]))
-	{
-		/* data collection processes might utilize CPU fully, start manager and worker processes beforehand */
-		*local_process_type = ZBX_PROCESS_TYPE_ALERTMANAGER;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTMANAGER];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_ALERTER;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER];
-	}
+	// else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTMANAGER]))
+	// {
+	// 	/* data collection processes might utilize CPU fully, start manager and worker processes beforehand */
+	// 	*local_process_type = ZBX_PROCESS_TYPE_ALERTMANAGER;
+	// 	*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTMANAGER];
+	// }
+	// else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER]))
+	// {
+	// 	*local_process_type = ZBX_PROCESS_TYPE_ALERTER;
+	// 	*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER];
+	// }
 	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
@@ -645,11 +645,11 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PINGER];
 	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTSYNCER]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_ALERTSYNCER;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTSYNCER];
-	}
+	// else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTSYNCER]))
+	// {
+	// 	*local_process_type = ZBX_PROCESS_TYPE_ALERTSYNCER;
+	// 	*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTSYNCER];
+	// }
 	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTORYPOLLER]))
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_HISTORYPOLLER;
@@ -681,8 +681,10 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_ODBCPOLLER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ODBCPOLLER];
 	}
-	else
+	else {
+		LOG_INF("Local server num: %d, server_count is %d", local_server_num, server_count);
 		return FAIL;
+	}
 
 	return SUCCEED;
 }
@@ -698,6 +700,10 @@ void glb_set_pre_config_defaults() {
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 2;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 0;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER] = 0;
+
+
+	
 }
 
 
@@ -1190,7 +1196,7 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"SocketDir", &CONFIG_SOCKET_PATH, TYPE_STRING,
 			 PARM_OPT, 0, 0},
-			{"StartAlerters", &CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER], TYPE_INT,
+			{"StartGLBAlerters", &CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER], TYPE_INT,
 			 PARM_OPT, 1, 100},
 			{"StartPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
 			 PARM_OPT, 1, 1000},
@@ -1594,8 +1600,8 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 #ifdef HAVE_OPENIPMI
 	zbx_thread_ipmi_manager_args ipmi_manager_args = {config_timeout};
 #endif
-	zbx_thread_alert_syncer_args alert_syncer_args = {CONFIG_CONFSYNCER_FREQUENCY};
-	zbx_thread_alert_manager_args alert_manager_args = {get_config_forks, get_alert_scripts_path};
+	//zbx_thread_alert_syncer_args alert_syncer_args = {CONFIG_CONFSYNCER_FREQUENCY};
+//	zbx_thread_alert_manager_args alert_manager_args = {get_config_forks, get_alert_scripts_path};
 	zbx_thread_lld_manager_args lld_manager_args = {get_config_forks};
 
 	if (SUCCEED != init_database_cache(&error))
@@ -1706,6 +1712,8 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 	zbx_set_exit_on_terminate();
 
 	thread_args.info.program_type = program_type;
+	
+	LOG_INF("Total forks num is %d",threads_num );
 
 	for (i = 0; i < threads_num; i++)
 	{
@@ -1819,9 +1827,9 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			thread_args.args = &pinger_args;
 			zbx_thread_start(pinger_thread, &thread_args, &threads[i]);
 			break;
-		case ZBX_PROCESS_TYPE_ALERTER:
-			zbx_thread_start(zbx_alerter_thread, &thread_args, &threads[i]);
-			break;
+//		case ZBX_PROCESS_TYPE_ALERTER:
+//			zbx_thread_start(zbx_alerter_thread, &thread_args, &threads[i]);
+//			break;
 		case ZBX_PROCESS_TYPE_HOUSEKEEPER:
 			thread_args.args = &housekeeper_args;
 			zbx_thread_start(housekeeper_thread, &thread_args, &threads[i]);
@@ -1881,10 +1889,10 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			zbx_thread_start(ipmi_poller_thread, &thread_args, &threads[i]);
 			break;
 #endif
-		case ZBX_PROCESS_TYPE_ALERTMANAGER:
-			thread_args.args = &alert_manager_args;
-			zbx_thread_start(zbx_alert_manager_thread, &thread_args, &threads[i]);
-			break;
+		// case ZBX_PROCESS_TYPE_ALERTMANAGER:
+		// 	thread_args.args = &alert_manager_args;
+		// 	zbx_thread_start(zbx_alert_manager_thread, &thread_args, &threads[i]);
+		// 	break;
 		case ZBX_PROCESS_TYPE_LLDMANAGER:
 			thread_args.args = &lld_manager_args;
 			zbx_thread_start(lld_manager_thread, &thread_args, &threads[i]);
@@ -1892,10 +1900,10 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		case ZBX_PROCESS_TYPE_LLDWORKER:
 			zbx_thread_start(lld_worker_thread, &thread_args, &threads[i]);
 			break;
-		case ZBX_PROCESS_TYPE_ALERTSYNCER:
-			thread_args.args = &alert_syncer_args;
-			zbx_thread_start(zbx_alert_syncer_thread, &thread_args, &threads[i]);
-			break;
+		// case ZBX_PROCESS_TYPE_ALERTSYNCER:
+		// 	thread_args.args = &alert_syncer_args;
+		// 	zbx_thread_start(zbx_alert_syncer_thread, &thread_args, &threads[i]);
+		// 	break;
 			//	case ZBX_PROCESS_TYPE_HISTORYPOLLER:
 			//		poller_args.poller_type =  ITEM_TYPE_CALCULATED;
 			//		thread_args.args = &poller_args;

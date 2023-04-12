@@ -23,7 +23,8 @@
 #include "zbxself.h"
 #include "log.h"
 #include "zbxjson.h"
-#include "../alerter/alerter.h"
+//#include "../alerter/alerter.h"
+#include "zbxipcservice.h"
 #include "report_protocol.h"
 #include "zbxtime.h"
 
@@ -258,58 +259,59 @@ out:
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	rw_begin_report(zbx_ipc_message_t *msg, zbx_alerter_dispatch_t *dispatch,
-		const char *config_tls_ca_file, const char *config_tls_cert_file, const char *config_tls_key_file,
-		const char *config_source_ip, char **error)
-{
-	zbx_vector_ptr_pair_t	params;
-	int			i, ret, width, height;
-	const char		*subject = "", *message = "";
-	char			*url, *cookie, *report = NULL, *name;
-	size_t			report_size = 0;
+// static int	rw_begin_report(zbx_ipc_message_t *msg, zbx_alerter_dispatch_t *dispatch,
+// 		const char *config_tls_ca_file, const char *config_tls_cert_file, const char *config_tls_key_file,
+// 		const char *config_source_ip, char **error)
+// {
+// 	zbx_vector_ptr_pair_t	params;
+// 	int			i, ret, width, height;
+// 	const char		*subject = "", *message = "";
+// 	char			*url, *cookie, *report = NULL, *name;
+// 	size_t			report_size = 0;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_ptr_pair_create(&params);
+// 	zbx_vector_ptr_pair_create(&params);
 
-	report_deserialize_begin_report(msg->data, &name, &url, &cookie, &width, &height, &params);
+// 	report_deserialize_begin_report(msg->data, &name, &url, &cookie, &width, &height, &params);
 
-	for (i = 0; i < params.values_num; i++)
-	{
-		if (0 == strcmp(params.values[i].first, ZBX_REPORT_PARAM_SUBJECT))
-		{
-			subject = (char *)params.values[i].second;
-		}
-		else if (0 == strcmp(params.values[i].first, ZBX_REPORT_PARAM_BODY))
-		{
-			message = (char *)params.values[i].second;
-		}
-		else
-		{
-			zabbix_log(LOG_LEVEL_WARNING, "unsupported parameter: %s=%s", (char *)params.values[i].first,
-					(char *)params.values[i].second);
-		}
-	}
+// 	for (i = 0; i < params.values_num; i++)
+// 	{
+// 		if (0 == strcmp(params.values[i].first, ZBX_REPORT_PARAM_SUBJECT))
+// 		{
+// 			subject = (char *)params.values[i].second;
+// 		}
+// 		else if (0 == strcmp(params.values[i].first, ZBX_REPORT_PARAM_BODY))
+// 		{
+// 			message = (char *)params.values[i].second;
+// 		}
+// 		else
+// 		{
+// 			zabbix_log(LOG_LEVEL_WARNING, "unsupported parameter: %s=%s", (char *)params.values[i].first,
+// 					(char *)params.values[i].second);
+// 		}
+// 	}
 
-	if (SUCCEED == (ret = rw_get_report(url, cookie, width, height, &report, &report_size, config_tls_ca_file,
-			config_tls_cert_file, config_tls_key_file, config_source_ip, error)))
-	{
-		ret = zbx_alerter_begin_dispatch(dispatch, subject, message, name, "application/pdf", report,
-				report_size, error);
-	}
+// 	if (SUCCEED == (ret = rw_get_report(url, cookie, width, height, &report, &report_size, config_tls_ca_file,
+// 			config_tls_cert_file, config_tls_key_file, config_source_ip, error)))
+// 	{
+// 	//	ret = zbx_alerter_begin_dispatch(dispatch, subject, message, name, "application/pdf", report,
+// 	//			report_size, error);
+// 	HALT_HERE("Implement report sending");
+// 	}
 
-	zbx_free(report);
-	zbx_free(name);
-	zbx_free(url);
-	zbx_free(cookie);
+// 	zbx_free(report);
+// 	zbx_free(name);
+// 	zbx_free(url);
+// 	zbx_free(cookie);
 
-	report_destroy_params(&params);
+// 	report_destroy_params(&params);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s report_size:" ZBX_FS_SIZE_T, __func__, zbx_result_string(ret),
-			report_size);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s report_size:" ZBX_FS_SIZE_T, __func__, zbx_result_string(ret),
+// 			report_size);
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -323,33 +325,33 @@ static int	rw_begin_report(zbx_ipc_message_t *msg, zbx_alerter_dispatch_t *dispa
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	rw_send_report(zbx_ipc_message_t *msg, zbx_alerter_dispatch_t *dispatch, char **error)
-{
-	int			ret = FAIL;
-	zbx_vector_str_t	recipients;
-	ZBX_DB_MEDIATYPE		mt;
+// static int	rw_send_report(zbx_ipc_message_t *msg, zbx_alerter_dispatch_t *dispatch, char **error)
+// {
+// 	int			ret = FAIL;
+// 	zbx_vector_str_t	recipients;
+// 	ZBX_DB_MEDIATYPE		mt;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_str_create(&recipients);
+// 	zbx_vector_str_create(&recipients);
 
-	/* The message data is identical (mediatype + recipients) so currently it */
-	/* could be forwarded without deserializing/serializing it. Also it could */
-	/* have been directly sent from report manager to alert manager, however  */
-	/* then 'dispatch' message could be delivered before 'begin' message.     */
-	/* While sending through writer does add overhead, it also adds           */
-	/* synchronization. And the overhead is only at writer's side.            */
-	report_deserialize_send_report(msg->data, &mt, &recipients);
-	ret = zbx_alerter_send_dispatch(dispatch, &mt, &recipients, error);
+// 	/* The message data is identical (mediatype + recipients) so currently it */
+// 	/* could be forwarded without deserializing/serializing it. Also it could */
+// 	/* have been directly sent from report manager to alert manager, however  */
+// 	/* then 'dispatch' message could be delivered before 'begin' message.     */
+// 	/* While sending through writer does add overhead, it also adds           */
+// 	/* synchronization. And the overhead is only at writer's side.            */
+// 	report_deserialize_send_report(msg->data, &mt, &recipients);
+// 	ret = zbx_alerter_send_dispatch(dispatch, &mt, &recipients, error);
 
-	zbx_db_mediatype_clean(&mt);
-	zbx_vector_str_clear_ext(&recipients, zbx_str_free);
-	zbx_vector_str_destroy(&recipients);
+// 	zbx_db_mediatype_clean(&mt);
+// 	zbx_vector_str_clear_ext(&recipients, zbx_str_free);
+// 	zbx_vector_str_destroy(&recipients);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -362,18 +364,18 @@ static int	rw_send_report(zbx_ipc_message_t *msg, zbx_alerter_dispatch_t *dispat
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	rw_end_report(zbx_alerter_dispatch_t *dispatch, char **error)
-{
-	int	ret;
+// static int	rw_end_report(zbx_alerter_dispatch_t *dispatch, char **error)
+// {
+// 	int	ret;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	ret = zbx_alerter_end_dispatch(dispatch, error);
+// 	ret = zbx_alerter_end_dispatch(dispatch, error);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -384,19 +386,19 @@ static int	rw_end_report(zbx_alerter_dispatch_t *dispatch, char **error)
  *             error  - [IN] the error message                                *
  *                                                                            *
  ******************************************************************************/
-static void	rw_send_result(zbx_ipc_socket_t *socket, zbx_alerter_dispatch_t *dispatch, int status, char *error)
-{
-	unsigned char	*data;
-	zbx_uint32_t	size;
+// static void	rw_send_result(zbx_ipc_socket_t *socket, zbx_alerter_dispatch_t *dispatch, int status, char *error)
+// {
+// 	unsigned char	*data;
+// 	zbx_uint32_t	size;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() status:%d error:%s", __func__, status, ZBX_NULL2EMPTY_STR(error));
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() status:%d error:%s", __func__, status, ZBX_NULL2EMPTY_STR(error));
 
-	size = report_serialize_response(&data, status, error, &dispatch->results);
-	zbx_ipc_socket_write(socket, ZBX_IPC_REPORTER_RESULT, data, size);
-	zbx_free(data);
+// 	size = report_serialize_response(&data, status, error, &dispatch->results);
+// 	zbx_ipc_socket_write(socket, ZBX_IPC_REPORTER_RESULT, data, size);
+// 	zbx_free(data);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 ZBX_THREAD_ENTRY(report_writer_thread, args)
 {
@@ -408,7 +410,7 @@ ZBX_THREAD_ENTRY(report_writer_thread, args)
 	char				*error = NULL;
 	zbx_ipc_socket_t		socket;
 	zbx_ipc_message_t		message;
-	zbx_alerter_dispatch_t		dispatch = {0};
+	//zbx_alerter_dispatch_t		dispatch = {0};
 	int				report_status = FAIL, started_num = 0, sent_num = 0, finished_num = 0;
 	double				time_now, time_stat, time_wake, time_idle = 0;
 	const zbx_thread_info_t		*info = &((zbx_thread_args_t *)args)->info;
@@ -470,47 +472,47 @@ ZBX_THREAD_ENTRY(report_writer_thread, args)
 		time_wake = zbx_time();
 		zbx_update_env(get_process_type_string(process_type), time_wake);
 		time_idle += time_wake - time_now;
+		HALT_HERE("Sending of reports via alerts isn't implemented");
+		// switch (message.code)
+		// {
+		// 	case ZBX_IPC_REPORTER_BEGIN_REPORT:
+		// 		if (SUCCEED != (report_status = rw_begin_report(&message, &dispatch,
+		// 				poller_args_in->config_tls_ca_file,
+		// 				poller_args_in->config_tls_cert_file,
+		// 				poller_args_in->config_tls_key_file,
+		// 				poller_args_in->config_source_ip, &error)))
+		// 		{
+		// 			zabbix_log(LOG_LEVEL_DEBUG, "failed to begin report dispatch: %s", error);
+		// 		}
+		// 		else
+		// 		{
+		// 			started_num++;
+		// 		}
+		// 		break;
+		// 	case ZBX_IPC_REPORTER_SEND_REPORT:
+		// 		if (SUCCEED == report_status)
+		// 		{
+		// 			if (SUCCEED != (report_status = rw_send_report(&message, &dispatch, &error)))
+		// 				zabbix_log(LOG_LEVEL_DEBUG, "failed to send report: %s", error);
+		// 			else
+		// 				sent_num++;
+		// 		}
+		// 		break;
+		// 	case ZBX_IPC_REPORTER_END_REPORT:
+		// 		if (SUCCEED == report_status)
+		// 		{
+		// 			if (SUCCEED != (report_status = rw_end_report(&dispatch, &error)))
+		// 				zabbix_log(LOG_LEVEL_DEBUG, "failed to end report dispatch: %s", error);
+		// 			else
+		// 				finished_num++;
+		// 		}
 
-		switch (message.code)
-		{
-			case ZBX_IPC_REPORTER_BEGIN_REPORT:
-				if (SUCCEED != (report_status = rw_begin_report(&message, &dispatch,
-						poller_args_in->config_tls_ca_file,
-						poller_args_in->config_tls_cert_file,
-						poller_args_in->config_tls_key_file,
-						poller_args_in->config_source_ip, &error)))
-				{
-					zabbix_log(LOG_LEVEL_DEBUG, "failed to begin report dispatch: %s", error);
-				}
-				else
-				{
-					started_num++;
-				}
-				break;
-			case ZBX_IPC_REPORTER_SEND_REPORT:
-				if (SUCCEED == report_status)
-				{
-					if (SUCCEED != (report_status = rw_send_report(&message, &dispatch, &error)))
-						zabbix_log(LOG_LEVEL_DEBUG, "failed to send report: %s", error);
-					else
-						sent_num++;
-				}
-				break;
-			case ZBX_IPC_REPORTER_END_REPORT:
-				if (SUCCEED == report_status)
-				{
-					if (SUCCEED != (report_status = rw_end_report(&dispatch, &error)))
-						zabbix_log(LOG_LEVEL_DEBUG, "failed to end report dispatch: %s", error);
-					else
-						finished_num++;
-				}
+		// 		rw_send_result(&socket, &dispatch, report_status, error);
 
-				rw_send_result(&socket, &dispatch, report_status, error);
-
-				zbx_alerter_clear_dispatch(&dispatch);
-				zbx_free(error);
-				break;
-		}
+		// 		zbx_alerter_clear_dispatch(&dispatch);
+		// 		zbx_free(error);
+		// 		break;
+		// }
 
 		zbx_ipc_message_clean(&message);
 	}
