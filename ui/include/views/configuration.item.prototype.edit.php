@@ -29,7 +29,7 @@ $html_page = (new CHtmlPage())
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_ITEM_PROTOTYPE_EDIT));
 
 if (!empty($data['hostid'])) {
-	$html_page->setNavigation(getHostNavigation('items', $data['hostid'], $data['parent_discoveryid']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostid']))); 
 }
 
 $url = (new CUrl('disc_prototypes.php'))

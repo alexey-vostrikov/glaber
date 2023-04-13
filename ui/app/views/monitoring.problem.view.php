@@ -54,11 +54,11 @@ if ($data['action'] === 'problem.view') {
 		);
 
 
-if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
+	if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 
-        if (isset($data['filter']) && isset($data['filter']['filter_src'])  && count ($data['filter']['filter_src']['hostids']) == 1){
-            $html_page->setNavigation(new CHostNav(CHostNav::getData($data['filter']['filter_src']['hostids'][0])));
-        }
+		if (isset($data['filter']) && isset($data['filter']['hostids'])  && count ($data['filter']['hostids']) == 1){
+			$html_page->setNavigation(new CHostNav(CHostNav::getData($data['filter']['hostids'][0])));
+		}
 
 		$filter = (new CTabFilter())
 			->setId('monitoring_problem_filter')

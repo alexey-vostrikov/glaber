@@ -44,7 +44,8 @@ $html_page = (new CHtmlPage())
 				)
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->setNavigation(getHostNavigation('items', $data['hostid'], $data['parent_discoveryid']));
+	//->setNavigation(
+	->setNavigation(new CHostNav(CHostNav::getData($data['hostid']))); 
 
 $url = (new CUrl('disc_prototypes.php'))
 	->setArgument('parent_discoveryid', $data['parent_discoveryid'])

@@ -42,7 +42,8 @@ if ($data['hostid'] != 0) {
 			$host_table_element = '';
 	}
 
-	$html_page->setNavigation(getHostNavigation($host_table_element, $data['hostid']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostid']))); 
+	
 }
 
 // create form

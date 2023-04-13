@@ -30,7 +30,7 @@ $html_page = (new CHtmlPage())
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_TEMPLATES_EDIT));
 
 if ($data['form'] !== 'clone' && $data['form'] !== 'full_clone') {
-	$html_page->setNavigation(getHostNavigation('', $data['templateid']));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['templateid']))); 
 }
 
 $tabs = new CTabView();

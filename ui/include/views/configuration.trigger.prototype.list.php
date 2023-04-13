@@ -44,7 +44,7 @@ $html_page = (new CHtmlPage())
 				)
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->setNavigation(getHostNavigation('triggers', $this->data['hostid'], $this->data['parent_discoveryid']));
+	->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid']))); 
 
 $url = (new CUrl('trigger_prototypes.php'))
 	->setArgument('parent_discoveryid', $data['parent_discoveryid'])

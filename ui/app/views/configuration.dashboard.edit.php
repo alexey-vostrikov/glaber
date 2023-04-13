@@ -64,7 +64,7 @@ $html_page = (new CHtmlPage())
 					->addClass(ZBX_STYLE_DASHBOARD_EDIT)
 			)
 	)
-	->setNavigation(getHostNavigation('dashboards', $data['dashboard']['templateid']));
+c
 
 $dashboard = (new CDiv())
 	->addClass(ZBX_STYLE_DASHBOARD)

@@ -83,6 +83,6 @@ $form->addItem([
 				))
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->setNavigation(getHostNavigation('dashboards', $data['templateid']))
+	->setNavigation(new CHostNav(CHostNav::getData($data['templateid'])))
 	->addItem($form)
 	->show();
