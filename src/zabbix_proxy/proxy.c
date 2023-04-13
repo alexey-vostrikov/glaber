@@ -204,7 +204,7 @@ char *CONFIG_VCDUMP_LOCATION	= NULL;
 int CONFIG_DISABLE_SNMPV1_ASYNC = 0;
 int CONFIG_SELF_MONITOR_PORT		= DEFAULT_SELF_MONITOR_PORT;
 char	*CONFIG_SELF_MONITOR_IP		= NULL;
-
+int CONFIG_ICMP_NA_ON_RESOLVE_FAIL = 0;
 
 
 char	*CONFIG_SOURCE_IP = NULL;
@@ -854,6 +854,9 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
+
+       {"IcmpNaResloveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
+        PARM_OPT,       0,                      1},
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"SnmpDisableSNMPV1Async",			&CONFIG_DISABLE_SNMPV1_ASYNC,			TYPE_INT,

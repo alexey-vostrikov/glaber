@@ -117,6 +117,30 @@ static void delete_item(poller_item_t *poller_item)
     zbx_free(worker);
 }
 
+static int json_responce_has_timestamp(char *data, u_int64_t *timestamp) {
+    struct zbx_json_parse jp;
+    int err_flag;
+    long int ts;
+
+    if (SUCCEED != zbx_json_open(data, &jp))
+        return FAIL;
+
+    if (FAIL != (ts = glb_json_get_int_value_by_name(&jp, "timestamp", &err_flag))) {
+        if (ts < 1000000000) //year 2001, no data expected that old
+            return FAIL;
+
+        if (ts > 16000000000) //year 2477 
+            ts = ts / 1000; // maybe its msec time
+         
+        if (ts > 1000000000  && //~2001
+            ts < 10000000000 ) // ~2286
+            return ts;
+    }
+
+    return FAIL;
+}
+
+
 #define MAX_ITERATIONS 10000
 ITEMS_ITERATOR(check_workers_data_cb)
 {
@@ -124,6 +148,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
     int iterations = 0;
     int now = time(NULL);
     char *worker_response = NULL;
+    u_int64_t timestamp = 0;
 
     /* workers have own alive and restart checks, we don't bother here*/
     while (iterations < MAX_ITERATIONS)
@@ -135,7 +160,12 @@ ITEMS_ITERATOR(check_workers_data_cb)
 
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_response);
         poller_inc_responses();
-        poller_preprocess_str_value(poller_item, worker_response);
+        
+        if (SUCCEED == json_responce_has_timestamp(worker_response, &timestamp))
+            poller_preprocess_str_timestamp(poller_item, timestamp, worker_response);
+        else
+            poller_preprocess_str_value(poller_item, worker_response);
+        
         worker->last_heard = now;
         zbx_free(worker_response);
     }
@@ -169,6 +199,7 @@ static int forks_count(void)
 
 int glb_worker_server_init(void)
 {
-    poller_set_poller_callbacks(init_item, delete_item, handle_async_io, NULL, NULL, forks_count, NULL);
+    poller_set_poller_callbacks(init_item, delete_item, handle_async_io, NULL, NULL, 
+            forks_count, NULL, NULL);
     return SUCCEED;
 }

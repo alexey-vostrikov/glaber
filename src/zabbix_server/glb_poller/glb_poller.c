@@ -99,6 +99,7 @@ typedef struct
 	shutdown_cb shutdown;
 	forks_count_cb forks_count;
 	poller_resolve_cb resolve_callback;
+	poller_resolve_fail_cb resolve_fail_callback;
 } poll_module_t;
 
 typedef struct
@@ -525,6 +526,7 @@ static int poller_init(zbx_thread_args_t *args)
 	}
 	
 	poller_async_set_resolve_cb(conf.poller.resolve_callback);
+	 poller_async_set_resolve_fail_cb(conf.poller.resolve_fail_callback);
 
 	apm_track_counter(&conf.total_requests, "requests", NULL);
 	apm_add_proc_labels(&conf.total_requests);
@@ -633,7 +635,8 @@ void poller_register_item_succeed(poller_item_t *item)
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown,
-								 forks_count_cb forks_count, poller_resolve_cb resolve_callback)
+								 forks_count_cb forks_count, poller_resolve_cb resolve_callback,
+								 poller_resolve_fail_cb resolve_fail_callback)
 {
 	conf.poller.init_item = init_item;
 	conf.poller.delete_item = delete_item;
@@ -642,6 +645,7 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 	conf.poller.shutdown = shutdown;
 	conf.poller.forks_count = forks_count;
 	conf.poller.resolve_callback = resolve_callback;
+	conf.poller.resolve_fail_callback = resolve_fail_callback;
 }
 
 void poller_preprocess_error(poller_item_t *poller_item, const char *error)  
@@ -682,11 +686,11 @@ void poller_preprocess_uint64_value(poller_item_t *poller_item, u_int64_t value)
 	zbx_free_agent_result(&result);
 }
 
-void poller_preprocess_str_value(poller_item_t *poller_item, char* value) {
+void poller_preprocess_str_timestamp(poller_item_t *poller_item, u_int64_t timestamp, char *value) {
 	AGENT_RESULT result;
 	zbx_timespec_t ts;
 
-	zbx_timespec(&ts);
+	ts.sec = timestamp;
 
 	zbx_init_agent_result(&result);
 	SET_TEXT_RESULT(&result, strdup(value));
@@ -697,6 +701,13 @@ void poller_preprocess_str_value(poller_item_t *poller_item, char* value) {
 	zbx_free_agent_result(&result);
 }
 
+void poller_preprocess_str_value(poller_item_t *poller_item, char* value) {
+	AGENT_RESULT result;
+	zbx_timespec_t ts;
+
+	zbx_timespec(&ts);
+	poller_preprocess_str_timestamp(poller_item, ts.sec, value);
+}
 
 void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error)
 {

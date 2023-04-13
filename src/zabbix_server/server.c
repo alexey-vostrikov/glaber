@@ -103,6 +103,7 @@ u_int64_t CONFIG_DEBUG_TRIGGER = 0;
 int CONFIG_ICMP_METHOD = GLB_ICMP;
 char *CONFIG_VCDUMP_LOCATION = NULL;
 int CONFIG_VCDUMP_FREQUENCY = 60;
+int CONFIG_ICMP_NA_ON_RESOLVE_FAIL = 0;
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -955,6 +956,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 		{
 			/* PARAMETER,			VAR,					TYPE,
 				MANDATORY,	MIN,			MAX */
+            {"IcmpNaResloveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
+            PARM_OPT,       0,                      1},
 			{"SnmpDisableSNMPV1Async", &CONFIG_DISABLE_SNMPV1_ASYNC, TYPE_INT,
 			 PARM_OPT, 0, 1},
 			{"SnmpRetries", &CONFIG_SNMP_RETRIES, TYPE_INT,

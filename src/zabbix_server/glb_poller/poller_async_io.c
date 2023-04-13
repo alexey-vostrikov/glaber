@@ -29,6 +29,7 @@ typedef struct {
 	struct evdns_base *evdns_base;
 	struct event_base *events_base;
 	resolve_cb resolve_callback;
+	resolve_fail_cb resolve_fail_callback;
 	u_int32_t dns_requests;
 } async_poller_conf_t;
 
@@ -114,9 +115,16 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 		return;
 	
 	if (DNS_ERR_NONE != result) {
+	    DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
+
+        if (NULL != conf.resolve_fail_callback) {
+            DEBUG_ITEM(poller_get_item_id(poller_item), "Calling specific resolve fail func");
+            conf.resolve_fail_callback(poller_item);
+            return;
+        }
+
 		char buff[MAX_STRING_LEN];
 
-		DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
 		zbx_snprintf(buff, MAX_STRING_LEN, "Couldn't resolve item's hostname, errcode is %d, returned %d records", result, count);
 		poller_preprocess_error(poller_item, buff);
 		poller_return_item_to_queue(poller_item);
@@ -135,6 +143,10 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 }
 void poller_async_set_resolve_cb(resolve_cb callback) {
 	conf.resolve_callback = callback;
+}
+
+void poller_async_set_resolve_fail_cb(resolve_fail_cb callback) {
+       conf.resolve_fail_callback = callback;
 }
 
 int poller_async_get_dns_requests() {

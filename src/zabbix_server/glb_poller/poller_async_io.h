@@ -15,7 +15,7 @@
 ** You should have received a copy of the GNU General Public License
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-**/
+**/ 
 #include "log.h"
 #include "zbxcommon.h"
 #include "glb_poller.h"
@@ -25,6 +25,7 @@ typedef struct poller_event_t poller_event_t;
 
 /*async resolve interface */
 typedef void (*resolve_cb)(poller_item_t *poller_item, const char* ipv4_addr);
+typedef void (*resolve_fail_cb)(poller_item_t *poller_item);
 typedef void (*poller_event_cb)(poller_item_t *poller_item, void *data);
 
 
@@ -40,6 +41,7 @@ int   poller_destroy_event(poller_event_t *event);
 void  poller_disable_event(poller_event_t *poll_event);
 
 void  poller_async_set_resolve_cb(resolve_cb callback);
+void  poller_async_set_resolve_fail_cb(resolve_fail_cb callback);
 int   poller_async_get_dns_requests();
 struct event_base* poller_async_get_events_base();
 

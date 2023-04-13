@@ -76,6 +76,7 @@ extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_GLBMAP_LOCATION;
 extern char *CONFIG_GLBMAP_OPTIONS;
 extern char *CONFIG_SOURCE_IP;
+extern int CONFIG_ICMP_NA_ON_RESOLVE_FAIL;
 
 static int pinger_process_response(poller_item_t *poller_item, int rtt) {
     
@@ -108,11 +109,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
     AGENT_RESULT result;
     
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
-    
-    //LOG_INF("Pinger item is %p, time event is %p", pinger_item, pinger_item->time_event);
-
     poller_disable_event(pinger_item->timeout_event);
-    //pinger_item->time_event = NULL;
     
     zbx_init_agent_result(&result);
         
@@ -347,7 +344,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
 
 void send_timeout_cb(poller_item_t *poller_item, void *data) {
     DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
-    finish_icmp_poll(poller_item, ITEM_STATE_NORMAL, NULL, glb_ms_time());
+    finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
     poller_register_item_timeout(poller_item);
 }
 
@@ -513,6 +510,21 @@ static void resolved_callback(poller_item_t *poller_item, const char *addr) {
     schedule_item_poll(poller_item);
 }
 
+static void resolve_fail_callback(poller_item_t *poller_item) {
+    pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
+    
+    if (CONFIG_ICMP_NA_ON_RESOLVE_FAIL) {
+        
+        pinger_item->sent = pinger_item->count;
+        pinger_item->rcv = 0;
+
+        finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
+        return;
+    } 
+    
+    finish_icmp_poll(poller_item, FAIL, "Failed to resolve host name", glb_ms_time());
+}
+
 /******************************************************************************
  * start pinging an item             										  * 
  * ***************************************************************************/
@@ -577,7 +589,7 @@ void glb_pinger_init(void) {
 	conf.sent_packets = 0;
 
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_ping, pings_shutdown, 
-        forks_count,  resolved_callback);    
+        forks_count,  resolved_callback, resolve_fail_callback);    
  
     add_params[0]='\0';
 

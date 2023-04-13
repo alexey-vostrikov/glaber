@@ -383,7 +383,8 @@ void glb_worker_poller_init(void) {
 		zbx_error("cannot set sigprocmask to block the user signal");
 
     zbx_hashset_create(&conf.workers, 10, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-    poller_set_poller_callbacks(init_item, free_item, handle_async_io, send_request, worker_shutdown, forks_count, NULL);
+    poller_set_poller_callbacks(init_item, free_item, handle_async_io, send_request, worker_shutdown, 
+                    forks_count, NULL, NULL);
 
     if (NULL == CONFIG_WORKERS_DIR ) {
         zabbix_log(LOG_LEVEL_WARNING, "Warning: trying to run glb_worker without 'WorkersScript' set in the config file, not starting");
