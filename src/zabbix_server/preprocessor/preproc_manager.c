@@ -1058,7 +1058,7 @@ static void	preprocessor_enqueue(zbx_preprocessing_manager_t *manager, zbx_prepr
 	item = (zbx_preproc_item_t *)zbx_hashset_search(&manager->item_config, &item_local);
 	
 	if (NULL != item) {
-		DEBUG_ITEM(item->itemid,"Recieved item %ld for preprocessing",item->itemid);
+		DEBUG_ITEM(item->itemid,"Recieved for preprocessing timestamp %ld", value->ts->sec);
 	}
 
 	/* override priority based on item type */

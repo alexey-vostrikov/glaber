@@ -1570,7 +1570,7 @@ void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigne
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	int manager_num = ( hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN] );
-	DEBUG_ITEM(itemid,"Preparing item to send to preprocessing");
+	DEBUG_ITEM(itemid,"Preparing item to send to preprocessing timestamp %ld", ts->sec);
 
 	if (ITEM_STATE_NORMAL == state)
 	{

@@ -117,7 +117,7 @@ static void delete_item(poller_item_t *poller_item)
     zbx_free(worker);
 }
 
-static int json_responce_has_timestamp(char *data, u_int64_t *timestamp) {
+static int json_responce_has_timestamp(char *data) {
     struct zbx_json_parse jp;
     int err_flag;
     long int ts;
@@ -127,7 +127,9 @@ static int json_responce_has_timestamp(char *data, u_int64_t *timestamp) {
 
     if ((FAIL != (ts = glb_json_get_int_value_by_name(&jp, "timestamp", &err_flag))) ||   
         (FAIL != (ts = glb_json_get_int_value_by_name(&jp, "time", &err_flag))) ) {
-
+        
+       // LOG_INF("Found time attribute value is %ld", ts);
+        
         if (ts < 1000000000) //year 2001, no data expected that old
             return FAIL;
 
@@ -135,8 +137,10 @@ static int json_responce_has_timestamp(char *data, u_int64_t *timestamp) {
             ts = ts / 1000; // maybe its msec time
          
         if (ts > 1000000000  && //~2001
-            ts < 10000000000 ) // ~2286
+            ts < 10000000000 ) {// ~2286
+          //  LOG_INF("Resulting Found data time is %ld", ts);
             return ts;
+            }
     }
 
     return FAIL;
@@ -163,7 +167,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_response);
         poller_inc_responses();
         
-        if (SUCCEED == json_responce_has_timestamp(worker_response, &timestamp)) 
+        if (FAIL != ( timestamp = json_responce_has_timestamp(worker_response))) 
             poller_preprocess_str_timestamp(poller_item, timestamp, worker_response);
         else
             poller_preprocess_str_value(poller_item, worker_response);
