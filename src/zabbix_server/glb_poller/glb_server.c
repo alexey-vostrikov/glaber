@@ -125,7 +125,9 @@ static int json_responce_has_timestamp(char *data, u_int64_t *timestamp) {
     if (SUCCEED != zbx_json_open(data, &jp))
         return FAIL;
 
-    if (FAIL != (ts = glb_json_get_int_value_by_name(&jp, "timestamp", &err_flag))) {
+    if ((FAIL != (ts = glb_json_get_int_value_by_name(&jp, "timestamp", &err_flag))) ||   
+        (FAIL != (ts = glb_json_get_int_value_by_name(&jp, "time", &err_flag))) ) {
+
         if (ts < 1000000000) //year 2001, no data expected that old
             return FAIL;
 
@@ -161,7 +163,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_response);
         poller_inc_responses();
         
-        if (SUCCEED == json_responce_has_timestamp(worker_response, &timestamp))
+        if (SUCCEED == json_responce_has_timestamp(worker_response, &timestamp)) 
             poller_preprocess_str_timestamp(poller_item, timestamp, worker_response);
         else
             poller_preprocess_str_value(poller_item, worker_response);

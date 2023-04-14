@@ -956,7 +956,7 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 		{
 			/* PARAMETER,			VAR,					TYPE,
 				MANDATORY,	MIN,			MAX */
-            {"IcmpNaResloveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
+            {"IcmpNaResolveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
             PARM_OPT,       0,                      1},
 			{"SnmpDisableSNMPV1Async", &CONFIG_DISABLE_SNMPV1_ASYNC, TYPE_INT,
 			 PARM_OPT, 0, 1},
