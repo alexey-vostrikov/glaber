@@ -21,7 +21,9 @@ variables:
   # used for build docker images
   BUILDER_VERSION: 1.0.1
   # used for build debian based apt
-  DEBIAN_BUILDER_VERSION: 1.0.5
+  DEBIAN_BUILDER_VERSION: 1.0.6
+  # used for build ubuntu based apt
+  UBUNTU_BUILDER_VERSION: 1.0.1
   KANIKO_VERSION: 1.9.2
 
 stages:
@@ -186,12 +188,9 @@ ubuntu-focal:
   variables:
     OS: ubuntu
     OS_VER: focal
-  image: ${OS}:${OS_VER}
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
   script:
-    - apt-get update
-    - *install_common_apt
-    - apt-get --ignore-missing install -y default-libmysqlclient-dev libssh-dev sass
-    - *build_go
+    - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
@@ -202,11 +201,9 @@ ubuntu-bionic:
   variables:
     OS: ubuntu
     OS_VER: bionic
-  image: ${OS}:${OS_VER}
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
   script:
-    - *install_common_apt
-    - apt-get --ignore-missing install -y default-libmysqlclient-dev libssh-dev sass
-    - *build_go
+    - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
@@ -289,6 +286,40 @@ debian-bullseye-builder:
     BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
     BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${DEBIAN_BUILDER_VERSION}
+    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
+  script:
+    - *kaniko_build
+  rules:
+    - if: '$PREBUILD'
+
+ubuntu-bionic-builder:
+  stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  variables:
+    OS: ubuntu
+    OS_VER: bionic
+    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
+    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
+    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
+  script:
+    - *kaniko_build
+  rules:
+    - if: '$PREBUILD'
+
+ubuntu-focal-builder:
+  stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  variables:
+    OS: ubuntu
+    OS_VER: focal
+    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
+    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
     CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
   script:
     - *kaniko_build
