@@ -3,7 +3,7 @@ ARG OS_VER
 FROM ${OS}:${OS_VER}
 
 RUN apt-get -qq update && \
-    DEBIAN_FRONTEND=noninteractive && \
+    export DEBIAN_FRONTEND=noninteractive && \
     GO_VER=1.16.2 && \
     apt-get --ignore-missing install -yqq sshpass \
     build-essential cmake libgmp3-dev gengetopt  \
@@ -14,12 +14,15 @@ RUN apt-get -qq update && \
     libcurl4-openssl-dev libldap2-dev libiksemel-dev \
     libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk \
     libxml2-dev libpcre3-dev libevent-dev curl libssl-dev \
-    libmariadb-dev default-libmysqlclient-dev libssh-dev sass && \
+    lsb-release default-libmysqlclient-dev libssh-dev sass && \
     wget -q https://golang.org/dl/go${GO_VER}.linux-amd64.tar.gz && \
     rm -rf /usr/local/go && \
     tar -C /usr/local -xzf go${GO_VER}.linux-amd64.tar.gz && \
     rm go${GO_VER}.linux-amd64.tar.gz && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN lsb_release -cs | grep bullseye && \
+    apt-get install -y libmariadb-dev || true
 
 # Set environment variables
 ENV PATH="/usr/local/go/bin:${PATH}"
