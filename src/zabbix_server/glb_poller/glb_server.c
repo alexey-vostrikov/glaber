@@ -128,8 +128,6 @@ static int json_responce_has_timestamp(char *data) {
     if ((FAIL != (ts = glb_json_get_int_value_by_name(&jp, "timestamp", &err_flag))) ||   
         (FAIL != (ts = glb_json_get_int_value_by_name(&jp, "time", &err_flag))) ) {
         
-       // LOG_INF("Found time attribute value is %ld", ts);
-        
         if (ts < 1000000000) //year 2001, no data expected that old
             return FAIL;
 
@@ -138,7 +136,6 @@ static int json_responce_has_timestamp(char *data) {
          
         if (ts > 1000000000  && //~2001
             ts < 10000000000 ) {// ~2286
-          //  LOG_INF("Resulting Found data time is %ld", ts);
             return ts;
             }
     }
