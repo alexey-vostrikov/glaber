@@ -466,7 +466,18 @@ class CApiService {
 			$sqlParts['from'][] = $table_id;
 		}
 
-		$sqlSelect = implode(',', array_unique($sqlParts['select']));
+        $sql_left_join_ex = '';
+        if (array_key_exists('left_join_ex', $sqlParts)) {
+            foreach ($sqlParts['left_join_ex'] as $join) {
+                $sql_left_join_ex .= ' LEFT JOIN '.$join['table'].' '.$join['alias'].' ON ';
+                foreach ($join['on'] as $a => $b) {
+                    $sql_left_join_ex .= $a . '=' . $b . ' ';
+                }
+            }
+        }
+
+
+        $sqlSelect = implode(',', array_unique($sqlParts['select']));
 		$sqlFrom = implode(',', array_unique($sqlParts['from']));
 		$sqlWhere = empty($sqlParts['where']) ? '' : ' WHERE '.implode(' AND ', array_unique($sqlParts['where']));
 		$sqlGroup = empty($sqlParts['group']) ? '' : ' GROUP BY '.implode(',', array_unique($sqlParts['group']));
@@ -475,6 +486,7 @@ class CApiService {
 		return 'SELECT'.self::dbDistinct($sqlParts).' '.$sqlSelect.
 				' FROM '.$sqlFrom.
 				$sql_left_join.
+                $sql_left_join_ex.
 				$sqlWhere.
 				$sqlGroup.
 				$sqlOrder;
