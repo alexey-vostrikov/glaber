@@ -68,8 +68,11 @@ static int	GLB_DBpatch_3000006(void)
 	return DBadd_foreign_key("hosts_depends", 2, &field);
 }
 
+static int	GLB_DBpatch_3000007(void)
+{
+	return DBcreate_index("hosts_depends", "hosts_depends_up_down_name_idx", "hostid_up,hostid_down,name", 1);
+}
 #endif
-
 
 GLB_DBPATCH_START(3000)
 
@@ -80,6 +83,8 @@ GLB_DBPATCH_ADD(3000002, 0, 1)
 GLB_DBPATCH_ADD(3000003, 0, 1)
 GLB_DBPATCH_ADD(3000004, 0, 1)
 GLB_DBPATCH_ADD(3000005, 0, 1)
+GLB_DBPATCH_ADD(3000006, 0, 1)
+GLB_DBPATCH_ADD(3000007, 0, 1)
 #endif
 
 DBPATCH_END()
