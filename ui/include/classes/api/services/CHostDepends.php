@@ -36,6 +36,7 @@ class CHostDepends extends CApiService
             'with_hostname' => false,
             'countOutput' => false,
             'preservekeys' => false,
+            'searchByAny' => false,
             'sortfield' => '',
             'sortorder' => '',
             'limit' => null
