@@ -217,7 +217,7 @@ class CControllerHostUpdate extends CControllerHostUpdateGeneral {
 
         $db_depends = API::HostDepends()->get([
             'output' => API_OUTPUT_EXTEND,
-            'hostids' => $hostid,
+            'hostId' => (int)$hostid,
             'preservekeys' => true
         ]);
 
