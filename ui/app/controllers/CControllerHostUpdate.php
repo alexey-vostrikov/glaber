@@ -211,6 +211,10 @@ class CControllerHostUpdate extends CControllerHostUpdateGeneral {
 
     private function processDepends($hostid, array $depends)
     {
+        if ($hostid == null){
+            return true;
+        }
+
         $db_depends = API::HostDepends()->get([
             'output' => API_OUTPUT_EXTEND,
             'hostids' => $hostid,
