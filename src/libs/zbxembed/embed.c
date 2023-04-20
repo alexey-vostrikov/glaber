@@ -312,7 +312,7 @@ int	zbx_es_init_env(zbx_es_t *es, char **error)
 	}
 
 	///* initialize Zabbix object */
-	//zbx_es_init_zabbix(es, error);
+	zbx_es_init_zabbix(es, error);
 
 	/* initialize console object */
 	zbx_es_init_console(es, error);
