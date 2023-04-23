@@ -1,4 +1,4 @@
-ver 3.0.51
+ver 3.0.52
     - fixed support of 'Zabbix' object in javascript
 ver 3.0.50
     - added time attribute to parse from server data
