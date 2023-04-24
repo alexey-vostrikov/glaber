@@ -214,9 +214,9 @@ foreach ($data['items'] as $item) {
 				->setArgument('backurl', $backurl)
 		);
 
-		if ($trigger['state'] == TRIGGER_STATE_UNKNOWN) {
-			$trigger['error'] = '';
-		}
+	//	if ($trigger['state'] == TRIGGER_STATE_UNKNOWN) {
+	//		$trigger['error'] = '';
+	//	}
 
 		if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
 			$expression = [
@@ -233,7 +233,7 @@ foreach ($data['items'] as $item) {
 			$trigger_description,
 			(new CDiv($expression))->addClass(ZBX_STYLE_WORDWRAP),
 			(new CSpan(triggerIndicator($trigger['status'], $trigger['state'])))
-				->addClass(triggerIndicatorStyle($trigger['status'], $trigger['state']))
+				->addClass(triggerIndicatorStyle($trigger['status'], $trigger['value']))
 		]);
 	}
 	unset($trigger);

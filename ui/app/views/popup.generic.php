@@ -345,8 +345,8 @@ switch ($data['popup_type']) {
 				$check_box,
 				$description,
 				CSeverityHelper::makeSeverityCell((int) $trigger['priority']),
-				(new CSpan(triggerIndicator($trigger['status'], $trigger['state'])))
-					->addClass(triggerIndicatorStyle($trigger['status'], $trigger['state']))
+				(new CSpan(triggerIndicator($trigger['status'], $trigger['value'])))
+					->addClass(triggerIndicatorStyle($trigger['status'], $trigger['value']))
 			]);
 
 			if ($data['multiselect']) {
