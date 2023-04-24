@@ -321,7 +321,8 @@ static int event_actions_calc_escalate_actions(events_processor_event_t *event, 
 				//{
 				//	execute_operations(event, action->actionid);
 				//}
-				HALT_HERE("This is where the escalation starts, not implemented yet");
+				//HALT_HERE("This is where the escalation starts, not implemented yet");
+				LOG_INF("This is where the escalation starts, not implemented yet");
 			}
 		}
 

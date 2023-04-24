@@ -1,6 +1,5 @@
 /*
-** Glaber
-** Copyright (C) 2001-2030 Glaber JSC
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,27 +16,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#ifndef GLB_ALERTER_H
-#define GLB_ALERTER_H
-
 #include "zbxcommon.h"
-#include "zbxcomms.h"
-#include "zbxthreads.h"
+#include "../items/conf_items.h"
 
-typedef struct
-{
-	//zbx_config_tls_t	*zbx_config_tls;
-	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
-	int			config_timeout;
-} glb_alerter_args;
+typedef struct glb_conf_mediatype_t glb_conf_mediatype_t;
 
-typedef struct {
-	void *placeholder;
-} glb_alert_t;
 
-int glb_alerting_init(); //called from the parent fork to init alerting shmem ipc
-int glb_alerter_send_alert();
+void glb_conf_mediatype_free(glb_conf_mediatype_t *vm, mem_funcs_t *memf, strpool_t *strpool);
+glb_conf_mediatype_t *glb_conf_mediatype_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
 
-ZBX_THREAD_ENTRY(glb_alerter_thread, args);
-
-#endif

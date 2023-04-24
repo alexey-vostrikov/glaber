@@ -37,6 +37,7 @@
 #include "zbxcomms.h"
 
 //#include "alerter/alerter.h"
+#include "glb_events_processor/glb_events_processor.h"
 #include "dbsyncer/dbsyncer.h"
 #include "dbconfig/dbconfig.h"
 #include "discoverer/discoverer.h"
@@ -47,10 +48,10 @@
 #include "poller/poller.h"
 #include "glb_poller/glb_poller.h"
 #include "glb_poller/poller_ipc.h"
+#include "glb_alerter/glb_alerter.h"
 #include "timer/timer.h"
 #include "trapper/trapper.h"
 #include "snmptrapper/snmptrapper.h"
-#include "glb_events_processor/glb_events_processor.h"
 #include "proxypoller/proxypoller.h"
 #include "vmware/vmware.h"
 #include "taskmanager/taskmanager.h"
@@ -87,8 +88,6 @@
 #include "zbxipcservice.h"
 #include "preprocessor/preproc_stats.h"
 #include "glb_preproc.h"
-#include "glb_events_processor/glb_events_processor.h"
-
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
@@ -680,6 +679,10 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_ODBCPOLLER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ODBCPOLLER];
+	} 	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER]))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_ALERTER;
+		*local_process_num = local_server_num - server_count + CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER];
 	}
 	else {
 		LOG_INF("Local server num: %d, server_count is %d", local_server_num, server_count);
@@ -692,6 +695,8 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
  * sets defaults before cfg is parsed *
  * ************************************/
 void glb_set_pre_config_defaults() {
+	//TODO: move all initialization here, current implementation is prone to errors
+
 	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_API_TRAPPER] = 0;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_EVENTS_PROCESSOR] = 1;
@@ -700,10 +705,8 @@ void glb_set_pre_config_defaults() {
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 2;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 0;
-	CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER] = 0;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER] = 2;
 
-
-	
 }
 
 
@@ -1669,7 +1672,13 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		zbx_error("Cannot initialize events processing IPC");
 		exit(EXIT_FAILURE);
 	}
-		
+
+	if (FAIL == glb_alerting_init()) {
+		zbx_error("Cannot initialize alerter IPC");
+		exit(EXIT_FAILURE);
+	}
+	
+
 	if (NULL != CONFIG_VCDUMP_LOCATION && FAIL == glb_state_load())
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "Failed to check read-write permissions on cache file %s, check permissions", CONFIG_VCDUMP_LOCATION);
@@ -1827,9 +1836,9 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			thread_args.args = &pinger_args;
 			zbx_thread_start(pinger_thread, &thread_args, &threads[i]);
 			break;
-//		case ZBX_PROCESS_TYPE_ALERTER:
-//			zbx_thread_start(zbx_alerter_thread, &thread_args, &threads[i]);
-//			break;
+		case GLB_PROCESS_TYPE_ALERTER:
+			zbx_thread_start(glb_alerter_thread, &thread_args, &threads[i]);
+			break;
 		case ZBX_PROCESS_TYPE_HOUSEKEEPER:
 			thread_args.args = &housekeeper_args;
 			zbx_thread_start(housekeeper_thread, &thread_args, &threads[i]);

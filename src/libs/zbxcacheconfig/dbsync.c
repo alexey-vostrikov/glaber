@@ -3025,38 +3025,6 @@ int	zbx_dbsync_compare_corr_operations(zbx_dbsync_t *sync)
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-/*
-CREATE TABLE valuemap (
-	valuemapid               bigint                                    NOT NULL,
-	hostid                   bigint                                    NOT NULL,
-	name                     varchar(64)     DEFAULT ''                NOT NULL,
-	uuid                     varchar(32)     DEFAULT ''                NOT NULL,
-	PRIMARY KEY (valuemapid)
-);
-CREATE TABLE valuemap_mapping (
-	valuemap_mappingid       bigint                                    NOT NULL,
-	valuemapid               bigint                                    NOT NULL,
-	value                    varchar(64)     DEFAULT ''                NOT NULL,
-	newvalue                 varchar(64)     DEFAULT ''                NOT NULL,
-	type                     integer         DEFAULT '0'               NOT NULL,
-	sortorder                integer         DEFAULT '0'               NOT NULL,
-	PRIMARY KEY (valuemap_mappingid)
-);
-
-/*jsonrpc": "2.0",     "result": [  
-        
-		{           "valuemapid": "4",
-                    "name": "APC Battery Replacement Status",
-                    "mappings": [ 
-                        {  "type": "0",
-                            "value": "1",
-                            "newvalue": "unknown"
-                        }, 
-                        {   "type": "0",
-                            "value": "2",                     
-							"newvalue": "notInstalled"      
-                        .... */
-
 int	zbx_dbsync_compare_valuemaps()
 {
 	DB_ROW			dbrow;

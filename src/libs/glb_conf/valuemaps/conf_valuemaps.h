@@ -22,4 +22,5 @@
 
 int glb_conf_valuemaps_init(mem_funcs_t *memf);
 int glb_conf_valuemaps_set_data(char *json_buffer);
+//the primary func valuemaps are for
 void glb_conf_valuemaps_format_value(strlen_t *value, glb_conf_item_valuemap_info_t *vm_info);    

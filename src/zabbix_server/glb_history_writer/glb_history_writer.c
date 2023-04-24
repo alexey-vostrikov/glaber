@@ -87,7 +87,6 @@ static void new_alerts_check_cb(poller_item_t *garbage, void *data) {
 
 static void update_mdeiatypes_cb(poller_item_t *garbage, void *data){
 	LOG_INF("Updating mediatypes");
-	LOG_INF("Updating scripts info");
 	
 	HALT_HERE("Not implemented");
 	//glb_actions_update(conf.actions_conf);
