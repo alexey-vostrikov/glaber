@@ -2022,12 +2022,10 @@ function orderTriggersByStatus(array &$triggers, $sortorder = ZBX_SORT_UP) {
 	$sort = [];
 
 	foreach ($triggers as $key => $trigger) {
-		if ($trigger['status'] == TRIGGER_STATUS_ENABLED) {
-			$sort[$key] = ($trigger['value'] == TRIGGER_VALUE_UNKNOWN) ? 2 : 0;
-		}
-		else {
+		if ($trigger['status'] == TRIGGER_STATUS_ENABLED) 
+			$sort[$key] = 0; 
+		else 
 			$sort[$key] = 1;
-		}
 	}
 
 	if ($sortorder == ZBX_SORT_UP) {
