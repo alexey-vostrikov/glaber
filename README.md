@@ -14,3 +14,12 @@ cd glaber/build/appliance/run/docker
 # deployed in docker-compose
 ./glaber.sh start
 ```
+
+Available options to install glaber:
+- `./glaber.sh start stable`,   - install latest stable version
+- `./glaber.sh start latest`,   - install latest version
+- `./glaber.sh start 3.0.50`,   - install a certain glaber version
+- `./glaber.sh upgrade 3.0.50`, - upgrade to the certain glaber version
+- `./glaber.sh upgrade`       , - upgrade to the latest glaber version
+
+By default, glaber install a latest stable version
