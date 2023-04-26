@@ -5,7 +5,6 @@ services:
     image: percona:8.0.29-21-centos
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8 --collation-server=utf8_bin
     entrypoint:
-    - /usr/bin/bash
     - /docker-entrypoint.sh
     cap_add:
     - SYS_NICE
@@ -35,8 +34,8 @@ services:
       source: ./mysql/mysql_data/
       target: /var/lib/mysql/
     - type: bind
-      source: ./mysql/etc/my.cnf.d/innodb.cnf
-      target: /etc/my.cnf.d/innodb.cnf
+      source: ./mysql/etc/my.cnf.d/
+      target: /etc/my.cnf.d/
     - type: bind
       source: ./mysql/docker-entrypoint-initdb.d/
       target: /docker-entrypoint-initdb.d/
