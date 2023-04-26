@@ -1,3 +1,5 @@
+ver 3.0.58
+    - fix updated datatables and jquery libs to fix cve security issues
 ver 3.0.57
 ver 3.0.56
     - fix: trigger state error on attempt to sort by the trigger state
