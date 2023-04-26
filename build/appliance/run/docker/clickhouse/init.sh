@@ -2,6 +2,7 @@
 set -e
 
 if [ ! -f database.exist ]; then
+  echo "Install glaber clickhouse schema"
   wget -q https://gitlab.com/mikler/glaber/-/raw/${GLABER_TAG}/database/clickhouse/history.sql
 
   sed -i -e "s/glaber/${ZBX_CH_DB}/g" \
