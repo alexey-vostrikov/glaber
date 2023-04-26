@@ -6,4 +6,3 @@ innodb_flush_method = O_DSYNC
 innodb_flush_log_at_trx_commit = 0
 innodb_thread_concurrency = 6
 innodb_file_per_table = 1
-log_bin_trust_function_creators = 1
