@@ -1559,10 +1559,10 @@ static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32
  *                                                                            *
  ******************************************************************************/
 void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type,
-		unsigned char item_flags, AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, const char *error)
+		unsigned char item_flags, AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error)
 {
 	zbx_preproc_item_value_t	value = {.itemid = itemid, .hostid = hostid, .item_value_type = item_value_type,
-					.error = (char *)error, .item_flags = item_flags, .state = state, .ts = ts,
+					.error = (char *)error, .item_flags = item_flags, .state = state, .ts = (zbx_timespec_t *)ts,
 					.result = result};
 	size_t				value_len = 0, len;
 	glb_state_item_meta_t meta = {0};

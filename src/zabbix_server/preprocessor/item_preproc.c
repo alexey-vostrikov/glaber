@@ -1835,8 +1835,6 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 	{
 
 		AGENT_RESULT result = {0};
-		zbx_timespec_t ts;
-		zbx_timespec(&ts);
 
 		zbx_init_agent_result(&result);
 
@@ -1844,7 +1842,7 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
 
 		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0,
-								  &result, &ts, ITEM_STATE_NORMAL, NULL);
+								  &result, ts, ITEM_STATE_NORMAL, NULL);
 		zbx_free_agent_result(&result);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
@@ -1902,8 +1900,6 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 	{
 
 		AGENT_RESULT result = {0};
-		zbx_timespec_t ts;
-		zbx_timespec(&ts);
 
 		zbx_init_agent_result(&result);
 
@@ -1911,7 +1907,7 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", hostid, new_itemid);
 
 		zbx_preprocess_item_value(hostid, new_itemid, ITEM_VALUE_TYPE_TEXT, 0,
-								  &result, &ts, ITEM_STATE_NORMAL, NULL);
+								  &result, ts, ITEM_STATE_NORMAL, NULL);
 		zbx_free_agent_result(&result);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}

@@ -164,10 +164,14 @@ ITEMS_ITERATOR(check_workers_data_cb)
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_response);
         poller_inc_responses();
         
-        if (FAIL != ( timestamp = json_responce_has_timestamp(worker_response))) 
+        if (FAIL != ( timestamp = json_responce_has_timestamp(worker_response))) {
+            DEBUG_ITEM(poller_get_item_id(poller_item), "Set timestamp from time field: %ld", timestamp);
             poller_preprocess_str_timestamp(poller_item, timestamp, worker_response);
-        else
+        }
+        else {
+             DEBUG_ITEM(poller_get_item_id(poller_item), "No timestamp in the data, using current time");
             poller_preprocess_str_value(poller_item, worker_response);
+        }
         
         worker->last_heard = now;
         zbx_free(worker_response);
