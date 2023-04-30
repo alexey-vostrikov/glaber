@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-if [ ! -f database.exist ]; then
+if ! clickhouse-client --user $ZBX_CH_USER --password $ZBX_CH_PASS \
+    --database $ZBX_CH_DB --query "select count(*) from history_str;"; then
   echo "Install glaber clickhouse schema"
   wget -q https://gitlab.com/mikler/glaber/-/raw/${GLABER_TAG}/database/clickhouse/history.sql
 
@@ -16,8 +17,8 @@ if [ ! -f database.exist ]; then
   clickhouse-client \
     --user ${ZBX_CH_USER} --password ${ZBX_CH_PASS} \
     --multiquery < history.sql
-
-  touch database.exist
+else
+  echo "Glaber clickhouse schema already installed"
 fi
 
 ## for debug

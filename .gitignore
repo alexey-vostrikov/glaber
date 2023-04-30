@@ -238,3 +238,4 @@ clickhouse_data
 workers_script
 create.sql
 .version
+create.sql.done
