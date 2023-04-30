@@ -119,6 +119,7 @@ services:
       target: /usr/share/glaber/workers/
     cap_add:
     - NET_RAW
+    - NET_ADMIN
     env_file:
     - .env
     ports:
