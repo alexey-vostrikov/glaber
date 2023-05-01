@@ -127,7 +127,7 @@ set-passwords() {
     echo "pass=$ZBX_WEB_ADMIN_PASS" >> ../../test/.hurl
     echo "port=${ZBX_PORT:-80}" >> ../../test/.hurl
     touch .passwords.created
-    echo "Zabbix web access http://127.0.1.1:${ZBX_PORT:-80} Admin $ZBX_WEB_ADMIN_PASS" > .zbxweb
+    echo "Zabbix web access http://$(hostname -I | awk '{print $1}'):${ZBX_PORT:-80} Admin $ZBX_WEB_ADMIN_PASS" > .zbxweb
   fi
 }
 usage() {
@@ -137,7 +137,6 @@ usage() {
   echo "$0 start   (latest,stable,3.0.50) - Build docker images and start glaber"
   echo "$0 upgrade (latest,stable,3.0.50) - Upgrade docker images and restart glaber"
   echo "$0 stop                           - Stop glaber containers"
-  echo "$0 recreate                       - Completely remove glaber and start it again"
   echo "$0 diag                           - Collect glaber start and some base system info to the file"
 }
 build() {
@@ -168,6 +167,12 @@ remove() {
     sudo rm -rf mysql/docker-entrypoint-initdb.d mysql/mysql_data/ clickhouse/clickhouse_data
     git-reset-variables-files
   fi
+}
+force-remove() {
+  docker-compose down
+  rm .passwords.created .zbxweb ../../test/.hurl .version || true
+  sudo rm -rf mysql/docker-entrypoint-initdb.d mysql/mysql_data/ clickhouse/clickhouse_data
+  git-reset-variables-files
 }
 recreate() {
   remove
@@ -210,7 +215,11 @@ elif [ "$1" == "stop" ]; then
 elif [ "$1" == "recreate" ]; then
   recreate
 elif [ "$1" == "remove" ]; then
+  glaber-version $2
   remove
+elif [ "$1" == "force-remove" ]; then
+  glaber-version $2
+  force-remove
 elif [ "$1" == "diag" ]; then
   diag
 elif [ "$1" == "test" ]; then
