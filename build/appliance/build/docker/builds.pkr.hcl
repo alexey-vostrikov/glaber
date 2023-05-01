@@ -6,7 +6,7 @@ build {
   provisioner "shell" {
     inline = [
       "apt-get update",
-      "apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales",
+      "apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools snmp-mibs-downloader",
       "wget -qO - https://glaber.io/${var.glaber_repo}/key/repo.gpg | apt-key add -",
       "echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
       "apt-get update",
@@ -20,7 +20,8 @@ build {
       "chmod +s /usr/sbin/glbmap",
       "sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen",
       "sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen",
-      "locale-gen"
+      "locale-gen",
+      "download-mibs"
     ]
   }
   provisioner "file" {
