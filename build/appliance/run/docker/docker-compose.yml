@@ -139,4 +139,3 @@ networks:
     driver: bridge
     driver_opts:
       com.docker.network.enable_ipv6: "false"
-      gateway_mac: "02:42:ac:16:00:01"
