@@ -140,9 +140,3 @@ networks:
     driver_opts:
       com.docker.network.enable_ipv6: "false"
       gateway_mac: "02:42:ac:16:00:01"
-    ipam:
-      driver: default
-      config:
-      - subnet: 10.128.1.0/24
-        gateway: 10.128.1.1
-        ip_range: 10.128.1.0/24
