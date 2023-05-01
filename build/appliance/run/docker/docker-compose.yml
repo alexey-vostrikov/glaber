@@ -3,7 +3,10 @@ version: "3.6"
 services:
   mysql:
     image: percona:8.0.29-21-centos
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8 --collation-server=utf8_bin
+    command:
+    -  --default-authentication-plugin=mysql_native_password
+    -  --character-set-server=utf8
+    -  --collation-server=utf8_bin
     entrypoint:
     - /docker-entrypoint.sh
     cap_add:
@@ -12,13 +15,13 @@ services:
     - .env
     healthcheck:
       test:
-        - "CMD"
-        - "/usr/bin/mysql"
-        - "--user=$MYSQL_USER"
-        - "--password=$MYSQL_PASSWORD"
-        - "--database=$MYSQL_DATABASE"
-        - "--execute"
-        - 'SELECT count(*) from users;'
+      - "CMD"
+      - "/usr/bin/mysql"
+      - "--user=$MYSQL_USER"
+      - "--password=$MYSQL_PASSWORD"
+      - "--database=$MYSQL_DATABASE"
+      - "--execute"
+      - 'SELECT count(*) from users;'
       interval: 10s
       timeout: 5s
       retries: 10
@@ -46,16 +49,16 @@ services:
     image: yandex/clickhouse-server:21.3.20
     healthcheck:
       test:
-        - "CMD"
-        - "clickhouse-client"
-        - "--user"
-        - "$ZBX_CH_USER"
-        - "--password"
-        - "$ZBX_CH_PASS"
-        - "--database"
-        - "$ZBX_CH_DB"
-        - "--query"
-        - "select count(*) from history_str;"
+      - "CMD"
+      - "clickhouse-client"
+      - "--user"
+      - "$ZBX_CH_USER"
+      - "--password"
+      - "$ZBX_CH_PASS"
+      - "--database"
+      - "$ZBX_CH_DB"
+      - "--query"
+      - "select count(*) from history_str;"
       interval: 10s
       timeout: 10s
       retries: 10
@@ -91,10 +94,10 @@ services:
     image: registry.gitlab.com/mikler/glaber/glaber-nginx:${GLABER_VERSION}
     healthcheck:
       test:
-        - "CMD"
-        - "wget"
-        - "-q"
-        - "127.0.0.1"
+      - "CMD"
+      - "wget"
+      - "-q"
+      - "127.0.0.1"
       interval: 10s
       timeout: 5s
       retries: 15
@@ -133,3 +136,13 @@ services:
         - glaber-server-1
 networks:
   zabbix:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
+      gateway_mac: "02:42:ac:16:00:01"
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.128.1.0/24
+        gateway: 10.128.1.1
+        ip_range: 10.128.1.0/24
