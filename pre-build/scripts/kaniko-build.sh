@@ -6,7 +6,7 @@ DOCKER_IMAGE_TAG=${BUILD_TAG}
 GITLAB_API_URL="https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/registry/repositories/"
 SEARCH_PATH="${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/${DOCKER_IMAGE}"
 
-# install jq
+# Install jq
 wget -q --no-check-certificate -O /busybox/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
 chmod +x /busybox/jq
 
@@ -16,7 +16,7 @@ REPO_DETAILS=$(wget --no-check-certificate -q -O - "${GITLAB_API_URL}" | jq --ar
 # Extract repository ID from repository details
 REPO_ID=$(echo "${REPO_DETAILS}" | jq -r '.id')
 
-# build image if not equal the starting version 1.0.1
+# Build image if not equal the starting version 1.0.1
 # https://semver.org/spec/v2.0.0.html
 
 if [ -z "$REPO_ID" ] && [ "$DOCKER_IMAGE_TAG" != "1.0.1" ] ; then
@@ -24,8 +24,10 @@ if [ -z "$REPO_ID" ] && [ "$DOCKER_IMAGE_TAG" != "1.0.1" ] ; then
   exit 1
 fi
 
-# Image repository url
+# Set image repository URL
 IMAGE_REPO_URL="https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/registry/repositories/${REPO_ID}"
+
+# Check if docker image already exists
 if [[ "$(wget --no-check-certificate -q -O - "${IMAGE_REPO_URL}/tags/${DOCKER_IMAGE_TAG}" | jq -r '.name')" == "${DOCKER_IMAGE_TAG}" ]]
 then
   echo "Docker image ${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG} already exists, skipping the build"
