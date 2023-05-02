@@ -1,0 +1,130 @@
+Source: glaber
+Section: net
+Priority: optional
+Maintainer: Mikhail Makurov <makurov@gmail.com>
+Build-Depends: debhelper (>= 9),
+               quilt (>= 0.40) | devscripts (>= 2.17.12),
+               pkg-config,
+               libpcre3-dev,
+               libssl-dev
+Standards-Version: 3.9.5
+Homepage: https://glaber.io
+Package: zabbix
+
+Package: glaber-server-mysql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client | default-mysql-client, fping, adduser, lsb-base
+Pre-Depends: debconf
+Recommends: snmpd
+Suggests: glaber-frontend-php, logrotate, virtual-mysql-server
+Conflicts: zabbix-server-pgsql, glaber-server-pgsql
+Description: Glaber server, based on Zabbix network monitoring solution - server (MySQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+
+Package: glaber-server-pgsql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
+Pre-Depends: debconf
+Recommends: snmpd
+Suggests: glaber-frontend-php, logrotate, postgresql-client, postgresql (>= 8.1)
+Conflicts: zabbix-server-mysql, glaber-server-mysql
+Description: Glaber server, based on Zabbix network monitoring solution - server (PostgreSQL)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+
+Package: glaber-frontend-php
+Architecture: all
+Depends: ${misc:Depends}
+ php-mbstring, php-bcmath, php-xml,
+ php-mysql | php-pgsql, php-gd, php-ldap,
+ fonts-dejavu | ttf-dejavu-core | ttf-japanese-gothic
+Suggests: glaber-apache-conf, glaber-nginx-conf
+Conflicts: zabbix-frontend-php
+Description: Glaber server, based on Zabbix network monitoring solution - server (Frontend)
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+ .
+ This package provides a web-browsable front-end to the Glaber server, which
+ can display graphs of the data collected from clients.
+
+
+Package: glaber-apache-conf
+Architecture: all
+Depends: glaber-frontend-php, apache2 | httpd, libapache2-mod-php | php
+Description: Glaber server, based on Zabbix network monitoring solution - apache conf for fron-end
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+ .
+ This package provides automatic configuration of zabbix frontend with apache web server.
+
+
+Package: glaber-nginx-conf
+Architecture: all
+Depends: glaber-frontend-php, nginx, php-fpm
+Description: Glaber server based on Zabbix network monitoring solution - nginx and php-fpm configuration for front-end
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides automatic configuration of zabbix frontend with nginx web server.
+
+
+Package: glaber-proxy-mysql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, mysql-client | virtual-mysql-client, fping, adduser, lsb-base
+Suggests: logrotate, virtual-mysql-server
+Conflicts: glaber-proxy-pgsql, glaber-proxy-sqlite3, zabbix-proxy-pgsql, zabbix-proxy-sqltie3
+Description: Glaber network monitoring solution - proxy (MySQL). Glaber is a Zabbix fork.
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ Glaber makes it quite faster by using NoSQL data engines,
+ optimized architecture and asyncronius polling
+ .
+ This package provides the software needed to integrate a host as a Glaber
+ proxy. It collects information from Zabbix agents, temporarily stores it
+ in a MySQL database and then passes it to a Glaber server.
+
+
+Package: glaber-proxy-pgsql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, fping, adduser, lsb-base
+Suggests: logrotate, postgresql-client, postgresql (>= 8.1)
+Conflicts: glaber-proxy-mysql, glaber-proxy-sqlite3, zabbix-proxy-mysql, zabbix-proxy-sqlite3
+Description:  Glaber  network monitoring solution - proxy (PostgreSQL). Glaber is a Zabbix fork. 
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Glaber
+ proxy. It collects information from Zabbix agents, temporarily stores it
+ in a PostgreSQL database and then passes it to a Glaber server.
+
+
+Package: glaber-proxy-sqlite3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, sqlite3, fping, adduser, lsb-base
+Suggests: logrotate
+Conflicts: glaber-proxy-pgsql, glaber-proxy-mysql3, zabbix-proxy-pgsql, zabbix-proxy-mysql3, 
+Description: Glaber network monitoring solution - proxy (SQLite3). Glaber is a Zabbix fork.
+ Zabbix is the ultimate enterprise-level software designed for
+ real-time monitoring of millions of metrics collected from tens of
+ thousands of servers, virtual machines and network devices.
+ .
+ This package provides the software needed to integrate a host as a Zabbix
+ proxy. It collects information from Zabbix agents, temporarily stores it
+ in an SQLite3 database and then passes it to a Zabbix server.

@@ -1,3 +1,5 @@
+ver 3.0.61
+    - added astra/orel build rules
 ver 3.0.60
     - fix: timestamp  loss for dispathced items
 ver 3.0.59
