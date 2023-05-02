@@ -1,4 +1,4 @@
-glaber (1:2.0.5-1+debian8) stable; urgency=low
+glaber (1:2.0.5-1+orel212) stable; urgency=low
 
   * update to 5.2.4
   * added fonts-dejavu as an alternative dependency to zabbix-frontend-php package
