@@ -1,9 +1,6 @@
 ---
 workflow:
   rules:
-    - if: '$CI_COMMIT_MESSAGE =~ /pre-build/'
-      variables:
-        PREBUILD: "true"
     - if: '$CI_COMMIT_MESSAGE =~ /no-build/'
       when: never
     - if: '$CI_COMMIT_TAG != null'
@@ -148,6 +145,8 @@ debian-buster:
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 # astra:
 #  stage: pkg-build
@@ -162,6 +161,8 @@ debian-buster:
 #    - *build_glbmap
 #    - dpkg-buildpackage -b --no-sign
 #    - *upload_packages
+#  rules:
+#    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 debian-bullseye:
   stage: pkg-build
@@ -175,6 +176,8 @@ debian-bullseye:
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 ubuntu-focal:
   stage: pkg-build
@@ -188,6 +191,8 @@ ubuntu-focal:
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 ubuntu-bionic:
   stage: pkg-build
@@ -201,6 +206,8 @@ ubuntu-bionic:
     - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 centos-8:
   stage: pkg-build
@@ -215,6 +222,8 @@ centos-8:
     - yum-builddep -y SPECS/zabbix.spec
     - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
     - *upload_rpms
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 docker-debian-bullseye:
   stage: docker-build
@@ -227,6 +236,8 @@ docker-debian-bullseye:
     - *build_docker
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 builder:
   stage: pre-build
@@ -243,7 +254,7 @@ builder:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 debian-buster-builder:
   stage: pre-build
@@ -260,7 +271,7 @@ debian-buster-builder:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 debian-bullseye-builder:
   stage: pre-build
@@ -277,7 +288,7 @@ debian-bullseye-builder:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 ubuntu-bionic-builder:
   stage: pre-build
@@ -294,7 +305,7 @@ ubuntu-bionic-builder:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 ubuntu-focal-builder:
   stage: pre-build
@@ -311,7 +322,7 @@ ubuntu-focal-builder:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 almalinux-8-builder:
   stage: pre-build
@@ -328,7 +339,7 @@ almalinux-8-builder:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 alpine-php-fpm-7:
   stage: pre-build
@@ -345,4 +356,4 @@ alpine-php-fpm-7:
   script:
     - *kaniko_build
   rules:
-    - if: '$PREBUILD'
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
