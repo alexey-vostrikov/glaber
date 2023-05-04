@@ -1537,8 +1537,6 @@ int  glb_state_get_item_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
-
-
 int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
 	int i;
 	
@@ -1549,6 +1547,41 @@ int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
 	}
 }
 
-void glb_state_items_housekeep() {
+typedef struct {
+    u_int64_t clean_count;
+    u_int64_t was_count;
+    long int clean_time;
+} items_hkeep_stat_t;
 
+ELEMS_CALLBACK(clean_old_values) {
+    item_elem_t *elm = elem->data;
+    //long int clean_time = (long int)data;
+    items_hkeep_stat_t *stat = data;
+    
+    int cnt = 0;
+        
+    while(glb_tsbuff_get_count(&elm->tsbuff) > 0 ){
+        glb_state_item_value_t *c_val = glb_tsbuff_get_value_tail(&elm->tsbuff);
+      
+        stat->was_count +=glb_tsbuff_get_count(&elm->tsbuff);
+
+        if (c_val->time_sec < stat->clean_time ) {
+            item_variant_clear(&c_val->value);
+            glb_tsbuff_free_tail(&elm->tsbuff);
+            stat->clean_count++;
+            continue;
+        }
+        
+        break;
+    }
+    
+    return SUCCEED;
+}
+
+void glb_state_items_housekeep() {
+    items_hkeep_stat_t stat = {0};
+    stat.clean_time  = time(NULL) - GLB_CACHE_ITEMS_MAX_DURATION;
+   // LOG_INF("Housekeeping items cache");
+    elems_hash_iterate(state->items,clean_old_values, &stat, ELEMS_HASH_WRITE);
+    //LOG_INF("Housekeeping items cache finished, was items %ld, cleaned items %ld", stat.was_count, stat.clean_count);
 }

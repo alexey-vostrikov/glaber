@@ -1,7 +1,8 @@
 ver 3.0.61
     - added astra/orel build rules
+    - fixed sorting in datatables for date column if Russian localisation is used, added valuecache cleanup in housekeeper
 ver 3.0.60
-    - fix: timestamp  loss for dispathced items
+    - fix: timestamp  loss for dispatched items
 ver 3.0.59
     - reverted jquery update 
 ver 3.0.58
@@ -28,7 +29,7 @@ ver 3.0.46
 ver 3.0.45
     - fix Sqlite3 build issues
 ver 3.0.44
-    - implemented parallel Glaber tables updating procedures, added automatic hosts dependancy table creation
+    - implemented parallel Glaber tables updating procedures, added automatic hosts dependency table creation
 ver 3.0.43
     - removed go workers from rpms of server
 ver 3.0.42
@@ -100,13 +101,13 @@ ver 3.0.10
 ver 3.0.9
     - fix bug on detecting proper number of pingers if using fping
 ver 3.0.8
-    - fix removing of redundant problems is impelmented
+    - fix removing of redundant problems is implemented
 ver 3.0.7
     - fix "unknown request method error on host duplication", maximum interval skip time is set to 30 seconds
 ver 3.0.6
-    - fixed CI/CD build to buld older ubuntu versions and astra linux deb files
+    - fixed CI/CD build to build older ubuntu versions and astra linux deb files
 ver 3.0.5
-    - refactored trigger expression code to avoid puzzling flags, fixed triger status return (error field is always returned, even if empty), fixed missing error field in trigger API
+    - refactored trigger expression code to avoid puzzling flags, fixed trigger status return (error field is always returned, even if empty), fixed missing error field in trigger API
 ver 3.0.4
     - fixed items validation rules for Glaber specific preprocessing types, fixed trends/history settings, added trigger operative data to the event page
 ver 3.0.2
@@ -114,11 +115,11 @@ ver 3.0.2
 ver 3.0.1
     - triggers state moved to memory, saving triggers to DB is eliminated
 ver 3.0.0
-    - mirgated to Zabbix 6.4. sources
+    - migrated to Zabbix 6.4. sources
 ver 2.18.0
     - introducing poller connection contention library. It allow to control per-ip (not per-hostid) number of connections and supports control event in cases when host or ip is taken from the key, not from the interface configuration 
 ver 2.17.0
-    - introducing async simple tcp checks. Now glb_agent poller deals with all tcp connections. For now net.tcp.serivce[http is either supported by glb_agent poller, which will eventually
+    - introducing async simple tcp checks. Now glb_agent poller deals with all tcp connections. For now net.tcp.service[http is either supported by glb_agent poller, which will eventually
     will be renamed to glb_tcp_poller
 ver 2.16.10
     - fix: endless restart of glbamp if it's failed
