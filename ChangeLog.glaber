@@ -1,3 +1,5 @@
+ver 3.0.62
+    - artwork (icons) reverted to Glaber
 ver 3.0.61
     - added astra/orel build rules
     - fixed sorting in datatables for date column if Russian localisation is used, added valuecache cleanup in housekeeper
