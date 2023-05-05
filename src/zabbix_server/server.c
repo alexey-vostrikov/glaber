@@ -1722,8 +1722,6 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 
 	thread_args.info.program_type = program_type;
 	
-	LOG_INF("Total forks num is %d",threads_num );
-
 	for (i = 0; i < threads_num; i++)
 	{
 		if (FAIL == get_process_info_by_thread(i + 1, &thread_args.info.process_type,

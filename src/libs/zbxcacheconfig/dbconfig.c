@@ -7083,6 +7083,9 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_valuemaps())
 		goto out;
 	valuemap_sec = zbx_time() - sec;
+	
+	if (FAIL == glb_dbsync_compare_scripts())
+		goto out;
 
 	START_SYNC;
 

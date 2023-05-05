@@ -25,6 +25,7 @@
 #include "zbxeval.h"
 #include "zbxnum.h"
 #include "../glb_conf/valuemaps/conf_valuemaps.h"
+#include "../glb_conf/scripts/scripts.h"
 
 /* global correlation constants */
 #define ZBX_CORRELATION_ENABLED				0
@@ -3013,6 +3014,148 @@ int	zbx_dbsync_compare_corr_operations(zbx_dbsync_t *sync)
 
 	return SUCCEED;
 }
+
+
+
+/*
+CREATE TABLE scripts (
+	scriptid                 bigint                                    NOT NULL,
+	name                     varchar(255)    DEFAULT ''                NOT NULL,
+	command                  text            DEFAULT ''                NOT NULL,
+	host_access              integer         DEFAULT '2'               NOT NULL,
+	usrgrpid                 bigint                                    NULL,
+	groupid                  bigint                                    NULL,
+	description              text            DEFAULT ''                NOT NULL,
+	confirmation             varchar(255)    DEFAULT ''                NOT NULL,
+	type                     integer         DEFAULT '5'               NOT NULL,
+	execute_on               integer         DEFAULT '2'               NOT NULL,
+	timeout                  varchar(32)     DEFAULT '30s'             NOT NULL,
+	scope                    integer         DEFAULT '1'               NOT NULL,
+	port                     varchar(64)     DEFAULT ''                NOT NULL,
+	authtype                 integer         DEFAULT '0'               NOT NULL,
+	username                 varchar(64)     DEFAULT ''                NOT NULL,
+	password                 varchar(64)     DEFAULT ''                NOT NULL,
+	publickey                varchar(64)     DEFAULT ''                NOT NULL,
+	privatekey               varchar(64)     DEFAULT ''                NOT NULL,
+	menu_path                varchar(255)    DEFAULT ''                NOT NULL,
+	url                      varchar(2048)   DEFAULT ''                NOT NULL,
+	new_window               integer         DEFAULT '1'               NOT NULL,
+	PRIMARY KEY (scriptid)
+);
+CREATE INDEX scripts_1 ON scripts (usrgrpid);
+CREATE INDEX scripts_2 ON scripts (groupid);
+CREATE UNIQUE INDEX scripts_3 ON scripts (name);
+CREATE TABLE script_param (
+	script_paramid           bigint                                    NOT NULL,
+	scriptid                 bigint                                    NOT NULL,
+	name                     varchar(255)    DEFAULT ''                NOT NULL,
+	value                    varchar(2048)   DEFAULT ''                NOT NULL,
+	PRIMARY KEY (script_paramid)
+);
+
+
+
+*/
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: compares valuemap tables with cached configuration   		      *
+ *          data                                                              *
+ *                                                                            *
+ * Parameter: sync - [OUT] the changeset                                      *
+ *                                                                            *
+ * Return value: SUCCEED - the changeset was successfully calculated          *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ ******************************************************************************/
+int	glb_dbsync_compare_scripts()
+{
+	DB_ROW			dbrow;
+	DB_RESULT		result;
+	zbx_uint64_t	scriptid, prev_id = 0;
+	struct zbx_json j;
+
+	zbx_json_init(&j, MAX_BUFFER_LEN);
+
+	LOG_INF("Syncing scripts data");
+
+	if (NULL == (result = DBselect(
+			"select s.scriptid, s.name, s.command, s.host_access, s.usrgrpid, s.groupid, "
+					"s.description, s.confirmation, s.type, s.execute_on, s.timeout, " 
+					"s.scope, s.port, s.authtype, s.username, s.password, s.publickey,"
+					"s.privatekey, s.menu_path, s.url, s.new_window, p.name, p.value " 
+			"from scripts s left join script_param p "
+			"on s.scriptid = p.scriptid "
+			"order by s.scriptid "))) {
+		HALT_HERE("Valuemap query failed");
+		return FAIL;
+	}
+	
+	zbx_json_addarray(&j, "result");
+
+	while (NULL != (dbrow = DBfetch(result)))
+	{
+		ZBX_STR2UINT64(scriptid, dbrow[0]);
+		
+		if (scriptid != prev_id) {
+			char *id = dbrow[0], *name = dbrow[1], *command = dbrow[2],
+				*host_access = dbrow[3], *usrgrpid = dbrow[4], *groupid = dbrow[5], 
+				*description = dbrow[6], *confirmation = dbrow[7], *type = dbrow[8], 
+				*execute_on = dbrow[9], *timeout = dbrow[10], *scope = dbrow[11], 
+				*port = dbrow[12], *authtype = dbrow[13], *username = dbrow[14], 
+				*password = dbrow[15], *publickey = dbrow[16], *privatekey = dbrow[17],
+				*menu_path = dbrow[18], *url = dbrow[19], *new_window = dbrow[20];
+
+	 		if (prev_id != 0) { //need to close the previos valuemap
+	 			zbx_json_close(&j); //close parameters array
+	 			zbx_json_close(&j); //close script object
+			}			
+	
+			zbx_json_addobject(&j, NULL);  //opening the new script object
+	 		zbx_json_addstring(&j, "scriptid", id, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "name", name, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "command", command, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "usrgrpid", usrgrpid, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "groupid", groupid, ZBX_JSON_TYPE_STRING );	
+			zbx_json_addstring(&j, "host_access", host_access, ZBX_JSON_TYPE_STRING );
+		 	zbx_json_addstring(&j, "description", description, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "confirmation", confirmation, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "type", type, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "execute_on", execute_on, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "timeout", timeout, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "scope", scope, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "port", port, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "authtype", authtype, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "username", username, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "password", password, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "publickey", publickey, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "privatekey", privatekey, ZBX_JSON_TYPE_STRING );		
+			zbx_json_addstring(&j, "menu_path", menu_path, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "url", url, ZBX_JSON_TYPE_STRING );
+			zbx_json_addstring(&j, "new_window", new_window, ZBX_JSON_TYPE_STRING );
+	 		zbx_json_addarray(&j, "parameters");
+		}	
+		
+		char *param_name = dbrow[21], *param_value = dbrow[22]; 
+		prev_id = scriptid;
+	 
+		if (NULL != param_name) {
+			zbx_json_addobject(&j, NULL);
+	 		zbx_json_addstring(&j, "name", param_name, ZBX_JSON_TYPE_STRING);
+	 		zbx_json_addstring(&j, "value", param_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_close(&j);
+		}
+	}
+
+	if (0 != prev_id) //there was at least one object opened
+	zbx_json_close(&j);
+
+	zbx_json_close(&j); //closing the result object
+
+	glb_conf_scripts_set_data(j.buffer);
+	zbx_json_free(&j);
+	return SUCCEED;
+}	
 
 /******************************************************************************
  *                                                                            *
