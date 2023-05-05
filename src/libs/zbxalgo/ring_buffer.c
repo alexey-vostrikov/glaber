@@ -57,7 +57,11 @@ int glb_tsbuff_free_tail(glb_tsbuff_t *tsbuff) {
         return FAIL;
     
     tsbuff->count --;
-    tsbuff->tail = BUFF_IDX(tsbuff, tsbuff->tail+1);
+    
+    if (0 == tsbuff->count)
+        tsbuff->tail = -1;
+    else 
+        tsbuff->tail = BUFF_IDX(tsbuff, tsbuff->tail+1);
     
     return SUCCEED;
 }

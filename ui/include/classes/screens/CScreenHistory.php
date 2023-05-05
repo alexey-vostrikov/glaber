@@ -338,8 +338,6 @@ class CScreenHistory extends CScreenBase {
 					['field' => 'ns', 'order' => $sort_order]
 				]);
 
-				//show_error_message("Hello world:".json_encode($history_data));
-				
 				foreach ($history_data as $data) {
 					$data['value'] = rtrim($data['value'], " \t\r\n");
 					
@@ -355,14 +353,13 @@ class CScreenHistory extends CScreenBase {
 						(new CUrl('tr_events.php'))
 							->setArgument('triggerid', $data['source'])
 							->setArgument('eventid', $data['logeventid'])
-						)))->addClass(ZBX_STYLE_NOWRAP);
+						)))->addClass(ZBX_STYLE_NOWRAP)
+						   ->setAttribute('data-order', $data['clock']);
 						
-						//show_error_message("Making a link");
 					} else {
 						$cell_clock = (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock'])))
 						->addClass(ZBX_STYLE_NOWRAP)
-						//->addClass($color)
-						;
+						->setAttribute('data-order', $data['clock']);
 					}
 					
 					$item = $items[$data['itemid']];
