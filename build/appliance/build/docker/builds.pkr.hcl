@@ -6,11 +6,12 @@ build {
   provisioner "shell" {
     inline = [
       "apt-get update",
-      "apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools snmp-mibs-downloader",
+      "apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools",
       "wget -qO - https://glaber.io/${var.glaber_repo}/key/repo.gpg | apt-key add -",
       "echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
+      "echo 'deb http://ftp.de.debian.org/debian bullseye main non-free' > /etc/apt/sources.list.d/nonfree.list",
       "apt-get update",
-      "apt-get install -y glaber-server-mysql=1:${var.glaber_build_version}*",
+      "apt-get install -y glaber-server-mysql=1:${var.glaber_build_version}* snmp-mibs-downloader",
       "rm -rf /var/lib/{apt,dpkg,cache,log}/",
       "apt-get autoremove --yes",
       "apt-get clean autoclean",
