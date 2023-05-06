@@ -1,3 +1,5 @@
+ver 3.0.65
+    - fix in tsbuff to prevent retrieving wrong metrics on emtpied buffer 
 ver 3.0.64
     - fixed datatables warning message on empty tables
 ver 3.0.63
