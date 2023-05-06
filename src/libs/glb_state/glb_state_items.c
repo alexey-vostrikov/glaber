@@ -1541,7 +1541,7 @@ int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids) {
 	int i;
 	
     for (i = 0; i< deleted_itemids->values_num; i++) {
-        LOG_INF("Deleting item %ld from the cache", deleted_itemids->values[i]);
+      //  LOG_INF("Deleting item %ld from the cache", deleted_itemids->values[i]);
         DEBUG_ITEM(deleted_itemids->values[i],"Deleting item from the value cache");
     	elems_hash_delete(state->items, deleted_itemids->values[i]);
 	}
