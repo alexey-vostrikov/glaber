@@ -5,13 +5,15 @@ set -e
 mysql-schema-package-url() {
   local name=$1
   local version=$2
-  url="${GITLAB_PROJECT_URL}/${PROJECT_ID}/packages?per_page=1000"
-  PACKAGE_ID=$(curl -s "$url" | jq --arg name "$name" --arg version "$version" '.[] | select(.name == $name) | select(.version == $version) | .id')
+  URL="${GITLAB_PROJECT_URL}/${PROJECT_ID}/packages?per_page=1000"
+  PACKAGE_ID=$(curl -s "$URL" | jq --arg name "$name" --arg version "$version" '.[] | select(.name == $name) | select(.version == $version) | .id')
   if [[ ! -z "$VERSION" ]]; then
     info "Wrong or not existing glaber version: $version"
     exit 1
   else
-    echo "${GIT_BASE}/-/package_files/${PACKAGE_ID}/download/"
+    FILES_URL="${GITLAB_PROJECT_URL}/${PROJECT_ID}/packages/${PACKAGE_ID}/package_files"
+    FILE_ID=$(curl -s "$FILES_URL" | jq '.[] | .id')
+    echo "${GIT_BASE}/-/package_files/${FILE_ID}/download/"
   fi
 }
 glaber-version() {
