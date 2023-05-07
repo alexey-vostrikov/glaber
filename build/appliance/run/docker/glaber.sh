@@ -2,6 +2,18 @@
 set -e
 
 # functions
+mysql-schema-package-url() {
+  local name=$1
+  local version=$2
+  url="${GITLAB_PROJECT_URL}/${PROJECT_ID}/packages?per_page=1000"
+  PACKAGE_ID=$(curl -s "$url" | jq --arg name "$name" --arg version "$version" '.[] | select(.name == $name) | select(.version == $version) | .id')
+  if [[ ! -z "$VERSION" ]]; then
+    info "Wrong or not existing glaber version: $version"
+    exit 1
+  else
+    echo "${GIT_BASE}/-/package_files/${PACKAGE_ID}/download/"
+  fi
+}
 glaber-version() {
   if [[ -f .version ]]; then
     export GLABER_TAG=$(cat .version)
@@ -30,7 +42,7 @@ glaber-version() {
         export GLABER_TAG=$LATEST_TAG
       fi
   fi
-  export GLABER_VERSION=$(curl -s ${GIT_BASE}${GLABER_TAG}/include/version.h | \
+  export GLABER_VERSION=$(curl -s ${GIT_BASE}/-/raw/${GLABER_TAG}/include/version.h | \
                   grep GLABER_VERSION | tr -dc 0-9.)
 }
 apitest () {
@@ -109,7 +121,7 @@ set-passwords() {
     [ -d ".mysql/docker-entrypoint-initdb.d/" ] || \
     sudo install -d -o 1001 -g 1001 mysql/docker-entrypoint-initdb.d/  
     [[ ! -f mysql/docker-entrypoint-initdb.d/create.sql ]] && \
-    wget -q https://storage.yandexcloud.net/glaber/repo/$GLABER_VERSION-create-mysql.sql.tar.gz -O - | tar -xz && \
+    curl -sSR $(mysql-schema-package-url "mysql" $GLABER_VERSION) --output - | tar -xz && \
     mv create.sql mysql/docker-entrypoint-initdb.d/create.sql
     echo "use MYSQL_DATABASE;" >> mysql/docker-entrypoint-initdb.d/create.sql
     echo "update users set passwd='\$2y\$10\$ZBX_WEB_ADMIN_PASS' where username='Admin';" >> mysql/docker-entrypoint-initdb.d/create.sql
@@ -186,8 +198,10 @@ upgrade() {
 
 HURL_VERSION="1.8.0"
 # export ZBX_PORT=8050
-GIT_BASE="https://gitlab.com/mikler/glaber/-/raw/"
-GIT_REPO="https://gitlab.com/mikler/glaber.git"
+GIT_BASE="https://gitlab.com/mikler/glaber"
+GIT_REPO="${GIT_BASE}.git"
+PROJECT_ID="11936575"
+GITLAB_PROJECT_URL="https://gitlab.com/api/v4/projects"
 
 # main part
 if [ $# -gt 0 ] && [ $# -lt 3 ]; then
@@ -198,9 +212,12 @@ else
   exit 1
 fi
 
-# Check whether docker-compose and apache2-utils is installed
+# Check whether docker-compose, jq and apache2-utils is installed
 command -v docker-compose >/dev/null 2>&1 || \
 { echo >&2 "docker-compose is required, please install it and start over. Aborting."; exit 1; }
+
+command -v jq >/dev/null 2>&1 || \
+{ echo >&2 "jq is required, please install it and start over. Aborting."; exit 1; }
 
 command -v htpasswd >/dev/null 2>&1 || \
 { echo >&2 "htpasswd is required, please install it apt-get install apache2-utils. And start over. Aborting."; exit 1; }
