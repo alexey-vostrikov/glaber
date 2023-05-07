@@ -16,13 +16,13 @@ workflow:
 
 variables:
   # used for build docker images
-  BUILDER_VERSION: 1.0.2
+  BUILDER_VERSION: 1.0.3
   # used for build debian based apt
-  DEBIAN_BUILDER_VERSION: 1.0.10
+  DEBIAN_BUILDER_VERSION: 1.0.11
   # used for build ubuntu based apt
-  UBUNTU_BUILDER_VERSION: 1.0.5
+  UBUNTU_BUILDER_VERSION: 1.0.6
   # used for build centos based yum
-  CENTOS_BUILDER_VERSION: 1.0.2
+  CENTOS_BUILDER_VERSION: 1.0.3
   # used for glager php-fpm7
   ALPINE_PHP_FPM_VERSION: 1.0.2
   KANIKO_VERSION: 1.9.2
@@ -59,14 +59,13 @@ stages:
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
   - packer build -color=false -timestamp-ui -warn-on-undeclared-var .
 
-
-.build_go: &build_go
-  - export FULL_PROJECT_PATH=$PWD
-  - wget --no-verbose "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
-  - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
-  - rm ./go1.16.2.linux-amd64.tar.gz
-  - export PATH=$PATH:/usr/local/go/bin
-  - go version
+.upload_mysql_schema: &upload_mysql_schema
+  - cat database/mysql/schema.sql > create.sql
+  - cat database/mysql/images.sql >> create.sql
+  - cat database/mysql/data.sql >> create.sql
+  - tar -czvf create-mysql.sql.tar.gz create.sql
+  - curl -s "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages?per_page=1000" | jq --arg name "mysql" '.[] | select(.name == $name)' | grep $GLABER_VERSION || curl -s --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file "create-mysql.sql.tar.gz" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/mysql/$GLABER_VERSION/create-mysql.sql.tar.gz"
+  - rm create.sql create-mysql.sql.tar.gz
 
 .build_glbmap: &build_glbmap
   - git clone https://gitlab.com/mikler/glbmap.git
@@ -100,6 +99,7 @@ stages:
   - ./bootstrap.sh
   - ./configure
   - make dbschema gettext
+  - *upload_mysql_schema
   - autoreconf -fvi
   - cd ..
   - cp -r glaber glaber-$GLABER_VERSION
@@ -117,10 +117,6 @@ stages:
   - cp -r build/${OS}/${OS_VER}/* build/centos
   - mv ../glaber-$GLABER_VERSION.tar.gz build/centos/SOURCES/glaber-$GLABER_VERSION.tar.gz
   - sed -i "2 s/Version:.*/Version:\t$GLABER_VERSION/g" build/centos/SPECS/zabbix.spec
-
-.install_common_apt: &install_common_apt
-  - apt-get update
-  - apt-get --ignore-missing install -y sshpass build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev dpkg-dev devscripts wget git gcc automake dh-make build-essential autoconf autotools-dev quilt pkg-config libsnmp-dev libpq-dev libsqlite3-dev libcurl4-openssl-dev libldap2-dev libiksemel-dev libopenipmi-dev libssh2-1-dev unixodbc-dev default-jdk libxml2-dev libpcre3-dev libevent-dev curl libssl-dev
 
 .upload_packages: &upload_packages
   - cd $FULL_PROJECT_PATH; cd ..

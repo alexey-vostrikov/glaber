@@ -7,7 +7,7 @@ RUN dnf update && \
 
 RUN dnf config-manager --set-enabled powertools
 
-RUN dnf -y install OpenIPMI-devel libarchive
+RUN dnf -y install OpenIPMI-devel libarchive jq
 
 RUN yum groupinstall "Development Tools" -y
 

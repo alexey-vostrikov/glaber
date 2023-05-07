@@ -5,7 +5,7 @@ FROM ${OS}:${OS_VER}
 RUN apt-get -qq update && \
     export DEBIAN_FRONTEND=noninteractive && \
     GO_VER=1.16.2 && \
-    apt-get --ignore-missing install -yqq sshpass \
+    apt-get --ignore-missing install -yqq sshpass jq \
     build-essential cmake libgmp3-dev gengetopt  \
     libpcap-dev flex byacc libjson-c-dev \
     libunistring-dev dpkg-dev devscripts wget git gcc \
