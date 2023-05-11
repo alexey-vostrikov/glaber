@@ -121,7 +121,7 @@ set-passwords() {
            -e "s/MYSQL_ROOT_PASSWORD=.*/MYSQL_ROOT_PASSWORD=$(gen-password)/" \
     .env
     [ -d ".mysql/docker-entrypoint-initdb.d/" ] || \
-    sudo install -d -o 1001 -g 1001 mysql/docker-entrypoint-initdb.d/  
+    mkdir mysql/docker-entrypoint-initdb.d/  
     [[ ! -f mysql/docker-entrypoint-initdb.d/create.sql ]] && \
     curl -sSR $(mysql-schema-package-url "mysql" $GLABER_VERSION) --output - | tar -xz && \
     mv create.sql mysql/docker-entrypoint-initdb.d/create.sql
@@ -131,6 +131,7 @@ set-passwords() {
     sed -i -e "s#MYSQL_DATABASE#$MYSQL_DATABASE#" \
            -e "s#ZBX_WEB_ADMIN_PASS#$ZBX_WEB_ADMIN_PASS_HASH#" \
     mysql/docker-entrypoint-initdb.d/create.sql
+    sudo chown -R 1001:1001 mysql/docker-entrypoint-initdb.d/
     sed -i -e "s/<password>.*<\/password>/<password>$ZBX_CH_PASS<\/password>/" \
            -e "s/10000000000/$ZBX_CH_CONFIG_MAX_MEMORY_USAGE/" \
            -e "s/defaultuser/$ZBX_CH_USER/" \
