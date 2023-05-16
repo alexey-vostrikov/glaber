@@ -1,4 +1,4 @@
-ver 3.1
+ver 4.0
     - introducing in-memory problems and events in the history
 ver 3.0.15
     - ui fixes: improved datatables load speed, latest data refactored: hint info added, trigger info added, links fixed, added add new item button

@@ -35,6 +35,18 @@ typedef struct {
 	void *placeholder;
 } glb_alert_t;
 
+typedef enum {
+	PROBLEM_CREATE = 1,  //only local - signinficant, no DB storage
+	PROBLEM_CLOSE, 
+	PROBLEM_SUPPRESS
+} glb_escalation_reason_t;
+
+typedef struct {
+	u_int64_t problemid;
+	glb_escalation_reason_t reason;
+} glb_escalation_t;
+
+
 int glb_alerting_init(); //called from the parent fork to init alerting shmem ipc
 int glb_alerter_send_alert();
 

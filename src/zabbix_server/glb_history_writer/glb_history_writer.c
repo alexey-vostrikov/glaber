@@ -85,7 +85,7 @@ static void new_alerts_check_cb(poller_item_t *garbage, void *data) {
 	glb_ipc_process(conf.ipc, conf.args.info.process_num -1 , alert_process_cb, NULL, 1000 );
 }
 
-static void update_mdeiatypes_cb(poller_item_t *garbage, void *data){
+static void update_config_cb(poller_item_t *garbage, void *data){
 	LOG_INF("Updating mediatypes");
 	
 	HALT_HERE("Not implemented");
@@ -136,7 +136,7 @@ static int alerter_fork_init(zbx_thread_args_t *args)
 	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL * 1000);
 
-	conf.update_mediatypes = poller_create_event(NULL, update_mdeiatypes_cb, 0, NULL, 1);
+	conf.update_mediatypes = poller_create_event(NULL, update_config_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.update_mediatypes, MEDIATYPES_UPDATE_INTERVAL * 1000);
 
 	return SUCCEED;

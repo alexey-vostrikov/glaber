@@ -1,5 +1,6 @@
 /*
-** Copyright Glaber 2018-2023
+** Glaber
+** Copyright (C) 2001-2023 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,11 +17,17 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "glb_common.h"
 #include "zbxalgo.h"
 
-typedef struct glb_conf_script_t glb_conf_script_t;
+typedef enum {
+     GLB_CONF_API_ACTIONS_OPERATIONS = 0,
+     GLB_CONF_API_OBJECTS_MAX
+} glb_conf_json_object_t;
 
-//int glb_conf_script_create_update_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
-glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
-void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool);
+int       glb_conf_api_sync_init(mem_funcs_t *memf);
+void      glb_conf_api_sync_destroy();
+
+void      glb_conf_set_json_data_table(char *buffer, int table);
+char*     glb_conf_get_json_data_table(int table);
+
+int       glb_api_sync_operations();

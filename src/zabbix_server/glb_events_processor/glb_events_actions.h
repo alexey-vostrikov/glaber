@@ -16,12 +16,6 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-
-//glb escalator is responsible for performing operations based on actions configuration
-//whenever an actionable object is created it is passed to process_actions_xxxx, which in 
-//turn should notify escalator on object id and type
-//escalator uses actions-operations cache and schedules operations and performs them (or uses exec services, like alerter?)
-
 #ifndef GLB_EVENT_ACTIONS_H
 #define GLB_EVENT_ACTIONS_H
 
@@ -47,6 +41,6 @@ glb_actions_t *glb_actions_create();
 void glb_actions_destroy(glb_actions_t *actions);
 void glb_actions_update(glb_actions_t *actions);
 
-void glb_actions_process_event(events_processor_event_t *event, glb_actions_t *actions);
+void glb_actions_process_event(events_processor_event_t *event, glb_actions_t *actions, zbx_vector_uint64_t *matched_actions);
 
 #endif

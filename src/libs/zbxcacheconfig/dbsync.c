@@ -3157,6 +3157,7 @@ int	glb_dbsync_compare_scripts()
 	return SUCCEED;
 }	
 
+
 /******************************************************************************
  *                                                                            *
  * Purpose: compares valuemap tables with cached configuration   		      *

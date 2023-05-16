@@ -73,6 +73,7 @@ int     glb_state_problems_check_tag_name(u_int64_t problemid, tag_t *tag, unsig
 int     glb_state_problems_check_tag_value(u_int64_t problemid, tag_t *tag, unsigned char operation, int *result);
 
 int     glb_state_problems_is_acknowledged(u_int64_t problemid, int *is_ack);
+int     glb_state_problems_if_exists(u_int64_t problemid);
 
 //todo: methods for load
 

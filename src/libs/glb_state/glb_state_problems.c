@@ -526,3 +526,7 @@ int glb_state_problems_check_tag_value(u_int64_t problemid, tag_t *tag, unsigned
     tags_request_t tags_request = {.oper = operation, .result = result, .tag = tag};
     return elems_hash_process(conf->problems, problemid, check_tag_value_cb, &tags_request, ELEM_FLAG_DO_NOT_CREATE);
 }
+
+int glb_state_problems_if_exists(u_int64_t problemid) {
+    return elems_hash_id_exists(conf->problems, problemid);
+}

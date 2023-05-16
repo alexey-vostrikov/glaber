@@ -296,42 +296,28 @@ clean:
 	return ret;
 }
 
-static int event_actions_calc_escalate_actions(events_processor_event_t *event, glb_actions_t *actions) {
-	int j=0;
+static int event_actions_calc_matched_actions(events_processor_event_t *event, glb_actions_t *actions, 
+					zbx_vector_uint64_t *matched_actions)
+{
+	int j = 0;
 
 	for (j = 0; j < actions->actions.values_num; j++)
+	{
+		zbx_action_eval_t *action = (zbx_action_eval_t *)actions->actions.values[j];
+
+		if (action->eventsource != event->event_type)
+			continue;
+
+		if (SUCCEED == check_and_calc_action_conditions(event, action))
 		{
-			zbx_action_eval_t	*action = (zbx_action_eval_t *)actions->actions.values[j];
-
-			if (action->eventsource != event->event_type)
-				continue;
-
-			if (SUCCEED == check_and_calc_action_conditions(event, action))
-			{
-				//zbx_escalation_new_t	*new_escalation;
-				/* command and message operations handled by escalators even for    */
-				/* EVENT_SOURCE_DISCOVERY and EVENT_SOURCE_AUTOREGISTRATION events  */
-				//new_escalation = (zbx_escalation_new_t *)zbx_malloc(NULL, sizeof(zbx_escalation_new_t));
-				//new_escalation->actionid = action->actionid;
-				//new_escalation->event = event;
-				//zbx_vector_ptr_append(&new_escalations, new_escalation);
-
-				//if (EVENT_SOURCE_DISCOVERY == event->source ||
-				//		EVENT_SOURCE_AUTOREGISTRATION == event->source)
-				//{
-				//	execute_operations(event, action->actionid);
-				//}
-				//HALT_HERE("This is where the escalation starts, not implemented yet");
-				LOG_INF("This is where the escalation starts, not implemented yet");
-			}
+			LOG_INF("Action %ld matched to the event", action->actionid);
+			zbx_vector_uint64_append(matched_actions, action->actionid);
 		}
-
+	}
 }
-
-
-void glb_actions_process_event(events_processor_event_t *event, glb_actions_t *actions) {
-
+//calculates list of of operations needed for the event
+//returns the list of action ids which fit by the conditions
+void glb_actions_process_event(events_processor_event_t *event, glb_actions_t *actions, zbx_vector_uint64_t *matched_actions) {
 	event_actions_reset_conditions(event, actions);
-	event_actions_calc_escalate_actions(event, actions);
-
+	event_actions_calc_matched_actions(event, actions, matched_actions);
 }

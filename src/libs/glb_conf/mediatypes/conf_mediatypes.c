@@ -102,9 +102,9 @@ int glb_conf_mediatypes_set_data(char *json_buff){
 
             if (err)
                 continue;
-            zbx_vector_uint64_append(&ids, vm_id);
+          //  zbx_vector_uint64_append(&ids, vm_id);
 
-            //note: for large tables it might be feasible to separate update and create and add cahange check
+            //note: for large tables it might be feasible to separate update and create and add change check
             if (SUCCEED == elems_hash_process(conf->mtypes, vm_id, create_update_mediatype, &jp_mapping, 0)) 
                 zbx_vector_uint64_append(&ids, vm_id);
         }

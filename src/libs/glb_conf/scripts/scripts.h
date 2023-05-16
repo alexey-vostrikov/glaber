@@ -17,11 +17,11 @@
 **/
 
 #include "zbxcommon.h"
+#include "script.h"
 
-typedef struct glb_conf_script_t glb_conf_script_t;
+int glb_conf_scripts_init(mem_funcs_t *memf);
 
-void glb_conf_script_free(glb_conf_script_t *vm, mem_funcs_t *memf, strpool_t *strpool);
-glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
-
-int glb_conf_scripts_set_data(char *json_buffer);
+void    glb_conf_script_free(glb_conf_script_t *vm, mem_funcs_t *memf, strpool_t *strpool);
+glb_conf_script_t*  glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
+int     glb_conf_scripts_set_data(char *json_buffer);
 //todo: interface to fetch and use script data should be here

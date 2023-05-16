@@ -52,6 +52,8 @@
 #include "zbxjson.h"
 #include "scripts.h"
 #include "zbxstr.h"
+#include "../conf.h"
+#include "script.h"
 
 #include "zbxvariant.h"
 #include "zbxserver.h"
@@ -64,93 +66,109 @@ typedef struct {
 struct glb_conf_script_t {
     const char *name;
 	const char *command;
-	int host_access;
-	u_int64_t usrgrpid;
-	u_int64_t groupid;
-	const char *description;
-	const char *confirmation;
+	
 	int type;
 	int execute_on;
 	const char *timeout;
 	int scope;
+
 	u_int64_t port;
 	int authtype;
+
 	const char *username;
 	const char *password;
 	const char *publickey;
 	const char *privatekey;
-//	const char *menu_path;
+
 	const char *url;
-//	int new_window;
+
 	int params_count;
 	script_params_t *params;
+	/*next params are probably not needed for the server, but exists in DB/API*/
+
+	//int host_access;
+	//u_int64_t usrgrpid;
+	//u_int64_t groupid;
+	//const char *description;
+	//const char *confirmation;
+	//const char *menu_path;
+	//int new_window;
 } script_t;
 
-
 void glb_conf_script_free(glb_conf_script_t *script, mem_funcs_t *memf, strpool_t *strpool) {
-
-    memf->free_func(script);
+	glb_conf_script_clear(script, strpool);
+	memf->free_func(script);
 }
 
-glb_conf_script_t* json_to_script(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool) {
-    char value[64], newvalue[64], type[MAX_ID_LEN];
-    zbx_json_type_t jtype;
-  
-    if (SUCCEED == zbx_json_value_by_name(jp, "type", type, MAX_ID_LEN, &jtype ) && 
-        SUCCEED == zbx_json_value_by_name(jp, "value", value, MAX_ID_LEN, &jtype ) && 
-        SUCCEED == zbx_json_value_by_name(jp, "newvalue", newvalue, MAX_ID_LEN, &jtype )) {
-        glb_conf_script_t *script = memf->malloc_func(NULL, sizeof(glb_conf_script_t));
+void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool) {
 
-        return script;
-    }
+	strpool_free(strpool, script->name);
+	strpool_free(strpool, script->command);
+	strpool_free(strpool, script->timeout);
+	strpool_free(strpool, script->username);
+	strpool_free(strpool, script->password);
+	strpool_free(strpool, script->publickey);
+	strpool_free(strpool, script->privatekey);
+	strpool_free(strpool, script->url);
 
-    return NULL;
+	bzero(script, sizeof(glb_conf_script_t));
 }
 
-// int parse_valuemap(glb_conf_valuemap_t *vm, struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool) {
-//     const char *mapping_ptr = NULL;
-//     struct zbx_json_parse jp_mapping;
-//     mapping_t *mapping;
-//     int i = 0;
-    
-//     //LOG_INF("In %s", __func__);
-    
-//     while (NULL != (mapping_ptr = zbx_json_next(jp, mapping_ptr)))
-//     {
-//         //LOG_INF("In %s 1", __func__);
-//         if ( SUCCEED == zbx_json_brackets_open(mapping_ptr, &jp_mapping) &&
-//             NULL != (mapping = json_to_valuemap(&jp_mapping, memf, strpool))) {
-//             zbx_vector_ptr_append(&vm->mappings, mapping);
-//             i++;
-//         }
-//     }
-//     return i;
-// }
+static int script_fill_from_json(glb_conf_script_t *script, struct zbx_json_parse *jp, strpool_t *strpool) {
+	int errflg;
+	bzero(script, sizeof(glb_conf_script_t));
+	
+	glb_conf_add_json_param_strpool(jp, strpool, "name",  &script->name);
+	glb_conf_add_json_param_strpool(jp, strpool, "command",  &script->command);
+	glb_conf_add_json_param_strpool(jp, strpool, "timeout",  &script->timeout);
+	glb_conf_add_json_param_strpool(jp, strpool, "username",  &script->username);
+	glb_conf_add_json_param_strpool(jp, strpool, "password",  &script->password);
+	glb_conf_add_json_param_strpool(jp, strpool, "publickey",  &script->publickey);
+	glb_conf_add_json_param_strpool(jp, strpool, "privatekey",  &script->privatekey);
+	glb_conf_add_json_param_strpool(jp, strpool, "url",  &script->url);
+	
+	script->type 	   = glb_json_get_uint64_value_by_name(jp, "type", &errflg);
+	script->execute_on = glb_json_get_uint64_value_by_name(jp, "execute_on", &errflg);
+	script->scope      = glb_json_get_uint64_value_by_name(jp, "scope", &errflg);
+	script->port       = glb_json_get_uint64_value_by_name(jp, "port", &errflg);
+	script->authtype   = glb_json_get_uint64_value_by_name(jp, "authtype", &errflg);
+	
+	//script_fill_params_from_json(script, jp, strpool);
+	LOG_INF("Params filling should be here");
+	return SUCCEED;
+}
 
-
-/*takes the whole mapping object and */
 glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool) {
-
-    struct zbx_json_parse jp_mappings;
     glb_conf_script_t *script;
-    int errflag;
-//    LOG_INF("In %s", __func__);
 
     if (NULL ==(script = memf->malloc_func(NULL, sizeof(glb_conf_script_t))))
         return NULL;
 
-    //zbx_vector_ptr_create_ext(&vm->mappings, memf->malloc_func, memf->realloc_func, memf->free_func);
-
-    // if (SUCCEED != zbx_json_brackets_by_name(jp, "mappings", &jp_mappings) ||
-    //        0 ==( vm->id = glb_json_get_uint64_value_by_name(jp, "valuemapid", &errflag)) || 
-    //        0 == parse_valuemap(vm, &jp_mappings, memf, strpool) ) {
-    
-    //     zbx_vector_ptr_destroy(&vm->mappings);
-    //     memf->free_func(vm);
-
-    //     return NULL;
-    // } 
-
-    return script;
+	if (FAIL == script_fill_from_json(script, jp, strpool))  {
+		glb_conf_script_clear(script, strpool);
+		memf->free_func(script);
+	
+		return NULL;
+	}
+	return script;
 };   
 
+glb_conf_script_t *glb_conf_script_copy(glb_conf_script_t *src_script, mem_funcs_t *memf, strpool_t *strpool) {
+ 	glb_conf_script_t *dst_script;
+
+ 	if (NULL ==(dst_script = memf->malloc_func(NULL, sizeof(glb_conf_script_t))))
+         return NULL;
+	
+	//this will copy all the numerical values
+ 	memcpy(dst_script, src_script, sizeof(glb_conf_script_t));
+	dst_script->name = strpool_add(strpool, src_script->name);
+	dst_script->command = strpool_add(strpool, src_script->command);
+	dst_script->timeout = strpool_add(strpool, src_script->timeout);
+	dst_script->username = strpool_add(strpool, src_script->username);
+	dst_script->password = strpool_add(strpool, src_script->password);
+	dst_script->publickey = strpool_add(strpool, src_script->publickey);	
+	dst_script->privatekey = strpool_add(strpool, src_script->privatekey);
+	dst_script->url = strpool_add(strpool, src_script->url);
+	
+	return dst_script;
+}

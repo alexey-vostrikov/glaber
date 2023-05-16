@@ -48,6 +48,7 @@
 #include "../glb_conf/conf_hosts.h"
 #include "../glb_conf/items/conf_items.h"
 #include "../glb_conf/tags/tags.h"
+#include "../glb_conf/api_sync.h"
 #include "../../zabbix_server/glb_poller/poller_ipc.h"
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
@@ -7464,6 +7465,10 @@ out:
 	config->status->last_update = 0;
 	config->sync_ts = time(NULL);
 	FINISH_SYNC;
+	
+	
+	glb_api_sync_operations();
+
 #ifdef HAVE_ORACLE
 	if (ZBX_DB_OK == dberr)
 		dberr = DBcommit();

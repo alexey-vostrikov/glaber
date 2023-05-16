@@ -16,11 +16,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "glb_common.h"
+#include "log.h"
 #include "zbxalgo.h"
 
-typedef struct glb_conf_script_t glb_conf_script_t;
-
-//int glb_conf_script_create_update_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
-glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
-void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool);
+void run_api_io_tests();

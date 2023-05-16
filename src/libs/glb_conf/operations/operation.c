@@ -1,5 +1,7 @@
+
 /*
-** Copyright Glaber 2018-2023
+** Glaber
+** Copyright (C) 2001-2030 Glaber JSC
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,11 +18,20 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "glb_common.h"
+#include "operations.h"
+#include "zbxcommon.h"
+#include "log.h"
 #include "zbxalgo.h"
+#include "operation.h"
 
-typedef struct glb_conf_script_t glb_conf_script_t;
+typedef struct glb_operation_t {
+    char *name;
+};
 
-//int glb_conf_script_create_update_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
-glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
-void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool);
+void glb_operation_free(mem_funcs_t *memf, glb_operation_t *operation) {
+    HALT_HERE("Unimplemeted");
+}
+
+glb_operation_t *glb_operation_create_from_json(mem_funcs_t *memf, struct zbx_json_parse *jp) {
+    HALT_HERE("Unimplemeted");
+}

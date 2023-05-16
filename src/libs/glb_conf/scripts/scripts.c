@@ -22,6 +22,8 @@
 #include "zbxjson.h"
 #include "scripts.h"
 #include "zbxstr.h"
+#include "../conf.h"
+#include "script.h"
 
 typedef struct
 {
@@ -79,44 +81,8 @@ ELEMS_CALLBACK(create_update_script) {
     return FAIL;
 } 
 
-int glb_conf_script_set_data(char *json_buff){
-    struct zbx_json_parse	jp, jp_result, jp_mapping;
-    const char *mapping = NULL;
-    int err;
-    zbx_vector_uint64_t ids;
-    
-    zbx_vector_uint64_create(&ids);
-    zbx_vector_uint64_reserve(&ids, 65536);
-
-    if (SUCCEED != zbx_json_open(json_buff, &jp) ||
-        SUCCEED != zbx_json_brackets_by_name(&jp, "result", &jp_result)) {
-		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't open JSON data (broken or malformed json) %s", json_buff);
-		return FAIL;
-	}
-
-    while (NULL != (mapping = zbx_json_next(&jp_result, mapping))) {
-        if (SUCCEED == zbx_json_brackets_open(mapping, &jp_mapping)) {
-           
-            u_int64_t vm_id = glb_json_get_uint64_value_by_name(&jp_mapping, "scriptid", &err);
-
-            if (err)
-                continue;
-            
-
-            zbx_vector_uint64_append(&ids, vm_id);
-
-            if (SUCCEED == elems_hash_process(conf->scripts, vm_id, create_update_script, &jp_mapping, 0)) 
-                zbx_vector_uint64_append(&ids, vm_id);
-        }
-    }
-
-    elems_hash_remove_absent_in_vector(conf->scripts, &ids);
-    zbx_vector_uint64_destroy(&ids);
-    return SUCCEED;
-}
-
-//TODO: implement interface to fetch and work with the scripts 
-int glb_conf_scripts_set_data(char *json_buffer) {
-    LOG_INF("Setting data based on json: %s:", json_buffer);
-    HALT_HERE();
+//this proc is probably should go to a library -
+//it will be common for most sets
+int glb_conf_scripts_set_data(char *json_buff){
+    return glb_conf_iterate_on_set_data(json_buff, "scriptid", conf->scripts, create_update_script);
 }

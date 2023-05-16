@@ -12,8 +12,15 @@ libglbconfig_a_SOURCES = \
     ./valuemaps/conf_valuemap.c \
     ./triggers/conf_calc_trigger.c \
     ./tags/tags.c \
-    ./scripts/scritps.c \
-    ./scripts/script.c
+    ./api_io/glb_api_conf.c \
+    ./api_io/openssl_hostname_validation.c \
+    ./api_io/hostcheck.c \
+    ./scripts/scripts.c \
+    ./scripts/script.c \
+    api_sync.c \ 
+    ./operations/operations.c \
+    ./operations/operation.c
+
     
 libglbconfig_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxalgo

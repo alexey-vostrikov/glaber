@@ -1,6 +1,6 @@
 /*
 ** Glaber
-** Copyright (C) 2001-2030 Glaber JSC
+** Copyright (C) 2001-2023 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,10 +17,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-//glb escalator is responsible for performing operations based on actions configuration
-//whenever an actionable object is created it is passed to process_actions_xxxx, which in 
-//turn should notify escalator on object id and type
-//escalator uses actions-operations cache and schedules operations and performs them (or uses exec services, like alerter?)
 #include "glb_alerter.h"
 
 #include "zbxcommon.h"
@@ -33,8 +29,10 @@
 
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
-//TODO: check out of mem situation
-#define CONFIG_ALERTER_IPC_SIZE 16 * ZBX_MEBIBYTE
+
+//alerter can accept both escalations for problems and alerts either
+//escalations serve as a notifications for problem creation/deletion
+//#define CONFIG_ALERTER_IPC_SIZE 16 * ZBX_MEBIBYTE
 
 #define ALERTS_CHECK_INTERVAL 		1
 #define PROCTITLE_UPDATE_INTERVAL	5
@@ -49,9 +47,9 @@ typedef struct {
 	zbx_thread_args_t args;
 	poller_event_t *new_alerts_check;
 	poller_event_t *update_proctitle;
-	poller_event_t *update_mediatypes;
+	poller_event_t *update_config;
 	u_int64_t requests;
-	ipc_conf_t *ipc;
+	ipc_conf_t *ipc_alerts;
 	int process_num;
 	glb_mediatypes_t *mediatypes;
 } conf_t;
@@ -71,28 +69,37 @@ IPC_CREATE_CB(alert_send_cb) {
 	HALT_HERE("Not implemented");
 }
 
-IPC_FREE_CB(alert_free_cb) {
-
+IPC_PROCESS_CB(alert_process_cb) {
+	HALT_HERE("The actual alert processing isn't implemented yet")
 }
 
-IPC_PROCESS_CB(alert_process_cb) {
-	HALT_HERE("The actual alert sending isn't implemented")
+IPC_FREE_CB(alert_free_cb) {
 }
 
 static void new_alerts_check_cb(poller_item_t *garbage, void *data) {
-	LOG_INF("Checking for the new alerts, proc num is %d, %p",conf.args.info.process_num -1, &conf.ipc);
+	LOG_INF("Checking for the new alerts/escalations, proc num is %d",conf.args.info.process_num -1);
 
-	glb_ipc_process(conf.ipc, conf.args.info.process_num -1 , alert_process_cb, NULL, 1000 );
+	glb_ipc_process(conf.ipc_alerts, conf.args.info.process_num -1 , alert_process_cb, NULL, 1000 );
 }
 
-static void update_mdeiatypes_cb(poller_item_t *garbage, void *data){
-	LOG_INF("Updating mediatypes");
-	LOG_INF("Updating scripts info");
-	
+static void update_mediatypes() {
 	HALT_HERE("Not implemented");
-	//glb_actions_update(conf.actions_conf);
+}
 
-	LOG_INF("Finished update of mediatypes");
+static void update_scripts() {
+	HALT_HERE("Not implemented");
+}
+
+
+//mediatypes and scripts are copied to the local memory cache 
+static void update_config_cb(poller_item_t *garbage, void *data){
+	LOG_INF("Updating mediatypes");
+	update_mediatypes();
+
+	LOG_INF("Updating scripts info");
+	update_scripts();
+
+	LOG_INF("Finished update of mediatypes/scripts/operations");
 }
  
 static void update_proc_title_cb(poller_item_t *garbage, void *dat)
@@ -108,7 +115,6 @@ static void update_proc_title_cb(poller_item_t *garbage, void *dat)
 					get_process_type_string(conf.args.info.process_type), conf.args.info.process_num, (conf.requests * 1000) / (time_diff));
 
 	conf.requests = 0;
-	
 	last_call = now;
 
 	if (!ZBX_IS_RUNNING())
@@ -128,7 +134,6 @@ static int alerter_fork_init(zbx_thread_args_t *args)
 
 	conf.mediatypes = mediatypes_create();
 
-
 	poller_async_loop_init();
 
 	conf.new_alerts_check = poller_create_event(NULL, new_alerts_check_cb, 0, NULL, 1);
@@ -137,8 +142,8 @@ static int alerter_fork_init(zbx_thread_args_t *args)
 	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL * 1000);
 
-	conf.update_mediatypes = poller_create_event(NULL, update_mdeiatypes_cb, 0, NULL, 1);
-	poller_run_timer_event(conf.update_mediatypes, MEDIATYPES_UPDATE_INTERVAL * 1000);
+	conf.update_config = poller_create_event(NULL, update_config_cb, 0, NULL, 1);
+	poller_run_timer_event(conf.update_config, MEDIATYPES_UPDATE_INTERVAL * 1000);
 
 	return SUCCEED;
 }
@@ -148,16 +153,16 @@ int glb_alerting_init() {
     char *error = NULL;
     
 	LOG_INF("Doing init of event proc");
-    if (SUCCEED != zbx_shmem_create(&alerter_shmem, CONFIG_ALERTER_IPC_SIZE, "alerting ipc cache size", 
+    if (SUCCEED != zbx_shmem_create(&alerter_shmem, ZBX_MEBIBYTE * CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER], "alerting/escalations ipc cache size", 
 				"CONFIG_IPC_MEM_SIZE", 1, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
     	return FAIL;
     }
     
-    conf.ipc = glb_ipc_init(1024, sizeof(glb_alert_t), CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER] , 
-					&ipc_memf, alert_send_cb, alert_free_cb, IPC_LOW_LATENCY);
-
-    return SUCCEED;
+    conf.ipc_alerts = glb_ipc_init(512 *  CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER], sizeof(glb_alert_t), 
+			CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER] , &ipc_memf, alert_send_cb, alert_free_cb, IPC_LOW_LATENCY);
+	
+	return SUCCEED;
 }
 
 ZBX_THREAD_ENTRY(glb_alerter_thread, args)
@@ -173,6 +178,6 @@ ZBX_THREAD_ENTRY(glb_alerter_thread, args)
 		zbx_sleep(SEC_PER_MIN);
 }
 
-int  glb_alerter_send_alert(void) {
-	HALT_HERE("Not implemented");
+int  glb_alerter_send_alert(u_int64_t id, void *alert) {
+	return glb_ipc_send(conf.ipc_alerts, id % CONFIG_FORKS[GLB_PROCESS_TYPE_ALERTER], alert, IPC_LOCK_NOWAIT);
 }
