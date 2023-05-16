@@ -593,7 +593,7 @@ void glb_pinger_init(void) {
  
     add_params[0]='\0';
 
-    if (-1 == access(CONFIG_GLBMAP_LOCATION, X_OK))
+    if (-1 == access(CONFIG_GLBMAP_LOCATION, X_OK) )
 	{
         zabbix_log(LOG_LEVEL_WARNING,"Couldn't find glbmap at the path: %s or it isn't set to be executable: %s", CONFIG_GLBMAP_LOCATION, zbx_strerror(errno));
 		exit(-1);

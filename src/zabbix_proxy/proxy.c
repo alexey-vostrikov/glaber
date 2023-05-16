@@ -785,7 +785,7 @@ static void	zbx_validate_config(ZBX_TASK_EX *task)
 			"IPMI support"));
 #endif
 
-	if ( 0 == CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] &&  ZBX_ICMP == CONFIG_ICMP_METHOD) {
+	if ( 0 == CONFIG_FORKS[ZBX_PROCESS_TYPE_PINGER] &&  ZBX_ICMP == CONFIG_ICMP_METHOD) {
 		zbx_error("Cannot use default ICMP method fping without any PINGER poller enabled, set StartPingers > 0 in the server config file");
 		exit(EXIT_FAILURE);
 	}
