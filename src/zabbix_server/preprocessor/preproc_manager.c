@@ -2049,7 +2049,6 @@ static void preprocessor_register_worker(zbx_preprocessing_manager_t *manager, z
 		return;
 	}
 	
-	LOG_INF("Processing registration request from worker %d", manager->worker_count );
 	if (CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] == manager->worker_count)
 	{
 		LOG_INF("Has %d and %d", CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],  manager->worker_count);
