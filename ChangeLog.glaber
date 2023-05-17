@@ -1,3 +1,5 @@
+ver 3.0.67
+    - feat: monospace font for item keys and more icons for latest data
 ver 3.0.66
     - fixed problem preventing proxy to start in absence of glbmap even if old pingers where enabled
 ver 3.0.65
