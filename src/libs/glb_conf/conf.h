@@ -24,6 +24,7 @@ int glb_conf_iterate_on_set_data(char *json_buff, char *id_name,
 			elems_hash_t *elems, elems_hash_process_cb_t create_update_func);
 
 int glb_conf_add_json_param_strpool(struct zbx_json_parse *jp,  strpool_t *strpool, char *name, const char **param_addr);
+int glb_conf_add_json_param_memf(struct zbx_json_parse *jp, mem_funcs_t *memf, char *name, char **addr);
 
 int glb_conf_host_get_host(u_int64_t hostid, char **host);
 int glb_conf_host_get_name(u_int64_t hostid, char **name);

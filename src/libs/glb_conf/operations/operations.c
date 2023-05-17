@@ -28,7 +28,7 @@
 
 typedef struct {
     u_int16_t count;
-    void *operations;
+    glb_operation_t **operations;
 } operations_t ;
 
 typedef struct {
@@ -46,11 +46,10 @@ static void operations_free(mem_funcs_t *memf,  operations_t *opers) {
     int i;
     
     for (int i =0; i < opers->count; i ++) 
-        glb_operation_free(memf, (glb_operation_t*)opers->operations[i]);    
+        glb_operation_free(memf, opers->operations[i]);    
     memf->free_func(opers->operations);
     opers->count = 0;
 }
-
 
 int     glb_events_operations_get_max_steps(glb_events_operations_conf_t *operations, u_int64_t actionid) {
     HALT_HERE("Not implemented");
@@ -73,14 +72,12 @@ void    glb_events_operations_execute_recovery(glb_events_operations_conf_t *ope
 }
 
 ELEMS_CREATE(operation_create_cb) {
-    LOG_INF("Creating action %ld", elem->id);
     elem->data = memf->malloc_func(NULL, sizeof(glb_action_t));
     
     if (NULL == elem->data)
         return FAIL;
-    LOG_INF("Bzero");
+
     bzero(elem->data, sizeof(glb_action_t));
-    LOG_INF("Finished");
     return SUCCEED;
 }
 
@@ -101,7 +98,7 @@ void operations_create_from_json(mem_funcs_t *memf, operations_t *opers, struct 
     int i=0;
 
     opers->count = zbx_json_count(jp);
-    *opers->operations = memf->malloc_func(NULL, sizeof(glb_operation_t *) * opers->count);
+    opers->operations = memf->malloc_func(NULL, sizeof(glb_operation_t *) * opers->count);
     
     LOG_INF("There are %d operations in the action", opers->count);
 

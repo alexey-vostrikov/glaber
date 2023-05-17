@@ -17,7 +17,7 @@ libglbconfig_a_SOURCES = \
     ./api_io/hostcheck.c \
     ./scripts/scripts.c \
     ./scripts/script.c \
-    api_sync.c \ 
+    api_sync.c \
     ./operations/operations.c \
     ./operations/operation.c
 

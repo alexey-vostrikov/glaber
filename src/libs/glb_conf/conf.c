@@ -133,3 +133,18 @@ int glb_conf_add_json_param_strpool(struct zbx_json_parse *jp, strpool_t *strpoo
 	return FAIL;
 }
 
+int glb_conf_add_json_param_memf(struct zbx_json_parse *jp, mem_funcs_t *memf, char *name, char **addr) {
+	char tmp[MAX_STRING_LEN];
+    size_t len;
+	zbx_json_type_t jtype;
+
+	if (SUCCEED == zbx_json_value_by_name(jp, name, tmp, MAX_STRING_LEN, &jtype ))  {
+		len = strlen(tmp); 
+        *addr = memf->malloc_func(NULL, len + 1);
+        zbx_strlcpy(*addr, tmp, len);
+        return SUCCEED;
+	}
+	
+    *addr = NULL;
+	return FAIL;
+}
