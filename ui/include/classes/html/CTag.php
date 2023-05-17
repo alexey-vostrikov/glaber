@@ -51,6 +51,7 @@ class CTag extends CObject {
 	 * @var CSpan
 	 */
 	protected $hint = null;
+	protected $attributes = [];
 
 	public function __construct($tagname, $paired = false, $body = null) {
 		parent::__construct();

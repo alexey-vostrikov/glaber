@@ -23,8 +23,8 @@ class CLatestValue extends CSpan {
     private $triggers;
     
     private $value_raw;
-    private $value_formatted = " - ";
-    private $value_short = " - ";
+    private $value_formatted; 
+    private $value_short;
     private $value_change;
     private $value_change_raw = 0;
     
@@ -42,22 +42,32 @@ class CLatestValue extends CSpan {
         $this->history = $history;
         $this->triggers = $triggers;
         $this->editable = $editable;
-
+        
+        $this->value_formatted = " - ";
+        $this->value_short = new CIcon("fa-solid fa-eye-slash fa-lg");
+        
         $this->fetchMissingData();
         $this->makeValueFormatted();
         
         $this->makeValueChange();
         $this->calcTimestamps();
-
-       // error_log("Got trigger info:".json_encode($triggerinfo)."\n");
-        parent::__construct($this->value_short);
+       
         
-        if (!$this->isSupportedItem())
-            $this->addClass(ZBX_STYLE_RED);
+        if ($this->isDisabledItem()) {
+          //  $this->addClass(ZBX_STYLE_GREY);
+            $this->value_short = (new CIcon("fa-solid fa-triangle-exclamation fa-lg"))
+                            ->addClass(ZBX_STYLE_YELLOW);;
+        }
+        else if (!$this->isSupportedItem()) {
+//            $this->addClass(ZBX_STYLE_RED);
+            $this->value_short = (new CIcon("fa-solid fa-triangle-exclamation fa-lg"))
+                            ->addClass(ZBX_STYLE_RED);
+        }
+        parent::__construct($this->value_short);
         
         if ($this->isNumericItem())
             $this->addClass(ZBX_STYLE_NOWRAP);
-        
+
         $this->makeHint();
 
         $this->setHint($this->hintbox, 'hintbox-wrap'); 
@@ -74,7 +84,9 @@ class CLatestValue extends CSpan {
         return $this->value_change_raw;
     }
     public function GetLastCheck() {
-        return $this->last_poll_time;
+        if ( !$this->isDisabledItem()) 
+            return $this->last_poll_time;
+        return null;
     }
     public function GetLastCheckRaw() {
         return $this->last_poll_time_raw;
@@ -82,8 +94,6 @@ class CLatestValue extends CSpan {
     public function GetValueRaw() {
         return $this->value_raw;
     }
-
-
 
     private function calcTimestamps() {
         if (isset($this->itemdata['nextcheck']) && $this->itemdata['nextcheck'] > 0) {
@@ -125,6 +135,11 @@ class CLatestValue extends CSpan {
 
     private function makeValueFormatted() {
 
+        if ( $this->isDisabledItem() ) {
+            $this->value_formatted =  'DISABLED';
+            return;
+        }
+
         if (isset( $this->itemdata['error']) && $this->itemdata['state'] == ITEM_STATE_NOTSUPPORTED) {
             $this->value_formatted =  'UNSUPPORTED';
             $this->value_raw = 'UNSUPPORTED';
@@ -156,6 +171,11 @@ class CLatestValue extends CSpan {
             ->setArgument('itemid', $this->itemdata['itemid'])
             ->setArgument('context', 'host'));
     }
+    
+    private function isDisabledItem() {
+        return (ITEM_STATUS_DISABLED == $this->itemdata['status']);
+    }
+    
     private function isSupportedItem() {
         if (isset($this->itemdata['error']) && strlen($this->itemdata['error']) > 0) 
             return false;
@@ -174,8 +194,10 @@ class CLatestValue extends CSpan {
         $this->hintbox = (new CTableInfo())->setHeader(["",""]);
         $this->hintbox->addRow((new CCol(new CTag('strong', true, $this->itemdata['name'])))->setColSpan(2));
         
-        $this->addHintRow(_('Last check'), $this->last_poll_time, $this->last_poll_time);
-        $this->addHintRow(_('Next check'), $this->next_poll_time, $this->next_poll_time);
+        if ( ! $this->isDisabledItem()) {
+            $this->addHintRow(_('Last check'), $this->last_poll_time, $this->last_poll_time);
+            $this->addHintRow(_('Next check'), $this->next_poll_time, $this->next_poll_time);
+        }
 
         if ($this->isSupportedItem()) {
             $this->addHintRow(_('Value'), $this->value_formatted, $this->value_formatted);

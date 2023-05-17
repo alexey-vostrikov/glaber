@@ -175,12 +175,16 @@ function ShowItemsPlainTable(array &$data)
         $is_graph = ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT || $item['value_type'] == ITEM_VALUE_TYPE_UINT64);
 
         $checkbox = (new CCheckBox('itemids[' . $itemid . ']', $itemid))->addClass('no-sort');
-        $state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
-
+    //    $state_css = ($item['state'] == ITEM_STATE_NOTSUPPORTED) ? ZBX_STYLE_GREY : null;
+        $state_css = null;
         $item_name = (new CDiv([
             (new CSpan($item['name']))->addClass('label'),
             ($item['description'] !== '') ? makeDescriptionIcon($item['description']) : null,
         ]))->addClass('action-container');
+
+        if ( ITEM_STATUS_DISABLED == $item['status'] ) {
+            $item_name = new CTag('s', true, $item_name);
+        }
 
         $item_history_url = (new CUrl('history.php'))
             ->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
@@ -223,10 +227,15 @@ function ShowItemsPlainTable(array &$data)
         if ($data['filter']['show_details']) {
 
             $item_key = ($item['type'] == ITEM_TYPE_HTTPTEST)
-            ? (new CSpan($item['key_expanded']))->addClass(ZBX_STYLE_GREEN)
+            ? (new CSpan($item['key_expanded']))->addClass(ZBX_STYLE_GREEN)->addClass(GLB_STYLE_MONO)
             : (new CLink($item['key_expanded'], $item_history_url))
                 ->addClass(ZBX_STYLE_LINK_ALT)
-                ->addClass(ZBX_STYLE_GREEN);
+                ->addClass(ZBX_STYLE_GREEN)
+                ->addClass(GLB_STYLE_MONO);
+            
+            if ( ITEM_STATUS_DISABLED == $item['status'] ) {
+                $item_key = new CTag('s', true, $item_key);
+            }
 
             if (in_array($item['type'], [ITEM_TYPE_SNMPTRAP, ITEM_TYPE_TRAPPER, ITEM_TYPE_DEPENDENT])
                 || ($item['type'] == ITEM_TYPE_ZABBIX_ACTIVE && strncmp($item['key_expanded'], 'mqtt.get', 8) === 0)) {

@@ -59,12 +59,12 @@ abstract class CControllerGlaberLatest extends \CController {
 		
 		$fetch_options = [
 			'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
-					 'value_type', 'units', 'description', 'state', 'error'],
+					 'value_type', 'units', 'description', 'state', 'error', 'status'],
 			'selectTags' => ['tag', 'value'],
 			'selectValueMap' => ['mappings'],
 			'hostids' => array_column($hosts,'hostid'),
 			'webitems' => true,
-			'filter' => [ 'status' => [ITEM_STATUS_ACTIVE]	],
+	//		'filter' => [ 'status' => [ITEM_STATUS_ACTIVE]	],
 			'search' => ($filter['select'] === '') ? null : ['name' => $filter['select']],
 			'preservekeys' => true,
 			'discovery_items' => true,

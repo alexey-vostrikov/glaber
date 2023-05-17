@@ -299,7 +299,7 @@ foreach ($data['items'] as $item) {
 		($data['hostid'] == 0) ? $item['host'] : null,
 		(new CCol($description))->addClass(ZBX_STYLE_WORDBREAK),
 		$triggerInfo,
-		(new CDiv(CHtml::encode($item['key_'])))->addClass(ZBX_STYLE_WORDWRAP),
+		(new CDiv(CHtml::encode($item['key_'])))->addClass(ZBX_STYLE_WORDWRAP)->addClass(GLB_STYLE_MONO),
 		$item['delay'],
 		$item['history'] > 0 ?
 				(new CSpan(""))

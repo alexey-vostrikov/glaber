@@ -1020,11 +1020,14 @@ function make_trigger_details($trigger, $eventid) {
 	$table
 		->addRow([
 			new CCol(_('Problem expression')),
-			new CCol((new CDiv($trigger['expression']))->addClass(ZBX_STYLE_WORDWRAP))
+			new CCol((new CDiv($trigger['expression']))->addClass(ZBX_STYLE_WORDWRAP)
+														->addClass(GLB_STYLE_MONO))
 		])
 		->addRow([
 			new CCol(_('Recovery expression')),
-			new CCol((new CDiv($trigger['recovery_expression']))->addClass(ZBX_STYLE_WORDWRAP))
+			new CCol((new CDiv($trigger['recovery_expression']))->addClass(ZBX_STYLE_WORDWRAP)
+															->addClass(GLB_STYLE_MONO)
+			)
 		])
 		->addRow([_('Event generation'), _('Normal').((TRIGGER_MULT_EVENT_ENABLED == $trigger['type'])
 			? SPACE.'+'.SPACE._('Multiple PROBLEM events')

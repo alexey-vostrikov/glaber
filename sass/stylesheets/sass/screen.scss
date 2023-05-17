@@ -4037,6 +4037,10 @@ $form-icon-btn: (
 	color: $green;
 }
 
+.mono {
+	font-family: monospace, monospace;
+}
+
 a.green {
 	@extend .green;
 

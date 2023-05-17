@@ -312,12 +312,12 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 
 	if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
 		$expression = [
-			_('Problem'), ': ', $trigger['expression'], BR(),
-			_('Recovery'), ': ', $trigger['recovery_expression']
+			_('Problem'), ': ',((new CSpan($trigger['expression']))->addClass(GLB_STYLE_MONO)), BR(),
+			_('Recovery'), ': ',((new CSpan($trigger['recovery_expression']))->addClass(GLB_STYLE_MONO))
 		];
 	}
 	else {
-		$expression = $trigger['expression'];
+		$expression = (new CSpan($trigger['expression']))->addClass(GLB_STYLE_MONO);
 	}
 
 	$host = reset($trigger['hosts']);

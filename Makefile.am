@@ -95,16 +95,16 @@ gettext:
 	ui/locale/make_mo.sh
 
 css_theme_blue:
-	sass --no-source-map sass/stylesheets/sass/screen.scss ui/assets/styles/blue-theme.css
+	sass  sass/stylesheets/sass/screen.scss ui/assets/styles/blue-theme.css
 
 css_theme_dark:
-	sass --no-source-map sass/stylesheets/sass/dark-theme.scss ui/assets/styles/dark-theme.css
+	sass  sass/stylesheets/sass/dark-theme.scss ui/assets/styles/dark-theme.css
 
 css_hc_light:
-	sass --no-source-map sass/stylesheets/sass/hc-light.scss ui/assets/styles/hc-light.css
+	sass  sass/stylesheets/sass/hc-light.scss ui/assets/styles/hc-light.css
 
 css_hc_dark:
-	sass --no-source-map sass/stylesheets/sass/hc-dark.scss ui/assets/styles/hc-dark.css
+	sass  sass/stylesheets/sass/hc-dark.scss ui/assets/styles/hc-dark.css
 
 css_icons:
 	cp sass/img/icon-sprite.svg ui/assets/img/
