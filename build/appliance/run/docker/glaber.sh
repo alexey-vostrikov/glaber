@@ -75,10 +75,12 @@ diag () {
   cat /etc/os-release > .tmp/diag/os-release
   free -m > .tmp/diag/mem.log
   df -h   > .tmp/diag/disk.log
-  docker-compose -version > .tmp/diag/docker-compose-version.log
+  docker-compose --version > .tmp/diag/docker-compose-version.log
   docker --version > .tmp/diag/docker-version.log
   docker info > .tmp/diag/docker-info.log
   curl http://127.0.1.1:${ZBX_PORT:-80} > .tmp/diag/curl.log
+  command -v zip >/dev/null 2>&1 || \
+  { echo >&2 "zip is required, please install it and start over. Aborting."; exit 1; }
   info "Add diagnostic information to .tmp/diag/diag.zip"
   zip -r .tmp/diag/diag.zip .tmp/diag/ 1>/dev/null
   info "Fill free to create issue https://gitlab.com/mikler/glaber/-/issues"
