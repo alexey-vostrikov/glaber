@@ -7,16 +7,16 @@ ver 3.0.67
 ver 3.0.66
     - fixed problem preventing proxy to start in absence of glbmap even if old pingers where enabled
 ver 3.0.65
-    - fix in tsbuff to prevent retrieving wrong metrics on emtpied buffer 
+    - fix in tsbuff to prevent retrieving wrong metrics on emptied buffer 
 ver 3.0.64
     - fixed datatables warning message on empty tables
 ver 3.0.63
-    - fix in tsbuff to prevent retrieving wrong metrics on emtpied buffer 
+    - fix in tsbuff to prevent retrieving wrong metrics on emptied buffer 
 ver 3.0.62
     - artwork (icons) reverted to Glaber
 ver 3.0.61
     - added astra/orel build rules
-    - fixed sorting in datatables for date column if Russian localisation is used, added valuecache cleanup in housekeeper
+    - fixed sorting in datatables for date column if Russian localization is used, added valuecache cleanup in housekeeper
 ver 3.0.60
     - fix: timestamp  loss for dispatched items
 ver 3.0.59
