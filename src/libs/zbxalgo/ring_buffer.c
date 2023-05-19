@@ -410,3 +410,9 @@ int glb_tsbuff_check_has_enough_count_data_time(glb_tsbuff_t *tsbuff, int need_c
     
     return glb_tsbuff_check_has_enough_count_data_idx(tsbuff,need_count,idx);
 };
+int		glb_tsbuff_get_head_idx(glb_tsbuff_t *tsbuff) {
+    return tsbuff->head;
+}
+int		glb_tsbuff_get_tail_idx(glb_tsbuff_t *tsbuff) {
+    return tsbuff->tail;
+}

@@ -120,7 +120,6 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				writer.Flush()
 
 			case "put_history":
-			//	log.Print("Processing put request")
 				for _,metric := range v.GetArray("metrics") {
 					m := Metric {
 						Host :string(metric.GetStringBytes("hostname")),
@@ -153,7 +152,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				writer.Flush()
 
 			case "put_trends":
-				//log.Print( "Processing put trends request", string(request) )
+
 				for _,metric := range v.GetArray("aggmetrics") {
 					m := AggMetric {
 						Host :string(metric.GetStringBytes("hostname")),

@@ -365,8 +365,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 						zabbix_log(LOG_LEVEL_DEBUG, "Parsed as UINT64 %s",value);
 						if (SUCCEED != zbx_json_value_by_name(&jp_row, "value_int", value, MAX_STRING_LEN,&type) ) continue;
 			    		hr.value = history_str2value(value, value_type);
-						zbx_vector_history_record_append_ptr(values, &hr);
-						
+						zbx_vector_history_record_append_ptr(values, &hr);	
 						break;
 
 					case ITEM_VALUE_TYPE_FLOAT: 

@@ -820,12 +820,16 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
         now = time(NULL),
         fetch_seconds = req->seconds;
 
-    int cache_start = glb_tsbuff_get_time_head(&elm->tsbuff);
-
     head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head);
     tail_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head - req->seconds);
 
+    //if requested range start is more recent than the cache, then use what there are in the cache anyway
+    //but only if there is a tail exists - if there are data at all.
+    if (-1 != tail_idx && -1 == head_idx ) 
+        head_idx = glb_tsbuff_get_head_idx(&elm->tsbuff);
+    
     item_update_demand(elm, 0, MAX(0, req->seconds), now);
+    
     if (glb_tsbuff_get_count(&elm->tsbuff) > 0)
     {
         DEBUG_ITEM(elem->id, "Cache stats oldest time(relative):%d, most recent time(relative):%d, total values:%d, cache size: %d",
@@ -846,7 +850,8 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
         return SUCCEED;
     }
 
-    DEBUG_ITEM(elem->id, "NO/NOT ENOUGH data in the cache, requesting from the db");
+    DEBUG_ITEM(elem->id, "NO/NOT ENOUGH data in the cache, requesting from the db, head idx is %d, tail idx is %d", 
+            head_idx, tail_idx);
 
     count_miss();
 
@@ -938,7 +943,6 @@ int add_value_lld_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data) {
         LOG_WRN("Cannot add LLD value for item %ld with timestamp %d to the cache", h->itemid, h->ts.sec);
         return FAIL;
     }
-   
 }
 
 int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
@@ -989,6 +993,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
 
     return SUCCEED;
 }
+
 static int item_update_nextcheck_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *cb_data)
 {
     item_elem_t *elm = (item_elem_t *)elem->data;

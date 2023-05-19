@@ -1,3 +1,5 @@
+ver 3.0.69
+    - cache fetching allowing fetch of data event if head is out of cache bounds
 ver 3.0.68
     - fix: history_worker fixed to produce proper keys in json, victoria worker fixed to work in jsonl format
 ver 3.0.67

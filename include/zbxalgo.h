@@ -769,6 +769,10 @@ int		glb_tsbuff_get_count(glb_tsbuff_t *tsbuff);
 void*	glb_tsbuff_get_value_ptr(glb_tsbuff_t *tsbuf, int idx);
 int 	glb_tsbuff_get_time_head(glb_tsbuff_t *tsbuff);
 int		glb_tsbuff_get_time_tail(glb_tsbuff_t *tsbuff);
+
+int		glb_tsbuff_get_head_idx(glb_tsbuff_t *tsbuff);
+int		glb_tsbuff_get_tail_idx(glb_tsbuff_t *tsbuff);
+
 int 	glb_tsbuff_free_tail(glb_tsbuff_t *tsbuff);
 int		glb_tsbuff_is_full(glb_tsbuff_t *tsbuff);
 
