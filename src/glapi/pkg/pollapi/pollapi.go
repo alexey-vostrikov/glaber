@@ -93,7 +93,7 @@ func ServePoll ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer, l
 //worker module will treat the value according to it's value type
 func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
 	if num > 0 {
-		fmt.Fprintln(wr,",")
+		fmt.Fprint(wr,",")
 	}
 	fmt.Fprint(wr,"{\"time_sec\":",metric.Sec,", \"time_ns\":",metric.Ns, ", \"value_type\":",metric.Value_type)
 	switch metric.Value_type {
@@ -113,7 +113,7 @@ func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
 func dumpAggMetric(agg_metric *AggMetric,wr *bufio.Writer, num int) {
 	
 	if num > 0 {
-		fmt.Fprintln(wr,",")
+		fmt.Fprint(wr,",")
 	}
 
 	fmt.Fprint(wr,"{\"clock\":",agg_metric.Time,", \"value_type\":",agg_metric.Value_type, ", \"itemid\":",agg_metric.Itemid, ", \"i\":",agg_metric.I)

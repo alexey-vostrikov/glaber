@@ -116,7 +116,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				}
 				fmt.Fprint(writer,"{\"metrics\":[")
 				he.ReadMetrics(hr,dumpMetric,writer,log) 
-				fmt.Fprintln(writer,"]}\n");
+				fmt.Fprintln(writer,"]}");
 				writer.Flush()
 
 			case "put_history":
@@ -211,7 +211,7 @@ func ServeHistory ( he HistoryEngine, reader *bufio.Reader, writer *bufio.Writer
 				
 				fmt.Fprint(writer,"{\"aggmetrics\":[")
 				he.ReadAgg(hr,dumpAggMetric,writer,log) 
-				fmt.Fprintln(writer,"]}\n");
+				fmt.Fprintln(writer,"]}");
 				writer.Flush()
 
 
@@ -235,9 +235,9 @@ var jq = strings.NewReplacer("\b","\\b","\f", "\\f", "\n", "\\n","\\","\\\\", "\
 
 func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
 
-	if num > 0 {
-		fmt.Fprintln(wr,",")
-	}
+	 if num > 0 {
+	 	fmt.Fprint(wr,",")
+	 }
 
 	fmt.Fprint(wr,"{\"time_sec\":",metric.Sec,", \"time_ns\":",metric.Ns, ", \"value_type\":",metric.Value_type)
 	switch metric.Value_type {
@@ -252,13 +252,12 @@ func dumpMetric(metric *Metric,wr *bufio.Writer, num int) {
 				", \"source\":\"",metric.Source,"\", \"severity\":",metric.Severity)
 	}
 	fmt.Fprint(wr,"}")
-	
 }
 
 func dumpAggMetric(agg_metric *AggMetric,wr *bufio.Writer, num int) {
 	
 	if num > 0 {
-		fmt.Fprintln(wr,",")
+	 	fmt.Fprint(wr,",")
 	}
 
 	fmt.Fprint(wr,"{\"clock\":",agg_metric.Time,", \"value_type\":",agg_metric.Value_type, ", \"itemid\":",agg_metric.Itemid, ", \"i\":",agg_metric.I)

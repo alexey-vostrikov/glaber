@@ -1,3 +1,5 @@
+ver 3.0.68
+    - fix: history_worker fixed to produce proper keys in json, victoria worker fixed to work in jsonl format
 ver 3.0.67
     - feat: monospace font for item keys and more icons for latest data
 ver 3.0.66

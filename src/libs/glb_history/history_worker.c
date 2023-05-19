@@ -124,8 +124,7 @@ static int	worker_get_trends_json(void *data, int value_type, zbx_uint64_t itemi
 		return FAIL;
 	}	
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "Got aggregation responce :%s",response);
-
+	LOG_INF("Got aggregation responce :%s",response);
 
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:", worker_get_path(conf->worker), response);
@@ -153,9 +152,9 @@ static int	worker_get_trends_json(void *data, int value_type, zbx_uint64_t itemi
 			zbx_json_addobject(json,NULL);
 			zbx_json_adduint64 (json, "itemid", itemid);
 			zbx_json_addstring( json, "clock", clck, ZBX_JSON_TYPE_INT);
-			zbx_json_addstring( json, "value_max", max_value, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring( json, "value_min", min_value, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring( json, "value_avg", avg_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "max", max_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "min", min_value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring( json, "avg", avg_value, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring( json, "num", count, ZBX_JSON_TYPE_INT);
 			zbx_json_close(json);
 		} else {
@@ -215,7 +214,7 @@ static int	worker_get_agg_json(void *data, int value_type, zbx_uint64_t itemid, 
 		return FAIL;
 	}	
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "Got aggregation responce :%s",response);
+//	LOG_INF("Got aggregation responce :%s",response);
 
 	if (SUCCEED != zbx_json_open(response, &jp)) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:",worker_get_path(conf->worker), response);
@@ -245,9 +244,10 @@ static int	worker_get_agg_json(void *data, int value_type, zbx_uint64_t itemid, 
 				zbx_json_addobject(json,NULL);
 				zbx_json_adduint64 (json, "itemid", itemid);
 				zbx_json_addstring( json, "clock", clck, ZBX_JSON_TYPE_INT);
-				zbx_json_addstring( json, "value_max", max_value, ZBX_JSON_TYPE_STRING);
-				zbx_json_addstring( json, "value_min", min_value, ZBX_JSON_TYPE_STRING);
-				zbx_json_addstring( json, "value_avg", avg_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "max", max_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "min", min_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "avg", avg_value, ZBX_JSON_TYPE_STRING);
+				zbx_json_addstring( json, "count", count, ZBX_JSON_TYPE_STRING);
 				zbx_json_addstring( json, "i", i, ZBX_JSON_TYPE_INT);
 				zbx_json_close(json);
 			} 
@@ -331,6 +331,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 		 zabbix_log(LOG_LEVEL_DEBUG, "Got the LOG response: '%s'", response);
 	
 	if (SUCCEED != zbx_json_open(response, &jp)) {
+		//if (strlen(response) > 0 )
 		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse responce from worker: '%s'",response);
 		return SUCCEED;
 	}
@@ -358,8 +359,6 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 				hr.timestamp.ns = atoi(ns);
 				zabbix_log(LOG_LEVEL_DEBUG,"read: Clock: %s, ns: %s, value: %s, ",clck,ns,value);
 				
-				//DEBUG_ITEM(itemid, "Got history response: %s -> %s", clck, value );
-                
 				switch (value_type)
 				{
 					case ITEM_VALUE_TYPE_UINT64:
@@ -367,6 +366,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 						if (SUCCEED != zbx_json_value_by_name(&jp_row, "value_int", value, MAX_STRING_LEN,&type) ) continue;
 			    		hr.value = history_str2value(value, value_type);
 						zbx_vector_history_record_append_ptr(values, &hr);
+						
 						break;
 
 					case ITEM_VALUE_TYPE_FLOAT: 
