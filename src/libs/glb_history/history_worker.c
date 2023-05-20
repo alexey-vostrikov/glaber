@@ -208,19 +208,23 @@ static int	worker_get_agg_json(void *data, int value_type, zbx_uint64_t itemid, 
 	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_agg\", \"itemid\":%ld, \"value_type\":%d, \"start\": %d, \"count\":%d, \"end\":%d }",
 				itemid,value_type,start,aggregates,end);
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "Sending request %s",request);
+	DEBUG_ITEM(itemid, "Sending history aggregated data request %s",request);
+
 	if (SUCCEED !=glb_process_worker_request(conf->worker, request, &response)) {
 		zabbix_log(LOG_LEVEL_INFORMATION,"Failed to get info from worker");
 		return FAIL;
 	}	
 	
-//	LOG_INF("Got aggregation responce :%s",response);
+	if (NULL != response)
+		DEBUG_ITEM(itemid, "Got history aggregated data response %s",response);
 
 	if (SUCCEED != zbx_json_open(response, &jp)) {
+		DEBUG_ITEM(itemid, "Couldn't open JSON response from worker (format error?)");
 		zabbix_log(LOG_LEVEL_INFORMATION, "Couldn't ropen JSON response from worker %s %s:",worker_get_path(conf->worker), response);
 		return FAIL;
 	}
 	if (SUCCEED != zbx_json_brackets_by_name(&jp, "aggmetrics", &jp_data)) {
+		DEBUG_ITEM(itemid, "No aggregated metrics array in the response");
 		LOG_DBG("Couldn't find data section in the worker %s  responce %s:",worker_get_path(conf->worker), response);
 		return FAIL;
 	};
@@ -312,18 +316,17 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
       	return FAIL;
 	}
 	
-	//creating the request
 	zbx_snprintf(request,MAX_STRING_LEN, "{\"request\":\"get_history\", \"itemid\":%ld, \"start\": %d, \"count\":%d, \"end\":%d, \"value_type\":%d }",
 				itemid,start,count,end,value_type);
 
-	DEBUG_ITEM(itemid, "Requested from the history via history worker, start:%d, count:%d, end:%d ",start, count, end);
+	DEBUG_ITEM(itemid, "Requesting history via history worker, start:%d, count:%d, end:%d ",start, count, end);
+	DEBUG_ITEM(itemid, "Request: %s", request);
 
 	glb_process_worker_request(conf->worker, request, &response);
 	
 	if (NULL != response)
 		DEBUG_ITEM(itemid, "Got response:%s ",response);
 
-	//LOG_INF("Got response: %s",response);	
 	if (NULL == response)
 			return SUCCEED;
 			
@@ -331,14 +334,17 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 		 zabbix_log(LOG_LEVEL_DEBUG, "Got the LOG response: '%s'", response);
 	
 	if (SUCCEED != zbx_json_open(response, &jp)) {
-		//if (strlen(response) > 0 )
-		zabbix_log(LOG_LEVEL_WARNING, "Couldn't parse responce from worker: '%s'",response);
+		
+		DEBUG_ITEM(itemid, "Couldn't open JSON response from worker (format error?)");
+		LOG_DBG("Couldn't parse responce from worker: '%s'",response);
+		
 		return SUCCEED;
 	}
 
 	zabbix_log(LOG_LEVEL_DEBUG,"parsing worker response '%s':",response);
 
     if (SUCCEED != zbx_json_brackets_by_name(&jp, "metrics", &jp_data)) {
+		DEBUG_ITEM(itemid, "No metrics array in the response");
 		zabbix_log(LOG_LEVEL_INFORMATION,"NO data object in the responce JSON");
 		return SUCCEED;
 	}   
@@ -362,7 +368,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 				switch (value_type)
 				{
 					case ITEM_VALUE_TYPE_UINT64:
-						zabbix_log(LOG_LEVEL_DEBUG, "Parsed as UINT64 %s",value);
+						DEBUG_ITEM(itemid, "Parsed as clock %ld UINT64 %s",hr.timestamp.sec, value);
 						if (SUCCEED != zbx_json_value_by_name(&jp_row, "value_int", value, MAX_STRING_LEN,&type) ) continue;
 			    		hr.value = history_str2value(value, value_type);
 						zbx_vector_history_record_append_ptr(values, &hr);	
@@ -370,7 +376,7 @@ static int	worker_get_history(void *data, int value_type, zbx_uint64_t itemid, i
 
 					case ITEM_VALUE_TYPE_FLOAT: 
 						if (SUCCEED != zbx_json_value_by_name(&jp_row, "value_dbl", value, MAX_STRING_LEN,&type)) continue;
-						zabbix_log(LOG_LEVEL_DEBUG, "Parsed as DBL field %s",value);
+						DEBUG_ITEM(itemid, "Parsed as clock %ld DBL %s",hr.timestamp.sec, value);
 			    		hr.value = history_str2value(value, value_type);
                         zbx_vector_history_record_append_ptr(values, &hr);
 						break;
@@ -466,6 +472,8 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			continue;
 		}
 		
+		
+
 		zbx_json_addobject(&json, NULL);
 		zbx_json_addstring(&json,"hostname",h->host_name,ZBX_JSON_TYPE_STRING);
 		zbx_json_addstring(&json,"item_key",h->item_key,ZBX_JSON_TYPE_STRING);
@@ -478,8 +486,10 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 		switch (h->value_type) {
 			case ITEM_VALUE_TYPE_UINT64:
 	    		zbx_json_addint64(&json, "value_int", h->value.ui64);
+				DEBUG_ITEM(h->itemid, "Sending item to the history storage UINT64 %ld", h->value.ui64);
 				break;
 			case ITEM_VALUE_TYPE_FLOAT: 
+				DEBUG_ITEM(h->itemid, "Sending item to the history storage DOUBLE %f", h->value.dbl);
 		   		zbx_json_addfloat(&json, "value_dbl", h->value.dbl);
 				break;
 			case ITEM_VALUE_TYPE_LOG:
@@ -512,7 +522,7 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
   	LOG_DBG("sending to the worker: %s", json.buffer);
 
 	if (num > 0)
-		ret=glb_process_worker_request(conf->worker, json.buffer, &response);
+		ret = glb_process_worker_request(conf->worker, json.buffer, &response);
 	
     zbx_free(response);
 	zbx_json_free(&json);
@@ -565,12 +575,16 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 
 		switch (trends[i].value_type) {
 			case ITEM_VALUE_TYPE_FLOAT:
+				DEBUG_ITEM(trends[i].itemid, "Sending item to the trend storage DBL (min:%f, max:%f, avg:%f)",
+						trends[i].value_min.dbl, trends[i].value_max.dbl, trends[i].value_avg.dbl);
 				zbx_json_addfloat(&json,"min",trends[i].value_min.dbl);
 				zbx_json_addfloat(&json,"max",trends[i].value_max.dbl);
 				zbx_json_addfloat(&json,"avg",trends[i].value_avg.dbl);
 				break;
 
 			case ITEM_VALUE_TYPE_UINT64:
+				DEBUG_ITEM(trends[i].itemid, "Sending item to the trend storage UINT64 (min:%ld, max:%ld, avg:%ld)",
+						trends[i].value_min.ui64, trends[i].value_max.ui64, trends[i].value_avg.ui64);
 				zbx_json_adduint64(&json,"minint",trends[i].value_min.ui64);
 				zbx_json_adduint64(&json,"maxint",trends[i].value_max.ui64);
 				zbx_json_adduint64(&json,"avgint", (trends[i].value_avg.ui64.lo /  trends[i].num) );
@@ -584,9 +598,7 @@ static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
 	zbx_json_close(&json);
 	
 	LOG_DBG("Syncing %d trend values", num);
-   // zbx_json_addraw(&json,NULL,"\n");
-	//zbx_snprintf_alloc(&json.buffer,&json.buffer_allocated,&json.buffer_offset + 1,"\n");
-
+   
     LOG_DBG("Sending trends data %s", json.buffer);
 	
 	if (num > 0)
@@ -717,4 +729,3 @@ int	glb_history_worker_init(char *params)
 		
 	return SUCCEED;
 }
-

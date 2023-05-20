@@ -34,9 +34,7 @@ type VictoriaHist struct {
 	quotter *strings.Replacer
 }
 
-const MAX_VMETRICS_VALUES = 20000
-const MAX_VMETRICS_TIMEFRAME = 86400
-
+const MAX_VMETRICS_AGG_VALUES = 4096
 
 func Init(he *VictoriaHist, url string, dbname string, batch int, flush int, disable_ns bool, save_names bool )   {
 
@@ -66,7 +64,6 @@ func Init(he *VictoriaHist, url string, dbname string, batch int, flush int, dis
 	he.quotter = strings.NewReplacer(",","\\,"," ","\\_")
 
 }
-
 
 func (he VictoriaHist) WriteMetrics (metric *histApi.Metric, log *log.Logger) {
 	var buf = he.sql_buffer[metric.Value_type]
@@ -241,6 +238,7 @@ func (he VictoriaHist) ReadTrends (hr histApi.HistoryRequest, dumpf func(*histAp
 func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.AggMetric, *bufio.Writer, int), wr* bufio.Writer, log *log.Logger) []histApi.AggMetric  {
 
 	var url strings.Builder
+	//var tmp strings.Builder
 	var step uint64
 	var  vmax, vmin, vavg []*fastjson.Value
 
@@ -248,8 +246,11 @@ func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.A
 		return nil
 	}
 
-	if ( 0 == hr.Count  || (MAX_VMETRICS_VALUES > hr.End - hr.Start) ) {
-		step =  (hr.End - hr.Start) / MAX_VMETRICS_VALUES
+	//fmt.Fprintf(&tmp, "Sending query, count is %d, time diff is %d \n", hr.Count , hr.End-hr.Start );
+	//log.Println(tmp.String());
+
+	if ( 0 == hr.Count  || (MAX_VMETRICS_AGG_VALUES > hr.End - hr.Start) ) {
+		step =  (hr.End - hr.Start) / MAX_VMETRICS_AGG_VALUES
 	} else {
 		step = (hr.End-hr.Start)/hr.Count
 	}
@@ -259,8 +260,8 @@ func (he VictoriaHist) ReadAgg (hr histApi.HistoryRequest, dumpf func(*histApi.A
 	}
 
 	//one more check, if there are more then MAX_VMETRIC_POINTS, then change the step to fit
-	if (MAX_VMETRICS_VALUES < (hr.End - hr.Start) / step ) {
-		step = (hr.End - hr.Start) / MAX_VMETRICS_VALUES
+	if (MAX_VMETRICS_AGG_VALUES < (hr.End - hr.Start) / step ) {
+		step = (hr.End - hr.Start) / MAX_VMETRICS_AGG_VALUES
 	}
 	
 	fmt.Fprintf(&url, "%s/api/v1/query_range?query=(rollup(item_%d_value))&start=%d&end=%d&step=%dms",
@@ -513,8 +514,6 @@ func (he VictoriaHist) Flush () int {
 			(*he.metrics)[i]=0
 		}	
 	}
-
-	//log.Print("Flushed records:",flushed)
 	
 	return flushed
 	

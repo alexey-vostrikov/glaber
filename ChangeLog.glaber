@@ -1,3 +1,5 @@
+ver 3.0.70
+    - fixed glb_hist_victoria : interval miscalculation where producing too much data
 ver 3.0.69
     - cache fetching allowing fetch of data event if head is out of cache bounds
 ver 3.0.68
