@@ -75,7 +75,6 @@ if (hasRequest('mark_color')) {
 $actions = [
 	HISTORY_GRAPH => _('Graph'),
 	HISTORY_VALUES => _('Values'),
-	HISTORY_LATEST => _('500 latest values')
 ];
 
 if (!$items_numeric) {
@@ -264,18 +263,11 @@ if ($data['plaintext']) {
 		$html_page->addItem([new CSpan($text), BR()]);
 	}
 
-	if ($data['itemids']) {
-//		$screen = $screen->get();
-		$pre = new CPre();
-
-		foreach($screens as $screen_type => $screen) {
-			foreach ($screen->get() as $text) {
-				$pre->addItem([$text, BR()]);
-			}
-		}
-
-		$html_page->addItem($pre);
-	}
+    foreach ($screens as $screen) {
+        if ($screen->plaintext) {
+            $html_page->addItem($screens[$typename]->get());
+        }
+    }
 }
 else {
 	$html_page

@@ -22,71 +22,27 @@
 class CScreenHistory extends CScreenBase {
 
 	/**
-	 * Type of graph to display.
+	 * @var int Type of graph to display.
 	 *
 	 * Supported values:
 	 * - GRAPH_TYPE_NORMAL
 	 * - GRAPH_TYPE_STACKED
-	 *
-	 * @var int
 	 */
 	protected $graphType;
-
-	/**
-	 * Search string
-	 *
-	 * @var string
-	 */
+	/** @var string Search string */
 	public $filter;
-
-	/**
-	 * Filter show/hide
-	 *
-	 * @var int
-	 */
+	/** @var int Filter show/hide */
 	public $filterTask;
-
-	/**
-	 * Filter highlight color
-	 *
-	 * @var string
-	 */
+	/** @var string Filter highlight color */
 	public $markColor;
-
-	/**
-	 * Is plain text displayed
-	 *
-	 * @var boolean
-	 */
+	/** @var boolean Is plain text displayed */
 	public $plaintext;
-
-	/**
-	 * Items ids.
-	 *
-	 * @var array
-	 */
+	/** @var array Items ids. */
 	public $itemids;
-
-	/**
-	 * Graph id.
-	 *
-	 * @var int
-	 */
+	/** @var int Graph id. */
 	public $graphid = 0;
-
-	/**
-	 * String containing base URL for pager.
-	 *
-	 * @var string
-	 */
+	/** @var string String containing base URL for pager. */
 	public $page_file;
-
-	/**
-	 * String containing id for time control
-	 *
-	 * @var string
-	 */
-	//protected $screenid;
 
 	/**
 	 * Init screen data.
@@ -126,7 +82,7 @@ class CScreenHistory extends CScreenBase {
 				'output' => ['itemid'],
 				'graphids' => [$options['graphid']]
 			]);
-			$this->itemids = zbx_objectValues($itemids, 'itemid');
+			$this->itemids = array_column($itemids, 'itemid');
 			$this->graphid = $options['graphid'];
 		}
 	}
@@ -138,7 +94,7 @@ class CScreenHistory extends CScreenBase {
 	 */
 	public function get() {
 		$output = [];
-		
+
 		$items = API::Item()->get([
 			'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'history', 'trends'],
 			'selectHosts' => ['name'],
@@ -154,405 +110,54 @@ class CScreenHistory extends CScreenBase {
 			return;
 		}
 
-	///	$items = CMacrosResolverHelper::resolveItemNames($items);
-
-		$iv_string = [
-			ITEM_VALUE_TYPE_LOG => 1,
-			ITEM_VALUE_TYPE_TEXT => 1,
-			ITEM_VALUE_TYPE_STR => 1
-		];
-
-		if ($this->action == HISTORY_VALUES || $this->action == HISTORY_LATEST) {
+		if ($this->action == HISTORY_VALUES) {
 			$options = [
 				'output' => API_OUTPUT_EXTEND,
 				'sortfield' => ['clock'],
-				'sortorder' => ZBX_SORT_DOWN
+				'sortorder' => ZBX_SORT_DOWN,
+                'time_from' => $this->timeline['from_ts'],
+                'time_till' => $this->timeline['to_ts'],
+                'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
 			];
 
-			if ($this->action == HISTORY_LATEST) {
-				$options['limit'] = 500;
-			}
-			else {
-				$options += [
-					'time_from' => $this->timeline['from_ts'],
-					'time_till' => $this->timeline['to_ts'],
-					'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
-				];
-			}
-
 			$is_many_items = (count($items) > 1);
-			$numeric_items = true;
+            $numeric_items = !$this->hasStringItems($items);
+            //if there are logs, we'll sort output showvalues data in ascending order
+            $has_logs = $this->hasLogs($items);
 
-			foreach ($items as $item) {
-				$numeric_items = ($numeric_items && !array_key_exists($item['value_type'], $iv_string));
-				if (!$numeric_items) {
-					break;
-				}
-			}
-			
-			//if there are logs, we'll sort output showvalues data in ascending order
-			$has_logs = false;
-			foreach ($items as $item) {
-				if ( ITEM_VALUE_TYPE_LOG == $item['value_type'] ) {
-					$has_logs = true;
-					break;
-				}
-			}
-
-
-			if ($numeric_items) {
-				$this->dataId = 'numeric'; 
-			} else {
-				$this->dataId = 'text';
-			}
+            $this->dataId = $numeric_items ? 'numeric' : 'text';
 
 			/**
 			 * View type: As plain text.
 			 * Item type: numeric (unsigned, char), float, text, log.
 			 */
 			if ($this->plaintext) {
-				if (!$numeric_items && $this->filter !== ''
-						&& in_array($this->filterTask, [FILTER_TASK_SHOW, FILTER_TASK_HIDE])) {
-					$options['search'] = ['value' => $this->filter];
-
-					if ($this->filterTask == FILTER_TASK_HIDE) {
-						$options['excludeSearch'] = true;
-					}
-				}
-
-				$history_data = [];
-				$items_by_type = [];
-
-				foreach ($items as $item) {
-					$items_by_type[$item['value_type']][] = $item['itemid'];
-				}
-
-				foreach ($items_by_type as $value_type => $itemids) {
-					$options['history'] = $value_type;
-					$options['itemids'] = $itemids;
-					
-					$item_data = API::History()->get($options);
-			
-
-					if ($item_data) {
-						$history_data = array_merge($history_data, $item_data);
-					}
-				}
-					
-				
-				$sort_order = $has_logs? ZBX_SORT_UP : ZBX_SORT_DOWN;
-				
-				CArrayHelper::sort($history_data, [
-					['field' => 'clock', 'order' => $sort_order],
-					['field' => 'ns', 'order' => $sort_order]
-				]);
-
-
-				$history_data = array_slice($history_data, 0, $options['limit']);
-
-				foreach ($history_data as $history_row) {
-					$value = $history_row['value'];
-
-					if (in_array($items[$history_row['itemid']]['value_type'],
-							[ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_TEXT])) {
-						$value = '"'.$value.'"';
-					}
-					elseif ($items[$history_row['itemid']]['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
-						$value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
-					}
-
-					$row = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_row['clock']).' '.$history_row['clock'].
-						' '.$value;
-
-					if ($is_many_items) {
-						$row .= ' "'.$items[$history_row['itemid']]['hosts'][0]['name'].NAME_DELIMITER.
-							$items[$history_row['itemid']]['name_expanded'].'"';
-					}
-					$output[] = $row;
-				}
-
-				// Return values as array of formatted strings.
-				return $output;
-			}
+                return $this->getOutput(
+                    $this->getPlainTextView($items, $options, $numeric_items, $has_logs, $is_many_items),
+                    false
+                );
+            }
 			/**
 			 * View type: Values, 500 latest values
 			 * Item type: text, log
 			 */
 			elseif (!$numeric_items) {
-				$use_log_item = false;
-				$use_eventlog_item = false;
-				$items_by_type = [];
-				$history_data = [];
-
-				foreach ($items as $item) {
-					$items_by_type[$item['value_type']][] = $item['itemid'];
-
-				//	if ($item['value_type'] == ITEM_VALUE_TYPE_LOG) {
-				//		$use_log_item = true;
-				//	}
-
-					if (strpos($item['key_'], 'eventlog[') === 0) {
-						$use_eventlog_item = true;
-					}
-				}
-
-				$history_table = (new CDataTable('logview'))
-					->setHeader([
-						(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)->addClass('search'),
-						$is_many_items ? _('Item') : null,
-						$use_log_item ? (new CColHeader(_('Local time')))->addClass(ZBX_STYLE_CELL_WIDTH)->addClass('search') : null,
-						($use_eventlog_item && $use_log_item)
-							? (new CColHeader(_('Source')))->addClass(ZBX_STYLE_CELL_WIDTH)
-							: null,
-						($use_eventlog_item && $use_log_item)
-							? (new CColHeader(_('Severity')))->addClass(ZBX_STYLE_CELL_WIDTH)
-							: null,
-						($use_eventlog_item && $use_log_item)
-							? (new CColHeader(_('Event ID')))->addClass(ZBX_STYLE_CELL_WIDTH)
-							: null,
-						(new CColHeader(_('Value')))->addClass('search')
-					]);
-
-				if ($this->filter !== '' && in_array($this->filterTask, [FILTER_TASK_SHOW, FILTER_TASK_HIDE])) {
-					$options['search'] = ['value' => $this->filter];
-					if ($this->filterTask == FILTER_TASK_HIDE) {
-						$options['excludeSearch'] = true;
-					}
-				}
-				
-				foreach ($items_by_type as $value_type => $itemids) {
-					$options['history'] = $value_type;
-					$options['itemids'] = $itemids;
-					$item_data = API::History()->get($options);
-					$this->filterDataArray($item_data);
-
-					if ($item_data) {
-						$history_data = array_merge($history_data, $item_data);
-					}
-				}
-				$sort_order = $has_logs? ZBX_SORT_UP : ZBX_SORT_DOWN;
-				
-					
-				CArrayHelper::sort($history_data, [
-					['field' => 'clock', 'order' => $sort_order],
-					['field' => 'ns', 'order' => $sort_order]
-				]);
-
-				foreach ($history_data as $data) {
-					$data['value'] = rtrim($data['value'], " \t\r\n");
-					
-					if (!isset($data['severity'])) 
-						$severity = TRIGGER_SEVERITY_UNDEFINED;
-					else 
-						$severity = $data['severity'];
-					
-					if (isset($data['logeventid']) && isset($data['source'])
-						&& $data['logeventid']>0 ) 
-					{
-						$cell_clock = (new CCol(new CLink(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock']),
-						(new CUrl('tr_events.php'))
-							->setArgument('triggerid', $data['source'])
-							->setArgument('eventid', $data['logeventid'])
-						)))->addClass(ZBX_STYLE_NOWRAP)
-						   ->setAttribute('data-order', $data['clock']);
-						
-					} else {
-						$cell_clock = (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock'])))
-						->addClass(ZBX_STYLE_NOWRAP)
-						->setAttribute('data-order', $data['clock']);
-					}
-					
-					$item = $items[$data['itemid']];
-					$host = reset($item['hosts']);
-					
-					isset($data['color'] )
-						? $color = $data['color']
-						: $color = null;
-					
-					$row = [];
-					
-					$row[] = $cell_clock;
-
-					if ($is_many_items) {
-						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name']))
-							->addClass($color);
-					}
-
-
-					if ($use_log_item) {
-						$row[] = (array_key_exists('timestamp', $data) && $data['timestamp'] != 0)
-							? (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['timestamp'])))
-								->addClass(ZBX_STYLE_NOWRAP)
-								->addClass($color)
-							: '';
-
-						// If this is an eventLog item, showing additional info.
-						if ($use_eventlog_item) {
-							$row[] = array_key_exists('source', $data)
-								? (new CCol($data['source']))
-									->addClass(ZBX_STYLE_NOWRAP)
-									->addClass($color)
-								: '';
-							$row[] = (array_key_exists('severity', $data) && $data['severity'] != 0)
-								? (new CCol(get_item_logtype_description($data['severity'])))
-									->addClass(ZBX_STYLE_NOWRAP)
-									->addClass(get_item_logtype_style($data['severity']))
-								: '';
-							$row[] = array_key_exists('severity', $data)
-								? (new CCol($data['logeventid']))
-									->addClass(ZBX_STYLE_NOWRAP)
-									->addClass($color)
-								: '';
-						}
-					}
-
-					$row[] = (new CCol(new CPre(zbx_nl2br($data['value']))))->addClass(CSeverityHelper::getStatusStyle($severity));
-
-					$history_table->addRow($row);
-				}
-
-				$output[] = [$history_table];
-			}
-			/**
-			 * View type: 500 latest values.
-			 * Item type: numeric (unsigned, char), float.
-			 */
-			elseif ($this->action === HISTORY_LATEST) {
-				$history_table = (new CTableInfo())
-					->makeVerticalRotation()
-					->setHeader([(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH), _('Value')]);
-
-				$items_by_type = [];
-				$history_data = [];
-
-				foreach ($items as $item) {
-					$items_by_type[$item['value_type']][] = $item['itemid'];
-				}
-
-				foreach ($items_by_type as $value_type => $itemids) {
-					$options['history'] = $value_type;
-					$options['itemids'] = $itemids;
-					$item_data = API::History()->get($options);
-					$this->filterDataArray($item_data);
-
-					if ($item_data) {
-						$history_data = array_merge($history_data, $item_data);
-					}
-				}
-
-				CArrayHelper::sort($history_data, [
-					['field' => 'clock', 'order' => ZBX_SORT_DOWN],
-					['field' => 'ns', 'order' => ZBX_SORT_DOWN]
-				]);
-
-				$history_data = array_slice($history_data, 0, $options['limit']);
-
-				foreach ($history_data as $history_row) {
-					$item = $items[$history_row['itemid']];
-					$value = $history_row['value'];
-
-					if ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
-						$value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
-					}
-
-					$value = CValueMapHelper::applyValueMap($item['value_type'], $value, $item['valuemap']);
-
-					$history_table->addRow([
-						(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_row['clock'])))
-							->addClass(ZBX_STYLE_NOWRAP),
-						new CPre(zbx_nl2br($value))
-					]);
-				}
-
-				$output[] = $history_table;
-			}
+                $output[] = $this->getNumericItemsView($items, $options, $is_many_items, $has_logs);
+            }
 			/**
 			 * View type: Values.
 			 * Item type: numeric (unsigned, char), float.
 			 */
 			else {
-				CArrayHelper::sort($items, [
-					['field' => 'name_expanded', 'order' => ZBX_SORT_UP]
-				]);
-				$table_header = [(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)];
-				$history_data = [];
-
-				foreach ($items as $item) {
-					$options['itemids'] = [$item['itemid']];
-					$options['history'] = $item['value_type'];
-					$item_data = API::History()->get($options);
-			
-					$this->filterDataArray($item_data);
-					
-					CArrayHelper::sort($item_data, [
-						['field' => 'clock', 'order' => ZBX_SORT_DOWN],
-						['field' => 'ns', 'order' => ZBX_SORT_DOWN]
-					]);
-
-					$table_header[] = (new CColHeader($item['name']))
-						->addClass('vertical_rotation')
-						->setTitle($item['name']);
-					$history_data_index = 0;
-
-					foreach ($item_data as $item_data_row) {
-						// Searching for starting 'insert before' index in results array.
-						while (array_key_exists($history_data_index, $history_data)) {
-							$history_row = $history_data[$history_data_index];
-
-							if ($history_row['clock'] <= $item_data_row['clock']
-									&& !array_key_exists($item['itemid'], $history_row['values'])) {
-								break;
-							}
-
-							++$history_data_index;
-						}
-
-						if (array_key_exists($history_data_index, $history_data)
-								&& !array_key_exists($item['itemid'], $history_row['values'])
-								&& $history_data[$history_data_index]['clock'] === $item_data_row['clock']) {
-							$history_data[$history_data_index]['values'][$item['itemid']] = $item_data_row['value'];
-						}
-						else {
-							array_splice($history_data, $history_data_index, 0, [[
-								'clock' => $item_data_row['clock'],
-								'values' => [$item['itemid'] => $item_data_row['value']]
-							]]);
-						}
-					}
-				}
-
-					$history_table = (new CTableInfo())->makeVerticalRotation()->setHeader($table_header);
-
-				foreach ($history_data as $history_data_row) {
-					$row = [(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_data_row['clock'])))
-						->addClass(ZBX_STYLE_NOWRAP)
-					];
-					$values = $history_data_row['values'];
-
-					foreach ($items as $item) {
-						$value = array_key_exists($item['itemid'], $values) ? $values[$item['itemid']] : '';
-
-						if ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT && $value !== '') {
-							$value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
-						}
-
-						$value = CValueMapHelper::applyValueMap($item['value_type'], $value, $item['valuemap']);
-
-						$row[] = ($value === '') ? '' : new CPre($value);
-					}
-
-					$history_table->addRow($row);
-				}
-
-				$output[] = [$history_table, NULL];
-			}
+                $output = $this->getHistoryValuesView($items, $options);
+            }
 		}
 
 		// time control
 		if (str_in_array($this->action, [HISTORY_VALUES, HISTORY_GRAPH, HISTORY_BATCH_GRAPH])) {
-			$graphDims = getGraphDims();
-
-			$timeControlData = [];
+			$timeControlData = [
+                'id' => $this->getDataId(),
+            ];
 
 			if ($this->action == HISTORY_GRAPH || $this->action == HISTORY_BATCH_GRAPH) {
 				$containerId = 'graph_cont1';
@@ -560,16 +165,12 @@ class CScreenHistory extends CScreenBase {
 					->addClass('center')
 					->setId($containerId);
 				
-				$timeControlData['id'] = $this->getDataId();
 				$timeControlData['containerid'] = $containerId;
 				$timeControlData['src'] = $this->getGraphUrl($this->itemids);
-				$timeControlData['objDims'] = $graphDims;
+				$timeControlData['objDims'] = getGraphDims();
 				$timeControlData['loadSBox'] = 1;
 				$timeControlData['loadImage'] = 1;
 				$timeControlData['dynamic'] = 1;
-			}
-			else {
-				$timeControlData['id'] = $this->getDataId();
 			}
 
 			if ($this->mode == SCREEN_MODE_JS) {
@@ -618,11 +219,10 @@ class CScreenHistory extends CScreenBase {
 	 *
 	 * 
 	 */
-	
  	protected function filterDataArray(array &$history_data = null) {
 
 		if ( $this->filterTask != FILTER_TASK_HIDE &&
-			 $this->filterTask != FILTER_TASK_HIDE &&  
+			 $this->filterTask != FILTER_TASK_SHOW &&
 			 $this->filterTask != FILTER_TASK_INVERT_MARK &&
 			 $this->filterTask != FILTER_TASK_MARK)
 				return;
@@ -690,4 +290,299 @@ class CScreenHistory extends CScreenBase {
 
 		return $url->getUrl();
 	}
+
+    /**
+     * Checks the array of items for the presence of string items
+     * @param array $items
+     * @return bool
+     */
+    public function hasStringItems(array $items): bool
+    {
+        $iv_string = [
+            ITEM_VALUE_TYPE_LOG => 1,
+            ITEM_VALUE_TYPE_TEXT => 1,
+            ITEM_VALUE_TYPE_STR => 1
+        ];
+
+        foreach ($items as $item) {
+            if (array_key_exists($item['value_type'], $iv_string)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array $items
+     * @return bool
+     */
+    public function hasLogs(array $items): bool
+    {
+        foreach ($items as $item) {
+            if (ITEM_VALUE_TYPE_LOG === $item['value_type']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array $options
+     * @param array $items
+     * @param string $sort_order
+     * @return array
+     * @throws Exception
+     */
+    public function getData(array $items, array $options, string $sort_order): array
+    {
+        if ($this->filter !== '' && in_array($this->filterTask, [FILTER_TASK_SHOW, FILTER_TASK_HIDE])) {
+            $options['search'] = ['value' => $this->filter];
+            if ($this->filterTask == FILTER_TASK_HIDE) {
+                $options['excludeSearch'] = true;
+            }
+        }
+
+        $history_data = [];
+        $items_by_type = [];
+
+        foreach ($items as $item) {
+            $items_by_type[$item['value_type']][] = $item['itemid'];
+        }
+
+        foreach ($items_by_type as $value_type => $itemids) {
+            $options['history'] = $value_type;
+            $options['itemids'] = $itemids;
+
+            $item_data = API::History()->get($options);
+
+            if ($item_data) {
+                $history_data = array_merge($history_data, $item_data);
+            }
+        }
+
+        CArrayHelper::sort($history_data, [
+            ['field' => 'clock', 'order' => $sort_order],
+            ['field' => 'ns', 'order' => $sort_order]
+        ]);
+
+
+        return array_key_exists('limit', $options)
+            ? array_slice($history_data, 0, $options['limit'])
+            : $history_data;
+    }
+
+    /**
+     * @param bool $numeric_items
+     * @param array $options
+     * @param array $items
+     * @param bool $has_logs
+     * @param bool $is_many_items
+     * @return CTag
+     * @throws Exception
+     */
+    public function getPlainTextView(array $items, array $options, bool $numeric_items, bool $has_logs, bool $is_many_items): CTag
+    {
+        $pre = new CPre();
+        $history_data = $this->getData($items, $options, $has_logs ? ZBX_SORT_UP : ZBX_SORT_DOWN);
+
+        foreach ($history_data as $row) {
+            $value = $row['value'];
+            $item = $items[$row['itemid']];
+
+            if (in_array($item['value_type'], [ITEM_VALUE_TYPE_LOG, ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_TEXT])) {
+                $value = '"' . $value . '"';
+            } elseif ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT) {
+                $value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
+            }
+
+            $row = zbx_date2str(DATE_TIME_FORMAT_SECONDS, $row['clock']) . ' ' . $row['clock'] . ' ' . $value;
+
+            if ($is_many_items) {
+                // TODO: Разобраться почему нет name_expanded
+                $name_expanded = array_key_exists('name_expanded', $item) ? $item['name_expanded'] : $item['name'];
+                $row .= ' "' . $item['hosts'][0]['name'] . NAME_DELIMITER . $name_expanded . '"';
+            }
+            $pre->addItem([$row, BR()]);
+        }
+
+        return $pre;
+    }
+
+    /**
+     * @param array $items
+     * @param bool $is_many_items
+     * @param array $options
+     * @param bool $has_logs
+     * @return CTag
+     * @throws Exception
+     */
+    public function getNumericItemsView(array $items, array $options, bool $is_many_items, bool $has_logs): CTag
+    {
+        $history_data = $this->getData($items, $options, $has_logs ? ZBX_SORT_UP : ZBX_SORT_DOWN);
+
+        $history_table = (new CDataTable('logview'))
+            ->setHeader([
+                (new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)->addClass('search'),
+                $is_many_items ? _('Item') : null,
+                $has_logs ? (new CColHeader(_('Local time')))->addClass(ZBX_STYLE_CELL_WIDTH)->addClass('search') : null,
+                $has_logs ? (new CColHeader(_('Source')))->addClass(ZBX_STYLE_CELL_WIDTH) : null,
+                $has_logs ? (new CColHeader(_('Severity')))->addClass(ZBX_STYLE_CELL_WIDTH) : null,
+                $has_logs ? (new CColHeader(_('Event ID')))->addClass(ZBX_STYLE_CELL_WIDTH) : null,
+                (new CColHeader(_('Value')))->addClass('search')
+            ]);
+
+        foreach ($history_data as $data) {
+            $data['value'] = rtrim($data['value'], " \t\r\n");
+
+            if (!isset($data['severity']))
+                $severity = TRIGGER_SEVERITY_UNDEFINED;
+            else
+                $severity = $data['severity'];
+
+            if (isset($data['logeventid']) && isset($data['source'])
+                && $data['logeventid'] > 0) {
+                $cell_clock = (new CCol(new CLink(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock']),
+                    (new CUrl('tr_events.php'))
+                        ->setArgument('triggerid', $data['source'])
+                        ->setArgument('eventid', $data['logeventid'])
+                )))->addClass(ZBX_STYLE_NOWRAP)
+                    ->setAttribute('data-order', $data['clock']);
+
+            } else {
+                $cell_clock = (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['clock'])))
+                    ->addClass(ZBX_STYLE_NOWRAP)
+                    ->setAttribute('data-order', $data['clock']);
+            }
+
+            $item = $items[$data['itemid']];
+            $host = reset($item['hosts']);
+
+            isset($data['color'])
+                ? $color = $data['color']
+                : $color = null;
+
+            $row = [];
+
+            $row[] = $cell_clock;
+
+            if ($is_many_items) {
+                $row[] = (new CCol($host['name'] . NAME_DELIMITER . $item['name']))
+                    ->addClass($color);
+            }
+
+            if ($has_logs) {
+                $row[] = (array_key_exists('timestamp', $data) && $data['timestamp'] != 0)
+                    ? (new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $data['timestamp'])))
+                        ->addClass(ZBX_STYLE_NOWRAP)
+                        ->addClass($color)
+                    : '';
+                $row[] = array_key_exists('source', $data)
+                    ? (new CCol($data['source']))
+                        ->addClass(ZBX_STYLE_NOWRAP)
+                        ->addClass($color)
+                    : '';
+                $row[] = (array_key_exists('severity', $data) && $data['severity'] != 0)
+                    ? (new CCol(get_item_logtype_description($data['severity'])))
+                        ->addClass(ZBX_STYLE_NOWRAP)
+                        ->addClass(get_item_logtype_style($data['severity']))
+                    : '';
+                $row[] = array_key_exists('severity', $data)
+                    ? (new CCol($data['logeventid']))
+                        ->addClass(ZBX_STYLE_NOWRAP)
+                        ->addClass($color)
+                    : '';
+            }
+
+            $row[] = (new CCol(new CPre(zbx_nl2br($data['value']))))->addClass(CSeverityHelper::getStatusStyle($severity));
+
+            $history_table->addRow($row);
+        }
+
+        return $history_table;
+    }
+
+    /**
+     * @param array $items
+     * @param array $options
+     * @return array
+     * @throws Exception
+     */
+    public function getHistoryValuesView(array $items, array $options): array
+    {
+        CArrayHelper::sort($items, [['field' => 'name_expanded', 'order' => ZBX_SORT_UP]]);
+
+        $table_header = [(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)];
+        $history_data = [];
+
+        foreach ($items as $item) {
+            $options['itemids'] = [$item['itemid']];
+            $options['history'] = $item['value_type'];
+            $item_data = API::History()->get($options);
+
+            $this->filterDataArray($item_data);
+
+            CArrayHelper::sort($item_data, [
+                ['field' => 'clock', 'order' => ZBX_SORT_DOWN],
+                ['field' => 'ns', 'order' => ZBX_SORT_DOWN]
+            ]);
+
+            $table_header[] = (new CColHeader($item['name']))
+                ->addClass('vertical_rotation')
+                ->setTitle($item['name']);
+            $history_data_index = 0;
+
+            foreach ($item_data as $item_data_row) {
+                // Searching for starting 'insert before' index in results array.
+                while (array_key_exists($history_data_index, $history_data)) {
+                    $history_row = $history_data[$history_data_index];
+
+                    if ($history_row['clock'] <= $item_data_row['clock']
+                        && !array_key_exists($item['itemid'], $history_row['values'])) {
+                        break;
+                    }
+
+                    ++$history_data_index;
+                }
+
+                if (array_key_exists($history_data_index, $history_data)
+                    && !array_key_exists($item['itemid'], $history_row['values'])
+                    && $history_data[$history_data_index]['clock'] === $item_data_row['clock']) {
+                    $history_data[$history_data_index]['values'][$item['itemid']] = $item_data_row['value'];
+                } else {
+                    array_splice($history_data, $history_data_index, 0, [[
+                        'clock' => $item_data_row['clock'],
+                        'values' => [$item['itemid'] => $item_data_row['value']]
+                    ]]);
+                }
+            }
+        }
+
+        $history_table = (new CTableInfo())->makeVerticalRotation()->setHeader($table_header);
+
+        foreach ($history_data as $history_data_row) {
+            $row = [(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_data_row['clock'])))
+                ->addClass(ZBX_STYLE_NOWRAP)
+            ];
+            $values = $history_data_row['values'];
+
+            foreach ($items as $item) {
+                $value = array_key_exists($item['itemid'], $values) ? $values[$item['itemid']] : '';
+
+                if ($item['value_type'] == ITEM_VALUE_TYPE_FLOAT && $value !== '') {
+                    $value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
+                }
+
+                $value = CValueMapHelper::applyValueMap($item['value_type'], $value, $item['valuemap']);
+
+                $row[] = ($value === '') ? '' : new CPre($value);
+            }
+
+            $history_table->addRow($row);
+        }
+
+        $output[] = [$history_table, NULL];
+        return $output;
+    }
 }
