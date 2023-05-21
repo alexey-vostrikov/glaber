@@ -19,277 +19,256 @@
 **/
 
 
-class CScreenHistory extends CScreenBase {
+class CScreenHistory extends CScreenBase
+{
 
-	/**
-	 * @var int Type of graph to display.
-	 *
-	 * Supported values:
-	 * - GRAPH_TYPE_NORMAL
-	 * - GRAPH_TYPE_STACKED
-	 */
-	protected $graphType;
-	/** @var string Search string */
-	public $filter;
-	/** @var int Filter show/hide */
-	public $filterTask;
-	/** @var string Filter highlight color */
-	public $markColor;
-	/** @var boolean Is plain text displayed */
-	public $plaintext;
-	/** @var array Items ids. */
-	public $itemids;
-	/** @var int Graph id. */
-	public $graphid = 0;
-	/** @var string String containing base URL for pager. */
-	public $page_file;
+    /**
+     * @var int Type of graph to display.
+     *
+     * Supported values:
+     * - GRAPH_TYPE_NORMAL
+     * - GRAPH_TYPE_STACKED
+     */
+    protected $graphType;
+    /** @var string Search string */
+    public $filter;
+    /** @var int Filter show/hide */
+    public $filterTask;
+    /** @var string Filter highlight color */
+    public $markColor;
+    /** @var boolean Is plain text displayed */
+    public $plaintext;
+    /** @var array Items ids. */
+    public $itemids;
+    /** @var int Graph id. */
+    public $graphid = 0;
+    /** @var string String containing base URL for pager. */
+    public $page_file;
 
-	/**
-	 * Init screen data.
-	 *
-	 * @param array		$options
-	 * @param string	$options['filter']
-	 * @param int		$options['filterTask']
-	 * @param int		$options['markColor']
-	 * @param boolean	$options['plaintext']
-	 * @param array		$options['itemids']
-	 * @param array     $options['graphid']     When set defines graph id where item.
-	 * @param string    $options['pageFile']    Current page file, is used for pagination links.
-	 */
-	public function __construct(array $options = []) {
-		parent::__construct($options);
+    /**
+     * Init screen data.
+     *
+     * @param array $options
+     * @param string $options ['filter']
+     * @param int $options ['filterTask']
+     * @param int $options ['markColor']
+     * @param boolean $options ['plaintext']
+     * @param array $options ['itemids']
+     * @param array $options ['graphid']     When set defines graph id where item.
+     * @param string $options ['pageFile']    Current page file, is used for pagination links.
+     */
+    public function __construct(array $options = [])
+    {
+        parent::__construct($options);
 
-		$this->resourcetype = SCREEN_RESOURCE_HISTORY;
+        $this->resourcetype = SCREEN_RESOURCE_HISTORY;
 
-		// mandatory
-		$this->filter = isset($options['filter']) ? $options['filter'] : '';
-		$this->filterTask = isset($options['filter_task']) ? $options['filter_task'] : null;
-		$this->markColor = isset($options['mark_color']) ? $options['mark_color'] : MARK_COLOR_RED;
-		$this->graphType = isset($options['graphtype']) ? $options['graphtype'] : GRAPH_TYPE_NORMAL;
+        // mandatory
+        $this->filter = isset($options['filter']) ? $options['filter'] : '';
+        $this->filterTask = isset($options['filter_task']) ? $options['filter_task'] : null;
+        $this->markColor = isset($options['mark_color']) ? $options['mark_color'] : MARK_COLOR_RED;
+        $this->graphType = isset($options['graphtype']) ? $options['graphtype'] : GRAPH_TYPE_NORMAL;
 
-		// optional
-		$this->itemids = array_key_exists('itemids', $options) ?  $options['itemids'] : [];
-		$this->plaintext = isset($options['plaintext']) ? $options['plaintext'] : false;
-		$this->page_file = array_key_exists('pageFile', $options) ? $options['pageFile'] : null;
-		//for proper timeticker work we need to set differnt dataIds to all 
-		//different screens. Now there are two screens poss
-		
+        // optional
+        $this->itemids = array_key_exists('itemids', $options) ? $options['itemids'] : [];
+        $this->plaintext = isset($options['plaintext']) ? $options['plaintext'] : false;
+        $this->page_file = array_key_exists('pageFile', $options) ? $options['pageFile'] : null;
+        //for proper timeticker work we need to set differnt dataIds to all
+        //different screens. Now there are two screens poss
 
-		$this->dataId = isset($options['screenid']) ? $options['screenid'] : 'historyGraph';
 
-		if (!$this->itemids && array_key_exists('graphid', $options)) {
-			$itemids = API::Item()->get([
-				'output' => ['itemid'],
-				'graphids' => [$options['graphid']]
-			]);
-			$this->itemids = array_column($itemids, 'itemid');
-			$this->graphid = $options['graphid'];
-		}
-	}
+        $this->dataId = isset($options['screenid']) ? $options['screenid'] : 'historyGraph';
 
-	/**
-	 * Process screen.
-	 *
-	 * @return CDiv (screen inside container)
-	 */
-	public function get() {
-		$output = [];
+        if (!$this->itemids && array_key_exists('graphid', $options)) {
+            $itemids = API::Item()->get([
+                'output' => ['itemid'],
+                'graphids' => [$options['graphid']]
+            ]);
+            $this->itemids = array_column($itemids, 'itemid');
+            $this->graphid = $options['graphid'];
+        }
+    }
 
-		$items = API::Item()->get([
-			'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'history', 'trends'],
-			'selectHosts' => ['name'],
-			'selectValueMap' => ['mappings'],
-			'itemids' => $this->itemids,
-			'webitems' => true,
-			'preservekeys' => true
-		]);
+    /**
+     * Process screen.
+     *
+     * @return array|string
+     * @throws Exception
+     */
+    public function get()
+    {
+        $output = [];
 
-		if (!$items) {
-			show_error_message(_('No permissions to referred object or it does not exist!'));
+        $items = API::Item()->get([
+            'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'history', 'trends'],
+            'selectHosts' => ['name'],
+            'selectValueMap' => ['mappings'],
+            'itemids' => $this->itemids,
+            'webitems' => true,
+            'preservekeys' => true
+        ]);
 
-			return;
-		}
+        if (!$items) {
+            show_error_message(_('No permissions to referred object or it does not exist!'));
 
-		if ($this->action == HISTORY_VALUES) {
-			$options = [
-				'output' => API_OUTPUT_EXTEND,
-				'sortfield' => ['clock'],
-				'sortorder' => ZBX_SORT_DOWN,
+            return;
+        }
+
+        if ($this->action == HISTORY_VALUES) {
+            $options = [
+                'output' => API_OUTPUT_EXTEND,
+                'sortfield' => ['clock'],
+                'sortorder' => ZBX_SORT_DOWN,
                 'time_from' => $this->timeline['from_ts'],
                 'time_till' => $this->timeline['to_ts'],
                 'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
-			];
-
-			$is_many_items = (count($items) > 1);
-            $numeric_items = !$this->hasStringItems($items);
-            //if there are logs, we'll sort output showvalues data in ascending order
-            $has_logs = $this->hasLogs($items);
-
-            $this->dataId = $numeric_items ? 'numeric' : 'text';
-
-			/**
-			 * View type: As plain text.
-			 * Item type: numeric (unsigned, char), float, text, log.
-			 */
-			if ($this->plaintext) {
-                return $this->getOutput(
-                    $this->getPlainTextView($items, $options, $numeric_items, $has_logs, $is_many_items),
-                    false
-                );
-            }
-			/**
-			 * View type: Values, 500 latest values
-			 * Item type: text, log
-			 */
-			elseif (!$numeric_items) {
-                $output[] = $this->getNumericItemsView($items, $options, $is_many_items, $has_logs);
-            }
-			/**
-			 * View type: Values.
-			 * Item type: numeric (unsigned, char), float.
-			 */
-			else {
-                $output = $this->getHistoryValuesView($items, $options);
-            }
-		}
-
-		// time control
-		if (str_in_array($this->action, [HISTORY_VALUES, HISTORY_GRAPH, HISTORY_BATCH_GRAPH])) {
-			$timeControlData = [
-                'id' => $this->getDataId(),
             ];
 
-			if ($this->action == HISTORY_GRAPH || $this->action == HISTORY_BATCH_GRAPH) {
-				$containerId = 'graph_cont1';
-				$output[] = (new CDiv())
-					->addClass('center')
-					->setId($containerId);
-				
-				$timeControlData['containerid'] = $containerId;
-				$timeControlData['src'] = $this->getGraphUrl($this->itemids);
-				$timeControlData['objDims'] = getGraphDims();
-				$timeControlData['loadSBox'] = 1;
-				$timeControlData['loadImage'] = 1;
-				$timeControlData['dynamic'] = 1;
-			}
+            $numeric_items = !$this->hasStringItems($items);
 
-			if ($this->mode == SCREEN_MODE_JS) {
-				$timeControlData['dynamic'] = 0;
+            /**
+             * View type: As plain text.
+             * Item type: numeric (unsigned, char), float, text, log.
+             */
+            if ($this->plaintext) {
+                return $this->getOutput(
+                    $this->getPlainTextView($items, $options),
+                    false
+                );
+            } /**
+             * View type: Values
+             * Item type: text, log
+             */
+            elseif (!$numeric_items) {
+                $output[] = $this->getTextItemsView($items, $options);
+            } /**
+             * View type: Values.
+             * Item type: numeric (unsigned, char), float.
+             */
+            else {
+                $output[] = $this->getScalarValuesView($items, $options);
+            }
+        }
 
-				return 'timeControl.addObject("'.$this->getDataId().'", '.json_encode($this->timeline).', '.
-					json_encode($timeControlData).');';
-			}
 
-			zbx_add_post_js('timeControl.addObject("'.$this->getDataId().'", '.json_encode($this->timeline).', '.
-				json_encode($timeControlData).');'
-			);
-			
-		}
+        // time control
+		if (str_in_array($this->action, [HISTORY_GRAPH, HISTORY_BATCH_GRAPH])) {
+            list($elem, $js) = $this->getGraphView($items, [], $this->mode);
 
-		if ($this->mode != SCREEN_MODE_JS) {
-			$flickerfreeData = [
-				'itemids' => $this->itemids,
-				'action' => ($this->action == HISTORY_BATCH_GRAPH) ? HISTORY_GRAPH : $this->action,
-				'filter' => $this->filter,
-				'filterTask' => $this->filterTask,
-				'markColor' => $this->markColor
-			];
+            if ($this->mode == SCREEN_MODE_JS) {
+                return $js;
+            }
 
-			if ($this->action == HISTORY_VALUES) {
-				$flickerfreeData['page'] = $this->page;
-			}
+            $output[] = $elem;
+            zbx_add_post_js($js);
+        }
 
-			if ($this->graphid != 0) {
-				unset($flickerfreeData['itemids']);
-				$flickerfreeData['graphid'] = $this->graphid;
-			}
+        if ($this->mode != SCREEN_MODE_JS) {
+            $flickerfreeData = [
+                'itemids' => $this->itemids,
+                'action' => ($this->action == HISTORY_BATCH_GRAPH) ? HISTORY_GRAPH : $this->action,
+                'filter' => $this->filter,
+                'filterTask' => $this->filterTask,
+                'markColor' => $this->markColor
+            ];
 
-			return $this->getOutput($output, true, $flickerfreeData);
-		}
+            if ($this->action == HISTORY_VALUES) {
+                $flickerfreeData['page'] = $this->page;
+            }
 
-		return $output;
-	}
+            if ($this->graphid != 0) {
+                unset($flickerfreeData['itemids']);
+                $flickerfreeData['graphid'] = $this->graphid;
+            }
 
-	/**
-	 * Does filtering of the data is filter is set
-	 *
-	 * @param array $history_data
-	 * @param array $filter
-	 * @param int $filterTask
-	 *
-	 * 
-	 */
- 	protected function filterDataArray(array &$history_data = null) {
+            return $this->getOutput($output, true, $flickerfreeData);
+        }
 
-		if ( $this->filterTask != FILTER_TASK_HIDE &&
-			 $this->filterTask != FILTER_TASK_SHOW &&
-			 $this->filterTask != FILTER_TASK_INVERT_MARK &&
-			 $this->filterTask != FILTER_TASK_MARK)
-				return;
-		
-			 if ($this->filter == '')
-			return;
+        return $output;
+    }
 
-		if (null == $history_data)
-			return;
+    /**
+     * Does filtering of the data is filter is set
+     *
+     * @param array $history_data
+     * @param array $filter
+     * @param int $filterTask
+     *
+     *
+     */
+    protected function filterDataArray(array &$history_data = null)
+    {
 
-		$needle = mb_strtolower($this->filter);
-		
-		foreach ($history_data as $key => $data) {
+        if ($this->filterTask != FILTER_TASK_HIDE &&
+            $this->filterTask != FILTER_TASK_SHOW &&
+            $this->filterTask != FILTER_TASK_INVERT_MARK &&
+            $this->filterTask != FILTER_TASK_MARK)
+            return;
 
-			$haystack = mb_strtolower($data['value']);
-			$pos = mb_strpos($haystack, $needle);
-			$color = null;
+        if ($this->filter == '')
+            return;
 
-			if ($pos !== false && $this->filterTask == FILTER_TASK_MARK) {
-				$color = $this->markColor;
-			} elseif ($pos === false && $this->filterTask == FILTER_TASK_INVERT_MARK) {
-				$color = $this->markColor;
-			} elseif ($pos !== false && $this->filterTask == FILTER_TASK_HIDE) {
-				unset($history_data[$key]);
-				continue;
-			}
-			if ($pos == false && $this->filterTask == FILTER_TASK_SHOW ) {
-				unset($history_data[$key]);
-				continue;
-			}
+        if (null == $history_data)
+            return;
 
-			switch ($color) {
-				case MARK_COLOR_RED:
-					$history_data[$key]['color'] = ZBX_STYLE_RED;
-					break;
-				case MARK_COLOR_GREEN:
-					$history_data[$key]['color'] = ZBX_STYLE_GREEN;
-					break;
-				case MARK_COLOR_BLUE:
-					$history_data[$key]['color'] = ZBX_STYLE_BLUE;
-					break;
-			}
-		}
-	}
+        $needle = mb_strtolower($this->filter);
 
-	/**
-	 * Return the URL for the graph.
-	 *
-	 * @param array $itemIds
-	 *
-	 * @return string
-	 */
-	protected function getGraphUrl(array $itemIds) {
-		$url = (new CUrl('chart.php'))
-			->setArgument('from', $this->timeline['from'])
-			->setArgument('to', $this->timeline['to'])
-			->setArgument('itemids', $itemIds)
-			->setArgument('type', $this->graphType)
-			->setArgument('profileIdx', $this->profileIdx)
-			->setArgument('profileIdx2', $this->profileIdx2);
+        foreach ($history_data as $key => $data) {
 
-		if ($this->action == HISTORY_BATCH_GRAPH) {
-			$url->setArgument('batch', 1);
-		}
+            $haystack = mb_strtolower($data['value']);
+            $pos = mb_strpos($haystack, $needle);
+            $color = null;
 
-		return $url->getUrl();
-	}
+            if ($pos !== false && $this->filterTask == FILTER_TASK_MARK) {
+                $color = $this->markColor;
+            } elseif ($pos === false && $this->filterTask == FILTER_TASK_INVERT_MARK) {
+                $color = $this->markColor;
+            } elseif ($pos !== false && $this->filterTask == FILTER_TASK_HIDE) {
+                unset($history_data[$key]);
+                continue;
+            }
+            if ($pos == false && $this->filterTask == FILTER_TASK_SHOW) {
+                unset($history_data[$key]);
+                continue;
+            }
+
+            switch ($color) {
+                case MARK_COLOR_RED:
+                    $history_data[$key]['color'] = ZBX_STYLE_RED;
+                    break;
+                case MARK_COLOR_GREEN:
+                    $history_data[$key]['color'] = ZBX_STYLE_GREEN;
+                    break;
+                case MARK_COLOR_BLUE:
+                    $history_data[$key]['color'] = ZBX_STYLE_BLUE;
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Return the URL for the graph.
+     *
+     * @param array $itemIds
+     *
+     * @return string
+     */
+    protected function getGraphUrl(array $itemIds)
+    {
+        $url = (new CUrl('chart.php'))
+            ->setArgument('from', $this->timeline['from'])
+            ->setArgument('to', $this->timeline['to'])
+            ->setArgument('itemids', $itemIds)
+            ->setArgument('type', $this->graphType)
+            ->setArgument('profileIdx', $this->profileIdx)
+            ->setArgument('profileIdx2', $this->profileIdx2);
+
+        if ($this->action == HISTORY_BATCH_GRAPH) {
+            $url->setArgument('batch', 1);
+        }
+
+        return $url->getUrl();
+    }
 
     /**
      * Checks the array of items for the presence of string items
@@ -374,16 +353,17 @@ class CScreenHistory extends CScreenBase {
     }
 
     /**
-     * @param bool $numeric_items
      * @param array $options
      * @param array $items
-     * @param bool $has_logs
-     * @param bool $is_many_items
      * @return CTag
      * @throws Exception
      */
-    public function getPlainTextView(array $items, array $options, bool $numeric_items, bool $has_logs, bool $is_many_items): CTag
+    public function getPlainTextView(array $items, array $options): CTag
     {
+        //if there are logs, we'll sort output showvalues data in ascending order
+        $has_logs = $this->hasLogs($items);
+        $is_many_items = (count($items) > 1);
+
         $pre = new CPre();
         $history_data = $this->getData($items, $options, $has_logs ? ZBX_SORT_UP : ZBX_SORT_DOWN);
 
@@ -412,14 +392,16 @@ class CScreenHistory extends CScreenBase {
 
     /**
      * @param array $items
-     * @param bool $is_many_items
      * @param array $options
-     * @param bool $has_logs
      * @return CTag
      * @throws Exception
      */
-    public function getNumericItemsView(array $items, array $options, bool $is_many_items, bool $has_logs): CTag
+    public function getTextItemsView(array $items, array $options): CTag
     {
+        //if there are logs, we'll sort output showvalues data in ascending order
+        $has_logs = $this->hasLogs($items);
+        $is_many_items = (count($items) > 1);
+
         $history_data = $this->getData($items, $options, $has_logs ? ZBX_SORT_UP : ZBX_SORT_DOWN);
 
         $history_table = (new CDataTable('logview'))
@@ -506,16 +488,17 @@ class CScreenHistory extends CScreenBase {
     /**
      * @param array $items
      * @param array $options
-     * @return array
+     * @return CTag
      * @throws Exception
      */
-    public function getHistoryValuesView(array $items, array $options): array
+    public function getScalarValuesView(array $items, array $options): CTag
     {
         CArrayHelper::sort($items, [['field' => 'name_expanded', 'order' => ZBX_SORT_UP]]);
 
         $table_header = [(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)];
         $history_data = [];
 
+        // TODO: разделить получение данных и формирование таблицы
         foreach ($items as $item) {
             $options['itemids'] = [$item['itemid']];
             $options['history'] = $item['value_type'];
@@ -582,7 +565,39 @@ class CScreenHistory extends CScreenBase {
             $history_table->addRow($row);
         }
 
-        $output[] = [$history_table, NULL];
-        return $output;
+        return $history_table;
+    }
+
+    /**
+     * @param array $items
+     * @param array $options
+     * @param int $mode Display mode
+     * @return array
+     */
+    public function getGraphView(array $items, array $options, int $mode = SCREEN_MODE_SLIDESHOW): array {
+        $timeControlData = [
+            'id' => $this->getDataId(),
+        ];
+
+        $containerId = 'graph_cont1';
+        $timeControlData['containerid'] = $containerId;
+        $timeControlData['src'] = $this->getGraphUrl(array_column($items, 'itemid', 'itemid'));
+        $timeControlData['objDims'] = getGraphDims();
+        $timeControlData['loadSBox'] = 1;
+        $timeControlData['loadImage'] = 1;
+        $timeControlData['dynamic'] = 1;
+
+        if ($mode == SCREEN_MODE_JS) {
+            $timeControlData['dynamic'] = 0;
+        }
+
+        $js = 'timeControl.addObject("' . $this->getDataId() . '", ' . json_encode($this->timeline) . ', ' .
+            json_encode($timeControlData) . ');';
+
+        $elem = (new CDiv())
+            ->addClass('center')
+            ->setId($containerId);
+
+        return [$elem, $js];
     }
 }

@@ -80,9 +80,6 @@ $actions = [
 if (!$items_numeric) {
 	unset($actions[HISTORY_GRAPH]);
 }
-elseif (count($data['items']) > 1) {
-	unset($actions[HISTORY_LATEST]);
-}
 
 $action_list = (new CList())
 	->addItem([
@@ -116,7 +113,7 @@ $header['right']->addItem($action_list);
 $filter_form = new CFilter(new CUrl());
 $filter_tab = [];
 
-if ($data['action'] == HISTORY_LATEST || $data['action'] == HISTORY_VALUES) {
+if ($data['action'] == HISTORY_VALUES) {
 	if (array_key_exists($data['value_type'], $data['iv_string']) || !$data['itemids']) {
 		$filter_form->addVar('action', $data['action']);
 
@@ -274,12 +271,9 @@ else {
 		->setTitle($header['left'])
 		->setControls((new CTag('nav', true, $header['right']))->setAttribute('aria-label', _('Content controls')));
 
-	if ($data['itemids'] && $data['action'] !== HISTORY_LATEST) {
-		
+	if ($data['itemids']) {
 		$filter_form->addTimeSelector(reset($screens)->timeline['from'], reset($screens)->timeline['to'],
 			$web_layout_mode != ZBX_LAYOUT_KIOSKMODE);
-	
-
 	}
 
 	if ($data['action'] == HISTORY_BATCH_GRAPH) {
@@ -308,9 +302,7 @@ else {
 	}
 
 	if ($data['itemids']) {
-		if ($data['action'] !== HISTORY_LATEST) {
-			$html_page->addItem($filter_form);
-		}
+		$html_page->addItem($filter_form);
 
 		//need to create a separate screen for each group of data
 		foreach (array('numeric','text') as $idx => $typename) {
@@ -319,10 +311,7 @@ else {
 		
 			$html_page->addItem($screens[$typename]->get());
 	
-			if ($data['action'] !== HISTORY_LATEST ) {
-				CScreenBuilder::insertScreenStandardJs($screens[$typename]->timeline);
-	
-			}
+    		CScreenBuilder::insertScreenStandardJs($screens[$typename]->timeline);
 		}
 	}
 	else {
