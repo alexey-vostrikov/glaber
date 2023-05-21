@@ -99,61 +99,11 @@ class CScreenHistory extends CScreenBase
     {
         $output = [];
 
-        $items = API::Item()->get([
-            'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'history', 'trends'],
-            'selectHosts' => ['name'],
-            'selectValueMap' => ['mappings'],
-            'itemids' => $this->itemids,
-            'webitems' => true,
-            'preservekeys' => true
-        ]);
-
-        if (!$items) {
-            show_error_message(_('No permissions to referred object or it does not exist!'));
-
-            return;
-        }
-
         if ($this->action == HISTORY_VALUES) {
-            $options = [
-                'output' => API_OUTPUT_EXTEND,
-                'sortfield' => ['clock'],
-                'sortorder' => ZBX_SORT_DOWN,
-                'time_from' => $this->timeline['from_ts'],
-                'time_till' => $this->timeline['to_ts'],
-                'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
-            ];
-
-            $numeric_items = !$this->hasStringItems($items);
-
-            /**
-             * View type: As plain text.
-             * Item type: numeric (unsigned, char), float, text, log.
-             */
-            if ($this->plaintext) {
-                return $this->getOutput(
-                    $this->getPlainTextView($items, $options),
-                    false
-                );
-            } /**
-             * View type: Values
-             * Item type: text, log
-             */
-            elseif (!$numeric_items) {
-                $output[] = $this->getTextItemsView($items, $options);
-            } /**
-             * View type: Values.
-             * Item type: numeric (unsigned, char), float.
-             */
-            else {
-                $output[] = $this->getScalarValuesView($items, $options);
-            }
-        }
-
-
-        // time control
-		if (str_in_array($this->action, [HISTORY_GRAPH, HISTORY_BATCH_GRAPH])) {
-            list($elem, $js) = $this->getGraphView($items, [], $this->mode);
+            list($elem, $js) = $this->getTextView($this->itemids, $this->mode);
+            $output[] = $elem;
+        } elseif (str_in_array($this->action, [HISTORY_GRAPH, HISTORY_BATCH_GRAPH])) {
+            list($elem, $js) = $this->getGraphView($this->itemids, $this->mode);
 
             if ($this->mode == SCREEN_MODE_JS) {
                 return $js;
@@ -164,6 +114,10 @@ class CScreenHistory extends CScreenBase
         }
 
         if ($this->mode != SCREEN_MODE_JS) {
+            if ($this->plaintext) {
+                return $this->getOutput($output, false);
+            }
+
             $flickerfreeData = [
                 'itemids' => $this->itemids,
                 'action' => ($this->action == HISTORY_BATCH_GRAPH) ? HISTORY_GRAPH : $this->action,
@@ -185,6 +139,90 @@ class CScreenHistory extends CScreenBase
         }
 
         return $output;
+    }
+
+    /**
+     * @param array $itemids
+     * @param int $mode Display mode
+     * @return array
+     * @throws Exception
+     */
+    public function getTextView(array $itemids, int $mode = SCREEN_MODE_SLIDESHOW): array {
+        $items = API::Item()->get([
+            'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'history', 'trends'],
+            'selectHosts' => ['name'],
+            'selectValueMap' => ['mappings'],
+            'itemids' => $itemids,
+            'webitems' => true,
+            'preservekeys' => true
+        ]);
+
+        $options = [
+            'output' => API_OUTPUT_EXTEND,
+            'sortfield' => ['clock'],
+            'sortorder' => ZBX_SORT_DOWN,
+            'time_from' => $this->timeline['from_ts'],
+            'time_till' => $this->timeline['to_ts'],
+            'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
+        ];
+
+        $numeric_items = !$this->hasStringItems($items);
+
+        /**
+         * View type: As plain text.
+         * Item type: numeric (unsigned, char), float, text, log.
+         */
+        if ($this->plaintext) {
+            $elem = $this->getPlainTextView($items, $options);
+        }
+        /**
+         * View type: Values
+         * Item type: text, log
+         */
+        elseif (!$numeric_items) {
+            $elem = $this->getTextItemsView($items, $options);
+        }
+        /**
+         * View type: Values.
+         * Item type: numeric (unsigned, char), float.
+         */
+        else {
+            $elem = $this->getScalarValuesView($items, $options);
+        }
+
+        return [$elem, ''];
+    }
+
+    /**
+     * @param array $itemids
+     * @param int $mode Display mode
+     * @return array
+     */
+    public function getGraphView(array $itemids, int $mode = SCREEN_MODE_SLIDESHOW): array {
+        $timeControlData = [
+            'id' => $this->getDataId(),
+        ];
+
+        $containerId = 'graph_cont1';
+        $timeControlData['containerid'] = $containerId;
+        $timeControlData['src'] = $this->getGraphUrl($itemids);
+        $timeControlData['objDims'] = getGraphDims();
+        $timeControlData['loadSBox'] = 1;
+        $timeControlData['loadImage'] = 1;
+        $timeControlData['dynamic'] = 1;
+
+        if ($mode == SCREEN_MODE_JS) {
+            $timeControlData['dynamic'] = 0;
+        }
+
+        $js = 'timeControl.addObject("' . $this->getDataId() . '", ' . json_encode($this->timeline) . ', ' .
+            json_encode($timeControlData) . ');';
+
+        $elem = (new CDiv())
+            ->addClass('center')
+            ->setId($containerId);
+
+        return [$elem, $js];
     }
 
     /**
@@ -566,38 +604,5 @@ class CScreenHistory extends CScreenBase
         }
 
         return $history_table;
-    }
-
-    /**
-     * @param array $items
-     * @param array $options
-     * @param int $mode Display mode
-     * @return array
-     */
-    public function getGraphView(array $items, array $options, int $mode = SCREEN_MODE_SLIDESHOW): array {
-        $timeControlData = [
-            'id' => $this->getDataId(),
-        ];
-
-        $containerId = 'graph_cont1';
-        $timeControlData['containerid'] = $containerId;
-        $timeControlData['src'] = $this->getGraphUrl(array_column($items, 'itemid', 'itemid'));
-        $timeControlData['objDims'] = getGraphDims();
-        $timeControlData['loadSBox'] = 1;
-        $timeControlData['loadImage'] = 1;
-        $timeControlData['dynamic'] = 1;
-
-        if ($mode == SCREEN_MODE_JS) {
-            $timeControlData['dynamic'] = 0;
-        }
-
-        $js = 'timeControl.addObject("' . $this->getDataId() . '", ' . json_encode($this->timeline) . ', ' .
-            json_encode($timeControlData) . ');';
-
-        $elem = (new CDiv())
-            ->addClass('center')
-            ->setId($containerId);
-
-        return [$elem, $js];
     }
 }
