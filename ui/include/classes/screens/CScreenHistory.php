@@ -21,7 +21,6 @@
 
 class CScreenHistory extends CScreenBase
 {
-
     /**
      * @var int Type of graph to display.
      *
