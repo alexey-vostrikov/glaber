@@ -107,7 +107,7 @@ wait () {
 }
 set-passwords() {
   gen-password() {
-    < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c12
+    head -c60 /dev/urandom | tr -dc _A-Z-a-z-0-9 | head -c12
   }
   make-bcrypt-hash() {
     htpasswd -bnBC 10 "" $1 | tail -c 55
