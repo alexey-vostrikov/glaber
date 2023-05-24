@@ -120,6 +120,7 @@ services:
     - type: bind
       source: ./glaber-server/workers_script/
       target: /usr/share/glaber/workers/
+    - ./glaber-server/etc/zabbix:/etc/zabbix:rw
     cap_add:
     - NET_RAW
     - NET_ADMIN

@@ -157,6 +157,10 @@ usage() {
   echo "$0 diag                           - Collect glaber start and some base system info to the file"
 }
 build() {
+  [[ ! -f glaber-server/etc/zabbix/zabbix_server.conf ]] && \
+  mkdir -p glaber-server/etc/zabbix/ && \
+  curl -sSR ${GIT_BASE}/-/raw/${GLABER_VERSION}/conf/zabbix_server.conf \
+  --output glaber-server/etc/zabbix/zabbix_server.conf
   [ -d "glaber-server/workers_script/" ] || mkdir -p glaber-server/workers_script/
   [ -d ".tmp/diag/" ] || mkdir -p .tmp/diag/
   [ -d ".mysql/mysql_data/" ] || \
@@ -181,7 +185,7 @@ remove() {
   if [[ $REPLY =~ ^[Yy]$ ]]
   then
     rm .passwords.created .zbxweb ../../test/.hurl .version || true
-    sudo rm -rf mysql/docker-entrypoint-initdb.d mysql/mysql_data/ clickhouse/clickhouse_data
+    sudo rm -rf glaber-server/etc/ mysql/docker-entrypoint-initdb.d mysql/mysql_data/ clickhouse/clickhouse_data
     git-reset-variables-files
   fi
 }
