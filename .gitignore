@@ -239,3 +239,4 @@ workers_script
 create.sql
 .version
 create.sql.done
+build/appliance/run/docker/glaber-server/etc/zabbix
