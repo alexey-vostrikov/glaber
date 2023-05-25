@@ -1,0 +1,8 @@
+debian/tmp.build-postgresql/src/zabbix_server/zabbix_server usr/sbin
+debian/tmp.build-postgresql/src/glapi/glb_syslog_worker usr/sbin
+debian/tmp.build-postgresql/src/glapi/glb_ripe_subscriber usr/sbin
+debian/tmp.build-postgresql/src/glapi/glb_hist_victoria usr/sbin
+debian/glbmap/src/glbmap usr/sbin
+debian/conf/zabbix_server.conf etc/zabbix
+database/postgresql/create.sql usr/share/doc/zabbix-server-pgsql
+
