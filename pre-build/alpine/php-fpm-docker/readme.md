@@ -32,20 +32,20 @@ This command uses the gunzip command to decompress the glaber-php-fpm.tgz file a
 To run the glaber-php-fpm Docker container, first create a directory on the host machine to store the PHP files that will be served by the container:
 
 ```bash
-mkdir -p /var/www/ui
+mkdir -p /usr/share/zabbix
 ```
-Then copy the PHP files to the /var/www/ui directory on the host machine.
+Then copy the PHP files to the /usr/share/zabbix directory on the host machine.
 
-Next, set the ownership of the /var/www/ui directory to the user and group ID of the www-data user inside the container (UID and GID 1101):
+Next, set the ownership of the /usr/share/zabbix directory to the user and group ID of the www-data user inside the container (UID and GID 1101):
 
 ```bash
-chown -R 1101:1101 /var/www/ui
+chown -R 1101:1101 /usr/share/zabbix
 ```
 
 Finally, run the glaber-php-fpm Docker container with the following command:
 
 ```bash
-docker run -d -p 9000:9000 -v /var/www/ui:/var/www/ui glaber-php-fpm
+docker run -d --network="host" -v /usr/share/zabbix:/usr/share/zabbix glaber-php-fpm8
 ```
 
-This command runs the glaber-php-fpm Docker container in detached mode (-d), maps port 9000 of the container to port 9000 of the host machine (-p 9000:9000), and mounts the /var/www/ui directory on the host machine as a volume inside the container (-v /var/www/ui:/var/www/ui). This allows the PHP files in the /var/www/ui directory on the host machine to be served by the PHP-FPM process inside the container.
+This command runs the glaber-php-fpm Docker container in detached mode (-d), uses the host networking to be able to access database,  and mounts the /usr/share/zabbix directory on the host machine as a volume inside the container (-v /usr/share/zabbix:/usr/share/zabbix). This allows the PHP files in the /usr/share/zabbix directory on the host machine to be served by the PHP-FPM process inside the container.
