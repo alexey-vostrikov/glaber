@@ -63,8 +63,8 @@ $html_page = (new CHtmlPage())
 					->setAttribute('aria-label', _('Content controls'))
 					->addClass(ZBX_STYLE_DASHBOARD_EDIT)
 			)
-	)
-c
+	);
+
 
 $dashboard = (new CDiv())
 	->addClass(ZBX_STYLE_DASHBOARD)
