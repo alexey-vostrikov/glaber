@@ -1,6 +1,6 @@
 ARG OS
 ARG OS_VER
-FROM alpine:3.15
+FROM ${OS}:${OS_VER}
 
 RUN apk update && \
     apk add --no-cache --clean-protected \
