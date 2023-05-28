@@ -19,7 +19,7 @@
 **/
 
 
-require_once dirname(__FILE__).'/../../include/forms.inc.php';f
+require_once dirname(__FILE__).'/../../include/forms.inc.php';
 
 class CControllerPopupMassupdateItem extends CController {
 
