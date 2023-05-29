@@ -26,6 +26,8 @@
 #include "elems_hash_tests.c"
 #include "obj_index_tests.c"
 
+#ifdef HAVE_GLB_TESTS
+
 void tests_algo_run() {
     LOG_INF("Running algo tests");
     sleep(1);
@@ -37,7 +39,9 @@ void tests_algo_run() {
     tests_index_uint64_run();
     
     LOG_INF("Running obj index tests");
+    
     tests_obj_index_run();
     LOG_INF("Finished algo tests");
 }
 
+#endif

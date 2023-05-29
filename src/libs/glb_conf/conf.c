@@ -102,24 +102,6 @@ int glb_conf_iterate_on_set_data(char *json_buff, char *id_name,
     
     return SUCCEED;
 }
-/*for parsing arrays of objects that belongs to the same object - parses the array, 
-  allocates the necessary mem and calls callback to fill the data per-subobject
-  unlike elems hash - it's just an array without indexing, thow good for the compact storage
-  for rather small objects number
-  */
-// int glb_conf_json_array_parse(struct zbx_json_parse *jp_array, mem_funcs_t *memf, strpool_t *strpool, size_t element_size, element_parse_callback cb_func) {
-    
-//     void *arr = NULL;
-//     int n = glb_json_get_array_elem_count(jp_array);
-
-//     if ( 0 == n)
-//         return SUCCEED;
-
-    
-
-
-// }
-
 
 int glb_conf_add_json_param_strpool(struct zbx_json_parse *jp, strpool_t *strpool, char *name, const char **addr) {
 	char tmp[MAX_STRING_LEN];
@@ -147,4 +129,49 @@ int glb_conf_add_json_param_memf(struct zbx_json_parse *jp, mem_funcs_t *memf, c
 	
     *addr = NULL;
 	return FAIL;
+}
+
+void glb_conf_free_json_array(void *data, int count, size_t element_size,  mem_funcs_t *memf, strpool_t *strpool, 
+    glb_conf_array_free_func_cb_t free_cb) {
+    
+    int i;
+  //  LOG_INF("Freeng elements");
+    for (i = 0; i < count; i++) {
+        free_cb(data + i * element_size, memf, strpool);
+    }
+ //   LOG_INF("Freeng memory %p", data);
+    memf->free_func(data);
+    
+}
+
+int glb_conf_create_array_from_json(void **data, char *name, struct zbx_json_parse *jp, size_t element_size, mem_funcs_t *memf, strpool_t *strpool,
+     glb_conf_array_create_func_cb_t create_cb) {
+    
+    int count = 0;
+    struct zbx_json_parse jp_arr, jp_elem;
+    const char *p = NULL;
+    void *elem_ptr;
+    
+    if (FAIL == zbx_json_brackets_by_name(jp, name, &jp_arr))
+        return 0;
+    
+    if (0 >= (count = zbx_json_count(&jp_arr)))
+        return 0;
+
+   // LOG_INF("Allocating %d bytes, memf is %p", count * element_size, memf->malloc_func);
+    *data = memf->malloc_func(NULL, count * element_size);
+    elem_ptr = *data;
+
+    LOG_INF("Allocated memory at %p", *data);
+   // LOG_INF("Iterating");
+     while (NULL != (p = zbx_json_next(&jp_arr, p))) {
+        if (SUCCEED != zbx_json_brackets_open(p, &jp_elem)) 
+            continue;
+  
+        create_cb(elem_ptr, &jp_elem, memf, strpool);
+        
+        elem_ptr += element_size;
+    }
+
+    return count;
 }

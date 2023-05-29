@@ -59,9 +59,9 @@
 #include "zbxserver.h"
 
 typedef struct {
-	const char *name;
-	const char *value;
-} script_params_t;
+	char *name;
+	char *value;
+} script_param_t;
 
 struct glb_conf_script_t {
     const char *name;
@@ -83,7 +83,7 @@ struct glb_conf_script_t {
 	const char *url;
 
 	int params_count;
-	script_params_t *params;
+	script_param_t *params;
 	/*next params are probably not needed for the server, but exists in DB/API*/
 
 	//int host_access;
@@ -95,12 +95,35 @@ struct glb_conf_script_t {
 	//int new_window;
 } script_t;
 
+CONF_ARRAY_CREATE_FROM_JSON_CB(parameter_create_cb) {
+	script_param_t *param = data;
+	
+	if (SUCCEED == glb_conf_add_json_param_memf(jp, memf, "name", &param->name) &&
+		SUCCEED == glb_conf_add_json_param_memf(jp, memf, "value", &param->value)) 
+		return SUCCEED;
+
+	param->name = NULL;
+	param->value = NULL;
+	
+	return FAIL;
+}
+
+CONF_ARRAY_FREE_CB(parameter_free_cb){
+	script_param_t *param = data;
+	
+	if (NULL != param->name)
+		memf->free_func(param->name);
+	
+	if (NULL != param->value)
+		memf->free_func(param->value);
+}
+
 void glb_conf_script_free(glb_conf_script_t *script, mem_funcs_t *memf, strpool_t *strpool) {
-	glb_conf_script_clear(script, strpool);
+	glb_conf_script_clear(script, memf, strpool);
 	memf->free_func(script);
 }
 
-void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool) {
+void glb_conf_script_clear(glb_conf_script_t *script, mem_funcs_t *memf, strpool_t *strpool) {
 
 	strpool_free(strpool, script->name);
 	strpool_free(strpool, script->command);
@@ -111,10 +134,11 @@ void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool) {
 	strpool_free(strpool, script->privatekey);
 	strpool_free(strpool, script->url);
 
+	glb_conf_free_json_array(script->params, script->params_count, sizeof(script_param_t), memf, strpool,  parameter_free_cb);
 	bzero(script, sizeof(glb_conf_script_t));
 }
 
-static int script_fill_from_json(glb_conf_script_t *script, struct zbx_json_parse *jp, strpool_t *strpool) {
+static int script_fill_from_json(glb_conf_script_t *script, struct zbx_json_parse *jp, mem_funcs_t *memf,  strpool_t *strpool) {
 	int errflg;
 	bzero(script, sizeof(glb_conf_script_t));
 	
@@ -133,8 +157,10 @@ static int script_fill_from_json(glb_conf_script_t *script, struct zbx_json_pars
 	script->port       = glb_json_get_uint64_value_by_name(jp, "port", &errflg);
 	script->authtype   = glb_json_get_uint64_value_by_name(jp, "authtype", &errflg);
 	
-	//script_fill_params_from_json(script, jp, strpool);
-	LOG_INF("Params filling should be here");
+	script->params_count = glb_conf_create_array_from_json((void **)&script->params, "parameters", jp, sizeof(script_param_t), 
+				memf, strpool, parameter_create_cb);
+	
+	//LOG_INF("Params filled, total %d params", script->params_count);
 	return SUCCEED;
 }
 
@@ -144,8 +170,8 @@ glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, m
     if (NULL ==(script = memf->malloc_func(NULL, sizeof(glb_conf_script_t))))
         return NULL;
 
-	if (FAIL == script_fill_from_json(script, jp, strpool))  {
-		glb_conf_script_clear(script, strpool);
+	if (FAIL == script_fill_from_json(script, jp, memf,  strpool))  {
+		glb_conf_script_clear(script, memf, strpool);
 		memf->free_func(script);
 	
 		return NULL;

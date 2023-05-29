@@ -1,6 +1,5 @@
 /*
-** Glaber
-** Copyright (C) 2001-2023 Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,22 +16,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include "log.h"
+
 #include "zbxalgo.h"
+#include "glb_common.h"
+#include "../conf.h"
 
-#ifndef API_SYNC_H
-#define API_SYNC_H
-
-typedef enum {
-     GLB_CONF_API_ACTIONS_OPERATIONS = 0,
-     GLB_CONF_API_OBJECTS_MAX
-} glb_conf_json_object_t;
-
-int       glb_conf_api_sync_init(mem_funcs_t *memf);
-void      glb_conf_api_sync_destroy();
-
-void      glb_conf_set_json_data_table(char *buffer, int table);
-char*     glb_conf_get_json_data_table(int table);
-
-int       glb_api_sync_operations();
-
-#endif
+void conf_tests_run();

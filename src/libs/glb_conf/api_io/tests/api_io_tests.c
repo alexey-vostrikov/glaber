@@ -35,7 +35,7 @@ static void test_api_init() {
     assert( FAIL == glb_api_conf_init("http1://", "1234") && "should fail if host not exists");
 }
 
-void glb_api_sync_operations() {
+static void glb_api_sync_operations_test() {
     char *buffer = NULL;
     char *query = 
     "{  \"jsonrpc\": \"2.0\", \
@@ -63,7 +63,7 @@ static void test_sync_api() {
    // glb_api_conf_sync_request("{\"jsonrpc\":\"2.0\",\"method\":\"action.get\",\"params\":{\"output\":\"extend\"},\"id\":1}", &buffer, "test", API_NO_CACHE);
     LOG_INF("Got response %s", buffer);
     zbx_free(buffer);
-    glb_api_sync_operations();
+    glb_api_sync_operations_test();
     
     
     HALT_HERE("Tests aren't truly implemented yet");

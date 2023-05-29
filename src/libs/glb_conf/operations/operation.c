@@ -23,6 +23,30 @@
 #include "log.h"
 #include "zbxalgo.h"
 #include "operation.h"
+#include "../conf.h"
+
+/*
+    "actionid": "2",
+    "name": "Auto discovery. Linux servers.",
+    "eventsource": "1",
+    "status": "1",
+    "esc_period": "0s",
+    "pause_suppressed": "1",
+    "filter": {               
+          "evaltype": "0",
+          "formula": "",
+           "conditions": [
+            {   "conditiontype": "10",
+                "operator": "0",                 
+                "value": "0",
+                "value2": "",
+                "formulaid": "B"
+            },
+*/
+
+typedef struct {
+
+} condition_t;
 
 typedef struct glb_operation_t {
     u_int64_t id;
@@ -32,18 +56,27 @@ typedef struct glb_operation_t {
     int esc_step_from;
     int esc_step_to;
     int evaltype;
+    void *conditions;
 };
 
 void glb_operation_free(mem_funcs_t *memf, glb_operation_t *operation) {
-    HALT_HERE("Unimplemeted");
+    memf->free_func(operation);
 }
 
-glb_operation_t *glb_operation_create_from_json(mem_funcs_t *memf, struct zbx_json_parse *jp) {
+glb_operation_t *glb_operation_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool ) {
+    int errflag;
     glb_operation_t *oper = memf->malloc_func(NULL, sizeof(glb_operation_t));
     bzero(oper, sizeof(glb_operation_t));
 
     LOG_INF("Creating operation from json: %s", jp->start);
-    oper->glb_json_get_uint64_value_by_name(jp, "operationid", &errflag);
-
-    HALT_HERE("Unimplemeted");
+    oper->id            = glb_json_get_uint64_value_by_name(jp, "operationid", &errflag);
+    oper->action_id     = glb_json_get_uint64_value_by_name(jp, "actionid", &errflag);
+    oper->operationtype = glb_json_get_uint64_value_by_name(jp, "operationtype", &errflag);
+    oper->esc_step_from = glb_json_get_uint64_value_by_name(jp, "esc_step_from", &errflag);
+    oper->esc_step_to   = glb_json_get_uint64_value_by_name(jp, "esc_step_to", &errflag);
+    oper->esc_period    = glb_json_get_uint64_value_by_name(jp, "esc_period", &errflag);
+    oper->evaltype      = glb_json_get_uint64_value_by_name(jp, "evaltype", &errflag);
+    LOG_INF("Creating operation conditions");
+    LOG_INF("Also loading operations messages");
+    return oper;
 }

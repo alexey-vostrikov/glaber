@@ -26,19 +26,21 @@
 #include "../../libs/glb_conf/conf.h"
 #include "zbxalgo.h"
 
+#define MIN_STEP_DURATION 60
+
 typedef struct {
     u_int16_t count;
     glb_operation_t **operations;
 } operations_t ;
 
 typedef struct {
+    int default_step_duration;
     operations_t step_operations;
     operations_t update_operations;
     operations_t recovery_operations;
 } glb_action_t;
 
 struct glb_events_operations_conf_t {
-    //char *json_config;
     elems_hash_t *actions; //action id - indexed operations
 };
 
@@ -55,8 +57,39 @@ int     glb_events_operations_get_max_steps(glb_events_operations_conf_t *operat
     HALT_HERE("Not implemented");
 }
 
-int     glb_events_operations_get_step_delay(glb_events_operations_conf_t *operations, u_int64_t actionid) {
-    HALT_HERE("Not implemented");
+CONF_ARRAY_ITERATE_CB(get_step_duration_cb) {
+    
+}
+
+ELEMS_CALLBACK(get_step_duration_cb) {
+    glb_action_t *action = elem->data;
+
+    int default_duration = get_simple_interval(action->default_step_duration);
+    HALT_HERE("Check out if step duration might have macro, if so - transalte");
+    glb_conf_array_iterate(action->step_operations.operations, get_step_duration_cb, get_min_step_durtion_data);
+
+
+    HALT_HERE("Need to translate string based time to seconds");
+}
+
+static operations_get_default_step_duration(glb_events_operations_conf_t *operations, u_int64_t actionid) {
+    int duration;
+    
+    if (SUCCEED == elems_hash_process(operations->actions, actionid, get_step_duration_cb, &duration, ELEM_FLAG_DO_NOT_CREATE))
+        return duration;
+    
+    return MIN_STEP_DURATION;
+}
+
+int     glb_events_operations_get_step_delay(glb_events_operations_conf_t *operations, u_int64_t actionid, int step) {
+    LOG_INF("Getting step delay for action %ld", actionid);
+    return MAX( 
+                MIN(
+                    operations_get_default_step_duration(operations, actionid),
+                    operations_get_min_step_duration(operations, actionid, step)
+                ) , 
+                MIN_STEP_DURATION 
+    );
 }
 
 void    glb_event_operations_execute_step(glb_events_operations_conf_t *operations, u_int64_t actionid, int step_no) {
@@ -92,7 +125,7 @@ ELEMS_FREE(operation_free_cb) {
     memf->free_func(elem->data);
 }
 
-void operations_create_from_json(mem_funcs_t *memf, operations_t *opers, struct zbx_json_parse *jp ) {
+void operations_create_from_json( operations_t *opers, struct zbx_json_parse *jp, mem_funcs_t *memf) {
     const char *operation_ptr = NULL;
     struct zbx_json_parse jp_oper;
     int i=0;
@@ -104,13 +137,10 @@ void operations_create_from_json(mem_funcs_t *memf, operations_t *opers, struct 
 
     while (NULL != (operation_ptr = zbx_json_next(jp, operation_ptr))) {
          if (SUCCEED == zbx_json_brackets_open(operation_ptr, &jp_oper)) {
-                opers->operations[i] = glb_operation_create_from_json(memf, &jp_oper);
+                opers->operations[i] = glb_operation_create_from_json(&jp_oper, memf, NULL);
          }
          i++;
     }
-
-
-    HALT_HERE("Not implemented");
 }
 
 ELEMS_CALLBACK(process_action_json) {
@@ -119,15 +149,17 @@ ELEMS_CALLBACK(process_action_json) {
     struct zbx_json_parse *jp = data, jp_opers;
     
     action_clear(memf, action);
+    LOG_INF("Processing action %s", jp->start);
+    HALT_HERE();
     
     if (SUCCEED == zbx_json_brackets_by_name(jp, "operations", &jp_opers))
-        operations_create_from_json(memf, &action->step_operations, &jp_opers);
+        operations_create_from_json(&action->step_operations, &jp_opers, memf);
 
     if (SUCCEED == zbx_json_brackets_by_name(jp, "recovery_operations", &jp_opers))
-        operations_create_from_json(memf, &action->recovery_operations, &jp_opers);
+        operations_create_from_json(&action->recovery_operations, &jp_opers, memf);
     
     if (SUCCEED == zbx_json_brackets_by_name(jp, "update_operations", &jp_opers))
-        operations_create_from_json(memf, &action->update_operations, &jp_opers);
+        operations_create_from_json(&action->update_operations, &jp_opers, memf);
 
 } 
 
@@ -145,7 +177,8 @@ void    glb_events_operations_update(glb_events_operations_conf_t *operations) {
     
     if (NULL != ops_json)
         glb_conf_iterate_on_set_data(ops_json, "actionid", operations->actions, process_action_json);
-    HALT_HERE();
+  
+  //  HALT_HERE();
     
 }
 

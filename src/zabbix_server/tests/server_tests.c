@@ -20,21 +20,24 @@
 
 #include "zbxcommon.h"
 #include "glb_log.h"
-//#include "zbxcommon.h"
 
 
-
-#include "../../libs/glb_state/tests/glb_state_tests.h"
 #include "../../libs/zbxalgo/tests/algo_tests.h"
+#include "../../libs/glb_state/tests/glb_state_tests.h"
 #include "../../libs/glb_macro/tests/glb_macro_tests.h"
 #include "../../libs/glb_conf/tags/tests/tag_tests.h"
 #include "../../libs/glb_conf/api_io/tests/api_io_tests.h"
+#include "../../libs/glb_conf/tests/conf_tests.h"
 
 //#include "../preprocessor/worker_tests.c"
 //#include "../../libs/zbxexec/tests/exec_tests.c"
 int tests_server_run(void) {
    LOG_INF("Running server tests");
    sleep(2);
+   
+   LOG_INF("Running configuration parsing tests");
+   conf_tests_run();
+   
    LOG_INF("Running API io tests");
    run_api_io_tests();
    

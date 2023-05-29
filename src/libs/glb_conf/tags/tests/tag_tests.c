@@ -49,23 +49,16 @@ static void init(void) {
 static void test_create_delete() {
     u_int64_t was_size = shmtest_mem->free_size;
     tags_t *t_set = tags_create_ext(&test_memf);
-  //  LOG_INF("Diff is %lld %lld", was_size,shmtest_mem->free_size);
+
     assert( shmtest_mem->free_size != was_size && "Assert some shmem has been used");
     tag_t tag = {.tag = "tag", .value = "value"};
     tag_t tag2 = {.tag = "tag1", .value = "value2"};
     tag_t tag3 = {.tag = "tag1", .value = "value3"};
-//    LOG_INF("ewrgwrtgwt1, t_set is %p", t_set);
- //   LOG_INF("Diff is %lld %lld", was_size,shmtest_mem->free_size);
     assert(FAIL == tags_add_tag_ext(t_set, NULL, &test_memf) && "Assert FAILS on null tag add");
-//    LOG_INF("ewrgwrtgwt2, t_set is %p", t_set);
-//    LOG_INF("Diff is %lld %lld", was_size,shmtest_mem->free_size);
+
     assert(SUCCEED  == tags_add_tag_ext(t_set, &tag, &test_memf) && "Assert SUCCEED on real tag add");
-//    LOG_INF("ewrgwrtgwt3");
- //   LOG_INF("Diff is %lld %lld", was_size,shmtest_mem->free_size);
     assert(FAIL  == tags_add_tag_ext(t_set, &tag, &test_memf) && "Assert FAILS on existing tag add");
- //   LOG_INF("After fail Diff is %lld %lld", was_size,shmtest_mem->free_size);
-//    tags_add_tag(tags, &tag);
-  //  LOG_INF("Adding tag2");
+
     assert(SUCCEED == tags_add_tag_ext(t_set, &tag2, &test_memf) && "Assert SUCCEED on new tag add");
     assert(SUCCEED == tags_add_tag_ext(t_set, &tag3, &test_memf) && "Assert SUCCEED on existing tag with new value add");
     

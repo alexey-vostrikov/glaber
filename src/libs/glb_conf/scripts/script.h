@@ -23,4 +23,4 @@ typedef struct glb_conf_script_t glb_conf_script_t;
 
 //int glb_conf_script_create_update_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *data);
 glb_conf_script_t *glb_conf_script_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
-void glb_conf_script_clear(glb_conf_script_t *script, strpool_t *strpool);
+void glb_conf_script_clear(glb_conf_script_t *script, mem_funcs_t *memf, strpool_t *strpool);

@@ -52,7 +52,7 @@ mem_funcs_t heap_memf = {.malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC,
 typedef struct {
 	u_int64_t action_id;
 	u_int64_t problem_id;
-	int executed_steps;
+	int current_step;
 	int step_delay;
 	poller_event_t *event;
 } escalation_t;
@@ -107,26 +107,26 @@ static void destroy_escalation_event(escalation_t *escalation) {
 
 void process_escalation_step_cb(poller_item_t *garbage, void *esc) {
 	escalation_t *escalation = esc;
-	
+	int step_delay = 60;
+
 	if (FAIL == glb_state_problems_if_exists(escalation->problem_id)) {
 		destroy_escalation_event(escalation);
 		return;
 	}
 	
-	glb_event_operations_execute_step(conf.operations, escalation->action_id, escalation->executed_steps +1 );
-	escalation->executed_steps ++;
-
-	
-	if (glb_events_operations_get_max_steps(conf.operations, escalation->action_id) <= escalation->executed_steps) {
+	glb_event_operations_execute_step(conf.operations, escalation->action_id, escalation->current_step );
+		
+	if (glb_events_operations_get_max_steps(conf.operations, escalation->action_id) <= escalation->current_step) {
 		//no steps left, destroying escalation
 		destroy_escalation_event(escalation);
 		return;
 	}
-	
-	//planing next step
-	poller_run_timer_event(escalation->event, escalation->step_delay * 1000);
-}
 
+	escalation->current_step++;
+	step_delay = glb_events_operations_get_step_delay(conf.operations, escalation->action_id, escalation->current_step);
+
+	poller_run_timer_event(escalation->event, step_delay * 1000);
+}
 
 void create_new_event_operations(events_processor_event_t *event, u_int64_t actionid) {
 	
@@ -135,8 +135,8 @@ void create_new_event_operations(events_processor_event_t *event, u_int64_t acti
 	escalation_t *escalation = zbx_malloc(NULL, sizeof(escalation_t));
 	escalation->problem_id = event->object_id;
 	escalation->action_id = actionid;
-	escalation->step_delay = glb_events_operations_get_step_delay(conf.operations, actionid);
-	escalation->executed_steps = 0;
+	escalation->current_step = 1;
+	escalation->step_delay = glb_events_operations_get_step_delay(conf.operations, actionid, escalation->current_step);
 	escalation->event = poller_create_event(NULL, process_escalation_step_cb, 0, escalation, 0);
 	
 	poller_run_timer_event(escalation->event, 0); //planning first step right now

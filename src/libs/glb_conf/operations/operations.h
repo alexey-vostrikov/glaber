@@ -22,7 +22,7 @@
 typedef struct glb_events_operations_conf_t glb_events_operations_conf_t;
 
 int     glb_events_operations_get_max_steps(glb_events_operations_conf_t *operations, u_int64_t actionid);
-int     glb_events_operations_get_step_delay(glb_events_operations_conf_t *operations, u_int64_t actionid);
+int     glb_events_operations_get_step_delay(glb_events_operations_conf_t *operations, u_int64_t actionid, int step_no);
 
 void    glb_event_operations_execute_step(glb_events_operations_conf_t *operations, u_int64_t actionid, int step_no);
 void    glb_events_operations_execute_change(glb_events_operations_conf_t *operations, u_int64_t problem_id, u_int64_t actionid);
