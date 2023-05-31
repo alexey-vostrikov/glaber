@@ -436,7 +436,7 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
     static size_t buf_alloc = 0, buf_offset;
 
 	buf_offset = 0;
-    char *responce;
+    char *response;
 
 	LOG_DBG("In %s()", __func__);
 	
@@ -481,11 +481,15 @@ static int	clickhouse_get_values(void *data, int value_type, zbx_uint64_t itemid
 
     zbx_snprintf_alloc(&sql_buffer, &buf_alloc, &buf_offset, "format JSON ");
 
-	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
+	DEBUG_ITEM(itemid, "Executing clickhouse query: %s", sql_buffer);
+	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &response)) {
+		DEBUG_ITEM(itemid, "Query failed");
 	 	return FAIL;
-
-    if (SUCCEED != parse_history_get_values(itemid, conf, responce, value_type, values)) 
+	}
+    if (SUCCEED != parse_history_get_values(itemid, conf, response, value_type, values)) {
+		DEBUG_ITEM(itemid, "Couldn't parse response %s", response);
 		return FAIL;
+	}
 
 	zbx_vector_history_record_sort(values, (zbx_compare_func_t)zbx_history_record_compare_desc_func);
 	LOG_DBG( "End of %s()", __func__);
@@ -507,7 +511,7 @@ static int	get_history_aggregates_json(void *data, int value_type, zbx_uint64_t 
     static size_t buf_alloc = 0, buf_offset;
 
 	buf_offset = 0;
-	char *responce;
+	char *response;
 
     char *table_name=NULL;
 
@@ -547,14 +551,19 @@ static int	get_history_aggregates_json(void *data, int value_type, zbx_uint64_t 
 	FORMAT JSON", start, steps, end-start, 
 				conf->dbname, table_name,  start, end, itemid);
 
-	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &responce)) 
-	 	return FAIL;
-	 
-    
-	if (SUCCEED != parse_aggregate_responce(itemid, responce, json)) 
-		return FAIL;
+	DEBUG_ITEM(itemid, "Executing aggregation query: %s", sql_buffer);
 
-	LOG_DBG("Finished parsing, returning, buffer is '%s'", json->buffer);
+	if (SUCCEED != curl_post_request(conf->url, sql_buffer, &response)) { 
+		DEBUG_ITEM(itemid, "Request failed");
+		return FAIL;
+	}
+    
+	if (SUCCEED != parse_aggregate_responce(itemid, response, json))  {
+		DEBUG_ITEM(itemid, "Couldn't parse response: %s", response);
+		return FAIL;
+	}
+
+	DEBUG_ITEM(itemid, "Finished parsing, returning, buffer is '%s'", json->buffer);
 	return SUCCEED;
 }
 
