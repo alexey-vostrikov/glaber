@@ -366,8 +366,13 @@ jQuery(function($) {
 		var offset = target.offset(),
 			left = data.left,
 			right = target.outerWidth() - data.right,
+			bottom = target.outerHeight() - data.height,
 			xpos = Math.min(Math.max(left, event.pageX - offset.left), right),
+			ypos = Math.min(Math.max(top, event.pageY1 - offset.top), bottom),
 			parent = target.parent();
+
+			console.log(xpos)
+			console.log(ypos)
 
 		offset.top += data.top;
 		if ((event.pageY < offset.top) || event.pageY > offset.top + data.height) {
@@ -455,7 +460,7 @@ jQuery(function($) {
 			width = Math.abs(x - selection.base_x),
 			seconds = Math.round(width * selection.seconds_per_px),
 			label = formatTimestamp(seconds, false, true) + (seconds < 60 ? ' [min 1' + t('S_MINUTE_SHORT') + ']' : '');
-
+		
 		if (!was_dragged) {
 			was_dragged = true;
 			noclick_area.show();
