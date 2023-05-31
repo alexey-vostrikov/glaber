@@ -1,3 +1,5 @@
+ver 3.0.71
+    - feature: additional history interface item debug logging is added
 ver 3.0.70
     - fixed glb_hist_victoria : interval miscalculation where producing too much data
 ver 3.0.69
