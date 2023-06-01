@@ -310,6 +310,9 @@ int	glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, 
 	int			j, ret=FAIL;
 	
 	//zabbix_log(LOG_LEVEL_INFORMATION,"Starting %s",__func__);
+	if (ITEM_VALUE_TYPE_FLOAT != value_type && 
+		ITEM_VALUE_TYPE_UINT64 != value_type)
+		return FAIL;
 	
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON]->values_num; j++) {
 

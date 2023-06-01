@@ -1,3 +1,5 @@
+ver 3.0.74
+    - fix: disable attempts to request trends for non-numeric types
 ver 3.0.73
     - added extra clickhouse logging for item debugging
 ver 3.0.72
