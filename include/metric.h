@@ -24,15 +24,18 @@
 #include "zbxcommon.h"
 //#include "log.h"
 #include "zbxvariant.h"
-#include "metric.h"
+//#include "metric.h"
+#include "zbxtime.h"
+
+#define METRIC_TYPE_DISCOVERY   1
 
 typedef struct  {
     u_int64_t itemid;
     u_int64_t hostid;
-    u_int64_t mstime;
-    variant_t value;
+    u_int64_t flags;
+    zbx_timespec_t ts;
+    zbx_variant_t value;
 } metric_t;
 
-
-void metric_set_time(metric_t *metric, u_int64_t *mstime);
+void metric_set_time(metric_t *metric, u_int64_t mstime);
 #endif

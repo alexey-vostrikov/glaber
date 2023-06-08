@@ -385,6 +385,22 @@
 						placeholder_0: <?= json_encode(_('$.path.to.ip_attr')) ?>,
 						placeholder_1: <?= json_encode(_('item_key')) ?>
 					}));
+				case '<?= GLB_PREPROC_DISCOVERY_PREPARE ?>':
+					return $(preproc_param_double_tmpl.evaluate({
+						rowNum: index,
+						placeholder_0: <?= json_encode(_('new tiemout')) ?>,
+						placeholder_1: <?= json_encode(_('retry timout')) ?>
+					}));
+				case '<?= GLB_PREPROC_JSON_FILTER ?>':
+					return $(preproc_param_double_tmpl.evaluate({
+						rowNum: index,
+						placeholder_0: <?= json_encode(_('field1,field2,field3')) ?>
+					}));
+				case '<?= GLB_PREPROC_LOCAL_DISPATCH ?>':
+					return $(preproc_param_double_tmpl.evaluate({
+						rowNum: index,
+						placeholder_0: <?= json_encode(_('test{$.path} or {attribute}')) ?>
+					}));
 				default:
 					return '';
 			}
@@ -549,6 +565,7 @@
 					case '<?= ZBX_PREPROC_STR_REPLACE ?>':
 					case '<?= GLB_PREPROC_DISPATCH_ITEM ?>':
 					case '<?= GLB_PREPROC_DISPATCH_ITEM_BY_IP ?>':
+					case '<?= GLB_PREPROC_JSON_FILTER ?>':
 
 						$on_fail
 							.prop('checked', false)

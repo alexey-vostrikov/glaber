@@ -585,10 +585,13 @@ typedef struct
 	zbx_uint64_t		hostid;
 	unsigned char		type;
 	unsigned char		value_type;
-	unsigned char		fast_preprocess; //flag to signal that preproc is simple, no worker needed
+//	unsigned char		fast_preprocess; //flag to signal that preproc is simple, no worker needed
 
 	int			dep_itemids_num;
 	int			preproc_ops_num;
+
+//	zbx_vector_ptr_t 	*history;
+	
 	zbx_uint64_t		revision;
 	zbx_uint64_t		preproc_revision;
 
@@ -611,9 +614,9 @@ int	is_item_processed_by_server(unsigned char type, const char *key);
 int	zbx_is_counted_in_item_queue(unsigned char type, const char *key);
 int	in_maintenance_without_data_collection(unsigned char maintenance_status, unsigned char maintenance_type,
 		unsigned char type);
-void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
-int 	dc_flush_history(void);
+//void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+//		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
+//int 	dc_flush_history(void);
 
 #define ZBX_SYNC_NONE	0
 #define ZBX_SYNC_ALL	1

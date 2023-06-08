@@ -105,6 +105,18 @@ class CMenuPopupHelper {
         return $data;
     }
 
+	public static function getTemplate($hostid) {
+        $data = [
+            'type' => 'template',
+            'data' => [
+                'hostid' => $hostid
+            ]
+        ];
+
+        return $data;
+    }
+
+
 
 	/**
 	 * Prepare data for Ajax map element menu popup.

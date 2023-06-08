@@ -68,10 +68,10 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 								 shutdown_cb shutdown, forks_count_cb forks_count, 
 								 poller_resolve_cb resolve_callback, poller_resolve_fail_cb resolve_fail_callback);
 
-void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error);
-void poller_preprocess_uint64_value(poller_item_t *poller_item, u_int64_t value);
-void poller_preprocess_str_value(poller_item_t *poller_item, char* value);
-void poller_preprocess_str_timestamp(poller_item_t *poller_item, u_int64_t timestamp, char *value);
+void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value);
+void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, double value);
+void poller_preprocess_str(poller_item_t *poller_item, zbx_timespec_t *ts, const char *value);
+void poller_preprocess_agent_result_value(poller_item_t *poller_item, zbx_timespec_t *ts, AGENT_RESULT *ar);
 
 void poller_inc_requests();
 void poller_inc_responses();
@@ -93,6 +93,6 @@ const char *poller_strpool_add(const char * str);
 const char *poller_strpool_copy(const char * str);
 
 void poller_preprocess_error(poller_item_t *poller_item, const char *error);
-void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime);
+void poller_preprocess_str(poller_item_t *poller_item, zbx_timespec_t *ts, const char *value);
 
 #endif

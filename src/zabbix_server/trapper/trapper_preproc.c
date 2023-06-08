@@ -287,11 +287,14 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 			zbx_variant_copy(&result->value, &value);
 			zbx_vector_ptr_append(&results, result);
 		}
-		else if (FAIL == zbx_preprocessor_test(value_type, values[i], &ts[i], &steps, &results, &history,
-				&preproc_error, error))
-		{
-			goto out;
+		else {
+			HALT_HERE("Testing needs to be implemented back for the new preprocessor");
 		}
+		// (FAIL == zbx_preprocessor_test(value_type, values[i], &ts[i], &steps, &results, &history,
+		//		&preproc_error, error))
+		//{
+		//	goto out;
+		//}
 
 		if (NULL != preproc_error)
 			break;

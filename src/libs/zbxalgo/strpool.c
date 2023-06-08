@@ -88,7 +88,12 @@ static const char *__strpool_acquire(const char *str)
 
 // mem-based strpool operations
 int strpool_init(strpool_t *strpool, mem_funcs_t *memf)
-{
+{	
+	mem_funcs_t local_memf = { .malloc_func = zbx_default_mem_malloc_func, 
+            .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
+    
+    if (NULL == memf)
+        memf  = &local_memf;
 
 	zbx_hashset_create_ext(&strpool->strs, 100, __strpool_hash, __strpool_compare, NULL,
 						   memf->malloc_func, memf->realloc_func, memf->free_func);

@@ -56,7 +56,7 @@ ZBX_THREAD_ENTRY(httppoller_thread, args)
 	last_stat_time = time(NULL);
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
-	glb_preprocessing_init();
+//	glb_preprocessing_init();
 
 	while (ZBX_IS_RUNNING())
 	{

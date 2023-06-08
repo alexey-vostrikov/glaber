@@ -53,7 +53,6 @@
 #include "proxypoller/proxypoller.h"
 #include "vmware/vmware.h"
 #include "taskmanager/taskmanager.h"
-#include "preprocessor/preproc_manager.h"
 #include "preprocessor/preproc_worker.h"
 #include "availability/avail_manager.h"
 #include "service/service_manager.h"
@@ -283,8 +282,8 @@ int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	1, /* ZBX_PROCESS_TYPE_TASKMANAGER */
 	0, /* ZBX_PROCESS_TYPE_IPMIMANAGER */
 	1, /* ZBX_PROCESS_TYPE_ALERTMANAGER */
-	1, /* ZBX_PROCESS_TYPE_PREPROCMAN */
-	3, /* ZBX_PROCESS_TYPE_PREPROCESSOR */
+	0, /* ZBX_PROCESS_TYPE_PREPROCMAN - do not set to non 0, legacy */
+	0, /* ZBX_PROCESS_TYPE_PREPROCESSOR - do not set to non 0, legacy*/
 	1, /* ZBX_PROCESS_TYPE_LLDMANAGER */
 	2, /* ZBX_PROCESS_TYPE_LLDWORKER */
 	1, /* ZBX_PROCESS_TYPE_ALERTSYNCER */
@@ -493,16 +492,6 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_ALERTER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR];
 	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]))
 	{
@@ -940,7 +929,7 @@ static void set_config_defaults() {
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_API_TRAPPER] = 3;
-	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] =1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] = 4;
 }
 
 /******************************************************************************
@@ -990,9 +979,9 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"HistoryModule", &CONFIG_HISTORY_MODULE, TYPE_MULTISTRING,
 			 PARM_OPT, 0, 0},
-			{"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
-			 PARM_OPT, 1, 1000},
-			{"StartGLBPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN], TYPE_INT,
+			// {"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+			//  PARM_OPT, 1, 1000},
+			{"StartGLBPreprocessors", &CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
 			 PARM_OPT, 1, 1000},
 			{"StartDBSyncers", &CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], TYPE_INT,
 			 PARM_OPT, 1, 100},
@@ -1188,8 +1177,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"StartAlerters", &CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER], TYPE_INT,
 			 PARM_OPT, 1, 100},
-			{"StartPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
-			 PARM_OPT, 1, 1000},
+			// {"StartPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+			//  PARM_OPT, 1, 1000},
 			{"ExportDir", &(zbx_config_export.dir), TYPE_STRING,
 			 PARM_OPT, 0, 0},
 			{"ExportType", &(zbx_config_export.type), TYPE_STRING_LIST,
@@ -1237,7 +1226,6 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 	zbx_tls_validate_config(zbx_config_tls, CONFIG_FORKS[ZBX_PROCESS_TYPE_ACTIVE_CHECKS],
 							CONFIG_FORKS[ZBX_PROCESS_TYPE_LISTENER], get_program_type);
 #endif
-	CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR ] = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
 }
 
 /******************************************************************************
@@ -1494,13 +1482,13 @@ static void zbx_check_db(void)
 		zbx_db_extract_dbextension_info(&db_version_info);
 	}
 
-	LOG_INF("Updating base database version");
+	//LOG_INF("Updating base database version");
 	if (SUCCEED == result && (SUCCEED != DBcheck_version(DB_UPDATE_COMMON_DATABASE)))
 	{
 		result = FAIL;
 	}
 	
-	LOG_INF("Updating Glaber specific database version");
+	//LOG_INF("Updating Glaber specific database version");
 	if (SUCCEED == result && (SUCCEED != DBcheck_version(DB_UPDATE_GLABER_DATABASE)))
 	{
 		result = FAIL;
@@ -1848,12 +1836,12 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			thread_args.args = &taskmanager_args;
 			zbx_thread_start(taskmanager_thread, &thread_args, &threads[i]);
 			break;
-		case ZBX_PROCESS_TYPE_PREPROCMAN:
-			zbx_thread_start(preprocessing_manager_thread, &thread_args, &threads[i]);
-			break;
-		case ZBX_PROCESS_TYPE_PREPROCESSOR:
-			zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
-			break;
+//		case ZBX_PROCESS_TYPE_PREPROCMAN:
+//			zbx_thread_start(preprocessing_manager_thread, &thread_args, &threads[i]);
+//			break;
+		// case ZBX_PROCESS_TYPE_PREPROCESSOR:
+		// 	zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
+		// 	break;
 #ifdef HAVE_OPENIPMI
 		case ZBX_PROCESS_TYPE_IPMIMANAGER:
 			thread_args.args = &ipmi_manager_args;
@@ -2331,7 +2319,7 @@ int MAIN_ZABBIX_ENTRY(int flags)
 		zbx_set_exiting_with_fail();
 	}
 
-	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
+//	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
 	zbx_register_stats_data_func(zbx_server_stats_ext_get, NULL);
 	zbx_register_stats_ext_func(zbx_vmware_stats_ext_get, NULL);
 	zbx_diag_init(diag_add_section_info);

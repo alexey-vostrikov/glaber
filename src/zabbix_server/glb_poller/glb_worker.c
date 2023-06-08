@@ -56,7 +56,6 @@ static int worker_submit_result(char *response) {
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Started", __func__);
     worker_item_t *worker_item; 
     poller_item_t *poller_item;
-    AGENT_RESULT	result;
     zbx_json_type_t type;
     
     //error is unset - sending the value
@@ -80,16 +79,9 @@ static int worker_submit_result(char *response) {
     }
 
     worker_item = poller_get_item_specific_data(poller_item);      
-           
-    zbx_init_agent_result(&result);
-    zbx_rtrim(value, ZBX_WHITESPACE);
-    
-    zbx_set_agent_result_type(&result, ITEM_VALUE_TYPE_TEXT, value);
-    
-	poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
-    
-    zbx_free_agent_result(&result);
-    
+
+
+    poller_preprocess_str(poller_item, NULL, value);
      
     poller_return_item_to_queue(poller_item);
     worker_item->state = POLL_QUEUED;
@@ -225,7 +217,7 @@ static void send_request(poller_item_t *poller_item) {
         //sending config error status for the item
         zabbix_log(LOG_LEVEL_DEBUG, "Couldn't send request %s",request);
         
-        poller_preprocess_value(poller_item, NULL , mstime, ITEM_STATE_NOTSUPPORTED, "Couldn't send request to the script");
+        poller_preprocess_error(poller_item, "Couldn't send request to the script");
         
         return;
     }

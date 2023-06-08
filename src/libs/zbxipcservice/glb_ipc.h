@@ -91,6 +91,7 @@ int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned cha
 int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
 
 int		glb_ipc_flush(ipc_conf_t *ipc_conf);
+int 	glb_ipc_force_flush(ipc_conf_t *ipc);  
 
 void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);

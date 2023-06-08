@@ -92,12 +92,13 @@ typedef struct
 	unsigned char	value_type;
 	zbx_history_value_t	value;
 	
+	unsigned char	state;
 	zbx_uint64_t	lastlogsize;
 	zbx_timespec_t	ts;
 	int		mtime;
 		
 	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
-	unsigned char	state;
+	
 
 	char *host_name; /*hostname to log to history */
 	char *item_key; /* name of metric*/
@@ -117,7 +118,7 @@ int glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, 
 int glb_history_get_history_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, struct zbx_json *json);
 
 int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_history_record_t *record, struct zbx_json *json);
-int	glb_history_json_to_history_record(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
+//int	glb_history_json_to_history_record(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
  
 int	history_update_log_enty_severity(ZBX_DC_HISTORY *h, int severity, u_int64_t eventid, u_int64_t triggerid, int value);
 

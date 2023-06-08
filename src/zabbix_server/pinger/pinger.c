@@ -49,7 +49,6 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 {
 	DC_ITEM		item;
 	int		errcode;
-	AGENT_RESULT	value;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -67,23 +66,15 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 	if (NOTSUPPORTED == ping_result)
 	{
 		item.state = ITEM_STATE_NOTSUPPORTED;
-		zbx_preprocess_item_value(item.host.hostid, item.itemid, item.value_type, item.flags, NULL, ts,
-				item.state, error);
+		preprocess_error(item.host.hostid, item.itemid, ts, error);
 	}
 	else
 	{
-		zbx_init_agent_result(&value);
-
 		if (NULL != value_ui64)
-			SET_UI64_RESULT(&value, *value_ui64);
+			preprocess_uint64(item.host.hostid, item.itemid, ts, *value_ui64);
 		else
-			SET_DBL_RESULT(&value, *value_dbl);
-
+			preprocess_dbl(item.host.hostid, item.itemid, ts, *value_dbl);
 		item.state = ITEM_STATE_NORMAL;
-		zbx_preprocess_item_value(item.host.hostid, item.itemid, item.value_type, item.flags, &value, ts,
-				item.state, NULL);
-
-		zbx_free_agent_result(&value);
 	}
 clean:
 	DCrequeue_items(&item.itemid, &ts->sec, &errcode, 1);
@@ -106,7 +97,6 @@ static void	process_values(icmpitem_t *items, int first_index, int last_index, Z
 	double		value_dbl;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
 	for (h = 0; h < hosts_count; h++)
 	{
 		const ZBX_FPING_HOST	*host = &hosts[h];
@@ -174,8 +164,6 @@ static void	process_values(icmpitem_t *items, int first_index, int last_index, Z
 			}
 		}
 	}
-
-	zbx_preprocessor_flush();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
@@ -431,8 +419,9 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 			zbx_timespec(&ts);
 
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			zbx_preprocess_item_value( items[i].host.hostid, items[i].itemid, items[i].value_type,
-					items[i].flags, NULL, &ts, items[i].state, error);
+			preprocess_error(items[i].host.hostid, items[i].itemid, &ts, error);
+			//zbx_preprocess_item_value( items[i].host.hostid, items[i].itemid, items[i].value_type,
+			//		items[i].flags, NULL, &ts, items[i].state, error);
 
 			DCrequeue_items(&items[i].itemid, &ts.sec, &errcode, 1);
 		}
@@ -445,7 +434,7 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 	if (items != &item)
 		zbx_free(items);
 
-	zbx_preprocessor_flush();
+	//zbx_preprocessor_flush();
 
 	zbx_dc_close_user_macros(um_handle);
 
@@ -558,8 +547,7 @@ ZBX_THREAD_ENTRY(pinger_thread, args)
 
 	if (NULL == items)
 		items = (icmpitem_t *)zbx_malloc(items, sizeof(icmpitem_t) * items_alloc);
-	glb_preprocessing_init();
-	
+
 	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();

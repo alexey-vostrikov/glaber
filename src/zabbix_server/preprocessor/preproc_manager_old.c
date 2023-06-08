@@ -198,7 +198,7 @@ static void	preprocessor_sync_configuration(zbx_preprocessing_manager_t *manager
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	old_revision = manager->revision;
-	DCconfig_get_preprocessable_items(&manager->item_config, &manager->revision, manager_num);
+	DCconfig_get_preprocessable_items(&manager->item_config, &manager->revision, -1);
 
 	if (old_revision != manager->revision)
 	{
@@ -704,15 +704,15 @@ static void	preprocessor_flush_value(const zbx_preproc_item_value_t *value)
 {
 	if (0 == (value->item_flags & ZBX_FLAG_DISCOVERY_RULE) || 0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 	{
-		dc_add_history(value->itemid, value->item_value_type, value->item_flags, value->result,
-				value->ts, value->state, value->error);
+		//dc_add_history(value->itemid, value->item_value_type, value->item_flags, value->result,
+		//		value->ts, value->state, value->error);
 	//	LOG_INF("Adding itemid %ld to the history cache", value->itemid);
 
 	}
 	else
 	{
-		zbx_lld_process_agent_result(value->itemid, value->hostid, value->result, value->ts,
-				value->error);
+	//	zbx_lld_process_agent_result(value->itemid, value->hostid, value->result, value->ts,
+	//			value->error);
 	}
 }
 
@@ -730,9 +730,9 @@ static void	preprocessor_flush_dep_results(zbx_preprocessing_manager_t *manager,
 		if (0 == (request->results[i].flags & ZBX_FLAG_DISCOVERY_RULE) ||
 				0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
 		{
-			dc_add_history(request->results[i].itemid, request->results[i].value_type,
-					request->results[i].flags, &request->results[i].value, &request->ts, state,
-					request->results[i].error);
+		//	dc_add_history(request->results[i].itemid, request->results[i].value_type,
+		//			request->results[i].flags, &request->results[i].value, &request->ts, state,
+		//			request->results[i].error);
 		}
 		else
 		{
@@ -1899,82 +1899,82 @@ static	void	preprocessor_get_items_view(zbx_preprocessing_manager_t *manager, zb
  *             message - [IN] the message with request                        *
  *                                                                            *
  ******************************************************************************/
-static void	preprocessor_get_top_items(zbx_preprocessing_manager_t *manager, zbx_ipc_client_t *client,
-		zbx_ipc_message_t *message)
-{
-	int			limit;
-	unsigned char		*data;
-	zbx_uint32_t		data_len;
-	zbx_hashset_t		items;
-	zbx_vector_ptr_t	view;
+// static void	preprocessor_get_top_items(zbx_preprocessing_manager_t *manager, zbx_ipc_client_t *client,
+// 		zbx_ipc_message_t *message)
+// {
+// 	int			limit;
+// 	unsigned char		*data;
+// 	zbx_uint32_t		data_len;
+// 	zbx_hashset_t		items;
+// 	zbx_vector_ptr_t	view;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_preprocessor_unpack_top_request(&limit, message->data);
+// 	zbx_preprocessor_unpack_top_request(&limit, message->data);
 
-	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	zbx_vector_ptr_create(&view);
+// 	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+// 	zbx_vector_ptr_create(&view);
 
-	preprocessor_get_items_view(manager, &items, &view);
+// 	preprocessor_get_items_view(manager, &items, &view);
 
-	zbx_vector_ptr_sort(&view, preproc_sort_item_by_values_desc);
+// 	zbx_vector_ptr_sort(&view, preproc_sort_item_by_values_desc);
 
-	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view.values,
-			MIN(limit, view.values_num));
-	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_TOP_ITEMS_RESULT, data, data_len);
-	zbx_free(data);
+// 	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view.values,
+// 			MIN(limit, view.values_num));
+// 	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_TOP_ITEMS_RESULT, data, data_len);
+// 	zbx_free(data);
 
-	zbx_vector_ptr_destroy(&view);
-	zbx_hashset_destroy(&items);
+// 	zbx_vector_ptr_destroy(&view);
+// 	zbx_hashset_destroy(&items);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
-static void	preprocessor_get_oldest_preproc_items(zbx_preprocessing_manager_t *manager, zbx_ipc_client_t *client,
-		zbx_ipc_message_t *message)
-{
-	int			limit, i;
-	unsigned char		*data;
-	zbx_uint32_t		data_len;
-	zbx_hashset_t		items;
-	zbx_vector_ptr_t	view, view_preproc;
+// static void	preprocessor_get_oldest_preproc_items(zbx_preprocessing_manager_t *manager, zbx_ipc_client_t *client,
+// 		zbx_ipc_message_t *message)
+// {
+// 	int			limit, i;
+// 	unsigned char		*data;
+// 	zbx_uint32_t		data_len;
+// 	zbx_hashset_t		items;
+// 	zbx_vector_ptr_t	view, view_preproc;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_preprocessor_unpack_top_request(&limit, message->data);
+// 	zbx_preprocessor_unpack_top_request(&limit, message->data);
 
-	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-	zbx_vector_ptr_create(&view);
-	zbx_vector_ptr_create(&view_preproc);
-	zbx_vector_ptr_reserve(&view_preproc, (size_t)limit);
+// 	zbx_hashset_create(&items, 1024, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+// 	zbx_vector_ptr_create(&view);
+// 	zbx_vector_ptr_create(&view_preproc);
+// 	zbx_vector_ptr_reserve(&view_preproc, (size_t)limit);
 
-	preprocessor_get_items_view(manager, &items, &view);
+// 	preprocessor_get_items_view(manager, &items, &view);
 
-	for (i = 0; i < view.values_num && 0 < limit; i++)
-	{
-		zbx_preproc_item_stats_t	*item;
+// 	for (i = 0; i < view.values_num && 0 < limit; i++)
+// 	{
+// 		zbx_preproc_item_stats_t	*item;
 
-		item = (zbx_preproc_item_stats_t *)view.values[i];
+// 		item = (zbx_preproc_item_stats_t *)view.values[i];
 
-		/* only items with preprocessing can slow down queue */
-		if (0 == item->steps_num)
-			continue;
+// 		/* only items with preprocessing can slow down queue */
+// 		if (0 == item->steps_num)
+// 			continue;
 
-		zbx_vector_ptr_append(&view_preproc, item);
-		limit--;
-	}
+// 		zbx_vector_ptr_append(&view_preproc, item);
+// 		limit--;
+// 	}
 
-	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view_preproc.values,
-			MIN(limit, view_preproc.values_num));
-	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_TOP_ITEMS_RESULT, data, data_len);
-	zbx_free(data);
+// 	data_len = zbx_preprocessor_pack_top_items_result(&data, (zbx_preproc_item_stats_t **)view_preproc.values,
+// 			MIN(limit, view_preproc.values_num));
+// 	zbx_ipc_client_send(client, ZBX_IPC_PREPROCESSOR_TOP_ITEMS_RESULT, data, data_len);
+// 	zbx_free(data);
 
-	zbx_vector_ptr_destroy(&view_preproc);
-	zbx_vector_ptr_destroy(&view);
-	zbx_hashset_destroy(&items);
+// 	zbx_vector_ptr_destroy(&view_preproc);
+// 	zbx_vector_ptr_destroy(&view);
+// 	zbx_hashset_destroy(&items);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 static zbx_hash_t	preproc_item_link_hash(const void *d)
 {
@@ -2233,12 +2233,12 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 				case ZBX_IPC_PREPROCESSOR_DIAG_STATS:
 					preprocessor_get_diag_stats(&manager, client);
 					break;
-				case ZBX_IPC_PREPROCESSOR_TOP_ITEMS:
-					preprocessor_get_top_items(&manager, client, message);
-					break;
-				case ZBX_IPC_PREPROCESSOR_TOP_OLDEST_PREPROC_ITEMS:
-					preprocessor_get_oldest_preproc_items(&manager, client, message);
-					break;
+				// case ZBX_IPC_PREPROCESSOR_TOP_ITEMS:
+				// 	preprocessor_get_top_items(&manager, client, message);
+				// 	break;
+				// case ZBX_IPC_PREPROCESSOR_TOP_OLDEST_PREPROC_ITEMS:
+				// 	preprocessor_get_oldest_preproc_items(&manager, client, message);
+				// 	break;
 			}
 
 			zbx_ipc_message_free(message);
@@ -2249,7 +2249,7 @@ ZBX_THREAD_ENTRY(preprocessing_manager_thread, args)
 
 		if (0 == manager.preproc_num || 1 < time_now - time_flush)
 		{
-			dc_flush_history();
+			//dc_flush_history();
 			time_flush = time_now;
 		}
 	}

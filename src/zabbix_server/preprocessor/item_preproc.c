@@ -1833,17 +1833,7 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 
 	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
 	{
-
-		AGENT_RESULT result = {0};
-
-		zbx_init_agent_result(&result);
-
-		SET_STR_RESULT(&result, zbx_strdup(NULL, value->data.str));
-		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", host_item_ids.first, host_item_ids.second);
-
-		zbx_preprocess_item_value(host_item_ids.first, host_item_ids.second, ITEM_VALUE_TYPE_TEXT, 0,
-								  &result, ts, ITEM_STATE_NORMAL, NULL);
-		zbx_free_agent_result(&result);
+		preprocess_str(host_item_ids.first, host_item_ids.second, ts, value->data.str);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
@@ -1882,7 +1872,7 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 		return SUCCEED;
 	}
 
-	//ip often comes with port, so ignore evth after semicolon
+	//ip often comes with port, so ignore everything after semicolon
 	char *semicolon = NULL;
 
 	if (NULL != (semicolon = strchr(ip_str, ':'))) {
@@ -1895,20 +1885,10 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 		return SUCCEED;
 	}
 
-
 	if (SUCCEED == DCconfig_get_itemid_by_item_key_hostid(hostid, key, &new_itemid))
 	{
 
-		AGENT_RESULT result = {0};
-
-		zbx_init_agent_result(&result);
-
-		SET_STR_RESULT(&result, zbx_strdup(NULL, value->data.str));
-		DEBUG_ITEM(itemid, "Found new hostid %lld, itemid %lld", hostid, new_itemid);
-
-		zbx_preprocess_item_value(hostid, new_itemid, ITEM_VALUE_TYPE_TEXT, 0,
-								  &result, ts, ITEM_STATE_NORMAL, NULL);
-		zbx_free_agent_result(&result);
+		preprocess_str(hostid, new_itemid, ts, value->data.str);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
@@ -1925,11 +1905,15 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 											   zbx_variant_t *history_value, zbx_timespec_t *history_ts, char value_type, char **errmsg)
 {
 	static unsigned char init_done = 0;
-	const char *ready_data = NULL;
+	char *response = NULL;
 	struct zbx_json_parse jp;
-
+	static preproc_discovery_agg_conf_t* conf = NULL;
+	
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
 
+	if (NULL == conf)
+		conf = preproc_discovery_agg_init();
+	
 	if (FAIL == zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
 
@@ -1939,26 +1923,16 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 		return SUCCEED;
 	}
 
-	// TODO: move to worker init section
-	if (!init_done)
-	{
-		//		json_discovery_init();
-		init_done = 1;
-	}
-	HALT_HERE("Not implemented yet");
+	//int timeout = strtol(params, 0, 10);
+	//DEBUG_ITEM(itemid, "Discovery timeout is %d", timeout);
 
-	int timeout = strtol(params, 0, 10);
-	DEBUG_ITEM(itemid, "Discovery timeout is %d", timeout);
-
-	json_discovery_add_data(itemid, (char *)value->data.str);
-
-	if (NULL != (ready_data = json_discovery_get_data(itemid, timeout)))
-	{
-		zbx_variant_set_str(value, (char *)ready_data);
-		return SUCCEED;
-	}
-
-	zbx_variant_set_none(value);
+	preproc_discovery_account_json(conf,itemid, value->data.str, &response);
+	
+	zbx_variant_clear(value);
+	
+	if (NULL != response)
+		zbx_variant_set_str(value, (char *)response);
+	
 	return SUCCEED;
 }
 
@@ -2000,30 +1974,16 @@ static int item_preproc_json_filter(u_int64_t itemid, zbx_variant_t *value, cons
 		zbx_json_type_t type;
 
 		DEBUG_ITEM(itemid, "Processing field %s", field_name);
-		field_name = strtok(NULL, ";");
+		field_name = strtok(NULL, ",");
 
 		if (SUCCEED == zbx_json_value_by_name(&jp, field_name, field_value, MAX_STRING_LEN, &type))
-		{
 			zbx_json_addstring(new_json, field_name, field_value, type);
-		}
+		
 	}
-
+	zbx_variant_clear(value);
 	zbx_variant_set_str(value, new_json->buffer);
+
 	zbx_json_free(new_json);
-
-	const char *filtered_json, *discovery_data;
-	HALT_HERE("Not implemented yet, waiting for managerless workers release");
-
-	// if (NULL == (filtered_json = json_discovery_filter_fields(&jp, json_fields)))  {
-	// 	DEBUG_ITEM(itemid,"No data after fields '%s', filtering '%s'", json_fields, value->data.str);
-	// 	return SUCCEED;
-	// }
-
-	// json_discovery_register_data(filtered_json);
-
-	// if (NULL != (discovery_data = json_discovery_get_new_data())) {
-	// 	zbx_variant_set_str(value, (char *)filtered_json);
-	// }
 
 	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }

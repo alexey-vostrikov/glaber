@@ -1778,6 +1778,18 @@ function get_preprocessing_types($type = null, $grouped = true, array $supported
 			'group' => _('Dispatch'),
 			'name' => _('Dispatch by IP from JSON')
 		],
+		GLB_PREPROC_LOCAL_DISPATCH => [
+			'group' => _('Dispatch'),
+			'name' => _('Dispatch within host by JSON')
+		],
+		GLB_PREPROC_JSON_FILTER => [
+			'group' => _('Structured data'),
+			'name' => _('JSON fields filter')
+		],
+		GLB_PREPROC_DISCOVERY_PREPARE => [
+			'group' => _('Aggregation'),
+			'name' => _('Discovery aggregation')
+		],
 		ZBX_PREPROC_REGSUB => [
 			'group' => _('Text'),
 			'name' => _('Regular expression')
@@ -2168,6 +2180,9 @@ function normalizeItemPreprocessingSteps(array $preprocessing): array {
 			
 			case GLB_PREPROC_DISPATCH_ITEM:
 			case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
+			case GLB_PREPROC_LOCAL_DISPATCH:
+			case GLB_PREPROC_JSON_FILTER:
+			case GLB_PREPROC_DISCOVERY_PREPARE:
 			case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
 				$step['params'] = implode("\n", $step['params']);
 				break;

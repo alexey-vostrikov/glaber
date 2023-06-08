@@ -103,18 +103,18 @@ static int pinger_process_response(poller_item_t *poller_item, int rtt) {
 }
 
 
-static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error, u_int64_t mstime) {
+static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error) {
     u_int64_t value_uint64;
     double value_dbl;
-    AGENT_RESULT result;
+    //AGENT_RESULT result;
     
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
     poller_disable_event(pinger_item->timeout_event);
     
-    zbx_init_agent_result(&result);
+  //  zbx_init_agent_result(&result);
         
-    LOG_DBG("In %s: Starting, itemid is %ld, status is %d, error is '%s', mstime is %ld", __func__,
-                poller_get_item_id(poller_item), status, error, mstime);
+    LOG_DBG("In %s: Starting, itemid is %ld, status is %d, error is '%s'", __func__,
+                poller_get_item_id(poller_item), status, error);
       
     switch (status) {
         case SUCCEED: {
@@ -124,11 +124,8 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
 			{
 				case ICMPPING:
 					value_uint64 = (0 != pinger_item->rcv ? 1 : 0);
-                    SET_UI64_RESULT(&result, value_uint64);
-                
-                    poller_preprocess_value(poller_item, &result , mstime, ITEM_STATE_NORMAL, NULL);
-
-					break;
+                    poller_preprocess_uint64(poller_item, NULL, value_uint64);
+                    break;
 				case ICMPPINGSEC:
 					switch (pinger_item->type)
 					{
@@ -142,21 +139,15 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
 							value_dbl = (0 != pinger_item->rcv ? pinger_item->sum / pinger_item->rcv : 0);
 							break;
 					}
-                    //glbmap returns value in milliseconds
-                    //but zabbix expects seconds
                     value_dbl = value_dbl/1000;
 
 					if (0 < value_dbl && PINGER_FLOAT_PRECISION > value_dbl)
-						value_dbl = PINGER_FLOAT_PRECISION;
-                        SET_DBL_RESULT(&result, value_dbl);
-                        //zabbix_log(LOG_LEVEL_DEBUG,"For item %ld submitting  min/max/avg value %f",poller_item->itemid,value_dbl);
-                        poller_preprocess_value(poller_item, &result , mstime, ITEM_STATE_NORMAL, NULL);
+                        value_dbl = PINGER_FLOAT_PRECISION;
+                    poller_preprocess_dbl(poller_item, NULL, value_dbl);
 				    break;
 				case ICMPPINGLOSS:
 					value_dbl = (100 * (pinger_item->count - pinger_item->rcv)) / (double)pinger_item->count;
-					    SET_DBL_RESULT(&result, value_dbl);
-                        //zabbix_log(LOG_LEVEL_DEBUG,"For item %ld submitting loss value %f",poller_item->itemid,value_dbl);
-                        poller_preprocess_value(poller_item, &result , mstime, ITEM_STATE_NORMAL, NULL);
+					poller_preprocess_dbl(poller_item, NULL, value_dbl);
 					break;
                 default: 
                     zabbix_log(LOG_LEVEL_WARNING,"Inknown ICMP processing type %d for item %ld - this is a programming BUG",
@@ -165,11 +156,11 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
                     exit(-1);
 			}
 
-            zbx_free_agent_result(&result);
+      //      zbx_free_agent_result(&result);
             break;
          }
         default:
-            poller_preprocess_value(poller_item, NULL, mstime, ITEM_STATE_NOTSUPPORTED, error);
+            poller_preprocess_error(poller_item, error);
             break;
     }
     
@@ -189,7 +180,9 @@ ITEMS_ITERATOR(process_item_by_ip_cb) {
     //checking if the item has matched ip 
     char *ip = data;
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
+//    zbx_timespec_t ts;
     u_int32_t rtt;
+
 
     if ( NULL == pinger_item->ip || 0 != strcmp(pinger_item->ip,ip)) 
         return POLLER_ITERATOR_CONTINUE;
@@ -206,7 +199,7 @@ ITEMS_ITERATOR(process_item_by_ip_cb) {
 
         DEBUG_ITEM(poller_get_item_id(poller_item), "Got the final packet for the item with broken echo data");
         poller_inc_responses();
-        finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
+        finish_icmp_poll(poller_item, SUCCEED, NULL);
                     
         pinger_item->state = POLL_QUEUED; 
         poller_return_item_to_queue(poller_item);
@@ -218,7 +211,7 @@ ITEMS_ITERATOR(process_item_by_ip_cb) {
 static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     char *worker_response = NULL;
     zbx_json_type_t type;
-    u_int64_t mstime = glb_ms_time();
+    //u_int64_t mstime = glb_ms_time();
     
     //LOG_INF("In %s: start", __func__);
        
@@ -280,7 +273,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
             DEBUG_ITEM(poller_get_item_id(poller_item), "Got the final packet for the item");
  
             poller_inc_responses();
-            finish_icmp_poll(poller_item, SUCCEED, NULL, mstime);
+            finish_icmp_poll(poller_item, SUCCEED, NULL);
                     
            //theese are two different things, need to set both
             pinger_item->state = POLL_QUEUED; 
@@ -312,7 +305,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     char request[MAX_STRING_LEN];
     static int last_worker_pid = 0;
 
-    u_int64_t now = glb_ms_time();
+    //u_int64_t now = glb_ms_time();
     LOG_DBG("In %s() Started", __func__);
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
   
@@ -325,7 +318,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     if (SUCCEED != glb_worker_send_request(conf.worker, request) ) {
         //sending config error status for the item
         DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't send request for ping: %s",request);
-        finish_icmp_poll(poller_item, CONFIG_ERROR ,"Couldn't start or pass request to glbmap", now);
+        finish_icmp_poll(poller_item, CONFIG_ERROR ,"Couldn't start or pass request to glbmap");
         return FAIL;
     }
    
@@ -344,7 +337,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
 
 void send_timeout_cb(poller_item_t *poller_item, void *data) {
     DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
-    finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
+    finish_icmp_poll(poller_item, SUCCEED, NULL);
     poller_register_item_timeout(poller_item);
 }
 
@@ -518,11 +511,11 @@ static void resolve_fail_callback(poller_item_t *poller_item) {
         pinger_item->sent = pinger_item->count;
         pinger_item->rcv = 0;
 
-        finish_icmp_poll(poller_item, SUCCEED, NULL, glb_ms_time());
+        finish_icmp_poll(poller_item, SUCCEED, NULL);
         return;
     } 
     
-    finish_icmp_poll(poller_item, FAIL, "Failed to resolve host name", glb_ms_time());
+    finish_icmp_poll(poller_item, FAIL, "Failed to resolve host name");
 }
 
 /******************************************************************************

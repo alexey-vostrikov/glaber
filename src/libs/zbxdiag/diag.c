@@ -417,92 +417,94 @@ int	zbx_diag_add_preproc_info(const struct zbx_json_parse *jp, struct zbx_json *
 					{NULL, 0}
 					};
 
-	zbx_vector_ptr_create(&tops);
+	HALT_HERE("Implement Glaber - specific preprocessing diognostics");
 
-	if (SUCCEED == (ret = zbx_diag_parse_request(jp, field_map, &fields, &tops, error)))
-	{
-		zbx_json_addobject(json, ZBX_DIAG_PREPROCESSING);
+// 	zbx_vector_ptr_create(&tops);
 
-		if (0 != (fields & ZBX_DIAG_PREPROC_SIMPLE))
-		{
-			int	total, queued, processing, done, pending;
+// 	if (SUCCEED == (ret = zbx_diag_parse_request(jp, field_map, &fields, &tops, error)))
+// 	{
+// 		zbx_json_addobject(json, ZBX_DIAG_PREPROCESSING);
 
-			time1 = zbx_time();
-			if (FAIL == (ret = zbx_preprocessor_get_diag_stats(&total, &queued, &processing, &done,
-					&pending, error)))
-			{
-				goto out;
-			}
+// 		if (0 != (fields & ZBX_DIAG_PREPROC_SIMPLE))
+// 		{
+// 			int	total, queued, processing, done, pending;
 
-			time2 = zbx_time();
-			time_total += time2 - time1;
+// 			time1 = zbx_time();
+// 			if (FAIL == (ret = zbx_preprocessor_get_diag_stats(&total, &queued, &processing, &done,
+// 					&pending, error)))
+// 			{
+// 				goto out;
+// 			}
 
-			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES))
-			{
-				zbx_json_addint64(json, "values", total);
-				zbx_json_addint64(json, "done", done);
-			}
-			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES_PREPROC))
-			{
-				zbx_json_addint64(json, "queued", queued);
-				zbx_json_addint64(json, "processing", processing);
-				zbx_json_addint64(json, "pending", pending);
-			}
-		}
+// 			time2 = zbx_time();
+// 			time_total += time2 - time1;
 
-		if (0 != tops.values_num)
-		{
-			int	i;
+// 			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES))
+// 			{
+// 				zbx_json_addint64(json, "values", total);
+// 				zbx_json_addint64(json, "done", done);
+// 			}
+// 			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES_PREPROC))
+// 			{
+// 				zbx_json_addint64(json, "queued", queued);
+// 				zbx_json_addint64(json, "processing", processing);
+// 				zbx_json_addint64(json, "pending", pending);
+// 			}
+// 		}
 
-			zbx_json_addobject(json, "top");
+// 		if (0 != tops.values_num)
+// 		{
+// 			int	i;
 
-			for (i = 0; i < tops.values_num; i++)
-			{
-				zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
+// 			zbx_json_addobject(json, "top");
 
-				if (0 == strcmp(map->name, "values") || 0 == strcmp(map->name, "oldest.preproc.values"))
-				{
-					zbx_vector_ptr_t	items;
+// 			for (i = 0; i < tops.values_num; i++)
+// 			{
+// 				zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
 
-					zbx_vector_ptr_create(&items);
-					time1 = zbx_time();
-					if (0 == strcmp(map->name, "values"))
-						ret = zbx_preprocessor_get_top_items(map->value, &items, error);
-					else
-						ret = zbx_preprocessor_get_top_oldest_preproc_items(map->value, &items,
-								error);
+// 				if (0 == strcmp(map->name, "values") || 0 == strcmp(map->name, "oldest.preproc.values"))
+// 				{
+// 					zbx_vector_ptr_t	items;
 
-					if (FAIL == ret)
-					{
-						zbx_vector_ptr_destroy(&items);
-						goto out;
-					}
-					time2 = zbx_time();
-					time_total += time2 - time1;
+// 					zbx_vector_ptr_create(&items);
+// 					time1 = zbx_time();
+// 					if (0 == strcmp(map->name, "values"))
+// 						ret = zbx_preprocessor_get_top_items(map->value, &items, error);
+// 					else
+// 						ret = zbx_preprocessor_get_top_oldest_preproc_items(map->value, &items,
+// 								error);
 
-					diag_add_preproc_items(json, map->name, &items);
-					zbx_vector_ptr_clear_ext(&items, zbx_ptr_free);
-					zbx_vector_ptr_destroy(&items);
-				}
-				else
-				{
-					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
-					ret = FAIL;
-					goto out;
-				}
-			}
+// 					if (FAIL == ret)
+// 					{
+// 						zbx_vector_ptr_destroy(&items);
+// 						goto out;
+// 					}
+// 					time2 = zbx_time();
+// 					time_total += time2 - time1;
 
-			zbx_json_close(json);
-		}
+// 					diag_add_preproc_items(json, map->name, &items);
+// 					zbx_vector_ptr_clear_ext(&items, zbx_ptr_free);
+// 					zbx_vector_ptr_destroy(&items);
+// 				}
+// 				else
+// 				{
+// 					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
+// 					ret = FAIL;
+// 					goto out;
+// 				}
+// 			}
 
-		zbx_json_addfloat(json, "time", time_total);
-		zbx_json_close(json);
-	}
-out:
-	zbx_vector_ptr_clear_ext(&tops, (zbx_ptr_free_func_t)zbx_diag_map_free);
-	zbx_vector_ptr_destroy(&tops);
+// 			zbx_json_close(json);
+// 		}
 
-	return ret;
+// 		zbx_json_addfloat(json, "time", time_total);
+// 		zbx_json_close(json);
+// 	}
+// out:
+// 	zbx_vector_ptr_clear_ext(&tops, (zbx_ptr_free_func_t)zbx_diag_map_free);
+// 	zbx_vector_ptr_destroy(&tops);
+
+	return FAIL;
 }
 
 static void	zbx_json_addhex(struct zbx_json *j, const char *name, zbx_uint64_t value)

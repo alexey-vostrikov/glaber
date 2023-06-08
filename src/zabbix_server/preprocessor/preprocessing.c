@@ -685,126 +685,126 @@ zbx_uint32_t	zbx_preprocessor_pack_result(unsigned char **data, zbx_variant_t *v
  *             results_num - [IN] the number of preprocessing results         *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_free_dep_results(zbx_preproc_dep_result_t *results, int results_num)
-{
-	int	i;
+// void	zbx_preprocessor_free_dep_results(zbx_preproc_dep_result_t *results, int results_num)
+// {
+// 	int	i;
 
-	for (i = 0; i < results_num; i++)
-	{
-		zbx_free_agent_result(&results[i].value);
-		zbx_free(results[i].error);
-		zbx_vector_ptr_clear_ext(&results[i].history, (zbx_clean_func_t)zbx_preproc_op_history_free);
-		zbx_vector_ptr_destroy(&results[i].history);
-	}
+// 	for (i = 0; i < results_num; i++)
+// 	{
+// 		zbx_free_agent_result(&results[i].value);
+// 		zbx_free(results[i].error);
+// 		zbx_vector_ptr_clear_ext(&results[i].history, (zbx_clean_func_t)zbx_preproc_op_history_free);
+// 		zbx_vector_ptr_destroy(&results[i].history);
+// 	}
 
-	zbx_free(results);
-}
+// 	zbx_free(results);
+// }
 
-void	zbx_preprocessor_result_init(zbx_preproc_result_buffer_t *buf, int total_num)
-{
-	if (ZBX_PREPROC_MAX_PACKET_SIZE < (buf->data_alloc = (zbx_uint32_t)total_num * 64))
-		buf->data_alloc = ZBX_PREPROC_MAX_PACKET_SIZE;
+// void	zbx_preprocessor_result_init(zbx_preproc_result_buffer_t *buf, int total_num)
+// {
+// 	if (ZBX_PREPROC_MAX_PACKET_SIZE < (buf->data_alloc = (zbx_uint32_t)total_num * 64))
+// 		buf->data_alloc = ZBX_PREPROC_MAX_PACKET_SIZE;
 
-	buf->data = (unsigned char *)zbx_malloc(NULL, buf->data_alloc);
-	buf->data_offset = zbx_serialize_value(buf->data, total_num);
-	/* reserve space for number of results in batch */
-	buf->data_offset += (zbx_uint32_t)sizeof(int);
+// 	buf->data = (unsigned char *)zbx_malloc(NULL, buf->data_alloc);
+// 	buf->data_offset = zbx_serialize_value(buf->data, total_num);
+// 	/* reserve space for number of results in batch */
+// 	buf->data_offset += (zbx_uint32_t)sizeof(int);
 
-	/* reserve fields for result + one history record */
-	buf->fields_num = 12;
-	buf->fields = (zbx_packed_field_t *)zbx_malloc(NULL, (size_t)buf->fields_num * sizeof(zbx_packed_field_t));
+// 	/* reserve fields for result + one history record */
+// 	buf->fields_num = 12;
+// 	buf->fields = (zbx_packed_field_t *)zbx_malloc(NULL, (size_t)buf->fields_num * sizeof(zbx_packed_field_t));
 
-	buf->results_num = 0;
-	buf->code = ZBX_IPC_PREPROCESSOR_DEP_RESULT;
-}
+// 	buf->results_num = 0;
+// 	buf->code = ZBX_IPC_PREPROCESSOR_DEP_RESULT;
+// }
 
-void	zbx_preprocessor_result_clear(zbx_preproc_result_buffer_t *buf)
-{
-	zbx_free(buf->data);
-	zbx_free(buf->fields);
-}
+// void	zbx_preprocessor_result_clear(zbx_preproc_result_buffer_t *buf)
+// {
+// 	zbx_free(buf->data);
+// 	zbx_free(buf->fields);
+// }
 
-void	zbx_preprocessor_result_flush(zbx_preproc_result_buffer_t *buf, zbx_ipc_socket_t *socket)
-{
-	unsigned char	*batch_ptr;
+// void	zbx_preprocessor_result_flush(zbx_preproc_result_buffer_t *buf, zbx_ipc_socket_t *socket)
+// {
+// 	unsigned char	*batch_ptr;
 
-	if (0 == buf->results_num)
-		return;
+// 	if (0 == buf->results_num)
+// 		return;
 
-	batch_ptr = buf->data;
+// 	batch_ptr = buf->data;
 
-	if (ZBX_IPC_PREPROCESSOR_DEP_RESULT == buf->code)
-		batch_ptr += sizeof(int);
+// 	if (ZBX_IPC_PREPROCESSOR_DEP_RESULT == buf->code)
+// 		batch_ptr += sizeof(int);
 
-	(void)zbx_serialize_value(batch_ptr, buf->results_num);
+// 	(void)zbx_serialize_value(batch_ptr, buf->results_num);
 
-	if (FAIL == zbx_ipc_socket_write(socket, buf->code, buf->data, buf->data_offset))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot send preprocessing result");
-		exit(EXIT_FAILURE);
-	}
-}
+// 	if (FAIL == zbx_ipc_socket_write(socket, buf->code, buf->data, buf->data_offset))
+// 	{
+// 		zabbix_log(LOG_LEVEL_CRIT, "cannot send preprocessing result");
+// 		exit(EXIT_FAILURE);
+// 	}
+// }
 
-void	zbx_preprocessor_result_append(zbx_preproc_result_buffer_t *buf, zbx_uint64_t itemid, unsigned char flags,
-		unsigned char value_type, const zbx_variant_t *value, const char *error,
-		const zbx_vector_ptr_t *history, zbx_ipc_socket_t *socket)
-{
-	zbx_uint32_t		result_size;
-	int			fields_num;
-	zbx_packed_field_t	*offset;
+// void	zbx_preprocessor_result_append(zbx_preproc_result_buffer_t *buf, zbx_uint64_t itemid, unsigned char flags,
+// 		unsigned char value_type, const zbx_variant_t *value, const char *error,
+// 		const zbx_vector_ptr_t *history, zbx_ipc_socket_t *socket)
+// {
+// 	zbx_uint32_t		result_size;
+// 	int			fields_num;
+// 	zbx_packed_field_t	*offset;
 
-	fields_num = 7; /* itemid + flags + value_type + value(variant) + error + history_num */
-	fields_num += 5 * history->values_num;
+// 	fields_num = 7; /* itemid + flags + value_type + value(variant) + error + history_num */
+// 	fields_num += 5 * history->values_num;
 
-	if (fields_num > buf->fields_num)
-	{
-		buf->fields = (zbx_packed_field_t *)zbx_realloc(buf->fields,
-				(size_t)fields_num * sizeof(zbx_packed_field_t));
-		buf->fields_num = fields_num;
-	}
+// 	if (fields_num > buf->fields_num)
+// 	{
+// 		buf->fields = (zbx_packed_field_t *)zbx_realloc(buf->fields,
+// 				(size_t)fields_num * sizeof(zbx_packed_field_t));
+// 		buf->fields_num = fields_num;
+// 	}
 
-	offset = buf->fields;
-	*offset++ = PACKED_FIELD(&itemid, sizeof(zbx_uint64_t));
-	*offset++ = PACKED_FIELD(&flags, sizeof(unsigned char));
-	*offset++ = PACKED_FIELD(&value_type, sizeof(unsigned char));
-	offset += preprocessor_pack_variant(offset, value);
-	*offset++ = PACKED_FIELD(error, 0);
-	offset += preprocessor_pack_history(offset, history, &history->values_num);
+// 	offset = buf->fields;
+// 	*offset++ = PACKED_FIELD(&itemid, sizeof(zbx_uint64_t));
+// 	*offset++ = PACKED_FIELD(&flags, sizeof(unsigned char));
+// 	*offset++ = PACKED_FIELD(&value_type, sizeof(unsigned char));
+// 	offset += preprocessor_pack_variant(offset, value);
+// 	*offset++ = PACKED_FIELD(error, 0);
+// 	offset += preprocessor_pack_history(offset, history, &history->values_num);
 
-	result_size = fields_calc_size(buf->fields, (int)(offset - buf->fields));
+// 	result_size = fields_calc_size(buf->fields, (int)(offset - buf->fields));
 
-	if (ZBX_PREPROC_MAX_PACKET_SIZE - sizeof(int) < result_size)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "preprocessing result with size %u for item \"" ZBX_FS_UI64 "\" is too large",
-				result_size, itemid);
-		exit(EXIT_FAILURE);
-	}
+// 	if (ZBX_PREPROC_MAX_PACKET_SIZE - sizeof(int) < result_size)
+// 	{
+// 		zabbix_log(LOG_LEVEL_CRIT, "preprocessing result with size %u for item \"" ZBX_FS_UI64 "\" is too large",
+// 				result_size, itemid);
+// 		exit(EXIT_FAILURE);
+// 	}
 
-	if (ZBX_PREPROC_MAX_PACKET_SIZE - result_size < buf->data_offset)
-	{
-		zbx_preprocessor_result_flush(buf, socket);
-		buf->code = ZBX_IPC_PREPROCESSOR_DEP_RESULT_CONT;
-		/* reserve space for number of results in batch */
-		buf->data_offset = sizeof(int);
-		buf->results_num = 0;
-	}
+// 	if (ZBX_PREPROC_MAX_PACKET_SIZE - result_size < buf->data_offset)
+// 	{
+// 		zbx_preprocessor_result_flush(buf, socket);
+// 		buf->code = ZBX_IPC_PREPROCESSOR_DEP_RESULT_CONT;
+// 		/* reserve space for number of results in batch */
+// 		buf->data_offset = sizeof(int);
+// 		buf->results_num = 0;
+// 	}
 
-	if (buf->data_offset + result_size > buf->data_alloc)
-	{
-		while (buf->data_offset + result_size > buf->data_alloc)
-		{
-			if (ZBX_PREPROC_MAX_PACKET_SIZE / 2 < buf->data_alloc)
-				buf->data_alloc = ZBX_PREPROC_MAX_PACKET_SIZE;
-			else
-				buf->data_alloc *= 2;
-		}
+// 	if (buf->data_offset + result_size > buf->data_alloc)
+// 	{
+// 		while (buf->data_offset + result_size > buf->data_alloc)
+// 		{
+// 			if (ZBX_PREPROC_MAX_PACKET_SIZE / 2 < buf->data_alloc)
+// 				buf->data_alloc = ZBX_PREPROC_MAX_PACKET_SIZE;
+// 			else
+// 				buf->data_alloc *= 2;
+// 		}
 
-		buf->data = (unsigned char *)zbx_realloc(buf->data, buf->data_alloc);
-	}
+// 		buf->data = (unsigned char *)zbx_realloc(buf->data, buf->data_alloc);
+// 	}
 
-	buf->data_offset += fields_pack(buf->fields, (int)(offset - buf->fields), buf->data + buf->data_offset);
-	buf->results_num++;
-}
+// 	buf->data_offset += fields_pack(buf->fields, (int)(offset - buf->fields), buf->data + buf->data_offset);
+// 	buf->results_num++;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -821,41 +821,41 @@ void	zbx_preprocessor_result_append(zbx_preproc_result_buffer_t *buf, zbx_uint64
  * Return value: size of packed data                                          *
  *                                                                            *
  ******************************************************************************/
-zbx_uint32_t	zbx_preprocessor_pack_test_result(unsigned char **data, const zbx_preproc_result_t *results,
-		int results_num, const zbx_vector_ptr_t *history, const char *error)
-{
-	zbx_packed_field_t	*offset, *fields;
-	zbx_uint32_t		size;
-	zbx_ipc_message_t	message;
-	int			i, history_num;
+// zbx_uint32_t	zbx_preprocessor_pack_test_result(unsigned char **data, const zbx_preproc_result_t *results,
+// 		int results_num, const zbx_vector_ptr_t *history, const char *error)
+// {
+// 	zbx_packed_field_t	*offset, *fields;
+// 	zbx_uint32_t		size;
+// 	zbx_ipc_message_t	message;
+// 	int			i, history_num;
 
-	history_num = history->values_num;
+// 	history_num = history->values_num;
 
-	fields = (zbx_packed_field_t *)zbx_malloc(NULL, (size_t)(3 + history_num * 5 + results_num * 4) *
-			sizeof(zbx_packed_field_t));
-	offset = fields;
+// 	fields = (zbx_packed_field_t *)zbx_malloc(NULL, (size_t)(3 + history_num * 5 + results_num * 4) *
+// 			sizeof(zbx_packed_field_t));
+// 	offset = fields;
 
-	*offset++ = PACKED_FIELD(&results_num, sizeof(int));
+// 	*offset++ = PACKED_FIELD(&results_num, sizeof(int));
 
-	for (i = 0; i < results_num; i++)
-	{
-		offset += preprocessor_pack_variant(offset, &results[i].value);
-		*offset++ = PACKED_FIELD(results[i].error, 0);
-		*offset++ = PACKED_FIELD(&results[i].action, sizeof(unsigned char));
-	}
+// 	for (i = 0; i < results_num; i++)
+// 	{
+// 		offset += preprocessor_pack_variant(offset, &results[i].value);
+// 		*offset++ = PACKED_FIELD(results[i].error, 0);
+// 		*offset++ = PACKED_FIELD(&results[i].action, sizeof(unsigned char));
+// 	}
 
-	offset += preprocessor_pack_history(offset, history, &history_num);
+// 	offset += preprocessor_pack_history(offset, history, &history_num);
 
-	*offset++ = PACKED_FIELD(error, 0);
+// 	*offset++ = PACKED_FIELD(error, 0);
 
-	zbx_ipc_message_init(&message);
-	size = message_pack_data(&message, fields, offset - fields);
-	*data = message.data;
+// 	zbx_ipc_message_init(&message);
+// 	size = message_pack_data(&message, fields, offset - fields);
+// 	*data = message.data;
 
-	zbx_free(fields);
+// 	zbx_free(fields);
 
-	return size;
-}
+// 	return size;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -876,29 +876,29 @@ zbx_uint32_t	zbx_preprocessor_pack_test_result(unsigned char **data, const zbx_p
  *             data       - [IN] IPC data buffer                              *
  *                                                                            *
  ******************************************************************************/
-zbx_uint32_t	zbx_preprocessor_pack_diag_stats(unsigned char **data, int total, int queued, int processing, int done,
-		int pending)
-{
-	unsigned char	*ptr;
-	zbx_uint32_t	data_len = 0;
+// zbx_uint32_t	zbx_preprocessor_pack_diag_stats(unsigned char **data, int total, int queued, int processing, int done,
+// 		int pending)
+// {
+// 	unsigned char	*ptr;
+// 	zbx_uint32_t	data_len = 0;
 
-	zbx_serialize_prepare_value(data_len, total);
-	zbx_serialize_prepare_value(data_len, queued);
-	zbx_serialize_prepare_value(data_len, processing);
-	zbx_serialize_prepare_value(data_len, done);
-	zbx_serialize_prepare_value(data_len, pending);
+// 	zbx_serialize_prepare_value(data_len, total);
+// 	zbx_serialize_prepare_value(data_len, queued);
+// 	zbx_serialize_prepare_value(data_len, processing);
+// 	zbx_serialize_prepare_value(data_len, done);
+// 	zbx_serialize_prepare_value(data_len, pending);
 
-	*data = (unsigned char *)zbx_malloc(NULL, data_len);
+// 	*data = (unsigned char *)zbx_malloc(NULL, data_len);
 
-	ptr = *data;
-	ptr += zbx_serialize_value(ptr, total);
-	ptr += zbx_serialize_value(ptr, queued);
-	ptr += zbx_serialize_value(ptr, processing);
-	ptr += zbx_serialize_value(ptr, done);
-	(void)zbx_serialize_value(ptr, pending);
+// 	ptr = *data;
+// 	ptr += zbx_serialize_value(ptr, total);
+// 	ptr += zbx_serialize_value(ptr, queued);
+// 	ptr += zbx_serialize_value(ptr, processing);
+// 	ptr += zbx_serialize_value(ptr, done);
+// 	(void)zbx_serialize_value(ptr, pending);
 
-	return data_len;
-}
+// 	return data_len;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -909,16 +909,16 @@ zbx_uint32_t	zbx_preprocessor_pack_diag_stats(unsigned char **data, int total, i
  *             limit - [IN] the number of top values to return                *
  *                                                                            *
  ******************************************************************************/
-zbx_uint32_t	zbx_preprocessor_pack_top_items_request(unsigned char **data, int limit)
-{
-	zbx_uint32_t	data_len = 0;
+// zbx_uint32_t	zbx_preprocessor_pack_top_items_request(unsigned char **data, int limit)
+// {
+// 	zbx_uint32_t	data_len = 0;
 
-	zbx_serialize_prepare_value(data_len, limit);
-	*data = (unsigned char *)zbx_malloc(NULL, data_len);
-	(void)zbx_serialize_value(*data, limit);
+// 	zbx_serialize_prepare_value(data_len, limit);
+// 	*data = (unsigned char *)zbx_malloc(NULL, data_len);
+// 	(void)zbx_serialize_value(*data, limit);
 
-	return data_len;
-}
+// 	return data_len;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -929,36 +929,36 @@ zbx_uint32_t	zbx_preprocessor_pack_top_items_request(unsigned char **data, int l
  *             items_num - [IN] the number of items                           *
  *                                                                            *
  ******************************************************************************/
-zbx_uint32_t	zbx_preprocessor_pack_top_items_result(unsigned char **data, zbx_preproc_item_stats_t **items,
-		int items_num)
-{
-	unsigned char	*ptr;
-	zbx_uint32_t	data_len = 0, item_len = 0;
-	int		i;
+// zbx_uint32_t	zbx_preprocessor_pack_top_items_result(unsigned char **data, zbx_preproc_item_stats_t **items,
+// 		int items_num)
+// {
+// 	unsigned char	*ptr;
+// 	zbx_uint32_t	data_len = 0, item_len = 0;
+// 	int		i;
 
-	if (0 != items_num)
-	{
-		zbx_serialize_prepare_value(item_len, items[0]->itemid);
-		zbx_serialize_prepare_value(item_len, items[0]->values_num);
-		zbx_serialize_prepare_value(item_len, items[0]->steps_num);
-	}
+// 	if (0 != items_num)
+// 	{
+// 		zbx_serialize_prepare_value(item_len, items[0]->itemid);
+// 		zbx_serialize_prepare_value(item_len, items[0]->values_num);
+// 		zbx_serialize_prepare_value(item_len, items[0]->steps_num);
+// 	}
 
-	zbx_serialize_prepare_value(data_len, items_num);
-	data_len += item_len * (zbx_uint32_t)items_num;
-	*data = (unsigned char *)zbx_malloc(NULL, data_len);
+// 	zbx_serialize_prepare_value(data_len, items_num);
+// 	data_len += item_len * (zbx_uint32_t)items_num;
+// 	*data = (unsigned char *)zbx_malloc(NULL, data_len);
 
-	ptr = *data;
-	ptr += zbx_serialize_value(ptr, items_num);
+// 	ptr = *data;
+// 	ptr += zbx_serialize_value(ptr, items_num);
 
-	for (i = 0; i < items_num; i++)
-	{
-		ptr += zbx_serialize_value(ptr, items[i]->itemid);
-		ptr += zbx_serialize_value(ptr, items[i]->values_num);
-		ptr += zbx_serialize_value(ptr, items[i]->steps_num);
-	}
+// 	for (i = 0; i < items_num; i++)
+// 	{
+// 		ptr += zbx_serialize_value(ptr, items[i]->itemid);
+// 		ptr += zbx_serialize_value(ptr, items[i]->values_num);
+// 		ptr += zbx_serialize_value(ptr, items[i]->steps_num);
+// 	}
 
-	return data_len;
-}
+// 	return data_len;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -970,101 +970,68 @@ zbx_uint32_t	zbx_preprocessor_pack_top_items_result(unsigned char **data, zbx_pr
  * Return value: size of packed data                                          *
  *                                                                            *
  ******************************************************************************/
-zbx_uint32_t	zbx_preprocessor_unpack_value(zbx_preproc_item_value_t *value, unsigned char *data)
-{
-	zbx_uint32_t	value_len;
-	zbx_timespec_t	*timespec = NULL;
-	AGENT_RESULT	*agent_result = NULL;
-	zbx_log_t	*log = NULL;
-	unsigned char	*offset = data, ts_marker, result_marker, log_marker;
+// zbx_uint32_t	zbx_preprocessor_unpack_value(zbx_preproc_item_value_t *value, unsigned char *data)
+// {
+// 	zbx_uint32_t	value_len;
+// 	zbx_timespec_t	*timespec = NULL;
+// 	AGENT_RESULT	*agent_result = NULL;
+// 	zbx_log_t	*log = NULL;
+// 	unsigned char	*offset = data, ts_marker, result_marker, log_marker;
 
-	offset += zbx_deserialize_uint64(offset, &value->itemid);
-	offset += zbx_deserialize_uint64(offset, &value->hostid);
-	offset += zbx_deserialize_char(offset, &value->item_value_type);
-	offset += zbx_deserialize_char(offset, &value->item_flags);
-	offset += zbx_deserialize_char(offset, &value->state);
-	offset += zbx_deserialize_str(offset, &value->error, value_len);
-	//offset += zbx_deserialize_str(offset, &value->key, value_len);
-	offset += zbx_deserialize_char(offset, &ts_marker);
+// 	offset += zbx_deserialize_uint64(offset, &value->itemid);
+// 	offset += zbx_deserialize_uint64(offset, &value->hostid);
+// 	offset += zbx_deserialize_char(offset, &value->item_value_type);
+// 	offset += zbx_deserialize_char(offset, &value->item_flags);
+// 	offset += zbx_deserialize_char(offset, &value->state);
+// 	offset += zbx_deserialize_str(offset, &value->error, value_len);
+// 	//offset += zbx_deserialize_str(offset, &value->key, value_len);
+// 	offset += zbx_deserialize_char(offset, &ts_marker);
 
-	if (0 != ts_marker)
-	{
-		timespec = (zbx_timespec_t *)zbx_malloc(NULL, sizeof(zbx_timespec_t));
+// 	if (0 != ts_marker)
+// 	{
+// 		timespec = (zbx_timespec_t *)zbx_malloc(NULL, sizeof(zbx_timespec_t));
 
-		offset += zbx_deserialize_int(offset, &timespec->sec);
-		offset += zbx_deserialize_int(offset, &timespec->ns);
-	}
+// 		offset += zbx_deserialize_int(offset, &timespec->sec);
+// 		offset += zbx_deserialize_int(offset, &timespec->ns);
+// 	}
 
-	value->ts = timespec;
+// 	value->ts = timespec;
 
-	offset += zbx_deserialize_char(offset, &result_marker);
-	if (0 != result_marker)
-	{
-		agent_result = (AGENT_RESULT *)zbx_malloc(NULL, sizeof(AGENT_RESULT));
+// 	offset += zbx_deserialize_char(offset, &result_marker);
+// 	if (0 != result_marker)
+// 	{
+// 		agent_result = (AGENT_RESULT *)zbx_malloc(NULL, sizeof(AGENT_RESULT));
 
-		offset += zbx_deserialize_uint64(offset, &agent_result->lastlogsize);
-		offset += zbx_deserialize_uint64(offset, &agent_result->ui64);
-		offset += zbx_deserialize_double(offset, &agent_result->dbl);
-		offset += zbx_deserialize_str(offset, &agent_result->str, value_len);
-		offset += zbx_deserialize_str(offset, &agent_result->text, value_len);
-		offset += zbx_deserialize_str(offset, &agent_result->msg, value_len);
-		offset += zbx_deserialize_int(offset, &agent_result->type);
-		offset += zbx_deserialize_int(offset, &agent_result->mtime);
+// 		offset += zbx_deserialize_uint64(offset, &agent_result->lastlogsize);
+// 		offset += zbx_deserialize_uint64(offset, &agent_result->ui64);
+// 		offset += zbx_deserialize_double(offset, &agent_result->dbl);
+// 		offset += zbx_deserialize_str(offset, &agent_result->str, value_len);
+// 		offset += zbx_deserialize_str(offset, &agent_result->text, value_len);
+// 		offset += zbx_deserialize_str(offset, &agent_result->msg, value_len);
+// 		offset += zbx_deserialize_int(offset, &agent_result->type);
+// 		offset += zbx_deserialize_int(offset, &agent_result->mtime);
 
-		offset += zbx_deserialize_char(offset, &log_marker);
-		if (0 != log_marker)
-		{
-			log = (zbx_log_t *)zbx_malloc(NULL, sizeof(zbx_log_t));
+// 		offset += zbx_deserialize_char(offset, &log_marker);
+// 		if (0 != log_marker)
+// 		{
+// 			log = (zbx_log_t *)zbx_malloc(NULL, sizeof(zbx_log_t));
 
-			offset += zbx_deserialize_str(offset, &log->value, value_len);
-			offset += zbx_deserialize_str(offset, &log->source, value_len);
-			offset += zbx_deserialize_int(offset, &log->timestamp);
-			offset += zbx_deserialize_int(offset, &log->severity);
-			offset += zbx_deserialize_int(offset, &log->logeventid);
-		}
+// 			offset += zbx_deserialize_str(offset, &log->value, value_len);
+// 			offset += zbx_deserialize_str(offset, &log->source, value_len);
+// 			offset += zbx_deserialize_int(offset, &log->timestamp);
+// 			offset += zbx_deserialize_int(offset, &log->severity);
+// 			offset += zbx_deserialize_int(offset, &log->logeventid);
+// 		}
 
-		agent_result->log = log;
-	}
+// 		agent_result->log = log;
+// 	}
 
-	value->result = agent_result;
+// 	value->result = agent_result;
 
-	return (int)(offset - data);
-}
+// 	return (int)(offset - data);
+// }
 
-extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
-
-void glb_preprocessing_init() {
-	int 	i;
-	char 	service[MAX_STRING_LEN];
-	char	*error = NULL;
-	
-	
-	if (NULL == (sockets = zbx_malloc( NULL, sizeof(zbx_ipc_socket_t) * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))) {
-			zabbix_log(LOG_LEVEL_CRIT, "Allocate mem for IPC to preprocessing managers");
-			exit(EXIT_FAILURE);
-	};
-	
-	/* each process has a permanent connection to preprocessing manager */
-	for (i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++ ) {
-	
-		zbx_snprintf(service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,i);
-		
-		if (FAIL == zbx_ipc_socket_open(&sockets[i], service, SEC_PER_MIN, &error))
-		{
-			zabbix_log(LOG_LEVEL_CRIT, "cannot connect to preprocessing service: %s", error);
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	if (NULL == (cached_messages=zbx_malloc(NULL, sizeof(zbx_ipc_message_t) * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))) {
-		
-		zabbix_log(LOG_LEVEL_CRIT,"Couldn't allocate memory for IPC messages");
-		exit(EXIT_FAILURE);	
-	};
-
-	memset(cached_messages,0,sizeof(zbx_ipc_message_t) * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]);
-	cached_values=0;
-}
+// extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 
 /******************************************************************************
@@ -1081,32 +1048,32 @@ void glb_preprocessing_init() {
  *             data          - [IN] IPC data buffer                           *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_task(zbx_uint64_t *itemid, unsigned char *value_type, zbx_timespec_t **ts,
-		zbx_variant_t *value, zbx_vector_ptr_t *history, zbx_preproc_op_t **steps,
-		int *steps_num, const unsigned char *data)
-{
-	const unsigned char		*offset = data;
-	unsigned char 			ts_marker;
-	zbx_timespec_t			*timespec = NULL;
+// void	zbx_preprocessor_unpack_task(zbx_uint64_t *itemid, unsigned char *value_type, zbx_timespec_t **ts,
+// 		zbx_variant_t *value, zbx_vector_ptr_t *history, zbx_preproc_op_t **steps,
+// 		int *steps_num, const unsigned char *data)
+// {
+// 	const unsigned char		*offset = data;
+// 	unsigned char 			ts_marker;
+// 	zbx_timespec_t			*timespec = NULL;
 
-	offset += zbx_deserialize_uint64(offset, itemid);
-	offset += zbx_deserialize_char(offset, value_type);
-	offset += zbx_deserialize_char(offset, &ts_marker);
+// 	offset += zbx_deserialize_uint64(offset, itemid);
+// 	offset += zbx_deserialize_char(offset, value_type);
+// 	offset += zbx_deserialize_char(offset, &ts_marker);
 
-	if (0 != ts_marker)
-	{
-		timespec = (zbx_timespec_t *)zbx_malloc(NULL, sizeof(zbx_timespec_t));
+// 	if (0 != ts_marker)
+// 	{
+// 		timespec = (zbx_timespec_t *)zbx_malloc(NULL, sizeof(zbx_timespec_t));
 
-		offset += zbx_deserialize_int(offset, &timespec->sec);
-		offset += zbx_deserialize_int(offset, &timespec->ns);
-	}
+// 		offset += zbx_deserialize_int(offset, &timespec->sec);
+// 		offset += zbx_deserialize_int(offset, &timespec->ns);
+// 	}
 
-	*ts = timespec;
+// 	*ts = timespec;
 
-	offset += preprocesser_unpack_variant(offset, value);
-	offset += preprocesser_unpack_history(offset, history);
-	(void)preprocessor_unpack_steps(offset, steps, steps_num);
-}
+// 	offset += preprocesser_unpack_variant(offset, value);
+// 	offset += preprocesser_unpack_history(offset, history);
+// 	(void)preprocessor_unpack_steps(offset, steps, steps_num);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1133,19 +1100,19 @@ void	zbx_preprocessor_free_steps(zbx_preproc_op_t *steps, int steps_num)
  *             deps_num - [IN] the number of dependent items                  *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_free_deps(zbx_preproc_dep_t *deps, int deps_num)
-{
-	int	i;
+// void	zbx_preprocessor_free_deps(zbx_preproc_dep_t *deps, int deps_num)
+// {
+// 	int	i;
 
-	for (i = 0; i < deps_num; i++)
-	{
-		zbx_preprocessor_free_steps(deps[i].steps, deps[i].steps_num);
-		zbx_vector_ptr_clear_ext(&deps[i].history, (zbx_clean_func_t)zbx_preproc_op_history_free);
-		zbx_vector_ptr_destroy(&deps[i].history);
-	}
+// 	for (i = 0; i < deps_num; i++)
+// 	{
+// 		zbx_preprocessor_free_steps(deps[i].steps, deps[i].steps_num);
+// 		zbx_vector_ptr_clear_ext(&deps[i].history, (zbx_clean_func_t)zbx_preproc_op_history_free);
+// 		zbx_vector_ptr_destroy(&deps[i].history);
+// 	}
 
-	zbx_free(deps);
-}
+// 	zbx_free(deps);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1155,20 +1122,20 @@ void	zbx_preprocessor_free_deps(zbx_preproc_dep_t *deps, int deps_num)
  *             dep  - [OUT] unpacked dependent item preprocessing data        *
  *                                                                            *
  ******************************************************************************/
-static zbx_uint32_t	preprocessor_unpack_dep(const unsigned char *data, zbx_preproc_dep_t *dep)
-{
-	const unsigned char	*offset = data;
+// static zbx_uint32_t	preprocessor_unpack_dep(const unsigned char *data, zbx_preproc_dep_t *dep)
+// {
+// 	const unsigned char	*offset = data;
 
-	offset += zbx_deserialize_value(offset, &dep->itemid);
-	offset += zbx_deserialize_value(offset, &dep->flags);
-	offset += zbx_deserialize_value(offset, &dep->value_type);
-	offset += preprocessor_unpack_steps(offset, &dep->steps, &dep->steps_num);
+// 	offset += zbx_deserialize_value(offset, &dep->itemid);
+// 	offset += zbx_deserialize_value(offset, &dep->flags);
+// 	offset += zbx_deserialize_value(offset, &dep->value_type);
+// 	offset += preprocessor_unpack_steps(offset, &dep->steps, &dep->steps_num);
 
-	zbx_vector_ptr_create(&dep->history);
-	offset += preprocesser_unpack_history(offset, &dep->history);
+// 	zbx_vector_ptr_create(&dep->history);
+// 	offset += preprocesser_unpack_history(offset, &dep->history);
 
-	return offset - data;
-}
+// 	return offset - data;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1184,23 +1151,23 @@ static zbx_uint32_t	preprocessor_unpack_dep(const unsigned char *data, zbx_prepr
  * Return value: size of packed data                                          *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_dep_task(zbx_timespec_t *ts, zbx_variant_t *value, int *total_num,
-		zbx_preproc_dep_t **deps, int *deps_num, const unsigned char *data)
-{
-	const unsigned char	*offset = data;
-	int			i;
+// void	zbx_preprocessor_unpack_dep_task(zbx_timespec_t *ts, zbx_variant_t *value, int *total_num,
+// 		zbx_preproc_dep_t **deps, int *deps_num, const unsigned char *data)
+// {
+// 	const unsigned char	*offset = data;
+// 	int			i;
 
-	offset += preprocesser_unpack_variant(offset, value);
-	offset += zbx_deserialize_value(offset, &ts->sec);
-	offset += zbx_deserialize_value(offset, &ts->ns);
+// 	offset += preprocesser_unpack_variant(offset, value);
+// 	offset += zbx_deserialize_value(offset, &ts->sec);
+// 	offset += zbx_deserialize_value(offset, &ts->ns);
 
-	offset += zbx_deserialize_value(offset, total_num);
-	offset += zbx_deserialize_value(offset, deps_num);
-	*deps = (zbx_preproc_dep_t *)zbx_malloc(NULL, (size_t)*total_num * sizeof(zbx_preproc_dep_t));
+// 	offset += zbx_deserialize_value(offset, total_num);
+// 	offset += zbx_deserialize_value(offset, deps_num);
+// 	*deps = (zbx_preproc_dep_t *)zbx_malloc(NULL, (size_t)*total_num * sizeof(zbx_preproc_dep_t));
 
-	for (i = 0; i < *deps_num; i++)
-		offset += preprocessor_unpack_dep(offset, *deps + i);
-}
+// 	for (i = 0; i < *deps_num; i++)
+// 		offset += preprocessor_unpack_dep(offset, *deps + i);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1215,18 +1182,18 @@ void	zbx_preprocessor_unpack_dep_task(zbx_timespec_t *ts, zbx_variant_t *value, 
  * Return value: size of packed data                                          *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_dep_task_cont(zbx_preproc_dep_t *deps, int *deps_num, const unsigned char *data)
-{
-	const unsigned char	*offset = data;
-	int			i, batch_num;
+// void	zbx_preprocessor_unpack_dep_task_cont(zbx_preproc_dep_t *deps, int *deps_num, const unsigned char *data)
+// {
+// 	const unsigned char	*offset = data;
+// 	int			i, batch_num;
 
-	offset += zbx_deserialize_value(offset, &batch_num);
+// 	offset += zbx_deserialize_value(offset, &batch_num);
 
-	for (i = 0; i < batch_num; i++)
-		offset += preprocessor_unpack_dep(offset, deps + i);
+// 	for (i = 0; i < batch_num; i++)
+// 		offset += preprocessor_unpack_dep(offset, deps + i);
 
-	*deps_num += batch_num;
-}
+// 	*deps_num += batch_num;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1238,17 +1205,17 @@ void	zbx_preprocessor_unpack_dep_task_cont(zbx_preproc_dep_t *deps, int *deps_nu
  *             data          - [IN] IPC data buffer                           *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_result(zbx_variant_t *value, zbx_vector_ptr_t *history, char **error,
-		const unsigned char *data)
-{
-	zbx_uint32_t		value_len;
-	const unsigned char	*offset = data;
+// void	zbx_preprocessor_unpack_result(zbx_variant_t *value, zbx_vector_ptr_t *history, char **error,
+// 		const unsigned char *data)
+// {
+// 	zbx_uint32_t		value_len;
+// 	const unsigned char	*offset = data;
 
-	offset += preprocesser_unpack_variant(offset, value);
-	offset += preprocesser_unpack_history(offset, history);
+// 	offset += preprocesser_unpack_variant(offset, value);
+// 	offset += preprocesser_unpack_history(offset, history);
 
-	(void)zbx_deserialize_str(offset, error, value_len);
-}
+// 	(void)zbx_deserialize_str(offset, error, value_len);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1259,71 +1226,71 @@ void	zbx_preprocessor_unpack_result(zbx_variant_t *value, zbx_vector_ptr_t *hist
  *             result     - [OUT] the result                                  *
  *                                                                            *
  ******************************************************************************/
-static void	agent_result_set_value(zbx_variant_t *value, zbx_item_value_type_t value_type, AGENT_RESULT *result,
-		char **error)
-{
-	unsigned char	type;
-	zbx_log_t	*log;
+// static void	agent_result_set_value(zbx_variant_t *value, zbx_item_value_type_t value_type, AGENT_RESULT *result,
+// 		char **error)
+// {
+// 	unsigned char	type;
+// 	zbx_log_t	*log;
 
-	zbx_init_agent_result(result);
+// 	zbx_init_agent_result(result);
 
-	if (NULL != *error)
-		return;
+// 	if (NULL != *error)
+// 		return;
 
-	if (ZBX_VARIANT_NONE == value->type)
-		return;
+// 	if (ZBX_VARIANT_NONE == value->type)
+// 		return;
 
-	switch (value_type)
-	{
-		case ITEM_VALUE_TYPE_FLOAT:
-			type = ZBX_VARIANT_DBL;
-			break;
-		case ITEM_VALUE_TYPE_UINT64:
-			type = ZBX_VARIANT_UI64;
-			break;
-		default:
-			/* ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_TEXT, ITEM_VALUE_TYPE_LOG */
-			type = ZBX_VARIANT_STR;
-	}
+// 	switch (value_type)
+// 	{
+// 		case ITEM_VALUE_TYPE_FLOAT:
+// 			type = ZBX_VARIANT_DBL;
+// 			break;
+// 		case ITEM_VALUE_TYPE_UINT64:
+// 			type = ZBX_VARIANT_UI64;
+// 			break;
+// 		default:
+// 			/* ITEM_VALUE_TYPE_STR, ITEM_VALUE_TYPE_TEXT, ITEM_VALUE_TYPE_LOG */
+// 			type = ZBX_VARIANT_STR;
+// 	}
 
-	if (FAIL == zbx_variant_convert(value, type))
-	{
-		*error = zbx_dsprintf(*error, "Value \"%s\" of type \"%s\" is not suitable for"
-			" value type \"%s\"", zbx_variant_value_desc(value), zbx_variant_type_desc(value),
-			zbx_item_value_type_string((zbx_item_value_type_t)value_type));
+// 	if (FAIL == zbx_variant_convert(value, type))
+// 	{
+// 		*error = zbx_dsprintf(*error, "Value \"%s\" of type \"%s\" is not suitable for"
+// 			" value type \"%s\"", zbx_variant_value_desc(value), zbx_variant_type_desc(value),
+// 			zbx_item_value_type_string((zbx_item_value_type_t)value_type));
 
-		return;
-	}
+// 		return;
+// 	}
 
-	switch (value_type)
-	{
-		case ITEM_VALUE_TYPE_FLOAT:
-			SET_DBL_RESULT(result, value->data.dbl);
-			break;
-		case ITEM_VALUE_TYPE_STR:
-			SET_STR_RESULT(result, value->data.str);
-			zbx_variant_set_none(value);
-			break;
-		case ITEM_VALUE_TYPE_TEXT:
-			SET_TEXT_RESULT(result, value->data.str);
-			zbx_variant_set_none(value);
-			break;
-		case ITEM_VALUE_TYPE_LOG:
-			log = (zbx_log_t *)zbx_malloc(NULL, sizeof(zbx_log_t));
-			memset(log, 0, sizeof(zbx_log_t));
-			log->value = value->data.str;
-			SET_LOG_RESULT(result, log);
-			zbx_variant_set_none(value);
-			break;
-		case ITEM_VALUE_TYPE_UINT64:
-			SET_UI64_RESULT(result, value->data.ui64);
-			break;
-		default:
-			*error = zbx_dsprintf(*error, "Unsupported value \"%s\" of type \"%s\"",
-					zbx_variant_value_desc(value), zbx_variant_type_desc(value));
-			return;
-	}
-}
+// 	switch (value_type)
+// 	{
+// 		case ITEM_VALUE_TYPE_FLOAT:
+// 			SET_DBL_RESULT(result, value->data.dbl);
+// 			break;
+// 		case ITEM_VALUE_TYPE_STR:
+// 			SET_STR_RESULT(result, value->data.str);
+// 			zbx_variant_set_none(value);
+// 			break;
+// 		case ITEM_VALUE_TYPE_TEXT:
+// 			SET_TEXT_RESULT(result, value->data.str);
+// 			zbx_variant_set_none(value);
+// 			break;
+// 		case ITEM_VALUE_TYPE_LOG:
+// 			log = (zbx_log_t *)zbx_malloc(NULL, sizeof(zbx_log_t));
+// 			memset(log, 0, sizeof(zbx_log_t));
+// 			log->value = value->data.str;
+// 			SET_LOG_RESULT(result, log);
+// 			zbx_variant_set_none(value);
+// 			break;
+// 		case ITEM_VALUE_TYPE_UINT64:
+// 			SET_UI64_RESULT(result, value->data.ui64);
+// 			break;
+// 		default:
+// 			*error = zbx_dsprintf(*error, "Unsupported value \"%s\" of type \"%s\"",
+// 					zbx_variant_value_desc(value), zbx_variant_type_desc(value));
+// 			return;
+// 	}
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1333,27 +1300,27 @@ static void	agent_result_set_value(zbx_variant_t *value, zbx_item_value_type_t v
  *             result - [OUT] the preprocessing result                        *
  *                                                                            *
  ******************************************************************************/
-static zbx_uint32_t	preprocessor_unpack_dep_result(const unsigned char *data, zbx_preproc_dep_result_t *result)
-{
-	const unsigned char	*offset = data;
-	zbx_uint32_t		error_len;
-	zbx_variant_t		value;
+// static zbx_uint32_t	preprocessor_unpack_dep_result(const unsigned char *data, zbx_preproc_dep_result_t *result)
+// {
+// 	const unsigned char	*offset = data;
+// 	zbx_uint32_t		error_len;
+// 	zbx_variant_t		value;
 
-	offset += zbx_deserialize_value(offset, &result->itemid);
-	offset += zbx_deserialize_value(offset, &result->flags);
-	offset += zbx_deserialize_value(offset, &result->value_type);
-	offset += preprocesser_unpack_variant(offset, &value);
-	offset += zbx_deserialize_str(offset, &result->error, error_len);
+// 	offset += zbx_deserialize_value(offset, &result->itemid);
+// 	offset += zbx_deserialize_value(offset, &result->flags);
+// 	offset += zbx_deserialize_value(offset, &result->value_type);
+// 	offset += preprocesser_unpack_variant(offset, &value);
+// 	offset += zbx_deserialize_str(offset, &result->error, error_len);
 
-	zbx_vector_ptr_create(&result->history);
-	offset += preprocesser_unpack_history(offset, &result->history);
+// 	zbx_vector_ptr_create(&result->history);
+// 	offset += preprocesser_unpack_history(offset, &result->history);
 
-	agent_result_set_value(&value, result->value_type, &result->value, &result->error);
+// 	agent_result_set_value(&value, result->value_type, &result->value, &result->error);
 
-	zbx_variant_clear(&value);
+// 	zbx_variant_clear(&value);
 
-	return offset - data;
-}
+// 	return offset - data;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1367,19 +1334,19 @@ static zbx_uint32_t	preprocessor_unpack_dep_result(const unsigned char *data, zb
  * Return value: size of packed data                                          *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_dep_result(int *total_num, int *results_num, zbx_preproc_dep_result_t **results,
-		const unsigned char *data)
-{
-	const unsigned char	*offset = data;
-	int			i;
+// void	zbx_preprocessor_unpack_dep_result(int *total_num, int *results_num, zbx_preproc_dep_result_t **results,
+// 		const unsigned char *data)
+// {
+// 	const unsigned char	*offset = data;
+// 	int			i;
 
-	offset += zbx_deserialize_value(offset, total_num);
-	offset += zbx_deserialize_value(offset, results_num);
-	*results = (zbx_preproc_dep_result_t *)zbx_malloc(NULL, (size_t)*total_num * sizeof(zbx_preproc_dep_result_t));
+// 	offset += zbx_deserialize_value(offset, total_num);
+// 	offset += zbx_deserialize_value(offset, results_num);
+// 	*results = (zbx_preproc_dep_result_t *)zbx_malloc(NULL, (size_t)*total_num * sizeof(zbx_preproc_dep_result_t));
 
-	for (i = 0; i < *results_num; i++)
-		offset += preprocessor_unpack_dep_result(offset, *results + i);
-}
+// 	for (i = 0; i < *results_num; i++)
+// 		offset += preprocessor_unpack_dep_result(offset, *results + i);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1392,19 +1359,19 @@ void	zbx_preprocessor_unpack_dep_result(int *total_num, int *results_num, zbx_pr
  * Return value: size of packed data                                          *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_dep_result_cont(int *results_num, zbx_preproc_dep_result_t *results,
-		const unsigned char *data)
-{
-	const unsigned char	*offset = data;
-	int			i, batch_num;
+// void	zbx_preprocessor_unpack_dep_result_cont(int *results_num, zbx_preproc_dep_result_t *results,
+// 		const unsigned char *data)
+// {
+// 	const unsigned char	*offset = data;
+// 	int			i, batch_num;
 
-	offset += zbx_deserialize_value(offset, &batch_num);
+// 	offset += zbx_deserialize_value(offset, &batch_num);
 
-	for (i = 0; i < batch_num; i++)
-		offset += preprocessor_unpack_dep_result(offset, results + i);
+// 	for (i = 0; i < batch_num; i++)
+// 		offset += preprocessor_unpack_dep_result(offset, results + i);
 
-	*results_num += batch_num;
-}
+// 	*results_num += batch_num;
+// }
 /******************************************************************************
  *                                                                            *
  * Purpose: unpack preprocessing test data from IPC data buffer               *
@@ -1415,31 +1382,31 @@ void	zbx_preprocessor_unpack_dep_result_cont(int *results_num, zbx_preproc_dep_r
  *             data          - [IN] IPC data buffer                           *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_test_result(zbx_vector_ptr_t *results, zbx_vector_ptr_t *history,
-		char **error, const unsigned char *data)
-{
-	zbx_uint32_t		value_len;
-	const unsigned char	*offset = data;
-	int			i, results_num;
-	zbx_preproc_result_t	*result;
+// void	zbx_preprocessor_unpack_test_result(zbx_vector_ptr_t *results, zbx_vector_ptr_t *history,
+// 		char **error, const unsigned char *data)
+// {
+// 	zbx_uint32_t		value_len;
+// 	const unsigned char	*offset = data;
+// 	int			i, results_num;
+// 	zbx_preproc_result_t	*result;
 
-	offset += zbx_deserialize_int(offset, &results_num);
+// 	offset += zbx_deserialize_int(offset, &results_num);
 
-	zbx_vector_ptr_reserve(results, (size_t)results_num);
+// 	zbx_vector_ptr_reserve(results, (size_t)results_num);
 
-	for (i = 0; i < results_num; i++)
-	{
-		result = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t));
-		offset += preprocesser_unpack_variant(offset, &result->value);
-		offset += zbx_deserialize_str(offset, &result->error, value_len);
-		offset += zbx_deserialize_char(offset, &result->action);
-		zbx_vector_ptr_append(results, result);
-	}
+// 	for (i = 0; i < results_num; i++)
+// 	{
+// 		result = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t));
+// 		offset += preprocesser_unpack_variant(offset, &result->value);
+// 		offset += zbx_deserialize_str(offset, &result->error, value_len);
+// 		offset += zbx_deserialize_char(offset, &result->action);
+// 		zbx_vector_ptr_append(results, result);
+// 	}
 
-	offset += preprocesser_unpack_history(offset, history);
+// 	offset += preprocesser_unpack_history(offset, history);
 
-	(void)zbx_deserialize_str(offset, error, value_len);
-}
+// 	(void)zbx_deserialize_str(offset, error, value_len);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1459,17 +1426,17 @@ void	zbx_preprocessor_unpack_test_result(zbx_vector_ptr_t *results, zbx_vector_p
  *             data       - [IN] IPC data buffer                              *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_diag_stats(int *total, int *queued, int *processing, int *done,
-		int *pending, const unsigned char *data)
-{
-	const unsigned char	*offset = data;
+// void	zbx_preprocessor_unpack_diag_stats(int *total, int *queued, int *processing, int *done,
+// 		int *pending, const unsigned char *data)
+// {
+// 	const unsigned char	*offset = data;
 
-	offset += zbx_deserialize_int(offset, total);
-	offset += zbx_deserialize_int(offset, queued);
-	offset += zbx_deserialize_int(offset, processing);
-	offset += zbx_deserialize_int(offset, done);
-	(void)zbx_deserialize_int(offset, pending);
-}
+// 	offset += zbx_deserialize_int(offset, total);
+// 	offset += zbx_deserialize_int(offset, queued);
+// 	offset += zbx_deserialize_int(offset, processing);
+// 	offset += zbx_deserialize_int(offset, done);
+// 	(void)zbx_deserialize_int(offset, pending);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1479,10 +1446,10 @@ void	zbx_preprocessor_unpack_diag_stats(int *total, int *queued, int *processing
  *             limit - [IN] the number of top values to return                *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_top_request(int *limit, const unsigned char *data)
-{
-	(void)zbx_deserialize_value(data, limit);
-}
+// void	zbx_preprocessor_unpack_top_request(int *limit, const unsigned char *data)
+// {
+// 	(void)zbx_deserialize_value(data, limit);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1492,28 +1459,28 @@ void	zbx_preprocessor_unpack_top_request(int *limit, const unsigned char *data)
  *             data  - [IN] memory buffer for packed data                     *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_unpack_top_result(zbx_vector_ptr_t *items, const unsigned char *data)
-{
-	int	i, items_num;
+// void	zbx_preprocessor_unpack_top_result(zbx_vector_ptr_t *items, const unsigned char *data)
+// {
+// 	int	i, items_num;
 
-	data += zbx_deserialize_value(data, &items_num);
+// 	data += zbx_deserialize_value(data, &items_num);
 
-	if (0 != items_num)
-	{
-		zbx_vector_ptr_reserve(items, (size_t)items_num);
+// 	if (0 != items_num)
+// 	{
+// 		zbx_vector_ptr_reserve(items, (size_t)items_num);
 
-		for (i = 0; i < items_num; i++)
-		{
-			zbx_preproc_item_stats_t	*item;
+// 		for (i = 0; i < items_num; i++)
+// 		{
+// 			zbx_preproc_item_stats_t	*item;
 
-			item = (zbx_preproc_item_stats_t *)zbx_malloc(NULL, sizeof(zbx_preproc_item_stats_t));
-			data += zbx_deserialize_value(data, &item->itemid);
-			data += zbx_deserialize_value(data, &item->values_num);
-			data += zbx_deserialize_value(data, &item->steps_num);
-			zbx_vector_ptr_append(items, item);
-		}
-	}
-}
+// 			item = (zbx_preproc_item_stats_t *)zbx_malloc(NULL, sizeof(zbx_preproc_item_stats_t));
+// 			data += zbx_deserialize_value(data, &item->itemid);
+// 			data += zbx_deserialize_value(data, &item->values_num);
+// 			data += zbx_deserialize_value(data, &item->steps_num);
+// 			zbx_vector_ptr_append(items, item);
+// 		}
+// 	}
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1526,21 +1493,21 @@ void	zbx_preprocessor_unpack_top_result(zbx_vector_ptr_t *items, const unsigned 
  *                              not requested)                                *
  *                                                                            *
  ******************************************************************************/
-static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32_t size,
-		zbx_ipc_message_t *response, int manager_num)
-{
-	if (FAIL == zbx_ipc_socket_write(&sockets[manager_num], code, data, size))
- 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot send data to preprocessing service %d", manager_num);
- 		exit(EXIT_FAILURE);
- 	}
+// static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32_t size,
+// 		zbx_ipc_message_t *response, int manager_num)
+// {
+// 	if (FAIL == zbx_ipc_socket_write(&sockets[manager_num], code, data, size))
+//  	{
+// 		zabbix_log(LOG_LEVEL_CRIT, "cannot send data to preprocessing service %d", manager_num);
+//  		exit(EXIT_FAILURE);
+//  	}
  
-	if (NULL != response && FAIL == zbx_ipc_socket_read(&sockets[manager_num], response))
- 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot receive data from preprocessing service");
- 		exit(EXIT_FAILURE);
- 	}
-}
+// 	if (NULL != response && FAIL == zbx_ipc_socket_read(&sockets[manager_num], response))
+//  	{
+// 		zabbix_log(LOG_LEVEL_CRIT, "cannot receive data from preprocessing service");
+//  		exit(EXIT_FAILURE);
+//  	}
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1558,83 +1525,83 @@ static void	preprocessor_send(zbx_uint32_t code, unsigned char *data, zbx_uint32
  *                               ITEM_STATE_NOTSUPPORTED                      *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type,
-		unsigned char item_flags, AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error)
-{
-	zbx_preproc_item_value_t	value = {.itemid = itemid, .hostid = hostid, .item_value_type = item_value_type,
-					.error = (char *)error, .item_flags = item_flags, .state = state, .ts = (zbx_timespec_t *)ts,
-					.result = result};
-	size_t				value_len = 0, len;
-	glb_state_item_meta_t meta = {0};
+// void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type,
+// 		unsigned char item_flags, AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error)
+// {
+// 	zbx_preproc_item_value_t	value = {.itemid = itemid, .hostid = hostid, .item_value_type = item_value_type,
+// 					.error = (char *)error, .item_flags = item_flags, .state = state, .ts = (zbx_timespec_t *)ts,
+// 					.result = result};
+// 	size_t				value_len = 0, len;
+// 	glb_state_item_meta_t meta = {0};
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	int manager_num = ( hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN] );
-	DEBUG_ITEM(itemid,"Preparing item to send to preprocessing timestamp %ld", ts->sec);
+// 	int manager_num = ( hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN] );
+// 	DEBUG_ITEM(itemid,"Preparing item to send to preprocessing timestamp %ld", ts->sec);
 
-	if (ITEM_STATE_NORMAL == state)
-	{
-		if (0 != ZBX_ISSET_STR(result))
-			value_len = strlen(result->str);
+// 	if (ITEM_STATE_NORMAL == state)
+// 	{
+// 		if (0 != ZBX_ISSET_STR(result))
+// 			value_len = strlen(result->str);
 
-		if (0 != ZBX_ISSET_TEXT(result))
-		{
-			if (value_len < (len = strlen(result->text)))
-				value_len = len;
-		}
+// 		if (0 != ZBX_ISSET_TEXT(result))
+// 		{
+// 			if (value_len < (len = strlen(result->text)))
+// 				value_len = len;
+// 		}
 
-		if (0 != ZBX_ISSET_LOG(result))
-		{
-			if (value_len < (len = strlen(result->log->value)))
-				value_len = len;
-		}
+// 		if (0 != ZBX_ISSET_LOG(result))
+// 		{
+// 			if (value_len < (len = strlen(result->log->value)))
+// 				value_len = len;
+// 		}
 
-		if (ZBX_MAX_RECV_DATA_SIZE < value_len)
-		{
-			value.result = NULL;
-			value.state = ITEM_STATE_NOTSUPPORTED;
-			value.error = "Value is too large.";
-		}
-	}
+// 		if (ZBX_MAX_RECV_DATA_SIZE < value_len)
+// 		{
+// 			value.result = NULL;
+// 			value.state = ITEM_STATE_NOTSUPPORTED;
+// 			value.error = "Value is too large.";
+// 		}
+// 	}
 
-	if (NULL != value.error && ITEM_STATE_NORMAL != state ) 
-			meta.error = error;
+// 	if (NULL != value.error && ITEM_STATE_NORMAL != state ) 
+// 			meta.error = error;
 	
-	meta.lastdata = time(NULL);
-	meta.state = value.state;
+// 	meta.lastdata = time(NULL);
+// 	meta.state = value.state;
 
-	glb_state_item_update_meta(itemid, &meta, 
-			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG ,
-			item_value_type );
+// 	glb_state_item_update_meta(itemid, &meta, 
+// 			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG ,
+// 			item_value_type );
 	
-	if (preprocessor_pack_value(&cached_messages[manager_num], &value));
-		zbx_preprocessor_flush();
+// 	if (preprocessor_pack_value(&cached_messages[manager_num], &value));
+// 		zbx_preprocessor_flush();
 	
-	if (MAX_VALUES_LOCAL < ++cached_values)
-		zbx_preprocessor_flush();
+// 	if (MAX_VALUES_LOCAL < ++cached_values)
+// 		zbx_preprocessor_flush();
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 /******************************************************************************
  *                                                                            *
  * Purpose: send flush command to preprocessing manager                       *
  *                                                                            *
  ******************************************************************************/
-void	zbx_preprocessor_flush(void)
-{	int i;
-	if(!cached_messages) return ;
-	for ( i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++ ) {
-		if (0 < cached_messages[i].size)
-		{
-			preprocessor_send(ZBX_IPC_PREPROCESSOR_REQUEST, cached_messages[i].data, cached_messages[i].size, NULL, i);
+// void	zbx_preprocessor_flush(void)
+// {	int i;
+// 	if(!cached_messages) return ;
+// 	for ( i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++ ) {
+// 		if (0 < cached_messages[i].size)
+// 		{
+// 			preprocessor_send(ZBX_IPC_PREPROCESSOR_REQUEST, cached_messages[i].data, cached_messages[i].size, NULL, i);
 
-			zbx_ipc_message_clean(&cached_messages[i]);
-			zbx_ipc_message_init(&cached_messages[i]);
-			cached_values = 0;
-		}
-	}
-}
+// 			zbx_ipc_message_clean(&cached_messages[i]);
+// 			zbx_ipc_message_init(&cached_messages[i]);
+// 			cached_values = 0;
+// 		}
+// 	}
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1643,24 +1610,24 @@ void	zbx_preprocessor_flush(void)
  * Return value: enqueued item count                                          *
  *                                                                            *
  ******************************************************************************/
-zbx_uint64_t	zbx_preprocessor_get_queue_size(void)
-{
-	zbx_uint64_t		size, total_size;
-	zbx_ipc_message_t	message;
-	int i;
+// zbx_uint64_t	zbx_preprocessor_get_queue_size(void)
+// {
+// 	zbx_uint64_t		size, total_size;
+// 	zbx_ipc_message_t	message;
+// 	int i;
 
-	for (i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++) {
+// 	for (i = 0; i < CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]; i++) {
 	
-		zbx_ipc_message_init(&message);
-		preprocessor_send(ZBX_IPC_PREPROCESSOR_QUEUE, NULL, 0, &message, i );
-		memcpy(&size, message.data, sizeof(zbx_uint64_t));
-		zbx_ipc_message_clean(&message);
-		total_size += size;
+// 		zbx_ipc_message_init(&message);
+// 	//	preprocessor_send(ZBX_IPC_PREPROCESSOR_QUEUE, NULL, 0, &message, i );
+// 		memcpy(&size, message.data, sizeof(zbx_uint64_t));
+// 		zbx_ipc_message_clean(&message);
+// 		total_size += size;
 	
-	}
+// 	}
 
-	return size;
-}
+// 	return size;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -1764,105 +1731,106 @@ void	zbx_preprocessor_unpack_test_request(unsigned char *value_type, char **valu
  * Purpose: tests item preprocessing with the specified input value and steps *
  *                                                                            *
  ******************************************************************************/
-int	zbx_preprocessor_test(unsigned char value_type, const char *value, const zbx_timespec_t *ts,
-		const zbx_vector_ptr_t *steps, zbx_vector_ptr_t *results, zbx_vector_ptr_t *history,
-		char **preproc_error, char **error)
-{
-	unsigned char	*data = NULL;
-	zbx_uint32_t	size;
-	int		ret = FAIL;
-	unsigned char	*result;
-	char preproc_service[MAX_STRING_LEN];
+// //TODO: fix to execute localy on the calling process (this is most likely is the trapper)
+// int	zbx_preprocessor_test(unsigned char value_type, const char *value, const zbx_timespec_t *ts,
+// 		const zbx_vector_ptr_t *steps, zbx_vector_ptr_t *results, zbx_vector_ptr_t *history,
+// 		char **preproc_error, char **error)
+// {
+// 	unsigned char	*data = NULL;
+// 	zbx_uint32_t	size;
+// 	int		ret = FAIL;
+// 	unsigned char	*result;
+// 	char preproc_service[MAX_STRING_LEN];
 
-	size = preprocessor_pack_test_request(&data, value_type, value, ts, history, steps);
+// 	size = preprocessor_pack_test_request(&data, value_type, value, ts, history, steps);
 	
-	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
+// 	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
 	
-	if (SUCCEED != zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_TEST_REQUEST,
-			SEC_PER_MIN, data, size, &result, error))
-	{
-		goto out;
-	}
+// 	if (SUCCEED != zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_TEST_REQUEST,
+// 			SEC_PER_MIN, data, size, &result, error))
+// 	{
+// 		goto out;
+// 	}
 
-	zbx_preprocessor_unpack_test_result(results, history, preproc_error, result);
-	zbx_free(result);
+// 	zbx_preprocessor_unpack_test_result(results, history, preproc_error, result);
+// 	zbx_free(result);
 
-	ret = SUCCEED;
-out:
-	zbx_free(data);
+// 	ret = SUCCEED;
+// out:
+// 	zbx_free(data);
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
  * Purpose: get preprocessing manager diagnostic statistics                   *
  *                                                                            *
  ******************************************************************************/
-int	zbx_preprocessor_get_diag_stats(int *total, int *queued, int *processing, int *done,
-		int *pending, char **error)
-{
-	unsigned char	*result;
-	char preproc_service[MAX_STRING_LEN];
+// int	zbx_preprocessor_get_diag_stats(int *total, int *queued, int *processing, int *done,
+// 		int *pending, char **error)
+// {
+// 	unsigned char	*result;
+// 	char preproc_service[MAX_STRING_LEN];
 
-	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
-	if (SUCCEED != zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_DIAG_STATS,
-			SEC_PER_MIN, NULL, 0, &result, error))
-	{
-		return FAIL;
-	}
+// 	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
+// 	if (SUCCEED != zbx_ipc_async_exchange(preproc_service, ZBX_IPC_PREPROCESSOR_DIAG_STATS,
+// 			SEC_PER_MIN, NULL, 0, &result, error))
+// 	{
+// 		return FAIL;
+// 	}
 
-	zbx_preprocessor_unpack_diag_stats(total, queued, processing, done, pending, result);
-	zbx_free(result);
+// 	zbx_preprocessor_unpack_diag_stats(total, queued, processing, done, pending, result);
+// 	zbx_free(result);
 
-	return SUCCEED;
-}
+// 	return SUCCEED;
+// }
 
 /******************************************************************************
  *                                                                            *
  * Purpose: get the top N items by the number of queued values                *
  *                                                                            *
  ******************************************************************************/
-static int	preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **error, zbx_uint32_t code)
-{
-	int		ret;
-	unsigned char	*data, *result;
-	zbx_uint32_t	data_len;
-	char preproc_service[MAX_STRING_LEN];
+// static int	preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **error, zbx_uint32_t code)
+// {
+// 	int		ret;
+// 	unsigned char	*data, *result;
+// 	zbx_uint32_t	data_len;
+// 	char preproc_service[MAX_STRING_LEN];
 
-	data_len = zbx_preprocessor_pack_top_items_request(&data, limit);
-	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
+// 	data_len = zbx_preprocessor_pack_top_items_request(&data, limit);
+// 	zbx_snprintf(preproc_service,MAX_STRING_LEN,"%s%d",GLB_IPC_SERVICE_PREPROCESSING,0);
 	
-	if (SUCCEED != (ret = zbx_ipc_async_exchange(preproc_service, code, SEC_PER_MIN, data, data_len,
-			&result, error)))
-	{
-		goto out;
-	}
+// 	if (SUCCEED != (ret = zbx_ipc_async_exchange(preproc_service, code, SEC_PER_MIN, data, data_len,
+// 			&result, error)))
+// 	{
+// 		goto out;
+// 	}
 
-	zbx_preprocessor_unpack_top_result(items, result);
-	zbx_free(result);
-out:
-	zbx_free(data);
+// 	zbx_preprocessor_unpack_top_result(items, result);
+// 	zbx_free(result);
+// out:
+// 	zbx_free(data);
 
-	return ret;
-}
+// 	return ret;
+// }
 
 /******************************************************************************
  *                                                                            *
  * Purpose: get the top N items by the number of queued values                *
  *                                                                            *
  ******************************************************************************/
-int	zbx_preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **error)
-{
-	return preprocessor_get_top_items(limit, items, error, ZBX_IPC_PREPROCESSOR_TOP_ITEMS);
-}
+// int	zbx_preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **error)
+// {
+// 	return preprocessor_get_top_items(limit, items, error, ZBX_IPC_PREPROCESSOR_TOP_ITEMS);
+// }
 
 /******************************************************************************
  *                                                                            *
  * Purpose: get the oldest items with preprocessing still in queue            *
  *                                                                            *
  ******************************************************************************/
-int	zbx_preprocessor_get_top_oldest_preproc_items(int limit, zbx_vector_ptr_t *items, char **error)
-{
-	return preprocessor_get_top_items(limit, items, error, ZBX_IPC_PREPROCESSOR_TOP_OLDEST_PREPROC_ITEMS);
-}
+// int	zbx_preprocessor_get_top_oldest_preproc_items(int limit, zbx_vector_ptr_t *items, char **error)
+// {
+// 	return preprocessor_get_top_items(limit, items, error, ZBX_IPC_PREPROCESSOR_TOP_OLDEST_PREPROC_ITEMS);
+// }

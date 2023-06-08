@@ -42,9 +42,12 @@ zbx_preproc_item_stats_t;
 
 /* the following functions are implemented differently for server and proxy */
 
-void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
-void	zbx_preprocessor_flush(void);
+//void	zbx_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+//		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
+//void	zbx_preprocessor_flush(void);
+
+
+
 zbx_uint64_t	zbx_preprocessor_get_queue_size(void);
 
 void	zbx_preproc_op_free(zbx_preproc_op_t *op);
@@ -61,9 +64,21 @@ int	zbx_preprocessor_get_top_items(int limit, zbx_vector_ptr_t *items, char **er
 int	zbx_preprocessor_get_top_oldest_preproc_items(int limit, zbx_vector_ptr_t *items, char **error);
 
 //TODO: since inpoller preproc was dismissed, figure if this is still needed
-void glb_fast_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error, DC_ITEM *item, zbx_hashset_t *history_cache, int poller_type);
+//void glb_fast_preprocess_item_value(zbx_uint64_t hostid, zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
+//		AGENT_RESULT *result, zbx_timespec_t *ts, unsigned char state, char *error, DC_ITEM *item, zbx_hashset_t *history_cache, int poller_type);
  
-void glb_preprocessing_init();
+//void glb_preprocessing_init();
 //void preproc_item_clear(zbx_preproc_item_t *item);
+
+int preprocess_error	(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const char *error);
+int preprocess_str		(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const char *str);
+int preprocess_uint64	(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, u_int64_t int_val);
+int preprocess_dbl		(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, double dbl_val);
+int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const AGENT_RESULT *ar);
+int preprocessing_force_flush();
+
+int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const AGENT_RESULT *ar);
+int processing_send_error(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const char *error);
+int processing_force_flush();
+
 #endif /* ZABBIX_PREPROC_H */

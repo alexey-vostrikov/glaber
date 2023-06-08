@@ -4105,9 +4105,16 @@ class CApiInputValidator {
 				break;
 			case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
 			case GLB_PREPROC_DISPATCH_ITEM:
+			case GLB_PREPROC_DISCOVERY_PREPARE:
 				$api_input_rules = ['type' => API_OBJECT, 'fields' => [
 					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY],
 					'2' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
+				]];
+				break;
+			case GLB_PREPROC_JSON_FILTER: 
+			case GLB_PREPROC_LOCAL_DISPATCH:	
+				$api_input_rules = ['type' => API_OBJECT, 'fields' => [
+					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
 				]];
 				break;
 	

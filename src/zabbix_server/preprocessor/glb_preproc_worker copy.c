@@ -20,6 +20,7 @@
 #include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "zbxthreads.h"
+//#include "zbxself.h"
 #include "log.h"
 #include "metric.h"
 #include "glb_preproc_ipc.h"
@@ -29,8 +30,6 @@
 #include "item_preproc.h"
 #include "../../libs/zbxipcservice/glb_ipc.h"
 #include "zbxembed.h"
-
-#define MAX_DEPENDENCY_LEVEL 16
 
 zbx_es_t	es_engine;
 
@@ -48,7 +47,7 @@ typedef struct
 
 static glb_preproc_worker_conf_t conf = {0};
 
-static void process_dependent_metrics(metric_t *metric, int max_dep);
+static void process_dependent_metrics(const metric_t *metric);
 
 int  prepare_preproc_task_data(const metric_t *metric, zbx_vector_ptr_t **history_in, zbx_vector_ptr_t *history_out, 
              zbx_preproc_op_t **ops, int *ops_num, zbx_preproc_result_t **results) {
@@ -108,7 +107,7 @@ static void save_steps_history(u_int64_t itemid, zbx_vector_ptr_t *out_history) 
 
 //this is almost worker_preprocess_value, but instead deserializing / serializing data to/from the socket
 //it uses local memory storage.
-static void preprocess_metric_execute_steps(const metric_t *metric, int dep_level) {
+static void preprocess_metric_execute_steps(const metric_t *metric) {
 
 	zbx_variant_t	value_out;
 	int			i, steps_num, results_num, ret;
@@ -144,6 +143,10 @@ static void preprocess_metric_execute_steps(const metric_t *metric, int dep_leve
 			error = errmsg;
 	}
 
+	for (i = 0; i < results_num; i++)
+		zbx_variant_clear(&results[i].value);
+	zbx_free(results);
+
     DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', code: '%s', result is '%s'",
         zbx_variant_value_desc(&metric->value),  zbx_result_string(ret), (SUCCEED == ret ? zbx_variant_value_desc(&value_out) : error ));
     
@@ -153,35 +156,26 @@ static void preprocess_metric_execute_steps(const metric_t *metric, int dep_leve
 	save_steps_history(metric->itemid, &history_out);
 	zbx_vector_ptr_destroy(&history_out);
 
-	for (i = 0; i < results_num; i++)
-		zbx_variant_clear(&results[i].value);
-	zbx_free(results);
-
-    process_dependent_metrics(&new_metric, dep_level);
-    
- 	zbx_variant_clear(&value_out);
+    process_dependent_metrics(&new_metric);
+    zbx_variant_clear(&value_out);
 
 	zbx_free(error);
 }
 
-static void process_dependent_metrics(metric_t * metric, int level) {
+static void process_dependent_metrics(const metric_t *metric) {
     zbx_preproc_item_t *preproc_item_conf;
     int i;
-	
-	if (level < 0) //reqursion protection
-		return;
 
     if (NULL == (preproc_item_conf = zbx_hashset_search(&conf.item_config, &metric->itemid))) 
         return;
     
-    for (i = 0; i < preproc_item_conf->dep_itemids_num; i++ ) {
-		metric->itemid = preproc_item_conf->dep_itemids[i].first;
-        preprocess_metric_execute_steps(metric, level);
-	}
+    for (i = 0; i < preproc_item_conf->dep_itemids_num; i++ ) 
+        preprocess_metric_execute_steps(metric);
+
 }
 
 IPC_PROCESS_CB(metrics_proc_cb) {
-    preprocess_metric_execute_steps((metric_t*)ipc_data, MAX_DEPENDENCY_LEVEL);
+    preprocess_metric_execute_steps((metric_t*)ipc_data);
 }
 
 static void	preproc_item_clear(zbx_preproc_item_t *item)
@@ -290,4 +284,5 @@ ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args) {
   }
   
   zbx_es_destroy(&es_engine);
+
 }
