@@ -42,7 +42,7 @@ zbx_preproc_cache_t;
 
 int	zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char value_type, zbx_variant_t *value,
 		const zbx_timespec_t *ts, const zbx_preproc_op_t *op, zbx_variant_t *history_value,
-		zbx_timespec_t *history_ts, char **error);
+		zbx_timespec_t *history_ts, u_int64_t flags, char **error);
 
 int	zbx_item_preproc_handle_error(zbx_variant_t *value, const zbx_preproc_op_t *op, char **error);
 
@@ -51,9 +51,9 @@ int	zbx_item_preproc_convert_value_to_numeric(zbx_variant_t *value_num, const zb
 
 int	zbx_item_preproc_convert_value(zbx_variant_t *value, unsigned char type, char **errmsg);
 
-int	zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-		zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
-		zbx_preproc_result_t *results, int *results_num, char **error);
+int zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
+						  zbx_vector_ptr_t *steps, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
+						  zbx_vector_ptr_t *results, char **error);
 
 void	*zbx_preproc_cache_get(zbx_preproc_cache_t *cache, unsigned char type);
 void	zbx_preproc_cache_put(zbx_preproc_cache_t *cache, unsigned char type, void *impl);

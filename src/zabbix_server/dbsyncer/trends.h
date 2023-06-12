@@ -1,6 +1,5 @@
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,11 +16,22 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#ifndef ZABBIX_PREPROCESSING_MANAGER_H
-#define ZABBIX_PREPROCESSING_MANAGER_H
+#ifndef PROC_TRENDS_H
+#define PROC_TRENDS_H
 
-#include "zbxthreads.h"
+#include "zbxcommon.h"
+#include "glb_history.h"
 
-ZBX_THREAD_ENTRY(preprocessing_manager_thread, args);
+
+int trends_account_metric(const ZBX_DC_HISTORY *h);
+
+int trends_init_cache();
+int trends_destroy_cache();
+
+void trend_set_hostname(trend_t *trend, const char *hostname);
+void trend_set_itemkey(trend_t *trend, const char *itemkey);
+
+char *trend_get_hostname(trend_t *trend);
+char *trend_get_itemkey(trend_t *trend);
 
 #endif

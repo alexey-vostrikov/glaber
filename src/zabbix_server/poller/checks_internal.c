@@ -30,6 +30,7 @@
 #include "zbxnum.h"
 #include "zbxsysinfo.h"
 #include "zbx_host_constants.h"
+#include "../glb_poller/internal.h"
 
 extern unsigned char	program_type;
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
@@ -190,7 +191,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 {
 	AGENT_REQUEST	request;
 	int		ret = NOTSUPPORTED, nparams;
-	const char	*tmp, *tmp1;
+	const char	*first_param, *tmp1;
 
 	zbx_init_agent_request(&request);
 
@@ -200,25 +201,36 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 		goto out;
 	}
 
+	ret = NOTSUPPORTED;
+	/* NULL check to silence analyzer warning */
+	if (0 == (nparams = get_rparams_num(&request)) || NULL == (first_param = get_rparam(&request, 0)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
+		goto out;
+	}
+	
+	if (FAIL != (ret = zbx_get_value_internal_ext(first_param, &request, result)))
+		goto out;
+
+
+	if (0 == strcmp("internal", get_rkey(&request)))
+	{
+		char *str_result = NULL;
+		if (SUCCEED == (ret =  glb_get_internal_metric(first_param, nparams, &request, &str_result)))
+			SET_MSG_RESULT(result, str_result);
+		else 
+			SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported internal key"));
+		
+		goto out;
+	}
+
 	if (0 != strcmp("zabbix", get_rkey(&request)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported item key for this item type."));
 		goto out;
 	}
 
-	/* NULL check to silence analyzer warning */
-	if (0 == (nparams = get_rparams_num(&request)) || NULL == (tmp = get_rparam(&request, 0)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		goto out;
-	}
-
-	if (FAIL != (ret = zbx_get_value_internal_ext(tmp, &request, result)))
-		goto out;
-
-	ret = NOTSUPPORTED;
-
-	if (0 == strcmp(tmp, "items"))			/* zabbix["items"] */
+	if (0 == strcmp(first_param, "items"))			/* zabbix["items"] */
 	{
 		if (1 != nparams)
 		{
@@ -228,7 +240,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_UI64_RESULT(result, DCget_item_count(0));
 	}
-	else if (0 == strcmp(tmp, "version"))			/* zabbix["version"] */
+	else if (0 == strcmp(first_param, "version"))			/* zabbix["version"] */
 	{
 		if (1 != nparams)
 		{
@@ -238,7 +250,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_STR_RESULT(result, zbx_strdup(NULL, ZABBIX_VERSION));
 	}
-	else if (0 == strcmp(tmp, "items_unsupported"))		/* zabbix["items_unsupported"] */
+	else if (0 == strcmp(first_param, "items_unsupported"))		/* zabbix["items_unsupported"] */
 	{
 		if (1 != nparams)
 		{
@@ -248,7 +260,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_UI64_RESULT(result, DCget_item_unsupported_count(0));
 	}
-	else if (0 == strcmp(tmp, "hosts"))			/* zabbix["hosts"] */
+	else if (0 == strcmp(first_param, "hosts"))			/* zabbix["hosts"] */
 	{
 		if (1 != nparams)
 		{
@@ -258,8 +270,9 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_UI64_RESULT(result, DCget_host_count());
 	}
-	else if (0 == strcmp(tmp, "queue"))			/* zabbix["queue",<from>,<to>] */
+	else if (0 == strcmp(first_param, "queue"))			/* zabbix["queue",<from>,<to>] */
 	{
+		char *tmp;
 		int	from = ZBX_QUEUE_FROM_DEFAULT, to = ZBX_QUEUE_TO_INFINITY;
 
 		if (3 < nparams)
@@ -268,7 +281,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 
-		if (NULL != (tmp = get_rparam(&request, 1)) && '\0' != *tmp &&
+		if (NULL != (tmp = get_rparam(&request, 1)) && '\0' != *first_param &&
 				FAIL == zbx_is_time_suffix(tmp, &from, ZBX_LENGTH_UNLIMITED))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
@@ -290,7 +303,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_UI64_RESULT(result, DCget_item_queue(NULL, from, to));
 	}
-	else if (0 == strcmp(tmp, "requiredperformance"))	/* zabbix["requiredperformance"] */
+	else if (0 == strcmp(first_param, "requiredperformance"))	/* zabbix["requiredperformance"] */
 	{
 		if (1 != nparams)
 		{
@@ -300,7 +313,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_DBL_RESULT(result, DCget_required_performance());
 	}
-	else if (0 == strcmp(tmp, "uptime"))			/* zabbix["uptime"] */
+	else if (0 == strcmp(first_param, "uptime"))			/* zabbix["uptime"] */
 	{
 		if (1 != nparams)
 		{
@@ -310,7 +323,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_UI64_RESULT(result, time(NULL) - config_startup_time);
 	}
-	else if (0 == strcmp(tmp, "boottime"))			/* zabbix["boottime"] */
+	else if (0 == strcmp(first_param, "boottime"))			/* zabbix["boottime"] */
 	{
 		if (1 != nparams)
 		{
@@ -320,7 +333,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		SET_UI64_RESULT(result, config_startup_time);
 	}
-	else if (0 == strcmp(tmp, "host"))			/* zabbix["host",*] */
+	else if (0 == strcmp(first_param, "host"))			/* zabbix["host",*] */
 	{
 		if (3 != nparams)
 		{
@@ -328,7 +341,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 
-		tmp = get_rparam(&request, 2);
+		char *tmp = get_rparam(&request, 2);
 
 		if (0 == strcmp(tmp, "available"))		/* zabbix["host",<type>,"available"] */
 		{
@@ -428,7 +441,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 	}
-	else if (0 == strcmp(tmp, "java"))			/* zabbix["java",...] */
+	else if (0 == strcmp(first_param, "java"))			/* zabbix["java",...] */
 	{
 		int	res;
 
@@ -446,11 +459,12 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 	}
-	else if (0 == strcmp(tmp, "process"))			/* zabbix["process",<type>,<mode>,<state>] */
+	else if (0 == strcmp(first_param, "process"))			/* zabbix["process",<type>,<mode>,<state>] */
 	{
 		unsigned char	process_type = ZBX_PROCESS_TYPE_UNKNOWN;
 		int		process_forks;
 		double		value;
+		char *tmp;
 
 		if (2 > nparams || nparams > 4)
 		{
@@ -645,7 +659,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 	// 		goto out;
 	// 	}
 	// }
-	else if (0 == strcmp(tmp, "rcache"))			/* zabbix[rcache,<cache>,<mode>] */
+	else if (0 == strcmp(first_param, "rcache"))			/* zabbix[rcache,<cache>,<mode>] */
 	{
 		if (2 > nparams || nparams > 3)
 		{
@@ -653,7 +667,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 
-		tmp = get_rparam(&request, 1);
+		char *tmp = get_rparam(&request, 1);
 		tmp1 = get_rparam(&request, 2);
 
 		if (0 == strcmp(tmp, "buffer"))
@@ -680,7 +694,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 	}
-	else if (0 == strcmp(tmp, "vmware"))
+	else if (0 == strcmp(first_param, "vmware"))
 	{
 		zbx_vmware_stats_t	stats;
 
@@ -697,7 +711,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 
-		tmp = get_rparam(&request, 1);
+		char *tmp = get_rparam(&request, 1);
 		if (NULL == (tmp1 = get_rparam(&request, 2)))
 			tmp1 = "";
 
@@ -736,7 +750,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 	}
-	else if (0 == strcmp(tmp, "stats"))			/* zabbix[stats,...] */
+	else if (0 == strcmp(first_param, "stats"))			/* zabbix[stats,...] */
 	{
 		const char	*ip_str, *port_str, *ip;
 		unsigned short	port_number;
@@ -790,7 +804,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 			if (0 == strcmp(tmp1, ZBX_PROTO_VALUE_ZABBIX_STATS_QUEUE))
 			{
-				tmp = get_rparam(&request, 4);		/* from */
+				char *tmp = get_rparam(&request, 4);		/* from */
 				tmp1 = get_rparam(&request, 5);		/* to */
 
 				if ((NULL == ip_str || '\0' == *ip_str) && (NULL == port_str || '\0' == *port_str))
@@ -840,7 +854,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			}
 		}
 	}
-	else if (0 == strcmp(tmp, "preprocessing_queue"))
+	else if (0 == strcmp(first_param, "preprocessing_queue"))
 	{
 		if (1 != nparams)
 		{
@@ -850,83 +864,6 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		//SET_UI64_RESULT(result, zbx_preprocessor_get_queue_size());
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "There is no preprocessor queue in Glaber"));
-	}
-	else if (0 == strcmp(tmp, "tcache"))			/* zabbix[tcache,cache,<parameter>] */
-	{
-		char		*error = NULL;
-		zbx_tfc_stats_t	stats;
-
-		if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid first parameter."));
-			goto out;
-		}
-
-		if (2 > nparams || 3 < nparams)
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-			goto out;
-		}
-
-		tmp1 = get_rparam(&request, 1);
-
-		if (0 != strcmp(tmp1, "cache"))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
-			goto out;
-		}
-
-		tmp = get_rparam(&request, 2);
-
-		if (FAIL == zbx_tfc_get_stats(&stats, &error))
-		{
-			SET_MSG_RESULT(result, error);
-			goto out;
-		}
-
-		if (NULL == tmp || 0 == strcmp(tmp, "all"))
-		{
-			SET_UI64_RESULT(result, stats.hits + stats.misses);
-		}
-		else if (0 == strcmp(tmp, "hits"))
-		{
-			SET_UI64_RESULT(result, stats.hits);
-		}
-		else if (0 == strcmp(tmp, "misses"))
-		{
-			SET_UI64_RESULT(result, stats.misses);
-		}
-		else if (0 == strcmp(tmp, "items"))
-		{
-			SET_UI64_RESULT(result, stats.items_num);
-		}
-		else if (0 == strcmp(tmp, "requests"))
-		{
-			SET_UI64_RESULT(result, stats.requests_num);
-		}
-		else if (0 == strcmp(tmp, "pmisses"))
-		{
-			zbx_uint64_t	total = stats.hits + stats.misses;
-
-			SET_DBL_RESULT(result, (0 == total ? 0 : (double)stats.misses / total * 100));
-		}
-		else if (0 == strcmp(tmp, "phits"))
-		{
-			zbx_uint64_t	total = stats.hits + stats.misses;
-
-			SET_DBL_RESULT(result, (0 == total ? 0 : (double)stats.hits / total * 100));
-		}
-		else if (0 == strcmp(tmp, "pitems"))
-		{
-			zbx_uint64_t	total = stats.items_num + stats.requests_num;
-
-			SET_DBL_RESULT(result, (0 == total ? 0 : (double)stats.items_num / total * 100));
-		}
-		else
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
-			goto out;
-		}
 	}
 	else
 	{

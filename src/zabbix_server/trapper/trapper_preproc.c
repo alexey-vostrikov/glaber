@@ -162,6 +162,7 @@ static int	trapper_parse_preproc_test(const struct zbx_json_parse *jp, char **va
 			goto out;
 		}
 		step_type = atoi(buffer);
+	//	LOG_INF("PREPROC Parsed step type %d", step_type);
 
 		if (FAIL == zbx_json_value_by_name(&jp_step, ZBX_PROTO_TAG_ERROR_HANDLER, buffer, sizeof(buffer), NULL))
 		{
@@ -257,7 +258,7 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 	{
 		goto out;
 	}
-
+	
 	first_step_type = 0;
 	if (0 != steps.values_num)
 		first_step_type  = ((zbx_preproc_op_t *)steps.values[0])->type;
@@ -275,6 +276,7 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 	for (i = 0; i < values_num; i++)
 	{
 		zbx_vector_ptr_clear_ext(&results, (zbx_clean_func_t)zbx_preproc_result_free);
+		zbx_vector_ptr_reserve(&results, steps.values_num);
 
 		if (0 == steps.values_num)
 		{
@@ -286,15 +288,11 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 			zbx_variant_set_str(&value, values[i]);
 			zbx_variant_copy(&result->value, &value);
 			zbx_vector_ptr_append(&results, result);
+		} 	else if (FAIL == zbx_preprocessor_test(value_type, values[i], &ts[i], &steps, &results, &history,
+				&preproc_error))
+		{
+			goto out;
 		}
-		else {
-			HALT_HERE("Testing needs to be implemented back for the new preprocessor");
-		}
-		// (FAIL == zbx_preprocessor_test(value_type, values[i], &ts[i], &steps, &results, &history,
-		//		&preproc_error, error))
-		//{
-		//	goto out;
-		//}
 
 		if (NULL != preproc_error)
 			break;
@@ -330,7 +328,6 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 		for (i = 0; i < results.values_num; i++)
 		{
 			result = (zbx_preproc_result_t *)results.values[i];
-
 			zbx_json_addobject(json, NULL);
 
 			if (NULL != result->error)
@@ -360,34 +357,40 @@ static int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_
 		}
 	}
 err:
+
 	zbx_json_close(json);
 
 	if (NULL == preproc_error)
 	{
 		result = (zbx_preproc_result_t *)results.values[results.values_num - 1];
-
 		if (ZBX_VARIANT_NONE != result->value.type)
 		{
+
 			zbx_json_addstring(json, ZBX_PROTO_TAG_RESULT, zbx_variant_value_desc(&result->value),
 					ZBX_JSON_TYPE_STRING);
 		}
-		else
+		else {
 			zbx_json_addstring(json, ZBX_PROTO_TAG_RESULT, NULL, ZBX_JSON_TYPE_NULL);
+		}
 	}
 	else
 		zbx_json_addstring(json, ZBX_PROTO_TAG_ERROR, preproc_error, ZBX_JSON_TYPE_STRING);
 
 	ret = SUCCEED;
 out:
-	for (i = 0; i < values_num; i++)
-		zbx_free(values[i]);
+
+//TODO: figure how to free values
+//	for (i = 0; i < values_num; i++)
+//		zbx_free(values[i]);
 
 	zbx_free(preproc_error);
 
 	zbx_vector_ptr_clear_ext(&history, (zbx_clean_func_t)zbx_preproc_op_history_free);
 	zbx_vector_ptr_destroy(&history);
+
 	zbx_vector_ptr_clear_ext(&results, (zbx_clean_func_t)zbx_preproc_result_free);
 	zbx_vector_ptr_destroy(&results);
+
 	zbx_vector_ptr_clear_ext(&steps, (zbx_clean_func_t)zbx_preproc_op_free);
 	zbx_vector_ptr_destroy(&steps);
 

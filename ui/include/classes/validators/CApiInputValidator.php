@@ -4117,7 +4117,6 @@ class CApiInputValidator {
 					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
 				]];
 				break;
-	
 		}
 
 		if (self::validate($api_input_rules, $params, $path, $error)) {

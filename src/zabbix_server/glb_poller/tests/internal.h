@@ -1,6 +1,6 @@
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Glaber
+** Copyright (C)  Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,16 +16,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+#include "log.h"
+#include "zbxcommon.h"
 
-#include "preproc_stats.h"
-
-#include "preproc.h"
-#include "zbxjson.h"
-
-// void zbx_preproc_stats_ext_get(struct zbx_json *json, const void *arg)
-// {
-// 	ZBX_UNUSED(arg);
-
-// 	/* zabbix[preprocessing_queue] */
-// 	zbx_json_adduint64(json, "preprocessing_queue", zbx_preprocessor_get_queue_size());
-// }
+void run_internal_metric_tests();

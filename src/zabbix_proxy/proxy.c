@@ -65,7 +65,6 @@
 #include "zbx_rtc_constants.h"
 #include "zbxicmpping.h"
 #include "zbxipcservice.h"
-#include "../zabbix_server/preprocessor/preproc_stats.h"
 
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
@@ -205,6 +204,10 @@ int CONFIG_DISABLE_SNMPV1_ASYNC = 0;
 int CONFIG_SELF_MONITOR_PORT		= DEFAULT_SELF_MONITOR_PORT;
 char	*CONFIG_SELF_MONITOR_IP		= NULL;
 int CONFIG_ICMP_NA_ON_RESOLVE_FAIL = 0;
+
+size_t  CONFIG_PREPROC_IPC_SIZE   =  512 * ZBX_MEBIBYTE;
+int CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR = 128 * ZBX_KIBIBYTE;
+int CONFIG_PROC_IPC_METRICS_PER_SYNCER =  128 * ZBX_KIBIBYTE;
 
 
 char	*CONFIG_SOURCE_IP = NULL;
@@ -844,6 +847,12 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
+		{"IPCBufferSize",                   &CONFIG_IPC_BUFFER_SIZE, TYPE_UINT64,
+		 	PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(64) * ZBX_GIBIBYTE},
+		{"IPCProcMetricsPerPreprocessor", &CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR, TYPE_INT,
+		 	PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
+		{"IPCProcMetricsPerSyncer", &CONFIG_PROC_IPC_METRICS_PER_SYNCER, TYPE_INT,
+			 PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
        	{"IcmpNaResolveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
         	PARM_OPT,       0,                      1},
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
@@ -912,10 +921,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"CacheSize",			&CONFIG_CONF_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(64) * ZBX_GIBIBYTE},
-		{"HistoryCacheSize",		&CONFIG_HISTORY_CACHE_SIZE,		TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
-		{"HistoryIndexCacheSize",	&CONFIG_HISTORY_INDEX_CACHE_SIZE,	TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"HousekeepingFrequency",	&CONFIG_HOUSEKEEPING_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	0,			24},
 		{"ProxyLocalBuffer",		&CONFIG_PROXY_LOCAL_BUFFER,		TYPE_INT,
@@ -1609,7 +1614,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	proxy_db_init();
 
-	change_proxy_history_count(proxy_get_history_count());
 
 	for (threads_num = 0, i = 0; i < ZBX_PROCESS_TYPE_COUNT; i++)
 		threads_num += CONFIG_FORKS[i];

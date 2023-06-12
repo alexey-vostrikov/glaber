@@ -187,18 +187,14 @@ next:
 				}
 
 				items[i].state = ITEM_STATE_NORMAL;
-				preprocess_agent_result(items[i].host.hostid, items[i].itemid, ts, &results[i]);
-				//zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags,
-				//		&results[i], ts, items[i].state, NULL);
+				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &results[i]);
 
 				itemids[i] = items[i].itemid;
 				lastclocks[i] = ts->sec;
 				break;
 			case NOTSUPPORTED:
 				items[i].state = ITEM_STATE_NOTSUPPORTED;
-				preprocess_error(items[i].host.hostid, items[i].itemid, ts, results[i].msg );
-				//zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type, items[i].flags, NULL,
-				//		ts, items[i].state, results[i].msg);
+				preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, ts, results[i].msg );
 
 				itemids[i] = items[i].itemid;
 				lastclocks[i] = ts->sec;

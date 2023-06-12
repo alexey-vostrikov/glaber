@@ -40,9 +40,7 @@ int	diag_add_section_info(const char *section, const struct zbx_json_parse *jp, 
 {
 	int	ret = FAIL;
 
-	if (0 == strcmp(section, ZBX_DIAG_HISTORYCACHE))
-		ret = zbx_diag_add_historycache_info(jp, json, error);
-	else if (0 == strcmp(section, ZBX_DIAG_PREPROCESSING))
+	if (0 == strcmp(section, ZBX_DIAG_PREPROCESSING))
 		ret = zbx_diag_add_preproc_info(jp, json, error);
 	else if (0 == strcmp(section, ZBX_DIAG_LOCKS))
 	{

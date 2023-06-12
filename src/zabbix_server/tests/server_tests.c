@@ -26,6 +26,7 @@
 #include "../../libs/glb_state/tests/glb_state_tests.h"
 #include "../../libs/zbxalgo/tests/algo_tests.h"
 #include "../preprocessor/worker_tests.h"
+#include "../glb_poller/tests/internal.h"
 
 #include "../../libs/zbxexec/tests/exec_tests.c"
 
@@ -33,6 +34,10 @@
 void tests_server_run(void) {
     LOG_INF("Running server tests");
     
+    LOG_INF("Running internal metric tests");
+    void run_internal_metric_tests();
+    HALT_HERE("Intentional tests stop");
+
     LOG_INF("Running glb_state tests");
     glb_state_run_tests();
 

@@ -106,9 +106,7 @@ static void save_steps_history(u_int64_t itemid, zbx_vector_ptr_t *out_history) 
 	zbx_vector_ptr_append_array(&hist_results->history, out_history->values, out_history->values_num);
 }
 
-//this is almost worker_preprocess_value, but instead deserializing / serializing data to/from the socket
-//it uses local memory storage.
-static void preprocess_metric_execute_steps(const metric_t *metric, int dep_level) {
+static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_cache_t	*cache, int dep_level) {
 
 	zbx_variant_t	value_out;
 	int			i, steps_num, results_num, ret;
@@ -127,11 +125,11 @@ static void preprocess_metric_execute_steps(const metric_t *metric, int dep_leve
         return;
     }
 
-	DEBUG_ITEM(metric->itemid, "Will run preprocessing for item %d steps", steps_num);
-
-	if (FAIL == (ret = worker_item_preproc_execute(metric->itemid, NULL, metric->value.type, 
+	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps", steps_num);
+	//TODO: just pass metric 
+	if (FAIL == (ret = worker_item_preproc_execute(metric->itemid, cache, metric->value.type, 
                         (zbx_variant_t *)&metric->value, &value_out, &metric->ts, steps, steps_num, history_in,
-			            &history_out, results, &results_num, &errmsg)) && 0 != results_num)
+			            &history_out, results, &results_num, metric->flags, &errmsg)) && 0 != results_num)
 	{
 		int action = results[results_num - 1].action;
 
@@ -155,10 +153,10 @@ static void preprocess_metric_execute_steps(const metric_t *metric, int dep_leve
 
 	for (i = 0; i < results_num; i++)
 		zbx_variant_clear(&results[i].value);
+
 	zbx_free(results);
 
     process_dependent_metrics(&new_metric, dep_level);
-    
  	zbx_variant_clear(&value_out);
 
 	zbx_free(error);
@@ -166,22 +164,27 @@ static void preprocess_metric_execute_steps(const metric_t *metric, int dep_leve
 
 static void process_dependent_metrics(metric_t * metric, int level) {
     zbx_preproc_item_t *preproc_item_conf;
-    int i;
+    zbx_preproc_cache_t		cache;
+	int i;
 	
-	if (level < 0) //reqursion protection
+	if (level < 0) //recursion protection
 		return;
-
+	
+	zbx_preproc_cache_init(&cache); //cache is for same-metric, thow not passing in recurse down
+	
     if (NULL == (preproc_item_conf = zbx_hashset_search(&conf.item_config, &metric->itemid))) 
         return;
     
     for (i = 0; i < preproc_item_conf->dep_itemids_num; i++ ) {
 		metric->itemid = preproc_item_conf->dep_itemids[i].first;
-        preprocess_metric_execute_steps(metric, level);
+        preprocess_metric_execute_steps(metric, &cache, level);
 	}
+
+	zbx_preproc_cache_clear(&cache);
 }
 
 IPC_PROCESS_CB(metrics_proc_cb) {
-    preprocess_metric_execute_steps((metric_t*)ipc_data, MAX_DEPENDENCY_LEVEL);
+    preprocess_metric_execute_steps((metric_t*)ipc_data, NULL, MAX_DEPENDENCY_LEVEL);
 }
 
 static void	preproc_item_clear(zbx_preproc_item_t *item)
@@ -206,8 +209,8 @@ void preprocessing_sync_conf() {
   zbx_hashset_iter_t	iter;
 
   old_revision = conf.cfg_revision;
-  DCconfig_get_preprocessable_items(&conf.item_config, &conf.cfg_revision, conf.process_num - 1);
-  
+  DCconfig_get_preprocessable_items(&conf.item_config, &conf.cfg_revision, conf.process_num );
+
   if (old_revision != conf.cfg_revision)
 	{
 		/* drop items with removed preprocessing steps from preprocessing history cache */
@@ -286,6 +289,7 @@ ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args) {
       total_proc = 0;
       proctitle_update = time(NULL);
       preprocessing_sync_conf();
+	  preprocessing_force_flush(); //if there are redirected items, flush them
     }    
   }
   

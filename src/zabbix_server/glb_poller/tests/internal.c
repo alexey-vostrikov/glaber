@@ -1,6 +1,6 @@
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Glaber
+** Copyright (C)  Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,12 +16,9 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+#include "log.h"
+#include "zbxcommon.h"
 
-#ifndef ZABBIX_PREPROCESSING_STATS_H
-#define ZABBIX_PREPROCESSING_STATS_H
-
-#include "zbxjson.h"
-
-void zbx_preproc_stats_ext_get(struct zbx_json *json, const void *arg);
-
-#endif
+void run_internal_metric_tests() {
+    
+}

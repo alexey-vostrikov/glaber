@@ -26,19 +26,22 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 #include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "../../libs/zbxipcservice/glb_ipc.h"
+#include "../../libs/glb_state/glb_state_items.h"
+#include "zbx_item_constants.h"
 #include "log.h"
 #include "zbxshmem.h"
 #include "metric.h"
 #include "zbxlld.h"
 
+
 u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid);
 extern int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
-#define CONFIG_PREPROC_IPC_SIZE     512 * ZBX_MEBIBYTE
-#define PREPROC_IPC_METRICS_BUFFER  128 * 1024
-#define PROCESS_IPC_METRICS_BUFFER  128 * 1024
+extern size_t  CONFIG_PREPROC_IPC_SIZE;
+extern int CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR;  //128 * 1024
+extern int CONFIG_PROC_IPC_METRICS_PER_SYNCER; //128 * 1024
 
-extern int  CONFIG_GLB_PREPROCESSOR_FORKS;
+//extern int  CONFIG_GLB_PREPROCESSOR_FORKS;
 
 static  zbx_shmem_info_t	*preproc_ipc_mem;
 ZBX_SHMEM_FUNC_IMPL(_preprocipc, preproc_ipc_mem);
@@ -105,11 +108,11 @@ int preproc_ipc_init(size_t ipc_size) {
     conf.memf.malloc_func = _preprocipc_shmem_malloc_func;
     conf.memf.realloc_func = _preprocipc_shmem_realloc_func;
 
-    conf.preproc_ipc = glb_ipc_init(PREPROC_IPC_METRICS_BUFFER * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
+    conf.preproc_ipc = glb_ipc_init(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
         CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf.memf, preproc_ipc_metric_create_cb,
          preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME);
     
-    conf.process_ipc = glb_ipc_init(PROCESS_IPC_METRICS_BUFFER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
+    conf.process_ipc = glb_ipc_init(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
         CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf.memf, preproc_ipc_metric_create_cb,
          preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME);
     
@@ -123,18 +126,19 @@ void preproc_ipc_destroy() {
 //TODO: add handling of stucking due to no IPC buffer is left
 //with information to log on such a situations
 int preprocess_send_metric(const metric_t *metric) {
+    glb_state_items_set_poll_result(metric->itemid, metric->ts.sec, ITEM_STATE_NORMAL);
     glb_ipc_send(conf.preproc_ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], (void *)metric, IPC_LOCK_WAIT);
     glb_ipc_flush(conf.preproc_ipc);
 }
 
 int processing_send_metric(const metric_t *metric) {
 
-    if (metric->flags && METRIC_TYPE_DISCOVERY) {
+    if (metric->flags & ZBX_FLAG_DISCOVERY_RULE ) {
         
         if (ZBX_VARIANT_STR != metric->value.type || NULL == metric->value.data.str )
             return FAIL;
-        //TODO: implement no-wait IPC queues to LLD workers, skip LLD data on congestion, get rid of lld manager :)
-        //this is important as this implementation might block on LLD manager slowdowns, allthow it shouldn't, it has a queue
+        DEBUG_ITEM(metric->itemid, "Items is discivery, sending to Discovery system");
+        //glb_state_item_add_lld_value(metric); it's better do it at lld processing
         zbx_lld_process_value(metric->itemid, metric->hostid, metric->value.data.str, &metric->ts, 0, 0, 0, NULL);
         return SUCCEED;
     }
@@ -152,10 +156,9 @@ int processing_send_metric(const metric_t *metric) {
         glb_ipc_dump_sender_queues(conf.process_ipc, "WAIT: Processing send queue");
         sleep(1);
         glb_ipc_flush(conf.process_ipc);
-    //    RUN_ONCE_IN_WITH_RET(10, 0);
-      //  glb_ipc_dump_sender_queues(conf.process_ipc, "WAIT QUEUE STAT: Processing send queue");
     }
-   
+
+    
     glb_ipc_flush(conf.process_ipc);
     
     RUN_ONCE_IN_WITH_RET(10, 0);
@@ -172,7 +175,7 @@ int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, vo
    return glb_ipc_process(conf.process_ipc, process_num -1 , proc_func, cb_data, max_count );
 };
 
-static int prepare_metric_common(metric_t *metric, u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts) {
+static int prepare_metric_common(metric_t *metric, u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts) {
     if (NULL == ts) 
       zbx_timespec(&metric->ts);
     else 
@@ -184,24 +187,25 @@ static int prepare_metric_common(metric_t *metric, u_int64_t hostid, u_int64_t i
     
     metric->hostid = hostid;
     metric->itemid = itemid;
+    metric->flags = flags;
     return SUCCEED;
 }
 
 //required to pass metric to processing and avoid false nodata 
-int preprocess_empty(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts) {
+int preprocess_empty(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts) {
     metric_t metric={0};
   //  LOG_INF("Setting empty %ld ");
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     zbx_variant_set_none(&metric.value);
     preprocess_send_metric(&metric);
     return SUCCEED;
 }
 
-int preprocess_error(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const char *error) {
+int preprocess_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error) {
     metric_t metric={0};
 
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     if (NULL != error)
         zbx_variant_set_error(&metric.value, (char *)error);
@@ -212,10 +216,10 @@ int preprocess_error(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *t
     return SUCCEED;
 }
 
-int preprocess_str(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const char *str) {
+int preprocess_str(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *str) {
     metric_t metric={0};
 
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     zbx_variant_set_str(&metric.value, (char *)str);
    // LOG_INF("Sending to preproc_send_metric");
@@ -223,50 +227,50 @@ int preprocess_str(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts,
     return SUCCEED;
 }
 
-int preprocess_uint64(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, u_int64_t int_val) {
+int preprocess_uint64(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, u_int64_t int_val) {
     metric_t metric={0};
     
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     zbx_variant_set_ui64(&metric.value, int_val);
     preprocess_send_metric(&metric);
     return SUCCEED;
 }
 
-int preprocess_dbl(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, double dbl_val) {
+int preprocess_dbl(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, double dbl_val) {
     metric_t metric={0};
 
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     zbx_variant_set_dbl(&metric.value, dbl_val);
     preprocess_send_metric(&metric);
     return SUCCEED;
 }
 
-int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
+int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
     metric_t metric={0};
 
  //   LOG_INF("Setting itmeid %ld agent result %d", itemid, ar->type);
 
     if (ar->type | AR_UINT64)
-        return preprocess_uint64(hostid, itemid, ts, ar->ui64);
+        return preprocess_uint64(hostid, itemid, flags, ts, ar->ui64);
 
     if (ar->type | AR_STRING)
-        return preprocess_str(hostid, itemid, ts, ar->str);
+        return preprocess_str(hostid, itemid, flags, ts, ar->str);
 
     if (ar->type | AR_TEXT)
-        return preprocess_str(hostid, itemid, ts, ar->text);
+        return preprocess_str(hostid, itemid, flags, ts, ar->text);
     
     if (ar->type | AR_DOUBLE)
-        return preprocess_dbl(hostid, itemid, ts, ar->dbl);
+        return preprocess_dbl(hostid, itemid, flags, ts, ar->dbl);
     
     return FAIL;
 }
 
-int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
+int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
     metric_t metric={0};
     
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
 
  //   LOG_INF("Setting itmeid %ld agent result %d", itemid, ar->type);
@@ -285,10 +289,10 @@ int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, const zbx_t
     processing_send_metric(&metric);
 }
 
-int processing_send_error(u_int64_t hostid, u_int64_t itemid, const zbx_timespec_t *ts, const char *error) {
+int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error) {
     metric_t metric={0};
  
-    if (FAIL == prepare_metric_common(&metric, hostid, itemid, ts)) 
+    if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     
     if (NULL != error)

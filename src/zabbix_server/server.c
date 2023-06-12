@@ -83,7 +83,6 @@
 #include "zbxthreads.h"
 #include "zbxicmpping.h"
 #include "zbxipcservice.h"
-#include "preprocessor/preproc_stats.h"
 #include "glb_preproc.h"
 
 #include "../libs/zbxexec/worker.h"
@@ -103,6 +102,10 @@ int CONFIG_ICMP_METHOD = GLB_ICMP;
 char *CONFIG_VCDUMP_LOCATION = NULL;
 int CONFIG_VCDUMP_FREQUENCY = 60;
 int CONFIG_ICMP_NA_ON_RESOLVE_FAIL = 0;
+
+size_t  CONFIG_PREPROC_IPC_SIZE   =  512 * ZBX_MEBIBYTE;
+int CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR = 128 * ZBX_KIBIBYTE;
+int CONFIG_PROC_IPC_METRICS_PER_SYNCER =  128 * ZBX_KIBIBYTE;
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -366,7 +369,7 @@ zbx_uint64_t CONFIG_CONF_CACHE_SIZE = 32 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_HISTORY_CACHE_SIZE = 16 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_HISTORY_INDEX_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_TRENDS_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
-static zbx_uint64_t CONFIG_TREND_FUNC_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
+//static zbx_uint64_t CONFIG_TREND_FUNC_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_VALUE_CACHE_SIZE = 256 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_VMWARE_CACHE_SIZE = 8 * ZBX_MEBIBYTE;
 u_int64_t CONFIG_IPC_BUFFER_SIZE = 128 * ZBX_MEBIBYTE;
@@ -800,12 +803,12 @@ static void zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
-	if (0 != CONFIG_TREND_FUNC_CACHE_SIZE && 128 * ZBX_KIBIBYTE > CONFIG_TREND_FUNC_CACHE_SIZE)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "\"TrendFunctionCacheSize\" configuration parameter must be either 0"
-								   " or greater than 128KB");
-		err = 1;
-	}
+	// if (0 != CONFIG_TREND_FUNC_CACHE_SIZE && 128 * ZBX_KIBIBYTE > CONFIG_TREND_FUNC_CACHE_SIZE)
+	// {
+	// 	zabbix_log(LOG_LEVEL_CRIT, "\"TrendFunctionCacheSize\" configuration parameter must be either 0"
+	// 							   " or greater than 128KB");
+	// 	err = 1;
+	// }
 
 	if (NULL != CONFIG_SOURCE_IP && SUCCEED != zbx_is_supported_ip(CONFIG_SOURCE_IP))
 	{
@@ -945,6 +948,12 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 		{
 			/* PARAMETER,			VAR,					TYPE,
 				MANDATORY,	MIN,			MAX */
+            {"IPCBufferSize",                   &CONFIG_IPC_BUFFER_SIZE, TYPE_UINT64,
+			 	PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(64) * ZBX_GIBIBYTE},
+			{"IPCProcMetricsPerPreprocessor", &CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR, TYPE_INT,
+			 	PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
+			{"IPCProcMetricsPerSyncer", &CONFIG_PROC_IPC_METRICS_PER_SYNCER, TYPE_INT,
+			 PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
             {"IcmpNaResolveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
             PARM_OPT,       0,                      1},
 			{"SnmpDisableSNMPV1Async", &CONFIG_DISABLE_SNMPV1_ASYNC, TYPE_INT,
@@ -1015,14 +1024,6 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 1},
 			{"CacheSize", &CONFIG_CONF_CACHE_SIZE, TYPE_UINT64,
 			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(64) * ZBX_GIBIBYTE},
-			{"HistoryCacheSize", &CONFIG_HISTORY_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(2) * ZBX_GIBIBYTE},
-			{"HistoryIndexCacheSize", &CONFIG_HISTORY_INDEX_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(2) * ZBX_GIBIBYTE},
-			{"TrendCacheSize", &CONFIG_TRENDS_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(2) * ZBX_GIBIBYTE},
-			{"TrendFunctionCacheSize", &CONFIG_TREND_FUNC_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 0, __UINT64_C(2) * ZBX_GIBIBYTE},
 			{"ValueCacheSize", &CONFIG_VALUE_CACHE_SIZE, TYPE_UINT64,
 			 PARM_OPT, 0, __UINT64_C(64) * ZBX_GIBIBYTE},
 			{"IPCBufferSize", &CONFIG_IPC_BUFFER_SIZE, TYPE_UINT64,
@@ -1640,12 +1641,12 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		exit(EXIT_FAILURE);
 	}
 
-	if (SUCCEED != zbx_tfc_init(CONFIG_TREND_FUNC_CACHE_SIZE, &error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize trends read cache: %s", error);
-		zbx_free(error);
-		return FAIL;
-	}
+	// if (SUCCEED != zbx_tfc_init(CONFIG_TREND_FUNC_CACHE_SIZE, &error))
+	// {
+	// 	zabbix_log(LOG_LEVEL_CRIT, "cannot initialize trends read cache: %s", error);
+	// 	zbx_free(error);
+	// 	return FAIL;
+	// }
 
 	if (0 != CONFIG_FORKS[ZBX_PROCESS_TYPE_TRAPPER])
 	{
@@ -1980,7 +1981,7 @@ static void server_teardown(zbx_rtc_t *rtc, zbx_socket_t *listen_sock, zbx_socke
 		zbx_tcp_unlisten(api_listen_sock);
 
 	/* destroy shared caches */
-	zbx_tfc_destroy();
+//	zbx_tfc_destroy();
 	zbx_vmware_destroy();
 	zbx_free_selfmon_collector();
 	free_configuration_cache();

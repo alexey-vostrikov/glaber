@@ -10,10 +10,6 @@ libpreprocessor_a_SOURCES = \
 	preproc_history.c \
 	preproc_history.h \
 	preproc_worker.c \
-	preproc_stats.c \
-	preproc_stats.h \
-	preprocessing.c \
-	preprocessing.h \
 	preproc_cache.c \
 	preproc_snmp.c \
 	preproc_snmp.h \

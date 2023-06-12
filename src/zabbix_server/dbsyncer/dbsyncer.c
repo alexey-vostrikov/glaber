@@ -26,6 +26,7 @@
 #include "zbxcachehistory.h"
 #include "zbxexport.h"
 #include "zbxprof.h"
+#include "trends.h"
 #include "../../libs/apm/apm.h"
 
 extern int				CONFIG_HISTSYNCER_FREQUENCY;
@@ -85,12 +86,6 @@ static void	zbx_db_flush_timer_queue(void)
 	zbx_vector_ptr_destroy(&persistent_timers);
 }
 
-static void	db_trigger_queue_cleanup(void)
-{
-	DBexecute("delete from trigger_queue");
-	zbx_db_trigger_queue_unlock();
-}
-
 /******************************************************************************
  *                                                                            *
  * Purpose: periodically synchronises data in memory cache with database      *
@@ -129,8 +124,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	zbx_block_signals(&orig_mask);
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	if (1 == process_num)
-		db_trigger_queue_cleanup();
+	trends_init_cache();
 
 	zbx_unblock_signals(&orig_mask);
 
@@ -151,12 +145,9 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 		zbx_prof_update(get_process_type_string(process_type), sec);
 
-	//	if (0 != sleeptime)
+
 		zbx_setproctitle("%s #%d [%s, syncing history]", process_name, process_num, stats);
 
-		/* clear timer trigger queue to avoid processing time triggers at exit */
-		if (!ZBX_IS_RUNNING())
-			zbx_log_sync_history_cache_progress();
 
 		/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 		zbx_block_signals(&orig_mask);
@@ -164,16 +155,12 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		zbx_sync_history_cache(&values_num, &triggers_num, &more, process_num);
 		zbx_prof_end();
 
-		if (!ZBX_IS_RUNNING() && SUCCEED != zbx_db_trigger_queue_locked())
-			zbx_db_flush_timer_queue();
 
 		zbx_unblock_signals(&orig_mask);
 
 		total_values_num += values_num;
 		total_triggers_num += triggers_num;
 		total_sec += zbx_time() - sec;
-
-		//sleeptime = (ZBX_SYNC_MORE == more ? 0 : CONFIG_HISTSYNCER_FREQUENCY);
 
 		if (STAT_INTERVAL <= time(NULL) - last_stat_time)
 		{
@@ -186,20 +173,13 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 						total_triggers_num/STAT_INTERVAL);
 			}
 
-		//	zbx_snprintf_alloc(&stats, &stats_alloc, &stats_offset, " in " ZBX_FS_DBL " sec", total_sec);
-
-//			if (0 == sleeptime)
 			zbx_setproctitle("%s #%d [%s, syncing history]", process_name, process_num, stats);
-//			else
-//				zbx_setproctitle("%s #%d [%s, idle %d sec]", process_name, process_num, stats, sleeptime);
 			total_values_num = 0;
 			total_triggers_num = 0;
 			total_sec = 0.0;
 			last_stat_time = time(NULL);
 		}
 
-//		if (ZBX_SYNC_MORE == more)
-//			continue;
 
 		if (!ZBX_IS_RUNNING())
 			break;
@@ -213,13 +193,12 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 	/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 	zbx_block_signals(&orig_mask);
-	if (SUCCEED != zbx_db_trigger_queue_locked())
-		zbx_db_flush_timer_queue();
+
+	trends_destroy_cache();
 
 	DBclose();
 	zbx_unblock_signals(&orig_mask);
 
-	zbx_log_sync_history_cache_progress();
 
 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_HISTORY))
 		zbx_export_deinit(history_export);

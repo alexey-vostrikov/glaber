@@ -392,9 +392,9 @@
 						placeholder_1: <?= json_encode(_('retry timout')) ?>
 					}));
 				case '<?= GLB_PREPROC_JSON_FILTER ?>':
-					return $(preproc_param_double_tmpl.evaluate({
+					return $(preproc_param_single_tmpl.evaluate({
 						rowNum: index,
-						placeholder_0: <?= json_encode(_('field1,field2,field3')) ?>
+						placeholder: <?= json_encode(_('field1,field2,field3')) ?>
 					}));
 				case '<?= GLB_PREPROC_LOCAL_DISPATCH ?>':
 					return $(preproc_param_double_tmpl.evaluate({

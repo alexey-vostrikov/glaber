@@ -886,9 +886,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			if (0 == add_results.values_num)
 			{
 				items[i].state = ITEM_STATE_NORMAL;
-				preprocess_agent_result(items[i].host.hostid, items[i].itemid, &timespec, &results[i] );
-				//zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type,
-				//		items[i].flags, &results[i], &timespec, items[i].state, NULL);
+				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, &results[i] );
 			}
 			else
 			{
@@ -904,18 +902,12 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 					if (ZBX_ISSET_MSG(add_result))
 					{
 						items[i].state = ITEM_STATE_NOTSUPPORTED;
-						preprocess_error(items[i].host.hostid, items[i].itemid, &ts_tmp, add_result->msg);
-						//zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid,&ts_tmp
-						//items[i].value_type, items[i].flags, NULL, &ts_tmp, items[i].state,
-						//		add_result->msg);
+						preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result->msg);
 					}
 					else
 					{
 						items[i].state = ITEM_STATE_NORMAL;
-						preprocess_agent_result(items[i].host.hostid, items[i].itemid, &ts_tmp, add_result);
-						//zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid,
-						//		items[i].value_type, items[i].flags, add_result,
-						//		&ts_tmp, items[i].state, NULL);
+						preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result);
 					}
 
 					/* ensure that every log item value timestamp is unique */
@@ -930,9 +922,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		else if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i])
 		{
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			preprocess_error(items[i].host.hostid, items[i].itemid, &timespec, results[i].msg);
-			//zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type,
-			//		items[i].flags, NULL, &timespec, items[i].state, results[i].msg);
+			preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, results[i].msg);
 		}
 
 		DCpoller_requeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1, poller_type,

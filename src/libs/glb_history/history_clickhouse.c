@@ -725,76 +725,76 @@ static int	add_history_values(void *data, ZBX_DC_HISTORY *hist, int history_num)
  *              history - [IN] the history data vector (may have mixed value types) *
  *                                                                                  *
  ************************************************************************************/
-static int	add_trend_values(void *data, ZBX_DC_TREND *trends, int trends_num)
+static int	add_trend_values(void *data, trend_t *trend)
 {
 	glb_clickhouse_data_t	*conf = (glb_clickhouse_data_t *)data;
-	int			i,j, value_type, num = 0;
+	int		value_type = trend->value_type;
 	
-	ZBX_DC_TREND *tr;
 	static glb_clickhouse_buffer_t tbuffer[ITEM_VALUE_TYPE_MAX] = {0};	
 	char *responce;
 
 	char *host_name, *item_key;	
 	char *precision="%0.4f,";
 
-	if (0 == trends_num ) 
-		return SUCCEED;
+	//if (0 == trends->values_num ) 
+	//	return SUCCEED;
     
-	for (i = 0; i < trends_num; i++)
-	{  
-		value_type=trends[i].value_type;
+	//for (i = 0; i < trends->values_num; i++)
+	//{  
+	//trend_t *trend = trends->values[i];
+	//value_type=trend->value_type;
 		
-		LOG_DBG("Got trend data: itemid %ld %s:%s", trends[i].itemid, trends[i].host_name, trends[i].item_key);
-		if ( 0 == trends[i].num ) 
-		 	continue;
-
-		tr=&trends[i];
-
-		if (0 == tbuffer[value_type].num) {
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
-				"INSERT INTO %s.%s (day, itemid, clock, value_min, value_max, value_avg, count, hostname, itemname) VALUES", 
-				conf->dbname, trend_tables[value_type]);
-		} else {
-			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",");
-		}
-
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
-			"(CAST(%d as date) ,%ld,%d,", trends[i].clock,trends[i].itemid,trends[i].clock);
-    	
-		switch (tr->value_type) {
-		
-			case ITEM_VALUE_TYPE_FLOAT:
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc,
-								&tbuffer[value_type].offset,precision,trends[i].value_min.dbl);
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,
-								&tbuffer[value_type].offset,precision,trends[i].value_max.dbl);
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,
-								&tbuffer[value_type].offset,precision,trends[i].value_avg.dbl);
-				break;
-			case ITEM_VALUE_TYPE_UINT64:
-				zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"%ld,%ld,%ld,",
-			   			trends[i].value_min.ui64,
-						trends[i].value_max.ui64,
-						(trends[i].value_avg.ui64.lo / trends[i].num) );
-				break;
-			default:
-				THIS_SHOULD_NEVER_HAPPEN;
-				break;
-		}
+	DEBUG_ITEM(trend->itemid, "Got trend data: itemid %ld %s:%s", trend->itemid, trend->host_name, trend->item_key);
+	//LOG_INF("Clickhouse got trend data: itemid %ld %s:%s", trend->itemid, trend->host_name, trend->item_key);
 	
-		host_name = zbx_dyn_escape_string(trends[i].host_name, ESCAPE_CHARS);   
-		item_key = zbx_dyn_escape_string(trends[i].item_key, ESCAPE_CHARS);   
+	//if ( 0 == trend->num ) 
+	//	 	continue;
 
-		zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,
-				"%d, '%s','%s')", trends[i].num, host_name, item_key);
-		
-		zbx_free(host_name);
-		zbx_free(item_key);
-
-        tbuffer[value_type].num++;
+	if (0 == tbuffer[value_type].num) {
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
+			"INSERT INTO %s.%s (day, itemid, clock, value_min, value_max, value_avg, count, hostname, itemname) VALUES", 
+			conf->dbname, trend_tables[value_type]);
+	} else {
+		zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,",");
 	}
 
-    for (value_type=0; value_type <ITEM_VALUE_TYPE_MAX; value_type ++ ) {
+	zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,
+		"(CAST(%d as date) ,%ld,%d,", trend->account_hour,trend->itemid,trend->account_hour);
+    	
+	switch (value_type) {
+		
+		case ITEM_VALUE_TYPE_FLOAT:
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc,
+							&tbuffer[value_type].offset,precision,trend->value_min.dbl);
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,
+							&tbuffer[value_type].offset,precision,trend->value_max.dbl);
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,
+							&tbuffer[value_type].offset,precision,trend->value_avg.dbl);
+			break;
+		case ITEM_VALUE_TYPE_UINT64:
+			zbx_snprintf_alloc(&tbuffer[value_type].buffer,&tbuffer[value_type].alloc,&tbuffer[value_type].offset,"%ld,%ld,%ld,",
+		   			trend->value_min.ui64,
+					trend->value_max.ui64,
+					(trend->value_avg.ui64 / trend->num) );
+			break;
+		default:
+			LOG_INF("Clickhouse export trend: type %d is not supported, itemid %ld", value_type, trend->itemid);
+			THIS_SHOULD_NEVER_HAPPEN;
+			break;
+	}	
+	
+	host_name = zbx_dyn_escape_string(trend->host_name, ESCAPE_CHARS);   
+	item_key = zbx_dyn_escape_string(trend->item_key, ESCAPE_CHARS);   
+
+	zbx_snprintf_alloc(&tbuffer[value_type].buffer, &tbuffer[value_type].alloc, &tbuffer[value_type].offset,
+			"%d, '%s','%s')", trend->num, host_name, item_key);
+		
+	zbx_free(host_name);
+	zbx_free(item_key);
+
+    tbuffer[value_type].num++;
+	
+    for (value_type = 0; value_type < ITEM_VALUE_TYPE_MAX; value_type ++ ) {
 		if ((tbuffer[value_type].num > GLB_CLICKHOUSE_WRITE_BATCH || 
 			 tbuffer[value_type].lastflush + GLB_CLICKHOUSE_FLUSH_TIMEOUT < time(NULL)) && 
 			 tbuffer[value_type].num > 0 )

@@ -61,12 +61,9 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 	char			*value, *error;
 	zbx_timespec_t		ts;
 	
-	
-	ZBX_DC_HISTORY hist = {0};
 	DC_ITEM			item;
 	int			errcode, mtime;
 	unsigned char		state, meta;
-	glb_state_item_meta_t cache_state = {0};
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -89,11 +86,10 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 
 		if (state != item.state)
 		{
-			hist.state = state;
 
 			if (ITEM_STATE_NORMAL == state)
 			{
-				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became supported",
+				DEBUG_ITEM(item.itemid, "discovery rule \"%s:%s\" became supported",
 						item.host.host, item.key_orig);
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
@@ -102,7 +98,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 			}
 			else
 			{
-				zabbix_log(LOG_LEVEL_WARNING, "discovery rule \"%s:%s\" became not supported: %s",
+				DEBUG_ITEM(item.itemid, "discovery rule \"%s:%s\" became not supported: %s",
 						item.host.host, item.key_orig, error);
 
 				zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_LLDRULE, itemid, &ts,
@@ -116,24 +112,11 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 	}
 
 	
-	cache_state.state = state;
-	cache_state.lastdata = time(NULL);
-	cache_state.error = error;
-		
-	glb_state_item_update_meta(itemid, &cache_state, 
-			GLB_CACHE_ITEM_UPDATE_LASTDATA | GLB_CACHE_ITEM_UPDATE_STATE | 	GLB_CACHE_ITEM_UPDATE_ERRORMSG , ITEM_VALUE_TYPE_STR );	
-	/* with successful LLD processing LLD error will be set to empty string */
-		
-	if (NULL != error)
-		hist.value.err = error;
-			
-	if (NULL != value )	 {
-		hist.value_type = ITEM_VALUE_TYPE_TEXT;
-		hist.value.str = value;
-		hist.ts = ts;
-		hist.itemid = itemid;
-		glb_state_item_add_lld_value(&hist);
- 	}
+	if (NULL != error) 
+		glb_state_item_set_error(itemid,error);
+	else if (NULL != value )	 
+		glb_state_item_add_lld_value(itemid, &ts, value);
+ 	
 
 	DCconfig_clean_items(&item, &errcode, 1);
 

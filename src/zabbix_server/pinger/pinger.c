@@ -66,14 +66,14 @@ static void	process_value(zbx_uint64_t itemid, zbx_uint64_t *value_ui64, double 
 	if (NOTSUPPORTED == ping_result)
 	{
 		item.state = ITEM_STATE_NOTSUPPORTED;
-		preprocess_error(item.host.hostid, item.itemid, ts, error);
+		preprocess_error(item.host.hostid, item.itemid, item.flags, ts, error);
 	}
 	else
 	{
 		if (NULL != value_ui64)
-			preprocess_uint64(item.host.hostid, item.itemid, ts, *value_ui64);
+			preprocess_uint64(item.host.hostid, item.itemid, item.flags, ts, *value_ui64);
 		else
-			preprocess_dbl(item.host.hostid, item.itemid, ts, *value_dbl);
+			preprocess_dbl(item.host.hostid, item.itemid, item.flags, ts, *value_dbl);
 		item.state = ITEM_STATE_NORMAL;
 	}
 clean:
@@ -419,9 +419,7 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 			zbx_timespec(&ts);
 
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			preprocess_error(items[i].host.hostid, items[i].itemid, &ts, error);
-			//zbx_preprocess_item_value( items[i].host.hostid, items[i].itemid, items[i].value_type,
-			//		items[i].flags, NULL, &ts, items[i].state, error);
+			preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags,  &ts, error);
 
 			DCrequeue_items(&items[i].itemid, &ts.sec, &errcode, 1);
 		}

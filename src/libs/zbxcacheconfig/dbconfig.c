@@ -49,6 +49,7 @@
 #include "../../zabbix_server/glb_poller/poller_ipc.h"
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
+#include "../../zabbix_server/dbsyncer/trends.h"
 int sync_in_progress = 0;
 
 #define START_SYNC               \
@@ -9606,9 +9607,9 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 		//alive check
 		if (HOST_STATUS_MONITORED != dc_host->status)
 			continue;
-		//proper host id check
-		//if (manager_num >= 0  && dc_host->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] != manager_num)
-		//	continue;
+		//only the process config fetching
+		if (manager_num >= 0  && dc_host->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] != manager_num - 1)
+			continue;
 		
 		//iterating on all hosts items
 		for (i = 0; i < dc_host->items.values_num; i++)
@@ -15802,41 +15803,6 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type)
 
 	UNLOCK_CACHE;
 	return ret;
-}
-/************************************************
- * fetches items host names and keys to send to 	*
- * trends storage
- * when i come back this func i should reconsider
- * implementing something like go contexts for
- * pass-through item processing
- ************************************************/
-void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num)
-{
-	int i;
-
-	ZBX_DC_ITEM *item;
-	ZBX_DC_HOST *host;
-
-	RDLOCK_CACHE;
-
-	for (i = 0; i < trends_num; i++)
-	{
-
-		if ((NULL != (item = zbx_hashset_search(&config->items, &trends[i].itemid))) &&
-			(NULL != (host = zbx_hashset_search(&config->hosts, &item->hostid))))
-		{
-			trends[i].host_name = zbx_strdup(NULL, host->host);
-			trends[i].item_key = zbx_strdup(NULL, item->key);
-		}
-		else
-		{
-			trends[i].host_name = zbx_strdup(NULL, "");
-			trends[i].item_key = zbx_strdup(NULL, "");
-		}
-		DEBUG_ITEM(trends[i].itemid, "Retrieved trend's host and key: '%s':'%s'", trends[i].host_name, trends[i].item_key);
-	}
-
-	UNLOCK_CACHE;
 }
 
 void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items)

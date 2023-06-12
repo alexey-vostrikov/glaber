@@ -125,6 +125,7 @@ ELEMS_CREATE(item_create_cb)
     i_data->db_fetched_time = ZBX_JAN_2038;
     i_data->value_type = ITEM_VALUE_TYPE_NONE;
     i_data->meta.state = ITEM_STATE_UNKNOWN;
+
     glb_tsbuff_init(&i_data->tsbuff, GLB_CACHE_ITEM_MIN_VALUES, sizeof(glb_state_item_value_t), memf->malloc_func);
     
     return SUCCEED;
@@ -919,6 +920,8 @@ int add_value_lld_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data) {
 
     int now = time(NULL);
     
+    elm->meta.state = ITEM_STATE_NORMAL;
+
     //for lld-based items need to store only one element
     if (glb_tsbuff_get_size(&elm->tsbuff) != 1) {
         glb_tsbuff_resize(&elm->tsbuff, 1 , memf->malloc_func, memf->free_func, NULL);
@@ -954,6 +957,13 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     ZBX_DC_HISTORY *h = (ZBX_DC_HISTORY *)data;
     int now = time(NULL);
 
+    if (ITEM_STATE_NORMAL != h->state ||
+        ITEM_VALUE_TYPE_NONE <= h->value_type )
+        return FAIL;
+
+    if (elm->meta.lastdata < h->ts.sec)
+        elm->meta.lastdata = h->ts.sec;
+
     DEBUG_ITEM(elem->id, "Adding item to the items value cache");
 
     if (elm->value_type == ITEM_VALUE_TYPE_NONE) {
@@ -987,6 +997,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
+        LOG_INF("Cannot add value for item %ld with timestamp %d to the cache, type is %d, state is %d", h->itemid,  h->ts.sec, h->value_type, h->state);
         DEBUG_ITEM(h->itemid, "Cannot add value for item with timestamp %d to the cache",  h->ts.sec);
         return FAIL;
     }
@@ -1158,7 +1169,7 @@ static int parse_json_item_state(struct zbx_json_parse *jp, glb_state_item_meta_
 
     meta->state = glb_json_get_int_value_by_name(jp, "state", &errflag);
     meta->lastdata = glb_json_get_int_value_by_name(jp, "lastdata", &errflag);
-    meta->nextcheck = glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
+    meta->nextcheck = 0;// glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
 
     if (0 == errflag)
         return SUCCEED;
@@ -1285,37 +1296,20 @@ DUMPER_FROM_JSON(unmarshall_item_cb)
     return parse_json_item_values(&jp_values, elem, memf);
 }
 
-int  glb_state_item_add_lld_value(ZBX_DC_HISTORY *h) {
-    DEBUG_ITEM(h->itemid,"Adding LLD value to the history");
-    return elems_hash_process(state->items, h->itemid, add_value_lld_cb, h, 0);
+
+int  glb_state_item_add_lld_value(u_int64_t itemid, zbx_timespec_t *ts, char *value ) {
+    
+    ZBX_DC_HISTORY h = {0};
+    h.itemid = itemid;
+    h.value.str = value;
+    h.value_type = ITEM_VALUE_TYPE_TEXT;
+    h.ts = *ts;
+
+    DEBUG_ITEM(itemid,"Adding LLD value to the state cache");
+
+    return elems_hash_process(state->items, itemid, add_value_lld_cb, &h, 0);
 }
 
-int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
-    int i, ret = SUCCEED;
-
-    LOG_DBG("In %s: starting adding new history %d values", __func__, history_num);
-
-    for (i = 0; i < history_num; i++)
-    {
-        ZBX_DC_HISTORY *h;
-        h = (ZBX_DC_HISTORY *)&history[i];
-
-        DEBUG_ITEM(h->itemid, "Adding to value cache, flags is %d state is %d", h->flags, h->state);
-        if (0 != ((ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF) & h->flags) || ITEM_STATE_NOTSUPPORTED == h->state)
-        {
-            DEBUG_ITEM(h->itemid, "Not adding to value cache, no_hist flag is set");
-            continue;
-        }
-
-        if (FAIL == elems_hash_process(state->items, h->itemid, add_value_cb, h, 0))
-        {
-            ret = FAIL;
-        };
-        DEBUG_ITEM(h->itemid, "Adding value with timestamp %d to the cache", h->ts.sec);
-    }
-
-    return ret;
-};
 
 
 int	zbx_vc_get_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
@@ -1359,19 +1353,48 @@ ELEMS_CALLBACK(item_set_error_cb) {
     item_elem_t *elm = (item_elem_t *)elem->data;
     const char *error = (const char *)data;
 
-    if (NULL == error)
-        return FAIL;
-    
-    elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, error);
     elm->meta.state = ITEM_STATE_NOTSUPPORTED;
+    if (NULL != error)
+        elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, error);
+    else 
+        elm->meta.error = strpool_replace(&state->strpool, "Error message is not set", error);
    
     return SUCCEED;
 }
+
+
 
 int  glb_state_item_set_error(u_int64_t itemid, const char *error) {
 	return elems_hash_process(state->items, itemid, item_set_error_cb, (void *)error, 0);
 }
 
+
+int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
+    int i, ret = SUCCEED;
+
+    LOG_DBG("In %s: starting adding new history %d values", __func__, history_num);
+
+    for (i = 0; i < history_num; i++)
+    {
+        ZBX_DC_HISTORY *h;
+        h = (ZBX_DC_HISTORY *)&history[i];
+
+        DEBUG_ITEM(h->itemid, "Adding to value cache, flags is %d state is %d", h->flags, h->state);
+        if (ITEM_STATE_NOTSUPPORTED == h->state)
+        {
+            if ( NULL != h->value.err ) {
+                DEBUG_ITEM(h->itemid, "Added error %s as state error", h->value.err);
+                elems_hash_process(state->items, h->itemid, item_set_error_cb,  h->value.err, 0);
+            }
+            continue;
+        }
+
+        ret = elems_hash_process(state->items, h->itemid, add_value_cb, h, 0);
+        DEBUG_ITEM(h->itemid, "Added value with timestamp %d to the cache", h->ts.sec);
+    }
+
+    return ret;
+};
 
 int glb_state_item_get_state(u_int64_t itemid) {
 	int st;
@@ -1586,7 +1609,27 @@ ELEMS_CALLBACK(clean_old_values) {
 void glb_state_items_housekeep() {
     items_hkeep_stat_t stat = {0};
     stat.clean_time  = time(NULL) - GLB_CACHE_ITEMS_MAX_DURATION;
-   // LOG_INF("Housekeeping items cache");
     elems_hash_iterate(state->items,clean_old_values, &stat, ELEMS_HASH_WRITE);
-    //LOG_INF("Housekeeping items cache finished, was items %ld, cleaned items %ld", stat.was_count, stat.clean_count);
+}
+
+typedef struct {
+    unsigned int lastcheck;
+    unsigned int nextcheck;
+    int state;
+} poll_result_t;
+
+ELEMS_CALLBACK(set_item_poll_result) {
+    item_elem_t *item=elem->data;
+    poll_result_t *res = data;
+    
+    if (res->state > -1) 
+        item->meta.state = res->state;
+    
+    if (res->lastcheck > item->meta.lastdata)
+        item->meta.lastdata = res->lastcheck;
+}
+
+void glb_state_items_set_poll_result(u_int64_t itemid, unsigned int lastcheck, int laststate) {
+    poll_result_t poll_res ={.lastcheck = lastcheck, .state = laststate};
+    elems_hash_process(state->items,itemid, set_item_poll_result, &poll_res, 0);
 }

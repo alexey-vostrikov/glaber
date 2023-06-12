@@ -45,6 +45,30 @@ extern zbx_es_t	es_engine;
 
 /******************************************************************************
  *                                                                            *
+ * Purpose: frees preprocessing step                                          *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_preproc_op_free(zbx_preproc_op_t *op)
+{
+	zbx_free(op->params);
+	zbx_free(op->error_handler_params);
+	zbx_free(op);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: frees preprocessing step test result                              *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_preproc_result_free(zbx_preproc_result_t *result)
+{
+	zbx_variant_clear(&result->value);
+	zbx_free(result->error);
+	zbx_free(result);
+}
+
+/******************************************************************************
+ *                                                                            *
  * Purpose: returns numeric type hint based on item value type                *
  *                                                                            *
  * Parameters: value_type - [IN] the item value type                          *
@@ -1805,12 +1829,13 @@ static preproc_params_t *item_preproc_parse_params(char *params_str)
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
  * *************************************************************************/
-static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
+static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, u_int64_t flags, const zbx_timespec_t *ts, char *params_str, char **errmsg)
 {
 	zbx_uint64_pair_t host_item_ids;
 	char *hostname = NULL;
 
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
+
 
 	if (FAIL == zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return SUCCEED;
@@ -1833,7 +1858,7 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 
 	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
 	{
-		preprocess_str(host_item_ids.first, host_item_ids.second, ts, value->data.str);
+		preprocess_str(host_item_ids.first, host_item_ids.second,  flags, ts, value->data.str);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
@@ -1846,7 +1871,7 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, const z
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
  * *************************************************************************/
-static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, const zbx_timespec_t *ts, char *params_str, char **errmsg)
+static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, u_int64_t flags, const zbx_timespec_t *ts, char *params_str, char **errmsg)
 {
 //	zbx_uint64_pair_t host_item_ids;
 	u_int64_t hostid, new_itemid;
@@ -1888,7 +1913,7 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, cons
 	if (SUCCEED == DCconfig_get_itemid_by_item_key_hostid(hostid, key, &new_itemid))
 	{
 
-		preprocess_str(hostid, new_itemid, ts, value->data.str);
+		preprocess_str(hostid, new_itemid, flags, ts, value->data.str);
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
@@ -1916,20 +1941,19 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 	
 	if (FAIL == zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 		return FAIL;
-
+		
 	if (FAIL == zbx_json_open(value->data.str, &jp))
 	{
 		DEBUG_ITEM(itemid, "Cannot open JSON '%s'", value->data.str);
+		zbx_variant_clear(value);
+	
 		return SUCCEED;
 	}
-
-	//int timeout = strtol(params, 0, 10);
-	//DEBUG_ITEM(itemid, "Discovery timeout is %d", timeout);
 
 	preproc_discovery_account_json(conf,itemid, value->data.str, &response);
 	
 	zbx_variant_clear(value);
-	
+
 	if (NULL != response)
 		zbx_variant_set_str(value, (char *)response);
 	
@@ -1963,10 +1987,10 @@ static int item_preproc_json_filter(u_int64_t itemid, zbx_variant_t *value, cons
 		return SUCCEED;
 	}
 
-	struct zbx_json *new_json;
-	zbx_json_init(new_json, 1024);
+	struct zbx_json new_json;
+	zbx_json_init(&new_json, 1024);
 
-	char *field_name = strtok(json_fields, ";");
+	char *field_name = strtok(json_fields, ",");
 
 	while (NULL != field_name)
 	{
@@ -1974,18 +1998,17 @@ static int item_preproc_json_filter(u_int64_t itemid, zbx_variant_t *value, cons
 		zbx_json_type_t type;
 
 		DEBUG_ITEM(itemid, "Processing field %s", field_name);
-		field_name = strtok(NULL, ",");
-
-		if (SUCCEED == zbx_json_value_by_name(&jp, field_name, field_value, MAX_STRING_LEN, &type))
-			zbx_json_addstring(new_json, field_name, field_value, type);
 		
+		if (SUCCEED == zbx_json_value_by_name(&jp, field_name, field_value, MAX_STRING_LEN, &type))
+			zbx_json_addstring(&new_json, field_name, field_value, type);
+		
+		field_name = strtok(NULL, ",");
 	}
+
 	zbx_variant_clear(value);
-	zbx_variant_set_str(value, new_json->buffer);
+	zbx_variant_set_str(value, zbx_strdup(NULL, new_json.buffer));
 
-	zbx_json_free(new_json);
-
-	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -2635,28 +2658,35 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
  ******************************************************************************/
 int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char value_type, zbx_variant_t *value,
 					 const zbx_timespec_t *ts, const zbx_preproc_op_t *op, zbx_variant_t *history_value,
-					 zbx_timespec_t *history_ts, char **error)
+					 zbx_timespec_t *history_ts, u_int64_t flags, char **error)
 {
 	int ret;
+	char params[MAX_STRING_LEN];
+
+	
+	if (NULL != op->params)
+		zbx_strlcpy(params, op->params, strlen(op->params) + 1);
+	else 
+		params[0] = 0;
 
 	DEBUG_ITEM(itemid, "Performing preprocessing step of type %d, incoming value %s", op->type, zbx_variant_value_desc(value));
 	
 	switch (op->type)
 	{
 	case ZBX_PREPROC_MULTIPLIER:
-		ret = item_preproc_multiplier(value_type, value, op->params, error);
+		ret = item_preproc_multiplier(value_type, value, params, error);
 		break;
 	case ZBX_PREPROC_RTRIM:
-		ret = item_preproc_rtrim(value, op->params, error);
+		ret = item_preproc_rtrim(value, params, error);
 		break;
 	case ZBX_PREPROC_LTRIM:
-		ret = item_preproc_ltrim(value, op->params, error);
+		ret = item_preproc_ltrim(value, params, error);
 		break;
 	case ZBX_PREPROC_TRIM:
-		ret = item_preproc_lrtrim(value, op->params, error);
+		ret = item_preproc_lrtrim(value, params, error);
 		break;
 	case ZBX_PREPROC_REGSUB:
-		ret = item_preproc_regsub(value, op->params, error);
+		ret = item_preproc_regsub(value, params, error);
 		break;
 	case ZBX_PREPROC_BOOL2DEC:
 		ret = item_preproc_bool2dec(value, error);
@@ -2674,68 +2704,68 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		ret = item_preproc_delta_speed(value_type, value, ts, history_value, history_ts, error);
 		break;
 	case ZBX_PREPROC_XPATH:
-		ret = item_preproc_xpath(value, op->params, error);
+		ret = item_preproc_xpath(value, params, error);
 		break;
 	case ZBX_PREPROC_JSONPATH:
-		ret = item_preproc_jsonpath(cache, value, op->params, error);
+		ret = item_preproc_jsonpath(cache, value, params, error);
 		break;
 	case ZBX_PREPROC_VALIDATE_RANGE:
-		ret = item_preproc_validate_range(value_type, value, op->params, error);
+		ret = item_preproc_validate_range(value_type, value, params, error);
 		break;
 	case ZBX_PREPROC_VALIDATE_REGEX:
-		ret = item_preproc_validate_regex(value, op->params, error);
+		ret = item_preproc_validate_regex(value, params, error);
 		break;
 	case ZBX_PREPROC_VALIDATE_NOT_REGEX:
-		ret = item_preproc_validate_not_regex(value, op->params, error);
+		ret = item_preproc_validate_not_regex(value, params, error);
 		break;
 	case ZBX_PREPROC_ERROR_FIELD_JSON:
-		ret = item_preproc_get_error_from_json(value, op->params, error);
+		ret = item_preproc_get_error_from_json(value, params, error);
 		break;
 	case ZBX_PREPROC_ERROR_FIELD_XML:
-		ret = item_preproc_get_error_from_xml(value, op->params, error);
+		ret = item_preproc_get_error_from_xml(value, params, error);
 		break;
 	case ZBX_PREPROC_ERROR_FIELD_REGEX:
-		ret = item_preproc_get_error_from_regex(value, op->params, error);
+		ret = item_preproc_get_error_from_regex(value, params, error);
 		break;
 	case ZBX_PREPROC_THROTTLE_VALUE:
 		ret = item_preproc_throttle_value(value, ts, history_value, history_ts);
 		break;
 	case ZBX_PREPROC_THROTTLE_TIMED_VALUE:
-		ret = item_preproc_throttle_timed_value(value, ts, op->params, history_value, history_ts,
+		ret = item_preproc_throttle_timed_value(value, ts, params, history_value, history_ts,
 												error);
 		break;
 	case GLB_PREPROC_THROTTLE_TIMED_VALUE_AGG:
-		ret = item_preproc_throttle_value_agg(value, ts, op->params, history_value, history_ts, value_type,
+		ret = item_preproc_throttle_value_agg(value, ts, params, history_value, history_ts, value_type,
 											  error);
 		break;
 	case GLB_PREPROC_DISPATCH_ITEM:
-		ret = item_preproc_dispatch(itemid, value, ts, op->params, error);
+		ret = item_preproc_dispatch(itemid, value, flags, ts, params, error);
 		break;
 	case GLB_PREPROC_DISPATCH_ITEM_BY_IP:
-		ret = item_preproc_dispatch_ip(itemid, value, ts, op->params, error);
+		ret = item_preproc_dispatch_ip(itemid, value, flags, ts, params, error);
 		break;	
 	case GLB_PREPROC_JSON_FILTER:
-		ret = item_preproc_json_filter(itemid, value, ts, op->params, history_value, history_ts, value_type,
+		ret = item_preproc_json_filter(itemid, value, ts, params, history_value, history_ts, value_type,
 									   error);
 		break;
 	case GLB_PREPROC_DISCOVERY_PREPARE:
-		ret = item_preproc_json_discovery_prepare(itemid, value, ts, op->params, history_value, history_ts, value_type,
+		ret = item_preproc_json_discovery_prepare(itemid, value, ts, params, history_value, history_ts, value_type,
 												  error);
 		break;
 	case ZBX_PREPROC_SCRIPT:
 		ret = item_preproc_script(value, op->params, history_value, error);
 		break;
 	case ZBX_PREPROC_PROMETHEUS_PATTERN:
-		ret = item_preproc_prometheus_pattern(cache, value, op->params, error);
+		ret = item_preproc_prometheus_pattern(cache, value, params, error);
 		break;
 	case ZBX_PREPROC_PROMETHEUS_TO_JSON:
-		ret = item_preproc_prometheus_to_json(value, op->params, error);
+		ret = item_preproc_prometheus_to_json(value, params, error);
 		break;
 	case ZBX_PREPROC_CSV_TO_JSON:
-		ret = item_preproc_csv_to_json(value, op->params, error);
+		ret = item_preproc_csv_to_json(value, params, error);
 		break;
 	case ZBX_PREPROC_STR_REPLACE:
-		ret = item_preproc_str_replace(value, op->params, error);
+		ret = item_preproc_str_replace(value, params, error);
 		break;
 	case ZBX_PREPROC_VALIDATE_NOT_SUPPORTED:
 		ret = item_preproc_validate_notsupport(error);
@@ -2744,13 +2774,13 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		ret = item_preproc_xml_to_json(value, error);
 		break;
 	case ZBX_PREPROC_SNMP_WALK_TO_VALUE:
-			ret = item_preproc_snmp_walk_to_value(cache, value, op->params, error);
+			ret = item_preproc_snmp_walk_to_value(cache, value, params, error);
 			break;
 	default:
-		*error = zbx_dsprintf(*error, "unknown preprocessing operation");
+		*error = zbx_dsprintf(*error, "unknown preprocessing operation %d", op->type);
 		ret = FAIL;
 	}
-
+	
 	DEBUG_ITEM(itemid, "Result of preprocessing step of type %d, result value %s, return %d",
 			   op->type, zbx_variant_value_desc(value), ret);
 
@@ -2815,41 +2845,48 @@ int zbx_item_preproc_handle_error(zbx_variant_t *value, const zbx_preproc_op_t *
  *                                                                            *
  ******************************************************************************/
 int zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const zbx_timespec_t *ts,
-						  zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
-						  zbx_preproc_result_t *results, int *results_num, char **error)
+						  zbx_vector_ptr_t *steps, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
+						  zbx_vector_ptr_t *results, char **error)
 {
 	int i, ret = SUCCEED;
 
-	for (i = 0; i < steps_num; i++)
+	zbx_vector_ptr_clear_ext(results, (zbx_clean_func_t)zbx_preproc_result_free);
+
+	for (i = 0; i < steps->values_num; i++)
 	{
-		zbx_preproc_op_t *op = &steps[i];
+		zbx_preproc_op_t *op = steps->values[i];
 		zbx_variant_t history_value;
 		zbx_timespec_t history_ts;
-
+		zbx_preproc_result_t	*result;
+		
 		zbx_preproc_history_pop_value(history_in, i, &history_value, &history_ts);
 
-		if (FAIL == (ret = zbx_item_preproc(0, NULL, value_type, value, ts, op, &history_value, &history_ts,
+		result = (zbx_preproc_result_t *)zbx_malloc(NULL, sizeof(zbx_preproc_result_t));
+		result->error = NULL;
+		results->values[i] = result;
+		zbx_variant_set_none(&result->value);
+
+		if (FAIL == (ret = zbx_item_preproc(0, NULL, value_type, value, ts, op, &history_value, &history_ts, 0, 
 											error)))
 		{
-			results[i].action = op->error_handler;
-			results[i].error = zbx_strdup(NULL, *error);
+			result->action = op->error_handler;
+			result->error = zbx_strdup(NULL, *error);
 			ret = zbx_item_preproc_handle_error(value, op, error);
 		}
 		else
 		{
-			results[i].action = ZBX_PREPROC_FAIL_DEFAULT;
-			results[i].error = NULL;
+			result->action = ZBX_PREPROC_FAIL_DEFAULT;
+			result->error = NULL;
 		}
 
 		if (SUCCEED != ret)
-		{
-			zbx_variant_set_none(&results[i].value);
-			zbx_variant_clear(&history_value);
+		{	zbx_variant_clear(&history_value);
 			break;
 		}
 
-		zbx_variant_copy(&results[i].value, value);
-
+		zbx_variant_copy(&result->value, value);
+		zbx_vector_ptr_append(results, result);
+			
 		if (ZBX_VARIANT_NONE != history_value.type)
 		{
 			/* the value is byte copied to history_out vector and doesn't have to be cleared */
@@ -2859,8 +2896,6 @@ int zbx_item_preproc_test(unsigned char value_type, zbx_variant_t *value, const 
 		if (ZBX_VARIANT_NONE == value->type)
 			break;
 	}
-
-	*results_num = (i == steps_num ? i : i + 1);
 
 	return ret;
 }

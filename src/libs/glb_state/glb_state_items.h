@@ -51,11 +51,15 @@ int     glb_state_item_get_state(u_int64_t itemid);
 int     glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
 int     glb_state_item_set_error(u_int64_t itemid, const char *error);
 
+void    glb_state_items_set_poll_result(u_int64_t itemid, unsigned int lastcheck, int laststate);
+
+
+
 int     glb_state_items_load();
 int     glb_state_items_dump();
 
-int     glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num);
-int     glb_state_item_add_lld_value(ZBX_DC_HISTORY *h);
+int     glb_state_item_add_values(ZBX_DC_HISTORY *history, int history_num);
+int     glb_state_item_add_lld_value(u_int64_t itemid, zbx_timespec_t *ts, char *value );
 
 int     glb_state_get_items_lastvalues_json(zbx_vector_uint64_t *itemids, struct zbx_json *json, int count);
 int     glb_state_get_items_status_json(zbx_vector_uint64_t *itemids, struct zbx_json *json);
