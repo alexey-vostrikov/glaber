@@ -762,9 +762,9 @@ static int	ipmi_manager_schedule_requests(zbx_ipmi_manager_t *manager, int now, 
 		if (FAIL == zbx_ipmi_port_expand_macros(items[i].host.hostid, items[i].interface.port_orig,
 				&items[i].interface.port, &error))
 		{
-
-			//zbx_timespec(&ts);
-			preprocess_error(items[i].host.hostid, items[i].itemid, NULL, error);
+			zbx_timespec_t ts;
+			zbx_timespec(&ts);
+			preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, NULL, error);
 	//		zbx_preprocess_item_value( items[i].host.hostid, items[i].itemid, items[i].value_type,
 	//				items[i].flags, NULL, &ts, state, error);
 			DCrequeue_items(&items[i].itemid, &ts.sec, &errcode, 1);
@@ -780,7 +780,6 @@ static int	ipmi_manager_schedule_requests(zbx_ipmi_manager_t *manager, int now, 
 		ipmi_manager_schedule_request(manager, items[i].host.hostid, request, now);
 	}
 
-	zbx_preprocessor_flush();
 	DCconfig_clean_items(items, NULL, num);
 
 	return num;
@@ -908,27 +907,14 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 	switch (errcode)
 	{
 		case SUCCEED:
-			state = ITEM_STATE_NORMAL;
 			if (NULL != value)
-			{
-				
-				preprocess_str(items[i].host.hostid, items[i].itemid, ts, value );
-				//zbx_init_agent_result(&result);
-				//SET_TEXT_RESULT(&result, value);
-				//zbx_free(value);// = NULL;
-				//zbx_preprocess_item_value(poller->request->hostid, itemid,  ITEM_VALUE_TYPE_TEXT, flags,
-				//		&result, &ts, state, NULL);
-				//zbx_free_agent_result(&result);
-			}
+				preprocess_str(poller->request->hostid, itemid,  poller->request->item_flags,  &ts, value );
 			break;
 
 		case NOTSUPPORTED:
 		case AGENT_ERROR:
 		case CONFIG_ERROR:
-			//state = ITEM_STATE_NOTSUPPORTED;
-			preprocess_error(poller->request->hostid, itemid, ts, value);
-			//zbx_preprocess_item_value(poller->request->hostid, itemid,  ITEM_VALUE_TYPE_TEXT, flags, NULL,
-			//		&ts, state, value);
+			preprocess_error(poller->request->hostid, itemid, poller->request->item_flags, &ts, value);
 			break;
 		default:
 			/* don't change item's state when network related error occurs */
@@ -980,8 +966,6 @@ ZBX_THREAD_ENTRY(ipmi_manager_thread, args)
 	}
 
 	ipmi_manager_init(&ipmi_manager);
-
-	glb_preprocessing_init();
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
