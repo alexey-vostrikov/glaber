@@ -388,8 +388,7 @@
 				case '<?= GLB_PREPROC_DISCOVERY_PREPARE ?>':
 					return $(preproc_param_double_tmpl.evaluate({
 						rowNum: index,
-						placeholder_0: <?= json_encode(_('new tiemout')) ?>,
-						placeholder_1: <?= json_encode(_('retry timout')) ?>
+						placeholder_0: <?= json_encode(_('resend to lld timeout')) ?>
 					}));
 				case '<?= GLB_PREPROC_JSON_FILTER ?>':
 					return $(preproc_param_single_tmpl.evaluate({

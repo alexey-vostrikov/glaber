@@ -5,4 +5,4 @@ noinst_LIBRARIES = libservertests.a
 libservertests_a_SOURCES = \
 	server_tests.c \
 	../preprocessor/worker_tests.c \
-	../glb_poller/tests/internal.c
+	../glb_poller/tests/test_internal.c

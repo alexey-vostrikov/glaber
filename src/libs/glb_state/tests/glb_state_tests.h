@@ -1,6 +1,6 @@
+
 /*
-** Glaber
-** Copyright (C)  Glaber
+** Copyright Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,9 +16,5 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#include "log.h"
-#include "zbxcommon.h"
 
-void run_internal_metric_tests() {
-    
-}
+void glb_state_run_tests(void);

@@ -34,6 +34,7 @@
 #include "zbxmodules.h"
 #include "zbxnix.h"
 #include "zbxcomms.h"
+#include "glb_common.h"
 
 #include "alerter/alerter.h"
 #include "dbsyncer/dbsyncer.h"
@@ -84,6 +85,7 @@
 #include "zbxicmpping.h"
 #include "zbxipcservice.h"
 #include "glb_preproc.h"
+#include "glb_poller/internal.h"
 
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
@@ -1294,7 +1296,8 @@ static void zbx_on_exit(int ret)
 
 		zbx_free_selfmon_collector();
 	}
-
+	
+	glb_internal_metrics_destory ();
 	zbx_uninitialize_events();
 
 	zbx_unload_modules();
@@ -1611,6 +1614,11 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 	DC_set_debug_trigger(CONFIG_DEBUG_TRIGGER);
 
+	if (FAIL == glb_internal_metrics_init()) {
+		zbx_error("Cannot initialize internal metrics register API");
+		exit(EXIT_FAILURE);
+	}
+
 	if (FAIL == glb_state_init())
 	{
 		zbx_error("Cannot initialize Glaber state CACHE");
@@ -1622,14 +1630,14 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		zbx_error("Cannot initialize internal monitoring IPC");
 		exit(EXIT_FAILURE);
 	}
-
+	
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE))
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == preproc_ipc_init(128 * ZBX_MEBIBYTE))
+	if (FAIL == preproc_ipc_init())
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);

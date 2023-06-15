@@ -22,5 +22,5 @@ typedef struct preproc_discovery_agg_conf_t preproc_discovery_agg_conf_t;
 preproc_discovery_agg_conf_t *preproc_discovery_agg_init();
 void    proproc_discovery_agg_destroy(preproc_discovery_agg_conf_t * conf);
 
-int    preproc_discovery_account_json(preproc_discovery_agg_conf_t * conf, u_int64_t itemid, const char *json, char **response);
+int    preproc_discovery_account_json(preproc_discovery_agg_conf_t * conf, u_int64_t itemid, int reexport_freq,  const char *json, char **response);
 //int  preproc_discovery_get_ready_data(preproc_discovery_agg_conf_t * conf, u_int64_t itemid, char **json_data);

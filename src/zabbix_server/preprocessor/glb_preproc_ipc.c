@@ -32,6 +32,7 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 #include "zbxshmem.h"
 #include "metric.h"
 #include "zbxlld.h"
+#include "../glb_poller/internal.h"
 
 
 u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid);
@@ -74,13 +75,18 @@ static void  preproc_ipc_free_buffer(void *buff) {
 IPC_CREATE_CB(preproc_ipc_metric_create_cb) {
 
     metric_t *local_metric = local_data, *ipc_metric = ipc_data;
-    char *ipc_str = NULL; 
-   // LOG_INF("Copying metric");
+
+	DEBUG_ITEM(local_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", local_metric->value.type,
+					zbx_variant_type_desc(&local_metric->value), zbx_variant_value_desc(&local_metric->value));
+
+
     memcpy(ipc_metric, local_metric, sizeof(metric_t));
-    //LOG_INF("Allocating and attaching the buffer");
+
     if ( SUCCEED == variant_is_dynamic_length(&local_metric->value)) 
         ipc_metric->value.data.str = preproc_ipc_allocate_str(local_metric->value.data.str);
-    //LOG_INF("Finished metric copy");
+    
+	DEBUG_ITEM(ipc_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", ipc_metric->value.type,
+					zbx_variant_type_desc(&ipc_metric->value), zbx_variant_value_desc(&ipc_metric->value));
 }
 
 IPC_FREE_CB(preproc_ipc_metric_free_cb) {
@@ -95,7 +101,26 @@ IPC_FREE_CB(preproc_ipc_metric_free_cb) {
     ipc_metric->value.type = VARIANT_VALUE_NONE;
 }
 
-int preproc_ipc_init(size_t ipc_size) {
+
+
+INTERNAL_METRIC_CALLBACK(preprocessing_stat_cb) {
+    LOG_INF("Called preproc statistics");
+    size_t alloc = 0, offset = 0;
+    zbx_snprintf_alloc(result, &alloc, &offset, "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\"}", 
+                glb_ipc_get_queue(conf.preproc_ipc), glb_ipc_get_free_pcnt(conf.preproc_ipc), glb_ipc_get_sent(conf.preproc_ipc) );
+
+    return SUCCEED;
+}
+
+INTERNAL_METRIC_CALLBACK(processing_stat_cb) {
+    size_t alloc = 0, offset = 0;
+    zbx_snprintf_alloc(result, &alloc, &offset, "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\"}", 
+                glb_ipc_get_queue(conf.process_ipc), glb_ipc_get_free_pcnt(conf.process_ipc), glb_ipc_get_sent(conf.process_ipc) );
+    
+    return SUCCEED;
+}
+
+int preproc_ipc_init() {
     char *error = NULL;
 
     if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, CONFIG_PREPROC_IPC_SIZE, "Metrics IPC buffer size", "MetricsBufferSize ", 1, &error)) {
@@ -115,7 +140,10 @@ int preproc_ipc_init(size_t ipc_size) {
     conf.process_ipc = glb_ipc_init(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
         CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf.memf, preproc_ipc_metric_create_cb,
          preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME);
-    
+
+    glb_register_internal_metric_handler("preprocessing", preprocessing_stat_cb);
+    glb_register_internal_metric_handler("processing", processing_stat_cb);
+
     return SUCCEED;
 }
 
@@ -161,9 +189,9 @@ int processing_send_metric(const metric_t *metric) {
     
     glb_ipc_flush(conf.process_ipc);
     
-    RUN_ONCE_IN_WITH_RET(10, 0);
-    glb_ipc_dump_sender_queues(conf.process_ipc, "WAIT QUEUE STAT: Processing send queue");
-    LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
+  //  RUN_ONCE_IN_WITH_RET(10, 0);
+  //  glb_ipc_dump_sender_queues(conf.process_ipc, "WAIT QUEUE STAT: Processing send queue");
+  //  LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
 }
 
 /*******receiver-side functions *******/
@@ -222,7 +250,7 @@ int preprocess_str(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zb
     if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     zbx_variant_set_str(&metric.value, (char *)str);
-   // LOG_INF("Sending to preproc_send_metric");
+    
     preprocess_send_metric(&metric);
     return SUCCEED;
 }
@@ -251,17 +279,17 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
     metric_t metric={0};
 
  //   LOG_INF("Setting itmeid %ld agent result %d", itemid, ar->type);
-
-    if (ar->type | AR_UINT64)
+    DEBUG_ITEM(itemid, "Sending item to preprocessing,  ar type is %d", ar->type);
+    if (ar->type & AR_UINT64)
         return preprocess_uint64(hostid, itemid, flags, ts, ar->ui64);
 
-    if (ar->type | AR_STRING)
+    if (ar->type & AR_STRING)
         return preprocess_str(hostid, itemid, flags, ts, ar->str);
 
-    if (ar->type | AR_TEXT)
+    if (ar->type & AR_TEXT)
         return preprocess_str(hostid, itemid, flags, ts, ar->text);
     
-    if (ar->type | AR_DOUBLE)
+    if (ar->type & AR_DOUBLE)
         return preprocess_dbl(hostid, itemid, flags, ts, ar->dbl);
     
     return FAIL;
@@ -309,5 +337,6 @@ int processing_force_flush() {
     glb_ipc_force_flush(conf.process_ipc);
 }
 int preprocessing_force_flush() {
-    glb_ipc_force_flush(conf.process_ipc);
+    glb_ipc_force_flush(conf.preproc_ipc);
 }
+

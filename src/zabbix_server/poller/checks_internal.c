@@ -217,10 +217,10 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 	{
 		char *str_result = NULL;
 		if (SUCCEED == (ret =  glb_get_internal_metric(first_param, nparams, &request, &str_result)))
-			SET_MSG_RESULT(result, str_result);
+			SET_STR_RESULT(result, str_result);
 		else 
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported internal key"));
-		
+		//warn: str result doesn't have to be deallocated!!!
 		goto out;
 	}
 

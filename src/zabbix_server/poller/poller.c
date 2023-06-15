@@ -307,6 +307,7 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 			break;
 		case ITEM_TYPE_INTERNAL:
 			res = get_value_internal(item, result, config_comms, config_startup_time);
+			DEBUG_ITEM(item->itemid, "Got item result '%s' code is %d", result->str, res);
 			break;
 		case ITEM_TYPE_DB_MONITOR:
 #ifdef HAVE_UNIXODBC
@@ -870,6 +871,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 					last_available = INTERFACE_AVAILABLE_FALSE;
 				}
 				break;
+			case FAIL:
 			case CONFIG_ERROR:
 				/* nothing to do */
 				break;
@@ -877,15 +879,17 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 				/* nothing to do, execution was forcibly interrupted by signal */
 				break;
 			default:
-				zbx_error("unknown response code returned: %d", errcodes[i]);
+				zbx_error("unknown response code returned for item %ld of type %d keys %s - code %d",items[i].itemid, items[i].type, items[i].key, errcodes[i]);
 				THIS_SHOULD_NEVER_HAPPEN;
 		}
+		DEBUG_ITEM(items[i].itemid, "Processing item result, errcode is %d, add results %d", errcodes[i], add_results.values_num);
 
 		if (SUCCEED == errcodes[i])
 		{
 			if (0 == add_results.values_num)
 			{
 				items[i].state = ITEM_STATE_NORMAL;
+				DEBUG_ITEM(items[i].itemid, "Processing item as agent result");
 				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, &results[i] );
 			}
 			else

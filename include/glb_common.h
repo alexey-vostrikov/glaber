@@ -24,4 +24,6 @@
 #define GLB_ICMP 20
 #define ZBX_ICMP 21
 
+//#define HAVE_GLB_TESTS 1
+
 #endif

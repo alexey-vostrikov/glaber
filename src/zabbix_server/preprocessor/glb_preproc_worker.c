@@ -116,7 +116,8 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
 	zbx_vector_ptr_t	*history_in = NULL, history_out;
 	zbx_preproc_result_t	*results;
 
-	DEBUG_ITEM(metric->itemid,"Metric entered to preprocessing");
+	DEBUG_ITEM(metric->itemid,"Metric entered to preprocessing with type %d, type %s value %s", 
+					zbx_variant_type_desc(&metric->value), zbx_variant_value_desc(&metric->value));
 	
     if (FAIL == prepare_preproc_task_data(metric, &history_in, &history_out, &steps, &steps_num, &results) || 
         ZBX_VARIANT_NONE == metric->value.type ) {

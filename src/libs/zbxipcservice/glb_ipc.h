@@ -96,6 +96,12 @@ int 	glb_ipc_force_flush(ipc_conf_t *ipc);
 void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_num);
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);
 
+
+u_int64_t glb_ipc_get_sent(ipc_conf_t *ipc);
+double glb_ipc_get_free_pcnt(ipc_conf_t *ipc);
+u_int64_t glb_ipc_get_queue(ipc_conf_t *ipc);
+
+
 /* vector specific ipc functions to pass zbx_vector_uint64_t arrays */
 typedef void (*ipc_data_vector_uint64_cb_t)(mem_funcs_t *memf, int i, zbx_vector_uint64_t *vector, void *data);
 

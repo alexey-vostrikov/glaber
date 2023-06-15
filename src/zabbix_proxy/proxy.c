@@ -73,8 +73,7 @@
 #include "../libs/apm/apm.h"
 #include "../zabbix_server/glb_poller/poller_ipc.h"
 #include "../zabbix_server/preprocessor/glb_preproc_worker.h"
-
- 
+#include "../zabbix_server/glb_poller/internal.h"
 
 
 #ifdef HAVE_OPENIPMI
@@ -1562,17 +1561,23 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
+	
+	if (FAIL == glb_internal_metrics_init() ) {
+		zbx_error("Cannot initialize internal metrics API");
+		exit(EXIT_FAILURE);
+	}
 
 	if (FAIL == glb_state_init()) {
 		zbx_error("Cannot initialize ValueCache");
 		exit(EXIT_FAILURE);
 	}
-
-	if (FAIL == preproc_ipc_init(128 * ZBX_MEBIBYTE)) {
+	
+	
+	if (FAIL == preproc_ipc_init()) {
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
-	
+		
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
@@ -1582,7 +1587,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_error("Cannot initialize internal monitoring IPC");
 		exit(EXIT_FAILURE);
 	}
-
 
 	if (0 != CONFIG_FORKS[ZBX_PROCESS_TYPE_VMWARE] && SUCCEED != zbx_vmware_init(&error))
 	{
@@ -1613,7 +1617,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	}
 
 	proxy_db_init();
-
 
 	for (threads_num = 0, i = 0; i < ZBX_PROCESS_TYPE_COUNT; i++)
 		threads_num += CONFIG_FORKS[i];

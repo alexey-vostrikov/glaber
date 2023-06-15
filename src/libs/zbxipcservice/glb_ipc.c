@@ -69,7 +69,7 @@ struct  ipc_conf_t {
 	ipc_mode_t mode; //ipc_bulk or ipc_fast
 	unsigned int lastflush;
 	unsigned int bulk_count;
-
+	int total_slots;
 };
 
 
@@ -348,7 +348,10 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		}
 
 		element = local_rcv_queue->first;
-	//	LOG_INF("Processing elemnt %p", element);
+		
+		//not: races possible here, make atomic or do under lock
+		rcv_queue->sent++;
+		
 		cb_func(&ipc->memf, i, (void *)(&element->data), cb_data);
 		
 		if (NULL != ipc->free_cb)
@@ -419,6 +422,7 @@ ipc_conf_t* glb_ipc_init(int elems_count, int elem_size, int consumers, mem_func
 	ipc->free_queue.first = elements;
 	ipc->free_queue.last =  elem;
 	ipc->free_queue.count = elems_count;
+	ipc->total_slots = elems_count;
 	
 	ipc->create_cb = create_cb;
 	ipc->free_cb = free_cb;
@@ -445,6 +449,31 @@ ipc_conf_t* glb_ipc_init(int elems_count, int elem_size, int consumers, mem_func
 void glb_ipc_destroy(ipc_conf_t *ipc) {
 	
 	zbx_free(ipc->local_queues);
+}
+
+//this might be not realy precise without locks
+u_int64_t glb_ipc_get_queue(ipc_conf_t *ipc) {
+	int i;
+	u_int64_t global_count = 0;
+	
+	for (i = 0; i < ipc->consumers; i++) 
+		global_count += ipc->queues[i].count;
+	
+	return global_count;
+}
+
+double glb_ipc_get_free_pcnt(ipc_conf_t *ipc) {
+	return (double)((double)ipc->free_queue.count * 100) /(double)ipc->total_slots;
+}
+
+u_int64_t glb_ipc_get_sent(ipc_conf_t *ipc) {
+	int i;
+	u_int64_t sent = 0;
+	
+	for (i = 0; i < ipc->consumers; i++) 
+		sent += ipc->queues[i].sent;
+	
+	return sent;
 }
 
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc, char *name) {

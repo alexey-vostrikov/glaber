@@ -46,8 +46,8 @@ int	zbx_get_value_internal_ext(const char *param1, const AGENT_REQUEST *request,
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
 			return NOTSUPPORTED;
 		}
-		HALT_HERE("Use glaber precessing ipc instead");
-//		SET_UI64_RESULT(result, get_proxy_history_count());
+//		HALT_HERE("Use glaber precessing ipc instead");
+		SET_MSG_RESULT(result, "history size not implemented");
 	}
 	else
 		return FAIL;

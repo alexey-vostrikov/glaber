@@ -20,11 +20,13 @@
 #include "zbxcommon.h"
 
 
-typedef int (*internal_metric_handler_func_t)(char *first_param, int nparams,  
+typedef int (*internal_metric_handler_func_t)(const char *first_param, int nparams,  
                     AGENT_REQUEST *request, char **result);
 
 #define INTERNAL_METRIC_CALLBACK(name) \
-        int name(char *first_param, int nparams, AGENT_RESULT *result, char **result);
+        int name(const char *first_param, int nparams, AGENT_REQUEST *request, char **result)
 
-int register_internal_metric_handler(const char *name, internal_metric_handler_func_t func);
+int glb_internal_metrics_init();
+void glb_internal_metrics_destory();
+int glb_register_internal_metric_handler(const char *name, internal_metric_handler_func_t func);
 int glb_get_internal_metric(const char *first_param, int nparams, AGENT_REQUEST *request, char **result);

@@ -11922,7 +11922,10 @@ int DCconfig_get_proxypoller_hosts(DC_PROXY *proxies, int max_hosts)
 
 		min = zbx_binary_heap_find_min(queue);
 		dc_proxy = (ZBX_DC_PROXY *)min->data;
-
+		
+	//	LOG_INF("PROXY POLLER: nextchek check");
+	//	LOG_INF("PROXY POLLER: Got proxy %ld, nextcheck in %d", dc_proxy->hostid, dc_proxy->nextcheck - now);
+		
 		if (dc_proxy->nextcheck > now)
 			break;
 
@@ -11934,7 +11937,7 @@ int DCconfig_get_proxypoller_hosts(DC_PROXY *proxies, int max_hosts)
 	}
 
 	UNLOCK_CACHE;
-
+	//LOG_INF("PROXY POLLER: returning %d proxies to check", num);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
 
 	return num;
@@ -12022,7 +12025,8 @@ void DCrequeue_proxy(zbx_uint64_t hostid, unsigned char update_nextcheck, int pr
 				dc_proxy->proxy_tasks_nextcheck = (int)calculate_proxy_nextcheck(
 					hostid, ZBX_TASK_UPDATE_FREQUENCY, now);
 			}
-
+			
+			//LOG_INF("PROXY POLLER: finished proxy processing, %s, next data check in %d", dc_host->host, dc_proxy->proxy_data_nextcheck - time(NULL));
 			DCupdate_proxy_queue(dc_proxy);
 		}
 	}

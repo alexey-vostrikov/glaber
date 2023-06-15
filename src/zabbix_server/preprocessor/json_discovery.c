@@ -24,7 +24,6 @@
 #include "zbxstr.h"
 
 #define MIN_ITEM_EXPORT_FREQUENCY 5
-#define REEXPORT_FREQUENCY 15
 
 typedef struct preproc_discovery_agg_conf_t {
 	elems_hash_t *discovery_data;
@@ -162,9 +161,9 @@ ELEMS_CALLBACK(account_json_cb) {
 	return SUCCEED;
 }
 
-int   preproc_discovery_account_json(preproc_discovery_agg_conf_t * conf, u_int64_t itemid, const char *json, char **response) {
+int   preproc_discovery_account_json(preproc_discovery_agg_conf_t * conf, u_int64_t itemid, int reexport_freq,	const char *json, char **response) {
 	cb_data_params_t cbdata = {.conf = conf, .in_json = json, .response = response, 
-				.export_time = time(NULL) - REEXPORT_FREQUENCY, .ttl_time = time(NULL) - 2*REEXPORT_FREQUENCY };
+				.export_time = time(NULL) - reexport_freq, .ttl_time = time(NULL) - 2 * reexport_freq };
 
 	if (FAIL  == elems_hash_process(conf->discovery_data, itemid, account_json_cb, &cbdata, 0)) 
 		return FAIL;

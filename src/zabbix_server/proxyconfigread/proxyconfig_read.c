@@ -181,14 +181,14 @@ static void	proxyconfig_add_row(struct zbx_json *j, const DB_ROW row, const ZBX_
  *             j          - [OUT] the output json                             *
  *                                                                            *
  ******************************************************************************/
-static void	proxyconfig_get_fields(char **sql, size_t *sql_alloc, size_t *sql_offset, const ZBX_TABLE *table,
+static void	proxyconfig_get_fields(char **sql, size_t *sql_alloc, size_t *sql_offset, const char *prefix, const ZBX_TABLE *table,
 		struct zbx_json *j)
 {
 	int	i;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "select %s", table->recid);
+	zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "select %s%s", prefix, table->recid);
 
 	zbx_json_addarray(j, "fields");
 	zbx_json_addstring(j, NULL, table->recid, ZBX_JSON_TYPE_STRING);
@@ -198,7 +198,7 @@ static void	proxyconfig_get_fields(char **sql, size_t *sql_alloc, size_t *sql_of
 		if (0 == (table->fields[i].flags & ZBX_PROXY))
 			continue;
 
-		zbx_chrcpy_alloc(sql, sql_alloc, sql_offset, ',');
+		zbx_snprintf_alloc(sql, sql_alloc, sql_offset, ", %s", prefix);
 		zbx_strcpy_alloc(sql, sql_alloc, sql_offset, table->fields[i].name);
 
 		zbx_json_addstring(j, NULL, table->fields[i].name, ZBX_JSON_TYPE_STRING);
@@ -242,7 +242,7 @@ static int	proxyconfig_get_macro_updates(const char *table_name, const zbx_vecto
 
 	sql = (char *)zbx_malloc(NULL, sql_alloc);
 
-	proxyconfig_get_fields(&sql, &sql_alloc, &sql_offset, table, j);
+	proxyconfig_get_fields(&sql, &sql_alloc, &sql_offset, "", table, j);
 	zbx_json_addarray(j, "data");
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " from %s", table->table);
@@ -366,7 +366,7 @@ out:
  ******************************************************************************/
 static int	proxyconfig_get_table_data(const char *table_name, const char *key_name,
 		const zbx_vector_uint64_t *key_ids, const char *filter, zbx_vector_uint64_t *recids, struct zbx_json *j,
-		char **error)
+		int select_items_by_hosts,	char **error)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -381,17 +381,24 @@ static int	proxyconfig_get_table_data(const char *table_name, const char *key_na
 	zbx_json_addobject(j, table->table);
 
 	sql = (char *)zbx_malloc(NULL, sql_alloc);
-	proxyconfig_get_fields(&sql, &sql_alloc, &sql_offset, table, j);
+	
+	proxyconfig_get_fields(&sql, &sql_alloc, &sql_offset, "tbl.",table, j);
 
 	zbx_json_addarray(j, ZBX_PROTO_TAG_DATA);
 
 	if (NULL == key_ids || 0 != key_ids->values_num)
 	{
-		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " from %s", table->table);
+		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " from %s tbl", table->table);
+		if (select_items_by_hosts)
+			zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, ", hosts h, items i");
 
 		if (NULL != key_ids || NULL != filter)
 		{
-			const char	*keyword = " where";
+			const char	*keyword;
+			if (select_items_by_hosts)
+				keyword = " where i.hostid = h.hostid and i.itemid = tbl.itemid and ";
+			else 
+				keyword =" where ";
 
 			if (NULL != key_ids)
 			{
@@ -442,6 +449,8 @@ out:
 
 	return ret;
 }
+
+
 
 typedef struct
 {
@@ -548,7 +557,7 @@ static int	proxyconfig_get_item_data(const zbx_vector_uint64_t *hostids, zbx_vec
 	zbx_json_addobject(j, table->table);
 
 	sql = (char *)zbx_malloc(NULL, sql_alloc);
-	proxyconfig_get_fields(&sql, &sql_alloc, &sql_offset, table, j);
+	proxyconfig_get_fields(&sql, &sql_alloc, &sql_offset, "", table, j);
 
 	zbx_json_addarray(j, ZBX_PROTO_TAG_DATA);
 
@@ -653,7 +662,7 @@ out:
  *               FAIL    - otherwise                                          *
  *                                                                            *
  ******************************************************************************/
-static int	proxyconfig_get_host_data(const zbx_vector_uint64_t *hostids, struct zbx_json *j, char **error)
+static int	proxyconfig_get_host_data(u_int64_t proxy_hostid, const zbx_vector_uint64_t *hostids, struct zbx_json *j, char **error)
 {
 	zbx_vector_uint64_t	interfaceids, itemids;
 	int			ret = FAIL;
@@ -663,31 +672,31 @@ static int	proxyconfig_get_host_data(const zbx_vector_uint64_t *hostids, struct 
 	zbx_vector_uint64_create(&interfaceids);
 	zbx_vector_uint64_create(&itemids);
 
-	if (SUCCEED != proxyconfig_get_table_data("hosts", "hostid", hostids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("hosts", "hostid", hostids, NULL, NULL, j, 0, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("interface",  "hostid", hostids, NULL, &interfaceids, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("interface",  "hostid", hostids, NULL, &interfaceids, j, 0, error))
 		goto out;
 
 	if (SUCCEED != proxyconfig_get_table_data("interface_snmp",  "interfaceid", &interfaceids, NULL, NULL,
-			j, error))
+			j, 0, error))
 	{
 		goto out;
 	}
 
-	if (SUCCEED != proxyconfig_get_table_data("host_inventory", "hostid", hostids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("host_inventory", "hostid", hostids, NULL, NULL, j, 0, error))
 		goto out;
 
 	if (SUCCEED != proxyconfig_get_item_data(hostids, &itemids, j, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("item_rtdata", "itemid", &itemids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("item_rtdata", "h.hostid", hostids, NULL, NULL, j, 1, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("item_preproc", "itemid", &itemids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("item_preproc", "h.hostid", hostids, NULL, NULL, j, 1, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("item_parameter", "itemid", &itemids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("item_parameter", "h.hostid", hostids, NULL, NULL, j, 1, error))
 		goto out;
 
 	ret = SUCCEED;
@@ -729,13 +738,13 @@ static int	proxyconfig_get_drules_data(const DC_PROXY *proxy, struct zbx_json *j
 
 	zbx_snprintf_alloc(&filter, &filter_alloc, &filter_offset, " status=%d", DRULE_STATUS_MONITORED);
 
-	if (SUCCEED != proxyconfig_get_table_data("drules", "proxy_hostid", &proxy_hostids, filter, &druleids, j,
+	if (SUCCEED != proxyconfig_get_table_data("drules", "proxy_hostid", &proxy_hostids, filter, &druleids, j, 0,
 			error))
 	{
 		goto out;
 	}
 
-	if (SUCCEED != proxyconfig_get_table_data("dchecks", "druleid", &druleids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("dchecks", "druleid", &druleids, NULL, NULL, j, 0,  error))
 		goto out;
 
 	ret = SUCCEED;
@@ -770,10 +779,10 @@ static int	proxyconfig_get_expression_data(struct zbx_json *j, char **error)
 
 	zbx_vector_uint64_create(&regexpids);
 
-	if (SUCCEED != proxyconfig_get_table_data("regexps", NULL, NULL, NULL, &regexpids, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("regexps", NULL, NULL, NULL, &regexpids, j, 0, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("expressions", "regexpid", &regexpids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("expressions", "regexpid", &regexpids, NULL, NULL, j, 0,  error))
 		goto out;
 
 	ret = SUCCEED;
@@ -806,22 +815,22 @@ static int	proxyconfig_get_httptest_data(const zbx_vector_uint64_t *httptestids,
 
 	zbx_vector_uint64_create(&httpstepids);
 
-	if (SUCCEED != proxyconfig_get_table_data("httptest", "httptestid", httptestids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("httptest", "httptestid", httptestids, NULL, NULL, j, 0, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("httptestitem", "httptestid", httptestids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("httptestitem", "httptestid", httptestids, NULL, NULL, j, 0, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("httptest_field", "httptestid", httptestids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("httptest_field", "httptestid", httptestids, NULL, NULL, j, 0, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("httpstep", "httptestid", httptestids, NULL, &httpstepids, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("httpstep", "httptestid", httptestids, NULL, &httpstepids, j, 0, error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("httpstepitem", "httpstepid", &httpstepids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("httpstepitem", "httpstepid", &httpstepids, NULL, NULL, j, 0,  error))
 		goto out;
 
-	if (SUCCEED != proxyconfig_get_table_data("httpstep_field", "httpstepid", &httpstepids, NULL, NULL, j, error))
+	if (SUCCEED != proxyconfig_get_table_data("httpstep_field", "httpstepid", &httpstepids, NULL, NULL, j, 0, error))
 		goto out;
 
 	ret = SUCCEED;
@@ -917,7 +926,7 @@ static int	proxyconfig_get_tables(const DC_PROXY *proxy, zbx_uint64_t proxy_conf
 		DBbegin();
 
 		if (0 != (flags & ZBX_PROXYCONFIG_SYNC_HOSTS) &&
-				SUCCEED != proxyconfig_get_host_data(&updated_hostids, j, error))
+				SUCCEED != proxyconfig_get_host_data(proxy->hostid, &updated_hostids, j, error))
 		{
 			goto out;
 		}
@@ -932,7 +941,7 @@ static int	proxyconfig_get_tables(const DC_PROXY *proxy, zbx_uint64_t proxy_conf
 		if (0 != (flags & ZBX_PROXYCONFIG_SYNC_HMACROS))
 		{
 			if (SUCCEED != proxyconfig_get_table_data("hosts_templates", "hostid", &macro_hostids, NULL,
-					NULL, j, error))
+					NULL, j, 0, error))
 			{
 				goto out;
 			}
@@ -957,7 +966,7 @@ static int	proxyconfig_get_tables(const DC_PROXY *proxy, zbx_uint64_t proxy_conf
 		}
 
 		if (0 != (flags & ZBX_PROXYCONFIG_SYNC_CONFIG) &&
-				SUCCEED != proxyconfig_get_table_data("config", NULL, NULL, NULL, NULL, j, error))
+				SUCCEED != proxyconfig_get_table_data("config", NULL, NULL, NULL, NULL, j, 0, error))
 		{
 			goto out;
 		}
@@ -969,7 +978,7 @@ static int	proxyconfig_get_tables(const DC_PROXY *proxy, zbx_uint64_t proxy_conf
 		}
 
 		if (0 != (flags & ZBX_PROXYCONFIG_SYNC_AUTOREG) &&
-				SUCCEED != proxyconfig_get_table_data("config_autoreg_tls", NULL, NULL, NULL, NULL, j,
+				SUCCEED != proxyconfig_get_table_data("config_autoreg_tls", NULL, NULL, NULL, NULL, j, 0, 
 						error))
 		{
 			goto out;

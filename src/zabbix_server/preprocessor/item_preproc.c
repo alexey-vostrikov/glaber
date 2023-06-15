@@ -1933,15 +1933,15 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 	char *response = NULL;
 	struct zbx_json_parse jp;
 	static preproc_discovery_agg_conf_t* conf = NULL;
+	int reexport_frequency;
 	
 	DEBUG_ITEM(itemid, "In %s: starting", __func__);
 
 	if (NULL == conf)
 		conf = preproc_discovery_agg_init();
 	
-	if (FAIL == zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
-		return FAIL;
-		
+	reexport_frequency = atoi(params);
+
 	if (FAIL == zbx_json_open(value->data.str, &jp))
 	{
 		DEBUG_ITEM(itemid, "Cannot open JSON '%s'", value->data.str);
@@ -1950,7 +1950,7 @@ static int item_preproc_json_discovery_prepare(u_int64_t itemid, zbx_variant_t *
 		return SUCCEED;
 	}
 
-	preproc_discovery_account_json(conf,itemid, value->data.str, &response);
+	preproc_discovery_account_json(conf, itemid, reexport_frequency, value->data.str, &response);
 	
 	zbx_variant_clear(value);
 

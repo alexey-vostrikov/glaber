@@ -719,13 +719,11 @@ const char *poller_strpool_copy(const char *str)
 void set_poller_proc_info(zbx_thread_args_t *args)
 {
 	zbx_thread_poller_args *poller_args_in = (zbx_thread_poller_args *)(args->args);
-	//conf.procinfo.poller_type = poller_args_in->poller_type;
+
 	conf.procinfo.server_num = args->info.server_num;
 	conf.procinfo.process_num = args->info.process_num;
 	conf.procinfo.process_type = args->info.process_type;
 	conf.procinfo.program_type = poller_args_in->zbx_get_program_type_cb_arg();
-	LOG_INF("Set program type %d, server num %d, process num %d, process type %d", 
-	   conf.procinfo.program_type, conf.procinfo.server_num, conf.procinfo.process_num, conf.procinfo.process_type );
 }
 
 /*in milliseconds */
