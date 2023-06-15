@@ -229,13 +229,13 @@ int	glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int 
 		return FAIL;
 	}
 
-	//whoever first gets the data, it's rusult is used 
+	//whoever first gets the data, it's result is used 
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ]->values[j];
 		glb_history_get_func_t get_values = callback->callback;
 		last_run = zbx_time();
-		
+		DEBUG_ITEM(itemid, "Calling history.get for the item");
 		if (SUCCEED == get_values(callback->callbackData , value_type, itemid, start, count, end, interactive, values)) {
 			get_runtime += zbx_time() - last_run;	
 			zabbix_log(LOG_LEVEL_DEBUG,"Current runtime is %f stat is %d",get_runtime,enabled_gets);
@@ -277,9 +277,9 @@ int	glb_history_get_history_aggregates_json(zbx_uint64_t itemid, int value_type,
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGG_JSON]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_AGG_JSON]->values[j];
-		glb_history_get_agg_buff_func_t get_values = callback->callback;
-		
-		if (SUCCEED == get_values(callback->callbackData , value_type, itemid, start, aggregates ,end, json)) 
+		glb_history_get_agg_buff_func_t get_agg_values = callback->callback;
+		DEBUG_ITEM(itemid, "Calling aggregated hitory get for the item");
+		if (SUCCEED == get_agg_values(callback->callbackData , value_type, itemid, start, aggregates ,end, json)) 
 			return SUCCEED;
 	}
 
@@ -310,6 +310,9 @@ int	glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, 
 	int			j, ret=FAIL;
 	
 	//zabbix_log(LOG_LEVEL_INFORMATION,"Starting %s",__func__);
+	if (ITEM_VALUE_TYPE_FLOAT != value_type && 
+		ITEM_VALUE_TYPE_UINT64 != value_type)
+		return FAIL;
 	
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_READ_TRENDS_AGG_JSON]->values_num; j++) {
 

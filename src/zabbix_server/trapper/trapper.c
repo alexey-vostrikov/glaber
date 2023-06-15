@@ -327,14 +327,14 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	zbx_json_type_t type;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-	LOG_DBG("Got history request %s",jp->start);
+	DEBUG_ITEM(itemid, "Got history request %s",jp->start);
 
 	if (FAIL == zbx_json_value_by_name(jp, "itemid", itemid_str, MAX_ID_LEN, &type) ||
 		FAIL == zbx_json_value_by_name(jp, "start", start_str, MAX_ID_LEN, &type) ||
 	    FAIL == zbx_json_value_by_name(jp, "end", end_str, MAX_ID_LEN, &type) ||
 		FAIL == zbx_json_value_by_name(jp, "type", req_type, MAX_ID_LEN,&type) ) 
 	{
-		LOG_WRN("Wrond history request: on of fields [itemid, start, end, type] is missing");
+		DEBUG_ITEM(itemid, "Wrong history request: on of fields [itemid, start, end, type] is missing");
 		failed_json_responce(sock, "Wrond history request: on of fields [itemid, start, end, type] is missing");
 		return FAIL;
 	}
@@ -352,7 +352,8 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	end=strtol(end_str,NULL, 10);
 						
 	if (FAIL == zbx_dc_get_item_type(itemid, &value_type)) {
-		failed_json_responce(sock, "Wrond history request: requested itemid doesn't exists in the config");
+		DEBUG_ITEM(itemid, "Wrong history request: itemid doesn't exitst in the config");
+		failed_json_responce(sock, "Wrong history request: requested itemid doesn't exists in the config");
 		return FAIL;
 	};
 
@@ -364,9 +365,10 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		
 		if ( 0 == strcmp(req_type,"history")) {
 		
-			LOG_DBG("History request processing");
+			DEBUG_ITEM(itemid, "History request processing");
 			zbx_history_record_vector_create(&values);
-			glb_history_get_history(itemid, value_type, start, count, end, GLB_HISTORY_GET_INTERACTIVE, &values);
+			if (FAIL == glb_history_get_history(itemid, value_type, start, count, end, GLB_HISTORY_GET_INTERACTIVE, &values))
+				DEBUG_ITEM(itemid, "Wrong history request: got FAIL from the hostory backend");
 			
 			for (i = 0; i < values.values_num; i++) 
 				glb_history_history_record_to_json(itemid,value_type, &values.values[i], &json);
@@ -375,26 +377,26 @@ static int recv_history_get_data(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		} 
 		
 		if ( 0 == strcmp(req_type,"trends")) {
-			LOG_DBG("Trends request processing");
+			DEBUG_ITEM(itemid, "Trends request processing");
 			glb_history_get_trends_json(itemid, value_type, start, end, &json);
 		} 
 
 	} else {
 		//aggregated requests 
 		if ( 0 == strcmp(req_type,"history")) {
-			LOG_DBG("Aggregated history request processing");
+			DEBUG_ITEM(itemid, "Aggregated history request processing");
 			glb_history_get_history_aggregates_json(itemid,value_type,start, end, aggregates, &json);
 		} 
 
 		if ( 0 == strcmp(req_type,"trends")) {
-			LOG_DBG("Aggregated trends request processing");
+			DEBUG_ITEM(itemid, "Aggregated trends request processing");
 			glb_history_get_trends_aggregates_json(itemid,value_type,start, end, aggregates, &json);
 		}
 	
 	}
 	
 	zbx_json_close(&json); 	
-	LOG_DBG("HISTORY RESPONCE IS: '%s'",json.buffer);
+	DEBUG_ITEM(itemid, "history response: '%s'",json.buffer);
 
 	(void)zbx_tcp_send(sock, json.buffer);
 	zbx_json_free(&json);
