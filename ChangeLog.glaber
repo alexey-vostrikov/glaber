@@ -1,3 +1,6 @@
+ver 3.1.0
+    -feat: intoroducing glb_preproc_worker, glb_ipc for metrics exchange, got rid of preproc manager, history cache, 
+    proxy config fetch improved, new preprocessing steps added
 ver 3.0.74
     - fix: disable attempts to request trends for non-numeric types
 ver 3.0.73
