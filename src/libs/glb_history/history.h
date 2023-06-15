@@ -22,13 +22,14 @@
 
 #include "zbxjson.h"
 #include "glb_history.h"
+#include "../../zabbix_server/dbsyncer/trends.h"
 
 //TODO: consider putting Glaber history implementation to a separate files
 typedef void (*glb_history_destroy_func_t)(void *data);
 
 typedef int (*glb_history_add_func_t)(void *data, ZBX_DC_HISTORY *history, int history_num);
 typedef int (*glb_history_get_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
-typedef int (*glb_history_add_trends_func_t)(void *data, ZBX_DC_TREND *trends, int trends_num);
+typedef int (*glb_history_add_trend_func_t)(void *data, trend_t *trend);
 
 typedef int (*glb_history_get_agg_buff_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int aggregates, int end, struct zbx_json* json);
 typedef int (*glb_history_get_trends_json_func_t)(void *data, int value_type, zbx_uint64_t itemid, int start, int end, struct zbx_json* json);

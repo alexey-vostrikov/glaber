@@ -241,3 +241,5 @@ create.sql
 create.sql.done
 build/appliance/run/docker/glaber-server/etc/zabbix
 src/glapi/glb_netflow_collector
+configure.ac
+src/libs/zbxdbschema/dbschema.c

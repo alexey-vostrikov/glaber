@@ -493,7 +493,7 @@ static int poller_init(zbx_thread_args_t *args)
 	  					.malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, 
 						.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC};
 
-	glb_preprocessing_init();
+	//glb_preprocessing_init();
 	poller_contention_init();
 	// conf.item_type = args->info.process_type;
 
@@ -526,7 +526,7 @@ static int poller_init(zbx_thread_args_t *args)
 	}
 	
 	poller_async_set_resolve_cb(conf.poller.resolve_callback);
-	 poller_async_set_resolve_fail_cb(conf.poller.resolve_fail_callback);
+	poller_async_set_resolve_fail_cb(conf.poller.resolve_fail_callback);
 
 	apm_track_counter(&conf.total_requests, "requests", NULL);
 	apm_add_proc_labels(&conf.total_requests);
@@ -650,89 +650,29 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 
 void poller_preprocess_error(poller_item_t *poller_item, const char *error)  
 {
-
-	zbx_timespec_t ts;
-
-	zbx_timespec(&ts);
-
-	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
-							  NULL, &ts, ITEM_STATE_NOTSUPPORTED, error);
+	preprocess_error(poller_item->hostid, poller_item->itemid, poller_item->flags, NULL, (char*)error);
 	glb_state_item_set_error(poller_item->itemid, error);
 	glb_state_interfaces_register_fail(poller_item->interfaceid, error);
 }
 
-void poller_preprocess_str(poller_item_t *poller_item, char *value, u_int64_t *mstime)
-{
-	metric_t metric = {.itemid = poller_item->itemid, .hostid = poller_item->hostid, .value.type = VARIANT_VALUE_STR, .value.data.str = value};
-
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Submitting item's string result to preproc: %s", value);
-
-	metric_set_time(&metric, mstime);
-	preprocess_send_metric(&metric);
+void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value) {
+	preprocess_uint64(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
+	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
 }
 
-
-void poller_preprocess_uint64_value(poller_item_t *poller_item, u_int64_t value) {
-	AGENT_RESULT result;
-	zbx_timespec_t ts;
-
-	zbx_timespec(&ts);
-	zbx_init_agent_result(&result);
-
-	SET_UI64_RESULT(&result, value);
-
-	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
-								  &result, &ts, ITEM_STATE_NORMAL, NULL);
-	zbx_free_agent_result(&result);
+void poller_preprocess_str(poller_item_t *poller_item, zbx_timespec_t *ts, const char *value) {
+	preprocess_str(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
+	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
 }
 
-void poller_preprocess_str_timestamp(poller_item_t *poller_item, u_int64_t timestamp, char *value) {
-	AGENT_RESULT result;
-	zbx_timespec_t ts;
-
-	ts.sec = timestamp;
-
-	zbx_init_agent_result(&result);
-	SET_TEXT_RESULT(&result, strdup(value));
-	
-	zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
-								  &result, &ts, ITEM_STATE_NORMAL, NULL);
-   
-	zbx_free_agent_result(&result);
+void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, double dbl_value) {
+	preprocess_dbl(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, dbl_value);
+	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
 }
 
-void poller_preprocess_str_value(poller_item_t *poller_item, char* value) {
-	AGENT_RESULT result;
-	zbx_timespec_t ts;
-
-	zbx_timespec(&ts);
-	poller_preprocess_str_timestamp(poller_item, ts.sec, value);
-}
-
-void poller_preprocess_value(poller_item_t *poller_item, AGENT_RESULT *result, u_int64_t mstime, unsigned char state, char *error)
-{
-	zbx_timespec_t ts = {.sec = mstime / 1000, .ns = (mstime % 1000) * 1000000};
-
-	if (NULL != result && (result->type | AR_UINT64))
-	{
-		DEBUG_ITEM(poller_item->itemid, "Preprocessing item of uint64 type value %ld", result->ui64);
-	}
-
-	if (ITEM_STATE_NORMAL == state)
-	{
-		zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
-								  result, &ts, state, NULL);
-		
-		glb_state_interfaces_register_ok(poller_item->interfaceid, "Successifully got data");
-	}
-
-	if (ITEM_STATE_NOTSUPPORTED == state)
-	{
-		zbx_preprocess_item_value(poller_item->hostid, poller_item->itemid, poller_item->value_type, poller_item->flags,
-								  NULL, &ts, state, error);
-		
-		glb_state_interfaces_register_fail(poller_item->interfaceid, error);
-	}
+void poller_preprocess_agent_result_value(poller_item_t *poller_item, zbx_timespec_t *ts, AGENT_RESULT *ar) {
+	preprocess_agent_result(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, ar);
+	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
 }
 
 void poller_inc_responses()
@@ -779,13 +719,11 @@ const char *poller_strpool_copy(const char *str)
 void set_poller_proc_info(zbx_thread_args_t *args)
 {
 	zbx_thread_poller_args *poller_args_in = (zbx_thread_poller_args *)(args->args);
-	//conf.procinfo.poller_type = poller_args_in->poller_type;
+
 	conf.procinfo.server_num = args->info.server_num;
 	conf.procinfo.process_num = args->info.process_num;
 	conf.procinfo.process_type = args->info.process_type;
 	conf.procinfo.program_type = poller_args_in->zbx_get_program_type_cb_arg();
-	LOG_INF("Set program type %d, server num %d, process num %d, process type %d", 
-	   conf.procinfo.program_type, conf.procinfo.server_num, conf.procinfo.process_num, conf.procinfo.process_type );
 }
 
 /*in milliseconds */

@@ -32,27 +32,14 @@
 /* For uint64 values the item values are summed into ui64 member and the    */
 /* average value is calculated before flushing trends to database:          */
 /* avg = ui64 / count                                                       */
-typedef union
-{
-	double		dbl;
-	zbx_uint128_t	ui64;
-}
-zbx_value_avg_t;
-
-// typedef struct
+// typedef union
 // {
-// 	zbx_uint64_t		itemid;
-// 	zbx_history_value_t	value_min;
-// 	zbx_value_avg_t		value_avg;
-// 	zbx_history_value_t	value_max;
-// 	int			clock;
-// 	int			num;
-// 	int			disable_from;
-// 	unsigned char		value_type;
-// 	char *host_name; /*hostname to log to history */
-// 	char *item_key; /* name of metric*/
+// 	double		dbl;
+// 	zbx_uint128_t	ui64;
 // }
-// ZBX_DC_TREND;
+// zbx_value_avg_t;
+
+
 
 int	zbx_trends_parse_base(const char *params, zbx_time_unit_t *base, char **error);
 int	zbx_trends_parse_timeshift(time_t from, const char *timeshift, struct tm *tm, char **error);
@@ -79,7 +66,7 @@ zbx_tfc_stats_t;
 int	zbx_tfc_init(zbx_uint64_t cache_size, char **error);
 void	zbx_tfc_destroy(void);
 int	zbx_tfc_get_stats(zbx_tfc_stats_t *stats, char **error);
-void	zbx_tfc_invalidate_trends(ZBX_DC_TREND *trends, int trends_num);
+//void	zbx_tfc_invalidate_trends(ZBX_DC_TREND *trends, int trends_num);
 
 int	zbx_baseline_get_data(zbx_uint64_t itemid, unsigned char value_type, time_t now, const char *period,
 		int season_num, zbx_time_unit_t season_unit, int skip, zbx_vector_dbl_t *values,

@@ -450,42 +450,6 @@ DBUser=zabbix
 # Default:
 # StartDBSyncers=4
 
-### Option: HistoryCacheSize
-#	Size of history cache, in bytes.
-#	Shared memory size for storing history data.
-#
-# Mandatory: no
-# Range: 128K-2G
-# Default:
-# HistoryCacheSize=16M
-
-### Option: HistoryIndexCacheSize
-#	Size of history index cache, in bytes.
-#	Shared memory size for indexing history cache.
-#
-# Mandatory: no
-# Range: 128K-2G
-# Default:
-# HistoryIndexCacheSize=4M
-
-### Option: TrendCacheSize
-#	Size of trend write cache, in bytes.
-#	Shared memory size for storing trends data.
-#
-# Mandatory: no
-# Range: 128K-2G
-# Default:
-# TrendCacheSize=4M
-
-### Option: TrendFunctionCacheSize
-#	Size of trend function cache, in bytes.
-#	Shared memory size for caching calculated trend function data.
-#
-# Mandatory: no
-# Range: 128K-2G
-# Default:
-# TrendFunctionCacheSize=4M
-
 ### Option: ValueCacheSize
 #	Size of history value cache, in bytes.
 #	Shared memory size for caching item history data requests.

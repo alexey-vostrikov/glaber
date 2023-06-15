@@ -50,7 +50,7 @@
 #include "../zabbix_server/vmware/vmware.h"
 #include "setproctitle.h"
 #include "zbxcomms.h"
-#include "../zabbix_server/preprocessor/preproc_manager.h"
+//#include "../zabbix_server/preprocessor/preproc_manager.h"
 #include "../zabbix_server/preprocessor/preproc_worker.h"
 #include "zbxvault.h"
 #include "zbxdiag.h"
@@ -65,7 +65,6 @@
 #include "zbx_rtc_constants.h"
 #include "zbxicmpping.h"
 #include "zbxipcservice.h"
-#include "../zabbix_server/preprocessor/preproc_stats.h"
 
 #include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
@@ -74,8 +73,7 @@
 #include "../libs/apm/apm.h"
 #include "../zabbix_server/glb_poller/poller_ipc.h"
 #include "../zabbix_server/preprocessor/glb_preproc_worker.h"
-
- 
+#include "../zabbix_server/glb_poller/internal.h"
 
 
 #ifdef HAVE_OPENIPMI
@@ -206,6 +204,10 @@ int CONFIG_SELF_MONITOR_PORT		= DEFAULT_SELF_MONITOR_PORT;
 char	*CONFIG_SELF_MONITOR_IP		= NULL;
 int CONFIG_ICMP_NA_ON_RESOLVE_FAIL = 0;
 
+size_t  CONFIG_PREPROC_IPC_SIZE   =  512 * ZBX_MEBIBYTE;
+int CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR = 128 * ZBX_KIBIBYTE;
+int CONFIG_PROC_IPC_METRICS_PER_SYNCER =  128 * ZBX_KIBIBYTE;
+
 
 char	*CONFIG_SOURCE_IP = NULL;
 static const char	*get_source_ip(void)
@@ -261,8 +263,8 @@ int	CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	1, /* ZBX_PROCESS_TYPE_TASKMANAGER */
 	0, /* ZBX_PROCESS_TYPE_IPMIMANAGER */
 	0, /* ZBX_PROCESS_TYPE_ALERTMANAGER */
-	1, /* ZBX_PROCESS_TYPE_PREPROCMAN */
-	3, /* ZBX_PROCESS_TYPE_PREPROCESSOR */
+	0, /* ZBX_PROCESS_TYPE_PREPROCMAN  - do not set to non 0, legacy*/
+	0, /* ZBX_PROCESS_TYPE_PREPROCESSOR - do not set to non 0, legacy*/
 	0, /* ZBX_PROCESS_TYPE_LLDMANAGER */
 	0, /* ZBX_PROCESS_TYPE_LLDWORKER */
 	0, /* ZBX_PROCESS_TYPE_ALERTSYNCER */
@@ -412,17 +414,7 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = ZBX_PROCESS_TYPE_TRAPPER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_TRAPPER];
 	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR]))
-	{
-		/* data collection processes might utilize CPU fully, start manager and worker processes beforehand */
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR];
-	} else  if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]))
+	else  if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]))
 	{
 		/* data collection processes might utilize CPU fully, start manager and worker processes beforehand */
 		*local_process_type = GLB_PROCESS_TYPE_PREPROCESSOR;
@@ -838,7 +830,7 @@ static void set_config_defaults() {
 	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
-	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] =1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] = 4;
 }
 
 /******************************************************************************
@@ -854,13 +846,19 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 	{
 		/* PARAMETER,			VAR,					TYPE,
 			MANDATORY,	MIN,			MAX */
-       {"IcmpNaResolveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
-        PARM_OPT,       0,                      1},
+		{"IPCBufferSize",                   &CONFIG_IPC_BUFFER_SIZE, TYPE_UINT64,
+		 	PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(64) * ZBX_GIBIBYTE},
+		{"IPCProcMetricsPerPreprocessor", &CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR, TYPE_INT,
+		 	PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
+		{"IPCProcMetricsPerSyncer", &CONFIG_PROC_IPC_METRICS_PER_SYNCER, TYPE_INT,
+			 PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
+       	{"IcmpNaResolveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
+        	PARM_OPT,       0,                      1},
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"SnmpDisableSNMPV1Async",			&CONFIG_DISABLE_SNMPV1_ASYNC,			TYPE_INT,
 			PARM_OPT,	0,			1},
-		{"StartGLBPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN], TYPE_INT,
+		{"StartGLBPreprocessors", &CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
 			 PARM_OPT, 1, 1000},
 		{"IPCBufferSize",		&CONFIG_IPC_BUFFER_SIZE,		TYPE_UINT64,
 			PARM_OPT,	1024*1024,			__UINT64_C(64) * ZBX_GIBIBYTE},	
@@ -922,10 +920,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			1},
 		{"CacheSize",			&CONFIG_CONF_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(64) * ZBX_GIBIBYTE},
-		{"HistoryCacheSize",		&CONFIG_HISTORY_CACHE_SIZE,		TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
-		{"HistoryIndexCacheSize",	&CONFIG_HISTORY_INDEX_CACHE_SIZE,	TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"HousekeepingFrequency",	&CONFIG_HOUSEKEEPING_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	0,			24},
 		{"ProxyLocalBuffer",		&CONFIG_PROXY_LOCAL_BUFFER,		TYPE_INT,
@@ -1090,8 +1084,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 //		{"StartPreprocessors",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR],		TYPE_INT,
 //			PARM_OPT,	1,			1000},
-		{"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
-			 PARM_OPT, 1, 1000},
+		// {"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+		// 	 PARM_OPT, 1, 1000},
 		{"ListenBacklog",		&CONFIG_TCP_MAX_BACKLOG_SIZE,		TYPE_INT,
 			PARM_OPT,	0,			INT_MAX},
 		{"StartODBCPollers",		&CONFIG_FORKS[ZBX_PROCESS_TYPE_ODBCPOLLER],		TYPE_INT,
@@ -1123,8 +1117,6 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			exit(EXIT_FAILURE);
 		}
 	}
-
-CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR ] = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
 
 #if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
 	zbx_db_validate_config();
@@ -1569,17 +1561,23 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
+	
+	if (FAIL == glb_internal_metrics_init() ) {
+		zbx_error("Cannot initialize internal metrics API");
+		exit(EXIT_FAILURE);
+	}
 
 	if (FAIL == glb_state_init()) {
 		zbx_error("Cannot initialize ValueCache");
 		exit(EXIT_FAILURE);
 	}
-
-	if (FAIL == preproc_ipc_init(128 * ZBX_MEBIBYTE)) {
+	
+	
+	if (FAIL == preproc_ipc_init()) {
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
-	
+		
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
@@ -1589,7 +1587,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		zbx_error("Cannot initialize internal monitoring IPC");
 		exit(EXIT_FAILURE);
 	}
-
 
 	if (0 != CONFIG_FORKS[ZBX_PROCESS_TYPE_VMWARE] && SUCCEED != zbx_vmware_init(&error))
 	{
@@ -1621,8 +1618,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	proxy_db_init();
 
-	change_proxy_history_count(proxy_get_history_count());
-
 	for (threads_num = 0, i = 0; i < ZBX_PROCESS_TYPE_COUNT; i++)
 		threads_num += CONFIG_FORKS[i];
 
@@ -1642,7 +1637,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "proxy #0 started [main process]");
 
-	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
+//	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
 	zbx_register_stats_data_func(zbx_proxy_stats_ext_get, &config_comms);
 	zbx_register_stats_ext_func(zbx_vmware_stats_ext_get, NULL);
 	zbx_diag_init(diag_add_section_info);
@@ -1767,12 +1762,6 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 			case ZBX_PROCESS_TYPE_TASKMANAGER:
 				thread_args.args = &taskmanager_args;
 				zbx_thread_start(taskmanager_thread, &thread_args, &threads[i]);
-				break;
-			case ZBX_PROCESS_TYPE_PREPROCMAN:
-				zbx_thread_start(preprocessing_manager_thread, &thread_args, &threads[i]);
-				break;
-			case ZBX_PROCESS_TYPE_PREPROCESSOR:
-				zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
 				break;
 			case ZBX_PROCESS_TYPE_AVAILMAN:
 				threads_flags[i] = ZBX_THREAD_PRIORITY_FIRST;

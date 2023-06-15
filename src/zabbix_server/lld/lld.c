@@ -1025,7 +1025,7 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	
 	if (SUCCEED != zbx_json_open(value, &jp))
 	{
-		*error = zbx_dsprintf(*error, "Invalid discovery rule value: %s", zbx_json_strerror());
+		*error = zbx_dsprintf(*error, "Invalid discovery rule value: %s value is '%s'", zbx_json_strerror(), value);
 		goto out;
 	}
 

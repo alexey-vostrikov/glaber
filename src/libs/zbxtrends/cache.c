@@ -628,43 +628,43 @@ void	zbx_tfc_put_value(zbx_uint64_t itemid, int start, int end, zbx_trend_functi
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-void	zbx_tfc_invalidate_trends(ZBX_DC_TREND *trends, int trends_num)
+void	zbx_tfc_invalidate_trends(trend_t *trends, int trends_num)
 {
-	zbx_tfc_data_t	*root, *data, data_local;
-	int		i, next;
+	// zbx_tfc_data_t	*root, *data, data_local;
+	// int		i, next;
 
-	if (NULL == cache)
-		return;
+	// if (NULL == cache)
+	// 	return;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() trends_num:%d", __func__, trends_num);
+	// zabbix_log(LOG_LEVEL_DEBUG, "In %s() trends_num:%d", __func__, trends_num);
 
-	data_local.start = 0;
-	data_local.end = 0;
-	data_local.function = ZBX_TREND_FUNCTION_UNKNOWN;
+	// data_local.start = 0;
+	// data_local.end = 0;
+	// data_local.function = ZBX_TREND_FUNCTION_UNKNOWN;
 
-	LOCK_CACHE;
+	// LOCK_CACHE;
 
-	for (i = 0; i < trends_num; i++)
-	{
-		data_local.itemid = trends[i].itemid;
+	// for (i = 0; i < trends_num; i++)
+	// {
+	// 	data_local.itemid = trends[i].itemid;
 
-		if (NULL == (root = (zbx_tfc_data_t *)zbx_hashset_search(&cache->index, &data_local)))
-			continue;
+	// 	if (NULL == (root = (zbx_tfc_data_t *)zbx_hashset_search(&cache->index, &data_local)))
+	// 		continue;
 
-		for (data = &cache->slots[root->next_value].data; data != root; data = &cache->slots[next].data)
-		{
-			next = data->next_value;
+	// 	for (data = &cache->slots[root->next_value].data; data != root; data = &cache->slots[next].data)
+	// 	{
+	// 		next = data->next_value;
 
-			if (trends[i].clock < data->start || trends[i].clock > data->end)
-				continue;
+	// 		if (trends[i].clock < data->start || trends[i].clock > data->end)
+	// 			continue;
 
-			tfc_free_data(data);
-		}
-	}
+	// 		tfc_free_data(data);
+	// 	}
+	// }
 
-	UNLOCK_CACHE;
+	// UNLOCK_CACHE;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+	// zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 int	zbx_tfc_get_stats(zbx_tfc_stats_t *stats, char **error)

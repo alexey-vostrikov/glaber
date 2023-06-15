@@ -166,16 +166,16 @@ int	glb_history_add_history(ZBX_DC_HISTORY *history, int history_num)
  *                                                                                  *
  *                                                                                  *
  ************************************************************************************/
-int	glb_history_add_trends(ZBX_DC_TREND *trends, int trends_num)
+int	glb_history_add_trend(trend_t *trend)
 {
 	int	j,  ret = SUCCEED;
 	
 	for (j = 0; j < API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values_num; j++) {
 
 		glb_api_callback_t *callback = API_CALLBACKS[GLB_MODULE_API_HISTORY_WRITE_TRENDS]->values[j];
-		glb_history_add_trends_func_t write_trends = callback->callback;
+		glb_history_add_trend_func_t write_trends = callback->callback;
 		
-		if (SUCCEED == write_trends(callback->callbackData, trends, trends_num) ) return SUCCEED;
+		if (SUCCEED == write_trends(callback->callbackData, trend) ) return SUCCEED;
 	}
 
 	return SUCCEED;

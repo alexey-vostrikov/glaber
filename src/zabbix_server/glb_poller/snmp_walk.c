@@ -233,15 +233,9 @@ static int snmp_walk_submit_result(poller_item_t *poller_item) {
 
 	DEBUG_ITEM(poller_get_item_id(poller_item),"Finished walk for the item, result is %s", js.buffer);
 	zbx_json_close(&js);
-	
-	AGENT_RESULT result = {0};
-
-	zbx_init_agent_result(&result);
-	result.type = AR_TEXT;
-	result.text = zbx_strdup(NULL, js.buffer);
-	poller_preprocess_value(poller_item, &result , glb_ms_time(), ITEM_STATE_NORMAL, NULL);
-	
-	zbx_free_agent_result(&result);
+	//LOG_INF("Submitting buffer to preprocessing: %p, length is %d", js.buffer, strlen(js.buffer));
+	poller_preprocess_str(poller_item, NULL, js.buffer);
+	//LOG_INF("Preprocessed");
 	zbx_json_free(&js);
 
 	return ret;

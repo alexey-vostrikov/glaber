@@ -20,7 +20,8 @@ libglbpoller_a_SOURCES = \
 	poller_contention.c \
 	snmp_util.c \
 	tcp_agent_proto.c \
-	tcp_simple_http_proto.c
+	tcp_simple_http_proto.c \
+	internal.c
 	
 libglbpoller_a_CFLAGS = \
 	-I$(top_srcdir)/src/libs/zbxsysinfo/simple \

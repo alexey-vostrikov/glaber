@@ -69,20 +69,8 @@ void	zbx_history_value2variant(const zbx_history_value_t *value, unsigned char v
 int     history_record_float_compare(const zbx_history_record_t *d1, const zbx_history_record_t *d2);
 void	zbx_history_value_print(char *buffer, size_t size, const zbx_history_value_t *value, int value_type);
 
-typedef struct
-{
-	zbx_uint64_t	itemid;
-	zbx_history_value_t	value_min;
-	value_avg_t	value_avg;
-	zbx_history_value_t	value_max;
-	int		clock;
-	int		num;
-	int		disable_from;
-	unsigned char	value_type;
-	char *host_name; /*hostname to log to history */
-	char *item_key; /* name of metric*/
-}
-ZBX_DC_TREND;
+
+
 
 typedef struct
 {
@@ -92,24 +80,45 @@ typedef struct
 	unsigned char	value_type;
 	zbx_history_value_t	value;
 	
+	unsigned char	state;
 	zbx_uint64_t	lastlogsize;
 	zbx_timespec_t	ts;
 	int		mtime;
 		
 	unsigned char	flags;		/* see ZBX_DC_FLAG_* */
-	unsigned char	state;
+	
 
 	char *host_name; /*hostname to log to history */
 	char *item_key; /* name of metric*/
 }
 ZBX_DC_HISTORY;
 
+typedef union
+{
+	double		dbl;
+	zbx_uint64_t	ui64;
+} trend_value_t;
+
+typedef struct 
+{
+	zbx_uint64_t	itemid;
+    zbx_uint64_t	hostid;
+    trend_value_t	value_min;
+	trend_value_t	value_avg; //until exported we keep the sum, calc avg on export
+	trend_value_t	value_max;
+	int		account_hour;
+	int		num;
+	unsigned char	value_type; //inherited from variant
+	char *host_name; /*hostname to log to history */
+	char *item_key; /* name of metric*/
+} trend_t;
+
 
 int glb_history_init(char **history_modules, char **error);
 
 int glb_history_add_history(ZBX_DC_HISTORY *history, int history_num);
 int glb_history_get_history(zbx_uint64_t itemid, int value_type, int start, int count, int end, unsigned char interactive, zbx_vector_history_record_t *values);
-int glb_history_add_trends(ZBX_DC_TREND *trend, int trends_num);
+int glb_history_add_trend(trend_t *trend);
 
 int glb_history_get_trends_json(zbx_uint64_t itemid, int value_type, int start, int end, struct zbx_json *json);
  
@@ -117,7 +126,7 @@ int glb_history_get_trends_aggregates_json(zbx_uint64_t itemid, int value_type, 
 int glb_history_get_history_aggregates_json(zbx_uint64_t itemid, int value_type, int start, int end, int aggregates, struct zbx_json *json);
 
 int glb_history_history_record_to_json(u_int64_t itemid, int value_type, zbx_history_record_t *record, struct zbx_json *json);
-int	glb_history_json_to_history_record(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
+//int	glb_history_json_to_history_record(struct zbx_json_parse *jp, char value_type, zbx_history_record_t * value);
  
 int	history_update_log_enty_severity(ZBX_DC_HISTORY *h, int severity, u_int64_t eventid, u_int64_t triggerid, int value);
 

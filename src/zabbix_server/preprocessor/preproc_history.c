@@ -30,6 +30,13 @@ void	zbx_preproc_history_pop_value(zbx_vector_ptr_t *history, int index, zbx_var
 	int				i;
 	zbx_preproc_op_history_t	*ophistory;
 
+	zbx_variant_set_none(value);
+	ts->sec = 0;
+	ts->ns = 0;
+	
+	if (NULL == history)
+		return;
+
 	for (i = 0; i < history->values_num; i++)
 	{
 		ophistory = (zbx_preproc_op_history_t *)history->values[i];
@@ -43,10 +50,6 @@ void	zbx_preproc_history_pop_value(zbx_vector_ptr_t *history, int index, zbx_var
 			return;
 		}
 	}
-
-	zbx_variant_set_none(value);
-	ts->sec = 0;
-	ts->ns = 0;
 }
 
 void	zbx_preproc_history_add_value(zbx_vector_ptr_t *history, int index, zbx_variant_t *data,

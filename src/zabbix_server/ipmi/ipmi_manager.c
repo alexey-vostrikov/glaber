@@ -755,7 +755,7 @@ static int	ipmi_manager_schedule_requests(zbx_ipmi_manager_t *manager, int now, 
 
 	for (i = 0; i < num; i++)
 	{
-		zbx_timespec_t	ts;
+		//zbx_timespec_t	ts;
 		unsigned char	state = ITEM_STATE_NOTSUPPORTED;
 		int		errcode = CONFIG_ERROR;
 
@@ -763,9 +763,10 @@ static int	ipmi_manager_schedule_requests(zbx_ipmi_manager_t *manager, int now, 
 				&items[i].interface.port, &error))
 		{
 
-			zbx_timespec(&ts);
-			zbx_preprocess_item_value( items[i].host.hostid, items[i].itemid, items[i].value_type,
-					items[i].flags, NULL, &ts, state, error);
+			//zbx_timespec(&ts);
+			preprocess_error(items[i].host.hostid, items[i].itemid, NULL, error);
+	//		zbx_preprocess_item_value( items[i].host.hostid, items[i].itemid, items[i].value_type,
+	//				items[i].flags, NULL, &ts, state, error);
 			DCrequeue_items(&items[i].itemid, &ts.sec, &errcode, 1);
 			zbx_free(error);
 			continue;
@@ -861,7 +862,7 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 {
 	char			*value;
 	zbx_timespec_t		ts;
-	unsigned char		state;
+//	unsigned char		state;
 	int			errcode;
 	AGENT_RESULT		result;
 	zbx_ipmi_poller_t	*poller;
@@ -910,21 +911,24 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 			state = ITEM_STATE_NORMAL;
 			if (NULL != value)
 			{
-				zbx_init_agent_result(&result);
-				SET_TEXT_RESULT(&result, value);
-				value = NULL;
-				zbx_preprocess_item_value(poller->request->hostid, itemid,  ITEM_VALUE_TYPE_TEXT, flags,
-						&result, &ts, state, NULL);
-				zbx_free_agent_result(&result);
+				
+				preprocess_str(items[i].host.hostid, items[i].itemid, ts, value );
+				//zbx_init_agent_result(&result);
+				//SET_TEXT_RESULT(&result, value);
+				//zbx_free(value);// = NULL;
+				//zbx_preprocess_item_value(poller->request->hostid, itemid,  ITEM_VALUE_TYPE_TEXT, flags,
+				//		&result, &ts, state, NULL);
+				//zbx_free_agent_result(&result);
 			}
 			break;
 
 		case NOTSUPPORTED:
 		case AGENT_ERROR:
 		case CONFIG_ERROR:
-			state = ITEM_STATE_NOTSUPPORTED;
-			zbx_preprocess_item_value(poller->request->hostid, itemid,  ITEM_VALUE_TYPE_TEXT, flags, NULL,
-					&ts, state, value);
+			//state = ITEM_STATE_NOTSUPPORTED;
+			preprocess_error(poller->request->hostid, itemid, ts, value);
+			//zbx_preprocess_item_value(poller->request->hostid, itemid,  ITEM_VALUE_TYPE_TEXT, flags, NULL,
+			//		&ts, state, value);
 			break;
 		default:
 			/* don't change item's state when network related error occurs */

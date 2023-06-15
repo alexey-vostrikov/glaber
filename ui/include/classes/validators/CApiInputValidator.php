@@ -4110,7 +4110,13 @@ class CApiInputValidator {
 					'2' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
 				]];
 				break;
-	
+			case GLB_PREPROC_DISCOVERY_PREPARE:
+			case GLB_PREPROC_JSON_FILTER: 
+			case GLB_PREPROC_LOCAL_DISPATCH:	
+				$api_input_rules = ['type' => API_OBJECT, 'fields' => [
+					'1' =>	['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY]
+				]];
+				break;
 		}
 
 		if (self::validate($api_input_rules, $params, $path, $error)) {

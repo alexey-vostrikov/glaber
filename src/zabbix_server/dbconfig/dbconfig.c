@@ -128,7 +128,7 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 			DCsync_configuration(ZBX_DBSYNC_UPDATE, ZBX_SYNCED_NEW_CONFIG_YES, &deleted_itemids,
 					dbconfig_args_in->config_vault);
 			DCsync_kvs_paths(NULL, dbconfig_args_in->config_vault);
-			DCupdate_interfaces_availability();
+//			DCupdate_interfaces_availability();
 
 			nextcheck = (int)time(NULL) + CONFIG_CONFSYNCER_FREQUENCY;
 				

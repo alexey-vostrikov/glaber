@@ -307,6 +307,7 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 			break;
 		case ITEM_TYPE_INTERNAL:
 			res = get_value_internal(item, result, config_comms, config_startup_time);
+			DEBUG_ITEM(item->itemid, "Got item result '%s' code is %d", result->str, res);
 			break;
 		case ITEM_TYPE_DB_MONITOR:
 #ifdef HAVE_UNIXODBC
@@ -870,6 +871,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 					last_available = INTERFACE_AVAILABLE_FALSE;
 				}
 				break;
+			case FAIL:
 			case CONFIG_ERROR:
 				/* nothing to do */
 				break;
@@ -877,17 +879,18 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 				/* nothing to do, execution was forcibly interrupted by signal */
 				break;
 			default:
-				zbx_error("unknown response code returned: %d", errcodes[i]);
+				zbx_error("unknown response code returned for item %ld of type %d keys %s - code %d",items[i].itemid, items[i].type, items[i].key, errcodes[i]);
 				THIS_SHOULD_NEVER_HAPPEN;
 		}
+		DEBUG_ITEM(items[i].itemid, "Processing item result, errcode is %d, add results %d", errcodes[i], add_results.values_num);
 
 		if (SUCCEED == errcodes[i])
 		{
 			if (0 == add_results.values_num)
 			{
 				items[i].state = ITEM_STATE_NORMAL;
-				zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type,
-						items[i].flags, &results[i], &timespec, items[i].state, NULL);
+				DEBUG_ITEM(items[i].itemid, "Processing item as agent result");
+				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, &results[i] );
 			}
 			else
 			{
@@ -903,16 +906,12 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 					if (ZBX_ISSET_MSG(add_result))
 					{
 						items[i].state = ITEM_STATE_NOTSUPPORTED;
-						zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid,
-						items[i].value_type, items[i].flags, NULL, &ts_tmp, items[i].state,
-								add_result->msg);
+						preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result->msg);
 					}
 					else
 					{
 						items[i].state = ITEM_STATE_NORMAL;
-						zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid,
-								items[i].value_type, items[i].flags, add_result,
-								&ts_tmp, items[i].state, NULL);
+						preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result);
 					}
 
 					/* ensure that every log item value timestamp is unique */
@@ -927,8 +926,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		else if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i])
 		{
 			items[i].state = ITEM_STATE_NOTSUPPORTED;
-			zbx_preprocess_item_value(items[i].host.hostid, items[i].itemid, items[i].value_type,
-					items[i].flags, NULL, &timespec, items[i].state, results[i].msg);
+			preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, results[i].msg);
 		}
 
 		DCpoller_requeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1, poller_type,
@@ -936,7 +934,8 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		DEBUG_ITEM(items[i].itemid,"Poller %d: Returned item to the zbx queue", poller_type);
 	}
 
-	zbx_preprocessor_flush();
+	//zbx_preprocessor_flush();
+	preprocessing_force_flush();
 	zbx_clean_items(items, num, results);
 	DCconfig_clean_items(items, NULL, num);
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
@@ -980,7 +979,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 	
-	glb_preprocessing_init();
+//	glb_preprocessing_init();
 
 	scriptitem_es_engine_init();
 

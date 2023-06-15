@@ -39,6 +39,7 @@
 #include "zbxversion.h"
 #include "zbx_host_constants.h"
 #include "zbx_item_constants.h"
+#include "metric.h"
 
 extern char	*CONFIG_SERVER;
 
@@ -1167,8 +1168,12 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 {
 	if (0 == item->host.proxy_hostid)
 	{
-		zbx_preprocess_item_value(item->host.hostid, item->itemid, item->value_type, item->flags, result, ts,
-				item->state, error);
+		
+		if (ITEM_STATE_NORMAL == item->state && NULL != result) 
+			preprocess_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
+		else 
+			preprocess_error(item->host.hostid, item->itemid, item->flags, ts, error);
+		
 		*h_num = 0;
 	}
 	else
@@ -1180,7 +1185,11 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 		}
 		else
 		{
-			dc_add_history(item->itemid, item->value_type, item->flags, result, ts, item->state, error);
+			metric_t metric = {.hostid = item->host.hostid, .itemid = item->itemid, .ts = *ts };
+			if (ITEM_STATE_NORMAL == item->state) 
+				processing_send_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
+			else 
+				processing_send_error(item->host.hostid, item->itemid, item->flags, ts, error);
 			*h_num = 1;
 		}
 	}
@@ -1348,8 +1357,10 @@ int	process_history_data(zbx_history_recv_item_t *items, zbx_agent_value_t *valu
 	if (0 < processed_num)
 		zbx_dc_items_update_nextcheck(items, values, errcodes, values_num);
 
-	zbx_preprocessor_flush();
-	dc_flush_history();
+	
+	
+	processing_force_flush();
+	preprocessing_force_flush();
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() processed:%d", __func__, processed_num);
 

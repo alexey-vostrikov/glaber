@@ -1376,8 +1376,23 @@ function getItemPreprocessing(array $preprocessing, $readonly, array $types) {
 					$step_param_1->setAttribute('placeholder', _('item key'))
 				];
 				break;
-			
+			case GLB_PREPROC_JSON_FILTER:
+				$params = [
+					$step_param_0->setAttribute('placeholder', _('fields list'))
+				];
+				break;
+			case GLB_PREPROC_LOCAL_DISPATCH:
+				$params = [
+					$step_param_0->setAttribute('placeholder', _('field name'))
+				];
+				break;
 
+			case GLB_PREPROC_DISCOVERY_PREPARE:
+				$params = [
+					$step_param_0->setAttribute('placeholder', _('Appear timeout')),
+					$step_param_1->setAttribute('placeholder', _('Repeat timeout'))
+				];
+				break;
 
 			case ZBX_PREPROC_SCRIPT:
 				$params = new CMultilineInput($step_param_0->getName(), $step_param_0_value, [

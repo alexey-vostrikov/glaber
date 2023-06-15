@@ -152,6 +152,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
     int now = time(NULL);
     char *worker_response = NULL;
     u_int64_t timestamp = 0;
+    zbx_timespec_t ts = {0};
 
     /* workers have own alive and restart checks, we don't bother here*/
     while (iterations < MAX_ITERATIONS)
@@ -166,11 +167,12 @@ ITEMS_ITERATOR(check_workers_data_cb)
         
         if (FAIL != ( timestamp = json_responce_has_timestamp(worker_response))) {
             DEBUG_ITEM(poller_get_item_id(poller_item), "Set timestamp from time field: %ld", timestamp);
-            poller_preprocess_str_timestamp(poller_item, timestamp, worker_response);
+            ts.sec = timestamp;
+            poller_preprocess_str(poller_item, &ts, worker_response);
         }
         else {
              DEBUG_ITEM(poller_get_item_id(poller_item), "No timestamp in the data, using current time");
-            poller_preprocess_str_value(poller_item, worker_response);
+            poller_preprocess_str(poller_item, NULL, worker_response);
         }
         
         worker->last_heard = now;

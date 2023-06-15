@@ -24,7 +24,7 @@
 #include "zbxcommon.h"
 #include "metric.h"
 
-int preproc_ipc_init(size_t ipc_mem_size);
+int preproc_ipc_init();
 int preprocess_send_metric(metric_t *metric);
 
 
