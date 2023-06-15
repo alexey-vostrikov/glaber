@@ -100,9 +100,9 @@ const char	*get_process_type_string(unsigned char proc_type)
 		case ZBX_PROCESS_TYPE_ALERTMANAGER:
 			return "alert manager";
 		case ZBX_PROCESS_TYPE_PREPROCMAN:
-			return "preprocessing manager";
+			return "former preprocessing manager - not used in Glaber";
 		case ZBX_PROCESS_TYPE_PREPROCESSOR:
-			return "preprocessing worker";
+			return "former preprocessing worker - not used in Glaber";
 		case ZBX_PROCESS_TYPE_LLDMANAGER:
 			return "lld manager";
 		case ZBX_PROCESS_TYPE_LLDWORKER:

@@ -297,6 +297,7 @@ int	zbx_variant_convert(zbx_variant_t *value, int type)
 			zbx_variant_clear(value);
 			return SUCCEED;
 		default:
+			LOG_INF("Unknwon variant type %d", type);
 			return FAIL;
 	}
 }

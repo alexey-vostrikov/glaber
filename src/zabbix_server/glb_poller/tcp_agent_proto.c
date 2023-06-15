@@ -143,7 +143,7 @@ static void process_payload_response(poller_item_t *poller_item, const char* buf
         return;
     }
 
-    poller_preprocess_str_value(poller_item, value);
+    poller_preprocess_str(poller_item, NULL, value);
     
 	DEBUG_ITEM(poller_get_item_id(poller_item), "Arrived agent response: %s", value);
 

@@ -1619,7 +1619,7 @@ ZBX_THREAD_ENTRY(trapper_thread, args)
 	zbx_setproctitle("%s #%d [connecting to the database]", get_process_type_string(process_type), process_num);
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
-	glb_preprocessing_init();
+//	glb_preprocessing_init();
 
 #ifdef HAVE_NETSNMP
 	zbx_rtc_subscribe(process_type, process_num, trapper_args_in->config_comms->config_timeout, &rtc);

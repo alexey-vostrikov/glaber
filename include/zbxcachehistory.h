@@ -55,7 +55,7 @@ typedef struct
 }
 zbx_wcache_info_t;
 
-void	zbx_sync_history_cache(int *values_num, int *triggers_num, int *more);
+void	zbx_sync_history_cache(int *values_num, int *triggers_num, int *more, int proc_num);
 void	zbx_log_sync_history_cache_progress(void);
 
 #define ZBX_SYNC_NONE	0

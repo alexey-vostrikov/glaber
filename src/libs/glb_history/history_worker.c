@@ -43,6 +43,10 @@ extern int CONFIG_SERVER_STARTUP_TIME;
 #define GLB_DEFAULT_WORKER_TREND_TYPES "dbl, uint"
 #define GLB_DEFAULT_WORKER_READ_AGG_TYPES "dbl, uint"
 
+
+#define MAX_TRENDS_BATCH 100000
+#define MAX_TRENDS_TIMEOUT	3
+
 typedef struct
 {
 	glb_worker_t *worker;
@@ -55,6 +59,10 @@ typedef struct
 	u_int16_t preload_values;
 	u_int16_t disable_read_timeout;
 	int startup_time;
+	
+	struct zbx_json trends_json;
+	int trends_count;
+	unsigned int trends_lastexport;
 	
 }
 zbx_worker_data_t;
@@ -471,8 +479,6 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
 			DEBUG_ITEM(h->itemid, "Not saving item's history to worker, flags are %u", h->flags);
 			continue;
 		}
-		
-		
 
 		zbx_json_addobject(&json, NULL);
 		zbx_json_addstring(&json,"hostname",h->host_name,ZBX_JSON_TYPE_STRING);
@@ -541,71 +547,75 @@ static int	worker_add_history(void *data, ZBX_DC_HISTORY *hist, int history_num)
  *              history - [IN] the history data vector (may have mixed value types) *
  *                                                                                  *
  ************************************************************************************/
-static int	worker_add_trends(void *data, ZBX_DC_TREND *trends, int trends_num)
+static int	worker_add_trends(void *data, trend_t *trend)
 {
-	char *response=NULL;
-	int i,num=0;
-
-	struct zbx_json json;
-
-	LOG_DBG("Started %s()", __func__);	
-	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
-		
 	zbx_worker_data_t	*conf = (zbx_worker_data_t *)data;
 	
-	if (0 == trends_num) 
-		return SUCCEED;
+	char *response=NULL;
+	int i, now = time(NULL);
 
-	zbx_json_addstring(&json,"request","put_history",ZBX_JSON_TYPE_STRING);
-	zbx_json_addarray(&json,"aggmetrics");
+	LOG_DBG("Started %s()", __func__);	
 	
-    for (i = 0; i < trends_num; i++)
-	{
-		if (0 == conf->write_trend_types[trends[i].value_type]) 
-			continue;
+	if (0 == conf->write_trend_types[trend->value_type]) 
+		return FAIL;
 		
-		zbx_json_addobject(&json, NULL);
-		zbx_json_addstring(&json,"hostname",trends[i].host_name,ZBX_JSON_TYPE_STRING);
-		zbx_json_addstring(&json,"item_key",trends[i].item_key,ZBX_JSON_TYPE_STRING);
-		
+	if (conf->trends_count == 0) {
 	
-		zbx_json_adduint64(&json,"itemid",trends[i].itemid);
-		zbx_json_adduint64(&json,"time",trends[i].clock);
-		zbx_json_adduint64(&json,"value_type", trends[i].value_type);
-
-		switch (trends[i].value_type) {
-			case ITEM_VALUE_TYPE_FLOAT:
-				DEBUG_ITEM(trends[i].itemid, "Sending item to the trend storage DBL (min:%f, max:%f, avg:%f)",
-						trends[i].value_min.dbl, trends[i].value_max.dbl, trends[i].value_avg.dbl);
-				zbx_json_addfloat(&json,"min",trends[i].value_min.dbl);
-				zbx_json_addfloat(&json,"max",trends[i].value_max.dbl);
-				zbx_json_addfloat(&json,"avg",trends[i].value_avg.dbl);
-				break;
-
-			case ITEM_VALUE_TYPE_UINT64:
-				DEBUG_ITEM(trends[i].itemid, "Sending item to the trend storage UINT64 (min:%ld, max:%ld, avg:%ld)",
-						trends[i].value_min.ui64, trends[i].value_max.ui64, trends[i].value_avg.ui64);
-				zbx_json_adduint64(&json,"minint",trends[i].value_min.ui64);
-				zbx_json_adduint64(&json,"maxint",trends[i].value_max.ui64);
-				zbx_json_adduint64(&json,"avgint", (trends[i].value_avg.ui64.lo /  trends[i].num) );
-				break;
-
-		}
-		zbx_json_adduint64(&json, "count",trends[i].num );
-		zbx_json_close(&json);
-		num++;
+		zbx_json_init(&conf->trends_json, ZBX_JSON_STAT_BUF_LEN);
+		
+		zbx_json_addstring(&conf->trends_json, "request", "put_history", ZBX_JSON_TYPE_STRING);
+		zbx_json_addarray(&conf->trends_json,"aggmetrics");
 	}
-	zbx_json_close(&json);
 	
-	LOG_DBG("Syncing %d trend values", num);
-   
-    LOG_DBG("Sending trends data %s", json.buffer);
+    	
+	zbx_json_addobject(&conf->trends_json, NULL);
+	zbx_json_addstring(&conf->trends_json,"hostname", trend_get_hostname(trend),ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&conf->trends_json,"item_key", trend_get_itemkey(trend),ZBX_JSON_TYPE_STRING);
+		
 	
-	if (num > 0)
-		glb_process_worker_request(conf->worker, json.buffer, &response);
+	zbx_json_adduint64(&conf->trends_json,"itemid", trend->itemid);
+	zbx_json_adduint64(&conf->trends_json,"time", trend->account_hour);
+	zbx_json_adduint64(&conf->trends_json,"value_type", trend->value_type);
+
+	switch (trend->value_type) {
+		case ITEM_VALUE_TYPE_FLOAT:
+			DEBUG_ITEM(trend->itemid, "Sending item to the trend storage DBL (min:%f, max:%f, avg:%f)",
+					trend->value_min.dbl, trend->value_max.dbl, trend->value_avg.dbl);
+			zbx_json_addfloat(&conf->trends_json,"min",trend->value_min.dbl);
+			zbx_json_addfloat(&conf->trends_json,"max",trend->value_max.dbl);
+			zbx_json_addfloat(&conf->trends_json,"avg",trend->value_avg.dbl);
+			break;
+
+		case ITEM_VALUE_TYPE_UINT64:
+			DEBUG_ITEM(trend->itemid, "Sending item to the trend storage UINT64 (min:%ld, max:%ld, avg:%ld)",
+					trend->value_min.ui64, trend->value_max.ui64, trend->value_avg.ui64);
+			zbx_json_adduint64(&conf->trends_json,"minint",trend->value_min.ui64);
+			zbx_json_adduint64(&conf->trends_json,"maxint",trend->value_max.ui64);
+			zbx_json_adduint64(&conf->trends_json,"avgint", (trend->value_avg.ui64 /  trend->num) );
+			break;
+
+	}
+
+	zbx_json_adduint64(&conf->trends_json, "count",trend->num );
+	zbx_json_close(&conf->trends_json);
+	conf->trends_count++;
+	
+	//
+	
+	if (conf->trends_count > MAX_TRENDS_BATCH || now > conf->trends_lastexport + MAX_TRENDS_TIMEOUT) 
+	{
+		zbx_json_close(&conf->trends_json);
+
+		LOG_DBG("Syncing %d trend values", conf->trends_count);
+    	LOG_DBG("Sending trends data %s", conf->trends_json.buffer);
+	
+		glb_process_worker_request(conf->worker, conf->trends_json.buffer, &response);
     
-	zbx_json_free(&json);
-    zbx_free(response);
+		zbx_json_clean(&conf->trends_json);
+    	zbx_free(response);
+		conf->trends_count = 0;
+		conf->trends_lastexport = now; 
+	}		
 	
 	LOG_DBG("End of %s()", __func__);
 	return SUCCEED;

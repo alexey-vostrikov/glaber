@@ -221,8 +221,8 @@ void	zbx_lld_process_value(zbx_uint64_t itemid, zbx_uint64_t hostid, const char 
  *             error  - [IN] the error message (can be NULL)                  *
  *                                                                            *
  ******************************************************************************/
-void	zbx_lld_process_agent_result(zbx_uint64_t itemid, zbx_uint64_t hostid, AGENT_RESULT *result,
-		zbx_timespec_t *ts, char *error)
+void	zbx_lld_process_agent_result(zbx_uint64_t itemid, zbx_uint64_t hostid, const AGENT_RESULT *result,
+		const zbx_timespec_t *ts, const char *error)
 {
 	const char	*value = NULL;
 	unsigned char	meta = 0;
@@ -231,10 +231,10 @@ void	zbx_lld_process_agent_result(zbx_uint64_t itemid, zbx_uint64_t hostid, AGEN
 
 	if (NULL != result)
 	{
-		if (NULL != ZBX_GET_TEXT_RESULT(result))
-			value = *(ZBX_GET_TEXT_RESULT(result));
+		if (NULL != ZBX_GET_TEXT_RESULT((AGENT_RESULT*)result))
+			value = *(ZBX_GET_TEXT_RESULT((AGENT_RESULT*)result));
 
-		if (0 != ZBX_ISSET_META(result))
+		if (0 != ZBX_ISSET_META((AGENT_RESULT*)result))
 		{
 			meta = 1;
 			lastlogsize = result->lastlogsize;

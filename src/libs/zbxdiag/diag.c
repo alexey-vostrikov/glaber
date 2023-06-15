@@ -245,123 +245,6 @@ static void	diag_historycache_add_items(struct zbx_json *json, const char *field
 	zbx_json_close(json);
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: add requested history cache diagnostic information to json data   *
- *                                                                            *
- * Parameters: jp    - [IN] the request                                       *
- *             json  - [IN/OUT] the json to update                            *
- *             error - [OUT] error message                                    *
- *                                                                            *
- * Return value: SUCCEED - the information was added successfully             *
- *               FAIL    - otherwise                                          *
- *                                                                            *
- ******************************************************************************/
-int	zbx_diag_add_historycache_info(const struct zbx_json_parse *jp, struct zbx_json *json, char **error)
-{
-	zbx_vector_ptr_t	tops;
-	int			ret;
-	double			time1, time2, time_total = 0;
-	zbx_uint64_t		fields;
-	zbx_diag_map_t		field_map[] = {
-					{"", ZBX_DIAG_HISTORYCACHE_SIMPLE | ZBX_DIAG_HISTORYCACHE_MEMORY},
-					{"items", ZBX_DIAG_HISTORYCACHE_ITEMS},
-					{"values", ZBX_DIAG_HISTORYCACHE_VALUES},
-					{"memory", ZBX_DIAG_HISTORYCACHE_MEMORY},
-					{"memory.data", ZBX_DIAG_HISTORYCACHE_MEMORY_DATA},
-					{"memory.index", ZBX_DIAG_HISTORYCACHE_MEMORY_INDEX},
-					{NULL, 0}
-					};
-
-	zbx_vector_ptr_create(&tops);
-
-	if (SUCCEED == (ret = zbx_diag_parse_request(jp, field_map, &fields, &tops, error)))
-	{
-		int	i;
-
-		zbx_json_addobject(json, ZBX_DIAG_HISTORYCACHE);
-
-		if (0 != (fields & ZBX_DIAG_HISTORYCACHE_SIMPLE))
-		{
-			zbx_uint64_t	values_num, items_num;
-
-			time1 = zbx_time();
-			zbx_hc_get_diag_stats(&items_num, &values_num);
-			time2 = zbx_time();
-			time_total += time2 - time1;
-
-			if (0 != (fields & ZBX_DIAG_HISTORYCACHE_ITEMS))
-				zbx_json_addint64(json, "items", items_num);
-			if (0 != (fields & ZBX_DIAG_HISTORYCACHE_VALUES))
-				zbx_json_addint64(json, "values", values_num);
-		}
-
-		if (0 != (fields & ZBX_DIAG_HISTORYCACHE_MEMORY))
-		{
-			zbx_shmem_stats_t	data_mem, index_mem, *pdata_mem, *pindex_mem;
-
-			pdata_mem = (0 != (fields & ZBX_DIAG_HISTORYCACHE_MEMORY_DATA) ? &data_mem : NULL);
-			pindex_mem = (0 != (fields & ZBX_DIAG_HISTORYCACHE_MEMORY_INDEX) ? &index_mem : NULL);
-
-			time1 = zbx_time();
-			zbx_hc_get_mem_stats(pdata_mem, pindex_mem);
-			time2 = zbx_time();
-			time_total += time2 - time1;
-
-			zbx_json_addobject(json, "memory");
-			zbx_diag_add_mem_stats(json, "data", pdata_mem);
-			zbx_diag_add_mem_stats(json, "index", pindex_mem);
-			zbx_json_close(json);
-		}
-
-		if (0 != tops.values_num)
-		{
-			zbx_json_addobject(json, "top");
-
-			for (i = 0; i < tops.values_num; i++)
-			{
-				zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
-
-				if (0 == strcmp(map->name, "values"))
-				{
-					zbx_vector_uint64_pair_t	items;
-					int				limit;
-
-					zbx_vector_uint64_pair_create(&items);
-
-					time1 = zbx_time();
-					zbx_hc_get_items(&items);
-					time2 = zbx_time();
-					time_total += time2 - time1;
-
-					zbx_vector_uint64_pair_sort(&items, diag_compare_pair_second_desc);
-					limit = MIN((int)map->value, items.values_num);
-
-					diag_historycache_add_items(json, map->name, (zbx_uint64_pair_t *)items.values,
-							limit);
-					zbx_vector_uint64_pair_destroy(&items);
-				}
-				else
-				{
-					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
-					ret = FAIL;
-					break;
-				}
-			}
-
-			zbx_json_close(json);
-		}
-
-		zbx_json_addfloat(json, "time", time_total);
-
-		zbx_json_close(json);
-	}
-
-	zbx_vector_ptr_clear_ext(&tops, (zbx_ptr_free_func_t)zbx_diag_map_free);
-	zbx_vector_ptr_destroy(&tops);
-
-	return ret;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -417,92 +300,94 @@ int	zbx_diag_add_preproc_info(const struct zbx_json_parse *jp, struct zbx_json *
 					{NULL, 0}
 					};
 
-	zbx_vector_ptr_create(&tops);
+	HALT_HERE("Implement Glaber - specific preprocessing diognostics");
 
-	if (SUCCEED == (ret = zbx_diag_parse_request(jp, field_map, &fields, &tops, error)))
-	{
-		zbx_json_addobject(json, ZBX_DIAG_PREPROCESSING);
+// 	zbx_vector_ptr_create(&tops);
 
-		if (0 != (fields & ZBX_DIAG_PREPROC_SIMPLE))
-		{
-			int	total, queued, processing, done, pending;
+// 	if (SUCCEED == (ret = zbx_diag_parse_request(jp, field_map, &fields, &tops, error)))
+// 	{
+// 		zbx_json_addobject(json, ZBX_DIAG_PREPROCESSING);
 
-			time1 = zbx_time();
-			if (FAIL == (ret = zbx_preprocessor_get_diag_stats(&total, &queued, &processing, &done,
-					&pending, error)))
-			{
-				goto out;
-			}
+// 		if (0 != (fields & ZBX_DIAG_PREPROC_SIMPLE))
+// 		{
+// 			int	total, queued, processing, done, pending;
 
-			time2 = zbx_time();
-			time_total += time2 - time1;
+// 			time1 = zbx_time();
+// 			if (FAIL == (ret = zbx_preprocessor_get_diag_stats(&total, &queued, &processing, &done,
+// 					&pending, error)))
+// 			{
+// 				goto out;
+// 			}
 
-			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES))
-			{
-				zbx_json_addint64(json, "values", total);
-				zbx_json_addint64(json, "done", done);
-			}
-			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES_PREPROC))
-			{
-				zbx_json_addint64(json, "queued", queued);
-				zbx_json_addint64(json, "processing", processing);
-				zbx_json_addint64(json, "pending", pending);
-			}
-		}
+// 			time2 = zbx_time();
+// 			time_total += time2 - time1;
 
-		if (0 != tops.values_num)
-		{
-			int	i;
+// 			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES))
+// 			{
+// 				zbx_json_addint64(json, "values", total);
+// 				zbx_json_addint64(json, "done", done);
+// 			}
+// 			if (0 != (fields & ZBX_DIAG_PREPROC_VALUES_PREPROC))
+// 			{
+// 				zbx_json_addint64(json, "queued", queued);
+// 				zbx_json_addint64(json, "processing", processing);
+// 				zbx_json_addint64(json, "pending", pending);
+// 			}
+// 		}
 
-			zbx_json_addobject(json, "top");
+// 		if (0 != tops.values_num)
+// 		{
+// 			int	i;
 
-			for (i = 0; i < tops.values_num; i++)
-			{
-				zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
+// 			zbx_json_addobject(json, "top");
 
-				if (0 == strcmp(map->name, "values") || 0 == strcmp(map->name, "oldest.preproc.values"))
-				{
-					zbx_vector_ptr_t	items;
+// 			for (i = 0; i < tops.values_num; i++)
+// 			{
+// 				zbx_diag_map_t	*map = (zbx_diag_map_t *)tops.values[i];
 
-					zbx_vector_ptr_create(&items);
-					time1 = zbx_time();
-					if (0 == strcmp(map->name, "values"))
-						ret = zbx_preprocessor_get_top_items(map->value, &items, error);
-					else
-						ret = zbx_preprocessor_get_top_oldest_preproc_items(map->value, &items,
-								error);
+// 				if (0 == strcmp(map->name, "values") || 0 == strcmp(map->name, "oldest.preproc.values"))
+// 				{
+// 					zbx_vector_ptr_t	items;
 
-					if (FAIL == ret)
-					{
-						zbx_vector_ptr_destroy(&items);
-						goto out;
-					}
-					time2 = zbx_time();
-					time_total += time2 - time1;
+// 					zbx_vector_ptr_create(&items);
+// 					time1 = zbx_time();
+// 					if (0 == strcmp(map->name, "values"))
+// 						ret = zbx_preprocessor_get_top_items(map->value, &items, error);
+// 					else
+// 						ret = zbx_preprocessor_get_top_oldest_preproc_items(map->value, &items,
+// 								error);
 
-					diag_add_preproc_items(json, map->name, &items);
-					zbx_vector_ptr_clear_ext(&items, zbx_ptr_free);
-					zbx_vector_ptr_destroy(&items);
-				}
-				else
-				{
-					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
-					ret = FAIL;
-					goto out;
-				}
-			}
+// 					if (FAIL == ret)
+// 					{
+// 						zbx_vector_ptr_destroy(&items);
+// 						goto out;
+// 					}
+// 					time2 = zbx_time();
+// 					time_total += time2 - time1;
 
-			zbx_json_close(json);
-		}
+// 					diag_add_preproc_items(json, map->name, &items);
+// 					zbx_vector_ptr_clear_ext(&items, zbx_ptr_free);
+// 					zbx_vector_ptr_destroy(&items);
+// 				}
+// 				else
+// 				{
+// 					*error = zbx_dsprintf(*error, "Unsupported top field: %s", map->name);
+// 					ret = FAIL;
+// 					goto out;
+// 				}
+// 			}
 
-		zbx_json_addfloat(json, "time", time_total);
-		zbx_json_close(json);
-	}
-out:
-	zbx_vector_ptr_clear_ext(&tops, (zbx_ptr_free_func_t)zbx_diag_map_free);
-	zbx_vector_ptr_destroy(&tops);
+// 			zbx_json_close(json);
+// 		}
 
-	return ret;
+// 		zbx_json_addfloat(json, "time", time_total);
+// 		zbx_json_close(json);
+// 	}
+// out:
+// 	zbx_vector_ptr_clear_ext(&tops, (zbx_ptr_free_func_t)zbx_diag_map_free);
+// 	zbx_vector_ptr_destroy(&tops);
+
+	return FAIL;
 }
 
 static void	zbx_json_addhex(struct zbx_json *j, const char *name, zbx_uint64_t value)

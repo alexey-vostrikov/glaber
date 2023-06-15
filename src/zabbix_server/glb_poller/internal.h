@@ -1,7 +1,6 @@
-
 /*
 ** Glaber
-** Copyright (C) Glaber
+** Copyright (C)  Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,23 +16,17 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-
-#ifndef METRIC_H
-#define METRIC_H
-
+#include "log.h"
 #include "zbxcommon.h"
-#include "zbxvariant.h"
-#include "zbxtime.h"
 
-#define METRIC_TYPE_DISCOVERY   1
 
-typedef struct  {
-    u_int64_t itemid;
-    u_int64_t hostid;
-    u_int64_t flags;
-    zbx_timespec_t ts;
-    zbx_variant_t value;
-} metric_t;
+typedef int (*internal_metric_handler_func_t)(const char *first_param, int nparams,  
+                    AGENT_REQUEST *request, char **result);
 
-void metric_set_time(metric_t *metric, u_int64_t mstime);
-#endif
+#define INTERNAL_METRIC_CALLBACK(name) \
+        int name(const char *first_param, int nparams, AGENT_REQUEST *request, char **result)
+
+int glb_internal_metrics_init();
+void glb_internal_metrics_destory();
+int glb_register_internal_metric_handler(const char *name, internal_metric_handler_func_t func);
+int glb_get_internal_metric(const char *first_param, int nparams, AGENT_REQUEST *request, char **result);

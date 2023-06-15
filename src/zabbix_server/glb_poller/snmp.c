@@ -331,12 +331,12 @@ void snmp_async_init(void) {
 		exit(-1);
 	}
 
-	LOG_INF("Creating socket event on fd %d", conf.socket);
+	//LOG_INF("Creating socket event on fd %d", conf.socket);
 	conf.socket_event = poller_create_event(NULL, responce_arrived_cb, conf.socket, NULL, 1);
 
-	LOG_INF("Running socket event");
+	//LOG_INF("Running socket event");
 	poller_run_fd_event(conf.socket_event);
 	
 	poller_sessions_init();
-	LOG_INF("Finished snmp init");
+	//LOG_INF("Finished snmp init");
 }

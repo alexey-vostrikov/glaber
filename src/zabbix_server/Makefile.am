@@ -29,7 +29,8 @@ SUBDIRS = \
 	service \
 	rtc \
 	ha \
-	proxyconfigread
+	proxyconfigread \
+	tests
 
 sbin_PROGRAMS = zabbix_server
 
@@ -82,6 +83,7 @@ zabbix_server_LDADD = \
 	scripts/libzbxscripts.a \
 	availability/libavailability.a \
 	service/libservice.a \
+	tests/libservertests.a \
 	$(top_builddir)/src/libs/zbxembed/libzbxembed.a \
 	$(top_builddir)/src/libs/zbxdiscovery/libzbxdiscovery.a \
 	$(top_builddir)/src/libs/zbxexport/libzbxexport.a \

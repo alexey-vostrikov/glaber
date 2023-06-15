@@ -49,6 +49,7 @@
 #include "../../zabbix_server/glb_poller/poller_ipc.h"
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
+#include "../../zabbix_server/dbsyncer/trends.h"
 int sync_in_progress = 0;
 
 #define START_SYNC               \
@@ -1231,7 +1232,7 @@ void DCsync_autoreg_host(zbx_dbsync_t *sync)
 		}
 		else
 		{
-			zabbix_log(LOG_LEVEL_WARNING, "cannot process duplicate host '%s' in autoreg_host table",
+			zabbix_log(LOG_LEVEL_DEBUG, "cannot process duplicate host '%s' in autoreg_host table",
 					   row[0]);
 			found = 1;
 		}
@@ -3371,10 +3372,8 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 					/* ITEM_STATE_NOTSUPPORTED here.                                            */
 
 					if (0 == host->proxy_hostid)
-					{
-						dc_add_history(item->itemid, item->value_type, 0, NULL, &ts,
-									   ITEM_STATE_NOTSUPPORTED, error);
-					}
+						glb_state_item_set_error(item->itemid, error);
+			
 					zbx_free(error);
 				}
 			}
@@ -5552,6 +5551,13 @@ void DCsync_item_preproc(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		op->step = atoi(row[4]);
 		op->error_handler = atoi(row[5]);
 		dc_strpool_replace(found, &op->error_handler_params, row[6]);
+		
+//		char *tmp = zbx_strdup(NULL, op->params);
+//		char *nl_pos = strchr(tmp, '\n');
+//		if (NULL !=nl_pos) nl_pos[0]=' ';
+
+		DEBUG_ITEM(itemid, "Loaded from config preprocessing step %d operation type %d params '%s'", op->step, op->type, op->params);
+//		zbx_free(tmp);
 
 		if (0 == found)
 		{
@@ -7015,8 +7021,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 
 	config->item_sync_ts = time(NULL);
 	FINISH_SYNC;
-
-	dc_flush_history(); /* misconfigured items generate pseudo-historic values to become notsupported */
 
 	/* sync function data to support function lookups when resolving macros during configuration sync */
 
@@ -9481,33 +9485,51 @@ static void dc_preproc_sync_preprocitem(zbx_preproc_item_t *item, const ZBX_DC_P
  ******************************************************************************/
 static void dc_preproc_sync_masteritem(zbx_preproc_item_t *item, const ZBX_DC_MASTERITEM *masteritem)
 {
+	DEBUG_ITEM(item->itemid, "Syncing dependant items");
+	//if there is no link to master item info, cleaning 
+	//dependend items vector
 	if (NULL == masteritem)
 	{
 		zbx_free(item->dep_itemids);
 		item->dep_itemids_num = 0;
+		DEBUG_ITEM(item->itemid, "No dependant items found");
 		return;
 	}
 
+	DEBUG_ITEM(item->itemid, "Found %d depend items", masteritem->dep_itemids.values_num);
+	//if there are more values in master item then in the item,
+	//reallocating the array 
 	if (masteritem->dep_itemids.values_num > item->dep_itemids_num)
 	{
 		item->dep_itemids = (zbx_uint64_pair_t *)zbx_realloc(item->dep_itemids,
 															 sizeof(zbx_uint64_pair_t) * masteritem->dep_itemids.values_num);
 	}
-
+	
+	//copying all the dependancy data
 	memcpy(item->dep_itemids, masteritem->dep_itemids.values,
 		   sizeof(zbx_uint64_pair_t) * masteritem->dep_itemids.values_num);
-
+	
 	item->dep_itemids_num = masteritem->dep_itemids.values_num;
+
+	if (DC_get_debug_item() == item->itemid) {
+		int i;
+		for (i = 0; i < item->dep_itemids_num; i++)
+			DEBUG_ITEM(item->itemid, "PREPROCSYNC: Adding for item %ld dep items info pair: (%ld, %ld)", item->itemid,
+				item->dep_itemids[i].first,item->dep_itemids[i].second);
+	}
 }
 
+//syncs preprocessing conf for pp items in the hash items from dc_item 
 static void dc_preproc_sync_item(zbx_hashset_t *items, ZBX_DC_ITEM *dc_item, zbx_uint64_t revision)
 {
 	zbx_preproc_item_t *pp_item;
-
+	DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration for the item");
+	//creating the new item if not existed
 	if (NULL == (pp_item = (zbx_preproc_item_t *)zbx_hashset_search(items, &dc_item->itemid)))
 	{
+		DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration: created config for the item");
 		zbx_preproc_item_t pp_item_local = {.itemid = dc_item->itemid};
-
+		
 		pp_item = (zbx_preproc_item_t *)zbx_hashset_insert(items, &pp_item_local, sizeof(pp_item_local));
 		pp_item->hostid = dc_item->hostid;
 		pp_item->preproc_revision = revision;
@@ -9516,8 +9538,10 @@ static void dc_preproc_sync_item(zbx_hashset_t *items, ZBX_DC_ITEM *dc_item, zbx
 	pp_item->type = dc_item->type;
 	pp_item->value_type = dc_item->value_type;
 	pp_item->revision = revision;
-
+	
+	//syncing items dependancy information
 	dc_preproc_sync_masteritem(pp_item, dc_item->master_item);
+	//syncing items preprocessing steps
 	dc_preproc_sync_preprocitem(pp_item, dc_item->preproc_item, revision);
 }
 
@@ -9572,59 +9596,69 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 	zbx_vector_dc_item_ptr_reserve(&items_sync, 100);
 
 	RDLOCK_CACHE;
-
+	//global revision check
 	if (SUCCEED != um_cache_get_host_revision(config->um_cache, 0, &global_revision))
 		global_revision = 0;
 
 	zbx_hashset_iter_reset(&config->hosts, &iter);
+	//all hosts iteration
 	while (NULL != (dc_host = (ZBX_DC_HOST *)zbx_hashset_iter_next(&iter)))
 	{
+		//alive check
 		if (HOST_STATUS_MONITORED != dc_host->status)
 			continue;
-
+		//only the process config fetching
+		if (manager_num >= 0  && dc_host->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] != manager_num - 1)
+			continue;
+		
+		//iterating on all hosts items
 		for (i = 0; i < dc_host->items.values_num; i++)
 		{
 			ZBX_DC_ITEM *dc_item = dc_host->items.values[i];
-
+			//item alive check
 			if (ITEM_STATUS_ACTIVE != dc_item->status || ITEM_TYPE_DEPENDENT == dc_item->type)
 				continue;
 
 			if (NULL == dc_item->preproc_item && NULL == dc_item->master_item &&
 				ITEM_TYPE_INTERNAL != dc_item->type)
-			{
 				continue;
-			}
+		
 
-			if (0 == dc_host->proxy_hostid ||
-				SUCCEED == is_item_processed_by_server(dc_item->type, dc_item->key))
-			{
-				dc_preproc_add_item_rec(dc_item, &items_sync);
-			}
+			if (0 != dc_host->proxy_hostid &&
+				FAIL == is_item_processed_by_server(dc_item->type, dc_item->key))
+				continue;
+			
+			dc_preproc_add_item_rec(dc_item, &items_sync);
+			
+			//just a log
+			if (manager_num >= 0 && dc_item->master_itemid > 0)  
+				LOG_INF("Processing item %ld, has master item %ld", dc_item->itemid, dc_item->master_itemid);
+			
 		}
 
 		/* don't check host macro revision if the host does not have locally pre-processable items */
 		if (0 == items_sync.values_num)
 			continue;
-
+		
+		//preprocessor config revision is equal or more recent the config revision
 		if (*revision >= global_revision && *revision >= dc_host->revision)
 		{
 			zbx_uint64_t macro_revision = *revision;
-
+			
+			//host has a new revision
 			if (SUCCEED == um_cache_get_host_revision(config->um_cache, dc_host->hostid, &macro_revision) &&
 				*revision >= macro_revision)
 			{
+				//setting the new reivisions to be equal to the config ones
 				for (i = 0; i < items_sync.values_num; i++)
-				{
-					if (NULL != (pp_item = (zbx_preproc_item_t *)zbx_hashset_search(items,
-																					&items_sync.values[i]->itemid)))
-					{
+					if (NULL != (pp_item = zbx_hashset_search(items, &items_sync.values[i]->itemid)))
 						pp_item->revision = config->revision.config;
-					}
-				}
+				//cleaning the vector - there is no need to update the host items preproc config	
 				zbx_vector_dc_item_ptr_clear(&items_sync);
 			}
 		}
-
+		
+		//the actual config is copied here
 		for (i = 0; i < items_sync.values_num; i++)
 			dc_preproc_sync_item(items, items_sync.values[i], config->revision.config);
 
@@ -11888,7 +11922,10 @@ int DCconfig_get_proxypoller_hosts(DC_PROXY *proxies, int max_hosts)
 
 		min = zbx_binary_heap_find_min(queue);
 		dc_proxy = (ZBX_DC_PROXY *)min->data;
-
+		
+	//	LOG_INF("PROXY POLLER: nextchek check");
+	//	LOG_INF("PROXY POLLER: Got proxy %ld, nextcheck in %d", dc_proxy->hostid, dc_proxy->nextcheck - now);
+		
 		if (dc_proxy->nextcheck > now)
 			break;
 
@@ -11900,7 +11937,7 @@ int DCconfig_get_proxypoller_hosts(DC_PROXY *proxies, int max_hosts)
 	}
 
 	UNLOCK_CACHE;
-
+	//LOG_INF("PROXY POLLER: returning %d proxies to check", num);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
 
 	return num;
@@ -11988,7 +12025,8 @@ void DCrequeue_proxy(zbx_uint64_t hostid, unsigned char update_nextcheck, int pr
 				dc_proxy->proxy_tasks_nextcheck = (int)calculate_proxy_nextcheck(
 					hostid, ZBX_TASK_UPDATE_FREQUENCY, now);
 			}
-
+			
+			//LOG_INF("PROXY POLLER: finished proxy processing, %s, next data check in %d", dc_host->host, dc_proxy->proxy_data_nextcheck - time(NULL));
 			DCupdate_proxy_queue(dc_proxy);
 		}
 	}
@@ -15334,7 +15372,7 @@ static void dc_reschedule_items(const zbx_hashset_t *activated_hosts)
 
 		UNLOCK_CACHE;
 
-		dc_flush_history();
+		//dc_flush_history();
 	}
 
 	zbx_vector_ptr_pair_destroy(&activated_items);
@@ -15770,41 +15808,6 @@ int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type)
 	UNLOCK_CACHE;
 	return ret;
 }
-/************************************************
- * fetches items host names and keys to send to 	*
- * trends storage
- * when i come back this func i should reconsider
- * implementing something like go contexts for
- * pass-through item processing
- ************************************************/
-void DC_get_trends_items_keys(ZBX_DC_TREND *trends, int trends_num)
-{
-	int i;
-
-	ZBX_DC_ITEM *item;
-	ZBX_DC_HOST *host;
-
-	RDLOCK_CACHE;
-
-	for (i = 0; i < trends_num; i++)
-	{
-
-		if ((NULL != (item = zbx_hashset_search(&config->items, &trends[i].itemid))) &&
-			(NULL != (host = zbx_hashset_search(&config->hosts, &item->hostid))))
-		{
-			trends[i].host_name = zbx_strdup(NULL, host->host);
-			trends[i].item_key = zbx_strdup(NULL, item->key);
-		}
-		else
-		{
-			trends[i].host_name = zbx_strdup(NULL, "");
-			trends[i].item_key = zbx_strdup(NULL, "");
-		}
-		DEBUG_ITEM(trends[i].itemid, "Retrieved trend's host and key: '%s':'%s'", trends[i].host_name, trends[i].item_key);
-	}
-
-	UNLOCK_CACHE;
-}
 
 void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items)
 {
@@ -15827,6 +15830,7 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items)
 
 	UNLOCK_CACHE;
 }
+
 void DC_notify_changed_items(zbx_vector_uint64_t *items)
 {
 	int i;
@@ -15857,6 +15861,21 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items)
 	}
 
 	UNLOCK_CACHE;
+}
+
+u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid) {
+	ZBX_DC_ITEM *item;
+	u_int64_t hostid = 0;
+
+	RDLOCK_CACHE;
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid)))
+	{
+		DEBUG_ITEM(itemid, "Couldn't find item in items cache to find host");
+		hostid = item->hostid;
+	}
+	
+	UNLOCK_CACHE;
+	return hostid;
 }
 
 #ifdef HAVE_TESTS

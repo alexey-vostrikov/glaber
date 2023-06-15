@@ -131,18 +131,18 @@ void	zbx_zabbix_stats_get(struct zbx_json *json, int config_startup_time)
 	zbx_json_addstring(json, "version", ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
 
 	/* zabbix[wcache,<cache>,<mode>] */
-	DCget_stats_all(&wcache_info);
-	zbx_json_addobject(json, "wcache");
+//	DCget_stats_all(&wcache_info);
+	// zbx_json_addobject(json, "wcache");
 
-	zbx_json_addobject(json, "values");
-	zbx_json_adduint64(json, "all", wcache_info.stats.history_counter);
-	zbx_json_adduint64(json, "float", wcache_info.stats.history_float_counter);
-	zbx_json_adduint64(json, "uint", wcache_info.stats.history_uint_counter);
-	zbx_json_adduint64(json, "str", wcache_info.stats.history_str_counter);
-	zbx_json_adduint64(json, "log", wcache_info.stats.history_log_counter);
-	zbx_json_adduint64(json, "text", wcache_info.stats.history_text_counter);
-	zbx_json_adduint64(json, "not supported", wcache_info.stats.notsupported_counter);
-	zbx_json_close(json);
+	// zbx_json_addobject(json, "values");
+	// zbx_json_adduint64(json, "all", wcache_info.stats.history_counter);
+	// zbx_json_adduint64(json, "float", wcache_info.stats.history_float_counter);
+	// zbx_json_adduint64(json, "uint", wcache_info.stats.history_uint_counter);
+	// zbx_json_adduint64(json, "str", wcache_info.stats.history_str_counter);
+	// zbx_json_adduint64(json, "log", wcache_info.stats.history_log_counter);
+	// zbx_json_adduint64(json, "text", wcache_info.stats.history_text_counter);
+	// zbx_json_adduint64(json, "not supported", wcache_info.stats.notsupported_counter);
+	// zbx_json_close(json);
 
 	zbx_json_addobject(json, "history");
 	zbx_json_addfloat(json, "pfree", 100 * (double)wcache_info.history_free / wcache_info.history_total);

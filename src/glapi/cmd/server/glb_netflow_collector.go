@@ -97,9 +97,11 @@ func dumpFlows(chFlows chan Flow, ASNs []ASNRecord, writer *bufio.Writer) {
 		var srcnet bytes.Buffer
 
 		dstASN := findASNbyIP(flow.DstIp ,ASNs[:])
+	
 		if ( nil == dstASN) {
 			continue
 		}
+	
 		flow.DstAS = dstASN.AS
 		flow.DstCountry = &dstASN.Country
 		flow.DstOrg = &dstASN.Org
@@ -291,7 +293,7 @@ func parseNetflow(buf chan NetflowDatagramm, chFlows chan Flow) {
 func main() {
 	srcIp := flag.String("src_ip", "0.0.0.0", "Source IP (receving socket for conntrackd)")
 	srcPort := flag.Int("src_port", 2055, "Source port (receving socket for conntrackd)")
-	asnfile := flag.String("asn_file", "ip2asn.gz", "IP 2 ASN with addrs in uint32 file (will be auto - downloaded from https://iptoasn.com/data/ip2asn-v4-u32.tsv.gz")
+	asnfile := flag.String("asn_file", "/tmp/ip2asn.gz", "IP 2 ASN with addrs in uint32 file (will be auto - downloaded from https://iptoasn.com/data/ip2asn-v4-u32.tsv.gz")
 	var ASNs []ASNRecord
 
 	flag.Parse()

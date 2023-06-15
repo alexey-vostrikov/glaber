@@ -29,6 +29,7 @@
 #include <zlib.h>
 #include "glb_lock.h"
 #include "load_dump.h"
+#include "../../zabbix_server/glb_poller/internal.h"
 
 extern char	*CONFIG_VCDUMP_LOCATION;
 
@@ -59,11 +60,12 @@ typedef struct
 
 typedef struct
 {
+    int requests; //requests = hist + misses
     int hits;
     int misses;
-    int db_requests;
+    int db_hits; //misses = db_hits + db_misses + db_fails
+    int db_misses;
     int db_fails;
-    int fails;
 } stats_t;
 
 typedef struct
@@ -125,12 +127,11 @@ ELEMS_CREATE(item_create_cb)
     i_data->db_fetched_time = ZBX_JAN_2038;
     i_data->value_type = ITEM_VALUE_TYPE_NONE;
     i_data->meta.state = ITEM_STATE_UNKNOWN;
+
     glb_tsbuff_init(&i_data->tsbuff, GLB_CACHE_ITEM_MIN_VALUES, sizeof(glb_state_item_value_t), memf->malloc_func);
     
     return SUCCEED;
 }
-
-
 
 static void item_variant_clear(zbx_variant_t *value)
 {
@@ -168,6 +169,19 @@ ELEMS_FREE(item_free_cb) {
     return SUCCEED;
 }
 
+INTERNAL_METRIC_CALLBACK(items_cache_stat_cb) {
+    size_t len = 0, offset = 0;
+        zbx_snprintf_alloc(result, &len, &offset, 
+         "{\"requests\":%ld, \"hits\":%ld, \"misses\":%ld,"
+         " \"db_hits\":%ld, \"db_misses\":%ld,  \"db_fails\":%ld}", 
+                state->stats.requests,
+                state->stats.hits,
+                state->stats.misses,
+                state->stats.db_hits,
+                state->stats.db_misses,
+                state->stats.db_fails);
+        return SUCCEED;
+}
 
 int glb_state_items_init(mem_funcs_t *memf)
 {
@@ -180,6 +194,8 @@ int glb_state_items_init(mem_funcs_t *memf)
     state->memf = *memf;
     strpool_init(&state->strpool, memf);
     
+    glb_register_internal_metric_handler("valuecache", items_cache_stat_cb);
+
   return SUCCEED;
 }
 /*******************************************************
@@ -447,7 +463,10 @@ static int fetch_from_db_by_count(u_int64_t itemid, item_elem_t *elm, int count,
 
     zbx_history_record_vector_create(&values);
 
-    // LOG_INF("CACHE DB COUNT GET: itemid:%ld, head_time: %d, duration: %d", itemid, head_time, count);
+  //  zbx_backtrace();
+  //  LOG_INF("NEED TO GET FROM DB COUNT GET: itemid:%ld, head_time: %d, duration: %d", itemid, head_time, count);
+  //  glb_tsbuff_dump(&elm->tsbuff);
+
     if (SUCCEED == (ret = glb_history_get_history(itemid, elm->value_type, 0, count, head_time, GLB_HISTORY_GET_NON_INTERACTIVE, &values)))
     {
         // LOG_INF("GLB_CACHE: DB item %ld, fetching by count from DB SUCCEED, %d values", itemid, values.values_num);
@@ -638,25 +657,33 @@ static int fill_items_values_by_count(u_int64_t itemid, item_elem_t *elm, int co
     return fill_items_values_by_index(itemid, elm, tail_idx, head_idx, values);
 }
 
+static int count_request()
+{
+    state->stats.requests++;
+}
+
 static int count_hit()
 {
     state->stats.hits++;
 }
+
 static int count_miss()
 {
     state->stats.misses++;
 }
-static int count_db_requests()
-{
-    state->stats.db_requests++;
+
+static int count_db_hit(void) {
+    state->stats.db_hits++;
 }
-static int count_db_fails()
+
+static int count_db_miss()
+{
+    state->stats.db_misses++;
+}
+
+static int count_db_fail()
 {
     state->stats.db_fails++;
-}
-static int count_fails()
-{
-    state->stats.fails++;
 }
 
 static int update_db_fetch(item_elem_t *elm, int fetch_time)
@@ -691,6 +718,7 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
     int ts_head;
     int seconds;
 
+    count_request();
     DEBUG_ITEM(elem->id, "Fetching from the cache, item %ld has %d values, oldest(tail) value ts: %d, newest(head) value ts: %d, Request: head ts: %d, count %d, second: %d", 
             elem->id,  glb_tsbuff_get_count(&elm->tsbuff), glb_tsbuff_get_time_tail(&elm->tsbuff), glb_tsbuff_get_size(&elm->tsbuff),
             req->ts_head, req->count, req->seconds  );
@@ -729,16 +757,15 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
  
     if (-1 == head_idx)
     {
-        count_db_requests();
+     //   count_db_requests();
         DEBUG_ITEM(elem->id, "Requesting item from the DB by time %d->%d", req->ts_head, now);
                 
         if (FAIL == glb_state_fetch_from_db_by_time(req->itemid, elm, now - req->ts_head, now, now))
         {
-            count_db_fails();
-            count_fails();
+            count_db_fail();
             return FAIL;
         }
-
+      //  count_db_hits();
         update_db_fetch(elm, req->ts_head);
     }
    
@@ -753,34 +780,36 @@ int cache_fetch_count_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *req_
 
     if (need_count > 0)
     {
-        count_db_requests();
+      //  count_db_requests();
         DEBUG_ITEM(elem->id, "Requesting item from the DB by count starting at %d,  %d items", req->ts_head, need_count);
         if (SUCCEED != fetch_from_db_by_count(req->itemid, elm, need_count, req->ts_head, now))
         {
-            count_db_fails();
-            count_fails();
+            count_db_fail();
             return FAIL;
         }
+     //   count_db_hit();
         update_db_fetch(elm, req->ts_head);
     }
 
     if (-1 == (head_idx = glb_tsbuff_find_time_idx(&elm->tsbuff, req->ts_head)))
     {
-        count_fails();
+        count_db_miss();
+        count_miss();
         DEBUG_ITEM(elem->id, "Fetch from db hasn't retrun the data we need, cache + db request FAILed");
-
         return FAIL;
     }
 
     if (FAIL == glb_tsbuff_check_has_enough_count_data_idx(&elm->tsbuff, req->count, head_idx))
     {
-        count_fails();
+        count_db_miss();
+        count_miss();
         DEBUG_ITEM(elem->id, "Fetch from db hasn't retrun enough data, cache+db request will fail");
 
         return FAIL;
     }
     
     fill_items_values_by_count(elem->id, elm, req->count, head_idx, req->values);
+    count_db_hit();
 
     DEBUG_ITEM(elem->id, "Fetch from db successful, filled %d values", req->count);
 
@@ -802,6 +831,8 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
    
     fetch_req_t *req = (fetch_req_t *)req_data;
     item_elem_t *elm = (item_elem_t *)elem->data;
+
+    count_request();
 
     int head_idx = -1, tail_idx = -1;
 
@@ -868,13 +899,11 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
     else
         fetch_head_time = now;
 
-    count_db_requests();
 
     if (SUCCEED != glb_state_fetch_from_db_by_time(req->itemid, elm, fetch_seconds, fetch_head_time, now))
     {
         DEBUG_ITEM(elem->id, "DB FAILED to return data required, cache request will FAIL");
-        count_fails();
-        count_db_fails();
+        count_db_fail();
         return FAIL;
     }
     update_db_fetch(elm, req->ts_head);
@@ -891,8 +920,10 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
 
     if (-1 == tail_idx)
     {
+        count_db_miss();
         if (0 == glb_tsbuff_get_count(&elm->tsbuff))
         {
+            
             DEBUG_ITEM(elem->id, "No data in the cache after DB fetch, FAILing");
             return FAIL;
         }
@@ -905,6 +936,7 @@ static int cache_fetch_time_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void 
 
     if (-1 != tail_idx && -1 != head_idx)
     {
+        count_db_hit();
         fill_items_values_by_index(elem->id, elm, tail_idx, head_idx, req->values);
         DEBUG_ITEM(elem->id, "DB request successful, data cached and filled %d values", glb_tsbuff_get_count(&elm->tsbuff));
     }
@@ -919,6 +951,8 @@ int add_value_lld_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data) {
 
     int now = time(NULL);
     
+    elm->meta.state = ITEM_STATE_NORMAL;
+
     //for lld-based items need to store only one element
     if (glb_tsbuff_get_size(&elm->tsbuff) != 1) {
         glb_tsbuff_resize(&elm->tsbuff, 1 , memf->malloc_func, memf->free_func, NULL);
@@ -954,6 +988,13 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     ZBX_DC_HISTORY *h = (ZBX_DC_HISTORY *)data;
     int now = time(NULL);
 
+    if (ITEM_STATE_NORMAL != h->state ||
+        ITEM_VALUE_TYPE_NONE <= h->value_type )
+        return FAIL;
+
+    if (elm->meta.lastdata < h->ts.sec)
+        elm->meta.lastdata = h->ts.sec;
+
     DEBUG_ITEM(elem->id, "Adding item to the items value cache");
 
     if (elm->value_type == ITEM_VALUE_TYPE_NONE) {
@@ -987,6 +1028,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
+        LOG_INF("Cannot add value for item %ld with timestamp %d to the cache, type is %d, state is %d", h->itemid,  h->ts.sec, h->value_type, h->state);
         DEBUG_ITEM(h->itemid, "Cannot add value for item with timestamp %d to the cache",  h->ts.sec);
         return FAIL;
     }
@@ -1142,6 +1184,8 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 
     if ( FAIL ==( elm->value_type = glb_json_get_int_value_by_name(jp, "value_type", &errflag) ))
         return FAIL;
+    
+    elm->db_fetched_time = glb_json_get_int_value_by_name(jp, "db_fetched_time", &errflag);
 
     if ((elm->value_type >= ITEM_VALUE_TYPE_MAX || elm->value_type < 0) && elm->value_type != ITEM_VALUE_TYPE_NONE) {
         LOG_WRN("Imporeper value type is set in the file: %d: '%s'", elm->value_type, jp->start);
@@ -1158,7 +1202,8 @@ static int parse_json_item_state(struct zbx_json_parse *jp, glb_state_item_meta_
 
     meta->state = glb_json_get_int_value_by_name(jp, "state", &errflag);
     meta->lastdata = glb_json_get_int_value_by_name(jp, "lastdata", &errflag);
-    meta->nextcheck = glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
+    meta->nextcheck = 0;// glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
+    
 
     if (0 == errflag)
         return SUCCEED;
@@ -1206,7 +1251,6 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
         break;
     case ITEM_VALUE_TYPE_STR:
     case ITEM_VALUE_TYPE_TEXT:
-    case ITEM_VALUE_TYPE_LOG:
         if (SUCCEED == zbx_json_value_by_name_dyn(jp, "value", &str_value, &alloc, &type))
         {
             hist->value.str = str_value;
@@ -1215,6 +1259,8 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
         {
             hist->value.str = NULL;
         }
+        break;
+    case ITEM_VALUE_TYPE_LOG:
     case ITEM_VALUE_TYPE_NONE:
         return FAIL;
     default:
@@ -1281,41 +1327,32 @@ DUMPER_FROM_JSON(unmarshall_item_cb)
     }
 
     DEBUG_ITEM(elem->id, "Loaded item value type %d", elm->value_type);
-
-    return parse_json_item_values(&jp_values, elem, memf);
-}
-
-int  glb_state_item_add_lld_value(ZBX_DC_HISTORY *h) {
-    DEBUG_ITEM(h->itemid,"Adding LLD value to the history");
-    return elems_hash_process(state->items, h->itemid, add_value_lld_cb, h, 0);
-}
-
-int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
-    int i, ret = SUCCEED;
-
-    LOG_DBG("In %s: starting adding new history %d values", __func__, history_num);
-
-    for (i = 0; i < history_num; i++)
-    {
-        ZBX_DC_HISTORY *h;
-        h = (ZBX_DC_HISTORY *)&history[i];
-
-        DEBUG_ITEM(h->itemid, "Adding to value cache, flags is %d state is %d", h->flags, h->state);
-        if (0 != ((ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF) & h->flags) || ITEM_STATE_NOTSUPPORTED == h->state)
-        {
-            DEBUG_ITEM(h->itemid, "Not adding to value cache, no_hist flag is set");
-            continue;
-        }
-
-        if (FAIL == elems_hash_process(state->items, h->itemid, add_value_cb, h, 0))
-        {
-            ret = FAIL;
-        };
-        DEBUG_ITEM(h->itemid, "Adding value with timestamp %d to the cache", h->ts.sec);
+    
+    if (SUCCEED == parse_json_item_values(&jp_values, elem, memf)) {
+        DEBUG_ITEM(elem->id, "Succesifully loaded from the cache:");
+        
+        if (DC_get_debug_item() == elem->id)
+                glb_tsbuff_dump(&elm->tsbuff);
+        return SUCCEED;
     }
+    
+    return FAIL;
+}
 
-    return ret;
-};
+
+int  glb_state_item_add_lld_value(u_int64_t itemid, zbx_timespec_t *ts, char *value ) {
+    
+    ZBX_DC_HISTORY h = {0};
+    h.itemid = itemid;
+    h.value.str = value;
+    h.value_type = ITEM_VALUE_TYPE_TEXT;
+    h.ts = *ts;
+
+    DEBUG_ITEM(itemid,"Adding LLD value to the state cache");
+
+    return elems_hash_process(state->items, itemid, add_value_lld_cb, &h, 0);
+}
+
 
 
 int	zbx_vc_get_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
@@ -1359,19 +1396,48 @@ ELEMS_CALLBACK(item_set_error_cb) {
     item_elem_t *elm = (item_elem_t *)elem->data;
     const char *error = (const char *)data;
 
-    if (NULL == error)
-        return FAIL;
-    
-    elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, error);
     elm->meta.state = ITEM_STATE_NOTSUPPORTED;
+    if (NULL != error)
+        elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, error);
+    else 
+        elm->meta.error = strpool_replace(&state->strpool, "Error message is not set", error);
    
     return SUCCEED;
 }
+
+
 
 int  glb_state_item_set_error(u_int64_t itemid, const char *error) {
 	return elems_hash_process(state->items, itemid, item_set_error_cb, (void *)error, 0);
 }
 
+
+int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
+    int i, ret = SUCCEED;
+
+    LOG_DBG("In %s: starting adding new history %d values", __func__, history_num);
+
+    for (i = 0; i < history_num; i++)
+    {
+        ZBX_DC_HISTORY *h;
+        h = (ZBX_DC_HISTORY *)&history[i];
+
+        DEBUG_ITEM(h->itemid, "Adding to value cache, flags is %d state is %d", h->flags, h->state);
+        if (ITEM_STATE_NOTSUPPORTED == h->state)
+        {
+            if ( NULL != h->value.err ) {
+                DEBUG_ITEM(h->itemid, "Added error %s as state error", h->value.err);
+                elems_hash_process(state->items, h->itemid, item_set_error_cb,  h->value.err, 0);
+            }
+            continue;
+        }
+
+        ret = elems_hash_process(state->items, h->itemid, add_value_cb, h, 0);
+        DEBUG_ITEM(h->itemid, "Added value with timestamp %d to the cache", h->ts.sec);
+    }
+
+    return ret;
+};
 
 int glb_state_item_get_state(u_int64_t itemid) {
 	int st;
@@ -1586,7 +1652,27 @@ ELEMS_CALLBACK(clean_old_values) {
 void glb_state_items_housekeep() {
     items_hkeep_stat_t stat = {0};
     stat.clean_time  = time(NULL) - GLB_CACHE_ITEMS_MAX_DURATION;
-   // LOG_INF("Housekeeping items cache");
     elems_hash_iterate(state->items,clean_old_values, &stat, ELEMS_HASH_WRITE);
-    //LOG_INF("Housekeeping items cache finished, was items %ld, cleaned items %ld", stat.was_count, stat.clean_count);
+}
+
+typedef struct {
+    unsigned int lastcheck;
+    unsigned int nextcheck;
+    int state;
+} poll_result_t;
+
+ELEMS_CALLBACK(set_item_poll_result) {
+    item_elem_t *item=elem->data;
+    poll_result_t *res = data;
+    
+    if (res->state > -1) 
+        item->meta.state = res->state;
+    
+    if (res->lastcheck > item->meta.lastdata)
+        item->meta.lastdata = res->lastcheck;
+}
+
+void glb_state_items_set_poll_result(u_int64_t itemid, unsigned int lastcheck, int laststate) {
+    poll_result_t poll_res ={.lastcheck = lastcheck, .state = laststate};
+    elems_hash_process(state->items,itemid, set_item_poll_result, &poll_res, 0);
 }

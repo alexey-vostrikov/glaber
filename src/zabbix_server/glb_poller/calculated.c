@@ -91,7 +91,6 @@ void poll_item(poller_item_t *poller_item) {
     DC_ITEM dc_item = {0};
 
     AGENT_RESULT result;
-    u_int64_t now = glb_ms_time();
 
     prepare_dc_item(&dc_item, poller_item);
     zbx_init_agent_result(&result);
@@ -99,9 +98,10 @@ void poll_item(poller_item_t *poller_item) {
     poller_inc_requests();
 
     if (SUCCEED != get_value_calculated(&dc_item, &result) ) {
-        poller_preprocess_value(poller_item, &result, now, ITEM_STATE_NOTSUPPORTED, result.msg);
+        poller_preprocess_error(poller_item, result.msg);
     } else 
-        poller_preprocess_value(poller_item, &result, now, ITEM_STATE_NORMAL, NULL);
+        
+        poller_preprocess_agent_result_value(poller_item, NULL, &result);
     
     poller_inc_responses();
     poller_return_item_to_queue(poller_item);   

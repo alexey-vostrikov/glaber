@@ -28,6 +28,12 @@
 
 elems_hash_t *elems_hash_init(mem_funcs_t *memf, elems_hash_create_cb_t create_func, elems_hash_free_cb_t free_func ) {
     
+    mem_funcs_t local_memf = { .malloc_func = zbx_default_mem_malloc_func, 
+            .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
+    
+    if (NULL == memf)
+        memf  = &local_memf;
+
     elems_hash_t *e_hash = (elems_hash_t *) (*memf->malloc_func)(NULL, sizeof(elems_hash_t));  
     
     zbx_hashset_create_ext(&e_hash->elems, 0, ZBX_DEFAULT_UINT64_HASH_FUNC,
@@ -163,7 +169,7 @@ int elems_hash_mass_delete(elems_hash_t *elems, zbx_vector_uint64_t *ids) {
 
         if (NULL != (elem = zbx_hashset_search(&elems->elems, &ids->values[i])));
         {
-            LOG_INF("Deleting element id %ld", elem->id);
+            //LOG_INF("Deleting element id %ld", elem->id);
             delete_element(elems, elem);
             count++;
         }
@@ -236,6 +242,7 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
     elems_hash_elem_t *elem;
     int last_ret = SUCCEED;
     zbx_hashset_iter_t iter;
+    int count = 0;
 
     glb_rwlock_rdlock(&elems->meta_lock);
 
@@ -246,10 +253,11 @@ int elems_hash_iterate(elems_hash_t *elems, elems_hash_process_cb_t proc_func, v
         elem_lock(elem, flags);
         (*proc_func)(elem, &elems->memf, params);
         elem_unlock(elem);
+        count++;
     }
     
     glb_rwlock_unlock(&elems->meta_lock);
-    
+    return count;
 }
 
 int  elems_hash_get_num(elems_hash_t *elems) {

@@ -5680,16 +5680,16 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 			continue;
 		}
 
-		// if (ITEM_STATE_NOTSUPPORTED == item->state &&
-		// 		FAIL == zbx_evaluatable_for_notsupported(func->function))
-		// {
-		// 	/* set 'unknown' error value */
-		// 	zbx_variant_set_error(&func->value,
-		// 			zbx_eval_format_function_error(func->function, item->host.host,
-		// 					item->key_orig, func->parameter, "item is not supported"));
-		// 	DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is not supported");
-		// 	continue;
-		// }
+		if (ITEM_STATE_NORMAL != glb_state_item_get_state(item->itemid) &&
+				FAIL == zbx_evaluatable_for_notsupported(func->function))
+		{
+			/* set 'unknown' error value */
+			zbx_variant_set_error(&func->value,
+					zbx_eval_format_function_error(func->function, item->host.host,
+							item->key_orig, func->parameter, "item is not supported"));
+			DEBUG_ITEM(func->itemid, "Skipping func eval to due to item is not supported");
+			continue;
+		}
 
 		params = zbx_dc_expand_user_macros_in_func_params(func->parameter, item->host.hostid);
 

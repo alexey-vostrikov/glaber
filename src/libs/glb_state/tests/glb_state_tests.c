@@ -39,9 +39,6 @@ static void state_test_untyped_interfaces() {
 
     sleep(2);
     HALT_HERE("Intentional halt on iface tests finish- SUCCESS");
-
-
-
 }
 
 
@@ -217,11 +214,10 @@ static void state_test_triggers(){
 
 
 #ifdef HAVE_GLB_TESTS
-void glb_state_run_tests(void) {
+
+void glb_state_run_tests1(void) {
     state_test_untyped_interfaces();
     state_test_interfaces();
     state_test_triggers();
-
-   
 }
 #endif

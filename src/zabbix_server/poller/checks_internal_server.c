@@ -182,8 +182,6 @@ int	zbx_get_value_internal_ext(const char *param1, const AGENT_REQUEST *request,
 				SET_UI64_RESULT(result, stats.hits + stats.misses);
 			else if (0 == strcmp(param3, "misses"))
 				SET_UI64_RESULT(result, stats.misses);
-	//		else if (0 == strcmp(param3, "mode"))
-	//			SET_UI64_RESULT(result, stats.mode);
 			else
 			{
 				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));

@@ -976,7 +976,7 @@ static int	expression_eval_one(zbx_expression_eval_t *eval, zbx_expression_query
 	/*     NOTSUPPORTED items. */
 	/*   - other functions. Result of evaluation is ZBX_UNKNOWN.     */
 
-	if (ITEM_STATE_NOTSUPPORTED == item->state && FAIL == zbx_evaluatable_for_notsupported(func_name))
+	if (ITEM_STATE_NORMAL != item->state && FAIL == zbx_evaluatable_for_notsupported(func_name))
 	{
 		/* compose and store 'unknown' message for future use */
 		*error = zbx_dsprintf(NULL, "item \"/%s/%s\" is not supported",

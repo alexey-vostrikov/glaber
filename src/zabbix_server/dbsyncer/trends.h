@@ -1,6 +1,5 @@
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,15 +16,22 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "preproc_stats.h"
+#ifndef PROC_TRENDS_H
+#define PROC_TRENDS_H
 
-#include "preproc.h"
-#include "zbxjson.h"
+#include "zbxcommon.h"
+#include "glb_history.h"
 
-void zbx_preproc_stats_ext_get(struct zbx_json *json, const void *arg)
-{
-	ZBX_UNUSED(arg);
 
-	/* zabbix[preprocessing_queue] */
-	zbx_json_adduint64(json, "preprocessing_queue", zbx_preprocessor_get_queue_size());
-}
+int trends_account_metric(const ZBX_DC_HISTORY *h);
+
+int trends_init_cache();
+int trends_destroy_cache();
+
+void trend_set_hostname(trend_t *trend, const char *hostname);
+void trend_set_itemkey(trend_t *trend, const char *itemkey);
+
+char *trend_get_hostname(trend_t *trend);
+char *trend_get_itemkey(trend_t *trend);
+
+#endif

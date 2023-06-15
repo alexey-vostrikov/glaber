@@ -23,11 +23,11 @@
 #include "metric.h"
 #include "zbxtime.h"
 
-void metric_set_time(metric_t *metric, u_int64_t *mstime) {
-    if (NULL == mstime) {
-        metric->mstime = glb_ms_time();
-        return;
-    }
+// void metric_set_time(metric_t *metric, u_int64_t mstime) {
+//     if (0 == mstime) {
+//         metric->mstime = glb_ms_time();
+//         return;
+//     }
 
-    metric->mstime = *mstime;
-}
+//     metric->mstime = mstime;
+// }

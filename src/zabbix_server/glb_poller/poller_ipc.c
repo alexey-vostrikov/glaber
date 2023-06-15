@@ -109,7 +109,7 @@ int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t
 	return SUCCEED;
 }
 
-void poller_item_notify_flush() {
+void poller_item_notify_flush(void) {
 	int type, i;
 	for (type = 0; type < ZBX_PROCESS_TYPE_COUNT; type++) {
 	

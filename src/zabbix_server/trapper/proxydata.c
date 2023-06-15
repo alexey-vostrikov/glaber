@@ -161,13 +161,7 @@ void	zbx_recv_proxy_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_time
 		goto reply;
 	}
 
-	if (FAIL == (ret = zbx_hc_check_proxy(proxy.hostid)))
-	{
-		upload_status = ZBX_PROXY_UPLOAD_DISABLED;
-		ret = proxy_data_no_history(jp);
-	}
-	else
-		upload_status = ZBX_PROXY_UPLOAD_ENABLED;
+	upload_status = ZBX_PROXY_UPLOAD_ENABLED;
 
 	if (SUCCEED == ret)
 	{
@@ -340,7 +334,6 @@ void	zbx_send_proxy_data(zbx_socket_t *sock, zbx_timespec_t *ts, const zbx_confi
 
 			zbx_db_free_result(result);
 
-			reset_proxy_history_count(history_maxid - history_lastid);
 			proxy_set_hist_lastid(history_lastid);
 		}
 

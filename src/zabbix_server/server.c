@@ -34,6 +34,7 @@
 #include "zbxmodules.h"
 #include "zbxnix.h"
 #include "zbxcomms.h"
+#include "glb_common.h"
 
 #include "alerter/alerter.h"
 #include "dbsyncer/dbsyncer.h"
@@ -53,7 +54,6 @@
 #include "proxypoller/proxypoller.h"
 #include "vmware/vmware.h"
 #include "taskmanager/taskmanager.h"
-#include "preprocessor/preproc_manager.h"
 #include "preprocessor/preproc_worker.h"
 #include "availability/avail_manager.h"
 #include "service/service_manager.h"
@@ -84,8 +84,8 @@
 #include "zbxthreads.h"
 #include "zbxicmpping.h"
 #include "zbxipcservice.h"
-#include "preprocessor/preproc_stats.h"
 #include "glb_preproc.h"
+#include "glb_poller/internal.h"
 
 #include "../libs/zbxexec/worker.h"
 #include "../libs/zbxipcservice/glb_ipc.h"
@@ -104,6 +104,10 @@ int CONFIG_ICMP_METHOD = GLB_ICMP;
 char *CONFIG_VCDUMP_LOCATION = NULL;
 int CONFIG_VCDUMP_FREQUENCY = 60;
 int CONFIG_ICMP_NA_ON_RESOLVE_FAIL = 0;
+
+size_t  CONFIG_PREPROC_IPC_SIZE   =  512 * ZBX_MEBIBYTE;
+int CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR = 128 * ZBX_KIBIBYTE;
+int CONFIG_PROC_IPC_METRICS_PER_SYNCER =  128 * ZBX_KIBIBYTE;
 
 #ifdef HAVE_OPENIPMI
 #include "ipmi/ipmi_manager.h"
@@ -283,8 +287,8 @@ int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	1, /* ZBX_PROCESS_TYPE_TASKMANAGER */
 	0, /* ZBX_PROCESS_TYPE_IPMIMANAGER */
 	1, /* ZBX_PROCESS_TYPE_ALERTMANAGER */
-	1, /* ZBX_PROCESS_TYPE_PREPROCMAN */
-	3, /* ZBX_PROCESS_TYPE_PREPROCESSOR */
+	0, /* ZBX_PROCESS_TYPE_PREPROCMAN - do not set to non 0, legacy */
+	0, /* ZBX_PROCESS_TYPE_PREPROCESSOR - do not set to non 0, legacy*/
 	1, /* ZBX_PROCESS_TYPE_LLDMANAGER */
 	2, /* ZBX_PROCESS_TYPE_LLDWORKER */
 	1, /* ZBX_PROCESS_TYPE_ALERTSYNCER */
@@ -367,7 +371,7 @@ zbx_uint64_t CONFIG_CONF_CACHE_SIZE = 32 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_HISTORY_CACHE_SIZE = 16 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_HISTORY_INDEX_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_TRENDS_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
-static zbx_uint64_t CONFIG_TREND_FUNC_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
+//static zbx_uint64_t CONFIG_TREND_FUNC_CACHE_SIZE = 4 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_VALUE_CACHE_SIZE = 256 * ZBX_MEBIBYTE;
 zbx_uint64_t CONFIG_VMWARE_CACHE_SIZE = 8 * ZBX_MEBIBYTE;
 u_int64_t CONFIG_IPC_BUFFER_SIZE = 128 * ZBX_MEBIBYTE;
@@ -493,16 +497,6 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_ALERTER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_PREPROCESSOR;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR];
 	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]))
 	{
@@ -811,12 +805,12 @@ static void zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
-	if (0 != CONFIG_TREND_FUNC_CACHE_SIZE && 128 * ZBX_KIBIBYTE > CONFIG_TREND_FUNC_CACHE_SIZE)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "\"TrendFunctionCacheSize\" configuration parameter must be either 0"
-								   " or greater than 128KB");
-		err = 1;
-	}
+	// if (0 != CONFIG_TREND_FUNC_CACHE_SIZE && 128 * ZBX_KIBIBYTE > CONFIG_TREND_FUNC_CACHE_SIZE)
+	// {
+	// 	zabbix_log(LOG_LEVEL_CRIT, "\"TrendFunctionCacheSize\" configuration parameter must be either 0"
+	// 							   " or greater than 128KB");
+	// 	err = 1;
+	// }
 
 	if (NULL != CONFIG_SOURCE_IP && SUCCEED != zbx_is_supported_ip(CONFIG_SOURCE_IP))
 	{
@@ -940,7 +934,7 @@ static void set_config_defaults() {
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_API_TRAPPER] = 3;
-	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] =1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] = 4;
 }
 
 /******************************************************************************
@@ -956,6 +950,12 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 		{
 			/* PARAMETER,			VAR,					TYPE,
 				MANDATORY,	MIN,			MAX */
+            {"IPCBufferSize",                   &CONFIG_IPC_BUFFER_SIZE, TYPE_UINT64,
+			 	PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(64) * ZBX_GIBIBYTE},
+			{"IPCProcMetricsPerPreprocessor", &CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR, TYPE_INT,
+			 	PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
+			{"IPCProcMetricsPerSyncer", &CONFIG_PROC_IPC_METRICS_PER_SYNCER, TYPE_INT,
+			 PARM_OPT, 2048, 1024 * ZBX_MEBIBYTE},
             {"IcmpNaResolveFail",                   &CONFIG_ICMP_NA_ON_RESOLVE_FAIL,                        TYPE_INT,
             PARM_OPT,       0,                      1},
 			{"SnmpDisableSNMPV1Async", &CONFIG_DISABLE_SNMPV1_ASYNC, TYPE_INT,
@@ -990,9 +990,9 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"HistoryModule", &CONFIG_HISTORY_MODULE, TYPE_MULTISTRING,
 			 PARM_OPT, 0, 0},
-			{"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
-			 PARM_OPT, 1, 1000},
-			{"StartGLBPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN], TYPE_INT,
+			// {"StartPreprocessorsPerManager", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+			//  PARM_OPT, 1, 1000},
+			{"StartGLBPreprocessors", &CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
 			 PARM_OPT, 1, 1000},
 			{"StartDBSyncers", &CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], TYPE_INT,
 			 PARM_OPT, 1, 100},
@@ -1026,14 +1026,6 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 1},
 			{"CacheSize", &CONFIG_CONF_CACHE_SIZE, TYPE_UINT64,
 			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(64) * ZBX_GIBIBYTE},
-			{"HistoryCacheSize", &CONFIG_HISTORY_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(2) * ZBX_GIBIBYTE},
-			{"HistoryIndexCacheSize", &CONFIG_HISTORY_INDEX_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(2) * ZBX_GIBIBYTE},
-			{"TrendCacheSize", &CONFIG_TRENDS_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 128 * ZBX_KIBIBYTE, __UINT64_C(2) * ZBX_GIBIBYTE},
-			{"TrendFunctionCacheSize", &CONFIG_TREND_FUNC_CACHE_SIZE, TYPE_UINT64,
-			 PARM_OPT, 0, __UINT64_C(2) * ZBX_GIBIBYTE},
 			{"ValueCacheSize", &CONFIG_VALUE_CACHE_SIZE, TYPE_UINT64,
 			 PARM_OPT, 0, __UINT64_C(64) * ZBX_GIBIBYTE},
 			{"IPCBufferSize", &CONFIG_IPC_BUFFER_SIZE, TYPE_UINT64,
@@ -1188,8 +1180,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"StartAlerters", &CONFIG_FORKS[ZBX_PROCESS_TYPE_ALERTER], TYPE_INT,
 			 PARM_OPT, 1, 100},
-			{"StartPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
-			 PARM_OPT, 1, 1000},
+			// {"StartPreprocessors", &CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR], TYPE_INT,
+			//  PARM_OPT, 1, 1000},
 			{"ExportDir", &(zbx_config_export.dir), TYPE_STRING,
 			 PARM_OPT, 0, 0},
 			{"ExportType", &(zbx_config_export.type), TYPE_STRING_LIST,
@@ -1237,7 +1229,6 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 	zbx_tls_validate_config(zbx_config_tls, CONFIG_FORKS[ZBX_PROCESS_TYPE_ACTIVE_CHECKS],
 							CONFIG_FORKS[ZBX_PROCESS_TYPE_LISTENER], get_program_type);
 #endif
-	CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR ] = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR] * CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCMAN];
 }
 
 /******************************************************************************
@@ -1305,7 +1296,8 @@ static void zbx_on_exit(int ret)
 
 		zbx_free_selfmon_collector();
 	}
-
+	
+	glb_internal_metrics_destory ();
 	zbx_uninitialize_events();
 
 	zbx_unload_modules();
@@ -1494,13 +1486,13 @@ static void zbx_check_db(void)
 		zbx_db_extract_dbextension_info(&db_version_info);
 	}
 
-	LOG_INF("Updating base database version");
+	//LOG_INF("Updating base database version");
 	if (SUCCEED == result && (SUCCEED != DBcheck_version(DB_UPDATE_COMMON_DATABASE)))
 	{
 		result = FAIL;
 	}
 	
-	LOG_INF("Updating Glaber specific database version");
+	//LOG_INF("Updating Glaber specific database version");
 	if (SUCCEED == result && (SUCCEED != DBcheck_version(DB_UPDATE_GLABER_DATABASE)))
 	{
 		result = FAIL;
@@ -1622,6 +1614,11 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 	DC_set_debug_trigger(CONFIG_DEBUG_TRIGGER);
 
+	if (FAIL == glb_internal_metrics_init()) {
+		zbx_error("Cannot initialize internal metrics register API");
+		exit(EXIT_FAILURE);
+	}
+
 	if (FAIL == glb_state_init())
 	{
 		zbx_error("Cannot initialize Glaber state CACHE");
@@ -1633,14 +1630,14 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		zbx_error("Cannot initialize internal monitoring IPC");
 		exit(EXIT_FAILURE);
 	}
-
+	
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE))
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == preproc_ipc_init(128 * ZBX_MEBIBYTE))
+	if (FAIL == preproc_ipc_init())
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
@@ -1652,12 +1649,12 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		exit(EXIT_FAILURE);
 	}
 
-	if (SUCCEED != zbx_tfc_init(CONFIG_TREND_FUNC_CACHE_SIZE, &error))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize trends read cache: %s", error);
-		zbx_free(error);
-		return FAIL;
-	}
+	// if (SUCCEED != zbx_tfc_init(CONFIG_TREND_FUNC_CACHE_SIZE, &error))
+	// {
+	// 	zabbix_log(LOG_LEVEL_CRIT, "cannot initialize trends read cache: %s", error);
+	// 	zbx_free(error);
+	// 	return FAIL;
+	// }
 
 	if (0 != CONFIG_FORKS[ZBX_PROCESS_TYPE_TRAPPER])
 	{
@@ -1848,12 +1845,12 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			thread_args.args = &taskmanager_args;
 			zbx_thread_start(taskmanager_thread, &thread_args, &threads[i]);
 			break;
-		case ZBX_PROCESS_TYPE_PREPROCMAN:
-			zbx_thread_start(preprocessing_manager_thread, &thread_args, &threads[i]);
-			break;
-		case ZBX_PROCESS_TYPE_PREPROCESSOR:
-			zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
-			break;
+//		case ZBX_PROCESS_TYPE_PREPROCMAN:
+//			zbx_thread_start(preprocessing_manager_thread, &thread_args, &threads[i]);
+//			break;
+		// case ZBX_PROCESS_TYPE_PREPROCESSOR:
+		// 	zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
+		// 	break;
 #ifdef HAVE_OPENIPMI
 		case ZBX_PROCESS_TYPE_IPMIMANAGER:
 			thread_args.args = &ipmi_manager_args;
@@ -1992,7 +1989,7 @@ static void server_teardown(zbx_rtc_t *rtc, zbx_socket_t *listen_sock, zbx_socke
 		zbx_tcp_unlisten(api_listen_sock);
 
 	/* destroy shared caches */
-	zbx_tfc_destroy();
+//	zbx_tfc_destroy();
 	zbx_vmware_destroy();
 	zbx_free_selfmon_collector();
 	free_configuration_cache();
@@ -2331,7 +2328,7 @@ int MAIN_ZABBIX_ENTRY(int flags)
 		zbx_set_exiting_with_fail();
 	}
 
-	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
+//	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
 	zbx_register_stats_data_func(zbx_server_stats_ext_get, NULL);
 	zbx_register_stats_ext_func(zbx_vmware_stats_ext_get, NULL);
 	zbx_diag_init(diag_add_section_info);
