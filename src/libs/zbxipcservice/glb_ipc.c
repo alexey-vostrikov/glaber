@@ -368,7 +368,7 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 	return i;
 }
 
-ipc_conf_t* glb_ipc_init(int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
+ipc_conf_t* glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode) {
     
 	ipc_conf_t *ipc;

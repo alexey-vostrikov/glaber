@@ -194,7 +194,7 @@ int state_load_objects(elems_hash_t *elems, char *table_name, char *id_name, sta
 
 	state_loader_destroy(&unmdata.loader);
 
-	LOG_INF("STATE: finished loading trigger data, loaded %d lines; parsed %d lines",lines, parsed);
+	LOG_INF("STATE: finished loading data, loaded %d lines; parsed %d lines", lines, parsed);
     return parsed;
  }
 

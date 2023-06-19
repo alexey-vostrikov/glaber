@@ -83,7 +83,7 @@ typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, 
 typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
 typedef struct ipc_conf_t ipc_conf_t;
 
-ipc_conf_t	*glb_ipc_init(int elems_count, int elem_size, int consumers, mem_funcs_t *memf,
+ipc_conf_t	*glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
 void		glb_ipc_destroy(ipc_conf_t* ipc);
 
