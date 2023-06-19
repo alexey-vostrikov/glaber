@@ -192,13 +192,17 @@ void glb_actions_destroy(glb_actions_t *actions) {
 static void  event_actions_reset_conditions(events_processor_event_t *event, glb_actions_t *actions) {
 	zbx_hashset_iter_t iter;
 	condition_t		*condition;
+	LOG_INF("Doing results cleanup for problem %ld, unique conditions to clean %d",event->object_id, 
+					actions->uniq_conditions[event->event_type].num_data);
 
 	zbx_hashset_iter_reset(&actions->uniq_conditions[event->event_type], &iter);
 	
 	//calculating the conditions
-	while (NULL != (condition = zbx_hashset_iter_next(&iter))) 
+	while (NULL != (condition = zbx_hashset_iter_next(&iter))) {
+		LOG_INF("Setting problem %ld of condition %ld set to UNSET", event->object_id,
+							 condition->conditionid);
 		condition->result = UNSET;
-	
+	}
 }
 
 static int check_and_calc_action_conditions(events_processor_event_t *event, const zbx_action_eval_t *action)
@@ -209,11 +213,13 @@ static int check_and_calc_action_conditions(events_processor_event_t *event, con
 	char		*expression = NULL, tmp[ZBX_MAX_UINT64_LEN + 2], *ptr, error[256];
 	double		eval_result;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() actionid:" ZBX_FS_UI64 " eventsource:%d", __func__,
-			action->actionid, (int)action->eventsource);
+	LOG_INF("In %s() actionid:" ZBX_FS_UI64 " eventsource:%d action type %d, problem %ld", __func__,
+			action->actionid, (int)action->eventsource, event->object_id);
 
 	if (ZBX_CONDITION_EVAL_TYPE_EXPRESSION == action->evaltype)
 		expression = zbx_strdup(expression, action->formula);
+	
+	LOG_INF("Problem %ld Expression is %s", event->object_id, expression);
 
 	for (i = 0; i < action->conditions.values_num; i++)
 	{
@@ -221,17 +227,30 @@ static int check_and_calc_action_conditions(events_processor_event_t *event, con
 			continue; 
 
 		condition = (condition_t *)action->conditions.values[i];
+		
+		LOG_INF("Problem %ld, checking condition %ld, current result is %d", event->object_id,
+									 condition->conditionid, condition->result);
+		if (UNSET != condition->result && FAIL != condition->result && condition->result != NOTSUPPORTED
+			&& condition->result != SUCCEED ) {
+				HALT_HERE("Condition state error!");
+			}
+
 
 		if (ZBX_CONDITION_EVAL_TYPE_AND_OR == action->evaltype && 
 				old_type == condition->conditiontype && SUCCEED == ret)
 		{
+			LOG_INF("Shortcutted");
 			continue;	/* short-circuit true OR condition block to the next AND condition */
 		}
 
+		LOG_INF("Condition result is %d", condition->result);
 
-		if (UNSET == condition->result) 
+		if (UNSET == condition->result) {
+			LOG_INF("Calling condition %ld calc", condition->conditionid);
 			glb_event_condition_calc(event, condition);
-		
+		}
+		LOG_INF("Switching by evaltype: %d", action->evaltype);
+
 		switch (action->evaltype)
 		{
 			case ZBX_CONDITION_EVAL_TYPE_AND_OR:
@@ -305,8 +324,10 @@ static int event_actions_calc_matched_actions(events_processor_event_t *event, g
 	{
 		zbx_action_eval_t *action = (zbx_action_eval_t *)actions->actions.values[j];
 
-		if (action->eventsource != event->event_type)
+		if (action->eventsource != event->event_source)
 			continue;
+		LOG_INF("Calculating actions conditions for problem %ld action %ld, action eventsource %d", event->object_id,
+				 action->actionid, action->eventsource);
 
 		if (SUCCEED == check_and_calc_action_conditions(event, action))
 		{

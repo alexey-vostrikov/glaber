@@ -1,4 +1,3 @@
-
 /*
 ** Glaber
 ** Copyright (C) 2001-2030 Glaber JSC
@@ -44,11 +43,11 @@
             },
 */
 
-typedef struct {
+// typedef struct {
+//     void * unused;
+// } condition_t;
 
-} condition_t;
-
-typedef struct glb_operation_t {
+struct glb_operation_t {
     u_int64_t id;
     u_int64_t action_id;
     int operationtype;
@@ -63,12 +62,16 @@ void glb_operation_free(mem_funcs_t *memf, glb_operation_t *operation) {
     memf->free_func(operation);
 }
 
-glb_operation_t *glb_operation_create_from_json(struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool ) {
+size_t glb_operation_size(void) {
+    return sizeof(glb_operation_t);
+}
+
+int glb_operation_create_from_json(glb_operation_t* oper,struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool ) {
     int errflag;
-    glb_operation_t *oper = memf->malloc_func(NULL, sizeof(glb_operation_t));
+    //glb_operation_t *oper = memf->malloc_func(NULL, sizeof(glb_operation_t));
     bzero(oper, sizeof(glb_operation_t));
 
-    LOG_INF("Creating operation from json: %s", jp->start);
+    //LOG_INF("Creating operation from json: %s", jp->start);
     oper->id            = glb_json_get_uint64_value_by_name(jp, "operationid", &errflag);
     oper->action_id     = glb_json_get_uint64_value_by_name(jp, "actionid", &errflag);
     oper->operationtype = glb_json_get_uint64_value_by_name(jp, "operationtype", &errflag);
@@ -76,7 +79,35 @@ glb_operation_t *glb_operation_create_from_json(struct zbx_json_parse *jp, mem_f
     oper->esc_step_to   = glb_json_get_uint64_value_by_name(jp, "esc_step_to", &errflag);
     oper->esc_period    = glb_json_get_uint64_value_by_name(jp, "esc_period", &errflag);
     oper->evaltype      = glb_json_get_uint64_value_by_name(jp, "evaltype", &errflag);
-    LOG_INF("Creating operation conditions");
-    LOG_INF("Also loading operations messages");
-    return oper;
+    //LOG_INF("Creating operation conditions");
+    //LOG_INF("Also loading operations messages");
+    return SUCCEED;
+}
+
+int glb_operation_match_step(glb_operation_t *oper, int step_no) {
+    if ( oper->esc_step_from == step_no ||
+         oper->esc_step_from < step_no && oper->esc_step_to >= step_no )
+        return SUCCEED;
+}
+
+int glb_operation_get_duration(glb_operation_t *oper) {
+    if ( 0 == oper->esc_period)
+        return ZBX_MAX_UINT31_1;
+
+    return oper->esc_period;   
+}
+
+int glb_operation_execute(glb_operation_t *oper) {
+    LOG_INF("Need to execute operation id %ld of type %d esc_period %d, evaltype %d ", 
+                 oper->id, oper->operationtype, oper->esc_period, oper->evaltype);
+
+    //there might be many different event sources as well as object types
+    //so here some universall (probably callback) interface should be implemented to
+    //handle operations the same way except for calling the specific interface for, 
+    //say, macro translation, or logging
+    
+    //anouther approach might be is to create specific interfaces for each object type
+    
+
+    HALT_HERE("Operations execution is not implemented yet");
 }

@@ -163,7 +163,7 @@ int glb_conf_create_array_from_json(void **data, char *name, struct zbx_json_par
     elem_ptr = *data;
 
     LOG_INF("Allocated memory at %p", *data);
-   // LOG_INF("Iterating");
+
      while (NULL != (p = zbx_json_next(&jp_arr, p))) {
         if (SUCCEED != zbx_json_brackets_open(p, &jp_elem)) 
             continue;
@@ -174,4 +174,13 @@ int glb_conf_create_array_from_json(void **data, char *name, struct zbx_json_par
     }
 
     return count;
+}
+
+int glb_conf_array_iterate(void *array_ptr, int count, size_t elem_size, glb_conf_array_iter_func_t cb_func, void *data ) {
+    int i;
+
+    for (i =0 ; i < count; i++) 
+        cb_func(array_ptr + i * elem_size , i, data);
+    
+    return i;
 }

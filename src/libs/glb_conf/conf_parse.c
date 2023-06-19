@@ -1,8 +1,5 @@
-
-
 /*
-** Glaber
-** Copyright (C) 2001-2030 Glaber JSC
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,16 +16,17 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "zbxalgo.h"
-#include "zbxjson.h"
+#include "zbxcommon.h"
+#include "log.h"
 
-typedef struct glb_operation_t glb_operation_t;
 
-void glb_operation_free(mem_funcs_t *memf, glb_operation_t *operation);
-int glb_operation_create_from_json(glb_operation_t *oper, struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
+// int glb_conf_get_simple_interval(const char *delay)
+// {
+// 	int interval;
+// 	char *delim;
 
-size_t glb_operation_size(void);
-int glb_operation_match_step(glb_operation_t *oper, int step_no);
-int glb_operation_get_duration(glb_operation_t *oper);
+// 	if (SUCCEED != zbx_is_time_suffix(delay, &interval, (int)(NULL == (delim = strchr(delay, ';')) ? ZBX_LENGTH_UNLIMITED : delim - delay)))
+// 		return 0;
 
-int glb_operation_execute(glb_operation_t *oper);
+// 	return interval;
+// }

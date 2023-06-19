@@ -19,7 +19,8 @@ libglbconfig_a_SOURCES = \
     ./scripts/script.c \
     api_sync.c \
     ./operations/operations.c \
-    ./operations/operation.c
+    ./operations/operation.c \
+    conf_parse.c
 
     
 libglbconfig_a_CFLAGS = \

@@ -29,6 +29,7 @@
 #include "zbxipcservice.h"
 #include "ipmi_protocol.h"
 #include "checks_ipmi.h"
+#include "../../libs/glb_macro/glb_macro.h"
 #include "zbxnum.h"
 
 /******************************************************************************
@@ -51,8 +52,10 @@ int	zbx_ipmi_port_expand_macros(zbx_uint64_t hostid, const char *port_orig, unsi
 	int	ret = SUCCEED;
 
 	tmp = zbx_strdup(NULL, port_orig);
-	zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-			&tmp, MACRO_TYPE_COMMON, NULL, 0);
+	glb_macro_expand_by_hostid(&tmp,hostid, NULL, 0);
+
+	// zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &hostid, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	// 		&tmp, MACRO_TYPE_COMMON, NULL, 0);
 
 	if (FAIL == zbx_is_ushort(tmp, port) || 0 == *port)
 	{

@@ -114,7 +114,7 @@ void process_escalation_step_cb(poller_item_t *garbage, void *esc) {
 		return;
 	}
 	
-	glb_event_operations_execute_step(conf.operations, escalation->action_id, escalation->current_step );
+	glb_event_operations_execute_step(escalation->problem_id, conf.operations, escalation->action_id, escalation->current_step );
 		
 	if (glb_events_operations_get_max_steps(conf.operations, escalation->action_id) <= escalation->current_step) {
 		//no steps left, destroying escalation
@@ -152,10 +152,13 @@ void exec_event_recovery_operations(events_processor_event_t *event, u_int64_t a
 	// }
 	
 	HALT_HERE("Create get_active_escalation first");
-	glb_events_operations_execute_recovery(conf.operations, event->object_id, actionid);
+	glb_events_operations_execute_recovery(event->object_id, conf.operations, event->object_id, actionid);
 }
 
 static void run_event_operations(events_processor_event_t *event, u_int64_t actionid) {
+	
+	LOG_INF("Running new event for event %ld action %ld", event->object_id, actionid);
+
 	switch(event->event_type) {
 		case EVENTS_TYPE_NEW:
 			create_new_event_operations(event, actionid);
@@ -170,13 +173,16 @@ static void run_event_operations(events_processor_event_t *event, u_int64_t acti
 	}
 }
 
+//THERE IS SUSPICIOUS PROBLEM: AN EVENT MATCHES 48 ACTIONS! WHICH IS KIND A STRANGE
+
 static void start_operations_for_event(events_processor_event_t *event, zbx_vector_uint64_t *matched_actions) {
 	int i;
 
 	LOG_INF("Problem %ld matched %d actions", event->object_id, matched_actions->values_num);
 	
-	for (i = 0 ; i < matched_actions->values_num; i++) 
+	for (i = 0 ; i < matched_actions->values_num; i++) {
 		run_event_operations(event, matched_actions->values[i]);
+	}
 }
 
 

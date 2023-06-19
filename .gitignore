@@ -228,3 +228,4 @@ include/config.h.in~
 build/config.log
 include/common/config.h
 
+m4/ldap.m4

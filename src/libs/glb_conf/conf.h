@@ -33,15 +33,21 @@ void glb_conf_set_json_data_table(char *buffer, int table);
 
 typedef void (*glb_conf_array_free_func_cb_t)(void *data, mem_funcs_t *memf, strpool_t *strpool);
 typedef int (*glb_conf_array_create_func_cb_t)(void *data, struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool);
-
-
+typedef void (*glb_conf_array_iter_func_t)(void *elem_ptr, int i, void *data);
 
 #define CONF_ARRAY_CREATE_FROM_JSON_CB(name) \
         	static int name(void *data, struct zbx_json_parse *jp, mem_funcs_t *memf, strpool_t *strpool) 
+
 #define CONF_ARRAY_FREE_CB(name) \
 			static void name(void *data, mem_funcs_t *memf, strpool_t *strpool)			
+
+#define CONF_ARRAY_ITERATE_CB(name) \
+        static void name(void *elem_ptr, int i, void *data)
 
 void glb_conf_free_json_array(void *data, int count, size_t element_size,  mem_funcs_t *memf, strpool_t *strpool,
 		glb_conf_array_free_func_cb_t free_cb);
 int glb_conf_create_array_from_json(void **data, char * name, struct zbx_json_parse *jp, size_t element_size, mem_funcs_t *memf, strpool_t *strpool,
 		glb_conf_array_create_func_cb_t create_cb);
+int glb_conf_array_iterate(void *array_ptr, int count, size_t elem_size, glb_conf_array_iter_func_t cb_func, void *data );
+
+//int glb_conf_get_simple_interval(const char *delay);
