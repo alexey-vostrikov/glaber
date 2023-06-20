@@ -35,9 +35,15 @@ int  glb_lock_free(pthread_mutex_t *lock) {
 }
 
 void glb_lock_block(pthread_mutex_t *lock) {
-    while ( pthread_mutex_trylock(lock)) {
-		usleep(GLB_LOCK_SLEEP_US);
-	};
+	if (0 != pthread_mutex_lock(lock)) {
+		HALT_HERE("Pthread lock block error");
+	}
+}
+
+int glb_lock_try_block(pthread_mutex_t *lock) {
+    if  (pthread_mutex_trylock(lock))
+		return FAIL;
+	return SUCCEED;
 }
 
 void glb_lock_unlock(pthread_mutex_t *lock) {

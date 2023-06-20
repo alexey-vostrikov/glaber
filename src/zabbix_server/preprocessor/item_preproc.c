@@ -29,6 +29,8 @@
 #include "zbxprometheus.h"
 #include "zbx_item_constants.h"
 #include "zbxsysinfo.h"
+#include "metric.h"
+#include "glb_preproc_worker.h"
 
 #include "zbxxml.h"
 #ifdef HAVE_LIBXML2
@@ -1858,7 +1860,14 @@ static int item_preproc_dispatch(u_int64_t itemid, zbx_variant_t *value, u_int64
 
 	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
 	{
-		preprocess_str(host_item_ids.first, host_item_ids.second,  flags, ts, value->data.str);
+		zbx_variant_t str_val;
+
+		metric_t metric = {.hostid = host_item_ids.first, .itemid = host_item_ids.second,
+				.flags = flags, .ts = *ts, .value = *value};
+
+		preprocess_metric(&metric);
+
+		
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
@@ -1914,6 +1923,7 @@ static int item_preproc_dispatch_ip(u_int64_t itemid, zbx_variant_t *value, u_in
 	{
 
 		preprocess_str(hostid, new_itemid, flags, ts, value->data.str);
+
 		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
@@ -2621,6 +2631,9 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 
 	len_replace = strlen(ptr + 1);
 	unescape_param(ZBX_PREPROC_STR_REPLACE, ptr + 1, MIN(len_replace, sizeof(replace_str) - 1), replace_str);
+
+	if (value->type = ZBX_VARIANT_ERR)
+		return FAIL;
 
 	if (SUCCEED != zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 	{

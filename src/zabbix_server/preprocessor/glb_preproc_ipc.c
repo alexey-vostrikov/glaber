@@ -38,7 +38,7 @@ now it's NOT follows standards as it doesn't support HELP and TYPE keywords
 u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid);
 extern int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
-extern size_t  CONFIG_PREPROC_IPC_SIZE;
+extern size_t  CONFIG_IPC_BUFFER_SIZE;
 extern int CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR;  //128 * 1024
 extern int CONFIG_PROC_IPC_METRICS_PER_SYNCER; //128 * 1024
 
@@ -53,15 +53,17 @@ typedef struct  {
     ipc_conf_t *process_ipc; //ipc preprocessing->hist_syncer
 } preproc_ipc_conf_t;
 
-static preproc_ipc_conf_t conf = {0};
+static preproc_ipc_conf_t *conf = NULL;
 
 //static 
 char *preproc_ipc_allocate_str(const char *str) {
     size_t len = strlen(str) + 1;
 
-    char *new_str = conf.memf.malloc_func(NULL, len);
-    if (NULL == new_str) {
+    char *new_str = conf->memf.malloc_func(NULL, len);
+    if (NULL == new_str ) {
+        LOG_INF("Mememory free is %ld", preproc_ipc_mem->free_size);
         HALT_HERE("Out of memory situation!");
+        return NULL;
     }
     memcpy(new_str, str, len);
     
@@ -69,7 +71,7 @@ char *preproc_ipc_allocate_str(const char *str) {
 }
 
 static void  preproc_ipc_free_buffer(void *buff) {
-    conf.memf.free_func(buff);
+    conf->memf.free_func(buff);
 }
 
 IPC_CREATE_CB(preproc_ipc_metric_create_cb) {
@@ -107,7 +109,7 @@ INTERNAL_METRIC_CALLBACK(preprocessing_stat_cb) {
     LOG_INF("Called preproc statistics");
     size_t alloc = 0, offset = 0;
     zbx_snprintf_alloc(result, &alloc, &offset, "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\"}", 
-                glb_ipc_get_queue(conf.preproc_ipc), glb_ipc_get_free_pcnt(conf.preproc_ipc), glb_ipc_get_sent(conf.preproc_ipc) );
+                glb_ipc_get_queue(conf->preproc_ipc), glb_ipc_get_free_pcnt(conf->preproc_ipc), glb_ipc_get_sent(conf->preproc_ipc) );
 
     return SUCCEED;
 }
@@ -115,34 +117,36 @@ INTERNAL_METRIC_CALLBACK(preprocessing_stat_cb) {
 INTERNAL_METRIC_CALLBACK(processing_stat_cb) {
     size_t alloc = 0, offset = 0;
     zbx_snprintf_alloc(result, &alloc, &offset, "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\"}", 
-                glb_ipc_get_queue(conf.process_ipc), glb_ipc_get_free_pcnt(conf.process_ipc), glb_ipc_get_sent(conf.process_ipc) );
+                glb_ipc_get_queue(conf->process_ipc), glb_ipc_get_free_pcnt(conf->process_ipc), glb_ipc_get_sent(conf->process_ipc) );
     
     return SUCCEED;
 }
 
 int preproc_ipc_init() {
     char *error = NULL;
-
-    if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, CONFIG_PREPROC_IPC_SIZE, "Metrics IPC buffer size", "MetricsBufferSize ", 1, &error)) {
+    LOG_INF("IPC mem size is %ld", CONFIG_IPC_BUFFER_SIZE);
+    if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, CONFIG_IPC_BUFFER_SIZE, "Metrics IPC buffer size", "MetricsBufferSize ", 0, &error)) {
         LOG_WRN("Shared memory create failed: %s", error);
     	return FAIL;
     }
     
+    conf = _preprocipc_shmem_malloc_func(NULL, sizeof(conf));
+
     //TODO: to reduce congestion on malloc on varaible data, split IPC mem into two separte segments
-    conf.memf.free_func = _preprocipc_shmem_free_func;
-    conf.memf.malloc_func = _preprocipc_shmem_malloc_func;
-    conf.memf.realloc_func = _preprocipc_shmem_realloc_func;
+    conf->memf.free_func = _preprocipc_shmem_free_func;
+    conf->memf.malloc_func = _preprocipc_shmem_malloc_func;
+    conf->memf.realloc_func = _preprocipc_shmem_realloc_func;
 
-    conf.preproc_ipc = glb_ipc_init(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
-        CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf.memf, preproc_ipc_metric_create_cb,
-         preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME);
+    conf->preproc_ipc = glb_ipc_init_ext(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
+        CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->memf, preproc_ipc_metric_create_cb,
+         preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME, "poll->preproc");
     
-    conf.process_ipc = glb_ipc_init(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
-        CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf.memf, preproc_ipc_metric_create_cb,
-         preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME);
+    conf->process_ipc = glb_ipc_init_ext(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
+        CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->memf, preproc_ipc_metric_create_cb,
+         preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME, "preproc->proc");
 
-    glb_register_internal_metric_handler("preprocessing", preprocessing_stat_cb);
-    glb_register_internal_metric_handler("processing", processing_stat_cb);
+    glb_register_internal_metric_handler("preprocessing",   preprocessing_stat_cb);
+    glb_register_internal_metric_handler("processing",      processing_stat_cb);
 
     return SUCCEED;
 }
@@ -151,12 +155,14 @@ void preproc_ipc_destroy() {
     zbx_shmem_destroy(preproc_ipc_mem);
 }
 
-//TODO: add handling of stucking due to no IPC buffer is left
-//with information to log on such a situations
 int preprocess_send_metric(const metric_t *metric) {
-    glb_state_items_set_poll_result(metric->itemid, metric->ts.sec, ITEM_STATE_NORMAL);
-    glb_ipc_send(conf.preproc_ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], (void *)metric, IPC_LOCK_WAIT);
-    glb_ipc_flush(conf.preproc_ipc);
+//    int i;
+//
+//    for (i = 0; i < 150; i++) {
+        glb_state_items_set_poll_result(metric->itemid, metric->ts.sec, ITEM_STATE_NORMAL);
+        glb_ipc_send(conf->preproc_ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], (void *)metric, IPC_LOCK_TRY_ONLY);
+        glb_ipc_flush(conf->preproc_ipc);
+//    }
 }
 
 int processing_send_metric(const metric_t *metric) {
@@ -171,36 +177,26 @@ int processing_send_metric(const metric_t *metric) {
         return SUCCEED;
     }
    
-    int retries = 10;
-    while (FAIL == glb_ipc_send(conf.process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_NOWAIT)) {
-        if (retries > 0) {
-            retries--;
-            usleep(11000);
-            continue;
-        }
-        
-        retries = 10;
-        LOG_WRN("WAIT: No free slots in processing metric IPC, sleeping 5 sec");
-        glb_ipc_dump_sender_queues(conf.process_ipc, "WAIT: Processing send queue");
-        sleep(1);
-        glb_ipc_flush(conf.process_ipc);
-    }
+    glb_ipc_send(conf->process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_TRY_ONLY);
+    glb_ipc_flush(conf->process_ipc);
 
-    
-    glb_ipc_flush(conf.process_ipc);
-    
-  //  RUN_ONCE_IN_WITH_RET(10, 0);
-  //  glb_ipc_dump_sender_queues(conf.process_ipc, "WAIT QUEUE STAT: Processing send queue");
-  //  LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
 }
 
 /*******receiver-side functions *******/
 int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count) {
-   return glb_ipc_process(conf.preproc_ipc, process_num -1 , proc_func, cb_data, max_count );
+    int i = glb_ipc_process(conf->preproc_ipc, process_num -1 , proc_func, cb_data, max_count );
+  //  RUN_ONCE_IN_WITH_RET(10, i);
+  //  glb_ipc_dump_reciever_queues(conf->process_ipc, "WAIT PREPROC STAT: Preproc rcv queue", 0);
+  //  LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
+    return i;
 };
 
 int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count) {
-   return glb_ipc_process(conf.process_ipc, process_num -1 , proc_func, cb_data, max_count );
+    int i = glb_ipc_process(conf->process_ipc, process_num -1 , proc_func, cb_data, max_count );
+   // RUN_ONCE_IN_WITH_RET(10, i);
+    //glb_ipc_dump_reciever_queues(conf->process_ipc, "%p WAIT QUEUE STAT: Processing send queue", process_num -1 );
+   // LOG_INF("IPC addr is %p", conf->preproc_ipc);
+    return i;
 };
 
 static int prepare_metric_common(metric_t *metric, u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts) {
@@ -334,9 +330,9 @@ int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, c
 }
 
 int processing_force_flush() {
-    glb_ipc_force_flush(conf.process_ipc);
+    glb_ipc_force_flush(conf->process_ipc);
 }
 int preprocessing_force_flush() {
-    glb_ipc_force_flush(conf.preproc_ipc);
+    glb_ipc_force_flush(conf->preproc_ipc);
 }
 

@@ -61,8 +61,8 @@ typedef enum
 
 typedef enum 
 {
-	IPC_LOCK_NOWAIT = 0, //abort waiting if all buffer elements is busy
-	IPC_LOCK_WAIT //wait for free buffer
+	IPC_LOCK_BLOCK = 1,
+	IPC_LOCK_TRY_ONLY 
 } ipc_lock_mode_t;
 
 #define IPC_PROCESS_ALL 0
@@ -83,6 +83,9 @@ typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, 
 typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
 typedef struct ipc_conf_t ipc_conf_t;
 
+ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name);
+			
 ipc_conf_t	*glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
 void		glb_ipc_destroy(ipc_conf_t* ipc);

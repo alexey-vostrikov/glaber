@@ -103,7 +103,7 @@ int glb_get_internal_metric(const char *first_param, int nparams, AGENT_REQUEST 
     if (NULL == func)
         return FAIL;
 
-    LOG_INF("Calling function %p", func);
+    //LOG_INF("Calling function %p", func);
     return func(first_param, nparams, request, result);
 }
 

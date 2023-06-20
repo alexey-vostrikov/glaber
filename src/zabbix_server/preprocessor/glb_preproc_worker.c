@@ -163,6 +163,10 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
 	zbx_free(error);
 }
 
+int preprocess_metric(const metric_t *metric) {
+	preprocess_metric_execute_steps(metric, NULL, MAX_DEPENDENCY_LEVEL);	
+}
+
 static void process_dependent_metrics(metric_t * metric, int level) {
     zbx_preproc_item_t *preproc_item_conf;
     zbx_preproc_cache_t		cache;
@@ -274,18 +278,16 @@ ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args) {
   
   preprocessing_worker_init((zbx_thread_args_t *)args);
 
-
   //TODO: event-based loop to avoid all the clutter 
   while (1) {
 
     if (0 == (i = preproc_receive_metrics(conf.process_num, metrics_proc_cb, NULL, BATCH_PROCESS_METRICS))) {
-        usleep(10000);
+        usleep(10011);
     } else {
       total_proc +=i;
     }
 
     if (time(NULL) - 5 > proctitle_update) {
-      
       zbx_setproctitle("glb_preproc_worker: processed %d/sec", total_proc/5);
       total_proc = 0;
       proctitle_update = time(NULL);

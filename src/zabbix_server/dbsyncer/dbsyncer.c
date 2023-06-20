@@ -184,13 +184,10 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		if (!ZBX_IS_RUNNING())
 			break;
 		
-		//if (values_num == 0) 
-		//	zbx_sleep_loop(info, 1);
-		if (values_num == 0) 
+		if (values_num == 0) {
 			usleep(10000);
-		
-	//	apm_update_heap_usage();
-	//	apm_flush();
+		}
+
 	}
 
 	/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
