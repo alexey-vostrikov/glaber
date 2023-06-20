@@ -1,3 +1,5 @@
+ver 3.1.2
+    -fix: metrics IPC fixes to improove speed, fix in preprocessing to avoid preprocessor stuck when preproc queue is empty, internal monitoring of the dbsync
 ver 3.1.1
     -fix: counter types for ipc options to not overflow on high queue size numbers
 ver 3.1.0

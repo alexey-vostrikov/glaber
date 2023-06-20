@@ -185,7 +185,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 			break;
 		
 		if (values_num == 0) {
-			usleep(10000);
+			zbx_sleep_loop(info, 1);
 		}
 
 	}

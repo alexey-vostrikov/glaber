@@ -3438,12 +3438,6 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		if (NULL == (item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &rowid)))
 			continue;
 
-		if (SUCCEED == glb_might_be_async_polled(item, host))
-		{
-			DEBUG_ITEM(item->itemid, "Sending poller notify about item removal");
-			poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
-		}
-
 		if (NULL != (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &item->hostid)))
 		{
 			dc_host_update_revision(host, revision);
@@ -3453,10 +3447,13 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 			{
 				zbx_vector_dc_item_ptr_remove(&host->items, i);
 			}
+		
+			if (SUCCEED == glb_might_be_async_polled(item, host))
+			{
+				DEBUG_ITEM(item->itemid, "Sending poller notify about item removal");
+				poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
+			}
 		}
-
-		if (SUCCEED == glb_might_be_async_polled(item, host))
-			poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
 
 		if (ITEM_STATUS_ACTIVE == item->status)
 		{
