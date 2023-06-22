@@ -190,13 +190,16 @@ static int item_preproc_multiplier_variant(unsigned char value_type, zbx_variant
 		zbx_variant_set_dbl(value, value_dbl);
 		break;
 	case ZBX_VARIANT_UI64:
-		if (SUCCEED == zbx_is_uint64(params, &multiplier_ui64))
+		if (SUCCEED == zbx_is_uint64(params, &multiplier_ui64)) {
 			value_ui64 = value_num.data.ui64 * multiplier_ui64;
-		else
-			value_ui64 = (double)value_num.data.ui64 * atof(params);
-
-		zbx_variant_clear(value);
-		zbx_variant_set_ui64(value, value_ui64);
+			zbx_variant_clear(value);
+			zbx_variant_set_ui64(value, value_ui64);
+		} else {
+			value_dbl = (double)value_num.data.ui64 * atof(params);
+			value_dbl = roundf(value_dbl * 10000) / 10000;
+			zbx_variant_clear(value);
+			zbx_variant_set_dbl(value, value_dbl);
+		}
 		break;
 	}
 
