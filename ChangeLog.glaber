@@ -1,3 +1,5 @@
+ver 3.1.6
+    -fix: setting of state of supported items fixed
 ver 3.1.5
     -fix: agent result double preproc fixed
 ver 3.1.3

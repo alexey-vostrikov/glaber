@@ -996,6 +996,11 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
         elm->meta.lastdata = h->ts.sec;
     
     elm->meta.state = ITEM_STATE_NORMAL;
+    
+    if (NULL != elm->meta.error ) {
+        strpool_free(&state->strpool, elm->meta.error);
+        elm->meta.error = NULL;
+    }
 
     DEBUG_ITEM(elem->id, "Adding item to the items value cache");
 
