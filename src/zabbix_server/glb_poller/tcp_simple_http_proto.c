@@ -67,7 +67,7 @@ static void* item_init(poller_item_t* poller_item, DC_ITEM *dc_item) {
 }
 
 static void fail_cb(poller_item_t *poller_item, void *proto_ctx, const char *error) {
-    poller_preprocess_uint64(poller_item, NULL, 0);
+    poller_preprocess_uint64(poller_item, NULL, 0, poller_get_item_type(poller_item));
 }
 
 static void  timeout_cb(poller_item_t *poller_item, void *proto_ctx) {
@@ -75,13 +75,13 @@ static void  timeout_cb(poller_item_t *poller_item, void *proto_ctx) {
 } 
 
 static unsigned char connect_cb(poller_item_t *poller_item, void *proto_ctx) {
-    poller_preprocess_uint64(poller_item, NULL, 1);
+    poller_preprocess_uint64(poller_item, NULL, 1, poller_get_item_type(poller_item));
     poller_inc_responses();
     return ASYNC_IO_TCP_PROC_FINISH;
 }
 
 static unsigned char response_cb(poller_item_t *poller_item, void *proto_ctx, const char *response, size_t response_size) {
-    poller_preprocess_uint64(poller_item, NULL, 1);
+    poller_preprocess_uint64(poller_item, NULL,  1, poller_get_item_type(poller_item));
     return ASYNC_IO_TCP_PROC_FINISH;
 }
 

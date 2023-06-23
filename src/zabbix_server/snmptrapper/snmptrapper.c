@@ -187,7 +187,7 @@ next:
 				}
 
 				items[i].state = ITEM_STATE_NORMAL;
-				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &results[i]);
+				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &results[i], items[i].value_type);
 
 				itemids[i] = items[i].itemid;
 				lastclocks[i] = ts->sec;

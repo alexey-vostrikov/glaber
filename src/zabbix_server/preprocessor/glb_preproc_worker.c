@@ -116,7 +116,10 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
 	zbx_vector_ptr_t	*history_in = NULL, history_out;
 	zbx_preproc_result_t	*results;
 
-	DEBUG_ITEM(metric->itemid,"Metric entered to preprocessing with type %d, type %s value %s", 
+	//LOG_INF("Metric itemid %ld entered to preprocessing with type %d, type %s value %s", metric->itemid, metric->value.type,
+	//				zbx_variant_type_desc(&metric->value), zbx_variant_value_desc(&metric->value));
+	
+	DEBUG_ITEM(metric->itemid,"Metric entered to preprocessing with type %d, type %s value %s", metric->value.type,
 					zbx_variant_type_desc(&metric->value), zbx_variant_value_desc(&metric->value));
 	
     if (FAIL == prepare_preproc_task_data(metric, &history_in, &history_out, &steps, &steps_num, &results) || 
@@ -127,9 +130,10 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
     }
 
 	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps", steps_num);
+	//LOG_INF("Item %ld, runing preprocessing for item %d steps",metric->itemid, steps_num);
 	//TODO: just pass metric 
 	if (FAIL == (ret = worker_item_preproc_execute(metric->itemid, cache, metric->value.type, 
-                        (zbx_variant_t *)&metric->value, &value_out, &metric->ts, steps, steps_num, history_in,
+                        &metric->value, &value_out, &metric->ts, steps, steps_num, history_in,
 			            &history_out, results, &results_num, metric->flags, &errmsg)) && 0 != results_num)
 	{
 		int action = results[results_num - 1].action;
@@ -143,6 +147,9 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
 			error = errmsg;
 	}
 
+	//LOG_INF("Result of preprocessing item %ld of in: '%s', code: '%s', result is '%s'", metric->itemid, 
+    //    zbx_variant_value_desc(&metric->value),  zbx_result_string(ret), (SUCCEED == ret ? zbx_variant_value_desc(&value_out) : error ));
+    
     DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', code: '%s', result is '%s'",
         zbx_variant_value_desc(&metric->value),  zbx_result_string(ret), (SUCCEED == ret ? zbx_variant_value_desc(&value_out) : error ));
     

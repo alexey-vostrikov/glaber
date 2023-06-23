@@ -2617,6 +2617,7 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 	char *new_string, search_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1],
 		replace_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 
+	//LOG_INF("Replace func start");
 	if (NULL == (ptr = strchr(params, '\n')))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -2629,25 +2630,29 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 		*errmsg = zbx_strdup(*errmsg, "first parameter is expected");
 		return FAIL;
 	}
-
+	//LOG_INF("Escaping");
 	unescape_param(ZBX_PREPROC_STR_REPLACE, params, MIN(len_search, sizeof(search_str) - 1), search_str);
 
 	len_replace = strlen(ptr + 1);
 	unescape_param(ZBX_PREPROC_STR_REPLACE, ptr + 1, MIN(len_replace, sizeof(replace_str) - 1), replace_str);
-
-	if (value->type = ZBX_VARIANT_ERR)
+	
+	//LOG_INF("Type check");
+	if (value->type = ZBX_VARIANT_ERR || value->type == ZBX_VARIANT_NONE)
 		return FAIL;
-
+	
+	//LOG_INF("Converting");
 	if (SUCCEED != zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
-
+	//LOG_INF("Replacing");
 	new_string = zbx_string_replace(value->data.str, search_str, replace_str);
+	//LOG_INF("Clearing");
 	zbx_variant_clear(value);
+	//LOG_INF("Setting the value");
 	zbx_variant_set_str(value, new_string);
-
+	//LOG_INF("Returning");
 	return SUCCEED;
 }
 
@@ -2686,6 +2691,7 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		params[0] = 0;
 
 	DEBUG_ITEM(itemid, "Performing preprocessing step of type %d, incoming value %s", op->type, zbx_variant_value_desc(value));
+	//LOG_INF("Performing preprocessing step for item %ld, type %d, incoming value %s", itemid, op->type, zbx_variant_value_desc(value));
 	
 	switch (op->type)
 	{
@@ -2797,13 +2803,14 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		ret = FAIL;
 	}
 	
+	//LOG_INF("Result of item %ld preprocessing step of type %d, result value %s, return %d", itemid,
+	//		   op->type, zbx_variant_value_desc(value), ret);
+
 	DEBUG_ITEM(itemid, "Result of preprocessing step of type %d, result value %s, return %d",
 			   op->type, zbx_variant_value_desc(value), ret);
 
 	return ret;
 }
-
-
 
 /******************************************************************************
  *                                                                            *

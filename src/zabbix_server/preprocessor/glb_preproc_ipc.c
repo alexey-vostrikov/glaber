@@ -77,15 +77,22 @@ static void  preproc_ipc_free_buffer(void *buff) {
 IPC_CREATE_CB(preproc_ipc_metric_create_cb) {
 
     metric_t *local_metric = local_data, *ipc_metric = ipc_data;
-
-	DEBUG_ITEM(local_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", local_metric->value.type,
+    
+    //LOG_INF("Got dynamic metric id %ld type %ld, str ptr is %ld", local_metric->itemid, local_metric->value.type, local_metric->value.data.str );
+	
+    DEBUG_ITEM(local_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", local_metric->value.type,
 					zbx_variant_type_desc(&local_metric->value), zbx_variant_value_desc(&local_metric->value));
-
 
     memcpy(ipc_metric, local_metric, sizeof(metric_t));
 
-    if ( SUCCEED == variant_is_dynamic_length(&local_metric->value)) 
+    if ( SUCCEED == variant_is_dynamic_length(&local_metric->value)) {
+        
+      //  LOG_INF("Got dynamic metric id %ld type %ld, str ptr is %ld", local_metric->itemid, local_metric->value.type, local_metric->value.data.str );
+//        if (NULL !=local_metric->value.data.str )
+  //          LOG_INF("Metric value is %s", local_metric->value.data.str);
+
         ipc_metric->value.data.str = preproc_ipc_allocate_str(local_metric->value.data.str);
+    }
     
 	DEBUG_ITEM(ipc_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", ipc_metric->value.type,
 					zbx_variant_type_desc(&ipc_metric->value), zbx_variant_value_desc(&ipc_metric->value));
@@ -165,6 +172,19 @@ int preprocess_send_metric(const metric_t *metric) {
 //    }
 }
 
+ void set_item_state(const metric_t *metric) {
+     switch (metric->value.type) {
+         case ZBX_VARIANT_ERR:
+             if (NULL != metric->value.data.err)
+                 glb_state_item_set_error(metric->itemid, metric->value.data.err);
+             else 
+                 glb_state_item_set_error(metric->itemid, "");
+             break;
+        default:
+            glb_state_items_set_poll_result(metric->itemid,metric->ts.sec, ITEM_STATE_NORMAL);
+    }
+}
+
 int processing_send_metric(const metric_t *metric) {
 
     if (metric->flags & ZBX_FLAG_DISCOVERY_RULE ) {
@@ -176,7 +196,9 @@ int processing_send_metric(const metric_t *metric) {
         zbx_lld_process_value(metric->itemid, metric->hostid, metric->value.data.str, &metric->ts, 0, 0, 0, NULL);
         return SUCCEED;
     }
-   
+    //item state will be set in the history syncer
+    //but for dependend items we need to set the state immediately
+    set_item_state(metric);
     glb_ipc_send(conf->process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_TRY_ONLY);
     glb_ipc_flush(conf->process_ipc);
 
@@ -271,14 +293,19 @@ int preprocess_dbl(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zb
     return SUCCEED;
 }
 
-int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
+int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar, int desired_type) {
     metric_t metric={0};
 
  //   LOG_INF("Setting itmeid %ld agent result %d", itemid, ar->type);
     DEBUG_ITEM(itemid, "Sending item to preprocessing,  ar type is %d", ar->type);
-    if (ar->type & AR_UINT64)
-        return preprocess_uint64(hostid, itemid, flags, ts, ar->ui64);
-
+    if (ar->type & AR_UINT64) {
+        if (ITEM_VALUE_TYPE_FLOAT == desired_type) {
+            double dbl_val = ar->ui64;
+            preprocess_dbl(hostid, itemid, flags, ts, ar->dbl);
+        } else 
+            return preprocess_uint64(hostid, itemid, flags, ts, ar->ui64);
+    }
+    
     if (ar->type & AR_STRING)
         return preprocess_str(hostid, itemid, flags, ts, ar->str);
 

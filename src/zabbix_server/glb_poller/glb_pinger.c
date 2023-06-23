@@ -124,7 +124,7 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
 			{
 				case ICMPPING:
 					value_uint64 = (0 != pinger_item->rcv ? 1 : 0);
-                    poller_preprocess_uint64(poller_item, NULL, value_uint64);
+                    poller_preprocess_uint64(poller_item, NULL, value_uint64, ITEM_VALUE_TYPE_UINT64);
                     break;
 				case ICMPPINGSEC:
 					switch (pinger_item->type)

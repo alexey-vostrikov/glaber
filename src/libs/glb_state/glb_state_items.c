@@ -994,6 +994,8 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
 
     if (elm->meta.lastdata < h->ts.sec)
         elm->meta.lastdata = h->ts.sec;
+    
+    elm->meta.state = ITEM_STATE_NORMAL;
 
     DEBUG_ITEM(elem->id, "Adding item to the items value cache");
 

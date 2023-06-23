@@ -1170,7 +1170,7 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 	{
 		
 		if (ITEM_STATE_NORMAL == item->state && NULL != result) 
-			preprocess_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
+			preprocess_agent_result(item->host.hostid, item->itemid, item->flags, ts, result, item->value_type);
 		else 
 			preprocess_error(item->host.hostid, item->itemid, item->flags, ts, error);
 		
