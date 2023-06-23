@@ -77,7 +77,8 @@ int  prepare_preproc_task_data(const metric_t *metric, zbx_vector_ptr_t **histor
 	zbx_vector_ptr_create(history_out);
 	
     *results = (zbx_preproc_result_t *)zbx_calloc(NULL, 0, sizeof(zbx_preproc_result_t) * (size_t)*ops_num);
-	
+
+	LOG_INF("Finished preparing task data");	
 	return SUCCEED;
 }
 
@@ -128,9 +129,10 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
         processing_send_metric(metric);
         return;
     }
+	
+	zbx_variant_set_none(&value_out);
 
 	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps", steps_num);
-	//LOG_INF("Item %ld, runing preprocessing for item %d steps",metric->itemid, steps_num);
 	//TODO: just pass metric 
 	if (FAIL == (ret = worker_item_preproc_execute(metric->itemid, cache, metric->value.type, 
                         &metric->value, &value_out, &metric->ts, steps, steps_num, history_in,
@@ -147,9 +149,7 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_preproc_
 			error = errmsg;
 	}
 
-	//LOG_INF("Result of preprocessing item %ld of in: '%s', code: '%s', result is '%s'", metric->itemid, 
-    //    zbx_variant_value_desc(&metric->value),  zbx_result_string(ret), (SUCCEED == ret ? zbx_variant_value_desc(&value_out) : error ));
-    
+	    
     DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', code: '%s', result is '%s'",
         zbx_variant_value_desc(&metric->value),  zbx_result_string(ret), (SUCCEED == ret ? zbx_variant_value_desc(&value_out) : error ));
     

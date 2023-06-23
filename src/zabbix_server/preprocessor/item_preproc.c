@@ -2637,7 +2637,7 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 	unescape_param(ZBX_PREPROC_STR_REPLACE, ptr + 1, MIN(len_replace, sizeof(replace_str) - 1), replace_str);
 	
 	//LOG_INF("Type check");
-	if (value->type = ZBX_VARIANT_ERR || value->type == ZBX_VARIANT_NONE)
+	if (ZBX_VARIANT_ERR == value->type || ZBX_VARIANT_NONE == value->type )
 		return FAIL;
 	
 	//LOG_INF("Converting");
@@ -2691,8 +2691,7 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		params[0] = 0;
 
 	DEBUG_ITEM(itemid, "Performing preprocessing step of type %d, incoming value %s", op->type, zbx_variant_value_desc(value));
-	//LOG_INF("Performing preprocessing step for item %ld, type %d, incoming value %s", itemid, op->type, zbx_variant_value_desc(value));
-	
+
 	switch (op->type)
 	{
 	case ZBX_PREPROC_MULTIPLIER:
@@ -2803,8 +2802,6 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		ret = FAIL;
 	}
 	
-	//LOG_INF("Result of item %ld preprocessing step of type %d, result value %s, return %d", itemid,
-	//		   op->type, zbx_variant_value_desc(value), ret);
 
 	DEBUG_ITEM(itemid, "Result of preprocessing step of type %d, result value %s, return %d",
 			   op->type, zbx_variant_value_desc(value), ret);

@@ -22,6 +22,7 @@
 
 #include "zbxcommon.h"
 #include "metric.h"
+#include "zbxself.h"
 
 
 ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args);
