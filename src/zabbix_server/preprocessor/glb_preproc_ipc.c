@@ -300,8 +300,9 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
     DEBUG_ITEM(itemid, "Sending item to preprocessing,  ar type is %d", ar->type);
     if (ar->type & AR_UINT64) {
         if (ITEM_VALUE_TYPE_FLOAT == desired_type) {
-            double dbl_val = ar->ui64;
-            preprocess_dbl(hostid, itemid, flags, ts, ar->dbl);
+            double dbl_val = (double)ar->ui64;
+            DEBUG_ITEM(itemid,"Will preprocess uint64 value %ld as double value %f", ar->ui64, dbl_val);
+            preprocess_dbl(hostid, itemid, flags, ts, dbl_val);
         } else 
             return preprocess_uint64(hostid, itemid, flags, ts, ar->ui64);
     }
