@@ -5110,7 +5110,9 @@ section .section-toggle:hover, .filter-container.tabfilter-container .icon-edit:
   background-color: #ffffff;
   border: 1px solid #383838;
   border-bottom-color: #353535;
-  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.5); }
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.5);
+  height: 90%;
+  overflow: auto; }
   .menu-popup:focus {
     outline: none; }
   .menu-popup li {
