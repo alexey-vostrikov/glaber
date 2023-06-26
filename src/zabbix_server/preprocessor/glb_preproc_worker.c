@@ -78,7 +78,6 @@ int  prepare_preproc_task_data(const metric_t *metric, zbx_vector_ptr_t **histor
 	
     *results = (zbx_preproc_result_t *)zbx_calloc(NULL, 0, sizeof(zbx_preproc_result_t) * (size_t)*ops_num);
 
-	LOG_INF("Finished preparing task data");	
 	return SUCCEED;
 }
 
