@@ -3095,7 +3095,7 @@ $form-icon-btn: (
 	border: 1px solid $overlay-border-color;
 	border-bottom-color: darken($overlay-border-color, 1%);
 	box-shadow: 0 4px 20px 0 $action-shadow-color;
-	height: 90%;
+	max-height: 90%;
 	overflow: auto;
 
 	&:focus {

@@ -243,3 +243,4 @@ build/appliance/run/docker/glaber-server/etc/zabbix
 src/glapi/glb_netflow_collector
 configure.ac
 src/libs/zbxdbschema/dbschema.c
+.sass-cache/*
