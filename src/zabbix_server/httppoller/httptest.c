@@ -123,9 +123,9 @@ static void	process_test_data(zbx_uint64_t httptestid, int lastfailedstep, doubl
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	result = DBselect("select type,itemid from httptestitem where httptestid=" ZBX_FS_UI64, httptestid);
+	result = zbx_db_select("select type,itemid from httptestitem where httptestid=" ZBX_FS_UI64, httptestid);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		if (3 == num)
 		{
@@ -266,9 +266,9 @@ static void	process_step_data(zbx_uint64_t httpstepid, zbx_httpstat_t *stat, zbx
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() rspcode:%ld time:" ZBX_FS_DBL " speed:" ZBX_FS_DBL,
 			__func__, stat->rspcode, stat->total_time, stat->speed_download);
 
-	result = DBselect("select type,itemid from httpstepitem where httpstepid=" ZBX_FS_UI64, httpstepid);
+	result = zbx_db_select("select type,itemid from httpstepitem where httpstepid=" ZBX_FS_UI64, httpstepid);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		if (3 == num)
 		{
@@ -366,14 +366,14 @@ static int	httpstep_load_pairs(DC_HOST *host, zbx_httpstep_t *httpstep)
 	zbx_vector_ptr_pair_create(&post_fields);
 	zbx_vector_ptr_pair_create(&httpstep->variables);
 
-	result = DBselect(
+	result = zbx_db_select(
 			"select name,value,type"
 			" from httpstep_field"
 			" where httpstepid=" ZBX_FS_UI64
 			" order by httpstep_fieldid",
 			httpstep->httpstep->httpstepid);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		type = atoi(row[2]);
 
@@ -544,14 +544,14 @@ static int	httptest_load_pairs(DC_HOST *host, zbx_httptest_t *httptest)
 	zbx_vector_ptr_pair_create(&httptest->variables);
 
 	httptest->headers = NULL;
-	result = DBselect(
+	result = zbx_db_select(
 			"select name,value,type"
 			" from httptest_field"
 			" where httptestid=" ZBX_FS_UI64
 			" order by httptest_fieldid",
 			httptest->httptest.httptestid);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		type = atoi(row[2]);
 		value = zbx_strdup(NULL, row[1]);
@@ -615,7 +615,7 @@ out:
 static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest, int *delay)
 {
 	DB_RESULT	result;
-	DB_HTTPSTEP	db_httpstep;
+	zbx_db_httpstep	db_httpstep;
 	char		*err_str = NULL, *buffer = NULL;
 	int		lastfailedstep = 0;
 	zbx_timespec_t	ts;
@@ -632,7 +632,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest, int *delay
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() httptestid:" ZBX_FS_UI64 " name:'%s'",
 			__func__, httptest->httptest.httptestid, httptest->httptest.name);
 
-	result = DBselect(
+	result = zbx_db_select(
 			"select httpstepid,no,name,url,timeout,posts,required,status_codes,post_type,follow_redirects,"
 				"retrieve_mode"
 			" from httpstep"
@@ -674,6 +674,15 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest, int *delay
 		goto clean;
 	}
 
+#if LIBCURL_VERSION_NUM >= 0x071304
+	/* CURLOPT_PROTOCOLS is supported starting with version 7.19.4 (0x071304) */
+	if (CURLE_OK != (err = curl_easy_setopt(easyhandle, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS)))
+	{
+		err_str = zbx_strdup(err_str, curl_easy_strerror(err));
+		goto clean;
+	}
+#endif
+
 	if (SUCCEED != zbx_http_prepare_ssl(easyhandle, httptest->httptest.ssl_cert_file,
 			httptest->httptest.ssl_key_file, httptest->httptest.ssl_key_password,
 			httptest->httptest.verify_peer, httptest->httptest.verify_host, &err_str))
@@ -684,7 +693,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest, int *delay
 	httpstep.httptest = httptest;
 	httpstep.httpstep = &db_httpstep;
 
-	while (NULL != (row = DBfetch(result)) && ZBX_IS_RUNNING())
+	while (NULL != (row = zbx_db_fetch(result)) && ZBX_IS_RUNNING())
 	{
 		struct curl_slist	*headers_slist = NULL;
 		char			*header_cookie = NULL;
@@ -838,7 +847,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest, int *delay
 		}
 
 		if (SUCCEED != zbx_http_prepare_auth(easyhandle, httptest->httptest.authentication,
-				httptest->httptest.http_user, httptest->httptest.http_password, &err_str))
+				httptest->httptest.http_user, httptest->httptest.http_password, NULL, &err_str))
 		{
 			goto httpstep_error;
 		}
@@ -949,7 +958,7 @@ static void	process_httptest(DC_HOST *host, zbx_httptest_t *httptest, int *delay
 			zbx_free(page.data);
 		}
 		else
-			err_str = zbx_dsprintf(err_str, "%s: %s", curl_easy_strerror(err), errbuf);
+			err_str = zbx_dsprintf(err_str, "%s", 0 < strlen(errbuf) ? errbuf : curl_easy_strerror(err));
 
 httpstep_error:
 		zbx_free(db_httpstep.status_codes);
@@ -1045,7 +1054,7 @@ int	process_httptests(int now, time_t *nextcheck)
 	{
 		int	delay = 0;
 
-		result = DBselect(
+		result = zbx_db_select(
 				"select h.hostid,h.host,h.name,t.httptestid,t.name,t.agent,"
 					"t.authentication,t.http_user,t.http_password,t.http_proxy,t.retries,t.ssl_cert_file,"
 					"t.ssl_key_file,t.ssl_key_password,t.verify_peer,t.verify_host,t.delay"
@@ -1054,7 +1063,7 @@ int	process_httptests(int now, time_t *nextcheck)
 					" and t.httptestid=" ZBX_FS_UI64,
 				httptestid);
 
-		if (NULL != (row = DBfetch(result)))
+		if (NULL != (row = zbx_db_fetch(result)))
 		{
 			ZBX_STR2UINT64(host.hostid, row[0]);
 			zbx_strscpy(host.host, row[1]);
