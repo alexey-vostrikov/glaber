@@ -42,6 +42,7 @@
 #include "metric.h"
 
 
+
 extern char	*CONFIG_SERVER;
 
 /* the space reserved in json buffer to hold at least one record plus service data */
