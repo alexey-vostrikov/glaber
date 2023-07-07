@@ -43,14 +43,12 @@
 #include "../zabbix_server/trapper/trapper.h"
 #include "../zabbix_server/trapper/proxydata.h"
 #include "../zabbix_server/snmptrapper/snmptrapper.h"
-#include "../zabbix_server/preprocessor/preproc_worker.h"
 #include "proxyconfig/proxyconfig.h"
 #include "datasender/datasender.h"
 #include "taskmanager/taskmanager.h"
 #include "../zabbix_server/vmware/vmware.h"
 #include "setproctitle.h"
 #include "zbxcomms.h"
-#include "../zabbix_server/preprocessor/preproc_worker.h"
 #include "zbxvault.h"
 #include "zbxdiag.h"
 #include "diag/diag_proxy.h"
@@ -1365,7 +1363,7 @@ static void	proxy_db_init(void)
 	zbx_db_check_character_set();
 	zbx_check_db();
 
-	if (SUCCEED != (version_check = DBcheck_version(ZBX_HA_MODE_STANDALONE)))
+	if (SUCCEED != (version_check = DBcheck_version(ZBX_HA_MODE_STANDALONE, DB_UPDATE_COMMON_DATABASE)))
 	{
 #ifdef HAVE_SQLITE3
 		if (NOTSUPPORTED == version_check)
@@ -1422,8 +1420,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 #ifdef HAVE_OPENIPMI
 	zbx_thread_ipmi_manager_args		ipmimanager_args = {config_timeout, config_unavailable_delay};
 #endif
-	zbx_thread_preprocessing_manager_args	preproc_man_args =
-						{.workers_num = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR]};
+	//zbx_thread_preprocessing_manager_args	preproc_man_args =
+	//					{.workers_num = CONFIG_FORKS[ZBX_PROCESS_TYPE_PREPROCESSOR]};
 
 	zbx_rtc_process_request_ex_func_t	rtc_process_request_func = NULL;
 
@@ -1645,7 +1643,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 //	zbx_register_stats_data_func(zbx_preproc_stats_ext_get, NULL);
 	zbx_register_stats_data_func(zbx_proxy_stats_ext_get, &config_comms);
 	zbx_register_stats_ext_func(zbx_vmware_stats_ext_get, NULL);
-	zbx_register_stats_procinfo_func(ZBX_PROCESS_TYPE_PREPROCESSOR, zbx_preprocessor_get_worker_info);
+	//zbx_register_stats_procinfo_func(ZBX_PROCESS_TYPE_PREPROCESSOR, zbx_preprocessor_get_worker_info);
 	zbx_diag_init(diag_add_section_info);
 
 	thread_args.info.program_type = program_type;
