@@ -34,6 +34,15 @@ stages:
   - pkg-build
   - docker-build
 
+#.build_go: &build_go
+#    - export FULL_PROJECT_PATH=$PWD
+#    - wget --no-verbose "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz"
+#    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.20.5.linux-amd64.tar.gz
+#    - rm ./go1.20.5.linux-amd64.tar.gz
+#    - export PATH=$PATH:/usr/local/go/bin
+#    - go version
+
+
 .kaniko_build: &kaniko_build
   - sh pre-build/scripts/kaniko-build.sh
 
