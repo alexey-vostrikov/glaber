@@ -186,13 +186,14 @@ int	ssh_run(DC_ITEM *item, AGENT_RESULT *result, const char *encoding, const cha
 	{
 		int	proc_config = 0;
 
+#ifdef SSH_OPTIONS_PROCESS_CONFIG
 		if (0 != ssh_options_set(session, SSH_OPTIONS_PROCESS_CONFIG, &proc_config))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot turn off SSH default config processing: %s",
 					ssh_get_error(session)));
 			goto session_free;
 		}
-
+#endif
 		if (SUCCEED != ssh_parse_options(session, options, &err_msg))
 		{
 			SET_MSG_RESULT(result, err_msg);
