@@ -223,6 +223,7 @@ centos-8:
     OS_VER: 8
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
   script:
+    - rm -rf /root/rpmbuild/BUILD/
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_rpm_sources
     - cd build/centos
