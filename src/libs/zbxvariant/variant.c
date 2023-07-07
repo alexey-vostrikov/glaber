@@ -28,7 +28,7 @@ ZBX_VECTOR_IMPL(var, zbx_variant_t)
 int variant_is_dynamic_length(variant_t *variant) {
 	
 	if (VARIANT_VALUE_ERROR == variant->type ||
-	    VARIANT_VALUE_STR == variant->type) 
+	    VARIANT_VALUE_STR == variant->type ) 
 			return SUCCEED;
 
 	return FAIL;

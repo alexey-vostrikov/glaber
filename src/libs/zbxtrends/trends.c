@@ -22,6 +22,8 @@
 #include "zbxcommon.h"
 #include "zbxdbhigh.h"
 #include "log.h"
+#include "zbxdb.h"
+#include "zbxcacheconfig.h"
 
 static char	*trends_errors[ZBX_TREND_STATE_COUNT] = {
 		"unknown error",
@@ -434,6 +436,11 @@ static zbx_trend_state_t	trends_eval(const char *table, zbx_uint64_t itemid, int
 	size_t			sql_alloc = 0, sql_offset = 0;
 	zbx_trend_state_t	state;
 
+	zbx_recalc_time_period(&start, ZBX_RECALC_TIME_PERIOD_TRENDS);
+
+	if (start > end)
+		return ZBX_TREND_STATE_NODATA;
+
 	if (start != end)
 	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
@@ -452,10 +459,10 @@ static zbx_trend_state_t	trends_eval(const char *table, zbx_uint64_t itemid, int
 				eval_single, table, itemid, start);
 	}
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 	zbx_free(sql);
 
-	if (NULL != (row = DBfetch(result)) && SUCCEED != DBis_null(row[0]))
+	if (NULL != (row = zbx_db_fetch(result)) && SUCCEED != zbx_db_is_null(row[0]))
 	{
 		*value = atof(row[0]);
 		state = ZBX_TREND_STATE_NORMAL;
@@ -493,22 +500,30 @@ static zbx_trend_state_t	trends_eval_avg(const char *table, zbx_uint64_t itemid,
 	zbx_trend_state_t	state;
 	double			avg, num, num2, avg2;
 
+	zbx_recalc_time_period(&start, ZBX_RECALC_TIME_PERIOD_TRENDS);
+
+	if (start > end)
+		return ZBX_TREND_STATE_NODATA;
+
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "select value_avg,num from %s where itemid=" ZBX_FS_UI64,
 			table, itemid);
+
 	if (start != end)
+	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " and clock>=%d and clock<=%d", start, end);
+	}
 	else
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " and clock=%d", start);
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 	zbx_free(sql);
 
-	if (NULL != (row = DBfetch(result)))
+	if (NULL != (row = zbx_db_fetch(result)))
 	{
 		avg = atof(row[0]);
 		num = atof(row[1]);
 
-		while (NULL != (row = DBfetch(result)))
+		while (NULL != (row = zbx_db_fetch(result)))
 		{
 			avg2 = atof(row[0]);
 			num2 = atof(row[1]);
@@ -551,17 +566,25 @@ static zbx_trend_state_t	trends_eval_sum(const char *table, zbx_uint64_t itemid,
 	size_t		sql_alloc = 0, sql_offset = 0;
 	double		sum = 0;
 
+	zbx_recalc_time_period(&start, ZBX_RECALC_TIME_PERIOD_TRENDS);
+
+	if (start > end)
+		return ZBX_TREND_STATE_NODATA;
+
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "select value_avg,num from %s where itemid=" ZBX_FS_UI64,
 			table, itemid);
+
 	if (start != end)
+	{
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " and clock>=%d and clock<=%d", start, end);
+	}
 	else
 		zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, " and clock=%d", start);
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 	zbx_free(sql);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 		sum += atof(row[0]) * atof(row[1]);
 
 	zbx_db_free_result(result);

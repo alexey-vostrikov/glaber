@@ -42,7 +42,10 @@ $html_page = (new CHtmlPage())
 			->addItem(
 				(new CButton('form', _('Import')))
 					->onClick(
-						'return PopUp("popup.import", {rules_preset: "host"}, {
+						'return PopUp("popup.import", {
+							rules_preset: "host", '.
+							CCsrfTokenHelper::CSRF_TOKEN_NAME.': "'. CCsrfTokenHelper::get('import').
+						'"}, {
 							dialogueid: "popup_import",
 							dialogue_class: "modal-popup-generic"
 						});'
@@ -213,6 +216,7 @@ $table = (new CTableInfo())
 	]);
 
 $current_time = time();
+$csrf_token_massupdate = CCsrfTokenHelper::get('host');
 
 foreach ($data['hosts'] as $host) {
 	// Select an interface from the list with highest priority.
@@ -274,7 +278,7 @@ foreach ($data['hosts'] as $host) {
 		->setArgument('visible[status]', 1)
 		->setArgument('update', 1)
 		->setArgument('backurl',
-			(new CUrl('zabbix.php', false))
+			(new CUrl('zabbix.php'))
 				->setArgument('action', 'host.list')
 				->setArgument('page', CPagerHelper::loadPage('host.list', null))
 				->getUrl()
@@ -298,7 +302,7 @@ foreach ($data['hosts'] as $host) {
 			->addClass(ZBX_STYLE_LINK_ACTION)
 			->addClass(ZBX_STYLE_GREEN)
 			->addConfirmation(_('Disable host?'))
-			->addSID();
+			->addCsrfToken($csrf_token_massupdate);
 	}
 	else {
 		$status_toggle_url->setArgument('status', HOST_STATUS_MONITORED);
@@ -306,7 +310,7 @@ foreach ($data['hosts'] as $host) {
 			->addClass(ZBX_STYLE_LINK_ACTION)
 			->addClass(ZBX_STYLE_RED)
 			->addConfirmation(_('Enable host?'))
-			->addSID();
+			->addCsrfToken($csrf_token_massupdate);
 	}
 
 	if ($maintenance_icon) {
@@ -504,10 +508,11 @@ foreach ($data['hosts'] as $host) {
 
 $status_toggle_url =  (new CUrl('zabbix.php'))
 	->setArgument('action', 'popup.massupdate.host')
+	->setArgument(CCsrfTokenHelper::CSRF_TOKEN_NAME, $csrf_token_massupdate)
 	->setArgument('visible[status]', 1)
 	->setArgument('update', 1)
 	->setArgument('backurl',
-		(new CUrl('zabbix.php', false))
+		(new CUrl('zabbix.php'))
 			->setArgument('action', 'host.list')
 			->setArgument('page', CPagerHelper::loadPage('host.list', null))
 			->getUrl()
@@ -540,7 +545,9 @@ $form->addItem([
 		'popup.massupdate.host' => [
 			'content' => (new CButton('', _('Mass update')))
 				->onClick(
-					"openMassupdatePopup('popup.massupdate.host', {}, {
+					"openMassupdatePopup('popup.massupdate.host', {".
+						CCsrfTokenHelper::CSRF_TOKEN_NAME.": '".$csrf_token_massupdate.
+					"'}, {
 						dialogue_class: 'modal-popup-static',
 						trigger_element: this
 					});"

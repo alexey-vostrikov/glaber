@@ -301,8 +301,8 @@ void	zbx_block_signals(sigset_t *orig_mask)
 	sigaddset(&mask, SIGINT);
 	sigaddset(&mask, SIGQUIT);
 
-	if (0 > sigprocmask(SIG_BLOCK, &mask, orig_mask))
-		zabbix_log(LOG_LEVEL_WARNING, "cannot set sigprocmask to block the signal");
+	if (0 > zbx_sigmask(SIG_BLOCK, &mask, orig_mask))
+		zabbix_log(LOG_LEVEL_WARNING, "cannot set signal mask to block the signal");
 }
 
 /******************************************************************************
@@ -312,6 +312,6 @@ void	zbx_block_signals(sigset_t *orig_mask)
  ******************************************************************************/
 void	zbx_unblock_signals(const sigset_t *orig_mask)
 {
-	if (0 > sigprocmask(SIG_SETMASK, orig_mask, NULL))
-		zabbix_log(LOG_LEVEL_WARNING,"cannot restore sigprocmask");
+	if (0 > zbx_sigmask(SIG_SETMASK, orig_mask, NULL))
+		zabbix_log(LOG_LEVEL_WARNING,"cannot restore signal mask");
 }

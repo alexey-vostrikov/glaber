@@ -39,6 +39,7 @@
 #include "../../zabbix_server/preprocessor/glb_preproc_ipc.h"
 #include "metric.h"
 #include "../zabbix_server/dbsyncer/trends.h"
+#include "zbxconnector.h"
 
 static zbx_shmem_info_t *hc_index_mem = NULL;
 //static zbx_shmem_info_t *hc_mem = NULL;
@@ -234,11 +235,11 @@ static void db_get_hosts_info_by_hostid(zbx_hashset_t *hosts_info, const zbx_vec
 					   " where g.groupid=hg.groupid"
 					   " and");
 
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "hg.hostid", hostids->values, hostids->values_num);
+	zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "hg.hostid", hostids->values, hostids->values_num);
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		zbx_uint64_t hostid;
 		zbx_host_info_t *host_info;
@@ -261,32 +262,32 @@ typedef struct
 	zbx_uint64_t itemid;
 	char *name;
 	zbx_history_sync_item_t *item;
-	zbx_vector_item_tag_t item_tags;
+	zbx_vector_tags_t	item_tags;
 } zbx_item_info_t;
 
 /******************************************************************************
  *                                                                            *
- * Purpose: get items name and item tags                                      *
+ * Purpose: get item names                                                    *
  *                                                                            *
- * Parameters: items_info - [IN/OUT] output item name and item tags           *
+ * Parameters: items_info - [IN/OUT] output item names                        *
  *             itemids    - [IN] the item identifiers                         *
  *                                                                            *
  ******************************************************************************/
-static void db_get_items_info_by_itemid(zbx_hashset_t *items_info, const zbx_vector_uint64_t *itemids)
+static void	db_get_item_names_by_itemid(zbx_hashset_t *items_info, const zbx_vector_uint64_t *itemids)
 {
-	size_t sql_offset = 0;
-	DB_RESULT result;
-	DB_ROW row;
+	size_t		sql_offset = 0;
+	DB_RESULT	result;
+	DB_ROW		row;
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "select itemid,name from items where");
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "itemid", itemids->values, itemids->values_num);
+	zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "itemid", itemids->values, itemids->values_num);
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
-		zbx_uint64_t itemid;
-		zbx_item_info_t *item_info;
+		zbx_uint64_t	itemid;
+		zbx_item_info_t	*item_info;
 
 		ZBX_DBROW2UINT64(itemid, row[0]);
 
@@ -298,48 +299,77 @@ static void db_get_items_info_by_itemid(zbx_hashset_t *items_info, const zbx_vec
 
 		item_info->name = zbx_strdup(item_info->name, row[1]);
 	}
-	zbx_db_free_result(result);
 
-	sql_offset = 0;
-	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-					   "select itemid,tag,value from item_tag where");
-
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "itemid", itemids->values, itemids->values_num);
-
-	result = DBselect("%s", sql);
-
-	while (NULL != (row = DBfetch(result)))
-	{
-		zbx_uint64_t itemid;
-		zbx_item_info_t *item_info;
-		zbx_tag_t item_tag;
-
-		ZBX_DBROW2UINT64(itemid, row[0]);
-
-		if (NULL == (item_info = (zbx_item_info_t *)zbx_hashset_search(items_info, &itemid)))
-		{
-			THIS_SHOULD_NEVER_HAPPEN;
-			continue;
-		}
-
-		item_tag.tag = zbx_strdup(NULL, row[1]);
-		item_tag.value = zbx_strdup(NULL, row[2]);
-		zbx_vector_item_tag_append(&item_info->item_tags, item_tag);
-	}
 	zbx_db_free_result(result);
 }
 
 /******************************************************************************
  *                                                                            *
- * Purpose: frees resources allocated to store item tag                       *
+ * Purpose: get item tags                                                     *
  *                                                                            *
- * Parameters: item_tag - [IN] item tag                                       *
+ * Parameters: items_info - [IN/OUT] output item tags                         *
+ *             itemids    - [IN] the item identifiers                         *
  *                                                                            *
  ******************************************************************************/
-static void item_tag_free(zbx_tag_t item_tag)
+static void	db_get_item_tags_by_itemid(zbx_hashset_t *items_info, const zbx_vector_uint64_t *itemids)
 {
-	zbx_free(item_tag.tag);
-	zbx_free(item_tag.value);
+	size_t		sql_offset = 0;
+	DB_RESULT	result;
+	DB_ROW		row;
+	zbx_item_info_t	*item_info = NULL;
+
+	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset, "select itemid,tag,value from item_tag where");
+	zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "itemid", itemids->values, itemids->values_num);
+	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, " order by itemid");
+
+	result = zbx_db_select("%s", sql);
+
+	while (NULL != (row = zbx_db_fetch(result)))
+	{
+		zbx_uint64_t	itemid;
+		zbx_tag_t	*item_tag;
+
+		ZBX_DBROW2UINT64(itemid, row[0]);
+
+		if (NULL == item_info || item_info->itemid != itemid)
+		{
+			if (NULL != item_info)
+			{
+				zbx_vector_tags_sort(&item_info->item_tags, zbx_compare_tags);
+			}
+			if (NULL == (item_info = (zbx_item_info_t *)zbx_hashset_search(items_info, &itemid)))
+			{
+				THIS_SHOULD_NEVER_HAPPEN;
+				continue;
+			}
+		}
+
+		item_tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(*item_tag));
+		item_tag->tag = zbx_strdup(NULL, row[1]);
+		item_tag->value = zbx_strdup(NULL, row[2]);
+		zbx_vector_tags_append(&item_info->item_tags, item_tag);
+	}
+
+	if (NULL != item_info)
+	{
+		zbx_vector_tags_sort(&item_info->item_tags, zbx_compare_tags);
+	}
+
+	zbx_db_free_result(result);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: get item names and item tags                                      *
+ *                                                                            *
+ * Parameters: items_info - [IN/OUT] output item name and item tags           *
+ *             itemids    - [IN] the item identifiers                         *
+ *                                                                            *
+ ******************************************************************************/
+static void	db_get_items_info_by_itemid(zbx_hashset_t *items_info, const zbx_vector_uint64_t *itemids)
+{
+	db_get_item_names_by_itemid(items_info, itemids);
+	db_get_item_tags_by_itemid(items_info, itemids);
 }
 
 /******************************************************************************
@@ -351,8 +381,8 @@ static void item_tag_free(zbx_tag_t item_tag)
  ******************************************************************************/
 static void zbx_item_info_clean(zbx_item_info_t *item_info)
 {
-	zbx_vector_item_tag_clear_ext(&item_info->item_tags, item_tag_free);
-	zbx_vector_item_tag_destroy(&item_info->item_tags);
+	zbx_vector_tags_clear_ext(&item_info->item_tags, zbx_free_tag);
+	zbx_vector_tags_destroy(&item_info->item_tags);
 	zbx_free(item_info->name);
 }
 
@@ -366,17 +396,20 @@ static void zbx_item_info_clean(zbx_item_info_t *item_info)
  *             items_info  - [IN] item names and tags                         *
  *                                                                            *
  ******************************************************************************/
-static void DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx_hashset_t *hosts_info,
-							 zbx_hashset_t *items_info)
+static void	DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx_hashset_t *hosts_info,
+		zbx_hashset_t *items_info, int history_export_enabled, zbx_vector_connector_filter_t *connector_filters,
+		unsigned char **data, size_t *data_alloc, size_t *data_offset)
 {
-	const ZBX_DC_HISTORY *h;
-	const zbx_history_sync_item_t *item;
-	int i, j;
-	zbx_host_info_t *host_info;
-	zbx_item_info_t *item_info;
-	struct zbx_json json;
+	const ZBX_DC_HISTORY		*h;
+	const zbx_history_sync_item_t	*item;
+	int				i, j;
+	zbx_host_info_t			*host_info;
+	zbx_item_info_t			*item_info;
+	struct zbx_json			json;
+	zbx_connector_object_t		connector_object;
 
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_vector_uint64_create(&connector_object.ids);
 
 	for (i = 0; i < history_num; i++)
 	{
@@ -399,9 +432,27 @@ static void DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx
 			continue;
 		}
 
+		if (0 != connector_filters->values_num)
+		{
+			int	k;
+
+			for (k = 0; k < connector_filters->values_num; k++)
+			{
+				if (SUCCEED == zbx_match_tags(connector_filters->values[k].tags_evaltype,
+						&connector_filters->values[k].connector_tags, &item_info->item_tags))
+				{
+					zbx_vector_uint64_append(&connector_object.ids,
+							connector_filters->values[k].connectorid);
+				}
+			}
+
+			if (0 == connector_object.ids.values_num && FAIL == history_export_enabled)
+				continue;
+		}
+
 		zbx_json_clean(&json);
 
-		zbx_json_addobject(&json, ZBX_PROTO_TAG_HOST);
+		zbx_json_addobject(&json,ZBX_PROTO_TAG_HOST);
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, item->host.host, ZBX_JSON_TYPE_STRING);
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_NAME, item->host.name, ZBX_JSON_TYPE_STRING);
 		zbx_json_close(&json);
@@ -417,11 +468,11 @@ static void DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx
 
 		for (j = 0; j < item_info->item_tags.values_num; j++)
 		{
-			zbx_tag_t item_tag = item_info->item_tags.values[j];
+			zbx_tag_t	*item_tag = item_info->item_tags.values[j];
 
 			zbx_json_addobject(&json, NULL);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag->tag, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag->value, ZBX_JSON_TYPE_STRING);
 			zbx_json_close(&json);
 		}
 
@@ -436,38 +487,55 @@ static void DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx
 
 		switch (h->value_type)
 		{
-		case ITEM_VALUE_TYPE_FLOAT:
-			zbx_json_addfloat(&json, ZBX_PROTO_TAG_VALUE, h->value.dbl);
-			break;
-		case ITEM_VALUE_TYPE_UINT64:
-			zbx_json_adduint64(&json, ZBX_PROTO_TAG_VALUE, h->value.ui64);
-			break;
-		case ITEM_VALUE_TYPE_STR:
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
-			break;
-		case ITEM_VALUE_TYPE_TEXT:
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
-			break;
-		case ITEM_VALUE_TYPE_LOG:
-			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGTIMESTAMP, h->value.log->timestamp);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_LOGSOURCE,
-							   ZBX_NULL2EMPTY_STR(h->value.log->source), ZBX_JSON_TYPE_STRING);
-			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGSEVERITY, h->value.log->severity);
-			zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGEVENTID, h->value.log->logeventid);
-			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.log->value,
-							   ZBX_JSON_TYPE_STRING);
-			break;
-		default:
-			THIS_SHOULD_NEVER_HAPPEN;
+			case ITEM_VALUE_TYPE_FLOAT:
+				zbx_json_adddouble(&json, ZBX_PROTO_TAG_VALUE, h->value.dbl);
+				break;
+			case ITEM_VALUE_TYPE_UINT64:
+				zbx_json_adduint64(&json, ZBX_PROTO_TAG_VALUE, h->value.ui64);
+				break;
+			case ITEM_VALUE_TYPE_STR:
+				zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
+				break;
+			case ITEM_VALUE_TYPE_TEXT:
+				zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.str, ZBX_JSON_TYPE_STRING);
+				break;
+			case ITEM_VALUE_TYPE_LOG:
+				zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGTIMESTAMP, h->value.log->timestamp);
+				zbx_json_addstring(&json, ZBX_PROTO_TAG_LOGSOURCE,
+						ZBX_NULL2EMPTY_STR(h->value.log->source), ZBX_JSON_TYPE_STRING);
+				zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGSEVERITY, h->value.log->severity);
+				zbx_json_addint64(&json, ZBX_PROTO_TAG_LOGEVENTID, h->value.log->logeventid);
+				zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, h->value.log->value,
+						ZBX_JSON_TYPE_STRING);
+				break;
+			default:
+				THIS_SHOULD_NEVER_HAPPEN;
 		}
 
 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_TYPE, h->value_type);
-		zbx_history_export_write(json.buffer, json.buffer_size);
+
+		if (0 != connector_object.ids.values_num)
+		{
+			connector_object.objectid = item->itemid;
+			connector_object.ts = h->ts;
+			connector_object.str = json.buffer;
+
+			zbx_connector_serialize_object(data, data_alloc, data_offset, &connector_object);
+
+			zbx_vector_uint64_clear(&connector_object.ids);
+		}
+
+		if (SUCCEED == history_export_enabled)
+			zbx_history_export_write(json.buffer, json.buffer_size);
 	}
 
-	zbx_history_export_flush();
+	if (SUCCEED == history_export_enabled)
+		zbx_history_export_flush();
+
+	zbx_vector_uint64_destroy(&connector_object.ids);
 	zbx_json_free(&json);
 }
+
 
 /******************************************************************************
  *                                                                            *
@@ -718,7 +786,7 @@ static void DCinventory_value_add(zbx_vector_ptr_t *inventory_values, const zbx_
 		return;
 
 	if (0 != (ZBX_DC_FLAG_UNDEF & h->flags) || 0 != (ZBX_DC_FLAG_NOVALUE & h->flags) ||
-		NULL == (inventory_field = DBget_inventory_field(item->inventory_link)))
+		NULL == (inventory_field = zbx_db_get_inventory_field(item->inventory_link)))
 	{
 		return;
 	}
@@ -760,13 +828,13 @@ static void DCadd_update_inventory_sql(size_t *sql_offset, const zbx_vector_ptr_
 	{
 		const zbx_inventory_value_t *inventory_value = (zbx_inventory_value_t *)inventory_values->values[i];
 
-		value_esc = DBdyn_escape_field("host_inventory", inventory_value->field_name, inventory_value->value);
+		value_esc = zbx_db_dyn_escape_field("host_inventory", inventory_value->field_name, inventory_value->value);
 
 		zbx_snprintf_alloc(&sql, &sql_alloc, sql_offset,
 						   "update host_inventory set %s='%s' where hostid=" ZBX_FS_UI64 ";\n",
 						   inventory_value->field_name, value_esc, inventory_value->hostid);
 
-		DBexecute_overflowed_sql(&sql, &sql_alloc, sql_offset);
+		zbx_db_execute_overflowed_sql(&sql, &sql_alloc, sql_offset);
 
 		zbx_free(value_esc);
 	}
@@ -997,10 +1065,10 @@ static void normalize_item_value(const zbx_history_sync_item_t *item, ZBX_DC_HIS
 	zbx_variant_clear(&value_var);
 }
 
-static int history_value_compare_func(const void *d1, const void *d2)
+static int	history_value_compare_func(const void *d1, const void *d2)
 {
-	const ZBX_DC_HISTORY *i1 = *(const ZBX_DC_HISTORY **)d1;
-	const ZBX_DC_HISTORY *i2 = *(const ZBX_DC_HISTORY **)d2;
+	const ZBX_DC_HISTORY	*i1 = *(const ZBX_DC_HISTORY * const *)d1;
+	const ZBX_DC_HISTORY	*i2 = *(const ZBX_DC_HISTORY * const *)d2;
 
 	ZBX_RETURN_IF_NOT_EQUAL(i1->itemid, i2->itemid);
 	ZBX_RETURN_IF_NOT_EQUAL(i1->value_type, i2->value_type);
@@ -1624,9 +1692,9 @@ static void sync_proxy_history(int *total_num, int proc_num)
 
 		do
 		{
-			DBbegin();
+			zbx_db_begin();
 			DBmass_proxy_add_history(history, history_num);
-		} while (ZBX_DB_DOWN == (txn_rc = DBcommit()));
+		} while (ZBX_DB_DOWN == (txn_rc = zbx_db_commit()));
 
 		*total_num += history_num;
 		
@@ -1668,9 +1736,12 @@ static void sync_server_history(int *values_num, int *triggers_num, int proc_num
 	zbx_vector_ptr_t trigger_diff, inventory_values, trigger_timers;
 	zbx_vector_uint64_pair_t proxy_subscribtions;
 	ZBX_DC_HISTORY history[ZBX_HC_SYNC_MAX];
+	zbx_vector_connector_filter_t	connector_filters_history, connector_filters_events;
 
 	item_retrieve_mode = 0 == zbx_has_export_dir() ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
 
+	zbx_vector_connector_filter_create(&connector_filters_history);
+	zbx_vector_connector_filter_create(&connector_filters_events);
 	zbx_vector_ptr_create(&inventory_values);
 	zbx_vector_ptr_create(&trigger_diff);
 
@@ -1685,6 +1756,8 @@ static void sync_server_history(int *values_num, int *triggers_num, int proc_num
 	*values_num = 0;
 	*triggers_num = 0;
 	sync_start = time(NULL);
+
+	item_retrieve_mode = 0 == zbx_has_export_dir() ? ZBX_ITEM_GET_SYNC : ZBX_ITEM_GET_SYNC_EXPORT;
 
 	do
 	{
@@ -1748,7 +1821,7 @@ static void sync_server_history(int *values_num, int *triggers_num, int proc_num
 
 				do
 				{
-					DBbegin();
+					zbx_db_begin();
 
 					*triggers_num = *triggers_num + recalculate_triggers(history, history_num, &itemids, items, errcodes,
 										 &trigger_timers, &trigger_diff);
@@ -1757,7 +1830,7 @@ static void sync_server_history(int *values_num, int *triggers_num, int proc_num
 					zbx_process_events(&trigger_diff, &triggerids, history);
 					glb_state_triggers_apply_diffs(&trigger_diff);
 
-					if (ZBX_DB_OK != (txn_error = DBcommit()))
+					if (ZBX_DB_OK != (txn_error = zbx_db_commit()))
 						zbx_clean_events();
 
 					zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);
@@ -1784,12 +1857,12 @@ static void sync_server_history(int *values_num, int *triggers_num, int proc_num
 			zbx_vector_uint64_pair_clear(&proxy_subscribtions);
 		}
 
-		if (FAIL != ret)
-		{
+		// if (FAIL != ret)
+		// {
 
-			if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
-				zbx_export_events();
-		}
+		// 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
+		// 		zbx_export_events()
+		// }
 
 		if (0 != history_num || 0 != timers_num)
 			zbx_clean_events();
@@ -1801,11 +1874,11 @@ static void sync_server_history(int *values_num, int *triggers_num, int proc_num
 
 			do
 			{
-				DBbegin();
+				zbx_db_begin();
 
 				zbx_process_events(NULL, NULL, NULL);
 
-				if (ZBX_DB_OK != (txn_error = DBcommit()))
+				if (ZBX_DB_OK != (txn_error = zbx_db_commit()))
 					zbx_reset_event_recovery();
 			
 			} while (ZBX_DB_DOWN == txn_error);
@@ -1978,16 +2051,16 @@ zbx_uint64_t DCget_nextid(const char *table_name, int num)
 		exit(EXIT_FAILURE);
 	}
 
-	table = DBget_table(table_name);
+	table = zbx_db_get_table(table_name);
 
-	result = DBselect("select max(%s) from %s where %s between " ZBX_FS_UI64 " and " ZBX_FS_UI64,
+	result = zbx_db_select("select max(%s) from %s where %s between " ZBX_FS_UI64 " and " ZBX_FS_UI64,
 					  table->recid, table_name, table->recid, min, max);
 
 	if (NULL != result)
 	{
 		zbx_strlcpy(id->table_name, table_name, sizeof(id->table_name));
 
-		if (NULL == (row = DBfetch(result)) || SUCCEED == DBis_null(row[0]))
+		if (NULL == (row = zbx_db_fetch(result)) || SUCCEED == zbx_db_is_null(row[0]))
 			id->lastid = min;
 		else
 			ZBX_STR2UINT64(id->lastid, row[0]);

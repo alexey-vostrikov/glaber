@@ -20,7 +20,7 @@
 #include "zbxdbschema.h"
 #include "zbxcommon.h"
 
-const ZBX_TABLE	tables[] = {
+ZBX_TABLE	tables[] = {
 
 #if defined(HAVE_ORACLE)
 #	define ZBX_TYPE_SHORTTEXT_LEN	2048
@@ -109,6 +109,8 @@ const ZBX_TABLE	tables[] = {
 		{"custom_interfaces",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"uuid",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"name_upper",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"vendor_name",	"",	NULL,	NULL,	64,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"vendor_version",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -347,7 +349,6 @@ const ZBX_TABLE	tables[] = {
 		{"smtp_verify_peer",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"smtp_verify_host",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"smtp_authentication",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
-		{"exec_params",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"maxsessions",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"maxattempts",	"3",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"attempt_interval",	"10s",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
@@ -370,6 +371,7 @@ const ZBX_TABLE	tables[] = {
 		{"mediatypeid",	NULL,	"media_type",	"mediatypeid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
 		{"name",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"value",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"sortorder",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -432,7 +434,7 @@ const ZBX_TABLE	tables[] = {
 		{"new_window",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{0}
 		},
-		"name"
+		"name,menu_path"
 	},
 	{"script_param",	"script_paramid",	0,
 		{
@@ -1562,6 +1564,7 @@ const ZBX_TABLE	tables[] = {
 		{"userid",	NULL,	"users",	"userid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	ZBX_FK_CASCADE_DELETE},
 		{"lastaccess",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"secret",	"",	NULL,	NULL,	32,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{0}
 		},
 		NULL
@@ -2534,6 +2537,45 @@ const ZBX_TABLE	tables[] = {
 		},
 		NULL
 	},
+	{"connector",	"connectorid",	0,
+		{
+		{"connectorid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"name",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"protocol",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"data_type",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"url",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"max_records",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"max_senders",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"max_attempts",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"timeout",	"5s",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"http_proxy",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"authtype",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"username",	"",	NULL,	NULL,	64,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"password",	"",	NULL,	NULL,	64,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"token",	"",	NULL,	NULL,	128,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"verify_peer",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"verify_host",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"ssl_cert_file",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"ssl_key_file",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"ssl_key_password",	"",	NULL,	NULL,	64,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"description",	"",	NULL,	NULL,	ZBX_TYPE_SHORTTEXT_LEN,	ZBX_TYPE_SHORTTEXT,	ZBX_NOTNULL,	0},
+		{"status",	"1",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"tags_evaltype",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		"name"
+	},
+	{"connector_tag",	"connector_tagid",	0,
+		{
+		{"connector_tagid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"connectorid",	NULL,	"connector",	"connectorid",	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
+		{"tag",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"operator",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
+		{"value",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{0}
+		},
+		NULL
+	},
 	{"dbversion",	"dbversionid",	0,
 		{
 		{"dbversionid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
@@ -2551,22 +2593,24 @@ const ZBX_TABLE	tables[] = {
 };
 
 const zbx_db_table_changelog_t	changelog_tables[] = {
-	{"items", 3},
 	{"host_tag", 2},
-	{"trigger_tag", 6},
-	{"hosts", 1},
-	{"triggers", 5},
-	{"item_preproc", 8},
-	{"httptest_field", 12},
-	{"item_tag", 4},
-	{"httptestitem", 13},
-	{"httpstep", 14},
-	{"httptest", 11},
 	{"drules", 9},
-	{"httpstepitem", 16},
-	{"dchecks", 10},
+	{"trigger_tag", 6},
+	{"item_preproc", 8},
 	{"httpstep_field", 15},
+	{"dchecks", 10},
 	{"functions", 7},
+	{"hosts", 1},
+	{"connector_tag", 18},
+	{"items", 3},
+	{"connector", 17},
+	{"triggers", 5},
+	{"httpstepitem", 16},
+	{"item_tag", 4},
+	{"httptest", 11},
+	{"httptestitem", 13},
+	{"httptest_field", 12},
+	{"httpstep", 14},
 	{0}
 };
 #if defined(HAVE_SQLITE3)
@@ -2644,6 +2688,8 @@ discover integer DEFAULT '0' NOT NULL,\n\
 custom_interfaces integer DEFAULT '0' NOT NULL,\n\
 uuid varchar(32) DEFAULT '' NOT NULL,\n\
 name_upper varchar(128) DEFAULT '' NOT NULL,\n\
+vendor_name varchar(64) DEFAULT '' NOT NULL,\n\
+vendor_version varchar(32) DEFAULT '' NOT NULL,\n\
 PRIMARY KEY (hostid)\n\
 );\n\
 CREATE INDEX hosts_1 ON hosts (host);\n\
@@ -2874,7 +2920,6 @@ smtp_security integer DEFAULT '0' NOT NULL,\n\
 smtp_verify_peer integer DEFAULT '0' NOT NULL,\n\
 smtp_verify_host integer DEFAULT '0' NOT NULL,\n\
 smtp_authentication integer DEFAULT '0' NOT NULL,\n\
-exec_params varchar(255) DEFAULT '' NOT NULL,\n\
 maxsessions integer DEFAULT '1' NOT NULL,\n\
 maxattempts integer DEFAULT '3' NOT NULL,\n\
 attempt_interval varchar(32) DEFAULT '10s' NOT NULL,\n\
@@ -2895,6 +2940,7 @@ mediatype_paramid bigint  NOT NULL,\n\
 mediatypeid bigint  NOT NULL REFERENCES media_type (mediatypeid) ON DELETE CASCADE,\n\
 name varchar(255) DEFAULT '' NOT NULL,\n\
 value varchar(2048) DEFAULT '' NOT NULL,\n\
+sortorder integer DEFAULT '0' NOT NULL,\n\
 PRIMARY KEY (mediatype_paramid)\n\
 );\n\
 CREATE INDEX media_type_param_1 ON media_type_param (mediatypeid);\n\
@@ -2953,7 +2999,7 @@ PRIMARY KEY (scriptid)\n\
 );\n\
 CREATE INDEX scripts_1 ON scripts (usrgrpid);\n\
 CREATE INDEX scripts_2 ON scripts (groupid);\n\
-CREATE UNIQUE INDEX scripts_3 ON scripts (name);\n\
+CREATE UNIQUE INDEX scripts_3 ON scripts (name,menu_path);\n\
 CREATE TABLE script_param (\n\
 script_paramid bigint  NOT NULL,\n\
 scriptid bigint  NOT NULL REFERENCES scripts (scriptid) ON DELETE CASCADE,\n\
@@ -3970,6 +4016,7 @@ sessionid varchar(32) DEFAULT '' NOT NULL,\n\
 userid bigint  NOT NULL REFERENCES users (userid) ON DELETE CASCADE,\n\
 lastaccess integer DEFAULT '0' NOT NULL,\n\
 status integer DEFAULT '0' NOT NULL,\n\
+secret varchar(32) DEFAULT '' NOT NULL,\n\
 PRIMARY KEY (sessionid)\n\
 );\n\
 CREATE INDEX sessions_1 ON sessions (userid,status,lastaccess);\n\
@@ -4040,6 +4087,7 @@ PRIMARY KEY (eventid)\n\
 CREATE INDEX problem_1 ON problem (source,object,objectid);\n\
 CREATE INDEX problem_2 ON problem (r_clock);\n\
 CREATE INDEX problem_3 ON problem (r_eventid);\n\
+CREATE INDEX problem_4 ON problem (cause_eventid);\n\
 CREATE TABLE problem_tag (\n\
 problemtagid bigint  NOT NULL,\n\
 eventid bigint  NOT NULL REFERENCES problem (eventid) ON DELETE CASCADE,\n\
@@ -4775,13 +4823,48 @@ PRIMARY KEY (user_scim_groupid)\n\
 );\n\
 CREATE INDEX user_scim_group_1 ON user_scim_group (userid);\n\
 CREATE INDEX user_scim_group_2 ON user_scim_group (scim_groupid);\n\
+CREATE TABLE connector (\n\
+connectorid bigint  NOT NULL,\n\
+name varchar(255) DEFAULT '' NOT NULL,\n\
+protocol integer DEFAULT '0' NOT NULL,\n\
+data_type integer DEFAULT '0' NOT NULL,\n\
+url varchar(2048) DEFAULT '' NOT NULL,\n\
+max_records integer DEFAULT '0' NOT NULL,\n\
+max_senders integer DEFAULT '1' NOT NULL,\n\
+max_attempts integer DEFAULT '1' NOT NULL,\n\
+timeout varchar(255) DEFAULT '5s' NOT NULL,\n\
+http_proxy varchar(255) DEFAULT '' NOT NULL,\n\
+authtype integer DEFAULT '0' NOT NULL,\n\
+username varchar(64) DEFAULT '' NOT NULL,\n\
+password varchar(64) DEFAULT '' NOT NULL,\n\
+token varchar(128) DEFAULT '' NOT NULL,\n\
+verify_peer integer DEFAULT '1' NOT NULL,\n\
+verify_host integer DEFAULT '1' NOT NULL,\n\
+ssl_cert_file varchar(255) DEFAULT '' NOT NULL,\n\
+ssl_key_file varchar(255) DEFAULT '' NOT NULL,\n\
+ssl_key_password varchar(64) DEFAULT '' NOT NULL,\n\
+description text DEFAULT '' NOT NULL,\n\
+status integer DEFAULT '1' NOT NULL,\n\
+tags_evaltype integer DEFAULT '0' NOT NULL,\n\
+PRIMARY KEY (connectorid)\n\
+);\n\
+CREATE UNIQUE INDEX connector_1 ON connector (name);\n\
+CREATE TABLE connector_tag (\n\
+connector_tagid bigint  NOT NULL,\n\
+connectorid bigint  NOT NULL REFERENCES connector (connectorid),\n\
+tag varchar(255) DEFAULT '' NOT NULL,\n\
+operator integer DEFAULT '0' NOT NULL,\n\
+value varchar(255) DEFAULT '' NOT NULL,\n\
+PRIMARY KEY (connector_tagid)\n\
+);\n\
+CREATE INDEX connector_tag_1 ON connector_tag (connectorid);\n\
 CREATE TABLE dbversion (\n\
 dbversionid bigint  NOT NULL,\n\
 mandatory integer DEFAULT '0' NOT NULL,\n\
 optional integer DEFAULT '0' NOT NULL,\n\
 PRIMARY KEY (dbversionid)\n\
 );\n\
-INSERT INTO dbversion VALUES ('1','6030159','6030159');\n\
+INSERT INTO dbversion VALUES ('1','6040000','6040001');\n\
 create trigger hosts_insert after insert on hosts\n\
 for each row\n\
 begin\n\
@@ -5069,6 +5152,42 @@ for each row\n\
 begin\n\
 insert into changelog (object,objectid,operation,clock)\n\
 values (4,old.itemtagid,3,cast(strftime('%s', 'now') as integer));\n\
+end;\n\
+create trigger connector_insert after insert on connector\n\
+for each row\n\
+begin\n\
+insert into changelog (object,objectid,operation,clock)\n\
+values (17,new.connectorid,1,cast(strftime('%s', 'now') as integer));\n\
+end;\n\
+create trigger connector_update after update on connector\n\
+for each row\n\
+begin\n\
+insert into changelog (object,objectid,operation,clock)\n\
+values (17,old.connectorid,2,cast(strftime('%s', 'now') as integer));\n\
+end;\n\
+create trigger connector_delete before delete on connector\n\
+for each row\n\
+begin\n\
+insert into changelog (object,objectid,operation,clock)\n\
+values (17,old.connectorid,3,cast(strftime('%s', 'now') as integer));\n\
+end;\n\
+create trigger connector_tag_insert after insert on connector_tag\n\
+for each row\n\
+begin\n\
+insert into changelog (object,objectid,operation,clock)\n\
+values (18,new.connector_tagid,1,cast(strftime('%s', 'now') as integer));\n\
+end;\n\
+create trigger connector_tag_update after update on connector_tag\n\
+for each row\n\
+begin\n\
+insert into changelog (object,objectid,operation,clock)\n\
+values (18,old.connector_tagid,2,cast(strftime('%s', 'now') as integer));\n\
+end;\n\
+create trigger connector_tag_delete before delete on connector_tag\n\
+for each row\n\
+begin\n\
+insert into changelog (object,objectid,operation,clock)\n\
+values (18,old.connector_tagid,3,cast(strftime('%s', 'now') as integer));\n\
 end;\n\
 ";
 const char	*const db_schema_fkeys[] = {

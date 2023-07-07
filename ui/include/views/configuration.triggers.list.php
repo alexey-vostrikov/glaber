@@ -212,6 +212,8 @@ $data['triggers'] = CMacrosResolverHelper::resolveTriggerExpressions($data['trig
 	'context' => $data['context']
 ]);
 
+$csrf_token = CCsrfTokenHelper::get('triggers.php');
+
 foreach ($data['triggers'] as $tnum => $trigger) {
 	$triggerid = $trigger['triggerid'];
 
@@ -295,9 +297,9 @@ foreach ($data['triggers'] as $tnum => $trigger) {
 			->setArgument('context', $data['context'])
 			->getUrl()
 		))
+		->addCsrfToken($csrf_token)
 		->addClass(ZBX_STYLE_LINK_ACTION)
-		->addClass(triggerIndicatorStyleByValue($trigger['status'], $trigger['value']))
-		->addSID();
+		->addClass(triggerIndicatorStyle($trigger['status'], $trigger['value']));
 
 	// hosts
 	$hosts = null;
@@ -347,8 +349,12 @@ $triggers_form->addItem([
 	$data['paging'],
 	new CActionButtonList('action', 'g_triggerid',
 		[
-			'trigger.massenable' => ['name' => _('Enable'), 'confirm' => _('Enable selected triggers?')],
-			'trigger.massdisable' => ['name' => _('Disable'), 'confirm' => _('Disable selected triggers?')],
+			'trigger.massenable' => ['name' => _('Enable'), 'confirm' => _('Enable selected triggers?'),
+				'csrf_token' => $csrf_token
+			],
+			'trigger.massdisable' => ['name' => _('Disable'), 'confirm' => _('Disable selected triggers?'),
+				'csrf_token' => $csrf_token
+			],
 			'trigger.masscopyto' => [
 				'content' => (new CSimpleButton(_('Copy')))
 					->addClass('js-copy')
@@ -358,7 +364,9 @@ $triggers_form->addItem([
 			'popup.massupdate.trigger' => [
 				'content' => (new CButton('', _('Mass update')))
 					->onClick(
-						"openMassupdatePopup('popup.massupdate.trigger', {}, {
+						"openMassupdatePopup('popup.massupdate.trigger', {".
+							CCsrfTokenHelper::CSRF_TOKEN_NAME.": '".CCsrfTokenHelper::get('trigger').
+						"'}, {
 							dialogue_class: 'modal-popup-static',
 							trigger_element: this
 						});"
@@ -366,7 +374,9 @@ $triggers_form->addItem([
 					->addClass(ZBX_STYLE_BTN_ALT)
 					->removeAttribute('id')
 			],
-			'trigger.massdelete' => ['name' => _('Delete'), 'confirm' => _('Delete selected triggers?')]
+			'trigger.massdelete' => ['name' => _('Delete'), 'confirm' => _('Delete selected triggers?'),
+				'csrf_token' => $csrf_token
+			]
 		],
 		$data['checkbox_hash']
 	)

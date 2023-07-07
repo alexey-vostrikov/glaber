@@ -26,7 +26,7 @@
 /******************************************************************************
  *                                                                            *
  * Purpose: get events and flags that indicate what was filled in             *
- *           ZBX_DB_EVENT structure                                           *
+ *           zbx_db_event structure                                           *
  *                                                                            *
  * Parameters: eventids   - [IN] requested event ids                          *
  *             events     - [OUT] the array of events                         *
@@ -55,16 +55,16 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 			"select eventid,source,object,objectid,clock,value,acknowledged,ns,name,severity"
 			" from events"
 			" where");
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids->values, eventids->values_num);
+	zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids->values, eventids->values_num);
 	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, " order by eventid");
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
-		ZBX_DB_EVENT	*event = NULL;
+		zbx_db_event	*event = NULL;
 
-		event = (ZBX_DB_EVENT *)zbx_malloc(event, sizeof(ZBX_DB_EVENT));
+		event = (zbx_db_event *)zbx_malloc(event, sizeof(zbx_db_event));
 		ZBX_STR2UINT64(event->eventid, row[0]);
 		event->source = atoi(row[1]);
 		event->object = atoi(row[2]);
@@ -82,7 +82,7 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 		if (EVENT_SOURCE_TRIGGERS == event->source || EVENT_SOURCE_INTERNAL == event->source ||
 				EVENT_SOURCE_SERVICE == event->source)
 		{
-			zbx_vector_ptr_create(&event->tags);
+			zbx_vector_tags_create(&event->tags);
 			zbx_vector_uint64_append(&tagged_eventids, event->eventid);
 		}
 
@@ -99,13 +99,13 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 
 	sql_offset = 0;
 	zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, "select distinct eventid from event_suppress where");
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids->values, eventids->values_num);
+	zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids->values, eventids->values_num);
 
-	result = DBselect("%s", sql);
+	result = zbx_db_select("%s", sql);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
-		ZBX_DB_EVENT	*event;
+		zbx_db_event	*event;
 		zbx_uint64_t	eventid;
 
 		ZBX_STR2UINT64(eventid, row[0]);
@@ -115,7 +115,7 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 			continue;
 		}
 
-		event = (ZBX_DB_EVENT *)events->values[index];
+		event = (zbx_db_event *)events->values[index];
 		event->suppressed = ZBX_PROBLEM_SUPPRESSED_TRUE;
 	}
 	zbx_db_free_result(result);
@@ -123,15 +123,15 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 	/* EVENT_SOURCE_TRIGGERS || EVENT_SOURCE_INTERNAL || EVENT_SOURCE_SERVICE */
 	if (0 != tagged_eventids.values_num)
 	{
-		ZBX_DB_EVENT	*event = NULL;
+		zbx_db_event	*event = NULL;
 
 		sql_offset = 0;
-		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", tagged_eventids.values,
+		zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", tagged_eventids.values,
 				tagged_eventids.values_num);
 
-		result = DBselect("select eventid,tag,value from event_tag where%s order by eventid", sql);
+		result = zbx_db_select("select eventid,tag,value from event_tag where%s order by eventid", sql);
 
-		while (NULL != (row = DBfetch(result)))
+		while (NULL != (row = zbx_db_fetch(result)))
 		{
 			zbx_uint64_t	eventid;
 			zbx_tag_t	*tag;
@@ -147,13 +147,13 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 					continue;
 				}
 
-				event = (ZBX_DB_EVENT *)events->values[index];
+				event = (zbx_db_event *)events->values[index];
 			}
 
 			tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
 			tag->tag = zbx_strdup(NULL, row[1]);
 			tag->value = zbx_strdup(NULL, row[2]);
-			zbx_vector_ptr_append(&event->tags, tag);
+			zbx_vector_tags_append(&event->tags, tag);
 		}
 		zbx_db_free_result(result);
 	}
@@ -164,17 +164,17 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 		zbx_vector_uint64_uniq(&triggerids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
 		sql_offset = 0;
-		DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "triggerid", triggerids.values,
+		zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "triggerid", triggerids.values,
 				triggerids.values_num);
 
-		result = DBselect(
+		result = zbx_db_select(
 				"select triggerid,description,expression,priority,comments,url,url_name,recovery_expression,"
 					"recovery_mode,null,opdata,event_name"
 				" from triggers"
 				" where%s",
 				sql);
 
-		while (NULL != (row = DBfetch(result)))
+		while (NULL != (row = zbx_db_fetch(result)))
 		{
 			zbx_uint64_t	triggerid;
 
@@ -182,7 +182,7 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
 
 			for (i = 0; i < events->values_num; i++)
 			{
-				ZBX_DB_EVENT	*event = (ZBX_DB_EVENT *)events->values[i];
+				zbx_db_event	*event = (zbx_db_event *)events->values[i];
 
 				if (EVENT_OBJECT_TRIGGER != event->object)
 					continue;
@@ -222,13 +222,13 @@ void	zbx_db_get_events_by_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ptr
  * Parameters: event - [IN] event data                                        *
  *                                                                            *
  ******************************************************************************/
-void	zbx_db_free_event(ZBX_DB_EVENT *event)
+void	zbx_db_free_event(zbx_db_event *event)
 {
 	if (EVENT_SOURCE_TRIGGERS == event->source || EVENT_SOURCE_INTERNAL == event->source ||
 			EVENT_SOURCE_SERVICE == event->source)
 	{
-		zbx_vector_ptr_clear_ext(&event->tags, (zbx_clean_func_t)zbx_free_tag);
-		zbx_vector_ptr_destroy(&event->tags);
+		zbx_vector_tags_clear_ext(&event->tags, zbx_free_tag);
+		zbx_vector_tags_destroy(&event->tags);
 	}
 
 	if (0 != event->trigger.triggerid)
@@ -257,15 +257,15 @@ void	zbx_db_get_eventid_r_eventid_pairs(zbx_vector_uint64_t *eventids, zbx_vecto
 	char		*filter = NULL;
 	size_t		filter_alloc = 0, filter_offset = 0;
 
-	DBadd_condition_alloc(&filter, &filter_alloc, &filter_offset, "eventid", eventids->values,
+	zbx_db_add_condition_alloc(&filter, &filter_alloc, &filter_offset, "eventid", eventids->values,
 			eventids->values_num);
 
-	result = DBselect("select eventid,r_eventid"
+	result = zbx_db_select("select eventid,r_eventid"
 			" from event_recovery"
 			" where%s order by eventid",
 			filter);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		zbx_uint64_pair_t	r_event;
 
@@ -290,17 +290,17 @@ void	zbx_db_get_eventid_r_eventid_pairs(zbx_vector_uint64_t *eventids, zbx_vecto
  * Comments: use 'zbx_db_free_event' function to release allocated memory     *
  *                                                                            *
  ******************************************************************************/
-void	zbx_db_prepare_empty_event(zbx_uint64_t eventid, ZBX_DB_EVENT **event)
+void	zbx_db_prepare_empty_event(zbx_uint64_t eventid, zbx_db_event **event)
 {
-	ZBX_DB_EVENT	*evt = NULL;
+	zbx_db_event	*evt = NULL;
 
-	evt = (ZBX_DB_EVENT*)zbx_malloc(evt, sizeof(ZBX_DB_EVENT));
+	evt = (zbx_db_event*)zbx_malloc(evt, sizeof(zbx_db_event));
 	evt->eventid = eventid;
 	evt->name = NULL;
-	zbx_vector_ptr_create(&evt->tags);
+	zbx_vector_tags_create(&evt->tags);
 
 	evt->source = EVENT_SOURCE_TRIGGERS;
-	memset(&evt->trigger, 0, sizeof(ZBX_DB_TRIGGER));
+	memset(&evt->trigger, 0, sizeof(zbx_db_trigger));
 
 	evt->flags = ZBX_FLAGS_DB_EVENT_UNSET;
 
@@ -314,7 +314,7 @@ void	zbx_db_prepare_empty_event(zbx_uint64_t eventid, ZBX_DB_EVENT **event)
  * Parameters: event     - [IN/OUT]                                           *
  *                                                                            *
  ******************************************************************************/
-void	zbx_db_get_event_data_core(ZBX_DB_EVENT *event)
+void	zbx_db_get_event_data_core(zbx_db_event *event)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -322,11 +322,11 @@ void	zbx_db_get_event_data_core(ZBX_DB_EVENT *event)
 	if (0 != (ZBX_FLAGS_DB_EVENT_RETRIEVED_CORE & event->flags))
 		return;
 
-	result = DBselect("select source,object,objectid,clock,value,acknowledged,ns,name,severity"
+	result = zbx_db_select("select source,object,objectid,clock,value,acknowledged,ns,name,severity"
 			" from events"
 			" where eventid=" ZBX_FS_UI64, event->eventid);
 
-	if (NULL != (row = DBfetch(result)))
+	if (NULL != (row = zbx_db_fetch(result)))
 	{
 		event->source = atoi(row[0]);
 		event->object = atoi(row[1]);
@@ -352,7 +352,7 @@ void	zbx_db_get_event_data_core(ZBX_DB_EVENT *event)
  * Parameters: event   - [IN/OUT] event data                                  *
  *                                                                            *
  ******************************************************************************/
-void	zbx_db_get_event_data_tags(ZBX_DB_EVENT *event)
+void	zbx_db_get_event_data_tags(zbx_db_event *event)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -363,16 +363,16 @@ void	zbx_db_get_event_data_tags(ZBX_DB_EVENT *event)
 		return;
 	}
 
-	result = DBselect("select tag,value from event_tag where eventid=" ZBX_FS_UI64, event->eventid);
+	result = zbx_db_select("select tag,value from event_tag where eventid=" ZBX_FS_UI64, event->eventid);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		zbx_tag_t	*tag;
 
 		tag = (zbx_tag_t *)zbx_malloc(NULL, sizeof(zbx_tag_t));
 		tag->tag = zbx_strdup(NULL, row[0]);
 		tag->value = zbx_strdup(NULL, row[1]);
-		zbx_vector_ptr_append(&event->tags, tag);
+		zbx_vector_tags_append(&event->tags, tag);
 	}
 	zbx_db_free_result(result);
 
@@ -388,7 +388,7 @@ void	zbx_db_get_event_data_tags(ZBX_DB_EVENT *event)
  * Parameters: event   - [IN/OUT] event data                                  *
  *                                                                            *
  ******************************************************************************/
-void	zbx_db_get_event_data_triggers(ZBX_DB_EVENT *event)
+void	zbx_db_get_event_data_triggers(zbx_db_event *event)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -396,12 +396,12 @@ void	zbx_db_get_event_data_triggers(ZBX_DB_EVENT *event)
 	if (0 != (ZBX_FLAGS_DB_EVENT_RETRIEVED_TRIGGERS & event->flags) || EVENT_OBJECT_TRIGGER != event->object)
 		return;
 
-	result = DBselect("select description,expression,priority,comments,url,url_name,recovery_expression,"
+	result = zbx_db_select("select description,expression,priority,comments,url,url_name,recovery_expression,"
 			"recovery_mode,value,opdata,event_name"
 			" from triggers"
 			" where triggerid=" ZBX_FS_UI64, event->objectid);
 
-	if (NULL != (row = DBfetch(result)))
+	if (NULL != (row = zbx_db_fetch(result)))
 	{
 		event->trigger.triggerid = event->objectid;
 		event->trigger.description = zbx_strdup(NULL, row[0]);
@@ -441,12 +441,12 @@ void	zbx_db_select_symptom_eventids(zbx_vector_uint64_t *eventids, zbx_vector_ui
 	zbx_vector_uint64_sort(eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_vector_uint64_uniq(eventids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids->values,
+	zbx_db_add_condition_alloc(&sql, &sql_alloc, &sql_offset, "eventid", eventids->values,
 			eventids->values_num);
 
-	result = DBselect("select eventid from event_symptom where%s", sql);
+	result = zbx_db_select("select eventid from event_symptom where%s", sql);
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		ZBX_STR2UINT64(s_eventid, row[0]);
 		zbx_vector_uint64_append(symptom_eventids, s_eventid);
@@ -471,9 +471,9 @@ zbx_uint64_t	zbx_db_get_cause_eventid(zbx_uint64_t eventid)
 	DB_ROW		row;
 	zbx_uint64_t	cause_eventid;
 
-	result = DBselect("select cause_eventid from event_symptom where eventid=" ZBX_FS_UI64, eventid);
+	result = zbx_db_select("select cause_eventid from event_symptom where eventid=" ZBX_FS_UI64, eventid);
 
-	if (NULL != (row = DBfetch(result)))
+	if (NULL != (row = zbx_db_fetch(result)))
 		ZBX_STR2UINT64(cause_eventid, row[0]);
 	else
 		cause_eventid = 0;
@@ -498,9 +498,9 @@ zbx_uint64_t	zbx_get_objectid_by_eventid(zbx_uint64_t eventid)
 	DB_ROW		row;
 	zbx_uint64_t	objectid;
 
-	result = DBselect("select objectid from events where eventid=" ZBX_FS_UI64, eventid);
+	result = zbx_db_select("select objectid from events where eventid=" ZBX_FS_UI64, eventid);
 
-	if (NULL != (row = DBfetch(result)))
+	if (NULL != (row = zbx_db_fetch(result)))
 		ZBX_STR2UINT64(objectid, row[0]);
 	else
 		objectid = 0;

@@ -52,6 +52,7 @@ class CDashboardPage extends CBaseComponent {
 		can_edit_dashboards,
 		time_period,
 		dynamic_hostid,
+		csrf_token = null,
 		unique_id
 	}) {
 		super(document.createElement('div'));
@@ -81,6 +82,7 @@ class CDashboardPage extends CBaseComponent {
 		this._can_edit_dashboards = can_edit_dashboards;
 		this._time_period = time_period;
 		this._dynamic_hostid = dynamic_hostid;
+		this._csrf_token = csrf_token;
 		this._unique_id = unique_id;
 
 		this._init();
@@ -341,7 +343,7 @@ class CDashboardPage extends CBaseComponent {
 			});
 		}
 		else {
-			widget = this._createInaccessibleWidget({name, widgetid, pos, unique_id});
+			widget = this._createInaccessibleWidget({widgetid, pos, unique_id});
 		}
 
 		this._doAddWidget(widget);
@@ -439,14 +441,14 @@ class CDashboardPage extends CBaseComponent {
 			can_edit_dashboards: this._can_edit_dashboards,
 			time_period: this._time_period,
 			dynamic_hostid: this._dynamic_hostid,
+			csrf_token: this._csrf_token,
 			unique_id
 		});
 	}
 
-	_createInaccessibleWidget({name, widgetid, pos, unique_id}) {
+	_createInaccessibleWidget({widgetid, pos, unique_id}) {
 		return this._createWidget(CWidgetInaccessible, {
 			type: 'inaccessible',
-			name,
 			view_mode: ZBX_WIDGET_VIEW_MODE_HIDDEN_HEADER,
 			fields: {},
 			defaults: {
@@ -745,10 +747,14 @@ class CDashboardPage extends CBaseComponent {
 			}
 			while (!element.classList.contains('wrapper'));
 
-			height = Math.max(height, min_height);
+			height = Math.min(Math.max(height, min_height), this._cell_height * this._max_rows);
 		}
 
-		this._dashboard_grid.style.height = `${height}px`;
+		this._dashboard_grid.style.height = '';
+
+		if (num_rows !== 0) {
+			this._dashboard_grid.style.height = `${height}px`;
+		}
 	}
 
 	_getNumOccupiedRows() {

@@ -340,6 +340,21 @@ int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char 
 	return SUCCEED;
 }
 
+static unsigned int __redirect_queue = -1;
+
+void ipc_set_redirect_queue(int queue_num) {
+	__redirect_queue = queue_num;
+}
+
+static int ipc_get_redirect_queue(void) {
+	return __redirect_queue;
+}
+
+static void ipc_reset_redirect_queue(void) {
+	__redirect_queue = -1;
+}
+
+
 //processing is the priority, so they are use locks to lock ipc in blocking mode
 int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
 	int i = 0;
@@ -370,10 +385,23 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 
 		element = local_rcv_queue->first;
 		
-		//not: races possible here, make atomic or do under lock
+		//note: races possible here, make atomic or do under lock
 		rcv_queue->sent++;
 		
-		cb_func(&ipc->memf, i, (void *)(&element->data), cb_data);
+		cb_func(&ipc->memf, i, (void *)(&element->data), cb_data);// {
+		
+		i++;
+
+		if (-1 != ipc_get_redirect_queue()) {
+			ipc_queue_t *local_send_queue = &ipc->local_queues->send_queues[ipc_get_redirect_queue()];	
+			
+			ipc_reset_redirect_queue();
+			move_one_element(local_rcv_queue, local_send_queue, NULL);
+			
+//			HALT_HERE("Shouldn't get here yet");
+
+			continue;
+		}
 		
 		if (NULL != ipc->free_cb)
 			ipc->free_cb(&ipc->memf, (void *)(&element->data));	
@@ -382,8 +410,6 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		
 		if (local_free_queue->count >= ipc->bulk_count ) 
 			move_all_elements(local_free_queue, &ipc->free_queue, IPC_LOCK_TRY_ONLY);
-		
-		i++;
 	}
 	
 	return i;
@@ -602,5 +628,6 @@ int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, un
 void ipc_vector_uint64_destroy(ipc_conf_t *ipc) {
 	glb_ipc_destroy(ipc);
 }
+
 
 #endif

@@ -89,8 +89,31 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 					->addValue(_('Simple graphs'), GRAPH_FILTER_SIMPLE)
 					->setModern(true)
 			)
+			// ->addRow(
+			// 	(new CLabel(_('Graphs'), 'filter_graphids__ms')),
+			// 	(new CMultiSelect([
+			// 		'multiple' => true,
+			// 		'name' => 'filter_graphids[]',
+			// 		'object_name' => 'graphs',
+			// 		'data' => $data['ms_graphs'],
+				
+			// 		'popup' => [
+						
+			// 			'parameters' => [
+			// 				'srctbl' => 'graphs',
+			// 				'srcfld1' => 'graphid',
+			// 				'dstfrm' => 'zbx_filter',
+			// 				'dstfld1' => 'filter_graphids_',
+			// 				'real_hosts' => true
+			// 			]
+			// 		]
+			// 	]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH),
+			// 	'ms_graphids',
+			// 	''
+			// )
 	],
-	new CPartial('monitoring.charts.subfilter', $data['subfilters']));
+	new CPartial('monitoring.charts.subfilter', $data['subfilters'])
+	);
 }
 
 $html_page->addItem($filter);

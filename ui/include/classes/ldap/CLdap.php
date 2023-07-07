@@ -106,14 +106,12 @@ class CLdap {
 	 */
 	protected $ds;
 
-	public function __construct($config = []) {
+	public function __construct(array $config = []) {
 		$this->ds = false;
 		$this->bound = static::BIND_NONE;
 		$this->error = static::ERR_NONE;
 
-		if (is_array($config)) {
-			$this->cnf = zbx_array_merge($this->cnf, $config);
-		}
+		$this->cnf = zbx_array_merge($this->cnf, $config);
 
 		if ($this->cnf['search_filter'] === '') {
 			$this->cnf['search_filter'] = static::DEFAULT_FILTER_USER;
@@ -264,7 +262,7 @@ class CLdap {
 
 		if (!$this->bind($user, $pass)) {
 			if ($this->bind_type == static::BIND_DNSTRING) {
-				$this->serror = static::ERR_USER_NOT_FOUND;
+				$this->error = static::ERR_USER_NOT_FOUND;
 			}
 
 			return false;
@@ -353,6 +351,7 @@ class CLdap {
 		}
 
 		$placeholders = ['%{user}' => $user];
+		$group_key = strtolower($this->cnf['group_membership']);
 		$results = $this->search($this->cnf['base_dn'], $this->cnf['search_filter'], $placeholders, $attributes);
 		$user = [];
 
@@ -370,7 +369,7 @@ class CLdap {
 			$key = $results[$i];
 			[$key => $value] = $results;
 
-			if (strtolower($key) === strtolower($this->cnf['group_membership'])) {
+			if ($key === $group_key) {
 				$groups = [];
 				$regex = '/'.preg_quote($this->cnf['group_name'], '/').'=(?<groupname>[^,]+)/';
 				unset($value['count']);
@@ -386,7 +385,7 @@ class CLdap {
 					}
 				}
 
-				$user[$this->cnf['group_membership']] = $groups;
+				$user[$key] = $groups;
 			}
 			else {
 				$user[$key] = $value[0];
@@ -500,6 +499,7 @@ class CLdap {
 
 	/**
 	 * Search for entry in LDAP tree for specified $dn and $filter.
+	 * Requested attributes in resulting array, will be set in lowercase.
 	 *
 	 * @param string $dn            DN string value, supports placeholders.
 	 * @param string $filter        Filter string, supports placeholders.
@@ -516,7 +516,6 @@ class CLdap {
 		$results = false;
 
 		if ($resource !== false) {
-			// All attributes keys, in result array, will be in lowercase.
 			$results = @ldap_get_entries($this->ds, $resource);
 			ldap_free_result($resource);
 		}

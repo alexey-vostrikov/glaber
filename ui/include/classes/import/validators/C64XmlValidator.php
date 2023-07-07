@@ -414,7 +414,7 @@ class C64XmlValidator extends CXmlValidatorGeneral {
 			'version' =>				['type' => XML_STRING | XML_REQUIRED],
 			'host_groups' =>			['type' => XML_INDEXED_ARRAY, 'prefix' => 'host_group', 'rules' => [
 				'host_group' =>				['type' => XML_ARRAY, 'rules' => [
-					'uuid' =>					['type' => XML_STRING | XML_REQUIRED, 'flags' => CImportDataNormalizer::LOWERCASE],
+					'uuid' =>				 	['type' => XML_STRING | XML_REQUIRED, 'flags' => CImportDataNormalizer::LOWERCASE],
 					'name' =>					['type' => XML_STRING | XML_REQUIRED]
 				]]
 			]],

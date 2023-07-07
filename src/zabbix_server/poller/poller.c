@@ -768,7 +768,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			{
 				items[i].state = ITEM_STATE_NORMAL;
 				DEBUG_ITEM(items[i].itemid, "Processing item as agent result");
-				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, &results[i] );
+				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, &results[i], items[i].value_type );
 			}
 			else
 			{
@@ -789,7 +789,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 					else
 					{
 						items[i].state = ITEM_STATE_NORMAL;
-						preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result);
+						preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result, items[i].value_type);
 					}
 
 					/* ensure that every log item value timestamp is unique */

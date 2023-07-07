@@ -190,13 +190,16 @@ static int item_preproc_multiplier_variant(unsigned char value_type, zbx_variant
 		zbx_variant_set_dbl(value, value_dbl);
 		break;
 	case ZBX_VARIANT_UI64:
-		if (SUCCEED == zbx_is_uint64(params, &multiplier_ui64))
+		if (SUCCEED == zbx_is_uint64(params, &multiplier_ui64)) {
 			value_ui64 = value_num.data.ui64 * multiplier_ui64;
-		else
-			value_ui64 = (double)value_num.data.ui64 * atof(params);
-
-		zbx_variant_clear(value);
-		zbx_variant_set_ui64(value, value_ui64);
+			zbx_variant_clear(value);
+			zbx_variant_set_ui64(value, value_ui64);
+		} else {
+			value_dbl = (double)value_num.data.ui64 * atof(params);
+			value_dbl = roundf(value_dbl * 10000) / 10000;
+			zbx_variant_clear(value);
+			zbx_variant_set_dbl(value, value_dbl);
+		}
 		break;
 	}
 
@@ -2614,6 +2617,7 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 	char *new_string, search_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1],
 		replace_str[ITEM_PREPROC_PARAMS_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 
+	//LOG_INF("Replace func start");
 	if (NULL == (ptr = strchr(params, '\n')))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
@@ -2626,25 +2630,29 @@ static int item_preproc_str_replace(zbx_variant_t *value, const char *params, ch
 		*errmsg = zbx_strdup(*errmsg, "first parameter is expected");
 		return FAIL;
 	}
-
+	//LOG_INF("Escaping");
 	unescape_param(ZBX_PREPROC_STR_REPLACE, params, MIN(len_search, sizeof(search_str) - 1), search_str);
 
 	len_replace = strlen(ptr + 1);
 	unescape_param(ZBX_PREPROC_STR_REPLACE, ptr + 1, MIN(len_replace, sizeof(replace_str) - 1), replace_str);
-
-	if (value->type = ZBX_VARIANT_ERR)
+	
+	//LOG_INF("Type check");
+	if (ZBX_VARIANT_ERR == value->type || ZBX_VARIANT_NONE == value->type )
 		return FAIL;
-
+	
+	//LOG_INF("Converting");
 	if (SUCCEED != zbx_item_preproc_convert_value(value, ZBX_VARIANT_STR, errmsg))
 	{
 		THIS_SHOULD_NEVER_HAPPEN;
 		return FAIL;
 	}
-
+	//LOG_INF("Replacing");
 	new_string = zbx_string_replace(value->data.str, search_str, replace_str);
+	//LOG_INF("Clearing");
 	zbx_variant_clear(value);
+	//LOG_INF("Setting the value");
 	zbx_variant_set_str(value, new_string);
-
+	//LOG_INF("Returning");
 	return SUCCEED;
 }
 
@@ -2683,7 +2691,7 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		params[0] = 0;
 
 	DEBUG_ITEM(itemid, "Performing preprocessing step of type %d, incoming value %s", op->type, zbx_variant_value_desc(value));
-	
+
 	switch (op->type)
 	{
 	case ZBX_PREPROC_MULTIPLIER:
@@ -2794,13 +2802,12 @@ int zbx_item_preproc(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char
 		ret = FAIL;
 	}
 	
+
 	DEBUG_ITEM(itemid, "Result of preprocessing step of type %d, result value %s, return %d",
 			   op->type, zbx_variant_value_desc(value), ret);
 
 	return ret;
 }
-
-
 
 /******************************************************************************
  *                                                                            *

@@ -73,16 +73,16 @@ foreach ($data['hosts'] as $hostid => $host) {
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'latest.view')
 				->setArgument('hostids[]', $hostid)
+				->setArgument('filter_set', '1')
 		)
 		: _('Latest data');
 
-	
 	$problems_link = $data['allowed_ui_problems']
 		? new CLink(_('Problems'),
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'problem.view')
-				->setArgument('filter_name', '')
 				->setArgument('hostids', [$hostid])
+				->setArgument('filter_set', '1')
 		)
 		: _('Problems');
 
@@ -162,15 +162,15 @@ foreach ($data['hosts'] as $hostid => $host) {
 	$host_context_links = APP::Component()->get('links.context.handler')->getLinks($host,'host','short');
 
 	$view_links = (new CDiv())
-		->addItem([$latest_data_link, " ", $problems_link, " "]);
+		->addItem([$latest_data_link, "&nbsp;", $problems_link, "&nbsp;"]);
 	
 	if ($graph_count > 0) 
-			$view_links->addItem([$charts_link, " "]);
+			$view_links->addItem([$charts_link, "&nbsp;"]);
 	
-	$view_links->addItem([$dashboards_link, " "]);
+	$view_links->addItem([$dashboards_link, "&nbsp;"]);
 	
 	if ($httptest_count > 0) 
-		$view_links->addItem([$web_link, " "]);
+		$view_links->addItem([$web_link, "&nbsp;"]);
 
 	if (count($host_context_links) > 0) 
 		$view_links->addItem($host_context_links);
@@ -240,7 +240,7 @@ foreach ($data['host_groups'] as $groupid => $group) {
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'latest.view')
 				->setArgument('groupids[]', $groupid)
-				->setArgument('filter_name', '')
+				->setArgument('filter_set', '1')
 		)
 		: _('Latest data');
 
@@ -253,8 +253,8 @@ foreach ($data['host_groups'] as $groupid => $group) {
 			? new CLink(_('Problems'),
 				(new CUrl('zabbix.php'))
 					->setArgument('action', 'problem.view')
-					->setArgument('filter_name', '')
 					->setArgument('groupids', [$groupid])
+					->setArgument('filter_set', '1')
 			)
 			: _('Problems'),
 		$data['allowed_ui_hosts']

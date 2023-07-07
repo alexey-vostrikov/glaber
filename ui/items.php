@@ -185,33 +185,33 @@ $fields = [
 	'ssl_cert_file' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	'ssl_key_file' =>				[T_ZBX_STR, O_OPT, null,	null,		null],
 	'ssl_key_password' =>			[T_ZBX_STR, O_OPT, null,	null,		null],
-	'verify_peer' =>				[T_ZBX_INT, O_OPT, null, IN([HTTPTEST_VERIFY_PEER_OFF, HTTPTEST_VERIFY_PEER_ON]),
+	'verify_peer' =>				[T_ZBX_INT, O_OPT, null, IN([ZBX_HTTP_VERIFY_PEER_OFF, ZBX_HTTP_VERIFY_PEER_ON]),
 										null
 									],
-	'verify_host' =>				[T_ZBX_INT, O_OPT, null, IN([HTTPTEST_VERIFY_HOST_OFF, HTTPTEST_VERIFY_HOST_ON]),
+	'verify_host' =>				[T_ZBX_INT, O_OPT, null, IN([ZBX_HTTP_VERIFY_HOST_OFF, ZBX_HTTP_VERIFY_HOST_ON]),
 										null
 									],
 	'http_authtype' =>				[T_ZBX_INT, O_OPT, null,
-										IN([HTTPTEST_AUTH_NONE, HTTPTEST_AUTH_BASIC, HTTPTEST_AUTH_NTLM,
-											HTTPTEST_AUTH_KERBEROS, HTTPTEST_AUTH_DIGEST
+										IN([ZBX_HTTP_AUTH_NONE, ZBX_HTTP_AUTH_BASIC, ZBX_HTTP_AUTH_NTLM,
+											ZBX_HTTP_AUTH_KERBEROS, ZBX_HTTP_AUTH_DIGEST
 										]),
 										null
 									],
 	'http_username' =>				[T_ZBX_STR, O_OPT, null,	null,
 										'(isset({add}) || isset({update})) && isset({http_authtype})'.
-											' && ({http_authtype} == '.HTTPTEST_AUTH_BASIC.
-												' || {http_authtype} == '.HTTPTEST_AUTH_NTLM.
-												' || {http_authtype} == '.HTTPTEST_AUTH_KERBEROS.
-												' || {http_authtype} == '.HTTPTEST_AUTH_DIGEST.
+											' && ({http_authtype} == '.ZBX_HTTP_AUTH_BASIC.
+												' || {http_authtype} == '.ZBX_HTTP_AUTH_NTLM.
+												' || {http_authtype} == '.ZBX_HTTP_AUTH_KERBEROS.
+												' || {http_authtype} == '.ZBX_HTTP_AUTH_DIGEST.
 											')',
 										_('Username')
 									],
 	'http_password' =>				[T_ZBX_STR, O_OPT, null,	null,
 										'(isset({add}) || isset({update})) && isset({http_authtype})'.
-											' && ({http_authtype} == '.HTTPTEST_AUTH_BASIC.
-												' || {http_authtype} == '.HTTPTEST_AUTH_NTLM.
-												' || {http_authtype} == '.HTTPTEST_AUTH_KERBEROS.
-												' || {http_authtype} == '.HTTPTEST_AUTH_DIGEST.
+											' && ({http_authtype} == '.ZBX_HTTP_AUTH_BASIC.
+												' || {http_authtype} == '.ZBX_HTTP_AUTH_NTLM.
+												' || {http_authtype} == '.ZBX_HTTP_AUTH_KERBEROS.
+												' || {http_authtype} == '.ZBX_HTTP_AUTH_DIGEST.
 											')',
 										_('Password')
 									],
@@ -501,6 +501,7 @@ if (hasRequest('backurl') && !CHtmlUrlValidator::validateSameSite(getRequest('ba
 /*
  * Actions
  */
+$checkbox_hash = crc32(implode('', $filter_hostids));
 $result = false;
 if (isset($_REQUEST['delete']) && isset($_REQUEST['itemid'])) {
 	$result = API::Item()->delete([getRequest('itemid')]);
@@ -684,7 +685,7 @@ elseif (hasRequest('action') && str_in_array(getRequest('action'), ['item.massen
 	$result = (bool) API::Item()->update($items);
 
 	if ($result) {
-		uncheckTableRows(getRequest('checkbox_hash'));
+		$filter_hostids ? uncheckTableRows($checkbox_hash) : uncheckTableRows();
 	}
 
 	$updated = count($itemids);
@@ -703,7 +704,7 @@ elseif (hasRequest('action') && getRequest('action') === 'item.massclearhistory'
 	$result = (bool) API::History()->clear(getRequest('group_itemid'));
 
 	if ($result) {
-		uncheckTableRows(getRequest('checkbox_hash'));
+		$filter_hostids ? uncheckTableRows($checkbox_hash) : uncheckTableRows();
 	}
 
 	show_messages($result, _('History cleared'), _('Cannot clear history'));
@@ -714,7 +715,7 @@ elseif (hasRequest('action') && getRequest('action') === 'item.massdelete' && ha
 	$result = API::Item()->delete($group_itemid);
 
 	if ($result) {
-		uncheckTableRows(getRequest('checkbox_hash'));
+		$filter_hostids ? uncheckTableRows($checkbox_hash) : uncheckTableRows();
 	}
 	show_messages($result, _('Items deleted'), _('Cannot delete items'));
 }
@@ -1299,7 +1300,7 @@ else {
 	$data['trigger_parent_templates'] = getTriggerParentTemplates($data['itemTriggers'], ZBX_FLAG_DISCOVERY_NORMAL);
 
 	sort($filter_hostids);
-	$data['checkbox_hash'] = crc32(implode('', $filter_hostids));
+	$data['checkbox_hash'] = $checkbox_hash;
 
 	$data['config'] = [
 		'compression_status' => CHousekeepingHelper::get(CHousekeepingHelper::COMPRESSION_STATUS)

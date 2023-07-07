@@ -437,6 +437,9 @@ window.service_edit_popup = new class {
 
 		const curl = new Curl('zabbix.php');
 		curl.setArgument('action', 'service.delete');
+		curl.setArgument('<?= CCsrfTokenHelper::CSRF_TOKEN_NAME ?>',
+			<?= json_encode(CCsrfTokenHelper::get('service')) ?>
+		);
 
 		this._post(curl.getUrl(), {serviceids: [this.serviceid]}, (response) => {
 			overlayDialogueDestroy(this.overlay.dialogueid);
@@ -471,7 +474,7 @@ window.service_edit_popup = new class {
 
 		this.overlay.setLoading();
 
-		const curl = new Curl('zabbix.php', false);
+		const curl = new Curl('zabbix.php');
 		curl.setArgument('action', this.serviceid !== null ? 'service.update' : 'service.create');
 
 		this._post(curl.getUrl(), fields, (response) => {

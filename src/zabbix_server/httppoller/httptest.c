@@ -188,7 +188,7 @@ static void	process_test_data(zbx_uint64_t httptestid, int lastfailedstep, doubl
 					break;
 			}
 
-			preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &value );
+			preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &value, items[i].value_type );
 			zbx_free_agent_result(&value);
 		}
 
@@ -325,7 +325,7 @@ static void	process_step_data(zbx_uint64_t httpstepid, zbx_httpstat_t *stat, zbx
 			}
 
 			items[i].state = ITEM_STATE_NORMAL;
-			preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &value );
+			preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &value, items[i].value_type );
 
 			zbx_free_agent_result(&value);
 		}

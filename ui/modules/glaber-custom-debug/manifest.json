@@ -2,7 +2,7 @@
     "manifest_version": 2.0,
     "id": "glaber-custom-debug",
     "name": "Custom Debug",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "namespace": "CustomDebug",
     "author": "Mikhail Makurov",
     "url": "https://gitlbab.com/mikler/glaber",

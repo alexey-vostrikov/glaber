@@ -30,10 +30,10 @@ typedef struct
 	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
 	unsigned char		poller_type;
 	int			config_startup_time;
+	int			config_unavailable_delay;
 }
 zbx_thread_poller_args;
 
-extern int	CONFIG_UNAVAILABLE_DELAY;
 extern int	CONFIG_UNREACHABLE_PERIOD;
 extern int	CONFIG_UNREACHABLE_DELAY;
 

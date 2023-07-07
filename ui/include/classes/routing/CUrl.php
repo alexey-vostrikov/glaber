@@ -123,10 +123,15 @@ class CUrl {
 		return $this;
 	}
 
-	public function setArgumentSID() {
-		$this->arguments['sid'] = substr(CSessionHelper::getId(), 16, 16);
-
-		return $this;
+	/**
+	 * Returns true if the specified argument is present in $this->arguments.
+	 *
+	 * @param $key string  The name of the argument.
+	 *
+	 * @return bool
+	 */
+	public function hasArgument($key) {
+		return array_key_exists($key, $this->arguments) ;
 	}
 
 	public function toString() {

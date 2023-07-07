@@ -144,12 +144,6 @@ static void	zbx_json_setempty(struct zbx_json *j)
 	*j->buffer = '\0';
 }
 
-void	zbx_json_cleanarray(struct zbx_json *j)
-{
-	zbx_json_setempty(j);
-	zbx_json_addarray(j, NULL);
-}
-
 void	zbx_json_clean(struct zbx_json *j)
 {
 	zbx_json_setempty(j);
@@ -483,6 +477,14 @@ void	zbx_json_addfloatstring(struct zbx_json *j, const char *name, double value)
 	zbx_json_addstring(j, name, buffer, ZBX_JSON_TYPE_STRING);
 }
 
+void	zbx_json_adddouble(struct zbx_json *j, const char *name, double value)
+{
+	char	buffer[MAX_ID_LEN];
+
+	zbx_print_double(buffer, sizeof(buffer), value);
+	zbx_json_addstring(j, name, buffer, ZBX_JSON_TYPE_INT);
+}
+
 int	zbx_json_close(struct zbx_json *j)
 {
 	if (1 == j->level)
@@ -746,7 +748,7 @@ static unsigned int	zbx_hex2num(char c)
  *               0 on error (invalid escape sequence)                         *
  *                                                                            *
  ******************************************************************************/
-static unsigned int	zbx_json_decode_character(const char **p, unsigned char *bytes)
+unsigned int	zbx_json_decode_character(const char **p, unsigned char *bytes)
 {
 	bytes[0] = '\0';
 

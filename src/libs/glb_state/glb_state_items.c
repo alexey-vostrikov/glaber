@@ -994,13 +994,21 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
 
     if (elm->meta.lastdata < h->ts.sec)
         elm->meta.lastdata = h->ts.sec;
+    
+    elm->meta.state = ITEM_STATE_NORMAL;
+    
+    if (NULL != elm->meta.error ) {
+        strpool_free(&state->strpool, elm->meta.error);
+        elm->meta.error = NULL;
+    }
 
     DEBUG_ITEM(elem->id, "Adding item to the items value cache");
 
     if (elm->value_type == ITEM_VALUE_TYPE_NONE) {
         elm->value_type = h->value_type;
     }
-    else if (elm->value_type != h->value_type)
+
+    if (elm->value_type != h->value_type)
     {
         DEBUG_ITEM(elem->id, "Resetting value type %d -> %d ", elm->value_type, h->value_type);
         free_item(elm);
@@ -1010,7 +1018,7 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
-        DEBUG_ITEM(elem->id, "Ensuring there is enough space, before there there %d items, tsbuff size is %d, type is %d", elm->tsbuff.count, elm->tsbuff.size, elm->value_type );
+      //  DEBUG_ITEM(elem->id, "Ensuring there is enough space, before there there %d items, tsbuff size is %d, type is %d", elm->tsbuff.count, elm->tsbuff.size, elm->value_type );
         ensure_tsbuff_has_space(elm);
         DEBUG_ITEM(elem->id, "After ensuring there %d items, tsbuff size is %d", elm->tsbuff.count, elm->tsbuff.size );
     }
@@ -1028,7 +1036,8 @@ int add_value_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *data)
     }
     else
     {
-        LOG_INF("Cannot add value for item %ld with timestamp %d to the cache, type is %d, state is %d", h->itemid,  h->ts.sec, h->value_type, h->state);
+        //LOG_INF("Cannot add value for item %ld with timestamp %d to the cache, type is %d, state is %d", h->itemid,  h->ts.sec, h->value_type, h->state);
+        //LOG_INF("After ensuring there %d items, tsbuff size is %d", elm->tsbuff.count, elm->tsbuff.size );
         DEBUG_ITEM(h->itemid, "Cannot add value for item with timestamp %d to the cache",  h->ts.sec);
         return FAIL;
     }

@@ -21,7 +21,7 @@
 #define ZABBIX_UPGRADE_H
 
 #include "zbxcommon.h"
-
+#include "zbxdbhigh.h"
 
 typedef enum {
 	DB_UPDATE_COMMON_DATABASE = 1,
@@ -29,9 +29,15 @@ typedef enum {
 } db_update_db_type_t;
 
 
+typedef enum {
+	ZBX_HA_MODE_STANDALONE,
+	ZBX_HA_MODE_CLUSTER
+} zbx_ha_mode_t;
+
+
 void	zbx_init_library_dbupgrade(zbx_get_program_type_f get_program_type_cb);
 
-int	DBcheck_version(db_update_db_type_t update_type);
-int	DBcheck_double_type(void);
+int	DBcheck_version(zbx_ha_mode_t ha_mode,  db_update_db_type_t update_type);
+int	DBcheck_double_type(zbx_config_dbhigh_t *config_dbhigh);
 
 #endif

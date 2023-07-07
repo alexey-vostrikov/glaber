@@ -22,6 +22,7 @@
 
 #include "zbxcacheconfig.h"
 #include "zbxshmem.h"
+#include "zbxpreproc.h"
 
 #define ZBX_SYNC_DONE		0
 #define	ZBX_SYNC_MORE		1
@@ -97,12 +98,13 @@ zbx_uint64_t	DCget_nextid(const char *table_name, int num);
 
 void	DCupdate_interfaces_availability(void);
 
-void	zbx_hc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num);
-void	zbx_hc_get_mem_stats(zbx_shmem_stats_t *data, zbx_shmem_stats_t *index);
-void	zbx_hc_get_items(zbx_vector_uint64_pair_t *items);
+//void	zbx_hc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num);
+//void	zbx_hc_get_mem_stats(zbx_shmem_stats_t *data, zbx_shmem_stats_t *index);
+//void	zbx_hc_get_items(zbx_vector_uint64_pair_t *items);
 
-int	zbx_db_trigger_queue_locked(void);
-void	zbx_db_trigger_queue_unlock(void);
+//int	zbx_db_trigger_queue_locked(void);
+//void	zbx_db_trigger_queue_unlock(void);
 
-int	zbx_hc_check_proxy(zbx_uint64_t proxyid);
+//int	zbx_hc_check_proxy(zbx_uint64_t proxyid);
+
 #endif

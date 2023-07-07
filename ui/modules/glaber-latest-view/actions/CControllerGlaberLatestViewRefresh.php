@@ -25,7 +25,7 @@ namespace Modules\GlaberLatestView\Actions;
 class CControllerGlaberLatestViewRefresh extends CControllerGlaberLatest {
 
 	protected function init() {
-		$this->disableSIDValidation();
+		$this->disableCsrfValidation();
 	}
 
 	protected function checkInput() {

@@ -24,4 +24,5 @@ int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, vo
 int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
 
 int processing_send_metric(const metric_t *metric);
+int preprocess_send_metric_ext(const metric_t *metric, int send_mode);
 int preprocessing_send_metric(const metric_t *metric);

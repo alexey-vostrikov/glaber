@@ -199,10 +199,8 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 			return SUCCEED;
 			break;
 		}
-		case SNMP_TP_BOOL:
-    	case SNMP_TP_INT:
-    	case SNMP_TP_COUNTER:
-    	case SNMP_TP_GAUGE:
+		case SNMP_TP_INT:
+    	 	DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived bool/int/counter gauge");
  			if (*(int*)var->value >= 0) {
 				result->type = AR_UINT64;
 				result->ui64 = *(int*)var->value;
@@ -212,12 +210,22 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 				result->dbl = (double)*(int*)var->value;
 				DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to double type %f", result->dbl);
 			}
-			
 			return SUCCEED;
-			
+	       	break;
+
+		case SNMP_TP_BOOL:
+    	case SNMP_TP_COUNTER:
+    	case SNMP_TP_GAUGE:
+			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived bool/counter/gauge value");
+ 			result->type = AR_UINT64;
+			result->ui64 = *(unsigned int*)var->value;
+			DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to uint type %llu", result->ui64);
+
+			return SUCCEED;
 	       	break;
 		case SNMP_TP_BIT_STR:
     	case SNMP_TP_OCT_STR: {
+			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived binary/octet data");
 			unsigned char str_type = ZBX_SNMP_STR_UNDEFINED;
 			const char *parsed_str = get_octet_string(var, &str_type);
 			result->type = AR_TEXT;	

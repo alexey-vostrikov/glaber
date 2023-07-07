@@ -50,6 +50,9 @@
 #include "../../zabbix_server/glb_poller/glb_poller.h"
 #include "../../zabbix_server/poller/poller.h"
 #include "../../zabbix_server/dbsyncer/trends.h"
+#include "zbxconnector.h"
+#include "zbxpreproc.h"
+
 int sync_in_progress = 0;
 
 #define START_SYNC               \
@@ -92,6 +95,7 @@ ZBX_PTR_VECTOR_IMPL(dc_httptest_ptr, zbx_dc_httptest_t *)
 ZBX_PTR_VECTOR_IMPL(dc_host_ptr, ZBX_DC_HOST *)
 ZBX_PTR_VECTOR_IMPL(dc_item_ptr, ZBX_DC_ITEM *)
 ZBX_VECTOR_IMPL(host_rev, zbx_host_rev_t)
+ZBX_PTR_VECTOR_IMPL(dc_connector_tag, zbx_dc_connector_tag_t *)
 
 
 
@@ -1003,10 +1007,10 @@ static int DCsync_config(zbx_dbsync_t *sync, zbx_uint64_t revision, int *flags)
 		if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
 			zabbix_log(LOG_LEVEL_ERR, "no records in table 'config'");
 
-		config_table = DBget_table("config");
+		config_table = zbx_db_get_table("config");
 
 		for (i = 0; i < ARRSIZE(selected_fields); i++)
-			row[i] = DBget_field(config_table, selected_fields[i])->default_value;
+			row[i] = zbx_db_get_field(config_table, selected_fields[i])->default_value;
 	}
 	else
 	{
@@ -2392,7 +2396,7 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 				zbx_vector_uint64_append(&interface_snmpaddr->interfaceids, interfaceid);
 			}
 
-			if (FAIL == DBis_null(row[12]))
+			if (FAIL == zbx_db_is_null(row[12]))
 			{
 				snmp = dc_interface_snmp_set(interfaceid, (const char **)row, &bulk_changed);
 
@@ -3076,7 +3080,7 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 
 		/* dependent items */
 
-		if (ITEM_TYPE_DEPENDENT == item->type && SUCCEED != DBis_null(row[29]))
+		if (ITEM_TYPE_DEPENDENT == item->type && SUCCEED != zbx_db_is_null(row[29]))
 		{
 			depitem = (ZBX_DC_DEPENDENTITEM *)DCfind_id(&config->dependentitems, itemid,
 														sizeof(ZBX_DC_DEPENDENTITEM), &found);
@@ -6637,9 +6641,9 @@ static void dc_load_trigger_queue(zbx_hashset_t *trend_functions)
 	DB_RESULT result;
 	DB_ROW row;
 
-	result = DBselect("select objectid,type,clock,ns from trigger_queue");
+	result = zbx_db_select("select objectid,type,clock,ns from trigger_queue");
 
-	while (NULL != (row = DBfetch(result)))
+	while (NULL != (row = zbx_db_fetch(result)))
 	{
 		zbx_trigger_timer_t timer_local, *timer;
 
@@ -6681,6 +6685,198 @@ static void zbx_dbsync_process_active_avail_diff(zbx_vector_uint64_t *diff)
 
 /******************************************************************************
  *                                                                            *
+ * Purpose: Updates connectors in configuration cache                         *
+ *                                                                            *
+ * Parameters: sync     - [IN] the db synchronization data                    *
+ *             revision - [IN] updated configuration revision                 *
+ *                                                                            *
+ ******************************************************************************/
+static void	DCsync_connectors(zbx_dbsync_t *sync, zbx_uint64_t revision)
+{
+	char			**row;
+	zbx_uint64_t		rowid;
+	unsigned char		tag;
+	zbx_uint64_t		connectorid;
+	zbx_dc_connector_t	*connector;
+	int			found, ret;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
+	{
+		/* removed rows will be always added at the end */
+		if (ZBX_DBSYNC_ROW_REMOVE == tag)
+			break;
+
+		ZBX_STR2UINT64(connectorid, row[0]);
+
+		connector = (zbx_dc_connector_t *)DCfind_id(&config->connectors, connectorid,
+				sizeof(zbx_dc_connector_t), &found);
+
+		if (0 == found)
+		{
+			zbx_vector_dc_connector_tag_create_ext(&connector->tags, config->connectors.mem_malloc_func,
+					config->connectors.mem_realloc_func, config->connectors.mem_free_func);
+		}
+
+		ZBX_STR2UCHAR(connector->protocol, row[1]);
+		ZBX_STR2UCHAR(connector->data_type, row[2]);
+		dc_strpool_replace(found, &connector->url, row[3]);
+		connector->max_records = atoi(row[4]);
+		connector->max_senders = atoi(row[5]);
+		dc_strpool_replace(found, &connector->timeout, row[6]);
+		ZBX_STR2UCHAR(connector->max_attempts, row[7]);
+		dc_strpool_replace(found, &connector->token, row[8]);
+		dc_strpool_replace(found, &connector->http_proxy, row[9]);
+		ZBX_STR2UCHAR(connector->authtype, row[10]);
+		dc_strpool_replace(found, &connector->username, row[11]);
+		dc_strpool_replace(found, &connector->password, row[12]);
+		ZBX_STR2UCHAR(connector->verify_peer, row[13]);
+		ZBX_STR2UCHAR(connector->verify_host, row[14]);
+		dc_strpool_replace(found, &connector->ssl_cert_file, row[15]);
+		dc_strpool_replace(found, &connector->ssl_key_file, row[16]);
+		dc_strpool_replace(found, &connector->ssl_key_password, row[17]);
+		ZBX_STR2UCHAR(connector->status, row[18]);
+		ZBX_STR2UCHAR(connector->tags_evaltype, row[19]);
+	}
+
+	/* remove deleted connectors */
+
+	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
+	{
+		if (NULL == (connector = (zbx_dc_connector_t *)zbx_hashset_search(&config->connectors, &rowid)))
+			continue;
+
+		zbx_vector_dc_connector_tag_destroy(&connector->tags);
+		dc_strpool_release(connector->url);
+		dc_strpool_release(connector->timeout);
+		dc_strpool_release(connector->token);
+		dc_strpool_release(connector->http_proxy);
+		dc_strpool_release(connector->username);
+		dc_strpool_release(connector->password);
+		dc_strpool_release(connector->ssl_cert_file);
+		dc_strpool_release(connector->ssl_key_file);
+		dc_strpool_release(connector->ssl_key_password);
+
+		zbx_hashset_remove_direct(&config->connectors, connector);
+	}
+
+	if (0 != sync->add_num || 0 != sync->update_num || 0 != sync->remove_num)
+		config->revision.connector = revision;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: compare connector tags by tag name for sorting                    *
+ *                                                                            *
+ ******************************************************************************/
+static int	dc_compare_connector_tags(const void *d1, const void *d2)
+{
+	const zbx_dc_connector_tag_t	*tag1 = *(const zbx_dc_connector_tag_t * const *)d1;
+	const zbx_dc_connector_tag_t	*tag2 = *(const zbx_dc_connector_tag_t * const *)d2;
+
+	return strcmp(tag1->tag, tag2->tag);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: Updates connector tags in configuration cache                     *
+ *                                                                            *
+ * Parameters: sync - [IN] the db synchronization data                        *
+ *                                                                            *
+ ******************************************************************************/
+static void	DCsync_connector_tags(zbx_dbsync_t *sync)
+{
+	char			**row;
+	zbx_uint64_t		rowid;
+	unsigned char		tag;
+	zbx_uint64_t		connectortagid, connectorid;
+	zbx_dc_connector_tag_t	*connector_tag;
+	zbx_dc_connector_t	*connector;
+	zbx_vector_ptr_t	connectors;
+	int			found, ret, index, i;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_vector_ptr_create(&connectors);
+
+	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
+	{
+		/* removed rows will be always added at the end */
+		if (ZBX_DBSYNC_ROW_REMOVE == tag)
+			break;
+
+		ZBX_STR2UINT64(connectorid, row[1]);
+		if (NULL == (connector = (zbx_dc_connector_t *)zbx_hashset_search(&config->connectors,
+				&connectorid)))
+		{
+			continue;
+		}
+
+		ZBX_STR2UINT64(connectortagid, row[0]);
+		connector_tag = (zbx_dc_connector_tag_t *)DCfind_id(&config->connector_tags, connectortagid,
+				sizeof(zbx_dc_connector_tag_t), &found);
+
+		connector_tag->connectorid = connectorid;
+		ZBX_STR2UCHAR(connector_tag->op, row[2]);
+		dc_strpool_replace(found, &connector_tag->tag, row[3]);
+		dc_strpool_replace(found, &connector_tag->value, row[4]);
+
+		if (0 == found)
+			zbx_vector_dc_connector_tag_append(&connector->tags, connector_tag);
+
+		zbx_vector_ptr_append(&connectors, connector);
+	}
+
+	/* remove deleted connector tags */
+
+	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
+	{
+		if (NULL == (connector_tag = (zbx_dc_connector_tag_t *)zbx_hashset_search(&config->connector_tags,
+				&rowid)))
+		{
+			continue;
+		}
+
+		if (NULL != (connector = (zbx_dc_connector_t *)zbx_hashset_search(&config->connectors,
+				&connector_tag->connectorid)))
+		{
+			index = zbx_vector_dc_connector_tag_search(&connector->tags, connector_tag,
+					ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
+
+			if (FAIL != index)
+				zbx_vector_dc_connector_tag_remove_noorder(&connector->tags, index);
+
+			zbx_vector_ptr_append(&connectors, connector);
+		}
+
+		dc_strpool_release(connector_tag->tag);
+		dc_strpool_release(connector_tag->value);
+
+		zbx_hashset_remove_direct(&config->connector_tags, connector_tag);
+	}
+
+	/* sort connector tags */
+
+	zbx_vector_ptr_sort(&connectors, ZBX_DEFAULT_PTR_COMPARE_FUNC);
+	zbx_vector_ptr_uniq(&connectors, ZBX_DEFAULT_PTR_COMPARE_FUNC);
+
+	for (i = 0; i < connectors.values_num; i++)
+	{
+		connector = (zbx_dc_connector_t *)connectors.values[i];
+		zbx_vector_dc_connector_tag_sort(&connector->tags, dc_compare_connector_tags);
+	}
+
+	zbx_vector_ptr_destroy(&connectors);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+/******************************************************************************
+ *                                                                            *
  * Purpose: Synchronize configuration data from database                      *
  *                                                                            *
  ******************************************************************************/
@@ -6695,10 +6891,10 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		expr_sec2, action_sec, action_sec2, action_op_sec, action_op_sec2, action_condition_sec,
 		action_condition_sec2, trigger_tag_sec, trigger_tag_sec2, host_tag_sec, host_tag_sec2,
 		correlation_sec, correlation_sec2, corr_condition_sec, corr_condition_sec2, corr_operation_sec,
-		corr_operation_sec2, hgroups_sec, hgroups_sec2, itempp_sec, itempp_sec2, itemscrp_sec,
+		corr_operation_sec2, hgroups_sec, hgroups_sec2, itempp_sec, itempp_sec2, itemscrp_sec, 
 		itemscrp_sec2, total, total2, update_sec, maintenance_sec, maintenance_sec2, item_tag_sec,
 		item_tag_sec2, um_cache_sec, queues_sec, changelog_sec, drules_sec, drules_sec2, httptest_sec,
-		httptest_sec2;
+		httptest_sec2, connector_sec, connector_sec2;
 
 	zbx_dbsync_t config_sync, hosts_sync, hi_sync, htmpl_sync, gmacro_sync, hmacro_sync, if_sync, items_sync,
 		template_items_sync, prototype_items_sync, item_discovery_sync, triggers_sync, tdep_sync,
@@ -6707,7 +6903,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		hgroups_sync, itempp_sync, itemscrp_sync, maintenance_sync, maintenance_period_sync,
 		maintenance_tag_sync, maintenance_group_sync, maintenance_host_sync, hgroup_host_sync,
 		drules_sync, dchecks_sync, httptest_sync, httptest_field_sync, httpstep_sync,
-		httpstep_field_sync, autoreg_host_sync;
+		httpstep_field_sync, autoreg_host_sync, connector_sync, connector_tag_sync;
 
 	double autoreg_csec, autoreg_csec2, autoreg_host_csec, autoreg_host_csec2;
 	zbx_dbsync_t autoreg_config_sync;
@@ -6718,6 +6914,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	zbx_vector_uint64_t active_avail_diff;
 	zbx_hashset_t activated_hosts;
 	zbx_uint64_t new_revision = config->revision.config + 1;
+	int			connectors_num = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -6786,12 +6983,15 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	zbx_dbsync_init(&httpstep_sync, changelog_sync_mode);
 	zbx_dbsync_init(&httpstep_field_sync, changelog_sync_mode);
 
+	zbx_dbsync_init(&connector_sync, changelog_sync_mode);
+	zbx_dbsync_init(&connector_tag_sync, changelog_sync_mode);
+
 #ifdef HAVE_ORACLE
 	/* With Oracle fetch statements can fail before all data has been fetched. */
 	/* In such cache next sync will need to do full scan rather than just      */
 	/* applying changelog diff. To detect this problem configuration is synced */
 	/* in transaction and error is checked at the end.                         */
-	DBbegin();
+	zbx_db_begin();
 #endif
 
 	sec = zbx_time();
@@ -6845,6 +7045,13 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (FAIL == zbx_dbsync_compare_host_tags(&host_tag_sync))
 		goto out;
 	host_tag_sec = zbx_time() - sec;
+
+	sec = zbx_time();
+	if (FAIL == zbx_dbsync_compare_connectors(&connector_sync))
+		goto out;
+	if (FAIL == zbx_dbsync_compare_connector_tags(&connector_tag_sync))
+		goto out;
+	connector_sec = zbx_time() - sec;
 
 	START_SYNC;
 	sec = zbx_time();
@@ -6950,6 +7157,11 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (0 != (update_flags & (ZBX_DBSYNC_UPDATE_HOST_GROUPS | ZBX_DBSYNC_UPDATE_MAINTENANCE_GROUPS)))
 		dc_maintenance_precache_nested_groups();
 
+	sec = zbx_time();
+	DCsync_connectors(&connector_sync, new_revision);
+	DCsync_connector_tags(&connector_tag_sync);
+	connector_sec2 = zbx_time() - sec;
+
 	FINISH_SYNC;
 
 	zbx_dbsync_process_active_avail_diff(&active_avail_diff);
@@ -7016,7 +7228,6 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	DCsync_itemscript_param(&itemscrp_sync, new_revision);
 	itemscrp_sec2 = zbx_time() - sec;
 
-	config->item_sync_ts = time(NULL);
 	FINISH_SYNC;
 
 	/* sync function data to support function lookups when resolving macros during configuration sync */
@@ -7170,6 +7381,12 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	if (0 != htmpl_sync.add_num + htmpl_sync.update_num + htmpl_sync.remove_num)
 		update_flags |= ZBX_DBSYNC_UPDATE_MACROS;
 
+	if (0 != connector_sync.add_num + connector_sync.update_num + connector_sync.remove_num +
+			connector_tag_sync.add_num + connector_tag_sync.update_num + connector_tag_sync.remove_num)
+	{
+		connectors_num = config->connectors.num_data;
+	}
+
 	/* update various trigger related links in cache */
 	if (0 != (update_flags & (ZBX_DBSYNC_UPDATE_HOSTS | ZBX_DBSYNC_UPDATE_ITEMS | ZBX_DBSYNC_UPDATE_FUNCTIONS |
 							  ZBX_DBSYNC_UPDATE_TRIGGERS | ZBX_DBSYNC_UPDATE_MACROS)))
@@ -7186,12 +7403,13 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		total = csec + hsec + hisec + htsec + gmsec + hmsec + ifsec + idsec + isec + tisec + pisec + tsec +
 				dsec + fsec + expr_sec + action_sec + action_op_sec + action_condition_sec +
 				trigger_tag_sec + correlation_sec + corr_condition_sec + corr_operation_sec +
-				hgroups_sec + itempp_sec + maintenance_sec + item_tag_sec + drules_sec + httptest_sec;
+				hgroups_sec + itempp_sec + maintenance_sec + item_tag_sec + drules_sec + httptest_sec +
+				connector_sec;
 		total2 = csec2 + hsec2 + hisec2 + ifsec2 + idsec2 + isec2 + tisec2 + pisec2 + tsec2 + dsec2 + fsec2 +
 				 expr_sec2 + action_op_sec2 + action_sec2 + action_condition_sec2 + trigger_tag_sec2 +
 				 correlation_sec2 + corr_condition_sec2 + corr_operation_sec2 + hgroups_sec2 +
 				 itempp_sec2 + maintenance_sec2 + item_tag_sec2 + update_sec + um_cache_sec +
-				 drules_sec2 + httptest_sec2;
+				 drules_sec2 + httptest_sec2 + connector_sec2;
 
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() changelog  : sql:" ZBX_FS_DBL " sec (%d records)",
 				   __func__, changelog_sec, changelog_num);
@@ -7309,6 +7527,14 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() httpstepfld : (" ZBX_FS_UI64 "/" ZBX_FS_UI64 "/" ZBX_FS_UI64 ").",
 				   __func__, httpstep_field_sync.add_num, httpstep_field_sync.update_num,
 				   httpstep_field_sync.remove_num);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() connector: sql:" ZBX_FS_DBL " sync:" ZBX_FS_DBL " sec ("
+					ZBX_FS_UI64 "/" ZBX_FS_UI64 "/" ZBX_FS_UI64 ").",
+					__func__, connector_sec, connector_sec2, connector_sync.add_num,
+				connector_sync.update_num, connector_sync.remove_num);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() connector_tag: sql:" ZBX_FS_DBL " sync:" ZBX_FS_DBL " sec ("
+					ZBX_FS_UI64 "/" ZBX_FS_UI64 "/" ZBX_FS_UI64 ").",
+					__func__, connector_sec, connector_sec2, connector_tag_sync.add_num,
+					connector_tag_sync.update_num, connector_tag_sync.remove_num);
 
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() macro cache: " ZBX_FS_DBL " sec.", __func__, um_cache_sec);
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() reindex    : " ZBX_FS_DBL " sec.", __func__, update_sec);
@@ -7433,6 +7659,11 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() httpstepfld: %d (%d slots)", __func__,
 				   config->httpstep_fields.num_data, config->httpstep_fields.num_slots);
 
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() connector: %d (%d slots)", __func__,
+				config->connectors.num_data, config->connectors.num_slots);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() connector tags : %d (%d slots)", __func__,
+				config->connector_tags.num_data, config->connector_tags.num_slots);
+
 		for (i = 0; ZBX_POLLER_TYPE_COUNT > i; i++)
 		{
 			zabbix_log(LOG_LEVEL_DEBUG, "%s() queue[%d]   : %d (%d allocated)", __func__,
@@ -7465,9 +7696,9 @@ out:
 	FINISH_SYNC;
 #ifdef HAVE_ORACLE
 	if (ZBX_DB_OK == dberr)
-		dberr = DBcommit();
+		dberr = zbx_db_commit();
 	else
-		DBrollback();
+		zbx_db_rollback();
 #endif
 	switch (dberr)
 	{
@@ -7499,6 +7730,12 @@ out:
 
 		queues_sec = zbx_time() - sec;
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() reschedule : " ZBX_FS_DBL " sec.", __func__, queues_sec);
+	}
+
+	if (0 != connectors_num && FAIL == zbx_connector_initialized())
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "connectors cannot be used without connector workers:"
+				" please check \"StartConnectors\" configuration parameter");
 	}
 clean:
 	zbx_dbsync_clear(&config_sync);
@@ -7542,6 +7779,8 @@ clean:
 	zbx_dbsync_clear(&httptest_field_sync);
 	zbx_dbsync_clear(&httpstep_sync);
 	zbx_dbsync_clear(&httpstep_field_sync);
+	zbx_dbsync_clear(&connector_sync);
+	zbx_dbsync_clear(&connector_tag_sync);
 
 	if (ZBX_DBSYNC_INIT == mode)
 		zbx_hashset_destroy(&trend_queue);
@@ -7974,6 +8213,9 @@ int init_configuration_cache(char **error)
 	CREATE_HASHSET_EXT(config->psks, 0, __config_psk_hash, __config_psk_compare);
 #endif
 
+	CREATE_HASHSET(config->connectors, 0);
+	CREATE_HASHSET(config->connector_tags, 0);
+
 	for (i = 0; i < ZBX_POLLER_TYPE_COUNT; i++)
 	{
 		switch (i)
@@ -8051,7 +8293,6 @@ int init_configuration_cache(char **error)
 
 	config->availability_diff_ts = 0;
 	config->sync_ts = 0;
-	config->item_sync_ts = 0;
 
 	config->internal_actions = 0;
 	config->auto_registration_actions = 0;
@@ -9400,79 +9641,30 @@ static void dc_preproc_dump(zbx_hashset_t *items)
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-static void dc_preproc_free_ops(zbx_preproc_op_t *ops, int ops_num)
-{
-	int i;
-
-	for (i = 0; i < ops_num; i++)
-	{
-		zbx_free(ops[i].params);
-		zbx_free(ops[i].error_handler_params);
-	}
-	zbx_free(ops);
-}
-
 /******************************************************************************
  *                                                                            *
  * Purpose: sync item preprocessing steps with preprocessing manager cache,   *
  *          updating preprocessing revision if any changes were detected      *
  *                                                                            *
  ******************************************************************************/
-static void dc_preproc_sync_preprocitem(zbx_preproc_item_t *item, const ZBX_DC_PREPROCITEM *preprocitem,
-										zbx_uint64_t revision)
+static void	dc_preproc_sync_preprocitem(zbx_pp_item_preproc_t *preproc, zbx_uint64_t hostid,
+		const ZBX_DC_PREPROCITEM *preprocitem)
 {
-	int i, ops_num = 0;
-	zbx_preproc_op_t *ops;
+	preproc->steps = (zbx_pp_step_t *)zbx_malloc(NULL, sizeof(zbx_pp_step_t) *
+			(size_t)preprocitem->preproc_ops.values_num);
 
-	if (NULL == preprocitem)
+	for (int i = 0; i < preprocitem->preproc_ops.values_num; i++)
 	{
-		dc_preproc_free_ops(item->preproc_ops, item->preproc_ops_num);
-		item->preproc_ops = NULL;
-		item->preproc_ops_num = 0;
-		return;
+		zbx_dc_preproc_op_t	*op = (zbx_dc_preproc_op_t *)preprocitem->preproc_ops.values[i];
+
+		preproc->steps[i].type = op->type;
+		preproc->steps[i].error_handler = op->error_handler;
+
+		preproc->steps[i].params = dc_expand_user_macros_dyn(op->params, &hostid, 1, ZBX_MACRO_ENV_NONSECURE);
+		preproc->steps[i].error_handler_params = zbx_strdup(NULL, op->error_handler_params);
 	}
 
-	ops = (zbx_preproc_op_t *)zbx_malloc(NULL, sizeof(zbx_preproc_op_t) * preprocitem->preproc_ops.values_num);
-
-	for (i = 0; i < preprocitem->preproc_ops.values_num; i++)
-	{
-		zbx_dc_preproc_op_t *op = (zbx_dc_preproc_op_t *)preprocitem->preproc_ops.values[i];
-
-		ops[i].type = op->type;
-		ops[i].error_handler = op->error_handler;
-
-		ops[i].params = dc_expand_user_macros_dyn(op->params, &item->hostid, 1, ZBX_MACRO_ENV_NONSECURE);
-		ops[i].error_handler_params = zbx_strdup(NULL, op->error_handler_params);
-	}
-
-	if (preprocitem->preproc_ops.values_num == item->preproc_ops_num)
-	{
-		for (; ops_num < item->preproc_ops_num; ops_num++)
-		{
-			zbx_preproc_op_t *src = &ops[ops_num];
-			zbx_preproc_op_t *dst = &item->preproc_ops[ops_num];
-
-			if (src->type != dst->type)
-				break;
-
-			if (src->error_handler != dst->error_handler)
-				break;
-
-			if (0 != zbx_strcmp_null(src->params, dst->params))
-				break;
-
-			if (0 != zbx_strcmp_null(src->error_handler_params, dst->error_handler_params))
-				break;
-		}
-	}
-
-	if (ops_num != item->preproc_ops_num)
-		item->preproc_revision = revision;
-
-	dc_preproc_free_ops(item->preproc_ops, item->preproc_ops_num);
-
-	item->preproc_ops = ops;
-	item->preproc_ops_num = preprocitem->preproc_ops.values_num;
+	preproc->steps_num = preprocitem->preproc_ops.values_num;
 }
 
 /******************************************************************************
@@ -9480,83 +9672,223 @@ static void dc_preproc_sync_preprocitem(zbx_preproc_item_t *item, const ZBX_DC_P
  * Purpose: sync mater-dependent item links                                   *
  *                                                                            *
  ******************************************************************************/
-static void dc_preproc_sync_masteritem(zbx_preproc_item_t *item, const ZBX_DC_MASTERITEM *masteritem)
+static void	dc_preproc_sync_masteritem(zbx_pp_item_preproc_t *preproc, const ZBX_DC_MASTERITEM *masteritem)
 {
-	DEBUG_ITEM(item->itemid, "Syncing dependant items");
-	//if there is no link to master item info, cleaning 
-	//dependend items vector
-	if (NULL == masteritem)
-	{
-		zbx_free(item->dep_itemids);
-		item->dep_itemids_num = 0;
-		DEBUG_ITEM(item->itemid, "No dependant items found");
-		return;
-	}
+	preproc->dep_itemids = (zbx_uint64_t *)zbx_malloc(NULL,
+			sizeof(zbx_uint64_t) * (size_t)masteritem->dep_itemids.values_num);
 
-	DEBUG_ITEM(item->itemid, "Found %d depend items", masteritem->dep_itemids.values_num);
-	//if there are more values in master item then in the item,
-	//reallocating the array 
-	if (masteritem->dep_itemids.values_num > item->dep_itemids_num)
-	{
-		item->dep_itemids = (zbx_uint64_pair_t *)zbx_realloc(item->dep_itemids,
-															 sizeof(zbx_uint64_pair_t) * masteritem->dep_itemids.values_num);
-	}
-	
-	//copying all the dependancy data
-	memcpy(item->dep_itemids, masteritem->dep_itemids.values,
-		   sizeof(zbx_uint64_pair_t) * masteritem->dep_itemids.values_num);
-	
-	item->dep_itemids_num = masteritem->dep_itemids.values_num;
+	for (int i = 0; i < masteritem->dep_itemids.values_num; i++)
+		preproc->dep_itemids[i] = masteritem->dep_itemids.values[i].first;
 
-	if (DC_get_debug_item() == item->itemid) {
-		int i;
-		for (i = 0; i < item->dep_itemids_num; i++)
-			DEBUG_ITEM(item->itemid, "PREPROCSYNC: Adding for item %ld dep items info pair: (%ld, %ld)", item->itemid,
-				item->dep_itemids[i].first,item->dep_itemids[i].second);
-	}
+	qsort(preproc->dep_itemids, (size_t)preproc->dep_itemids_num, sizeof(zbx_uint64_t),
+			ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+	preproc->dep_itemids_num = masteritem->dep_itemids.values_num;
 }
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: compare item preprocessing data                                   *
+ *                                                                            *
+ * Return value: SUCCEED - the item preprocessing data matches                *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ ******************************************************************************/
+static int	dc_preproc_compare(const zbx_pp_item_preproc_t *pp1, const zbx_pp_item_preproc_t *pp2)
+{
+	if (pp1->type != pp2->type)
+		return FAIL;
+
+	if (pp1->value_type != pp2->value_type)
+		return FAIL;
+
+	if (pp1->flags != pp2->flags)
+		return FAIL;
+
+	if (pp1->dep_itemids_num != pp2->dep_itemids_num)
+		return FAIL;
+
+	if (0 != memcmp(pp1->dep_itemids, pp2->dep_itemids, (size_t)pp1->dep_itemids_num * sizeof(zbx_uint64_t)))
+		return FAIL;
+
+	if (pp1->steps_num != pp2->steps_num)
+		return FAIL;
+
+	for (int i = 0; i < pp1->steps_num; i++)
+	{
+		if (pp1->steps[i].type != pp2->steps[i].type)
+			return FAIL;
+
+		if (pp1->steps[i].error_handler != pp2->steps[i].error_handler)
+			return FAIL;
+
+		if (0 != zbx_strcmp_null(pp1->steps[i].params, pp2->steps[i].params))
+			return FAIL;
+
+		if (0 != zbx_strcmp_null(pp1->steps[i].error_handler_params, pp2->steps[i].error_handler_params))
+			break;
+	}
+
+	return SUCCEED;
+}
+
+
+// /******************************************************************************
+//  *                                                                            *
+//  * Purpose: sync mater-dependent item links                                   *
+//  *                                                                            *
+//  ******************************************************************************/
+// static void dc_preproc_sync_masteritem(zbx_preproc_item_t *item, const ZBX_DC_MASTERITEM *masteritem)
+// {
+// 	DEBUG_ITEM(item->itemid, "Syncing dependant items");
+// 	//if there is no link to master item info, cleaning 
+// 	//dependend items vector
+// 	if (NULL == masteritem)
+// 	{
+// 		zbx_free(item->dep_itemids);
+// 		item->dep_itemids_num = 0;
+// 		DEBUG_ITEM(item->itemid, "No dependant items found");
+// 		return;
+// 	}
+
+// 	DEBUG_ITEM(item->itemid, "Found %d depend items", masteritem->dep_itemids.values_num);
+// 	//if there are more values in master item then in the item,
+// 	//reallocating the array 
+// 	if (masteritem->dep_itemids.values_num > item->dep_itemids_num)
+// 	{
+// 		item->dep_itemids = (zbx_uint64_pair_t *)zbx_realloc(item->dep_itemids,
+// 															 sizeof(zbx_uint64_pair_t) * masteritem->dep_itemids.values_num);
+// 	}
+	
+// 	//copying all the dependancy data
+// 	memcpy(item->dep_itemids, masteritem->dep_itemids.values,
+// 		   sizeof(zbx_uint64_pair_t) * masteritem->dep_itemids.values_num);
+	
+// 	item->dep_itemids_num = masteritem->dep_itemids.values_num;
+
+// 	if (DC_get_debug_item() == item->itemid) {
+// 		int i;
+// 		for (i = 0; i < item->dep_itemids_num; i++)
+// 			DEBUG_ITEM(item->itemid, "PREPROCSYNC: Adding for item %ld dep items info pair: (%ld, %ld)", item->itemid,
+// 				item->dep_itemids[i].first,item->dep_itemids[i].second);
+// 	}
+// }
 
 //syncs preprocessing conf for pp items in the hash items from dc_item 
-static void dc_preproc_sync_item(zbx_hashset_t *items, ZBX_DC_ITEM *dc_item, zbx_uint64_t revision)
-{
-	zbx_preproc_item_t *pp_item;
-	DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration for the item");
-	//creating the new item if not existed
-	if (NULL == (pp_item = (zbx_preproc_item_t *)zbx_hashset_search(items, &dc_item->itemid)))
-	{
-		DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration: created config for the item");
-		zbx_preproc_item_t pp_item_local = {.itemid = dc_item->itemid};
-		
-		pp_item = (zbx_preproc_item_t *)zbx_hashset_insert(items, &pp_item_local, sizeof(pp_item_local));
-		pp_item->hostid = dc_item->hostid;
-		pp_item->preproc_revision = revision;
-	}
 
-	pp_item->type = dc_item->type;
-	pp_item->value_type = dc_item->value_type;
-	pp_item->revision = revision;
-	
-	//syncing items dependancy information
-	dc_preproc_sync_masteritem(pp_item, dc_item->master_item);
-	//syncing items preprocessing steps
-	dc_preproc_sync_preprocitem(pp_item, dc_item->preproc_item, revision);
+static void debug_out_pp_item(zbx_pp_item_preproc_t	*pp_item) {
+
 }
 
-static void dc_preproc_add_item_rec(ZBX_DC_ITEM *dc_item, zbx_vector_dc_item_ptr_t *items_sync)
+static void	dc_preproc_sync_item(zbx_hashset_t *items, ZBX_DC_ITEM *dc_item, zbx_uint64_t revision)
 {
-	if (NULL != dc_item->master_item || NULL != dc_item->preproc_item || ITEM_TYPE_INTERNAL == dc_item->type)
-		zbx_vector_dc_item_ptr_append(items_sync, dc_item);
+	zbx_pp_item_t		*pp_item;
+	zbx_pp_item_preproc_t	*preproc;
+	DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration for the item");
+
+	if (NULL == (pp_item = (zbx_pp_item_t *)zbx_hashset_search(items, &dc_item->itemid)))
+	{
+		zbx_pp_item_t	pp_item_local = {.itemid = dc_item->itemid, .hostid = dc_item->hostid};
+		DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration: created config for the item");
+		pp_item = (zbx_pp_item_t *)zbx_hashset_insert(items, &pp_item_local, sizeof(pp_item_local));
+	}
+
+	preproc = zbx_pp_item_preproc_create(dc_item->type, dc_item->value_type, dc_item->flags);
+	pp_item->revision = revision;
+
+	if (NULL != dc_item->master_item)
+		dc_preproc_sync_masteritem(preproc, dc_item->master_item);
+
+	if (NULL != dc_item->preproc_item)
+		dc_preproc_sync_preprocitem(preproc, dc_item->hostid, dc_item->preproc_item);
+
+	if (NULL != pp_item->preproc)
+	{
+		if (SUCCEED == dc_preproc_compare(preproc, pp_item->preproc))
+		{
+			zbx_pp_item_preproc_release(preproc);
+			return;
+		}
+
+		zbx_pp_item_preproc_release(pp_item->preproc);
+	}
+
+	for (int i = 0; i < preproc->steps_num; i++)
+	{
+		if (SUCCEED == zbx_pp_preproc_has_history(preproc->steps[i].type))
+		{
+			preproc->history_num++;
+			preproc->mode = ZBX_PP_PROCESS_SERIAL;
+		}
+	}
+		
+	pp_item->preproc = preproc;
+
+	if (DC_get_debug_item() == pp_item->itemid) {
+		int i = 0;
+		char buffer[MAX_STRING_LEN];
+		size_t printed=0;
+
+		DEBUG_ITEM(pp_item->itemid,"Synced preproc config to preprocessor: steps %d, depends %d", 
+					pp_item->preproc->steps_num, pp_item->preproc->dep_itemids_num);
+
+		for (i = 0; i < pp_item->preproc->steps_num; i++) {
+			DEBUG_ITEM(pp_item->itemid, "Step %d type %d, params '%s'", i,
+							pp_item->preproc->steps[i].type, pp_item->preproc->steps[i].params);
+		}
+
+		for (i = 0; i < pp_item->preproc->dep_itemids_num; i++) {
+			printed += zbx_snprintf(buffer + printed, MAX_STRING_LEN, "%ld ", pp_item->preproc->dep_itemids[i]);
+		}
+
+		if (pp_item->preproc->dep_itemids_num > 0) 
+			DEBUG_ITEM(pp_item->itemid,"Dependant items: [ %s]",buffer);
+
+ 	}
+
+}
+
+
+// static void dc_preproc_sync_item(zbx_hashset_t *items, ZBX_DC_ITEM *dc_item, zbx_uint64_t revision)
+// {
+// 	zbx_preproc_item_t *pp_item;
+// 	DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration for the item");
+// 	//creating the new item if not existed
+// 	if (NULL == (pp_item = (zbx_preproc_item_t *)zbx_hashset_search(items, &dc_item->itemid)))
+// 	{
+// 		DEBUG_ITEM(dc_item->itemid, "Syncing preproc configuration: created config for the item");
+// 		zbx_preproc_item_t pp_item_local = {.itemid = dc_item->itemid};
+		
+// 		pp_item = (zbx_preproc_item_t *)zbx_hashset_insert(items, &pp_item_local, sizeof(pp_item_local));
+// 		pp_item->hostid = dc_item->hostid;
+// 		pp_item->preproc_revision = revision;
+// 	}
+
+// 	pp_item->type = dc_item->type;
+// 	pp_item->value_type = dc_item->value_type;
+// 	pp_item->revision = revision;
+	
+// 	//syncing items dependancy information
+// 	dc_preproc_sync_masteritem(pp_item, dc_item->master_item);
+// 	//syncing items preprocessing steps
+// 	dc_preproc_sync_preprocitem(pp_item, dc_item->preproc_item, revision);
+// }
+
+static void	dc_preproc_add_item_rec(ZBX_DC_ITEM *dc_item, zbx_vector_dc_item_ptr_t *items_sync)
+{
+	zbx_vector_dc_item_ptr_append(items_sync, dc_item);
 
 	if (NULL != dc_item->master_item)
 	{
-		int i;
+		int	i;
 
 		for (i = 0; i < dc_item->master_item->dep_itemids.values_num; i++)
 		{
-			ZBX_DC_ITEM *dep_item;
+			ZBX_DC_ITEM	*dep_item;
 
 			if (NULL == (dep_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items,
-																	  &dc_item->master_item->dep_itemids.values[i].first)))
+					&dc_item->master_item->dep_itemids.values[i].first)) ||
+					ITEM_STATUS_ACTIVE != dep_item->status)
 			{
 				continue;
 			}
@@ -9580,7 +9912,7 @@ static void dc_preproc_add_item_rec(ZBX_DC_ITEM *dc_item, zbx_vector_dc_item_ptr
 void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revision, int manager_num)
 {
 	ZBX_DC_HOST *dc_host;
-	zbx_preproc_item_t *pp_item;
+	zbx_pp_item_t			*pp_item;
 	zbx_hashset_iter_t iter;
 	int i;
 	zbx_uint64_t global_revision = *revision;
@@ -9617,10 +9949,12 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 				continue;
 
 			if (NULL == dc_item->preproc_item && NULL == dc_item->master_item &&
-				ITEM_TYPE_INTERNAL != dc_item->type)
+					ITEM_TYPE_INTERNAL != dc_item->type &&
+					ZBX_FLAG_DISCOVERY_RULE != dc_item->flags)
+			{
 				continue;
-		
-
+			}
+				
 			if (0 != dc_host->proxy_hostid &&
 				FAIL == is_item_processed_by_server(dc_item->type, dc_item->key))
 				continue;
@@ -9643,12 +9977,12 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 			zbx_uint64_t macro_revision = *revision;
 			
 			//host has a new revision
-			if (SUCCEED == um_cache_get_host_revision(config->um_cache, dc_host->hostid, &macro_revision) &&
+			if (SUCCEED != um_cache_get_host_revision(config->um_cache, dc_host->hostid, &macro_revision) ||
 				*revision >= macro_revision)
 			{
 				//setting the new reivisions to be equal to the config ones
 				for (i = 0; i < items_sync.values_num; i++)
-					if (NULL != (pp_item = zbx_hashset_search(items, &items_sync.values[i]->itemid)))
+					if (NULL != (pp_item = (zbx_pp_item_t *)zbx_hashset_search(items, &items_sync.values[i]->itemid)))
 						pp_item->revision = config->revision.config;
 				//cleaning the vector - there is no need to update the host items preproc config	
 				zbx_vector_dc_item_ptr_clear(&items_sync);
@@ -9669,7 +10003,7 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 	/* remove items without preprocessing */
 
 	zbx_hashset_iter_reset(items, &iter);
-	while (NULL != (pp_item = (zbx_preproc_item_t *)zbx_hashset_iter_next(&iter)))
+	while (NULL != (pp_item = (zbx_pp_item_t *)zbx_hashset_iter_next(&iter)))
 	{
 		if (pp_item->revision == *revision)
 			continue;
@@ -9678,9 +10012,6 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 	}
 
 	zbx_vector_dc_item_ptr_destroy(&items_sync);
-
-	if (SUCCEED == ZBX_CHECK_LOG_LEVEL(LOG_LEVEL_TRACE))
-		dc_preproc_dump(items);
 }
 
 void DCconfig_get_hosts_by_itemids(DC_HOST *hosts, const zbx_uint64_t *itemids, int *errcodes, size_t num)
@@ -11508,8 +11839,8 @@ out:
  *           schema.                                                                *
  *                                                                                  *
  ***********************************************************************************/
-int DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, zbx_agent_availability_t *in,
-						   zbx_agent_availability_t *out, const char *error_msg)
+int	DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, int unavailable_delay,
+		zbx_agent_availability_t *in, zbx_agent_availability_t *out, const char *error_msg)
 {
 	int ret = FAIL, errors_from, disable_until;
 	const char *error;
@@ -11568,7 +11899,7 @@ int DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, z
 			else
 			{
 				/* make host unavailable, schedule next unavailable check */
-				disable_until = ts->sec + CONFIG_UNAVAILABLE_DELAY;
+				disable_until = ts->sec + unavailable_delay;
 				available = INTERFACE_AVAILABLE_FALSE;
 				error = error_msg;
 			}
@@ -15874,6 +16205,45 @@ u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid) {
 	UNLOCK_CACHE;
 	return hostid;
 }
+
+void	zbx_recalc_time_period(int *ts_from, int table_group)
+{
+#define HK_CFG_UPDATE_INTERVAL	5
+	time_t			least_ts = 0, now;
+	zbx_config_t		cfg;
+	static time_t		last_cfg_retrieval = 0;
+	static zbx_config_hk_t	hk;
+
+	now = time(NULL);
+
+	if (HK_CFG_UPDATE_INTERVAL < now - last_cfg_retrieval)
+	{
+		last_cfg_retrieval = now;
+
+		zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_HOUSEKEEPER);
+		hk = cfg.hk;
+	}
+
+	if (ZBX_RECALC_TIME_PERIOD_HISTORY == table_group)
+	{
+		if (1 != hk.history_global)
+			return;
+
+		least_ts = now - hk.history;
+	}
+	else if (ZBX_RECALC_TIME_PERIOD_TRENDS == table_group)
+	{
+		if (1 != hk.trends_global)
+			return;
+
+		least_ts = now - hk.trends + 1;
+	}
+
+	if (least_ts > *ts_from)
+		*ts_from = (int)least_ts;
+#undef HK_CFG_UPDATE_INTERVAL
+}
+
 
 #ifdef HAVE_TESTS
 #include "../../../tests/libs/zbxdbcache/dc_item_poller_type_update_test.c"

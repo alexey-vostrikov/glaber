@@ -30,7 +30,6 @@ $output = [
 $options = $data['options'];
 
 $overrides_popup_form = (new CForm())
-	->cleanItems()
 	->setId('lldoverride_form')
 	->addItem((new CVar('no', $options['no']))->removeId())
 	->addItem((new CVar('templated', $options['templated']))->removeId())
@@ -90,7 +89,9 @@ $override_evaltype = (new CDiv([
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 			->setId('overrides_formula')
 			->setAttribute('placeholder', 'A or (B and C) &hellip;')
-	]))->addClass(ZBX_STYLE_CELL)
+	]))
+		->addClass(ZBX_STYLE_CELL)
+		->addClass(ZBX_STYLE_CELL_EXPRESSION)
 ]))
 	->addClass(ZBX_STYLE_ROW)
 	->setId('overrideRow');

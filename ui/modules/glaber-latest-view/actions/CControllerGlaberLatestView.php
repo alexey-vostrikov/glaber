@@ -25,10 +25,6 @@ require_once 'CControllerGlaberLatest.php';
  */
 class CControllerGlaberLatestView extends CControllerGlaberLatest {
 
-	protected function init() {
-		$this->disableSIDValidation();
-	}
-
 	protected function checkInput() {
 		$fields = [
 			'page' =>						'ge 1',
@@ -59,8 +55,12 @@ class CControllerGlaberLatestView extends CControllerGlaberLatest {
 		return $ret;
 	}
 
-	protected function checkPermissions() {
-		return $this->checkAccess(\CRoleHelper::UI_MONITORING_LATEST_DATA);
+	protected function checkPermissions(): bool {
+		return true;
+	}
+
+	public function init(): void {
+		$this->disableCsrfValidation();
 	}
 
 	protected function doAction() {

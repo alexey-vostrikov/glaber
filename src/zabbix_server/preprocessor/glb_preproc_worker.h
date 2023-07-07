@@ -24,6 +24,7 @@
 #include "metric.h"
 #include "zbxself.h"
 
+
 ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args);
 
 //NOTE: only to be used inside glb_preprocessing fork

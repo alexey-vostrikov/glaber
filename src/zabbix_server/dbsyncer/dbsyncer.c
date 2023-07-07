@@ -122,7 +122,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 	/* database APIs might not handle signals correctly and hang, block signals to avoid hanging */
 	zbx_block_signals(&orig_mask);
-	DBconnect(ZBX_DB_CONNECT_NORMAL);
+	zbx_db_connect(ZBX_DB_CONNECT_NORMAL);
 
 	trends_init_cache();
 
@@ -195,7 +195,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 
 	trends_destroy_cache();
 
-	DBclose();
+	zbx_db_close();
 	zbx_unblock_signals(&orig_mask);
 
 

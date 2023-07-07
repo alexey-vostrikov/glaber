@@ -23,6 +23,7 @@ SUBDIRS = \
 	stats \
 	preprocessor \
 	availability \
+	connector \
 	lld \
 	reporter \
 	glb_poller \
@@ -82,6 +83,7 @@ zabbix_server_LDADD = \
 	odbc/libzbxodbc.a \
 	scripts/libzbxscripts.a \
 	availability/libavailability.a \
+	connector/libconnector.a \
 	service/libservice.a \
 	tests/libservertests.a \
 	$(top_builddir)/src/libs/zbxembed/libzbxembed.a \
@@ -106,6 +108,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxcacheconfig/libzbxcacheconfig.a \
 	$(top_builddir)/src/libs/zbxcachehistory/libzbxcachehistory.a \
 	preprocessor/libpreprocessor.a \
+	$(top_builddir)/src/libs/zbxpreproc/libzbxpreproc.a \
 	$(top_builddir)/src/libs/zbxvariant/libzbxvariant.a \
 	$(top_builddir)/src/libs/glb_history/libglbhistory.a \
 	$(top_builddir)/src/libs/zbxeval/libzbxeval.a \
@@ -114,6 +117,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxstats/libzbxstats.a \
 	$(top_builddir)/src/libs/zbxregexp/libzbxregexp.a \
 	$(top_builddir)/src/libs/zbxself/libzbxself.a \
+	$(top_builddir)/src/libs/zbxtimekeeper/libzbxtimekeeper.a \
 	$(top_builddir)/src/libs/zbxipcservice/libzbxipcservice.a \
 	$(top_builddir)/src/libs/zbxthreads/libzbxthreads.a \
 	$(top_builddir)/src/libs/zbxmutexs/libzbxmutexs.a \
@@ -138,6 +142,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxdbschema/libzbxdbschema.a \
 	$(top_builddir)/src/libs/zbxdb/libzbxdb.a \
 	$(top_builddir)/src/libs/zbxmodules/libzbxmodules.a \
+	$(top_builddir)/src/libs/zbxtagfilter/libzbxtagfilter.a \
 	$(top_builddir)/src/libs/zbxtasks/libzbxtasks.a \
 	$(top_builddir)/src/libs/zbxdiag/libzbxdiag.a \
 	$(top_builddir)/src/libs/zbxcompress/libzbxcompress.a \
@@ -152,6 +157,7 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/zbxalgo/libzbxalgo.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
 	$(top_builddir)/src/libs/zbxavailability/libzbxavailability.a \
+	$(top_builddir)/src/libs/zbxconnector/libzbxconnector.a \
 	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
 	$(top_builddir)/src/libs/zbxservice/libzbxservice.a \
 	$(top_builddir)/src/libs/zbxnum/libzbxnum.a \

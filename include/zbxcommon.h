@@ -93,9 +93,9 @@ extern char ZABBIX_EVENT_SOURCE[ZBX_SERVICE_NAME_LEN];
 #endif
 
 //preprocessing types - used for glaber optimized preprocessing
-#define GLB_PREPROC_MANAGER	0
-#define GLB_PREPROC_LOCAL	1
-#define GLB_NO_PREPROC	2
+// #define GLB_PREPROC_MANAGER	0
+// #define GLB_PREPROC_LOCAL	1
+// #define GLB_NO_PREPROC	2
 
 //for efficient polling in async mode
 #define	POLL_FREE			108
@@ -333,14 +333,16 @@ const char	*get_program_type_string(unsigned char program_type);
 #define ZBX_PROCESS_TYPE_SERVICEMAN		34
 #define ZBX_PROCESS_TYPE_TRIGGERHOUSEKEEPER	35
 #define ZBX_PROCESS_TYPE_ODBCPOLLER		36
-#define GLB_PROCESS_TYPE_SNMP	37
-#define GLB_PROCESS_TYPE_PINGER	38
-#define GLB_PROCESS_TYPE_WORKER	39
-#define GLB_PROCESS_TYPE_SERVER	40
-#define GLB_PROCESS_TYPE_AGENT	41
-#define GLB_PROCESS_TYPE_API_TRAPPER	42
-#define GLB_PROCESS_TYPE_PREPROCESSOR	43
-#define ZBX_PROCESS_TYPE_COUNT		44	/* number of process types */
+#define ZBX_PROCESS_TYPE_CONNECTORMANAGER	37
+#define ZBX_PROCESS_TYPE_CONNECTORWORKER	38
+#define GLB_PROCESS_TYPE_SNMP	39
+#define GLB_PROCESS_TYPE_PINGER	40
+#define GLB_PROCESS_TYPE_WORKER	41
+#define GLB_PROCESS_TYPE_SERVER	42
+#define GLB_PROCESS_TYPE_AGENT	43
+#define GLB_PROCESS_TYPE_API_TRAPPER	44
+#define GLB_PROCESS_TYPE_PREPROCESSOR	45
+#define ZBX_PROCESS_TYPE_COUNT		46	/* number of process types */
 
 
 /* special processes that are not present worker list */
@@ -528,7 +530,8 @@ typedef enum
 	HTTPTEST_AUTH_BASIC,
 	HTTPTEST_AUTH_NTLM,
 	HTTPTEST_AUTH_NEGOTIATE,
-	HTTPTEST_AUTH_DIGEST
+	HTTPTEST_AUTH_DIGEST,
+	HTTPTEST_AUTH_BEARER
 }
 zbx_httptest_auth_t;
 
@@ -730,6 +733,7 @@ int	zbx_alarm_timed_out(void);
 
 #define zbx_bsearch(key, base, nmemb, size, compar)	(0 == (nmemb) ? NULL : bsearch(key, base, nmemb, size, compar))
 
+#define ZBX_PREPROC_NONE			0
 #define ZBX_PREPROC_MULTIPLIER			1
 #define ZBX_PREPROC_RTRIM			2
 #define ZBX_PREPROC_LTRIM			3
@@ -774,9 +778,6 @@ int	zbx_alarm_timed_out(void);
 #define ZBX_PREPROC_FAIL_SET_VALUE	2
 #define ZBX_PREPROC_FAIL_SET_ERROR	3
 
-/* internal on fail actions */
-#define ZBX_PREPROC_FAIL_FORCE_ERROR	4
-
 #define ZBX_HTTPFIELD_HEADER		0
 #define ZBX_HTTPFIELD_VARIABLE		1
 #define ZBX_HTTPFIELD_POST_FIELD	2
@@ -786,6 +787,7 @@ int	zbx_alarm_timed_out(void);
 #define ZBX_POSTTYPE_FORM		1
 #define ZBX_POSTTYPE_JSON		2
 #define ZBX_POSTTYPE_XML		3
+#define ZBX_POSTTYPE_NDJSON		4
 
 #define ZBX_RETRIEVE_MODE_CONTENT	0
 #define ZBX_RETRIEVE_MODE_HEADERS	1
@@ -827,8 +829,6 @@ typedef struct
 }
 zbx_tag_t;
 
-void	zbx_free_tag(zbx_tag_t *tag);
-
 #define ZBX_STR2UCHAR(var, string) var = (unsigned char)atoi(string)
 
 #define ZBX_CONST_STRING(str) "" str
@@ -846,5 +846,13 @@ zbx_uint64_t	suffix2factor(char c);
 #define ZBX_MESSAGE_BUF_SIZE	1024
 
 char	*zbx_strerror(int errnum);
+
+#if !defined(_WINDOWS)
+#	if defined(HAVE_LIBPTHREAD)
+#		define zbx_sigmask	pthread_sigmask
+#	else
+#		define zbx_sigmask	sigprocmask
+#	endif
+#endif
 
 #endif

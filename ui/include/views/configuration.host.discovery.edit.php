@@ -35,6 +35,7 @@ $url = (new CUrl('host_discovery.php'))
 
 $form = (new CForm('post', $url))
 	->addItem((new CVar('form_refresh', $data['form_refresh'] + 1))->removeId())
+	->addItem((new CVar(CCsrfTokenHelper::CSRF_TOKEN_NAME, CCsrfTokenHelper::get('host_discovery.php')))->removeId())
 	->setId('host-discovery-form')
 	->setName('itemForm')
 	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
@@ -409,7 +410,7 @@ $item_tab
 		(new CFormField((new CTextBox('http_proxy', $data['http_proxy'], $data['limited'],
 				DB::getFieldLength('items', 'http_proxy')))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-			->setAttribute('placeholder', '[protocol://][user[:password]@]proxy.example.com[:port]')
+			->setAttribute('placeholder', _('[protocol://][user[:password]@]proxy.example.com[:port]'))
 			->disableAutocomplete()
 		))->setId('js-item-http-proxy-field')
 	])
@@ -449,18 +450,18 @@ $item_tab
 	// Append ITEM_TYPE_HTTPAGENT SSL verify peer to form list.
 	->addItem([
 		(new CLabel(_('SSL verify peer'), 'verify_peer'))->setId('js-item-verify-peer-label'),
-		(new CFormField((new CCheckBox('verify_peer', HTTPTEST_VERIFY_PEER_ON))
+		(new CFormField((new CCheckBox('verify_peer', ZBX_HTTP_VERIFY_PEER_ON))
 			->setEnabled(!$data['limited'])
-			->setChecked($data['verify_peer'] == HTTPTEST_VERIFY_PEER_ON)
+			->setChecked($data['verify_peer'] == ZBX_HTTP_VERIFY_PEER_ON)
 		))->setId('js-item-verify-peer-field')
 	])
 	// Append ITEM_TYPE_HTTPAGENT SSL verify host to form list.
 	->addItem([
 		(new CLabel(_('SSL verify host'), 'verify_host'))->setId('js-item-verify-host-label'),
 		(new CFormField(
-			(new CCheckBox('verify_host', HTTPTEST_VERIFY_HOST_ON))
+			(new CCheckBox('verify_host', ZBX_HTTP_VERIFY_HOST_ON))
 				->setEnabled(!$data['limited'])
-				->setChecked($data['verify_host'] == HTTPTEST_VERIFY_HOST_ON)
+				->setChecked($data['verify_host'] == ZBX_HTTP_VERIFY_HOST_ON)
 		))->setId('js-item-verify-host-field')
 	])
 	// Append ITEM_TYPE_HTTPAGENT SSL certificate file to form list.
@@ -741,23 +742,29 @@ $condition_tab = new CFormGrid();
 $condition_tab->addItem([
 	(new CLabel(_('Type of calculation'), 'label-evaltype'))->setId('js-item-condition-label'),
 	(new CFormField([
-		(new CSelect('evaltype'))
-			->setFocusableElementId('label-evaltype')
-			->setId('evaltype')
-			->setValue($data['evaltype'])
-			->addOptions(CSelect::createOptionsFromArray([
-				CONDITION_EVAL_TYPE_AND_OR => _('And/Or'),
-				CONDITION_EVAL_TYPE_AND => _('And'),
-				CONDITION_EVAL_TYPE_OR => _('Or'),
-				CONDITION_EVAL_TYPE_EXPRESSION => _('Custom expression')
-			])),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-		(new CSpan(''))
-			->setId('expression'),
-		(new CTextBox('formula', $data['formula']))
-			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-			->setId('formula')
-			->setAttribute('placeholder', 'A or (B and C) &hellip;')
+		(new CDiv(
+			(new CSelect('evaltype'))
+				->setFocusableElementId('label-evaltype')
+				->setId('evaltype')
+				->setValue($data['evaltype'])
+				->addOptions(CSelect::createOptionsFromArray([
+					CONDITION_EVAL_TYPE_AND_OR => _('And/Or'),
+					CONDITION_EVAL_TYPE_AND => _('And'),
+					CONDITION_EVAL_TYPE_OR => _('Or'),
+					CONDITION_EVAL_TYPE_EXPRESSION => _('Custom expression')
+				]))
+				->addClass(ZBX_STYLE_FORM_INPUT_MARGIN)
+		))->addClass(ZBX_STYLE_CELL),
+		(new CDiv([
+			(new CSpan(''))
+				->setId('expression'),
+			(new CTextBox('formula', $data['formula']))
+				->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+				->setId('formula')
+				->setAttribute('placeholder', 'A or (B and C) &hellip;')
+		]))
+			->addClass(ZBX_STYLE_CELL)
+			->addClass(ZBX_STYLE_CELL_EXPRESSION)
 	]))->setId('js-item-condition-field')
 ]);
 
@@ -995,8 +1002,8 @@ if (!empty($data['itemid'])) {
 	}
 
 	$buttons[] = (new CSimpleButton(_('Test')))->setId('test_item');
-
-	$buttons[] = (new CButtonDelete(_('Delete discovery rule?'), url_params(['form', 'itemid', 'hostid', 'context']),
+	$buttons[] = (new CButtonDelete(_('Delete discovery rule?'), url_params(['form', 'itemid', 'hostid', 'context']).
+		'&'.CCsrfTokenHelper::CSRF_TOKEN_NAME.'='.CCsrfTokenHelper::get('host_discovery.php'),
 		'context'
 	))->setEnabled(!$data['limited']);
 	$buttons[] = new CButtonCancel(url_param('context'));
@@ -1017,7 +1024,9 @@ else {
 	);
 }
 
-$tab->setFooter(new CFormGrid($form_actions));
+$tab->setFooter(
+	(new CFormGrid($form_actions))->addClass(CFormGrid::ZBX_STYLE_FORM_GRID_ACTIONS)
+);
 
 $form->addItem($tab);
 $html_page->addItem($form);

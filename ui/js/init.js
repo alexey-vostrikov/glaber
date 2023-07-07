@@ -17,6 +17,7 @@
  ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  **/
 
+
 /**
  * An object that is used to namespace objects, allows to retrieve and write objects via arbitrary path.
  */
@@ -126,7 +127,7 @@ jQuery(function($) {
 			case 'host_admin':
 				sections = getMenuPopupHostAdmin(data, $obj);
 				break;
-
+	
 			case 'map_element_submap':
 				sections = getMenuPopupMapElementSubmap(data);
 				break;
@@ -394,6 +395,10 @@ jQuery(function($) {
 		var confirmation = button.attr('data-confirmation');
 
 		if (typeof confirmation === 'undefined' || (typeof confirmation !== 'undefined' && confirm(confirmation))) {
+			if (button.attr('data-post')) {
+				return redirect(button.attr('data-url'), 'post', '_csrf_token', true);
+			}
+
 			window.location = button.attr('data-url');
 		}
 	});

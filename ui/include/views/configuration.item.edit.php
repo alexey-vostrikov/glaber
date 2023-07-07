@@ -41,6 +41,7 @@ $url = (new CUrl('items.php'))
 // Create form.
 $form = (new CForm('post', $url))
 	->addItem((new CVar('form_refresh', $data['form_refresh'] + 1))->removeId())
+	->addItem((new CVar(CCsrfTokenHelper::CSRF_TOKEN_NAME, CCsrfTokenHelper::get('items.php')))->removeId())
 	->setId('item-form')
 	->setName('itemForm')
 	->setAttribute('aria-labelledby', CHtmlPage::PAGE_TITLE_ID)
@@ -125,7 +126,6 @@ $item_type_options = CSelect::createOptionsFromArray([
 ]);
 $type_mismatch_hint = (new CSpan(makeWarningIcon(_('This type of information may not match the key.'))))
 	->setId('js-item-type-hint')
-	->addStyle('margin: 5px 0 0 5px;')
 	->addClass(ZBX_STYLE_DISPLAY_NONE);
 
 $item_tab
@@ -135,15 +135,14 @@ $item_tab
 		new CFormField($key_controls)
 	])
 	->addItem([
-		new CLabel(_('Type of information'), 'label-value-type'),
+		new CLabel([_('Type of information'), $type_mismatch_hint], 'label-value-type'),
 		new CFormField([
 			(new CSelect('value_type'))
 				->setFocusableElementId('label-value-type')
 				->setId('value_type')
 				->setValue($data['value_type'])
 				->addOptions($item_type_options)
-				->setReadonly($readonly),
-			$type_mismatch_hint
+				->setReadonly($readonly)
 		])
 	])
 	// Append ITEM_TYPE_HTTPAGENT URL field to form list.
@@ -487,7 +486,7 @@ $item_tab
 		(new CFormField((new CTextBox('http_proxy', $data['http_proxy'], $readonly,
 				DB::getFieldLength('items', 'http_proxy')))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-			->setAttribute('placeholder', '[protocol://][user[:password]@]proxy.example.com[:port]')
+			->setAttribute('placeholder', _('[protocol://][user[:password]@]proxy.example.com[:port]'))
 			->disableAutocomplete()
 		))->setId('js-item-http-proxy-field')
 	])
@@ -527,17 +526,17 @@ $item_tab
 	// Append ITEM_TYPE_HTTPAGENT SSL verify peer to form list.
 	->addItem([
 		(new CLabel(_('SSL verify peer'), 'verify_peer'))->setId('js-item-verify-peer-label'),
-		(new CFormField((new CCheckBox('verify_peer', HTTPTEST_VERIFY_PEER_ON))
+		(new CFormField((new CCheckBox('verify_peer', ZBX_HTTP_VERIFY_PEER_ON))
 			->setEnabled(!$readonly)
-			->setChecked($data['verify_peer'] == HTTPTEST_VERIFY_PEER_ON)
+			->setChecked($data['verify_peer'] == ZBX_HTTP_VERIFY_PEER_ON)
 		))->setId('js-item-verify-peer-field')
 	])
 	// Append ITEM_TYPE_HTTPAGENT SSL verify host to form list.
 	->addItem([
 		(new CLabel(_('SSL verify host'), 'verify_host'))->setId('js-item-verify-host-label'),
-		(new CFormField((new CCheckBox('verify_host', HTTPTEST_VERIFY_HOST_ON))
+		(new CFormField((new CCheckBox('verify_host', ZBX_HTTP_VERIFY_HOST_ON))
 			->setEnabled(!$readonly)
-			->setChecked($data['verify_host'] == HTTPTEST_VERIFY_HOST_ON)
+			->setChecked($data['verify_host'] == ZBX_HTTP_VERIFY_HOST_ON)
 		))->setId('js-item-verify-host-field')
 	])
 	// Append ITEM_TYPE_HTTPAGENT SSL certificate file to form list.
@@ -841,29 +840,8 @@ $item_tab->addItem([
 ]);
 
 // Append history storage to form list.
-$keep_history_hint = null;
-
-if ($data['config']['hk_history_global']  && ($host['status'] == HOST_STATUS_MONITORED
-			|| $host['status'] == HOST_STATUS_NOT_MONITORED)) {
-	$link = (CWebUser::getType() == USER_TYPE_SUPER_ADMIN)
-		? (new CLink(_x('global housekeeping settings', 'item_form'), (new CUrl('zabbix.php'))
-				->setArgument('action', 'housekeeping.edit')
-				->getUrl()
-			))
-				->setTarget('_blank')
-		: _x('global housekeeping settings', 'item_form');
-
-	$keep_history_hint = (new CSpan(makeWarningIcon([
-		' '._x('Overridden by', 'item_form').' ',
-		$link,
-		' ('.$data['config']['hk_history'].')'
-	])))
-		->addStyle('margin: 5px 0 0 5px;')
-		->setId('history_mode_hint');
-}
-
 $item_tab->addItem([
-	(new CLabel(_('History storage period'), 'history'))->setAsteriskMark(),
+	(new CLabel([_('History storage period')], 'history'))->setAsteriskMark(),
 	new CFormField([
 		(new CRadioButtonList('history_mode', (int) $data['history_mode']))
 			->addValue(_('Do not keep history'), ITEM_STORAGE_OFF)
@@ -876,17 +854,23 @@ $item_tab->addItem([
 
 $item_tab
 	->addItem([
-			 (new CLabel(_('Trends storage'), 'trends'))
-			 	->setAsteriskMark()
-				->setId('js-item-trends-label'),
-			(new CDiv([
-				(new CRadioButtonList('trends_mode', (int) $data['trends_mode']))
-					->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
-					->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
-					->setReadonly($discovered_item)
- 					->setModern(true),
-				(new CInput('hidden', 'trends', "86400"))])
-			)->setId('js-item-trends-field')]);
+		(new CLabel(_('Trends storage'), 'trends'))
+		 	->setAsteriskMark()
+			->setId('js-item-trends-label'),
+		(new CDiv([
+			(new CRadioButtonList('trends_mode', (int) $data['trends_mode']))
+				->addValue(_('Do not keep trends'), ITEM_STORAGE_OFF)
+				->addValue(_('Keep trends'), ITEM_STORAGE_CUSTOM)
+				->setReadonly($discovered_item)
+ 				->setModern(true),
+			(new CInput('hidden', 'trends', "86400"))])
+		)->setId('js-item-trends-field')])
+	->addItem([
+		(new CLabel(_('Log time format'), 'logtimefmt'))->setId('js-item-log-time-format-label'),
+		(new CFormField(
+			(new CTextBox('logtimefmt', $data['logtimefmt'], $readonly, 64))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+		))->setId('js-item-log-time-format-field')
+	]);
 
 if ($data['host']['flags'] != ZBX_FLAG_DISCOVERY_CREATED) {
 	$item_tab->addItem([
@@ -981,22 +965,12 @@ $item_tab
 		new CFormField((new CCheckBox('status', ITEM_STATUS_ACTIVE))->setChecked($data['status'] == ITEM_STATUS_ACTIVE))
 	]);
 
-// 	// Add link to Latest data.
-// if (CWebUser::checkAccess(CRoleHelper::UI_MONITORING_LATEST_DATA) && $data['itemid'] != 0
-// 		&& $data['context'] === 'host') {
-// 	$item_tab->addItem(
-// 		(new CFormField((new CLink(_('Latest data'),
-// 			(new CUrl('zabbix.php'))
-// 				->setArgument('action', 'latest.view')
-// 				->setArgument('hostids[]', $data['hostid'])
-// 				->setArgument('name', $data['name'])
-// 				->setArgument('filter_name', '')
-// 		))->setTarget('_blank')))
-// 	);
-// }
-
 // Append tabs to form.
 $item_tabs = (new CTabView())
+	->addTab('itemInfo',_('Operational state'),
+		(new CFormGrid())
+			->setId('item_state_information')
+	)
 	->addTab('itemTab', $data['caption'], $item_tab)
 	->addTab('tags-tab', _('Tags'),
 		new CPartial('configuration.tags.tab', [
@@ -1053,19 +1027,10 @@ if ($data['itemid'] != 0) {
 	}
 
 	$buttons[] = (new CSimpleButton(_('Test')))->setId('test_item');
-/*
-	if ($host['status'] == HOST_STATUS_MONITORED || $host['status'] == HOST_STATUS_NOT_MONITORED) {
-		$buttons[] = ($data['config']['compression_status'])
-			? new CSubmit('del_history', _('Clear history and trends'))
-			: new CButtonQMessage(
-				'del_history',
-				_('Clear history and trends'),
-				_('History clearing can take a long time. Continue?')
-			);
-	}
-*/
-	$buttons[] = (new CButtonDelete(_('Delete item?'), url_params(['form', 'itemid', 'hostid', 'context']), 'context'))
-		->setEnabled(!$data['limited']);
+
+	$buttons[] = (new CButtonDelete(_('Delete item?'), url_params(['form', 'itemid', 'hostid', 'context']).'&'.
+		CCsrfTokenHelper::CSRF_TOKEN_NAME.'='.CCsrfTokenHelper::get('items.php'), 'context'
+	))->setEnabled(!$data['limited']);
 	$buttons[] = $cancel_button;
 
 	$item_tabs->setFooter(makeFormFooter(new CSubmit('update', _('Update')), $buttons));
@@ -1091,7 +1056,8 @@ $html_page->show();
 		'keys_by_item_type' => CItemData::getKeysByItemType(),
 		'testable_item_types' => CControllerPopupItemTest::getTestableItemTypes($data['hostid']),
 		'field_switches' => CItemData::fieldSwitchingConfiguration($data),
-		'interface_types' => itemTypeInterface()
+		'interface_types' => itemTypeInterface(),
+		'discovered_item' => $discovered_item
 	]).');
 '))->show();
 

@@ -62,7 +62,8 @@ typedef enum
 typedef enum 
 {
 	IPC_LOCK_BLOCK = 1,
-	IPC_LOCK_TRY_ONLY 
+	IPC_LOCK_TRY_ONLY,
+	IPC_LOCK_TRY_1MS 
 } ipc_lock_mode_t;
 
 #define IPC_PROCESS_ALL 0
@@ -114,4 +115,8 @@ int 	ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint6
 int 	ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock);
 
 void 		ipc_vector_uint64_destroy(ipc_conf_t *ipc);
+
+void	ipc_set_redirect_queue(int queue_num);
+
+
 #endif

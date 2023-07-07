@@ -110,6 +110,7 @@ void*  glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
 
         if (old_time != ZBX_JAN_2038 && old_time > time)  {
             LOG_DBG("Old time is %d, not adding item to the head due to lower time: %d", old_time, time);
+           // LOG_INF("Item is not added to the cache as it has more recent data has time %d, adding time %d", old_time, time);
             return NULL;     
         }
 
@@ -132,7 +133,6 @@ void*  glb_tsbuff_add_to_head(glb_tsbuff_t *tsbuff, int time) {
     if (1 == tsbuff->count) 
         tsbuff->tail = tsbuff->head;
     
-    //LOG_WRN("Total count2 is %d", glb_tsbuff_get_count(tsbuff));
     return val;
 }
 

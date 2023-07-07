@@ -25,7 +25,7 @@
 class CControllerChartsView extends CControllerCharts {
 
 	protected function init() {
-		$this->disableSIDValidation();
+		$this->disableCsrfValidation();
 	}
 
 	protected function checkInput() {
@@ -80,6 +80,7 @@ class CControllerChartsView extends CControllerCharts {
 		$filter_hostids = CProfile::getArray('web.charts.filter.hostids', []);
 		$filter_name = CProfile::get('web.charts.filter.name', '');
 		$filter_show = (int) CProfile::get('web.charts.filter.show', GRAPH_FILTER_ALL);
+		$filter_graphids = $this->getInput('filter_graphids', CProfile::getArray('web.charts.filter.graphids', []));
 
 		$subfilter_tagnames = CProfile::getArray('web.charts.subfilter.tagnames', []);
 		$subfilter_tags = json_decode(CProfile::get('web.charts.subfilter.tags', '{}'), true);
@@ -151,6 +152,30 @@ class CControllerChartsView extends CControllerCharts {
 		);
 
 		$data['charts'] = $this->getCharts($graphs);
+
+		if ($filter_graphids) {
+			$data['ms_graphs'] = CArrayHelper::renameObjectsKeys(API::Graph()->get([
+				'output' => ['name', 'graphid'],
+				'selectHosts' => ['name'],
+				'graphids' => $filter_graphids
+			]), ['graphid' => 'id']);
+
+			// Cuntinue with readable graphs only.
+			if (count($filter_graphids) != count($data['ms_graphs'])) {
+				$filter_graphids = array_column($data['ms_graphs'], 'id');
+				if ($this->hasInput('filter_set')) {
+					$data['error'] = _('No permissions to referred object or it does not exist!');
+				}
+			}
+
+			// Prefix graphs by hostnames.
+			foreach ($data['ms_graphs'] as &$graph) {
+				$graph['prefix'] = $graph['hosts'][0]['name'].NAME_DELIMITER;
+				unset($graph['hosts']);
+			}
+			unset($graph);
+		}
+
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle(_('Custom graphs'));

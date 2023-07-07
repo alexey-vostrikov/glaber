@@ -20,12 +20,13 @@
 
 namespace Modules\CustomDebug\Actions;
 
-class CControllerDebugList extends \CController {
+use CControllerResponseData; 
+use CController;
 
-	protected function init() {
-		$this->disableSIDValidation();
-	}
+class CControllerDebugList extends CController {
 
+	public function init(): void {$this->disableCsrfValidation();}
+	
 	protected function checkInput() {
 
 		$fields = [

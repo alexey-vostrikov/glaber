@@ -22,6 +22,8 @@
 
 #include "module.h"
 #include "zbxcacheconfig.h"
+#include "zbxpreproc.h"
+
 
 /* preprocessing step execution result */
 typedef struct
@@ -46,15 +48,14 @@ zbx_preproc_item_stats_t;
 //		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
 //void	zbx_preprocessor_flush(void);
 
-
-
 zbx_uint64_t	zbx_preprocessor_get_queue_size(void);
 
 void	zbx_preproc_op_free(zbx_preproc_op_t *op);
 void	zbx_preproc_result_free(zbx_preproc_result_t *result);
 
-int	zbx_preprocessor_test( unsigned char value_type, char *value_str,  const zbx_timespec_t *ts,
-						  zbx_vector_ptr_t *steps,  zbx_vector_ptr_t *results,  zbx_vector_ptr_t *history, char **error );
+int	zbx_preprocessor_test(unsigned char value_type, const char *value, const zbx_timespec_t *ts,
+		unsigned char state, zbx_pp_step_t *steps, int steps_num, zbx_pp_result_t **results, 
+		int *results_num);
 
 int	zbx_preprocessor_get_diag_stats(int *total, int *queued, int *processing, int *done,
 		int *pending, char **error);
@@ -66,7 +67,7 @@ int preprocess_error	(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const
 int preprocess_str		(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *str);
 int preprocess_uint64	(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, u_int64_t int_val);
 int preprocess_dbl		(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, double dbl_val);
-int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar);
+int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar, int desired_type);
 int preprocessing_force_flush();
 
 int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar);

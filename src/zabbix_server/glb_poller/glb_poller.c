@@ -547,6 +547,10 @@ u_int64_t poller_get_item_id(poller_item_t *poll_item)
 	return poll_item->itemid;
 }
 
+int poller_get_item_type(poller_item_t *poll_item ) {
+	return poll_item->value_type;
+}
+
 void poller_set_item_specific_data(poller_item_t *poll_item, void *data)
 {
 	poll_item->itemdata = data;
@@ -655,8 +659,14 @@ void poller_preprocess_error(poller_item_t *poller_item, const char *error)
 	glb_state_interfaces_register_fail(poller_item->interfaceid, error);
 }
 
-void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value) {
-	preprocess_uint64(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
+void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value, int orig_type) {
+	
+	if (ITEM_VALUE_TYPE_FLOAT == orig_type) {
+		double dbl_val = value;
+		preprocess_dbl(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, dbl_val);
+	} else 
+		preprocess_uint64(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
+
 	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
 }
 
@@ -671,7 +681,7 @@ void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, doubl
 }
 
 void poller_preprocess_agent_result_value(poller_item_t *poller_item, zbx_timespec_t *ts, AGENT_RESULT *ar) {
-	preprocess_agent_result(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, ar);
+	preprocess_agent_result(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, ar, poller_item->value_type);
 	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
 }
 

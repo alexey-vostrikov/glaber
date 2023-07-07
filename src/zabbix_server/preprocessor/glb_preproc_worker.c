@@ -30,6 +30,7 @@
 #include "../../libs/zbxpreproc/pp_execute.h"
 #include "../../libs/zbxpreproc/preproc_snmp.h"
 #include "zbxembed.h"
+#include "zbxlld.h"
 
 #define MAX_DEPENDENCY_LEVEL 16
 
@@ -47,38 +48,57 @@ typedef struct
 
 static glb_preproc_worker_conf_t conf = {0};
 
-static void process_dependent_metrics(metric_t *metric, int max_dep);
+static void process_dependent_metrics(metric_t *metric, zbx_pp_item_preproc_t *preproc, int max_dep);
 
-zbx_pp_item_preproc_t *get_prperoc_item(u_int64_t itemid) {
+zbx_pp_item_t *get_prperoc_item(u_int64_t itemid) {
     return zbx_hashset_search(&conf.items, &itemid);
+}
+
+void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *preproc_conf) {
+    
+    if ( NULL != preproc_conf && ( preproc_conf->preproc->flags & ZBX_FLAG_DISCOVERY_RULE ) ) {
+        
+        if (ZBX_VARIANT_STR != metric->value.type || NULL == metric->value.data.str )
+            return;
+
+        DEBUG_ITEM(metric->itemid, "Items is discovery, sending to LLD manager");
+        zbx_lld_process_value(metric->itemid, metric->hostid, metric->value.data.str, &metric->ts, 0, 0, 0, NULL);
+        
+        return;
+    }
+    
+    processing_send_metric(metric);
 }
 
 static void preprocess_metric_execute_steps(const metric_t *metric, zbx_pp_cache_t	*cache, int dep_level) {
 
 	zbx_variant_t	value_out;
 	int			i, steps_num, results_num, ret;
-    zbx_pp_item_preproc_t *item;
+    
+    zbx_pp_item_t *preproc_conf;
 
-	DEBUG_ITEM(metric->itemid,"Metric entered to preprocessing with type %d, type %s value %s", 
+	DEBUG_ITEM(metric->itemid,"Metric entered to preprocessing with type %d, type %s value %s", metric->value.type,
 					zbx_variant_type_desc(&metric->value), zbx_variant_value_desc(&metric->value));
 	
-    if (ZBX_VARIANT_NONE == metric->value.type || NULL == ( item = get_prperoc_item(metric->itemid))) {
+    if (ZBX_VARIANT_NONE == metric->value.type || NULL == ( preproc_conf = get_prperoc_item(metric->itemid))) {
         DEBUG_ITEM(metric->itemid, "No preprocessing conf found for item, sending to processing");
-        processing_send_metric(metric);
+        send_preprocessed_metric(metric, NULL);
         return;
     }
+	
+	zbx_variant_set_none(&value_out);
 
-	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps", steps_num);
+	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps",   preproc_conf->preproc->steps_num);
 
-	pp_execute(&conf.ctx, item, cache, (zbx_variant_t*)&metric->value, metric->ts, &value_out, NULL, NULL);
+	pp_execute(&conf.ctx, preproc_conf->preproc, cache, metric, &value_out, NULL, NULL);
 
-    DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', result is '%s'",
-        zbx_variant_value_desc(&metric->value),  zbx_variant_value_desc(&value_out));
+    DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', result is %p '%s'",
+        zbx_variant_type_desc(&value_out), &value_out, zbx_variant_value_desc(&value_out));
     
     metric_t new_metric = {.hostid = metric->hostid, .itemid = metric->itemid, .ts = metric->ts, .value = value_out };
-    processing_send_metric(&new_metric);
-
-    process_dependent_metrics(&new_metric, dep_level);
+    
+    send_preprocessed_metric(&new_metric, preproc_conf);
+    process_dependent_metrics(&new_metric, preproc_conf->preproc, dep_level - 1);
  	zbx_variant_clear(&value_out);
 }
 
@@ -89,22 +109,28 @@ int preprocess_metric(const metric_t *metric) {
 	preprocess_metric_execute_steps(metric, NULL, MAX_DEPENDENCY_LEVEL);	
 }
 
-static void process_dependent_metrics(metric_t * metric, int level) {
-    zbx_pp_item_preproc_t *item_conf;
+static void process_dependent_metrics(metric_t * metric, zbx_pp_item_preproc_t *preproc_conf, int level) {
+    metric_t dep_metric = *metric;
     zbx_pp_cache_t*		cache;
 	int i;
 	
 	if (level < 0) //recursion protection
 		return;
 	
-    if (NULL == (item_conf = zbx_hashset_search(&conf.items, &metric->itemid))) 
+    if (NULL == preproc_conf) 
         return;
     
-    cache = pp_cache_create(item_conf, &metric->value);
+    DEBUG_ITEM(metric->itemid, "Processing dependat metrics");
+
+    
+
+    cache = pp_cache_create(preproc_conf, &metric->value);
 	
-    for (i = 0; i < item_conf->dep_itemids_num; i++ ) {
-		metric->itemid = item_conf->dep_itemids[i];
-        preprocess_metric_execute_steps(metric, cache, level);
+    for (i = 0; i < preproc_conf->dep_itemids_num; i++ ) {
+        DEBUG_ITEM(metric->itemid, "Processing dependat metric %ld", preproc_conf->dep_itemids[i]);
+		dep_metric.itemid = preproc_conf->dep_itemids[i];
+        preprocess_metric_execute_steps(&dep_metric, cache, level);
+        DEBUG_ITEM(metric->itemid, "Finished processing dependat metric %ld", preproc_conf->dep_itemids[i]);
 	}
 
     pp_cache_release(cache);

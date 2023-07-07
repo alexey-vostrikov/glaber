@@ -30,6 +30,7 @@ $html_page = (new CHtmlPage())
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::ADMINISTRATION_HOUSEKEEPING_EDIT));
 
 $form = (new CForm())
+	->addItem((new CVar(CCsrfTokenHelper::CSRF_TOKEN_NAME, CCsrfTokenHelper::get('housekeeping')))->removeId())
 	->setId('housekeeping')
 	->setAction((new CUrl('zabbix.php'))
 		->setArgument('action', 'housekeeping.update')
@@ -117,29 +118,79 @@ $house_keeper_tab = (new CFormList())
 			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 			->setEnabled($data['hk_sessions_mode'] == 1)
 			->setAriaRequired()
-	)
-	->addRow((new CTag('h4', true, _('History')))->addClass('input-section-header'))
-	->addRow(
-		new CLabel(_('Enable internal housekeeping'), 'hk_history_mode'),
-		(new CCheckBox('hk_history_mode'))->setChecked($data['hk_history_mode'] == 1)
-	)
-	->addRow(
-		new CLabel(_('Override item history period'), 'hk_history_global'),
-		[
-			(new CCheckBox('hk_history_global'))->setChecked($data['hk_history_global'] == 1),
-			array_key_exists(CHousekeepingHelper::OVERRIDE_NEEDED_HISTORY, $data)
-				? new CSpan([
-					' ',
-					makeWarningIcon(
-						_('This setting should be enabled, because history tables contain compressed chunks.')
-					)
-						->addStyle('display:none;')
-						->addClass('js-hk-history-warning')
-				])
-				: null
-		]
 	);
 	
+
+	if ($data['db_extension'] === ZBX_DB_EXTENSION_TIMESCALEDB) {
+		switch ($data['extension_err_code']) {
+			case ZBX_EXT_ERR_UNDEFINED:
+				$timescaledb_error = _('Unable to retrieve TimescaleDB compression support status.');
+				break;
+
+			case ZBX_TIMESCALEDB_POSTGRES_TOO_OLD:
+				$timescaledb_error = _('Compression is not supported.').' '.
+					_('PostgreSQL database server version is too old.');
+				break;
+
+			case ZBX_TIMESCALEDB_VERSION_FAILED_TO_RETRIEVE:
+				$timescaledb_error = _('Compression is not supported.').' '.
+					_('Unable to retrieve TimescaleDB version.');
+				break;
+
+			case ZBX_TIMESCALEDB_VERSION_LOWER_THAN_MINIMUM:
+				$timescaledb_error = _('Compression is not supported.').' '.
+					_s('Minimum required TimescaleDB version is %1$s.', $data['timescaledb_min_version']);
+				break;
+
+			case ZBX_TIMESCALEDB_VERSION_NOT_SUPPORTED:
+				$timescaledb_error = _s('Unsupported TimescaleDB version. Should be at least %1$s.',
+					$data['timescaledb_min_supported_version']
+				);
+
+				if (!$data['compression_availability']) {
+					$timescaledb_error = _('Compression is not supported.').' '.$timescaledb_error;
+				}
+				break;
+
+			case ZBX_TIMESCALEDB_VERSION_HIGHER_THAN_MAXIMUM:
+				$timescaledb_error = _s('Unsupported TimescaleDB version. Should not be higher than %1$s.',
+					$data['timescaledb_max_version']
+				);
+				break;
+
+			case ZBX_TIMESCALEDB_LICENSE_NOT_COMMUNITY:
+				$timescaledb_error = _('Detected TimescaleDB license does not support compression. Compression is supported in TimescaleDB Community Edition.');
+				break;
+
+			case ZBX_EXT_SUCCEED:
+			default:
+				$timescaledb_error = '';
+		}
+
+		$timescaledb_error = $timescaledb_error !== '' ? makeErrorIcon($timescaledb_error) : null;
+
+		$compression_status_checkbox = (new CCheckBox('compression_status'))
+			->setChecked($data['compression_status'] == 1)
+			->setEnabled($data['compression_availability']);
+
+		$house_keeper_tab
+			->addRow((new CTag('h4', true, _('History and trends compression')))->addClass('input-section-header'))
+			->addRow(
+				new CLabel([_('Enable compression'), $timescaledb_error], 'compression_status'),
+				$compression_status_checkbox
+			)
+			->addRow(
+				(new CLabel(_('Compress records older than'), 'compress_older'))
+					->setAsteriskMark(),
+				(new CTextBox('compress_older', $data['compress_older'], false,
+					DB::getFieldLength('config', 'compress_older')
+				))
+					->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+					->setEnabled($data['compression_status'] == 1 && $data['compression_availability'])
+					->setAriaRequired()
+			);
+	}
+
 if (CWebUser::checkAccess(CRoleHelper::UI_ADMINISTRATION_AUDIT_LOG)) {
 	$house_keeper_tab
 		->addRow((new CTag('h4', true, _('Audit log')))->addClass('input-section-header'))

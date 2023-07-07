@@ -20,7 +20,6 @@
 #include "zbxcommon.h"
 #include "zbxdbhigh.h"
 #include "dbupgrade.h"
-#include "zbxdbschema.h"
 
 #ifndef HAVE_SQLITE3
 

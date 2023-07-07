@@ -38,6 +38,7 @@ void	zbx_lld_process_value(zbx_uint64_t itemid, zbx_uint64_t hostid, const char 
 	ZBX_UNUSED(value);
 	ZBX_UNUSED(ts);
 	ZBX_UNUSED(error);
-
-
+	ZBX_UNUSED(meta);
+	ZBX_UNUSED(lastlogsize);
+	ZBX_UNUSED(mtime);
 }

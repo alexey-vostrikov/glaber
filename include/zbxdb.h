@@ -44,6 +44,24 @@ typedef union
 }
 zbx_db_value_t;
 
+typedef struct
+{
+	char	*config_dbhost;
+	char	*config_dbname;
+	char	*config_dbschema;
+	char	*config_dbuser;
+	char	*config_dbpassword;
+	char	*config_dbsocket;
+	char	*config_db_tls_connect;
+	char	*config_db_tls_cert_file;
+	char	*config_db_tls_key_file;
+	char	*config_db_tls_ca_file;
+	char	*config_db_tls_cipher;
+	char	*config_db_tls_cipher_13;
+	int	config_dbport;
+}
+zbx_config_dbhigh_t;
+
 #ifdef HAVE_SQLITE3
 	/* we have to put double % here for sprintf */
 #	define ZBX_SQL_MOD(x, y) #x "%%" #y
@@ -57,18 +75,17 @@ zbx_db_value_t;
 #	define ZBX_FOR_UPDATE	" for update"
 #endif
 
-int	zbx_db_init(const char *dbname, const char *const dbschema, char **error);
-void	zbx_db_deinit(void);
+int	zbx_db_init_basic(const char *dbname, const char *const dbschema, char **error);
+void	zbx_db_deinit_basic(void);
 
-void	zbx_db_init_autoincrement_options(void);
+void	zbx_db_init_autoincrement_options_basic(void);
 
-int	zbx_db_connect(char *host, char *user, char *password, char *dbname, char *dbschema, char *dbsocket, int port,
-			char *tls_connect, char *cert, char *key, char *ca, char *cipher, char *cipher_13);
-void	zbx_db_close(void);
+int	zbx_db_connect_basic(const zbx_config_dbhigh_t *config_dbhigh);
+void	zbx_db_close_basic(void);
 
-int	zbx_db_begin(void);
-int	zbx_db_commit(void);
-int	zbx_db_rollback(void);
+int	zbx_db_begin_basic(void);
+int	zbx_db_commit_basic(void);
+int	zbx_db_rollback_basic(void);
 int	zbx_db_txn_level(void);
 int	zbx_db_txn_error(void);
 int	zbx_db_txn_end_error(void);
@@ -112,7 +129,7 @@ typedef struct
 }
 zbx_db_bind_context_t;
 
-int		zbx_db_statement_prepare(const char *sql);
+int		zbx_db_statement_prepare_basic(const char *sql);
 int		zbx_db_bind_parameter_dyn(zbx_db_bind_context_t *context, int position, unsigned char type,
 				zbx_db_value_t **rows, int rows_num);
 void		zbx_db_clean_bind_context(zbx_db_bind_context_t *context);
@@ -120,11 +137,11 @@ int		zbx_db_statement_execute(int iters);
 #endif
 int		zbx_db_vexecute(const char *fmt, va_list args);
 DB_RESULT	zbx_db_vselect(const char *fmt, va_list args);
-DB_RESULT	zbx_db_select_n(const char *query, int n);
+DB_RESULT	zbx_db_select_n_basic(const char *query, int n);
 
-DB_ROW		zbx_db_fetch(DB_RESULT result);
+DB_ROW		zbx_db_fetch_basic(DB_RESULT result);
 void		zbx_db_free_result(DB_RESULT result);
-int		zbx_db_is_null(const char *field);
+int		zbx_db_is_null_basic(const char *field);
 
 typedef enum
 {
@@ -132,29 +149,14 @@ typedef enum
 	ESCAPE_SEQUENCE_ON
 }
 zbx_escape_sequence_t;
-char		*zbx_db_dyn_escape_string(const char *src, size_t max_bytes, size_t max_chars,
+char		*zbx_db_dyn_escape_string_basic(const char *src, size_t max_bytes, size_t max_chars,
 		zbx_escape_sequence_t flag);
 #define ZBX_SQL_LIKE_ESCAPE_CHAR '!'
-char		*zbx_db_dyn_escape_like_pattern(const char *src);
+char		*zbx_db_dyn_escape_like_pattern_basic(const char *src);
 
 int		zbx_db_strlen_n(const char *text_loc, size_t maxlen);
 
-#define ZBX_DBVERSION_UNDEFINED				0
-
-#define ZBX_DB_EXTENSION_TIMESCALEDB				"timescaledb"
-
-#define ZBX_POSTGRESQL_MIN_VERSION_WITH_TIMESCALEDB		100002
-#define ZBX_POSTGRESQL_MIN_VERSION_WITH_TIMESCALEDB_STR		"10.2"
-#define ZBX_TIMESCALE_MIN_VERSION				10500
-#define ZBX_TIMESCALE_MIN_VERSION_STR				"1.5.0"
-#define ZBX_TIMESCALE_MIN_SUPPORTED_VERSION 			20001
-#define ZBX_TIMESCALE_MIN_SUPPORTED_VERSION_STR 		"2.0.1"
-#define ZBX_TIMESCALE_MIN_VERSION_WITH_LICENSE_PARAM_SUPPORT	20000
-#define ZBX_TIMESCALE_MAX_VERSION				20999
-#define ZBX_TIMESCALE_MAX_VERSION_STR				"2.9"
-#define ZBX_TIMESCALE_LICENSE_APACHE_STR			"TimescaleDB Apache 2 Edition"
-#define ZBX_TIMESCALE_LICENSE_COMMUNITY				"timescale"
-#define ZBX_TIMESCALE_LICENSE_COMMUNITY_STR			"TimescaleDB Community Edition"
+#define ZBX_DB_EXTENSION_TIMESCALEDB	"timescaledb"
 
 #if defined(HAVE_POSTGRESQL)
 #	define ZBX_SUPPORTED_DB_CHARACTER_SET	"utf8"
@@ -239,6 +241,9 @@ struct zbx_db_version_info_t
 
 	int			history_compressed_chunks;
 	int			trends_compressed_chunks;
+#ifdef HAVE_ORACLE
+	struct zbx_json		tables_json;
+#endif
 };
 
 void	zbx_dbms_version_info_extract(struct zbx_db_version_info_t *version_info);
