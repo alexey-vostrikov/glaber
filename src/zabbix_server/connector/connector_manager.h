@@ -28,6 +28,11 @@ typedef struct
 }
 zbx_thread_connector_manager_args;
 
+int	worker_item_preproc_execute(u_int64_t itemid, zbx_preproc_cache_t *cache, unsigned char value_type,
+		const zbx_variant_t *value_in, zbx_variant_t *value_out, const zbx_timespec_t *ts,
+		zbx_preproc_op_t *steps, int steps_num, zbx_vector_ptr_t *history_in, zbx_vector_ptr_t *history_out,
+		zbx_preproc_result_t *results, int *results_num, u_int64_t flags, char **error);
+
 ZBX_THREAD_ENTRY(connector_manager_thread, args);
 
 #endif
