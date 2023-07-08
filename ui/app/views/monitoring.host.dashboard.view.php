@@ -108,17 +108,8 @@ $html_page = (new CHtmlPage())
 				)
 			: null
 	)
-	->setNavigation((new CList())->addItem(new CBreadcrumbs([
-		(new CSpan())->addItem(new CLink(_('All hosts'), (new CUrl('zabbix.php'))->setArgument('action', 'host.view'))),
-		(new CSpan())->addItem($data['host']['name']),
-		(new CSpan())
-			->addItem(new CLink($data['dashboard']['name'],
-				(new CUrl('zabbix.php'))
-					->setArgument('action', 'host.dashboard.view')
-					->setArgument('hostid', $data['host']['hostid'])
-			))
-			->addClass(ZBX_STYLE_SELECTED)
-	])));
+	->setNavigation(new CHostNav(CHostNav::getData($data['host']['hostid']))
+	);
 
 if ($data['has_time_selector']) {
 	$html_page->addItem(

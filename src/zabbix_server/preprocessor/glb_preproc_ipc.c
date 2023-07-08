@@ -171,9 +171,9 @@ int preprocess_send_metric_ext(const metric_t *metric, int send_wait_mode) {
 int preprocess_send_metric(const metric_t *metric) {
     int i;
 //
-//for (i = 0; i < 10; i++) {
+   for (i = 0; i < 50; i++) {
     preprocess_send_metric_ext(metric, IPC_LOCK_TRY_1MS);
-//    }
+    }
 }
 
 void set_item_state(const metric_t *metric) {
@@ -353,5 +353,9 @@ int processing_force_flush() {
 }
 int preprocessing_force_flush() {
     glb_ipc_force_flush(conf->preproc_ipc);
+}
+
+int preprocessing_flush() {
+    glb_ipc_flush(conf->preproc_ipc);
 }
 

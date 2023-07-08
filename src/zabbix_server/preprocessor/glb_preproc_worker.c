@@ -29,10 +29,15 @@
 #include "../../libs/zbxipcservice/glb_ipc.h"
 #include "../../libs/zbxpreproc/pp_execute.h"
 #include "../../libs/zbxpreproc/preproc_snmp.h"
+#include "../glb_poller/poller_async_io.h"
 #include "zbxembed.h"
 #include "zbxlld.h"
 
 #define MAX_DEPENDENCY_LEVEL 16
+#define PREPROC_CONFIG_SYNC_INTERVAL 5
+#define PROCTITLE_UPDATE_INTERVAL 5 
+#define FLUSH_INTERVAL  1
+
 
 /* c-paste of zbx preprocessing manager data */
 typedef struct
@@ -43,7 +48,12 @@ typedef struct
     unsigned char process_type;
     int server_num;
     int  process_num;
+    int total_proc; 
     zbx_pp_context_t ctx;
+    poller_event_t *new_config_check;
+    poller_event_t *proctitle_update;
+    poller_event_t *periodic_flush;
+    poller_event_t *processing;
 } glb_preproc_worker_conf_t;
 
 static glb_preproc_worker_conf_t conf = {0};
@@ -70,7 +80,7 @@ void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *prepr
     processing_send_metric(metric);
 }
 
-static void preprocess_metric_execute_steps(const metric_t *metric, zbx_pp_cache_t	*cache, int dep_level) {
+static void preprocess_metric_execute_steps(metric_t *metric, zbx_pp_cache_t *cache, int dep_level) {
 
 	zbx_variant_t	value_out;
 	int			i, steps_num, results_num, ret;
@@ -105,7 +115,7 @@ static void preprocess_metric_execute_steps(const metric_t *metric, zbx_pp_cache
 
 //note this should be preprocessed via normal preprocessing
 //or at least, using "local" preprocessing only for "local" data
-int preprocess_metric(const metric_t *metric) {
+int preprocess_metric(metric_t *metric) {
 	preprocess_metric_execute_steps(metric, NULL, MAX_DEPENDENCY_LEVEL);	
 }
 
@@ -140,23 +150,50 @@ IPC_PROCESS_CB(metrics_proc_cb) {
     preprocess_metric_execute_steps((metric_t*)ipc_data, NULL, MAX_DEPENDENCY_LEVEL);
 }
 
-void preprocessing_sync_conf() {
-  DCconfig_get_preprocessable_items(&conf.items, &conf.cfg_revision, conf.process_num );
+void preprocessing_sync_conf(poller_item_t *poller_item, void *data) {
+  glb_preproc_worker_conf_t *conf = data;
+  DCconfig_get_preprocessable_items(&conf->items, &conf->cfg_revision, conf->process_num );
 }
 
-void preprocessing_worker_init(zbx_thread_args_t *args) {
-  
- 	conf.process_type = args->info.process_type;
-	conf.server_num = args->info.server_num;
-	conf.process_num = args->info.process_num;
+void proctitle_update(poller_item_t *poller_item, void *data) {
+    glb_preproc_worker_conf_t *conf = data;
+ //   LOG_INF("Updating proctitle");
+    zbx_setproctitle("glb_preproc_worker #%d: processed %d/sec", conf->process_num,
+                                         conf->total_proc/PROCTITLE_UPDATE_INTERVAL);
+    conf->total_proc = 0;
+}
+
+#define BATCH_PROCESS_METRICS 32768
+
+void process_incoming_metrics(poller_item_t *poller_item, void *data) {
+    glb_preproc_worker_conf_t *conf = data;
+    int next_run = 0, i;
     
-    bzero(&conf.ctx, sizeof(conf.ctx));
+    if (0 == (i = preproc_receive_metrics(conf->process_num, metrics_proc_cb, NULL, BATCH_PROCESS_METRICS))) 
+        next_run = 1; //sleeping 1msec if no items
+    
+    conf->total_proc += i;
+    poller_run_timer_event(conf->processing, next_run);
+
+}
+
+void ipc_flush(poller_item_t *poller_item, void *data) {
+    preprocessing_flush();
+}
+
+void preprocessing_worker_init(zbx_thread_args_t *args, glb_preproc_worker_conf_t *conf) {
   
- 	zbx_hashset_create_ext(&conf.items, 0, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC,
+ 	conf->process_type = args->info.process_type;
+	conf->server_num = args->info.server_num;
+	conf->process_num = args->info.process_num;
+    
+    bzero(&conf->ctx, sizeof(conf->ctx));
+  
+ 	zbx_hashset_create_ext(&conf->items, 0, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC,
 			(zbx_clean_func_t)pp_item_clear,
 			ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
   
-    preprocessing_sync_conf();
+    preprocessing_sync_conf(NULL, conf);
 	
 #ifdef HAVE_LIBXML2
 	xmlInitParser();
@@ -170,36 +207,32 @@ void preprocessing_worker_init(zbx_thread_args_t *args) {
 	preproc_init_snmp();
 #endif
 
-}
+  poller_async_loop_init();
+    
+  conf->new_config_check = poller_create_event(NULL, preprocessing_sync_conf, 0, conf, 1);
+  poller_run_timer_event(conf->new_config_check, PREPROC_CONFIG_SYNC_INTERVAL * 1000 );
 
-#define BATCH_PROCESS_METRICS 256
+  conf->proctitle_update = poller_create_event(NULL, proctitle_update , 0, conf, 1);
+  poller_run_timer_event(conf->proctitle_update, PROCTITLE_UPDATE_INTERVAL * 1000 );
+
+  conf->periodic_flush = poller_create_event(NULL, ipc_flush , 0, conf, 1);
+  poller_run_timer_event(conf->periodic_flush, FLUSH_INTERVAL * 1000 );
+
+  conf->processing = poller_create_event(NULL, process_incoming_metrics , 0, conf, 0);
+  poller_run_timer_event(conf->processing, 1 );
+
+}
 
 ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args) {
   int i = 0, total_proc =0, proctitle_update=0;
 
   zbx_setproctitle("glb_preproc_worker");
   LOG_INF("glb_preproc_worker started");
+
+  preprocessing_worker_init((zbx_thread_args_t *)args, &conf);
   
-  preprocessing_worker_init((zbx_thread_args_t *)args);
+  poller_async_loop_run();
 
-  //TODO: event-based loop to avoid all the clutter 
-  while (1) {
-
-    if (0 == (i = preproc_receive_metrics(conf.process_num, metrics_proc_cb, NULL, BATCH_PROCESS_METRICS))) {
-        usleep(10011);
-    } else {
-      total_proc +=i;
-    }
-
-    if (time(NULL) - 5 > proctitle_update) {
-      zbx_setproctitle("glb_preproc_worker: processed %d/sec", total_proc/5);
-      total_proc = 0;
-      proctitle_update = time(NULL);
-      preprocessing_sync_conf();
-	  preprocessing_force_flush(); //if there are redirected items, flush them
-    }    
-  }
-  
   if (conf.ctx.es_initialized)
     zbx_es_destroy(&conf.ctx.es_engine);
 }

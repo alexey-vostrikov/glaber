@@ -377,7 +377,7 @@ $item_tab
 		    ->setReadonly($readonly))
 		)->setId('js-item-workerpath-field')
 	]);
-	error_log(json_encode($data)."\n");
+//	error_log(json_encode($data)."\n");
 $headers_data = [];
 
 if (is_array($data['headers']) && $data['headers']) {
@@ -967,10 +967,6 @@ $item_tab
 
 // Append tabs to form.
 $item_tabs = (new CTabView())
-	->addTab('itemInfo',_('Operational state'),
-		(new CFormGrid())
-			->setId('item_state_information')
-	)
 	->addTab('itemTab', $data['caption'], $item_tab)
 	->addTab('tags-tab', _('Tags'),
 		new CPartial('configuration.tags.tab', [
@@ -1003,7 +999,14 @@ $item_tabs = (new CTabView())
 				))->addClass('js-item-preprocessing-type')
 			]),
 		TAB_INDICATOR_PREPROCESSING
+	)
+	->addTab('itemInfo',_('Operational state'),
+	(new CFormGrid())
+			->setId('item_state_information')
+			->addItem((new CLatestValue($data, NULL, $data['triggers']))->makeStateInfo())
 	);
+
+//error_log(json_encode(array_keys($data)));
 
 if ($data['form_refresh'] == 0) {
 	$item_tabs->setSelected(0);

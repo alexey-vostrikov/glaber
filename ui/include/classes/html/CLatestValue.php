@@ -73,7 +73,6 @@ class CLatestValue extends CSpan {
         $this->setHint($this->hintbox, 'hintbox-wrap'); 
         $this->addClass(ZBX_STYLE_LINK_ACTION);
     }
-
     public function GetWorstSeverity() {
         return $this->worst_severity;
     }
@@ -182,42 +181,89 @@ class CLatestValue extends CSpan {
         return true;
     }
     
-    private function addHintRow($name, $check_value, $object) {
+    private function addHintRow(&$element, $name, $check_value, $object) {
         if (!isset($check_value))
             return;
-        $this->hintbox->addRow([(new CSpan($name))->addStyle(ZBX_STYLE_RIGHT)->addStyle(ZBX_STYLE_WORDWRAP), $object]);
+        $element->addRow([(new CSpan($name))->addStyle(ZBX_STYLE_RIGHT)->addStyle(ZBX_STYLE_WORDWRAP), $object]);
     }
     
     private function makeHint() {
-        $value_div = (new CDiv());
+        //$value_div = (new CDiv());
     
         $this->hintbox = (new CTableInfo())->setHeader(["",""]);
         $this->hintbox->addRow((new CCol(new CTag('strong', true, $this->itemdata['name'])))->setColSpan(2));
         
         if ( ! $this->isDisabledItem()) {
-            $this->addHintRow(_('Last check'), $this->last_poll_time, $this->last_poll_time);
-            $this->addHintRow(_('Next check'), $this->next_poll_time, $this->next_poll_time);
+            $this->addHintRow($this->hintbox, _('Last check'), $this->last_poll_time, $this->last_poll_time);
+            $this->addHintRow($this->hintbox, _('Next check'), $this->next_poll_time, $this->next_poll_time);
         }
 
         if ($this->isSupportedItem()) {
-            $this->addHintRow(_('Value'), $this->value_formatted, $this->value_formatted);
+            $this->addHintRow($this->hintbox, _('Value'), $this->value_formatted, $this->value_formatted);
 
             if ($this->isNumericItem()) {
-                $this->addHintRow(_('Change'), $this->value_change, $this->value_change); //maybe its worth to add down or up arrow
-                $this->addHintRow(_('Graph'), $this->history , $this->generateSvgGraph());
+                $this->addHintRow($this->hintbox, _('Change'), $this->value_change, $this->value_change); //maybe its worth to add down or up arrow
+                $this->addHintRow($this->hintbox, _('Graph'), $this->history , $this->generateSvgGraph());
             }
         } else {
-            $this->addHintRow(_('Operational status'), 1, (new CSpan('UNSUPPORTED'))->addClass(ZBX_STYLE_RED));
-            $this->addHintRow(_('Error'), $this->itemdata['error'], (new CSpan($this->itemdata['error']))->addClass(ZBX_STYLE_RED));
+            $this->addHintRow($this->hintbox, _('Operational status'), 1, (new CSpan('UNSUPPORTED'))->addClass(ZBX_STYLE_RED));
+            $this->addHintRow($this->hintbox, _('Error'), $this->itemdata['error'], (new CSpan($this->itemdata['error']))->addClass(ZBX_STYLE_RED));
         }
 
-        $this->addHintRow(_('Triggers'), $this->triggers, $this->makeTriggerInfo());
-        $this->addHintRow(_('History'), 1, $this->makeHistoryLinks() );
-        $this->addHintRow(_('Manage'), $this->editable, $this->makeAdminLinks());
+        $this->addHintRow($this->hintbox, _('Triggers'), $this->triggers, $this->makeTriggerInfo());
+        $this->addHintRow($this->hintbox, _('History'), 1, $this->makeHistoryLinks() );
+        $this->addHintRow($this->hintbox, _('Manage'), $this->editable, $this->makeAdminLinks());
 
         $this->hintbox->addClass(ZBX_STYLE_HINTBOX_WRAP);
     }
+    
+    public function makeStateInfo() {
+        $info = new CDiv();
+        
+        $state_info = (new CTableInfo())->setHeader(["",""]);
+        //$this->hintbox->addRow((new CCol(new CTag('strong', true, $this->itemdata['name'])))->setColSpan(2));
+        
+        if ( ! $this->isDisabledItem()) {
+            $this->addHintRow($state_info, _('Last check'), $this->last_poll_time, $this->last_poll_time);
+            $this->addHintRow($state_info, _('Next check'), $this->next_poll_time, $this->next_poll_time);
+        }
 
+        if ($this->isSupportedItem()) {
+            $this->addHintRow($state_info, _('LastValue/Oper state'), $this->value_formatted, $this->value_formatted);
+
+            if ($this->isNumericItem()) {
+                $this->addHintRow($state_info, _('Change'), $this->value_change, $this->value_change); //maybe its worth to add down or up arrow
+                $this->addHintRow($state_info, _('Graph'), $this->history , $this->generateSvgGraph());
+            }
+        } else {
+            $this->addHintRow($state_info, _('Operational status'), 1, (new CSpan('UNSUPPORTED'))->addClass(ZBX_STYLE_RED));
+            $this->addHintRow($state_info, _('Error'), $this->itemdata['error'], (new CSpan($this->itemdata['error']))->addClass(ZBX_STYLE_RED));
+        }
+
+        $this->addHintRow($state_info, _('Triggers'), $this->triggers, $this->makeTriggerInfo());
+        $this->addHintRow($state_info, _('History'), 1, $this->makeHistoryLinks() );
+        
+
+        $vc_table = (new CTableInfo())->setHeader(["Time","Time rel", "Value"]);
+        
+        foreach ($this->history as $idx => $hist) {
+            $vc_table->addRow([
+                            zbx_date2str(DATE_TIME_FORMAT_SECONDS, $hist['clock']), 
+                            zbx_date2age($hist['clock']),
+                            formatHistoryValue($hist['value'], $this->itemdata, false)]);
+        }
+
+        $info->addItem((new CDiv())
+                ->addItem(new CTag('h3',true, _('Current state data')))
+                ->addItem($state_info) )
+             ->addItem((new CDiv())
+                ->addItem(new CTag('h3',true, _('Value Cache data')))
+                ->addItem($vc_table));
+
+        return $info;
+
+    }
+   
     private function makeHistoryLinks() {
         $ranges=[ ['name' => _('Last hour'), 'range' => 'now-1h'],
                   ['name' => _('Last day'), 'range' => 'now-1d'],
@@ -284,6 +330,16 @@ class CLatestValue extends CSpan {
     }
 
     private function fetchMissingData() {
-        
+        if (!isset($this->history) || 0 == count($this->history)) {
+           // error_log("Fetching the history for item ". $this->itemdata['itemid']. "\n");
+
+            $this->history = \Manager::History()->getLastValues([$this->itemdata], 100,
+			    timeUnitToSeconds(\CSettingsHelper::get(\CSettingsHelper::HISTORY_PERIOD))
+		    );
+          //  $this->history = $this->history[$this->itemdata['itemid']];
+           // error_log("Result is ".json_encode($this->history));
+        }
+
+
     }
 }

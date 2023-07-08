@@ -740,6 +740,7 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 	if (hasRequest('itemid') && !hasRequest('clone')) {
 		$items = API::Item()->get([
 			'output' => ['itemid', 'type', 'snmp_oid', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
+				'state', 'error',
 				'value_type', 'trapper_hosts', 'units', 'logtimefmt', 'templateid', 'valuemapid', 'params',
 				'ipmi_sensor', 'authtype', 'username', 'password', 'publickey', 'privatekey', 'flags', 'interfaceid',
 				'description', 'inventory_link', 'lifetime', 'jmx_endpoint', 'master_itemid', 'url', 'query_fields',
@@ -752,8 +753,10 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 			'selectItemDiscovery' => ['parent_itemid'],
 			'selectPreprocessing' => ['type', 'params', 'error_handler', 'error_handler_params'],
 			'selectTags' => ['tag', 'value'],
+			'selectTriggers' => ['triggerid', 'name', 'value', 'priority'],
 			'itemids' => getRequest('itemid')
 		]);
+
 		$item = $items[0];
 		$host = $item['hosts'][0];
 		unset($item['hosts']);
@@ -799,7 +802,7 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 
 		if (getRequest('master_itemid')) {
 			$master_item_options = [
-				'output' => ['itemid', 'type', 'hostid', 'name', 'key_'],
+				'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'state', 'error', 'status'],
 				'itemids' => getRequest('master_itemid'),
 				'hostids' => $host['hostid'],
 				'webitems' => true
@@ -826,6 +829,8 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 	$data['preprocessing_test_type'] = CControllerPopupItemTestEdit::ZBX_TEST_TYPE_ITEM;
 	$data['preprocessing_types'] = CItem::SUPPORTED_PREPROCESSING_TYPES;
 	$data['trends_default'] = DB::getDefault('items', 'trends');
+	
+	$data['triggers'] = $item['triggers'];
 
 	$history_in_seconds = timeUnitToSeconds($data['history']);
 	if (!getRequest('form_refresh') && $history_in_seconds !== null && $history_in_seconds == ITEM_NO_STORAGE_VALUE) {
@@ -853,12 +858,14 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 	}
 
 	$data['config'] = [
-		'compression_status' => CHousekeepingHelper::get(CHousekeepingHelper::COMPRESSION_STATUS),
-		'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL),
-		'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
-		'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
-		'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS)
+		// 'compression_status' => CHousekeepingHelper::get(CHousekeepingHelper::COMPRESSION_STATUS),
+		// 'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL),
+		// 'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
+		// 'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
+		// 'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS)
 	];
+	
+	$data['state'] = $item['state'];
 
 	// render view
 	if (!$has_errors) {
@@ -911,7 +918,7 @@ else {
 	$options = [
 		'search' => [],
 		'output' => [
-			'itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status', 'value_type', 'error',
+			'itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status','state', 'value_type', 'error',
 			'templateid', 'flags', 'state', 'master_itemid'
 		],
 		'templated' => ($data['context'] === 'template'),
@@ -1288,6 +1295,8 @@ else {
 	foreach ($data['items'] as $item) {
 		$itemTriggerIds = array_merge($itemTriggerIds, zbx_objectValues($item['triggers'], 'triggerid'));
 	}
+	error_log("Calculating triggers\n\n");
+
 	$data['itemTriggers'] = API::Trigger()->get([
 		'triggerids' => $itemTriggerIds,
 		'output' => ['triggerid', 'description', 'expression', 'recovery_mode', 'recovery_expression', 'priority',
