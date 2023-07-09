@@ -52,9 +52,6 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 	$filter = (new CTabFilter())
 		->setId('monitoring_latest_filter')
 		->setOptions($data['tabfilter_options'])
-		->addSubfilter(new CPartial('monitoring.latest.subfilter',
-			array_intersect_key($data, array_flip(['subfilters', 'subfilters_expanded'])))
-		)
 		->addTemplate(new CPartial($data['filter_view'], $data['filter_defaults']));
 
 	foreach ($data['filter_tabs'] as $tab) {
@@ -72,8 +69,8 @@ else {
 
 $html_page
 	->addItem(new CPartial('monitoring.latest.view.html', array_intersect_key($data,
-		array_flip(['filter', 'sort_field', 'sort_order', 'view_curl', 'paging', 'hosts', 'items', 'history', 'config',
-			'tags', 'maintenances', 'items_rw'
+		array_flip(['filter', 'view_curl', 'hosts', 'items', 'history', 'config',
+			'maintenances', 'items_rw', 'entities', 'tags'
 		])
 	)))
 	->show();

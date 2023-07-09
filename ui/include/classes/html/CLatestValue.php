@@ -162,9 +162,7 @@ class CLatestValue extends CSpan {
     }
 
     private function makeAdminLinks(){
-        if (!$this->editable) 
-            return null;
-        
+
         return new CLink(_('Edit'),  (new CUrl('items.php'))
             ->setArgument('form', 'update')
             ->setArgument('itemid', $this->itemdata['itemid'])
@@ -220,24 +218,28 @@ class CLatestValue extends CSpan {
     public function makeStateInfo() {
         $info = new CDiv();
         
-        $state_info = (new CTableInfo())->setHeader(["",""]);
+        $state_info = (new CTableInfo());//->setHeader(["",""]);
         //$this->hintbox->addRow((new CCol(new CTag('strong', true, $this->itemdata['name'])))->setColSpan(2));
         
         if ( ! $this->isDisabledItem()) {
             $this->addHintRow($state_info, _('Last check'), $this->last_poll_time, $this->last_poll_time);
             $this->addHintRow($state_info, _('Next check'), $this->next_poll_time, $this->next_poll_time);
-        }
+        
 
-        if ($this->isSupportedItem()) {
-            $this->addHintRow($state_info, _('LastValue/Oper state'), $this->value_formatted, $this->value_formatted);
+            if ($this->isSupportedItem()) {
+                $this->addHintRow($state_info, _('Operational status'), 1, (new CSpan('SUPPORTED'))->addClass(ZBX_STYLE_GREEN));
+                $this->addHintRow($state_info, _('LastValue'), $this->value_formatted, $this->value_formatted);
 
-            if ($this->isNumericItem()) {
-                $this->addHintRow($state_info, _('Change'), $this->value_change, $this->value_change); //maybe its worth to add down or up arrow
-                $this->addHintRow($state_info, _('Graph'), $this->history , $this->generateSvgGraph());
+                if ($this->isNumericItem()) {
+                    $this->addHintRow($state_info, _('Change'), $this->value_change, $this->value_change); //maybe its worth to add down or up arrow
+                    $this->addHintRow($state_info, _('Graph'), $this->history , $this->generateSvgGraph());
+                }
+            } else {
+                $this->addHintRow($state_info, _('Operational status'), 1, (new CSpan('UNSUPPORTED'))->addClass(ZBX_STYLE_RED));
+                $this->addHintRow($state_info, _('Error'), $this->itemdata['error'], (new CSpan($this->itemdata['error']))->addClass(ZBX_STYLE_RED));
             }
         } else {
-            $this->addHintRow($state_info, _('Operational status'), 1, (new CSpan('UNSUPPORTED'))->addClass(ZBX_STYLE_RED));
-            $this->addHintRow($state_info, _('Error'), $this->itemdata['error'], (new CSpan($this->itemdata['error']))->addClass(ZBX_STYLE_RED));
+           $this->addHintRow($state_info, _('Operational state'), 1, (new CSpan('DISABLED'))->addClass(ZBX_STYLE_YELLOW));
         }
 
         $this->addHintRow($state_info, _('Triggers'), $this->triggers, $this->makeTriggerInfo());
@@ -336,7 +338,9 @@ class CLatestValue extends CSpan {
             $this->history = \Manager::History()->getLastValues([$this->itemdata], 100,
 			    timeUnitToSeconds(\CSettingsHelper::get(\CSettingsHelper::HISTORY_PERIOD))
 		    );
-          //  $this->history = $this->history[$this->itemdata['itemid']];
+
+            if (isset( $this->history[$this->itemdata['itemid']]))
+                $this->history = $this->history[$this->itemdata['itemid']];
            // error_log("Result is ".json_encode($this->history));
         }
 

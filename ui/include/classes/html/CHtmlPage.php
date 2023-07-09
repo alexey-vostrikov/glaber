@@ -29,7 +29,7 @@ class CHtmlPage {
 	private const ZBX_STYLE_HEADER_CONTROLS = 'header-controls';
 	private const ZBX_STYLE_HEADER_KIOSKMODE_CONTROLS = 'header-kioskmode-controls';
 
-	private string $title = '';
+	private $title;
 	private array $title_submenu = [];
 
 	private ?CTag $controls = null;
@@ -49,7 +49,7 @@ class CHtmlPage {
 	 */
 	private int $web_layout_mode = ZBX_LAYOUT_NORMAL;
 
-	public function setTitle(string $title): self {
+	public function setTitle($title): self {
 		$this->title = $title;
 
 		return $this;
@@ -151,8 +151,10 @@ class CHtmlPage {
 				->setAttribute('aria-label', _('Sidebar control'))
 		];
 
-		if ($this->title !== '') {
-			$title_tag = (new CTag('h1', true, $this->title))->setId(self::PAGE_TITLE_ID);
+		if (isset($this->title)) {
+			$title_tag = (new CTag('h1', true))
+					->setId(self::PAGE_TITLE_ID)
+					->addItem($this->title);
 
 			if ($this->title_submenu !== []) {
 				$title_tag = (new CLinkAction($title_tag))
@@ -168,7 +170,7 @@ class CHtmlPage {
 					->setAttribute('aria-label', _('Content controls: header'));
 			}
 
-			$divs[] = new CDiv($title_tag);
+			$divs[] = (new CDiv())->addItem($title_tag);
 		}
 
 		if ($this->doc_url !== '') {

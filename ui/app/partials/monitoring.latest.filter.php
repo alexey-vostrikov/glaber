@@ -88,96 +88,12 @@ $left_column = (new CFormGrid())
 $filter_tags_table = new CTable();
 $filter_tags_table->setId('tags_#{uniqid}');
 
-$filter_tags_table->addRow(
-	(new CCol(
-		(new CRadioButtonList('evaltype', (int) $data['evaltype']))
-			->addValue(_('And/Or'), TAG_EVAL_TYPE_AND_OR, 'evaltype_0#{uniqid}')
-			->addValue(_('Or'), TAG_EVAL_TYPE_OR, 'evaltype_2#{uniqid}')
-			->setModern(true)
-			->setId('evaltype_#{uniqid}')
-	))->setColSpan(4)
-);
-
-$i = 0;
-foreach ($data['tags'] as $tag) {
-	$filter_tags_table->addRow([
-		(new CTextBox('tags['.$i.'][tag]', $tag['tag']))
-			->setAttribute('placeholder', _('tag'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH),
-		(new CSelect('tags['.$i.'][operator]'))
-			->addOptions(CSelect::createOptionsFromArray([
-				TAG_OPERATOR_EXISTS => _('Exists'),
-				TAG_OPERATOR_EQUAL => _('Equals'),
-				TAG_OPERATOR_LIKE => _('Contains'),
-				TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
-				TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
-				TAG_OPERATOR_NOT_LIKE => _('Does not contain')
-			]))
-			->setValue($tag['operator'])
-			->setFocusableElementId('tags-'.$i.'#{uniqid}-operator-select')
-			->setId('tags_'.$i.'#{uniqid}_operator'),
-		(new CTextBox('tags['.$i.'][value]', $tag['value']))
-			->setAttribute('placeholder', _('value'))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-			->setId('tags_'.$i.'#{uniqid}_value'),
-		(new CCol(
-			(new CButton('tags['.$i.'][remove]', _('Remove')))
-				->addClass(ZBX_STYLE_BTN_LINK)
-				->addClass('element-table-remove')
-				->removeId()
-		))->addClass(ZBX_STYLE_NOWRAP)
-	], 'form_row');
-
-	$i++;
-}
-$filter_tags_table->addRow(
-	(new CCol(
-		(new CButton('tags_add', _('Add')))
-			->addClass(ZBX_STYLE_BTN_LINK)
-			->addClass('element-table-add')
-			->removeId()
-	))->setColSpan(3)
-);
-
-$tag_format_line = (new CHorList())
-	->addItem((new CRadioButtonList('show_tags', (int) $data['show_tags']))
-		->addValue(_('None'), SHOW_TAGS_NONE, 'show_tags_0#{uniqid}')
-		->addValue(SHOW_TAGS_1, SHOW_TAGS_1, 'show_tags_1#{uniqid}')
-		->addValue(SHOW_TAGS_2, SHOW_TAGS_2, 'show_tags_2#{uniqid}')
-		->addValue(SHOW_TAGS_3, SHOW_TAGS_3, 'show_tags_3#{uniqid}')
-		->setModern(true)
-		->setId('show_tags_#{uniqid}')
-	)
-	->addItem((new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN))
-	->addItem(new CLabel(_('Tag name')))
-	->addItem((new CRadioButtonList('tag_name_format', (int) $data['tag_name_format']))
-		->addValue(_('Full'), TAG_NAME_FULL, 'tag_name_format_0#{uniqid}')
-		->addValue(_('Shortened'), TAG_NAME_SHORTENED, 'tag_name_format_1#{uniqid}')
-		->addValue(_('None'), TAG_NAME_NONE, 'tag_name_format_2#{uniqid}')
-		->setModern(true)
-		->setEnabled((int) $data['show_tags'] !== SHOW_TAGS_NONE)
-		->setId('tag_name_format_#{uniqid}')
-	);
 
 $right_column = (new CFormGrid())
 	->addClass(CFormGrid::ZBX_STYLE_FORM_GRID_LABEL_WIDTH_TRUE)
 	->addItem([
-		new CLabel(_('Tags')),
-		new CFormField($filter_tags_table)
 	])
 	->addItem([
-		new CLabel(_('Show tags')),
-		new CFormField($tag_format_line)
-	])
-	->addItem([
-		new CLabel(_('Tag display priority'), 'tag_priority_#{uniqid}'),
-		new CFormField(
-			(new CTextBox('tag_priority', $data['tag_priority']))
-				->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-				->setAttribute('placeholder', _('comma-separated list'))
-				->setEnabled((int) $data['show_tags'] !== SHOW_TAGS_NONE)
-				->setId('tag_priority_#{uniqid}')
-		)
 	])
 	->addItem([
 		new CLabel(_('Show details'), 'show_details'),
@@ -186,7 +102,15 @@ $right_column = (new CFormGrid())
 				->setChecked($data['show_details'] == 1)
 				->setUncheckedValue(0)
 		])
-	]);
+	])
+	->addItem([
+		new CLabel(_('Group by discovery'), 'group_by_discovery'),
+		new CFormField([
+			(new CCheckBox('group_by_discovery'))
+				->setChecked($data['group_by_discovery'] == 1)
+				->setUncheckedValue(0)
+		])
+	]);;
 
 $filter_template = (new CDiv())
 	->addClass(ZBX_STYLE_TABLE)
@@ -338,7 +262,7 @@ if (array_key_exists('render_html', $data)) {
 		});
 
 		// Input, radio and single checkboxes.
-		const fields = ['name', 'evaltype', 'show_details', 'show_tags', 'tag_name_format', 'tag_priority'];
+		const fields = ['name', 'evaltype', 'show_details', 'group_by_discovery'];
 
 		fields.forEach(key => {
 			const elm = $('[name="' + key + '"]', container);
@@ -346,6 +270,10 @@ if (array_key_exists('render_html', $data)) {
 			if (key === 'show_details') {
 				elm.prop('checked', (data[key] == 1));
 			}
+			if (key === 'group_by_discovery') {
+				elm.prop('checked', (data[key] == 1));
+			}
+
 			else if (elm.is(':radio,:checkbox')) {
 				elm.filter('[value="' + data[key] + '"]').prop('checked', true);
 			}

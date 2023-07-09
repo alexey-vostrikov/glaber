@@ -44,6 +44,7 @@ abstract class CControllerLatest extends CController {
 		'tag_name_format' => TAG_NAME_FULL,
 		'tag_priority' => '',
 		'show_details' => 0,
+		'group_by_discovery' => 1,
 		'page' => null,
 		'sort' => 'name',
 		'sortorder' => ZBX_SORT_UP,
@@ -73,6 +74,7 @@ abstract class CControllerLatest extends CController {
 	protected function prepareData(array $filter, $sort_field, $sort_order) {
 		// Select groups for subsequent selection of hosts and items.
 		$groupids = $filter['groupids'] ? getSubGroups($filter['groupids']) : null;
+		$discovery_options = [];
 
 		// Select hosts for subsequent selection of items.
 		$hosts = API::Host()->get([
@@ -85,6 +87,15 @@ abstract class CControllerLatest extends CController {
 		$search_limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT);
 		$select_items_cnt = 0;
 		$select_items = [];
+
+		if ($filter['group_by_discovery']) {
+			$discovery_options =  [
+				'selectTemplates' => ['templateid','name'],
+				'selectDiscoveryRule' => ['itemid', 'name', 'templateid', 'key_'],
+				'selectItemDiscovery' => ['parent_itemid','itemdiscoveryid','itemid'],
+				
+			];
+		}
 
 		foreach ($hosts as $hostid => $host) {
 			if ($select_items_cnt > $search_limit) {
@@ -119,8 +130,10 @@ abstract class CControllerLatest extends CController {
 				'selectValueMap' => ['mappings'],
 				'itemids' => array_keys($select_items),
 				'webitems' => true,
-				'preservekeys' => true
-			]);
+				'preservekeys' => true,
+				'discovery_items' => true,
+				'selectTriggers' => ['triggerid', 'name', 'value', 'priority']
+			] + $discovery_options);
 
 			// If user role checkbox 'Invoke "Execute now" on read-only hosts' is ON, read-write items are the same.
 			$items_rw = $items;
@@ -136,35 +149,43 @@ abstract class CControllerLatest extends CController {
 				]);
 			}
 
-			if ($sort_field === 'host') {
-				$items = array_map(function ($item) use ($hosts) {
-					return $item + [
-						'host_name' => $hosts[$item['hostid']]['name']
-					];
-				}, $items);
+			// if ($sort_field === 'host') {
+			// 	$items = array_map(function ($item) use ($hosts) {
+			// 		return $item + [
+			// 			'host_name' => $hosts[$item['hostid']]['name']
+			// 		];
+			// 	}, $items);
 
-				CArrayHelper::sort($items, [[
-					'field' => 'host_name',
-					'order' => $sort_order
-				]]);
-			}
-			else {
-				CArrayHelper::sort($items, [[
-					'field' => 'name',
-					'order' => $sort_order
-				]]);
-			}
+			// 	CArrayHelper::sort($items, [[
+			// 		'field' => 'host_name',
+			// 		'order' => $sort_order
+			// 	]]);
+			// }
+			// else {
+			// 	CArrayHelper::sort($items, [[
+			// 		'field' => 'name',
+			// 		'order' => $sort_order
+			// 	]]);
+			// }
+			$entities = \API::DiscoveryEntity()->get ([
+				'hostids' => array_column($hosts, 'hostid'),
+				'items' => $items
+			]
+		);
+
 		}
 		else {
 			$hosts = [];
 			$items = [];
 			$items_rw = [];
+			$entities = [];
 		}
 
 		return [
 			'hosts' => $hosts,
 			'items' => $items,
-			'items_rw' => $items_rw
+			'items_rw' => $items_rw,
+			'entities' => $entities
 		];
 	}
 

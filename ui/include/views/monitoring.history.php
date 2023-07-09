@@ -36,9 +36,6 @@ $header = [
 ];
 $header_row = [];
 
-if (isset($data['hostids']) && count($data['hostids']) == 1 ) 
-	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostids'][0])));
-
 $same_host = true;
 $items_numeric = true;
 $host_name = '';
@@ -54,8 +51,25 @@ if ($data['items']) {
 }
 
 if ((count($data['items']) == 1 || $same_host) && $data['itemids']) {
-	$header['left'] = $host_name.NAME_DELIMITER.(count($data['items']) == 1 ? $item['name'] : $header['left']);
-	$header_row[] = $header['left'];
+	
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($first_item['hostid'])));
+	
+	if (count($data['items']) == 1) {
+		$item_url =  (new CLink(CHtml::encode($item['name']),
+		(new CUrl('items.php'))
+			->setArgument('form', 'update')
+			->setArgument('hostid', $item['hostid'])
+			->setArgument('itemid', $item['itemid'])
+			->setArgument('context', 'host')
+		)); 
+	} else {
+		$item_url = $header['left'];
+	}
+	
+	
+	$header['left'] = (new CSpan())
+		->addItem($item_url);
+		$header_row[] = $header['left'];
 }
 else {
 	$header_row[] = $header['left'];
