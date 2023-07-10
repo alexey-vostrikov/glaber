@@ -198,17 +198,17 @@ int processing_send_metric(const metric_t *metric) {
 /*******receiver-side functions *******/
 int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count) {
     int i = glb_ipc_process(conf->preproc_ipc, process_num -1 , proc_func, cb_data, max_count );
-    RUN_ONCE_IN_WITH_RET(10, i);
-    glb_ipc_dump_reciever_queues(conf->process_ipc, "WAIT PREPROC STAT: Preproc rcv queue", 0);
-    LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
-    return i;
+    // RUN_ONCE_IN_WITH_RET(10, i);
+    // glb_ipc_dump_reciever_queues(conf->process_ipc, "WAIT PREPROC STAT: Preproc rcv queue", 0);
+    // LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
+     return i;
 };
 
 int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count) {
     int i = glb_ipc_process(conf->process_ipc, process_num -1 , proc_func, cb_data, max_count );
-    RUN_ONCE_IN_WITH_RET(10, i);
-    glb_ipc_dump_reciever_queues(conf->process_ipc, "%p WAIT QUEUE STAT: Processing send queue", process_num -1 );
-    LOG_INF("IPC addr is %p", conf->preproc_ipc);
+    // RUN_ONCE_IN_WITH_RET(10, i);
+    // glb_ipc_dump_reciever_queues(conf->process_ipc, "%p WAIT QUEUE STAT: Processing send queue", process_num -1 );
+    // LOG_INF("IPC addr is %p", conf->preproc_ipc);
     return i;
 };
 
