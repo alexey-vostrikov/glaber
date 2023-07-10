@@ -39,14 +39,22 @@ if ($data['uncheck']) {
 	uncheckTableRows('latest');
 }
 
+//show_error_message(json_encode($data));
 $html_page = (new CHtmlPage())
 	->setTitle(_('Latest data'))
 	->setWebLayoutMode($web_layout_mode)
+//	->setNavigation(new CHostNav(CHostNav::getData($data['hosts'][0])))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::MONITORING_LATEST_VIEW))
 	->setControls(
 		(new CTag('nav', true, (new CList())->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))))
 			->setAttribute('aria-label', _('Content controls'))
 	);
+
+//if (1 == count($data['hosts'])) {
+//
+//	$host = array_values($data['hosts'])[0];
+//	$html_page->setNavigation(new CHostNav(CHostNav::getData($host['hostid'])));
+//}
 
 if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 	$filter = (new CTabFilter())

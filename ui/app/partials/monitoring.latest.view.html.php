@@ -25,9 +25,6 @@
  */
 
 
-
-
-
  $div = (new CDiv());
 
  if (!isset($data['hosts']) || 0 == count( $data['hosts'])) {
@@ -84,7 +81,7 @@ function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_dat
             if (isset($entity_items[$prototype_itemid])) {
                 $itemid = $entity_items[$prototype_itemid];
                 
-                $value = new CLatestValue( $items[$itemid] , 
+                $value = new CLatestValue($items[$itemid] , 
                     isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
                     isset($items[$itemid]['triggers'])? $items[$itemid]['triggers'] : null,
                     isset($data['can_create'])
