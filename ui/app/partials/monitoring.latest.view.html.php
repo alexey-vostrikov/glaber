@@ -81,21 +81,23 @@ function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_dat
             if (isset($entity_items[$prototype_itemid])) {
                 $itemid = $entity_items[$prototype_itemid];
                 
-                $value = new CLatestValue($items[$itemid] , 
-                    isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
-                    isset($items[$itemid]['triggers'])? $items[$itemid]['triggers'] : null,
-                    isset($data['can_create'])
-                );    
-                
-                $col = (new CCol($value))->setAttribute('data-order', $value->GetValueRaw());
-                
-                if ($value->GetWorstSeverity() > 0) 
-                    $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
+                if (isset($items[$itemid])) {
+                    $value = new CLatestValue($items[$itemid] , 
+                        isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
+                        isset($items[$itemid]['triggers'])? $items[$itemid]['triggers'] : null,
+                        isset($data['can_create'])
+                    );
+            
+                    $col = (new CCol($value))->setAttribute('data-order', $value->GetValueRaw());
+                    
+                    if ($value->GetWorstSeverity() > 0) 
+                        $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
+    
+                    unset($data['items'][$itemid]);
+                } else 
+                    $col = (new CCol('NO item'));
 
                 array_push($row, $col);
-               
-                unset($data['items'][$itemid]);
-		
             } else {
 				array_push($row,"NO item");
 			} 

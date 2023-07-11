@@ -17,21 +17,24 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-?>
 
 
-window.navtreeitem_edit_popup = new class {
+use Zabbix\Widgets\Fields\CWidgetFieldMultiSelectMap;
 
-	init() {
-		const $sysmap = jQuery('#sysmapid');
-		const name_input = document.getElementById('name');
+class CWidgetFieldMultiSelectMapView extends CWidgetFieldMultiSelectView {
 
-		$sysmap.on('change', () => {
-			if (name_input.value === '') {
-				const sysmaps = $sysmap.multiSelect('getData');
-
-				name_input.value = sysmaps.length ? sysmaps[0]['name'] : '';
-			}
-		});
+	public function __construct(CWidgetFieldMultiSelectMap $field, array $data) {
+		parent::__construct($field, $data);
 	}
-};
+
+	protected function getObjectName(): string {
+		return 'sysmaps';
+	}
+
+	protected function getPopupParameters(): array {
+		return [
+			'srctbl' => 'sysmaps',
+			'srcfld1' => 'sysmapid'
+		];
+	}
+}

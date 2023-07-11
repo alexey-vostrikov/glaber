@@ -15,23 +15,17 @@
 **
 ** You should have received a copy of the GNU General Public License
 ** along with this program; if not, write to the Free Software
-** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 **/
-?>
 
 
-window.navtreeitem_edit_popup = new class {
+namespace Zabbix\Widgets\Fields;
 
-	init() {
-		const $sysmap = jQuery('#sysmapid');
-		const name_input = document.getElementById('name');
+class CWidgetFieldMultiSelectMap extends CWidgetFieldMultiSelect {
 
-		$sysmap.on('change', () => {
-			if (name_input.value === '') {
-				const sysmaps = $sysmap.multiSelect('getData');
+	public function __construct(string $name, string $label = null) {
+		parent::__construct($name, $label);
 
-				name_input.value = sysmaps.length ? sysmaps[0]['name'] : '';
-			}
-		});
+		$this->setSaveType(ZBX_WIDGET_FIELD_TYPE_MAP);
 	}
-};
+}
