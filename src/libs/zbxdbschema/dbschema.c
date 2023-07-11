@@ -2593,24 +2593,24 @@ ZBX_TABLE	tables[] = {
 };
 
 const zbx_db_table_changelog_t	changelog_tables[] = {
-	{"host_tag", 2},
 	{"drules", 9},
-	{"trigger_tag", 6},
-	{"item_preproc", 8},
-	{"httpstep_field", 15},
-	{"dchecks", 10},
-	{"functions", 7},
-	{"hosts", 1},
-	{"connector_tag", 18},
-	{"items", 3},
-	{"connector", 17},
 	{"triggers", 5},
-	{"httpstepitem", 16},
-	{"item_tag", 4},
-	{"httptest", 11},
+	{"hosts", 1},
+	{"trigger_tag", 6},
 	{"httptestitem", 13},
-	{"httptest_field", 12},
+	{"host_tag", 2},
+	{"httpstep_field", 15},
+	{"item_tag", 4},
 	{"httpstep", 14},
+	{"httptest_field", 12},
+	{"item_preproc", 8},
+	{"functions", 7},
+	{"httpstepitem", 16},
+	{"connector_tag", 18},
+	{"httptest", 11},
+	{"dchecks", 10},
+	{"connector", 17},
+	{"items", 3},
 	{0}
 };
 #if defined(HAVE_SQLITE3)

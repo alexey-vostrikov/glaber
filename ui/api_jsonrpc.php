@@ -61,7 +61,7 @@ try {
 
 	$jsonRpc = new CJsonRpc($apiClient, $data);
 	
-	$responce = $jsonRpc->execute();
+	$responce = $jsonRpc->execute($jsonRpc->execute($http_request));
 //	file_put_contents('/tmp/glaber_api', $responce."\n\n", FILE_APPEND | LOCK_EX);
 	echo $responce;
 }

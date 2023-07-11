@@ -5150,6 +5150,9 @@ section .section-toggle:hover, .filter-container.tabfilter-container .icon-edit:
   height: 100%;
   z-index: 1001; }
 
+.dashboard-menu {
+  overflow: auto; }
+
 .menu-popup {
   position: absolute;
   z-index: 1001;
@@ -5160,8 +5163,7 @@ section .section-toggle:hover, .filter-container.tabfilter-container .icon-edit:
   border: 1px solid #ccd5d9;
   border-bottom-color: #c9d3d7;
   box-shadow: 0 4px 20px 0 rgba(118, 141, 153, 0.5);
-  max-height: 90%;
-  overflow: auto; }
+  max-height: 90%; }
   .menu-popup:focus {
     outline: none; }
   .menu-popup li {

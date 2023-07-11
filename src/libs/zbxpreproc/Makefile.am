@@ -26,4 +26,5 @@ libzbxpreproc_a_SOURCES = \
 	pp_execute_json_discovery.c
 
 libzbxpreproc_a_CFLAGS = \
-	 $(LIBXML2_CFLAGS)
+	$(LIBXML2_CFLAGS) \
+	$(TLS_CFLAGS)
