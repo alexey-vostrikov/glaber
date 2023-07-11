@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 noinst_LIBRARIES = libpreprocessor.a
+	
 
 libpreprocessor_a_SOURCES = \
 	glb_preproc_ipc.c \
@@ -8,4 +9,5 @@ libpreprocessor_a_SOURCES = \
 
 
 libpreprocessor_a_CFLAGS = \
-	 $(LIBXML2_CFLAGS)
+	 $(LIBXML2_CFLAGS) \
+	$(TLS_CFLAGS)

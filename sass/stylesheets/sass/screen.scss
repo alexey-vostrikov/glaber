@@ -3102,6 +3102,10 @@ $form-icon-btn: (
 	z-index: 1001;
 }
 
+.dashboard-menu {
+	overflow: auto;
+}
+
 .menu-popup {
 	position: absolute;
 	z-index: 1001;
@@ -3113,7 +3117,6 @@ $form-icon-btn: (
 	border-bottom-color: darken($overlay-border-color, 1%);
 	box-shadow: 0 4px 20px 0 $action-shadow-color;
 	max-height: 90%;
-	overflow: auto;
 
 	&:focus {
 		outline: none;
@@ -3127,7 +3130,7 @@ $form-icon-btn: (
 			margin: 5px -15px 5px -25px;
 		}
 	}
-
+	
 	.menu-popup-item {
 		display: block;
 		height: 24px;
@@ -3142,7 +3145,7 @@ $form-icon-btn: (
 		position: relative;
 		@extend %overflow-ellipsis;
 		transition: background-color .2s ease-out;
-
+	
 		&:hover,
 		&:focus,
 		&:active,

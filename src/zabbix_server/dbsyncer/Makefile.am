@@ -6,3 +6,6 @@ libzbxdbsyncer_a_SOURCES = \
 	dbsyncer.c \
 	dbsyncer.h \
 	trends.c
+
+libzbxdbsyncer_a_CFLAGS = \
+	$(TLS_CFLAGS)

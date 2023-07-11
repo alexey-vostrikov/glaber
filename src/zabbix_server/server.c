@@ -840,8 +840,10 @@ static void zbx_validate_config(ZBX_TASK_EX *task)
 		err = 1;
 	}
 
-	if (FAIL == zbx_parse_serveractive_element(CONFIG_NODE_ADDRESS, &address, &port, 10051) ||
-		(FAIL == zbx_is_supported_ip(address) && FAIL == zbx_validate_hostname(address)))
+
+	if (NULL != CONFIG_NODE_ADDRESS &&
+			(FAIL == zbx_parse_serveractive_element(CONFIG_NODE_ADDRESS, &address, &port, 10051) ||
+			(FAIL == zbx_is_supported_ip(address) && FAIL == zbx_validate_hostname(address))))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "invalid \"NodeAddress\" configuration parameter: address \"%s\""
 								   " is invalid",
@@ -1444,11 +1446,13 @@ int main(int argc, char **argv)
 		config_file = zbx_strdup(NULL, DEFAULT_CONFIG_FILE);
 
 	/* required for simple checks */
+
 	zbx_init_metrics();
+	zbx_init_library_cfg(program_type, config_file);
 	set_config_defaults();
 	zbx_load_config(&t);
 
-	zbx_init_library_cfg(program_type);
+
 	zbx_init_library_dbupgrade(get_program_type);
 	zbx_init_library_icmpping(&config_icmpping);
 	zbx_init_library_ipcservice(program_type);
@@ -1982,7 +1986,7 @@ static void server_teardown(zbx_rtc_t *rtc, zbx_socket_t *listen_sock, zbx_socke
 {
 	int i;
 	char *error = NULL;
-	zbx_ha_config_t *ha_config = NULL;
+	zbx_ha_config_t	*ha_config = zbx_malloc(NULL, sizeof(zbx_ha_config_t));
 
 	/* hard kill all zabbix processes, no logging or other  */
 
@@ -2043,7 +2047,6 @@ static void server_teardown(zbx_rtc_t *rtc, zbx_socket_t *listen_sock, zbx_socke
 	zbx_locks_enable();
 #endif
 
-	ha_config = zbx_malloc(NULL, sizeof(zbx_ha_config_t));
 	ha_config->ha_node_name = CONFIG_HA_NODE_NAME;
 	ha_config->ha_node_address = CONFIG_NODE_ADDRESS;
 	ha_config->default_node_ip = CONFIG_LISTEN_IP;
@@ -2065,7 +2068,8 @@ static void server_teardown(zbx_rtc_t *rtc, zbx_socket_t *listen_sock, zbx_socke
  ******************************************************************************/
 static void server_restart_ha(zbx_rtc_t *rtc)
 {
-	char *error = NULL;
+	char		*error = NULL;
+	zbx_ha_config_t	*ha_config = zbx_malloc(NULL, sizeof(zbx_ha_config_t));
 
 	zbx_unset_child_signal_handler();
 
@@ -2090,7 +2094,13 @@ static void server_restart_ha(zbx_rtc_t *rtc)
 	zbx_locks_enable();
 #endif
 
-	if (SUCCEED != zbx_ha_start(rtc, ZBX_NODE_STATUS_STANDBY, &error))
+	ha_config->ha_node_name =	CONFIG_HA_NODE_NAME;
+	ha_config->ha_node_address =	CONFIG_NODE_ADDRESS;
+	ha_config->default_node_ip =	CONFIG_LISTEN_IP;
+	ha_config->default_node_port =	CONFIG_LISTEN_PORT;
+	ha_config->ha_status =		ZBX_NODE_STATUS_STANDBY;
+
+	if (SUCCEED != zbx_ha_start(rtc, ha_config, &error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot start HA manager: %s", error);
 		zbx_free(error);
@@ -2109,7 +2119,7 @@ int MAIN_ZABBIX_ENTRY(int flags)
 	time_t standby_warning_time;
 	zbx_rtc_t rtc;
 	zbx_timespec_t rtc_timeout = {1, 0};
-	zbx_ha_config_t *ha_config = NULL;
+	zbx_ha_config_t	*ha_config = zbx_malloc(NULL, sizeof(zbx_ha_config_t));
 	struct rlimit limits;
 	// ZBX_TASK_EX	t = {ZBX_TASK_START};
 
@@ -2317,7 +2327,7 @@ int MAIN_ZABBIX_ENTRY(int flags)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize database cache: %s", error);
 		zbx_free(error);
-		return FAIL;
+		exit(EXIT_FAILURE);
 	}
 
 	zbx_db_check_character_set();
@@ -2343,7 +2353,6 @@ int MAIN_ZABBIX_ENTRY(int flags)
 
 	zbx_unset_exit_on_terminate();
 
-	ha_config = zbx_malloc(NULL, sizeof(zbx_ha_config_t));
 	ha_config->ha_node_name = CONFIG_HA_NODE_NAME;
 	ha_config->ha_node_address = CONFIG_NODE_ADDRESS;
 	ha_config->default_node_ip = CONFIG_LISTEN_IP;
@@ -2504,7 +2513,6 @@ int MAIN_ZABBIX_ENTRY(int flags)
 
 		if (0 < (ret = waitpid((pid_t)-1, &i, WNOHANG)))
 		{
-			zabbix_log(LOG_LEVEL_CRIT, "PROCESS EXIT: %d", ret);
 			zbx_set_exiting_with_fail();
 			break;
 		}
@@ -2516,6 +2524,8 @@ int MAIN_ZABBIX_ENTRY(int flags)
 			break;
 		}
 	}
+
+	zbx_log_exit_signal();
 
 	if (SUCCEED == ZBX_EXIT_STATUS())
 		zbx_rtc_shutdown_subs(&rtc);
