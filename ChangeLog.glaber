@@ -1,3 +1,6 @@
+2023-11-07 ver 3.2.3 (master only)
+    -upgraded to Zabbix 6.4.4 sources, fixed second-level menu fail
+    -fixed rows selection in datatables
 2023-10-07 ver 3.2.2 (master only)
     -fix: removed excessive logging in preproc ipc
 2023-10-07 ver 3.2.1 (master only)

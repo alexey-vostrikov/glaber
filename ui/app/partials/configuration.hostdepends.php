@@ -79,7 +79,7 @@ function getDependencyRow(array $dep): CRow
         (new CCol(new CInput('text', "depends[{$dep['depid']}][name]", $dep['name'])))->addClass('dep-name'),
         (new CCol($direction))->addClass('dep-direction'),
         (new CCol([
-            $hostname_link,'&nbsp;',
+            $hostname_link, NBSP(),
             $hostname_edit,
             (new CInput('hidden', "depends[{$dep['depid']}][hostid]", $hostid))->addClass('js-dep-hostid')
         ]))->addClass('dep-hostname'),

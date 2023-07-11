@@ -293,6 +293,7 @@ function makeDashBoardButton(array $dashboards, $name = 'Dashboards', $styleclas
 	$dash_link = (new CButton('', ''))
 		->addItem((new CTag('i',true, ''))
 			->addClass($styleclass))
+		->addItem(NBSP())
 		->addItem(new CSpan($name))
 		->setMenuPopup([
 			'type' => 'dropdown',

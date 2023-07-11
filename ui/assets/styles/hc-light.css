@@ -7486,6 +7486,9 @@ z-select.z-select-host-interface li[disabled] .description:not(:empty),
   width: 250px;
   height: 80px; }
 
+.form-submit-hidden {
+  display: none; }
+
 .sidebar .logo:focus .sidebar-logo {
   box-shadow: 0 0 0 2px #ffffff; }
 .sidebar button:focus {
