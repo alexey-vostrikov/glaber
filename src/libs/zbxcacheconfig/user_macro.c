@@ -25,6 +25,7 @@
 #include "zbxregexp.h"
 #include "zbxnum.h"
 
+extern int zbx_log_level;
 extern zbx_shmem_info_t	*config_mem;
 ZBX_SHMEM_FUNC_IMPL(__config, config_mem)
 

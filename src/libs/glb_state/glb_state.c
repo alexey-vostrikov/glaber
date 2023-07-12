@@ -31,6 +31,7 @@
 #define GLB_VCDUMP_RECORD_TYPE_VALUE 2
 
 #define	REFCOUNT_FIELD_SIZE	sizeof(zbx_uint32_t)
+extern int zbx_log_level;
 
 extern u_int64_t CONFIG_VALUE_CACHE_SIZE;
 
