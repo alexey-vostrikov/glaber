@@ -25,6 +25,7 @@
 #include "load_dump.h"
 #include "zbxdbhigh.h"
 #include "zbxjson.h"
+extern int zbx_log_level;
 
 typedef struct {
     elems_hash_t *triggers;
