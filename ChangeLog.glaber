@@ -1,4 +1,6 @@
 2023-12-07 ver 3.2.4 (master only)
+    -fixed typo in api_jsonrpc leading api to be unfunctionable
+2023-12-07 ver 3.2.4 (master only)
     - fixed latest data content reloading
 2023-11-07 ver 3.2.3 (master only)
     -upgraded to Zabbix 6.4.4 sources, fixed second-level menu fail
