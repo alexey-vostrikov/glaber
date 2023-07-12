@@ -41,8 +41,8 @@ class CControllerLatestViewRefresh extends CControllerLatestView {
 				}
 
 				$prepared_data = $this->prepareData($tabfilter, $tabfilter['sort'], $tabfilter['sortorder']);
-				$subfilters_fields = self::getSubfilterFields($tabfilter);
-				self::getSubfilters($subfilters_fields, $prepared_data);
+			//	$subfilters_fields = self::getSubfilterFields($tabfilter);
+			//	self::getSubfilters($subfilters_fields, $prepared_data);
 				$filter_counters[$index] = count(self::applySubfilters($prepared_data['items']));
 			}
 
@@ -61,9 +61,9 @@ class CControllerLatestViewRefresh extends CControllerLatestView {
 			$prepared_data = $this->prepareData($filter, $filter['sort'], $filter['sortorder']);
 
 			// Prepare subfilter data.
-			$subfilters_fields = self::getSubfilterFields($filter);
-			$subfilters = self::getSubfilters($subfilters_fields, $prepared_data);
-			$prepared_data['items'] = self::applySubfilters($prepared_data['items']);
+			//$subfilters_fields = self::getSubfilterFields($filter);
+			//$subfilters = self::getSubfilters($subfilters_fields, $prepared_data);
+			//$prepared_data['items'] = self::applySubfilters($prepared_data['items']);
 
 			$page = $this->getInput('page', 1);
 			$view_url = (new CUrl('zabbix.php'))->setArgument('action', 'latest.view');
@@ -82,18 +82,18 @@ class CControllerLatestViewRefresh extends CControllerLatestView {
 					'sort_order' => $filter['sortorder'],
 					'paging' => $paging,
 					'config' => [
-						'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS),
-						'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
-						'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
-						'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)
+					//	'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS),
+				//	'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
+				//		'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
+				//		'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)
 					],
 					'tags' => makeTags($prepared_data['items'], true, 'itemid', (int) $filter['show_tags'],
-						$filter['tags'], array_key_exists('tags', $subfilters_fields) ? $subfilters_fields['tags'] : [],
+						$filter['tags'], [],
 						(int) $filter['tag_name_format'], $filter['tag_priority']
 					)
 				] + $prepared_data,
-				'subfilters' => $subfilters,
-				'subfilters_expanded' => array_flip($this->getInput('subfilters_expanded', []))
+			//	'subfilters' => $subfilters,
+			//	'subfilters_expanded' => array_flip($this->getInput('subfilters_expanded', []))
 			];
 
 			$response = new CControllerResponseData($data);
