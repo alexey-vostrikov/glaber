@@ -613,41 +613,6 @@ abstract class CControllerLatest extends CController {
 	}
 
 	/**
-	 * Returns array of items matching selected subfilters.
-	 *
-	 * @param array      $items
-	 * @param array      $items[]['matching_subfilters']
-	 * @param bool       $items[]['matching_subfilters']['hostids']   (optional) TRUE if item matches host subfilter.
-	 * @param array|bool $items[]['matching_subfilters']['tagnames']  (optional) TRUE if item matches tagname subfilter
-	 *                                                                or array of exactly matching tagnames.
-	 * @param array|bool $items[]['matching_subfilters']['tags']      (optional) TRUE if item matches tagname/value
-	 *                                                                subfilter or array of exactly matching
-	 *                                                                tagname/value pairs.
-	 * @param bool       $items[]['matching_subfilters']['data']      (optional) TRUE if item matches data subfilter.
-	 *
-	 * @return array
-	 */
-	protected static function applySubfilters(array $items): array {
-		return array_filter($items, function ($item) {
-			$matches = array_intersect_key($item['matching_subfilters'],
-				array_flip(['hostids', 'tagnames', 'tags', 'data'])
-			);
-
-			if (array_key_exists('tagnames', $matches)) {
-				$matches['tagnames'] = (bool) $matches['tagnames'];
-			}
-
-			if (array_key_exists('tags', $matches)) {
-				$matches['tags'] = (bool) $matches['tags'];
-			}
-
-			return (count(array_unique($matches)) == 1)
-				? current($matches)
-				: false;
-		});
-	}
-
-	/**
 	 * Make subset of most severe subfilters to reduce the space used by subfilter.
 	 *
 	 * @param array  $subfilters

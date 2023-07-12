@@ -80,13 +80,13 @@
 			});
 
 			// Tags must be activated also using the enter button on keyboard.
-			document.addEventListener('keydown', (event) => {
-				if (event.which == 13 && event.target.classList.contains('<?= ZBX_STYLE_BTN_TAG ?>')) {
-					view.setSubfilter([`subfilter_tags[${encodeURIComponent(event.target.dataset.key)}][]`,
-						event.target.dataset.value
-					]);
-				}
-			});
+		//	document.addEventListener('keydown', (event) => {
+		//		if (event.which == 13 && event.target.classList.contains('<?= ZBX_STYLE_BTN_TAG ?>')) {
+		//			view.setSubfilter([`subfilter_tags[${encodeURIComponent(event.target.dataset.key)}][]`,
+		//				event.target.dataset.value
+		//			]);
+		//		}
+		//	});
 		},
 
 		initExpandableSubfilter() {
@@ -159,12 +159,12 @@
 		},
 
 		getCurrentForm() {
-			return $('form[name=items]');
+			return $('div[name=content]');
 		},
 
-		getCurrentSubfilter() {
-			return $('#latest-data-subfilter');
-		},
+	//	getCurrentSubfilter() {
+	//		return $('#latest-data-subfilter');
+	//	},
 
 		_addRefreshMessage(messages) {
 			this._removeRefreshMessage();
@@ -196,6 +196,8 @@
 
 		refresh() {
 			this.setLoading();
+			
+			console.log("Doing data refresh");
 
 			const params = this.refresh_url.getArgumentsObject();
 			const exclude = ['action', 'filter_src', 'filter_show_counter', 'filter_custom_time', 'filter_name'];
@@ -214,9 +216,9 @@
 					return post_data;
 				}, {});
 
-			if (this.filter) {
-				post_data['subfilters_expanded'] = this.filter.getExpandedSubfilters();
-			}
+		//	if (this.filter) {
+		//		post_data['subfilters_expanded'] = this.filter.getExpandedSubfilters();
+		//	}
 
 			var deferred = $.ajax({
 				url: this.refresh_simple_url,
@@ -238,7 +240,7 @@
 
 		doRefresh(body, subfilter) {
 			this.getCurrentForm().replaceWith(body);
-			this.getCurrentSubfilter().replaceWith(subfilter);
+			//this.getCurrentSubfilter().replaceWith(subfilter);
 			chkbxRange.init();
 		},
 
@@ -425,13 +427,13 @@
 			}, {once: true});
 		},
 
-		setSubfilter(field) {
-			this.filter.setSubfilter(field[0], field[1]);
-		},
+	//	setSubfilter(field) {
+	//		this.filter.setSubfilter(field[0], field[1]);
+	//	},
 
-		unsetSubfilter(field) {
-			this.filter.unsetSubfilter(field[0], field[1]);
-		},
+	//	unsetSubfilter(field) {
+	//		this.filter.unsetSubfilter(field[0], field[1]);
+	//	},
 
 		events: {
 			hostSuccess(e) {

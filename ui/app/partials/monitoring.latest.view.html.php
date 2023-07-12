@@ -25,7 +25,7 @@
  */
 
 
- $div = (new CDiv());
+ $div = (new CDiv())->setName('content');
 
  if (!isset($data['hosts']) || 0 == count( $data['hosts'])) {
     $div->addItem(
@@ -36,16 +36,16 @@
 }
 
 if (1 == $data['filter']['group_by_discovery'] && $data['entities']) {
-    $page_view = ShowGroupedItems($data);
+    ShowGroupedItems($div, $data);
 } else {
-    $page_view = ShowItemsPlainTable($data);
+    $div->addItem(ShowItemsPlainTable($data));
 }
 
-echo $page_view;
+echo $div;
 return;
 
-function ShowGroupedItems(array &$data) {
-    $all_div = new CDiv();
+function ShowGroupedItems(&$div, array &$data) {
+  //  $all_div = new CDiv();
     $items = &$data['items'];
     
     $discovery_out = (new CDiv());
@@ -55,13 +55,13 @@ function ShowGroupedItems(array &$data) {
             $discovery_out->addItem((new CDiv())->addItem(' '));
     }
     
-    $all_div
+    $div
 	//	->addItem((new CTag("h4", true, "Host-specific items"))
      //   ->addStyle("font-weight: bold;"))
         ->addItem( ShowItemsPlainTable($data));
-    $all_div->addItem($discovery_out);
+    $div->addItem($discovery_out);
 
-    return $all_div->toString();
+    //return $all_div->toString();
 }
 
 
