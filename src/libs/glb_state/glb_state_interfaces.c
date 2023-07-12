@@ -20,6 +20,7 @@
 #include "glb_state_interfaces.h"
 #include "zbxjson.h"
 #include "zbxavailability.h"
+extern int zbx_log_level;
 
 #define INTERFACE_FAILS_TO_FAIL 3
 
