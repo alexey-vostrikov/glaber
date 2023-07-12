@@ -221,7 +221,7 @@ int apm_init() {
     char *error = NULL;
     
     if (SUCCEED != zbx_shmem_create(&apm_ipc, CONFIG_APM_IPC_SIZE, "APM ipc cache size", "APMIPCsize ", 1, &error)) {
-        zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
+        LOG_WRN("Shared memory create failed: %s", error);
     	return FAIL;
     }
     
