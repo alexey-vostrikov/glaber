@@ -1,4 +1,6 @@
-2023-12-07 ver 3.2.4 (master only)
+2023-12-07 ver 3.2.6 (master only)
+    -fix: segv on non-intrerval delays, absence of delay macro translation
+2023-12-07 ver 3.2.5 (master only)
     -fixed typo in api_jsonrpc leading api to be unfunctionable
 2023-12-07 ver 3.2.4 (master only)
     - fixed latest data content reloading

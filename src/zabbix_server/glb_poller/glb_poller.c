@@ -147,7 +147,7 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 	int simple_interval;
 	u_int64_t nextcheck;
 	zbx_custom_interval_t *custom_intervals;
-	char *error;
+	char *error = NULL;
 	const char *delay;
 	poller_host_t *glb_host;
 
@@ -158,7 +158,9 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 
 	if (SUCCEED != zbx_interval_preproc(delay, &simple_interval, &custom_intervals, &error))
 	{
-		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s", poller_item->itemid, poller_item->delay);
+	
+		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s :%s", poller_item->itemid, poller_item->delay, error);
+		poller_preprocess_error(poller_item, "error");
 		return FAIL;
 	}
 
@@ -307,7 +309,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_host_t *glb_host;
 	u_int64_t mstime = glb_ms_time();
 	int i;
-
+	
 	DEBUG_ITEM(dc_item->itemid, "Creating/updating item");
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
@@ -315,7 +317,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: deleting the old configuration");
 		glb_poller_delete_item(poller_item->itemid);
 	}
-
+	
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
 	bzero(&local_glb_item, sizeof(poller_item_t));
 
@@ -326,6 +328,11 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 
 	poller_item->state = POLL_QUEUED;
 	poller_item->hostid = dc_item->host.hostid;
+	
+	zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_item->host.hostid, NULL, NULL,
+						NULL, NULL, NULL, NULL, NULL, &dc_item->delay, MACRO_TYPE_COMMON,
+						NULL, 0);
+
 	poller_item->delay = strpool_add(&conf.strpool, dc_item->delay);
 	poller_item->value_type = dc_item->value_type;
 	poller_item->flags = dc_item->flags;
@@ -334,7 +341,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item->interfaceid = dc_item->interface.interfaceid;
 
 	add_item_to_host(poller_item->hostid);
-
+	
 	if (FAIL == conf.poller.init_item(dc_item, poller_item))
 	{
 		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
