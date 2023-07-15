@@ -244,3 +244,7 @@ src/glapi/glb_netflow_collector
 configure.ac
 src/libs/zbxdbschema/dbschema.c
 .sass-cache/*
+seed.img
+user-data
+meta-data
+vm-output
