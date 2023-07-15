@@ -1417,9 +1417,9 @@ ELEMS_CALLBACK(item_set_error_cb) {
 
 
 int  glb_state_item_set_error(u_int64_t itemid, const char *error) {
+    DEBUG_ITEM(itemid,"Set error value %s:", error);
 	return elems_hash_process(state->items, itemid, item_set_error_cb, (void *)error, 0);
 }
-
 
 int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
     int i, ret = SUCCEED;

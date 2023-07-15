@@ -72,11 +72,27 @@ abstract class CControllerLatest extends CController {
 	 * @return array
 	 */
 	protected function prepareData(array $filter, $sort_field, $sort_order) {
-		// Select groups for subsequent selection of hosts and items.
+
 		$groupids = $filter['groupids'] ? getSubGroups($filter['groupids']) : null;
 		$discovery_options = [];
 
-		// Select hosts for subsequent selection of items.
+		$hosts = [];
+		$items = [];
+		$items_rw = [];
+		$entities = [];
+
+		
+		if (  ( null == $groupids || 0 == count($groupids)) && 
+			  ( null == $filter['hostids'] || 0 == count( $filter['hostids'])) 
+		   ){
+			return [
+				'hosts' => [],
+				'items' => [],
+				'items_rw' => [],
+				'entities' => []
+			];
+		}
+
 		$hosts = API::Host()->get([
 			'output' => ['hostid', 'name', 'status', 'maintenanceid', 'maintenance_status', 'maintenance_type'],
 			'groupids' => $groupids,
@@ -84,102 +100,49 @@ abstract class CControllerLatest extends CController {
 			'preservekeys' => true
 		]);
 
-		$search_limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT);
 		$select_items_cnt = 0;
 		$select_items = [];
 
-		if ($filter['group_by_discovery']) {
+		if (1 == $filter['group_by_discovery']) {
 			$discovery_options =  [
 				'selectTemplates' => ['templateid','name'],
 				'selectDiscoveryRule' => ['itemid', 'name', 'templateid', 'key_'],
 				'selectItemDiscovery' => ['parent_itemid','itemdiscoveryid','itemid'],
-				
 			];
 		}
 
-		foreach ($hosts as $hostid => $host) {
-			if ($select_items_cnt > $search_limit) {
-				unset($hosts[$hostid]);
-				continue;
-			}
-
-			$select_items += API::Item()->get([
-				'output' => ['itemid', 'hostid', 'value_type'],
-				'hostids' => [$hostid],
-				'webitems' => true,
-				'evaltype' => $filter['evaltype'],
-				'tags' => $filter['tags'] ?: null,
-				'filter' => [
-					'status' => [ITEM_STATUS_ACTIVE]
-				],
-				'search' => ($filter['name'] === '') ? null : [
-					'name' => $filter['name']
-				],
-				'preservekeys' => true
-			]);
-
-			$select_items_cnt = count($select_items);
-		}
-
-		if ($select_items) {
-			$items = API::Item()->get([
-				'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
-					'value_type', 'units', 'description', 'state', 'error'
-				],
-				'selectTags' => ['tag', 'value'],
-				'selectValueMap' => ['mappings'],
-				'itemids' => array_keys($select_items),
-				'webitems' => true,
-				'preservekeys' => true,
-				'discovery_items' => true,
-				'selectTriggers' => ['triggerid', 'name', 'value', 'priority']
+		$items = API::Item()->get([
+			'output' => ['itemid', 'type', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
+				'value_type', 'units', 'description', 'state', 'error', 'status'],
+			'selectTags' => ['tag', 'value'],
+			'selectValueMap' => ['mappings'],
+			'hostids' => array_column($hosts,'hostid'),
+			'webitems' => true,
+			'search' => ($filter['name'] === '') ? null : ['name' => $filter['name']
+			],
+			'preservekeys' => true,
+			'discovery_items' => true,
+			'selectTriggers' => ['triggerid', 'name', 'value', 'priority']
 			] + $discovery_options);
 
-			// If user role checkbox 'Invoke "Execute now" on read-only hosts' is ON, read-write items are the same.
-			$items_rw = $items;
+		// If user role checkbox 'Invoke "Execute now" on read-only hosts' is ON, read-write items are the same.
+		$items_rw = $items;
 
-			// If user role checkbox 'Invoke "Execute now" on read-only hosts' is OFF, get only read-write items.
-			if (!$this->hasInput('filter_counters') && $this->getUserType() < USER_TYPE_SUPER_ADMIN
-					&& !$this->checkAccess(CRoleHelper::ACTIONS_INVOKE_EXECUTE_NOW)) {
-				$items_rw = API::Item()->get([
-					'output' => [],
-					'itemids' => array_keys($items),
-					'editable' => true,
-					'preservekeys' => true
-				]);
-			}
-
-			// if ($sort_field === 'host') {
-			// 	$items = array_map(function ($item) use ($hosts) {
-			// 		return $item + [
-			// 			'host_name' => $hosts[$item['hostid']]['name']
-			// 		];
-			// 	}, $items);
-
-			// 	CArrayHelper::sort($items, [[
-			// 		'field' => 'host_name',
-			// 		'order' => $sort_order
-			// 	]]);
-			// }
-			// else {
-			// 	CArrayHelper::sort($items, [[
-			// 		'field' => 'name',
-			// 		'order' => $sort_order
-			// 	]]);
-			// }
-			$entities = \API::DiscoveryEntity()->get ([
-				'hostids' => array_column($hosts, 'hostid'),
-				'items' => $items
-			]
-		);
-
+		// If user role checkbox 'Invoke "Execute now" on read-only hosts' is OFF, get only read-write items.
+		if (!$this->hasInput('filter_counters') && $this->getUserType() < USER_TYPE_SUPER_ADMIN
+				&& !$this->checkAccess(CRoleHelper::ACTIONS_INVOKE_EXECUTE_NOW)) {
+			$items_rw = API::Item()->get([
+				'output' => [],
+				'itemids' => array_keys($items),
+				'editable' => true,
+				'preservekeys' => true
+			]);
 		}
-		else {
-			$hosts = [];
-			$items = [];
-			$items_rw = [];
-			$entities = [];
-		}
+
+		$entities = \API::DiscoveryEntity()->get ([
+			'hostids' => array_column($hosts, 'hostid'),
+			'items' => $items
+		]);
 
 		return [
 			'hosts' => $hosts,
