@@ -59,15 +59,15 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
     zbx_json_type_t type;
     char *path = NULL;
 
- 	zbx_custom_interval_t *custom_intervals;
-    char *error;
+ 	zbx_custom_interval_t *custom_intervals = NULL;
+    char *error = NULL;
 
     worker = (worker_t *)zbx_calloc(NULL, 0, sizeof(worker_t));
 
     if (SUCCEED != zbx_interval_preproc(dcitem->delay, &worker->delay, &custom_intervals, &error))
 	{
 		LOG_INF("Worker itemd %ld has wrong delay time set :%s", dcitem->itemid, dcitem->delay);
-		return FAIL;
+		worker->delay = WORKER_SILENCE_TIMEOUT;
 	}
 
     DEBUG_ITEM(dcitem->itemid, "Set timeout of %d seconds for worker %s",worker->delay, dcitem->key);

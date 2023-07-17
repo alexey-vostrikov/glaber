@@ -344,12 +344,10 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	
 	if (FAIL == conf.poller.init_item(dc_item, poller_item))
 	{
-		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
 		strpool_free(&conf.strpool, poller_item->delay);
 		delete_item_from_host(poller_item->hostid);
 		zbx_hashset_remove(&conf.items, &poller_item->itemid);
-		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
-
+		
 		return FAIL;
 	};
 
