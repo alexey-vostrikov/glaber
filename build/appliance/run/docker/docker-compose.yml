@@ -2,7 +2,7 @@
 version: "3.6"
 services:
   mysql:
-    image: percona:8.0.29-21-centos
+    image: percona:8.0.33-25-centos
     command:
     -  --default-authentication-plugin=mysql_native_password
     -  --character-set-server=utf8
