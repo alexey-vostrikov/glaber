@@ -22,7 +22,8 @@ build {
       "sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen",
       "sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen",
       "locale-gen",
-      "download-mibs"
+      "download-mibs",
+      "rm /etc/zabbix/zabbix_server.conf"
     ]
   }
   provisioner "file" {
