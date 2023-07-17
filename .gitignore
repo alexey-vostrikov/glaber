@@ -247,4 +247,4 @@ src/libs/zbxdbschema/dbschema.c
 seed.img
 user-data
 meta-data
-vm-output
+vm-output*
