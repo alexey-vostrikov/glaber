@@ -1,4 +1,4 @@
-2023-12-07 ver 3.2.9 (master only)
+2023-12-07 ver 3.2.9, 3.2.10 (master only)
     -fix: incorrect dbupgrade code leading not creating glaber dependancy table
 2023-12-07 ver 3.2.8 (master only)
     -fix: segv on incorrect interval on server items
