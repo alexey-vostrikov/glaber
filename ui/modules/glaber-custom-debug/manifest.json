@@ -12,7 +12,6 @@
         "module.debug.list": {
             "class": "CControllerDebugList",
             "view": "module.debug.list"
-        }
-        
+        }      
     }
 }
