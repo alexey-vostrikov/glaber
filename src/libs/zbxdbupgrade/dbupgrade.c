@@ -1156,7 +1156,7 @@ int	DBcheck_version(zbx_ha_mode_t ha_mode, db_update_db_type_t update_type) {
 
 			zbx_db_begin();
 
-			result = zbx_db_select("select optional,mandatory from %d " ZBX_FOR_UPDATE, dbversion_table_name);
+			result = zbx_db_select("select optional,mandatory from %s " ZBX_FOR_UPDATE, dbversion_table_name);
 			if (NULL != (row = zbx_db_fetch(result)))
 				db_optional = atoi(row[0]);
 
