@@ -80,12 +80,13 @@ class CControllerChartsViewJson extends CControllerCharts {
 
 		$graphs = array_merge($host_graphs, $simple_graphs);
 
-	//	$subfilters_fields = self::getSubfilterFields([
-	//		'subfilter_tagnames' => $this->getInput('subfilter_tagnames', []),
-	//		'subfilter_tags' => $this->getInput('subfilter_tags', [])
-	//	]);
-	//	$subfilters = self::getSubfilters($graphs, $subfilters_fields);
-	//	$graphs = self::applySubfilters($graphs);
+		$subfilters_fields = self::getSubfilterFields([
+			'subfilter_tagnames' => $this->getInput('subfilter_tagnames', []),
+			'subfilter_tags' => $this->getInput('subfilter_tags', [])
+		]);
+	
+		$subfilters = self::getSubfilters($graphs, $subfilters_fields);
+		$graphs = self::applySubfilters($graphs);
 
 		CArrayHelper::sort($graphs, ['name', 'graphid', 'itemid']);
 
@@ -96,7 +97,7 @@ class CControllerChartsViewJson extends CControllerCharts {
 		$data = [
 			'charts' => $this->getCharts($graphs),
 			'timeline' => getTimeSelectorPeriod($timeselector_options),
-		//	'subfilter' => (new CPartial('monitoring.charts.subfilter', $subfilters))->getOutput(),
+			'subfilter' => (new CPartial('monitoring.charts.subfilter', $subfilters))->getOutput(),
 			'paging' => $paging->toString()
 		];
 
