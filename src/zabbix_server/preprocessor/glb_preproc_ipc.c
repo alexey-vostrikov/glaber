@@ -45,43 +45,48 @@ extern int CONFIG_PROC_IPC_METRICS_PER_SYNCER; //128 * 1024
 //extern int  CONFIG_GLB_PREPROCESSOR_FORKS;
 
 static  zbx_shmem_info_t	*preproc_ipc_mem;
+static  zbx_shmem_info_t	*proc_ipc_mem;
+
 ZBX_SHMEM_FUNC_IMPL(_preprocipc, preproc_ipc_mem);
+ZBX_SHMEM_FUNC_IMPL(_procipc, proc_ipc_mem);
 
 typedef struct  {
-    mem_funcs_t memf;
+    mem_funcs_t preproc_memf;
+    mem_funcs_t proc_memf;
     ipc_conf_t *preproc_ipc; //ipc poller->preprocessing
     ipc_conf_t *process_ipc; //ipc preprocessing->hist_syncer
 } preproc_ipc_conf_t;
 
 static preproc_ipc_conf_t *conf = NULL;
 
-//static 
-char *preproc_ipc_allocate_str(const char *str) {
+static char *preproc_ipc_allocate_str(const char *str, mem_funcs_t* memf) {
     size_t len = strlen(str) + 1;
+    char *new_str;
 
-    char *new_str = conf->memf.malloc_func(NULL, len);
-    if (NULL == new_str ) {
-        LOG_INF("Mememory free is %ld", preproc_ipc_mem->free_size);
-        HALT_HERE("Out of memory situation!");
-        return NULL;
+    while (NULL == (new_str = memf->malloc_func(NULL, len))) {
+        usleep(10000);
+        //LOG_INF("Mememory free is %ld", preproc_ipc_mem->free_size);
+        //HALT_HERE("Out of memory situation!");
+        //return NULL;
     }
+
     memcpy(new_str, str, len);
     
     return new_str;
 }
 
-static void  preproc_ipc_free_buffer(void *buff) {
-    conf->memf.free_func(buff);
+static void  preproc_ipc_free_buffer(void *buff, mem_funcs_t *memf) {
+    memf->free_func(buff);
 }
 
-IPC_CREATE_CB(preproc_ipc_metric_create_cb) {
+IPC_CREATE_CB(ipc_metric_create_cb) {
 
     metric_t *local_metric = local_data, *ipc_metric = ipc_data;
     
     //LOG_INF("Got dynamic metric id %ld type %ld, str ptr is %ld", local_metric->itemid, local_metric->value.type, local_metric->value.data.str );
 	
-    DEBUG_ITEM(local_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", local_metric->value.type,
-					zbx_variant_type_desc(&local_metric->value), zbx_variant_value_desc(&local_metric->value));
+    //DEBUG_ITEM(local_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", local_metric->value.type,
+	//				zbx_variant_type_desc(&local_metric->value), zbx_variant_value_desc(&local_metric->value));
 
     memcpy(ipc_metric, local_metric, sizeof(metric_t));
 
@@ -91,66 +96,85 @@ IPC_CREATE_CB(preproc_ipc_metric_create_cb) {
 //        if (NULL !=local_metric->value.data.str )
   //          LOG_INF("Metric value is %s", local_metric->value.data.str);
 
-        ipc_metric->value.data.str = preproc_ipc_allocate_str(local_metric->value.data.str);
+        ipc_metric->value.data.str = preproc_ipc_allocate_str(local_metric->value.data.str, memf);
     }
     
-	DEBUG_ITEM(ipc_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", ipc_metric->value.type,
-					zbx_variant_type_desc(&ipc_metric->value), zbx_variant_value_desc(&ipc_metric->value));
+//	DEBUG_ITEM(ipc_metric->itemid,"Metric sent to preprocessing with type %d, type %s value %s", ipc_metric->value.type,
+//					zbx_variant_type_desc(&ipc_metric->value), zbx_variant_value_desc(&ipc_metric->value));
 }
 
-IPC_FREE_CB(preproc_ipc_metric_free_cb) {
+IPC_FREE_CB(ipc_metric_free_cb) {
     metric_t *ipc_metric = ipc_data;
     
     if (SUCCEED == variant_is_dynamic_length(&ipc_metric->value)) {
-      //  LOG_INF("Free mem before free %ld", preproc_ipc_mem->free_size);
-        preproc_ipc_free_buffer(ipc_metric->value.data.str);
-        
+        preproc_ipc_free_buffer(ipc_metric->value.data.str, memf);
     }
 
     ipc_metric->value.type = VARIANT_VALUE_NONE;
+    ipc_metric->value.data.str = NULL;
 }
 
 
-
 INTERNAL_METRIC_CALLBACK(preprocessing_stat_cb) {
-    LOG_INF("Called preproc statistics");
     size_t alloc = 0, offset = 0;
-    zbx_snprintf_alloc(result, &alloc, &offset, "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\"}", 
-                glb_ipc_get_queue(conf->preproc_ipc), glb_ipc_get_free_pcnt(conf->preproc_ipc), glb_ipc_get_sent(conf->preproc_ipc) );
+    
+    zbx_snprintf_alloc(result, &alloc, &offset, 
+            "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\","
+            "\"mem_total\":\"%ld\", \"mem_used\":\"%ld\",\"mem_free_pcnt\":\"%0.2f\"}",
+            glb_ipc_get_queue(conf->preproc_ipc), glb_ipc_get_free_pcnt(conf->preproc_ipc), glb_ipc_get_sent(conf->preproc_ipc),
+            preproc_ipc_mem->total_size,  preproc_ipc_mem->used_size,  
+            ((double)preproc_ipc_mem->free_size * 100.0)/((double)preproc_ipc_mem->total_size));
 
     return SUCCEED;
 }
 
 INTERNAL_METRIC_CALLBACK(processing_stat_cb) {
     size_t alloc = 0, offset = 0;
-    zbx_snprintf_alloc(result, &alloc, &offset, "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\"}", 
-                glb_ipc_get_queue(conf->process_ipc), glb_ipc_get_free_pcnt(conf->process_ipc), glb_ipc_get_sent(conf->process_ipc) );
     
+    zbx_snprintf_alloc(result, &alloc, &offset, 
+        "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\","
+        "\"mem_total\":\"%ld\", \"mem_used\":\"%ld\",\"mem_free_pcnt\":\"%0.2f\"}",
+        glb_ipc_get_queue(conf->process_ipc), glb_ipc_get_free_pcnt(conf->process_ipc), glb_ipc_get_sent(conf->process_ipc),
+        proc_ipc_mem->total_size,  proc_ipc_mem->used_size,  ((double)proc_ipc_mem->free_size * 100.0)/((double)proc_ipc_mem->total_size));
+        
     return SUCCEED;
 }
 
 int preproc_ipc_init() {
     char *error = NULL;
-    LOG_INF("IPC mem size is %ld", CONFIG_IPC_BUFFER_SIZE);
-    if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, CONFIG_IPC_BUFFER_SIZE, "Metrics IPC buffer size", "MetricsBufferSize ", 0, &error)) {
+//    LOG_INF("IPC mem size is %ld", CONFIG_IPC_BUFFER_SIZE);
+    
+    if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, CONFIG_IPC_BUFFER_SIZE, "Preproc metrics IPC buffer size", "IPCBufferSize", 1, &error)) {
         LOG_WRN("Shared memory create failed: %s", error);
     	return FAIL;
     }
     
-    conf = _preprocipc_shmem_malloc_func(NULL, sizeof(conf));
-
-    //TODO: to reduce congestion on malloc on varaible data, split IPC mem into two separte segments
-    conf->memf.free_func = _preprocipc_shmem_free_func;
-    conf->memf.malloc_func = _preprocipc_shmem_malloc_func;
-    conf->memf.realloc_func = _preprocipc_shmem_realloc_func;
-
-    conf->preproc_ipc = glb_ipc_init_ext(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
-        CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->memf, preproc_ipc_metric_create_cb,
-         preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME, "poll->preproc");
+//    LOG_INF("IPC mem size is %ld 2", CONFIG_IPC_BUFFER_SIZE);
+    if (SUCCEED != zbx_shmem_create(&proc_ipc_mem, CONFIG_IPC_BUFFER_SIZE, "Processing IPC buffer size", "IPCBufferSize", 1, &error)) {
+        LOG_WRN("Shared memory create failed: %s", error);
+    	return FAIL;
+    }
     
+//    LOG_INF("IPC mem size is %ld 3", CONFIG_IPC_BUFFER_SIZE);
+    conf = _preprocipc_shmem_malloc_func(NULL, sizeof(preproc_ipc_conf_t));
+   
+    conf->preproc_memf.free_func = _preprocipc_shmem_free_func;
+    conf->preproc_memf.malloc_func = _preprocipc_shmem_malloc_func;
+    conf->preproc_memf.realloc_func = _preprocipc_shmem_realloc_func;
+
+    conf->proc_memf.free_func = _procipc_shmem_free_func;
+    conf->proc_memf.malloc_func = _procipc_shmem_malloc_func;
+    conf->proc_memf.realloc_func = _procipc_shmem_realloc_func;
+
+//    LOG_INF("IPC mem size is %ld 4, %p", CONFIG_IPC_BUFFER_SIZE, conf->preproc_memf.malloc_func);
+    conf->preproc_ipc = glb_ipc_init_ext(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
+        CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->preproc_memf, ipc_metric_create_cb,
+        ipc_metric_free_cb, IPC_HIGH_VOLUME, "poll->preproc");
+    
+//    LOG_INF("IPC mem size is %ld 5", CONFIG_IPC_BUFFER_SIZE);
     conf->process_ipc = glb_ipc_init_ext(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
-        CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->memf, preproc_ipc_metric_create_cb,
-         preproc_ipc_metric_free_cb, IPC_HIGH_VOLUME, "preproc->proc");
+        CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->proc_memf, ipc_metric_create_cb,
+         ipc_metric_free_cb, IPC_HIGH_VOLUME, "preproc->proc");
 
     glb_register_internal_metric_handler("preprocessing",   preprocessing_stat_cb);
     glb_register_internal_metric_handler("processing",      processing_stat_cb);
@@ -160,6 +184,7 @@ int preproc_ipc_init() {
 
 void preproc_ipc_destroy() {
     zbx_shmem_destroy(preproc_ipc_mem);
+    zbx_shmem_destroy(proc_ipc_mem);
 }
 
 int preprocess_send_metric_ext(const metric_t *metric, int send_wait_mode) {
@@ -179,8 +204,8 @@ int preprocess_send_metric(const metric_t *metric) {
 void set_item_state(const metric_t *metric) {
      switch (metric->value.type) {
          case ZBX_VARIANT_ERR:
-             if (NULL != metric->value.data.err)
-                 glb_state_item_set_error(metric->itemid, metric->value.data.err);
+             if (NULL != metric->value.data.str)
+                 glb_state_item_set_error(metric->itemid, metric->value.data.str);
              else 
                  glb_state_item_set_error(metric->itemid, "");
              break;

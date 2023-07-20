@@ -78,7 +78,7 @@ void	zbx_variant_clear(zbx_variant_t *value)
 			zbx_free(value->data.bin);
 			break;
 		case ZBX_VARIANT_ERR:
-			zbx_free(value->data.err);
+			zbx_free(value->data.str);
 			break;
 		case ZBX_VARIANT_DBL_VECTOR:
 			zbx_vector_dbl_destroy(value->data.dbl_vector);
@@ -132,7 +132,7 @@ void	zbx_variant_set_bin(zbx_variant_t *value, void *value_bin)
 
 void	zbx_variant_set_error(zbx_variant_t *value, char *error)
 {
-	value->data.err = error;
+	value->data.str = error;
 	value->type = ZBX_VARIANT_ERR;
 }
 
@@ -175,7 +175,7 @@ void	zbx_variant_copy(zbx_variant_t *value, const zbx_variant_t *source)
 			value->type = ZBX_VARIANT_NONE;
 			break;
 		case ZBX_VARIANT_ERR:
-			zbx_variant_set_error(value, zbx_strdup(NULL, source->data.err));
+			zbx_variant_set_error(value, zbx_strdup(NULL, source->data.str));
 			break;
 		case ZBX_VARIANT_DBL_VECTOR:
 			dbl_vector = (zbx_vector_dbl_t *)zbx_malloc(NULL, sizeof(zbx_vector_dbl_t));
@@ -368,7 +368,7 @@ const char	*zbx_variant_value_desc(const zbx_variant_t *value)
 				buffer[0] = '\0';
 			return buffer;
 		case ZBX_VARIANT_ERR:
-			return value->data.err;
+			return value->data.str;
 		case ZBX_VARIANT_DBL_VECTOR:
 			zbx_snprintf(buffer, sizeof(buffer), "double vector[0:%d]", value->data.dbl_vector->values_num);
 			return buffer;
@@ -461,7 +461,7 @@ static int	variant_compare_error(const zbx_variant_t *value1, const zbx_variant_
 		if (ZBX_VARIANT_ERR != value2->type)
 			return 1;
 
-		return strcmp(value1->data.err, value2->data.err);
+		return strcmp(value1->data.str, value2->data.str);
 	}
 
 	return -1;

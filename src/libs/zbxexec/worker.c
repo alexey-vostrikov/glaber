@@ -308,6 +308,7 @@ int glb_worker_is_alive(glb_worker_t *worker)
 
     if (0 == (n_pid = waitpid(worker->pid, &status, WNOHANG)))
         return SUCCEED;
+        
     LOG_INF("Worker %d changed status: %d", n_pid, status);
     
     //if (WIFEXITED(status)) { //|| WIFSIGNALED(status)) {

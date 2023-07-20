@@ -1,4 +1,3 @@
-
 /*
 ** Copyright Glaber
 **
@@ -17,20 +16,4 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "../../libs/zbxipcservice/glb_ipc.h"
-#include "metric.h"
-
-int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
-int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
-
-int processing_send_metric(const metric_t *metric);
-int preprocess_send_metric_ext(const metric_t *metric, int send_mode);
-int preprocess_send_metric(const metric_t *metric);
-
-int preprocessing_flush();
-
-int preproc_ipc_init();
-void preproc_ipc_destroy();
-
-int preprocessing_force_flush();
-int processing_force_flush();
+void run_proc_ipc_tests();

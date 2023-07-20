@@ -495,7 +495,7 @@ static int	eval_execute_push_value(const zbx_eval_context_t *ctx, const zbx_eval
 	{
 		if (ZBX_VARIANT_ERR == token->value.type && 0 == (ctx->rules & ZBX_EVAL_PROCESS_ERROR))
 		{
-			*error = zbx_strdup(*error, token->value.data.err);
+			*error = zbx_strdup(*error, token->value.data.str);
 			return FAIL;
 		}
 
@@ -2950,7 +2950,7 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 
 	if (ZBX_VARIANT_ERR == output.values[0].type)
 	{
-		errmsg = zbx_strdup(errmsg, output.values[0].data.err);
+		errmsg = zbx_strdup(errmsg, output.values[0].data.str);
 		goto out;
 	}
 

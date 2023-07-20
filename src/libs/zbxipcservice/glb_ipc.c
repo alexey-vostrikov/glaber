@@ -102,8 +102,44 @@ void glb_ipc_local_destroy(ipc_conf_t *ipc) {
 
 }
 
-static int move_all_elements(ipc_queue_t *src, ipc_queue_t *dst, int lock_mode) {
 
+static int move_all_elements_to_head(ipc_queue_t *src, ipc_queue_t *dst, int lock_mode) {
+	
+	if (IPC_LOCK_TRY_ONLY == lock_mode) {
+		if (FAIL == glb_lock_try_block(&src->lock))
+			return FAIL;
+	} else 
+		glb_lock_block(&src->lock);
+	 	
+	if (src->count == 0) {
+		glb_lock_unlock(&src->lock);
+		return FAIL;	
+	}
+	
+	if (IPC_LOCK_TRY_ONLY == lock_mode) {
+		if (FAIL == glb_lock_try_block(&dst->lock)) {
+			glb_lock_unlock(&src->lock);
+			return FAIL;
+		}
+	} else 
+		glb_lock_block(&dst->lock);
+
+	src->last->next = dst->first;
+	dst->first = src->first;
+	dst->count += src->count;
+
+	src->first = src->last = NULL;
+	src->count = 0;
+
+	glb_lock_unlock(&dst->lock);
+	glb_lock_unlock(&src->lock);
+
+	return SUCCEED;
+}
+
+
+
+static int move_all_elements(ipc_queue_t *src, ipc_queue_t *dst, int lock_mode) {
 	
 	if (IPC_LOCK_TRY_ONLY == lock_mode) {
 		if (FAIL == glb_lock_try_block(&src->lock))
@@ -397,9 +433,6 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 			
 			ipc_reset_redirect_queue();
 			move_one_element(local_rcv_queue, local_send_queue, NULL);
-			
-//			HALT_HERE("Shouldn't get here yet");
-
 			continue;
 		}
 		
@@ -409,7 +442,7 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		move_one_element(local_rcv_queue, local_free_queue, "local_receive -> local_free");
 		
 		if (local_free_queue->count >= ipc->bulk_count ) 
-			move_all_elements(local_free_queue, &ipc->free_queue, IPC_LOCK_TRY_ONLY);
+			move_all_elements_to_head(local_free_queue, &ipc->free_queue, IPC_LOCK_TRY_ONLY);
 	}
 	
 	return i;
@@ -429,12 +462,12 @@ ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers
     char *error = NULL;
 	ipc_element_t *elements;
 	
-
 	if (NULL == (ipc = memf->malloc_func(NULL, sizeof(ipc_conf_t)))) {	
 		LOG_WRN("Cannot allocate IPC structures for IPC, exiting");
 		return NULL;
 	}
-	
+
+
 	memset((void *)ipc, 0, sizeof(ipc_conf_t));
 	zbx_strlcpy(ipc->name, name, strlen(name));
 

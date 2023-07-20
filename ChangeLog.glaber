@@ -1,8 +1,10 @@
-2023-12-07 ver 3.2.9, 3.2.10 (master only)
+2023-20-07 ver 3.2.11 (master only)
+    -fix: ipc memory issue might be causing segv, ipc queue menagment to reduce shared mem usage
+2023-17-07 ver 3.2.9, 3.2.10 (master only)
     -fix: incorrect dbupgrade code leading not creating glaber dependancy table
-2023-12-07 ver 3.2.8 (master only)
+2023-15-07 ver 3.2.8 (master only)
     -fix: segv on incorrect interval on server items
-2023-12-07 ver 3.2.7 (master only)
+2023-14-07 ver 3.2.7 (master only)
     -fix: lld data not put to value cache, latest data view fixes
 2023-12-07 ver 3.2.6 (master only)
     -fix: segv on non-intrerval delays, absence of delay macro translation

@@ -144,7 +144,7 @@ static void item_variant_clear(zbx_variant_t *value)
         state->memf.free_func(value->data.bin);
         break;
     case ZBX_VARIANT_ERR:
-        state->memf.free_func(value->data.err);
+        state->memf.free_func(value->data.str);
         break;
     case ZBX_VARIANT_DBL_VECTOR:
         zbx_vector_dbl_destroy(value->data.dbl_vector);
@@ -243,8 +243,8 @@ static int glb_state_value_to_hist_copy(zbx_history_record_t *record,
         break;
 
     case ITEM_VALUE_TYPE_NONE: // TODO: get rid of the allocation!!!! we can just use the copy from the cache
-        if (NULL != c_val->value.data.err)
-            record->value.err = zbx_strdup(NULL, c_val->value.data.err);
+        if (NULL != c_val->value.data.str)
+            record->value.err = zbx_strdup(NULL, c_val->value.data.str);
         else
             record->value.err = NULL;
         break;
