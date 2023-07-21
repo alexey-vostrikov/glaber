@@ -1,3 +1,6 @@
+2023-21-07 ver 3.2.13, 3.2.14 (master only)
+    -fix: redirect preprocessing steps logic to avoid situation when redirected item continued to be processed after redirected
+    -fix: periodical ipc flushing to prevent metrics stuck on slow ingest rates
 2023-20-07 ver 3.2.11, 3.2.12 (master only)
     -fix: ipc memory issue might be causing segv, ipc queue menagment to reduce shared mem usage
     -fix: restored functionality of the original graphs view

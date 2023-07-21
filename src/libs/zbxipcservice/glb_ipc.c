@@ -335,15 +335,13 @@ int glb_ipc_flush(ipc_conf_t *ipc) {
 	int i = 0;
 	unsigned int now = time(NULL);
 
-
-	for (i = 0 ; i < ipc->consumers; i ++ ) {
-		if (IPC_LOW_LATENCY == ipc->mode || 
-		    (ipc->local_queues->send_queues[i].count > IPC_BULK_COUNT || now > IPC_BULK_TIMEOUT + ipc->lastflush) 
-		   )
+	if ( IPC_LOW_LATENCY == ipc->mode || 
+	    (ipc->local_queues->send_queues[i].count > IPC_BULK_COUNT || now > IPC_BULK_TIMEOUT + ipc->lastflush))
+	{	
+		for (i = 0 ; i < ipc->consumers; i ++ ) 
 			move_all_elements(&ipc->local_queues->send_queues[i], &ipc->queues[i], IPC_LOCK_TRY_ONLY);
+		ipc->lastflush = now;
 	}
-	
-	ipc->lastflush = now;
 }
 
 static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, unsigned char lock_mode) {

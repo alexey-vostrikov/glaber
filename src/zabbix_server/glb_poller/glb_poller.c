@@ -121,6 +121,7 @@ typedef struct
 	poller_event_t *update_proctitle;
 	poller_event_t *async_io_proc;
 	poller_event_t *lost_items_check;
+	poller_event_t *preprocessing_flush;
 
 } poll_engine_t;
 
@@ -456,6 +457,9 @@ void lost_items_check_cb(poller_item_t *garbage, void *data)
 
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
 }
+static void preprocessing_flush_cb(poller_item_t *garbage, void *data) {
+	preprocessing_flush();
+}
 
 static void update_proc_title_cb(poller_item_t *garbage, void *data)
 {
@@ -514,6 +518,9 @@ static int poller_init(zbx_thread_args_t *args)
 	
 	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, args, 1);
 	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL);
+
+	conf.preprocessing_flush = poller_create_event(NULL, preprocessing_flush_cb, 0, args, 1);
+	poller_run_timer_event(conf.preprocessing_flush, PROCTITLE_UPDATE_INTERVAL);
 
 	conf.lost_items_check = poller_create_event(NULL, lost_items_check_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);

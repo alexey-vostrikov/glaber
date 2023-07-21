@@ -16,13 +16,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-/* this is simple monitoring engine to export internal metrics
-via prometheus protocol via standart monitoring url
-
-now it's NOT follows standards as it doesn't support HELP and TYPE keywords
-*/
-
-//TODO idea for improvement - implement a kind of a buffer pool to avoid alloc cluttering
 #include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "../../libs/zbxipcservice/glb_ipc.h"
@@ -65,9 +58,6 @@ static char *preproc_ipc_allocate_str(const char *str, mem_funcs_t* memf) {
 
     while (NULL == (new_str = memf->malloc_func(NULL, len))) {
         usleep(10000);
-        //LOG_INF("Mememory free is %ld", preproc_ipc_mem->free_size);
-        //HALT_HERE("Out of memory situation!");
-        //return NULL;
     }
 
     memcpy(new_str, str, len);
@@ -142,20 +132,17 @@ INTERNAL_METRIC_CALLBACK(processing_stat_cb) {
 
 int preproc_ipc_init() {
     char *error = NULL;
-//    LOG_INF("IPC mem size is %ld", CONFIG_IPC_BUFFER_SIZE);
-    
+  
     if (SUCCEED != zbx_shmem_create(&preproc_ipc_mem, CONFIG_IPC_BUFFER_SIZE, "Preproc metrics IPC buffer size", "IPCBufferSize", 1, &error)) {
         LOG_WRN("Shared memory create failed: %s", error);
     	return FAIL;
     }
     
-//    LOG_INF("IPC mem size is %ld 2", CONFIG_IPC_BUFFER_SIZE);
     if (SUCCEED != zbx_shmem_create(&proc_ipc_mem, CONFIG_IPC_BUFFER_SIZE, "Processing IPC buffer size", "IPCBufferSize", 1, &error)) {
         LOG_WRN("Shared memory create failed: %s", error);
     	return FAIL;
     }
     
-//    LOG_INF("IPC mem size is %ld 3", CONFIG_IPC_BUFFER_SIZE);
     conf = _preprocipc_shmem_malloc_func(NULL, sizeof(preproc_ipc_conf_t));
    
     conf->preproc_memf.free_func = _preprocipc_shmem_free_func;
@@ -312,7 +299,6 @@ int preprocess_dbl(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zb
 int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar, int desired_type) {
     metric_t metric={0};
 
- //   LOG_INF("Setting itmeid %ld agent result %d", itemid, ar->type);
     DEBUG_ITEM(itemid, "Sending item to preprocessing,  ar type is %d", ar->type);
     if (ar->type & AR_UINT64) {
         if (ITEM_VALUE_TYPE_FLOAT == desired_type) {
@@ -341,7 +327,6 @@ int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t f
     if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
 
- //   LOG_INF("Setting itmeid %ld agent result %d", itemid, ar->type);
     if (ar->type | AR_UINT64)
         zbx_variant_set_ui64(&metric.value, ar->ui64);
 
@@ -376,6 +361,7 @@ int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, c
 int processing_force_flush() {
     glb_ipc_force_flush(conf->process_ipc);
 }
+
 int preprocessing_force_flush() {
     glb_ipc_force_flush(conf->preproc_ipc);
 }
@@ -383,4 +369,5 @@ int preprocessing_force_flush() {
 int preprocessing_flush() {
     glb_ipc_flush(conf->preproc_ipc);
 }
+
 

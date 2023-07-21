@@ -812,8 +812,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		DEBUG_ITEM(items[i].itemid,"Poller %d: Returned item to the zbx queue", poller_type);
 	}
 
-	//zbx_preprocessor_flush();
-	preprocessing_force_flush();
+	preprocessing_flush();
 	zbx_clean_items(items, num, results);
 	DCconfig_clean_items(items, NULL, num);
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
