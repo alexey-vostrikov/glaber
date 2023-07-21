@@ -153,6 +153,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
     char *worker_response = NULL;
     u_int64_t timestamp = 0;
     zbx_timespec_t ts = {0};
+    int ret = POLLER_ITERATOR_CONTINUE;
 
     /* workers have own alive and restart checks, we don't bother here*/
     while (iterations < MAX_ITERATIONS)
@@ -177,8 +178,12 @@ ITEMS_ITERATOR(check_workers_data_cb)
         
         worker->last_heard = now;
         zbx_free(worker_response);
+
     }
-    
+
+    if (NULL == worker_response)
+        ret = POLLER_ITERATOR_STOP;
+
     /*if worker is silent for too long, restarting it*/
     if (worker->last_heard < time(NULL) - worker->delay)
     {
@@ -190,7 +195,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
         poller_preprocess_error(poller_item, "Couldn't read from the worker - worker is silent for too long");
     }
 
-    return POLLER_ITERATOR_CONTINUE;
+    return ret;
 }
 
 static void handle_async_io(void)

@@ -411,7 +411,7 @@ static int parse_history_get_values(u_int64_t itemid, glb_clickhouse_data_t *con
 		//		hr.value.log->logeventid, hr.value.log->severity,hr.value.log->source );
 		}
 	}
-	return FAIL;
+	return SUCCEED;
 }
 
 /************************************************************************************
