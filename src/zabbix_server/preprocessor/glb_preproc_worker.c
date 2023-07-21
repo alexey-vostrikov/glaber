@@ -98,12 +98,12 @@ static void preprocess_metric_execute_steps(metric_t *metric, zbx_pp_cache_t *ca
 	
 	zbx_variant_set_none(&value_out);
 
-	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps",   preproc_conf->preproc->steps_num);
+	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item, %d steps",   preproc_conf->preproc->steps_num);
 
 	pp_execute(&conf.ctx, preproc_conf->preproc, cache, metric, &value_out, NULL, NULL);
 
-    DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', result is %p '%s'",
-        zbx_variant_type_desc(&value_out), &value_out, zbx_variant_value_desc(&value_out));
+    DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', result is '%s'",
+        zbx_variant_type_desc(&value_out), zbx_variant_value_desc(&value_out));
     
     metric_t new_metric = {.hostid = metric->hostid, .itemid = metric->itemid, .ts = metric->ts, .value = value_out };
     

@@ -101,8 +101,11 @@ int pp_execute_dispatch(metric_t *orig_metric, zbx_variant_t *value,  const char
 
 		//this will dispatch current metric to a new, correct fork as soon as we finish processing
 		ipc_set_redirect_queue(orig_metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]);
+		
+		zbx_variant_clear(value);
+		zbx_variant_set_none(value);
 	
-		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
+		return SUCCEED; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
 	DEBUG_ITEM(orig_metric->itemid, "Couldn find itemid for host %s item %s", host_key.host, host_key.key);
@@ -168,11 +171,14 @@ int pp_execute_dispatch_by_ip(metric_t *orig_metric, zbx_variant_t *value, const
 
 		ipc_set_redirect_queue(hostid %CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]);
 		
-		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
+		zbx_variant_clear(value);
+		zbx_variant_set_none(value);
+
+		return SUCCEED; 
 	}
 
 	DEBUG_ITEM(orig_metric->itemid, "Couldn find itemid for host %ld item %s", hostid, key);
 
 	DEBUG_ITEM(orig_metric->itemid, "In %s: finished", __func__);
-	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+	return SUCCEED; //actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }
