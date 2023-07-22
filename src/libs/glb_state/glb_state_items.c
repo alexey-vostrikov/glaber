@@ -26,6 +26,7 @@
 
 #include "glb_state.h"
 #include "glb_state_items.h"
+#include "metric.h"
 #include <zlib.h>
 #include "glb_lock.h"
 #include "load_dump.h"
@@ -1053,38 +1054,38 @@ static int item_update_nextcheck_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, 
     DEBUG_ITEM(elem->id, "Updated metadata: nextcheck");
 }
 
-static int item_update_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *cb_data)
+ELEMS_CALLBACK(item_update_lastdata_cb)
 {
-
     item_elem_t *elm = (item_elem_t *)elem->data;
-    glb_state_meta_udpate_req_t *req = (glb_state_meta_udpate_req_t *)cb_data;
+    metric_t *metric = data;
 
-    if ((req->flags & GLB_CACHE_ITEM_UPDATE_LASTDATA) && elm->meta.lastdata < req->meta->lastdata)
-    {
-        elm->meta.lastdata = req->meta->lastdata;
-        DEBUG_ITEM(elem->id, "Updated metadata: lastdata");
-    }
-
-    if (req->flags & GLB_CACHE_ITEM_UPDATE_NEXTCHECK)
-    {
-        elm->meta.nextcheck = req->meta->nextcheck;
-        DEBUG_ITEM(elem->id, "Updated metadata: nextcheck");
-    }
-    if (req->flags & GLB_CACHE_ITEM_UPDATE_STATE)
-    {
-        elm->meta.state = req->meta->state;
-        DEBUG_ITEM(elem->id, "Updated metadata: state");
-    }
-    if (req->flags & GLB_CACHE_ITEM_UPDATE_ERRORMSG)
-    {
-        DEBUG_ITEM(elem->id, "Updating metadata: errmsg");
-        DEBUG_ITEM(elem->id, "Updating metadata: errmsg old %s", elm->meta.error);
-        //DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", req->meta->error);
-       
-        elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, req->meta->error);
-        DEBUG_ITEM(elem->id, "Updating metadata: errmsg new %s", elm->meta.error);
+    if (elm->meta.lastdata > metric->ts.sec) {
+        DEBUG_ITEM(metric->itemid,"Metric is not used for lastdata update, there was more recent metric (%d , %d)",
+                metric->ts.sec, elm->meta.lastdata );
+        return FAIL;
     }
 
+    elm->meta.lastdata = metric->ts.sec;
+    DEBUG_ITEM(metric->itemid, "Updated metadata: lastdata = %d", metric->ts.sec);
+    
+    if (VARIANT_VALUE_ERROR == metric->value.type)
+    {
+        
+        if ( elm->meta.state != ITEM_STATE_NOTSUPPORTED) {
+            elm->meta.state = ITEM_STATE_NOTSUPPORTED;
+            DEBUG_ITEM(elem->id, "Updated state to ITEM_STATE_NUTSUPPORTED");
+        }
+
+        if (  (NULL == elm->meta.error && NULL != metric->value.data.str ) ||
+              (NULL != elm->meta.error && NULL == metric->value.data.str ) ||
+              (NULL != elm->meta.error && NULL != metric->value.data.str && 0 == strcmp(elm->meta.error, metric->value.data.str)) )
+        {
+            elm->meta.error = strpool_replace(&state->strpool, elm->meta.error,  metric->value.data.str);
+            DEBUG_ITEM(elem->id, "Updating error message to %s", elm->meta.error);
+        }
+        return SUCCEED;
+    }
+    
     return SUCCEED;
 }
 
@@ -1395,10 +1396,8 @@ int glb_state_item_update_nextcheck(u_int64_t itemid, int nextcheck) {
 		return elems_hash_process(state->items, itemid, item_update_nextcheck_cb, &nextcheck, 0);	
 }
 
-int  glb_state_item_update_meta(u_int64_t itemid, glb_state_item_meta_t *meta, unsigned int flags, int value_type) {
-	glb_state_meta_udpate_req_t req = { .meta = meta, .flags = flags, .value_type = value_type};
-
-	return elems_hash_process(state->items, itemid, item_update_meta_cb, &req, 0);
+int  glb_state_item_set_lastdata_by_metric(const metric_t *metric) {
+	return elems_hash_process(state->items, metric->itemid, item_update_lastdata_cb, metric, 0);
 }
 
 ELEMS_CALLBACK(item_set_error_cb) {
@@ -1448,7 +1447,7 @@ int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
     return ret;
 };
 
-int glb_state_item_get_state(u_int64_t itemid) {
+int glb_state_item_get_oper_state(u_int64_t itemid) {
 	int st;
     if (FAIL == (st = elems_hash_process(state->items, itemid, item_get_state_cb, NULL, ELEM_FLAG_DO_NOT_CREATE))) {
         return ITEM_STATE_UNKNOWN;

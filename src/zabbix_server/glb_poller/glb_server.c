@@ -24,6 +24,7 @@
 #include "glb_poller.h"
 #include "module.h"
 #include "zbxjson.h"
+#include "glb_preproc.h"
 
 extern int CONFIG_EXT_SERVER_FORKS;
 
@@ -153,7 +154,6 @@ ITEMS_ITERATOR(check_workers_data_cb)
     char *worker_response = NULL;
     u_int64_t timestamp = 0;
     zbx_timespec_t ts = {0};
-    int ret = POLLER_ITERATOR_CONTINUE;
 
     /* workers have own alive and restart checks, we don't bother here*/
     while (iterations < MAX_ITERATIONS)
@@ -181,9 +181,6 @@ ITEMS_ITERATOR(check_workers_data_cb)
 
     }
 
-    if (NULL == worker_response)
-        ret = POLLER_ITERATOR_STOP;
-
     /*if worker is silent for too long, restarting it*/
     if (worker->last_heard < time(NULL) - worker->delay)
     {
@@ -195,12 +192,13 @@ ITEMS_ITERATOR(check_workers_data_cb)
         poller_preprocess_error(poller_item, "Couldn't read from the worker - worker is silent for too long");
     }
 
-    return ret;
+    return POLLER_ITERATOR_CONTINUE;
 }
 
 static void handle_async_io(void)
 {
     poller_items_iterate(check_workers_data_cb, NULL);
+    preprocessing_flush();
 }
 
 

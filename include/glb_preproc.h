@@ -25,7 +25,29 @@
 #include "metric.h"
 
 int preproc_ipc_init();
-int preprocess_send_metric(metric_t *metric);
 
+int preprocess_send_metric(const metric_t *metric);
+int preprocess_send_metric_ext(const metric_t *metric, int send_mode, int priority);
+int preprocessing_flush();
+
+int preprocessing_force_flush();
+int processing_force_flush();
+void preprocessing_dump_sender_queues();
+
+typedef void (*ipc_data_create_cb_t)(mem_funcs_t *memf, void *ipc_data, void *buffer);
+typedef void (*ipc_data_free_cb_t)(mem_funcs_t *memf, void *ipc_data);
+typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data);
+
+int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
+int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
+
+#define IPC_CREATE_CB(name) \
+		static void name(mem_funcs_t *memf, void *ipc_data, void *local_data)
+
+#define IPC_FREE_CB(name) \
+		static void name(mem_funcs_t *memf, void *ipc_data)
+
+#define IPC_PROCESS_CB(name) \
+		static void name(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data)
 
 #endif

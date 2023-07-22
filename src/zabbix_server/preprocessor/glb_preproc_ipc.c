@@ -153,15 +153,13 @@ int preproc_ipc_init() {
     conf->proc_memf.malloc_func = _procipc_shmem_malloc_func;
     conf->proc_memf.realloc_func = _procipc_shmem_realloc_func;
 
-//    LOG_INF("IPC mem size is %ld 4, %p", CONFIG_IPC_BUFFER_SIZE, conf->preproc_memf.malloc_func);
     conf->preproc_ipc = glb_ipc_init_ext(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
         CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->preproc_memf, ipc_metric_create_cb,
-        ipc_metric_free_cb, IPC_HIGH_VOLUME, "poll->preproc");
+        ipc_metric_free_cb, IPC_HIGH_VOLUME, "poll->preproc", (CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR])/10);
     
-//    LOG_INF("IPC mem size is %ld 5", CONFIG_IPC_BUFFER_SIZE);
     conf->process_ipc = glb_ipc_init_ext(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
         CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->proc_memf, ipc_metric_create_cb,
-         ipc_metric_free_cb, IPC_HIGH_VOLUME, "preproc->proc");
+         ipc_metric_free_cb, IPC_HIGH_VOLUME, "preproc->proc", (CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER])/10);
 
     glb_register_internal_metric_handler("preprocessing",   preprocessing_stat_cb);
     glb_register_internal_metric_handler("processing",      processing_stat_cb);
@@ -174,37 +172,23 @@ void preproc_ipc_destroy() {
     zbx_shmem_destroy(proc_ipc_mem);
 }
 
-int preprocess_send_metric_ext(const metric_t *metric, int send_wait_mode) {
+int preprocess_send_metric_ext(const metric_t *metric, int send_wait_mode, int priority) {
     glb_state_items_set_poll_result(metric->itemid, metric->ts.sec, ITEM_STATE_NORMAL);
-    glb_ipc_send(conf->preproc_ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], (void *)metric, send_wait_mode);
+    glb_ipc_send(conf->preproc_ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], (void *)metric, send_wait_mode, priority);
     glb_ipc_flush(conf->preproc_ipc);
 }
 
 int preprocess_send_metric(const metric_t *metric) {
     int i;
 //
-  // for (i = 0; i < 50; i++) {
-    preprocess_send_metric_ext(metric, IPC_LOCK_TRY_1MS);
-  //  }
-}
-
-void set_item_state(const metric_t *metric) {
-     switch (metric->value.type) {
-         case ZBX_VARIANT_ERR:
-             if (NULL != metric->value.data.str)
-                 glb_state_item_set_error(metric->itemid, metric->value.data.str);
-             else 
-                 glb_state_item_set_error(metric->itemid, "");
-             break;
-        default:
-            glb_state_items_set_poll_result(metric->itemid,metric->ts.sec, ITEM_STATE_NORMAL);
-    }
+   // for (i = 0; i < 100; i++) {
+        preprocess_send_metric_ext(metric, IPC_LOCK_BLOCK, 0);
+    //}
 }
 
 int processing_send_metric(const metric_t *metric) {
-    set_item_state(metric);
-    glb_ipc_send(conf->process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_TRY_ONLY);
-    glb_ipc_flush(conf->process_ipc);
+    glb_state_item_set_lastdata_by_metric(metric);
+    glb_ipc_send(conf->process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_TRY_ONLY, 0);
 }
 
 /*******receiver-side functions *******/
@@ -370,4 +354,10 @@ int preprocessing_flush() {
     glb_ipc_flush(conf->preproc_ipc);
 }
 
+int processing_flush() {
+    glb_ipc_flush(conf->process_ipc);
+}
 
+void preprocessing_dump_sender_queues() {
+    glb_ipc_dump_sender_queues(conf->preproc_ipc, "preproc_ipc_sender queues");
+}

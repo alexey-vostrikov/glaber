@@ -23,6 +23,7 @@
 #include "log.h"
 #include "metric.h"
 #include "glb_preproc_ipc.h"
+#include "glb_preproc.h"
 #include "zbxpreproc.h"
 #include "zbxcacheconfig.h"
 #include "../../libs/zbxpreproc/pp_history.h"
@@ -64,7 +65,7 @@ zbx_pp_item_t *get_prperoc_item(u_int64_t itemid) {
     return zbx_hashset_search(&conf.items, &itemid);
 }
 
-void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *preproc_conf) {
+static void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *preproc_conf) {
     
     if ( NULL != preproc_conf && ( preproc_conf->preproc->flags & ZBX_FLAG_DISCOVERY_RULE ) ) {
         
@@ -172,6 +173,7 @@ void process_incoming_metrics(poller_item_t *poller_item, void *data) {
 
 void ipc_flush(poller_item_t *poller_item, void *data) {
     preprocessing_flush();
+    processing_flush();
 }
 
 void preprocessing_worker_init(zbx_thread_args_t *args, glb_preproc_worker_conf_t *conf) {

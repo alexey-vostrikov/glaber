@@ -36,7 +36,7 @@
 #include "zbx_item_constants.h"
 #include "../glb_state/glb_state_items.h"
 #include "../glb_state/glb_state_triggers.h"
-#include "../../zabbix_server/preprocessor/glb_preproc_ipc.h"
+#include "glb_preproc.h"
 #include "metric.h"
 #include "../zabbix_server/dbsyncer/trends.h"
 #include "zbxconnector.h"

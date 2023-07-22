@@ -49,6 +49,7 @@
 #include "zbx_rtc_constants.h"
 #include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_interfaces.h"
+#include "glb_preproc.h"
 
 /******************************************************************************
  *                                                                            *

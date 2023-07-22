@@ -25,15 +25,11 @@
 #include "zbxsysinfo.h"
 
 #include "log.h"
-#include "../glb_preproc_ipc.h"
+#include "glb_preproc.h"
 #include "../../glb_poller/internal.h"
 #include "../../../libs/glb_state/glb_state.h"
 
 IPC_PROCESS_CB(processing_cb) {
-}
-
-IPC_PROCESS_CB(processing_redirect_cb) {
-    ipc_set_redirect_queue(0);
 }
 
 
@@ -99,13 +95,13 @@ static int test_no_leaks_run() {
         //recieving all the metrics
         int cnt = preproc_receive_metrics(1, processing_cb, NULL, 5000);
         
-        cnt += preproc_receive_metrics(1, processing_redirect_cb, NULL, 5000);
-        preprocessing_force_flush();
+        //cnt += preproc_receive_metrics(1, processing_redirect_cb, NULL, 5000);
+        //preprocessing_force_flush();
 
         cnt += preproc_receive_metrics(1, processing_cb, NULL, 5000);
 
       //  LOG_INF("Processed %d metrics", cnt);
-        assert (15000 == cnt && "Should recieve all the metrics");
+        assert (10000 == cnt && "Should recieve all the metrics");
         
         //LOG_INF("Iteration %d finished", i);
     }

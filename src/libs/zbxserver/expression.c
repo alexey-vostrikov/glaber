@@ -5666,7 +5666,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 			continue;
 		}
 
-		if (ITEM_STATE_NORMAL != glb_state_item_get_state(item->itemid) &&
+		if (ITEM_STATE_NORMAL != glb_state_item_get_oper_state(item->itemid) &&
 				FAIL == zbx_evaluatable_for_notsupported(func->function))
 		{
 			/* set 'unknown' error value */

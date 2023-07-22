@@ -131,7 +131,7 @@ void apm_untrack(void *metric_ptr) {
         return;
     metric->type = METRIC_DELETE;
     
-    glb_ipc_send(conf.ipc, 0, metric, 0); /*notify server to delete metric */
+    glb_ipc_send(conf.ipc, 0, metric, 0, 0); /*notify server to delete metric */
     zbx_free(metric->name);
     zbx_free(metric->labels);
     zbx_hashset_remove_direct(&conf.metrics, metric);
@@ -147,7 +147,7 @@ void apm_flush() {
 
     lastflush = time(NULL);
 
-    glb_ipc_send(conf.ipc, 0, &conf.metrics, 0);
+    glb_ipc_send(conf.ipc, 0, &conf.metrics, 0, 0);
     glb_ipc_flush(conf.ipc);
 }
 

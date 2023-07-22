@@ -27,6 +27,7 @@
 #include "glb_ipc.h"
 #include "glb_lock.h"
 #include <pthread.h>
+#include "glb_preproc.h"
 
 typedef struct ipc_element_t ipc_element_t;
 #define IPC_BULK_TIMEOUT 3
@@ -68,14 +69,11 @@ struct  ipc_conf_t {
 	ipc_local_queues_t *local_queues; //local send and recieve, allocate in heap!!!
 
 	ipc_mode_t mode; //ipc_bulk or ipc_fast
-	unsigned int lastflush;
+	unsigned int *lastflush; //local flushing info, allocate in heap!!!
 	unsigned int bulk_count;
 	int total_slots;
+	int reserved_slots; //number of slots reserved to high priority senders
 };
-
-
-
-//static ipc_local_queues_t *local_queues = NULL;
 
 #define MOVE_ALL_ELEMENTS 0
 
@@ -239,7 +237,7 @@ static int move_one_element(ipc_queue_t *src, ipc_queue_t *dst, char *move_name)
 	return SUCCEED;
 }
 
-static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *move_name, int lock_mode) {
+static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *move_name, int lock_mode, int reserve) {
 	int ret = SUCCEED;
 
 	if (0 == count ) {
@@ -253,9 +251,9 @@ static int move_n_elements(ipc_queue_t *src, ipc_queue_t *dst, int count, char *
 	} else 
 		glb_lock_block(&src->lock);
 
-	if (src->count == 0) {
+	if (src->count == 0 ||  src->count < reserve )
+	{
 		glb_lock_unlock(&src->lock);
-
 		return FAIL;	
 	}
 
@@ -305,10 +303,10 @@ static void flush_queues(ipc_conf_t *ipc) {
 
 	unsigned int now = time(NULL);
 	
-	if (IPC_LOW_LATENCY != ipc->mode && now == ipc->lastflush ) 
+	if (IPC_LOW_LATENCY != ipc->mode && now == *ipc->lastflush ) 
 		return;
 	
-	ipc->lastflush = now;
+	*ipc->lastflush = now;
 
 	for (i =0 ; i < ipc->consumers; i ++ ) {
 		switch(ipc->mode) {
@@ -328,39 +326,50 @@ int glb_ipc_force_flush(ipc_conf_t *ipc) {
 	for (i = 0 ; i < ipc->consumers; i ++ )
 		move_all_elements(&ipc->local_queues->send_queues[i], &ipc->queues[i], IPC_LOCK_BLOCK);
 	
-	ipc->lastflush = time(NULL);
+	*ipc->lastflush = time(NULL);
 }
 
 int glb_ipc_flush(ipc_conf_t *ipc) {
-	int i = 0;
+	int i = 0, bulk_time_flush = 0;
 	unsigned int now = time(NULL);
 
-	if ( IPC_LOW_LATENCY == ipc->mode || 
-	    (ipc->local_queues->send_queues[i].count > IPC_BULK_COUNT || now > IPC_BULK_TIMEOUT + ipc->lastflush))
-	{	
-		for (i = 0 ; i < ipc->consumers; i ++ ) 
+	if (IPC_HIGH_VOLUME == ipc->mode && now > IPC_BULK_TIMEOUT + *ipc->lastflush) {
+		bulk_time_flush = 1;
+		*ipc->lastflush = now;	
+	} 
+
+	for (i = 0 ; i < ipc->consumers; i++ )  {
+		
+		if ( IPC_LOW_LATENCY == ipc->mode || 
+	   	 ipc->local_queues->send_queues[i].count > IPC_BULK_COUNT || 
+			 bulk_time_flush)
+		{	
 			move_all_elements(&ipc->local_queues->send_queues[i], &ipc->queues[i], IPC_LOCK_TRY_ONLY);
-		ipc->lastflush = now;
+		}
 	}
 }
 
-static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, unsigned char lock_mode) {
+static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, unsigned char lock_mode, int reserve_free) {
 	static int laststat = 0;
 	int cnt = 0;
 
 	if (local_free_queue->count > 0 ) 
 		return SUCCEED;
 
-	return move_n_elements(&ipc->free_queue, local_free_queue, ipc->bulk_count, "ipc_free -> local free", lock_mode);
+	return move_n_elements(&ipc->free_queue, local_free_queue, ipc->bulk_count, "ipc_free -> local free", lock_mode, reserve_free);
 }
 
-int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock_wait ) {
+int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock_wait, ipc_send_priority_t priority ) {
 	
 	ipc_queue_t *local_free_queue = &ipc->local_queues->free_snd_queue;
 	ipc_queue_t *local_send_queue = &ipc->local_queues->send_queues[queue_num];
 	ipc_element_t  *element = NULL;
+	int reserve_slots = ipc->reserved_slots;
 
-	if (FAIL == get_free_queue_items(ipc, local_free_queue, IPC_LOCK_BLOCK)) {
+	if (IPC_SEND_HIGH_PRIORITY == priority ) 
+		reserve_slots = 0;
+
+	if (FAIL == get_free_queue_items(ipc, local_free_queue, IPC_LOCK_BLOCK, reserve_slots)) {
 		return FAIL;
 	}
 
@@ -374,22 +383,6 @@ int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char 
 	return SUCCEED;
 }
 
-static unsigned int __redirect_queue = -1;
-
-void ipc_set_redirect_queue(int queue_num) {
-	__redirect_queue = queue_num;
-}
-
-static int ipc_get_redirect_queue(void) {
-	return __redirect_queue;
-}
-
-static void ipc_reset_redirect_queue(void) {
-	__redirect_queue = -1;
-}
-
-
-//processing is the priority, so they are use locks to lock ipc in blocking mode
 int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count) {
 	int i = 0;
 	ipc_element_t *element;
@@ -426,14 +419,6 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 		
 		i++;
 
-		if (-1 != ipc_get_redirect_queue()) {
-			ipc_queue_t *local_send_queue = &ipc->local_queues->send_queues[ipc_get_redirect_queue()];	
-			
-			ipc_reset_redirect_queue();
-			move_one_element(local_rcv_queue, local_send_queue, NULL);
-			continue;
-		}
-		
 		if (NULL != ipc->free_cb)
 			ipc->free_cb(&ipc->memf, (void *)(&element->data));	
 
@@ -450,10 +435,10 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 ipc_conf_t* glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode) {
 
-	return glb_ipc_init_ext(elems_count, elem_size, consumers, memf,create_cb, free_cb, mode, "");
+	return glb_ipc_init_ext(elems_count, elem_size, consumers, memf,create_cb, free_cb, mode, "", 0);
 }
 ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name) {
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name, int reserved_slots) {
     
 	ipc_conf_t *ipc;
 	int i;
@@ -502,19 +487,18 @@ ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers
 
 	elem = (void *) elements + full_elem_size * (elems_count-1);
 	elem->next = NULL;
-
 	
 	ipc->free_queue.first = elements;
 	ipc->free_queue.last =  elem;
 	ipc->free_queue.count = elems_count;
 	ipc->total_slots = elems_count;
-	
+	ipc->reserved_slots = reserved_slots;
 	ipc->create_cb = create_cb;
 	ipc->free_cb = free_cb;
 	ipc->mode = mode;
-
 	ipc->local_queues = zbx_calloc(NULL, 0, sizeof(ipc_local_queues_t));
-	
+	ipc->lastflush = zbx_malloc(NULL,sizeof(int));
+	*ipc->lastflush = time(NULL);
 
 	glb_lock_init(&ipc->local_queues->free_rcv_queue.lock);
 	glb_lock_init(&ipc->local_queues->rcv_queue.lock);
@@ -640,20 +624,17 @@ int ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, un
 		zbx_vector_uint64_create(&snd[i]);
 	
 	for (i = 0; i < vector->values_num; i++) {
-	//	LOG_INF("IPC Addimg host %ld, item %ld : sending value to consumer %d", vector->values[i].first, vector->values[i].second, vector->values[i].first % ipc->consumers);
 		zbx_vector_uint64_append(&snd[vector->values[i].first % ipc->consumers], vector->values[i].second);
 	}
 	
 	for(i = 0; i < ipc->consumers; i++) {
-		//LOG_INF("IPC Sending %d values to consumer %d", snd[i].values_num, i);
-		glb_ipc_send(ipc, i, &snd[i], lock);
+		glb_ipc_send(ipc, i, &snd[i], lock, 1);
 		zbx_vector_uint64_destroy(&snd[i]);
 	}
 	
 	flush_queues(ipc);
 	
 	zbx_free(snd);
-	//glb_ipc_dump_sender_queues(ipc, "Sender side");
 }
 
 void ipc_vector_uint64_destroy(ipc_conf_t *ipc) {

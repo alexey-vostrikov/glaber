@@ -46,6 +46,7 @@
 #include "poller_contention.h"
 #include "../../libs/apm/apm.h"
 #include "zbxsysinfo.h"
+#include "glb_preproc.h"
 
 extern int CONFIG_CONFSYNCER_FREQUENCY;
 
