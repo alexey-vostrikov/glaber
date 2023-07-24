@@ -155,7 +155,7 @@ debian-buster:
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
- astra:
+astra:
   stage: pkg-build
   variables:
     OS: astra
