@@ -1,3 +1,9 @@
+2023-24-07 ver 3.2.17 (master, release)
+    -3.2 release
+2023-21-07 ver 3.2.16 (master only)
+    -feat: add priorities to IPC to avoid preprocessor stucking on high load
+    -fix: async items notification
+    -fix: support of uppercase extensions for uploaded import files
 2023-21-07 ver 3.2.13, 3.2.14 3.2.15 (master only)
     -fix: redirect preprocessing steps logic to avoid situation when redirected item continued to be processed after redirected
     -fix: periodical ipc flushing to prevent metrics stuck on slow ingest rates
