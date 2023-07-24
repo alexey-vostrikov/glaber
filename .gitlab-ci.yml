@@ -162,7 +162,7 @@ astra:
     OS_VER: 1.7.3
   tags: ["virtbox"]
   script:
-    - update-ca-certificates
+    #- update-ca-certificates
     - *build_go
     - *prepare_sources
     - *build_glbmap
