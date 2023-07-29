@@ -37,15 +37,55 @@ build {
   provisioner "shell" {
     name = "Install clickhouse"
     inline = [
-      "export GNUPGHOME=$(mktemp -d)",
-      "sudo GNUPGHOME=\"$GNUPGHOME\" gpg --no-default-keyring --keyring /usr/share/keyrings/clickhouse-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8919F6BD2B48D754",
-      "sudo chmod +r /usr/share/keyrings/clickhouse-keyring.gpg",
-      "echo \"deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb lts main\" | sudo tee /etc/apt/sources.list.d/clickhouse.list",
-      "sudo apt-get update",
-      "echo clickhouse-server clickhouse-server/default-password password mysecretpassword | sudo debconf-set-selections",
-      "timeout 30m sudo apt-get install -y clickhouse-common-static=21.3*",
-      "timeout 30m sudo apt-get install -y clickhouse-server=21.3* clickhouse-client=21.3*"
+      "export DEBIAN_FRONTEND=noninteractive",
+      # "export GNUPGHOME=$(mktemp -d)",
+      # "sudo GNUPGHOME=\"$GNUPGHOME\" gpg --no-default-keyring --keyring /usr/share/keyrings/clickhouse-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8919F6BD2B48D754",
+      # "sudo chmod +r /usr/share/keyrings/clickhouse-keyring.gpg",
+      # "echo \"deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb lts main\" | sudo tee /etc/apt/sources.list.d/clickhouse.list",
+      # "sudo apt-get update",
+      # "echo clickhouse-server clickhouse-server/default-password password mysecretpassword | sudo debconf-set-selections",
+      # "timeout 30m sudo apt-get install -y clickhouse-common-static=21.3*",
+      # "timeout 30m sudo apt-get install -y clickhouse-server=21.3* clickhouse-client=21.3*"
     ]
   }
+  // add all config from docker
+  provisioner "shell" {
+  name = "Set permissions to copy config"
+  inline = [
+    "sudo chmod -R 700 /etc/clickhouse-server",
+    // packer run current user 1000 id and guid id -nu 1000
+    "sudo chown -R debian:debian /etc/clickhouse-server",
+  ]
+  }
+
+  provisioner "file" {
+    source      = "clickhouse/config.d"
+    destination = "/etc/clickhouse-server/config.d"
+  }
+
+  provisioner "file" {
+    source      = "clickhouse/users.xml"
+    destination = "/etc/clickhouse-server/users.xml"
+  }
+
+  provisioner "shell" {
+  name = "Revoke permissions to copy config"
+  inline = [
+    "sudo chmod -R 400 /etc/clickhouse-server",
+    "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server"
+  ]
+  }
+
+  provisioner "shell" {
+  name = "Check status"
+  inline = [
+    "sudo systemctl enable --now clickhouse-server"
+  ]
+  }
+
+  # set random password
+  # add ? script? ... to apply galber database
+  # make schema
+  # start systemd
 
 }

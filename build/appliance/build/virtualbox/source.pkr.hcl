@@ -1,6 +1,6 @@
 source "qemu" "debian" {
   # iso_url      = "${var.source_qcow}"
-  iso_url        = "vm-output/glaber.qcow2"
+  iso_url        = "vm-output-next/glaber.qcow2"
   # iso_checksum = "${var.source_checksum_url}"
   iso_checksum = "none"
   disk_image = true

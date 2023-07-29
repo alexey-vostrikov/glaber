@@ -35,7 +35,7 @@ variable "output_dir" {
 
 variable "output_dir_next" {
   type    = string
-  default = "vm-output-next"
+  default = "vm-output-next-2"
 }
 
 variable "output_name" {
