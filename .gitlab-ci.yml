@@ -27,6 +27,8 @@ variables:
   CENTOS_BUILDER_VERSION: 1.0.3
   # used for glager php-fpm7
   ALPINE_PHP_FPM_VERSION: 1.0.1
+  # 
+  DEBIAN_BULLSEYE_NET_SNMP_SSL: 1.0.2
   KANIKO_VERSION: 1.9.2
 
 stages:
@@ -34,13 +36,13 @@ stages:
   - pkg-build
   - docker-build
 
-#.build_go: &build_go
-#    - export FULL_PROJECT_PATH=$PWD
-#    - wget --no-verbose "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz"
-#    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.20.5.linux-amd64.tar.gz
-#    - rm ./go1.20.5.linux-amd64.tar.gz
-#    - export PATH=$PATH:/usr/local/go/bin
-#    - go version
+.build_go: &build_go
+    - export FULL_PROJECT_PATH=$PWD
+    - wget --no-verbose "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz"
+    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.20.5.linux-amd64.tar.gz
+    - rm ./go1.20.5.linux-amd64.tar.gz
+    - export PATH=$PATH:/usr/local/go/bin
+    - go version
 
 
 .kaniko_build: &kaniko_build
@@ -155,21 +157,21 @@ debian-buster:
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
-# astra:
-#  stage: pkg-build
-#  variables:
-#    OS: astra
-#    OS_VER: smolensk
-#  tags: ["virtbox"]
-#  script:
-#    - update-ca-certificates
-#    - *build_go
-#    - *prepare_sources
-#    - *build_glbmap
-#    - dpkg-buildpackage -b --no-sign
-#    - *upload_packages
-#  rules:
-#    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
+astra:
+  stage: pkg-build
+  variables:
+    OS: astra
+    OS_VER: 1.7.3
+  tags: ["virtbox"]
+  script:
+    - update-ca-certificates
+    - *build_go
+    - *prepare_sources
+    - *build_glbmap
+    - dpkg-buildpackage -b --no-sign
+    - *upload_packages
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 debian-bullseye:
   stage: pkg-build
@@ -360,6 +362,23 @@ alpine-php-fpm-8:
     BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}/php-fpm-8"
     BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${ALPINE_PHP_FPM_VERSION}
+    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
+  script:
+    - *kaniko_build
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
+
+debian-bullseye-net-snmp-ssl:
+  stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  variables:
+    OS: debian
+    OS_VER: bullseye
+    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}/net-snmp-ssl"
+    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_TAG: ${DEBIAN_BULLSEYE_NET_SNMP_SSL}
     CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
   script:
     - *kaniko_build

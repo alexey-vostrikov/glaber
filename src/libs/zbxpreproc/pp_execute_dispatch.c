@@ -25,6 +25,7 @@
 #include "pp_execute_json_discovery.h"
 #include "../glb_state/glb_state_interfaces.h"
 #include "glb_preproc.h"
+#include "../../zabbix_server/preprocessor/glb_preproc_ipc.h"
 
 #include "../zbxipcservice/glb_ipc.h"
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
@@ -92,17 +93,21 @@ int pp_execute_dispatch(metric_t *orig_metric, zbx_variant_t *value,  const char
 
 	if (SUCCEED == DCconfig_get_itemid_by_key(&host_key, &host_item_ids))
 	{
-		
+		metric_t metric = {0};
 		DEBUG_ITEM(orig_metric->itemid, "Redirect: [%ld, %ld] -> [%ld, %ld]", orig_metric->hostid, orig_metric->itemid, host_item_ids.first, host_item_ids.second);
 		DEBUG_ITEM(host_item_ids.second, "Redirect: [%ld, %ld] -> [%ld, %ld]", orig_metric->hostid, orig_metric->itemid, host_item_ids.first, host_item_ids.second);
 
-		orig_metric->hostid = host_item_ids.first;
-		orig_metric->itemid = host_item_ids.second;
+		metric.hostid = host_item_ids.first;
+		metric.itemid = host_item_ids.second;
+		metric.ts = orig_metric->ts;
+		metric.value = *value;
+		
+		preprocess_send_metric_ext(&metric, IPC_LOCK_BLOCK, IPC_SEND_HIGH_PRIORITY);
 
-		//this will dispatch current metric to a new, correct fork as soon as we finish processing
-		ipc_set_redirect_queue(orig_metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]);
+		zbx_variant_clear(value);
+		zbx_variant_set_none(value);
 	
-		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
+		return SUCCEED; // this intentional to be able to stop processing via 'custom on fail checkbox'
 	}
 
 	DEBUG_ITEM(orig_metric->itemid, "Couldn find itemid for host %s item %s", host_key.host, host_key.key);
@@ -160,19 +165,26 @@ int pp_execute_dispatch_by_ip(metric_t *orig_metric, zbx_variant_t *value, const
 	if (SUCCEED == DCconfig_get_itemid_by_item_key_hostid(hostid, key, &new_itemid))
 	{
 	
+		metric_t metric = {0};
+
 		DEBUG_ITEM(orig_metric->itemid, "Redirect: [%ld, %ld] -> [%ld, %ld]", orig_metric->hostid, orig_metric->itemid, hostid, new_itemid);
 		DEBUG_ITEM(new_itemid, "Redirect: [%ld, %ld] -> [%ld, %ld]", orig_metric->hostid, orig_metric->itemid, hostid, new_itemid);
 
-		orig_metric->hostid = hostid;
-		orig_metric->itemid = new_itemid;
+		metric.hostid = hostid;
+		metric.itemid = new_itemid;
+		metric.value = *value;
+		metric.ts = orig_metric->ts;
 
-		ipc_set_redirect_queue(hostid %CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]);
-		
-		return FAIL; // this intentional to be able to stop processing via 'custom on fail checkbox'
+		preprocess_send_metric_ext(&metric, IPC_LOCK_BLOCK, IPC_SEND_HIGH_PRIORITY);
+
+		zbx_variant_clear(value);
+		zbx_variant_set_none(value);
+
+		return SUCCEED; 
 	}
 
 	DEBUG_ITEM(orig_metric->itemid, "Couldn find itemid for host %ld item %s", hostid, key);
 
 	DEBUG_ITEM(orig_metric->itemid, "In %s: finished", __func__);
-	return SUCCEED; // we actially failed, but return succeed to continue the item preproc steps to process unmatched items
+	return SUCCEED; //actially failed, but return succeed to continue the item preproc steps to process unmatched items
 }

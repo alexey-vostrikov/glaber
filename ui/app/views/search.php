@@ -162,15 +162,15 @@ foreach ($data['hosts'] as $hostid => $host) {
 	$host_context_links = APP::Component()->get('links.context.handler')->getLinks($host,'host','short');
 
 	$view_links = (new CDiv())
-		->addItem([$latest_data_link, "&nbsp;", $problems_link, "&nbsp;"]);
+		->addItem([$latest_data_link, NBSP(), $problems_link, NBSP()]);
 	
 	if ($graph_count > 0) 
-			$view_links->addItem([$charts_link, "&nbsp;"]);
+			$view_links->addItem([$charts_link, NBSP()]);
 	
-	$view_links->addItem([$dashboards_link, "&nbsp;"]);
+	$view_links->addItem([$dashboards_link, NBSP()]);
 	
 	if ($httptest_count > 0) 
-		$view_links->addItem([$web_link, "&nbsp;"]);
+		$view_links->addItem([$web_link, NBSP()]);
 
 	if (count($host_context_links) > 0) 
 		$view_links->addItem($host_context_links);

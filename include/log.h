@@ -79,6 +79,7 @@ void	zabbix_close_log(void);
 int		zabbix_increase_log_level(void);
 int		zabbix_decrease_log_level(void);
 const char	*zabbix_get_log_level_string(void);
+void	zabbix_report_log_level_change(void);
 #endif
 
 char		*strerror_from_system(unsigned long error);

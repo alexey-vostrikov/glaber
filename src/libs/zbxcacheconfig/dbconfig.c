@@ -3841,9 +3841,6 @@ void DCsync_triggers(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		if (0 == found)
 		{
 			dc_strpool_replace(found, &trigger->error, "");
-			//	ZBX_STR2UCHAR(trigger->value, row[6]);
-			//	ZBX_STR2UCHAR(trigger->state, row[7]);
-			//	trigger->lastchange = 0;
 			trigger->locked = 0;
 			trigger->timer_revision = 0;
 
@@ -8925,7 +8922,7 @@ static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 	dst_item->type = src_item->type;
 	dst_item->value_type = src_item->value_type;
 
-	dst_item->state = glb_state_item_get_state(src_item->itemid);
+	zbx_strscpy(dst_item->key_orig, src_item->key);
 	dst_item->lastlogsize = src_item->lastlogsize;
 
 	dst_item->status = src_item->status;
@@ -11270,6 +11267,7 @@ int DCconfig_get_glb_poller_items_by_ids(void *poll_data, zbx_vector_uint64_t *i
 	return num;
 }
 
+#ifdef HAVE_OPENIPMI
 /******************************************************************************
  *                                                                            *
  * Purpose: Get array of items for IPMI poller                                *
@@ -11363,6 +11361,7 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 
 	return num;
 }
+#endif /* HAVE_OPENIPMI */
 
 /******************************************************************************
  *                                                                            *
@@ -11552,6 +11551,7 @@ void DCpoller_requeue_items(const zbx_uint64_t *itemids, const int *lastclocks,
 	UNLOCK_CACHE;
 }
 
+#ifdef HAVE_OPENIPMI
 /******************************************************************************
  *                                                                            *
  * Purpose: requeue unreachable items                                         *
@@ -11600,6 +11600,7 @@ void zbx_dc_requeue_unreachable_items(zbx_uint64_t *itemids, size_t itemids_num)
 
 	UNLOCK_CACHE;
 }
+#endif /* HAVE_OPENIPMI */
 
 /******************************************************************************
  *                                                                            *
@@ -12623,7 +12624,8 @@ static void get_host_statistics(ZBX_DC_HOST *dc_host, ZBX_DC_PROXY *dc_proxy, in
 
 					zbx_free(delay_s);
 				}
-				int state = glb_state_item_get_state(dc_item->itemid);
+
+				int state = glb_state_item_get_oper_state(dc_item->itemid);
 				switch (state)
 				{
 				case ITEM_STATE_NORMAL:
@@ -14487,8 +14489,15 @@ void zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, 
 		else if (0 == (proxy_hostid = dc_host->proxy_hostid) ||
 				 SUCCEED == is_item_processed_by_server(dc_item->type, dc_item->key))
 		{
-			dc_requeue_item_at(dc_item, dc_host, nextcheck);
-			proxy_hostid = 0;
+			if (SUCCEED == glb_might_be_async_polled(dc_item, dc_host) ) {
+				poller_item_add_notify(dc_item->type, dc_item->key, dc_item->itemid, dc_host->hostid);
+				
+				LOG_INF("Added poll now notify for async item %ld", dc_item->itemid);
+
+			} else {
+				dc_requeue_item_at(dc_item, dc_host, nextcheck);
+				proxy_hostid = 0;
+			}
 		}
 
 		if (NULL != proxy_hostids)

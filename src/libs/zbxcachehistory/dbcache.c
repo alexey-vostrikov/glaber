@@ -36,7 +36,7 @@
 #include "zbx_item_constants.h"
 #include "../glb_state/glb_state_items.h"
 #include "../glb_state/glb_state_triggers.h"
-#include "../../zabbix_server/preprocessor/glb_preproc_ipc.h"
+#include "glb_preproc.h"
 #include "metric.h"
 #include "../zabbix_server/dbsyncer/trends.h"
 #include "zbxconnector.h"
@@ -1659,7 +1659,7 @@ IPC_PROCESS_CB(metrics_proc_cb) {
 		case ZBX_VARIANT_ERR:
 			h->value_type = ITEM_VALUE_TYPE_NONE;
 			h->state =ITEM_STATE_NOTSUPPORTED;
-			h->value.err = zbx_strdup(NULL, metric->value.data.err);
+			h->value.err = zbx_strdup(NULL, metric->value.data.str);
 			h->flags = ZBX_DC_FLAG_UNDEF; 
 			break;
 		default:

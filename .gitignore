@@ -248,3 +248,4 @@ seed.img
 user-data
 meta-data
 vm-output*
+src/glapi/glb_syslog_sender

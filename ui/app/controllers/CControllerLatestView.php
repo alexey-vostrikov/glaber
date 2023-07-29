@@ -84,22 +84,6 @@ class CControllerLatestView extends CControllerLatest {
 			$ret = (!$hostids || count($hostids) === count(array_filter($hostids, 'ctype_digit')));
 		}
 
-		if ($ret && $this->hasInput('subfilter_tagnames')) {
-			$tagnames = $this->getInput('subfilter_tagnames', []);
-			$ret = (!$tagnames || count($tagnames) === count(array_filter($tagnames, 'is_string')));
-		}
-
-		if ($ret && $this->hasInput('subfilter_tags')) {
-			$tags = $this->getInput('subfilter_tags', []);
-			foreach ($tags as $tag => $values) {
-				if (!is_scalar($tag) || !is_array($values)
-						|| count($values) !== count(array_filter($values, 'is_string'))) {
-					$ret = false;
-					break;
-				}
-			}
-		}
-
 		if ($ret && $this->hasInput('subfilter_data')) {
 			$data = $this->getInput('subfilter_data', []);
 			$valid = array_filter($data, function ($val) {
@@ -149,21 +133,9 @@ class CControllerLatestView extends CControllerLatest {
 		$refresh_curl_params = ['action' => 'latest.view.refresh'] + $filter;
 		array_map([$refresh_curl, 'setArgument'], array_keys($refresh_curl_params), $refresh_curl_params);
 
-		// data sort and pager
-		$sort_field = $this->getInput('sort', 'name');
-		$sort_order = $this->getInput('sortorder', ZBX_SORT_UP);
-		$prepared_data = $this->prepareData($filter, $sort_field, $sort_order);
-
-		// Prepare subfilter data.
-		$subfilters_fields = self::getSubfilterFields($filter);
-		$subfilters = self::getSubfilters($subfilters_fields, $prepared_data);
-		$prepared_data['items'] = self::applySubfilters($prepared_data['items']);
+		$prepared_data = $this->prepareData($filter, null, null);
 
 		$view_url = (new CUrl('zabbix.php'))->setArgument('action', 'latest.view');
-		$paging_arguments = array_filter(array_intersect_key($filter, self::FILTER_FIELDS_DEFAULT));
-		array_map([$view_url, 'setArgument'], array_keys($paging_arguments), $paging_arguments);
-		$paging = CPagerHelper::paginate($this->getInput('page', 1), $prepared_data['items'], ZBX_SORT_UP, $view_url);
-
 		$this->extendData($prepared_data);
 
 		$refresh_data = array_filter([
@@ -177,16 +149,9 @@ class CControllerLatestView extends CControllerLatest {
 			'show_tags' => $filter['show_tags'],
 			'tag_name_format' => $filter['tag_name_format'],
 			'tag_priority' => $filter['tag_priority'],
-			'subfilter_hostids' => $filter['subfilter_hostids'],
-			'subfilter_tagnames' => $filter['subfilter_tagnames'],
-			'subfilter_tags' => $filter['tags'],
-			'subfilter_data' => $filter['subfilter_data'],
-			'sort' => $sort_field,
-			'sortorder' => $sort_order,
-			'page' => $this->hasInput('page') ? $this->getInput('page') : null
 		]);
 
-		// display
+
 		$data = [
 			'refresh_url' => $refresh_curl->getUrl(),
 			'refresh_interval' => CWebUser::getRefresh() * 1000,
@@ -203,20 +168,10 @@ class CControllerLatestView extends CControllerLatest {
 				'csrf_token' => CCsrfTokenHelper::get('tabfilter')
 			],
 			'filter' => $filter,
-			'subfilters' => $subfilters,
-			'sort_field' => $sort_field,
-			'sort_order' => $sort_order,
 			'view_curl' => $view_url,
-			'paging' => $paging,
 			'uncheck' => $this->hasInput('filter_reset'),
-			'config' => [
-				'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS),
-				'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
-				'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
-				'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)
-			],
 			'tags' => makeTags($prepared_data['items'], true, 'itemid', (int) $filter['show_tags'], $filter['tags'],
-				array_key_exists('tags', $subfilters_fields) ? $subfilters_fields['tags'] : [],
+				 [],
 				(int) $filter['tag_name_format'], $filter['tag_priority']
 			)
 		] + $prepared_data;

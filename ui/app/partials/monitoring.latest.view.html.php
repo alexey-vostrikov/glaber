@@ -25,10 +25,7 @@
  */
 
 
-
-
-
- $div = (new CDiv());
+ $div = (new CDiv())->setName('content');
 
  if (!isset($data['hosts']) || 0 == count( $data['hosts'])) {
     $div->addItem(
@@ -39,16 +36,16 @@
 }
 
 if (1 == $data['filter']['group_by_discovery'] && $data['entities']) {
-    $page_view = ShowGroupedItems($data);
+    ShowGroupedItems($div, $data);
 } else {
-    $page_view = ShowItemsPlainTable($data);
+    $div->addItem(ShowItemsPlainTable($data));
 }
 
-echo $page_view;
+echo $div;
 return;
 
-function ShowGroupedItems(array &$data) {
-    $all_div = new CDiv();
+function ShowGroupedItems(&$div, array &$data) {
+  //  $all_div = new CDiv();
     $items = &$data['items'];
     
     $discovery_out = (new CDiv());
@@ -58,13 +55,13 @@ function ShowGroupedItems(array &$data) {
             $discovery_out->addItem((new CDiv())->addItem(' '));
     }
     
-    $all_div
+    $div
 	//	->addItem((new CTag("h4", true, "Host-specific items"))
      //   ->addStyle("font-weight: bold;"))
         ->addItem( ShowItemsPlainTable($data));
-    $all_div->addItem($discovery_out);
+    $div->addItem($discovery_out);
 
-    return $all_div->toString();
+    //return $all_div->toString();
 }
 
 
@@ -84,21 +81,23 @@ function buildDiscoveryTable(array &$items, $discovery_id, array &$discovery_dat
             if (isset($entity_items[$prototype_itemid])) {
                 $itemid = $entity_items[$prototype_itemid];
                 
-                $value = new CLatestValue( $items[$itemid] , 
-                    isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
-                    isset($items[$itemid]['triggers'])? $items[$itemid]['triggers'] : null,
-                    isset($data['can_create'])
-                );    
-                
-                $col = (new CCol($value))->setAttribute('data-order', $value->GetValueRaw());
-                
-                if ($value->GetWorstSeverity() > 0) 
-                    $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
+                if (isset($items[$itemid])) {
+                    $value = new CLatestValue($items[$itemid] , 
+                        isset($data['history'][$itemid])? $data['history'][$itemid] : null ,
+                        isset($items[$itemid]['triggers'])? $items[$itemid]['triggers'] : null,
+                        isset($data['can_create'])
+                    );
+            
+                    $col = (new CCol($value))->setAttribute('data-order', $value->GetValueRaw());
+                    
+                    if ($value->GetWorstSeverity() > 0) 
+                        $col->addClass(CSeverityHelper::getStatusStyle($value->GetWorstSeverity()));
+    
+                    unset($data['items'][$itemid]);
+                } else 
+                    $col = (new CCol('NO item'));
 
                 array_push($row, $col);
-               
-                unset($data['items'][$itemid]);
-		
             } else {
 				array_push($row,"NO item");
 			} 
@@ -325,15 +324,15 @@ function ShowItemsPlainTable(array &$data)
     }
 
  $button_list = [
- 	GRAPH_TYPE_STACKED => ['name' => _('Display stacked graph'), 'attributes' => ['data-required' => 'graph']],
- 	GRAPH_TYPE_NORMAL => ['name' => _('Display graph'), 'attributes' => ['data-required' => 'graph']],
- 	GRAPH_TYPE_SEPARATED => ['name' => _('Display individual graphs'), 'attributes' => ['data-required' => 'graph']],
+ 	GRAPH_TYPE_STACKED => ['name' => _('Display stacked graph')],
+ 	GRAPH_TYPE_NORMAL => ['name' => _('Display graph')],
+ //	GRAPH_TYPE_SEPARATED => ['name' => _('Display individual graphs'), 'attributes' => ['data-required' => 'graph']],
  	'item.masscheck_now' => [
  		'content' => (new CSimpleButton(_('Execute now')))
  			->onClick('view.massCheckNow(this);')
  			->addClass(ZBX_STYLE_BTN_ALT)
  			->addClass('no-chkbxrange')
- 			->setAttribute('data-required', 'execute')
+ //			->setAttribute('data-required', 'execute')
  	]
  ];
 

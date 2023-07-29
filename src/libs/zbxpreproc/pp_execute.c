@@ -1028,8 +1028,8 @@ int	pp_execute_step(zbx_pp_context_t *ctx, metric_t *metric_in, zbx_pp_cache_t *
 			ret = FAIL;
 		}
 out:
-	DEBUG_ITEM(metric_in->itemid, "Processing step:%d result value:'%s'", 
-		step->type, zbx_variant_value_desc(value));
+	DEBUG_ITEM(metric_in->itemid, "Processing step:%d result value:'%s', step exec result is %d", 
+		step->type, zbx_variant_value_desc(value), ret);
 
 	return ret;
 }

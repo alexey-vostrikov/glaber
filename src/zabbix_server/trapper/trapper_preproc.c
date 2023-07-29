@@ -325,7 +325,7 @@ int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_json *j
 
 		if ( 0 < results_num && ZBX_VARIANT_ERR == results[results_num - 1].value.type)
 		{
-			preproc_error = zbx_strdup(NULL, results[results_num - 1].value.data.err);
+			preproc_error = zbx_strdup(NULL, results[results_num - 1].value.data.str);
 			break;
 		}
 		
@@ -368,7 +368,7 @@ int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_json *j
 			{
 				zbx_json_addint64(json, ZBX_PROTO_TAG_ACTION, result->action);
 				if (ZBX_VARIANT_ERR == result->value_raw.type)
-					zbx_json_addstring(json, ZBX_PROTO_TAG_ERROR, result->value_raw.data.err,
+					zbx_json_addstring(json, ZBX_PROTO_TAG_ERROR, result->value_raw.data.str,
 							ZBX_JSON_TYPE_STRING);
 
 				if (ZBX_PREPROC_FAIL_SET_ERROR == result->action)
@@ -382,7 +382,7 @@ int	trapper_preproc_test_run(const struct zbx_json_parse *jp, struct zbx_json *j
 			{
 				if (ZBX_PREPROC_FAIL_DEFAULT == result->action)
 				{
-					zbx_json_addstring(json, ZBX_PROTO_TAG_ERROR, result->value.data.err,
+					zbx_json_addstring(json, ZBX_PROTO_TAG_ERROR, result->value.data.str,
 						ZBX_JSON_TYPE_STRING);
 				}
 			}

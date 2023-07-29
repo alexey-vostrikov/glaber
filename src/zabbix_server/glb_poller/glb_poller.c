@@ -46,6 +46,7 @@
 #include "poller_contention.h"
 #include "../../libs/apm/apm.h"
 #include "zbxsysinfo.h"
+#include "glb_preproc.h"
 
 extern int CONFIG_CONFSYNCER_FREQUENCY;
 
@@ -121,6 +122,7 @@ typedef struct
 	poller_event_t *update_proctitle;
 	poller_event_t *async_io_proc;
 	poller_event_t *lost_items_check;
+	poller_event_t *preprocessing_flush;
 
 } poll_engine_t;
 
@@ -147,7 +149,7 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 	int simple_interval;
 	u_int64_t nextcheck;
 	zbx_custom_interval_t *custom_intervals;
-	char *error;
+	char *error = NULL;
 	const char *delay;
 	poller_host_t *glb_host;
 
@@ -158,7 +160,9 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 
 	if (SUCCEED != zbx_interval_preproc(delay, &simple_interval, &custom_intervals, &error))
 	{
-		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s", poller_item->itemid, poller_item->delay);
+	
+		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s :%s", poller_item->itemid, poller_item->delay, error);
+		poller_preprocess_error(poller_item, "error");
 		return FAIL;
 	}
 
@@ -307,7 +311,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_host_t *glb_host;
 	u_int64_t mstime = glb_ms_time();
 	int i;
-
+	
 	DEBUG_ITEM(dc_item->itemid, "Creating/updating item");
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
@@ -315,7 +319,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: deleting the old configuration");
 		glb_poller_delete_item(poller_item->itemid);
 	}
-
+	
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
 	bzero(&local_glb_item, sizeof(poller_item_t));
 
@@ -326,6 +330,11 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 
 	poller_item->state = POLL_QUEUED;
 	poller_item->hostid = dc_item->host.hostid;
+	
+	zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_item->host.hostid, NULL, NULL,
+						NULL, NULL, NULL, NULL, NULL, &dc_item->delay, MACRO_TYPE_COMMON,
+						NULL, 0);
+
 	poller_item->delay = strpool_add(&conf.strpool, dc_item->delay);
 	poller_item->value_type = dc_item->value_type;
 	poller_item->flags = dc_item->flags;
@@ -334,15 +343,13 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item->interfaceid = dc_item->interface.interfaceid;
 
 	add_item_to_host(poller_item->hostid);
-
+	
 	if (FAIL == conf.poller.init_item(dc_item, poller_item))
 	{
-		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
 		strpool_free(&conf.strpool, poller_item->delay);
 		delete_item_from_host(poller_item->hostid);
 		zbx_hashset_remove(&conf.items, &poller_item->itemid);
-		//LOG_INF("Item creation has failed, not creating, total items %d", conf.items.num_data);
-
+		
 		return FAIL;
 	};
 
@@ -451,6 +458,9 @@ void lost_items_check_cb(poller_item_t *garbage, void *data)
 
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
 }
+static void preprocessing_flush_cb(poller_item_t *garbage, void *data) {
+	preprocessing_flush();
+}
 
 static void update_proc_title_cb(poller_item_t *garbage, void *data)
 {
@@ -509,6 +519,9 @@ static int poller_init(zbx_thread_args_t *args)
 	
 	conf.update_proctitle = poller_create_event(NULL, update_proc_title_cb, 0, args, 1);
 	poller_run_timer_event(conf.update_proctitle, PROCTITLE_UPDATE_INTERVAL);
+
+	conf.preprocessing_flush = poller_create_event(NULL, preprocessing_flush_cb, 0, args, 1);
+	poller_run_timer_event(conf.preprocessing_flush, PROCTITLE_UPDATE_INTERVAL);
 
 	conf.lost_items_check = poller_create_event(NULL, lost_items_check_cb, 0, NULL, 1);
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
@@ -657,6 +670,7 @@ void poller_preprocess_error(poller_item_t *poller_item, const char *error)
 	preprocess_error(poller_item->hostid, poller_item->itemid, poller_item->flags, NULL, (char*)error);
 	glb_state_item_set_error(poller_item->itemid, error);
 	glb_state_interfaces_register_fail(poller_item->interfaceid, error);
+//	preprocessing_flush();
 }
 
 void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value, int orig_type) {
@@ -668,21 +682,25 @@ void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_
 		preprocess_uint64(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
 
 	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
+//	preprocessing_flush();
 }
 
 void poller_preprocess_str(poller_item_t *poller_item, zbx_timespec_t *ts, const char *value) {
 	preprocess_str(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
 	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
+//	preprocessing_flush();
 }
 
 void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, double dbl_value) {
 	preprocess_dbl(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, dbl_value);
 	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
+//	preprocessing_flush();
 }
 
 void poller_preprocess_agent_result_value(poller_item_t *poller_item, zbx_timespec_t *ts, AGENT_RESULT *ar) {
 	preprocess_agent_result(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, ar, poller_item->value_type);
 	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
+//	preprocessing_flush();
 }
 
 void poller_inc_responses()

@@ -495,7 +495,7 @@ static int	eval_execute_push_value(const zbx_eval_context_t *ctx, const zbx_eval
 	{
 		if (ZBX_VARIANT_ERR == token->value.type && 0 == (ctx->rules & ZBX_EVAL_PROCESS_ERROR))
 		{
-			*error = zbx_strdup(*error, token->value.data.err);
+			*error = zbx_strdup(*error, token->value.data.str);
 			return FAIL;
 		}
 
@@ -1843,17 +1843,18 @@ static int	eval_execute_function_repeat(const zbx_eval_context_t *ctx, const zbx
 		return FAIL;
 	}
 
-	len_utf8 = zbx_strlen_utf8(str->data.str);
-
-	if (num->data.ui64 * len_utf8 >= MAX_STRING_LEN)
+	if (0 != (len_utf8 = zbx_strlen_utf8(str->data.str)))
 	{
-		*error = zbx_dsprintf(*error, "maximum allowed string length (%d) exceeded: " ZBX_FS_UI64,
-				MAX_STRING_LEN, num->data.ui64 * len_utf8);
-		return FAIL;
-	}
+		if (num->data.ui64 * len_utf8 >= MAX_STRING_LEN)
+		{
+			*error = zbx_dsprintf(*error, "maximum allowed string length (%d) exceeded: " ZBX_FS_UI64,
+					MAX_STRING_LEN, num->data.ui64 * len_utf8);
+			return FAIL;
+		}
 
-	for (i = num->data.ui64; i > 0; i--)
-		strval = zbx_strdcat(strval, str->data.str);
+		for (i = num->data.ui64; i > 0; i--)
+			strval = zbx_strdcat(strval, str->data.str);
+	}
 
 	if (NULL == strval)
 		strval = zbx_strdup(NULL, "");
@@ -2949,7 +2950,7 @@ static int	eval_execute(const zbx_eval_context_t *ctx, zbx_variant_t *value, cha
 
 	if (ZBX_VARIANT_ERR == output.values[0].type)
 	{
-		errmsg = zbx_strdup(errmsg, output.values[0].data.err);
+		errmsg = zbx_strdup(errmsg, output.values[0].data.str);
 		goto out;
 	}
 

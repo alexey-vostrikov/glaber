@@ -11,7 +11,8 @@ build {
       "echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
       "echo 'deb http://ftp.de.debian.org/debian bullseye main non-free' > /etc/apt/sources.list.d/nonfree.list",
       "apt-get update",
-      "apt-get install -y glaber-server-mysql=1:${var.glaber_build_version}* snmp-mibs-downloader",
+      "apt-get install --no-install-recommends -y glaber-server-mysql=1:${var.glaber_build_version}*",
+      "apt-get install -y snmp-mibs-downloader",
       "rm -rf /var/lib/{apt,dpkg,cache,log}/",
       "apt-get autoremove --yes",
       "apt-get clean autoclean",
@@ -22,7 +23,8 @@ build {
       "sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen",
       "sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen",
       "locale-gen",
-      "download-mibs"
+      "download-mibs",
+      "rm /etc/zabbix/zabbix_server.conf"
     ]
   }
   provisioner "file" {

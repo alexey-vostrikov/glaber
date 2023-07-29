@@ -144,6 +144,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 		sec = zbx_time();
 
 		zbx_prof_update(get_process_type_string(process_type), sec);
+		zabbix_report_log_level_change();
 
 
 		zbx_setproctitle("%s #%d [%s, syncing history]", process_name, process_num, stats);

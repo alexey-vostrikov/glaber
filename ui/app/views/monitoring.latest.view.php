@@ -28,8 +28,6 @@ $this->addJsFile('layout.mode.js');
 $this->addJsFile('class.tagfilteritem.js');
 $this->addJsFile('class.tabfilter.js');
 $this->addJsFile('class.tabfilteritem.js');
-$this->addJsFile('class.expandable.subfilter.js');
-
 $this->includeJsFile('monitoring.latest.view.js.php');
 
 $this->enableLayoutModes();
@@ -39,6 +37,7 @@ if ($data['uncheck']) {
 	uncheckTableRows('latest');
 }
 
+
 $html_page = (new CHtmlPage())
 	->setTitle(_('Latest data'))
 	->setWebLayoutMode($web_layout_mode)
@@ -47,6 +46,11 @@ $html_page = (new CHtmlPage())
 		(new CTag('nav', true, (new CList())->addItem(get_icon('kioskmode', ['mode' => $web_layout_mode]))))
 			->setAttribute('aria-label', _('Content controls'))
 	);
+
+if (1 == count($data['hosts'])) {
+	$host = array_values($data['hosts'])[0];
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($host['hostid'])));
+}
 
 if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 	$filter = (new CTabFilter())
@@ -59,7 +63,7 @@ if ($web_layout_mode == ZBX_LAYOUT_NORMAL) {
 		$filter->addTemplatedTab($tab['filter_name'], $tab);
 	}
 
-	// Set javascript options for tab filter initialization in monitoring.latest.view.js.php file.
+	
 	$data['filter_options'] = $filter->options;
 	$html_page->addItem($filter);
 }

@@ -33,6 +33,14 @@ static HANDLE		system_log_handle = INVALID_HANDLE_VALUE;
 
 #define LOG_COMPONENT_LEN	64
 
+#define LOG_LEVEL_DEC_FAIL	-2
+#define LOG_LEVEL_DEC_SUCCEED	-1
+#define LOG_LEVEL_UNCHANGED	0
+#define LOG_LEVEL_INC_SUCCEED	1
+#define LOG_LEVEL_INC_FAIL	2
+
+static ZBX_THREAD_LOCAL int	zbx_log_level_change = LOG_LEVEL_UNCHANGED;
+
 static char			log_filename[MAX_STRING_LEN];
 static int			log_type = LOG_TYPE_UNDEFINED;
 static zbx_mutex_t		log_access = ZBX_MUTEX_NULL;
@@ -737,8 +745,38 @@ void	zbx_strlog_alloc(int level, char **out, size_t *out_alloc, size_t *out_offs
 
 	zbx_free(buf);
 }
-
-void	zbx_set_log_component(const char *component)
+void	 zabbix_report_log_level_change(void)
 {
-	zbx_snprintf(log_component, sizeof(log_component), "[%s] ", component);
+	int	change;
+
+	if (0 == zbx_log_level_change)
+		return;
+
+	/* reset log level change history to avoid recursion */
+	change = zbx_log_level_change;
+	zbx_log_level_change = LOG_LEVEL_UNCHANGED;
+
+	switch (change)
+	{
+		case LOG_LEVEL_DEC_FAIL:
+			zabbix_log(LOG_LEVEL_INFORMATION, "cannot decrease log level:"
+					" minimum level has been already set");
+			break;
+		case LOG_LEVEL_DEC_SUCCEED:
+			zabbix_log(LOG_LEVEL_INFORMATION, "log level has been decreased to %s",
+					zabbix_get_log_level_string());
+			break;
+		case LOG_LEVEL_INC_SUCCEED:
+			zabbix_log(LOG_LEVEL_INFORMATION, "log level has been increased to %s",
+					zabbix_get_log_level_string());
+			break;
+		case LOG_LEVEL_INC_FAIL:
+			zabbix_log(LOG_LEVEL_INFORMATION, "cannot increase log level:"
+					" maximum level has been already set");
+			break;
+	}
 }
+// void	zbx_set_log_component(const char *component)
+// {
+// 	zbx_snprintf(log_component, sizeof(log_component), "[%s] ", component);
+// }

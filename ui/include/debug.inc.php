@@ -25,7 +25,7 @@ function sdb($return = false) {
 	$result = 'DEBUG BACKTRACE: <br/>';
 	foreach ($backtrace as $n => $bt) {
 		$result .= '  --['.$n.']-- '.$bt['file'].' : '.$bt['line'].'<br/>';
-		$result .= "&nbsp;&nbsp;<b>".(isset($bt['class']) ? $bt['class'].$bt['type'].$bt['function'] : $bt['function']).'</b>';
+		$result .= NBSP().NBSP()."<b>".(isset($bt['class']) ? $bt['class'].$bt['type'].$bt['function'] : $bt['function']).'</b>';
 		$args = [];
 		foreach ($bt['args'] as $arg) {
 			$args[] = is_array($arg) ? print_r($arg, true) : $arg;
@@ -66,7 +66,7 @@ function sdii($msg = 'SDII', $for = '', $showInvisible = true) {
 function vdp($var, $msg = null) {
 	echo 'DEBUG DUMP: ';
 	if (isset($msg)) {
-		echo '"'.$msg.'"'.SPACE;
+		echo '"'.$msg. NBSP().'"';
 	}
 	var_dump($var);
 	echo BR();

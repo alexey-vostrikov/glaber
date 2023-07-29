@@ -618,7 +618,8 @@ int	zbx_shmem_create(zbx_shmem_info_t **info, zbx_uint64_t size, const char *des
 	
 	glb_lock_init(&(*info)->lock);
 	
-	zabbix_log(LOG_LEVEL_DEBUG, "valid user addresses: [%p, %p] total size: " ZBX_FS_SIZE_T,
+	LOG_DBG("Shmem '%s' created, valid user addresses: [%p, %p] total size: " ZBX_FS_SIZE_T,
+			descr,
 			(void *)((char *)(*info)->lo_bound + SHMEM_SIZE_FIELD),
 			(void *)((char *)(*info)->hi_bound - SHMEM_SIZE_FIELD),
 			(zbx_fs_size_t)(*info)->total_size);

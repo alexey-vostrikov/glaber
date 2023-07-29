@@ -124,7 +124,7 @@ static int	get_trigger_severity_name(int priority, char **replace_to)
  ******************************************************************************/
 static int	get_problem_update_actions(const zbx_db_acknowledge *ack, int actions, const char *tz, char **out)
 {
-	const char	*prefixes[] = {"", ", ", ", ", ", ", ", ", ", ", ", "};
+	const char	*prefixes[] = {"", ", ", ", ", ", ", ", ", ", ", ", ", ", ", ", "};
 	char		*buf = NULL;
 	size_t		buf_alloc = 0, buf_offset = 0;
 	int		i, index, flags;
@@ -217,7 +217,7 @@ static int	get_problem_update_actions(const zbx_db_acknowledge *ack, int actions
 
 	if (0 != (flags & ZBX_PROBLEM_UPDATE_RANK_TO_CAUSE))
 	{
-		zbx_strcpy_alloc(&buf, &buf_alloc, &buf_offset, prefixes[index++]);
+		zbx_strcpy_alloc(&buf, &buf_alloc, &buf_offset, prefixes[index]);
 		zbx_strcpy_alloc(&buf, &buf_alloc, &buf_offset, "ranked as cause");
 	}
 
@@ -5666,7 +5666,7 @@ static void	zbx_evaluate_item_functions(zbx_hashset_t *funcs, const zbx_vector_u
 			continue;
 		}
 
-		if (ITEM_STATE_NORMAL != glb_state_item_get_state(item->itemid) &&
+		if (ITEM_STATE_NORMAL != glb_state_item_get_oper_state(item->itemid) &&
 				FAIL == zbx_evaluatable_for_notsupported(func->function))
 		{
 			/* set 'unknown' error value */

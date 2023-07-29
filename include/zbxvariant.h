@@ -41,8 +41,7 @@ typedef union
 
 	zbx_vector_dbl_t	*dbl_vector;
 
-	/* null terminated error message */
-	char			*err;
+
 }
 zbx_variant_data_t;
 

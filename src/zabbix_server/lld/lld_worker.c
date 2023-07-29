@@ -111,16 +111,14 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		}
 	}
 
-	
-	if (NULL != error) 
-		glb_state_item_set_error(itemid,error);
-	else if (NULL != value )	 
-		glb_state_item_add_lld_value(itemid, &ts, value);
- 	
-
 	DCconfig_clean_items(&item, &errcode, 1);
 
 out:
+	if (NULL != error && strlen(error) > 0) 
+		glb_state_item_set_error(itemid,error);
+	else if (NULL != value )	
+		glb_state_item_add_lld_value(itemid, &ts, value);
+ 	
 	zbx_free(value);
 	zbx_free(error);
 

@@ -49,6 +49,7 @@
 #include "zbx_rtc_constants.h"
 #include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_interfaces.h"
+#include "glb_preproc.h"
 
 /******************************************************************************
  *                                                                            *
@@ -812,8 +813,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		DEBUG_ITEM(items[i].itemid,"Poller %d: Returned item to the zbx queue", poller_type);
 	}
 
-	//zbx_preprocessor_flush();
-	preprocessing_force_flush();
+	preprocessing_flush();
 	zbx_clean_items(items, num, results);
 	DCconfig_clean_items(items, NULL, num);
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
@@ -845,6 +845,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
 	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
+	zbx_uint32_t		rtc_msgs[] = {ZBX_RTC_SNMP_CACHE_RELOAD};
 	int last_stat_time = time(NULL);
 
 #define	STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
@@ -856,8 +857,6 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			server_num, get_process_type_string(process_type), process_num);
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
-	
-//	glb_preprocessing_init();
 
 	scriptitem_es_engine_init();
 
@@ -875,7 +874,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
 	last_stat_time = time(NULL);
 
-	zbx_rtc_subscribe(process_type, process_num, poller_args_in->config_comms->config_timeout, &rtc);
+	zbx_rtc_subscribe(process_type, process_num, rtc_msgs, ARRSIZE(rtc_msgs),
+			poller_args_in->config_comms->config_timeout, &rtc);
 
 	while (ZBX_IS_RUNNING())
 	{

@@ -55,7 +55,7 @@ if ((count($data['items']) == 1 || $same_host) && $data['itemids']) {
 	$html_page->setNavigation(new CHostNav(CHostNav::getData($first_item['hostid'])));
 	
 	if (count($data['items']) == 1) {
-		$item_url =  (new CLink(CHtml::encode($item['name']),
+		$item_url =  (new CLink($item['name'],
 		(new CUrl('items.php'))
 			->setArgument('form', 'update')
 			->setArgument('hostid', $item['hostid'])

@@ -23,6 +23,7 @@
 #include "log.h"
 #include "metric.h"
 #include "glb_preproc_ipc.h"
+#include "glb_preproc.h"
 #include "zbxpreproc.h"
 #include "zbxcacheconfig.h"
 #include "../../libs/zbxpreproc/pp_history.h"
@@ -64,7 +65,7 @@ zbx_pp_item_t *get_prperoc_item(u_int64_t itemid) {
     return zbx_hashset_search(&conf.items, &itemid);
 }
 
-void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *preproc_conf) {
+static void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *preproc_conf) {
     
     if ( NULL != preproc_conf && ( preproc_conf->preproc->flags & ZBX_FLAG_DISCOVERY_RULE ) ) {
         
@@ -98,25 +99,18 @@ static void preprocess_metric_execute_steps(metric_t *metric, zbx_pp_cache_t *ca
 	
 	zbx_variant_set_none(&value_out);
 
-	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item %d steps",   preproc_conf->preproc->steps_num);
+	DEBUG_ITEM(metric->itemid, "Runing preprocessing for item, %d steps",   preproc_conf->preproc->steps_num);
 
 	pp_execute(&conf.ctx, preproc_conf->preproc, cache, metric, &value_out, NULL, NULL);
 
-    DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', result is %p '%s'",
-        zbx_variant_type_desc(&value_out), &value_out, zbx_variant_value_desc(&value_out));
+    DEBUG_ITEM(metric->itemid, "Result of preprocessing of in: '%s', result is '%s'",
+        zbx_variant_type_desc(&value_out), zbx_variant_value_desc(&value_out));
     
     metric_t new_metric = {.hostid = metric->hostid, .itemid = metric->itemid, .ts = metric->ts, .value = value_out };
     
     send_preprocessed_metric(&new_metric, preproc_conf);
     process_dependent_metrics(&new_metric, preproc_conf->preproc, dep_level - 1);
  	zbx_variant_clear(&value_out);
-}
-
-
-//note this should be preprocessed via normal preprocessing
-//or at least, using "local" preprocessing only for "local" data
-int preprocess_metric(metric_t *metric) {
-	preprocess_metric_execute_steps(metric, NULL, MAX_DEPENDENCY_LEVEL);	
 }
 
 static void process_dependent_metrics(metric_t * metric, zbx_pp_item_preproc_t *preproc_conf, int level) {
@@ -157,7 +151,7 @@ void preprocessing_sync_conf(poller_item_t *poller_item, void *data) {
 
 void proctitle_update(poller_item_t *poller_item, void *data) {
     glb_preproc_worker_conf_t *conf = data;
- //   LOG_INF("Updating proctitle");
+ 
     zbx_setproctitle("glb_preproc_worker #%d: processed %d/sec", conf->process_num,
                                          conf->total_proc/PROCTITLE_UPDATE_INTERVAL);
     conf->total_proc = 0;
@@ -179,6 +173,7 @@ void process_incoming_metrics(poller_item_t *poller_item, void *data) {
 
 void ipc_flush(poller_item_t *poller_item, void *data) {
     preprocessing_flush();
+    processing_flush();
 }
 
 void preprocessing_worker_init(zbx_thread_args_t *args, glb_preproc_worker_conf_t *conf) {
@@ -224,10 +219,6 @@ void preprocessing_worker_init(zbx_thread_args_t *args, glb_preproc_worker_conf_
 }
 
 ZBX_THREAD_ENTRY(glb_preprocessing_worker_thread, args) {
-  int i = 0, total_proc =0, proctitle_update=0;
-
-  zbx_setproctitle("glb_preproc_worker");
-  LOG_INF("glb_preproc_worker started");
 
   preprocessing_worker_init((zbx_thread_args_t *)args, &conf);
   

@@ -47,6 +47,8 @@
 	in cases when same data traverses several steps to avoid extra memory copyings
 5.  sender might use flush function to force immediate sending
 	*/
+#include "glb_preproc.h"
+
 #ifndef GLB_IPC_H
 #define GLB_IPC_H
 
@@ -66,32 +68,28 @@ typedef enum
 	IPC_LOCK_TRY_1MS 
 } ipc_lock_mode_t;
 
+//some free slots reserved only for high priority senders, which gives them more chances to 
+//send data in congestion
+typedef enum 
+{
+  IPC_SEND_NORMAL_PRIORITY = 1,
+  IPC_SEND_HIGH_PRIORITY
+} ipc_send_priority_t;
+
 #define IPC_PROCESS_ALL 0
-
-typedef void (*ipc_data_create_cb_t)(mem_funcs_t *memf, void *ipc_data, void *buffer);
-typedef void (*ipc_data_free_cb_t)(mem_funcs_t *memf, void *ipc_data);
-typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data);
-
-#define IPC_CREATE_CB(name) \
-		static void name(mem_funcs_t *memf, void *ipc_data, void *local_data)
-
-#define IPC_FREE_CB(name) \
-		static void name(mem_funcs_t *memf, void *ipc_data)
-
-#define IPC_PROCESS_CB(name) \
-		static void name(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data)
 
 typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
 typedef struct ipc_conf_t ipc_conf_t;
 
 ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name);
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name, int reserved_slots);
 			
 ipc_conf_t	*glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
 			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
 void		glb_ipc_destroy(ipc_conf_t* ipc);
 
-int		glb_ipc_send(ipc_conf_t *ipc_conf, int queue_num , void *data, unsigned char lock_wait);
+
+int 	glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock_wait, ipc_send_priority_t priority );
 int 	glb_ipc_process(ipc_conf_t *ipc_conf, int consumerid, ipc_data_process_cb_t cb_func, void *cb_data, int max_count);
 
 int		glb_ipc_flush(ipc_conf_t *ipc_conf);

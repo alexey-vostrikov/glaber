@@ -5161,6 +5161,9 @@ section .section-toggle:hover, .filter-container.tabfilter-container .icon-edit:
   height: 100%;
   z-index: 1001; }
 
+.dashboard-menu {
+  overflow: auto; }
+
 .menu-popup {
   position: absolute;
   z-index: 1001;
@@ -5171,8 +5174,7 @@ section .section-toggle:hover, .filter-container.tabfilter-container .icon-edit:
   border: 1px solid #383838;
   border-bottom-color: #353535;
   box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.5);
-  max-height: 90%;
-  overflow: auto; }
+  max-height: 90%; }
   .menu-popup:focus {
     outline: none; }
   .menu-popup li {
@@ -7541,6 +7543,9 @@ z-select.z-select-host-interface li[disabled] .description:not(:empty),
 .graph-preview {
   width: 250px;
   height: 80px; }
+
+.form-submit-hidden {
+  display: none; }
 
 .sidebar.is-compact:not(.is-opened) .form-search .search-icon {
   opacity: .75; }

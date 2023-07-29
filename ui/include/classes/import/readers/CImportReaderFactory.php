@@ -64,7 +64,7 @@ class CImportReaderFactory {
 	 * @return string
 	 */
 	public static function fileExt2ImportFormat(string $ext): string {
-		switch ($ext) {
+		switch (strtolower($ext)) {
 			case 'yaml':
 			case 'yml':
 				return self::YAML;

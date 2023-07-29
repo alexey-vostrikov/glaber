@@ -1112,7 +1112,7 @@ int	DBcheck_version(zbx_ha_mode_t ha_mode, db_update_db_type_t update_type) {
 	if (0 != mandatory_num)
 	{
 		zabbix_log(LOG_LEVEL_INFORMATION, "mandatory patches were found");
-		if (SUCCEED == zbx_db_table_exists(ha_node_table_name))
+		if (SUCCEED == zbx_db_table_exists(ha_node_table_name) && DB_UPDATE_COMMON_DATABASE == update_type)
 			ret = DBcheck_nodes();
 
 		if (ZBX_HA_MODE_CLUSTER == ha_mode)
@@ -1156,7 +1156,7 @@ int	DBcheck_version(zbx_ha_mode_t ha_mode, db_update_db_type_t update_type) {
 
 			zbx_db_begin();
 
-			result = zbx_db_select("select optional,mandatory from dbversion" ZBX_FOR_UPDATE);
+			result = zbx_db_select("select optional,mandatory from %s " ZBX_FOR_UPDATE, dbversion_table_name);
 			if (NULL != (row = zbx_db_fetch(result)))
 				db_optional = atoi(row[0]);
 

@@ -278,12 +278,13 @@ class CLatestValue extends CSpan {
 
         foreach ($ranges as $range) {
             $list->addItem(
-                 new CLink($range['name'].'&nbsp;&nbsp;', (new CUrl('history.php'))
+                 new CLink($range['name'], (new CUrl('history.php'))
                         ->setArgument('action', $is_graph ? HISTORY_GRAPH : HISTORY_VALUES)
                         ->setArgument('from', $range['range'])
                         ->setArgument('to', 'now')
                         ->setArgument('itemids[]', $this->itemdata['itemid'])
-            ));
+            ))
+            ->addItem(NBSP())->addItem(NBSP()) ;
         }
 
         return $list;
