@@ -33,7 +33,17 @@ variable "output_dir" {
   default = "vm-output"
 }
 
+variable "output_dir_next" {
+  type    = string
+  default = "vm-output-next"
+}
+
 variable "output_name" {
   type    = string
   default = "glaber.qcow2"
+}
+
+variable "snmp_version" {
+  description = "The SNMP version to install with ssl support"
+  default     = "5.9.3"
 }

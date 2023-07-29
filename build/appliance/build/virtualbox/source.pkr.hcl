@@ -23,6 +23,7 @@ source "qemu" "debian" {
   disk_detect_zeroes = "unmap"
 
   output_directory = "${var.output_dir}"
+  # output_directory = "${var.output_dir_next}"
   format             = "qcow2"
 
   boot_wait    = "10s"
