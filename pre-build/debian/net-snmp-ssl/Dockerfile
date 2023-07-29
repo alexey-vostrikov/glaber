@@ -15,7 +15,7 @@ RUN apt-get update && \
     ./configure --with-defaults --with-persistent-directory=/var/net-snmp --with-logfile=/var/log/snmpd.log --with-openssl --enable-privacy && \
     make && \
     make install && \
-    apt-get remove -y build-essential file libperl-dev && \
+    apt-get remove -y build-essential file && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/net-snmp-${SNMP_VERSION}.tar.gz /tmp/net-snmp-${SNMP_VERSION}
