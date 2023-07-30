@@ -62,7 +62,7 @@ build {
 
   provisioner "file" {
     source      = "clickhouse/config.d"
-    destination = "/etc/clickhouse-server/config.d"
+    destination = "/etc/clickhouse-server"
   }
 
   provisioner "file" {
@@ -71,25 +71,15 @@ build {
   }
 
   provisioner "shell" {
-  name = "Revoke permissions to copy config"
-  inline = [
-    "sudo chmod -R 400 /etc/clickhouse-server",
-    "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server"
-  ]
-  }
-
-  provisioner "shell" {
   name = "Start clickhouse server"
   inline = [
-    "sudo systemctl enable --now clickhouse-server",
+    "sudo systemctl enable  clickhouse-server",
     "sudo systemctl restart clickhouse-server"
   ]
   }
 
 # provisioner "shell" {
 #   inline = [
-#     "sudo systemctl enable --now clickhouse-server",
-#     "sudo systemctl status clickhouse-server",
 #     "if ! clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --database ${var.zbx_ch_db} --query 'select count(*) from history_str;'; then",
 #     "echo 'Install glaber clickhouse schema'",
 #     "wget -q https://gitlab.com/mikler/glaber/-/raw/${var.glaber_tag}/database/clickhouse/history.sql",
