@@ -1,8 +1,8 @@
 source "qemu" "debian" {
-  # iso_url      = "${var.source_qcow}"
-  iso_url        = "vm-output-next/glaber.qcow2"
-  # iso_checksum = "${var.source_checksum_url}"
-  iso_checksum = "none"
+  iso_url      = "${var.source_qcow}"
+  # iso_url        = "vm-output-next-2/glaber.qcow2"
+  iso_checksum = "${var.source_checksum_url}"
+  # iso_checksum = "none"
   disk_image = true
 
   ssh_username     = "${var.username}"
@@ -22,8 +22,8 @@ source "qemu" "debian" {
   skip_compaction    = false
   disk_detect_zeroes = "unmap"
 
-  # output_directory = "${var.output_dir}"
-  output_directory = "${var.output_dir_next}"
+  output_directory = "${var.output_dir}"
+  # output_directory = "${var.output_dir_next}"
   format             = "qcow2"
 
   boot_wait    = "10s"

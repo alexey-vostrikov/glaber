@@ -33,10 +33,6 @@ variable "output_dir" {
   default = "vm-output"
 }
 
-variable "output_dir_next" {
-  type    = string
-  default = "vm-output-next-2"
-}
 
 variable "output_name" {
   type    = string
@@ -46,4 +42,38 @@ variable "output_name" {
 variable "snmp_version" {
   description = "The SNMP version to install with ssl support"
   default     = "5.9.3"
+}
+
+variable "clickhouse_version" {
+  default     = "21.3"
+}
+
+variable "zbx_ch_user" {
+  type        = string
+  description = "The ClickHouse username"
+  default     = "defaultuser"
+}
+
+variable "zbx_ch_pass" {
+  type        = string
+  description = "The ClickHouse password"
+  default     = "SzdcHLgihPav"
+}
+
+variable "zbx_ch_db" {
+  type        = string
+  description = "The ClickHouse database"
+  default     = "zabbix"
+}
+
+variable "glaber_tag" {
+  type        = string
+  description = "The Glaber tag"
+  default     = "3.2.16"
+}
+
+variable "zbx_ch_retention" {
+  type        = string
+  description = "The retention period for ClickHouse"
+  default     = "30 DAY"
 }
