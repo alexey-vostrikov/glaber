@@ -36,7 +36,7 @@
             <!-- Password could be specified in plaintext or in SHA256 (in hex format).
 
                  If you want to specify password in plaintext (not recommended), place it in 'password' element.
-                 Example: <password>SzdcHLgihPav</password>.
+                 Example: <password>password</password>.
                  Password could be empty.
 
                  If you want to specify SHA256, place it in 'password_sha256_hex' element.
@@ -54,7 +54,7 @@
                  Execute: PASSWORD=$(base64 < /dev/urandom | head -c8); echo "$PASSWORD"; echo -n "$PASSWORD" | openssl dgst -sha1 -binary | openssl dgst -sha1
                  In first line will be password and in second - corresponding double SHA1.
             -->
-            <password>SzdcHLgihPav</password>
+            <password>password</password>
 
             <!-- List of networks with open access.
 

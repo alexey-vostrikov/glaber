@@ -44,8 +44,8 @@ build {
       "echo \"deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb lts main\" | sudo tee /etc/apt/sources.list.d/clickhouse.list",
       "sudo apt-get update",
       "echo clickhouse-server clickhouse-server/default-password password ${var.zbx_ch_pass} | sudo debconf-set-selections",
-      "timeout 30m sudo apt-get install -y clickhouse-common-static=${var.clickhouse_version}*",
-      "timeout 30m sudo apt-get install -y clickhouse-server=${var.clickhouse_version}* clickhouse-client=${var.clickhouse_version}*"
+      "sudo apt-get install -y clickhouse-common-static=${var.clickhouse_version}*",
+      "sudo apt-get install -y clickhouse-server=${var.clickhouse_version}* clickhouse-client=${var.clickhouse_version}*"
     ]
   }
 
@@ -73,13 +73,18 @@ build {
   provisioner "shell" {
   name = "Start clickhouse server"
   inline = [
-    "sudo systemctl enable  clickhouse-server",
-    "sudo systemctl restart clickhouse-server"
+    "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
+    "sudo systemctl enable --now clickhouse-server",
+    "journalctl -u clickhouse-server| tail -20"
   ]
   }
 
 # provisioner "shell" {
 #   inline = [
+#     "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
+#     "sudo systemctl restart clickhouse-server",
+#     "sudo systemctl status clickhouse-server",
+#       "journalctl -u clickhouse-server| tail -20",
 #     "if ! clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --database ${var.zbx_ch_db} --query 'select count(*) from history_str;'; then",
 #     "echo 'Install glaber clickhouse schema'",
 #     "wget -q https://gitlab.com/mikler/glaber/-/raw/${var.glaber_tag}/database/clickhouse/history.sql",
@@ -90,6 +95,19 @@ build {
 #     "fi"
 #   ]
 # }
+
+# provisioner "shell" {
+#   inline = [
+#      "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
+#      "sudo systemctl restart clickhouse-server",
+#      "sudo systemctl status clickhouse-server",
+#      "while true; do",
+#      "  echo 'This will print indefinitely. Press Ctrl+C to stop.'",
+#      "  sleep 60",
+#      "done"
+#    ]
+#  }
+
 
   # set random password
   # add ? script? ... to apply galber database

@@ -1,6 +1,6 @@
 source "qemu" "debian" {
   iso_url      = "${var.source_qcow}"
-  # iso_url        = "vm-output/glaber.qcow2"
+  #iso_url        = "vm-output/glaber.qcow2"
   iso_checksum = "${var.source_checksum_url}"
   #iso_checksum = "none"
   disk_image = true
@@ -14,7 +14,7 @@ source "qemu" "debian" {
   cpus = 1
   memory = 2048
   disk_size = 300960
-  headless = true
+  # headless = true
 
   # Builds a compact image
   disk_compression   = true

@@ -51,19 +51,19 @@ variable "clickhouse_version" {
 variable "zbx_ch_user" {
   type        = string
   description = "The ClickHouse username"
-  default     = "defaultuser"
+  default     = "default"
 }
 
 variable "zbx_ch_pass" {
   type        = string
   description = "The ClickHouse password"
-  default     = "SzdcHLgihPav"
+  default     = "password"
 }
 
 variable "zbx_ch_db" {
   type        = string
   description = "The ClickHouse database"
-  default     = "zabbix"
+  default     = "glaber"
 }
 
 variable "glaber_tag" {
