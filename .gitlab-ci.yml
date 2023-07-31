@@ -103,9 +103,9 @@ stages:
   - ./configure
   - make dbschema gettext
   - autoreconf -fvi
-  - cp -r build/${OS}/${OS_VER}/ debian && cd debian
-  - sed -i "1 s/(.*+/(1:$GLABER_VERSION-${CI_COMMIT_SHORT_SHA}+/g" changelog
-  - head -n 5 changelog
+  - cp -r build/${OS}/${OS_VER}/ debian
+  - sed -i "1 s/(.*+/(1:$GLABER_VERSION-${CI_COMMIT_SHORT_SHA}+/g" debian/changelog
+  - head -n 5 debian/changelog
 
 .prepare_rpm_sources: &prepare_rpm_sources
   - *set_glb_version
