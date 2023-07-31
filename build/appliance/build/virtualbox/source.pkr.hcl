@@ -14,7 +14,7 @@ source "qemu" "debian" {
   cpus = 1
   memory = 2048
   disk_size = 300960
-  # headless = true
+  headless = true
 
   # Builds a compact image
   disk_compression   = true

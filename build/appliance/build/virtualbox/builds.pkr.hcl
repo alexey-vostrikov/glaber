@@ -53,8 +53,8 @@ build {
   name = "Set permissions to copy config"
   inline = [
     "sudo chmod -R 700 /etc/clickhouse-server",
-    // ru on host id
-    // set  
+    // run on builder host `id`
+    // set number in next step  
     "packer_user=$(id -nu 1000)", # debian
     "sudo chown -R $packer_user:$packer_user /etc/clickhouse-server",
   ]
@@ -75,43 +75,25 @@ build {
   inline = [
     "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
     "sudo systemctl enable --now clickhouse-server",
-    "journalctl -u clickhouse-server| tail -20"
+    "journalctl -u clickhouse-server| tail -50",
+    "while ! ss -ltn 'sport = :9000' | grep -q ':9000'; do echo 'Waiting for port 9000 to be ready...' && sleep 1; done",
   ]
   }
 
-# provisioner "shell" {
-#   inline = [
-#     "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
-#     "sudo systemctl restart clickhouse-server",
-#     "sudo systemctl status clickhouse-server",
-#       "journalctl -u clickhouse-server| tail -20",
-#     "if ! clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --database ${var.zbx_ch_db} --query 'select count(*) from history_str;'; then",
-#     "echo 'Install glaber clickhouse schema'",
-#     "wget -q https://gitlab.com/mikler/glaber/-/raw/${var.glaber_tag}/database/clickhouse/history.sql",
-#     "sed -i -e 's/glaber/${var.zbx_ch_db}/g' -e 's/6 MONTH/${var.zbx_ch_retention}/g' history.sql",
-#     "clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --multiquery < history.sql",
-#     "else",
-#     "echo 'Glaber clickhouse schema already installed'",
-#     "fi"
-#   ]
-# }
-
-# provisioner "shell" {
-#   inline = [
-#      "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
-#      "sudo systemctl restart clickhouse-server",
-#      "sudo systemctl status clickhouse-server",
-#      "while true; do",
-#      "  echo 'This will print indefinitely. Press Ctrl+C to stop.'",
-#      "  sleep 60",
-#      "done"
-#    ]
-#  }
-
-
-  # set random password
-  # add ? script? ... to apply galber database
-  # make schema
-  # start systemd
+provisioner "shell" {
+  name = "Import glaber schema to the clickhouse database"
+  inline = [
+    "if ! clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --database ${var.zbx_ch_db} --query 'select count(*) from history_str;'; then",
+    "echo 'Download glaber clickhouse schema'",
+    "wget -q https://gitlab.com/mikler/glaber/-/raw/${var.glaber_tag}/database/clickhouse/history.sql",
+    "echo 'Make custom retention period'",
+    "sed -i -e 's/glaber/${var.zbx_ch_db}/g' -e 's/6 MONTH/${var.zbx_ch_retention}/g' history.sql",
+    "echo 'Import clickhouse.sql to the ${var.zbx_ch_db} database'",
+    "clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --multiquery < history.sql",
+    "else",
+    "echo 'Glaber clickhouse schema already installed'",
+    "fi"
+  ]
+}
 
 }
