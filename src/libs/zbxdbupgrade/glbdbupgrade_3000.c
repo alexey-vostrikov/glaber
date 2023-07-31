@@ -71,6 +71,12 @@ static int	GLB_DBpatch_3000007(void)
 {
 	return DBcreate_index("hosts_depends", "hosts_depends_up_down_name_idx", "hostid_up,hostid_down,name", 1);
 }
+
+static int      GLB_DBpatch_3000008(void)
+{
+        const ZBX_FIELD field = {"description", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
+        return DBmodify_field_type("triggers", &field, NULL);
+}
 #endif
 
 GLB_DBPATCH_START(3000)
@@ -84,6 +90,7 @@ GLB_DBPATCH_ADD(3000004, 0, 1)
 GLB_DBPATCH_ADD(3000005, 0, 1)
 GLB_DBPATCH_ADD(3000006, 0, 1)
 GLB_DBPATCH_ADD(3000007, 0, 1)
+GLB_DBPATCH_ADD(3000008, 0, 1)
 #endif
 
 DBPATCH_END()

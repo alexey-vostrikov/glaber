@@ -1397,7 +1397,7 @@ int glb_state_item_update_nextcheck(u_int64_t itemid, int nextcheck) {
 }
 
 int  glb_state_item_set_lastdata_by_metric(const metric_t *metric) {
-	return elems_hash_process(state->items, metric->itemid, item_update_lastdata_cb, metric, 0);
+	return elems_hash_process(state->items, metric->itemid, item_update_lastdata_cb, (void *)metric, 0);
 }
 
 ELEMS_CALLBACK(item_set_error_cb) {

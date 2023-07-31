@@ -2,7 +2,6 @@
 
 DIST_SUBDIRS = \
 	go \
-	glapi \
 	libs \
 	zabbix_agent \
 	zabbix_get \
@@ -51,7 +50,6 @@ endif
 if SERVER
 SERVER_SUBDIRS = \
 	zabbix_server \
-	glapi \
 	zabbix_js
 endif
 

@@ -34,13 +34,13 @@ stages:
   - pkg-build
   - docker-build
 
-.build_go: &build_go
-    - export FULL_PROJECT_PATH=$PWD
-    - wget --no-verbose "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz"
-    - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.20.5.linux-amd64.tar.gz
-    - rm ./go1.20.5.linux-amd64.tar.gz
-    - export PATH=$PATH:/usr/local/go/bin
-    - go version
+# .build_go: &build_go
+#     - export FULL_PROJECT_PATH=$PWD
+#     - wget --no-verbose "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz"
+#     - rm -rf /usr/local/go; tar -C /usr/local -xzf go1.20.5.linux-amd64.tar.gz
+#     - rm ./go1.20.5.linux-amd64.tar.gz
+#     - export PATH=$PATH:/usr/local/go/bin
+#     - go version
 
 
 .kaniko_build: &kaniko_build
@@ -78,14 +78,14 @@ stages:
   - curl -s "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages?per_page=1000" | jq --arg name "mysql" '.[] | select(.name == $name)' | grep $GLABER_VERSION || curl -s --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file "create-mysql.sql.tar.gz" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/mysql/$GLABER_VERSION/create-mysql.sql.tar.gz"
   - rm create.sql create-mysql.sql.tar.gz
 
-.build_glbmap: &build_glbmap
-  - git clone https://gitlab.com/mikler/glbmap.git
-  - cd glbmap && cmake . && make -j4
-  - mv src/zmap src/glbmap && chmod +s src/glbmap
-  - pwd
-  - ls -al
-  - cd ../..
-  - ls -al
+# .build_glbmap: &build_glbmap
+#   - git clone https://gitlab.com/mikler/glbmap.git
+#   - cd glbmap && cmake . && make -j4
+#   - mv src/zmap src/glbmap && chmod +s src/glbmap
+#   - pwd
+#   - ls -al
+#   - cd ../..
+#   - ls -al
 
 .set_glb_version: &set_glb_version
   - export GLABER_VERSION=$(cat include/version.h | grep GLABER_VERSION | tr -dc 0-9.)
@@ -149,7 +149,7 @@ debian-buster:
   script:
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
-    - *build_glbmap
+ #   - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
   rules:
@@ -163,9 +163,9 @@ astra:
   tags: ["virtbox"]
   script:
     - update-ca-certificates
-    - *build_go
+   # - *build_go
     - *prepare_sources
-    - *build_glbmap
+   # - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
   rules:
@@ -180,7 +180,7 @@ debian-bullseye:
   script:
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
-    - *build_glbmap
+  #  - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
   rules:
@@ -195,7 +195,7 @@ ubuntu-focal:
   script:
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
-    - *build_glbmap
+  #  - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
   rules:
@@ -210,7 +210,7 @@ ubuntu-bionic:
   script:
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
-    - *build_glbmap
+  #  - *build_glbmap
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
   rules:

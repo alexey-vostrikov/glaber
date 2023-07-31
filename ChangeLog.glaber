@@ -1,34 +1,37 @@
-2023-24-07 ver 3.2.17 (master, release)
+2023-07-31 ver 3.2.18 (master)
+    - workers are moved to a seaparate project (and installation files), https://gitlab.com/glaber/workers
+    - triggers description len field enlarged to 2048 thks to https://t.me/AlexeyAksenoff patch
+2023-07-24 ver 3.2.17 (master, release)
     -3.2 release
-2023-21-07 ver 3.2.16 (master only)
+2023-07-24 ver 3.2.16 (master only)
     -feat: add priorities to IPC to avoid preprocessor stucking on high load
     -fix: async items notification
     -fix: support of uppercase extensions for uploaded import files
-2023-21-07 ver 3.2.13, 3.2.14 3.2.15 (master only)
+2023-07-21 ver 3.2.13, 3.2.14 3.2.15 (master only)
     -fix: redirect preprocessing steps logic to avoid situation when redirected item continued to be processed after redirected
     -fix: periodical ipc flushing to prevent metrics stuck on slow ingest rates
     -fix: glb_server too long buffering fix
-2023-20-07 ver 3.2.11, 3.2.12 (master only)
+2023-07-20 ver 3.2.11, 3.2.12 (master only)
     -fix: ipc memory issue might be causing segv, ipc queue menagment to reduce shared mem usage
     -fix: restored functionality of the original graphs view
-2023-17-07 ver 3.2.9, 3.2.10 (master only)
+2023-07-17 ver 3.2.9, 3.2.10 (master only)
     -fix: incorrect dbupgrade code leading not creating glaber dependancy table
-2023-15-07 ver 3.2.8 (master only)
+2023-07-15 ver 3.2.8 (master only)
     -fix: segv on incorrect interval on server items
-2023-14-07 ver 3.2.7 (master only)
+2023-07-14 ver 3.2.7 (master only)
     -fix: lld data not put to value cache, latest data view fixes
-2023-12-07 ver 3.2.6 (master only)
+2023-07-12 ver 3.2.6 (master only)
     -fix: segv on non-intrerval delays, absence of delay macro translation
-2023-12-07 ver 3.2.5 (master only)
+2023-07-12 ver 3.2.5 (master only)
     -fixed typo in api_jsonrpc leading api to be unfunctionable
-2023-12-07 ver 3.2.4 (master only)
+2023-07-12 ver 3.2.4 (master only)
     - fixed latest data content reloading
-2023-11-07 ver 3.2.3 (master only)
+2023-07-11 ver 3.2.3 (master only)
     -upgraded to Zabbix 6.4.4 sources, fixed second-level menu fail
     -fixed rows selection in datatables
-2023-10-07 ver 3.2.2 (master only)
+2023-07-10 ver 3.2.2 (master only)
     -fix: removed excessive logging in preproc ipc
-2023-10-07 ver 3.2.1 (master only)
+2023-07-10 ver 3.2.1 (master only)
     -fix: latest data fixed so that filters works now, latest data moved from modules to and replaced internal latest data
     -a few UI improvements (link to item from history)
 2023-07-07 ver 3.2.0

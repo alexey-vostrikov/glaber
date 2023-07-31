@@ -1947,7 +1947,6 @@ AC_CONFIG_FILES([
 	database/sqlite3/Makefile
 	misc/Makefile
 	src/Makefile
-	src/glapi/Makefile
 	src/go/Makefile
 	src/libs/Makefile
 	src/libs/glb_conf/Makefile
