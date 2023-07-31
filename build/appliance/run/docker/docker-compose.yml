@@ -3,6 +3,7 @@ version: "3.6"
 services:
   mysql:
     image: percona:8.0.33-25-centos
+    restart: on-failure
     command:
     -  --default-authentication-plugin=mysql_native_password
     -  --character-set-server=utf8
@@ -47,6 +48,7 @@ services:
       target: /docker-entrypoint.sh
   clickhouse:
     image: yandex/clickhouse-server:21.3.20
+    restart: on-failure
     healthcheck:
       test:
       - "CMD"
@@ -92,6 +94,7 @@ services:
         hard: 262144
   glaber-nginx:
     image: registry.gitlab.com/mikler/glaber/glaber-nginx:${GLABER_VERSION}
+    restart: on-failure
     healthcheck:
       test:
       - "CMD"
@@ -116,6 +119,7 @@ services:
     - .env
   glaber-server:
     image: registry.gitlab.com/mikler/glaber/glaber-server:${GLABER_VERSION}
+    restart: on-failure
     volumes:
     - type: bind
       source: ./glaber-server/workers_script/
