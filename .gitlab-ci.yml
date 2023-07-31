@@ -132,9 +132,8 @@ stages:
   - sed -i "2 s/Version:.*/Version:\t$GLABER_VERSION/g" build/centos/SPECS/zabbix.spec
 
 .upload_packages: &upload_packages
-  - cd $FULL_PROJECT_PATH; cd ..
   - pwd && ls -al
-  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
+  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r ../glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --waitforlock 120 --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
 
