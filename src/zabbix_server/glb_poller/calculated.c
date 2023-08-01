@@ -96,7 +96,8 @@ void poll_item(poller_item_t *poller_item) {
     zbx_init_agent_result(&result);
 
     poller_inc_requests();
-
+    
+    DEBUG_ITEM(poller_get_item_id(poller_item),"Calling calculation of the item");
     if (SUCCEED != get_value_calculated(&dc_item, &result) ) {
         poller_preprocess_error(poller_item, result.msg);
     } else 

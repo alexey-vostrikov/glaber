@@ -32,7 +32,7 @@ int	get_value_calculated(DC_ITEM *dc_item, AGENT_RESULT *result)
 	zbx_dc_um_handle_t	*um_handle;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s' expression:'%s'", __func__, dc_item->key_orig, dc_item->params);
-
+	DEBUG_ITEM(dc_item->itemid, "In %s() key:'%s' expression:'%s'", __func__, dc_item->key_orig, dc_item->params);
 	um_handle = zbx_dc_open_user_macros();
 
 	if (NULL == dc_item->formula_bin)
@@ -49,6 +49,9 @@ int	get_value_calculated(DC_ITEM *dc_item, AGENT_RESULT *result)
 			(zbx_macro_expand_func_t)zbx_dc_expand_user_macros, um_handle, &error))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot evaluate calculated item: %s", error));
+
+		DEBUG_ITEM(dc_item->itemid , "Got error while expainding the item %s:", result->msg);
+		
 		zbx_free(error);
 		zbx_eval_clear(&ctx);
 		goto out;
@@ -64,6 +67,7 @@ int	get_value_calculated(DC_ITEM *dc_item, AGENT_RESULT *result)
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() error:%s", __func__, error);
 		SET_MSG_RESULT(result, error);
+		DEBUG_ITEM(dc_item->itemid, "Got error while executing the expressions", error);
 		error = NULL;
 	}
 	else
