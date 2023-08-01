@@ -286,11 +286,13 @@ void	zbx_audit_clean(void)
 
 void	zbx_audit_init(int audit_mode_set)
 {
+	LOG_DBG("In %s()", __func__);
 	audit_mode = audit_mode_set;
 	RETURN_IF_AUDIT_OFF();
 #define AUDIT_HASHSET_DEF_SIZE	100
 	zbx_hashset_create(&zbx_audit, AUDIT_HASHSET_DEF_SIZE, zbx_audit_hash_func, zbx_audit_compare_func);
 #undef AUDIT_HASHSET_DEF_SIZE
+	LOG_DBG("In %s(): finished", __func__);
 }
 
 void	zbx_audit_prepare(void)

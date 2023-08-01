@@ -1,3 +1,5 @@
+2023-07-31 ver 3.2.19 (master)
+    - added some debug logging in lld worker
 2023-07-31 ver 3.2.18 (master)
     - workers are moved to a seaparate project (and installation files), https://gitlab.com/glaber/workers
     - triggers description len field enlarged to 2048 thks to https://t.me/AlexeyAksenoff patch

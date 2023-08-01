@@ -13272,6 +13272,8 @@ unsigned int DCget_auto_registration_action_count(void)
  ******************************************************************************/
 void zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags)
 {
+	LOG_DBG("In %s(): getting config, flags are %ld", __func__,  flags);
+
 	RDLOCK_CACHE;
 	if (0 != (flags & ZBX_CONFIG_FLAGS_SEVERITY_NAME))
 	{
@@ -13312,6 +13314,7 @@ void zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags)
 	UNLOCK_CACHE;
 
 	cfg->flags = flags;
+	LOG_DBG("In %s(): finished ", __func__);
 }
 
 /******************************************************************************

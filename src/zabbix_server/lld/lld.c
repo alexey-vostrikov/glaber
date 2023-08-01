@@ -1229,10 +1229,11 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		goto out;
 	}
 
+	LOG_DBG("Setting error");
 	*error = zbx_strdup(*error, "");
 
 	now = time(NULL);
-
+	
 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_AUDITLOG_ENABLED);
 	zbx_audit_init(cfg.auditlog_enabled);
 
