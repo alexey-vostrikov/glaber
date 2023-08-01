@@ -1042,8 +1042,6 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	p = NULL;
 	while (NULL != (p = zbx_json_next(&jp_array, p)))
 	{
-		
-
 		if (FAIL == zbx_json_brackets_open(p, &jp_row))
 			continue;
 
@@ -1229,7 +1227,7 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		goto out;
 	}
 
-	LOG_DBG("Setting error");
+	LOG_DBG("Setting error, current value is  %s", *error);
 	*error = zbx_strdup(*error, "");
 
 	now = time(NULL);
