@@ -767,7 +767,6 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		{
 			if (0 == add_results.values_num)
 			{
-				items[i].state = ITEM_STATE_NORMAL;
 				DEBUG_ITEM(items[i].itemid, "Processing item as agent result");
 				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, &results[i], items[i].value_type );
 			}
@@ -784,12 +783,10 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 
 					if (ZBX_ISSET_MSG(add_result))
 					{
-						items[i].state = ITEM_STATE_NOTSUPPORTED;
 						preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result->msg);
 					}
 					else
 					{
-						items[i].state = ITEM_STATE_NORMAL;
 						preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, &ts_tmp, add_result, items[i].value_type);
 					}
 
@@ -804,7 +801,6 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		}
 		else if (NOTSUPPORTED == errcodes[i] || AGENT_ERROR == errcodes[i] || CONFIG_ERROR == errcodes[i])
 		{
-			items[i].state = ITEM_STATE_NOTSUPPORTED;
 			preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, results[i].msg);
 		}
 

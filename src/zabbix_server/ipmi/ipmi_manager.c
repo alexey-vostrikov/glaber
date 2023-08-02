@@ -773,7 +773,7 @@ static int	ipmi_manager_schedule_requests(zbx_ipmi_manager_t *manager, int now, 
 
 		request = ipmi_request_create(items[i].host.hostid);
 		request->itemid = items[i].itemid;
-		request->item_state = items[i].state;
+		request->item_state = ITEM_STATE_NORMAL;
 		request->item_flags = items[i].flags;
 		ipmi_manager_serialize_request(&items[i], &request->message);
 		ipmi_manager_schedule_request(manager, items[i].host.hostid, request, now);

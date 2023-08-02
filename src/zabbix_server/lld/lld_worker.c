@@ -84,7 +84,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 		else
 			state = ITEM_STATE_NOTSUPPORTED;
 
-		if (state != item.state)
+		if (state != glb_state_item_get_oper_state(itemid))
 		{
 
 			if (ITEM_STATE_NORMAL == state)

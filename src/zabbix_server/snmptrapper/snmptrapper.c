@@ -186,14 +186,12 @@ next:
 							items[i].logtimefmt);
 				}
 
-				items[i].state = ITEM_STATE_NORMAL;
 				preprocess_agent_result(items[i].host.hostid, items[i].itemid, items[i].flags, ts, &results[i], items[i].value_type);
 
 				itemids[i] = items[i].itemid;
 				lastclocks[i] = ts->sec;
 				break;
 			case NOTSUPPORTED:
-				items[i].state = ITEM_STATE_NOTSUPPORTED;
 				preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, ts, results[i].msg );
 
 				itemids[i] = items[i].itemid;

@@ -147,7 +147,7 @@ typedef struct
 	unsigned char		type;
 	unsigned char		snmp_version;
 	unsigned char		value_type;
-	unsigned char		state;
+//	unsigned char		state;
 	unsigned char		snmpv3_securitylevel;
 	unsigned char		authtype;
 	unsigned char		flags;

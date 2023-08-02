@@ -1107,9 +1107,11 @@ static int item_get_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *c
 
 static int item_get_state_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *cb_data)
 {
+    int *state = cb_data;
     item_elem_t *elm = (item_elem_t *)elem->data;
+    *state = elm->meta.state; 
 
-    return elm->meta.state;
+    return SUCCEED;
 }
 
 int item_get_nextcheck_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *cb_data)
@@ -1449,11 +1451,15 @@ int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
 
 int glb_state_item_get_oper_state(u_int64_t itemid) {
 	int st;
-    if (FAIL == (st = elems_hash_process(state->items, itemid, item_get_state_cb, NULL, ELEM_FLAG_DO_NOT_CREATE))) {
+    if (FAIL == elems_hash_process(state->items, itemid, item_get_state_cb, &st, ELEM_FLAG_DO_NOT_CREATE)) {
+        DEBUG_ITEM(itemid, "Couldn't find state data for item, returning STATE_UNKNOWN");
         return ITEM_STATE_UNKNOWN;
     }
+    
+    DEBUG_ITEM(itemid, "requested item returned state %d", st);
     return st;
 }
+
 int glb_state_item_get_nextcheck(u_int64_t itemid) {
 	return elems_hash_process(state->items, itemid, item_get_nextcheck_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
 }
