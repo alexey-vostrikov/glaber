@@ -1227,11 +1227,8 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		goto out;
 	}
 
-	LOG_INF("Setting error, current ptr is  %p", *error);
-	LOG_INF("Setting error, current value is  %s", *error);
-	*error = zbx_strdup(*error, "");
+	*error = zbx_strdup(NULL, "");
 	
-	LOG_INF("Getting config");
 	now = time(NULL);
 	
 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_AUDITLOG_ENABLED);
