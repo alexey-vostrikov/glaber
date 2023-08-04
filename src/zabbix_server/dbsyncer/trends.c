@@ -82,7 +82,7 @@ static void export_trend(trend_t *trend, const ZBX_DC_HISTORY *h) {
             trend->value_avg.ui64 = trend->value_avg.ui64 / trend->num;
         break;
         case ITEM_VALUE_TYPE_FLOAT:
-            trend->value_avg.dbl = trend->value_avg.ui64 / trend->num;
+            trend->value_avg.dbl = trend->value_avg.dbl / trend->num;
         break;
     }
 
