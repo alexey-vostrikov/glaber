@@ -1,3 +1,5 @@
+2023-08-04 ver 3.2.26 (master, release)
+    - fix: removed glbmap setcap command to prevent deb pckts complain about missing binary
 2023-08-04 ver 3.2.25 (master, release)
     - fix: wrong update message on update dashboard
 2023-08-04 ver 3.2.24 (master, release)

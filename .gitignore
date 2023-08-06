@@ -235,3 +235,4 @@ configure.ac
 src/libs/zbxdbschema/dbschema.c
 .sass-cache/*
 src/glapi/glb_syslog_sender
+ui/modules/*

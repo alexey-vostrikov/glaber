@@ -456,7 +456,6 @@ cat conf/zabbix_proxy.conf | sed \
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|proxy|g' \
 	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-proxy
-install -m 0755 -p ./glbmap $RPM_BUILD_ROOT%{_sbindir}/
 install -Dm 0644 -p %{SOURCE12} $RPM_BUILD_ROOT%{_unitdir}/zabbix-proxy.service
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-proxy.conf
 %endif
@@ -465,8 +464,6 @@ install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-
 %if 0%{?build_server}
 #mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.d
 install -m 0755 -p src/zabbix_server/zabbix_server_* $RPM_BUILD_ROOT%{_sbindir}/
-install -m 0755 -p ./glbmap $RPM_BUILD_ROOT%{_sbindir}/
-#setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
 #rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
 #mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts $RPM_BUILD_ROOT/usr/lib/zabbix
 cat conf/zabbix_server.conf | sed \
@@ -654,7 +651,7 @@ fi
 %{_unitdir}/zabbix-server.service
 %{_prefix}/lib/tmpfiles.d/zabbix-server.conf
 %{_sbindir}/zabbix_server_mysql
-%{_sbindir}/glbmap
+
 
 %pre server-mysql
 getent group zabbix > /dev/null || groupadd -r zabbix
@@ -667,7 +664,6 @@ getent passwd zabbix > /dev/null || \
 %systemd_post zabbix-server.service
 /usr/sbin/update-alternatives --install %{_sbindir}/zabbix_server \
 	zabbix-server %{_sbindir}/zabbix_server_mysql 10
-setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
 :
 
 %preun server-mysql
@@ -698,7 +694,6 @@ fi
 %{_unitdir}/zabbix-server.service
 %{_prefix}/lib/tmpfiles.d/zabbix-server.conf
 %{_sbindir}/zabbix_server_pgsql
-%{_sbindir}/glbmap
 
 %pre server-pgsql
 getent group zabbix > /dev/null || groupadd -r zabbix
@@ -711,7 +706,6 @@ getent passwd zabbix > /dev/null || \
 %systemd_post zabbix-server.service
 /usr/sbin/update-alternatives --install %{_sbindir}/zabbix_server \
 	zabbix-server %{_sbindir}/zabbix_server_pgsql 10
-setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
 :
 
 %preun server-pgsql
