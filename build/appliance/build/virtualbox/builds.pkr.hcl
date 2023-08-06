@@ -53,8 +53,8 @@ build {
   name = "Set permissions to copy config"
   inline = [
     "sudo chmod -R 700 /etc/clickhouse-server",
-    // run on builder host `id`
-    // set number in next step  
+    // run on builder host `id -u`
+    // set number in next step  ## prepare set 1000 with env
     "packer_user=$(id -nu 1000)", # debian
     "sudo chown -R $packer_user:$packer_user /etc/clickhouse-server",
   ]
@@ -76,7 +76,7 @@ build {
     "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
     "sudo systemctl enable --now clickhouse-server",
     "journalctl -u clickhouse-server| tail -50",
-    "while ! ss -ltn 'sport = :9000' | grep -q ':9000'; do echo 'Waiting for port 9000 to be ready...' && sleep 1; done",
+    "while ! ss -ltn 'sport = :9000' | grep -q ':9000'; do echo 'Waiting for port 9000 to be ready...' && sleep 2; done",
   ]
   }
 

@@ -1,11 +1,11 @@
 variable "glaber_build_version" {
   type    = string
-  default = "3.1.8"
+  default = "3.1.8" ## prepare
 }
 
 variable "glaber_repo" {
   type    = string
-  default = "repo"
+  default = "repo" ## prepare
 }
 
 variable "source_checksum_url" {
@@ -20,7 +20,8 @@ variable "source_qcow" {
 
 variable "password" {
   type    = string
-  default = "debian"
+  default = "debian" ## prepare
+  sensitive = true
 }
 
 variable "username" {
@@ -51,29 +52,30 @@ variable "clickhouse_version" {
 variable "zbx_ch_user" {
   type        = string
   description = "The ClickHouse username"
-  default     = "default"
+  default     = "default" ## prepare
 }
 
 variable "zbx_ch_pass" {
   type        = string
   description = "The ClickHouse password"
-  default     = "password"
+  default     = "password" ## prepare
+  sensitive   = true
 }
 
 variable "zbx_ch_db" {
   type        = string
   description = "The ClickHouse database"
-  default     = "glaber"
+  default     = "glaber" ## prepare
 }
 
 variable "glaber_tag" {
   type        = string
   description = "The Glaber tag"
-  default     = "3.2.16"
+  default     = "3.2.16" ## prepare
 }
 
 variable "zbx_ch_retention" {
   type        = string
   description = "The retention period for ClickHouse"
-  default     = "30 DAY"
+  default     = "30 DAY" ## prepare
 }

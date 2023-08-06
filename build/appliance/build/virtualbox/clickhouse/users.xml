@@ -32,7 +32,7 @@
     <!-- Users and ACL. -->
     <users>
         <!-- If user name was not specified, 'default' user is used. -->
-        <default>
+        <defaultuser>
             <!-- Password could be specified in plaintext or in SHA256 (in hex format).
 
                  If you want to specify password in plaintext (not recommended), place it in 'password' element.
@@ -85,7 +85,7 @@
 
             <!-- Quota for user. -->
             <quota>default</quota>
-        </default>
+        </defaultuser>
     </users>
 
     <!-- Quotas. -->
