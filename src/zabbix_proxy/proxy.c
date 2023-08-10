@@ -814,7 +814,7 @@ static int	proxy_add_serveractive_host_cb(const zbx_vector_ptr_t *addrs, zbx_vec
 static void set_config_defaults() {
 	
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 1;
-	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 0;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
