@@ -98,7 +98,6 @@ stages:
   - autoreconf -fvi
   - cd ..
   - cp -r glaber glaber-$GLABER_VERSION
-  - cd glaber-$GLABER_VERSION
   - tar -czvf glaber-$GLABER_VERSION.tar.gz glaber-$GLABER_VERSION
   - cd ${CI_PROJECT_DIR}
   - cp -r build/${OS}/${OS_VER}/* build/centos
