@@ -1147,16 +1147,24 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	zbx_dc_um_handle_t	*um_handle;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() itemid:" ZBX_FS_UI64, __func__, lld_ruleid);
+	
+	LOG_INF("Processing rule id %ld", lld_ruleid);
+	LOG_INF("Processing rule id %ld, lld value is '%s'", lld_ruleid, value);
+	LOG_INF("Error is %p", *error);
 
 	um_handle = zbx_dc_open_user_macros();
-
+	LOG_INF("Error_1 is %p", *error);
 	zbx_vector_ptr_create(&lld_rows);
 	zbx_vector_ptr_create(&lld_macro_paths);
 	zbx_vector_ptr_create(&overrides);
 
+	LOG_INF("Error_2 is %p", *error);
+
 	lld_filter_init(&filter);
+	LOG_INF("Error_3 is %p", *error);
 
 	DCconfig_get_items_by_itemids(&item, &lld_ruleid, &errcode, 1);
+	LOG_INF("Error_4 is %p", *error);
 
 	if (SUCCEED != errcode)
 	{
@@ -1195,6 +1203,8 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 	}
 	zbx_db_free_result(result);
 
+	LOG_INF("Error_5 is %p", *error);
+
 	if (NULL == row)
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "invalid discovery rule ID [" ZBX_FS_UI64 "]", lld_ruleid);
@@ -1209,6 +1219,7 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		DEBUG_ITEM(lld_ruleid,"Filtrer load failed: %s", *error);
 		goto out;
 	}
+	LOG_INF("Error_6 is %p", *error);
 
 	if (SUCCEED != zbx_lld_macro_paths_get(lld_ruleid, &lld_macro_paths, error))
 	{
@@ -1216,11 +1227,13 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		DEBUG_ITEM(lld_ruleid,"Macro paths get failed: %s", *error);
 		goto out;
 	}
+	LOG_INF("Error_7 is %p", *error);
 
 	if (SUCCEED != (ret = lld_overrides_load(&overrides, lld_ruleid, &item, error))) {
 		DEBUG_ITEM(lld_ruleid,"Overrides get failed: %s", *error);
 		goto out;
 	}
+	LOG_INF("Error_8 is %p", *error);
 
 	if (SUCCEED != lld_rows_get(lld_ruleid, lifetime, value, &filter, &lld_rows, &lld_macro_paths, &overrides, &info, error))
 	{
@@ -1228,11 +1241,13 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		DEBUG_ITEM(lld_ruleid,"Rows get failed: %s", *error);
 		goto out;
 	}
+	LOG_INF("Error_9 is %p", *error);
 
 	*error = zbx_strdup(*error, "");
 
 	now = time(NULL);
-
+	
+	LOG_INF("Error_10 is %p", *error);
 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_AUDITLOG_ENABLED);
 	zbx_audit_init(cfg.auditlog_enabled);
 

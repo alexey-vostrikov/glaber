@@ -1919,36 +1919,43 @@ void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 	char **row;
 	unsigned char tag;
 	ZBX_DC_HOST *dc_host;
-
+	LOG_INF("Start inv sync 1");
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
 		/* removed rows will be always added at the end */
+		LOG_INF("Start inv sync 1.1, %p", row);
+		LOG_INF("Start inv sync 1.11, %p", row[0]);
+		
+		if (NULL == row[0])
+			break;
 
 		ZBX_STR2UINT64(hostid, row[0]);
-
+		LOG_INF("Start inv sync 1.2");
 		host_inventory = (ZBX_DC_HOST_INVENTORY *)DCfind_id(&config->host_inventories, hostid,
 															sizeof(ZBX_DC_HOST_INVENTORY), &found);
-
+		LOG_INF("Start inv sync 1.3");
 		ZBX_STR2UCHAR(host_inventory->inventory_mode, row[1]);
-
+		LOG_INF("Start inv sync 2");
 		/* store new information in host_inventory structure */
 		for (i = 0; i < HOST_INVENTORY_FIELD_COUNT; i++)
 			dc_strpool_replace(found, &(host_inventory->values[i]), row[i + 2]);
+		
+		LOG_INF("Start inv sync 3");
 
 		host_inventory_auto = (ZBX_DC_HOST_INVENTORY *)DCfind_id(&config->host_inventories_auto, hostid,
 																 sizeof(ZBX_DC_HOST_INVENTORY), &found);
 
 		host_inventory_auto->inventory_mode = host_inventory->inventory_mode;
-
+		LOG_INF("Start inv sync 4");
 		if (1 == found)
 		{
 			for (i = 0; i < HOST_INVENTORY_FIELD_COUNT; i++)
 			{
 				if (NULL == host_inventory_auto->values[i])
 					continue;
-
+				LOG_INF("Start inv sync 5");
 				dc_strpool_release(host_inventory_auto->values[i]);
 				host_inventory_auto->values[i] = NULL;
 			}
@@ -1962,7 +1969,7 @@ void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		if (NULL != (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &hostid)))
 			dc_host_update_revision(dc_host, revision);
 	}
-
+	LOG_INF("Start inv sync 6");
 	/* remove deleted host inventory from cache */
 	for (; SUCCEED == ret; ret = zbx_dbsync_next(sync, &rowid, &row, &tag))
 	{
@@ -1977,7 +1984,7 @@ void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 
 		for (i = 0; i < HOST_INVENTORY_FIELD_COUNT; i++)
 			dc_strpool_release(host_inventory->values[i]);
-
+		LOG_INF("Start inv sync 7");
 		zbx_hashset_remove_direct(&config->host_inventories, host_inventory);
 
 		if (NULL == (host_inventory_auto = (ZBX_DC_HOST_INVENTORY *)zbx_hashset_search(
@@ -1992,10 +1999,10 @@ void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 			if (NULL != host_inventory_auto->values[i])
 				dc_strpool_release(host_inventory_auto->values[i]);
 		}
-
+		LOG_INF("Start inv sync 8");	
 		zbx_hashset_remove_direct(&config->host_inventories_auto, host_inventory_auto);
 	}
-
+	LOG_INF("Start inv sync 9");
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
