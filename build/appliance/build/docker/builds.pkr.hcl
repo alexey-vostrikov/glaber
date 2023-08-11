@@ -11,7 +11,7 @@ build {
       "echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
       "echo 'deb http://ftp.de.debian.org/debian bullseye main non-free' > /etc/apt/sources.list.d/nonfree.list",
       "apt-get update",
-      "apt-get install --no-install-recommends -y glaber-server-mysql=1:${var.glaber_build_version}* glaber-workers",
+      "apt-get install --no-install-recommends -y glaber-server-mysql=1:${var.glaber_build_version}* glaber-workers fping",
       "apt-get install -y snmp-mibs-downloader",
       "rm -rf /var/lib/{apt,dpkg,cache,log}/",
       "apt-get autoremove --yes",
