@@ -28,7 +28,7 @@ variables:
   # used for glager php-fpm7
   ALPINE_PHP_FPM_VERSION: 1.0.1
   # 
-  DEBIAN_BULLSEYE_NET_SNMP_SSL: 1.0.2
+  DEBIAN_BULLSEYE_NET_SNMP_SSL: 1.0.3
   KANIKO_VERSION: 1.9.2
 
 stages:
@@ -342,7 +342,7 @@ debian-bullseye-net-snmp-ssl:
     name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
     entrypoint: [""]
   variables:
-    OS: debian
+    OS: bitnami/minideb
     OS_VER: bullseye
     BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}/net-snmp-ssl"
     BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
