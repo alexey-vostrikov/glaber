@@ -30,3 +30,5 @@ COPY --from=build /usr/local/sbin/snmpd /usr/local/sbin/
 COPY --from=build /usr/local/sbin/snmptrapd /usr/local/sbin/
 COPY --from=build /usr/local/include/net-snmp /usr/local/include/
 COPY --from=build /usr/local/share/snmp/ /usr/local/share/
+COPY --from=build /usr/local/lib/x86_64-linux-gnu/perl/5.32.1 /usr/local/lib/x86_64-linux-gnu/perl/
+COPY --from=build /usr/local/bin/ /usr/local/
