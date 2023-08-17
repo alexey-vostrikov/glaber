@@ -1018,9 +1018,10 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	const char		*p;
 	zbx_lld_row_t		*lld_row;
 	int			ret = FAIL, i;
-	char row_str[MAX_STRING_LEN];
+	char *row_str = NULL;
+	size_t allocated = 0, offset = 0;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	LOG_INF("In %s()", __func__);
 	
 	if (SUCCEED != zbx_json_open(value, &jp))
 	{
@@ -1042,16 +1043,15 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	p = NULL;
 	while (NULL != (p = zbx_json_next(&jp_array, p)))
 	{
-		
-
 		if (FAIL == zbx_json_brackets_open(p, &jp_row))
 			continue;
+		offset = 0;
 
-		zbx_snprintf(row_str, jp_row.end - jp_row.start, "%s", jp_row.start);
-		DEBUG_ITEM(discoveryid, "Evaluating row: '%s'", row_str);
+		zbx_snprintf_alloc(&row_str, &allocated, &offset, jp_row.end - jp_row.start, "%s", jp_row.start);
+		LOG_INF("Evaluating row: '%s'", row_str);
 
 		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info)) {
-			DEBUG_ITEM(discoveryid, "Row '%s' has been filtered out", row_str);
+			LOG_INF("Row '%s' has been filtered out", row_str);
 			continue;
 		}
 		//if (SUCCEED != glb_state_discovery_if_row_needs_processing(discoveryid, &jp_row, lifetime))
@@ -1102,7 +1102,9 @@ out:
 			}
 		}
 	}
-
+	
+	zbx_free(row_str);
+	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
