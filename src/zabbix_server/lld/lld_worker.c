@@ -65,7 +65,7 @@ static void	lld_process_task(zbx_ipc_message_t *message)
 	int			errcode, mtime;
 	unsigned char		state, meta;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+	LOG_INF("In %s()", __func__);
 
 	zbx_lld_deserialize_item_value(message->data, &itemid, &hostid, &value, &ts, &meta, &lastlogsize, &mtime, &error);
 
