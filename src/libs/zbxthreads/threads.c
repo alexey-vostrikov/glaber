@@ -121,6 +121,7 @@ void	zbx_thread_start(ZBX_THREAD_ENTRY_POINTER(handler), zbx_thread_args_t *thre
 
 	if (0 == *thread)	/* child process */
 	{
+		LOG_INF("Child process started, calling handler");
 		(*handler)(thread_args);
 
 		/* The zbx_thread_exit must be called from the handler. */

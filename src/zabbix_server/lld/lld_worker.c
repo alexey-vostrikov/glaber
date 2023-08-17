@@ -143,6 +143,8 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	LOG_INF("Ipc init0");
+	
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
 	LOG_INF("Ipc init");

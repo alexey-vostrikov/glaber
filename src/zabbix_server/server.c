@@ -1909,6 +1909,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			zbx_thread_start(lld_manager_thread, &thread_args, &threads[i]);
 			break;
 		case ZBX_PROCESS_TYPE_LLDWORKER:
+			LOG_INF("Starting lld worker, thread proc is %p", lld_worker_thread);
 			zbx_thread_start(lld_worker_thread, &thread_args, &threads[i]);
 			break;
 		case ZBX_PROCESS_TYPE_ALERTSYNCER:
