@@ -163,6 +163,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
 
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
+	LOG_INF("Running processing loop");
 
 	while (ZBX_IS_RUNNING())
 	{
@@ -170,6 +171,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 
 		if (STAT_INTERVAL < time_now - time_stat)
 		{
+			LOG_INF("Setting proctitle");
 			zbx_setproctitle("%s #%d [processed " ZBX_FS_UI64 " LLD rules, idle " ZBX_FS_DBL " sec during "
 					ZBX_FS_DBL " sec]", get_process_type_string(process_type), process_num,
 					processed_num, time_idle, time_now - time_stat);
@@ -178,7 +180,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 			time_idle = 0;
 			processed_num = 0;
 		}
-
+		
 		zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_IDLE);
 		if (SUCCEED != zbx_ipc_socket_read(&lld_socket, &message))
 		{
@@ -190,12 +192,16 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 		time_read = zbx_time();
 		time_idle += time_read - time_now;
 		zbx_update_env(get_process_type_string(process_type), time_read);
+		LOG_INF("Got message");
+		LOG_INF("Message code is %d", message.code);
 
 		switch (message.code)
 		{
 			case ZBX_IPC_LLD_TASK:
+				LOG_INF("Calling lld_process_task");
 				lld_process_task(&message);
 				zbx_ipc_socket_write(&lld_socket, ZBX_IPC_LLD_DONE, NULL, 0);
+				LOG_INF("Task has been processed");
 				processed_num++;
 				break;
 		}
