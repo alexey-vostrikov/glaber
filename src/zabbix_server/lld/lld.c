@@ -1018,7 +1018,7 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	const char		*p;
 	zbx_lld_row_t		*lld_row;
 	int			ret = FAIL, i;
-	char *row_str = NULL;
+	//char *row_str = NULL;
 	size_t allocated = 0, offset = 0;
 
 	LOG_INF("In %s()", __func__);
@@ -1047,11 +1047,11 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 			continue;
 		offset = 0;
 
-		zbx_snprintf_alloc(&row_str, &allocated, &offset, jp_row.end - jp_row.start, "%s", jp_row.start);
-		LOG_INF("Evaluating row: '%s'", row_str);
+	//	zbx_snprintf_alloc(&row_str, &allocated, &offset, jp_row.end - jp_row.start, "%s", jp_row.start);
+	//	LOG_INF("Evaluating row: '%s'", row_str);
 
 		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info)) {
-			LOG_INF("Row '%s' has been filtered out", row_str);
+	//		LOG_INF("Row '%s' has been filtered out", row_str);
 			continue;
 		}
 		//if (SUCCEED != glb_state_discovery_if_row_needs_processing(discoveryid, &jp_row, lifetime))
@@ -1103,7 +1103,7 @@ out:
 		}
 	}
 	
-	zbx_free(row_str);
+	//zbx_free(row_str);
 	
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 

@@ -139,29 +139,33 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 	int			server_num = ((zbx_thread_args_t *)args)->info.server_num;
 	int			process_num = ((zbx_thread_args_t *)args)->info.process_num;
 	unsigned char		process_type = ((zbx_thread_args_t *)args)->info.process_type;
-
+	LOG_INF("LLD worker started");
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(info->program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
+	LOG_INF("Ipc init");
 	zbx_ipc_message_init(&message);
 
+	LOG_INF("Socket open");
 	if (FAIL == zbx_ipc_socket_open(&lld_socket, ZBX_IPC_SERVICE_LLD, SEC_PER_MIN, &error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot connect to lld manager service: %s", error);
 		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
-
+	
+	LOG_INF("Worker register");
 	lld_register_worker(&lld_socket);
 
 	time_stat = zbx_time();
 
+	LOG_INF("DB connect");
 	zbx_db_connect(ZBX_DB_CONNECT_NORMAL);
 
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
-
+	
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 	LOG_INF("Running processing loop");
 
