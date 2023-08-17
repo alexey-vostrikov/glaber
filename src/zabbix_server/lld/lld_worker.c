@@ -129,7 +129,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 {
 #define	STAT_INTERVAL	5	/* if a process is busy and does not sleep then update status not faster than */
 				/* once in STAT_INTERVAL seconds */
-
+	LOG_INF("LLD worker started0");
 	char			*error = NULL;
 	zbx_ipc_socket_t	lld_socket;
 	zbx_ipc_message_t	message;
@@ -165,7 +165,7 @@ ZBX_THREAD_ENTRY(lld_worker_thread, args)
 	zbx_db_connect(ZBX_DB_CONNECT_NORMAL);
 
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
-	
+
 	zbx_update_selfmon_counter(info, ZBX_PROCESS_STATE_BUSY);
 	LOG_INF("Running processing loop");
 
