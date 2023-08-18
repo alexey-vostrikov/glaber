@@ -1,5 +1,5 @@
 source "docker" "glaber-server" {
-  image  = "registry.gitlab.com/mikler/glaber/debian-bullseye-net-snmp-ssl:1.0.2"
+  image  = "registry.gitlab.com/mikler/glaber/debian-bullseye-net-snmp-ssl:1.0.4"
   commit = true
   changes = [
     "ENV DEBIAN_FRONTEND noninteractive",
