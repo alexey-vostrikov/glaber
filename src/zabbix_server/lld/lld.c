@@ -1045,7 +1045,8 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 		if (FAIL == zbx_json_brackets_open(p, &jp_row))
 			continue;
 
-		zbx_snprintf(row_str, jp_row.end - jp_row.start, "%s", jp_row.start);
+		zbx_snprintf(row_str, MIN(MAX_STRING_LEN-2, jp_row.end - jp_row.start), 
+											"%s", jp_row.start);
 		DEBUG_ITEM(discoveryid, "Evaluating row: '%s'", row_str);
 
 		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info)) {
