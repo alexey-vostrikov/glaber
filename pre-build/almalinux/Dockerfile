@@ -2,7 +2,7 @@ ARG OS
 ARG OS_VER
 FROM ${OS}:${OS_VER}
 
-RUN dnf update && \
+RUN dnf update -y && \
     dnf -y install dnf-plugins-core epel-release
 
 RUN dnf config-manager --set-enabled powertools
