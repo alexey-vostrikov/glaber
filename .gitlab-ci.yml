@@ -115,12 +115,23 @@ stages:
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
-debian-buster:
-  stage: pkg-build
+.base-pre-builder:
+  stage: pre-build
+  image:
+    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
+    entrypoint: [""]
   variables:
-    OS: debian
-    OS_VER: buster
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
+    BUILD_DIR_BASE: "${CI_PROJECT_DIR}/pre-build/${OS}"
+    BUILD_DIR: "${BUILD_DIR_BASE}/${BUILD_DIR_SUFFIX}"
+  script:
+    - *kaniko_build
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
+
+.base-debian-builder:
+  stage: pkg-build
   script:
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
@@ -128,6 +139,13 @@ debian-buster:
     - *upload_packages
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
+
+debian-buster:
+  extends: .base-debian-builder
+  variables:
+    OS: debian
+    OS_VER: buster
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
 astra:
   stage: pkg-build
@@ -137,7 +155,6 @@ astra:
   tags: ["virtbox"]
   script:
     - update-ca-certificates
-   # - *build_go
     - *prepare_sources
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
@@ -145,46 +162,25 @@ astra:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 debian-bullseye:
-  stage: pkg-build
+  extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: bullseye
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
-  script:
-    - export FULL_PROJECT_PATH=$PWD
-    - *prepare_sources
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
-  rules:
-    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 ubuntu-focal:
-  stage: pkg-build
+  extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: focal
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
-  script:
-    - export FULL_PROJECT_PATH=$PWD
-    - *prepare_sources
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
-  rules:
-    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 ubuntu-bionic:
-  stage: pkg-build
+  extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: bionic
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
-  script:
-    - export FULL_PROJECT_PATH=$PWD
-    - *prepare_sources
-    - dpkg-buildpackage -b --no-sign
-    - *upload_packages
-  rules:
-    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 centos-8:
   stage: pkg-build
@@ -218,137 +214,74 @@ docker-debian-bullseye:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
 builder:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: alpine
     OS_VER: "3.17"
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}/builder"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_DIR_SUFFIX: "builder"
     BUILD_TAG: "${BUILDER_VERSION}"
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 debian-buster-builder:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: debian
     OS_VER: buster
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${DEBIAN_BUILDER_VERSION}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 debian-bullseye-builder:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: debian
     OS_VER: bullseye
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${DEBIAN_BUILDER_VERSION}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
+
+debian-bookworm-builder:
+  extends: .base-pre-builder
+  variables:
+    OS: debian
+    OS_VER: bookworm
+    BUILD_TAG: ${DEBIAN_BUILDER_VERSION}
 
 ubuntu-bionic-builder:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: ubuntu
     OS_VER: bionic
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 ubuntu-focal-builder:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: ubuntu
     OS_VER: focal
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 almalinux-8-builder:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: almalinux
     OS_VER: 8
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_TAG: ${CENTOS_BUILDER_VERSION}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
+
+almalinux-9-builder:
+  extends: .base-pre-builder
+  variables:
+    OS: almalinux
+    OS_VER: 9
+    BUILD_TAG: ${CENTOS_BUILDER_VERSION}
 
 alpine-php-fpm-8:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: alpine
     OS_VER: "3.15"
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}/php-fpm-8"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_DIR_SUFFIX: "php-fpm-8"
     BUILD_TAG: ${ALPINE_PHP_FPM_VERSION}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 debian-bullseye-net-snmp-ssl:
-  stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  extends: .base-pre-builder
   variables:
     OS: debian
     OS_VER: bullseye
-    BUILD_DIR: "${CI_PROJECT_DIR}/pre-build/${OS}/net-snmp-ssl"
-    BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
+    BUILD_DIR_SUFFIX: "net-snmp-ssl"
     BUILD_TAG: ${DEBIAN_BULLSEYE_NET_SNMP_SSL}
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
-  script:
-    - *kaniko_build
-  rules:
-    - if: $CI_COMMIT_MESSAGE =~ /pre-build/
