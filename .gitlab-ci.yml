@@ -28,7 +28,7 @@ variables:
   # used for glager php-fpm7
   ALPINE_PHP_FPM_VERSION: 1.0.1
   # 
-  DEBIAN_BULLSEYE_NET_SNMP_SSL: 1.0.4
+  DEBIAN_BULLSEYE_NET_SNMP_SSL: 1.0.5
   KANIKO_VERSION: 1.14.0
 
 stages:
@@ -200,7 +200,7 @@ debian-bullseye:
     OS_VER: bullseye
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
-# after spec folder created /build/bookworm
+# after spec folder created /build/debian/bookworm
 # debian-bookworm:
 #   extends: .base-debian-builder
 #   variables:
@@ -306,6 +306,7 @@ builder:
 
 debian-bullseye-net-snmp-ssl:
   extends: .base-pre-builder
+  tags: ["kaniko"]
   variables:
     OS: debian
     OS_VER: bullseye
