@@ -115,6 +115,7 @@ stages:
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
+# template for the pre-build stage with kaniko build
 .base-pre-builder:
   stage: pre-build
   image:
@@ -130,6 +131,7 @@ stages:
   rules:
     - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
+# template for the debian based pkg-build stage
 .base-debian-builder:
   stage: pkg-build
   script:
@@ -140,13 +142,21 @@ stages:
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
-debian-buster:
-  extends: .base-debian-builder
-  variables:
-    OS: debian
-    OS_VER: buster
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+# template for the centos based pkg-build stage
+.base-centos-builder:
+  stage: pkg-build
+  script:
+    - rm -rf /root/rpmbuild/BUILD/*
+    - export FULL_PROJECT_PATH=$PWD
+    - *prepare_rpm_sources
+    - cd build/centos
+    - yum-builddep -y SPECS/zabbix.spec
+    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
+    - *upload_rpms
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
+# build for the main glaber package
 astra:
   stage: pkg-build
   variables:
@@ -161,12 +171,42 @@ astra:
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
+centos-8:
+  extends: .base-centos-builder
+  variables:
+    OS: almalinux
+    OS_VER: 8
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
+
+# after spec folder created build/almalinux/
+# centos-9:
+#   extends: .base-centos-builder
+#   variables:
+#     OS: almalinux
+#     OS_VER: 9
+#   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
+
+debian-buster:
+  extends: .base-debian-builder
+  variables:
+    OS: debian
+    OS_VER: buster
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+
 debian-bullseye:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: bullseye
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+
+# after spec folder created /build/bookworm
+# debian-bookworm:
+#   extends: .base-debian-builder
+#   variables:
+#     OS: debian
+#     OS_VER: bookworm
+#   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
@@ -182,23 +222,7 @@ ubuntu-bionic:
     OS_VER: bionic
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
 
-centos-8:
-  stage: pkg-build
-  variables:
-    OS: almalinux
-    OS_VER: 8
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
-  script:
-    - rm -rf /root/rpmbuild/BUILD/*
-    - export FULL_PROJECT_PATH=$PWD
-    - *prepare_rpm_sources
-    - cd build/centos
-    - yum-builddep -y SPECS/zabbix.spec
-    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
-    - *upload_rpms
-  rules:
-    - if: $CI_COMMIT_MESSAGE !~ /pre-build/
-
+# build for the docker packages
 docker-debian-bullseye:
   stage: docker-build
   image: ${CI_REGISTRY_IMAGE}/builder:${BUILDER_VERSION}
@@ -213,13 +237,20 @@ docker-debian-bullseye:
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
-builder:
+# build for the support pre-build docker images
+almalinux-8-builder:
   extends: .base-pre-builder
   variables:
-    OS: alpine
-    OS_VER: "3.17"
-    BUILD_DIR_SUFFIX: "builder"
-    BUILD_TAG: "${BUILDER_VERSION}"
+    OS: almalinux
+    OS_VER: 8
+    BUILD_TAG: ${CENTOS_BUILDER_VERSION}
+
+almalinux-9-builder:
+  extends: .base-pre-builder
+  variables:
+    OS: almalinux
+    OS_VER: 9
+    BUILD_TAG: ${CENTOS_BUILDER_VERSION}
 
 debian-buster-builder:
   extends: .base-pre-builder
@@ -256,20 +287,7 @@ ubuntu-focal-builder:
     OS_VER: focal
     BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
 
-almalinux-8-builder:
-  extends: .base-pre-builder
-  variables:
-    OS: almalinux
-    OS_VER: 8
-    BUILD_TAG: ${CENTOS_BUILDER_VERSION}
-
-almalinux-9-builder:
-  extends: .base-pre-builder
-  variables:
-    OS: almalinux
-    OS_VER: 9
-    BUILD_TAG: ${CENTOS_BUILDER_VERSION}
-
+# build for the other support docker images (docker builder,php-fpm, etc)
 alpine-php-fpm-8:
   extends: .base-pre-builder
   variables:
@@ -277,6 +295,14 @@ alpine-php-fpm-8:
     OS_VER: "3.15"
     BUILD_DIR_SUFFIX: "php-fpm-8"
     BUILD_TAG: ${ALPINE_PHP_FPM_VERSION}
+
+builder:
+  extends: .base-pre-builder
+  variables:
+    OS: alpine
+    OS_VER: "3.17"
+    BUILD_DIR_SUFFIX: "builder"
+    BUILD_TAG: "${BUILDER_VERSION}"
 
 debian-bullseye-net-snmp-ssl:
   extends: .base-pre-builder
