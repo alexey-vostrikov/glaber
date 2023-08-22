@@ -117,8 +117,9 @@ void	zbx_thread_start(ZBX_THREAD_ENTRY_POINTER(handler), zbx_thread_args_t *thre
 		*thread = (ZBX_THREAD_HANDLE)ZBX_THREAD_ERROR;
 	}
 #else
+	LOG_INF("About to fork");
 	zbx_child_fork(thread);
-
+	
 	if (0 == *thread)	/* child process */
 	{
 		LOG_INF("Child process started, calling handler");
