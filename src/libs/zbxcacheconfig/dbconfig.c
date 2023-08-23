@@ -1925,7 +1925,8 @@ void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
 		/* removed rows will be always added at the end */
-
+		if (NULL == row) 
+			break;
 		ZBX_STR2UINT64(hostid, row[0]);
 
 		host_inventory = (ZBX_DC_HOST_INVENTORY *)DCfind_id(&config->host_inventories, hostid,
