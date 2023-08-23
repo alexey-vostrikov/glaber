@@ -351,7 +351,7 @@ else {
 
 		if ($templated_triggers_all) {
 			// Select monitored host triggers, derived from templates and belonging to the requested groups.
-			$limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1;
+			$limit = max(CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1, 32768);
 			$triggers = API::Trigger()->get([
 				'output' => ['triggerid', 'description', 'expression', 'value'],
 				'selectHosts' => ['name'],
@@ -500,14 +500,14 @@ else {
 	/*
 	 * Triggers
 	 */
-	$triggerTable = (new CTableInfo())->setHeader([_('Host'), _('Name'), _('Problems'), _('Ok'), _('Graph')]);
+	$triggerTable = (new CDataTable('availtriggers'))->setHeader([_('Host'), _('Name'), _('Problems'), _('Ok'), _('Graph')]);
 
 	CArrayHelper::sort($triggers, ['host_name', 'description']);
 
 	// pager
-	$page_num = getRequest('page', 1);
-	CPagerHelper::savePage($page['file'], $page_num);
-	$paging = CPagerHelper::paginate($page_num, $triggers, ZBX_SORT_UP, new CUrl('report2.php'));
+	//$page_num = getRequest('page', 1);
+	//CPagerHelper::savePage($page['file'], $page_num);
+	//$paging = CPagerHelper::paginate($page_num, $triggers, ZBX_SORT_UP, new CUrl('report2.php'));
 	$allowed_ui_problems = CWebUser::checkAccess(CRoleHelper::UI_MONITORING_PROBLEMS);
 
 	foreach ($triggers as $trigger) {
@@ -548,7 +548,7 @@ else {
 	zbx_add_post_js('timeControl.processObjects();');
 
 	$html_page
-		->addItem([$triggerTable, $paging])
+		->addItem($triggerTable)
 		->show();
 }
 
