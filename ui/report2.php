@@ -150,12 +150,14 @@ $triggerData = isset($_REQUEST['triggerid'])
 	: null;
 
 $html_page = (new CHtmlPage())
-	->setTitle(_('Availability report'))
+	//->setTitle(_('Availability report'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::REPORT2));
 
 if ($triggerData) {
 	$triggerData = reset($triggerData);
 	$host = reset($triggerData['hosts']);
+	$html_page->setTitle(_('Availability report').' '.$host['name'])
+			  ->setNavigation(isset($host['hostid'])? (new CHostNav(CHostNav::getData($host['hostid']))) : null);
 
 	$triggerData['hostid'] = $host['hostid'];
 	$triggerData['hostname'] = $host['name'];
@@ -181,7 +183,7 @@ else {
 	/**
 	 * Report list view (both data presentation modes).
 	 */
-
+	$html_page->setTitle(_('Availability report'));
 	$select_mode = (new CSelect('mode'))
 		->setValue($report_mode)
 		->setFocusableElementId('mode')
@@ -531,7 +533,7 @@ else {
 			($availability['false'] < 0.00005)
 				? ''
 				: (new CSpan(sprintf('%.4f%%', $availability['false'])))->addClass(ZBX_STYLE_GREEN),
-			new CLink(_('Show'), (new CUrl('report2.php'))->setArgument('triggerid', $trigger['triggerid']))
+			(new CLink(_('Show'), (new CUrl('report2.php'))->setArgument('triggerid', $trigger['triggerid'])))->setTarget('_blank')
 		]);
 	}
 
