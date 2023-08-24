@@ -1452,7 +1452,7 @@ class CItem extends CItemGeneral {
 		foreach ($items as $i => $item) {
 			$check = false;
 
-			if ($item['flags'] == ZBX_FLAG_DISCOVERY_NORMAL && in_array($item['value_type'], $value_types)) {
+			if (isset($item['flags']) && $item['flags'] == ZBX_FLAG_DISCOVERY_NORMAL && in_array($item['value_type'], $value_types)) {
 				if (array_key_exists('inventory_link', $item)) {
 					if (!array_key_exists('itemid', $item)) {
 						if ($item['inventory_link'] != 0) {

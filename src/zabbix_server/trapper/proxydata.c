@@ -163,15 +163,13 @@ void	zbx_recv_proxy_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_time
 
 	upload_status = ZBX_PROXY_UPLOAD_ENABLED;
 
-	if (SUCCEED == ret)
-	{
-		if (SUCCEED != (ret = zbx_process_proxy_data(&proxy, jp, ts, HOST_STATUS_PROXY_ACTIVE, NULL, &error)))
+	if (SUCCEED != (ret = zbx_process_proxy_data(&proxy, jp, ts, HOST_STATUS_PROXY_ACTIVE, NULL, &error)))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "received invalid proxy data from proxy \"%s\" at \"%s\": %s",
 					proxy.host, sock->peer, error);
 			goto out;
-		}
 	}
+
 
 	if (!ZBX_IS_RUNNING())
 	{
