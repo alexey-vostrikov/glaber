@@ -152,14 +152,20 @@ int preproc_ipc_init() {
     conf->proc_memf.free_func = _procipc_shmem_free_func;
     conf->proc_memf.malloc_func = _procipc_shmem_malloc_func;
     conf->proc_memf.realloc_func = _procipc_shmem_realloc_func;
-
-    conf->preproc_ipc = glb_ipc_init_ext(CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
-        CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->preproc_memf, ipc_metric_create_cb,
-        ipc_metric_free_cb, IPC_HIGH_VOLUME, "poll->preproc", (CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR])/10);
     
-    conf->process_ipc = glb_ipc_init_ext(CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
-        CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->proc_memf, ipc_metric_create_cb,
-         ipc_metric_free_cb, IPC_HIGH_VOLUME, "preproc->proc", (CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER])/10);
+    if (NULL == (conf->preproc_ipc = glb_ipc_init_ext(
+                CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
+                CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->preproc_memf, ipc_metric_create_cb,
+                ipc_metric_free_cb, IPC_HIGH_VOLUME, 
+                "poll->preproc", (CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR])/10)))
+        return FAIL;
+
+    if (NULL == ( conf->process_ipc = glb_ipc_init_ext(
+                CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
+                CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->proc_memf, ipc_metric_create_cb,
+                ipc_metric_free_cb, IPC_HIGH_VOLUME, 
+                "preproc->proc", (CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER])/10)))
+        return FAIL;
 
     glb_register_internal_metric_handler("preprocessing",   preprocessing_stat_cb);
     glb_register_internal_metric_handler("processing",      processing_stat_cb);
@@ -307,21 +313,30 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
 
 int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
     metric_t metric={0};
+    DEBUG_ITEM(itemid, "Sending item to preocessing, ar type is %d", ar->type);
     
     if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
 
-    if (ar->type | AR_UINT64)
+    if (ar->type & AR_UINT64) {
         zbx_variant_set_ui64(&metric.value, ar->ui64);
+        DEBUG_ITEM(itemid, "Sending to processing UINT64 value %lld", metric.value.data.ui64);
+    }
 
-    if (ar->type | AR_STRING)
+    if (ar->type & AR_STRING) {
         zbx_variant_set_str(&metric.value, ar->str);
+        DEBUG_ITEM(itemid, "Sending to processing STR value %s", metric.value.data.str);
+    }
         
-    if (ar->type | AR_TEXT)
+    if (ar->type & AR_TEXT) {
         zbx_variant_set_str(&metric.value, ar->text);
+         DEBUG_ITEM(itemid, "Sending to processing STR value %s", metric.value.data.str);
+    }
         
-    if (ar->type | AR_DOUBLE)
+    if (ar->type & AR_DOUBLE) {
         zbx_variant_set_dbl(&metric.value, ar->dbl);
+         DEBUG_ITEM(itemid, "Sending to processing DBL value %f", metric.value.data.dbl);
+    }
     
     processing_send_metric(&metric);
 }

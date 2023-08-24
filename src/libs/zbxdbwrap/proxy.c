@@ -1726,6 +1726,7 @@ static int	parse_history_data_by_itemids(struct zbx_json_parse *jp_data, const c
 		if (SUCCEED != parse_history_data_row_value(&jp_row, unique_shift, &values[*values_num]))
 			continue;
 
+		DEBUG_ITEM(itemids[*values_num], "Parsed item value %s", values[*values_num].value);
 		(*values_num)++;
 	}
 	while (NULL != (*pnext = zbx_json_next(jp_data, *pnext)) && *values_num < ZBX_HISTORY_VALUES_MAX);
