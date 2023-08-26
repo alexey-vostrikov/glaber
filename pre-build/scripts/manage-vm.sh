@@ -64,7 +64,6 @@ start_vm() {
                 # check ssh connection
                 while true; do nc -zv $(get_vm_ip) 22 > /dev/null 2>&1 && break || sleep 10;done
                 echo "VM is now running and ready."
-                export DOCKER_HOST=ssh://${SSH_USER}@$(get_vm_ip)
                 break
             fi
 

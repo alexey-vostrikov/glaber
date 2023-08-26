@@ -68,6 +68,7 @@ stages:
     bash pre-build/scripts/manage-vm.sh stop
   - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
   - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+  - cd ../../..
   - bash pre-build/scripts/manage-vm.sh stop
 
 .upload_mysql_schema: &upload_mysql_schema
