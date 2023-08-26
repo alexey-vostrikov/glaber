@@ -57,11 +57,18 @@ stages:
   # this code should work without PACKER_GITHUB_API_TOKEN,
   # but if packer init command failed, you must to set this vaiable in repo secrets
   # - export PACKER_GITHUB_API_TOKEN=${PACKER_GITHUB_API_TOKEN}
+  - bash pre-build/scripts/manage-vm.sh start
+  - export DOCKER_HOST=ssh://${SSH_USER}@$(bash pre-build/scripts/manage-vm.sh getip)
+  - while true; do docker ps > /dev/null 2>&1 && break || sleep 5;done
   - cd build/appliance/build/docker
   - packer init .
   - packer validate .
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
-  - packer build -color=false -timestamp-ui -warn-on-undeclared-var .
+  - packer build -color=false -timestamp-ui -warn-on-undeclared-var . || \
+    bash pre-build/scripts/manage-vm.sh stop
+  - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
+  - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+  - bash pre-build/scripts/manage-vm.sh stop
 
 .upload_mysql_schema: &upload_mysql_schema
   - cat database/mysql/schema.sql > create.sql
@@ -229,12 +236,8 @@ docker-debian-bullseye:
   before_script:
     - *add_ssh_key
   script:
-    - bash pre-build/scripts/manage-vm.sh start
     - *set_glb_version
     - *build_docker
-    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
-    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
-    - bash pre-build/scripts/manage-vm.sh stop
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
