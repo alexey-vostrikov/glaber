@@ -307,7 +307,6 @@ builder:
 
 debian-bullseye-net-snmp-ssl:
   extends: .base-pre-builder
-  tags: ["kaniko"]
   variables:
     OS: debian
     OS_VER: bullseye
