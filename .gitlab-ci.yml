@@ -17,7 +17,7 @@ workflow:
     - when: never
 
 variables:
-  # used for build docker images
+  # used for a build docker images
   BUILDER_VERSION: 1.0.6
   # used for build debian based apt
   DEBIAN_BUILDER_VERSION: 1.0.11
