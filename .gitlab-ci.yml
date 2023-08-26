@@ -41,7 +41,7 @@ stages:
 
 .add_ssh_key: &add_ssh_key
   - eval $(ssh-agent -s)
-  - echo "${SSH_PRIVATE_KEY_BASE64}" | base64 -d | ssh-add -
+  - echo "${SSH_PRIVATE_KEY_ED25519_BASE64}" | base64 -d | ssh-add -
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
   - echo 'Host *' > ~/.ssh/config
@@ -228,12 +228,13 @@ docker-debian-bullseye:
   image: ${CI_REGISTRY_IMAGE}/builder:${BUILDER_VERSION}
   before_script:
     - *add_ssh_key
-    - export DOCKER_HOST=ssh://${SSH_USER}@${SERVER}
   script:
+    - bash pre-build/scripts/manage-vm.sh start
     - *set_glb_version
     - *build_docker
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
     - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+    - bash pre-build/scripts/manage-vm.sh stop
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
