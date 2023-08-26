@@ -65,11 +65,10 @@ stages:
   - packer validate .
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
   - packer build -color=false -timestamp-ui -warn-on-undeclared-var . || \
-    bash pre-build/scripts/manage-vm.sh stop
+    bash ../../../../pre-build/scripts/manage-vm.sh stop
   - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
   - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
-  - cd ../../..
-  - bash pre-build/scripts/manage-vm.sh stop
+  - bash ../../../../pre-build/scripts/manage-vm.sh stop
 
 .upload_mysql_schema: &upload_mysql_schema
   - cat database/mysql/schema.sql > create.sql
