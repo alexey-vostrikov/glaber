@@ -16319,7 +16319,27 @@ int  DC_config_get_item_proxy_description(u_int64_t itemid, char **proxy_name) {
 	return ret;
 }
 
+int  DC_get_item_valuetype_valuemapid(u_int64_t itemid, u_int64_t *valuemapid, unsigned char *value_type, char **units) {
+	ZBX_DC_ITEM *item;
+	ZBX_DC_NUMITEM *numitem;
+	int ret = FAIL;
 
+	RDLOCK_CACHE;
+	
+	if ( NULL != (item = zbx_hashset_search(&config->items, &itemid))  && 
+		 NULL != (numitem = zbx_hashset_search(&config->numitems, &itemid)) )   {
+		
+		*valuemapid = item->valuemapid;
+		*value_type = item->value_type;
+		*units = zbx_strdup(*units, numitem->units);
+
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+
+}
 
 void	zbx_recalc_time_period(int *ts_from, int table_group)
 {

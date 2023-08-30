@@ -1046,7 +1046,7 @@ out:
 
 	return ret;
 }
-
+int  DC_get_item_valuetype_valuemapid(u_int64_t itemid, u_int64_t *valuemapid, unsigned char *value_type, char **units);
 /******************************************************************************
  *                                                                            *
  * Purpose: retrieve item value by item id                                    *
@@ -1057,47 +1057,37 @@ out:
  ******************************************************************************/
 static int	DBitem_get_value(zbx_uint64_t itemid, char **lastvalue, int raw, zbx_timespec_t *ts)
 {
-	DB_RESULT	result;
-	DB_ROW		row;
 	int		ret = FAIL;
+
+	unsigned char		value_type;
+	zbx_uint64_t		valuemapid;
+	char *units = NULL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	result = zbx_db_select(
-			"select value_type,valuemapid,units,hostid"
-			" from items"
-			" where itemid=" ZBX_FS_UI64,
-			itemid);
 
-	if (NULL != (row = zbx_db_fetch(result)))
+	if (SUCCEED == DC_get_item_valuetype_valuemapid(itemid, &valuemapid, &value_type, &units))
 	{
-		unsigned char		value_type;
-		zbx_uint64_t		valuemapid;
-		zbx_uint64_t 		hostid;
+		
 		zbx_history_record_t	vc_value;
-
-		value_type = (unsigned char)atoi(row[0]);
-		ZBX_DBROW2UINT64(valuemapid, row[1]);
-		hostid = (unsigned char)atoi(row[3]);
 
 		if (SUCCEED == zbx_vc_get_value(itemid, value_type, ts, &vc_value))
 		{
 			char	tmp[MAX_BUFFER_LEN];
 
-//			zbx_vc_flush_stats();
 			zbx_history_value_print(tmp, sizeof(tmp), &vc_value.value, value_type);
 			zbx_history_record_clear(&vc_value, value_type);
 
 			if (0 == raw)
-				zbx_format_value(tmp, sizeof(tmp), valuemapid, row[2], value_type);
+				zbx_format_value(tmp, sizeof(tmp), valuemapid, units, value_type);
 
 			*lastvalue = zbx_strdup(*lastvalue, tmp);
 
 			ret = SUCCEED;
 		}
 	}
-	zbx_db_free_result(result);
-
+	
+	zbx_free(units);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
