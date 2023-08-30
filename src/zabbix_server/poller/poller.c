@@ -49,6 +49,7 @@
 #include "zbx_rtc_constants.h"
 #include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_interfaces.h"
+#include "../../libs/glb_state/glb_state_items.h"
 #include "glb_preproc.h"
 
 /******************************************************************************
@@ -182,7 +183,7 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 			break;
 		case ITEM_TYPE_SIMPLE:
 			/* simple checks use their own timeouts */
-			res = get_value_simple(item, result, add_results);
+			res = get_value_simple(item, result, add_results, glb_state_items_get_lastlogsize(item->itemid));
 			break;
 		case ITEM_TYPE_INTERNAL:
 			res = get_value_internal(item, result, config_comms, config_startup_time);

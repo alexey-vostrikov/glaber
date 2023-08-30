@@ -570,6 +570,14 @@ static void	zbx_substitute_macros_in_item_key(DC_ITEM *dc_item, char **replace_t
 	*replace_to = key;
 }
 
+int DC_config_get_host_description(u_int64_t hostid, char **host_description);
+u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid);
+int  DC_config_get_item_proxy_name(u_int64_t itemid, char **proxy_name);
+int  DC_config_get_item_proxy_description(u_int64_t itemid, char **proxy_name);
+int DC_config_get_item_key(u_int64_t itemid, char **item_key);
+int DC_config_get_item_description(u_int64_t itemid, char **item_descr);
+int DC_config_get_item_name(u_int64_t itemid, char **item_name);
+
 /******************************************************************************
  *                                                                            *
  * Purpose: retrieve a particular value associated with the item              *
@@ -583,11 +591,12 @@ static int	DBget_item_value(zbx_uint64_t itemid, char **replace_to, int request)
 	DB_RESULT	result;
 	DB_ROW		row;
 	DC_ITEM		dc_item;
-	zbx_uint64_t	proxy_hostid;
-	int		ret = FAIL, errcode;
+	zbx_uint64_t	proxy_hostid, hostid;
+	int		ret = FAIL, errcode, valuetype;
+	char buffer[MAX_ID_LEN];
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
+	//LOG_INF("Expression, request is %d", request);
 	switch (request)
 	{
 		case ZBX_REQUEST_HOST_IP:
@@ -599,6 +608,13 @@ static int	DBget_item_value(zbx_uint64_t itemid, char **replace_to, int request)
 		case ZBX_REQUEST_HOST_HOST:
 		case ZBX_REQUEST_HOST_NAME:
 			return get_host_value(itemid, replace_to, request);
+		
+		case ZBX_REQUEST_ITEM_ID:
+			
+				zbx_snprintf(buffer, MAX_ID_LEN, "%lld", itemid);
+				*replace_to = zbx_strdup(*replace_to, buffer);
+			return SUCCEED;
+	
 		case ZBX_REQUEST_ITEM_KEY:
 			DCconfig_get_items_by_itemids(&dc_item, &itemid, &errcode, 1);
 
@@ -609,97 +625,57 @@ static int	DBget_item_value(zbx_uint64_t itemid, char **replace_to, int request)
 			}
 
 			DCconfig_clean_items(&dc_item, &errcode, 1);
-
 			return ret;
+
+		case ZBX_REQUEST_HOST_DESCRIPTION:
+			zbx_free(*replace_to);
+			
+			if ( 0 == (hostid = DC_config_get_hostid_by_itemid(itemid))) {
+				return FAIL;
+			}
+			
+			return DC_config_get_host_description(hostid, replace_to);
+
+		
+		case ZBX_REQUEST_PROXY_NAME:
+			return DC_config_get_item_proxy_name(itemid, replace_to);
+
+		case ZBX_REQUEST_PROXY_DESCRIPTION:
+			return DC_config_get_item_proxy_description(itemid, replace_to);
+
+		case ZBX_REQUEST_ITEM_ERROR:
+				return glb_state_item_get_error(itemid, replace_to);
+	
+		case ZBX_REQUEST_ITEM_VALUETYPE:
+			if (FAIL == (valuetype = glb_state_item_get_valuetype(itemid))) 
+				return FAIL;
+
+			zbx_snprintf(buffer, MAX_ID_LEN, "%d", valuetype);
+			*replace_to = zbx_strdup(*replace_to, buffer);
+			return SUCCEED;
+	
+		case ZBX_REQUEST_ITEM_DESCRIPTION_ORIG:
+			return DC_config_get_item_description(itemid, replace_to);
+		
+		case ZBX_REQUEST_ITEM_NAME:
+		case ZBX_REQUEST_ITEM_NAME_ORIG:
+			return DC_config_get_item_name(itemid, replace_to);
+
+		case ZBX_REQUEST_ITEM_KEY_ORIG:
+			return DC_config_get_item_key(itemid, replace_to);
+
+		case ZBX_REQUEST_ITEM_DESCRIPTION:
+			if (SUCCEED == DC_config_get_item_description(itemid, replace_to)) {
+				zbx_dc_um_handle_t	*um_handle;
+
+				um_handle = zbx_dc_open_user_macros();
+				(void)zbx_dc_expand_user_macros(um_handle, replace_to, &dc_item.host.hostid, 1,	NULL);
+
+				zbx_dc_close_user_macros(um_handle);
+				return SUCCEED;
+			}
+			return FAIL;
 	}
-
-	result = zbx_db_select(
-			"select h.proxy_hostid,h.description,i.itemid,i.name,i.key_,i.description,i.value_type,ir.error"
-			" from items i"
-				" join hosts h on h.hostid=i.hostid"
-				" left join item_rtdata ir on ir.itemid=i.itemid"
-			" where i.itemid=" ZBX_FS_UI64, itemid);
-
-	if (NULL != (row = zbx_db_fetch(result)))
-	{
-		switch (request)
-		{
-			case ZBX_REQUEST_HOST_DESCRIPTION:
-				*replace_to = zbx_strdup(*replace_to, row[1]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_ITEM_ID:
-				*replace_to = zbx_strdup(*replace_to, row[2]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_ITEM_NAME:
-				*replace_to = zbx_strdup(*replace_to, row[3]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_ITEM_DESCRIPTION:
-				DCconfig_get_items_by_itemids(&dc_item, &itemid, &errcode, 1);
-
-				if (SUCCEED == errcode)
-				{
-					zbx_dc_um_handle_t	*um_handle;
-
-					um_handle = zbx_dc_open_user_macros();
-					*replace_to = zbx_strdup(NULL, row[5]);
-
-					(void)zbx_dc_expand_user_macros(um_handle, replace_to, &dc_item.host.hostid, 1,
-							NULL);
-
-					zbx_dc_close_user_macros(um_handle);
-					ret = SUCCEED;
-				}
-
-				DCconfig_clean_items(&dc_item, &errcode, 1);
-				break;
-			case ZBX_REQUEST_ITEM_NAME_ORIG:
-				*replace_to = zbx_strdup(*replace_to, row[3]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_ITEM_KEY_ORIG:
-				*replace_to = zbx_strdup(*replace_to, row[4]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_ITEM_DESCRIPTION_ORIG:
-				*replace_to = zbx_strdup(*replace_to, row[5]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_PROXY_NAME:
-				ZBX_DBROW2UINT64(proxy_hostid, row[0]);
-
-				if (0 == proxy_hostid)
-				{
-					*replace_to = zbx_strdup(*replace_to, "");
-					ret = SUCCEED;
-				}
-				else
-					ret = DBget_host_value(proxy_hostid, replace_to, "host");
-				break;
-			case ZBX_REQUEST_PROXY_DESCRIPTION:
-				ZBX_DBROW2UINT64(proxy_hostid, row[0]);
-
-				if (0 == proxy_hostid)
-				{
-					*replace_to = zbx_strdup(*replace_to, "");
-					ret = SUCCEED;
-				}
-				else
-					ret = DBget_host_value(proxy_hostid, replace_to, "description");
-				break;
-			case ZBX_REQUEST_ITEM_VALUETYPE:
-				*replace_to = zbx_strdup(*replace_to, row[6]);
-				ret = SUCCEED;
-				break;
-			case ZBX_REQUEST_ITEM_ERROR:
-				*replace_to = zbx_strdup(*replace_to, FAIL == zbx_db_is_null(row[7]) ? row[7] : "");
-				ret = SUCCEED;
-				break;
-		}
-	}
-	zbx_db_free_result(result);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 

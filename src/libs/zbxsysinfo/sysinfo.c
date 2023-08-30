@@ -857,7 +857,7 @@ void	zbx_init_agent_request(AGENT_REQUEST *request)
 	request->params = NULL;
 	request->types = NULL;
 	request->lastlogsize = 0;
-	request->mtime = 0;
+//	request->mtime = 0;
 }
 
 /******************************************************************************

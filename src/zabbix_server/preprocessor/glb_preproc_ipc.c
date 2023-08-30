@@ -290,6 +290,11 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
     metric_t metric={0};
 
     DEBUG_ITEM(itemid, "Sending item to preprocessing,  ar type is %d", ar->type);
+    
+    if (ar->type & AR_META) {
+        glb_state_items_set_lastlogsize(itemid, ar->lastlogsize);
+    }
+    
     if (ar->type & AR_UINT64) {
         if (ITEM_VALUE_TYPE_FLOAT == desired_type) {
             double dbl_val = (double)ar->ui64;
@@ -308,6 +313,7 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
     if (ar->type & AR_DOUBLE)
         return preprocess_dbl(hostid, itemid, flags, ts, ar->dbl);
     
+    
     return FAIL;
 }
 
@@ -318,6 +324,10 @@ int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t f
     if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
 
+    if (ar->type & AR_META) {
+        glb_state_items_set_lastlogsize(itemid, ar->lastlogsize);
+    }
+    
     if (ar->type & AR_UINT64) {
         zbx_variant_set_ui64(&metric.value, ar->ui64);
         DEBUG_ITEM(itemid, "Sending to processing UINT64 value %lld", metric.value.data.ui64);

@@ -201,7 +201,7 @@ static int	get_vmware_function(const char *key, vmfunc_t *vmfunc)
 	return FAIL;
 }
 
-int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
+int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results, int lastlogsize)
 {
 	AGENT_REQUEST	request;
 	vmfunc_t	vmfunc;
@@ -217,7 +217,7 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 		goto out;
 	}
 
-	request.lastlogsize = item->lastlogsize;
+	request.lastlogsize = lastlogsize;
 
 	if (0 == strcmp(request.key, "net.tcp.service") || 0 == strcmp(request.key, "net.udp.service"))
 	{

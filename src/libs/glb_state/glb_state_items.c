@@ -1618,7 +1618,7 @@ ELEMS_CALLBACK(get_valuetype_cb) {
      return item->value_type;
 }
 
-int  glb_state_get_item_valuetype(u_int64_t itemid) {
+int  glb_state_item_get_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
@@ -1689,4 +1689,36 @@ ELEMS_CALLBACK(set_item_poll_result) {
 void glb_state_items_set_poll_result(u_int64_t itemid, unsigned int lastcheck, int laststate) {
     poll_result_t poll_res ={.lastcheck = lastcheck, .state = laststate};
     elems_hash_process(state->items,itemid, set_item_poll_result, &poll_res, 0);
+}
+
+ELEMS_CALLBACK(get_error_cb) {
+    item_elem_t *item=elem->data;
+    char **error = data;
+    
+    if (NULL != item->meta.error) 
+        *error =zbx_strdup(*error, item->meta.error);
+    else 
+        *error =zbx_strdup(*error, ""); 
+    
+    return SUCCEED;
+}
+
+int     glb_state_item_get_error(u_int64_t itemid, char **error) {
+    return elems_hash_process(state->items, itemid, get_error_cb, error, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(get_lastlogsize_cb) {
+      item_elem_t *item=elem->data;
+      return item->meta.lastlogsize;
+}
+int     glb_state_items_get_lastlogsize(u_int64_t itemid) {
+    return elems_hash_process(state->items, itemid, get_lastlogsize_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(set_lastlogsize_cb) {
+    item_elem_t *item=elem->data;
+    item->meta.lastlogsize = *(int*) data;
+}
+int  glb_state_items_set_lastlogsize(u_int64_t itemid, int lastlogsize) {
+    return elems_hash_process(state->items, itemid, set_lastlogsize_cb, &lastlogsize, 0);
 }

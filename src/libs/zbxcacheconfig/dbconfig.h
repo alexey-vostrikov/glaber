@@ -123,8 +123,10 @@ typedef struct
 	zbx_uint64_t		hostid;
 	int					queue_next_check;
 	zbx_uint64_t		interfaceid;
-	zbx_uint64_t		lastlogsize;
+	//zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
+	const char 		*name;
+	const char 		*description;
 	const char		*key;
 	const char		*port;
 	const char		*delay;
@@ -383,6 +385,8 @@ typedef struct
 
 	const char	*host;
 	const char	*name;
+	const char	*description;
+
 	int		maintenance_from;
 	int		data_expected_from;
 	zbx_uint64_t	revision;

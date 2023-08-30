@@ -603,7 +603,7 @@ static void	DCdump_items(void)
 		zabbix_log(LOG_LEVEL_TRACE, "  interfaceid:" ZBX_FS_UI64, item->interfaceid);
 		zabbix_log(LOG_LEVEL_TRACE, "  flags:%u status:%u", item->flags, item->status);
 		zabbix_log(LOG_LEVEL_TRACE, "  valuemapid:" ZBX_FS_UI64, item->valuemapid);
-		zabbix_log(LOG_LEVEL_TRACE, "  lastlogsize:" ZBX_FS_UI64 , item->lastlogsize);
+		//zabbix_log(LOG_LEVEL_TRACE, "  lastlogsize:" ZBX_FS_UI64 , item->lastlogsize);
 		zabbix_log(LOG_LEVEL_TRACE, "  delay:'%s'", item->delay);
 		zabbix_log(LOG_LEVEL_TRACE, "  history:'%s'", item->history_period);
 		zabbix_log(LOG_LEVEL_TRACE, "  poller_type:%u location:%u", item->poller_type, item->location);

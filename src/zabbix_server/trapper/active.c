@@ -31,6 +31,7 @@
 #include "zbxversion.h"
 #include "zbx_host_constants.h"
 #include "zbx_item_constants.h"
+#include "../../libs/glb_state/glb_state_items.h"
 
 extern unsigned char	program_type;
 
@@ -327,8 +328,8 @@ int	send_list_of_active_checks(zbx_socket_t *sock, char *request, int config_tim
 				continue;
 
 			zbx_snprintf_alloc(&buffer, &buffer_alloc, &buffer_offset, "%s:%d:" ZBX_FS_UI64 "\n",
-					dc_items[i].key_orig, delay, dc_items[i].lastlogsize);
-		}
+					dc_items[i].key_orig, delay, 0); //dc_items[i].lastlogsize);
+		}	
 
 		DCconfig_clean_items(dc_items, errcodes, num);
 
@@ -622,7 +623,7 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 
 			/* The agent expects ALWAYS to have lastlogsize and mtime tags. */
 			/* Removing those would cause older agents to fail. */
-			zbx_json_adduint64(&json, ZBX_PROTO_TAG_LASTLOGSIZE, dc_items[i].lastlogsize);
+			zbx_json_adduint64(&json, ZBX_PROTO_TAG_LASTLOGSIZE, glb_state_items_get_lastlogsize(dc_items[i].itemid));
 			zbx_json_adduint64(&json, ZBX_PROTO_TAG_MTIME, time(NULL));
 			zbx_json_close(&json);
 
