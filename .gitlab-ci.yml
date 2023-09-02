@@ -185,12 +185,13 @@ centos-8:
     OS_VER: 8
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
 
-centos-9:
-  extends: .base-centos-builder
-  variables:
-    OS: almalinux
-    OS_VER: 9
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
+# after spec folder created build/almalinux/9
+# centos-9:
+#   extends: .base-centos-builder
+#   variables:
+#     OS: almalinux
+#     OS_VER: 9
+#   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
 
 debian-buster:
   extends: .base-debian-builder
@@ -206,12 +207,13 @@ debian-bullseye:
     OS_VER: bullseye
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
-debian-bookworm:
-  extends: .base-debian-builder
-  variables:
-    OS: debian
-    OS_VER: bookworm
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+# after spec folder created /build/debian/bookworm
+# debian-bookworm:
+#   extends: .base-debian-builder
+#   variables:
+#     OS: debian
+#     OS_VER: bookworm
+#   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
