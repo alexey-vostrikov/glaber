@@ -41,105 +41,14 @@
 #include "zbxjson.h"
 #include "zbxhttp.h"
 #include "log.h"
-#include "zbxavailability.h"
 #include "zbxcomms.h"
 #include "zbxnum.h"
 #include "zbxtime.h"
 #include "zbxsysinfo.h"
 #include "zbx_rtc_constants.h"
 #include "zbx_item_constants.h"
-#include "../../libs/glb_state/glb_state_interfaces.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 #include "glb_preproc.h"
-
-/******************************************************************************
- *                                                                            *
- * Purpose: write interface availability changes into database                *
- *                                                                            *
- * Parameters: data        - [IN/OUT] the serialized availability data        *
- *             data_alloc  - [IN/OUT] the serialized availability data size   *
- *             data_alloc  - [IN/OUT] the serialized availability data offset *
- *             ia          - [IN] the interface availability data             *
- *                                                                            *
- * Return value: SUCCEED - the availability changes were written into db      *
- *               FAIL    - no changes in availability data were detected      *
- *                                                                            *
- ******************************************************************************/
-static int	update_interface_availability(unsigned char **data, size_t *data_alloc, size_t *data_offset,
-		const zbx_interface_availability_t *ia)
-{
-	if (FAIL == zbx_interface_availability_is_set(ia))
-		return FAIL;
-
-	zbx_availability_serialize_interface(data, data_alloc, data_offset, ia);
-
-	return SUCCEED;
-}
-
-/******************************************************************************
- *                                                                            *
- * Purpose: get interface availability data                                   *
- *                                                                            *
- * Parameters: dc_interface - [IN] the interface                              *
- *             ia           - [OUT] the interface availability data           *
- *                                                                            *
- ******************************************************************************/
-static void	interface_get_availability(const DC_INTERFACE *dc_interface, zbx_interface_availability_t *ia)
-{
-	zbx_agent_availability_t	*availability = &ia->agent;
-
-	availability->flags = ZBX_FLAGS_AGENT_STATUS;
-
-	availability->available = dc_interface->available;
-	availability->error = zbx_strdup(NULL, dc_interface->error);
-	availability->errors_from = dc_interface->errors_from;
-	availability->disable_until = dc_interface->disable_until;
-
-	ia->interfaceid = dc_interface->interfaceid;
-}
-
-/********************************************************************************
- *                                                                              *
- * Purpose: sets interface availability data                                    *
- *                                                                              *
- * Parameters: dc_interface - [IN/OUT] the interface                            *
- *             ia           - [IN] the interface availability data              *
- *                                                                              *
- *******************************************************************************/
-static void	interface_set_availability(DC_INTERFACE *dc_interface, const zbx_interface_availability_t *ia)
-{
-	const zbx_agent_availability_t	*availability = &ia->agent;
-	unsigned char			*pavailable;
-	int				*perrors_from, *pdisable_until;
-	char				*perror;
-
-	pavailable = &dc_interface->available;
-	perror = dc_interface->error;
-	perrors_from = &dc_interface->errors_from;
-	pdisable_until = &dc_interface->disable_until;
-
-	if (0 != (availability->flags & ZBX_FLAGS_AGENT_STATUS_AVAILABLE))
-		*pavailable = availability->available;
-
-	if (0 != (availability->flags & ZBX_FLAGS_AGENT_STATUS_ERROR))
-		zbx_strlcpy(perror, availability->error, ZBX_INTERFACE_ERROR_LEN_MAX);
-
-	if (0 != (availability->flags & ZBX_FLAGS_AGENT_STATUS_ERRORS_FROM))
-		*perrors_from = availability->errors_from;
-
-	if (0 != (availability->flags & ZBX_FLAGS_AGENT_STATUS_DISABLE_UNTIL))
-		*pdisable_until = availability->disable_until;
-}
-
-static int	interface_availability_by_item_type(unsigned char item_type, unsigned char interface_type)
-{
-	if ((ITEM_TYPE_ZABBIX == item_type && INTERFACE_TYPE_AGENT == interface_type) ||
-			(ITEM_TYPE_SNMP == item_type && INTERFACE_TYPE_SNMP == interface_type) ||
-			(ITEM_TYPE_JMX == item_type && INTERFACE_TYPE_JMX == interface_type) ||
-			(ITEM_TYPE_IPMI == item_type && INTERFACE_TYPE_IPMI == interface_type))
-		return SUCCEED;
-
-	return FAIL;
-}
 
 static const char	*item_type_agent_string(zbx_item_type_t item_type)
 {
@@ -736,7 +645,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case AGENT_ERROR:
 				if (INTERFACE_AVAILABLE_TRUE != last_available)
 				{
-					glb_state_interfaces_register_ok(items[i].interface.interfaceid,"Have a response");
+					glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
 					last_available = INTERFACE_AVAILABLE_TRUE;
 				}
 				break;
@@ -745,8 +654,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case TIMEOUT_ERROR:
 				if (INTERFACE_AVAILABLE_FALSE != last_available)
 				{
-					glb_state_interfaces_register_fail(items[i].interface.interfaceid, "There was a timeout/configuration/network error");
-
+					glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
 					last_available = INTERFACE_AVAILABLE_FALSE;
 				}
 				break;
@@ -815,11 +723,6 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
 	zbx_vector_ptr_destroy(&add_results);
 
-	if (NULL != data)
-	{
-		zbx_availability_send(ZBX_IPC_AVAILABILITY_REQUEST, data, (zbx_uint32_t)data_offset, NULL);
-		zbx_free(data);
-	}
 
 	if (items != &item)
 		zbx_free(items);

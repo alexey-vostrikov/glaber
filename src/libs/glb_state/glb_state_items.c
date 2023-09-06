@@ -1193,11 +1193,14 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 {
     int errflag = 0;
     zbx_json_type_t type;
+    int temp;
 
-    if ( FAIL ==( elm->value_type = glb_json_get_int_value_by_name(jp, "value_type", &errflag) ))
+    if ( FAIL == glb_json_get_int_value_by_name(jp, "value_type", &temp))
         return FAIL;
-    
-    elm->db_fetched_time = glb_json_get_int_value_by_name(jp, "db_fetched_time", &errflag);
+
+    elm->value_type = temp;
+
+    glb_json_get_int_value_by_name(jp, "db_fetched_time", &elm->db_fetched_time);
 
     if ((elm->value_type >= ITEM_VALUE_TYPE_MAX || elm->value_type < 0) && elm->value_type != ITEM_VALUE_TYPE_NONE) {
         LOG_WRN("Imporeper value type is set in the file: %d: '%s'", elm->value_type, jp->start);
@@ -1210,29 +1213,22 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 
 static int parse_json_item_state(struct zbx_json_parse *jp, glb_state_item_meta_t *meta)
 {
-    int errflag = 0;
-
-    meta->state = glb_json_get_int_value_by_name(jp, "state", &errflag);
-    meta->lastdata = glb_json_get_int_value_by_name(jp, "lastdata", &errflag);
-    meta->nextcheck = 0;// glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
+    if (FAIL == glb_json_get_int_value_by_name(jp, "state", &meta->state) ||
+        FAIL == glb_json_get_int_value_by_name(jp, "lastdata", &meta->lastdata)) 
     
-
-    if (0 == errflag)
-        return SUCCEED;
-
     return FAIL;
+    
+    meta->nextcheck = 0;
+    return SUCCEED;
 }
 
 static int parse_json_item_demand(struct zbx_json_parse *jp, item_demand_t *demand)
 {
-    int errflag = 0;
-
-    demand->count = glb_json_get_int_value_by_name(jp, "count", &errflag);
-    demand->period = glb_json_get_int_value_by_name(jp, "period", &errflag);
-    demand->count_change = glb_json_get_int_value_by_name(jp, "count_change", &errflag);
-    demand->period_change = glb_json_get_int_value_by_name(jp, "period_change", &errflag);
-
-    if (0 == errflag)
+    if (SUCCEED == glb_json_get_int_value_by_name(jp, "count", &demand->count) &&
+        SUCCEED == glb_json_get_int_value_by_name(jp, "period", &demand->period) &&
+        SUCCEED == glb_json_get_int_value_by_name(jp, "count_change", &demand->count_change) &&
+        SUCCEED == glb_json_get_int_value_by_name(jp, "period_change", &demand->period_change) 
+        )
         return SUCCEED;
 
     return FAIL;
@@ -1247,7 +1243,7 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
     zbx_json_type_t type;
     bzero(hist, sizeof(ZBX_DC_HISTORY));
 
-    if (FAIL == (hist->ts.sec = glb_json_get_int_value_by_name(jp, "clock", &errflag)))
+    if (FAIL == glb_json_get_int_value_by_name(jp, "clock", &hist->ts.sec))
         return FAIL;
 
     hist->ts.ns = 0;
@@ -1256,10 +1252,10 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
     switch (value_type)
     {
     case ITEM_VALUE_TYPE_UINT64:
-        hist->value.ui64 = glb_json_get_int_value_by_name(jp, "value", &errflag);
+        glb_json_get_uint64_value_by_name(jp, "value", &hist->value.ui64);
         break;
     case ITEM_VALUE_TYPE_FLOAT:
-        hist->value.dbl = glb_json_get_dbl_value_by_name(jp, "value", &errflag);
+        glb_json_get_dbl_value_by_name(jp, "value", &hist->value.dbl);
         break;
     case ITEM_VALUE_TYPE_STR:
     case ITEM_VALUE_TYPE_TEXT:

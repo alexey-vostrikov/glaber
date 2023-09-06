@@ -59,15 +59,16 @@ int 	poller_get_item_type(poller_item_t *poll_item);
 
 void poller_return_item_to_queue(poller_item_t *glb_item);
 void poller_return_delayed_item_to_queue(poller_item_t *glb_item);
-void poller_register_item_succeed(poller_item_t *glb_item);
-void poller_register_item_timeout(poller_item_t *glb_item);
+void poller_register_item_iface_succeed(poller_item_t *glb_item);
+void poller_register_item_iface_timeout(poller_item_t *glb_item);
 int poller_if_host_is_failed(poller_item_t *glb_item);
 u_int64_t poller_get_host_id(poller_item_t *glb_item);
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, 
 								 shutdown_cb shutdown, forks_count_cb forks_count, 
-								 poller_resolve_cb resolve_callback, poller_resolve_fail_cb resolve_fail_callback);
+								 poller_resolve_cb resolve_callback, poller_resolve_fail_cb resolve_fail_callback, 
+								 char *proto_name, unsigned char is_named_iface);
 
 void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value, int desired_type);
 void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, double value);

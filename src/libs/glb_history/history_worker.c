@@ -31,9 +31,7 @@
 
 
 size_t	DCconfig_get_trigger_itemids_by_valuetype( int value_type, zbx_vector_uint64_t *vector_itemids);
-//int	zbx_vc_simple_add(zbx_uint64_t itemids, zbx_history_record_t *record);
 
-extern int CONFIG_SERVER_STARTUP_TIME;
 
 #define GLB_DEFAULT_WORKER_PRELOAD_VALUES 0
 #define GLB_DEFAULT_WORKER_DISABLE_READ	0

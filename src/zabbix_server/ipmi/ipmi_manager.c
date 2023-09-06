@@ -32,11 +32,10 @@
 #include "ipmi_protocol.h"
 #include "ipmi.h"
 #include "../poller/poller.h"
-#include "zbxavailability.h"
 #include "zbxtime.h"
 #include "zbxsysinfo.h"
 #include "zbx_item_constants.h"
-#include "../../libs/glb_state/glb_state_interfaces.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 
 #define ZBX_IPMI_MANAGER_DELAY	1
 
@@ -600,28 +599,7 @@ static zbx_ipmi_manager_host_t	*ipmi_manager_cache_host(zbx_ipmi_manager_t *mana
 	return host;
 }
 
-/******************************************************************************
- *                                                                            *
- * Purpose: updates cached host                                               *
- *                                                                            *
- * Parameters: manager   - [IN] the IPMI manager                              *
- *             interface - [IN] the interface                                 *
- *             hostid    - [IN] the host                                        *
- *                                                                            *
- ******************************************************************************/
-static void	ipmi_manager_update_host(zbx_ipmi_manager_t *manager, const DC_INTERFACE *interface,
-		zbx_uint64_t hostid)
-{
-	zbx_ipmi_manager_host_t	*ipmi_host;
 
-	if (NULL == (ipmi_host = (zbx_ipmi_manager_host_t *)zbx_hashset_search(&manager->hosts, &hostid)))
-	{
-		THIS_SHOULD_NEVER_HAPPEN;
-		return;
-	}
-
-	ipmi_host->disable_until = interface->disable_until;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -636,21 +614,13 @@ static void	ipmi_manager_activate_interface(zbx_ipmi_manager_t *manager, zbx_uin
 {
 	DC_ITEM		item;
 	int		errcode;
-	unsigned char	*data = NULL;
-	size_t		data_alloc = 0, data_offset = 0;
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
 
-	glb_state_interfaces_register_ok(item.interface.interfaceid,"");
-	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
-
+	
+	glb_state_host_set_id_interface_avail(item.host.hostid, item.interface.interfaceid, INTERFACE_AVAILABLE_TRUE, NULL);
+	
 	DCconfig_clean_items(&item, &errcode, 1);
-
-	if (NULL != data)
-	{
-		zbx_availability_send(ZBX_IPC_AVAILABILITY_REQUEST, data, data_offset, NULL);
-		zbx_free(data);
-	}
 }
 
 /******************************************************************************
@@ -673,18 +643,11 @@ static void	ipmi_manager_deactivate_interface(zbx_ipmi_manager_t *manager, zbx_u
 	size_t		data_alloc = 0, data_offset = 0;
 
 	DCconfig_get_items_by_itemids(&item, &itemid, &errcode, 1);
-
-	glb_state_interfaces_register_fail(item.interface.interfaceid, error);
-
-	ipmi_manager_update_host(manager, &item.interface, item.host.hostid);
+	
+	glb_state_host_set_id_interface_avail(item.host.hostid, item.interface.interfaceid,INTERFACE_AVAILABLE_FALSE, error);
 
 	DCconfig_clean_items(&item, &errcode, 1);
 
-	if (NULL != data)
-	{
-		zbx_availability_send(ZBX_IPC_AVAILABILITY_REQUEST, data, data_offset, NULL);
-		zbx_free(data);
-	}
 }
 
 /******************************************************************************

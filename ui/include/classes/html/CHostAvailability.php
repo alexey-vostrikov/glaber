@@ -109,7 +109,8 @@ class CHostAvailability extends CTag {
 				$interfaces = array_merge($interfaces, $this->type_interfaces[INTERFACE_TYPE_AGENT_ACTIVE]);
 			}
 
-			if (!$interfaces || !array_key_exists($type, static::LABELS)) {
+			if (!$interfaces ||  INTERFACE_TYPE_AGENT_ACTIVE == $type ) {
+								//} || !array_key_exists($type, static::LABELS)) {
 				continue;
 			}
 
@@ -125,8 +126,9 @@ class CHostAvailability extends CTag {
 					? INTERFACE_AVAILABLE_MIXED
 					: INTERFACE_AVAILABLE_FALSE;
 			}
+			$ifname = isset(static::LABELS[$type])? static::LABELS[$type]:strtoupper($type);
 
-			$this->addItem((new CSpan(static::LABELS[$type]))
+			$this->addItem((new CSpan($ifname))
 				->addClass(static::COLORS[$status])
 				->setHint($this->getInterfaceHint($interfaces))
 			);

@@ -1296,8 +1296,6 @@ static void	proxyconfig_check_interface_availability(zbx_table_data_t *td)
 		i++;
 	}
 
-	if (0 != interfaceids.values_num)
-		DCtouch_interfaces_availability(&interfaceids);
 
 	zbx_vector_uint64_destroy(&interfaceids);
 }
@@ -1973,6 +1971,20 @@ int	zbx_proxyconfig_process(const char *addr, struct zbx_json_parse *jp, char **
 		*error = zbx_strdup(NULL, "invalid config_revision value in proxy configuration response");
 		goto out;
 	}
+
+	if (SUCCEED == (ret = zbx_json_value_by_name(jp, "server_start_time", tmp, sizeof(tmp), NULL)))
+	{
+		int server_time = strtol(tmp, 0, 10);
+		
+		if (errno) {
+			*error = zbx_strdup(NULL, "invalid server_start_time value in the configuration");
+			goto out;
+		}
+
+		if (SUCCEED == server_time_is_changed(server_time)) {
+			zbx_set_availability_diff_ts(0);
+		}
+	} 
 
 	if (SUCCEED == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_FULL_SYNC, tmp, sizeof(tmp), NULL))
 		full_sync = atoi(tmp);

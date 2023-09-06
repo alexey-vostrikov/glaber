@@ -27,10 +27,10 @@
 #include "zbxnix.h"
 #include "zbxcompress.h"
 #include "zbxcommshigh.h"
-#include "zbxavailability.h"
 #include "zbxnum.h"
 #include "zbx_host_constants.h"
 #include "../taskmanager/taskmanager.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 
 extern unsigned char	program_type;
 static zbx_mutex_t	proxy_lock = ZBX_MUTEX_NULL;
@@ -258,7 +258,7 @@ void	zbx_send_proxy_data(zbx_socket_t *sock, zbx_timespec_t *ts, const zbx_confi
 	struct zbx_json		j;
 	zbx_uint64_t		areg_lastid = 0, history_lastid = 0, discovery_lastid = 0;
 	char			*error = NULL, *buffer = NULL;
-	int			availability_ts, more_history, more_discovery, more_areg, proxy_delay;
+	int			availability_ts, avail_export_ts, more_history, more_discovery, more_areg, proxy_delay;
 	zbx_vector_tm_task_t	tasks;
 	struct zbx_json_parse	jp, jp_tasks;
 	size_t			buffer_size, reserved;
@@ -276,12 +276,18 @@ void	zbx_send_proxy_data(zbx_socket_t *sock, zbx_timespec_t *ts, const zbx_confi
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	zbx_json_addstring(&j, ZBX_PROTO_TAG_SESSION, zbx_dc_get_session_token(), ZBX_JSON_TYPE_STRING);
-	zbx_get_interface_availability_data(&j, &availability_ts);
 	zbx_proxy_get_hist_data(&j, &history_lastid, &more_history);
 	zbx_proxy_get_dhis_data(&j, &discovery_lastid, &more_discovery);
 	zbx_proxy_get_areg_data(&j, &areg_lastid, &more_areg);
-	zbx_proxy_get_host_active_availability(&j);
-
+	
+	
+	availability_ts = zbx_get_availability_diff_ts();
+	avail_export_ts = time(NULL);
+		
+	zbx_json_addarray(&j, ZBX_PROTO_TAG_INTERFACE_AVAILABILITY);
+	glb_state_hosts_get_changed_ifaces_json(availability_ts, &j);
+	zbx_json_close(&j);
+	
 	zbx_vector_tm_task_create(&tasks);
 	zbx_tm_get_remote_tasks(&tasks, 0, 0);
 
@@ -313,7 +319,7 @@ void	zbx_send_proxy_data(zbx_socket_t *sock, zbx_timespec_t *ts, const zbx_confi
 	if (SUCCEED == send_data_to_server(sock, &buffer, buffer_size, reserved, config_comms->config_timeout,
 			&error))
 	{
-		zbx_set_availability_diff_ts(availability_ts);
+		zbx_set_availability_diff_ts(avail_export_ts);
 
 		zbx_db_begin();
 

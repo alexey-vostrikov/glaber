@@ -172,7 +172,13 @@ class CHostInterface extends CApiService {
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$res = DBselect(self::createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
+		
 		while ($interface = DBfetch($res)) {
+			$interface['available'] = 0;
+			$interface['lastchange'] = 0;
+			$interface['lastupdate'] = 0;
+			$interface['error'] = "No data received yet";
+
 			if ($options['countOutput']) {
 				if ($options['groupCount']) {
 					$result[] = $interface;
@@ -184,6 +190,7 @@ class CHostInterface extends CApiService {
 			else {
 				$result[$interface['interfaceid']] = $interface;
 			}
+			
 		}
 
 		if ($options['countOutput']) {
@@ -197,17 +204,32 @@ class CHostInterface extends CApiService {
 
 		if ($this->needsStateInfo($options)) {
 
-			$ifaceids = array_keys($result);	
-			$states = CZabbixServer::getInterfacesAvail(CSessionHelper::getId(), $ifaceids);;
-			
+			$hostids = array_unique(array_column($result,'hostid'));	
+			$states = CZabbixServer::getHostInterfacesAvail(CSessionHelper::getId(), $hostids);;
+
 			foreach ($states as $state) {
-				$result[$state['id']]['available'] = $state['avail'];
-				$result[$state['id']]['error'] =  $state['error'];
-				$result[$state['id']]['lastchange'] = $state['lastchange'];
+				$interfaceid = "";//$state['interfaceid'];
+
+				if (!isset($state['interfaceid'])) {
+					$interfaceid = $state['interface_name'].$state['hostid'];
+					$state['interfaceid'] = $interfaceid;
+					$result[$interfaceid]['type'] = $state['interface_name'];
+					$result[$interfaceid]['interface'] = $state['interface_name'];	
+					$result[$interfaceid]['hostid'] = $state['hostid'];
+					$result[$interfaceid]['interfaceid'] = $interfaceid;
+					$result[$interfaceid]['useip'] = "";
+					$result[$interfaceid]['dns'] = "";
+					$result[$interfaceid]['port'] = "";
+				} else 
+					$interfaceid = $state['interfaceid'];
+
+				$result[$interfaceid]['available'] = $state['available'];
+				$result[$interfaceid]['error'] =  $state['error'];
+				$result[$interfaceid]['lastchange'] = $state['lastupdate'];
+				
 			}
 		}
-
-		// removing keys (hash -> array)
+		
 		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}

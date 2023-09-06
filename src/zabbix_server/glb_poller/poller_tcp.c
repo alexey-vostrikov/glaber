@@ -52,7 +52,7 @@ struct tcp_item_t
 };
 typedef struct tcp_item_t tcp_item_t;
 
-tcp_poll_type_procs_t conf[ASYNC_TCP_POLL_TYPE_COUNT] = {0};
+static tcp_poll_type_procs_t conf[ASYNC_TCP_POLL_TYPE_COUNT] = {0};
 
 static void async_tcp_destroy_session(poller_item_t *poller_item)
 {
@@ -84,7 +84,7 @@ static void response_cb(struct bufferevent *bev, void *ctx_ptr)
 	switch (status)
 	{
 	case ASYNC_IO_TCP_PROC_FINISH:
-		poller_register_item_succeed(poller_item);
+		poller_register_item_iface_succeed(poller_item);
 		async_tcp_destroy_session(poller_item);
 		poller_contention_remove_session(tcp_item->ipaddr);
 		break;
@@ -122,7 +122,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 	if (events & BEV_EVENT_ERROR)
 	{
 		DEBUG_ITEM(poller_get_item_id(poller_item), "Connection error event");
-		conf[tcp_item->poll_type].fail_cb(poller_item, tcp_item->proto_ctx, "Connection error");
+		conf[tcp_item->poll_type].conn_fail_cb(poller_item, tcp_item->proto_ctx, "Connection error");
 		async_tcp_destroy_session(poller_item);
 
 		return;
@@ -154,7 +154,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 		else
 		{
 			DEBUG_ITEM(poller_get_item_id(poller_item), "Connection is dropped");
-			conf[tcp_item->poll_type].fail_cb(poller_item, tcp_item->proto_ctx, "Connection is dropped");
+			conf[tcp_item->poll_type].conn_fail_cb(poller_item, tcp_item->proto_ctx, "Connection is dropped");
 		}
 
 		async_tcp_destroy_session(poller_item);
@@ -483,7 +483,7 @@ static void tcp_shutdown_cb()
 int glb_tcp_init(void)
 {
 	poller_set_poller_callbacks(tcp_init_item, tcp_free_item, async_io, tcp_start_connection, 
-		tcp_shutdown_cb, forks_count, resolve_ready_func_cb, NULL);
+		tcp_shutdown_cb, forks_count, resolve_ready_func_cb, NULL, "http", 1);
 
 	tcp_agent_proto_init(&conf[ASYNC_TCP_POLL_TYPE_AGENT]);
 	tcp_simple_http_proto_init(&conf[ASYNC_TCP_POLL_SIMPLE_HTTP_TYPE]);

@@ -46,8 +46,6 @@ int	zbx_check_access_passive_proxy(zbx_socket_t *sock, int send_response, const 
 int	zbx_get_active_proxy_from_request(const struct zbx_json_parse *jp, DC_PROXY *proxy, char **error);
 int	zbx_proxy_check_permissions(const DC_PROXY *proxy, const zbx_socket_t *sock, char **error);
 
-int	zbx_get_interface_availability_data(struct zbx_json *json, int *ts);
-
 int	zbx_proxy_get_hist_data(struct zbx_json *j, zbx_uint64_t *lastid, int *more);
 int	zbx_proxy_get_dhis_data(struct zbx_json *j, zbx_uint64_t *lastid, int *more);
 int	zbx_proxy_get_areg_data(struct zbx_json *j, zbx_uint64_t *lastid, int *more);

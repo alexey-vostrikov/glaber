@@ -37,7 +37,7 @@
 #include "calculated.h"
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
-#include "../../libs/glb_state/glb_state_interfaces.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 #include "../poller/poller.h"
 #include "../../libs/zbxexec/worker.h"
 #include "poller_async_io.h"
@@ -66,16 +66,6 @@ typedef struct
 	int program_type; //server, proxy etc....
 } poller_proc_info_t;
 
-typedef struct
-{
-	zbx_uint64_t hostid;
-	unsigned int poll_items;
-	unsigned int items;
-	unsigned int fails;
-	unsigned int first_fail;
-	time_t disabled_till;
-} poller_host_t;
-
 struct poller_item_t
 {
 	zbx_uint64_t itemid;
@@ -101,6 +91,8 @@ typedef struct
 	forks_count_cb forks_count;
 	poller_resolve_cb resolve_callback;
 	poller_resolve_fail_cb resolve_fail_callback;
+	char *proto_name;
+	unsigned char is_named_iface;
 } poll_module_t;
 
 typedef struct
@@ -141,17 +133,24 @@ static int is_active_item_type(unsigned char item_type)
 	return SUCCEED;
 }
 
+static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
+		
+	if (0 == conf.poller.is_named_iface )  
+		return glb_state_host_is_id_interface_pollable(item->hostid, item->interfaceid, disabled_till);
+
+	return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
+
+}
 /******************************************************************
  * adds next check event to the events b-tree					  *
  * ****************************************************************/
 static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 {
-	int simple_interval;
+	int simple_interval, disabled_till;
 	u_int64_t nextcheck;
 	zbx_custom_interval_t *custom_intervals;
 	char *error = NULL;
 	const char *delay;
-	poller_host_t *glb_host;
 
 	if (SUCCEED == is_active_item_type(poller_item->item_type))
 		delay = poller_item->delay;
@@ -166,21 +165,14 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 		return FAIL;
 	}
 
-	if (NULL == (glb_host = zbx_hashset_search(&conf.hosts, &poller_item->hostid)))
-	{
-		LOG_WRN("No host has been found for itemid %ld", poller_item->itemid);
-		return FAIL;
-	}
+	if (SUCCEED == item_interface_is_pollable(poller_item, &disabled_till)) {
+		nextcheck = zbx_calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
+												 custom_intervals, (mstime / 1000) + 1);
 
-	if (glb_host->disabled_till > mstime)
-	{
-		nextcheck = zbx_calculate_item_nextcheck_unreachable(simple_interval,
-															 custom_intervals, glb_host->disabled_till);
 	}
 	else
 	{
-		nextcheck = zbx_calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
-												 custom_intervals, (mstime / 1000) + 1);
+		nextcheck = zbx_calculate_item_nextcheck_unreachable(simple_interval, custom_intervals, disabled_till);	
 	}
 
 	/*note: since original algo is still seconds-based adding some millisecond-noise
@@ -199,6 +191,7 @@ static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
 void item_poll_cb(poller_item_t *poller_item, void *data) {
 
 	u_int64_t mstime = glb_ms_time();
+	int disabled_till, nextcheck;
 
 	DEBUG_ITEM(poller_item->itemid, "Item poll event");
 
@@ -209,11 +202,14 @@ void item_poll_cb(poller_item_t *poller_item, void *data) {
 		return;
 	}
 
-	//	if (poller_async_get_dns_requests() > POLLER_MAX_DNS_REQUESTS) {
-	//		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to too many DNS requests are int progress (%d) busy", POLLER_MAX_SESSIONS_DELAY / 1000, POLLER_MAX_DNS_REQUESTS );
-	//		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
-	//		return;
-	//	}
+	if (FAIL == item_interface_is_pollable(poller_item, &disabled_till)) {
+		
+		DEBUG_ITEM(poller_item->itemid, "Item's interface is disabled, delaying");
+		add_item_check_event(poller_item, (u_int64_t)disabled_till * 1000);
+
+		return;
+	}
+
 
 	add_item_check_event(poller_item, mstime);
 
@@ -233,34 +229,6 @@ void item_poll_cb(poller_item_t *poller_item, void *data) {
 		conf.poller.start_poll(poller_item);
 }
 
-static int add_item_to_host(u_int64_t hostid)
-{
-	poller_host_t *glb_host, new_host = {0};
-
-	if (NULL == (glb_host = (poller_host_t *)zbx_hashset_search(&conf.hosts, &hostid)))
-	{
-		poller_host_t new_host = {0};
-
-		new_host.hostid = hostid;
-		glb_host = zbx_hashset_insert(&conf.hosts, &new_host, sizeof(poller_host_t));
-	}
-
-	glb_host->items++;
-}
-
-static void delete_item_from_host(u_int64_t hostid)
-{
-	poller_host_t *glb_host;
-
-	if (NULL != (glb_host = zbx_hashset_search(&conf.hosts, &hostid)))
-	{
-		glb_host->items--;
-
-		if (0 == glb_host->items)
-			zbx_hashset_remove_direct(&conf.hosts, glb_host);
-	}
-}
-
 int glb_poller_get_forks()
 {
 	return conf.poller.forks_count();
@@ -275,7 +243,6 @@ int glb_poller_delete_item(u_int64_t itemid)
 		DEBUG_ITEM(itemid, "Item has been deleted, removing from the poller config");
 
 		conf.poller.delete_item(poller_item);
-		delete_item_from_host(poller_item->hostid);
 		strpool_free(&conf.strpool, poller_item->delay);
 		poller_destroy_event(poller_item->poll_event);
 		zbx_hashset_remove_direct(&conf.items, poller_item);
@@ -308,7 +275,6 @@ static int get_simple_interval(const char *delay)
 int glb_poller_create_item(DC_ITEM *dc_item)
 {
 	poller_item_t *poller_item, local_glb_item;
-	poller_host_t *glb_host;
 	u_int64_t mstime = glb_ms_time();
 	int i;
 	
@@ -342,12 +308,10 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item->poll_event = poller_create_event(poller_item, item_poll_cb, 0, NULL, 0);
 	poller_item->interfaceid = dc_item->interface.interfaceid;
 
-	add_item_to_host(poller_item->hostid);
-	
+
 	if (FAIL == conf.poller.init_item(dc_item, poller_item))
 	{
 		strpool_free(&conf.strpool, poller_item->delay);
-		delete_item_from_host(poller_item->hostid);
 		zbx_hashset_remove(&conf.items, &poller_item->itemid);
 		
 		return FAIL;
@@ -362,16 +326,6 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		add_item_check_event(poller_item, mstime);
 
 	return SUCCEED;
-}
-
-int host_is_failed(zbx_hashset_t *hosts, zbx_uint64_t hostid, int now)
-{
-	poller_host_t *glb_host;
-
-	if (NULL != (glb_host = (poller_host_t *)zbx_hashset_search(hosts, &hostid)) && glb_host->disabled_till > now)
-		return SUCCEED;
-
-	return FAIL;
 }
 
 static int poll_module_init()
@@ -571,11 +525,9 @@ void poller_set_item_specific_data(poller_item_t *poll_item, void *data)
 
 poller_item_t *poller_get_poller_item(u_int64_t itemid)
 {
-	poller_host_t *host;
 	poller_item_t *item;
 
-	if (NULL == (item = zbx_hashset_search(&conf.items, &itemid)) ||
-		NULL == (host = zbx_hashset_search(&conf.hosts, &item->hostid)))
+	if (NULL == (item = zbx_hashset_search(&conf.items, &itemid)))
 
 		return NULL;
 
@@ -607,53 +559,53 @@ void poller_return_delayed_item_to_queue(poller_item_t *item)
 
 u_int64_t poller_get_host_id(poller_item_t *item)
 {
-	poller_host_t *host;
-
-	if (NULL == (host = zbx_hashset_search(&conf.hosts, &item->hostid)))
-		return 0;
-
-	return host->hostid;
+	return item->hostid;
 }
 
-int poller_if_host_is_failed(poller_item_t *item)
+
+/*
+Genereal locking improvement:
+For Glaber pollers it might be feasible to cache interface changes localy and
+only propagate changes to the commnon cache 
+
+This will reduce read locks. However, it seems that read locks aren't a performance hit yet
+at least until there is no general lock (in both structure and memory or strpools), meaning
+that only configuration changes should cause write/mem locks, so we'll be able to deal about
+several hundred thousand changes a sec, or in other words, will need a minute to change 10m
+configuration on the fly. 
+
+*/
+void poller_register_item_iface_timeout(poller_item_t *item)
 {
-	poller_host_t *host;
-
-	if (NULL == (host = zbx_hashset_search(&conf.hosts, &item->hostid)))
-		return SUCCEED;
-	if (host->disabled_till > time(NULL))
-		return SUCCEED;
-
-	return FAIL;
-}
-
-void poller_register_item_timeout(poller_item_t *item)
-{
-	poller_host_t *glb_host;
-
-	if (NULL != (glb_host = (poller_host_t *)zbx_hashset_search(&conf.hosts, &item->hostid)) &&
-		(++glb_host->fails > GLB_MAX_FAILS))
-	{
-		glb_host->fails = 0;
-		glb_host->disabled_till = time(NULL) + CONFIG_UNREACHABLE_DELAY;
+	DEBUG_ITEM(item->itemid, "Registering interface timeout");
+	if (1 == conf.poller.is_named_iface) { 
+		DEBUG_ITEM(item->itemid, "Registering interface timeout by iface name %s", conf.poller.proto_name);
+		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_FALSE, "Request timeout");
+	}
+	else  {
+		DEBUG_ITEM(item->itemid, "Registering interface timeout by iface id %lld", item->interfaceid);
+		glb_state_host_set_id_interface_avail(item->hostid, item->interfaceid, INTERFACE_AVAILABLE_FALSE, "Request timeout");
+		
 	}
 }
 
-void poller_register_item_succeed(poller_item_t *item)
-{
-	poller_host_t *glb_host;
-
-	if (NULL != (glb_host = (poller_host_t *)zbx_hashset_search(&conf.hosts, &item->hostid)))
-	{
-		glb_host->fails = 0;
-		glb_host->disabled_till = 0;
+void poller_register_item_iface_succeed(poller_item_t *item)
+ {
+	
+	//LOG_INF("GLB Poller: registering interface succeed for host %d", item->hostid );
+	if (1 == conf.poller.is_named_iface) {
+	//	LOG_INF("Register iface avail true for host %ld iface %ld", item->hostid, item->interfaceid);
+		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_TRUE, "Got a repsonse");
 	}
+	else 
+		glb_state_host_set_id_interface_avail(item->hostid, item->interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a repsonse");	
 }
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown,
 								 forks_count_cb forks_count, poller_resolve_cb resolve_callback,
-								 poller_resolve_fail_cb resolve_fail_callback)
+								 poller_resolve_fail_cb resolve_fail_callback, char* proto_name,
+								 unsigned char is_named_iface)
 {
 	conf.poller.init_item = init_item;
 	conf.poller.delete_item = delete_item;
@@ -663,14 +615,17 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 	conf.poller.forks_count = forks_count;
 	conf.poller.resolve_callback = resolve_callback;
 	conf.poller.resolve_fail_callback = resolve_fail_callback;
+	
+	conf.poller.proto_name = zbx_strdup(NULL, proto_name);
+	conf.poller.is_named_iface = is_named_iface;
+
 }
+
 
 void poller_preprocess_error(poller_item_t *poller_item, const char *error)  
 {
 	preprocess_error(poller_item->hostid, poller_item->itemid, poller_item->flags, NULL, (char*)error);
 	glb_state_item_set_error(poller_item->itemid, error);
-	glb_state_interfaces_register_fail(poller_item->interfaceid, error);
-//	preprocessing_flush();
 }
 
 void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value, int orig_type) {
@@ -681,26 +636,18 @@ void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_
 	} else 
 		preprocess_uint64(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
 
-	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
-//	preprocessing_flush();
 }
 
 void poller_preprocess_str(poller_item_t *poller_item, zbx_timespec_t *ts, const char *value) {
 	preprocess_str(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
-	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
-//	preprocessing_flush();
 }
 
 void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, double dbl_value) {
 	preprocess_dbl(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, dbl_value);
-	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
-//	preprocessing_flush();
 }
 
 void poller_preprocess_agent_result_value(poller_item_t *poller_item, zbx_timespec_t *ts, AGENT_RESULT *ar) {
 	preprocess_agent_result(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, ar, poller_item->value_type);
-	glb_state_interfaces_register_ok(poller_item->interfaceid, "Polled normally");
-//	preprocessing_flush();
 }
 
 void poller_inc_responses()

@@ -33,6 +33,7 @@ typedef struct
 	zbx_config_vault_t	*config_vault;
 	zbx_get_program_type_f	zbx_get_program_type_cb_arg;
 	int			config_timeout;
+	int 		server_startup_time;
 }
 zbx_thread_proxy_poller_args;
 

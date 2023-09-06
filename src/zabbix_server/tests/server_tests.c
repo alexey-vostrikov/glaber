@@ -26,16 +26,20 @@
 
 #include "../../libs/glb_state/tests/glb_state_tests.h"
 #include "../../libs/zbxalgo/tests/algo_tests.h"
-//#include "../preprocessor/worker_tests.h"
+
 #include "../preprocessor/tests/preproc_tests.h"
 #include "../glb_poller/tests/test_internal.h"
 
-//#include "../../libs/zbxexec/tests/exec_tests.c"
+
 
 #include "log.h"
 void tests_server_run(void) {
     LOG_INF("Running server tests");    
     sleep(1);
+    
+    LOG_INF("Running state tests");
+    glb_state_run_tests();
+    
     LOG_INF("Reunning preprocessing tests");
     run_proc_ipc_tests();
     

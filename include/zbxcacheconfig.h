@@ -23,7 +23,6 @@
 #include "zbxdbhigh.h"
 #include "zbxcomms.h"
 #include "zbxeval.h"
-#include "zbxavailability.h"
 #include "zbxversion.h"
 #include "zbxvault.h"
 #include "zbxregexp.h"
@@ -82,10 +81,7 @@ typedef struct
 	unsigned char	useip;
 	unsigned char	type;
 	unsigned char	main;
-	unsigned char	available;
-	int		disable_until;
-	char		error[ZBX_INTERFACE_ERROR_LEN_MAX];
-	int		errors_from;
+
 }
 DC_INTERFACE;
 
@@ -827,11 +823,6 @@ void	DCget_autoregistration_psk(char *psk_identity_buf, size_t psk_identity_buf_
 
 #define ZBX_MACRO_SECRET_MASK	"******"
 
-int	DCinterface_activate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, zbx_agent_availability_t *in,
-		zbx_agent_availability_t *out);
-
-int	DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, int unavailable_delay,
-		zbx_agent_availability_t *in, zbx_agent_availability_t *out, const char *error_msg);
 
 #define ZBX_QUEUE_FROM_DEFAULT	6	/* default lower limit for delay (in seconds) */
 #define ZBX_QUEUE_TO_INFINITY	-1	/* no upper limit for delay */
@@ -873,16 +864,14 @@ void	zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags);
 void	zbx_config_clean(zbx_config_t *cfg);
 void	zbx_config_get_hk_mode(unsigned char *history_mode, unsigned char *trends_mode);
 
-int	DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities);
-
-int	DCreset_interfaces_availability(zbx_vector_availability_ptr_t *interfaces);
-
 void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions, unsigned char opflags);
 
 int	DCget_interfaces_availability(zbx_vector_ptr_t *interfaces, int *ts);
 void	DCtouch_interfaces_availability(const zbx_vector_uint64_t *interfaceids);
 
 void	zbx_set_availability_diff_ts(int ts);
+int 	zbx_get_availability_diff_ts();
+int  	server_time_is_changed(int new_time);
 
 void	zbx_dc_correlation_rules_init(zbx_correlation_rules_t *rules);
 void	zbx_dc_correlation_rules_clean(zbx_correlation_rules_t *rules);
@@ -1088,7 +1077,6 @@ void	zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 		const zbx_vector_ptr_t *timers);
 void	zbx_dc_free_timers(zbx_vector_ptr_t *timers);
 
-void	zbx_get_host_interfaces_availability(zbx_uint64_t	hostid, zbx_agent_availability_t *agents);
 
 /* external user macro cache API */
 

@@ -46,7 +46,7 @@ typedef struct {
 	tcp_poll_create_request_cb_func	create_request;
 	tcp_poll_response_cb_func	response_cb;
 	tcp_poll_timeout_cb_func	timeout_cb;
-	tcp_poll_fail_cb_func		fail_cb;
+	tcp_poll_fail_cb_func		conn_fail_cb;
 	tcp_poll_connect_cb_func connect_cb;
 } tcp_poll_type_procs_t ;
 

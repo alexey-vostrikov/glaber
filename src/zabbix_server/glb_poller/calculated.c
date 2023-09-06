@@ -125,7 +125,7 @@ int calculated_poller_init(void){
     conf.memf.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC;
 
     strpool_init(&conf.strpool, &conf.memf);
-	poller_set_poller_callbacks(init_item, free_item, handle_async_io, poll_item, poller_shutdown, forks_count, NULL, NULL);
+	poller_set_poller_callbacks(init_item, free_item, handle_async_io, poll_item, poller_shutdown, forks_count, NULL, NULL, "calc", 0);
     
     return SUCCEED;
 }

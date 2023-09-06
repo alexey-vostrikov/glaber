@@ -1,6 +1,6 @@
+
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Copyright Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,21 +17,5 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#ifndef ZABBIX_PROXYCONFIG_READ_H
-#define ZABBIX_PROXYCONFIG_READ_H
 
-#include "zbxcacheconfig.h"
-
-typedef enum {
-	ZBX_PROXYCONFIG_STATUS_EMPTY,
-	ZBX_PROXYCONFIG_STATUS_DATA
-}
-zbx_proxyconfig_status_t;
-
-int	zbx_proxyconfig_get_data(DC_PROXY *proxy, const struct zbx_json_parse *jp_request, struct zbx_json *j,
-		zbx_proxyconfig_status_t *status, const zbx_config_vault_t *config_vault, char **error, int server_start_time);
-
-void	zbx_send_proxyconfig(zbx_socket_t *sock, const struct zbx_json_parse *jp,
-		const zbx_config_vault_t *config_vault, int config_timeout, int server_start_time);
-
-#endif
+void glb_state_hosts_interfaces_run_tests(void);

@@ -85,8 +85,7 @@ static void	dump_item(const DC_ITEM *item)
 		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  host:'%s'", item->host.host);
 		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  maintenance_status: %u", item->host.maintenance_status);
 		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  maintenance_type: %u", item->host.maintenance_type);
-		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  available: %u", item->interface.available);
-		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  ipmi_authtype: %d", item->host.ipmi_authtype);
+			__zbx_zabbix_log(LOG_LEVEL_TRACE, "  ipmi_authtype: %d", item->host.ipmi_authtype);
 		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  ipmi_privilege: %u", item->host.ipmi_privilege);
 		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  ipmi_username:'%s'", item->host.ipmi_username);
 		__zbx_zabbix_log(LOG_LEVEL_TRACE, "  ipmi_password:'%s'", item->host.ipmi_password);
@@ -246,8 +245,8 @@ int	zbx_trapper_item_test_run(const struct zbx_json_parse *jp_data, zbx_uint64_t
 	db_string_from_json(&jp_interface, ZBX_PROTO_TAG_PORT, table_interface, "port", item.interface.port_orig,
 			sizeof(item.interface.port_orig));
 
-	db_uchar_from_json(&jp_interface, ZBX_PROTO_TAG_AVAILABLE, table_interface, "available",
-			&item.interface.available);
+//	db_uchar_from_json(&jp_interface, ZBX_PROTO_TAG_AVAILABLE, table_interface, "available",
+//			&item.interface.available);
 
 	if (FAIL == zbx_json_brackets_by_name(&jp_interface, ZBX_PROTO_TAG_DETAILS, &jp_details))
 		zbx_json_open("{}", &jp_details);

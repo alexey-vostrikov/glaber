@@ -35,7 +35,6 @@
 #include "trapper_expressions_evaluate.h"
 #include "trapper_item_test.h"
 #include "trapper_request.h"
-#include "zbxavailability.h"
 #include "zbxxml.h"
 #include "base64.h"
 #include "zbxtime.h"
@@ -47,7 +46,7 @@
 
 #include "../../libs/glb_state/glb_state_items.h"
 #include "../../libs/glb_state/glb_state_triggers.h"
-#include "../../libs/glb_state/glb_state_interfaces.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 #include "preproc.h"
 
 
@@ -218,22 +217,27 @@ static int  get_triggers_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	return SUCCEED;
 }
 
-static int  get_interfaces_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
+
+static int  get_host_interfaces_state(zbx_socket_t *sock, struct zbx_json_parse *jp) {
 	zbx_vector_uint64_t ids;
 	struct zbx_json		response_json;
 		
 	zbx_json_init(&response_json, ZBX_JSON_STAT_BUF_LEN);
 	zbx_json_addstring(&response_json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
-	
+	zbx_json_addarray(&response_json,ZBX_PROTO_TAG_DATA);
+
 	zbx_vector_uint64_create(&ids);
 	
-	if (0 < json_ids_to_vector(jp, &ids, "interfaceids") ) 
-		glb_state_interfaces_get_state_json(&ids, &response_json);
+	if (0 < json_ids_to_vector(jp, &ids, "hostids") ) 
+		glb_state_hosts_get_interfaces_avail_json(&ids, &response_json);
 		
-	zbx_vector_uint64_destroy(&ids);
+
 	zbx_json_close(&response_json);
-	
+	zbx_json_close(&response_json);
 	(void)zbx_tcp_send(sock, response_json.buffer);
+
+	zbx_vector_uint64_destroy(&ids);
+
 
 	zbx_json_free(&response_json);
 	return SUCCEED;
@@ -1248,12 +1252,11 @@ out:
 
 static int	process_active_check_heartbeat(struct zbx_json_parse *jp)
 {
-	char		host[ZBX_MAX_HOSTNAME_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1],
+	char	host[ZBX_MAX_HOSTNAME_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1],
 			hbfreq[ZBX_MAX_UINT64_LEN];
 	zbx_uint64_t	hostid;
 	DC_HOST		dc_host;
-	unsigned char	*data = NULL;
-	zbx_uint32_t	data_len;
+
 
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOST, host, sizeof(host), NULL))
 		return FAIL;
@@ -1270,11 +1273,7 @@ static int	process_active_check_heartbeat(struct zbx_json_parse *jp)
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HEARTBEAT_FREQ, hbfreq, sizeof(hbfreq), NULL))
 		return FAIL;
 
-	data_len = zbx_availability_serialize_active_heartbeat(&data, hostid, atoi(hbfreq));
-	zbx_availability_send(ZBX_IPC_AVAILMAN_ACTIVE_HB, data, data_len, NULL);
-
-	zbx_free(data);
-
+	glb_state_hosts_process_heartbeat(hostid, atoi(hbfreq));
 	return SUCCEED;
 }
 
@@ -1371,7 +1370,7 @@ static int	comms_parse_response(char *xml, char *host, size_t host_len, char *ke
 
 static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx_timespec_t *ts,
 		const zbx_config_comms_args_t *config_comms, const zbx_config_vault_t *config_vault,
-		int config_startup_time)
+		int server_start_time)
 {
 	int	ret = SUCCEED;
 
@@ -1449,7 +1448,7 @@ static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx
 		}
 		else if (0 == strcmp(value, ZBX_PROTO_VALUE_ZABBIX_STATS))
 		{
-			ret = send_internal_stats_json(sock, &jp, config_comms, config_startup_time);
+			ret = send_internal_stats_json(sock, &jp, config_comms, server_start_time);
 		}
 		else if (0 == strcmp(value, ZBX_PROTO_VALUE_PREPROCESSING_TEST))
 		{
@@ -1464,7 +1463,7 @@ static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx
 		else if (0 == strcmp(value, ZBX_PROTO_VALUE_ZABBIX_ITEM_TEST))
 		{
 			if (0 != (zbx_get_program_type_cb() & ZBX_PROGRAM_TYPE_SERVER))
-				zbx_trapper_item_test(sock, &jp, config_comms, config_startup_time);
+				zbx_trapper_item_test(sock, &jp, config_comms, server_start_time);
 		} else if (0 == strcmp(value, "history.get"))
 		{
 			ret = recv_history_get_data(sock, &jp);
@@ -1474,8 +1473,8 @@ static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx
 			ret = get_items_state(sock,&jp);
 		else  if (0 ==strcmp(value, GLB_PROTO_VALUE_GET_TRIGGER_STATUS))
 			ret = get_triggers_state(sock,&jp);
-		else  if (0 ==strcmp(value, GLB_PROTO_VALUE_GET_INTERFACE_STATE))
-			ret = get_interfaces_state(sock,&jp);
+		else  if (0 ==strcmp(value, GLB_PROTO_VALUE_GET_INTERFACE_AVAIL_STATE))
+			ret = get_host_interfaces_state(sock,&jp);
 		else if (0 == strcmp(value, "debug.set"))
 		{	
 			 glb_trapper_set_debug(sock, &jp);
@@ -1490,7 +1489,7 @@ static int	process_trap(zbx_socket_t *sock, char *s, ssize_t bytes_received, zbx
 			ret = process_active_check_heartbeat(&jp);
 		}
 		else if (SUCCEED != trapper_process_request(value, sock, &jp, config_comms->config_tls, config_vault,
-				zbx_get_program_type_cb, config_comms->config_timeout))
+				zbx_get_program_type_cb, config_comms->config_timeout, server_start_time))
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "unknown request received from \"%s\": [%s]", sock->peer,
 				value);

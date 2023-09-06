@@ -268,8 +268,8 @@ ELEMS_CALLBACK(check_outdated_triggers) {
         zbx_vector_uint64_append(ids, elem->id);
 }
 
-void glb_state_triggers_housekeep(int frequency) {
-    RUN_ONCE_IN(frequency); 
+void glb_state_triggers_housekeep() {
+    RUN_ONCE_IN(300); 
 
     zbx_vector_uint64_t remove_ids;
     zbx_vector_uint64_create(&remove_ids);
@@ -283,20 +283,20 @@ void glb_state_triggers_housekeep(int frequency) {
 DUMPER_FROM_JSON(unmarshall_trigger_cb) {
     state_trigger_t *trigger = elem->data;
     char buff[MAX_STRING_LEN];
-     zbx_json_type_t type;
+    zbx_json_type_t type;
+    int tmp;
 
-    int errflag = 0;
+    //int errflag = 0;
     
-    trigger->value = glb_json_get_int_value_by_name(jp, "value", &errflag);
-    if (1 == errflag) 
+    if (SUCCEED == glb_json_get_int_value_by_name(jp, "value", &tmp))
+        trigger->value = tmp;
+    else
         trigger->value = TRIGGER_VALUE_UNKNOWN;
         
-    trigger->lastcalc = glb_json_get_int_value_by_name(jp, "lastcalc", &errflag);
-    if (1 == errflag) 
+     if (FAIL == glb_json_get_int_value_by_name(jp, "lastcalc", &trigger->lastcalc))
         trigger->lastcalc = 0;
 
-    trigger->lastchange = glb_json_get_int_value_by_name(jp, "lastchange", &errflag);
-    if (1 == errflag) 
+     if (FAIL == glb_json_get_int_value_by_name(jp, "lastchange", &trigger->lastchange))
         trigger->lastchange = 0;
 
     if (NULL != trigger->error) {

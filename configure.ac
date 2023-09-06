@@ -1953,10 +1953,8 @@ AC_CONFIG_FILES([
 	src/libs/zbxalgo/Makefile
 	src/libs/zbxalgo/tests/Makefile
 	src/libs/zbxaudit/Makefile
-	src/libs/zbxavailability/Makefile
 	src/libs/zbxconnector/Makefile
 	src/libs/glb_state/Makefile
-	src/libs/glb_state/tests/Makefile
 	src/libs/apm/Makefile
 	src/libs/zbxcommon/Makefile
 	src/libs/zbxcomms/Makefile
@@ -2049,7 +2047,6 @@ AC_CONFIG_FILES([
 	src/zabbix_sender/Makefile
 	src/zabbix_server/Makefile
 	src/zabbix_server/alerter/Makefile
-	src/zabbix_server/availability/Makefile
 	src/zabbix_server/connector/Makefile
 	src/zabbix_server/dbconfig/Makefile
 	src/zabbix_server/dbsyncer/Makefile

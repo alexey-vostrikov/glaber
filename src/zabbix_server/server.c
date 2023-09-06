@@ -54,7 +54,6 @@
 #include "proxypoller/proxypoller.h"
 #include "vmware/vmware.h"
 #include "taskmanager/taskmanager.h"
-#include "availability/avail_manager.h"
 #include "service/service_manager.h"
 #include "housekeeper/trigger_housekeeper.h"
 #include "lld/lld_manager.h"
@@ -295,7 +294,7 @@ int CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	2, /* ZBX_PROCESS_TYPE_LLDWORKER */
 	1, /* ZBX_PROCESS_TYPE_ALERTSYNCER */
 	5, /* ZBX_PROCESS_TYPE_HISTORYPOLLER */
-	1, /* ZBX_PROCESS_TYPE_AVAILMAN */
+	0, /* should be 0, deprecated!!!! ZBX_PROCESS_TYPE_AVAILMAN */
 	0, /* ZBX_PROCESS_TYPE_REPORTMANAGER */
 	0, /* ZBX_PROCESS_TYPE_REPORTWRITER */
 	1, /* ZBX_PROCESS_TYPE_SERVICEMAN */
@@ -640,11 +639,6 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_HISTORYPOLLER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTORYPOLLER];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_AVAILMAN]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_AVAILMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_AVAILMAN];
 	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_REPORTMANAGER]))
 	{
@@ -1594,7 +1588,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 											config_startup_time};
 	zbx_thread_escalator_args escalator_args = {zbx_config_tls, get_program_type, config_timeout};
 	zbx_thread_proxy_poller_args proxy_poller_args = {zbx_config_tls, &zbx_config_vault, get_program_type,
-													  config_timeout};
+													  config_timeout, .server_startup_time = config_startup_time};
 	zbx_thread_discoverer_args discoverer_args = {zbx_config_tls, get_program_type, config_timeout};
 	zbx_thread_report_writer_args report_writer_args = {zbx_config_tls->ca_file, zbx_config_tls->cert_file,
 														zbx_config_tls->key_file, CONFIG_SOURCE_IP};
@@ -1662,7 +1656,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		exit(EXIT_FAILURE);
 	}
 	
-	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE))
+	if (FAIL == poller_notify_ipc_init(256 * ZBX_MEBIBYTE))
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
@@ -1885,12 +1879,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 			thread_args.args = &taskmanager_args;
 			zbx_thread_start(taskmanager_thread, &thread_args, &threads[i]);
 			break;
-//		case ZBX_PROCESS_TYPE_PREPROCMAN:
-//			zbx_thread_start(preprocessing_manager_thread, &thread_args, &threads[i]);
-//			break;
-		// case ZBX_PROCESS_TYPE_PREPROCESSOR:
-		// 	zbx_thread_start(preprocessing_worker_thread, &thread_args, &threads[i]);
-		// 	break;
+
 #ifdef HAVE_OPENIPMI
 		case ZBX_PROCESS_TYPE_IPMIMANAGER:
 			thread_args.args = &ipmi_manager_args;
@@ -1914,15 +1903,6 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		case ZBX_PROCESS_TYPE_ALERTSYNCER:
 			thread_args.args = &alert_syncer_args;
 			zbx_thread_start(zbx_alert_syncer_thread, &thread_args, &threads[i]);
-			break;
-			//	case ZBX_PROCESS_TYPE_HISTORYPOLLER:
-			//		poller_args.poller_type =  ITEM_TYPE_CALCULATED;
-			//		thread_args.args = &poller_args;
-			//		zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
-			//		break;
-		case ZBX_PROCESS_TYPE_AVAILMAN:
-			threads_flags[i] = ZBX_THREAD_PRIORITY_FIRST;
-			zbx_thread_start(availability_manager_thread, &thread_args, &threads[i]);
 			break;
 		case ZBX_PROCESS_TYPE_CONNECTORMANAGER:
 			threads_flags[i] = ZBX_THREAD_PRIORITY_SECOND;

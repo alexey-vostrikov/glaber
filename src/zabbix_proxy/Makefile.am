@@ -25,7 +25,6 @@ libzbxproxy_a_CFLAGS = \
 zabbix_proxy_SOURCES = proxy.c
 
 zabbix_proxy_LDADD = \
-	$(top_builddir)/src/libs/glb_state/tests/libstatetests.a \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
 	$(top_builddir)/src/libs/apm/libglbapm.a \
 	diag/libzbxdiag_proxy.a \
@@ -54,7 +53,6 @@ zabbix_proxy_LDADD = \
 	taskmanager/libzbxtaskmanager.a \
 	$(top_builddir)/src/zabbix_server/vmware/libzbxvmware.a \
 	$(top_builddir)/src/zabbix_server/scripts/libzbxscripts.a \
-	$(top_builddir)/src/zabbix_server/availability/libavailability.a \
 	$(top_builddir)/src/libs/zbxsysinfo/libzbxproxysysinfo.a \
 	$(top_builddir)/src/libs/zbxsysinfo/common/libcommonsysinfo.a \
 	$(top_builddir)/src/libs/zbxsysinfo/common/libcommonsysinfo_httpmetrics.a \
@@ -108,7 +106,6 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxprometheus/libzbxprometheus.a \
 	$(top_builddir)/src/libs/zbxvault/libzbxvault.a \
 	$(top_builddir)/src/libs/zbxkvs/libzbxkvs.a \
-	$(top_builddir)/src/libs/zbxavailability/libzbxavailability.a \
 	$(top_builddir)/src/libs/zbxconnector/libzbxconnector.a \
 	$(top_builddir)/src/libs/zbxnum/libzbxnum.a \
 	$(top_builddir)/src/libs/zbxstr/libzbxstr.a \

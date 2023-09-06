@@ -68,7 +68,7 @@ static void timeout_event_cb(poller_item_t *poller_item, void *data) {
 		snmp_get_timeout(poller_item);
 	}
 
-	poller_register_item_timeout(poller_item);
+	poller_register_item_iface_timeout(poller_item);
 }
 /******************************************************************************
  * item init - from the general dc_item to compact and specific snmp		  * 
@@ -189,7 +189,7 @@ static int process_result(csnmp_pdu_t *pdu)
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit(-1);
 	}
-	poller_register_item_succeed(poller_item);
+	poller_register_item_iface_succeed(poller_item);
 }	
 
 void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
@@ -203,7 +203,6 @@ void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
 	csnmp_send_pdu(conf.socket, pdu);
 	poller_run_timer_event(snmp_item->tm_event, sysinfo_get_config_timeout() * 1000);
 	poller_inc_requests();
-
 }
 
 static int snmp_send_request(poller_item_t *poller_item) {
@@ -311,7 +310,7 @@ void snmp_async_init(void) {
 	init_snmp(progname);
 	
 	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item,
-			 snmp_async_shutdown, forks_count, resolve_ready_cb, NULL);
+			 snmp_async_shutdown, forks_count, resolve_ready_cb, NULL, "snmp", 0);
 
 	if ( (conf.socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
         LOG_INF("Couldn't create socket for ASYNC snmp poller");

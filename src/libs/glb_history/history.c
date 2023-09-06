@@ -26,12 +26,11 @@
 #include "glb_history.h"
 #include "zbxstr.h"
 #include "zbxvariant.h"
-//#include "../zbxalgo/vectorimpl.h"
+
 
 
 ZBX_VECTOR_IMPL(history_record, zbx_history_record_t);
 
-extern int CONFIG_SERVER_STARTUP_TIME;
 extern zbx_vector_ptr_t *API_CALLBACKS[GLB_MODULE_API_TOTAL_CALLBACKS];
 const char	*value_type_names[] = {"dbl", "str", "log", "uint", "text"};
 /************************************************************************************

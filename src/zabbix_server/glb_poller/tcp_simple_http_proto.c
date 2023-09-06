@@ -66,12 +66,14 @@ static void* item_init(poller_item_t* poller_item, DC_ITEM *dc_item) {
     return ret;   
 }
 
-static void fail_cb(poller_item_t *poller_item, void *proto_ctx, const char *error) {
+static void conn_fail_cb(poller_item_t *poller_item, void *proto_ctx, const char *error) {
     poller_preprocess_uint64(poller_item, NULL, 0, poller_get_item_type(poller_item));
+
 }
 
 static void  timeout_cb(poller_item_t *poller_item, void *proto_ctx) {
-    fail_cb(poller_item, proto_ctx, "Timeout while waiting for response");
+    conn_fail_cb(poller_item, proto_ctx, "Timeout while waiting for response");
+    poller_register_item_iface_timeout(poller_item);
 } 
 
 static unsigned char connect_cb(poller_item_t *poller_item, void *proto_ctx) {
@@ -90,5 +92,5 @@ void tcp_simple_http_proto_init(tcp_poll_type_procs_t *procs) {
     procs->response_cb = response_cb;
     procs->timeout_cb = timeout_cb;
     procs->connect_cb = connect_cb;
-    procs->fail_cb  = fail_cb;
+    procs->conn_fail_cb  = conn_fail_cb;
 }

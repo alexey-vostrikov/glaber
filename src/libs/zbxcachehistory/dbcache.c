@@ -27,7 +27,6 @@
 #include "module.h"
 #include "zbxexport.h"
 #include "zbxnix.h"
-#include "zbxavailability.h"
 #include "zbxtrends.h"
 #include "zbxnum.h"
 #include "zbxsysinfo.h"
