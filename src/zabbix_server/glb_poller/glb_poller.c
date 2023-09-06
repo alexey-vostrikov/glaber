@@ -135,10 +135,11 @@ static int is_active_item_type(unsigned char item_type)
 
 static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
 		
-	if (0 == conf.poller.is_named_iface )  
-		return glb_state_host_is_id_interface_pollable(item->hostid, item->interfaceid, disabled_till);
+	if (1 == conf.poller.is_named_iface )  
+		return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
 
-	return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
+	return glb_state_host_is_id_interface_pollable(item->hostid, item->interfaceid, disabled_till);
+	
 
 }
 /******************************************************************

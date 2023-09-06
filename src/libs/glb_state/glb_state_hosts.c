@@ -226,9 +226,7 @@ ELEMS_CALLBACK(set_interface_cb) {
     }
     
     interface = glb_vector_host_ifaces_get_element(&host->interfaces, idx);
-    
 
-    //HALT_HERE compare existing interfaces and do not replace if it's the same
     if (new) {
         interface->error = strpool_add(&conf->strpool, search_iface->error);
         interface->lastchange = time(NULL);
@@ -416,9 +414,9 @@ int parse_interface_record(const char *p) {
         return FAIL;
     
     if (FAIL == zbx_json_value_by_name(&jp, "interface_name", iface.name, 16, &type))
-        return FAIL;
-
-    if (SUCCEED == glb_json_get_uint64_value_by_name(&jp, "intrefaceid", &iface.iface.id)) {
+        return FAIL;    
+                                                        
+    if (SUCCEED == glb_json_get_uint64_value_by_name(&jp, "interfaceid", &iface.iface.id)) {
         if (FAIL ==  glb_json_get_uint64_value_by_name(&jp, "hostid", &hostid) ||
             FAIL == DC_config_get_hostid_by_interfaceid(iface.iface.id, &hostid))
             return FAIL;
