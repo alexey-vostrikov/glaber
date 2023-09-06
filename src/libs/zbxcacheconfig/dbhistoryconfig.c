@@ -57,9 +57,6 @@ static void	dc_get_history_sync_item(zbx_history_sync_item_t *dst_item, const ZB
 	dst_item->value_type = src_item->value_type;
 
 
-	dst_item->lastlogsize = src_item->lastlogsize;
-	//dst_item->mtime = src_item->mtime;
-
 	dst_item->inventory_link = src_item->inventory_link;
 	dst_item->valuemapid = src_item->valuemapid;
 	dst_item->status = src_item->status;

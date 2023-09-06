@@ -17,8 +17,8 @@ workflow:
     - when: never
 
 variables:
-  # used for build docker images
-  BUILDER_VERSION: 1.0.4
+  # used for a build docker images
+  BUILDER_VERSION: 1.0.6
   # used for build debian based apt
   DEBIAN_BUILDER_VERSION: 1.0.11
   # used for build ubuntu based apt
@@ -41,7 +41,7 @@ stages:
 
 .add_ssh_key: &add_ssh_key
   - eval $(ssh-agent -s)
-  - echo "${SSH_PRIVATE_KEY_BASE64}" | base64 -d | ssh-add -
+  - echo "${SSH_PRIVATE_KEY_ED25519_BASE64}" | base64 -d | ssh-add -
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
   - echo 'Host *' > ~/.ssh/config
@@ -57,11 +57,18 @@ stages:
   # this code should work without PACKER_GITHUB_API_TOKEN,
   # but if packer init command failed, you must to set this vaiable in repo secrets
   # - export PACKER_GITHUB_API_TOKEN=${PACKER_GITHUB_API_TOKEN}
+  - bash pre-build/scripts/manage-vm.sh start
+  - export DOCKER_HOST=ssh://${SSH_USER}@$(bash pre-build/scripts/manage-vm.sh getip)
+  - while true; do docker ps > /dev/null 2>&1 && break || sleep 5;done
   - cd build/appliance/build/docker
   - packer init .
   - packer validate .
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
-  - packer build -color=false -timestamp-ui -warn-on-undeclared-var .
+  - packer build -color=false -timestamp-ui -warn-on-undeclared-var . || \
+    bash ../../../../pre-build/scripts/manage-vm.sh stop
+  - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
+  - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
+  - bash ../../../../pre-build/scripts/manage-vm.sh stop
 
 .upload_mysql_schema: &upload_mysql_schema
   - cat database/mysql/schema.sql > create.sql
@@ -228,12 +235,9 @@ docker-debian-bullseye:
   image: ${CI_REGISTRY_IMAGE}/builder:${BUILDER_VERSION}
   before_script:
     - *add_ssh_key
-    - export DOCKER_HOST=ssh://${SSH_USER}@${SERVER}
   script:
     - *set_glb_version
     - *build_docker
-    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
-    - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
 
@@ -306,7 +310,6 @@ builder:
 
 debian-bullseye-net-snmp-ssl:
   extends: .base-pre-builder
-  tags: ["kaniko"]
   variables:
     OS: debian
     OS_VER: bullseye

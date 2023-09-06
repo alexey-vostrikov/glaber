@@ -1014,31 +1014,30 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 {
 	if (0 == item->host.proxy_hostid)
 	{
-		
 		if (ITEM_STATE_NORMAL == item->state && NULL != result) 
 			preprocess_agent_result(item->host.hostid, item->itemid, item->flags, ts, result, item->value_type);
 		else 
 			preprocess_error(item->host.hostid, item->itemid, item->flags, ts, error);
 		
 		*h_num = 0;
+		return;
 	}
-	else
+	
+	if (0 != (ZBX_FLAG_DISCOVERY_RULE & item->flags))
 	{
-		if (0 != (ZBX_FLAG_DISCOVERY_RULE & item->flags))
-		{
-			zbx_lld_process_agent_result(item->itemid, item->host.hostid, result, ts, error);
-			*h_num = 0;
-		}
-		else
-		{
-			metric_t metric = {.hostid = item->host.hostid, .itemid = item->itemid, .ts = *ts };
-			if (ITEM_STATE_NORMAL == item->state) 
-				processing_send_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
-			else 
-				processing_send_error(item->host.hostid, item->itemid, item->flags, ts, error);
-			*h_num = 1;
-		}
+		zbx_lld_process_agent_result(item->itemid, item->host.hostid, result, ts, error);
+		*h_num = 0;
+		return;
 	}
+	
+	//proxy data
+	metric_t metric = {.hostid = item->host.hostid, .itemid = item->itemid, .ts = *ts };
+	if (ITEM_STATE_NORMAL == item->state) 
+			processing_send_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
+		else 
+			processing_send_error(item->host.hostid, item->itemid, item->flags, ts, error);
+	
+	*h_num = 1;
 }
 
 /******************************************************************************

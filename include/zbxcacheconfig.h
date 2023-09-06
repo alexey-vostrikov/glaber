@@ -139,7 +139,7 @@ typedef struct
 	DC_HOST			host;
 	DC_INTERFACE		interface;
 	zbx_uint64_t		itemid;
-	zbx_uint64_t		lastlogsize;
+//	zbx_uint64_t		lastlogsize;
 	unsigned char		type;
 	unsigned char		snmp_version;
 	unsigned char		value_type;
@@ -160,7 +160,7 @@ typedef struct
 	unsigned char		allow_traps;
 	char			key_orig[ZBX_ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *key;
 	char			*delay;
-	int			mtime;
+	//int			mtime;
 	char 			*name;
 	char			*description;
 	char			trapper_hosts[ZBX_ITEM_TRAPPER_HOSTS_LEN_MAX];
@@ -211,7 +211,7 @@ typedef struct
 {
 	zbx_history_sync_host_t	host;
 	zbx_uint64_t		itemid;
-	zbx_uint64_t		lastlogsize;
+	//zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
 	char			key_orig[ZBX_ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 	char			*units;
@@ -730,7 +730,7 @@ void	DCconfig_get_functions_by_functionids(DC_FUNCTION *functions,
 		zbx_uint64_t *functionids, int *errcodes, size_t num);
 void	DCconfig_clean_functions(DC_FUNCTION *functions, int *errcodes, size_t num);
 void	DCconfig_clean_triggers(DC_TRIGGER *triggers, int *errcodes, size_t num);
-int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids);
+//int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids);
 void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zbx_vector_uint64_t *triggerids_out);
 void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids);
 void	DCconfig_unlock_all_triggers(void);
@@ -889,30 +889,30 @@ void	zbx_dc_get_hostids_by_group_name(const char *name, zbx_vector_uint64_t *hos
 #define ZBX_DC_FLAG_NOHISTORY	0x10	/* values should not be kept in history */
 #define ZBX_DC_FLAG_NOTRENDS	0x20	/* values should not be kept in trends */
 
-typedef struct zbx_hc_data
-{
-	zbx_history_value_t	value;
-	zbx_uint64_t		lastlogsize;
-	zbx_timespec_t		ts;
-	int			mtime;
-	unsigned char		value_type;
-	unsigned char		flags;
-	unsigned char		state;
+//typedef struct zbx_hc_data
+// {
+// 	zbx_history_value_t	value;
+// //	zbx_uint64_t		lastlogsize;
+// 	zbx_timespec_t		ts;
+// 	int			mtime;
+// 	unsigned char		value_type;
+// 	unsigned char		flags;
+// 	unsigned char		state;
 
-	struct zbx_hc_data	*next;
-}
-zbx_hc_data_t;
+// 	struct zbx_hc_data	*next;
+// }
+// zbx_hc_data_t;
 
-typedef struct
-{
-	zbx_uint64_t	itemid;
-	unsigned char	status;
-	int		values_num;
+// typedef struct
+// {
+// 	zbx_uint64_t	itemid;
+// 	unsigned char	status;
+// 	int		values_num;
 
-	zbx_hc_data_t	*tail;
-	zbx_hc_data_t	*head;
-}
-zbx_hc_item_t;
+// 	zbx_hc_data_t	*tail;
+// 	zbx_hc_data_t	*head;
+// }
+// zbx_hc_item_t;
 
 void	zbx_free_item_tag(zbx_item_tag_t *item_tag);
 

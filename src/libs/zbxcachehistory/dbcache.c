@@ -136,7 +136,7 @@ typedef struct
 	dc_value_t value;
 	zbx_timespec_t ts;
 	dc_value_str_t source; /* for log items only */
-	zbx_uint64_t lastlogsize;
+//	zbx_uint64_t lastlogsize;
 	int timestamp;	/* for log items only */
 	int severity;	/* for log items only */
 	int logeventid; /* for log items only */
