@@ -170,8 +170,10 @@ astra:
     OS: astra
     OS_VER: 1.7.3
   tags: ["virtbox"]
+  hooks: 
+    pre_get_sources_script: 
+      - update-ca-certificates
   script:
-    - update-ca-certificates
     - *prepare_sources
     - dpkg-buildpackage -b --no-sign
     - *upload_packages
