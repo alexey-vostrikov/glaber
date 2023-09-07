@@ -15644,6 +15644,8 @@ int DC_config_get_type_by_interfaceid(u_int64_t interfaceid, unsigned char *type
 	UNLOCK_CACHE;
 	
 	return ret;
+}
+
 int DC_config_get_host_description(u_int64_t hostid, char **host_description) {
 	ZBX_DC_HOST *host;
 	int ret = FAIL;
@@ -15794,38 +15796,6 @@ void	zbx_recalc_time_period(int *ts_from, int table_group)
 	if (least_ts > *ts_from)
 		*ts_from = (int)least_ts;
 #undef HK_CFG_UPDATE_INTERVAL
-}
-
-int DC_config_get_hostid_by_interfaceid(u_int64_t interfaceid, u_int64_t *hostid) {
-	ZBX_DC_INTERFACE *interface;
-	int ret = FAIL;
-
-	RDLOCK_CACHE;
-	
-	if (NULL != (interface = zbx_hashset_search(&config->interfaces, &interfaceid))){
-		*hostid = interface->hostid;
-		ret = SUCCEED;
-	}
-	
-	UNLOCK_CACHE;
-	
-	return ret;
-}
-
-int DC_config_get_type_by_interfaceid(u_int64_t interfaceid, unsigned char *type) {
-	ZBX_DC_INTERFACE *interface;
-	int ret = FAIL;
-
-	RDLOCK_CACHE;
-	
-	if (NULL != (interface = zbx_hashset_search(&config->interfaces, &interfaceid))){
-		*type = interface->type;
-		ret = SUCCEED;
-	}
-	
-	UNLOCK_CACHE;
-	
-	return ret;
 }
 
 

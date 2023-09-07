@@ -279,15 +279,13 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 	if (0 == strcmp("internal", get_rkey(&request)))
 	{
 		char *str_result = NULL;
-		if (SUCCEED == (ret =  glb_get_internal_metric(first_param, nparams, &request, &str_result)))
+		if (SUCCEED == (ret = glb_get_internal_metric(first_param, nparams, &request, &str_result))) {
 			SET_STR_RESULT(result, str_result);
-		else 
-			SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported internal key"));
-		//warn: str result doesn't have to be deallocated!!!
-		goto out;
+			goto out;
+		}
 	}
 
-	if (0 != strcmp("zabbix", get_rkey(&request)))
+	if (0 != strcmp("zabbix", get_rkey(&request)) && 0 != strcmp("internal", get_rkey(&request)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported item key for this item type."));
 		goto out;
