@@ -373,9 +373,8 @@ ELEMS_CALLBACK(get_ifaces_avail_state_json_cb) {
     json_gen_t *req = data;
     
     req->hostid = elem->id;
- //   LOG_INF("Requested JSON iface state, host has %d ifaces", host->interfaces.values_num);
+
     glb_vector_host_ifaces_iterate(&host->interfaces, generate_iface_state_json_cb, req);
-   // LOG_INF("Responce JSON is %s", req->j->buffer);
     return SUCCEED;
 }
 
@@ -386,13 +385,11 @@ int glb_state_host_get_interfaces_avail_json(u_int64_t hostid, struct zbx_json *
     
 int glb_state_hosts_get_interfaces_avail_json(zbx_vector_uint64_t *hostids, struct zbx_json *j) {
     int i;
-    LOG_INF("Requested JSON interface state");
     for (i = 0; i< hostids->values_num; i++) {
      
         int res = glb_state_host_get_interfaces_avail_json(hostids->values[i], j);
-        LOG_INF("Requested JSON interface state for host %lld, result is %d",hostids->values[i], res);
     }
-    LOG_INF("Overall Responce JSON is %s", j->buffer);
+
 }
 
 int glb_state_hosts_get_changed_ifaces_json(int timestamp, struct zbx_json *j) {
@@ -513,10 +510,10 @@ void reset_interface_cb(void *if_data, void*data) {
 }
 
 ELEMS_CALLBACK(host_reset_cb) {
-    host_state_t *host = data;
+    host_state_t *host = elem->data;
     host->heartbeat_frequency = 0;
     host->last_heartbeat = 0;
-
+    
     glb_vector_host_ifaces_iterate(&host->interfaces, reset_interface_cb, NULL);
 }
 

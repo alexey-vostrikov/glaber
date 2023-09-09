@@ -29,10 +29,11 @@
 #define GLB_MAX_FAILS 4// how many times in a row items should fail to mark host as unreachable and pause polling for CONFIG_UREACHABLE_PERIOD
 
 /*async pollers having too many sessions or dns requests will stagnate on session support and will loose data packets 
- so if there are more then this amount of sessions, item's polling is delayed for 30 seconds */
+ so if there are more then this amount of sessions, item's polling is delayed for POLLER_MAX_SESSIONS_DELAY seconds */
 #define POLLER_MAX_SESSIONS 8 * ZBX_KIBIBYTE 
 #define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
 //#define POLLER_MAX_DNS_REQUESTS	2 * ZBX_KIBIBYTE /*maximum simultanious DNS requests */
+#define POLLER_NEW_ITEM_DELAY_TIME 10
 
 typedef struct poller_item_t poller_item_t;
 

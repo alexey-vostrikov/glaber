@@ -6666,8 +6666,10 @@ static void dc_load_trigger_queue(zbx_hashset_t *trend_functions)
 static void zbx_dbsync_process_active_avail_diff(zbx_vector_uint64_t *diff)
 {
 	int i;
-	for (i = 0; i < diff->values_num; i++)
+
+	for (i = 0; i < diff->values_num; i++) 
 		glb_state_host_reset(diff->values[i]);
+
 
 }
 
@@ -7151,7 +7153,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	connector_sec2 = zbx_time() - sec;
 
 	FINISH_SYNC;
-
+	
 	zbx_dbsync_process_active_avail_diff(&active_avail_diff);
 	zbx_vector_uint64_destroy(&active_avail_diff);
 
