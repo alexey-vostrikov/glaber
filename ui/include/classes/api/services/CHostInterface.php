@@ -205,12 +205,18 @@ class CHostInterface extends CApiService {
 		if ($this->needsStateInfo($options)) {
 
 			$hostids = array_unique(array_column($result,'hostid'));	
-			$states = CZabbixServer::getHostInterfacesAvail(CSessionHelper::getId(), $hostids);;
+			$states = CZabbixServer::getHostInterfacesAvail(CSessionHelper::getId(), $hostids);
 
+			$include_named = $this->outputIsRequested('include_named', $options['output']);
+				
 			foreach ($states as $state) {
-				$interfaceid = "";//$state['interfaceid'];
+				$interfaceid = "";
 
 				if (!isset($state['interfaceid'])) {
+
+					if (!$include_named)
+						continue;
+
 					$interfaceid = $state['interface_name'].$state['hostid'];
 					$state['interfaceid'] = $interfaceid;
 					$result[$interfaceid]['type'] = $state['interface_name'];
@@ -226,7 +232,6 @@ class CHostInterface extends CApiService {
 				$result[$interfaceid]['available'] = $state['available'];
 				$result[$interfaceid]['error'] =  $state['error'];
 				$result[$interfaceid]['lastchange'] = $state['lastupdate'];
-				
 			}
 		}
 		

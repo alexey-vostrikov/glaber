@@ -52,7 +52,7 @@ extern int CONFIG_CONFSYNCER_FREQUENCY;
 
 /* poller timings in milliseconds */
 #define LOST_ITEMS_CHECK_INTERVAL 30 * 1000
-#define NEW_ITEMS_CHECK_INTERVAL 1 * 1000
+#define NEW_ITEMS_CHECK_INTERVAL 2 * 1000
 #define PROCTITLE_UPDATE_INTERVAL 5 * 1000
 #define ASYNC_RUN_INTERVAL 1
 #define ITEMS_REINIT_INTERVAL 300 * 1000 // after this time in poller item will be repolled whatever it's state is
@@ -198,7 +198,8 @@ void item_poll_cb(poller_item_t *poller_item, void *data) {
 
 	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || poller_contention_sessions_count() > POLLER_MAX_SESSIONS) 
 	{
-		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller is too busy", POLLER_MAX_SESSIONS_DELAY / 1000);
+		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller has too many connections: %d", POLLER_MAX_SESSIONS_DELAY / 1000,
+						 poller_sessions_count());
 		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
 		return;
 	}
@@ -278,13 +279,16 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item_t *poller_item, local_glb_item;
 	u_int64_t mstime = glb_ms_time();
 	int i;
-	
+
 	DEBUG_ITEM(dc_item->itemid, "Creating/updating item");
 
 	if (NULL != (poller_item = (poller_item_t *)zbx_hashset_search(&conf.items, &dc_item->itemid)))
 	{
 		DEBUG_ITEM(dc_item->itemid, "Item has changed: deleting the old configuration");
 		glb_poller_delete_item(poller_item->itemid);
+
+	} else {
+		mstime += POLLER_NEW_ITEM_DELAY_TIME * 1000;
 	}
 	
 	DEBUG_ITEM(dc_item->itemid, "Adding new item to poller");
@@ -318,13 +322,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 		return FAIL;
 	};
 
-	if (get_simple_interval(poller_item->delay) > 0)
-	{
-		/*	to avoid system hummering new items are planned to not exceed rate of 10k/sec */
-		poller_run_timer_event(poller_item->poll_event, conf.items.num_data / 10000);
-	}
-	else
-		add_item_check_event(poller_item, mstime);
+	poller_run_timer_event(poller_item->poll_event, POLLER_NEW_ITEM_DELAY_TIME * 1000);
 
 	return SUCCEED;
 }

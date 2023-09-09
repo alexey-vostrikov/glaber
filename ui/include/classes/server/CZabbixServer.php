@@ -250,7 +250,7 @@ class CZabbixServer {
 	}
 
     
-    public static  function getInterfacesAvail($sid, $Ids) {
+    public static  function getHostInterfacesAvail($sid, $Ids) {
         global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
         $result = [];
@@ -263,9 +263,9 @@ class CZabbixServer {
             );
 
             $newdata = $zabbix_server->request([
-                'request' => 'interface.state.get',
+                'request' => 'host.interfaces.avail.get',
                 'sid' => $sid,
-                'interfaceids' => $chunk
+                'hostids' => $chunk
             ]);
 
 			if (is_array($newdata))

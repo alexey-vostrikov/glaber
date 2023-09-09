@@ -116,8 +116,10 @@ static int cmp_key_id(const char *key_1, const char *key_2)
 extern int CONFIG_DISABLE_SNMPV1_ASYNC;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_WORKERS_DIR;
+
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
-	
+	extern unsigned char program_type;
+
 	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked if can be  async polled");
 	
 	if ( NULL == zbx_dc_host || NULL == zbx_dc_item ) {
@@ -125,8 +127,10 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		return FAIL;
 	}
 
-	if ( zbx_dc_host->proxy_hostid > 0)
-	 	return FAIL;
+	if (zbx_dc_host->proxy_hostid > 0 &&  //assigned to proxy
+		0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) &&   //running as server
+		ITEM_TYPE_CALCULATED != zbx_dc_item->type)  //all but calculated should be polled by proxy
+	 		return FAIL;
 		
 
 	switch (zbx_dc_item->type) {
@@ -6666,8 +6670,10 @@ static void dc_load_trigger_queue(zbx_hashset_t *trend_functions)
 static void zbx_dbsync_process_active_avail_diff(zbx_vector_uint64_t *diff)
 {
 	int i;
-	for (i = 0; i < diff->values_num; i++)
+
+	for (i = 0; i < diff->values_num; i++) 
 		glb_state_host_reset(diff->values[i]);
+
 
 }
 
@@ -7151,7 +7157,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	connector_sec2 = zbx_time() - sec;
 
 	FINISH_SYNC;
-
+	
 	zbx_dbsync_process_active_avail_diff(&active_avail_diff);
 	zbx_vector_uint64_destroy(&active_avail_diff);
 
@@ -11186,8 +11192,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 			DEBUG_ITEM(itemids->values[i], "Found item and host data");
 
-			if ((zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER)) ||
-				FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host))
+			if (FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host))
 			{
 
 				DEBUG_ITEM(itemids->values[i], "Item shouldn't be processed anymore, removing from async polling (if it's there)");

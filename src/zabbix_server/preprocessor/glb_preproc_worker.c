@@ -34,8 +34,10 @@
 #include "zbxembed.h"
 #include "zbxlld.h"
 
+extern unsigned char program_type;
+
 #define MAX_DEPENDENCY_LEVEL 16
-#define PREPROC_CONFIG_SYNC_INTERVAL 5
+#define PREPROC_CONFIG_SYNC_INTERVAL 1
 #define PROCTITLE_UPDATE_INTERVAL 5 
 #define FLUSH_INTERVAL  1
 
@@ -67,7 +69,13 @@ zbx_pp_item_t *get_prperoc_item(u_int64_t itemid) {
 
 static void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t *preproc_conf) {
     
-    if ( NULL != preproc_conf && ( preproc_conf->preproc->flags & ZBX_FLAG_DISCOVERY_RULE ) ) {
+    if ( 0 != (program_type & ZBX_PROGRAM_TYPE_PROXY)) {
+        DEBUG_ITEM(metric->itemid, "Sending item to server sync");
+        processing_send_metric(metric);
+    }
+
+     if( NULL != preproc_conf && 
+        ( preproc_conf->preproc->flags & ZBX_FLAG_DISCOVERY_RULE ) ) {
         
         if (ZBX_VARIANT_STR != metric->value.type || NULL == metric->value.data.str )
             return;

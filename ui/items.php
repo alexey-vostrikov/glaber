@@ -830,7 +830,7 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 	$data['preprocessing_types'] = CItem::SUPPORTED_PREPROCESSING_TYPES;
 	$data['trends_default'] = DB::getDefault('items', 'trends');
 	
-	$data['triggers'] = $item['triggers'];
+	 isset($item['triggers']) ?	$data['triggers']= $item['triggers'] : $data['triggers']=[];
 
 	$history_in_seconds = timeUnitToSeconds($data['history']);
 	if (!getRequest('form_refresh') && $history_in_seconds !== null && $history_in_seconds == ITEM_NO_STORAGE_VALUE) {
@@ -857,15 +857,10 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 		$data['inventory_link'] = $item['inventory_link'];
 	}
 
-	$data['config'] = [
-		// 'compression_status' => CHousekeepingHelper::get(CHousekeepingHelper::COMPRESSION_STATUS),
-		// 'hk_history_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL),
-		// 'hk_history' => CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY),
-		// 'hk_trends_global' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL),
-		// 'hk_trends' => CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS)
-	];
+	$data['config'] = [];
 	
-	$data['state'] = $item['state'];
+	if (isset($item['state']))
+		 $data['state'] = $item['state'];
 
 	// render view
 	if (!$has_errors) {

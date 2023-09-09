@@ -72,14 +72,12 @@ int     glb_state_items_set_lastlogsize(u_int64_t itemid, int lastlogsize);
 glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);
 void glb_state_items_housekeep();
 
-
-
-
 // functions to emulate old valuecache interface
 int zbx_vc_get_values(zbx_uint64_t itemid, int value_type, zbx_vector_history_record_t *values, int seconds,
                       int count, const zbx_timespec_t *ts);
 int zbx_vc_get_value(zbx_uint64_t itemid, int value_type, const zbx_timespec_t *ts, zbx_history_record_t *value);
 
 int glb_state_items_remove(zbx_vector_uint64_t *deleted_itemids);
+int glb_state_items_get_lastlogsize(u_int64_t itemid);
 
 #endif
