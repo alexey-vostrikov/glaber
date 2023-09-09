@@ -12,7 +12,7 @@ RUN apt-get update -y && apt-get upgrade -y && \
     wget http://sourceforge.net/projects/net-snmp/files/net-snmp/${SNMP_VERSION}/net-snmp-${SNMP_VERSION}.tar.gz && \
     tar -xvzf net-snmp-${SNMP_VERSION}.tar.gz && \
     cd /tmp/net-snmp-${SNMP_VERSION} && \
-    ./configure --with-defaults --with-persistent-directory=/var/net-snmp --with-logfile=/var/log/snmpd.log --with-openssl --enable-privacy && \
+    ./configure --with-defaults --with-persistent-directory=/var/net-snmp --with-logfile=/var/log/snmpd.log --with-openssl --enable-privacy --enable-blumenthal-aes && \
     make && \
     make install
 
