@@ -1,5 +1,6 @@
-2023-09-10 ver 3.3.3 (master)
+2023-09-11 ver 3.3.3 3.3.4 (master)
     - fix: host avialbility state added to glb_state, implemented proxy->server avail state sending
+    - fix: setting error on proxy error items
 2023-09-09 ver 3.3.2 (master)
     - fix: new metrics might be polled before proprocessing config is loaded to preprocessing_worker
     - fix: SEGV on host change either in proxy and server

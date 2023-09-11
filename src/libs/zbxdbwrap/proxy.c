@@ -40,6 +40,7 @@
 #include "zbx_item_constants.h"
 #include "metric.h"
 #include "../glb_state/glb_state_hosts.h"
+#include "../glb_state/glb_state_items.h"
 
 
 
@@ -1022,6 +1023,18 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 		*h_num = 0;
 		return;
 	}
+
+
+	if (ITEM_STATE_NORMAL != item->state && NULL != result) {
+		//LOG_INF("Got agent result type %d", result->type);
+		if (AR_MESSAGE & result->type)
+			glb_state_item_set_error(item->itemid, result->msg);
+		else {
+		//	LOG_INF("Got agent result type %d", result->type);
+			glb_state_item_set_error(item->itemid, "");
+		}
+	}
+
 	
 	if (0 != (ZBX_FLAG_DISCOVERY_RULE & item->flags))
 	{

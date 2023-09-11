@@ -633,8 +633,22 @@ void glb_state_hosts_get_changed_avail_states_json(int timestamp, struct zbx_jso
     elems_hash_iterate(conf->hosts, get_host_active_status_json_cb, &req, 0);
 }
 
+ELEMS_CALLBACK(set_host_avail_state_cb) {
+    host_state_t *host = elem->data;
+    host->host_avail_state = *(unsigned char*) data;
+}
+
 void parse_host_avail_record(const char *p) {
-    HALT_HERE("Parsing avail record is not implemented");
+  
+    u_int64_t hostid, avail_state;
+    struct zbx_json_parse jp;
+
+    if (SUCCEED == zbx_json_brackets_open(p, &jp) &&
+        SUCCEED == glb_json_get_uint64_value_by_name(&jp, "hostid", &hostid) &&
+        SUCCEED == glb_json_get_uint64_value_by_name(&jp, "active_status", &avail_state)) {
+            unsigned char state= avail_state;
+            elems_hash_process(conf->hosts, hostid, set_host_avail_state_cb, &state, 0);
+        }
 }
 
 int glb_state_hosts_set_avail_states_from_json(struct zbx_json_parse *jp) {
