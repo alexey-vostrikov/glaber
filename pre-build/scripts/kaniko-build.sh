@@ -26,7 +26,9 @@ kaniko_build() {
                    --destination "${BUILD_IMG}:${BUILD_TAG}" \
                    --cache=true \
                    --cache-repo="${CACHE_REPO}" \
-                   --cleanup
+                   --cleanup \
+                   --use-new-run \
+                   --snapshot-mode=redo
 }
 
 # Build image if docker repository not exist
