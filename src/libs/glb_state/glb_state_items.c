@@ -46,6 +46,15 @@ typedef struct
     int new_period;
 } item_demand_t;
 
+typedef struct {
+    int state;
+    int lastdata;
+    int nextcheck;
+    int lastlogsize;
+    const char *error;
+    int errcode;
+} glb_state_item_meta_t;
+
 typedef struct
 {
     glb_state_item_meta_t meta;

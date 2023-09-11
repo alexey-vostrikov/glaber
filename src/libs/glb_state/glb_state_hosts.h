@@ -22,9 +22,9 @@
 #include "zbxjson.h"
 
 typedef enum {
-    HOST_HEARTBEAT_UNKNOWN = 0,
-    HOST_HEARTBEAT_ALIVE, 
-    HOST_HEARTBEAT_DOWN
+    HOST_AVAIL_STATE_UNKNOWN = 0,
+    HOST_AVAIL_STATE_ALIVE, 
+    HOST_AVAIL_STATE_DOWN
 } glb_host_heartbeat_status_t;
 
 
@@ -50,6 +50,9 @@ void glb_state_host_reset(u_int64_t hostid);
 int glb_state_host_get_interfaces_avail_json(u_int64_t hostid, struct zbx_json *j);
 int glb_state_hosts_get_interfaces_avail_json(zbx_vector_uint64_t *hostids, struct zbx_json *j); 
 int glb_state_hosts_get_changed_ifaces_json(int timestamp, struct zbx_json *j);
+
+void glb_state_hosts_get_changed_avail_states_json(int timestamp, struct zbx_json *j);
+int glb_state_hosts_set_avail_states_from_json(struct zbx_json_parse *jp);
 
 int glb_state_host_get_interface_avail_by_type(u_int64_t hostid, int iface_type, const char *if_name);
 

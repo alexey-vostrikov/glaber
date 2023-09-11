@@ -288,6 +288,10 @@ void	zbx_send_proxy_data(zbx_socket_t *sock, zbx_timespec_t *ts, const zbx_confi
 	glb_state_hosts_get_changed_ifaces_json(availability_ts, &j);
 	zbx_json_close(&j);
 	
+	zbx_json_addarray(&j, ZBX_PROTO_TAG_PROXY_ACTIVE_AVAIL_DATA);
+	glb_state_hosts_get_changed_avail_states_json(availability_ts, &j);
+	zbx_json_close(&j);
+
 	zbx_vector_tm_task_create(&tasks);
 	zbx_tm_get_remote_tasks(&tasks, 0, 0);
 

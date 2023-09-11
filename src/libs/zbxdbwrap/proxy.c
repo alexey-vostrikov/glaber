@@ -2804,12 +2804,10 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_INTERFACE_AVAILABILITY, &jp_data))
 	{
-		
 		if (FAIL == glb_state_host_set_interfaces_from_json(&jp_data))
 				zbx_strcatnl_alloc(error, &error_alloc, &error_offset, "Failed to parse interfaces availability data");
 	}
 	
-
 	flags_old = proxy_diff.nodata_win.flags;
 
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_HISTORY_DATA, &jp_data))
@@ -2870,7 +2868,8 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_PROXY_ACTIVE_AVAIL_DATA, &jp_data))
 	{
-		//FIGURE WHAT IS THE ROLE OF THE HOST AVAILABILITY
+		if (FAIL == glb_state_hosts_set_avail_states_from_json(&jp_data))
+			zbx_strcatnl_alloc(error, &error_alloc, &error_offset, "Failed to parse hosts availability data");
 	}
 
 out:

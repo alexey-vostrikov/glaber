@@ -28,15 +28,6 @@
 
 #define ZBX_DC_FLAGS_NOT_FOR_HISTORY (ZBX_DC_FLAG_NOVALUE | ZBX_DC_FLAG_UNDEF | ZBX_DC_FLAG_NOHISTORY)
 
-typedef struct {
-    int state;
-    int lastdata;
-    int nextcheck;
-    int lastlogsize;
-    const char *error;
-    int errcode;
-} glb_state_item_meta_t;
-
 int glb_state_items_init(mem_funcs_t *memf);
 
 int     glb_state_item_get_valuetype(u_int64_t itemid);
@@ -69,7 +60,7 @@ int     glb_state_item_get_error(u_int64_t itemid, char **error);
 int     glb_state_items_get_lastlogsize(u_int64_t itemid);
 int     glb_state_items_set_lastlogsize(u_int64_t itemid, int lastlogsize);
 
-glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);
+//glb_state_item_meta_t *glb_state_get_item_meta(u_int64_t itemid);
 void glb_state_items_housekeep();
 
 // functions to emulate old valuecache interface

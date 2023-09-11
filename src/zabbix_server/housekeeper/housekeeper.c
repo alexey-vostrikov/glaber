@@ -158,32 +158,7 @@ typedef struct
 }
 zbx_hk_history_rule_t;
 
-/* The history item rules, used for housekeeping history and trends tables */
-/* The order of the rules must match the order of value types in zbx_item_value_type_t. */
-//static zbx_hk_history_rule_t	hk_history_rules[] = {
-//	{.table = "history",		.history = "history",	.poption_mode = &cfg.hk.history_mode,
-//			.poption_global = &cfg.hk.history_global,	.poption = &cfg.hk.history,
-//			.type = ITEM_VALUE_TYPE_FLOAT},
-	// {.table = "history_str",	.history = "history",	.poption_mode = &cfg.hk.history_mode,
-	// 		.poption_global = &cfg.hk.history_global,	.poption = &cfg.hk.history,
-	// 		.type = ITEM_VALUE_TYPE_STR},
-	// {.table = "history_log",	.history = "history",	.poption_mode = &cfg.hk.history_mode,
-	// 		.poption_global = &cfg.hk.history_global,	.poption = &cfg.hk.history,
-	// 		.type = ITEM_VALUE_TYPE_LOG},
-	// {.table = "history_uint",	.history = "history",	.poption_mode = &cfg.hk.history_mode,
-	// 		.poption_global = &cfg.hk.history_global,	.poption = &cfg.hk.history,
-	// 		.type = ITEM_VALUE_TYPE_UINT64},
-	// {.table = "history_text",	.history = "history",	.poption_mode = &cfg.hk.history_mode,
-	// 		.poption_global = &cfg.hk.history_global,	.poption = &cfg.hk.history,
-	// 		.type = ITEM_VALUE_TYPE_TEXT},
-	// {.table = "trends",		.history = "trends",	.poption_mode = &cfg.hk.trends_mode,
-	// 		.poption_global = &cfg.hk.trends_global,	.poption = &cfg.hk.trends,
-	// 		.type = ITEM_VALUE_TYPE_FLOAT},
-	// {.table = "trends_uint",	.history = "trends",	.poption_mode = &cfg.hk.trends_mode,
-	// 		.poption_global = &cfg.hk.trends_global,	.poption = &cfg.hk.trends,
-	// 		.type = ITEM_VALUE_TYPE_UINT64},
-//	{NULL}
-//};
+
 
 /******************************************************************************
  *                                                                            *
@@ -199,15 +174,15 @@ zbx_hk_history_rule_t;
  * Comments: this function is used to sort delete queue by itemids            *
  *                                                                            *
  ******************************************************************************/
-static int	hk_item_update_cache_compare(const void *d1, const void *d2)
-{
-	zbx_hk_delete_queue_t	*r1 = *(zbx_hk_delete_queue_t **)d1;
-	zbx_hk_delete_queue_t	*r2 = *(zbx_hk_delete_queue_t **)d2;
+// static int	hk_item_update_cache_compare(const void *d1, const void *d2)
+// {
+// 	zbx_hk_delete_queue_t	*r1 = *(zbx_hk_delete_queue_t **)d1;
+// 	zbx_hk_delete_queue_t	*r2 = *(zbx_hk_delete_queue_t **)d2;
 
-	ZBX_RETURN_IF_NOT_EQUAL(r1->itemid, r2->itemid);
+// 	ZBX_RETURN_IF_NOT_EQUAL(r1->itemid, r2->itemid);
 
-	return 0;
-}
+// 	return 0;
+// }
 
 /******************************************************************************
  *                                                                            *
