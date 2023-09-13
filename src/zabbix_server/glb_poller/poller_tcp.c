@@ -483,7 +483,7 @@ static void tcp_shutdown_cb()
 int glb_tcp_init(void)
 {
 	poller_set_poller_callbacks(tcp_init_item, tcp_free_item, async_io, tcp_start_connection, 
-		tcp_shutdown_cb, forks_count, resolve_ready_func_cb, NULL, "http", 1);
+		tcp_shutdown_cb, forks_count, resolve_ready_func_cb, NULL, "http", 0);
 
 	tcp_agent_proto_init(&conf[ASYNC_TCP_POLL_TYPE_AGENT]);
 	tcp_simple_http_proto_init(&conf[ASYNC_TCP_POLL_SIMPLE_HTTP_TYPE]);

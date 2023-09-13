@@ -207,7 +207,8 @@ class CHostInterface extends CApiService {
 			$hostids = array_unique(array_column($result,'hostid'));	
 			$states = CZabbixServer::getHostInterfacesAvail(CSessionHelper::getId(), $hostids);
 
-			$include_named = $this->outputIsRequested('include_named', $options['output']);
+			$include_named = is_array($options['output']) && 
+							 in_array('include_named', $options['output']);
 				
 			foreach ($states as $state) {
 				$interfaceid = "";

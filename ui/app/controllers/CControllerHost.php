@@ -159,7 +159,7 @@ abstract class CControllerHost extends CController {
 			'output' => ['hostid', 'name', 'status', 'maintenance_status', 'maintenanceid', 'maintenance_type',
 				'active_available'
 			],
-			'selectInterfaces' => ['ip', 'dns', 'port', 'main', 'type', 'useip', 'available', 'error', 'details'],
+			'selectInterfaces' => ['ip', 'dns', 'port', 'main', 'type', 'useip', 'available', 'error', 'details', 'include_named'],
 			'selectGraphs' => API_OUTPUT_COUNT,
 			'selectHttpTests' => API_OUTPUT_COUNT,
 			'selectTags' => ['tag', 'value'],
