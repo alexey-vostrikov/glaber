@@ -1,5 +1,6 @@
 2023-09-13 ver 3.3.5 (master)
     - fix: named host interfaces display in host list, fixed show http interface on agent activity
+    - fix: correct items accounting in statistics for proxy item count
 2023-09-11 ver 3.3.3 3.3.4 (master)
     - fix: host avialbility state added to glb_state, implemented proxy->server avail state sending
     - fix: setting error on proxy error items

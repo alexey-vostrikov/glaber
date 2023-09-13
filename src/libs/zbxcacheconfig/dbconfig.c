@@ -12209,19 +12209,20 @@ static void get_host_statistics(ZBX_DC_HOST *dc_host, ZBX_DC_PROXY *dc_proxy, in
 				int state = glb_state_item_get_oper_state(dc_item->itemid);
 				switch (state)
 				{
+				case ITEM_STATE_UNKNOWN:
 				case ITEM_STATE_NORMAL:
 					config->status->items_active_normal++;
 					dc_host->items_active_normal++;
-					if (NULL != dc_proxy_host)
+					if (NULL != dc_proxy_host) {
+					
 						dc_proxy_host->items_active_normal++;
+					}
 					break;
 				case ITEM_STATE_NOTSUPPORTED:
 					config->status->items_active_notsupported++;
 					dc_host->items_active_notsupported++;
 					if (NULL != dc_proxy_host)
 						dc_proxy_host->items_active_notsupported++;
-					break;
-				case ITEM_STATE_UNKNOWN:
 					break;
 				default:
 					zabbix_log(LOG_LEVEL_WARNING, "Unknown item state %d", state);
@@ -12305,6 +12306,7 @@ static void dc_status_update(void)
 	if (SUCCEED == reset)
 	{
 		ZBX_DC_PROXY *dc_proxy;
+		ZBX_DC_HOST *dc_host;
 
 		zbx_hashset_iter_reset(&config->proxies, &iter);
 
@@ -12313,6 +12315,13 @@ static void dc_status_update(void)
 			dc_proxy->hosts_monitored = 0;
 			dc_proxy->hosts_not_monitored = 0;
 			dc_proxy->required_performance = 0.0;
+
+			if (NULL != (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_proxy->hostid))) {
+				dc_host->items_active_normal = 0;
+				dc_host->items_active_notsupported = 0;
+				dc_host->items_disabled = 0;
+			}
+
 		}
 	}
 
@@ -12325,11 +12334,17 @@ static void dc_status_update(void)
 		ZBX_DC_PROXY *dc_proxy = NULL;
 
 		/* reset per-host/per-proxy item counters */
+//		if (161793 == dc_host->hostid)
+//			LOG_INF("Before zeroing: has active normal %d, active non supported %d, disabled %d",
+//				dc_host->items_active_normal, dc_host->items_active_notsupported, dc_host->items_disabled);
 
-		dc_host->items_active_normal = 0;
-		dc_host->items_active_notsupported = 0;
-		dc_host->items_disabled = 0;
-
+		if (HOST_STATUS_PROXY_ACTIVE != dc_host->status && 
+			HOST_STATUS_PROXY_PASSIVE != dc_host->status) {
+			dc_host->items_active_normal = 0;
+			dc_host->items_active_notsupported = 0;
+			dc_host->items_disabled = 0;
+		}
+		
 		/* gather per-proxy statistics of enabled and disabled hosts */
 		switch (dc_host->status)
 		{

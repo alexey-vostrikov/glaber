@@ -1976,7 +1976,8 @@ int	zbx_proxyconfig_process(const char *addr, struct zbx_json_parse *jp, char **
 	{
 		int server_time = strtol(tmp, 0, 10);
 		
-		if (errno) {
+		if (EINVAL == errno) {
+			LOG_INF("Invalid server_start_time");
 			*error = zbx_strdup(NULL, "invalid server_start_time value in the configuration");
 			goto out;
 		}
