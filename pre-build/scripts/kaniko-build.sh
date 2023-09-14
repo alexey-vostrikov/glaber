@@ -27,10 +27,10 @@ kaniko_build() {
                    --cache=true \
                    --cache-repo="${CACHE_REPO}" \
                    --use-new-run \
-                   --snapshot-mode redo \
-                   --log-format text \
-                   --log-timestamp true \
-                   --push-retry 2
+                   --snapshot-mode=redo \
+                   --log-format=text \
+                   --log-timestamp=true \
+                   --push-retry=2
 }
 
 # Build image if docker repository not exist
