@@ -293,6 +293,13 @@ ubuntu-focal-builder:
     OS_VER: focal
     BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
 
+ubuntu-jammy-builder:
+  extends: .base-pre-builder
+  variables:
+    OS: ubuntu
+    OS_VER: jammy
+    BUILD_TAG: ${UBUNTU_BUILDER_VERSION}
+
 # build for the other support docker images (docker builder,php-fpm, etc)
 alpine-php-fpm-8:
   extends: .base-pre-builder
