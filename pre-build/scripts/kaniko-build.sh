@@ -29,7 +29,7 @@ kaniko_build() {
                    --cleanup \
                    --use-new-run \
                    --snapshot-mode=redo \
-                   --verbosity=trace
+                   --verbosity=debug
 }
 
 # Build image if docker repository not exist
