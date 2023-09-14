@@ -28,7 +28,8 @@ kaniko_build() {
                    --cache-repo="${CACHE_REPO}" \
                    --cleanup \
                    --use-new-run \
-                   --snapshot-mode=redo
+                   --snapshot-mode=redo \
+                   --verbosity=trace
 }
 
 # Build image if docker repository not exist
