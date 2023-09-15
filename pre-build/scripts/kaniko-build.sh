@@ -24,13 +24,10 @@ kaniko_build() {
                    --build-arg OS_VER=${OS_VER} \
                    --dockerfile "${BUILD_DIR}/Dockerfile" \
                    --destination "${BUILD_IMG}:${BUILD_TAG}" \
-                   --cache=true \
-                   --cache-repo="${CACHE_REPO}" \
                    --use-new-run \
                    --snapshot-mode=redo \
                    --log-format=text \
-                   --log-timestamp=true \
-                   --push-retry=2
+                   --log-timestamp=true
 }
 
 # Build image if docker repository not exist

@@ -22,7 +22,7 @@ variables:
   # used for build debian based apt
   DEBIAN_BUILDER_VERSION: 1.0.11
   # used for build ubuntu based apt
-  UBUNTU_BUILDER_VERSION: 1.0.6
+  UBUNTU_BUILDER_VERSION: 1.0.7
   # used for build centos based yum
   CENTOS_BUILDER_VERSION: 1.0.5
   # used for glager php-fpm7
