@@ -1,0 +1,6 @@
+debian/tmp.build-mysql/src/zabbix_proxy/zabbix_proxy usr/sbin
+debian/conf/zabbix_proxy.conf etc/zabbix
+database/mysql/schema.sql usr/share/doc/zabbix-proxy-mysql
+database/mysql/data.sql usr/share/doc/zabbix-proxy-mysql
+database/mysql/images.sql usr/share/doc/zabbix-proxy-mysql
+

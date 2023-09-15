@@ -209,13 +209,12 @@ debian-bullseye:
     OS_VER: bullseye
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
-# after spec folder created /build/debian/bookworm
-# debian-bookworm:
-#   extends: .base-debian-builder
-#   variables:
-#     OS: debian
-#     OS_VER: bookworm
-#   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+debian-bookworm:
+  extends: .base-debian-builder
+  variables:
+    OS: debian
+    OS_VER: bookworm
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
@@ -230,6 +229,12 @@ ubuntu-bionic:
     OS: ubuntu
     OS_VER: bionic
   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
+
+ubuntu-jammy:
+  extends: .base-debian-builder
+  variables:
+    OS: ubuntu
+    OS_VER: jammy
 
 # build for the docker packages
 docker-debian-bullseye:
