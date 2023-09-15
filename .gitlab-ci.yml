@@ -235,6 +235,7 @@ ubuntu-jammy:
   variables:
     OS: ubuntu
     OS_VER: jammy
+  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
 
 # build for the docker packages
 docker-debian-bullseye:
