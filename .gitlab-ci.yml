@@ -18,7 +18,7 @@ workflow:
 
 variables:
   # used for a build docker images
-  BUILDER_VERSION: 1.0.6
+  BUILDER_VERSION: 1.0.7
   # used for build debian based apt
   DEBIAN_BUILDER_VERSION: 1.0.11
   # used for build ubuntu based apt
@@ -29,25 +29,11 @@ variables:
   ALPINE_PHP_FPM_VERSION: 1.0.1
   # 
   DEBIAN_BULLSEYE_NET_SNMP_SSL: 1.0.6
-  KANIKO_VERSION: 1.15.0
 
 stages:
   - pre-build
   - pkg-build
   - docker-build
-
-.kaniko_build: &kaniko_build
-  - sh pre-build/scripts/kaniko-build.sh
-
-.add_ssh_key: &add_ssh_key
-  - eval $(ssh-agent -s)
-  - echo "${SSH_PRIVATE_KEY_ED25519_BASE64}" | base64 -d | ssh-add -
-  - mkdir -p ~/.ssh
-  - chmod 700 ~/.ssh
-  - echo 'Host *' > ~/.ssh/config
-  - echo '  StrictHostKeyChecking no' >> ~/.ssh/config
-  - echo '  UserKnownHostsFile /dev/null' >> ~/.ssh/config
-  - chmod 400 ~/.ssh/config
 
 .build_docker: &build_docker
   # github api have some api rate limits for non auth users, so,
@@ -57,18 +43,13 @@ stages:
   # this code should work without PACKER_GITHUB_API_TOKEN,
   # but if packer init command failed, you must to set this vaiable in repo secrets
   # - export PACKER_GITHUB_API_TOKEN=${PACKER_GITHUB_API_TOKEN}
-  - bash pre-build/scripts/manage-vm.sh start
-  - export DOCKER_HOST=ssh://${SSH_USER}@$(bash pre-build/scripts/manage-vm.sh getip)
-  - while true; do docker ps > /dev/null 2>&1 && break || sleep 5;done
   - cd build/appliance/build/docker
   - packer init .
   - packer validate .
   - export DOCKER_PASSWORD=${CI_REGISTRY_PASSWORD}
-  - packer build -color=false -timestamp-ui -warn-on-undeclared-var . || \
-    bash ../../../../pre-build/scripts/manage-vm.sh stop
+  - packer build -color=false -timestamp-ui -warn-on-undeclared-var .
   - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-server -q)
   - docker rmi -f $(docker images ${CI_REGISTRY_IMAGE}/glaber-nginx -q)
-  - bash ../../../../pre-build/scripts/manage-vm.sh stop
 
 .upload_mysql_schema: &upload_mysql_schema
   - cat database/mysql/schema.sql > create.sql
@@ -122,25 +103,26 @@ stages:
   - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
   - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
-# template for the pre-build stage with kaniko build
+# template for the pre-build stage with docker build
 .base-pre-builder:
   stage: pre-build
-  image:
-    name: gcr.io/kaniko-project/executor:v${KANIKO_VERSION}-debug
-    entrypoint: [""]
+  image: ${CI_REGISTRY_IMAGE}/builder:1.0.7
   variables:
     BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
-    CACHE_REPO: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}-cache"
     BUILD_DIR_BASE: "${CI_PROJECT_DIR}/pre-build/${OS}"
     BUILD_DIR: "${BUILD_DIR_BASE}/${BUILD_DIR_SUFFIX}"
+    DOCKER_BUILDKIT: 1
   script:
-    - *kaniko_build
+    - docker images --format '{{.Repository}}:{{.Tag}}' | grep ${BUILD_IMG}:${BUILD_TAG} && echo "${BUILD_IMG}:${BUILD_TAG} already exist, skipping the build" && exit 0
+    - docker build ${BUILD_DIR} --build-arg OS=${OS} --build-arg OS_VER=${OS_VER} -t ${BUILD_IMG}:${BUILD_TAG}
+    - echo ${CI_JOB_NAME} | grep -v "\-builder" && docker push ${BUILD_IMG}:${BUILD_TAG}
   rules:
     - if: $CI_COMMIT_MESSAGE =~ /pre-build/
 
 # template for the debian based pkg-build stage
 .base-debian-builder:
   stage: pkg-build
+  image: "${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${PRE_BUILDER_VERSION}"
   script:
     - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
@@ -185,7 +167,7 @@ centos-8:
   variables:
     OS: almalinux
     OS_VER: 8
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${CENTOS_BUILDER_VERSION}
 
 # after spec folder created build/almalinux/9
 # centos-9:
@@ -193,56 +175,54 @@ centos-8:
 #   variables:
 #     OS: almalinux
 #     OS_VER: 9
-#   image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${CENTOS_BUILDER_VERSION}
+#     PRE_BUILDER_VERSION: :${CENTOS_BUILDER_VERSION}
 
 debian-buster:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: buster
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${DEBIAN_BUILDER_VERSION}
 
 debian-bullseye:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: bullseye
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${DEBIAN_BUILDER_VERSION}
 
 debian-bookworm:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: bookworm
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${DEBIAN_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: focal
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${UBUNTU_BUILDER_VERSION}
 
 ubuntu-bionic:
   extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: bionic
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${UBUNTU_BUILDER_VERSION}
 
 ubuntu-jammy:
   extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: jammy
-  image: ${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${UBUNTU_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: :${UBUNTU_BUILDER_VERSION}
 
 # build for the docker packages
 docker-debian-bullseye:
   stage: docker-build
   image: ${CI_REGISTRY_IMAGE}/builder:${BUILDER_VERSION}
-  before_script:
-    - *add_ssh_key
   script:
     - *set_glb_version
     - *build_docker
@@ -319,7 +299,7 @@ builder:
   extends: .base-pre-builder
   variables:
     OS: alpine
-    OS_VER: "3.17"
+    OS_VER: "3.18"
     BUILD_DIR_SUFFIX: "builder"
     BUILD_TAG: "${BUILDER_VERSION}"
 
