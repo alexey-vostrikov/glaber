@@ -18,7 +18,7 @@ workflow:
 
 variables:
   # used for a build docker images
-  BUILDER_VERSION: 1.0.7
+  BUILDER_VERSION: 1.0.8
   # used for build debian based apt
   DEBIAN_BUILDER_VERSION: 1.0.11
   # used for build ubuntu based apt
@@ -111,7 +111,7 @@ stages:
     BUILD_IMG: "${CI_REGISTRY_IMAGE}/${CI_JOB_NAME}"
     BUILD_DIR_BASE: "${CI_PROJECT_DIR}/pre-build/${OS}"
     BUILD_DIR: "${BUILD_DIR_BASE}/${BUILD_DIR_SUFFIX}"
-    DOCKER_BUILDKIT: 1
+    # DOCKER_BUILDKIT: 1
   script:
     - docker images --format '{{.Repository}}:{{.Tag}}' | grep ${BUILD_IMG}:${BUILD_TAG} && echo "${BUILD_IMG}:${BUILD_TAG} already exist, skipping the build" && exit 0
     - docker build ${BUILD_DIR} --build-arg OS=${OS} --build-arg OS_VER=${OS_VER} -t ${BUILD_IMG}:${BUILD_TAG}
