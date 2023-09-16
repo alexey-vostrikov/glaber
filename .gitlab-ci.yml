@@ -113,6 +113,7 @@ stages:
     BUILD_DIR: "${BUILD_DIR_BASE}/${BUILD_DIR_SUFFIX}"
     # DOCKER_BUILDKIT: 1
   script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker images --format '{{.Repository}}:{{.Tag}}' | grep ${BUILD_IMG}:${BUILD_TAG} && echo "${BUILD_IMG}:${BUILD_TAG} already exist, skipping the build" && exit 0
     - docker build ${BUILD_DIR} --build-arg OS=${OS} --build-arg OS_VER=${OS_VER} -t ${BUILD_IMG}:${BUILD_TAG}
     - echo ${CI_JOB_NAME} | grep -v "\-builder" && docker push ${BUILD_IMG}:${BUILD_TAG}
