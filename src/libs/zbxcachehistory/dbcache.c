@@ -27,7 +27,6 @@
 #include "module.h"
 #include "zbxexport.h"
 #include "zbxnix.h"
-#include "zbxavailability.h"
 #include "zbxtrends.h"
 #include "zbxnum.h"
 #include "zbxsysinfo.h"
@@ -42,18 +41,10 @@
 #include "zbxconnector.h"
 
 static zbx_shmem_info_t *hc_index_mem = NULL;
-//static zbx_shmem_info_t *hc_mem = NULL;
-//static zbx_shmem_info_t *trend_mem = NULL;
 
-//#define LOCK_CACHE zbx_mutex_lock(cache_lock)
-//#define UNLOCK_CACHE zbx_mutex_unlock(cache_lock)
-//#define LOCK_TRENDS zbx_mutex_lock(trends_lock)
-//#define UNLOCK_TRENDS zbx_mutex_unlock(trends_lock)
 #define LOCK_CACHE_IDS zbx_mutex_lock(cache_ids_lock)
 #define UNLOCK_CACHE_IDS zbx_mutex_unlock(cache_ids_lock)
 
-//static zbx_mutex_t cache_lock = ZBX_MUTEX_NULL;
-//static zbx_mutex_t trends_lock = ZBX_MUTEX_NULL;
 static zbx_mutex_t cache_ids_lock = ZBX_MUTEX_NULL;
 
 static char *sql = NULL;
@@ -137,7 +128,7 @@ typedef struct
 	dc_value_t value;
 	zbx_timespec_t ts;
 	dc_value_str_t source; /* for log items only */
-	zbx_uint64_t lastlogsize;
+//	zbx_uint64_t lastlogsize;
 	int timestamp;	/* for log items only */
 	int severity;	/* for log items only */
 	int logeventid; /* for log items only */

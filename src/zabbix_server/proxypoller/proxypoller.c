@@ -256,7 +256,7 @@ out:
  *           properties.                                                      *
  *                                                                            *
  ******************************************************************************/
-static int	proxy_send_configuration(DC_PROXY *proxy, const zbx_config_vault_t *config_vault)
+static int	proxy_send_configuration(DC_PROXY *proxy, const zbx_config_vault_t *config_vault, int server_start_time)
 {
 	char				*error = NULL, *buffer = NULL;
 	int				ret, flags = ZBX_TCP_PROTOCOL, loglevel;
@@ -265,7 +265,6 @@ static int	proxy_send_configuration(DC_PROXY *proxy, const zbx_config_vault_t *c
 	struct zbx_json_parse		jp;
 	size_t				buffer_size, reserved = 0;
 	zbx_proxyconfig_status_t	status;
-
 
 	zbx_json_init(&j, 512 * ZBX_KIBIBYTE);
 	zbx_json_addstring(&j, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_PROXY_CONFIG, ZBX_JSON_TYPE_STRING);
@@ -292,7 +291,7 @@ static int	proxy_send_configuration(DC_PROXY *proxy, const zbx_config_vault_t *c
 
 	zbx_json_clean(&j);
 
-	if (SUCCEED != (ret = zbx_proxyconfig_get_data(proxy, &jp, &j, &status, config_vault, &error)))
+	if (SUCCEED != (ret = zbx_proxyconfig_get_data(proxy, &jp, &j, &status, config_vault, &error, server_start_time)))
 	{
 		zabbix_log(LOG_LEVEL_ERR, "cannot collect configuration data for proxy \"%s\": %s",
 				proxy->host, error);
@@ -537,7 +536,7 @@ out:
  * Purpose: retrieve values of metrics from monitored hosts                   *
  *                                                                            *
  ******************************************************************************/
-static int	process_proxy(const zbx_config_vault_t *config_vault, int config_timeout)
+static int	process_proxy(const zbx_config_vault_t *config_vault, int config_timeout, int server_startup_time)
 {
 	DC_PROXY		proxy, proxy_old;
 	int			num, i;
@@ -591,7 +590,7 @@ static int	process_proxy(const zbx_config_vault_t *config_vault, int config_time
 
 			if (proxy.proxy_config_nextcheck <= now && proxy.compatibility == ZBX_PROXY_VERSION_CURRENT)
 			{
-				if (SUCCEED != (ret = proxy_send_configuration(&proxy, config_vault)))
+				if (SUCCEED != (ret = proxy_send_configuration(&proxy, config_vault, server_startup_time)))
 					goto error;
 			}
 
@@ -688,7 +687,7 @@ ZBX_THREAD_ENTRY(proxypoller_thread, args)
 					old_processed, old_total_sec);
 		}
 
-		processed += process_proxy(proxy_poller_args_in->config_vault, proxy_poller_args_in->config_timeout);
+		processed += process_proxy(proxy_poller_args_in->config_vault, proxy_poller_args_in->config_timeout, proxy_poller_args_in->server_startup_time);
 
 		total_sec += zbx_time() - sec;
 

@@ -123,8 +123,10 @@ typedef struct
 	zbx_uint64_t		hostid;
 	int					queue_next_check;
 	zbx_uint64_t		interfaceid;
-	zbx_uint64_t		lastlogsize;
+	//zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
+	const char 		*name;
+	const char 		*description;
 	const char		*key;
 	const char		*port;
 	const char		*delay;
@@ -383,6 +385,8 @@ typedef struct
 
 	const char	*host;
 	const char	*name;
+	const char	*description;
+
 	int		maintenance_from;
 	int		data_expected_from;
 	zbx_uint64_t	revision;
@@ -508,18 +512,10 @@ typedef struct
 	const char	*ip;
 	const char	*dns;
 	const char	*port;
-	const char	*error;
 	unsigned char	type;
 	unsigned char	main;
 	unsigned char	useip;
-	unsigned char	available;
 	int		disable_until;
-	int		errors_from;
-	/* timestamp of last availability status (available/error) field change on interface */
-	int		availability_ts;
-	/* flag to reset interface availability to unknown */
-	unsigned char	reset_availability;
-	/* item statistics per interface */
 	int		items_num;
 }
 ZBX_DC_INTERFACE;
@@ -1006,6 +1002,7 @@ typedef struct
 
 	u_int64_t debug_trigger;
 	u_int64_t debug_item;
+	int server_time;
 }
 ZBX_DC_CONFIG;
 

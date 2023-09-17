@@ -27,16 +27,16 @@
 #include "zbxself.h"
 #include "zbxtasks.h"
 #include "zbxcompress.h"
-#include "zbxavailability.h"
 #include "zbxnum.h"
 #include "zbxtime.h"
 #include "../taskmanager/taskmanager.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 
 extern zbx_vector_ptr_t	zbx_addrs;
 extern char		*CONFIG_HOSTNAME;
 extern char		*CONFIG_SOURCE_IP;
 
-#define ZBX_DATASENDER_AVAILABILITY		0x0001
+
 #define ZBX_DATASENDER_HISTORY			0x0002
 #define ZBX_DATASENDER_DISCOVERY		0x0004
 #define ZBX_DATASENDER_AUTOREGISTRATION		0x0008
@@ -87,9 +87,9 @@ static int	proxy_data_sender(int *more, int now, int *hist_upload_state, const z
 	static int		data_timestamp = 0, task_timestamp = 0, upload_state = SUCCEED;
 
 	zbx_socket_t		sock;
-	struct zbx_json		j;
+	struct zbx_json		j, j1;
 	struct zbx_json_parse	jp, jp_tasks;
-	int			availability_ts, history_records = 0, discovery_records = 0,
+	int			last_avail_export_ts, avail_exported_ts, history_records = 0, discovery_records = 0,
 				areg_records = 0, more_history = 0, more_discovery = 0, more_areg = 0, proxy_delay,
 				host_avail_records = 0;
 	zbx_uint64_t		history_lastid = 0, discovery_lastid = 0, areg_lastid = 0, flags = 0;
@@ -98,6 +98,9 @@ static int	proxy_data_sender(int *more, int now, int *hist_upload_state, const z
 	zbx_vector_tm_task_t	tasks;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	avail_exported_ts = time(NULL);
+	last_avail_export_ts = zbx_get_availability_diff_ts();
 
 	*more = ZBX_PROXY_DATA_DONE;
 	zbx_json_init(&j, 16 * ZBX_KIBIBYTE);
@@ -109,9 +112,10 @@ static int	proxy_data_sender(int *more, int now, int *hist_upload_state, const z
 	if (SUCCEED == upload_state && CONFIG_PROXYDATA_FREQUENCY <= now - data_timestamp &&
 			ZBX_PROXY_UPLOAD_DISABLED != *hist_upload_state)
 	{
-		if (SUCCEED == zbx_get_interface_availability_data(&j, &availability_ts))
-			flags |= ZBX_DATASENDER_AVAILABILITY;
-
+		zbx_json_addarray(&j, ZBX_PROTO_TAG_INTERFACE_AVAILABILITY);
+		glb_state_hosts_get_changed_ifaces_json(avail_exported_ts, &j);
+		zbx_json_close(&j);
+		
 		history_records = zbx_proxy_get_hist_data(&j, &history_lastid, &more_history);
 		if (0 != history_lastid)
 			flags |= ZBX_DATASENDER_HISTORY;
@@ -123,8 +127,6 @@ static int	proxy_data_sender(int *more, int now, int *hist_upload_state, const z
 		areg_records = zbx_proxy_get_areg_data(&j, &areg_lastid, &more_areg);
 		if (0 != areg_records)
 			flags |= ZBX_DATASENDER_AUTOREGISTRATION;
-
-		host_avail_records = zbx_proxy_get_host_active_availability(&j);
 
 		if (ZBX_PROXY_DATA_MORE != more_history && ZBX_PROXY_DATA_MORE != more_discovery &&
 						ZBX_PROXY_DATA_MORE != more_areg)
@@ -210,8 +212,7 @@ static int	proxy_data_sender(int *more, int now, int *hist_upload_state, const z
 		}
 		else
 		{
-			if (0 != (flags & ZBX_DATASENDER_AVAILABILITY))
-				zbx_set_availability_diff_ts(availability_ts);
+			zbx_set_availability_diff_ts(avail_exported_ts);
 
 			if (SUCCEED == zbx_json_open(sock.buffer, &jp))
 			{

@@ -100,10 +100,11 @@ void snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu)
  			if (SUCCEED == snmp_set_result(poller_item, &pdu->vars[i], &result)) {
 				DEBUG_ITEM(poller_get_item_id(poller_item),"Async SNMP SUCCEED RESULT processing for the item, type is %d", result.type);
 				poller_preprocess_agent_result_value(poller_item, NULL, &result);
-				poller_register_item_succeed(poller_item);
+				poller_register_item_iface_succeed(poller_item);
 			} else {
 				DEBUG_ITEM(poller_get_item_id(poller_item), "Async SNMP FAILED RESULT processing for the item: %s", result.msg );
 				poller_preprocess_error(poller_item, result.msg);
+				poller_register_item_iface_succeed(poller_item);
  			}
 
 			zbx_free_agent_result(&result);

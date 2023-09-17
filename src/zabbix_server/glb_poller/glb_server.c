@@ -126,8 +126,8 @@ static int json_responce_has_timestamp(char *data) {
     if (SUCCEED != zbx_json_open(data, &jp))
         return FAIL;
 
-    if ((FAIL != (ts = glb_json_get_int_value_by_name(&jp, "timestamp", &err_flag))) ||   
-        (FAIL != (ts = glb_json_get_int_value_by_name(&jp, "time", &err_flag))) ) {
+    if ((SUCCEED == (glb_json_get_uint64_value_by_name(&jp, "timestamp", &ts))) ||   
+        ( SUCCEED == (glb_json_get_uint64_value_by_name(&jp, "time", &ts))) ) {
         
         if (ts < 1000000000) //year 2001, no data expected that old
             return FAIL;
@@ -212,6 +212,6 @@ static int forks_count(void)
 int glb_worker_server_init(void)
 {
     poller_set_poller_callbacks(init_item, delete_item, handle_async_io, NULL, NULL, 
-            forks_count, NULL, NULL);
+            forks_count, NULL, NULL, "serv", 1);
     return SUCCEED;
 }

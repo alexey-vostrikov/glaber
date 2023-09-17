@@ -97,13 +97,11 @@ internal_metric_handler_func_t get_func_by_first_param(const char* name) {
 
 int glb_get_internal_metric(const char *first_param, int nparams, AGENT_REQUEST *request, char **result) 
 {
-//    HALT_HERE("Not implemented");
     internal_metric_handler_func_t func = get_func_by_first_param(first_param);
     
     if (NULL == func)
         return FAIL;
 
-    //LOG_INF("Calling function %p", func);
     return func(first_param, nparams, request, result);
 }
 
@@ -117,11 +115,9 @@ ELEMS_FREE(func_free_cb) {
 }
 
 int glb_internal_metrics_init() {
-    //LOG_INF("Registering internal metrics API");
+
     conf.funcs = elems_hash_init(NULL, func_create_cb, func_free_cb);
-    //LOG_INF("Strpool init");
     strpool_init(&conf.strpool, NULL);
-    //LOG_INF("Finushed");
     return SUCCEED;
 }
 

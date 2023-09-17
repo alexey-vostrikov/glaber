@@ -150,12 +150,14 @@ $triggerData = isset($_REQUEST['triggerid'])
 	: null;
 
 $html_page = (new CHtmlPage())
-	->setTitle(_('Availability report'))
+	//->setTitle(_('Availability report'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::REPORT2));
 
 if ($triggerData) {
 	$triggerData = reset($triggerData);
 	$host = reset($triggerData['hosts']);
+	$html_page->setTitle(_('Availability report').' '.$host['name'])
+			  ->setNavigation(isset($host['hostid'])? (new CHostNav(CHostNav::getData($host['hostid']))) : null);
 
 	$triggerData['hostid'] = $host['hostid'];
 	$triggerData['hostname'] = $host['name'];
@@ -181,7 +183,7 @@ else {
 	/**
 	 * Report list view (both data presentation modes).
 	 */
-
+	$html_page->setTitle(_('Availability report'));
 	$select_mode = (new CSelect('mode'))
 		->setValue($report_mode)
 		->setFocusableElementId('mode')
@@ -351,7 +353,7 @@ else {
 
 		if ($templated_triggers_all) {
 			// Select monitored host triggers, derived from templates and belonging to the requested groups.
-			$limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1;
+			$limit = max(CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1, 32768);
 			$triggers = API::Trigger()->get([
 				'output' => ['triggerid', 'description', 'expression', 'value'],
 				'selectHosts' => ['name'],
@@ -500,14 +502,14 @@ else {
 	/*
 	 * Triggers
 	 */
-	$triggerTable = (new CTableInfo())->setHeader([_('Host'), _('Name'), _('Problems'), _('Ok'), _('Graph')]);
+	$triggerTable = (new CDataTable('availtriggers'))->setHeader([_('Host'), _('Name'), _('Problems'), _('Ok'), _('Graph')]);
 
 	CArrayHelper::sort($triggers, ['host_name', 'description']);
 
 	// pager
-	$page_num = getRequest('page', 1);
-	CPagerHelper::savePage($page['file'], $page_num);
-	$paging = CPagerHelper::paginate($page_num, $triggers, ZBX_SORT_UP, new CUrl('report2.php'));
+	//$page_num = getRequest('page', 1);
+	//CPagerHelper::savePage($page['file'], $page_num);
+	//$paging = CPagerHelper::paginate($page_num, $triggers, ZBX_SORT_UP, new CUrl('report2.php'));
 	$allowed_ui_problems = CWebUser::checkAccess(CRoleHelper::UI_MONITORING_PROBLEMS);
 
 	foreach ($triggers as $trigger) {
@@ -531,7 +533,7 @@ else {
 			($availability['false'] < 0.00005)
 				? ''
 				: (new CSpan(sprintf('%.4f%%', $availability['false'])))->addClass(ZBX_STYLE_GREEN),
-			new CLink(_('Show'), (new CUrl('report2.php'))->setArgument('triggerid', $trigger['triggerid']))
+			(new CLink(_('Show'), (new CUrl('report2.php'))->setArgument('triggerid', $trigger['triggerid'])))->setTarget('_blank')
 		]);
 	}
 
@@ -548,7 +550,7 @@ else {
 	zbx_add_post_js('timeControl.processObjects();');
 
 	$html_page
-		->addItem([$triggerTable, $paging])
+		->addItem($triggerTable)
 		->show();
 }
 

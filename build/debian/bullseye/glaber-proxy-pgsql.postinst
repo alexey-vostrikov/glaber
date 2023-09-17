@@ -13,7 +13,7 @@ if [ "$1" = "configure" ]; then
     fi
 
     chown zabbix:zabbix /var/log/zabbix -R
-    setcap cap_net_raw,cap_net_admin=eip /usr/sbin/glbmap
+
 fi
 
 # dh_installdeb will replace this with shell code automatically

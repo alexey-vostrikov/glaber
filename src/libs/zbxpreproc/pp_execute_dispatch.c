@@ -23,7 +23,7 @@
 #include "zbxcacheconfig.h"
 #include "item_preproc.h"
 #include "pp_execute_json_discovery.h"
-#include "../glb_state/glb_state_interfaces.h"
+#include "glb_state.h"
 #include "glb_preproc.h"
 #include "../../zabbix_server/preprocessor/glb_preproc_ipc.h"
 
@@ -157,7 +157,7 @@ int pp_execute_dispatch_by_ip(metric_t *orig_metric, zbx_variant_t *value, const
 		DEBUG_ITEM(orig_metric->itemid, "Found semicolon, new IP string is %s", ip_str);
 	}		
 
-	if (0 == (hostid = glb_state_interfaces_find_host_by_ip(ip_str))) {
+	if (0 == (hostid = glb_state_host_find_by_ip(ip_str))) {
 		DEBUG_ITEM(orig_metric->itemid,"Cannot dispatch: cannot find host for ip addr '%s'", ip_str);
     	return SUCCEED;
 	}

@@ -64,12 +64,6 @@ static void	DCdump_config(void)
 	zabbix_log(LOG_LEVEL_TRACE, "  user sessions, mode:%u period:%d", config->config->hk.sessions_mode,
 			config->config->hk.sessions);
 
-//	zabbix_log(LOG_LEVEL_TRACE, "  history, mode:%u global:%u period:%d", config->config->hk.history_mode,
-//			config->config->hk.history_global, config->config->hk.history);
-
-//	zabbix_log(LOG_LEVEL_TRACE, "  trends, mode:%u global:%u period:%d", config->config->hk.trends_mode,
-//			config->config->hk.trends_global, config->config->hk.trends);
-
 	zabbix_log(LOG_LEVEL_TRACE, "  default timezone '%s'", config->config->default_timezone);
 
 	zabbix_log(LOG_LEVEL_TRACE, "  auditlog_enabled: %d", config->config->auditlog_enabled);
@@ -367,13 +361,10 @@ static void	DCdump_interfaces(void)
 
 		zbx_snprintf_alloc(&if_msg, &alloc, &offset, "interfaceid:" ZBX_FS_UI64 " hostid:" ZBX_FS_UI64
 				" ip:'%s' dns:'%s' port:'%s' type:%u main:%u useip:%u"
-				" available:%u errors_from:%d disable_until:%d error:'%s' availability_ts:%d"
-				" reset_availability:%d items_num %d",
+				" disable_until:%d items_num %d",
 				interface->interfaceid, interface->hostid, interface->ip, interface->dns,
 				interface->port, interface->type, interface->main, interface->useip,
-				interface->available, interface->errors_from, interface->disable_until,
-				interface->error, interface->availability_ts, interface->reset_availability,
-				interface->items_num);
+				interface->disable_until, interface->items_num);
 
 		if (INTERFACE_TYPE_SNMP == interface->type &&
 				NULL != (snmp = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp,
@@ -603,7 +594,7 @@ static void	DCdump_items(void)
 		zabbix_log(LOG_LEVEL_TRACE, "  interfaceid:" ZBX_FS_UI64, item->interfaceid);
 		zabbix_log(LOG_LEVEL_TRACE, "  flags:%u status:%u", item->flags, item->status);
 		zabbix_log(LOG_LEVEL_TRACE, "  valuemapid:" ZBX_FS_UI64, item->valuemapid);
-		zabbix_log(LOG_LEVEL_TRACE, "  lastlogsize:" ZBX_FS_UI64 , item->lastlogsize);
+		//zabbix_log(LOG_LEVEL_TRACE, "  lastlogsize:" ZBX_FS_UI64 , item->lastlogsize);
 		zabbix_log(LOG_LEVEL_TRACE, "  delay:'%s'", item->delay);
 		zabbix_log(LOG_LEVEL_TRACE, "  history:'%s'", item->history_period);
 		zabbix_log(LOG_LEVEL_TRACE, "  poller_type:%u location:%u", item->poller_type, item->location);

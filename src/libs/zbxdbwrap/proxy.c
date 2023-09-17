@@ -30,7 +30,6 @@
 #include "zbxcrypto.h"
 #include "zbxlld.h"
 #include "glb_events.h"
-#include "zbxavailability.h"
 #include "zbxcommshigh.h"
 #include "zbxnum.h"
 #include "zbxtime.h"
@@ -40,6 +39,8 @@
 #include "zbx_host_constants.h"
 #include "zbx_item_constants.h"
 #include "metric.h"
+#include "../glb_state/glb_state_hosts.h"
+#include "../glb_state/glb_state_items.h"
 
 
 
@@ -424,135 +425,6 @@ int	zbx_check_access_passive_proxy(zbx_socket_t *sock, int send_response, const 
 	}
 #endif
 	return SUCCEED;
-}
-
-/******************************************************************************
- *                                                                            *
- * Return value:  SUCCEED - processed successfully                            *
- *                FAIL - no interface availability has been changed           *
- *                                                                            *
- ******************************************************************************/
-int	zbx_get_interface_availability_data(struct zbx_json *json, int *ts)
-{
-	int				i, ret = FAIL;
-	zbx_vector_ptr_t		interfaces;
-	zbx_interface_availability_t	*ia;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-	zbx_vector_ptr_create(&interfaces);
-
-	if (SUCCEED != DCget_interfaces_availability(&interfaces, ts))
-		goto out;
-
-	zbx_json_addarray(json, ZBX_PROTO_TAG_INTERFACE_AVAILABILITY);
-
-	for (i = 0; i < interfaces.values_num; i++)
-	{
-		ia = (zbx_interface_availability_t *)interfaces.values[i];
-
-		zbx_json_addobject(json, NULL);
-		zbx_json_adduint64(json, ZBX_PROTO_TAG_INTERFACE_ID, ia->interfaceid);
-
-		zbx_json_adduint64(json, ZBX_PROTO_TAG_AVAILABLE, ia->agent.available);
-		zbx_json_addstring(json, ZBX_PROTO_TAG_ERROR, ia->agent.error, ZBX_JSON_TYPE_STRING);
-
-		zbx_json_close(json);
-	}
-
-	zbx_json_close(json);
-
-	ret = SUCCEED;
-out:
-	zbx_vector_ptr_clear_ext(&interfaces, (zbx_mem_free_func_t)zbx_interface_availability_free);
-	zbx_vector_ptr_destroy(&interfaces);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
-
-	return ret;
-}
-
-/******************************************************************************
- *                                                                            *
- * Purpose: parses interfaces availability data contents and processes it     *
- *                                                                            *
- * Return value:  SUCCEED - processed successfully                            *
- *                FAIL - an error occurred                                    *
- *                                                                            *
- ******************************************************************************/
-static int	process_interfaces_availability_contents(struct zbx_json_parse *jp_data, char **error)
-{
-	zbx_uint64_t			interfaceid;
-	struct zbx_json_parse		jp_row;
-	const char			*p = NULL;
-	char				*tmp;
-	size_t				tmp_alloc = 129;
-	zbx_interface_availability_t	*ia = NULL;
-	zbx_vector_availability_ptr_t	interfaces;
-	int				ret;
-
-	tmp = (char *)zbx_malloc(NULL, tmp_alloc);
-
-	zbx_vector_availability_ptr_create(&interfaces);
-
-	while (NULL != (p = zbx_json_next(jp_data, p)))	/* iterate the interface entries */
-	{
-		if (SUCCEED != (ret = zbx_json_brackets_open(p, &jp_row)))
-		{
-			*error = zbx_strdup(*error, zbx_json_strerror());
-			goto out;
-		}
-
-		if (SUCCEED != (ret = zbx_json_value_by_name_dyn(&jp_row, ZBX_PROTO_TAG_INTERFACE_ID, &tmp, &tmp_alloc,
-				NULL)))
-		{
-			*error = zbx_strdup(*error, zbx_json_strerror());
-			goto out;
-		}
-
-		if (SUCCEED != (ret = zbx_is_uint64(tmp, &interfaceid)))
-		{
-			*error = zbx_strdup(*error, "interfaceid is not a valid numeric");
-			goto out;
-		}
-
-		ia = (zbx_interface_availability_t *)zbx_malloc(NULL, sizeof(zbx_interface_availability_t));
-		zbx_interface_availability_init(ia, interfaceid);
-
-		if (SUCCEED == zbx_json_value_by_name_dyn(&jp_row, ZBX_PROTO_TAG_AVAILABLE, &tmp, &tmp_alloc, NULL))
-		{
-			ia->agent.available = atoi(tmp);
-			ia->agent.flags |= ZBX_FLAGS_AGENT_STATUS_AVAILABLE;
-		}
-
-		if (SUCCEED == zbx_json_value_by_name_dyn(&jp_row, ZBX_PROTO_TAG_ERROR, &tmp, &tmp_alloc, NULL))
-		{
-			ia->agent.error = zbx_strdup(NULL, tmp);
-			ia->agent.flags |= ZBX_FLAGS_AGENT_STATUS_ERROR;
-		}
-
-		if (SUCCEED != (ret = zbx_interface_availability_is_set(ia)))
-		{
-			zbx_free(ia);
-			*error = zbx_dsprintf(*error, "no availability data for \"interfaceid\":" ZBX_FS_UI64,
-					interfaceid);
-			goto out;
-		}
-
-		zbx_vector_availability_ptr_append(&interfaces, ia);
-	}
-
-	if (0 < interfaces.values_num && SUCCEED == DCset_interfaces_availability(&interfaces))
-		zbx_availabilities_flush(&interfaces);
-
-	ret = SUCCEED;
-out:
-	zbx_vector_availability_ptr_clear_ext(&interfaces, zbx_interface_availability_free);
-	zbx_vector_availability_ptr_destroy(&interfaces);
-
-	zbx_free(tmp);
-
-	return ret;
 }
 
 static void	proxy_get_lastid(const char *table_name, const char *lastidfield, zbx_uint64_t *lastid)
@@ -1125,33 +997,6 @@ int	zbx_proxy_get_areg_data(struct zbx_json *j, zbx_uint64_t *lastid, int *more)
 	return records_num;
 }
 
-int	zbx_proxy_get_host_active_availability(struct zbx_json *j)
-{
-	zbx_ipc_message_t	response;
-	int			records_num = 0;
-
-	zbx_ipc_message_init(&response);
-	zbx_availability_send(ZBX_IPC_AVAILMAN_ACTIVE_HOSTDATA, 0, 0, &response);
-
-	if (0 != response.size)
-	{
-		zbx_vector_proxy_hostdata_ptr_t	hostdata;
-
-		zbx_vector_proxy_hostdata_ptr_create(&hostdata);
-		zbx_availability_deserialize_hostdata(response.data, &hostdata);
-		zbx_availability_serialize_json_hostdata(&hostdata, j);
-
-		records_num = hostdata.values_num;
-
-		zbx_vector_proxy_hostdata_ptr_clear_ext(&hostdata, (zbx_proxy_hostdata_ptr_free_func_t)zbx_ptr_free);
-		zbx_vector_proxy_hostdata_ptr_destroy(&hostdata);
-	}
-
-	zbx_ipc_message_clean(&response);
-
-	return records_num;
-}
-
 /******************************************************************************
  *                                                                            *
  * Purpose: processes item value depending on proxy/flags settings            *
@@ -1170,31 +1015,42 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 {
 	if (0 == item->host.proxy_hostid)
 	{
-		
 		if (ITEM_STATE_NORMAL == item->state && NULL != result) 
 			preprocess_agent_result(item->host.hostid, item->itemid, item->flags, ts, result, item->value_type);
 		else 
 			preprocess_error(item->host.hostid, item->itemid, item->flags, ts, error);
 		
 		*h_num = 0;
+		return;
 	}
-	else
+
+
+	if (ITEM_STATE_NORMAL != item->state && NULL != result) {
+		//LOG_INF("Got agent result type %d", result->type);
+		if (AR_MESSAGE & result->type)
+			glb_state_item_set_error(item->itemid, result->msg);
+		else {
+		//	LOG_INF("Got agent result type %d", result->type);
+			glb_state_item_set_error(item->itemid, "");
+		}
+	}
+
+	
+	if (0 != (ZBX_FLAG_DISCOVERY_RULE & item->flags))
 	{
-		if (0 != (ZBX_FLAG_DISCOVERY_RULE & item->flags))
-		{
-			zbx_lld_process_agent_result(item->itemid, item->host.hostid, result, ts, error);
-			*h_num = 0;
-		}
-		else
-		{
-			metric_t metric = {.hostid = item->host.hostid, .itemid = item->itemid, .ts = *ts };
-			if (ITEM_STATE_NORMAL == item->state) 
-				processing_send_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
-			else 
-				processing_send_error(item->host.hostid, item->itemid, item->flags, ts, error);
-			*h_num = 1;
-		}
+		zbx_lld_process_agent_result(item->itemid, item->host.hostid, result, ts, error);
+		*h_num = 0;
+		return;
 	}
+	
+	//proxy data
+	metric_t metric = {.hostid = item->host.hostid, .itemid = item->itemid, .ts = *ts };
+	if (ITEM_STATE_NORMAL == item->state) 
+			processing_send_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
+		else 
+			processing_send_error(item->host.hostid, item->itemid, item->flags, ts, error);
+	
+	*h_num = 1;
 }
 
 /******************************************************************************
@@ -1726,6 +1582,7 @@ static int	parse_history_data_by_itemids(struct zbx_json_parse *jp_data, const c
 		if (SUCCEED != parse_history_data_row_value(&jp_row, unique_shift, &values[*values_num]))
 			continue;
 
+		DEBUG_ITEM(itemids[*values_num], "Parsed item value %s", values[*values_num].value);
 		(*values_num)++;
 	}
 	while (NULL != (*pnext = zbx_json_next(jp_data, *pnext)) && *values_num < ZBX_HISTORY_VALUES_MAX);
@@ -2920,6 +2777,7 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 	proxy_diff.flags = ZBX_FLAGS_PROXY_DIFF_UNSET;
 	proxy_diff.hostid = proxy->hostid;
 
+
 	if (SUCCEED != (ret = DCget_proxy_nodata_win(proxy_diff.hostid, &proxy_diff.nodata_win,
 			&proxy_diff.lastaccess)))
 	{
@@ -2927,6 +2785,7 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 		ret = FAIL;
 		goto out;
 	}
+
 
 	if (SUCCEED == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_MORE, value, sizeof(value), NULL))
 		proxy_diff.more_data = atoi(value);
@@ -2944,6 +2803,7 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 	proxy_diff.flags |= ZBX_FLAGS_PROXY_DIFF_UPDATE_PROXYDELAY;
 	flags_old = proxy_diff.nodata_win.flags;
 	check_proxy_nodata(ts, proxy_status, &proxy_diff);	/* first packet can be empty for active proxy */
+	//LOG_INF("Got proxy data2");
 
 	zabbix_log(LOG_LEVEL_DEBUG, "%s() flag_win:%d/%d flag:%d proxy_status:%d period_end:%d delay:%d"
 			" timestamp:%d lastaccess:%d proxy_delay:%d more:%d", __func__, proxy_diff.nodata_win.flags,
@@ -2954,12 +2814,13 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 	if (ZBX_FLAGS_PROXY_DIFF_UNSET != proxy_diff.flags)
 		zbx_dc_update_proxy(&proxy_diff);
 
+
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_INTERFACE_AVAILABILITY, &jp_data))
 	{
-		if (SUCCEED != (ret = process_interfaces_availability_contents(&jp_data, &error_step)))
-			zbx_strcatnl_alloc(error, &error_alloc, &error_offset, error_step);
+		if (FAIL == glb_state_host_set_interfaces_from_json(&jp_data))
+				zbx_strcatnl_alloc(error, &error_alloc, &error_offset, "Failed to parse interfaces availability data");
 	}
-
+	
 	flags_old = proxy_diff.nodata_win.flags;
 
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_HISTORY_DATA, &jp_data))
@@ -3020,79 +2881,8 @@ int	zbx_process_proxy_data(const DC_PROXY *proxy, struct zbx_json_parse *jp, zbx
 
 	if (SUCCEED == zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_PROXY_ACTIVE_AVAIL_DATA, &jp_data))
 	{
-		const char			*ptr;
-		zbx_vector_proxy_hostdata_ptr_t	host_avails;
-		struct zbx_json_parse		jp_host;
-		char				buffer[ZBX_KIBIBYTE];
-
-		zbx_vector_proxy_hostdata_ptr_create(&host_avails);
-
-		for (ptr = NULL; NULL != (ptr = zbx_json_next(&jp_data, ptr));)
-		{
-			zbx_proxy_hostdata_t	*host;
-
-			if (SUCCEED != zbx_json_brackets_open(ptr, &jp_host))
-				continue;
-
-			if (SUCCEED == zbx_json_value_by_name(&jp_host, ZBX_PROTO_TAG_HOSTID, buffer, sizeof(buffer), NULL))
-			{
-				host = (zbx_proxy_hostdata_t *)zbx_malloc(NULL, sizeof(zbx_proxy_hostdata_t));
-				host->hostid = atoi(buffer);
-			}
-			else
-				continue;
-
-			if (FAIL == zbx_json_value_by_name(&jp_host, ZBX_PROTO_TAG_ACTIVE_STATUS, buffer, sizeof(buffer), NULL))
-			{
-				zbx_free(host);
-				continue;
-			}
-
-			host->status = atoi(buffer);
-
-			zbx_vector_proxy_hostdata_ptr_append(&host_avails, host);
-		}
-
-		if (0 != host_avails.values_num)
-		{
-			unsigned char			*data = NULL;
-			zbx_uint32_t			data_len;
-			DC_HOST				*hosts;
-			int				i, *errcodes;
-			zbx_vector_uint64_t		hostids;
-			zbx_vector_proxy_hostdata_ptr_t	proxy_host_avails;
-
-			zbx_vector_uint64_create(&hostids);
-
-			for (i = 0; i < host_avails.values_num; i++)
-				zbx_vector_uint64_append(&hostids, host_avails.values[i]->hostid);
-
-			hosts = (DC_HOST *)zbx_malloc(NULL, sizeof(DC_HOST) * host_avails.values_num);
-			errcodes = (int *)zbx_malloc(NULL, sizeof(int) * host_avails.values_num);
-			DCconfig_get_hosts_by_hostids(hosts, hostids.values, errcodes, hostids.values_num);
-
-			zbx_vector_uint64_destroy(&hostids);
-
-			zbx_vector_proxy_hostdata_ptr_create(&proxy_host_avails);
-
-			for (i = 0; i < host_avails.values_num; i++)
-			{
-				if (SUCCEED == errcodes[i] && hosts[i].proxy_hostid == proxy->hostid)
-					zbx_vector_proxy_hostdata_ptr_append(&proxy_host_avails, host_avails.values[i]);
-			}
-
-			zbx_free(errcodes);
-			zbx_free(hosts);
-
-			data_len = zbx_availability_serialize_proxy_hostdata(&data, &proxy_host_avails, proxy->hostid);
-			zbx_availability_send(ZBX_IPC_AVAILMAN_PROCESS_PROXY_HOSTDATA, data, data_len, NULL);
-
-			zbx_vector_proxy_hostdata_ptr_destroy(&proxy_host_avails);
-			zbx_vector_proxy_hostdata_ptr_clear_ext(&host_avails, (zbx_proxy_hostdata_ptr_free_func_t)zbx_ptr_free);
-			zbx_free(data);
-		}
-
-		zbx_vector_proxy_hostdata_ptr_destroy(&host_avails);
+		if (FAIL == glb_state_hosts_set_avail_states_from_json(&jp_data))
+			zbx_strcatnl_alloc(error, &error_alloc, &error_offset, "Failed to parse hosts availability data");
 	}
 
 out:

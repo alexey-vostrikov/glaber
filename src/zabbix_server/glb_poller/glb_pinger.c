@@ -81,7 +81,7 @@ extern int CONFIG_ICMP_NA_ON_RESOLVE_FAIL;
 static int pinger_process_response(poller_item_t *poller_item, int rtt) {
     
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
-    
+
     DEBUG_ITEM( poller_get_item_id(poller_item),"Processing ping echo, packet %d out of %d", pinger_item->rcv + 1, pinger_item->count );
     
     if ( rtt > pinger_item->timeout ) {
@@ -98,7 +98,8 @@ static int pinger_process_response(poller_item_t *poller_item, int rtt) {
     if (pinger_item->count == pinger_item->rcv) {
         return POLL_FINISHED;
     } 
-    poller_register_item_succeed(poller_item);
+
+    poller_register_item_iface_succeed(poller_item);
     return SUCCEED;
 }
 
@@ -106,25 +107,25 @@ static int pinger_process_response(poller_item_t *poller_item, int rtt) {
 static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error) {
     u_int64_t value_uint64;
     double value_dbl;
-    //AGENT_RESULT result;
-    
+
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
     poller_disable_event(pinger_item->timeout_event);
-    
-  //  zbx_init_agent_result(&result);
-        
+
     LOG_DBG("In %s: Starting, itemid is %ld, status is %d, error is '%s'", __func__,
                 poller_get_item_id(poller_item), status, error);
       
     switch (status) {
         case SUCCEED: {
            
-            //value calculaition logic is taken from pinger.c process_value
             switch (pinger_item->icmpping)
 			{
 				case ICMPPING:
 					value_uint64 = (0 != pinger_item->rcv ? 1 : 0);
                     poller_preprocess_uint64(poller_item, NULL, value_uint64, ITEM_VALUE_TYPE_UINT64);
+                    if (0 == value_uint64) 
+                        poller_register_item_iface_timeout(poller_item);
+                    else 
+                        poller_register_item_iface_succeed(poller_item);
                     break;
 				case ICMPPINGSEC:
 					switch (pinger_item->type)
@@ -141,12 +142,21 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
 					}
                     value_dbl = value_dbl/1000;
 
-					if (0 < value_dbl && PINGER_FLOAT_PRECISION > value_dbl)
+					if (0 < value_dbl && PINGER_FLOAT_PRECISION > value_dbl) {
+                        poller_register_item_iface_timeout(poller_item);
                         value_dbl = PINGER_FLOAT_PRECISION;
+                    } else 
+                        poller_register_item_iface_succeed(poller_item);
+
                     poller_preprocess_dbl(poller_item, NULL, value_dbl);
 				    break;
 				case ICMPPINGLOSS:
 					value_dbl = (100 * (pinger_item->count - pinger_item->rcv)) / (double)pinger_item->count;
+                    if (100.0 - PINGER_FLOAT_PRECISION < value_dbl && value_dbl <= 100.0) 
+                        poller_register_item_iface_timeout(poller_item);
+                    else 
+                        poller_register_item_iface_succeed(poller_item);
+
 					poller_preprocess_dbl(poller_item, NULL, value_dbl);
 					break;
                 default: 
@@ -156,7 +166,6 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
                     exit(-1);
 			}
 
-      //      zbx_free_agent_result(&result);
             break;
          }
         default:
@@ -164,7 +173,6 @@ static void finish_icmp_poll(poller_item_t *poller_item, int status, char *error
             break;
     }
     
-    //marking that polling has finished
     poller_return_item_to_queue(poller_item);
     
     pinger_item->state = POLL_QUEUED;
@@ -338,7 +346,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
 void send_timeout_cb(poller_item_t *poller_item, void *data) {
     DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
     finish_icmp_poll(poller_item, SUCCEED, NULL);
-    poller_register_item_timeout(poller_item);
+    poller_register_item_iface_timeout(poller_item);
 }
 
 
@@ -456,16 +464,12 @@ static void free_item(poller_item_t *glb_poller_item ) {
     DEBUG_ITEM( poller_get_item_id(glb_poller_item), "Has been removed from the pinger poller");
 }
 
-int needs_resolve(pinger_item_t *pinger_item) {
+static int needs_resolve(pinger_item_t *pinger_item) {
     u_int64_t now = glb_ms_time();
 
-  //  if (pinger_item->lastresolve + GLB_DNS_CACHE_TIME > now) 
-  //      return FAIL;
-    
     if (SUCCEED == zbx_is_ip4(pinger_item->addr)) {
-        //    pinger_item->lastresolve = now;
-            pinger_item->ip = zbx_strdup(pinger_item->ip, pinger_item->addr);
-            return FAIL;
+        pinger_item->ip = zbx_strdup(pinger_item->ip, pinger_item->addr);
+        return FAIL;
     }
 
     return SUCCEED;    
@@ -556,9 +560,6 @@ static void handle_async_io(void)
     //in true async pollers this proc should always be empty!
 }
 
-/******************************************************************************
- * does snmp connections cleanup, not related to snmp shutdown 				  * 
- * ***************************************************************************/
 static void pings_shutdown(void) {
 	
 	//need to deallocate time hashset 
@@ -582,7 +583,7 @@ void glb_pinger_init(void) {
 	conf.sent_packets = 0;
 
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_ping, pings_shutdown, 
-        forks_count,  resolved_callback, resolve_fail_callback);    
+        forks_count,  resolved_callback, resolve_fail_callback, "icmp", 1);    
  
     add_params[0]='\0';
 

@@ -24,6 +24,6 @@
 #include "module.h"
 #include "zbxalgo.h"
 
-int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results);
+int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results, int lastlogsize);
 
 #endif

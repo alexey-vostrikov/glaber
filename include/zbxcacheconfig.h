@@ -23,7 +23,6 @@
 #include "zbxdbhigh.h"
 #include "zbxcomms.h"
 #include "zbxeval.h"
-#include "zbxavailability.h"
 #include "zbxversion.h"
 #include "zbxvault.h"
 #include "zbxregexp.h"
@@ -82,10 +81,7 @@ typedef struct
 	unsigned char	useip;
 	unsigned char	type;
 	unsigned char	main;
-	unsigned char	available;
-	int		disable_until;
-	char		error[ZBX_INTERFACE_ERROR_LEN_MAX];
-	int		errors_from;
+
 }
 DC_INTERFACE;
 
@@ -143,11 +139,11 @@ typedef struct
 	DC_HOST			host;
 	DC_INTERFACE		interface;
 	zbx_uint64_t		itemid;
-	zbx_uint64_t		lastlogsize;
+//	zbx_uint64_t		lastlogsize;
 	unsigned char		type;
 	unsigned char		snmp_version;
 	unsigned char		value_type;
-	unsigned char		state;
+//	unsigned char		state;
 	unsigned char		snmpv3_securitylevel;
 	unsigned char		authtype;
 	unsigned char		flags;
@@ -164,7 +160,7 @@ typedef struct
 	unsigned char		allow_traps;
 	char			key_orig[ZBX_ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1], *key;
 	char			*delay;
-	int			mtime;
+	//int			mtime;
 	char 			*name;
 	char			*description;
 	char			trapper_hosts[ZBX_ITEM_TRAPPER_HOSTS_LEN_MAX];
@@ -215,7 +211,7 @@ typedef struct
 {
 	zbx_history_sync_host_t	host;
 	zbx_uint64_t		itemid;
-	zbx_uint64_t		lastlogsize;
+	//zbx_uint64_t		lastlogsize;
 	zbx_uint64_t		valuemapid;
 	char			key_orig[ZBX_ITEM_KEY_LEN * ZBX_MAX_BYTES_IN_UTF8_CHAR + 1];
 	char			*units;
@@ -734,7 +730,7 @@ void	DCconfig_get_functions_by_functionids(DC_FUNCTION *functions,
 		zbx_uint64_t *functionids, int *errcodes, size_t num);
 void	DCconfig_clean_functions(DC_FUNCTION *functions, int *errcodes, size_t num);
 void	DCconfig_clean_triggers(DC_TRIGGER *triggers, int *errcodes, size_t num);
-int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids);
+//int	DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids);
 void	DCconfig_lock_triggers_by_triggerids(zbx_vector_uint64_t *triggerids_in, zbx_vector_uint64_t *triggerids_out);
 void	DCconfig_unlock_triggers(const zbx_vector_uint64_t *triggerids);
 void	DCconfig_unlock_all_triggers(void);
@@ -827,11 +823,6 @@ void	DCget_autoregistration_psk(char *psk_identity_buf, size_t psk_identity_buf_
 
 #define ZBX_MACRO_SECRET_MASK	"******"
 
-int	DCinterface_activate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, zbx_agent_availability_t *in,
-		zbx_agent_availability_t *out);
-
-int	DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, int unavailable_delay,
-		zbx_agent_availability_t *in, zbx_agent_availability_t *out, const char *error_msg);
 
 #define ZBX_QUEUE_FROM_DEFAULT	6	/* default lower limit for delay (in seconds) */
 #define ZBX_QUEUE_TO_INFINITY	-1	/* no upper limit for delay */
@@ -873,16 +864,14 @@ void	zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags);
 void	zbx_config_clean(zbx_config_t *cfg);
 void	zbx_config_get_hk_mode(unsigned char *history_mode, unsigned char *trends_mode);
 
-int	DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities);
-
-int	DCreset_interfaces_availability(zbx_vector_availability_ptr_t *interfaces);
-
 void	zbx_dc_config_history_sync_get_actions_eval(zbx_vector_ptr_t *actions, unsigned char opflags);
 
 int	DCget_interfaces_availability(zbx_vector_ptr_t *interfaces, int *ts);
 void	DCtouch_interfaces_availability(const zbx_vector_uint64_t *interfaceids);
 
 void	zbx_set_availability_diff_ts(int ts);
+int 	zbx_get_availability_diff_ts();
+int  	server_time_is_changed(int new_time);
 
 void	zbx_dc_correlation_rules_init(zbx_correlation_rules_t *rules);
 void	zbx_dc_correlation_rules_clean(zbx_correlation_rules_t *rules);
@@ -900,30 +889,30 @@ void	zbx_dc_get_hostids_by_group_name(const char *name, zbx_vector_uint64_t *hos
 #define ZBX_DC_FLAG_NOHISTORY	0x10	/* values should not be kept in history */
 #define ZBX_DC_FLAG_NOTRENDS	0x20	/* values should not be kept in trends */
 
-typedef struct zbx_hc_data
-{
-	zbx_history_value_t	value;
-	zbx_uint64_t		lastlogsize;
-	zbx_timespec_t		ts;
-	int			mtime;
-	unsigned char		value_type;
-	unsigned char		flags;
-	unsigned char		state;
+//typedef struct zbx_hc_data
+// {
+// 	zbx_history_value_t	value;
+// //	zbx_uint64_t		lastlogsize;
+// 	zbx_timespec_t		ts;
+// 	int			mtime;
+// 	unsigned char		value_type;
+// 	unsigned char		flags;
+// 	unsigned char		state;
 
-	struct zbx_hc_data	*next;
-}
-zbx_hc_data_t;
+// 	struct zbx_hc_data	*next;
+// }
+// zbx_hc_data_t;
 
-typedef struct
-{
-	zbx_uint64_t	itemid;
-	unsigned char	status;
-	int		values_num;
+// typedef struct
+// {
+// 	zbx_uint64_t	itemid;
+// 	unsigned char	status;
+// 	int		values_num;
 
-	zbx_hc_data_t	*tail;
-	zbx_hc_data_t	*head;
-}
-zbx_hc_item_t;
+// 	zbx_hc_data_t	*tail;
+// 	zbx_hc_data_t	*head;
+// }
+// zbx_hc_item_t;
 
 void	zbx_free_item_tag(zbx_item_tag_t *item_tag);
 
@@ -1088,7 +1077,6 @@ void	zbx_dc_get_triggers_by_timers(zbx_hashset_t *trigger_info, zbx_vector_ptr_t
 		const zbx_vector_ptr_t *timers);
 void	zbx_dc_free_timers(zbx_vector_ptr_t *timers);
 
-void	zbx_get_host_interfaces_availability(zbx_uint64_t	hostid, zbx_agent_availability_t *agents);
 
 /* external user macro cache API */
 

@@ -505,6 +505,9 @@ function getHostInterface(?array $interface): string {
 	else {
 		$ip_or_dns = $interface['dns'];
 	}
+	
+	if ( !isset($ip_or_dns) || 0 == strlen($ip_or_dns))
+		return strtoupper($interface['type']);
 
 	return $ip_or_dns.':'.$interface['port'];
 }

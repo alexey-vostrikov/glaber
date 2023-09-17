@@ -46,6 +46,15 @@ typedef struct
     int new_period;
 } item_demand_t;
 
+typedef struct {
+    int state;
+    int lastdata;
+    int nextcheck;
+    int lastlogsize;
+    const char *error;
+    int errcode;
+} glb_state_item_meta_t;
+
 typedef struct
 {
     glb_state_item_meta_t meta;
@@ -1107,9 +1116,11 @@ static int item_get_meta_cb(elems_hash_elem_t *elem, mem_funcs_t *memf,  void *c
 
 static int item_get_state_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *cb_data)
 {
+    int *state = cb_data;
     item_elem_t *elm = (item_elem_t *)elem->data;
+    *state = elm->meta.state; 
 
-    return elm->meta.state;
+    return SUCCEED;
 }
 
 int item_get_nextcheck_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, void *cb_data)
@@ -1191,11 +1202,14 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 {
     int errflag = 0;
     zbx_json_type_t type;
+    int temp;
 
-    if ( FAIL ==( elm->value_type = glb_json_get_int_value_by_name(jp, "value_type", &errflag) ))
+    if ( FAIL == glb_json_get_int_value_by_name(jp, "value_type", &temp))
         return FAIL;
-    
-    elm->db_fetched_time = glb_json_get_int_value_by_name(jp, "db_fetched_time", &errflag);
+
+    elm->value_type = temp;
+
+    glb_json_get_int_value_by_name(jp, "db_fetched_time", &elm->db_fetched_time);
 
     if ((elm->value_type >= ITEM_VALUE_TYPE_MAX || elm->value_type < 0) && elm->value_type != ITEM_VALUE_TYPE_NONE) {
         LOG_WRN("Imporeper value type is set in the file: %d: '%s'", elm->value_type, jp->start);
@@ -1208,29 +1222,22 @@ static int parse_json_item_fields(struct zbx_json_parse *jp, item_elem_t *elm)
 
 static int parse_json_item_state(struct zbx_json_parse *jp, glb_state_item_meta_t *meta)
 {
-    int errflag = 0;
-
-    meta->state = glb_json_get_int_value_by_name(jp, "state", &errflag);
-    meta->lastdata = glb_json_get_int_value_by_name(jp, "lastdata", &errflag);
-    meta->nextcheck = 0;// glb_json_get_int_value_by_name(jp, "nextcheck", &errflag);
+    if (FAIL == glb_json_get_int_value_by_name(jp, "state", &meta->state) ||
+        FAIL == glb_json_get_int_value_by_name(jp, "lastdata", &meta->lastdata)) 
     
-
-    if (0 == errflag)
-        return SUCCEED;
-
     return FAIL;
+    
+    meta->nextcheck = 0;
+    return SUCCEED;
 }
 
 static int parse_json_item_demand(struct zbx_json_parse *jp, item_demand_t *demand)
 {
-    int errflag = 0;
-
-    demand->count = glb_json_get_int_value_by_name(jp, "count", &errflag);
-    demand->period = glb_json_get_int_value_by_name(jp, "period", &errflag);
-    demand->count_change = glb_json_get_int_value_by_name(jp, "count_change", &errflag);
-    demand->period_change = glb_json_get_int_value_by_name(jp, "period_change", &errflag);
-
-    if (0 == errflag)
+    if (SUCCEED == glb_json_get_int_value_by_name(jp, "count", &demand->count) &&
+        SUCCEED == glb_json_get_int_value_by_name(jp, "period", &demand->period) &&
+        SUCCEED == glb_json_get_int_value_by_name(jp, "count_change", &demand->count_change) &&
+        SUCCEED == glb_json_get_int_value_by_name(jp, "period_change", &demand->period_change) 
+        )
         return SUCCEED;
 
     return FAIL;
@@ -1245,7 +1252,7 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
     zbx_json_type_t type;
     bzero(hist, sizeof(ZBX_DC_HISTORY));
 
-    if (FAIL == (hist->ts.sec = glb_json_get_int_value_by_name(jp, "clock", &errflag)))
+    if (FAIL == glb_json_get_int_value_by_name(jp, "clock", &hist->ts.sec))
         return FAIL;
 
     hist->ts.ns = 0;
@@ -1254,10 +1261,10 @@ int json_to_hist_record(struct zbx_json_parse *jp, unsigned char value_type, ZBX
     switch (value_type)
     {
     case ITEM_VALUE_TYPE_UINT64:
-        hist->value.ui64 = glb_json_get_int_value_by_name(jp, "value", &errflag);
+        glb_json_get_uint64_value_by_name(jp, "value", &hist->value.ui64);
         break;
     case ITEM_VALUE_TYPE_FLOAT:
-        hist->value.dbl = glb_json_get_dbl_value_by_name(jp, "value", &errflag);
+        glb_json_get_dbl_value_by_name(jp, "value", &hist->value.dbl);
         break;
     case ITEM_VALUE_TYPE_STR:
     case ITEM_VALUE_TYPE_TEXT:
@@ -1397,7 +1404,7 @@ int glb_state_item_update_nextcheck(u_int64_t itemid, int nextcheck) {
 }
 
 int  glb_state_item_set_lastdata_by_metric(const metric_t *metric) {
-	return elems_hash_process(state->items, metric->itemid, item_update_lastdata_cb, metric, 0);
+	return elems_hash_process(state->items, metric->itemid, item_update_lastdata_cb, (void *)metric, 0);
 }
 
 ELEMS_CALLBACK(item_set_error_cb) {
@@ -1449,11 +1456,15 @@ int  glb_state_item_add_values( ZBX_DC_HISTORY *history, int history_num) {
 
 int glb_state_item_get_oper_state(u_int64_t itemid) {
 	int st;
-    if (FAIL == (st = elems_hash_process(state->items, itemid, item_get_state_cb, NULL, ELEM_FLAG_DO_NOT_CREATE))) {
+    if (FAIL == elems_hash_process(state->items, itemid, item_get_state_cb, &st, ELEM_FLAG_DO_NOT_CREATE)) {
+        DEBUG_ITEM(itemid, "Couldn't find state data for item, returning STATE_UNKNOWN");
         return ITEM_STATE_UNKNOWN;
     }
+    
+    DEBUG_ITEM(itemid, "requested item returned state %d", st);
     return st;
 }
+
 int glb_state_item_get_nextcheck(u_int64_t itemid) {
 	return elems_hash_process(state->items, itemid, item_get_nextcheck_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
 }
@@ -1612,7 +1623,7 @@ ELEMS_CALLBACK(get_valuetype_cb) {
      return item->value_type;
 }
 
-int  glb_state_get_item_valuetype(u_int64_t itemid) {
+int  glb_state_item_get_valuetype(u_int64_t itemid) {
     return elems_hash_process(state->items, itemid, get_valuetype_cb, 0, ELEM_FLAG_DO_NOT_CREATE);
 }
 
@@ -1683,4 +1694,36 @@ ELEMS_CALLBACK(set_item_poll_result) {
 void glb_state_items_set_poll_result(u_int64_t itemid, unsigned int lastcheck, int laststate) {
     poll_result_t poll_res ={.lastcheck = lastcheck, .state = laststate};
     elems_hash_process(state->items,itemid, set_item_poll_result, &poll_res, 0);
+}
+
+ELEMS_CALLBACK(get_error_cb) {
+    item_elem_t *item=elem->data;
+    char **error = data;
+    
+    if (NULL != item->meta.error) 
+        *error =zbx_strdup(*error, item->meta.error);
+    else 
+        *error =zbx_strdup(*error, ""); 
+    
+    return SUCCEED;
+}
+
+int     glb_state_item_get_error(u_int64_t itemid, char **error) {
+    return elems_hash_process(state->items, itemid, get_error_cb, error, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(get_lastlogsize_cb) {
+      item_elem_t *item=elem->data;
+      return item->meta.lastlogsize;
+}
+int     glb_state_items_get_lastlogsize(u_int64_t itemid) {
+    return elems_hash_process(state->items, itemid, get_lastlogsize_cb, NULL, ELEM_FLAG_DO_NOT_CREATE);
+}
+
+ELEMS_CALLBACK(set_lastlogsize_cb) {
+    item_elem_t *item=elem->data;
+    item->meta.lastlogsize = *(int*) data;
+}
+int  glb_state_items_set_lastlogsize(u_int64_t itemid, int lastlogsize) {
+    return elems_hash_process(state->items, itemid, set_lastlogsize_cb, &lastlogsize, 0);
 }

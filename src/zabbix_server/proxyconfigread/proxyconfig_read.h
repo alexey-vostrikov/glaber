@@ -29,9 +29,9 @@ typedef enum {
 zbx_proxyconfig_status_t;
 
 int	zbx_proxyconfig_get_data(DC_PROXY *proxy, const struct zbx_json_parse *jp_request, struct zbx_json *j,
-		zbx_proxyconfig_status_t *status, const zbx_config_vault_t *config_vault, char **error);
+		zbx_proxyconfig_status_t *status, const zbx_config_vault_t *config_vault, char **error, int server_start_time);
 
 void	zbx_send_proxyconfig(zbx_socket_t *sock, const struct zbx_json_parse *jp,
-		const zbx_config_vault_t *config_vault, int config_timeout);
+		const zbx_config_vault_t *config_vault, int config_timeout, int server_start_time);
 
 #endif

@@ -918,4 +918,302 @@ typedef void* (*dedup_copy_func_t)(void *dest, void* sorce, mem_funcs_t *memf);
 typedef void* (*dedup_clean_func_t)(void *data, mem_funcs_t *memf);
 
 
+typedef void (*glb_vector_iterate_func_t)(void *element, void *cb_data);
+typedef void (*glb_vector_clear_func_t)(void *element, mem_funcs_t *memf);
+
+
+/*this is fixed implementation of the ZBX_VECTOR, with some changes:
+ - memory functions are passed as params to save some mem
+ - iterator function implemented
+ - clean item callbacks supported
+*/
+#define GLB_VECTOR_DECL(__id, __type)										\
+														\
+typedef struct													\
+{														\
+	__type			*values;									\
+	int			values_num;									\
+	int			values_alloc;									\
+}														\
+glb_vector_ ## __id ## _t;											\
+														\
+void	glb_vector_ ## __id ## _create(glb_vector_ ## __id ## _t *vector, mem_funcs_t *memf);					\
+void	glb_vector_ ## __id ## _destroy(glb_vector_ ## __id ## _t *vector, mem_funcs_t *memf,  glb_vector_clear_func_t clear_func);			\
+														\
+int 	glb_vector_ ## __id ## _append(glb_vector_ ## __id ## _t *vector, __type value, mem_funcs_t *memf);			\
+void	glb_vector_ ## __id ## _append_ptr(glb_vector_ ## __id ## _t *vector, __type *value, mem_funcs_t *memf);			\
+void	glb_vector_ ## __id ## _append_array(glb_vector_ ## __id ## _t *vector, __type const *values,		\
+									int values_num, mem_funcs_t *memf);			\
+void	glb_vector_ ## __id ## _remove_noorder(glb_vector_ ## __id ## _t *vector, int index);			\
+void	glb_vector_ ## __id ## _remove(glb_vector_ ## __id ## _t *vector, int index);				\
+														\
+void	glb_vector_ ## __id ## _sort(glb_vector_ ## __id ## _t *vector, zbx_compare_func_t compare_func);	\
+void	glb_vector_ ## __id ## _uniq(glb_vector_ ## __id ## _t *vector, zbx_compare_func_t compare_func);	\
+														\
+int	glb_vector_ ## __id ## _nearestindex(const glb_vector_ ## __id ## _t *vector, const __type value,	\
+									zbx_compare_func_t compare_func);	\
+int	glb_vector_ ## __id ## _bsearch(const glb_vector_ ## __id ## _t *vector, const __type value,		\
+									zbx_compare_func_t compare_func);	\
+int	glb_vector_ ## __id ## _lsearch(const glb_vector_ ## __id ## _t *vector, const __type value, int *index,\
+									zbx_compare_func_t compare_func);	\
+int	glb_vector_ ## __id ## _search(const glb_vector_ ## __id ## _t *vector, const __type value,		\
+									zbx_compare_func_t compare_func);	\
+void	glb_vector_ ## __id ## _setdiff(glb_vector_ ## __id ## _t *left, const glb_vector_ ## __id ## _t *right,\
+									zbx_compare_func_t compare_func);	\
+														\
+void	glb_vector_ ## __id ## _reserve(glb_vector_ ## __id ## _t *vector, size_t size, mem_funcs_t *memf);			\
+void	glb_vector_ ## __id ## _clear(glb_vector_ ## __id ## _t *vector);   \
+void	glb_vector_ ## __id ## _iterate(glb_vector_ ## __id ## _t *vector, glb_vector_iterate_func_t iter_func, void *data);  \
+__type *	glb_vector_ ## __id ## _get_element(glb_vector_ ## __id ## _t *vector, int idx); \
+
+
+#define	GLB_VECTOR_IMPL(__id, __type)										\
+														\
+static void	__vector_ ## __id ## _ensure_free_space(glb_vector_ ## __id ## _t *vector, mem_funcs_t *memf)			\
+{														\
+	if (NULL == vector->values)										\
+	{													\
+		vector->values_num = 0;										\
+		vector->values_alloc = 32;									\
+		vector->values = (__type *)memf->malloc_func(NULL, (size_t)vector->values_alloc *		\
+				sizeof(__type));								\
+	}													\
+	else if (vector->values_num == vector->values_alloc)							\
+	{													\
+		vector->values_alloc = MAX(vector->values_alloc + 1, vector->values_alloc *			\
+				ZBX_VECTOR_ARRAY_GROWTH_FACTOR);						\
+		vector->values = (__type *)memf->realloc_func(vector->values,				\
+				(size_t)vector->values_alloc * sizeof(__type));					\
+	}													\
+}														\
+														\
+														\
+void	glb_vector_ ## __id ## _create(glb_vector_ ## __id ## _t *vector, mem_funcs_t *memf) \
+{														\
+	vector->values = NULL;											\
+	vector->values_num = 0;											\
+	vector->values_alloc = 0;										\
+}														\
+														\
+void	glb_vector_ ## __id ## _destroy(glb_vector_ ## __id ## _t *vector, mem_funcs_t *memf, glb_vector_clear_func_t clear_func)					\
+{														\
+	int i;				\
+	if (NULL != clear_func)		\
+		for (i = 0 ; i < vector->values_num; i++)	\
+			clear_func(&vector->values[i], memf);	\
+													\
+	if (NULL != vector->values)										\
+	{													\
+		memf->free_func(vector->values);								\
+		vector->values = NULL;										\
+		vector->values_num = 0;										\
+		vector->values_alloc = 0;									\
+	}													\
+}														\
+														\
+int	glb_vector_ ## __id ## _append(glb_vector_ ## __id ## _t *vector, __type value, mem_funcs_t *memf)				\
+{														\
+	__vector_ ## __id ## _ensure_free_space(vector, memf);							\
+	vector->values[vector->values_num++] = value; 		\
+	return vector->values_num-1;								\
+}														\
+														\
+void	glb_vector_ ## __id ## _append_ptr(glb_vector_ ## __id ## _t *vector, __type *value, mem_funcs_t *memf)			\
+{														\
+	__vector_ ## __id ## _ensure_free_space(vector, memf);							\
+	vector->values[vector->values_num++] = *value;								\
+}														\
+														\
+void	glb_vector_ ## __id ## _append_array(glb_vector_ ## __id ## _t *vector, __type const *values,		\
+									int values_num, mem_funcs_t *memf)				\
+{														\
+	glb_vector_ ## __id ## _reserve(vector, (size_t)(vector->values_num + values_num), memf);			\
+	memcpy(vector->values + vector->values_num, values, (size_t)values_num * sizeof(__type));		\
+	vector->values_num = vector->values_num + values_num;							\
+}														\
+														\
+void	glb_vector_ ## __id ## _remove_noorder(glb_vector_ ## __id ## _t *vector, int index)			\
+{														\
+	if (!(0 <= index && index < vector->values_num))							\
+	{													\
+		zabbix_log(LOG_LEVEL_CRIT, "removing a non-existent element at index %d", index);		\
+		exit(EXIT_FAILURE);										\
+	}													\
+														\
+	vector->values[index] = vector->values[--vector->values_num];						\
+}														\
+														\
+void	glb_vector_ ## __id ## _remove(glb_vector_ ## __id ## _t *vector, int index)				\
+{														\
+	if (!(0 <= index && index < vector->values_num))							\
+	{													\
+		zabbix_log(LOG_LEVEL_CRIT, "removing a non-existent element at index %d", index);		\
+		exit(EXIT_FAILURE);										\
+	}													\
+														\
+	vector->values_num--;											\
+	memmove(&vector->values[index], &vector->values[index + 1],						\
+			sizeof(__type) * (size_t)(vector->values_num - index));					\
+}														\
+														\
+void	glb_vector_ ## __id ## _sort(glb_vector_ ## __id ## _t *vector, zbx_compare_func_t compare_func)	\
+{														\
+	if (2 <= vector->values_num)										\
+		qsort(vector->values, (size_t)vector->values_num, sizeof(__type), compare_func);		\
+}														\
+														\
+void	glb_vector_ ## __id ## _uniq(glb_vector_ ## __id ## _t *vector, zbx_compare_func_t compare_func)	\
+{														\
+	if (2 <= vector->values_num)										\
+	{													\
+		int	i, j = 1;										\
+														\
+		for (i = 1; i < vector->values_num; i++)							\
+		{												\
+			if (0 != compare_func(&vector->values[i - 1], &vector->values[i]))			\
+				vector->values[j++] = vector->values[i];					\
+		}												\
+														\
+		vector->values_num = j;										\
+	}													\
+}														\
+														\
+int	glb_vector_ ## __id ## _nearestindex(const glb_vector_ ## __id ## _t *vector, const __type value,	\
+									zbx_compare_func_t compare_func)	\
+{														\
+	int	lo = 0, hi = vector->values_num, mid, c;							\
+														\
+	while (1 <= hi - lo)											\
+	{													\
+		mid = (lo + hi) / 2;										\
+														\
+		c = compare_func(&vector->values[mid], &value);							\
+														\
+		if (0 > c)											\
+		{												\
+			lo = mid + 1;										\
+		}												\
+		else if (0 == c)										\
+		{												\
+			return mid;										\
+		}												\
+		else												\
+			hi = mid;										\
+	}													\
+														\
+	return hi;												\
+}														\
+														\
+int	glb_vector_ ## __id ## _bsearch(const glb_vector_ ## __id ## _t *vector, const __type value,		\
+									zbx_compare_func_t compare_func)	\
+{														\
+	__type	*ptr;												\
+														\
+	ptr = (__type *)zbx_bsearch(&value, vector->values, (size_t)vector->values_num, sizeof(__type),		\
+			compare_func);										\
+														\
+	if (NULL != ptr)											\
+		return (int)(ptr - vector->values);								\
+	else													\
+		return FAIL;											\
+}														\
+														\
+int	glb_vector_ ## __id ## _lsearch(const glb_vector_ ## __id ## _t *vector, const __type value, int *index,\
+									zbx_compare_func_t compare_func)	\
+{														\
+	while (*index < vector->values_num)									\
+	{													\
+		int	c = compare_func(&vector->values[*index], &value);					\
+														\
+		if (0 > c)											\
+		{												\
+			(*index)++;										\
+			continue;										\
+		}												\
+														\
+		if (0 == c)											\
+			return SUCCEED;										\
+														\
+		if (0 < c)											\
+			break;											\
+	}													\
+														\
+	return FAIL;												\
+}														\
+														\
+int	glb_vector_ ## __id ## _search(const glb_vector_ ## __id ## _t *vector, const __type value,		\
+									zbx_compare_func_t compare_func)	\
+{														\
+	int	index;												\
+														\
+	for (index = 0; index < vector->values_num; index++)							\
+	{													\
+		if (0 == compare_func(&vector->values[index], &value))						\
+			return index;										\
+	}													\
+														\
+	return FAIL;												\
+}														\
+														\
+														\
+void	glb_vector_ ## __id ## _setdiff(glb_vector_ ## __id ## _t *left, const glb_vector_ ## __id ## _t *right,\
+									zbx_compare_func_t compare_func)	\
+{														\
+	int	c, block_start, deleted = 0, left_index = 0, right_index = 0;					\
+														\
+	while (left_index < left->values_num && right_index < right->values_num)				\
+	{													\
+		c = compare_func(&left->values[left_index], &right->values[right_index]);			\
+														\
+		if (0 >= c)											\
+			left_index++;										\
+														\
+		if (0 <= c)											\
+			right_index++;										\
+														\
+		if (0 != c)											\
+			continue;										\
+														\
+		if (0 < deleted++)										\
+		{												\
+			memmove(&left->values[block_start - deleted + 1], &left->values[block_start],		\
+					(size_t)(left_index - 1 - block_start) * sizeof(__type));		\
+		}												\
+														\
+		block_start = left_index;									\
+	}													\
+														\
+	if (0 < deleted)											\
+	{													\
+		memmove(&left->values[block_start - deleted], &left->values[block_start],			\
+				(size_t)(left->values_num - block_start) * sizeof(__type));			\
+		left->values_num -= deleted;									\
+	}													\
+}														\
+														\
+void	glb_vector_ ## __id ## _reserve(glb_vector_ ## __id ## _t *vector, size_t size, mem_funcs_t *memf)				\
+{														\
+	if ((int)size > vector->values_alloc)									\
+	{													\
+		vector->values_alloc = (int)size;								\
+		vector->values = (__type *)memf->realloc_func(vector->values,				\
+				(size_t)vector->values_alloc * sizeof(__type));					\
+	}													\
+}														\
+														\
+void	glb_vector_ ## __id ## _clear(glb_vector_ ## __id ## _t *vector)					\
+{														\
+	vector->values_num = 0;											\
+}	\
+__type *	glb_vector_ ## __id ## _get_element(glb_vector_ ## __id ## _t *vector, int idx)					\
+{														\
+	return &vector->values[idx];											\
+}												\
+void	glb_vector_ ## __id ## _iterate(glb_vector_ ## __id ## _t *vector, glb_vector_iterate_func_t iter_func, void *data)				\
+{														\
+	int i;  \
+	for (i = 0 ; i < vector->values_num; i++  ) \
+		iter_func(&vector->values[i], data); \
+}								\
+
 #endif /* ZABBIX_ZBXALGO_H */

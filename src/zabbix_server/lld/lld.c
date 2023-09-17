@@ -1042,12 +1042,11 @@ static int	lld_rows_get(u_int64_t discoveryid, int lifetime, const char *value, 
 	p = NULL;
 	while (NULL != (p = zbx_json_next(&jp_array, p)))
 	{
-		
-
 		if (FAIL == zbx_json_brackets_open(p, &jp_row))
 			continue;
 
-		zbx_snprintf(row_str, jp_row.end - jp_row.start, "%s", jp_row.start);
+		zbx_snprintf(row_str, MIN(MAX_STRING_LEN-2, jp_row.end - jp_row.start), 
+											"%s", jp_row.start);
 		DEBUG_ITEM(discoveryid, "Evaluating row: '%s'", row_str);
 
 		if (SUCCEED != filter_evaluate(filter, &jp_row, lld_macro_paths, info)) {
@@ -1229,10 +1228,10 @@ int	lld_process_discovery_rule(zbx_uint64_t lld_ruleid, const char *value, char 
 		goto out;
 	}
 
-	*error = zbx_strdup(*error, "");
-
+	*error = zbx_strdup(NULL, "");
+	
 	now = time(NULL);
-
+	
 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_AUDITLOG_ENABLED);
 	zbx_audit_init(cfg.auditlog_enabled);
 

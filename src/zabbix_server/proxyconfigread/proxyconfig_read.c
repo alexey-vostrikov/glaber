@@ -1102,7 +1102,7 @@ out:
  *                                                                            *
  ******************************************************************************/
 int	zbx_proxyconfig_get_data(DC_PROXY *proxy, const struct zbx_json_parse *jp_request, struct zbx_json *j,
-		zbx_proxyconfig_status_t *status, const zbx_config_vault_t *config_vault, char **error)
+		zbx_proxyconfig_status_t *status, const zbx_config_vault_t *config_vault, char **error, int server_start_time)
 {
 	int			ret = FAIL;
 	char			token[ZBX_SESSION_TOKEN_SIZE + 1], tmp[ZBX_MAX_UINT64_LEN + 1];
@@ -1151,6 +1151,7 @@ int	zbx_proxyconfig_get_data(DC_PROXY *proxy, const struct zbx_json_parse *jp_re
 		}
 
 		zbx_json_adduint64(j, ZBX_PROTO_TAG_CONFIG_REVISION, dc_revision.config);
+		zbx_json_adduint64(j, "server_start_time", server_start_time);
 
 		zabbix_log(LOG_LEVEL_TRACE, "%s() configuration: %s", __func__, j->buffer);
 	}
@@ -1172,7 +1173,7 @@ out:
  *                                                                            *
  ******************************************************************************/
 void	zbx_send_proxyconfig(zbx_socket_t *sock, const struct zbx_json_parse *jp,
-		const zbx_config_vault_t *config_vault, int config_timeout)
+		const zbx_config_vault_t *config_vault, int config_timeout, int server_start_time)
 {
 	char				*error = NULL, *buffer = NULL, *version_str = NULL;
 	struct zbx_json			j;
@@ -1217,7 +1218,7 @@ void	zbx_send_proxyconfig(zbx_socket_t *sock, const struct zbx_json_parse *jp,
 
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
-	if (SUCCEED != zbx_proxyconfig_get_data(&proxy, jp, &j, &status, config_vault, &error))
+	if (SUCCEED != zbx_proxyconfig_get_data(&proxy, jp, &j, &status, config_vault, &error, server_start_time))
 	{
 		(void)zbx_send_response_ext(sock, FAIL, error, NULL, flags, config_timeout);
 		zabbix_log(LOG_LEVEL_WARNING, "cannot collect configuration data for proxy \"%s\" at \"%s\": %s",

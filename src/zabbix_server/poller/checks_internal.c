@@ -26,11 +26,12 @@
 #include "zbxtrends.h"
 #include "../vmware/vmware.h"
 #include "../../libs/zbxsysinfo/common/zabbix_stats.h"
-#include "zbxavailability.h"
+#include "../../libs/glb_state/glb_state_hosts.h"
 #include "zbxnum.h"
 #include "zbxsysinfo.h"
 #include "zbx_host_constants.h"
 #include "../glb_poller/internal.h"
+
 
 extern unsigned char	program_type;
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
@@ -278,15 +279,13 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 	if (0 == strcmp("internal", get_rkey(&request)))
 	{
 		char *str_result = NULL;
-		if (SUCCEED == (ret =  glb_get_internal_metric(first_param, nparams, &request, &str_result)))
+		if (SUCCEED == (ret = glb_get_internal_metric(first_param, nparams, &request, &str_result))) {
 			SET_STR_RESULT(result, str_result);
-		else 
-			SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported internal key"));
-		//warn: str result doesn't have to be deallocated!!!
-		goto out;
+			goto out;
+		}
 	}
 
-	if (0 != strcmp("zabbix", get_rkey(&request)))
+	if (0 != strcmp("zabbix", get_rkey(&request)) && 0 != strcmp("internal", get_rkey(&request)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Unsupported item key for this item type."));
 		goto out;
@@ -407,37 +406,35 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		if (0 == strcmp(tmp, "available"))		/* zabbix["host",<type>,"available"] */
 		{
-			zbx_agent_availability_t	agents[ZBX_AGENT_MAX];
-			int				i;
-
-			zbx_get_host_interfaces_availability(item->host.hostid, agents);
-
-			for (i = 0; i < ZBX_AGENT_MAX; i++)
-				zbx_free(agents[i].error);
-
+			int iface_type = INTERFACE_TYPE_AGENT;
+		
 			tmp = get_rparam(&request, 1);
-
+	
 			if (0 == strcmp(tmp, "agent"))
-				SET_UI64_RESULT(result, agents[ZBX_AGENT_ZABBIX].available);
+				iface_type = INTERFACE_TYPE_AGENT;
 			else if (0 == strcmp(tmp, "snmp"))
-				SET_UI64_RESULT(result, agents[ZBX_AGENT_SNMP].available);
+				iface_type = INTERFACE_TYPE_SNMP;
 			else if (0 == strcmp(tmp, "ipmi"))
-				SET_UI64_RESULT(result, agents[ZBX_AGENT_IPMI].available);
+				iface_type = INTERFACE_TYPE_IPMI; 
 			else if (0 == strcmp(tmp, "jmx"))
-				SET_UI64_RESULT(result, agents[ZBX_AGENT_JMX].available);
-			else if (0 == strcmp(tmp, "active_agent"))
-			{
-				SET_UI64_RESULT(result, zbx_get_active_agent_availability(item->host.hostid));
-				ret = SUCCEED;
-				goto out;
-			}
-			else
-			{
-				SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
-				goto out;
-			}
+				iface_type = INTERFACE_TYPE_JMX;
+			
 
-			result->ui64 = 2 - result->ui64;
+			int iface_avail_state = glb_state_host_get_interface_avail_by_type(item->host.hostid, iface_type, tmp);
+			//setting = 2 - iface_avail_state would be easier but its hard to understand
+			switch (iface_avail_state) {
+				case INTERFACE_AVAILABLE_FALSE: 
+					SET_UI64_RESULT(result, 0);
+					break;	 
+
+				case INTERFACE_AVAILABLE_TRUE:
+					SET_UI64_RESULT(result, 1);
+					break;
+
+				case INTERFACE_AVAILABLE_UNKNOWN:
+					SET_UI64_RESULT(result, 2);
+					break;
+			}
 		}
 		else if (0 == strcmp(tmp, "maintenance"))	/* zabbix["host",,"maintenance"] */
 		{

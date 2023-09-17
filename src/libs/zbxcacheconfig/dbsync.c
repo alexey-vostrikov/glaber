@@ -1008,7 +1008,7 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 			"select h.hostid,h.proxy_hostid,h.host,h.ipmi_authtype,h.ipmi_privilege,h.ipmi_username,"
 				"h.ipmi_password,h.maintenance_status,h.maintenance_type,h.maintenance_from,"
 				"h.status,h.name,hr.lastaccess,h.tls_connect,h.tls_accept,h.tls_issuer,h.tls_subject,"
-				"h.tls_psk_identity,h.tls_psk,h.proxy_address,h.auto_compress,h.maintenanceid"
+				"h.tls_psk_identity,h.tls_psk,h.proxy_address,h.auto_compress,h.maintenanceid,h.description"
 			" from hosts h"
 			" left join host_rtdata hr on h.hostid=hr.hostid"
 			" where status in (%d,%d,%d,%d)"
@@ -1017,13 +1017,13 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
 			ZBX_FLAG_DISCOVERY_PROTOTYPE);
 
-	dbsync_prepare(sync, 22, NULL);
+	dbsync_prepare(sync, 23, NULL);
 #else
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 			"select h.hostid,h.proxy_hostid,h.host,h.ipmi_authtype,h.ipmi_privilege,h.ipmi_username,"
 				"h.ipmi_password,h.maintenance_status,h.maintenance_type,h.maintenance_from,"
 				"h.status,h.name,hr.lastaccess,h.tls_connect,h.tls_accept,"
-				"h.proxy_address,h.auto_compress,h.maintenanceid"
+				"h.proxy_address,h.auto_compress,h.maintenanceid,h.description"
 			" from hosts h"
 			" left join host_rtdata hr on h.hostid=hr.hostid"
 			" where status in (%d,%d,%d,%d)"
@@ -1032,7 +1032,7 @@ int	zbx_dbsync_compare_hosts(zbx_dbsync_t *sync)
 			HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE,
 			ZBX_FLAG_DISCOVERY_PROTOTYPE);
 
-	dbsync_prepare(sync, 18, NULL);
+	dbsync_prepare(sync, 19, NULL);
 #endif
 
 	if (ZBX_DBSYNC_INIT == sync->mode)
@@ -1542,17 +1542,9 @@ static int	dbsync_compare_interface(const ZBX_DC_INTERFACE *interface, const DB_
 	if (FAIL == dbsync_compare_str(dbrow[7], interface->port))
 		return FAIL;
 
-	if (FAIL == dbsync_compare_uchar(dbrow[8], interface->available))
-		return FAIL;
-
 	if (FAIL == dbsync_compare_int(dbrow[9], interface->disable_until))
 		return FAIL;
 
-	if (FAIL == dbsync_compare_str(dbrow[10], interface->error))
-		return FAIL;
-
-	if (FAIL == dbsync_compare_int(dbrow[11], interface->errors_from))
-		return FAIL;
 	/* reset_availability, items_num and availability_ts are excluded from the comparison */
 
 	snmp = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&dbsync_env.cache->interfaces_snmp,
@@ -1727,16 +1719,15 @@ int	zbx_dbsync_compare_items(zbx_dbsync_t *sync)
 
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
 			"select i.itemid,i.hostid,i.status,i.type,i.value_type,i.key_,i.snmp_oid,i.ipmi_sensor,i.delay,"
-				"i.trapper_hosts,i.logtimefmt,i.params,ir.state,i.authtype,i.username,i.password,"
-				"i.publickey,i.privatekey,i.flags,i.interfaceid,ir.lastlogsize,ir.mtime,"
-				"i.history,i.trends,i.inventory_link,i.valuemapid,i.units,ir.error,i.jmx_endpoint,"
+				"i.trapper_hosts,i.logtimefmt,i.params,null,i.authtype,i.username,i.password,"
+				"i.publickey,i.privatekey,i.flags,i.interfaceid, null, null,"
+				"i.history,i.trends,i.inventory_link,i.valuemapid, i.units, i.name,i.jmx_endpoint,"
 				"i.master_itemid,i.timeout,i.url,i.query_fields,i.posts,i.status_codes,"
 				"i.follow_redirects,i.post_type,i.http_proxy,i.headers,i.retrieve_mode,"
 				"i.request_method,i.output_format,i.ssl_cert_file,i.ssl_key_file,i.ssl_key_password,"
-				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid,null"
+				"i.verify_peer,i.verify_host,i.allow_traps,i.templateid, i.description"
 			" from items i"
 			" inner join hosts h on i.hostid=h.hostid"
-			" join item_rtdata ir on i.itemid=ir.itemid"
 			" where h.status in (%d,%d) and i.flags<>%d",
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, ZBX_FLAG_DISCOVERY_PROTOTYPE);
 

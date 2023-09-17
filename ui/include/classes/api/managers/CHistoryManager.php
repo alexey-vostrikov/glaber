@@ -238,10 +238,9 @@ class CHistoryManager {
 	 *
 	 * @return string  Aggregated history value.
 	 */
-	//TODO implement this based on server's request
-	 public function getAggregatedValue(array $item, $aggregation, $time_from) {
-//		switch (self::getDataSourceType($item['value_type'])) {
-			   return $this->getAggregatedValueFromServer($item, $aggregation, $time_from);
+
+	public function getAggregatedValue(array $item, $aggregation, $time_from) {
+		return $this->getAggregatedValueFromServer($item, $aggregation, $time_from);
 	}
 
 	private function getAggregatedValueFromServer(array $item, $aggregation, $time_from) {

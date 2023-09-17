@@ -231,7 +231,7 @@
 #define ZBX_PROTO_VALUE_GET_STATUS		"status.get"
 #define ZBX_PROTO_VALUE_GET_HISTORY		"history.get"
 #define GLB_PROTO_VALUE_GET_TRIGGER_STATUS		"triggers.state.get"
-#define GLB_PROTO_VALUE_GET_INTERFACE_STATE		"interface.state.get"
+#define GLB_PROTO_VALUE_GET_INTERFACE_AVAIL_STATE		"host.interfaces.avail.get"
 
 #define ZBX_PROTO_VALUE_PROXY_DATA		"proxy data"
 #define ZBX_PROTO_VALUE_PROXY_TASKS		"proxy tasks"
@@ -342,8 +342,10 @@ const char	*zbx_json_decodevalue(const char *p, char *string, size_t size, zbx_j
 const char	*zbx_json_decodevalue_dyn(const char *p, char **string, size_t *string_alloc, zbx_json_type_t *type);
 void		zbx_json_escape(char **string);
 int		zbx_json_open_path(const struct zbx_json_parse *jp, const char *path, struct zbx_json_parse *out);
-long int glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag);
-double  glb_json_get_dbl_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag);
+
+int		glb_json_get_uint64_value_by_name(struct zbx_json_parse* jp, char *name, u_int64_t *value);
+int 	glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, int *value);
+int		glb_json_get_dbl_value_by_name(struct zbx_json_parse* jp, char *name, double *value);
 
 zbx_json_type_t	zbx_json_valuetype(const char *p);
 

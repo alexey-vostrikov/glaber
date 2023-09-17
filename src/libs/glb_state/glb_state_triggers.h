@@ -47,7 +47,7 @@ void    glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff);
 int     glb_state_triggers_dump();
 
 int     glb_state_triggers_destroy();
-void    glb_state_triggers_housekeep(int frequency);
+void    glb_state_triggers_housekeep();
 int     glb_state_triggers_load();
 
 int     glb_state_triggers_get_state_json(zbx_vector_uint64_t *ids, struct zbx_json *json);

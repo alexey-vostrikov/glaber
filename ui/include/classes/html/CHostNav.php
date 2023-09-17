@@ -97,7 +97,7 @@ class CHostNav extends CList {
             ],
             'selectHostDiscovery' => ['ts_delete'],
             'selectHttpTests' => API_OUTPUT_COUNT,
-            'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error'],
+            'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error', 'include_named'],
             'hostids' => [$hostid],
         //    'editable' => true
         ];

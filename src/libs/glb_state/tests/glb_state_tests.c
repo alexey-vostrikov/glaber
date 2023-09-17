@@ -17,74 +17,12 @@
 **/
 #include "zbxcommon.h"
 #include "zbx_trigger_constants.h"
-#include "zbxavailability.h"
 #include "../glb_state_triggers.h"
-#include "../glb_state_interfaces.h"
-
-static void state_test_untyped_interfaces() {
-    LOG_INF("Starting normal (untyped) interfaces tests");
-     mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
-            .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
-    
-    glb_state_interface_info_t *ifinfo;
-    sleep(1);
-    assert(FAIL == glb_state_interfaces_register_fail(0, NULL));
-    assert(SUCCEED == glb_state_interfaces_register_fail(1, "hi there"));
-    assert(NULL != (ifinfo = glb_state_interfaces_get_avail(1)));
-    assert(INTERFACE_AVAILABLE_UNKNOWN == ifinfo->avail);    
-    assert(SUCCEED == glb_state_interfaces_register_fail(1, "hi there"));
-    assert(SUCCEED == glb_state_interfaces_register_fail(1, "hi there"));
-    assert(NULL != (ifinfo = glb_state_interfaces_get_avail(1)));
-    assert(INTERFACE_AVAILABLE_FALSE == ifinfo->avail);    
-
-    sleep(2);
-    HALT_HERE("Intentional halt on iface tests finish- SUCCESS");
-}
-
-
-static void state_test_interfaces() {
-    LOG_INF("Starting interfaces tests");
-     mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
-            .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
-    
-    glb_state_interfaces_init(&memf);
-
-    assert(FAIL == glb_state_interfaces_register_ip(NULL, 0));
-    assert(SUCCEED == glb_state_interfaces_register_ip("1.4.5.6", 1));
-    
-    assert(0 == glb_state_interfaces_find_host_by_ip("4.5.6.7"));
-    assert(0 == glb_state_interfaces_find_host_by_ip(NULL));
-    
-    assert(1 == glb_state_interfaces_find_host_by_ip("1.4.5.6"));
-    //check several ip->same host
-    assert(SUCCEED == glb_state_interfaces_register_ip("127.0.0.1", 1));
-    assert(1 == glb_state_interfaces_find_host_by_ip("1.4.5.6"));
-    assert(1 == glb_state_interfaces_find_host_by_ip("127.0.0.1"));
-    //check ip change to another host
-    assert(SUCCEED == glb_state_interfaces_register_ip("127.0.0.1", 5461));
-    assert(5461 == glb_state_interfaces_find_host_by_ip("127.0.0.1"));
-
-    //cleanup check
-    LOG_INF("Deleting ip addr");
-    glb_state_interfaces_release_ip("127.0.0.1");
-    LOG_INF("Deleted ip addr");
-    assert(0 == glb_state_interfaces_find_host_by_ip("127.0.0.1"));
-
-    //some shit to test stability
-    glb_state_interfaces_release_ip(NULL);
-    glb_state_interfaces_release_ip("dfcwedfwe");
-    glb_state_interfaces_release_ip("127.0.0.1");
-    glb_state_interfaces_release_ip("127.0.0.1");
-
-    glb_state_interfaces_destroy();
-  //  HALT_HERE("Host tests succeed");
- 
-}
-
+#include "../glb_state_hosts.h"
 
 static void state_test_triggers(){
     LOG_INF("Starting triggers tests");
-     mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
+    mem_funcs_t memf = { .malloc_func = zbx_default_mem_malloc_func, 
             .free_func = zbx_default_mem_free_func, .realloc_func = zbx_default_mem_realloc_func};
     state_trigger_info_t info;
     
@@ -215,9 +153,9 @@ static void state_test_triggers(){
 
 #ifdef HAVE_GLB_TESTS
 
-void glb_state_run_tests1(void) {
-    state_test_untyped_interfaces();
-    state_test_interfaces();
+void glb_state_run_tests(void) {
+
+    glb_state_hosts_interfaces_run_tests();
     state_test_triggers();
 }
 #endif

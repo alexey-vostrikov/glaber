@@ -215,16 +215,6 @@ ui/locale/frontend.pot
 ui/tests/bootstrap.php
 ui/tests/composer.*
 ui/tests/vendor
-src/glapi/glb_syslog_worker
-src/glapi/glb_hist_victoria
-src/glapi/glb_ripe_subscriber
-src/glapi/glb_test_worker
-src/glapi/glb_syslog_worker
-src/glapi/glb_http_listener
-src/glapi/glb_domofon_logs_worker
-src/glapi/glb_hist_clickhouse
-src/glapi/glb_log_listener
-src/glapi/glb_hist_clickhouse
 include/config.h.in~
 build/config.log
 include/common/config.h
@@ -250,3 +240,4 @@ meta-data
 vm-output*
 src/glapi/glb_syslog_sender
 run.sh
+ui/modules/*

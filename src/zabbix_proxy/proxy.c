@@ -55,7 +55,7 @@
 #include "diag/diag_proxy.h"
 #include "zbxrtc.h"
 #include "rtc/rtc_proxy.h"
-#include "../zabbix_server/availability/avail_manager.h"
+
 #include "zbxstats.h"
 #include "stats/zabbix_stats.h"
 #include "zbxip.h"
@@ -266,7 +266,7 @@ int	CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT] = {
 	0, /* ZBX_PROCESS_TYPE_LLDWORKER */
 	0, /* ZBX_PROCESS_TYPE_ALERTSYNCER */
 	0, /* ZBX_PROCESS_TYPE_HISTORYPOLLER */
-	1, /* ZBX_PROCESS_TYPE_AVAILMAN */
+	0, /* deprecated !!! ZBX_PROCESS_TYPE_AVAILMAN */
 	0, /* ZBX_PROCESS_TYPE_REPORTMANAGER */
 	0, /* ZBX_PROCESS_TYPE_REPORTWRITER */
 	0, /* ZBX_PROCESS_TYPE_SERVICEMAN */
@@ -481,11 +481,6 @@ int	get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 	{
 		*local_process_type = ZBX_PROCESS_TYPE_PINGER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_PINGER];
-	}
-	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_AVAILMAN]))
-	{
-		*local_process_type = ZBX_PROCESS_TYPE_AVAILMAN;
-		*local_process_num = local_server_num - server_count + CONFIG_FORKS[ZBX_PROCESS_TYPE_AVAILMAN];
 	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[ZBX_PROCESS_TYPE_ODBCPOLLER]))
 	{
@@ -814,7 +809,7 @@ static int	proxy_add_serveractive_host_cb(const zbx_vector_ptr_t *addrs, zbx_vec
 static void set_config_defaults() {
 	
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 1;
-	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 1;
+	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 0;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT] = 1;
@@ -1253,7 +1248,8 @@ int	main(int argc, char **argv)
 				break;
 		}
 	}
-	zbx_error("Starting daemon0");
+	
+	//zbx_error("Starting daemon0");
 	/* every option may be specified only once */
 	if (1 < opt_c || 1 < opt_r)
 	{
@@ -1278,7 +1274,7 @@ int	main(int argc, char **argv)
 	}
 
 	if (NULL == config_file)
-		config_file = zbx_strdup(NULL, DEFAULT_CONFIG_FILE);
+	config_file = zbx_strdup(NULL, DEFAULT_CONFIG_FILE);
 
 	/* required for simple checks */
 	zbx_init_metrics();
@@ -1767,10 +1763,10 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				thread_args.args = &taskmanager_args;
 				zbx_thread_start(taskmanager_thread, &thread_args, &threads[i]);
 				break;
-			case ZBX_PROCESS_TYPE_AVAILMAN:
-				threads_flags[i] = ZBX_THREAD_PRIORITY_FIRST;
-				zbx_thread_start(availability_manager_thread, &thread_args, &threads[i]);
-				break;
+//			case ZBX_PROCESS_TYPE_AVAILMAN:
+//				threads_flags[i] = ZBX_THREAD_PRIORITY_FIRST;
+//				zbx_thread_start(availability_manager_thread, &thread_args, &threads[i]);
+//				break;
 			case ZBX_PROCESS_TYPE_ODBCPOLLER:
 				poller_args.poller_type = ZBX_POLLER_TYPE_ODBC;
 				thread_args.args = &poller_args;

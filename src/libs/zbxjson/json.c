@@ -1108,51 +1108,59 @@ int	zbx_json_value_by_name_dyn(const struct zbx_json_parse *jp, const char *name
 	return SUCCEED;
 }
 
-
-/**********************************************************
- * returns long int from json by name of the attribute
- * if error hapens, sets errflag to 1, otherwise it's 0
- * ****************************************************************/
-long int glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag) {
-    char temp_str[MAX_ID_LEN];
+int glb_json_get_uint64_value_by_name(struct zbx_json_parse* jp, char *name, u_int64_t *value) {
+    
+	char temp_str[MAX_ID_LEN];
     zbx_json_type_t type;	
-	*errflag = 0;
+	
+	temp_str[0] = 0;
 
-    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) {
-        *errflag = 1;
+    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) 
         return FAIL;
-    }
     
-    long int value = strtol(temp_str, NULL, 10);
+    *value = strtoull(temp_str, NULL, 10);
     
-    if (EINVAL == errno)  {
-        *errflag = 1;
+    if (EINVAL == errno) 
         return FAIL;
-    }
-
-    return value;   
+    
+    return SUCCEED;   
 }
+
+int glb_json_get_int_value_by_name(struct zbx_json_parse* jp, char *name, int *value) {
+    
+	char temp_str[MAX_ID_LEN];
+    zbx_json_type_t type;	
+	
+	temp_str[0] = 0;
+
+    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) 
+        return FAIL;
+    
+    *value = strtol(temp_str, NULL, 10);
+    
+    if (EINVAL == errno) 
+        return FAIL;
+    
+    return SUCCEED;   
+}
+
 /**********************************************************
  * returns long int from json by name of the attribute
  * if error hapens, sets errflag to 1, otherwise it's untouched
  * ****************************************************************/
-double  glb_json_get_dbl_value_by_name(struct zbx_json_parse* jp, char *name, int *errflag) {
+int  glb_json_get_dbl_value_by_name(struct zbx_json_parse* jp, char *name, double *value) {
     char temp_str[MAX_ID_LEN];
     zbx_json_type_t type;	
 
-    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) {
-        *errflag = 1;
+    if  (SUCCEED != zbx_json_value_by_name(jp, name, temp_str, MAX_ID_LEN, &type)  ) 
         return FAIL;
-    }
     
-    double value = strtof(temp_str, NULL);
+    *value = strtod(temp_str, NULL);
     
-    if (EINVAL == errno)  {
-        *errflag = 1;
+    if (EINVAL == errno)  
         return FAIL;
-    }
-
-    return value;   
+    
+    return SUCCEED;   
 }
 /******************************************************************************
  *                                                                            *

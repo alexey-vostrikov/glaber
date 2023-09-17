@@ -102,12 +102,13 @@ static void item_destroy(void *proto_ctx) {
     zbx_free(agent_data);
 }
 
-static void fail_cb(poller_item_t *poller_item, void *proto_ctx, const char *error) {
+static void conn_fail_cb(poller_item_t *poller_item, void *proto_ctx, const char *error) {
     poller_preprocess_error(poller_item, error);
 }
 
 static void  timeout_cb(poller_item_t *poller_item, void *proto_ctx) {
-    fail_cb(poller_item, proto_ctx, "Timeout while waiting for response");
+    poller_preprocess_error(poller_item, "Timeout while waiting for response");
+    poller_register_item_iface_timeout(poller_item);
 } 
 
 static void create_request(poller_item_t *poller_item, void *proto_ctx, void **buffer, size_t *buffsize) {
@@ -144,6 +145,7 @@ static void process_payload_response(poller_item_t *poller_item, const char* buf
     }
 
     poller_preprocess_str(poller_item, NULL, value);
+    poller_register_item_iface_succeed(poller_item);
     
 	DEBUG_ITEM(poller_get_item_id(poller_item), "Arrived agent response: %s", value);
 
@@ -243,7 +245,7 @@ static unsigned char response_cb(poller_item_t *poller_item, void *proto_ctx, co
 }
 
 void tcp_agent_proto_init(tcp_poll_type_procs_t *procs) {
-    procs->fail_cb = fail_cb;
+    procs->conn_fail_cb = conn_fail_cb;
     procs->item_destroy = item_destroy;
     procs->item_init = item_init;
     procs->response_cb = response_cb;

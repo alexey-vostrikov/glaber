@@ -33,7 +33,6 @@
 #include "zbxtrends.h"
 #include "zbxserialize.h"
 #include "user_macro.h"
-#include "zbxavailability.h"
 #include "zbxexpr.h"
 #include "zbxnum.h"
 #include "zbxtime.h"
@@ -43,7 +42,7 @@
 #include "zbx_trigger_constants.h"
 #include "zbx_item_constants.h"
 #include "../glb_state/glb_state_items.h"
-#include "../glb_state/glb_state_interfaces.h"
+#include "../glb_state/glb_state_hosts.h"
 #include "../glb_state/glb_state_triggers.h"
 #include "../glb_conf/conf_hosts.h"
 #include "../../zabbix_server/glb_poller/poller_ipc.h"
@@ -52,6 +51,7 @@
 #include "../../zabbix_server/dbsyncer/trends.h"
 #include "zbxconnector.h"
 #include "zbxpreproc.h"
+#include "log.h"
 
 int sync_in_progress = 0;
 
@@ -116,8 +116,10 @@ static int cmp_key_id(const char *key_1, const char *key_2)
 extern int CONFIG_DISABLE_SNMPV1_ASYNC;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_WORKERS_DIR;
+
 static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
-	
+	extern unsigned char program_type;
+
 	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked if can be  async polled");
 	
 	if ( NULL == zbx_dc_host || NULL == zbx_dc_item ) {
@@ -125,8 +127,10 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		return FAIL;
 	}
 
-	if ( zbx_dc_host->proxy_hostid > 0)
-	 	return FAIL;
+	if (zbx_dc_host->proxy_hostid > 0 &&  //assigned to proxy
+		0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) &&   //running as server
+		ITEM_TYPE_CALCULATED != zbx_dc_item->type)  //all but calculated should be polled by proxy
+	 		return FAIL;
 		
 
 	switch (zbx_dc_item->type) {
@@ -676,12 +680,6 @@ void DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host,
 	{
 		dc_item->poller_type = poller_type;
 	}
-}
-
-static void DCincrease_disable_until(ZBX_DC_INTERFACE *interface, int now, int config_timeout)
-{
-	if (NULL != interface && 0 != interface->errors_from)
-		interface->disable_until = now + config_timeout;
 }
 
 /******************************************************************************
@@ -1409,6 +1407,8 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 
 		dc_strpool_replace(found, &host->host, row[2]);
 		dc_strpool_replace(found, &host->name, row[11]);
+		dc_strpool_replace(found, &host->description, row[18 + ZBX_HOST_TLS_OFFSET]);
+
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		dc_strpool_replace(found, &host->tls_issuer, row[15]);
 		dc_strpool_replace(found, &host->tls_subject, row[16]);
@@ -1663,7 +1663,8 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 				for (i = 0; i < host->interfaces_v.values_num; i++)
 				{
 					interface = (ZBX_DC_INTERFACE *)host->interfaces_v.values[i];
-					interface->reset_availability = 1;
+					
+					glb_state_host_set_id_interface_avail(host->hostid, interface->interfaceid, INTERFACE_AVAILABLE_FALSE, NULL );
 				}
 			}
 
@@ -1877,6 +1878,7 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 
 		dc_strpool_release(host->host);
 		dc_strpool_release(host->name);
+		dc_strpool_release(host->description);
 
 #if defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 		dc_strpool_release(host->tls_issuer);
@@ -1925,7 +1927,8 @@ void DCsync_host_inventory(zbx_dbsync_t *sync, zbx_uint64_t revision)
 	while (SUCCEED == (ret = zbx_dbsync_next(sync, &rowid, &row, &tag)))
 	{
 		/* removed rows will be always added at the end */
-
+		if (NULL == row) 
+			break;
 		ZBX_STR2UINT64(hostid, row[0]);
 
 		host_inventory = (ZBX_DC_HOST_INVENTORY *)DCfind_id(&config->host_inventories, hostid,
@@ -2346,15 +2349,13 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		reset_snmp_stats |= (SUCCEED == dc_strpool_replace(found, &interface->ip, row[5]));
 		reset_snmp_stats |= (SUCCEED == dc_strpool_replace(found, &interface->dns, row[6]));
 		reset_snmp_stats |= (SUCCEED == dc_strpool_replace(found, &interface->port, row[7]));
-		reset_snmp_stats |= (SUCCEED == dc_strpool_replace(found, &interface->error, row[10]));
+
 
 		if (0 == found)
 		{
-			interface->errors_from = atoi(row[11]);
-			interface->available = (unsigned char)atoi(row[8]);
+
 			interface->disable_until = atoi(row[9]);
-			interface->availability_ts = time(NULL);
-			interface->reset_availability = 0;
+
 			interface->items_num = 0;
 		}
 
@@ -2443,9 +2444,9 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 
 		// registering ip->host index in the state;
 		if (interface->useip)
-			glb_state_interfaces_register_ip(interface->ip, interface->hostid);
+			glb_state_host_register_ip(interface->ip, interface->hostid);
 		else
-			glb_state_interfaces_register_ip(interface->dns, interface->hostid);
+			glb_state_host_register_ip(interface->dns, interface->hostid);
 	}
 
 	/* resolve macros in other interfaces */
@@ -2505,7 +2506,6 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		dc_strpool_release(interface->ip);
 		dc_strpool_release(interface->dns);
 		dc_strpool_release(interface->port);
-		dc_strpool_release(interface->error);
 
 		zbx_hashset_remove_direct(&config->interfaces, interface);
 	}
@@ -2912,6 +2912,8 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		ZBX_DBROW2UINT64(interfaceid, row[19]);
 
 		dc_strpool_replace(found, &item->history_period, row[22]);
+		dc_strpool_replace(found, &item->name, row[27]);
+		dc_strpool_replace(found, &item->description, row[49]);
 
 		ZBX_STR2UCHAR(item->inventory_link, row[24]);
 		ZBX_DBROW2UINT64(item->valuemapid, row[25]);
@@ -2928,7 +2930,7 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		{
 			item->triggers = NULL;
 			item->update_triggers = 0;
-			ZBX_STR2UINT64(item->lastlogsize, row[20]);
+			//ZBX_STR2UINT64(item->lastlogsize, row[20]);
 			item->data_expected_from = now;
 			item->location = ZBX_LOC_NOWHERE;
 			item->poller_type = ZBX_NO_POLLER;
@@ -3663,6 +3665,8 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		dc_strpool_release(item->key);
 		dc_strpool_release(item->delay);
 		dc_strpool_release(item->history_period);
+		dc_strpool_release(item->name);
+		dc_strpool_release(item->description);
 
 		if (NULL != item->delay_ex)
 			dc_strpool_release(item->delay_ex);
@@ -6665,19 +6669,12 @@ static void dc_load_trigger_queue(zbx_hashset_t *trend_functions)
 
 static void zbx_dbsync_process_active_avail_diff(zbx_vector_uint64_t *diff)
 {
-	zbx_ipc_message_t message;
-	unsigned char *data = NULL;
-	zbx_uint32_t data_len = 0;
+	int i;
 
-	if (0 == diff->values_num)
-		return;
+	for (i = 0; i < diff->values_num; i++) 
+		glb_state_host_reset(diff->values[i]);
 
-	zbx_ipc_message_init(&message);
-	data_len = zbx_availability_serialize_hostids(&data, diff);
-	zbx_availability_send(ZBX_IPC_AVAILMAN_CONFSYNC_DIFF, data, data_len, NULL);
 
-	zbx_ipc_message_clean(&message);
-	zbx_free(data);
 }
 
 /******************************************************************************
@@ -7160,7 +7157,7 @@ void DCsync_configuration(unsigned char mode, zbx_synced_new_config_t synced, zb
 	connector_sec2 = zbx_time() - sec;
 
 	FINISH_SYNC;
-
+	
 	zbx_dbsync_process_active_avail_diff(&active_avail_diff);
 	zbx_vector_uint64_destroy(&active_avail_diff);
 
@@ -8854,10 +8851,6 @@ void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE *src_in
 		dst_interface->useip = src_interface->useip;
 		dst_interface->type = src_interface->type;
 		dst_interface->main = src_interface->main;
-		dst_interface->available = src_interface->available;
-		dst_interface->disable_until = src_interface->disable_until;
-		dst_interface->errors_from = src_interface->errors_from;
-		zbx_strscpy(dst_interface->error, src_interface->error);
 	}
 	else
 	{
@@ -8868,10 +8861,6 @@ void DCget_interface(DC_INTERFACE *dst_interface, const ZBX_DC_INTERFACE *src_in
 		dst_interface->useip = 1;
 		dst_interface->type = INTERFACE_TYPE_UNKNOWN;
 		dst_interface->main = 0;
-		dst_interface->available = INTERFACE_AVAILABLE_UNKNOWN;
-		dst_interface->disable_until = 0;
-		dst_interface->errors_from = 0;
-		*dst_interface->error = '\0';
 	}
 
 	dst_interface->addr = (1 == dst_interface->useip ? dst_interface->ip_orig : dst_interface->dns_orig);
@@ -8923,7 +8912,7 @@ static void DCget_item(DC_ITEM *dst_item, const ZBX_DC_ITEM *src_item)
 	dst_item->value_type = src_item->value_type;
 
 	zbx_strscpy(dst_item->key_orig, src_item->key);
-	dst_item->lastlogsize = src_item->lastlogsize;
+	//dst_item->lastlogsize = src_item->lastlogsize;
 
 	dst_item->status = src_item->status;
 
@@ -10186,58 +10175,58 @@ void DCconfig_clean_triggers(DC_TRIGGER *triggers, int *errcodes, size_t num)
  * Return value: the number of items available for processing (unlocked).     *
  *                                                                            *
  ******************************************************************************/
-int DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids)
-{
-	int i, j, locked_num = 0;
-	const ZBX_DC_ITEM *dc_item;
-	ZBX_DC_TRIGGER *dc_trigger;
-	zbx_hc_item_t *history_item;
+// int DCconfig_lock_triggers_by_history_items(zbx_vector_ptr_t *history_items, zbx_vector_uint64_t *triggerids)
+// {
+// 	int i, j, locked_num = 0;
+// 	const ZBX_DC_ITEM *dc_item;
+// 	ZBX_DC_TRIGGER *dc_trigger;
+// 	zbx_hc_item_t *history_item;
 
-	WRLOCK_CACHE;
+// 	WRLOCK_CACHE;
 
-	for (i = 0; i < history_items->values_num; i++)
-	{
-		history_item = (zbx_hc_item_t *)history_items->values[i];
+// 	for (i = 0; i < history_items->values_num; i++)
+// 	{
+// 		history_item = (zbx_hc_item_t *)history_items->values[i];
 
-		if (0 != (ZBX_DC_FLAG_NOVALUE & history_item->tail->flags))
-			continue;
+// 		if (0 != (ZBX_DC_FLAG_NOVALUE & history_item->tail->flags))
+// 			continue;
 
-		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &history_item->itemid)))
-			continue;
+// 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &history_item->itemid)))
+// 			continue;
 
-		if (NULL == dc_item->triggers)
-			continue;
+// 		if (NULL == dc_item->triggers)
+// 			continue;
 
-		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
-		{
-			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
-				continue;
+// 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
+// 		{
+// 			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
+// 				continue;
 
-			if (1 == dc_trigger->locked)
-			{
-				locked_num++;
-				history_item->status = ZBX_HC_ITEM_STATUS_BUSY;
-				goto next;
-			}
-		}
+// 			if (1 == dc_trigger->locked)
+// 			{
+// 				locked_num++;
+// 				history_item->status = ZBX_HC_ITEM_STATUS_BUSY;
+// 				goto next;
+// 			}
+// 		}
 
-		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
-		{
-			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
-				continue;
+// 		for (j = 0; NULL != (dc_trigger = dc_item->triggers[j]); j++)
+// 		{
+// 			if (TRIGGER_STATUS_ENABLED != dc_trigger->status)
+// 				continue;
 
-			dc_trigger->locked = 1;
-			DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
-			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
-			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
-		}
-	next:;
-	}
+// 			dc_trigger->locked = 1;
+// 			DEBUG_TRIGGER(dc_trigger->triggerid, "Triggerid is locked");
+// 			DEBUG_ITEM(dc_item->itemid, "Triggerd %ld is locked for the item history processing", dc_trigger->triggerid);
+// 			zbx_vector_uint64_append(triggerids, dc_trigger->triggerid);
+// 		}
+// 	next:;
+// 	}
 
-	UNLOCK_CACHE;
+// 	UNLOCK_CACHE;
 
-	return history_items->values_num - locked_num;
-}
+// 	return history_items->values_num - locked_num;
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -11133,7 +11122,6 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 					continue;
 				}
 
-				DCincrease_disable_until(dc_interface, now, config_timeout);
 			}
 		}
 
@@ -11204,8 +11192,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 			DEBUG_ITEM(itemids->values[i], "Found item and host data");
 
-			if ((zbx_dc_host->proxy_hostid > 0 && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER)) ||
-				FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host))
+			if (FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host))
 			{
 
 				DEBUG_ITEM(itemids->values[i], "Item shouldn't be processed anymore, removing from async polling (if it's there)");
@@ -11343,7 +11330,6 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 					continue;
 				}
 
-				DCincrease_disable_until(dc_interface, now, config_timeout);
 			}
 		}
 
@@ -11602,411 +11588,6 @@ void zbx_dc_requeue_unreachable_items(zbx_uint64_t *itemids, size_t itemids_num)
 }
 #endif /* HAVE_OPENIPMI */
 
-/******************************************************************************
- *                                                                            *
- * Purpose: get interface availability data for the specified agent           *
- *                                                                            *
- * Parameters: dc_interface - [IN] the interface                              *
- *             availability - [OUT] the interface availability data           *
- *                                                                            *
- * Comments: The configuration cache must be locked already.                  *
- *                                                                            *
- ******************************************************************************/
-void DCinterface_get_agent_availability(const ZBX_DC_INTERFACE *dc_interface,
-										zbx_agent_availability_t *agent)
-{
-
-	agent->flags = ZBX_FLAGS_AGENT_STATUS;
-
-	agent->available = dc_interface->available;
-	agent->error = zbx_strdup(agent->error, dc_interface->error);
-	agent->errors_from = dc_interface->errors_from;
-	agent->disable_until = dc_interface->disable_until;
-}
-
-void DCagent_set_availability(zbx_agent_availability_t *av, unsigned char *available, const char **error,
-							  int *errors_from, int *disable_until)
-{
-#define AGENT_AVAILABILITY_ASSIGN(flags, mask, dst, src) \
-	if (0 != (flags & mask))                             \
-	{                                                    \
-		if (dst != src)                                  \
-			dst = src;                                   \
-		else                                             \
-			flags &= (unsigned char)(~(mask));           \
-	}
-
-#define AGENT_AVAILABILITY_ASSIGN_STR(flags, mask, dst, src) \
-	if (0 != (flags & mask))                                 \
-	{                                                        \
-		if (0 != strcmp(dst, src))                           \
-			dc_strpool_replace(1, &dst, src);                \
-		else                                                 \
-			flags &= (unsigned char)(~(mask));               \
-	}
-
-	AGENT_AVAILABILITY_ASSIGN(av->flags, ZBX_FLAGS_AGENT_STATUS_AVAILABLE, *available, av->available);
-	AGENT_AVAILABILITY_ASSIGN_STR(av->flags, ZBX_FLAGS_AGENT_STATUS_ERROR, *error, av->error);
-	AGENT_AVAILABILITY_ASSIGN(av->flags, ZBX_FLAGS_AGENT_STATUS_ERRORS_FROM, *errors_from, av->errors_from);
-	AGENT_AVAILABILITY_ASSIGN(av->flags, ZBX_FLAGS_AGENT_STATUS_DISABLE_UNTIL, *disable_until, av->disable_until);
-
-#undef AGENT_AVAILABILITY_ASSIGN_STR
-#undef AGENT_AVAILABILITY_ASSIGN
-}
-
-/******************************************************************************
- *                                                                            *
- * Purpose: set interface availability data in configuration cache            *
- *                                                                            *
- * Parameters: dc_interface - [OUT] the interface                             *
- *             now          - [IN] current timestamp                          *
- *             agent        - [IN/OUT] the agent availability data            *
- *                                                                            *
- * Return value: SUCCEED - at least one availability field was updated        *
- *               FAIL    - no availability fields were updated                *
- *                                                                            *
- * Comments: The configuration cache must be locked already.                  *
- *                                                                            *
- *           This function clears availability flags of non updated fields    *
- *           updated leaving only flags identifying changed fields.           *
- *                                                                            *
- ******************************************************************************/
-static int DCinterface_set_agent_availability(ZBX_DC_INTERFACE *dc_interface, int now,
-											  zbx_agent_availability_t *agent)
-{
-	DCagent_set_availability(agent, &dc_interface->available, &dc_interface->error,
-							 &dc_interface->errors_from, &dc_interface->disable_until);
-
-	if (ZBX_FLAGS_AGENT_STATUS_NONE == agent->flags)
-		return FAIL;
-
-	if (0 != (agent->flags & (ZBX_FLAGS_AGENT_STATUS_AVAILABLE | ZBX_FLAGS_AGENT_STATUS_ERROR)))
-		dc_interface->availability_ts = now;
-
-	return SUCCEED;
-}
-
-/******************************************************************************
- *                                                                            *
- * Purpose: set interface availability data in configuration cache            *
- *                                                                            *
- * Parameters: dc_interface - [OUT] the interface                             *
- *             ia           - [IN/OUT] the interface availability data        *
- *                                                                            *
- * Return value: SUCCEED - at least one availability field was updated        *
- *               FAIL    - no availability fields were updated                *
- *                                                                            *
- * Comments: The configuration cache must be locked already.                  *
- *                                                                            *
- *           This function clears availability flags of non updated fields    *
- *           updated leaving only flags identifying changed fields.           *
- *                                                                            *
- ******************************************************************************/
-static int DCinterface_set_availability(ZBX_DC_INTERFACE *dc_interface, int now, zbx_interface_availability_t *ia)
-{
-	unsigned char flags = ZBX_FLAGS_AGENT_STATUS_NONE;
-
-	DCagent_set_availability(&ia->agent, &dc_interface->available, &dc_interface->error,
-							 &dc_interface->errors_from, &dc_interface->disable_until);
-
-	flags |= ia->agent.flags;
-
-	if (ZBX_FLAGS_AGENT_STATUS_NONE == flags)
-		return FAIL;
-
-	if (0 != (flags & (ZBX_FLAGS_AGENT_STATUS_AVAILABLE | ZBX_FLAGS_AGENT_STATUS_ERROR)))
-		dc_interface->availability_ts = now;
-
-	return SUCCEED;
-}
-
-/**************************************************************************************
- *                                                                                    *
- * Host availability update example                                                   *
- *                                                                                    *
- *                                                                                    *
- *               |            UnreachablePeriod                                       *
- *               |               (conf file)                                          *
- *               |              ______________                                        *
- *               |             /              \                                       *
- *               |             p     p     p     p       p       p                    *
- *               |             o     o     o     o       o       o                    *
- *               |             l     l     l     l       l       l                    *
- *               |             l     l     l     l       l       l                    *
- *               | n                                                                  *
- *               | e           e     e     e     e       e       e                    *
- *     agent     | w   p   p   r     r     r     r       r       r       p   p   p    *
- *       polls   |     o   o   r     r     r     r       r       r       o   o   o    *
- *               | h   l   l   o     o     o     o       o       o       l   l   l    *
- *               | o   l   l   r     r     r     r       r       r       l   l   l    *
- *               | s                                                                  *
- *               | t   ok  ok  E1    E1    E2    E1      E1      E2      ok  ok  ok   *
- *  --------------------------------------------------------------------------------  *
- *  available    | 0   1   1   1     1     1     2       2       2       0   0   0    *
- *               |                                                                    *
- *  error        | ""  ""  ""  ""    ""    ""    E1      E1      E2      ""  ""  ""   *
- *               |                                                                    *
- *  errors_from  | 0   0   0   T4    T4    T4    T4      T4      T4      0   0   0    *
- *               |                                                                    *
- *  disable_until| 0   0   0   T5    T6    T7    T8      T9      T10     0   0   0    *
- *  --------------------------------------------------------------------------------  *
- *   timestamps  | T1  T2  T3  T4    T5    T6    T7      T8      T9     T10 T11 T12   *
- *               |  \_/ \_/ \_/ \___/ \___/ \___/ \_____/ \_____/ \_____/ \_/ \_/     *
- *               |   |   |   |    |     |     |      |       |       |     |   |      *
- *  polling      |  item delay   UnreachableDelay    UnavailableDelay     item |      *
- *      periods  |                 (conf file)         (conf file)         delay      *
- *                                                                                    *
- *                                                                                    *
- **************************************************************************************/
-
-/*******************************************************************************
- *                                                                             *
- * Purpose: set interface as available based on the agent availability data    *
- *                                                                             *
- * Parameters: interfaceid - [IN] the interface identifier                     *
- *             ts          - [IN] the last timestamp                           *
- *             in          - [IN/OUT] IN: the caller's agent availability data *
- *                                   OUT: the agent availability data in cache *
- *                                        before changes                       *
- *             out         - [OUT] the agent availability data after changes   *
- *                                                                             *
- * Return value: SUCCEED - the interface was activated successfully            *
- *               FAIL    - the interface was already activated or activation   *
- *                         failed                                              *
- *                                                                             *
- * Comments: The interface availability fields are updated according to the    *
- *           above schema.                                                     *
- *                                                                             *
- *******************************************************************************/
-int DCinterface_activate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts,
-						 zbx_agent_availability_t *in, zbx_agent_availability_t *out)
-{
-	int ret = FAIL;
-	ZBX_DC_HOST *dc_host;
-	ZBX_DC_INTERFACE *dc_interface;
-
-	/* don't try activating interface if there were no errors detected */
-	if (0 == in->errors_from && INTERFACE_AVAILABLE_TRUE == in->available)
-		goto out;
-
-	WRLOCK_CACHE;
-
-	if (NULL == (dc_interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &interfaceid)))
-		goto unlock;
-
-	if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_interface->hostid)))
-		goto unlock;
-
-	/* Don't try activating interface if:                */
-	/* - (server, proxy) host is not monitored any more; */
-	/* - (server) host is monitored by proxy.            */
-	if ((0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) && 0 != dc_host->proxy_hostid) ||
-		HOST_STATUS_MONITORED != dc_host->status)
-	{
-		goto unlock;
-	}
-
-	DCinterface_get_agent_availability(dc_interface, in);
-	zbx_agent_availability_init(out, INTERFACE_AVAILABLE_TRUE, "", 0, 0);
-
-	if (SUCCEED == DCinterface_set_agent_availability(dc_interface, ts->sec, out) &&
-		ZBX_FLAGS_AGENT_STATUS_NONE != out->flags)
-	{
-		ret = SUCCEED;
-	}
-unlock:
-	UNLOCK_CACHE;
-out:
-	return ret;
-}
-
-/************************************************************************************
- *                                                                                  *
- * Purpose: attempt to set interface as unavailable based on agent availability     *
- *                                                                                  *
- * Parameters: interfaceid - [IN] the interface identifier                          *
- *             ts          - [IN] the last timestamp                                *
- *             in          - [IN/OUT] IN: the caller's interface availability data  *
- *                                   OUT: the interface availability data in cache  *
- *                                        before changes                            *
- *             out         - [OUT] the interface availability data after changes    *
- *             error_msg   - [IN] the error message                                 *
- *                                                                                  *
- * Return value: SUCCEED - the interface was deactivated successfully               *
- *               FAIL    - the interface was already deactivated or deactivation    *
- *                         failed                                                   *
- *                                                                                  *
- * Comments: The interface availability fields are updated according to the above   *
- *           schema.                                                                *
- *                                                                                  *
- ***********************************************************************************/
-int	DCinterface_deactivate(zbx_uint64_t interfaceid, const zbx_timespec_t *ts, int unavailable_delay,
-		zbx_agent_availability_t *in, zbx_agent_availability_t *out, const char *error_msg)
-{
-	int ret = FAIL, errors_from, disable_until;
-	const char *error;
-	unsigned char available;
-	ZBX_DC_HOST *dc_host;
-	ZBX_DC_INTERFACE *dc_interface;
-
-	/* don't try deactivating interface if the unreachable delay has not passed since the first error */
-	if (CONFIG_UNREACHABLE_DELAY > ts->sec - in->errors_from)
-		goto out;
-
-	WRLOCK_CACHE;
-
-	if (NULL == (dc_interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &interfaceid)))
-		goto unlock;
-
-	if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_interface->hostid)))
-		goto unlock;
-
-	/* Don't try deactivating interface if:               */
-	/* - (server, proxy) host is not monitored any more;  */
-	/* - (server) host is monitored by proxy.             */
-	if ((0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) && 0 != dc_host->proxy_hostid) ||
-		HOST_STATUS_MONITORED != dc_host->status)
-	{
-		goto unlock;
-	}
-
-	DCinterface_get_agent_availability(dc_interface, in);
-
-	available = in->available;
-	error = in->error;
-
-	if (0 == in->errors_from)
-	{
-		/* first error, schedule next unreachable check */
-		errors_from = ts->sec;
-		disable_until = ts->sec + CONFIG_UNREACHABLE_DELAY;
-	}
-	else
-	{
-		errors_from = in->errors_from;
-		disable_until = in->disable_until;
-
-		/* Check if other pollers haven't already attempted deactivating host. */
-		/* In that case should wait the initial unreachable delay before       */
-		/* trying to make it unavailable.                                      */
-		if (CONFIG_UNREACHABLE_DELAY <= ts->sec - errors_from)
-		{
-			/* repeating error */
-			if (CONFIG_UNREACHABLE_PERIOD > ts->sec - errors_from)
-			{
-				/* leave host available, schedule next unreachable check */
-				disable_until = ts->sec + CONFIG_UNREACHABLE_DELAY;
-			}
-			else
-			{
-				/* make host unavailable, schedule next unavailable check */
-				disable_until = ts->sec + unavailable_delay;
-				available = INTERFACE_AVAILABLE_FALSE;
-				error = error_msg;
-			}
-		}
-	}
-
-	zbx_agent_availability_init(out, available, error, errors_from, disable_until);
-
-	if (SUCCEED == DCinterface_set_agent_availability(dc_interface, ts->sec, out) &&
-		ZBX_FLAGS_AGENT_STATUS_NONE != out->flags)
-	{
-		ret = SUCCEED;
-	}
-unlock:
-	UNLOCK_CACHE;
-out:
-	return ret;
-}
-
-/******************************************************************************
- *                                                                            *
- * Purpose: update availability of interfaces in configuration cache and      *
- *          return the updated field flags                                    *
- *                                                                            *
- * Parameters: availabilities - [IN/OUT] the interfaces availability data     *
- *                                                                            *
- * Return value: SUCCEED - at least one interface availability data           *
- *                         was updated                                        *
- *               FAIL    - no interfaces were updated                         *
- *                                                                            *
- ******************************************************************************/
-int DCset_interfaces_availability(zbx_vector_availability_ptr_t *availabilities)
-{
-	int i;
-	ZBX_DC_INTERFACE *dc_interface;
-	zbx_interface_availability_t *ia;
-	int ret = FAIL, now;
-
-	now = (int)time(NULL);
-
-	WRLOCK_CACHE;
-
-	for (i = 0; i < availabilities->values_num; i++)
-	{
-		ia = availabilities->values[i];
-
-		if (NULL == (dc_interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces,
-																		   &ia->interfaceid)))
-		{
-			int j;
-
-			/* reset availability flag so this host is ignored when saving availability diff to DB */
-			for (j = 0; j < ZBX_AGENT_MAX; j++)
-				ia->agent.flags = ZBX_FLAGS_AGENT_STATUS_NONE;
-
-			continue;
-		}
-
-		if (SUCCEED == DCinterface_set_availability(dc_interface, now, ia))
-			ret = SUCCEED;
-	}
-
-	UNLOCK_CACHE;
-
-	return ret;
-}
-
-// static int glb_get_trigger_status(u_int64_t triggerid, int *status, int *functional, int *value)
-// {
-// 	ZBX_DC_TRIGGER *trigger;
-
-// 	if (NULL == (trigger = (ZBX_DC_TRIGGER *)zbx_hashset_search(&config->triggers, &triggerid)))
-// 	{
-// 		*value = TRIGGER_VALUE_UNKNOWN;
-// 		*status = TRIGGER_STATUS_DISABLED;
-// 		*functional = TRIGGER_FUNCTIONAL_FALSE;
-// 		return FAIL;
-// 	}
-
-// 	*value = trigger->value;
-// 	*functional = trigger->functional;
-// 	*status = trigger->status;
-
-// 	return SUCCEED;
-// }
-/*
-char * glb_vector_uint64_dump(const zbx_vector_uint64_t *v) {
-	//LOG_INF("Called dump");
-	int i;
-	static char str[10240];
-	str[0] = '\0';
-	zbx_snprintf(str, 1024,"[");
-	//LOG_INF("Called dump1, v is %p",v);
-
-	for (i = 0; v != NULL && i < v->values_num; i++) {
-
-		if (i>0)
-			zbx_snprintf(str + strlen(str), 1024 - strlen(str),",");
-		zbx_snprintf(str + strlen(str),1024 - strlen(str),"%d", v->values[i]);
-	}
-
-	zbx_snprintf(str + strlen(str),1024 - strlen(str),"]");
-	//LOG_INF("finished dump, strlen is %d", strlen(str));
-	return str;
-}
-*/
 /******************************************************************************
  *                                                                            *
  * Comments: helper function for trigger dependency checking                  *
@@ -12490,8 +12071,8 @@ int DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 					continue;
 				}
 
-				if (INTERFACE_AVAILABLE_TRUE != dc_interface->available)
-					continue;
+	//			if (INTERFACE_AVAILABLE_TRUE != glb_state_hosts_get_id_interface_avail(dc_item->hostid, dc_interface->interfaceid))
+	//				continue;
 				break;
 			case ITEM_TYPE_ZABBIX_ACTIVE:
 				if (dc_host->data_expected_from >
@@ -12628,19 +12209,20 @@ static void get_host_statistics(ZBX_DC_HOST *dc_host, ZBX_DC_PROXY *dc_proxy, in
 				int state = glb_state_item_get_oper_state(dc_item->itemid);
 				switch (state)
 				{
+				case ITEM_STATE_UNKNOWN:
 				case ITEM_STATE_NORMAL:
 					config->status->items_active_normal++;
 					dc_host->items_active_normal++;
-					if (NULL != dc_proxy_host)
+					if (NULL != dc_proxy_host) {
+					
 						dc_proxy_host->items_active_normal++;
+					}
 					break;
 				case ITEM_STATE_NOTSUPPORTED:
 					config->status->items_active_notsupported++;
 					dc_host->items_active_notsupported++;
 					if (NULL != dc_proxy_host)
 						dc_proxy_host->items_active_notsupported++;
-					break;
-				case ITEM_STATE_UNKNOWN:
 					break;
 				default:
 					zabbix_log(LOG_LEVEL_WARNING, "Unknown item state %d", state);
@@ -12724,6 +12306,7 @@ static void dc_status_update(void)
 	if (SUCCEED == reset)
 	{
 		ZBX_DC_PROXY *dc_proxy;
+		ZBX_DC_HOST *dc_host;
 
 		zbx_hashset_iter_reset(&config->proxies, &iter);
 
@@ -12732,6 +12315,13 @@ static void dc_status_update(void)
 			dc_proxy->hosts_monitored = 0;
 			dc_proxy->hosts_not_monitored = 0;
 			dc_proxy->required_performance = 0.0;
+
+			if (NULL != (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_proxy->hostid))) {
+				dc_host->items_active_normal = 0;
+				dc_host->items_active_notsupported = 0;
+				dc_host->items_disabled = 0;
+			}
+
 		}
 	}
 
@@ -12744,11 +12334,17 @@ static void dc_status_update(void)
 		ZBX_DC_PROXY *dc_proxy = NULL;
 
 		/* reset per-host/per-proxy item counters */
+//		if (161793 == dc_host->hostid)
+//			LOG_INF("Before zeroing: has active normal %d, active non supported %d, disabled %d",
+//				dc_host->items_active_normal, dc_host->items_active_notsupported, dc_host->items_disabled);
 
-		dc_host->items_active_normal = 0;
-		dc_host->items_active_notsupported = 0;
-		dc_host->items_disabled = 0;
-
+		if (HOST_STATUS_PROXY_ACTIVE != dc_host->status && 
+			HOST_STATUS_PROXY_PASSIVE != dc_host->status) {
+			dc_host->items_active_normal = 0;
+			dc_host->items_active_notsupported = 0;
+			dc_host->items_disabled = 0;
+		}
+		
 		/* gather per-proxy statistics of enabled and disabled hosts */
 		switch (dc_host->status)
 		{
@@ -13272,6 +12868,8 @@ unsigned int DCget_auto_registration_action_count(void)
  ******************************************************************************/
 void zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags)
 {
+	LOG_DBG("In %s(): getting config, flags are %ld", __func__,  flags);
+
 	RDLOCK_CACHE;
 	if (0 != (flags & ZBX_CONFIG_FLAGS_SEVERITY_NAME))
 	{
@@ -13312,6 +12910,7 @@ void zbx_config_get(zbx_config_t *cfg, zbx_uint64_t flags)
 	UNLOCK_CACHE;
 
 	cfg->flags = flags;
+	LOG_DBG("In %s(): finished ", __func__);
 }
 
 /******************************************************************************
@@ -13359,154 +12958,6 @@ void zbx_config_clean(zbx_config_t *cfg)
 		zbx_free(cfg->default_timezone);
 }
 
-/*********************************************************************************
- *                                                                               *
- * Purpose: resets interfaces availability for disabled hosts and hosts          *
- *          without enabled items for the corresponding interface                *
- *                                                                               *
- * Parameters: interfaces - [OUT] changed interface availability data            *
- *                                                                               *
- * Return value: SUCCEED - interface availability was reset for at least one     *
- *                         interface                                             *
- *               FAIL    - no interfaces required availability reset             *
- *                                                                               *
- * Comments: This function resets interface availability in configuration cache. *
- *           The caller must perform corresponding database updates based on     *
- *           returned interface availability reset data. On server the function  *
- *           skips hosts handled by proxies.                                     *
- *                                                                               *
- ********************************************************************************/
-int DCreset_interfaces_availability(zbx_vector_availability_ptr_t *interfaces)
-{
-#define ZBX_INTERFACE_MOVE_TOLERANCE_INTERVAL (10 * SEC_PER_MIN)
-
-	ZBX_DC_HOST *host;
-	ZBX_DC_INTERFACE *interface;
-	zbx_hashset_iter_t iter;
-	zbx_interface_availability_t *ia = NULL;
-	int now;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-	now = time(NULL);
-
-	WRLOCK_CACHE;
-
-	zbx_hashset_iter_reset(&config->interfaces, &iter);
-
-	while (NULL != (interface = (ZBX_DC_INTERFACE *)zbx_hashset_iter_next(&iter)))
-	{
-		int items_num = 0;
-
-		if (NULL == (host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &interface->hostid)))
-			continue;
-
-		/* On server skip hosts handled by proxies. They are handled directly */
-		/* when receiving hosts' availability data from proxies.              */
-		/* Unless a host was just (re)assigned to a proxy or the proxy has    */
-		/* not updated its status during the maximum proxy heartbeat period.  */
-		/* In this case reset all interfaces to unknown status.               */
-		if (0 == interface->reset_availability &&
-			0 != (program_type & ZBX_PROGRAM_TYPE_SERVER) && 0 != host->proxy_hostid)
-		{
-			ZBX_DC_PROXY *proxy;
-
-			if (NULL != (proxy = (ZBX_DC_PROXY *)zbx_hashset_search(&config->proxies, &host->proxy_hostid)))
-			{
-				/* SEC_PER_MIN is a tolerance interval, it was chosen arbitrarily */
-				if (ZBX_INTERFACE_MOVE_TOLERANCE_INTERVAL >= now - proxy->lastaccess)
-					continue;
-			}
-
-			interface->reset_availability = 1;
-		}
-
-		if (NULL == ia)
-			ia = (zbx_interface_availability_t *)zbx_malloc(NULL, sizeof(zbx_interface_availability_t));
-
-		zbx_interface_availability_init(ia, interface->interfaceid);
-
-		if (0 == interface->reset_availability)
-			items_num = interface->items_num;
-
-		if (0 == items_num && INTERFACE_AVAILABLE_UNKNOWN != interface->available)
-			zbx_agent_availability_init(&ia->agent, INTERFACE_AVAILABLE_UNKNOWN, "", 0, 0);
-
-		if (SUCCEED == zbx_interface_availability_is_set(ia))
-		{
-			if (SUCCEED == DCinterface_set_availability(interface, now, ia))
-			{
-				zbx_vector_availability_ptr_append(interfaces, ia);
-				ia = NULL;
-			}
-			else
-				zbx_interface_availability_clean(ia);
-		}
-
-		interface->reset_availability = 0;
-	}
-	UNLOCK_CACHE;
-
-	zbx_free(ia);
-
-	zbx_vector_availability_ptr_sort(interfaces, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() interfaces:%d", __func__, interfaces->values_num);
-
-	return 0 == interfaces->values_num ? FAIL : SUCCEED;
-#undef ZBX_INTERFACE_MOVE_TOLERANCE_INTERVAL
-}
-
-/*******************************************************************************
- *                                                                             *
- * Purpose: gets availability data for interfaces with availability data       *
- *          changed in period from last availability update to the specified   *
- *          timestamp                                                          *
- *                                                                             *
- * Parameters: interfaces - [OUT] changed interfaces availability data         *
- *             ts    - [OUT] the availability diff timestamp                   *
- *                                                                             *
- * Return value: SUCCEED - availability was changed for at least one interface *
- *               FAIL    - no interface availability was changed               *
- *                                                                             *
- *******************************************************************************/
-int DCget_interfaces_availability(zbx_vector_ptr_t *interfaces, int *ts)
-{
-	const ZBX_DC_INTERFACE *interface;
-	zbx_hashset_iter_t iter;
-	zbx_interface_availability_t *ia = NULL;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-
-	RDLOCK_CACHE;
-
-	*ts = time(NULL);
-
-	zbx_hashset_iter_reset(&config->interfaces, &iter);
-
-	while (NULL != (interface = (const ZBX_DC_INTERFACE *)zbx_hashset_iter_next(&iter)))
-	{
-		if (config->availability_diff_ts <= interface->availability_ts && interface->availability_ts < *ts)
-		{
-			ia = (zbx_interface_availability_t *)zbx_malloc(NULL, sizeof(zbx_interface_availability_t));
-			zbx_interface_availability_init(ia, interface->interfaceid);
-
-			zbx_agent_availability_init(&ia->agent, interface->available, interface->error,
-										interface->errors_from, interface->disable_until);
-
-			zbx_vector_ptr_append(interfaces, ia);
-		}
-	}
-
-	UNLOCK_CACHE;
-
-	zbx_vector_ptr_sort(interfaces, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() interfaces:%d", __func__, interfaces->values_num);
-
-	return 0 == interfaces->values_num ? FAIL : SUCCEED;
-}
-
 /******************************************************************************
  *                                                                            *
  * Purpose: sets availability timestamp to current time for the specified     *
@@ -13515,27 +12966,27 @@ int DCget_interfaces_availability(zbx_vector_ptr_t *interfaces, int *ts)
  * Parameters: interfaceids - [IN] the interfaces identifiers                 *
  *                                                                            *
  ******************************************************************************/
-void DCtouch_interfaces_availability(const zbx_vector_uint64_t *interfaceids)
-{
-	ZBX_DC_INTERFACE *dc_interface;
-	int i, now;
+// void DCtouch_interfaces_availability(const zbx_vector_uint64_t *interfaceids)
+// {
+// 	ZBX_DC_INTERFACE *dc_interface;
+// 	int i, now;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() interfaceids:%d", __func__, interfaceids->values_num);
+// 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() interfaceids:%d", __func__, interfaceids->values_num);
 
-	now = time(NULL);
+// 	now = time(NULL);
 
-	WRLOCK_CACHE;
+// 	WRLOCK_CACHE;
 
-	for (i = 0; i < interfaceids->values_num; i++)
-	{
-		if (NULL != (dc_interface = zbx_hashset_search(&config->interfaces, &interfaceids->values[i])))
-			dc_interface->availability_ts = now;
-	}
+// 	for (i = 0; i < interfaceids->values_num; i++)
+// 	{
+// 		if (NULL != (dc_interface = zbx_hashset_search(&config->interfaces, &interfaceids->values[i])))
+// 			dc_interface->availability_ts = now;
+// 	}
 
-	UNLOCK_CACHE;
+// 	UNLOCK_CACHE;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
-}
+// 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+// }
 
 /******************************************************************************
  *                                                                            *
@@ -13551,6 +13002,18 @@ void zbx_set_availability_diff_ts(int ts)
 {
 	/* this data can't be accessed simultaneously from multiple processes - locking is not necessary */
 	config->availability_diff_ts = ts;
+}
+
+int zbx_get_availability_diff_ts()
+{
+	return config->availability_diff_ts;
+}
+
+int  server_time_is_changed(int new_time) {
+	if (config->server_time == new_time)
+		return FAIL;
+	config->server_time = new_time;
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -15289,50 +14752,6 @@ char *zbx_dc_expand_user_macros_in_func_params(const char *params, zbx_uint64_t 
 	return buf;
 }
 
-/*********************************************************************************
- *                                                                               *
- * Parameters: hostid               - [IN]                                       *
- *             agents               - [OUT] Zabbix agent availability            *
- *                                                                               *
- ********************************************************************************/
-void zbx_get_host_interfaces_availability(zbx_uint64_t hostid, zbx_agent_availability_t *agents)
-{
-	const ZBX_DC_INTERFACE *interface;
-	zbx_hashset_iter_t iter;
-	int i;
-
-	for (i = 0; i < ZBX_AGENT_MAX; i++)
-		zbx_agent_availability_init(&agents[i], INTERFACE_AVAILABLE_UNKNOWN, "", 0, 0);
-
-	RDLOCK_CACHE;
-
-	zbx_hashset_iter_reset(&config->interfaces, &iter);
-
-	while (NULL != (interface = (const ZBX_DC_INTERFACE *)zbx_hashset_iter_next(&iter)))
-	{
-		if (1 != interface->main)
-			continue;
-
-		if (hostid != interface->hostid)
-			continue;
-
-		i = ZBX_AGENT_UNKNOWN;
-
-		if (INTERFACE_TYPE_AGENT == interface->type)
-			i = ZBX_AGENT_ZABBIX;
-		else if (INTERFACE_TYPE_IPMI == interface->type)
-			i = ZBX_AGENT_IPMI;
-		else if (INTERFACE_TYPE_JMX == interface->type)
-			i = ZBX_AGENT_JMX;
-		else if (INTERFACE_TYPE_SNMP == interface->type)
-			i = ZBX_AGENT_SNMP;
-
-		if (ZBX_AGENT_UNKNOWN != i)
-			DCinterface_get_agent_availability(interface, &agents[i]);
-	}
-
-	UNLOCK_CACHE;
-}
 
 int zbx_dc_maintenance_has_tags(void)
 {
@@ -16213,6 +15632,152 @@ u_int64_t DC_config_get_hostid_by_itemid(u_int64_t itemid) {
 	
 	UNLOCK_CACHE;
 	return hostid;
+}
+
+int DC_config_get_hostid_by_interfaceid(u_int64_t interfaceid, u_int64_t *hostid) {
+	ZBX_DC_INTERFACE *interface;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (interface = zbx_hashset_search(&config->interfaces, &interfaceid))){
+		*hostid = interface->hostid;
+		ret = SUCCEED;
+	}
+	
+	UNLOCK_CACHE;
+	
+	return ret;
+}
+
+int DC_config_get_type_by_interfaceid(u_int64_t interfaceid, unsigned char *type) {
+	ZBX_DC_INTERFACE *interface;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	
+	if (NULL != (interface = zbx_hashset_search(&config->interfaces, &interfaceid))){
+		*type = interface->type;
+		ret = SUCCEED;
+	}
+	
+	UNLOCK_CACHE;
+	
+	return ret;
+}
+
+int DC_config_get_host_description(u_int64_t hostid, char **host_description) {
+	ZBX_DC_HOST *host;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	if (NULL != (host = zbx_hashset_search(&config->hosts, &hostid))) {
+		*host_description = zbx_strdup(NULL, host->description);
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int DC_config_get_item_key(u_int64_t itemid, char **item_key) {
+	ZBX_DC_ITEM *item;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) {
+		*item_key = zbx_strdup(*item_key, item->key);
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int DC_config_get_item_name(u_int64_t itemid, char **item_name) {
+	ZBX_DC_ITEM *item;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) {
+		*item_name = zbx_strdup(*item_name, item->name);
+		ret = SUCCEED;
+		LOG_INF("in %s: got value %s", __func__, *item_name);
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int DC_config_get_item_description(u_int64_t itemid, char **item_descr) {
+	ZBX_DC_ITEM *item;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid))) {
+		*item_descr = zbx_strdup(*item_descr, item->description);
+		LOG_INF("in %s: got value %s", __func__, *item_descr);
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int  DC_config_get_item_proxy_name(u_int64_t itemid, char **proxy_name) {
+	ZBX_DC_ITEM *item;
+	ZBX_DC_HOST *proxy_host;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid)) && 
+		NULL != (proxy_host = zbx_hashset_search(&config->hosts, &item->hostid) )) { 
+		
+		*proxy_name = zbx_strdup(*proxy_name, proxy_host->name);
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int  DC_config_get_item_proxy_description(u_int64_t itemid, char **proxy_name) {
+	ZBX_DC_ITEM *item;
+	ZBX_DC_HOST *proxy_host;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	if (NULL != (item = zbx_hashset_search(&config->items, &itemid)) && 
+		NULL != (proxy_host = zbx_hashset_search(&config->hosts, &item->hostid) )) { 
+		
+		*proxy_name = zbx_strdup(*proxy_name, proxy_host->description);
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+}
+
+int  DC_get_item_valuetype_valuemapid(u_int64_t itemid, u_int64_t *valuemapid, unsigned char *value_type, char **units) {
+	ZBX_DC_ITEM *item;
+	ZBX_DC_NUMITEM *numitem;
+	int ret = FAIL;
+
+	RDLOCK_CACHE;
+	
+	if ( NULL != (item = zbx_hashset_search(&config->items, &itemid))  && 
+		 NULL != (numitem = zbx_hashset_search(&config->numitems, &itemid)) )   {
+		
+		*valuemapid = item->valuemapid;
+		*value_type = item->value_type;
+		*units = zbx_strdup(*units, numitem->units);
+
+		ret = SUCCEED;
+	}
+
+	UNLOCK_CACHE;
+	return ret;
+
 }
 
 void	zbx_recalc_time_period(int *ts_from, int table_group)

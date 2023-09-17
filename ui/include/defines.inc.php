@@ -22,7 +22,7 @@ define('ZABBIX_VERSION',		'6.4.4');
 define('ZABBIX_API_VERSION',	'6.4.4');
 define('ZABBIX_EXPORT_VERSION',	'6.4');
 
-define('GLABER_VERSION',		'3.2.17');
+define('GLABER_VERSION',		'3.3.5');
 
 define('ZABBIX_DB_VERSION',		6040000);
 
@@ -1695,7 +1695,7 @@ define('SECTION_SEARCH_TEMPLATEGROUP',	'search_templategroup');
 define('SECTION_SEARCH_MAPS',	'search_maps');
 
 // widget defaults
-define('ZBX_WIDGET_ROWS', 20);
+define('ZBX_WIDGET_ROWS', 200);
 
 // widget field types
 define('ZBX_WIDGET_FIELD_TYPE_INT32',			0);

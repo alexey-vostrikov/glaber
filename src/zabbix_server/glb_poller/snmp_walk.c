@@ -233,9 +233,10 @@ static int snmp_walk_submit_result(poller_item_t *poller_item) {
 
 	DEBUG_ITEM(poller_get_item_id(poller_item),"Finished walk for the item, result is %s", js.buffer);
 	zbx_json_close(&js);
-	//LOG_INF("Submitting buffer to preprocessing: %p, length is %d", js.buffer, strlen(js.buffer));
+
 	poller_preprocess_str(poller_item, NULL, js.buffer);
-	//LOG_INF("Preprocessed");
+	poller_register_item_iface_succeed(poller_item);
+
 	zbx_json_free(&js);
 
 	return ret;

@@ -162,9 +162,6 @@
 			return $('div[name=content]');
 		},
 
-	//	getCurrentSubfilter() {
-	//		return $('#latest-data-subfilter');
-	//	},
 
 		_addRefreshMessage(messages) {
 			this._removeRefreshMessage();
