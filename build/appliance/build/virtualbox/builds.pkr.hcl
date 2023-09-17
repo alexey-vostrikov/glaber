@@ -9,7 +9,7 @@ build {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
       "sudo apt-get update",
-      //"sudo apt-get upgrade -y",
+      "sudo apt-get upgrade -y",
       "sudo apt-get install -y gnupg2",
       "sudo mkdir /root/.gnupg/",
       "export GNUPGHOME=$(mktemp -d)",

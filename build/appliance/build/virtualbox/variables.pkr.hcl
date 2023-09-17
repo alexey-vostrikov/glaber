@@ -40,11 +40,6 @@ variable "output_name" {
   default = "glaber.qcow2"
 }
 
-variable "snmp_version" {
-  description = "The SNMP version to install with ssl support"
-  default     = "5.9.3"
-}
-
 variable "clickhouse_version" {
   default     = "21.3"
 }
@@ -52,7 +47,7 @@ variable "clickhouse_version" {
 variable "zbx_ch_user" {
   type        = string
   description = "The ClickHouse username"
-  default     = "default" ## prepare
+  default     = "defaultuser" ## prepare
 }
 
 variable "zbx_ch_pass" {
