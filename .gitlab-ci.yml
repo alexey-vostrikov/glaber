@@ -135,6 +135,7 @@ stages:
 # template for the centos based pkg-build stage
 .base-centos-builder:
   stage: pkg-build
+  image: "${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${PRE_BUILDER_VERSION}"
   script:
     - rm -rf /root/rpmbuild/BUILD/*
     - export FULL_PROJECT_PATH=$PWD
@@ -168,7 +169,7 @@ centos-8:
   variables:
     OS: almalinux
     OS_VER: 8
-    PRE_BUILDER_VERSION: :${CENTOS_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
 
 # after spec folder created build/almalinux/9
 # centos-9:
@@ -176,49 +177,49 @@ centos-8:
 #   variables:
 #     OS: almalinux
 #     OS_VER: 9
-#     PRE_BUILDER_VERSION: :${CENTOS_BUILDER_VERSION}
+#     PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
 
 debian-buster:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: buster
-    PRE_BUILDER_VERSION: :${DEBIAN_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
 debian-bullseye:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: bullseye
-    PRE_BUILDER_VERSION: :${DEBIAN_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
 debian-bookworm:
   extends: .base-debian-builder
   variables:
     OS: debian
     OS_VER: bookworm
-    PRE_BUILDER_VERSION: :${DEBIAN_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: focal
-    PRE_BUILDER_VERSION: :${UBUNTU_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
 ubuntu-bionic:
   extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: bionic
-    PRE_BUILDER_VERSION: :${UBUNTU_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
 ubuntu-jammy:
   extends: .base-debian-builder
   variables:
     OS: ubuntu
     OS_VER: jammy
-    PRE_BUILDER_VERSION: :${UBUNTU_BUILDER_VERSION}
+    PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
 # build for the docker packages
 docker-debian-bullseye:
