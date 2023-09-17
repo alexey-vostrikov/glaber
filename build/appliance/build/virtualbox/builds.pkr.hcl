@@ -27,7 +27,7 @@ build {
   name = "Set permissions to copy config"
   inline = [
     "sudo chmod -R 700 /etc/clickhouse-server",
-    "packer_user=$(id -nu 1000)", # debian
+    "packer_user=$(id -nu 1000)", # debian inside the kvm
     "sudo chown -R $packer_user:$packer_user /etc/clickhouse-server",
   ]
   }
