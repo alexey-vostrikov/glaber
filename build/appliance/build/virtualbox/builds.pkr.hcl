@@ -8,9 +8,10 @@ build {
     name = "Install clickhouse"
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
-      "sudo apt-get update -y",
-      "sudo apt-get upgrade -y",
+      "sudo apt-get update",
+      //"sudo apt-get upgrade -y",
       "sudo apt-get install -y gnupg2",
+      "sudo mkdir /root/.gnupg/",
       "export GNUPGHOME=$(mktemp -d)",
       "sudo gpg --no-default-keyring --keyring /usr/share/keyrings/clickhouse-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8919F6BD2B48D754",
       "sudo chmod +r /usr/share/keyrings/clickhouse-keyring.gpg",
@@ -28,6 +29,8 @@ build {
 # any restiction for the docker build?
 # packer init ...
 # copy...
+# add more echo massage
+# update upgrade 10 mins
   provisioner "shell" {
   name = "Set permissions to copy config"
   inline = [
