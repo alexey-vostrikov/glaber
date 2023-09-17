@@ -6,6 +6,7 @@ virtualbox:
   stage: pkg-build
   tags: ["shell"]
   script:
+    - export PACKER_LOG=1
     - cd build/appliance/build/virtualbox/cloud-init
     - bash make-boot-image.sh
     - cd ..
