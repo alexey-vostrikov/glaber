@@ -59,7 +59,6 @@ class CLatestValue extends CSpan {
                             ->addClass(ZBX_STYLE_YELLOW);;
         }
         else if (!$this->isSupportedItem()) {
-//            $this->addClass(ZBX_STYLE_RED);
             $this->value_short = (new CIcon("fa-solid fa-triangle-exclamation fa-lg"))
                             ->addClass(ZBX_STYLE_RED);
         }

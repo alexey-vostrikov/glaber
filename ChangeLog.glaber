@@ -1,3 +1,7 @@
+
+2023-09-13 ver 3.3.6 (master)
+    - fix: added files cleanup in centos8 build
+    - fix: worker restart and run control stability
 2023-09-13 ver 3.3.5 (master)
     - fix: named host interfaces display in host list, fixed show http interface on agent activity
     - fix: correct items accounting in statistics for proxy item count

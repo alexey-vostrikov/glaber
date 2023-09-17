@@ -170,6 +170,9 @@ centos-8:
     OS: almalinux
     OS_VER: 8
     PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
+  hooks: 
+    pre_get_sources_script: 
+      - rm -rf $CI_BUILDS_DIR/*
 
 # after spec folder created build/almalinux/9
 # centos-9:

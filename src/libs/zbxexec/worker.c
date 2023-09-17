@@ -30,6 +30,7 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
+#define MAX_WORKER_SEND_DELAY 60 //how long time along a wroker should not accept data to start killing iy
 #define GLB_DEFAULT_WORKER_MAX_CALLS 1000000000 //how many reqeusts process by a runner befeore terminate it and start a new one
 #define WORKER_RESTART_TIMEOUT 15 //time to wait between restarts
 #define  GLB_WORKER_ARGS_MAX 64
@@ -46,8 +47,8 @@ struct glb_worker_t {
 	int pipe_from_worker;	//communication pipes
 	int pipe_to_worker;
 	int last_start;
-    int last_change;
-    int last_change_check;
+
+    int last_send;
     struct evbuffer *in_buffer;
     struct evbuffer *out_buffer; 
 };
@@ -115,8 +116,7 @@ int worker_process_args(glb_worker_t *worker, const char *params_buf) {
         while (  0 != params[i] && args_num < GLB_WORKER_ARGS_MAX) {
             if ( ' ' == params[i] && '\\' != prevchar ) {
                 params[i]=0;
-                worker->args[args_num++]=params+i+1;
-                
+                worker->args[args_num++]=params + i + 1;      
             }
         
             prevchar = params[i];
@@ -196,12 +196,24 @@ int glb_worker_restart(glb_worker_t *worker, char *reason)
         LOG_INF( "Killing old worker instance pid %d", worker->pid);
         
         if (0 == kill(worker->pid, 0))
-            kill(worker->pid, SIGKILL);
+            kill(worker->pid, SIGTERM);
 
-        waitpid(worker->pid, &exitstatus, WNOHANG);
+        //waitpid(worker->pid, &exitstatus, WNOHANG);
+        zbx_alarm_on(2);
+        waitpid(worker->pid, &exitstatus, 0);
+        zbx_alarm_off();
         
-        LOG_INF("Waitpid returned %d", exitstatus);
-       // worker->pid = 0;
+        //kill script with sigkill if sigterm is ignored
+        if (EINTR == errno) {
+            kill(worker->pid, SIGKILL);
+            
+            zbx_alarm_on(2);
+            waitpid(worker->pid, &exitstatus, 0);
+            zbx_alarm_off();
+        }
+
+
+        LOG_INF("Waitpid returned %d wifexited %d, wifsignaled %d", exitstatus, WIFEXITED(exitstatus), WIFSIGNALED(exitstatus));
     }
 
     int from_child[2];
@@ -279,21 +291,16 @@ int glb_worker_restart(glb_worker_t *worker, char *reason)
 
     worker->calls = 0;
    
-    zabbix_log(LOG_LEVEL_INFORMATION, "Started worker '%s' new pid is %d", worker->path, worker->pid);
-    zabbix_log(LOG_LEVEL_DEBUG, "Ended %s()", __func__);
+    LOG_INF("Started worker '%s' new pid is %d", worker->path, worker->pid);
+  
+    worker->last_send = worker->last_start = time(NULL);
     
-    worker->last_start = time(NULL);
-
     int flags = fcntl(worker->pipe_from_worker, F_GETFL, 0);
     fcntl(worker->pipe_from_worker, F_SETFL, flags | O_NONBLOCK);
     
     flags = fcntl(worker->pipe_to_worker, F_GETFL, 0);
     fcntl(worker->pipe_to_worker, F_SETFL, flags | O_NONBLOCK);
         
-  //  evbuffer_free(worker->in_buffer);
-  //  evbuffer_free(worker->out_buffer);
-  //  worker->in_buffer = evbuffer_new();
-  //  worker->out_buffer = evbuffer_new();
     return SUCCEED;
 }
 
@@ -332,15 +339,20 @@ static void worker_cleanup(glb_worker_t *worker)
 }
 
 int glb_worker_send_request(glb_worker_t *worker, const char * request) {
-   
+    int now = time(NULL);
+
     if ( (worker->calls++ >= worker->max_calls) || (SUCCEED != glb_worker_is_alive(worker) ) ) {
          glb_worker_restart(worker, "need to restart after 10000000 requetsts");
     }
 
     evbuffer_add_printf(worker->out_buffer, "%s%s", request, "\n");
-    
-    if ( 0 > evbuffer_write(worker->out_buffer, worker->pipe_to_worker) ) 
-         glb_worker_restart(worker, "write to the srcipt failed");
+
+    if ( 0 < evbuffer_write(worker->out_buffer, worker->pipe_to_worker) )
+        worker->last_send = time(NULL);
+
+    if (worker->last_send + MAX_WORKER_SEND_DELAY < now) {
+        glb_worker_restart(worker, "write to the srcipt failed for 60 seconds");
+    }
 
     return SUCCEED;
 };

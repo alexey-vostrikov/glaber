@@ -70,7 +70,7 @@ typedef struct {
 
 } pinger_conf_t;
 
-static pinger_conf_t conf;
+static pinger_conf_t conf = {0};
 
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_GLBMAP_LOCATION;
@@ -219,10 +219,7 @@ ITEMS_ITERATOR(process_item_by_ip_cb) {
 static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     char *worker_response = NULL;
     zbx_json_type_t type;
-    //u_int64_t mstime = glb_ms_time();
-    
-    //LOG_INF("In %s: start", __func__);
-       
+
     char itemid_s[MAX_ID_LEN], ip[MAX_ID_LEN], rtt_s[MAX_ID_LEN];
     u_int64_t itemid_l;
     int rtt_l;
@@ -294,7 +291,7 @@ static void process_worker_results_cb(poller_item_t *garbage, void *data) {
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: finished", __func__);
 }
 
-int subscribe_worker_fd() {
+static int subscribe_worker_fd() {
     
     if (NULL != conf.worker_event) {
       //  LOG_INF("Clearing the old event data %p", conf.worker_event);
@@ -343,7 +340,7 @@ static int send_icmp_packet(poller_item_t *poller_item) {
     return SUCCEED;
 }
 
-void send_timeout_cb(poller_item_t *poller_item, void *data) {
+static void send_timeout_cb(poller_item_t *poller_item, void *data) {
     DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting result");
     finish_icmp_poll(poller_item, SUCCEED, NULL);
     poller_register_item_iface_timeout(poller_item);
@@ -351,7 +348,7 @@ void send_timeout_cb(poller_item_t *poller_item, void *data) {
 
 
 //sends the packet, if all packets are sent, reset packet sent callback and sets timeout callback
-void send_packet_cb(poller_item_t *poller_item, void *data) {
+static void send_packet_cb(poller_item_t *poller_item, void *data) {
     pinger_item_t *pinger_item = poller_get_item_specific_data(poller_item);
        
     send_icmp_packet(poller_item);
@@ -475,7 +472,7 @@ static int needs_resolve(pinger_item_t *pinger_item) {
     return SUCCEED;    
 }
 
-void schedule_item_poll(poller_item_t *poller_item) {
+static void schedule_item_poll(poller_item_t *poller_item) {
 
     LOG_DBG("Start pinging item %ld", poller_get_item_id(poller_item));
     
@@ -540,8 +537,7 @@ static void start_ping(poller_item_t *poller_item)
     }
 
     if (SUCCEED == needs_resolve(pinger_item)) {
-       // LOG_INF("Item %ld needs resolving of name %s", poller_get_item_id(poller_item), pinger_item->addr );
-        
+     
         DEBUG_ITEM(poller_get_item_id(poller_item), "Sending item's hostname to async resolve");
         DEBUG_ITEM(poller_get_item_id(poller_item), "Sending item's hostname %s to async resolve", pinger_item->addr);
 
@@ -557,7 +553,7 @@ static void start_ping(poller_item_t *poller_item)
 
 static void handle_async_io(void)
 { 
-    //in true async pollers this proc should always be empty!
+   
 }
 
 static void pings_shutdown(void) {
@@ -613,9 +609,6 @@ void glb_pinger_init(void) {
 
     worker_set_mode_to_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
     worker_set_mode_from_worker(conf.worker, GLB_WORKER_MODE_NEWLINE);
-    //worker_set_async_mode(conf.worker, 1);
-    
-    conf.worker_event = NULL; //poller_create_event(NULL, process_worker_results_cb, NULL);
 
     LOG_DBG("In %s: Ended", __func__);
 }
