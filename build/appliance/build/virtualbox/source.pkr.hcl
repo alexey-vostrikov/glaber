@@ -5,6 +5,8 @@ source "qemu" "debian" {
   #iso_checksum = "none"
   disk_image = true
 
+  accelerator       = "kvm"
+  
   ssh_username     = "${var.username}"
   ssh_password     = "${var.password}"
   ssh_timeout      = "5m"
