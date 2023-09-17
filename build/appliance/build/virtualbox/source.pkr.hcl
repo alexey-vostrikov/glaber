@@ -28,7 +28,6 @@ source "qemu" "debian" {
 
   boot_wait    = "10s"
   qemuargs = [
-        ["-cpu", "host,+ssse3"],
         ["-m", "2048M"],
         ["-smp", "1"],
         ["-cdrom", "cloud-init/seed.img"]
