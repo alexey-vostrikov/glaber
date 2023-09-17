@@ -8,6 +8,8 @@ build {
     name = "Install clickhouse"
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
+      "sudo apt-get update -y",
+      "sudo apt-get upgrade",
       "sudo apt-get install -y gnupg2",
       "export GNUPGHOME=$(mktemp -d)",
       "sudo gpg --no-default-keyring --keyring /usr/share/keyrings/clickhouse-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8919F6BD2B48D754",
