@@ -22,32 +22,24 @@ build {
       "sudo apt-get install -y clickhouse-server=${var.clickhouse_version}* clickhouse-client=${var.clickhouse_version}*"
     ]
   }
-# try su - $(id -nu 1000)
-# add to builder image debian user with id 1000 and ability su - 1000;
-# with additional group root group
-# maybe set default USER?
-# any restiction for the docker build?
-# packer init ...
-# copy...
-# add more echo massage
-# update upgrade 10 mins
+
   provisioner "shell" {
   name = "Set permissions to copy config"
   inline = [
     "sudo chmod -R 700 /etc/clickhouse-server",
-    // run on builder host `id -u`
-    // set number in next step  ## prepare set 1000 with env
     "packer_user=$(id -nu 1000)", # debian
     "sudo chown -R $packer_user:$packer_user /etc/clickhouse-server",
   ]
   }
 
   provisioner "file" {
+    name = "Copy clickhouse server config"
     source      = "clickhouse/config.d"
     destination = "/etc/clickhouse-server"
   }
 
   provisioner "file" {
+    name = "Copy clickhouse server users config"
     source      = "clickhouse/users.xml"
     destination = "/etc/clickhouse-server/users.xml"
   }
