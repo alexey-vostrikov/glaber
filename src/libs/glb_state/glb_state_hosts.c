@@ -303,7 +303,7 @@ ELEMS_CALLBACK(update_host_avail_state_cb) {
 
 void update_hosts_avail_state_cb(void) {
     //LOG_INF("Updating hosts availability state");
-    elems_hash_iterate(conf->hosts, update_host_avail_state_cb, NULL, 0);
+    //elems_hash_iterate(conf->hosts, update_host_avail_state_cb, NULL, 0);
     //LOG_INF("Updated");
 }
 
