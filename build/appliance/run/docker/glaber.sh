@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 set -e
+set -o pipefail
 
 # functions
+echo_wrong_version() {
+  echo "Wrong glaber version $VERSION. Avaliable last versions:"
+  git ls-remote --refs --sort='version:refname' --tags \
+      $GIT_REPO origin 2* | tail --lines=1 | cut -d'/' -f3
+  git ls-remote --refs --sort='version:refname' --tags \
+      $GIT_REPO origin 3* | tail --lines=3 | cut -d'/' -f3
+  exit 1
+}
 mysql-schema-package-url() {
   local name=$1
   local version=$2
   URL="${GITLAB_PROJECT_URL}/${PROJECT_ID}/packages?per_page=1000"
   PACKAGE_ID=$(curl -s "$URL" | jq --arg name "$name" --arg version "$version" '.[] | select(.name == $name) | select(.version == $version) | .id')
   if [[ ! -z "$VERSION" ]]; then
-    info "Wrong or not existing glaber version: $version"
-    exit 1
+    echo_wrong_version
   else
     FILES_URL="${GITLAB_PROJECT_URL}/${PROJECT_ID}/packages/${PACKAGE_ID}/package_files"
     FILE_ID=$(curl -s "$FILES_URL" | jq '.[] | .id')
@@ -33,12 +41,7 @@ glaber-version() {
         elif git ls-remote --refs --tags $GIT_REPO| grep $VERSION| cut -d'/' -f3; then
           export GLABER_TAG=$VERSION
         else
-          echo "Wrong glaber version. Avaliable versions:"
-          git ls-remote --refs --sort='version:refname' --tags \
-              $GIT_REPO origin 2* | tail --lines=1 | cut -d'/' -f3
-          git ls-remote --refs --sort='version:refname' --tags \
-              $GIT_REPO origin 3* | tail --lines=3 | cut -d'/' -f3
-          exit 1
+          echo_wrong_version
         fi
       else
         export GLABER_TAG=$LATEST_TAG
@@ -46,6 +49,10 @@ glaber-version() {
   fi
   export GLABER_VERSION=$(curl -s ${GIT_BASE}/-/raw/${GLABER_TAG}/include/version.h | \
                   grep GLABER_VERSION | tr -dc 0-9.)
+
+  if [ -z "${GLABER_VERSION:-}" ]; then
+      echo_wrong_version
+  fi
 }
 apitest () {
   info "Install hurl for testing glaber"
@@ -251,7 +258,7 @@ elif [ "$1" == "diag" ]; then
 elif [ "$1" == "test" ]; then
   apitest
 elif [ "$1" == "upgrade" ]; then
-  rm .version
+  rm -f .version
   glaber-version $2
   upgrade
 else
