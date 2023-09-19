@@ -1,4 +1,6 @@
 
+2023-09-18 ver 3.3.11 (master)
+    - fix: logging of iface change in classic poller
 2023-09-18 ver 3.3.7-10 (master)
     - fixes: host state calculation, added sync pollers stat to rtc
 2023-09-13 ver 3.3.6 (master)

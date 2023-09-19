@@ -616,7 +616,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	AGENT_RESULT		results[MAX_POLLER_ITEMS];
 	int			errcodes[MAX_POLLER_ITEMS];
 	zbx_timespec_t		timespec;
-	int			i, num, last_available = INTERFACE_AVAILABLE_UNKNOWN;
+	int			i, num; //, last_available = INTERFACE_AVAILABLE_UNKNOWN;
 	zbx_vector_ptr_t	add_results;
 	unsigned char		*data = NULL;
 	size_t			data_alloc = 0, data_offset = 0;
@@ -650,20 +650,22 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case SUCCEED:
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
-				if (INTERFACE_AVAILABLE_TRUE != last_available)
-				{
-					glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
-					last_available = INTERFACE_AVAILABLE_TRUE;
-				}
+		//	if (INTERFACE_AVAILABLE_TRUE != last_available)
+		//		{
+				DEBUG_ITEM(items[i].itemid, "Set interface state to available");
+				glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
+		//			last_available = INTERFACE_AVAILABLE_TRUE;
+		//		}
 				break;
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
-				if (INTERFACE_AVAILABLE_FALSE != last_available)
-				{
-					glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
-					last_available = INTERFACE_AVAILABLE_FALSE;
-				}
+		//		if (INTERFACE_AVAILABLE_FALSE != last_available)
+		//		{
+				DEBUG_ITEM(items[i].itemid, "Set interface state to unavailable");
+				glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
+		//			last_available = INTERFACE_AVAILABLE_FALSE;
+		//		}
 				break;
 			case FAIL:
 			case CONFIG_ERROR:
