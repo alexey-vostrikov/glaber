@@ -196,12 +196,12 @@ debian-bullseye:
     OS_VER: bullseye
     PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
-debian-bookworm:
-  extends: .base-debian-builder
-  variables:
-    OS: debian
-    OS_VER: bookworm
-    PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
+# debian-bookworm:
+#   extends: .base-debian-builder
+#   variables:
+#     OS: debian
+#     OS_VER: bookworm
+#     PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
@@ -217,12 +217,12 @@ ubuntu-bionic:
     OS_VER: bionic
     PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
-ubuntu-jammy:
-  extends: .base-debian-builder
-  variables:
-    OS: ubuntu
-    OS_VER: jammy
-    PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
+# ubuntu-jammy:
+#   extends: .base-debian-builder
+#   variables:
+#     OS: ubuntu
+#     OS_VER: jammy
+#     PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
 # build for the docker packages
 docker-debian-bullseye:
