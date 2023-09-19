@@ -382,6 +382,7 @@ u_int64_t CONFIG_IPC_BUFFER_SIZE = 512 * ZBX_MEBIBYTE;
 
 char *CONFIG_WORKERS_DIR = NULL;
 char *CONFIG_GLBMAP_LOCATION = NULL;
+char *CONFIG_SNMP_WORKER_LOCATION = NULL;
 char *CONFIG_GLBMAP_OPTIONS = NULL;
 
 int CONFIG_SELF_MONITOR_PORT = DEFAULT_SELF_MONITOR_PORT;
@@ -600,6 +601,11 @@ int get_process_info_by_thread(int local_server_num, unsigned char *local_proces
 		*local_process_type = GLB_PROCESS_TYPE_WORKER;
 		*local_process_num = local_server_num - server_count + CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER];
 	}
+	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER]))
+	{
+		*local_process_type = GLB_PROCESS_TYPE_SNMP_WORKER;
+		*local_process_num = local_server_num - server_count + CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER];
+	}
 	else if (local_server_num <= (server_count += CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER]))
 	{
 		*local_process_type = GLB_PROCESS_TYPE_SERVER;
@@ -710,6 +716,9 @@ static void zbx_set_defaults(void)
 
 	if (NULL == CONFIG_GLBMAP_LOCATION)
 		CONFIG_GLBMAP_LOCATION = zbx_strdup(CONFIG_GLBMAP_LOCATION, "/usr/sbin/glbmap");
+
+	if (NULL == CONFIG_SNMP_WORKER_LOCATION)
+		CONFIG_SNMP_WORKER_LOCATION = zbx_strdup(CONFIG_SNMP_WORKER_LOCATION, "/usr/sbin/glb_snmp_worker");
 
 #ifdef HAVE_IPV6
 	if (NULL == CONFIG_FPING6_LOCATION)
@@ -931,7 +940,7 @@ static void zbx_validate_config(ZBX_TASK_EX *task)
 }
 
 static void set_config_defaults() {
-	
+	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER] = 0;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] = 1;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] = 0;
 	CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER] = 1;
@@ -980,6 +989,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 10},
 			{"StartGlbWorkers", &CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER], TYPE_INT,
 			 PARM_OPT, 0, 10},
+			{"StartGlbSnmpWorkers",		&CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER] , TYPE_INT,
+			PARM_OPT,	0,			10},	
 			{"DefaultICMPMethod", &ICMP_METHOD_STR, TYPE_STRING,
 			 PARM_OPT, 0, 0},
 			{"ValueCacheDumpLocation", &CONFIG_VCDUMP_LOCATION, TYPE_STRING,
@@ -1046,6 +1057,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"GlbmapLocation", &CONFIG_GLBMAP_LOCATION, TYPE_STRING,
 			 PARM_OPT, 0, 0},
+			{"SnmpWorkerLocation",		&CONFIG_SNMP_WORKER_LOCATION,			TYPE_STRING,
+				PARM_OPT,0,	0},
 			{"GlbmapOptions", &CONFIG_GLBMAP_OPTIONS, TYPE_STRING,
 			 PARM_OPT, 0, 0},
 			{"Fping6Location", &CONFIG_FPING6_LOCATION, TYPE_STRING,
@@ -1734,6 +1747,11 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 
 		switch (thread_args.info.process_type)
 		{
+		case GLB_PROCESS_TYPE_SNMP_WORKER:
+			thread_args.args = &poller_args;
+			LOG_INF("Starting SNMP WORKER glb poller of type %d", poller_args.poller_type);
+			zbx_thread_start(glbpoller_thread, &thread_args, &threads[i]);
+			break;
 		case ZBX_PROCESS_TYPE_HISTORYPOLLER:
 			thread_args.args = &poller_args;
 			LOG_INF("Starting  Calc glb poller of type %d", poller_args.poller_type);

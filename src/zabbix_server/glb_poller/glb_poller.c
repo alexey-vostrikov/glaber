@@ -35,6 +35,8 @@
 #include "glb_server.h"
 #include "poller_tcp.h"
 #include "calculated.h"
+#include "poller_snmp_worker.h"
+
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
 #include "../../libs/glb_state/glb_state_hosts.h"
@@ -49,6 +51,7 @@
 #include "glb_preproc.h"
 
 extern int CONFIG_CONFSYNCER_FREQUENCY;
+extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 /* poller timings in milliseconds */
 #define LOST_ITEMS_CHECK_INTERVAL 30 * 1000
@@ -139,7 +142,6 @@ static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
 		return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
 
 	return glb_state_host_is_id_interface_pollable(item->hostid, item->interfaceid, disabled_till);
-	
 
 }
 /******************************************************************
@@ -331,6 +333,9 @@ static int poll_module_init()
 {
 	switch (conf.procinfo.process_type)
 	{
+	case GLB_PROCESS_TYPE_SNMP_WORKER:
+		glb_snmp_worker_init();
+		break;
 #ifdef HAVE_NETSNMP
 	case GLB_PROCESS_TYPE_SNMP:
 		snmp_async_init();
@@ -456,9 +461,7 @@ static int poller_init(zbx_thread_args_t *args)
 	  					.malloc_func = ZBX_DEFAULT_MEM_MALLOC_FUNC, 
 						.realloc_func = ZBX_DEFAULT_MEM_REALLOC_FUNC};
 
-	//glb_preprocessing_init();
 	poller_contention_init();
-	// conf.item_type = args->info.process_type;
 
 	zbx_hashset_create(&conf.items, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 	zbx_hashset_create(&conf.hosts, 100, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
@@ -545,7 +548,7 @@ void poller_return_item_to_queue(poller_item_t *item)
 void poller_return_delayed_item_to_queue(poller_item_t *item)
 {
 	int nextcheck =  CONFIG_REPOLL_DELAY + rand() % 5 ;
-	//LOG_INF("Item %ld returned to the poller's queue, will repoll in %d msec", item->itemid, nextcheck);
+
 	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue, will repoll in %d sec", nextcheck);
 	
 	glb_state_item_update_nextcheck(item->itemid, time(NULL) + nextcheck * 1000 );
@@ -590,10 +593,8 @@ void poller_register_item_iface_timeout(poller_item_t *item)
 
 void poller_register_item_iface_succeed(poller_item_t *item)
  {
-	
-	//LOG_INF("GLB Poller: registering interface succeed for host %d", item->hostid );
+
 	if (1 == conf.poller.is_named_iface) {
-	//	LOG_INF("Register iface avail true for host %ld iface %ld", item->hostid, item->interfaceid);
 		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_TRUE, "Got a repsonse");
 	}
 	else 

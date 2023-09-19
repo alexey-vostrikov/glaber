@@ -186,10 +186,6 @@ class CConfigFile {
 			$this->config['IMAGE_FORMAT_DEFAULT'] = $IMAGE_FORMAT_DEFAULT;
 		}
 
-		if (isset($HISTORY)) {
-			$this->config['HISTORY'] = $HISTORY;
-		}
-
 		if (isset($SSO)) {
 			$this->config['SSO'] = $SSO;
 		}
@@ -200,14 +196,13 @@ class CConfigFile {
 	}
 
 	public function makeGlobal() {
-		global $DB, $ZBX_SERVER, $ZBX_SERVER_PORT, $ZBX_SERVER_NAME, $IMAGE_FORMAT_DEFAULT, $HISTORY, $SSO;
+		global $DB, $ZBX_SERVER, $ZBX_SERVER_PORT, $ZBX_SERVER_NAME, $IMAGE_FORMAT_DEFAULT, $SSO;
 
 		$DB = $this->config['DB'];
 		$ZBX_SERVER = $this->config['ZBX_SERVER'];
 		$ZBX_SERVER_PORT = $this->config['ZBX_SERVER_PORT'];
 		$ZBX_SERVER_NAME = $this->config['ZBX_SERVER_NAME'];
 		$IMAGE_FORMAT_DEFAULT = $this->config['IMAGE_FORMAT_DEFAULT'];
-		$HISTORY = $this->config['HISTORY'];
 		$SSO = $this->config['SSO'];
 	}
 
@@ -294,15 +289,6 @@ $DB[\'DOUBLE_IEEE754\']		= '.($this->config['DB']['DOUBLE_IEEE754'] ? 'true' : '
 $ZBX_SERVER_NAME		= \''.addcslashes($this->config['ZBX_SERVER_NAME'], "'\\").'\';
 
 $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
-
-// Uncomment this block only if you are using Elasticsearch.
-// Elasticsearch url (can be string if same url is used for all types).
-//$HISTORY[\'url\'] = [
-//	\'uint\' => \'http://localhost:9200\',
-//	\'text\' => \'http://localhost:9200\'
-//];
-// Value types stored in Elasticsearch.
-//$HISTORY[\'types\'] = [\'uint\', \'text\'];
 
 // Used for SAML authentication.
 // Uncomment to override the default paths to SP private key, SP and IdP X.509 certificates, and to set extra settings.

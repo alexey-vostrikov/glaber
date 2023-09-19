@@ -236,3 +236,6 @@ src/libs/zbxdbschema/dbschema.c
 .sass-cache/*
 src/glapi/glb_syslog_sender
 ui/modules/*
+src/glapi/glb_hist_victoria
+src/glapi/glb_syslog_worker
+src/glapi/glb_ripe_subscriber

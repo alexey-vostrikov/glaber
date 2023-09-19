@@ -8241,6 +8241,11 @@ int init_configuration_cache(char **error)
 		}
 	}
 
+	for (i = 0; i < ITEM_TYPE_MAX + 1; i++) {
+		config->time_by_poller_type[i] = 0.0;
+		config->runs_by_poller_type[i] = 0;
+	}
+	
 	zbx_binary_heap_create_ext(&config->pqueue,
 							   __config_proxy_compare,
 							   ZBX_BINARY_HEAP_OPTION_DIRECT,
@@ -8325,13 +8330,6 @@ int init_configuration_cache(char **error)
 #undef CREATE_HASHSET
 #undef CREATE_HASHSET_EXT
 out:
-//	glb_config = (GLB_CONFIG *)__config_shmem_malloc_func(NULL, sizeof(GLB_CONFIG));
-
-//	glb_config->host_to_template_idx = obj_index_init(&memf);
-	// glb_config->deptrigger_to_trigger_idx = obj_index_init(&memf);
-
-//	if (FAIL == strpool_init(&glb_config->strpool, &memf))
-//		ret = FAIL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
@@ -15818,6 +15816,42 @@ void	zbx_recalc_time_period(int *ts_from, int table_group)
 #undef HK_CFG_UPDATE_INTERVAL
 }
 
+void DC_account_sync_poller_time(int item_type, double time_spent) {
+	//LOG_INF("Accounted time spent %0.9f for item type %d", time_spent, item_type);
+	WRLOCK_CACHE;
+	config->time_by_poller_type[item_type] += time_spent;
+	config->runs_by_poller_type[item_type]++;
+	UNLOCK_CACHE;
+}
+
+void DC_get_account_sync_poller_time(char **out) {
+	int i;
+	double total_time = 0;
+	u_int64_t total_runs = 1 ;
+	size_t	alloc = 0, offset = 0;
+
+	RDLOCK_CACHE;
+
+	for (i=0; i< ITEM_TYPE_MAX; i++) {
+		total_time += config->time_by_poller_type[i];
+		total_runs += config->runs_by_poller_type[i];
+	}
+	total_time += config->time_by_poller_type[ITEM_TYPE_MAX];
+	
+	if (total_time > 5)
+		for (i = 0; i < ITEM_TYPE_MAX + 1; i++) 
+			if (config->time_by_poller_type[i] > 0.01) {
+				if ( i != ITEM_TYPE_MAX)
+					zbx_strlog_alloc(LOG_LEVEL_DEBUG, out, &alloc, &offset, "Item type %d time spent %0.2f%, runs %d% (%lld total)", i, 
+						(config->time_by_poller_type[i] * 100)/total_time, (config->runs_by_poller_type[i] * 100)/total_runs, 
+						config->runs_by_poller_type[i]); 
+				else 
+					zbx_strlog_alloc(LOG_LEVEL_DEBUG, out, &alloc, &offset, "Idle time %0.2f%, total runs %lld",  
+						(config->time_by_poller_type[i] * 100)/total_time, total_runs); 
+
+			}
+	UNLOCK_CACHE;
+}
 
 #ifdef HAVE_TESTS
 #include "../../../tests/libs/zbxdbcache/dc_item_poller_type_update_test.c"

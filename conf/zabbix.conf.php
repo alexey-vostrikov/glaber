@@ -21,8 +21,4 @@ $ZBX_SERVER_PORT                = '10055';
 $ZBX_SERVER_NAME                = $_SERVER['SERVER_NAME'] . '(' . gethostname() . ')';
 $IMAGE_FORMAT_DEFAULT   = IMAGE_FORMAT_PNG;
 
-//should be so, will deprecate soon
-global $HISTORY;
-$HISTORY['storagetype']='server';
-
 ?>

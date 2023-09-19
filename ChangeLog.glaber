@@ -1,4 +1,6 @@
 
+2023-09-18 ver 3.3.7-10 (master)
+    - fixes: host state calculation, added sync pollers stat to rtc
 2023-09-13 ver 3.3.6 (master)
     - fix: added files cleanup in centos8 build
     - fix: worker restart and run control stability

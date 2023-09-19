@@ -342,8 +342,8 @@ const char	*get_program_type_string(unsigned char program_type);
 #define GLB_PROCESS_TYPE_AGENT	43
 #define GLB_PROCESS_TYPE_API_TRAPPER	44
 #define GLB_PROCESS_TYPE_PREPROCESSOR	45
-//#define GLB_PROCESS_TYPE_SNMP_WORKER	46
-#define ZBX_PROCESS_TYPE_COUNT		46	/* number of process types */
+#define GLB_PROCESS_TYPE_SNMP_WORKER	46
+#define ZBX_PROCESS_TYPE_COUNT		47	/* number of process types */
 
 
 /* special processes that are not present worker list */

@@ -55,6 +55,7 @@ int poller_notify_ipc_init(size_t mem_size) {
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP, CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_PINGER, CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_WORKER, CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP_WORKER, CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, ZBX_PROCESS_TYPE_HISTORYPOLLER, CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTORYPOLLER], &ipc_memf);
 	
 	return SUCCEED;
@@ -68,7 +69,11 @@ static zbx_vector_uint64_pair_t *notify_buffer[ITEM_TYPE_MAX];
 int poller_item_notify_init() {
 	int i;
 	
-	process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP;
+	if (0 < CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER])
+		process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP_WORKER;
+	else 
+		process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP;
+
 	process_by_item_type[ITEM_TYPE_AGENT] = GLB_PROCESS_TYPE_AGENT;
 	process_by_item_type[ITEM_TYPE_SIMPLE] = GLB_PROCESS_TYPE_PINGER;
 	process_by_item_type[ITEM_TYPE_CALCULATED] = ZBX_PROCESS_TYPE_HISTORYPOLLER;

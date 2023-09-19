@@ -46,6 +46,8 @@
 #define ZBX_RTC_CONFIG_CACHE_RELOAD_WAIT	102
 #define ZBX_RTC_SUBSCRIBE_SERVICE		103
 
+#define GLB_RTC_SYNC_POLLER_TIMES   6000
+
 /* runtime control notifications, must be less than 10000 */
 #define ZBX_RTC_CONFIG_SYNC_NOTIFY		9999
 
@@ -62,6 +64,7 @@
 #define ZBX_DIAGINFO			"diaginfo"
 #define ZBX_TRIGGER_HOUSEKEEPER_EXECUTE "trigger_housekeeper_execute"
 #define ZBX_HA_STATUS			"ha_status"
+#define GLB_SYNC_POLLER_TIMES   "get_sync_poller_times"
 #define ZBX_HA_REMOVE_NODE		"ha_remove_node"
 #define ZBX_HA_SET_FAILOVER_DELAY	"ha_set_failover_delay"
 #define ZBX_USER_PARAMETERS_RELOAD	"userparameter_reload"

@@ -1416,7 +1416,9 @@ ELEMS_CALLBACK(item_set_error_cb) {
         elm->meta.error = strpool_replace(&state->strpool, elm->meta.error, error);
     else 
         elm->meta.error = strpool_replace(&state->strpool, "Error message is not set", error);
-   
+    
+    elm->meta.lastdata = time(NULL);
+
     return SUCCEED;
 }
 

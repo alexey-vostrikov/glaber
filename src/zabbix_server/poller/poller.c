@@ -489,9 +489,14 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 
 }
 
+void DC_account_sync_poller_time(int item_type, double time_spent);
+
 void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, zbx_vector_ptr_t *add_results,
 		unsigned char poller_type, const zbx_config_comms_args_t *config_comms, int config_startup_time)
 {
+	zbx_timespec_t start,end;
+	zbx_timespec(&start);
+
 	if (ITEM_TYPE_SNMP == items[0].type)
 	{
 #ifndef HAVE_NETSNMP
@@ -527,6 +532,8 @@ void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *resul
 	}
 	else
 		THIS_SHOULD_NEVER_HAPPEN;
+	zbx_timespec(&end);
+	DC_account_sync_poller_time(items[0].type, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
 }
 
 void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results)
@@ -780,6 +787,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	{
 		zbx_uint32_t	rtc_cmd;
 		unsigned char	*rtc_data;
+		zbx_timespec_t start, end;
 
 		sec = zbx_time();
 		zbx_update_env(get_process_type_string(process_type), sec);
@@ -816,6 +824,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			total_sec = 0.0;
 			last_stat_time = time(NULL);
 		}
+		
+		zbx_timespec(&start);
 
 		if (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
 		{
@@ -829,6 +839,9 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			if (ZBX_RTC_SHUTDOWN == rtc_cmd)
 				break;
 		}
+		
+		zbx_timespec(&end);
+		DC_account_sync_poller_time(ITEM_TYPE_MAX, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
 	}
 
 	scriptitem_es_engine_destroy();

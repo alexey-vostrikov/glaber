@@ -85,7 +85,7 @@ void poller_inc_responses();
 #define POLLER_ITERATOR_STOP 9
 
 typedef int (*items_iterator_cb)(poller_item_t *item, void *data);
-#define ITEMS_ITERATOR(func) int func(poller_item_t *poller_item, void *data)
+#define ITEMS_ITERATOR(func) static int func(poller_item_t *poller_item, void *data)
 
 void poller_items_iterate(items_iterator_cb iter_func, void *data);
 

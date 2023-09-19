@@ -37,9 +37,7 @@
 #define	ZBX_POLLER_TYPE_JAVA		4
 #define	ZBX_POLLER_TYPE_HISTORY		5
 #define	ZBX_POLLER_TYPE_ODBC		6
-#define	GLB_POLLER_TYPE_SNMP		7
-#define	GLB_POLLER_TYPE_PINGER		8
-#define	ZBX_POLLER_TYPE_COUNT		9	/* number of poller types */
+#define	ZBX_POLLER_TYPE_COUNT		7	/* number of poller types */
 
 typedef enum
 {

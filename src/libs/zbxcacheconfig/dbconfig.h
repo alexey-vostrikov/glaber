@@ -989,6 +989,8 @@ typedef struct
 	zbx_hashset_t		connector_tags;
 	zbx_hashset_t		sessions[ZBX_SESSION_TYPE_COUNT];
 	zbx_binary_heap_t	queues[ZBX_POLLER_TYPE_COUNT];
+	double				time_by_poller_type[ITEM_TYPE_MAX + 1];
+	u_int64_t			runs_by_poller_type[ITEM_TYPE_MAX + 1];
 	zbx_binary_heap_t	pqueue;
 	zbx_binary_heap_t	trigger_queue;
 	zbx_binary_heap_t	drule_queue;

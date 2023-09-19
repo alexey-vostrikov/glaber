@@ -87,6 +87,8 @@ void poller_disable_event(poller_event_t *poll_event) {
 }
 
 int poller_destroy_event(poller_event_t *poll_event) {
+	if (NULL == poll_event)
+		return SUCCEED;
 	event_del(poll_event->event);
 	event_free(poll_event->event);
 	zbx_free(poll_event);
