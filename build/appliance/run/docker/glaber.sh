@@ -4,11 +4,19 @@ set -o pipefail
 
 # functions
 echo_wrong_version() {
-  echo "Wrong glaber version $VERSION. Avaliable last versions:"
+  echo "Wrong glaber version $VERSION. Avaliable last release versions:"
   git ls-remote --refs --sort='version:refname' --tags \
       $GIT_REPO origin 2* | tail --lines=1 | cut -d'/' -f3
   git ls-remote --refs --sort='version:refname' --tags \
       $GIT_REPO origin 3* | tail --lines=3 | cut -d'/' -f3
+  echo "Last version:"
+  GITLAB_API_URL="${GITLAB_PROJECT_URL}/${PROJECT_ID}/registry/repositories"
+  SEARCH_PATH="mikler/glaber/glaber-server"
+  REPO_DETAILS=$(wget --no-check-certificate -q -O - "${GITLAB_API_URL}" | \
+                jq --arg path "${SEARCH_PATH}" '.[] | select(.path == $path)')
+  REPO_ID=$(echo "${REPO_DETAILS}" | jq -r '.id')
+  IMAGE_REPO_URL="${GITLAB_API_URL}/${REPO_ID}"
+  wget -q -O - "${IMAGE_REPO_URL}/tags" | jq -r '.[0].name'
   exit 1
 }
 mysql-schema-package-url() {
@@ -25,13 +33,18 @@ mysql-schema-package-url() {
   fi
 }
 glaber-version() {
+  GITLAB_API_URL="${GITLAB_PROJECT_URL}/${PROJECT_ID}/registry/repositories"
+  SEARCH_PATH="mikler/glaber/glaber-server"
+  REPO_DETAILS=$(wget --no-check-certificate -q -O - "${GITLAB_API_URL}" | \
+                jq --arg path "${SEARCH_PATH}" '.[] | select(.path == $path)')
+  REPO_ID=$(echo "${REPO_DETAILS}" | jq -r '.id')
+  IMAGE_REPO_URL="${GITLAB_API_URL}/${REPO_ID}"
   if [[ -f .version ]]; then
     export GLABER_TAG=$(cat .version)
     else
       MAIN_BRANCH=$(git ls-remote --symref $GIT_REPO HEAD | \
                     head -1 | awk '{print $2}' | cut -d'/' -f3)
-      LATEST_TAG=$(git ls-remote --refs --sort='version:refname' --tags \
-                  $GIT_REPO | tail --lines=1 | cut -d'/' -f3)
+      LATEST_TAG=$(wget -q -O - "${IMAGE_REPO_URL}/tags" | jq -r '.[0].name')
       local VERSION=$1
       if [[ ! -z "$VERSION" ]]; then
         if [[ "$VERSION" == "stable" ]]; then
