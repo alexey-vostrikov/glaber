@@ -172,8 +172,8 @@ centos-8:
     PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
   hooks: 
     pre_get_sources_script: 
-       - rm -rf /builds/mikler/*
-    #  - rm -rf $CI_BUILDS_DIR/glaber*
+    #   - rm -rf /builds/mikler/*
+      - rm -rf $CI_BUILDS_DIR/glaber*
 
 # after spec folder created build/almalinux/9
 # centos-9:
