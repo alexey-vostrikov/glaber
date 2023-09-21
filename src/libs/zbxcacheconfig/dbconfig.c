@@ -11105,7 +11105,10 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			{
 				/* move items on unreachable hosts to unreachable pollers or    */
 				/* postpone checks on hosts that have been checked recently and */
-				/* are still unreachable                                        */
+				/* are still unreachable   
+				                              */
+				DEBUG_ITEM(dc_item->itemid, "Throttling item due to interface is disbled");
+
 				if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type ||
 					disable_until > now)
 				{

@@ -235,6 +235,7 @@ ELEMS_CALLBACK(set_interface_cb) {
     if (new) {
         interface->error = strpool_add(&conf->strpool, set_iface->error);
         interface->lastchange = now;
+        interface->avail_state = INTERFACE_AVAILABLE_UNKNOWN;
     }
     else{ 
         if (NULL == interface->error || NULL == set_iface->error || 0 == strcmp(interface->error,set_iface->error))
@@ -250,20 +251,21 @@ ELEMS_CALLBACK(set_interface_cb) {
     if (set_iface->avail_state != interface->avail_state) {
         
         if ( INTERFACE_AVAILABLE_FALSE == set_iface->avail_state) {
-            //whatever->fail transition
+
             if (0 == interface->first_fail)
                 interface->first_fail == time(NULL);
             
             interface->fail_count++;
             
             if (set_iface->fail_count > 0)
-                interface->fail_count = set_iface->fail_count;
+               interface->fail_count = set_iface->fail_count;
 
             if (interface->fail_count < CONFIG_UNREACHABLE_RETRIES || 
-                now - interface->first_fail < CONFIG_UNREACHABLE_TIMEOUT )
+                now - interface->first_fail < CONFIG_UNREACHABLE_TIMEOUT ) {
                 return SUCCEED;
+            }
         } 
-         
+
         interface->fail_count = 0;
         interface->first_fail = 0;
         interface->disabled_till = 0;
@@ -310,12 +312,11 @@ ELEMS_CALLBACK(update_host_avail_state_cb) {
 
 }
 
-
 void update_hosts_avail_state_cb(void) {
-    //LOG_INF("Updating hosts availability state");
+
     int current_time = time(NULL);
     elems_hash_iterate(conf->hosts, update_host_avail_state_cb, &current_time , 0);
-    //LOG_INF("Updated");
+
 }
 
 void glb_state_host_set_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid,  int avail_state, const char *error) {

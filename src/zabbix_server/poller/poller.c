@@ -650,13 +650,13 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
 				DEBUG_ITEM(items[i].itemid, "Set interface state to available");
-				glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
+				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
 				break;
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
 				DEBUG_ITEM(items[i].itemid, "Set interface state to unavailable");
-				glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
+				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
 
 				break;
 				
