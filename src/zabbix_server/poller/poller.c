@@ -622,7 +622,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	size_t			data_alloc = 0, data_offset = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-	LOG_INF("Get items step1");
+//	LOG_INF("Get items step1");
 	items = &item;
 	num = DCconfig_get_poller_items(poller_type, config_comms->config_timeout, &items);
 
@@ -633,14 +633,14 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	}
 	
 	DEBUG_ITEM(items[0].itemid, "Fetched from the queue in zbx poller, total %d items", num);
-	LOG_INF("Get items step2");
+//	LOG_INF("Get items step2");
 	zbx_vector_ptr_create(&add_results);
 
 	zbx_prepare_items(items, errcodes, num, results, MACRO_EXPAND_YES);
 	zbx_check_items(items, errcodes, num, results, &add_results, poller_type, config_comms, config_startup_time);
 
 	zbx_timespec(&timespec);
-	LOG_INF("Get items step3");
+//	LOG_INF("Get items step3");
 	/* process item values */
 	for (i = 0; i < num; i++)
 	{
@@ -649,17 +649,17 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case SUCCEED:
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
-				LOG_INF("Get items step4");
+			//	LOG_INF("Get items step4");
 				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
-				LOG_INF("Get items step5");
+			//	LOG_INF("Get items step5");
 				break;
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
-				LOG_INF("Get items step6");
+				//LOG_INF("Get items step6");
 				//DEBUG_ITEM(items[i].itemid, "Set interface state to unavailable");
 				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
-				LOG_INF("Get items step7");
+				//LOG_INF("Get items step7");
 				break;
 				
 			case FAIL:
@@ -727,12 +727,12 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
 	zbx_vector_ptr_destroy(&add_results);
 
-	LOG_INF("Get items step8");
+//	LOG_INF("Get items step8");
 	if (items != &item)
 		zbx_free(items);
 exit:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
-	LOG_INF("Get items step9");
+//	LOG_INF("Get items step9");
 	return num;
 }
 
