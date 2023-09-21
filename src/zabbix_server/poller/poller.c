@@ -533,7 +533,7 @@ void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *resul
 	else
 		THIS_SHOULD_NEVER_HAPPEN;
 	zbx_timespec(&end);
-//	DC_account_sync_poller_time(items[0].type, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
+	DC_account_sync_poller_time(items[0].type, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
 }
 
 void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results)
@@ -837,8 +837,8 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 				break;
 		}
 		
-		zbx_tDC_account_sync_poller_timeimespec(&end);
-		//(ITEM_TYPE_MAX, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
+		zbx_timespec(&end);
+		//DC_account_sync_poller_time(ITEM_TYPE_MAX, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
 	}
 
 	scriptitem_es_engine_destroy();
