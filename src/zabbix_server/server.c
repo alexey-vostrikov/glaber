@@ -351,7 +351,6 @@ static int get_config_timeout(void)
 }
 
 static int config_startup_time = 0;
-static int	config_unavailable_delay	= 60;
 
 int CONFIG_LISTEN_PORT = ZBX_DEFAULT_SERVER_PORT;
 int CONFIG_API_LISTEN_PORT = GLB_DEFAULT_API_PORT;
@@ -391,8 +390,9 @@ char *CONFIG_SELF_MONITOR_IP = NULL;
 char **CONFIG_HISTORY_MODULE = NULL;
 int CONFIG_SNMP_RETRIES = 2;
 
-int CONFIG_UNREACHABLE_PERIOD = 45;
+int CONFIG_UNREACHABLE_TIMEOUT = 45;
 int CONFIG_UNREACHABLE_DELAY = 15;
+int CONFIG_UNREACHABLE_RETRIES = 2;
 
 int CONFIG_LOG_LEVEL = LOG_LEVEL_WARNING;
 char *CONFIG_EXTERNALSCRIPTS = NULL;
@@ -1067,11 +1067,11 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 1, 30},
 			{"TrapperTimeout", &CONFIG_TRAPPER_TIMEOUT, TYPE_INT,
 			 PARM_OPT, 1, 300},
-			{"UnreachablePeriod", &CONFIG_UNREACHABLE_PERIOD, TYPE_INT,
+			{"UnreachableRetries", &CONFIG_UNREACHABLE_RETRIES, TYPE_INT,
+			 PARM_OPT, 1, SEC_PER_HOUR},
+			{"UnreachableTimeout", &CONFIG_UNREACHABLE_TIMEOUT, TYPE_INT,
 			 PARM_OPT, 1, SEC_PER_HOUR},
 			{"UnreachableDelay", &CONFIG_UNREACHABLE_DELAY, TYPE_INT,
-			 PARM_OPT, 1, SEC_PER_HOUR},
-			{"UnavailableDelay",		&config_unavailable_delay,		TYPE_INT,
 			 PARM_OPT, 1, SEC_PER_HOUR},
 			{"ListenIP", &CONFIG_LISTEN_IP, TYPE_STRING_LIST,
 			 PARM_OPT, 0, 0},
@@ -1594,7 +1594,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 
 	zbx_thread_args_t thread_args;
 	zbx_thread_poller_args poller_args = {&config_comms, get_program_type, ZBX_NO_POLLER,
-									config_startup_time, config_unavailable_delay};
+									config_startup_time};
 	zbx_thread_trapper_args trapper_args = {&config_comms, &zbx_config_vault, get_program_type, listen_sock,
 											config_startup_time};
 	zbx_thread_trapper_args trapper_api_args = {&config_comms, &zbx_config_vault, get_program_type, api_listen_sock,
@@ -1613,7 +1613,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 	zbx_thread_connector_manager_args	connector_manager_args = {get_config_forks};
 
 #ifdef HAVE_OPENIPMI
-	zbx_thread_ipmi_manager_args	ipmi_manager_args = {config_timeout, config_unavailable_delay};
+	zbx_thread_ipmi_manager_args	ipmi_manager_args = {config_timeout};
 #endif
 	zbx_thread_alert_syncer_args	alert_syncer_args = {CONFIG_CONFSYNCER_FREQUENCY};
 	zbx_thread_alert_manager_args	alert_manager_args = {get_config_forks, get_alert_scripts_path,

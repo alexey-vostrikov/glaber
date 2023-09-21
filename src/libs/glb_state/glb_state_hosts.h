@@ -60,6 +60,8 @@ int glb_state_host_get_interface_avail_by_type(u_int64_t hostid, int iface_type,
 int glb_state_host_is_name_interface_pollable(u_int64_t hostid, char *ifname, int *disabled_till);
 int glb_state_host_is_id_interface_pollable(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till);
 
+int glb_state_host_get_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till);
+
 int glb_state_host_set_interfaces_from_json(struct zbx_json_parse *jp);
 void glb_state_hosts_process_heartbeat(u_int64_t hostid, int freq);
 

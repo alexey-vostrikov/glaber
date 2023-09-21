@@ -211,9 +211,7 @@ int glb_worker_restart(glb_worker_t *worker, char *reason)
             waitpid(worker->pid, &exitstatus, 0);
             zbx_alarm_off();
         }
-
-
-        LOG_INF("Waitpid returned %d wifexited %d, wifsignaled %d", exitstatus, WIFEXITED(exitstatus), WIFSIGNALED(exitstatus));
+       // LOG_INF("Waitpid returned %d wifexited %d, wifsignaled %d", exitstatus, WIFEXITED(exitstatus), WIFSIGNALED(exitstatus));
     }
 
     int from_child[2];

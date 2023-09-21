@@ -610,7 +610,7 @@ void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results)
  *                                                                            *
  ******************************************************************************/
 static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_config_comms_args_t *config_comms,
-		int config_startup_time, int config_unavailable_delay)
+		int config_startup_time)
 {
 	DC_ITEM			item, *items;
 	AGENT_RESULT		results[MAX_POLLER_ITEMS];
@@ -629,7 +629,6 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	if (0 == num)
 	{
 		*nextcheck = DCconfig_get_poller_nextcheck(poller_type);
-		//LOG_INF("No new data nextcheck calc");
 		goto exit;
 	}
 	
@@ -650,23 +649,17 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case SUCCEED:
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
-		//	if (INTERFACE_AVAILABLE_TRUE != last_available)
-		//		{
 				DEBUG_ITEM(items[i].itemid, "Set interface state to available");
 				glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
-		//			last_available = INTERFACE_AVAILABLE_TRUE;
-		//		}
 				break;
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
-		//		if (INTERFACE_AVAILABLE_FALSE != last_available)
-		//		{
 				DEBUG_ITEM(items[i].itemid, "Set interface state to unavailable");
 				glb_state_host_set_id_interface_avail(items[i].itemid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
-		//			last_available = INTERFACE_AVAILABLE_FALSE;
-		//		}
+
 				break;
+				
 			case FAIL:
 			case CONFIG_ERROR:
 				/* nothing to do */
@@ -802,7 +795,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 		}
 
 		processed += get_values(poller_type, &nextcheck, poller_args_in->config_comms,
-				poller_args_in->config_startup_time, poller_args_in->config_unavailable_delay);
+				poller_args_in->config_startup_time);
 		total_sec += zbx_time() - sec;
 
 		sleeptime = zbx_calculate_sleeptime(nextcheck, POLLER_DELAY);

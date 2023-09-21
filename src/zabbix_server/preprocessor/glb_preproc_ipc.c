@@ -193,6 +193,7 @@ int preprocess_send_metric(const metric_t *metric) {
 }
 
 int processing_send_metric(const metric_t *metric) {
+    DEBUG_ITEM(metric->itemid, "Sending metric to processing");
     glb_state_item_set_lastdata_by_metric(metric);
     glb_ipc_send(conf->process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_TRY_ONLY, 0);
 }
@@ -353,7 +354,7 @@ int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t f
 
 int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error) {
     metric_t metric={0};
- 
+    DEBUG_ITEM(itemid, "Sending error to processing");
     if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
         return FAIL;
     

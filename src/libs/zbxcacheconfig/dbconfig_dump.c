@@ -361,10 +361,9 @@ static void	DCdump_interfaces(void)
 
 		zbx_snprintf_alloc(&if_msg, &alloc, &offset, "interfaceid:" ZBX_FS_UI64 " hostid:" ZBX_FS_UI64
 				" ip:'%s' dns:'%s' port:'%s' type:%u main:%u useip:%u"
-				" disable_until:%d items_num %d",
+				" items_num %d",
 				interface->interfaceid, interface->hostid, interface->ip, interface->dns,
-				interface->port, interface->type, interface->main, interface->useip,
-				interface->disable_until, interface->items_num);
+				interface->port, interface->type, interface->main, interface->useip, interface->items_num);
 
 		if (INTERFACE_TYPE_SNMP == interface->type &&
 				NULL != (snmp = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp,

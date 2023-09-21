@@ -567,25 +567,12 @@ static zbx_uint64_t get_item_nextcheck_seed(zbx_uint64_t itemid, zbx_uint64_t in
 	return itemid;
 }
 
-static int DCget_disable_until(const ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface)
-{
-	switch (item->type)
-	{
-	case ITEM_TYPE_ZABBIX:
-	case ITEM_TYPE_SNMP:
-	case ITEM_TYPE_IPMI:
-	case ITEM_TYPE_JMX:
-		return (NULL == interface) ? 0 : interface->disable_until;
-	default:
-		return 0;
-	}
-}
 
 int DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface, int flags, int now,
 							char **error)
 {
 	zbx_uint64_t seed;
-	int simple_interval, disable_until, ret, nextcheck;
+	int simple_interval, disable_until, ret, nextcheck, iface_avail;
 	zbx_custom_interval_t *custom_intervals;
 	char *delay_s;
 
@@ -616,7 +603,9 @@ int DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface
 		return FAIL;
 	}
 
-	if (0 != (flags & ZBX_HOST_UNREACHABLE) && NULL != interface && 0 != (disable_until = DCget_disable_until(item, interface)))
+	iface_avail = glb_state_host_get_id_interface_avail(item->hostid, item->interfaceid, &disable_until);
+
+	if ( FAIL == iface_avail )
 	{
 		nextcheck = zbx_calculate_item_nextcheck_unreachable(simple_interval,
 															 custom_intervals, disable_until);
@@ -2354,7 +2343,7 @@ void DCsync_interfaces(zbx_dbsync_t *sync, zbx_uint64_t revision)
 		if (0 == found)
 		{
 
-			interface->disable_until = atoi(row[9]);
+			//interface->disable_until = atoi(row[9]);
 
 			interface->items_num = 0;
 		}
@@ -11051,6 +11040,8 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		ZBX_DC_INTERFACE *dc_interface;
 		ZBX_DC_ITEM *dc_item;
 		static const ZBX_DC_ITEM *dc_item_prev = NULL;
+		int disabled_until; 
+		int can_poll;
 
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
@@ -11093,11 +11084,14 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			dc_requeue_item(dc_item, dc_host, dc_interface, ZBX_ITEM_COLLECTED, now);
 			continue;
 		}
+		
+		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
 
 		/* don't apply unreachable item/host throttling for prioritized items */
 		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority)
 		{
-			if (0 == (disable_until = DCget_disable_until(dc_item, dc_interface)))
+					
+			if ( SUCCEED == can_poll)
 			{
 				/* move reachable items on reachable hosts to normal pollers */
 				if (ZBX_POLLER_TYPE_UNREACHABLE == poller_type &&
@@ -11283,7 +11277,7 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 
 	while (num < items_num && FAIL == zbx_binary_heap_empty(queue))
 	{
-		int disable_until;
+		int disable_until, iface_avail;
 		const zbx_binary_heap_elem_t *min;
 		ZBX_DC_HOST *dc_host;
 		ZBX_DC_INTERFACE *dc_interface;
@@ -11316,10 +11310,11 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 			continue;
 		}
 
+		iface_avail = glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disable_until);
 		/* don't apply unreachable item/host throttling for prioritized items */
 		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority)
 		{
-			if (0 != (disable_until = DCget_disable_until(dc_item, dc_interface)))
+			if ( FAIL == iface_avail )
 			{
 				if (disable_until > now)
 				{
@@ -15114,6 +15109,7 @@ static void dc_reschedule_items(const zbx_hashset_t *activated_hosts)
 				/* for queue requests by frontend.                          */
 				// if (NULL != item->delay_ex)
 				(void)DCitem_nextcheck_update(item, NULL, ZBX_ITEM_DELAY_CHANGED, now, NULL);
+
 			}
 			else if (NULL != item->delay_ex)
 				dc_reschedule_item(item, items.values[i]->host, now);

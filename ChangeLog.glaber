@@ -1,4 +1,5 @@
-
+2023-09-18 ver 3.3.11 (master)
+    - fix: double metrics, intrface throttling in classical pollers
 2023-09-18 ver 3.3.11 (master)
     - fix: logging of iface change in classic poller
 2023-09-18 ver 3.3.7-10 (master)

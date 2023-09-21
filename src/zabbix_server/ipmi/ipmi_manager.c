@@ -635,7 +635,7 @@ static void	ipmi_manager_activate_interface(zbx_ipmi_manager_t *manager, zbx_uin
  *                                                                            *
  ******************************************************************************/
 static void	ipmi_manager_deactivate_interface(zbx_ipmi_manager_t *manager, zbx_uint64_t itemid, zbx_timespec_t *ts,
-		int unavailable_delay, const char *error)
+		 const char *error)
 {
 	DC_ITEM		item;
 	int		errcode;
@@ -820,7 +820,7 @@ static void	ipmi_manager_process_client_result(zbx_ipmi_manager_t *manager, zbx_
  *                                                                                    *
  *************************************************************************************/
 static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_ipc_client_t *client,
-		zbx_ipc_message_t *message, int now, int unavailable_delay)
+		zbx_ipc_message_t *message, int now)
 {
 	char			*value;
 	zbx_timespec_t		ts;
@@ -859,7 +859,7 @@ static void	ipmi_manager_process_value_result(zbx_ipmi_manager_t *manager, zbx_i
 		case NETWORK_ERROR:
 		case GATEWAY_ERROR:
 		case TIMEOUT_ERROR:
-			ipmi_manager_deactivate_interface(manager, itemid, &ts, unavailable_delay, value);
+			ipmi_manager_deactivate_interface(manager, itemid, &ts, value);
 			break;
 		case CONFIG_ERROR:
 			/* nothing to do */
@@ -995,8 +995,7 @@ ZBX_THREAD_ENTRY(ipmi_manager_thread, args)
 					break;
 				/* poller -> manager or poller -> manager -> client if value request sent by client */
 				case ZBX_IPC_IPMI_VALUE_RESULT:
-					ipmi_manager_process_value_result(&ipmi_manager, client, message, now,
-							ipmi_manager_args_in->config_unavailable_delay);
+					ipmi_manager_process_value_result(&ipmi_manager, client, message, now);
 					polled_num++;
 					break;
 				/* client -> manager */

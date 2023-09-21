@@ -72,6 +72,7 @@ static void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t
     if ( 0 != (program_type & ZBX_PROGRAM_TYPE_PROXY)) {
         DEBUG_ITEM(metric->itemid, "Sending item to server sync");
         processing_send_metric(metric);
+        return;
     }
 
      if( NULL != preproc_conf && 

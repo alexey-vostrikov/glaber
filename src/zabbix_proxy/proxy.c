@@ -292,7 +292,6 @@ static int	get_config_timeout(void)
 }
 
 static int	config_startup_time	= 0;
-static int	config_unavailable_delay	=60;
 
 int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_SERVER_PORT;
 char	*CONFIG_LISTEN_IP		= NULL;
@@ -322,8 +321,9 @@ zbx_uint64_t	CONFIG_TRENDS_CACHE_SIZE	= 0;
 zbx_uint64_t	CONFIG_VALUE_CACHE_SIZE		= 64 * ZBX_MEBIBYTE;
 zbx_uint64_t	CONFIG_VMWARE_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
 
-int	CONFIG_UNREACHABLE_PERIOD	= 45;
+int	CONFIG_UNREACHABLE_TIMEOUT	= 45;
 int	CONFIG_UNREACHABLE_DELAY	= 15;
+int CONFIG_UNREACHABLE_RETRIES = 2;
 int	CONFIG_LOG_LEVEL		= LOG_LEVEL_WARNING;
 char	*CONFIG_EXTERNALSCRIPTS		= NULL;
 int	CONFIG_ALLOW_UNSUPPORTED_DB_VERSIONS = 0;
@@ -941,11 +941,11 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			30},
 		{"TrapperTimeout",		&CONFIG_TRAPPER_TIMEOUT,		TYPE_INT,
 			PARM_OPT,	1,			300},
-		{"UnreachablePeriod",		&CONFIG_UNREACHABLE_PERIOD,		TYPE_INT,
-			PARM_OPT,	1,			SEC_PER_HOUR},
+		{"UnreachableRetries", &CONFIG_UNREACHABLE_RETRIES, TYPE_INT,
+			 PARM_OPT, 1, SEC_PER_HOUR},
+		{"UnreachableTimeout", &CONFIG_UNREACHABLE_TIMEOUT, TYPE_INT,
+			 PARM_OPT, 1, SEC_PER_HOUR},
 		{"UnreachableDelay",		&CONFIG_UNREACHABLE_DELAY,		TYPE_INT,
-			PARM_OPT,	1,			SEC_PER_HOUR},
-		{"UnavailableDelay",		&config_unavailable_delay,		TYPE_INT,
 			PARM_OPT,	1,			SEC_PER_HOUR},
 		{"ListenIP",			&CONFIG_LISTEN_IP,			TYPE_STRING_LIST,
 			PARM_OPT,	0,			0},
@@ -1418,7 +1418,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 								config_timeout};
 	zbx_thread_args_t			thread_args;
 	zbx_thread_poller_args			poller_args = {&config_comms, get_program_type, ZBX_NO_POLLER,
-								config_startup_time, config_unavailable_delay};
+								config_startup_time};
 	zbx_thread_proxyconfig_args		proxyconfig_args = {zbx_config_tls, &zbx_config_vault,
 								get_program_type, config_timeout};
 	zbx_thread_datasender_args		datasender_args = {zbx_config_tls, get_program_type, config_timeout};
@@ -1430,7 +1430,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	zbx_thread_proxy_housekeeper_args	housekeeper_args = {config_timeout};
 	zbx_thread_pinger_args			pinger_args = {config_timeout};
 #ifdef HAVE_OPENIPMI
-	zbx_thread_ipmi_manager_args		ipmimanager_args = {config_timeout, config_unavailable_delay};
+	zbx_thread_ipmi_manager_args		ipmimanager_args = {config_timeout};
 #endif
 	zbx_rtc_process_request_ex_func_t	rtc_process_request_func = NULL;
 

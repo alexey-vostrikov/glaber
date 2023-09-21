@@ -515,7 +515,6 @@ typedef struct
 	unsigned char	type;
 	unsigned char	main;
 	unsigned char	useip;
-	int		disable_until;
 	int		items_num;
 }
 ZBX_DC_INTERFACE;

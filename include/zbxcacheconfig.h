@@ -63,7 +63,6 @@ zbx_session_type_t;
 
 extern zbx_uint64_t	CONFIG_CONF_CACHE_SIZE;
 
-extern int	CONFIG_UNREACHABLE_PERIOD;
 extern int	CONFIG_UNREACHABLE_DELAY;
 extern int	CONFIG_PROXYCONFIG_FREQUENCY;
 extern int	CONFIG_PROXYDATA_FREQUENCY;
@@ -648,9 +647,6 @@ int	is_item_processed_by_server(unsigned char type, const char *key);
 int	zbx_is_counted_in_item_queue(unsigned char type, const char *key);
 int	in_maintenance_without_data_collection(unsigned char maintenance_status, unsigned char maintenance_type,
 		unsigned char type);
-//void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned char item_flags,
-//		AGENT_RESULT *result, const zbx_timespec_t *ts, unsigned char state, const char *error);
-//int 	dc_flush_history(void);
 
 #define ZBX_SYNC_NONE	0
 #define ZBX_SYNC_ALL	1

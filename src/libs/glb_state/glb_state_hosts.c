@@ -21,6 +21,8 @@
 #include "zbxalgo.h"
 
 extern int CONFIG_UNREACHABLE_DELAY;
+extern int CONFIG_UNREACHABLE_RETRIES;
+extern int CONFIG_UNREACHABLE_TIMEOUT;
 
 typedef struct {
     elems_hash_t *hosts;
@@ -49,6 +51,7 @@ typedef struct {
     const char *error;
     int lastchange;
     int lastupdate;
+    int first_fail;
     int disabled_till;
     unsigned char avail_state;
     unsigned char fail_count;
@@ -214,50 +217,57 @@ int interface_compare_func(const void *d1, const void *d2) {
 
 ELEMS_CALLBACK(set_interface_cb) {
     host_state_t *host = elem->data;
-    host_iface_t  *search_iface = data, *interface = NULL;
+    host_iface_t  *set_iface = data, *interface = NULL;
     int idx, new = 0;
+    int now = time(NULL);
 
-    if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *search_iface, interface_compare_func ))) {
+    if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *set_iface, interface_compare_func ))) {
      
         if (host->interfaces.values_alloc == host->interfaces.values_num)
             glb_vector_host_ifaces_reserve(&host->interfaces, host->interfaces.values_num + 2, &conf->memf);
  
-        idx = glb_vector_host_ifaces_append(&host->interfaces, *search_iface, &conf->memf);
+        idx = glb_vector_host_ifaces_append(&host->interfaces, *set_iface, &conf->memf);
         new = 1;
     }
     
     interface = glb_vector_host_ifaces_get_element(&host->interfaces, idx);
 
     if (new) {
-        interface->error = strpool_add(&conf->strpool, search_iface->error);
-        interface->lastchange = time(NULL);
+        interface->error = strpool_add(&conf->strpool, set_iface->error);
+        interface->lastchange = now;
     }
     else{ 
-        if (NULL == interface->error || NULL == search_iface->error || 0 == strcmp(interface->error,search_iface->error))
-            interface->error = strpool_replace(&conf->strpool, interface->error, search_iface->error);
+        if (NULL == interface->error || NULL == set_iface->error || 0 == strcmp(interface->error,set_iface->error))
+            interface->error = strpool_replace(&conf->strpool, interface->error, set_iface->error);
     }
 
-    if (search_iface->lastupdate != 0) 
-        interface->lastupdate = search_iface->lastupdate;
+    if (set_iface->lastupdate != 0) 
+        interface->lastupdate = set_iface->lastupdate;
 
-    if (search_iface->lastchange != 0)
-        interface->lastchange = search_iface->lastchange;
+    if (set_iface->lastchange != 0)
+        interface->lastchange = set_iface->lastchange;
 
-    if (search_iface->avail_state != interface->avail_state) {
+    if (set_iface->avail_state != interface->avail_state) {
+        
+        if ( INTERFACE_AVAILABLE_FALSE == set_iface->avail_state) {
+            //whatever->fail transition
+            if (0 == interface->first_fail)
+                interface->first_fail == time(NULL);
+            
+            interface->fail_count++;
+            
+            if (set_iface->fail_count > 0)
+                interface->fail_count = set_iface->fail_count;
 
-        //kludge: using fail count to set iface immediately to FAIL state 
-        //need this in interface import procedures for data coming from proxy
-        if ( (INTERFACE_AVAILABLE_FALSE == search_iface->avail_state) && 
-            ((MAX_IFACE_TIMEOUT_COUNT-1) > interface->fail_count ) && 
-            search_iface->fail_count < MAX_IFACE_TIMEOUT_COUNT) {  
-
-            interface->fail_count ++;
-            return SUCCEED;
-        }
-    
+            if (interface->fail_count < CONFIG_UNREACHABLE_RETRIES || 
+                now - interface->first_fail < CONFIG_UNREACHABLE_TIMEOUT )
+                return SUCCEED;
+        } 
+         
         interface->fail_count = 0;
+        interface->first_fail = 0;
         interface->disabled_till = 0;
-        interface->avail_state = search_iface->avail_state;
+        interface->avail_state = set_iface->avail_state;
         interface->lastchange = time(NULL);
     }
 
@@ -321,10 +331,10 @@ void glb_state_host_set_id_interface_avail(u_int64_t hostid, u_int64_t interface
 
 ELEMS_CALLBACK(is_interface_pollable_cb) {
     host_state_t *host = elem->data;
-    host_iface_t  *search_iface = data, *interface = NULL;
+    host_iface_t  *set_iface = data, *interface = NULL;
     int idx;
 
-    if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *search_iface, interface_compare_func)))
+    if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *set_iface, interface_compare_func)))
         return SUCCEED;
 
     interface = glb_vector_host_ifaces_get_element(&host->interfaces, idx);
@@ -333,7 +343,7 @@ ELEMS_CALLBACK(is_interface_pollable_cb) {
         return SUCCEED;
     
     if ( interface->disabled_till > time(NULL)) {
-        search_iface->disabled_till = interface->disabled_till;
+        set_iface->disabled_till = interface->disabled_till;
         return FAIL;
     }
 
@@ -372,6 +382,47 @@ int glb_state_host_is_id_interface_pollable(u_int64_t hostid, u_int64_t interfac
 
     return is_interface_pollable(hostid, &if_info, disabled_till);
 }
+
+
+ELEMS_CALLBACK(get_interface_avail_cb) {
+    host_state_t *host = elem->data;
+    host_iface_t  *set_iface = data, *interface = NULL;
+    int idx;
+
+    if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *set_iface, interface_compare_func)))
+        return SUCCEED;
+
+    interface = glb_vector_host_ifaces_get_element(&host->interfaces, idx);
+
+    if (INTERFACE_AVAILABLE_FALSE != interface->avail_state)
+        return SUCCEED;
+    
+    set_iface->disabled_till = interface->disabled_till;
+    
+    return FAIL;
+}
+
+static int  get_interface_avail(u_int64_t hostid, host_iface_t *if_info, int *disabled_till) {
+    
+    if_info->disabled_till = -1;
+
+    if (SUCCEED == elems_hash_process(conf->hosts, hostid, get_interface_avail_cb, if_info, ELEM_FLAG_DO_NOT_CREATE)) 
+        return SUCCEED;
+    
+    if (-1 == if_info->disabled_till) 
+        return SUCCEED;
+
+    *disabled_till = if_info->disabled_till;
+
+    return FAIL;
+}
+int glb_state_host_get_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till) {
+
+    host_iface_t if_info = {.type = IFACE_TYPE_ID, .iface.id = interfaceid };
+
+    return get_interface_avail(hostid, &if_info, disabled_till);
+}
+
 
 typedef struct {
     struct zbx_json *j;
