@@ -11045,6 +11045,14 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
+		
+		u_int64_t itemid = dc_item->itemid;
+		UNLOCK_CACHE;
+		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
+		WRLOCK_CACHE;
+
+		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
+			continue;
 
 		if (dc_item->queue_next_check > now)
 		{
@@ -11085,12 +11093,9 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			continue;
 		}
 		
-		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
-
 		/* don't apply unreachable item/host throttling for prioritized items */
 		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority)
-		{
-					
+		{			
 			if ( SUCCEED == can_poll)
 			{
 				/* move reachable items on reachable hosts to normal pollers */
@@ -11288,7 +11293,16 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
+		
+		u_int64_t itemid = dc_item->itemid;
 
+		UNLOCK_CACHE;
+		iface_avail = glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disable_until);
+		WRLOCK_CACHE;
+
+		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
+			continue;
+			
 		if (dc_item->queue_next_check > now)
 			break;
 
@@ -11313,7 +11327,7 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 			continue;
 		}
 
-		iface_avail = glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disable_until);
+		
 		/* don't apply unreachable item/host throttling for prioritized items */
 		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority)
 		{
@@ -13951,7 +13965,7 @@ void zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, 
 			if (SUCCEED == glb_might_be_async_polled(dc_item, dc_host) ) {
 				poller_item_add_notify(dc_item->type, dc_item->key, dc_item->itemid, dc_host->hostid);
 				
-				LOG_INF("Added poll now notify for async item %ld", dc_item->itemid);
+				//LOG_INF("Added poll now notify for async item %ld", dc_item->itemid);
 
 			} else {
 				dc_requeue_item_at(dc_item, dc_host, nextcheck);
