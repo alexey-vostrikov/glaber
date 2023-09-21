@@ -170,11 +170,11 @@ set-passwords() {
 usage() {
   echo "Usage: $0 <action>"
   echo
-  echo "$0 build                          - Build docker images for mysql and clickhouse"
-  echo "$0 start   (latest,stable,3.0.50) - Build docker images and start glaber"
+  echo "$0 start   (latest,stable,3.0.50) - Start released glaber version"
   echo "$0 upgrade (latest,stable,3.0.50) - Upgrade docker images and restart glaber"
   echo "$0 stop                           - Stop glaber containers"
-  echo "$0 diag                           - Collect glaber start and some base system info to the file"
+  echo "$0 remove                         - Completely remove glaber installation with all data"
+  echo "$0 diag                           - Collect glaber logs and some base system info to the file"
 }
 build() {
   [[ ! -f glaber-server/etc/zabbix/zabbix_server.conf ]] && \
