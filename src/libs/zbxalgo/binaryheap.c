@@ -228,6 +228,7 @@ void	zbx_binary_heap_insert(zbx_binary_heap_t *heap, zbx_binary_heap_elem_t *ele
 
 	if (HAS_DIRECT_OPTION(heap) && FAIL != zbx_hashmap_get(heap->key_index, elem->key))
 	{
+		zbx_backtrace();
 		zabbix_log(LOG_LEVEL_CRIT, "inserting a duplicate key into a heap with direct option");
 		exit(EXIT_FAILURE);
 	}

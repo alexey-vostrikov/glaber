@@ -11047,18 +11047,11 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		dc_item = (ZBX_DC_ITEM *)min->data;
 		
 		u_int64_t itemid = dc_item->itemid;
-		UNLOCK_CACHE;
-		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
-		WRLOCK_CACHE;
-
-		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
-			continue;
 
 		if (dc_item->queue_next_check > now)
 		{
 			break;
 		}
-
 		if (0 != num)
 		{
 			if (ITEM_TYPE_SNMP == dc_item_prev->type)
@@ -11073,8 +11066,20 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			}
 		}
 
+
+
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
+	
+
+		UNLOCK_CACHE;
+		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
+		WRLOCK_CACHE;
+
+		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
+			continue;
+
+		
 
 		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			continue;
@@ -11296,18 +11301,20 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 		
 		u_int64_t itemid = dc_item->itemid;
 
+		if (dc_item->queue_next_check > now)
+			break;
+
+		zbx_binary_heap_remove_min(queue);
+		dc_item->location = ZBX_LOC_NOWHERE;
+
 		UNLOCK_CACHE;
 		iface_avail = glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disable_until);
 		WRLOCK_CACHE;
 
 		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
 			continue;
-			
-		if (dc_item->queue_next_check > now)
-			break;
 
-		zbx_binary_heap_remove_min(queue);
-		dc_item->location = ZBX_LOC_NOWHERE;
+	
 
 		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			continue;
