@@ -396,6 +396,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 	}
 	else if (0 == strcmp(first_param, "host"))			/* zabbix["host",*] */
 	{
+		
 		if (3 != nparams)
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
@@ -406,6 +407,8 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 
 		if (0 == strcmp(tmp, "available"))		/* zabbix["host",<type>,"available"] */
 		{
+			DEBUG_ITEM(item->itemid, "Processing host iface availability check");
+		
 			int iface_type = INTERFACE_TYPE_AGENT;
 		
 			tmp = get_rparam(&request, 1);
@@ -419,8 +422,10 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			else if (0 == strcmp(tmp, "jmx"))
 				iface_type = INTERFACE_TYPE_JMX;
 			
-
+			DEBUG_ITEM(item->itemid, "Iface type is %d", iface_type);
 			int iface_avail_state = glb_state_host_get_interface_avail_by_type(item->host.hostid, iface_type, tmp);
+			
+			DEBUG_ITEM(item->itemid, "Iface avail state is %d", iface_avail_state);
 			//setting = 2 - iface_avail_state would be easier but its hard to understand
 			switch (iface_avail_state) {
 				case INTERFACE_AVAILABLE_FALSE: 

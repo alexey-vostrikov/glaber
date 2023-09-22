@@ -310,7 +310,7 @@ void snmp_async_init(void) {
 	init_snmp(progname);
 	
 	poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll_item,
-			 snmp_async_shutdown, forks_count, resolve_ready_cb, NULL, "snmp", 0);
+			 snmp_async_shutdown, forks_count, resolve_ready_cb, NULL, "snmp", 0, 1);
 
 	if ( (conf.socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
         LOG_INF("Couldn't create socket for ASYNC snmp poller");

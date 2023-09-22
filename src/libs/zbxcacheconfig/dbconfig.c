@@ -11034,7 +11034,6 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 
 	while (num < max_items && FAIL == zbx_binary_heap_empty(queue))
 	{
-		int disable_until;
 		const zbx_binary_heap_elem_t *min;
 		ZBX_DC_HOST *dc_host;
 		ZBX_DC_INTERFACE *dc_interface;
@@ -11067,19 +11066,16 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		}
 
 
-
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
 	
-
 		UNLOCK_CACHE;
+		/*need to unlock to avoid deadlocks while doing another lock*/
 		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
 		WRLOCK_CACHE;
 
 		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
 			continue;
-
-		
 
 		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			continue;
@@ -11098,36 +11094,17 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			continue;
 		}
 		
-		/* don't apply unreachable item/host throttling for prioritized items */
-		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority)
+		/* thottle if iface is disabled by don't apply throttling for prioritized items */
+		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority && FAIL == can_poll)
 		{			
-			if ( SUCCEED == can_poll)
-			{
-				/* move reachable items on reachable hosts to normal pollers */
-				if (ZBX_POLLER_TYPE_UNREACHABLE == poller_type &&
-					ZBX_QUEUE_PRIORITY_LOW != dc_item->queue_priority)
-				{
-					dc_requeue_item(dc_item, dc_host, dc_interface, ZBX_ITEM_COLLECTED, now);
-					continue;
-				}
-			}
-			else
-			{
-				/* move items on unreachable hosts to unreachable pollers or    */
-				/* postpone checks on hosts that have been checked recently and */
-				/* are still unreachable   
-				                              */
-				DEBUG_ITEM(dc_item->itemid, "Throttling item due to interface is disbled");
+			DEBUG_ITEM(dc_item->itemid, "Throttling item due to interface is disbled for %d more seconds", disabled_until - now);
 
-				if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type ||
-					disable_until > now)
-				{
-					dc_requeue_item(dc_item, dc_host, dc_interface,
-									ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, now);
-					continue;
-				}
-
-			}
+			if (disabled_until < now) 
+				disabled_until = now;
+			//marking items as unreachable to put some to 	
+			dc_requeue_item(dc_item, dc_host, dc_interface,
+							ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, disabled_until);
+			continue;
 		}
 
 		if (0 == num)
@@ -11336,18 +11313,15 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 
 		
 		/* don't apply unreachable item/host throttling for prioritized items */
-		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority)
+		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority && FAIL == iface_avail )
 		{
-			if ( FAIL == iface_avail )
-			{
-				if (disable_until > now)
-				{
-					dc_requeue_item(dc_item, dc_host, dc_interface,
-									ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, now);
-					continue;
-				}
-
-			}
+			if (disable_until < now)
+				disable_until = now;
+				
+			dc_requeue_item(dc_item, dc_host, dc_interface,
+							ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, now);
+			continue;
+			
 		}
 
 		dc_item->location = ZBX_LOC_POLLER;

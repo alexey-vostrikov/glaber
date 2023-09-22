@@ -579,7 +579,7 @@ void glb_pinger_init(void) {
 	conf.sent_packets = 0;
 
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_ping, pings_shutdown, 
-        forks_count,  resolved_callback, resolve_fail_callback, "icmp", 1);    
+        forks_count,  resolved_callback, resolve_fail_callback, "icmp", 1, 1);    
  
     add_params[0]='\0';
 

@@ -69,7 +69,7 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, 
 								 shutdown_cb shutdown, forks_count_cb forks_count, 
 								 poller_resolve_cb resolve_callback, poller_resolve_fail_cb resolve_fail_callback, 
-								 char *proto_name, unsigned char is_named_iface);
+								 char *proto_name, unsigned char is_named_iface, unsigned char is_iface_bound);
 
 void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_int64_t value, int desired_type);
 void poller_preprocess_dbl(poller_item_t *poller_item, zbx_timespec_t *ts, double value);

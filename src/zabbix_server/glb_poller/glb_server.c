@@ -212,6 +212,6 @@ static int forks_count(void)
 int glb_worker_server_init(void)
 {
     poller_set_poller_callbacks(init_item, delete_item, handle_async_io, NULL, NULL, 
-            forks_count, NULL, NULL, "serv", 1);
+            forks_count, NULL, NULL, "serv", 1, 0);
     return SUCCEED;
 }

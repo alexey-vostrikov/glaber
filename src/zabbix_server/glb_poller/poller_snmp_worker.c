@@ -486,7 +486,7 @@ void glb_snmp_worker_init(void) {
     init_snmp(progname);
 
     poller_set_poller_callbacks(init_item, free_item, handle_async_io, start_poll, snmp_worker_shutdown, 
-                                         forks_count,  resolved_callback, resolve_fail_callback, "snmp", 0);    
+                                         forks_count,  resolved_callback, resolve_fail_callback, "snmp", 0, 1);    
  
     if (-1 == access(CONFIG_SNMP_WORKER_LOCATION, X_OK) )
  	{

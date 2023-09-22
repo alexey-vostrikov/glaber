@@ -36,6 +36,7 @@
 #include "poller_tcp.h"
 #include "calculated.h"
 #include "poller_snmp_worker.h"
+//#include "poller_agent.h"
 
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
@@ -96,6 +97,7 @@ typedef struct
 	poller_resolve_fail_cb resolve_fail_callback;
 	char *proto_name;
 	unsigned char is_named_iface;
+	unsigned char is_iface_bound;
 } poll_module_t;
 
 typedef struct
@@ -137,7 +139,10 @@ static int is_active_item_type(unsigned char item_type)
 }
 
 static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
-		
+
+	if (0 == conf.poller.is_iface_bound)
+		return SUCCEED;
+
 	if (1 == conf.poller.is_named_iface )  
 		return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
 
@@ -355,6 +360,7 @@ static int poll_module_init()
 
 	case GLB_PROCESS_TYPE_AGENT:
 		glb_tcp_init(&conf);
+		//glb_poller_agent_init();
 		break;
 
 	case ZBX_PROCESS_TYPE_HISTORYPOLLER:
@@ -587,7 +593,6 @@ void poller_register_item_iface_timeout(poller_item_t *item)
 	else  {
 		DEBUG_ITEM(item->itemid, "Registering interface timeout by iface id %lld", item->interfaceid);
 		glb_state_host_set_id_interface_avail(item->hostid, item->interfaceid, INTERFACE_AVAILABLE_FALSE, "Request timeout");
-		
 	}
 }
 
@@ -605,7 +610,7 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 								 handle_async_io_cb handle_async_io, start_poll_cb start_poll, shutdown_cb shutdown,
 								 forks_count_cb forks_count, poller_resolve_cb resolve_callback,
 								 poller_resolve_fail_cb resolve_fail_callback, char* proto_name,
-								 unsigned char is_named_iface)
+								 unsigned char is_named_iface, unsigned char is_iface_bound)
 {
 	conf.poller.init_item = init_item;
 	conf.poller.delete_item = delete_item;
@@ -618,7 +623,7 @@ void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_i
 	
 	conf.poller.proto_name = zbx_strdup(NULL, proto_name);
 	conf.poller.is_named_iface = is_named_iface;
-
+	conf.poller.is_iface_bound = is_iface_bound;
 }
 
 
