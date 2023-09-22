@@ -1,3 +1,7 @@
+2023-09-22 ver  3.3.22 - 3.3.23 (master)
+    - removed deadlock possibility in dbconfig.c
+2023-09-21 ver  3.3.14 - 3.3.21 (master)
+    - fix: fixes in classic poller queues to work correctly with interfaces
 2023-09-21 ver  3.3.12 3.3.13 (master)
     - fix: interface throttling for classical pollers
 2023-09-18 ver 3.3.11 (master)

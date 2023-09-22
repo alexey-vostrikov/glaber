@@ -576,9 +576,7 @@ int DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface
 	zbx_custom_interval_t *custom_intervals;
 	char *delay_s;
 
-	nextcheck = glb_state_item_get_nextcheck(item->itemid);
-
-	if (0 == (flags & ZBX_ITEM_COLLECTED) && 0 != nextcheck &&
+	if (0 == (flags & ZBX_ITEM_COLLECTED) && 
 		0 == (flags & ZBX_ITEM_KEY_CHANGED) && 0 == (flags & ZBX_ITEM_TYPE_CHANGED) &&
 		0 == (flags & ZBX_ITEM_DELAY_CHANGED))
 	{
@@ -598,20 +596,10 @@ int DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface
 		/* and such changes will be detected during configuration synchronization. DCsync_items()  */
 		/* detects item configuration changes affecting check scheduling and passes them in flags. */
 
-		glb_state_item_update_nextcheck(item->itemid, ZBX_JAN_2038);
-		item->queue_next_check = ZBX_JAN_2038;
+			item->queue_next_check = ZBX_JAN_2038;
 		return FAIL;
 	}
 
-	iface_avail = glb_state_host_get_id_interface_avail(item->hostid, item->interfaceid, &disable_until);
-
-	if ( FAIL == iface_avail )
-	{
-		nextcheck = zbx_calculate_item_nextcheck_unreachable(simple_interval,
-															 custom_intervals, disable_until);
-	}
-	else
-	{
 		if (0 != (flags & ZBX_ITEM_NEW) &&
 			FAIL == zbx_custom_interval_is_scheduling(custom_intervals) &&
 			ITEM_TYPE_ZABBIX_ACTIVE != item->type &&
@@ -627,8 +615,8 @@ int DCitem_nextcheck_update(ZBX_DC_ITEM *item, const ZBX_DC_INTERFACE *interface
 			nextcheck = zbx_calculate_item_nextcheck(seed, item->type, simple_interval,
 													 custom_intervals, now);
 		}
-	}
-	glb_state_item_update_nextcheck(item->itemid, nextcheck);
+
+	//glb_state_item_update_nextcheck(item->itemid, nextcheck);
 	item->queue_next_check = nextcheck;
 	zbx_custom_interval_free(custom_intervals);
 
@@ -881,7 +869,7 @@ void DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type)
 	{
 		item->location = ZBX_LOC_QUEUE;
 		DEBUG_ITEM(item->itemid, "Putting item to normal poller queue %d", item->poller_type);
-		DEBUG_ITEM(item->itemid, "Item's next check is in %d", glb_state_item_get_nextcheck(item->itemid) - time(NULL));
+		DEBUG_ITEM(item->itemid, "Item's next check is in %d", item->queue_next_check - time(NULL));
 		zbx_binary_heap_insert(&config->queues[item->poller_type], &elem);
 	}
 	else
@@ -1652,7 +1640,7 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 				for (i = 0; i < host->interfaces_v.values_num; i++)
 				{
 					interface = (ZBX_DC_INTERFACE *)host->interfaces_v.values[i];
-					
+					//THIS IS OK to run during sync
 					glb_state_host_set_id_interface_avail(host->hostid, interface->interfaceid, INTERFACE_AVAILABLE_FALSE, NULL );
 				}
 			}
@@ -6662,8 +6650,6 @@ static void zbx_dbsync_process_active_avail_diff(zbx_vector_uint64_t *diff)
 
 	for (i = 0; i < diff->values_num; i++) 
 		glb_state_host_reset(diff->values[i]);
-
-
 }
 
 /******************************************************************************
@@ -9273,10 +9259,7 @@ void DCget_trigger(DC_TRIGGER *dst_trigger, const ZBX_DC_TRIGGER *src_trigger, u
 	dst_trigger->timespec.ns = 0;
 	dst_trigger->priority = src_trigger->priority;
 	dst_trigger->type = src_trigger->type;
-	// dst_trigger->value = glb_state_trigger_get_value(src_trigger->triggerid);//src_trigger->value;
-	// dst_trigger->state = src_trigger->state;
 	dst_trigger->new_value = TRIGGER_VALUE_UNKNOWN;
-	// dst_trigger->lastchange = src_trigger->lastchange;
 	glb_state_trigger_get_value_lastchange(src_trigger->triggerid, &dst_trigger->value, &dst_trigger->lastchange);
 	dst_trigger->topoindex = src_trigger->topoindex;
 	dst_trigger->status = src_trigger->status;
@@ -10951,7 +10934,7 @@ int DCconfig_get_poller_nextcheck(unsigned char poller_type)
 	return nextcheck;
 }
 
-static void dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, const ZBX_DC_INTERFACE *dc_interface,
+static int dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, const ZBX_DC_INTERFACE *dc_interface,
 							int flags, int lastclock)
 {
 	unsigned char old_poller_type;
@@ -10963,6 +10946,8 @@ static void dc_requeue_item(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host, co
 	DCitem_poller_type_update(dc_item, dc_host, flags);
 	DEBUG_ITEM(dc_item->itemid, "Updating item from %s", __func__);
 	DCupdate_item_queue(dc_item, old_poller_type);
+	
+	return nextcheck;
 }
 
 /******************************************************************************
@@ -11040,13 +11025,13 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		ZBX_DC_ITEM *dc_item;
 		static const ZBX_DC_ITEM *dc_item_prev = NULL;
 		int disabled_until; 
-		int can_poll;
+		int iface_avail;
 
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 		
-		u_int64_t itemid = dc_item->itemid;
-
+		u_int64_t itemid=dc_item->itemid, hostid = dc_item->hostid, ifaceid = dc_item->interfaceid;
+		
 		if (dc_item->queue_next_check > now)
 		{
 			break;
@@ -11065,13 +11050,12 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			}
 		}
 
-
 		zbx_binary_heap_remove_min(queue);
 		dc_item->location = ZBX_LOC_NOWHERE;
 	
 		UNLOCK_CACHE;
 		/*need to unlock to avoid deadlocks while doing another lock*/
-		can_poll =  glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disabled_until);
+		iface_avail =  glb_state_host_is_id_interface_pollable( hostid, ifaceid, &disabled_until);
 		WRLOCK_CACHE;
 
 		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
@@ -11095,7 +11079,7 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		}
 		
 		/* thottle if iface is disabled by don't apply throttling for prioritized items */
-		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority && FAIL == can_poll)
+		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority && FAIL == iface_avail)
 		{			
 			DEBUG_ITEM(dc_item->itemid, "Throttling item due to interface is disbled for %d more seconds", disabled_until - now);
 
@@ -11276,7 +11260,7 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 		min = zbx_binary_heap_find_min(queue);
 		dc_item = (ZBX_DC_ITEM *)min->data;
 		
-		u_int64_t itemid = dc_item->itemid;
+		u_int64_t itemid = dc_item->itemid, hostid = dc_item->hostid, ifaceid = dc_item->interfaceid;
 
 		if (dc_item->queue_next_check > now)
 			break;
@@ -11286,7 +11270,7 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 
 		UNLOCK_CACHE;
 
-		iface_avail = glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disable_until);
+		iface_avail = glb_state_host_is_id_interface_pollable(hostid, ifaceid, &disable_until);
 		
 		WRLOCK_CACHE;
 
@@ -12063,8 +12047,6 @@ int DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 					continue;
 				}
 
-	//			if (INTERFACE_AVAILABLE_TRUE != glb_state_hosts_get_id_interface_avail(dc_item->hostid, dc_interface->interfaceid))
-	//				continue;
 				break;
 			case ITEM_TYPE_ZABBIX_ACTIVE:
 				if (dc_host->data_expected_from >
@@ -12085,7 +12067,7 @@ int DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to)
 				break;
 			}
 
-			int nextcheck = glb_state_item_get_nextcheck(dc_item->itemid);
+			int nextcheck =  dc_item->queue_next_check;
 
 			if (now - nextcheck < from || (ZBX_QUEUE_TO_INFINITY != to && now - nextcheck >= to))
 			{
@@ -13920,10 +13902,13 @@ void zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, 
 	ZBX_DC_HOST *dc_host;
 	zbx_uint64_t proxy_hostid;
 
-	WRLOCK_CACHE;
+
 
 	for (i = 0; i < itemids->values_num; i++)
 	{
+		int nextcheck;
+		WRLOCK_CACHE;
+
 		if (NULL == (dc_item = (ZBX_DC_ITEM *)zbx_hashset_search(&config->items, &itemids->values[i])) ||
 			NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 		{
@@ -13933,7 +13918,7 @@ void zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, 
 
 			proxy_hostid = 0;
 		}
-		else if (ZBX_JAN_2038 == glb_state_item_get_nextcheck(dc_item->itemid))
+		else if (ZBX_JAN_2038 == dc_item->queue_next_check)
 		{
 			zabbix_log(LOG_LEVEL_WARNING, "cannot perform check now for item \"%s\" on host \"%s\""
 										  ": item configuration error",
@@ -13957,9 +13942,13 @@ void zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, 
 
 		if (NULL != proxy_hostids)
 			proxy_hostids[i] = proxy_hostid;
+		nextcheck = dc_item->queue_next_check;
+		UNLOCK_CACHE;
+		//UNLOCKED VERSION!
+		glb_state_item_update_nextcheck(itemids->values[i], nextcheck);
 	}
 
-	UNLOCK_CACHE;
+
 }
 
 /******************************************************************************
@@ -15042,9 +15031,9 @@ static void dc_get_items_to_reschedule(const zbx_hashset_t *activated_hosts, zbx
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() items:%d", __func__, items->values_num);
 }
 
-static void dc_reschedule_item(ZBX_DC_ITEM *item, const ZBX_DC_HOST *host, int now)
+static int dc_reschedule_item(ZBX_DC_ITEM *item, const ZBX_DC_HOST *host, int now)
 {
-	int old_nextcheck = glb_state_item_get_nextcheck(item->itemid);
+	int nextcheck;
 	char *error = NULL;
 
 	if (SUCCEED == DCitem_nextcheck_update(item, NULL, ZBX_ITEM_DELAY_CHANGED, now, &error))
