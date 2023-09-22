@@ -11285,13 +11285,14 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 		dc_item->location = ZBX_LOC_NOWHERE;
 
 		UNLOCK_CACHE;
+
 		iface_avail = glb_state_host_is_id_interface_pollable(dc_item->hostid, dc_item->interfaceid, &disable_until);
+		
 		WRLOCK_CACHE;
 
 		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
 			continue;
 
-	
 
 		if (NULL == (dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &dc_item->hostid)))
 			continue;
