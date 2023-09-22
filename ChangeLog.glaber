@@ -1,4 +1,6 @@
-2023-09-22 ver  3.3.22 - 3.3.23 (master)
+2023-09-22 ver  3.3.25 (master)
+    - fix: only certain item types can maange interface state
+2023-09-22 ver  3.3.22 - 3.3.24 (master)
     - removed deadlock possibility in dbconfig.c
 2023-09-21 ver  3.3.14 - 3.3.21 (master)
     - fix: fixes in classic poller queues to work correctly with interfaces

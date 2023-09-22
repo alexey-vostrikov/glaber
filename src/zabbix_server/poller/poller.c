@@ -650,7 +650,12 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
 			//	LOG_INF("Get items step4");
-				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
+				//LOG_INF("item %lld polled succ")
+			//	LOG_INF("Interface %ld item id %ld polled SUCCESIFULLY errcode is %d",
+				//items[i].interface.interfaceid, items[i].itemid, errcodes[0]);
+				if (ITEM_TYPE_AGENT == items[i].type ||	ITEM_TYPE_SNMP == items[i].type ||
+					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type)
+					glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
 			//	LOG_INF("Get items step5");
 				break;
 			case NETWORK_ERROR:
@@ -658,10 +663,13 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case TIMEOUT_ERROR:
 				//LOG_INF("Get items step6");
 				//DEBUG_ITEM(items[i].itemid, "Set interface state to unavailable");
+				if (ITEM_TYPE_AGENT == items[i].type ||	ITEM_TYPE_SNMP == items[i].type ||
+					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type)
 				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
 				//LOG_INF("Get items step7");
 				break;
-				
+
+			
 			case FAIL:
 			case CONFIG_ERROR:
 				/* nothing to do */
@@ -715,6 +723,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		{
 			preprocess_error(items[i].host.hostid, items[i].itemid, items[i].flags, &timespec, results[i].msg);
 		}
+		DEBUG_ITEM(items[i].itemid,"Returning item to the queue");
 
 		DCpoller_requeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1, poller_type,
 				nextcheck);

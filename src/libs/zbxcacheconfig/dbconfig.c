@@ -640,7 +640,7 @@ void DCitem_poller_type_update(ZBX_DC_ITEM *dc_item, const ZBX_DC_HOST *dc_host,
 	{
 		if (ZBX_POLLER_TYPE_NORMAL == poller_type || ZBX_POLLER_TYPE_JAVA == poller_type)
 			poller_type = ZBX_POLLER_TYPE_UNREACHABLE;
-
+		DEBUG_ITEM(dc_item->itemid,"Placing item to the unreachable queue");
 		DEBUG_ITEM(dc_item->itemid, "%ld at %s: set poller type to %d", dc_item->itemid, __func__, poller_type);
 		dc_item->poller_type = poller_type;
 		return;
@@ -11057,6 +11057,12 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		/*need to unlock to avoid deadlocks while doing another lock*/
 		iface_avail =  glb_state_host_is_id_interface_pollable( hostid, ifaceid, &disabled_until);
 		WRLOCK_CACHE;
+		
+	//	LOG_INF("Poller type is %dItem interface avail is %d, disabled till is %d", 
+	//		poller_type, iface_avail, disabled_until);
+
+		DEBUG_ITEM(itemid, "Poller type is %dItem interface id %lld avail is %d, disabled till is %d", 
+			poller_type, ifaceid,  iface_avail, disabled_until);
 
 		if (NULL == (dc_item = zbx_hashset_search(&config->items, &itemid)))
 			continue;
@@ -11081,6 +11087,7 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 		/* thottle if iface is disabled by don't apply throttling for prioritized items */
 		if (ZBX_QUEUE_PRIORITY_HIGH != dc_item->queue_priority && FAIL == iface_avail)
 		{			
+		//	LOG_INF("Throttling item due to interface is disbled for %d more seconds", disabled_until - now);
 			DEBUG_ITEM(dc_item->itemid, "Throttling item due to interface is disbled for %d more seconds", disabled_until - now);
 
 			if (disabled_until < now) 
@@ -11088,6 +11095,7 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 			//marking items as unreachable to put some to 	
 			dc_requeue_item(dc_item, dc_host, dc_interface,
 							ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, disabled_until);
+		//	LOG_INF("Item skipped");
 			continue;
 		}
 
@@ -11481,6 +11489,7 @@ static void dc_requeue_items(const zbx_uint64_t *itemids, const int *lastclocks,
 
 		case GATEWAY_ERROR:
 		case TIMEOUT_ERROR:
+			DEBUG_ITEM(dc_item->itemid, "Requeueing item as ureachable");
 			dc_item->queue_priority = ZBX_QUEUE_PRIORITY_LOW;
 			dc_requeue_item(dc_item, dc_host, dc_interface,
 							ZBX_ITEM_COLLECTED | ZBX_HOST_UNREACHABLE, time(NULL));
