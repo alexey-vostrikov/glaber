@@ -1020,14 +1020,14 @@ extern ZBX_DC_CONFIG	*config;
 extern zbx_rwlock_t	config_lock;
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
-//#define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock); 
-//#define	WRLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_wrlock(config_lock); 
-//#define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock); 
+#define	RDLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_rdlock(config_lock); 
+#define	WRLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_wrlock(config_lock); 
+#define	UNLOCK_CACHE	if (0 == sync_in_progress) zbx_rwlock_unlock(config_lock); 
 
 //This might be usefull for locks debug
-#define	RDLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("RDLOCK"); zbx_rwlock_rdlock(config_lock); LOG_INF("RDLOCKED %s:%d", __FILE__, __LINE__); }
-#define	WRLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("WRLOCK"); zbx_rwlock_wrlock(config_lock); LOG_INF("WRLOCKED %s:%d", __FILE__, __LINE__); }
-#define	UNLOCK_CACHE	if (0 == sync_in_progress) { zbx_rwlock_unlock(config_lock); LOG_INF("UNLOCKED %s:%d", __FILE__, __LINE__); }
+//#define	RDLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("RDLOCK"); zbx_rwlock_rdlock(config_lock); LOG_INF("RDLOCKED %s:%d", __FILE__, __LINE__); }
+//#define	WRLOCK_CACHE	if (0 == sync_in_progress) { LOG_INF("WRLOCK"); zbx_rwlock_wrlock(config_lock); LOG_INF("WRLOCKED %s:%d", __FILE__, __LINE__); }
+//#define	UNLOCK_CACHE	if (0 == sync_in_progress) { zbx_rwlock_unlock(config_lock); LOG_INF("UNLOCKED %s:%d", __FILE__, __LINE__); }
 
 extern zbx_rwlock_t	config_history_lock;
 
