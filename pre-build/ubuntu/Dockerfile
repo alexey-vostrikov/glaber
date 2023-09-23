@@ -6,7 +6,7 @@ RUN apt-get -qq update && \
     export DEBIAN_FRONTEND=noninteractive && \
     GO_VER=1.16.2 && \
     apt-get --ignore-missing install -yqq sshpass jq \
-    build-essential cmake libgmp3-dev gengetopt  \
+    build-essential cmake libgmp3-dev gengetopt ccache \
     libpcap-dev flex byacc libjson-c-dev \
     libunistring-dev dpkg-dev devscripts wget git gcc \
     automake dh-make build-essential autoconf autotools-dev \
