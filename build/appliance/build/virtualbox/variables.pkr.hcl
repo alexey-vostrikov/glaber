@@ -44,6 +44,14 @@ variable "clickhouse_version" {
   default     = "21.3"
 }
 
+variable "percona_release" {
+  default     = "ps80"
+}
+
+variable "mysql_version" {
+  default     = "8.0.33-25-1.bullseye"
+}
+
 variable "zbx_ch_user" {
   type        = string
   description = "The ClickHouse username"

@@ -10,7 +10,7 @@ build {
       "export DEBIAN_FRONTEND=noninteractive",
       "sudo apt-get update",
       "sudo apt-get upgrade -y",
-      "sudo apt-get install -y gnupg2",
+      "sudo apt-get install -y gnupg2 debconf-utils lsb-release", # some prereq for click and mysql
       "sudo mkdir /root/.gnupg/",
       "sudo gpg --no-default-keyring --keyring /usr/share/keyrings/clickhouse-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8919F6BD2B48D754",
       "sudo chmod +r /usr/share/keyrings/clickhouse-keyring.gpg",
@@ -70,17 +70,16 @@ provisioner "shell" {
 }
 
   provisioner "shell" {
-  name = "Install percona mysql 8 server"
+  name = "Install percona Mysql 8 server"
   inline = [
-    "export DEBIAN_FRONTEND=noninteractive",
     "curl -O https://repo.percona.com/apt/percona-release_latest.generic_all.deb",
-    "sudo apt install -y debconf-utils lsb-release ./percona-release_latest.generic_all.deb",
+    "sudo apt install -y ./percona-release_latest.generic_all.deb",
     "sudo apt update",
-    "sudo percona-release setup ps80",
+    "sudo percona-release setup ${var.percona_release}",
     "echo percona-server-server	percona-server-server/root-pass password p@SSW0RDing74@r | sudo debconf-set-selections",
     "echo percona-server-server	percona-server-server/re-root-pass password p@SSW0RDing74@r | sudo debconf-set-selections",
     "echo percona-server-server	percona-server-server/default-auth-override select 'Use Legacy Authentication Method (Retain MySQL 5.x Compatibility)' | sudo debconf-set-selections",
-    "sudo apt install -y percona-server-server=8.0.33-25-1.bullseye",
+    "sudo apt install -y percona-server-server=${var.mysql_version}",
     //"sudo mysql_secure_installation",
     "sudo systemctl enable --now mysql",
     "sudo systemctl status mysql"
