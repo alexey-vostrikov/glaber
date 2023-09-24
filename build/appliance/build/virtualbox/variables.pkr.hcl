@@ -65,6 +65,11 @@ variable "zbx_ch_pass" {
   sensitive   = true
 }
 
+variable "ch_pgp" {
+  type        = string
+  default     = "8919F6BD2B48D754"
+}
+
 variable "mysql_pass" {
   type        = string
   default     = "p@SSW0RDing74@r" ## prepare
