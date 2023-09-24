@@ -74,12 +74,13 @@ provisioner "shell" {
   name = "Install percona mysql 8 server"
   inline = [
     "curl -O https://repo.percona.com/apt/percona-release_latest.generic_all.deb",
-    "sudo apt install lsb-release ./percona-release_latest.generic_all.deb",
+    "sudo apt install -y lsb-release ./percona-release_latest.generic_all.deb",
     "sudo apt update",
     "sudo percona-release setup ps80",
     "echo percona-server-server-8.0 percona-server-server-8.0/root-pass password P@SSW0RD | sudo debconf-set-selections",
     "echo percona-server-server-8.0 percona-server-server-8.0/re-root-pass password P@SSW0RD | sudo debconf-set-selections",
-    "sudo apt install -y percona-server-server",
+    "sudo apt install -y percona-server-server*",
+    "sudo mysql_secure_installation",
     "sudo systemctl enable --now mysqld",
     "sudo systemctl status mysqld"
   ]
