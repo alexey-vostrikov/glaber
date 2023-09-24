@@ -63,8 +63,7 @@ build {
     "echo percona-server-server	percona-server-server/default-auth-override select 'Use Legacy Authentication Method (Retain MySQL 5.x Compatibility)' | sudo debconf-set-selections",
     "sudo apt install -y percona-server-server=${var.mysql_version} percona-toolkit",
     //"sudo mysql_secure_installation",
-    "sudo systemctl enable --now mysql",
-    "sudo systemctl status mysql"
+    "sudo systemctl enable --now mysql"
   ]
   }
 
