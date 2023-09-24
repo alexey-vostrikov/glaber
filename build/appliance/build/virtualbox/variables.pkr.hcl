@@ -65,6 +65,12 @@ variable "zbx_ch_pass" {
   sensitive   = true
 }
 
+variable "mysql_pass" {
+  type        = string
+  default     = "p@SSW0RDing74@r" ## prepare
+  sensitive   = true
+}
+
 variable "zbx_ch_db" {
   type        = string
   description = "The ClickHouse database"

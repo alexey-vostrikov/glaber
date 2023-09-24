@@ -48,7 +48,6 @@ build {
   inline = [
     "sudo chown -R clickhouse:clickhouse /etc/clickhouse-server /etc/clickhouse-server /var/log/clickhouse-server /var/lib/clickhouse",
     "sudo systemctl enable --now clickhouse-server",
-    "journalctl -u clickhouse-server| tail -50",
     "while ! ss -ltn 'sport = :9000' | grep -q ':9000'; do echo 'Waiting for port 9000 to be ready...' && sleep 2; done",
   ]
   }
@@ -56,16 +55,11 @@ build {
 provisioner "shell" {
   name = "Import glaber schema to the clickhouse database"
   inline = [
-    "if ! clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --database ${var.zbx_ch_db} --query 'select count(*) from history_str;'; then",
-    "echo 'Download glaber clickhouse schema'",
     "wget -q https://gitlab.com/mikler/glaber/-/raw/${var.glaber_tag}/database/clickhouse/history.sql",
     "echo 'Make custom retention period'",
     "sed -i -e 's/glaber/${var.zbx_ch_db}/g' -e 's/6 MONTH/${var.zbx_ch_retention}/g' history.sql",
     "echo 'Import clickhouse.sql to the ${var.zbx_ch_db} database'",
-    "clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --multiquery < history.sql",
-    "else",
-    "echo 'Glaber clickhouse schema already installed'",
-    "fi"
+    "clickhouse-client --user ${var.zbx_ch_user} --password ${var.zbx_ch_pass} --multiquery < history.sql"
   ]
 }
 
@@ -76,8 +70,8 @@ provisioner "shell" {
     "sudo apt install -y ./percona-release_latest.generic_all.deb",
     "sudo apt update",
     "sudo percona-release setup ${var.percona_release}",
-    "echo percona-server-server	percona-server-server/root-pass password p@SSW0RDing74@r | sudo debconf-set-selections",
-    "echo percona-server-server	percona-server-server/re-root-pass password p@SSW0RDing74@r | sudo debconf-set-selections",
+    "echo percona-server-server	percona-server-server/root-pass password ${var.mysql_pass} | sudo debconf-set-selections",
+    "echo percona-server-server	percona-server-server/re-root-pass password ${var.mysql_pass} | sudo debconf-set-selections",
     "echo percona-server-server	percona-server-server/default-auth-override select 'Use Legacy Authentication Method (Retain MySQL 5.x Compatibility)' | sudo debconf-set-selections",
     "sudo apt install -y percona-server-server=${var.mysql_version}",
     //"sudo mysql_secure_installation",
