@@ -85,8 +85,8 @@ build {
       "sudo chmod +s /usr/bin/nmap",
       "sudo sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen",
       "sudo sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen",
-      "locale-gen",
-      "download-mibs",
+      "sudo locale-gen",
+      "sudo download-mibs",
       "sudo rm /etc/zabbix/zabbix_server.conf"
     ]
   }
