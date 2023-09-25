@@ -102,7 +102,8 @@ build {
   provisioner "shell" {
   name = "Prepare and start glaber server"
   inline = [
-    ". .env",
+    "ls -la && pwd",
+    "sudo source .env",
     "sudo mv /tmp/zabbix_server.conf /etc/zabbix/zabbix_server.conf",
     "sudo bash /tmp/prepare-zabbix-vars.sh",
     "sudo systemctl enable --now zabbix-server",
