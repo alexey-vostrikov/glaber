@@ -92,7 +92,7 @@ build {
   }
   provisioner "file" {
     source      = "glaber-server/etc/zabbix/zabbix_server.conf"
-    destination = "/etc/zabbix/zabbix_server.conf"
+    destination = "/tmp/zabbix_server.conf"
   }
   provisioner "file" {
     source      = "glaber-server/prepare-zabbix-vars.sh"
@@ -103,6 +103,7 @@ build {
   name = "Prepare and start glaber server"
   inline = [
     "source .env",
+    "sudo mv /tmp/zabbix_server.conf /etc/zabbix/zabbix_server.conf",
     "bash /tmp/prepare-zabbix-vars.sh",
     "sudo systemctl enable --now zabbix-server",
     "sleep 10",
