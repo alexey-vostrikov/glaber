@@ -69,22 +69,22 @@ build {
 
   provisioner "shell" {
     inline = [
-      "apt-get update",
-      "apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools iputils-ping",
-      "wget -qO - https://glaber.io/${var.glaber_repo}/key/repo.gpg | apt-key add -",
-      "echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
+      "sudo apt-get update",
+      "sudo apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools iputils-ping",
+      "wget -qO - https://glaber.io/${var.glaber_repo}/key/repo.gpg | sudo apt-key add -",
+      "sudo echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
       "echo 'deb http://ftp.de.debian.org/debian bullseye main non-free' > /etc/apt/sources.list.d/nonfree.list",
-      "apt-get update",
-      "apt-get install --no-install-recommends -y glaber-server-mysql=1:${var.glaber_build_version}* glaber-workers fping",
-      "apt-get install -y snmp-mibs-downloader",
-      "mkdir -p /var/lib/mysql/vcdump/ /run/zabbix",
-      "chown zabbix:zabbix /run/zabbix /var/lib/mysql/vcdump/",
-      "chmod +s /usr/bin/nmap",
-      "sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen",
-      "sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen",
+      "sudo apt-get update",
+      "sudo apt-get install --no-install-recommends -y glaber-server-mysql=1:${var.glaber_build_version}* glaber-workers fping",
+      "sudo apt-get install -y snmp-mibs-downloader",
+      "sudo mkdir -p /var/lib/mysql/vcdump/ /run/zabbix",
+      "sudo chown zabbix:zabbix /run/zabbix /var/lib/mysql/vcdump/",
+      "sudo chmod +s /usr/bin/nmap",
+      "sudo sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen",
+      "sudo sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen",
       "locale-gen",
       "download-mibs",
-      "rm /etc/zabbix/zabbix_server.conf"
+      "sudo rm /etc/zabbix/zabbix_server.conf"
     ]
   }
   provisioner "file" {
