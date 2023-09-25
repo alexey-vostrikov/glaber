@@ -14,4 +14,4 @@ virtualbox:
     - source .env
     - packer validate .
     - packer build -color=false -timestamp-ui -warn-on-undeclared-var .
-    - rm -f vm-output/*
+    - mv vm-output/glaber.qcow2 /opt/vm-output/glaber-int.qcow2
