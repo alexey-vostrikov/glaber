@@ -68,12 +68,14 @@ build {
 #   }
 
   provisioner "shell" {
+    name = "Install glaber server"
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
+      "sudo dpkg --configure -a",
       "sudo apt-get update",
       "sudo apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools iputils-ping",
       "wget -qO - https://glaber.io/${var.glaber_repo}/key/repo.gpg | sudo apt-key add -",
-      "sudo echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
+      "echo \"deb [arch=amd64] https://glaber.io/${var.glaber_repo}/debian $(lsb_release -sc) main\" >> /etc/apt/sources.list.d/glaber.list",
       "echo 'deb http://ftp.de.debian.org/debian bullseye main non-free' > /etc/apt/sources.list.d/nonfree.list",
       "sudo apt-get update",
       "sudo apt-get install --no-install-recommends -y glaber-server-mysql=1:${var.glaber_build_version}* glaber-workers fping",
@@ -104,7 +106,7 @@ build {
     "bash /tmp/prepare-zabbix-vars.sh",
     "sudo systemctl enable --now zabbix-server",
     "sleep 10",
-    "sudo systemctl status zabbix-server",
+    "sudo systemctl status zabbix-server"
   ]
   }
   
