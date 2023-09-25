@@ -92,7 +92,7 @@ build {
     destination = "/etc/zabbix/zabbix_server.conf"
   }
   provisioner "file" {
-    source      = "glaber-server/etc/zabbix/prepare-zabbix-vars.sh"
+    source      = "glaber-server/prepare-zabbix-vars.sh"
     destination = "/tmp/prepare-zabbix-vars.sh"
   }
 
