@@ -107,9 +107,9 @@ build {
   provisioner "shell" {
   name = "Prepare and start glaber server"
   inline = [
-    "sudo . /tmp/.env",
-    "sudo mv /tmp/zabbix_server.conf /etc/zabbix/zabbix_server.conf",
-    "sudo bash /tmp/prepare-zabbix-vars.sh",
+    ". /tmp/.env",
+    "mv /tmp/zabbix_server.conf /etc/zabbix/zabbix_server.conf",
+    "bash /tmp/prepare-zabbix-vars.sh",
     "sudo systemctl enable --now zabbix-server",
     "sleep 10",
     "sudo systemctl status zabbix-server"
