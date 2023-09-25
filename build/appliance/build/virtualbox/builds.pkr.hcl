@@ -104,7 +104,7 @@ build {
   inline = [
     ". .env",
     "sudo mv /tmp/zabbix_server.conf /etc/zabbix/zabbix_server.conf",
-    "bash /tmp/prepare-zabbix-vars.sh",
+    "sudo bash /tmp/prepare-zabbix-vars.sh",
     "sudo systemctl enable --now zabbix-server",
     "sleep 10",
     "sudo systemctl status zabbix-server"
