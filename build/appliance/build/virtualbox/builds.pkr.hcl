@@ -69,6 +69,7 @@ build {
 
   provisioner "shell" {
     inline = [
+      "export DEBIAN_FRONTEND=noninteractive",
       "sudo apt-get update",
       "sudo apt-get install -y nmap wget gnupg2 lsb-release apt-transport-https locales net-tools iputils-ping",
       "wget -qO - https://glaber.io/${var.glaber_repo}/key/repo.gpg | sudo apt-key add -",
