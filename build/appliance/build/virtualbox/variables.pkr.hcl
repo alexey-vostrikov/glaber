@@ -1,6 +1,6 @@
 variable "glaber_build_version" {
   type    = string
-  default = "3.1.8" ## prepare
+  default = "3.2.34" ## prepare
 }
 
 variable "glaber_repo" {
@@ -85,7 +85,7 @@ variable "zbx_ch_db" {
 variable "glaber_tag" {
   type        = string
   description = "The Glaber tag"
-  default     = "3.2.16" ## prepare
+  default     = "3.2.34" ## prepare
 }
 
 variable "zbx_ch_retention" {
