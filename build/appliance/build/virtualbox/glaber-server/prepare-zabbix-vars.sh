@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -eo pipefail
-
+set -x
 
 ZBX_HISTORY_MODULE_URL=${ZBX_HISTORY_MODULE}';{"url":"http://'${ZBX_CH_SERVER}':'${ZBX_CH_PORT}'", "username":"'${ZBX_CH_USER}'", "password":"'${ZBX_CH_PASS}'", "dbname":"'${ZBX_CH_DB}'",  "disable_reads":'${ZBX_HISTORY_MODULE_DISABLE_READS}', "timeout":'${ZBX_HISTORY_MODULE_TIMEOUT}' }'
 
