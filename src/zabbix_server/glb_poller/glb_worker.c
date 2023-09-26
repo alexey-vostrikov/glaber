@@ -78,7 +78,7 @@ static int worker_submit_result(char *response) {
         return FAIL;
     }
 
-    worker_item = poller_get_item_specific_data(poller_item);      
+    worker_item = poller_item_get_specific_data(poller_item);      
 
 
     poller_preprocess_str(poller_item, NULL, value);
@@ -86,7 +86,7 @@ static int worker_submit_result(char *response) {
     poller_return_item_to_queue(poller_item);
     worker_item->state = POLL_QUEUED;
     
-    DEBUG_ITEM(poller_get_item_id(poller_item),"In %s: marked item as available for polling ", __func__);
+    DEBUG_ITEM(poller_item_get_id(poller_item),"In %s: marked item as available for polling ", __func__);
     zabbix_log(LOG_LEVEL_DEBUG,"In %s: Finished", __func__);
 }
 
@@ -200,7 +200,7 @@ static void send_request(poller_item_t *poller_item) {
     
     zabbix_log(LOG_LEVEL_DEBUG, "In %s() Started", __func__);
 
-    worker_item_t *worker_item = poller_get_item_specific_data(poller_item);
+    worker_item_t *worker_item = poller_item_get_specific_data(poller_item);
 
     worker_item->lastrequest = glb_ms_time();
 
@@ -208,7 +208,7 @@ static void send_request(poller_item_t *poller_item) {
     
     if (NULL == worker ) {
         //worker not found - creating a new one
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't find a worker for item, creating a new one");
+        DEBUG_ITEM(poller_item_get_id(poller_item), "Couldn't find a worker for item, creating a new one");
         worker = worker_create_worker(worker_item);
     }
     
@@ -233,7 +233,7 @@ static void send_request(poller_item_t *poller_item) {
  * ***************************************************************************/
 static void free_item(poller_item_t *poller_item ) {
     
-    worker_item_t *worker_item = poller_get_item_specific_data(poller_item);
+    worker_item_t *worker_item = poller_item_get_specific_data(poller_item);
 
     zbx_free(worker_item->params_dyn);
     poller_strpool_free(worker_item->full_cmd);

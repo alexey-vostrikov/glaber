@@ -105,14 +105,14 @@ static int init_item(DC_ITEM *dcitem, poller_item_t *poller_item)
    
     poller_set_item_specific_data(poller_item, worker);
 
-    DEBUG_ITEM(poller_get_item_id(poller_item), "Finished init of server item, worker %s", worker_get_path(worker->worker));
+    DEBUG_ITEM(poller_item_get_id(poller_item), "Finished init of server item, worker %s", worker_get_path(worker->worker));
     return SUCCEED;
 };
 
 static void delete_item(poller_item_t *poller_item)
 {
-    worker_t *worker = poller_get_item_specific_data(poller_item);
-    DEBUG_ITEM(poller_get_item_id(poller_item), "Deleting server worker item ");
+    worker_t *worker = poller_item_get_specific_data(poller_item);
+    DEBUG_ITEM(poller_item_get_id(poller_item), "Deleting server worker item ");
 
     glb_worker_destroy(worker->worker);
     zbx_free(worker);
@@ -148,7 +148,7 @@ static int json_responce_has_timestamp(char *data) {
 #define MAX_ITERATIONS 10000
 ITEMS_ITERATOR(check_workers_data_cb)
 {
-    worker_t *worker = poller_get_item_specific_data(poller_item);
+    worker_t *worker = poller_item_get_specific_data(poller_item);
     int iterations = 0;
     int now = time(NULL);
     char *worker_response = NULL;
@@ -163,16 +163,16 @@ ITEMS_ITERATOR(check_workers_data_cb)
 
         iterations++;
 
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Got from worker: %s", worker_response);
+        DEBUG_ITEM(poller_item_get_id(poller_item), "Got from worker: %s", worker_response);
         poller_inc_responses();
         
         if (FAIL != ( timestamp = json_responce_has_timestamp(worker_response))) {
-            DEBUG_ITEM(poller_get_item_id(poller_item), "Set timestamp from time field: %ld", timestamp);
+            DEBUG_ITEM(poller_item_get_id(poller_item), "Set timestamp from time field: %ld", timestamp);
             ts.sec = timestamp;
             poller_preprocess_str(poller_item, &ts, worker_response);
         }
         else {
-             DEBUG_ITEM(poller_get_item_id(poller_item), "No timestamp in the data, using current time");
+             DEBUG_ITEM(poller_item_get_id(poller_item), "No timestamp in the data, using current time");
             poller_preprocess_str(poller_item, NULL, worker_response);
         }
         
@@ -188,7 +188,7 @@ ITEMS_ITERATOR(check_workers_data_cb)
         glb_worker_restart(worker->worker, "Worker has been silent for too long");
         worker->last_heard = now + rand() % 10;
         
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Worker has been silent for too long, setting UNSUPPORTED value");
+        DEBUG_ITEM(poller_item_get_id(poller_item), "Worker has been silent for too long, setting UNSUPPORTED value");
         poller_preprocess_error(poller_item, "Couldn't read from the worker - worker is silent for too long");
     }
 

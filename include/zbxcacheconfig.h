@@ -765,8 +765,7 @@ int	DCconfig_get_glb_poller_items(void *poll_engine, unsigned char item_type, un
 
 void	DCrequeue_items(const zbx_uint64_t *itemids, const int *lastclocks,
 		const int *errcodes, size_t num);
-void	DCpoller_requeue_items(const zbx_uint64_t *itemids, const int *lastclocks,
-		const int *errcodes, size_t num, unsigned char poller_type, int *nextcheck);
+
 #ifdef HAVE_OPENIPMI
 void	zbx_dc_requeue_unreachable_items(zbx_uint64_t *itemids, size_t itemids_num);
 #endif
@@ -821,7 +820,7 @@ void	DCget_autoregistration_psk(char *psk_identity_buf, size_t psk_identity_buf_
 #define ZBX_QUEUE_FROM_DEFAULT	6	/* default lower limit for delay (in seconds) */
 #define ZBX_QUEUE_TO_INFINITY	-1	/* no upper limit for delay */
 void	DCfree_item_queue(zbx_vector_ptr_t *queue);
-int	DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to);
+int		DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to, int filter_item_type);
 
 zbx_uint64_t	DCget_item_count(zbx_uint64_t hostid);
 zbx_uint64_t	DCget_item_unsupported_count(zbx_uint64_t hostid);

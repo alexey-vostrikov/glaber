@@ -70,8 +70,8 @@ int preprocess_dbl		(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const 
 int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar, int desired_type);
 int preprocessing_force_flush();
 
-int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar);
-int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error);
+int processing_send_agent_result_from_proxy(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar);
+int processing_send_error_from_proxy(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error);
 int processing_force_flush();
 
 #endif /* ZABBIX_PREPROC_H */

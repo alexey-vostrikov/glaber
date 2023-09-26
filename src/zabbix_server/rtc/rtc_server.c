@@ -55,11 +55,6 @@ static int	rtc_parse_options_server(const char *opt, zbx_uint32_t *code, struct 
 		*code = ZBX_RTC_HA_STATUS;
 		return SUCCEED;
 	}
-	if (0 == strcmp(opt, GLB_SYNC_POLLER_TIMES))
-	{
-		*code = GLB_RTC_SYNC_POLLER_TIMES;
-		return SUCCEED;
-	}
 
 	if (0 == strncmp(opt, ZBX_HA_REMOVE_NODE, ZBX_CONST_STRLEN(ZBX_HA_REMOVE_NODE)))
 	{
@@ -264,11 +259,6 @@ static int	rtc_process_diaginfo(const char *data, char **result)
 	return ret;
 }
 
-void DC_get_account_sync_poller_time(char **out);
-static void rtc_process_sync_poller_stats(char **result) {
-	DC_get_account_sync_poller_time(result);
-}
-
 /******************************************************************************
  *                                                                            *
  * Purpose: process ha_status runtime command                                 *
@@ -468,9 +458,6 @@ int	rtc_process_request_ex_server(zbx_rtc_t *rtc, zbx_uint32_t code, const unsig
 		case ZBX_RTC_LOG_LEVEL_DECREASE:
 			return rtc_process_server_loglevel_option(-1, (const char *)data, result);
 #endif
-		case GLB_RTC_SYNC_POLLER_TIMES:
-			rtc_process_sync_poller_stats(result);
-			return SUCCEED;
 		case ZBX_RTC_CONFIG_CACHE_RELOAD:
 			zbx_service_reload_cache();
 			return FAIL;

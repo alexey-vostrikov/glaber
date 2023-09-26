@@ -65,7 +65,9 @@ foreach ($data['item_types'] as $item_type) {
 		];
 
 	$table->addRow([
-		item_type2str($item_type),
+		(new CLink(item_type2str($item_type),
+				(new CUrl('zabbix.php'))->setArgument('action', 'queue.details')
+									  ->setArgument('filter_type', $item_type))),
 		($item_type_queue['delay5'] == 0) ? 0 : (new CCol($item_type_queue['delay5']))
 			->addClass(CSeverityHelper::getStyle(TRIGGER_SEVERITY_NOT_CLASSIFIED)),
 		($item_type_queue['delay10'] == 0) ? 0 : (new CCol($item_type_queue['delay10']))

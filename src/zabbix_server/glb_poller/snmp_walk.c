@@ -91,7 +91,7 @@ static int	snmp_dobject_compare(const void *d1, const void *d2)
 
 static int	snmp_ddata_init(poller_item_t *poller_item)
 {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	snmp_ddata_t *data = zbx_calloc(NULL, 0, sizeof(snmp_ddata_t));
 	int	i, j, ret = CONFIG_ERROR;
@@ -165,7 +165,7 @@ static void	snmp_ddata_clean(poller_item_t *poller_item)
 	int			i;
 	zbx_hashset_iter_t	iter;
 	snmp_dobject_t	*obj;
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_ddata_t *ddata = snmp_item->data;
 	
 	if (NULL == ddata)
@@ -194,8 +194,8 @@ static void	snmp_ddata_clean(poller_item_t *poller_item)
 
 
 void stop_item_poll(poller_item_t *poller_item) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
-	//LOG_INF("Item %ld: freeing walk data", poller_get_item_id(poller_item));
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+	//LOG_INF("Item %ld: freeing walk data", poller_item_get_id(poller_item));
 
 	poller_return_item_to_queue(poller_item);
 	snmp_ddata_clean(poller_item);
@@ -209,7 +209,7 @@ static int snmp_walk_submit_result(poller_item_t *poller_item) {
     snmp_dobject_t	*obj;
 	struct zbx_json		js;
     int			i, j, ret;
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_ddata_t *ddata = snmp_item->data;
 
 	zbx_json_initarray(&js, ZBX_JSON_STAT_BUF_LEN);
@@ -231,11 +231,11 @@ static int snmp_walk_submit_result(poller_item_t *poller_item) {
 		zbx_json_close(&js);
 	}
 
-	DEBUG_ITEM(poller_get_item_id(poller_item),"Finished walk for the item, result is %s", js.buffer);
+	DEBUG_ITEM(poller_item_get_id(poller_item),"Finished walk for the item, result is %s", js.buffer);
 	zbx_json_close(&js);
 
 	poller_preprocess_str(poller_item, NULL, js.buffer);
-	poller_register_item_iface_succeed(poller_item);
+	poller_iface_register_succeed(poller_item);
 
 	zbx_json_free(&js);
 
@@ -250,7 +250,7 @@ static void copy_oid(asn1_oid_t *dest_oid, asn1_oid_t *src_oid) {
 
 
 void snmp_walk_destroy_item(poller_item_t *poller_item) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 
 	//snmp_ddata_clean(poller_item);
 	stop_item_poll(poller_item);
@@ -322,10 +322,10 @@ numeric:
 
 
 int  snmp_walk_start_next_oid(poller_item_t *poller_item) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_ddata_t *ddata = snmp_item->data;
 
-	//LOG_INF("Starting next oid processing %d", poller_get_item_id(poller_item));
+	//LOG_INF("Starting next oid processing %d", poller_item_get_id(poller_item));
 
 	if (NULL == ddata) {
 		stop_item_poll(poller_item);
@@ -335,13 +335,13 @@ int  snmp_walk_start_next_oid(poller_item_t *poller_item) {
 	ddata->num++;
 
 	if (ddata->num >= ddata->request.nparam / 2) {
-		DEBUG_ITEM(poller_get_item_id(poller_item), "All oids are parsed for item, submitting the result");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "All oids are parsed for item, submitting the result");
 		snmp_walk_submit_result(poller_item);
 		stop_item_poll(poller_item);
 		return SUCCEED;
 	}
 
-	DEBUG_ITEM(poller_get_item_id(poller_item),"Starting walking oid %d out of %d", ddata->num + 1,  ddata->request.nparam / 2);
+	DEBUG_ITEM(poller_item_get_id(poller_item),"Starting walking oid %d out of %d", ddata->num + 1,  ddata->request.nparam / 2);
 	char *next_oid = ddata->request.params[ddata->num * 2 + 1];
 	
 	char buffer[MAX_STRING_LEN];
@@ -392,7 +392,7 @@ int  snmp_walk_start_next_oid(poller_item_t *poller_item) {
 	
 	ddata->oids_looped = 0;
 
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Sending first walk request for oid %s", next_oid);
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Sending first walk request for oid %s", next_oid);
 	
 	csnmp_add_var(&pdu, coid, SNMP_TP_NULL, NULL);
 	snmp_send_packet(poller_item, &pdu);
@@ -422,11 +422,11 @@ static void	snmp_walk_save_result_value(snmp_ddata_t *data, const char *snmp_oid
 
 /* returns SUCEED is get next requst is needed */
 int snmp_walk_process_var(poller_item_t *poller_item, csnmp_var_t *var) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_ddata_t *ddata = snmp_item->data;
 	
 	if (NULL == ddata) {
-		LOG_WRN("Arrived responce for the item %ld, but walk is not active for it", poller_get_item_id(poller_item));
+		LOG_WRN("Arrived responce for the item %ld, but walk is not active for it", poller_item_get_id(poller_item));
 		return FAIL;
 	}
 
@@ -471,7 +471,7 @@ int snmp_walk_process_var(poller_item_t *poller_item, csnmp_var_t *var) {
 		//				zbx_remove_chars(snmp_result.text, "\r\n");
 		char **text_result = ZBX_GET_TEXT_RESULT(&result);
 		
-		DEBUG_ITEM(poller_get_item_id(poller_item),"Saving walk responce '%s'", *text_result);
+		DEBUG_ITEM(poller_item_get_id(poller_item),"Saving walk responce '%s'", *text_result);
 
 		if (NULL != *text_result) 
 			snmp_walk_save_result_value(ddata, ddata->request.params[ddata->num * 2 + 1], oid_index, *text_result );
@@ -485,10 +485,10 @@ void snmp_walk_process_result(poller_item_t *poller_item, const csnmp_pdu_t *pdu
 	csnmp_pdu_t new_pdu;
 	csnmp_oid_t next_oid;
 	int i, ret;
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_ddata_t *ddata = snmp_item->data;
 	
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Processing responce for the walk item");
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Processing responce for the walk item");
 
 	if (pdu->vars_len < 1) {
 		snmp_walk_start_next_oid(poller_item);
@@ -496,17 +496,14 @@ void snmp_walk_process_result(poller_item_t *poller_item, const csnmp_pdu_t *pdu
 	}
 
 	for (i = 0; i < pdu->vars_len; i++) {
-	//	LOG_INF("Processing var for item %d", poller_get_item_id(poller_item));
 		/* either tree finished or walk fail - processing next oid or finishing the walk */
 		
 		if (FAIL == snmp_walk_process_var(poller_item, &pdu->vars[i])) {
-	//		LOG_INF("Failed to process item %d", poller_get_item_id(poller_item));
 			snmp_walk_start_next_oid(poller_item);
 			return;
 		}
 	}
 
-//	LOG_INF("Sending next packet for item %d", poller_get_item_id(poller_item));
 
 	copy_oid(&next_oid, &pdu->vars[pdu->vars_len-1].oid);
 	asn1_free_oid(&ddata->last_oid);
@@ -523,10 +520,9 @@ int snmp_walk_send_first_request(poller_item_t *poller_item) {
 	asn1_oid_t oid;
 	char *start_oid;
 
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
-//	LOG_INF("Starting walk item %d", poller_get_item_id(poller_item));
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Starting async walk on item ");
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Starting async walk on item ");
 	
 	if (NULL != snmp_item->data) {
 		poller_preprocess_error(poller_item, "Cannot start snmp walk: old request isn't finished yet");
@@ -540,13 +536,13 @@ int snmp_walk_send_first_request(poller_item_t *poller_item) {
 }
 
 void snmp_walk_timeout(poller_item_t *poller_item) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
-	DEBUG_ITEM(poller_get_item_id(poller_item),"Registered timeout for the item, try %d of %d", snmp_item->retries + 1 , SNMP_MAX_RETRIES);
+	DEBUG_ITEM(poller_item_get_id(poller_item),"Registered timeout for the item, try %d of %d", snmp_item->retries + 1 , SNMP_MAX_RETRIES);
 
 	if (snmp_item->retries >= SNMP_MAX_RETRIES) {
 		
-		DEBUG_ITEM(poller_get_item_id(poller_item),"SNMP WALK timeout, all retries exceeded");
+		DEBUG_ITEM(poller_item_get_id(poller_item),"SNMP WALK timeout, all retries exceeded");
 		poller_preprocess_error(poller_item, "SNMP timeout: max retries exceeded");
 		snmp_ddata_clean(poller_item);
 		poller_return_item_to_queue(poller_item);
@@ -556,7 +552,7 @@ void snmp_walk_timeout(poller_item_t *poller_item) {
 		csnmp_pdu_t pdu;
 		snmp_ddata_t *ddata = snmp_item->data;
 		asn1_oid_t last_oid;
-		DEBUG_ITEM( poller_get_item_id(poller_item),"Sending retry, retry %d", snmp_item->retries);
+		DEBUG_ITEM( poller_item_get_id(poller_item),"Sending retry, retry %d", snmp_item->retries);
 		
 		snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET_NEXT);
 		copy_oid(&last_oid, &ddata->last_oid);

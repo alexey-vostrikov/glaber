@@ -1,6 +1,6 @@
+<?php
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Copyright (C) 2001-2023 Glaber
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,20 +17,21 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#ifndef ZABBIX_PINGER_H
-#define ZABBIX_PINGER_H
 
-#include "zbxthreads.h"
-#include "zbxicmpping.h"
+class CItemLink extends CSpan {
 
-typedef struct
-{
-	int			config_timeout;
+	public function __construct($itemname, $itemid) {
+	
+		$menu = CMenuPopupHelper::getItem([
+			'itemid' => $itemid,
+			'context' => 'host',
+			'backurl' => (new CUrl('zabbix.php'))
+				->setArgument('action', 'queue.details')
+				->getUrl(),
+		]);
+
+		parent::__construct($itemname);
+		$this->addClass(ZBX_STYLE_LINK_ACTION);
+		$this->setMenuPopup($menu);
+	}
 }
-zbx_thread_pinger_args;
-
-ZBX_THREAD_ENTRY(pinger_thread, args);
-int	zbx_parse_key_params(const char *key, const char *host_addr, icmpping_t *icmpping, char **addr, int *count,
-		int *interval, int *size, int *timeout, icmppingsec_type_t *type, char *error, int max_error_len, int *use_item_addr);
-
-#endif

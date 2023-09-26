@@ -22,6 +22,7 @@
 #include "zbxsysinfo.h"
 #include "zbx_item_constants.h"
 #include "../poller/checks_calculated.h"
+#include "../../libs/glb_state/glb_state_items.h"
 
 extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
@@ -63,7 +64,7 @@ int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 }
 
 void free_item(poller_item_t *poller_item) {
-    calculated_item_t *calc_item = poller_get_item_specific_data(poller_item);
+    calculated_item_t *calc_item = poller_item_get_specific_data(poller_item);
     
     strpool_free(&conf.strpool, calc_item->params);
     strpool_free(&conf.strpool, calc_item->key);
@@ -71,13 +72,12 @@ void free_item(poller_item_t *poller_item) {
     strpool_free(&conf.strpool, calc_item->hostname);
 
     zbx_free(calc_item->formula_bin);
-
 	zbx_free(calc_item);
 }
 
 static void prepare_dc_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
-       calculated_item_t *calc_item = poller_get_item_specific_data(poller_item);
-       dc_item->itemid = poller_get_item_id(poller_item);
+       calculated_item_t *calc_item = poller_item_get_specific_data(poller_item);
+       dc_item->itemid = poller_item_get_id(poller_item);
        dc_item->params = (char *)calc_item->params;
        dc_item->formula_bin = calc_item->formula_bin;
        dc_item->key = (char *)calc_item->key;
@@ -97,11 +97,11 @@ void poll_item(poller_item_t *poller_item) {
 
     poller_inc_requests();
     
-    DEBUG_ITEM(poller_get_item_id(poller_item),"Calling calculation of the item");
+    DEBUG_ITEM(poller_item_get_id(poller_item),"Calling calculation of the item");
+
     if (SUCCEED != get_value_calculated(&dc_item, &result) ) {
         poller_preprocess_error(poller_item, result.msg);
     } else 
-        
         poller_preprocess_agent_result_value(poller_item, NULL, &result);
     
     poller_inc_responses();

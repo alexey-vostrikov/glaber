@@ -612,11 +612,12 @@ static int	recv_getqueue(zbx_socket_t *sock, struct zbx_json_parse *jp, int conf
 	struct zbx_json		json;
 	zbx_hashset_t		queue_stats;
 	zbx_queue_stats_t	*stats;
+	int filter_item_type = -1;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_user_init(&user);
-
+		
 	if (FAIL == zbx_get_user_from_json(jp, &user, NULL) || USER_TYPE_SUPER_ADMIN > user.type)
 	{
 		zbx_send_response(sock, ret, "Permission denied.", config_timeout);
@@ -643,6 +644,7 @@ static int	recv_getqueue(zbx_socket_t *sock, struct zbx_json_parse *jp, int conf
 				zbx_send_response(sock, ret, "Unsupported limit value.", config_timeout);
 				goto out;
 			}
+			glb_json_get_int_value_by_name(jp, "item_type", &filter_item_type);
 		}
 	}
 
@@ -654,7 +656,8 @@ static int	recv_getqueue(zbx_socket_t *sock, struct zbx_json_parse *jp, int conf
 
 	now = (int)time(NULL);
 	zbx_vector_ptr_create(&queue);
-	DCget_item_queue(&queue, ZBX_QUEUE_FROM_DEFAULT, ZBX_QUEUE_TO_INFINITY);
+	
+	DCget_item_queue(&queue, ZBX_QUEUE_FROM_DEFAULT, ZBX_QUEUE_TO_INFINITY, filter_item_type);
 
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
@@ -1225,7 +1228,7 @@ static int	send_internal_stats_json(zbx_socket_t *sock, const struct zbx_json_pa
 		}
 
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
-		zbx_json_addint64(&json, ZBX_PROTO_VALUE_ZABBIX_STATS_QUEUE, DCget_item_queue(NULL, from, to));
+		zbx_json_addint64(&json, ZBX_PROTO_VALUE_ZABBIX_STATS_QUEUE, DCget_item_queue(NULL, from, to, -1));
 	}
 	else
 	{

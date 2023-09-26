@@ -1004,12 +1004,16 @@ typedef struct
 	u_int64_t debug_trigger;
 	u_int64_t debug_item;
 	int server_time;
+	
+	int last_speed_recalc;
+	int counters[ITEM_TYPE_MAX];
+	int speeds[ITEM_TYPE_MAX];
 }
+
 ZBX_DC_CONFIG;
 
 typedef struct {
 	obj_index_t *host_to_template_idx;
-//	obj_index_t *deptrigger_to_trigger_idx;
 	strpool_t strpool;
 } GLB_CONFIG;
 

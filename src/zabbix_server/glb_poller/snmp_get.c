@@ -35,17 +35,14 @@ int snmp_get_send_request(poller_item_t *poller_item) {
 	asn1_oid_t oid;
 	int now = time(NULL);
 
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
-	//unsigned int lastpolled = (u_int64_t)snmp_item->data;
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	if ( now - snmp_item->lastpolled < MAX_ITEM_SNMP_GET_FREQUENCY ) {
-		DEBUG_ITEM(poller_get_item_id(poller_item),"Skipping polling, has been polled last time %ld seconds ago", now - snmp_item->lastpolled);
-	//	LOG_INF("Skipping item %ld from polling, has been polled last time %ld seconds ago", poller_get_item_id(poller_item), now - snmp_item->lastpolled);
+		DEBUG_ITEM(poller_item_get_id(poller_item),"Skipping polling, has been polled last time %ld seconds ago", now - snmp_item->lastpolled);
 		poller_return_item_to_queue(poller_item);
 		return SUCCEED;
 	}
 
-	//LOG_INF("Item %ld, sending GET packet, last time it was polled in %ld sec", poller_get_item_id(poller_item), now - snmp_item->lastpolled);
 	if (FAIL == snmp_fill_pdu_header(poller_item, &pdu, SNMP_CMD_GET))
 		return FAIL;
 		
@@ -64,28 +61,32 @@ int snmp_get_send_request(poller_item_t *poller_item) {
 }
 
 void snmp_get_timeout(poller_item_t *poller_item) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
-	DEBUG_ITEM(poller_get_item_id(poller_item),"Registered timeout for the item, try %d of %d", snmp_item->retries + 1 , SNMP_MAX_RETRIES);
+	DEBUG_ITEM(poller_item_get_id(poller_item),"Registered timeout for the item, try %d of %d", snmp_item->retries + 1 , SNMP_MAX_RETRIES);
 
 	if (snmp_item->retries >= SNMP_MAX_RETRIES) {
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Item timed out after try %d",  snmp_item->retries );
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Item timed out after try %d",  snmp_item->retries );
 		poller_return_item_to_queue(poller_item);
 		poller_preprocess_error(poller_item, "Timeout waiting for the responce");
+		poller_iface_register_timeout(poller_item);
 		return;
 	} else {
 		snmp_item->retries++;
-		DEBUG_ITEM(poller_get_item_id(poller_item),"Sending item, try %d",  snmp_item->retries);
-		snmp_get_send_request(poller_item);
+		DEBUG_ITEM(poller_item_get_id(poller_item),"Sending item, try %d",  snmp_item->retries);
+		
+		if (FAIL == snmp_get_send_request(poller_item)) {
+			glb_state_item_update_nextcheck(poller_item_get_id(poller_item), FAIL);
+			poller_return_item_to_queue(poller_item);
+		}
 	}
 }
 
 void snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu) {
 	u_int64_t mstime=glb_ms_time();
- 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+ 	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	snmp_item->lastpolled = time(NULL);
-	//LOG_INF("Set item %ld lastpolled time to %ld", poller_get_item_id(poller_item), snmp_item->lastpolled);
 	
 	poller_return_item_to_queue(poller_item);
 	
@@ -98,13 +99,13 @@ void snmp_get_process_result(poller_item_t *poller_item, const csnmp_pdu_t* pdu)
 			zbx_init_agent_result(&result);
 
  			if (SUCCEED == snmp_set_result(poller_item, &pdu->vars[i], &result)) {
-				DEBUG_ITEM(poller_get_item_id(poller_item),"Async SNMP SUCCEED RESULT processing for the item, type is %d", result.type);
+				DEBUG_ITEM(poller_item_get_id(poller_item),"Async SNMP SUCCEED RESULT processing for the item, type is %d", result.type);
 				poller_preprocess_agent_result_value(poller_item, NULL, &result);
-				poller_register_item_iface_succeed(poller_item);
+				poller_iface_register_succeed(poller_item);
 			} else {
-				DEBUG_ITEM(poller_get_item_id(poller_item), "Async SNMP FAILED RESULT processing for the item: %s", result.msg );
+				DEBUG_ITEM(poller_item_get_id(poller_item), "Async SNMP FAILED RESULT processing for the item: %s", result.msg );
 				poller_preprocess_error(poller_item, result.msg);
-				poller_register_item_iface_succeed(poller_item);
+				poller_iface_register_succeed(poller_item);
  			}
 
 			zbx_free_agent_result(&result);

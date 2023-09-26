@@ -108,7 +108,7 @@ static void conn_fail_cb(poller_item_t *poller_item, void *proto_ctx, const char
 
 static void  timeout_cb(poller_item_t *poller_item, void *proto_ctx) {
     poller_preprocess_error(poller_item, "Timeout while waiting for response");
-    poller_register_item_iface_timeout(poller_item);
+    poller_iface_register_timeout(poller_item);
 } 
 
 static void create_request(poller_item_t *poller_item, void *proto_ctx, void **buffer, size_t *buffsize) {
@@ -145,9 +145,9 @@ static void process_payload_response(poller_item_t *poller_item, const char* buf
     }
 
     poller_preprocess_str(poller_item, NULL, value);
-    poller_register_item_iface_succeed(poller_item);
+    poller_iface_register_succeed(poller_item);
     
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Arrived agent response: %s", value);
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Arrived agent response: %s", value);
 
     if (buffer_size >= MAX_STATIC_BUFFER)
         zbx_free(value);
@@ -161,7 +161,7 @@ static int process_response(poller_item_t *poller_item, const char *buffer, size
         return FAIL;
 
     if (0 != strncmp(buffer, ZBX_TCP_HEADER_DATA, 4 )) {
-        DEBUG_ITEM(poller_get_item_id(poller_item),"Response doesn't start from ZBXD prefix");
+        DEBUG_ITEM(poller_item_get_id(poller_item),"Response doesn't start from ZBXD prefix");
         poller_preprocess_error(poller_item, "Response doesn't start from ZBXD prefix");
         return SUCCEED;
     }
@@ -177,7 +177,7 @@ static int process_response(poller_item_t *poller_item, const char *buffer, size
     memcpy(&payload_len, buffer + PAYLOAD_OFFSET, sizeof(payload_len));
     payload_len= zbx_letoh_uint32(payload_len);
 
-    DEBUG_ITEM(poller_get_item_id(poller_item), "Got payload of size %d", payload_len);
+    DEBUG_ITEM(poller_item_get_id(poller_item), "Got payload of size %d", payload_len);
     
     if (payload_len + AGENT_HEADERS_SIZE > buffer_size) {
         return FAIL; 

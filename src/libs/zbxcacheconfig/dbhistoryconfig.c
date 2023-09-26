@@ -23,6 +23,7 @@
 #include "actions.h"
 #include "zbx_item_constants.h"
 #include "zbxtagfilter.h"
+#include "../glb_state/glb_state_items.h"
 
 ZBX_PTR_VECTOR_IMPL(connector_filter, zbx_connector_filter_t)
 
@@ -759,6 +760,7 @@ void	zbx_dc_items_update_nextcheck(zbx_history_recv_item_t *items, zbx_agent_val
 	ZBX_DC_ITEM		*dc_item;
 	ZBX_DC_HOST		*dc_host;
 	ZBX_DC_INTERFACE	*dc_interface;
+	int nextcheck;
 
 	RDLOCK_CACHE;
 
@@ -789,8 +791,10 @@ void	zbx_dc_items_update_nextcheck(zbx_history_recv_item_t *items, zbx_agent_val
 		dc_interface = (ZBX_DC_INTERFACE *)zbx_hashset_search(&config->interfaces, &dc_item->interfaceid);
 
 		/* update nextcheck for items that are counted in queue for monitoring purposes */
-		DCitem_nextcheck_update(dc_item, dc_interface, ZBX_ITEM_COLLECTED, values[i].ts.sec,
+		nextcheck = DCitem_nextcheck_update(dc_item, dc_interface, ZBX_ITEM_COLLECTED, values[i].ts.sec,
 				NULL);
+		
+		glb_state_item_update_nextcheck(dc_item->itemid, nextcheck);
 	}
 
 	UNLOCK_CACHE;

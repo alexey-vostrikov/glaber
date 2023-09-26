@@ -168,7 +168,7 @@ static void	process_values(icmpitem_t *items, int first_index, int last_index, Z
 
 int	zbx_parse_key_params(const char *key, const char *host_addr, icmpping_t *icmpping, char **addr,
 		int *count, int *interval, int *size, int *timeout, icmppingsec_type_t *type, char *error,
-		int max_error_len)
+		int max_error_len, int *use_item_addr)
 {
 	const char	*tmp;
 	int		ret = NOTSUPPORTED;
@@ -285,9 +285,12 @@ int	zbx_parse_key_params(const char *key, const char *host_addr, icmpping_t *icm
 			goto out;
 		}
 		*addr = strdup(host_addr);
+		*use_item_addr = 0;
 	}
-	else
+	else {
 		*addr = strdup(tmp);
+		*use_item_addr = 1;
+	}
 
 	ret = SUCCEED;
 out:
@@ -385,6 +388,7 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 	icmpping_t		icmpping;
 	icmppingsec_type_t	type;
 	zbx_dc_um_handle_t	*um_handle;
+	int use_item_addr;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -402,7 +406,7 @@ static void	get_pinger_hosts(icmpitem_t **icmp_items, int *icmp_items_alloc, int
 		if (SUCCEED == rc)
 		{
 			rc = zbx_parse_key_params(items[i].key, items[i].interface.addr, &icmpping, &addr, &count,
-					&interval, &size, &timeout, &type, error, sizeof(error));
+					&interval, &size, &timeout, &type, error, sizeof(error), &use_item_addr);
 		}
 
 		if (SUCCEED == rc)

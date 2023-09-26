@@ -56,7 +56,7 @@ static tcp_poll_type_procs_t conf[ASYNC_TCP_POLL_TYPE_COUNT] = {0};
 
 static void async_tcp_destroy_session(poller_item_t *poller_item)
 {
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 
 	bufferevent_free(tcp_item->bev);
 	poller_return_item_to_queue(poller_item);
@@ -72,7 +72,7 @@ static void response_cb(struct bufferevent *bev, void *ctx_ptr)
 	char buf[TCP_READ_BUFF_SIZE];
 
 	poller_item_t *poller_item = ctx_ptr;
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 
 	struct evbuffer *input = bufferevent_get_input(tcp_item->bev);
 
@@ -84,7 +84,7 @@ static void response_cb(struct bufferevent *bev, void *ctx_ptr)
 	switch (status)
 	{
 	case ASYNC_IO_TCP_PROC_FINISH:
-		poller_register_item_iface_succeed(poller_item);
+		poller_iface_register_succeed(poller_item);
 		async_tcp_destroy_session(poller_item);
 		poller_contention_remove_session(tcp_item->ipaddr);
 		break;
@@ -101,11 +101,11 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 {
 	char *buffer;
 	poller_item_t *poller_item = ptr;
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 
 	if (events & BEV_EVENT_CONNECTED)
 	{
-		DEBUG_ITEM(poller_get_item_id(poller_item), "TCP Connected event");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "TCP Connected event");
 
 		if (NULL != conf[tcp_item->poll_type].connect_cb)
 		{
@@ -121,7 +121,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 
 	if (events & BEV_EVENT_ERROR)
 	{
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Connection error event");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Connection error event");
 		conf[tcp_item->poll_type].conn_fail_cb(poller_item, tcp_item->proto_ctx, "Connection error");
 		async_tcp_destroy_session(poller_item);
 
@@ -130,7 +130,7 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 
 	if (events & BEV_EVENT_TIMEOUT)
 	{
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Timeout event");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Timeout event");
 
 		conf[tcp_item->poll_type].timeout_cb(poller_item, tcp_item->proto_ctx);
 
@@ -144,16 +144,16 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 		struct evbuffer *input = bufferevent_get_input(tcp_item->bev);
 		int n = evbuffer_get_length(input);
 
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Connection has been dropped for the item, there is %d bytes in the buffer",n);
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Connection has been dropped for the item, there is %d bytes in the buffer",n);
 		if (n > 0)
 		{ // agent answered and closed connection - this is fine!
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Connection closed, has %d byets to process", n);
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Connection closed, has %d byets to process", n);
 			response_cb(bev, ptr);
 			poller_contention_remove_session(tcp_item->ipaddr);
 		}
 		else
 		{
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Connection is dropped");
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Connection is dropped");
 			conf[tcp_item->poll_type].conn_fail_cb(poller_item, tcp_item->proto_ctx, "Connection is dropped");
 		}
 
@@ -168,7 +168,7 @@ extern char *CONFIG_SOURCE_IP;
 static int tcp_bev_request(poller_item_t *poller_item, const char *request, int request_size)
 {
 	struct addrinfo *ai = NULL, *ai_bind = NULL, hints;
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 	int true = 1, sock, ret = SUCCEED;
 
 #ifdef HAVE_IPV6
@@ -299,7 +299,7 @@ static int tcp_bev_request(poller_item_t *poller_item, const char *request, int 
 	if (-1 == bufferevent_socket_connect(tcp_item->bev, (struct sockaddr *)&hints, sizeof(struct sockaddr)))
 #endif
 	{
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't start connection");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Couldn't start connection");
 		async_tcp_destroy_session(poller_item);
 		ret = FAIL;
 	}
@@ -314,9 +314,9 @@ static int tcp_bev_request(poller_item_t *poller_item, const char *request, int 
 
 static int tcp_send_request(poller_item_t *poller_item)
 {
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Starting TCP connection");
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Starting TCP connection");
 
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 
 	void *request = NULL;
 	size_t request_size = 0;
@@ -338,8 +338,8 @@ static int tcp_send_request(poller_item_t *poller_item)
 void resolve_ready_func_cb(poller_item_t *poller_item, const char *addr)
 {
 
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Item ip %s resolved to '%s'", tcp_item->interface_addr, addr);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Item ip %s resolved to '%s'", tcp_item->interface_addr, addr);
 
 	poller_strpool_free(tcp_item->ipaddr);
 	tcp_item->ipaddr = poller_strpool_add(addr);
@@ -363,19 +363,19 @@ static int ip_str_version(const char *src) {
  * ***************************************************************************/
 static void tcp_start_connection(poller_item_t *poller_item)
 {
-	DEBUG_ITEM(poller_get_item_id(poller_item),
+	DEBUG_ITEM(poller_item_get_id(poller_item),
 			   "starting tcp connection for the item");
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
-	u_int64_t itemid = poller_get_item_id(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
+	u_int64_t itemid = poller_item_get_id(poller_item);
 	int n;
 
 	if (DEFAULT_TCP_HOST_CONTENTION <= (n = poller_contention_get_sessions(tcp_item->ipaddr)))
 	{
-	 	DEBUG_ITEM(poller_get_item_id(poller_item), "There are already %d connections for the %s host, delaying poll", n, tcp_item->interface_addr);
+	 	DEBUG_ITEM(poller_item_get_id(poller_item), "There are already %d connections for the %s host, delaying poll", n, tcp_item->interface_addr);
 	 	poller_return_delayed_item_to_queue(poller_item);
 	 	return;
 	}
-	DEBUG_ITEM(poller_get_item_id(poller_item), "There are already %d connections for the %s host, doing poll", n, tcp_item->interface_addr);
+	DEBUG_ITEM(poller_item_get_id(poller_item), "There are already %d connections for the %s host, doing poll", n, tcp_item->interface_addr);
 
 	if (1 == tcp_item->useip) {
 		tcp_send_request(poller_item);
@@ -384,11 +384,11 @@ static void tcp_start_connection(poller_item_t *poller_item)
 
 	if ( tcp_item->next_resolve < time(NULL))
 	{
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Need to resolve %s", tcp_item->interface_addr);
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Need to resolve %s", tcp_item->interface_addr);
 	
 		if (FAIL == poller_async_resolve(poller_item, tcp_item->interface_addr))
 		{
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Cannot resolve item's interface addr: '%s'", tcp_item->interface_addr);
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Cannot resolve item's interface addr: '%s'", tcp_item->interface_addr);
 			poller_preprocess_error(poller_item, "Cannot resolve item's interface hostname");
 			poller_return_item_to_queue(poller_item);
 		}
@@ -401,7 +401,7 @@ static void tcp_start_connection(poller_item_t *poller_item)
 static void tcp_free_item(poller_item_t *poller_item)
 {
 
-	tcp_item_t *tcp_item = poller_get_item_specific_data(poller_item);
+	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 
 	if (NULL != tcp_item->bev)
 		async_tcp_destroy_session(poller_item);
@@ -430,7 +430,7 @@ static int tcp_init_item(DC_ITEM *dc_item, poller_item_t *poller_item)
 
 	tcp_item_t *tcp_item;
 	tcp_item = zbx_calloc(NULL, 0, sizeof(tcp_item_t));
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Doing tcp init of the item");
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Doing tcp init of the item");
 	poller_set_item_specific_data(poller_item, tcp_item);
 
 	if (ITEM_TYPE_AGENT == dc_item->type)
@@ -441,8 +441,8 @@ static int tcp_init_item(DC_ITEM *dc_item, poller_item_t *poller_item)
 		return FAIL;
 
 	if (NULL == (tcp_item->proto_ctx = conf[tcp_item->poll_type].item_init(poller_item, dc_item)))
-	{ // tcp_init_proto_specific_data(dc_item, poller_item, tcp_item))){
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't create item in the poller, it will not be polled");
+	{ 
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Couldn't create item in the poller, it will not be polled");
 		poller_preprocess_error(poller_item, "Couldn't create item in the poller, it will not be polled");
 
 		tcp_free_item(poller_item);

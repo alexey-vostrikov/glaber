@@ -75,9 +75,8 @@ poller_event_t* poller_create_event(poller_item_t *poller_item, poller_event_cb_
 		 event_priority_set(poller_event->event, 1);
 	}
 
-
 	if (NULL != poller_item) 
-		poller_event->itemid = poller_get_item_id(poller_item);
+		poller_event->itemid = poller_item_get_id(poller_item);
 
 	return poller_event;
 };
@@ -96,8 +95,8 @@ int poller_destroy_event(poller_event_t *poll_event) {
 	return SUCCEED;
 }
 
-int poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec) {
-	struct timeval tv = { .tv_sec = tm_msec/1000, .tv_usec = (tm_msec % 1000) * 1000 };
+int poller_run_timer_event( poller_event_t *poll_event, u_int64_t tm_msec_relative) {
+	struct timeval tv = { .tv_sec = tm_msec_relative/1000, .tv_usec = (tm_msec_relative % 1000) * 1000 };
 	DEBUG_ITEM(poll_event->itemid, "Started timer event %p for the item in %ld sec, %ld msec", poll_event->event, tv.tv_sec, tv.tv_usec);;
 	return event_add(poll_event->event, &tv);
 }
@@ -117,10 +116,10 @@ void poller_async_resolve_cb(int result, char type, int count, int ttl, void *ad
 		return;
 	
 	if (DNS_ERR_NONE != result) {
-	    DEBUG_ITEM(poller_get_item_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
+	    DEBUG_ITEM(poller_item_get_id(poller_item), "There was an error resolving item :%s", evutil_gai_strerror(result));
 
         if (NULL != conf.resolve_fail_callback) {
-            DEBUG_ITEM(poller_get_item_id(poller_item), "Calling specific resolve fail func");
+            DEBUG_ITEM(poller_item_get_id(poller_item), "Calling specific resolve fail func");
             conf.resolve_fail_callback(poller_item);
             return;
         }
@@ -157,12 +156,12 @@ int poller_async_get_dns_requests() {
 
 int poller_async_resolve(poller_item_t *poller_item,  const char *name) {
 
-	u_int64_t itemid = poller_get_item_id(poller_item);
+	u_int64_t itemid = poller_item_get_id(poller_item);
 
 	if (NULL == evdns_base_resolve_ipv4(conf.evdns_base, name, 0, poller_async_resolve_cb, (void *)itemid)) {
 		
 		if ( NULL!= poller_item) {
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Async dns lookup failed for addr '%s'", name);
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Async dns lookup failed for addr '%s'", name);
 			poller_preprocess_error(poller_item, "Cannot start DNS lookup. Check the item hostname or interface settings");
 		}
 	}

@@ -1060,7 +1060,7 @@ static int item_update_nextcheck_cb(elems_hash_elem_t *elem, mem_funcs_t *memf, 
     item_elem_t *elm = (item_elem_t *)elem->data;
 
     elm->meta.nextcheck = *(int *)cb_data;
-    DEBUG_ITEM(elem->id, "Updated metadata: nextcheck");
+    DEBUG_ITEM(elem->id, "Updated metadata: nextcheck = %d", *(int *)cb_data);
 }
 
 ELEMS_CALLBACK(item_update_lastdata_cb)
@@ -1080,7 +1080,7 @@ ELEMS_CALLBACK(item_update_lastdata_cb)
     if (VARIANT_VALUE_ERROR == metric->value.type)
     {
         
-        if ( elm->meta.state != ITEM_STATE_NOTSUPPORTED) {
+        if (elm->meta.state != ITEM_STATE_NOTSUPPORTED) {
             elm->meta.state = ITEM_STATE_NOTSUPPORTED;
             DEBUG_ITEM(elem->id, "Updated state to ITEM_STATE_NUTSUPPORTED");
         }
@@ -1517,7 +1517,7 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
             zbx_json_addobject(json,NULL);
 			zbx_json_adduint64string(json,"itemid",itemids->values[i]);
             zbx_json_adduint64string(json,"lastdata", req.meta->lastdata);
-            zbx_json_adduint64string(json,"nextcheck", req.meta->nextcheck);
+            zbx_json_addint64string(json,"nextcheck", req.meta->nextcheck);
             zbx_json_adduint64string(json,"state", req.meta->state);
         
             if (NULL != req.meta->error && strlen(req.meta->error) > 0)
@@ -1525,7 +1525,7 @@ int glb_state_items_get_state_json(zbx_vector_uint64_t *itemids, struct zbx_json
 
             zbx_json_close(json);
             
-            DEBUG_ITEM(itemids->values[i], "Added info to the trapper status request: lastdata: %d, state %d, error %d",req.meta->lastdata,
+            DEBUG_ITEM(itemids->values[i], "Added info to the trapper status request: lastdata: %d, state %d, error '%s'",req.meta->lastdata,
                      req.meta->state, req.meta->error);
         }
     }

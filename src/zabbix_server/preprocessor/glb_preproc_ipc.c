@@ -186,15 +186,12 @@ int preprocess_send_metric_ext(const metric_t *metric, int send_wait_mode, int p
 
 int preprocess_send_metric(const metric_t *metric) {
     int i;
-//
-   // for (i = 0; i < 100; i++) {
-        preprocess_send_metric_ext(metric, IPC_LOCK_BLOCK, 0);
-    //}
+    glb_state_item_set_lastdata_by_metric(metric);
+    preprocess_send_metric_ext(metric, IPC_LOCK_BLOCK, 0);
 }
 
 int processing_send_metric(const metric_t *metric) {
     DEBUG_ITEM(metric->itemid, "Sending metric to processing");
-    glb_state_item_set_lastdata_by_metric(metric);
     glb_ipc_send(conf->process_ipc, metric->hostid % CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], (void *)metric, IPC_LOCK_TRY_ONLY, 0);
 }
 
@@ -318,7 +315,8 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
     return FAIL;
 }
 
-int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
+int processing_send_agent_result_from_proxy(u_int64_t hostid, u_int64_t itemid, 
+        u_int64_t flags, const zbx_timespec_t *ts, const AGENT_RESULT *ar) {
     metric_t metric={0};
     DEBUG_ITEM(itemid, "Sending item to preocessing, ar type is %d", ar->type);
     
@@ -350,9 +348,10 @@ int processing_send_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t f
     }
     
     processing_send_metric(&metric);
+    glb_state_item_set_lastdata_by_metric(&metric);
 }
 
-int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error) {
+int processing_send_error_from_proxy(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, const zbx_timespec_t *ts, const char *error) {
     metric_t metric={0};
     DEBUG_ITEM(itemid, "Sending error to processing");
     if (FAIL == prepare_metric_common(&metric, hostid, itemid, flags, ts)) 
@@ -364,7 +363,7 @@ int processing_send_error(u_int64_t hostid, u_int64_t itemid, u_int64_t flags, c
         zbx_variant_set_error(&metric.value,"");
 
     processing_send_metric(&metric);
-    
+    glb_state_item_set_lastdata_by_metric(&metric);
     return SUCCEED;
 }
 

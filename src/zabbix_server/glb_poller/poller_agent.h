@@ -1,6 +1,6 @@
 /*
-** Zabbix
-** Copyright (C) 2001-2023 Zabbix SIA
+** Glaber
+** Copyright (C) 2001-2028 Glaber JSC
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,21 +16,16 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+#ifndef GLABER_POLLER_AGENT_H
+#define GLABER_POLLER_AGENT_H
 
-#ifndef ZABBIX_PINGER_H
-#define ZABBIX_PINGER_H
+#include "glb_poller.h"
+#define DEFAULT_TCP_HOST_CONTENTION 4
 
-#include "zbxthreads.h"
-#include "zbxicmpping.h"
 
-typedef struct
-{
-	int			config_timeout;
-}
-zbx_thread_pinger_args;
+#define ASYNC_IO_TCP_PROC_FINISH	1
+#define ASYNC_IO_TCP_PROC_CONTINUE	2
 
-ZBX_THREAD_ENTRY(pinger_thread, args);
-int	zbx_parse_key_params(const char *key, const char *host_addr, icmpping_t *icmpping, char **addr, int *count,
-		int *interval, int *size, int *timeout, icmppingsec_type_t *type, char *error, int max_error_len, int *use_item_addr);
+int     glb_poller_agent_init();
 
 #endif

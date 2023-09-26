@@ -362,7 +362,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 			goto out;
 		}
 
-		SET_UI64_RESULT(result, DCget_item_queue(NULL, from, to));
+		SET_UI64_RESULT(result, DCget_item_queue(NULL, from, to, -1));
 	}
 	else if (0 == strcmp(first_param, "requiredperformance"))	/* zabbix["requiredperformance"] */
 	{
@@ -913,7 +913,7 @@ int	get_value_internal(const DC_ITEM *item, AGENT_RESULT *result, const zbx_conf
 					zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
 					zbx_json_addint64(&json, ZBX_PROTO_VALUE_ZABBIX_STATS_QUEUE,
-							DCget_item_queue(NULL, from, to));
+							DCget_item_queue(NULL, from, to, -1));
 
 					zbx_set_agent_result_type(result, ITEM_VALUE_TYPE_TEXT, json.buffer);
 

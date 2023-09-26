@@ -1046,10 +1046,10 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
 	//proxy data
 	metric_t metric = {.hostid = item->host.hostid, .itemid = item->itemid, .ts = *ts };
 	if (ITEM_STATE_NORMAL == item->state) 
-			processing_send_agent_result(item->host.hostid, item->itemid, item->flags, ts, result);
+			processing_send_agent_result_from_proxy(item->host.hostid, item->itemid, item->flags, ts, result);
 		else 
-			processing_send_error(item->host.hostid, item->itemid, item->flags, ts, error);
-	
+			processing_send_error_from_proxy(item->host.hostid, item->itemid, item->flags, ts, error);
+
 	*h_num = 1;
 }
 

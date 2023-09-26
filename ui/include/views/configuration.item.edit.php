@@ -1003,10 +1003,8 @@ $item_tabs = (new CTabView())
 	->addTab('itemInfo',_('Operational state'),
 	(new CFormGrid())
 			->setId('item_state_information')
-			->addItem((new CLatestValue($data, NULL, $data['triggers']))->makeStateInfo())
+			->addItem((new CLatestValue($data['item'], NULL, $data['triggers']))->makeStateInfo())
 	);
-
-//error_log(json_encode(array_keys($data)));
 
 if ($data['form_refresh'] == 0) {
 	$item_tabs->setSelected(0);

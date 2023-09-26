@@ -24,12 +24,6 @@
 
 
 
-void DC_get_account_sync_poller_time(char **out);
-static void rtc_process_sync_poller_stats(char **result) {
-	DC_get_account_sync_poller_time(result);
-}
-
-
 int	rtc_process_request_ex_passive(zbx_rtc_t *rtc, zbx_uint32_t code, const unsigned char *data, char **result)
 {
 	ZBX_UNUSED(data);
@@ -38,9 +32,6 @@ int	rtc_process_request_ex_passive(zbx_rtc_t *rtc, zbx_uint32_t code, const unsi
 	switch (code)
 	{
 	
-		case GLB_RTC_SYNC_POLLER_TIMES:
-			rtc_process_sync_poller_stats(result);
-			return SUCCEED;
 		case ZBX_RTC_CONFIG_CACHE_RELOAD:
 			zbx_rtc_notify(rtc, ZBX_PROCESS_TYPE_TASKMANAGER, 0, ZBX_RTC_CONFIG_CACHE_RELOAD, NULL, 0);
 			return SUCCEED;
@@ -70,12 +61,6 @@ int	rtc_process(const char *option, int config_timeout, char **error)
 	struct zbx_json	j;
 
 	zbx_json_init(&j, 1024);
-
-	if (0 == strcmp(option, GLB_SYNC_POLLER_TIMES))
-	{
-		code = GLB_RTC_SYNC_POLLER_TIMES;
-		return SUCCEED;
-	}
 
 	if (SUCCEED != zbx_rtc_parse_options(option, &code, &j, error))
 		goto out;

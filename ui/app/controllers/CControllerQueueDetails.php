@@ -26,9 +26,24 @@ class CControllerQueueDetails extends CController {
 	}
 
 	protected function checkInput() {
-		return true;
-	}
+		// VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
+		$fields = [
+			'filter_type' => 'in '.implode(',', [ITEM_TYPE_ZABBIX, ITEM_TYPE_TRAPPER, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL, 
+						ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_HTTPTEST, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, 
+						ITEM_TYPE_SSH, ITEM_TYPE_TELNET, ITEM_TYPE_CALCULATED, ITEM_TYPE_JMX, ITEM_TYPE_SNMPTRAP, 
+						ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT]),
+			'action' =>	'in queue.details',
+		];
+		
+		$ret = $this->validateInput($fields);
 
+		if (!$ret) {
+			$this->setResponse(new CControllerResponseFatal());
+		}
+
+		return $ret;
+	}
+		
 	protected function checkPermissions() {
 		return $this->checkAccess(CRoleHelper::UI_ADMINISTRATION_QUEUE);
 	}
@@ -41,10 +56,17 @@ class CControllerQueueDetails extends CController {
 			timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), ZBX_SOCKET_BYTES_LIMIT
 		);
 
-		$queue_data = $zabbix_server->getQueue(CZabbixServer::QUEUE_DETAILS, CSessionHelper::getId(),
-			CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
-		);
+		$filter_item_type = null;
 
+		if ($this->hasInput('filter_type'))
+			$filter_item_type = $this->getInput('filter_type');
+	
+		//show_error_message("Fetching data for type ". $item_type);
+
+		$queue_data = $zabbix_server->getQueue(CZabbixServer::QUEUE_DETAILS, CSessionHelper::getId(),
+			CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT), $filter_item_type
+		);
+		
 		if ($zabbix_server->getError()) {
 			$items = [];
 			$hosts = [];
@@ -57,7 +79,7 @@ class CControllerQueueDetails extends CController {
 		else {
 			$queue_data = array_column($queue_data, null, 'itemid');
 			$items = API::Item()->get([
-				'output' => ['hostid', 'name'],
+				'output' => ['hostid', 'name', 'type'],
 				'selectHosts' => ['name'],
 				'itemids' => array_keys($queue_data),
 				'webitems' => true,
@@ -76,7 +98,8 @@ class CControllerQueueDetails extends CController {
 			$hosts = API::Host()->get([
 				'output' => ['proxy_hostid'],
 				'hostids' => array_column($items, 'hostid', 'hostid'),
-				'preservekeys' => true
+				'preservekeys' => true,
+				'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'version', 'details', 'available', 'error', 'include_named'],
 			]);
 
 			$proxy_hostids = [];
@@ -102,7 +125,8 @@ class CControllerQueueDetails extends CController {
 			'hosts' => $hosts,
 			'proxies' => $proxies,
 			'queue_data' => $queue_data,
-			'total_count' => $zabbix_server->getTotalCount()
+			'total_count' => $zabbix_server->getTotalCount(),
+			'filter_item_type' => $filter_item_type
 		]);
 
 		$title = _('Queue');

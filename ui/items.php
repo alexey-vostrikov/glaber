@@ -217,11 +217,8 @@ $fields = [
 									],
 	'context' =>					[T_ZBX_STR, O_MAND, P_SYS,		IN('"host", "template"'),	null],
 	// actions
-	'action' =>						[T_ZBX_STR, O_OPT, P_SYS|P_ACT,
-										IN('"item.massclearhistory","item.massdelete",'.
-											'"item.massdisable","item.massenable"'
-										),
-										null
+	'action' =>						[T_ZBX_STR, O_OPT, P_SYS|P_ACT,	IN('"item.massclearhistory","item.massdelete",'.
+											'"item.massdisable","item.massenable"'), null
 									],
 	'add' =>						[T_ZBX_STR, O_OPT, P_SYS|P_ACT, null,	null],
 	'update' =>						[T_ZBX_STR, O_OPT, P_SYS|P_ACT, null,	null],
@@ -754,7 +751,8 @@ if (getRequest('form') === 'create' || getRequest('form') === 'update'
 			'selectPreprocessing' => ['type', 'params', 'error_handler', 'error_handler_params'],
 			'selectTags' => ['tag', 'value'],
 			'selectTriggers' => ['triggerid', 'name', 'value', 'priority'],
-			'itemids' => getRequest('itemid')
+			'itemids' => getRequest('itemid'),
+			'selectValueMap' => ['mappings'],
 		]);
 
 		$item = $items[0];
@@ -1266,23 +1264,6 @@ else {
 		default:
 			order_result($data['items'], $sortField, $sortOrder);
 	}
-
-	// pager
-//	if (hasRequest('page')) {
-//		$page_num = getRequest('page');
-//	}
-//	elseif (isRequestMethod('get') && !hasRequest('cancel')) {
-//		$page_num = 1;
-//	}
-//	else {
-//		$page_num = CPagerHelper::loadPage($page['file']);
-//	}
-
-//	CPagerHelper::savePage($page['file'], $page_num);
-
-//	$data['paging'] = CPagerHelper::paginate($page_num, $data['items'], $sortOrder,
-//		(new CUrl('items.php'))->setArgument('context', $data['context'])
-//	);
 
 	$data['parent_templates'] = getItemParentTemplates($data['items'], ZBX_FLAG_DISCOVERY_NORMAL);
 

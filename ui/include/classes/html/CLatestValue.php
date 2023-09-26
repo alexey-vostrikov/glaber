@@ -96,7 +96,8 @@ class CLatestValue extends CSpan {
     private function calcTimestamps() {
         if (isset($this->itemdata['nextcheck']) && $this->itemdata['nextcheck'] > 0) {
             $this->next_poll_time = zbx_date2age(2 * time() - $this->itemdata['nextcheck']);
-        }
+        } else if (isset($this->itemdata['nextcheck']) && $this->itemdata['nextcheck'] < 0 )
+            $this->next_poll_time = 'NOT PLANNED'; 
 
         if (isset($this->itemdata['lastdata']) && $this->itemdata['lastdata'] > 0) {
             $this->last_poll_time_raw = $this->itemdata['lastdata'];
@@ -161,8 +162,12 @@ class CLatestValue extends CSpan {
     }
 
     private function makeAdminLinks(){
+        $base_url = 'items.php';
+        
+        if (isset($this->itemdata['flags']) && ($this->itemdata['flags'] & ZBX_FLAG_DISCOVERY_RULE) )
+            $base_url = 'host_discovery.php';
 
-        return new CLink(_('Edit'),  (new CUrl('items.php'))
+        return new CLink(_('Edit'),  (new CUrl($base_url))
             ->setArgument('form', 'update')
             ->setArgument('itemid', $this->itemdata['itemid'])
             ->setArgument('context', 'host'));

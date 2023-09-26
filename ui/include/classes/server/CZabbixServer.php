@@ -412,12 +412,15 @@ class CZabbixServer {
 	 *
 	 * @return bool|array
 	 */
-	public function getQueue($type, $sid, $limit = 0) {
+	public function getQueue($type, $sid, $limit = 0, $item_type = null) {
 		$request = [
 			'request' => 'queue.get',
 			'sid' => $sid,
 			'type' => $type
 		];
+		
+		if (isset($item_type))
+			$request['item_type'] = $item_type;
 
 		if ($type == self::QUEUE_DETAILS) {
 			$request['limit'] = $limit;

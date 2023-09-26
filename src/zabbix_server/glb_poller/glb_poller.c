@@ -51,7 +51,6 @@
 #include "zbxsysinfo.h"
 #include "glb_preproc.h"
 
-extern int CONFIG_CONFSYNCER_FREQUENCY;
 extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 /* poller timings in milliseconds */
@@ -63,19 +62,19 @@ extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 typedef struct
 {
-	
 	int server_num;
 	int process_num;
 	int process_type; //by type of polling -agent, snmp, worker, etc polling
-	int program_type; //server, proxy etc....
+	int program_type; 
 } poller_proc_info_t;
 
 struct poller_item_t
 {
 	zbx_uint64_t itemid;
 	zbx_uint64_t hostid;
-	unsigned char state;
+	unsigned char poll_state;
 	unsigned char value_type;
+	unsigned char bound_to_interface;
 	const char *delay;
 	unsigned char item_type;
 	unsigned char flags;
@@ -142,6 +141,9 @@ static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
 
 	if (0 == conf.poller.is_iface_bound)
 		return SUCCEED;
+	
+	if (0 == item->bound_to_interface)
+		return SUCCEED;
 
 	if (1 == conf.poller.is_named_iface )  
 		return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
@@ -149,93 +151,89 @@ static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
 	return glb_state_host_is_id_interface_pollable(item->hostid, item->interfaceid, disabled_till);
 
 }
-/******************************************************************
- * adds next check event to the events b-tree					  *
- * ****************************************************************/
-static int add_item_check_event(poller_item_t *poller_item, u_int64_t mstime)
-{
-	int simple_interval, disabled_till;
-	u_int64_t nextcheck;
-	zbx_custom_interval_t *custom_intervals;
-	char *error = NULL;
-	const char *delay;
 
+static int poller_update_item_nextcheck(poller_item_t *poller_item, int base_time) {
+	
+	int simple_interval, disabled_till;
+	zbx_custom_interval_t *custom_intervals;
+	const char *delay;
+	char *error = NULL;
+	int nextcheck;
+	
 	if (SUCCEED == is_active_item_type(poller_item->item_type))
 		delay = poller_item->delay;
 	else
 		delay = "86400s";
 
-	if (SUCCEED != zbx_interval_preproc(delay, &simple_interval, &custom_intervals, &error))
-	{
-	
+	if (SUCCEED != zbx_interval_preproc(delay, &simple_interval, &custom_intervals, &error)) {
 		zabbix_log(LOG_LEVEL_INFORMATION, "Itemd %ld has wrong delay time set :%s :%s", poller_item->itemid, poller_item->delay, error);
 		poller_preprocess_error(poller_item, "error");
+		glb_state_item_update_nextcheck(poller_item->itemid, FAIL);
 		return FAIL;
 	}
 
-	if (SUCCEED == item_interface_is_pollable(poller_item, &disabled_till)) {
-		nextcheck = zbx_calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
-												 custom_intervals, (mstime / 1000) + 1);
-
-	}
-	else
-	{
-		nextcheck = zbx_calculate_item_nextcheck_unreachable(simple_interval, custom_intervals, disabled_till);	
-	}
-
-	/*note: since original algo is still seconds-based adding some millisecond-noise
-	to distribute checks evenly during one second */
-	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
-
-	nextcheck = nextcheck * 1000 + rand() % 1000;
+	nextcheck = zbx_calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
+												 custom_intervals, base_time + 1);
 	zbx_custom_interval_free(custom_intervals);
 
-	DEBUG_ITEM(poller_item->itemid, "Added item %ld poll event in %ld msec", poller_item->itemid, nextcheck - mstime);
+	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
 
-	poller_run_timer_event(poller_item->poll_event, nextcheck - mstime);
-	return SUCCEED;
+	return nextcheck;
 }
 
 void item_poll_cb(poller_item_t *poller_item, void *data) {
 
-	u_int64_t mstime = glb_ms_time();
-	int disabled_till, nextcheck;
+	u_int64_t now_ms = glb_ms_time();
+	int disabled_till, nextcheck, now = time(NULL);
 
 	DEBUG_ITEM(poller_item->itemid, "Item poll event");
-
-	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || poller_contention_sessions_count() > POLLER_MAX_SESSIONS) 
+	
+	poller_item->lastpolltime = now_ms;
+	
+	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || 
+	     poller_contention_sessions_count() > POLLER_MAX_SESSIONS) 
 	{
 		DEBUG_ITEM(poller_item->itemid, "Item delayed %d sec due to poller has too many connections: %d", POLLER_MAX_SESSIONS_DELAY / 1000,
 						 poller_sessions_count());
+
 		poller_run_timer_event(poller_item->poll_event, POLLER_MAX_SESSIONS_DELAY);
+		return;
+	}
+
+	if (POLL_QUEUED != poller_item->poll_state)
+	{
+		DEBUG_ITEM(poller_item->itemid, "Skipping from polling, not in QUEUED state (%d)", poller_item->poll_state);
+		poller_run_timer_event(poller_item->poll_event, POLLER_NOT_IN_QUEUE_DELAY);
 		return;
 	}
 
 	if (FAIL == item_interface_is_pollable(poller_item, &disabled_till)) {
 		
+		if (FAIL == (nextcheck = poller_update_item_nextcheck(poller_item, disabled_till)))  {
+			LOG_INF("Cannot calc of nextcheck for item %ld, it will not be polled anymore", poller_item->itemid);
+			return;
+		}
+		
 		DEBUG_ITEM(poller_item->itemid, "Item's interface is disabled, delaying");
-		add_item_check_event(poller_item, (u_int64_t)disabled_till * 1000);
+		poller_run_timer_event(poller_item->poll_event, (u_int64_t)(nextcheck - now) * 1000 + rand()%1000 );
 
 		return;
 	}
 
-
-	add_item_check_event(poller_item, mstime);
-
-	if (POLL_QUEUED != poller_item->state)
-	{
-		DEBUG_ITEM(poller_item->itemid, "Skipping from polling, not in QUEUED state (%d)", poller_item->state);
-		LOG_DBG("Not sending item %ld to polling, it's in the %d state or aged", poller_item->itemid, poller_item->state);
-		return;
-	}
-
-	poller_item->state = POLL_POLLING;
-	poller_item->lastpolltime = mstime;
+	poller_item->poll_state = POLL_POLLING;
 
 	DEBUG_ITEM(poller_item->itemid, "Starting poller item poll");
 	
 	if (NULL != conf.poller.start_poll)
 		conf.poller.start_poll(poller_item);
+
+	if (FAIL == (nextcheck = poller_update_item_nextcheck(poller_item, now))) {
+		LOG_INF("Cannot calc of nextcheck for item %ld, it will not be polled anymore", poller_item->itemid);
+		return;
+	}
+	
+	poller_run_timer_event(poller_item->poll_event, (nextcheck - now ) * 1000);
+	DEBUG_ITEM(poller_item->itemid, "Next item poll is planned in %d seconds", nextcheck - now);
 }
 
 int glb_poller_get_forks()
@@ -285,6 +283,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 {
 	poller_item_t *poller_item, local_glb_item;
 	u_int64_t mstime = glb_ms_time();
+	int nextcheck = time(NULL);
 	int i;
 
 	DEBUG_ITEM(dc_item->itemid, "Creating/updating item");
@@ -306,7 +305,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	if (NULL == (poller_item = (poller_item_t *)zbx_hashset_insert(&conf.items, &local_glb_item, sizeof(poller_item_t))))
 		return FAIL;
 
-	poller_item->state = POLL_QUEUED;
+	poller_item->poll_state = POLL_QUEUED;
 	poller_item->hostid = dc_item->host.hostid;
 	
 	zbx_substitute_simple_macros(NULL, NULL, NULL, NULL, &dc_item->host.hostid, NULL, NULL,
@@ -319,6 +318,7 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	poller_item->item_type = dc_item->type;
 	poller_item->poll_event = poller_create_event(poller_item, item_poll_cb, 0, NULL, 0);
 	poller_item->interfaceid = dc_item->interface.interfaceid;
+	poller_item->bound_to_interface = 1;
 
 
 	if (FAIL == conf.poller.init_item(dc_item, poller_item))
@@ -330,10 +330,11 @@ int glb_poller_create_item(DC_ITEM *dc_item)
 	};
 
 	poller_run_timer_event(poller_item->poll_event, POLLER_NEW_ITEM_DELAY_TIME * 1000);
+	glb_state_item_update_nextcheck(dc_item->itemid, nextcheck + POLLER_NEW_ITEM_DELAY_TIME);
 
 	return SUCCEED;
 }
-
+//todo: remove this in favor of call-back interface
 static int poll_module_init()
 {
 	switch (conf.procinfo.process_type)
@@ -380,7 +381,6 @@ void poll_shutdown()
 {
 	if (NULL != conf.poller.shutdown) 
 		conf.poller.shutdown();
-	
 
 	zbx_hashset_destroy(&conf.hosts);
 	zbx_hashset_destroy(&conf.items);
@@ -403,7 +403,7 @@ void new_items_check_cb(poller_item_t *garbage, void *data)
 
 }
 
-void lost_items_check_cb(poller_item_t *garbage, void *data)
+static void lost_items_check_cb(poller_item_t *garbage, void *data)
 {
 	u_int64_t mstime = glb_ms_time();
 
@@ -413,15 +413,18 @@ void lost_items_check_cb(poller_item_t *garbage, void *data)
 
 	while (NULL != (poller_item = zbx_hashset_iter_next(&iter)))
 	{
-		if (poller_item->lastpolltime + ITEMS_REINIT_INTERVAL < mstime && POLL_POLLING == poller_item->state)
+		if (poller_item->lastpolltime + ITEMS_REINIT_INTERVAL < mstime && POLL_POLLING == poller_item->poll_state)
 		{
-			DEBUG_ITEM(poller_item->itemid, "Item has timeout in the poller, resetting the sate")
-			poller_item->state = POLL_QUEUED;
+			DEBUG_ITEM(poller_item->itemid, "Item has timed out in the poller, resetting the sate")
+			poller_item->poll_state = POLL_QUEUED;
+		//	poller_disable_event(poller_item->poll_event);
+		//	poller_run_timer_event(poller_item)
 		}
 	}
 
 	poller_run_timer_event(conf.lost_items_check, LOST_ITEMS_CHECK_INTERVAL);
 }
+
 static void preprocessing_flush_cb(poller_item_t *garbage, void *data) {
 	preprocessing_flush();
 }
@@ -512,12 +515,12 @@ static int poller_init(zbx_thread_args_t *args)
 	return SUCCEED;
 }
 
-void *poller_get_item_specific_data(poller_item_t *poll_item)
+void *poller_item_get_specific_data(poller_item_t *poll_item)
 {
 	return poll_item->itemdata;
 }
 
-u_int64_t poller_get_item_id(poller_item_t *poll_item)
+u_int64_t poller_item_get_id(poller_item_t *poll_item)
 {
 	return poll_item->itemid;
 }
@@ -546,7 +549,7 @@ void poller_return_item_to_queue(poller_item_t *item)
 {
 	DEBUG_ITEM(item->itemid, "Item returned to the poller's queue");
 	item->lastpolltime = glb_ms_time();
-	item->state = POLL_QUEUED;
+	item->poll_state = POLL_QUEUED;
 }
 
 #define CONFIG_REPOLL_DELAY 10
@@ -559,7 +562,7 @@ void poller_return_delayed_item_to_queue(poller_item_t *item)
 	
 	glb_state_item_update_nextcheck(item->itemid, time(NULL) + nextcheck * 1000 );
 	item->lastpolltime = glb_ms_time();
-	item->state = POLL_QUEUED;
+	item->poll_state = POLL_QUEUED;
 
 	poller_disable_event(item->poll_event);
 	poller_run_timer_event(item->poll_event, nextcheck * 1000);
@@ -569,7 +572,6 @@ u_int64_t poller_get_host_id(poller_item_t *item)
 {
 	return item->hostid;
 }
-
 
 /*
 Genereal locking improvement:
@@ -582,10 +584,24 @@ that only configuration changes should cause write/mem locks, so we'll be able t
 several hundred thousand changes a sec, or in other words, will need a minute to change 10m
 configuration on the fly. 
 
+Actually, interface stata data is really local-important - there will be lot of local iface 
+reads which might be localy resolved, we only need to rarely sync data out,
+say, once a second. One more important simplification - there will be only one 
+interface for 
+
+item states are almost uncacheable, metadata changes all the time 
+
 */
-void poller_register_item_iface_timeout(poller_item_t *item)
+
+void poller_iface_register_timeout(poller_item_t *item)
 {
 	DEBUG_ITEM(item->itemid, "Registering interface timeout");
+
+	if (!item->bound_to_interface) {
+			DEBUG_ITEM(item->itemid, "Item is not bound to interface, not registering iface timeout");
+			return;
+	}
+
 	if (1 == conf.poller.is_named_iface) { 
 		DEBUG_ITEM(item->itemid, "Registering interface timeout by iface name %s", conf.poller.proto_name);
 		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_FALSE, "Request timeout");
@@ -596,9 +612,13 @@ void poller_register_item_iface_timeout(poller_item_t *item)
 	}
 }
 
-void poller_register_item_iface_succeed(poller_item_t *item)
+void poller_iface_register_succeed(poller_item_t *item)
  {
-
+	if (!item->bound_to_interface) {
+			DEBUG_ITEM(item->itemid, "Item is not bound to interface, not cannot register iface succeed");
+			return;
+	}
+	
 	if (1 == conf.poller.is_named_iface) {
 		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_TRUE, "Got a repsonse");
 	}
@@ -640,7 +660,6 @@ void poller_preprocess_uint64(poller_item_t *poller_item, zbx_timespec_t *ts, u_
 		preprocess_dbl(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, dbl_val);
 	} else 
 		preprocess_uint64(poller_item->hostid, poller_item->itemid, poller_item->flags, ts, value);
-
 }
 
 void poller_preprocess_str(poller_item_t *poller_item, zbx_timespec_t *ts, const char *value) {
@@ -680,6 +699,11 @@ void poller_items_iterate(items_iterator_cb iter_func, void *data)
 	}
 }
 
+void poller_item_unbound_interface(poller_item_t *poller_item) {
+	DEBUG_ITEM(poller_item->itemid, "Item is unbounded from the host's interface");
+	poller_item->bound_to_interface = 0;
+}
+
 void poller_strpool_free(const char *str)
 {
 	strpool_free(&conf.strpool, str);
@@ -695,8 +719,7 @@ const char *poller_strpool_copy(const char *str)
 	return strpool_copy(str);
 };
 
-
-void set_poller_proc_info(zbx_thread_args_t *args)
+static void set_poller_proc_info(zbx_thread_args_t *args)
 {
 	zbx_thread_poller_args *poller_args_in = (zbx_thread_poller_args *)(args->args);
 
@@ -705,9 +728,6 @@ void set_poller_proc_info(zbx_thread_args_t *args)
 	conf.procinfo.process_type = args->info.process_type;
 	conf.procinfo.program_type = poller_args_in->zbx_get_program_type_cb_arg();
 }
-
-/*in milliseconds */
-#define STAT_INTERVAL 5000
 
 ZBX_THREAD_ENTRY(glbpoller_thread, args)
 {
@@ -730,5 +750,4 @@ ZBX_THREAD_ENTRY(glbpoller_thread, args)
 	while (1)
 		zbx_sleep(SEC_PER_MIN);
 	
-#undef STAT_INTERVAL
 }

@@ -41,12 +41,16 @@ $html_page = (new CHtmlPage())
 		]
 	])
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::QUEUE_DETAILS));
-
-$table = (new CTableInfo())->setHeader([
+if (isset($data['filter_item_type']) && $data['filter_item_type'] >= 0) 
+			$html_page->setTitle(_('Queue details for item for item type '.item_type2str($data['filter_item_type'])));
+		
+$table = (new CDataTable("details"))->setHeader([
 	_('Scheduled check'),
 	_('Delayed by'),
 	_('Host'),
+	_('Interfaces'),
 	_('Name'),
+	_('Type'),
 	_('Proxy')
 ]);
 
@@ -57,12 +61,15 @@ foreach ($data['queue_data'] as $itemid => $item_queue_data) {
 
 	$item = $data['items'][$itemid];
 	$host = reset($item['hosts']);
-
+	$hostdata = $data['hosts'][$item['hostid']];
+	
 	$table->addRow([
 		zbx_date2str(DATE_TIME_FORMAT_SECONDS, $item_queue_data['nextcheck']),
-		zbx_date2age($item_queue_data['nextcheck']),
-		$host['name'],
-		$item['name'],
+		$item_queue_data['nextcheck']> 0 ?zbx_date2age($item_queue_data['nextcheck']):"NOT PLANNED",
+		(new CHostLink($host['name'], $host['hostid'])),
+		getHostAvailabilityTable( $hostdata['interfaces']),
+		(new CItemLink($item['name'], $item['itemid'])),
+		isset($item['type'])?item_type2str($item['type']):'',
 		array_key_exists($data['hosts'][$item['hostid']]['proxy_hostid'], $data['proxies'])
 			? $data['proxies'][$data['hosts'][$item['hostid']]['proxy_hostid']]['host']
 			: ''
@@ -77,14 +84,4 @@ if (CWebUser::getRefresh()) {
 
 $html_page
 	->addItem($table)
-	->addItem((new CDiv())
-		->addClass(ZBX_STYLE_TABLE_PAGING)
-		->addItem((new CDiv())
-			->addClass(ZBX_STYLE_PAGING_BTN_CONTAINER)
-			->addItem((new CDiv())
-				->addClass(ZBX_STYLE_TABLE_STATS)
-				->addItem(_s('Displaying %1$s of %2$s found', $table->getNumRows(), $data['total_count']))
-			)
-		)
-	)
-	->show();
+		->show();

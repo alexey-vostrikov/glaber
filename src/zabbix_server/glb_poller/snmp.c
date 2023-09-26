@@ -49,26 +49,26 @@ typedef struct {
 static async_snmp_conf_t conf = {0};
 
 static void timeout_event_cb(poller_item_t *poller_item, void *data) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);    
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);    
 	
 	//LOG_INF("Item %ld timed out, cleaning session %u", poller_get_item_id(poller_item), snmp_item->sessid);
 	poller_sessions_close_session(snmp_item->sessid);
 	snmp_item->sessid = 0;
 
-	DEBUG_ITEM(poller_get_item_id(poller_item), "SNMP: got timeout event,  req_type is %d, get is %d, walk is %d", snmp_item->snmp_req_type, SNMP_CMD_GET,SNMP_CMD_GET_NEXT );
+	DEBUG_ITEM(poller_item_get_id(poller_item), "SNMP: got timeout event,  req_type is %d, get is %d, walk is %d", snmp_item->snmp_req_type, SNMP_CMD_GET,SNMP_CMD_GET_NEXT );
 
 
 	if (SNMP_CMD_GET_NEXT == snmp_item->snmp_req_type) {
-		DEBUG_ITEM(poller_get_item_id(poller_item), "SNMP: got WALK timeout event");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "SNMP: got WALK timeout event");
 		snmp_walk_timeout(poller_item);
 	}
 	
 	if (SNMP_CMD_GET == snmp_item->snmp_req_type) {
-		DEBUG_ITEM(poller_get_item_id(poller_item), "SNMP: got GET timeout event");
+		DEBUG_ITEM(poller_item_get_id(poller_item), "SNMP: got GET timeout event");
 		snmp_get_timeout(poller_item);
 	}
 
-	poller_register_item_iface_timeout(poller_item);
+	//poller_iface_register_timeout(poller_item);
 }
 /******************************************************************************
  * item init - from the general dc_item to compact and specific snmp		  * 
@@ -94,7 +94,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 			zbx_snmp_translate(translated_oid, dc_item->snmp_oid, sizeof(translated_oid));
 	else
 	{
-		DEBUG_ITEM(poller_get_item_id(poller_item), "Empty oid %s for item ",translated_oid);
+		DEBUG_ITEM(poller_item_get_id(poller_item), "Empty oid %s for item ",translated_oid);
 		poller_preprocess_error(poller_item, "Error: empty OID, item will not be polled until updated, fix config to start poll");
 
 		return FAIL;
@@ -121,7 +121,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
 
 static void free_item(poller_item_t *poller_item ) {
 	
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	//LOG_INF("Item %ld freeing snmp data", poller_get_item_id(poller_item));
     
 	//zabbix_log(LOG_LEVEL_DEBUG, "In %s: starting", __func__);
@@ -171,7 +171,7 @@ static int process_result(csnmp_pdu_t *pdu)
         DEBUG_ITEM(itemid, "Cannot find item for arrived responce id, ignoring");
  		return SUCCEED;
     }
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	poller_disable_event(snmp_item->tm_event);
 	snmp_item->retries = 0;
@@ -189,15 +189,15 @@ static int process_result(csnmp_pdu_t *pdu)
 			THIS_SHOULD_NEVER_HAPPEN;
 			exit(-1);
 	}
-	poller_register_item_iface_succeed(poller_item);
+	poller_iface_register_succeed(poller_item);
 }	
 
 void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	//LOG_INF("Sending request for the item %ld", poller_get_item_id(poller_item));
-	DEBUG_ITEM(poller_get_item_id(poller_item),"Sending request for the item");
-	snmp_item->sessid = poller_sessions_create_session(poller_get_item_id(poller_item), 0);
+	DEBUG_ITEM(poller_item_get_id(poller_item),"Sending request for the item");
+	snmp_item->sessid = poller_sessions_create_session(poller_item_get_id(poller_item), 0);
 	pdu->req_id = snmp_item->sessid;
 
 	csnmp_send_pdu(conf.socket, pdu);
@@ -206,7 +206,7 @@ void snmp_send_packet(poller_item_t *poller_item, csnmp_pdu_t *pdu) {
 }
 
 static int snmp_send_request(poller_item_t *poller_item) {
- 	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+ 	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_item->retries = 0;
 	
  	switch ( snmp_item->snmp_req_type ) {
@@ -214,7 +214,10 @@ static int snmp_send_request(poller_item_t *poller_item) {
  			snmp_walk_send_first_request(poller_item);
  		break;
  	case SNMP_CMD_GET:	
-			snmp_get_send_request(poller_item);
+		if (FAIL == snmp_get_send_request(poller_item)) {
+			glb_state_item_update_nextcheck(poller_item_get_id(poller_item), FAIL);
+			poller_return_item_to_queue(poller_item);
+		}
  		break;
  	default:
  			LOG_WRN("Unknown snmp request type %d", snmp_item->snmp_req_type);
@@ -224,9 +227,9 @@ static int snmp_send_request(poller_item_t *poller_item) {
 }
 
 static void resolve_ready_cb(poller_item_t *poller_item,  const char *addr) {
-	DEBUG_ITEM(poller_get_item_id(poller_item), "Item resolved to '%s'", addr);
+	DEBUG_ITEM(poller_item_get_id(poller_item), "Item resolved to '%s'", addr);
 	
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	poller_strpool_free(snmp_item->ipaddr);
 	snmp_item->ipaddr = poller_strpool_add(addr);
@@ -235,13 +238,13 @@ static void resolve_ready_cb(poller_item_t *poller_item,  const char *addr) {
 }
 
 static void   start_poll_item(poller_item_t *poller_item) {
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
-    u_int64_t itemid = poller_get_item_id(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    u_int64_t itemid = poller_item_get_id(poller_item);
 	
 	/* note: queueing on per-host basis should be done here */
 	if (1 != snmp_item->useip) {
 		if (FAIL == poller_async_resolve(poller_item, snmp_item->interface_addr)) {
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Cannot resolve item's interface addr: '%s'", snmp_item->interface_addr);
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Cannot resolve item's interface addr: '%s'", snmp_item->interface_addr);
 			poller_preprocess_error(poller_item, "Cannot resolve item's interface hostname");
 			poller_return_item_to_queue(poller_item);
 		}

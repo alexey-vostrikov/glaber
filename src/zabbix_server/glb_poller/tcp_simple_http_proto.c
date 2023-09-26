@@ -73,7 +73,7 @@ static void conn_fail_cb(poller_item_t *poller_item, void *proto_ctx, const char
 
 static void  timeout_cb(poller_item_t *poller_item, void *proto_ctx) {
     conn_fail_cb(poller_item, proto_ctx, "Timeout while waiting for response");
-    poller_register_item_iface_timeout(poller_item);
+    poller_iface_register_timeout(poller_item);
 } 
 
 static unsigned char connect_cb(poller_item_t *poller_item, void *proto_ctx) {

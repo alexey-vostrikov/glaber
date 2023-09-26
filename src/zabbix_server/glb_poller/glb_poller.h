@@ -32,6 +32,7 @@
  so if there are more then this amount of sessions, item's polling is delayed for POLLER_MAX_SESSIONS_DELAY seconds */
 #define POLLER_MAX_SESSIONS 8 * ZBX_KIBIBYTE 
 #define POLLER_MAX_SESSIONS_DELAY 10000 /*in msec */
+#define POLLER_NOT_IN_QUEUE_DELAY 60 * 1000 /*how long to wait till try to poll not-returned from the queue item*/
 //#define POLLER_MAX_DNS_REQUESTS	2 * ZBX_KIBIBYTE /*maximum simultanious DNS requests */
 #define POLLER_NEW_ITEM_DELAY_TIME 10
 
@@ -53,15 +54,16 @@ int glb_poller_delete_item(u_int64_t itemid);
 int glb_poller_get_forks();
 
 poller_item_t *poller_get_poller_item(u_int64_t itemid);
-u_int64_t poller_get_item_id(poller_item_t *poll_item);
-void    *poller_get_item_specific_data(poller_item_t *poll_item);
+u_int64_t poller_item_get_id(poller_item_t *poll_item);
+void    *poller_item_get_specific_data(poller_item_t *poll_item);
+void 	poller_item_unbound_interface(poller_item_t *poller_item);
 void	poller_set_item_specific_data(poller_item_t *poll_item, void *data);
 int 	poller_get_item_type(poller_item_t *poll_item);
 
 void poller_return_item_to_queue(poller_item_t *glb_item);
 void poller_return_delayed_item_to_queue(poller_item_t *glb_item);
-void poller_register_item_iface_succeed(poller_item_t *glb_item);
-void poller_register_item_iface_timeout(poller_item_t *glb_item);
+void poller_iface_register_succeed(poller_item_t *glb_item);
+void poller_iface_register_timeout(poller_item_t *glb_item);
 int poller_if_host_is_failed(poller_item_t *glb_item);
 u_int64_t poller_get_host_id(poller_item_t *glb_item);
 

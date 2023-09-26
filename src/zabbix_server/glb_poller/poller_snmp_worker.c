@@ -86,9 +86,9 @@ extern char *CONFIG_SOURCE_IP;
 void snmp_worker_process_result(poller_item_t *poller_item, int result_code, const char *value) {
     
     if (TIMEOUT_ERROR == result_code || CONFIG_ERROR == result_code) {
-         poller_register_item_iface_timeout(poller_item);
+         poller_iface_register_timeout(poller_item);
     } else 
-        poller_register_item_iface_succeed(poller_item);
+        poller_iface_register_succeed(poller_item);
     
     if (SUCCEED == result_code) {
         poller_preprocess_str(poller_item, NULL, value);
@@ -99,7 +99,7 @@ void snmp_worker_process_result(poller_item_t *poller_item, int result_code, con
 
 void finish_snmp_poll(poller_item_t *poller_item, int result_code, const char *result) {
     
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
     
     poller_disable_event(snmp_item->timeout_event);
     poller_return_item_to_queue(poller_item);
@@ -190,7 +190,7 @@ static int subscribe_worker_fd() {
 
 
 void timeout_cb(poller_item_t *poller_item, void *data) {
-    DEBUG_ITEM(poller_get_item_id(poller_item), "In item timeout handler, submitting timeout");
+    DEBUG_ITEM(poller_item_get_id(poller_item), "In item timeout handler, submitting timeout");
     finish_snmp_poll(poller_item, TIMEOUT_ERROR, "Timout connecting to the host");
 }
 
@@ -241,7 +241,7 @@ void snmp_worker_free_discovery_request(snmp_worker_request_data_t *request){
     //LOG_INF("Implement discovery item cleaunup");
 }
 static void free_item(poller_item_t *poller_item ) {
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 
     switch (snmp_item->request_type) {
         case SNMP_REQUEST_GET:
@@ -379,11 +379,11 @@ int snmp_worker_send_request(poller_item_t *poller_item, const char *request) {
 
     static int last_worker_pid = 0;
     
-    DEBUG_ITEM(poller_get_item_id(poller_item), "Sending item poll request to the worker: '%s'", request);
+    DEBUG_ITEM(poller_item_get_id(poller_item), "Sending item poll request to the worker: '%s'", request);
 
     if (SUCCEED != glb_worker_send_request(conf.snmp_worker, request) ) {
         LOG_INF("Couldn't send request %s", request);
-        DEBUG_ITEM(poller_get_item_id(poller_item), "Couldn't send request for snmp: %s",request);
+        DEBUG_ITEM(poller_item_get_id(poller_item), "Couldn't send request for snmp: %s",request);
         finish_snmp_poll(poller_item, CONFIG_ERROR ,"Couldn't start or pass request to glb_snmp_worker");
         return FAIL;
     }
@@ -399,12 +399,12 @@ int snmp_worker_send_request(poller_item_t *poller_item, const char *request) {
 }
 
 void snmp_worker_start_get_request(poller_item_t *poller_item, const char *ipaddr) {
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 
     char request[MAX_STRING_LEN];
 
     zbx_snprintf(request, MAX_STRING_LEN, "{\"id\":%lld, \"ip\":\"%s\", \"oid\":\"%s\", \"type\":\"get\", %s}", 
-                poller_get_item_id(poller_item),
+                poller_item_get_id(poller_item),
                 ipaddr, snmp_item->request_data.get_data.oid, snmp_item->iface_json_info );
     
     //LOG_INF("Will do request: '%s'", request);
@@ -413,8 +413,7 @@ void snmp_worker_start_get_request(poller_item_t *poller_item, const char *ipadd
 }
 
 static void start_snmp_poll(poller_item_t *poller_item, const char *resolved_address) {
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
-  //  LOG_INF("Addr is %s, Net data is %s",resolved_address, snmp_item->iface_json_info);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
     
     switch (snmp_item->request_type) {
         case SNMP_REQUEST_GET:
@@ -434,23 +433,23 @@ static void start_snmp_poll(poller_item_t *poller_item, const char *resolved_add
     
     HALT_HERE("Need to implement starting and processing of the get, walk, and discovery walk");
     HALT_HERE("Also, parsing and translating of the walk and discovery items needs to be implemented either");
-    HALT_HERE("OMG ! we are polling now item %lld", poller_get_item_id(poller_item));    
+    HALT_HERE("OMG ! we are polling now item %lld", poller_item_get_id(poller_item));    
 
 }
 
 static void resolved_callback(poller_item_t *poller_item, const char *resolved_address) {
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
    // LOG_INF("Name %s resolved to %s", snmp_item->address, resolved_address);
     start_snmp_poll(poller_item, resolved_address);
 }
 
 static void resolve_fail_callback(poller_item_t *poller_item) {
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
     finish_snmp_poll(poller_item, CONFIG_ERROR, "Failed to resolve host name");
 }
 
 static void   start_poll(poller_item_t *poller_item) {
-    snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
         
     if (snmp_item->need_resolve) {
         poller_async_resolve(poller_item, snmp_item->address);

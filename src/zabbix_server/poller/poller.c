@@ -103,6 +103,7 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 #else
 			SET_MSG_RESULT(result,
 					zbx_strdup(NULL, "Support for Database monitor checks was not compiled in."));
+			DEBUG_ITEM(item->itemid,"Setting NO DB SUPPORT COMPILED IN");
 			res = CONFIG_ERROR;
 #endif
 			break;
@@ -489,14 +490,9 @@ void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *res
 
 }
 
-void DC_account_sync_poller_time(int item_type, double time_spent);
-
 void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, zbx_vector_ptr_t *add_results,
 		unsigned char poller_type, const zbx_config_comms_args_t *config_comms, int config_startup_time)
 {
-	zbx_timespec_t start,end;
-	zbx_timespec(&start);
-
 	if (ITEM_TYPE_SNMP == items[0].type)
 	{
 #ifndef HAVE_NETSNMP
@@ -532,8 +528,6 @@ void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *resul
 	}
 	else
 		THIS_SHOULD_NEVER_HAPPEN;
-	zbx_timespec(&end);
-	DC_account_sync_poller_time(items[0].type, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
 }
 
 void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results)
@@ -616,13 +610,12 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	AGENT_RESULT		results[MAX_POLLER_ITEMS];
 	int			errcodes[MAX_POLLER_ITEMS];
 	zbx_timespec_t		timespec;
-	int			i, num; //, last_available = INTERFACE_AVAILABLE_UNKNOWN;
+	int			i, num; 
 	zbx_vector_ptr_t	add_results;
 	unsigned char		*data = NULL;
 	size_t			data_alloc = 0, data_offset = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
-//	LOG_INF("Get items step1");
 	items = &item;
 	num = DCconfig_get_poller_items(poller_type, config_comms->config_timeout, &items);
 
@@ -633,15 +626,13 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	}
 	
 	DEBUG_ITEM(items[0].itemid, "Fetched from the queue in zbx poller, total %d items", num);
-//	LOG_INF("Get items step2");
 	zbx_vector_ptr_create(&add_results);
 
 	zbx_prepare_items(items, errcodes, num, results, MACRO_EXPAND_YES);
 	zbx_check_items(items, errcodes, num, results, &add_results, poller_type, config_comms, config_startup_time);
 
 	zbx_timespec(&timespec);
-//	LOG_INF("Get items step3");
-	/* process item values */
+
 	for (i = 0; i < num; i++)
 	{
 		switch (errcodes[i])
@@ -649,27 +640,17 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case SUCCEED:
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
-			//	LOG_INF("Get items step4");
-				//LOG_INF("item %lld polled succ")
-			//	LOG_INF("Interface %ld item id %ld polled SUCCESIFULLY errcode is %d",
-				//items[i].interface.interfaceid, items[i].itemid, errcodes[0]);
 				if (ITEM_TYPE_AGENT == items[i].type ||	ITEM_TYPE_SNMP == items[i].type ||
 					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type)
 					glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
-			//	LOG_INF("Get items step5");
 				break;
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
-				//LOG_INF("Get items step6");
-				//DEBUG_ITEM(items[i].itemid, "Set interface state to unavailable");
 				if (ITEM_TYPE_AGENT == items[i].type ||	ITEM_TYPE_SNMP == items[i].type ||
-					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type)
+					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type) 
 				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
-				//LOG_INF("Get items step7");
-				break;
-
-			
+				break;		
 			case FAIL:
 			case CONFIG_ERROR:
 				/* nothing to do */
@@ -725,9 +706,11 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		}
 		DEBUG_ITEM(items[i].itemid,"Returning item to the queue");
 
-		DCpoller_requeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1, poller_type,
-				nextcheck);
+		DCrequeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1);
 		DEBUG_ITEM(items[i].itemid,"Poller %d: Returned item to the zbx queue", poller_type);
+	
+		nextcheck = time(NULL);
+
 	}
 
 	preprocessing_flush();
@@ -736,12 +719,10 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 	zbx_vector_ptr_clear_ext(&add_results, (zbx_mem_free_func_t)zbx_free_agent_result_ptr);
 	zbx_vector_ptr_destroy(&add_results);
 
-//	LOG_INF("Get items step8");
 	if (items != &item)
 		zbx_free(items);
 exit:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%d", __func__, num);
-//	LOG_INF("Get items step9");
 	return num;
 }
 
@@ -793,7 +774,6 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 	{
 		zbx_uint32_t	rtc_cmd;
 		unsigned char	*rtc_data;
-		zbx_timespec_t start, end;
 
 		sec = zbx_time();
 		zbx_update_env(get_process_type_string(process_type), sec);
@@ -831,8 +811,6 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			last_stat_time = time(NULL);
 		}
 		
-		zbx_timespec(&start);
-
 		if (SUCCEED == zbx_rtc_wait(&rtc, info, &rtc_cmd, &rtc_data, sleeptime) && 0 != rtc_cmd)
 		{
 #ifdef HAVE_NETSNMP
@@ -845,9 +823,7 @@ ZBX_THREAD_ENTRY(poller_thread, args)
 			if (ZBX_RTC_SHUTDOWN == rtc_cmd)
 				break;
 		}
-		
-		zbx_timespec(&end);
-		//DC_account_sync_poller_time(ITEM_TYPE_MAX, (double)(end.sec - start.sec) + ((double)(end.ns - start.ns) /1000000000));	
+
 	}
 
 	scriptitem_es_engine_destroy();

@@ -1,3 +1,5 @@
+2023-09-26 ver  3.3.26 (master)
+    - feat: improved queue overview and detail panles, changed in state/throttling to correctly account polling slowdowns 
 2023-09-22 ver  3.3.25 (master)
     - fix: only certain item types can maange interface state
 2023-09-22 ver  3.3.22 - 3.3.24 (master)
@@ -29,7 +31,7 @@
 2023-09-06 ver 3.3.0 3.3.1 (master)
     - feat: interfaces are moved to the state, got rid of the availability manager
     - fix: proxy interface status accept and apply on the server
-    - feat: support of 'named' interfaces that for interface-less protocols
+    - feat: support of 'named' interfaces that fcommit or interface-less protocols
 2023-08-30 ver 3.2.35 3.2.26 (master)
     - perf: removed SQL query in expressions.c causing DB performance issues, lastlogsize returned and placed into state
 2023-08-25 ver 3.2.34 (master, release)

@@ -54,7 +54,7 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 	//static asn1_oid_t oid;
 	struct sockaddr_in server;
 
-	snmp_item_t *snmp_item = poller_get_item_specific_data(poller_item);
+	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	
 	bzero(pdu, sizeof(csnmp_pdu_t));
 	bzero((char*)&server, sizeof(server));
@@ -66,7 +66,7 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 	memcpy(&pdu->addr, &server, sizeof(struct sockaddr_in));
 	pdu->addr_len = sizeof(struct sockaddr_in);
 	
-	//pdu->req_id = poller_get_item_id(poller_item);
+	//pdu->req_id = poller_item_get_id(poller_item);
 	pdu->req_id = snmp_item->sessid;
 
 	/*note: pdu->command should be set in the type-specific handler */
@@ -83,7 +83,7 @@ int snmp_fill_pdu_header(poller_item_t *poller_item, csnmp_pdu_t *pdu, int comma
 			pdu->version = SNMP_VERSION_2c;
 		break;
 		default:
-			LOG_INF("Unsupported SNMP version in async code itemid %ld", poller_get_item_id(poller_item));
+			LOG_INF("Unsupported SNMP version in async code itemid %ld", poller_item_get_id(poller_item));
 			THIS_SHOULD_NEVER_HAPPEN;
 			//exit(EXIT_FAILURE);
 			
@@ -192,7 +192,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
     	case SNMP_TP_INT64:
     	case SNMP_TP_UINT64:
     	case SNMP_TP_TIMETICKS: {
-			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived 64bit unsigned value on smnp: %llu",*(u_int64_t*)var->value);
+			DEBUG_ITEM(poller_item_get_id(poller_item),"Arrived 64bit unsigned value on smnp: %llu",*(u_int64_t*)var->value);
 			result->type = AR_UINT64;
 			result->ui64 = *(u_int64_t*)var->value;
 			
@@ -200,15 +200,15 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 			break;
 		}
 		case SNMP_TP_INT:
-    	 	DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived bool/int/counter gauge");
+    	 	DEBUG_ITEM(poller_item_get_id(poller_item),"Arrived bool/int/counter gauge");
  			if (*(int*)var->value >= 0) {
 				result->type = AR_UINT64;
 				result->ui64 = *(int*)var->value;
-				DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to uint type %llu", result->ui64);
+				DEBUG_ITEM(poller_item_get_id(poller_item), "Converted item int to uint type %llu", result->ui64);
 			} else {
 				result->type = AR_DOUBLE;
 				result->dbl = (double)*(int*)var->value;
-				DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to double type %f", result->dbl);
+				DEBUG_ITEM(poller_item_get_id(poller_item), "Converted item int to double type %f", result->dbl);
 			}
 			return SUCCEED;
 	       	break;
@@ -216,16 +216,16 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 		case SNMP_TP_BOOL:
     	case SNMP_TP_COUNTER:
     	case SNMP_TP_GAUGE:
-			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived bool/counter/gauge value");
+			DEBUG_ITEM(poller_item_get_id(poller_item),"Arrived bool/counter/gauge value");
  			result->type = AR_UINT64;
 			result->ui64 = *(unsigned int*)var->value;
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Converted item int to uint type %llu", result->ui64);
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Converted item int to uint type %llu", result->ui64);
 
 			return SUCCEED;
 	       	break;
 		case SNMP_TP_BIT_STR:
     	case SNMP_TP_OCT_STR: {
-			DEBUG_ITEM(poller_get_item_id(poller_item),"Arrived binary/octet data");
+			DEBUG_ITEM(poller_item_get_id(poller_item),"Arrived binary/octet data");
 			unsigned char str_type = ZBX_SNMP_STR_UNDEFINED;
 			const char *parsed_str = get_octet_string(var, &str_type);
 			result->type = AR_TEXT;	
@@ -235,7 +235,7 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 	 	case SNMP_TP_IP_ADDR: {
 			asn1_str_t *str = (asn1_str_t *)var->value;
 
-    		DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as an ip addr type");
+    		DEBUG_ITEM(poller_item_get_id(poller_item), "Processing as an ip addr type");
 			SET_STR_RESULT(result, zbx_dsprintf(NULL, "%hhu.%hhu.%hhu.%hhu",
 				(unsigned char)str->b[0],
 				(unsigned char)str->b[1],
@@ -244,20 +244,20 @@ int	snmp_set_result(poller_item_t *poller_item, csnmp_var_t *var, AGENT_RESULT *
 			break;
 		 }
 		case SNMP_TP_FLOAT: 
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a float type");
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Processing as a float type");
 			SET_DBL_RESULT(result, *(float*)var->value);
 			break;
 		case SNMP_TP_DOUBLE: 
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Processing as a double type");
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Processing as a double type");
 			SET_DBL_RESULT(result, *(double*)var->value);
 			break;
 		case SNMP_TP_NO_SUCH_OBJ:
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Item not supported type or no such object: %s", snmp_err_to_text(var->type));
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Item not supported type or no such object: %s", snmp_err_to_text(var->type));
 			SET_MSG_RESULT(result, snmp_err_to_text(var->type));
 			ret = NOTSUPPORTED;
 			break;
 		default: 
-			DEBUG_ITEM(poller_get_item_id(poller_item), "Item not supported type: %s", snmp_err_to_text(var->type));
+			DEBUG_ITEM(poller_item_get_id(poller_item), "Item not supported type: %s", snmp_err_to_text(var->type));
 			SET_MSG_RESULT(result, snmp_err_to_text(var->type));
 			ret = NOTSUPPORTED;
 	}
