@@ -15,7 +15,7 @@ RUN dnf -y install OpenIPMI-devel libarchive jq
 
 RUN yum groupinstall "Development Tools" -y
 
-RUN yum install -y rpm-build yum-utils xz wget tar curl cmake json-c-devel gengetopt libunistring-devel libpcap-devel gmp-devel sshpass --allowerasing
+RUN yum install -y ccache rpm-build yum-utils xz wget tar curl cmake json-c-devel gengetopt libunistring-devel libpcap-devel gmp-devel sshpass --allowerasing
 
 RUN GO_VER=1.16.2 && \
     wget -q https://golang.org/dl/go${GO_VER}.linux-amd64.tar.gz && \
