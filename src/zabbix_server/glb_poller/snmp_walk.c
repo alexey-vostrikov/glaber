@@ -48,12 +48,10 @@ snmp_dobject_t;
 /* helper data structure used by snmp discovery */
 typedef struct
 {
-
 	csnmp_oid_t root_oid;
 	
 	size_t root_oid_str_len;
 	size_t root_oid_num_len;
-
 
 	csnmp_oid_t last_oid;
 	int oids_looped;
@@ -87,7 +85,6 @@ static int	snmp_dobject_compare(const void *d1, const void *d2)
 
 	return strcmp(i1, i2);
 }
-
 
 static int	snmp_ddata_init(poller_item_t *poller_item)
 {
@@ -202,7 +199,6 @@ void stop_item_poll(poller_item_t *poller_item) {
 	poller_sessions_close_session(snmp_item->sessid);
 
 	snmp_item->data = NULL;
-
 }
 
 static int snmp_walk_submit_result(poller_item_t *poller_item) {
@@ -319,13 +315,9 @@ numeric:
 	return SUCCEED;
 }
 
-
-
 int  snmp_walk_start_next_oid(poller_item_t *poller_item) {
 	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 	snmp_ddata_t *ddata = snmp_item->data;
-
-	//LOG_INF("Starting next oid processing %d", poller_item_get_id(poller_item));
 
 	if (NULL == ddata) {
 		stop_item_poll(poller_item);

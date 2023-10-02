@@ -1,3 +1,5 @@
+2023-09-26 ver  3.3.27 (master)
+    - fix: LastData fail on non numeric history values
 2023-09-26 ver  3.3.26 (master)
     - feat: improved queue overview and detail panles, changed in state/throttling to correctly account polling slowdowns 
 2023-09-22 ver  3.3.25 (master)

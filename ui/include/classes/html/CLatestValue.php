@@ -121,6 +121,9 @@ class CLatestValue extends CSpan {
         if (!$this->isNumericItem() || !isset($this->history) || count($this->history) < 2 
                             || $this->itemdata['state'] == ITEM_STATE_NOTSUPPORTED) 
             return;
+        
+            if (!is_numeric($this->history[0]['value']) || !is_numeric($this->history[1]['value']))
+            return;
 
         $this->value_change_raw = $this->history[0]['value'] - $this->history[1]['value'];
         
