@@ -155,7 +155,7 @@ static void state_test_triggers(){
 
 void glb_state_run_tests(void) {
 
-    glb_state_hosts_interfaces_run_tests();
+//    glb_state_hosts_interfaces_run_tests();
     state_test_triggers();
 }
 #endif

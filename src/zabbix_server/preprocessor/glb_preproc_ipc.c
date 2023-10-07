@@ -111,7 +111,7 @@ INTERNAL_METRIC_CALLBACK(preprocessing_stat_cb) {
     zbx_snprintf_alloc(result, &alloc, &offset, 
             "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\","
             "\"mem_total\":\"%ld\", \"mem_used\":\"%ld\",\"mem_free_pcnt\":\"%0.2f\"}",
-            glb_ipc_get_queue(conf->preproc_ipc), glb_ipc_get_free_pcnt(conf->preproc_ipc), glb_ipc_get_sent(conf->preproc_ipc),
+            glb_ipc_get_queue_size(conf->preproc_ipc), glb_ipc_get_free_pcnt(conf->preproc_ipc), glb_ipc_get_sent(conf->preproc_ipc),
             preproc_ipc_mem->total_size,  preproc_ipc_mem->used_size,  
             ((double)preproc_ipc_mem->free_size * 100.0)/((double)preproc_ipc_mem->total_size));
 
@@ -124,7 +124,7 @@ INTERNAL_METRIC_CALLBACK(processing_stat_cb) {
     zbx_snprintf_alloc(result, &alloc, &offset, 
         "{\"queue_size\":\"%ld\", \"free\":\"%0.2f\", \"sent\":\"%ld\","
         "\"mem_total\":\"%ld\", \"mem_used\":\"%ld\",\"mem_free_pcnt\":\"%0.2f\"}",
-        glb_ipc_get_queue(conf->process_ipc), glb_ipc_get_free_pcnt(conf->process_ipc), glb_ipc_get_sent(conf->process_ipc),
+        glb_ipc_get_queue_size(conf->process_ipc), glb_ipc_get_free_pcnt(conf->process_ipc), glb_ipc_get_sent(conf->process_ipc),
         proc_ipc_mem->total_size,  proc_ipc_mem->used_size,  ((double)proc_ipc_mem->free_size * 100.0)/((double)proc_ipc_mem->total_size));
         
     return SUCCEED;
@@ -157,14 +157,14 @@ int preproc_ipc_init() {
                 CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], sizeof(metric_t), 
                 CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] , &conf->preproc_memf, ipc_metric_create_cb,
                 ipc_metric_free_cb, IPC_HIGH_VOLUME, 
-                "poll->preproc", (CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR])/10)))
+                "poll->preproc", (CONFIG_PREPROC_IPC_METRICS_PER_PREPROCESSOR * CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR])/10, preproc_ipc_mem)))
         return FAIL;
 
     if (NULL == ( conf->process_ipc = glb_ipc_init_ext(
                 CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER], sizeof(metric_t), 
                 CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER] , &conf->proc_memf, ipc_metric_create_cb,
                 ipc_metric_free_cb, IPC_HIGH_VOLUME, 
-                "preproc->proc", (CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER])/10)))
+                "preproc->proc", (CONFIG_PROC_IPC_METRICS_PER_SYNCER * CONFIG_FORKS[ZBX_PROCESS_TYPE_HISTSYNCER])/10, proc_ipc_mem)))
         return FAIL;
 
     glb_register_internal_metric_handler("preprocessing",   preprocessing_stat_cb);
@@ -182,6 +182,9 @@ int preprocess_send_metric_ext(const metric_t *metric, int send_wait_mode, int p
     glb_state_items_set_poll_result(metric->itemid, metric->ts.sec, ITEM_STATE_NORMAL);
     glb_ipc_send(conf->preproc_ipc, metric->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR], (void *)metric, send_wait_mode, priority);
     glb_ipc_flush(conf->preproc_ipc);
+    
+ //   RUN_ONCE_IN_WITH_RET(30, SUCCEED);
+//    glb_ipc_dump_sender_queues(conf->preproc_ipc, "PREPROC SENDER");
 }
 
 int preprocess_send_metric(const metric_t *metric) {
@@ -198,10 +201,11 @@ int processing_send_metric(const metric_t *metric) {
 /*******receiver-side functions *******/
 int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count) {
     int i = glb_ipc_process(conf->preproc_ipc, process_num -1 , proc_func, cb_data, max_count );
-    // RUN_ONCE_IN_WITH_RET(10, i);
-    // glb_ipc_dump_reciever_queues(conf->process_ipc, "WAIT PREPROC STAT: Preproc rcv queue", 0);
-    // LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
-     return i;
+    
+    //RUN_ONCE_IN_WITH_RET(1, i);
+    //glb_ipc_dump_reciever_queues(conf->preproc_ipc, "WAIT PREPROC STAT: Preproc rcv queue", 0);
+    //LOG_INF("Free mem %ld", preproc_ipc_mem->free_size);
+    return i;
 };
 
 int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count) {

@@ -225,7 +225,7 @@ int apm_init() {
     	return FAIL;
     }
     
-    conf.ipc = glb_ipc_init(1000, sizeof(apm_metric_t), 1 , &apm_memf, ipc_metric_create_cb, ipc_metric_free_cb, IPC_LOW_LATENCY);
+    conf.ipc = glb_ipc_init(1000, sizeof(apm_metric_t), 1 , &apm_memf, ipc_metric_create_cb, ipc_metric_free_cb, IPC_LOW_LATENCY, apm_ipc);
 
     zbx_hashset_create(&conf.metrics, 0, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
     zbx_hashset_create(&conf.collected_metrics, 0, ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);

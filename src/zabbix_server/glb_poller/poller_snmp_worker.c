@@ -1,4 +1,3 @@
-
 /*
 ** Glaber
 ** Copyright (C) 2001-2028 Glaber JSC
@@ -17,6 +16,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+
 #include "log.h"
 #include "zbxcommon.h"
 #include "zbxserver.h"
@@ -30,140 +30,28 @@
 #include "poller_async_io.h"
 #include "zbxsysinfo.h"
 #include "zbxip.h"
+#include "poller_snmp_worker_discovery.h"
+#include "poller_snmp_worker_get.h"
+#include "poller_snmp_worker_walk.h"
 
 extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 #define SNMP_MAX_OID_LEN    128
 
-typedef struct
-{
-	u_int64_t time;
-	u_int64_t itemid;
-} pinger_event_t;
-
-
-typedef enum {
-    SNMP_REQUEST_GET = 1,
-    SNMP_REQUEST_WALK,
-    SNMP_REQUEST_DISCOVERY
-} snmp_request_type_t;
-
-typedef struct {
-    const char *oid;
-} snmp_worker_one_oid_t;
-
-typedef struct {
-    char *macro_names;
-    char *oids;
-    int count;
-} snmp_worker_multi_oid_t;
-
-typedef union 
-{
-    snmp_worker_one_oid_t get_data;
-    snmp_worker_one_oid_t walk_data;
-    snmp_worker_multi_oid_t discovery_data;
-} snmp_worker_request_data_t;
-
-typedef struct {
-    snmp_worker_request_data_t request_data;
-    const char *iface_json_info; 
-    const char *address;
-    unsigned char need_resolve;
-    snmp_request_type_t request_type;
-    poller_event_t *timeout_event;
-} snmp_item_t;
+static void process_result(const char *response);
 
 typedef struct {
     glb_worker_t *snmp_worker;
     poller_event_t *worker_event;
 } conf_t;
-
+ 
 static conf_t conf;
 
 extern char *CONFIG_SNMP_WORKER_LOCATION;
 extern char *CONFIG_SOURCE_IP;
 
-void snmp_worker_process_result(poller_item_t *poller_item, int result_code, const char *value) {
-    
-    if (TIMEOUT_ERROR == result_code || CONFIG_ERROR == result_code) {
-         poller_iface_register_timeout(poller_item);
-    } else 
-        poller_iface_register_succeed(poller_item);
-    
-    if (SUCCEED == result_code) {
-        poller_preprocess_str(poller_item, NULL, value);
-        return;
-    }
-    poller_preprocess_error(poller_item, value);
-}
-
-void finish_snmp_poll(poller_item_t *poller_item, int result_code, const char *result) {
-    
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
-    
-    poller_disable_event(snmp_item->timeout_event);
-    poller_return_item_to_queue(poller_item);
-    snmp_worker_process_result(poller_item, result_code, result);
-}
-
-static void process_result(const char *response) {
-    struct zbx_json_parse jp_resp;
-    u_int64_t itemid, code;
-    poller_item_t *poller_item;
-    char *buffer = NULL;
-    zbx_json_type_t type;
-    size_t alloc = 0;
-
-    poller_inc_responses();
-
-    if (SUCCEED != zbx_json_open(response, &jp_resp)) {
-		LOG_INF("Couldn't open JSON response from glb_snmp_worker: '%s'", response);
-        return;
-	}
-            
-    if (SUCCEED != glb_json_get_uint64_value_by_name(&jp_resp, "id", &itemid ) ||
-        SUCCEED != glb_json_get_uint64_value_by_name(&jp_resp, "code", &code))    
-    {
-        LOG_INF("Cannot parse glb_snmp_worker response: either id or code is missing: '%s'",response);
-        return;
-    }
-    DEBUG_ITEM(itemid, "Received response from worker: '%s'", response);
-
-    if (NULL == (poller_item = poller_get_poller_item(itemid))) {
-        LOG_INF("Got response from glb_snmp_worker for non-existing itemid %lld",itemid);
-        return;
-    }
-    
-    // if (FAIL == poller_item_is_polled(poller_item)) {
-    //     LOG_INF("Arrived response for item %lld which isn't in polling, not processing", itemid);
-    //     DEBUG_ITEM(itemid,"Arrived response for item  which isn't in polling, not processing" );
-    //     return;
-    // }
-
-    switch (code) {
-        case 200: 
-            if (SUCCEED != zbx_json_value_by_name_dyn(&jp_resp, "value", &buffer, &alloc, &type)){
-                LOG_INF("Got response from glb_snmp_worker with missing value: '%s'", response);
-                return;
-            }
-            finish_snmp_poll(poller_item, SUCCEED, buffer);
-            break;
-        case 408:
-            buffer[0]='\0';
-            zbx_json_value_by_name_dyn(&jp_resp, "error", &buffer, &alloc, &type);
-            finish_snmp_poll(poller_item, TIMEOUT_ERROR, buffer);
-            break;
-
-        default:
-            LOG_INF("Warning: unsupported code from glb_snmp_worker: %d", code);
-            return;
-    }
-    zbx_free(buffer);
-}
-
-void read_worker_results_cb(poller_item_t *poller_item, void *data) {
+static void read_worker_results_cb(poller_item_t *poller_item, void *data) {
     char *worker_response = NULL;
-    
+  //  LOG_INF("Reading data from the worker");
     while (SUCCEED == glb_worker_get_async_buffered_responce(conf.snmp_worker, &worker_response)) {
         
         if ( NULL == worker_response) //read succesifull, no data yet
@@ -171,6 +59,7 @@ void read_worker_results_cb(poller_item_t *poller_item, void *data) {
        // LOG_INF("Got response: %s",worker_response);
 
         process_result(worker_response);
+      //  LOG_INF("Response was processed");
         zbx_free(worker_response);
     }
 }
@@ -187,11 +76,127 @@ static int subscribe_worker_fd() {
     poller_run_fd_event(conf.worker_event);
 }
 
+static void snmp_worker_finish_poll(poller_item_t *poller_item) {
+    
+    snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    poller_disable_event(snmp_item->timeout_event);
+    poller_return_item_to_queue(poller_item);
 
+}
 
-void timeout_cb(poller_item_t *poller_item, void *data) {
+int snmp_worker_send_request(poller_item_t *poller_item, const char *request) {
+
+    static int last_worker_pid = 0;
+    
+    DEBUG_ITEM(poller_item_get_id(poller_item), "Sending item poll request to the worker: '%s'", request);
+    
+    if (SUCCEED != glb_worker_send_request(conf.snmp_worker, request) ) {
+        LOG_INF("Couldn't send request %s", request);
+        DEBUG_ITEM(poller_item_get_id(poller_item), "Couldn't send request for snmp: %s",request);
+        poller_preprocess_error(poller_item, "Cannot send snmp request");
+        snmp_worker_finish_poll(poller_item);
+        return FAIL;
+    }
+
+    if (last_worker_pid != glb_worker_get_pid(conf.snmp_worker)) {
+        LOG_INF("glb_snmp_worker worker's PID (%d) is changed, subscibing the new FD (%d)", last_worker_pid, glb_worker_get_pid(conf.snmp_worker));
+        last_worker_pid = glb_worker_get_pid(conf.snmp_worker);
+        subscribe_worker_fd(worker_get_fd_from_worker(conf.snmp_worker));
+    }
+    poller_inc_requests();
+    
+    return SUCCEED;
+}
+
+static void process_result(const char *response) {
+    struct zbx_json_parse jp_resp;
+    u_int64_t itemid, code;
+    poller_item_t *poller_item;
+    zbx_json_type_t type;
+    size_t alloc = 0;
+
+    poller_inc_responses();
+
+    if (SUCCEED != zbx_json_open(response, &jp_resp)) {
+		LOG_INF("Couldn't open JSON response from glb_snmp_worker: '%s'", response);
+        return;
+	}
+    
+    if (SUCCEED != glb_json_get_uint64_value_by_name(&jp_resp, "id", &itemid ) ||
+        SUCCEED != glb_json_get_uint64_value_by_name(&jp_resp, "code", &code))    
+    {
+        LOG_INF("Cannot parse glb_snmp_worker response: either id or code is missing: '%s'",response);
+        return;
+    }
+
+    DEBUG_ITEM(itemid, "Received response from worker: '%s'", response);
+
+    if (NULL == (poller_item = poller_get_poller_item(itemid))) {
+        DEBUG_ITEM(itemid, "Got response from glb_snmp_worker for non-existing itemid");
+        return;
+    }
+
+    DEBUG_ITEM(itemid, "Parsed itemid result code %lld ",code);
+    
+    if (200 == code ) {
+        snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+
+        switch (snmp_item->request_type) {
+            case SNMP_REQUEST_GET:
+                snmp_worker_process_get_response(poller_item, &jp_resp);
+                break;
+
+            case SNMP_REQUEST_DISCOVERY:
+                snmp_worker_process_discovery_response(poller_item, &jp_resp);
+        
+                if (SUCCEED == snmp_worker_discovery_need_more_data(snmp_item)) {
+                    //need to reset timer here
+                    snmp_worker_start_discovery_next_walk(poller_item, NULL);
+                    return;
+                }               
+                break;
+
+            case SNMP_REQUEST_WALK:
+                snmp_worker_process_walk_response(poller_item, &jp_resp);
+                break;
+
+        }
+        snmp_worker_finish_poll(poller_item);
+        return;
+    }
+
+    if (408 == code || 503 == code) {
+        char err_buffer[MAX_STRING_LEN];
+        zbx_json_value_by_name(&jp_resp, "error", err_buffer, MAX_STRING_LEN, &type);
+        
+        DEBUG_ITEM(itemid, "Got error %s", err_buffer);
+        poller_preprocess_error(poller_item, err_buffer);
+        poller_iface_register_timeout(poller_item);
+
+        snmp_worker_finish_poll(poller_item);
+        return;
+    }
+    
+    LOG_INF("Warning: unsupported code from glb_snmp_worker: %d", code);
+}
+
+static void timeout_cb(poller_item_t *poller_item, void *data) {
+    snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    
     DEBUG_ITEM(poller_item_get_id(poller_item), "In item timeout handler, submitting timeout");
-    finish_snmp_poll(poller_item, TIMEOUT_ERROR, "Timout connecting to the host");
+    
+    switch (snmp_item->request_type) {
+        case SNMP_REQUEST_GET:
+        case SNMP_REQUEST_WALK:
+            break;
+      
+        case SNMP_REQUEST_DISCOVERY:
+            snmp_worker_clean_discovery_request(snmp_item);
+            break;
+    }
+    
+    poller_iface_register_timeout(poller_item);
+    snmp_worker_finish_poll(poller_item);
 }
 
 static int isdigital_oid(const char *oid) {
@@ -203,113 +208,67 @@ static int isdigital_oid(const char *oid) {
     return SUCCEED;
 }
 
-static int snmp_worker_parse_oid(const char **out_oid, char *in_oid) {
+const char *snmp_worker_parse_oid(const char *in_oid) {
     int i;
 	oid p_oid[MAX_OID_LEN];
-    char buffer[MAX_OID_LEN *4];
+    static char buffer[MAX_OID_LEN *4];
 
 	size_t oid_len = MAX_OID_LEN, pos = 0;
 
-    if (SUCCEED == isdigital_oid(in_oid)) {
-        *out_oid = poller_strpool_add(in_oid);
-        return SUCCEED;
-    }
-    
-    //TODO: move all net-snmp related thing out to the worker
-    if (NULL == snmp_parse_oid(in_oid, p_oid, &oid_len)) {
-		return FAIL;
-	};
+    if (SUCCEED == isdigital_oid(in_oid)) 
+        return in_oid;
+
+    if (NULL == snmp_parse_oid(in_oid, p_oid, &oid_len)) 
+		return NULL;
 
     for (i = 0; i < oid_len; i++)
         pos += zbx_snprintf(buffer + pos, MAX_OID_LEN - pos, ".%d", p_oid[i]);
-    
-    *out_oid = poller_strpool_add(buffer);
-    
-    return SUCCEED;
+
+    return buffer;
 }
 
-void snmp_worker_free_get_request(snmp_worker_request_data_t *request){
-    poller_strpool_free(request->get_data.oid);
-}
-
-void snmp_worker_free_walk_request(snmp_worker_request_data_t *request) {
-     poller_strpool_free(request->walk_data.oid);
-}
-
-void snmp_worker_free_discovery_request(snmp_worker_request_data_t *request){
-    //HALT_HERE("Not implemented");
-    //LOG_INF("Implement discovery item cleaunup");
-}
 static void free_item(poller_item_t *poller_item ) {
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
 
     switch (snmp_item->request_type) {
-        case SNMP_REQUEST_GET:
-            snmp_worker_free_get_request(&snmp_item->request_data);
+        case SNMP_REQUEST_GET:   
+            //LOG_INF("Freeng normal item");
+            snmp_worker_free_get_item(poller_item);
             break;
         case SNMP_REQUEST_WALK:
-            snmp_worker_free_walk_request(&snmp_item->request_data);
+            snmp_worker_free_walk_item(poller_item);
             break;
         case SNMP_REQUEST_DISCOVERY:
-            snmp_worker_free_discovery_request(&snmp_item->request_data);
+            //LOG_INF("Freeng discovery item");
+            snmp_worker_free_discovery_item(poller_item);
             break;
         default:
-            LOG_INF("Trying to free item of request type %d",snmp_item->request_type);
+            LOG_INF("Unknown snmp item type %d",snmp_item->request_type);
             zbx_backtrace();
             THIS_SHOULD_NEVER_HAPPEN;
             exit(-1);
     }
-
+    //LOG_INF("doing coommon free");
     poller_strpool_free(snmp_item->address);
+    //LOG_INF("free addr");
     poller_strpool_free(snmp_item->iface_json_info);
-
+    //LOG_INF("destroy event");
     poller_destroy_event(snmp_item->timeout_event);
-
+    //LOG_INF("freeing item %p", snmp_item);
     zbx_free(snmp_item);
-}
-
-int snmp_worker_init_walk(snmp_item_t *snmp_item, DC_ITEM *dc_item) {
-    //walk items has only one oid just as get items but they are used for walks
-    snmp_item->request_type = SNMP_REQUEST_WALK;
-    if (FAIL == snmp_worker_parse_oid(&snmp_item->request_data.walk_data.oid, dc_item->snmp_oid))
-        return FAIL;
-    
-    
-    return SUCCEED;
-}
-
-int snmp_worker_init_get(snmp_item_t *snmp_item, DC_ITEM *dc_item) {
-    //walk items has only one oid just as get items but they are used for walks
-    snmp_item->request_type = SNMP_REQUEST_GET;
-    if (FAIL == snmp_worker_parse_oid(&snmp_item->request_data.get_data.oid, dc_item->snmp_oid))
-        return FAIL;
-    
-    
-    return SUCCEED;
-}
-
-int snmp_worker_init_discovery(snmp_item_t *snmp_item, DC_ITEM *dc_item) {
-    //for discovery items: parsing oid into single string with null separated macros and values
-    //count the params, creating results array where we'll keep the walk results and 
-    //will do the iteration
-    snmp_item->request_type = SNMP_REQUEST_DISCOVERY;
-    //it's reasonable to do this after first succesifull v2 tests
-     
-    //HALT_HERE("Discovery init isn't ready yet");
-    return FAIL;
+    //LOG_INF("Fisnished");
 }
 
 static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
-    //char translated_oid[4 * SNMP_MAX_OID_LEN];
+
  	char buffer[MAX_STRING_LEN];
     char *addr;
-    snmp_item_t *snmp_item;
+    snmp_worker_item_t *snmp_item;
     int ret = FAIL;
+    char *error = NULL;
 
-    // 	/* todo: if possible, do oid resolve without net-snmp*/
     if (NULL == dc_item->snmp_oid || 
         dc_item->snmp_oid[0] == '\0' )
-        //FAIL == snmp_worker_parse_oid(translated_oid, dc_item->snmp_oid))
  	{
  		DEBUG_ITEM(dc_item->itemid, "Empty oid for item, item will not be polled until OID is set ");
  		poller_preprocess_error(poller_item, "Error: empty OID, item will not be polled until OID is set");
@@ -317,23 +276,21 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
  		return FAIL;
  	}
     
-    if (NULL == (snmp_item = zbx_calloc(NULL, 0, sizeof(snmp_item_t)))) {
-        LOG_WRN("Cannot allocate memory for snmp item, not enough RSS memory, exiting");
+    if (NULL == (snmp_item = zbx_calloc(NULL, 0, sizeof(snmp_worker_item_t)))) {
+        LOG_WRN("Cannot allocate memory for snmp item, not enough HEAP memory, exiting");
         exit(-1);
     };
 
     poller_set_item_specific_data(poller_item, snmp_item);
-
-    if ( strstr(dc_item->snmp_oid,"walk[") )
-        ret = snmp_worker_init_walk(snmp_item, dc_item);
-    else 
-    if ( strstr(dc_item->snmp_oid,"discovery["))
-        ret = snmp_worker_init_discovery(snmp_item, dc_item);
-    else 
-        ret = snmp_worker_init_get(snmp_item, dc_item);
     
-
-
+    if ( strstr(dc_item->snmp_oid,"walk[") ) 
+        ret = snmp_worker_init_walk_item(poller_item, dc_item->snmp_oid);
+    else if ( strstr(dc_item->snmp_oid,"discovery[")) 
+        ret = snmp_worker_init_discovery_item(poller_item, dc_item->snmp_oid);
+    else 
+        ret = snmp_worker_init_get_item(poller_item, dc_item->snmp_oid);
+        
+    DEBUG_ITEM(dc_item->itemid, "Result of init key %s is %d", dc_item->snmp_oid, ret);
 
     if (FAIL == ret) {
         DEBUG_ITEM(dc_item->itemid, "Couldn't init item, wrong oid value: '%s'", dc_item->snmp_oid);
@@ -356,7 +313,7 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     }
 	    
     //TODO: bulk param support at least, for walks, normal items will need grouping and aggregating
-
+    //also v3 goes here
     zbx_snprintf(buffer, MAX_STRING_LEN, "\"port\":%d, \"community\":\"%s\", \"version\":%d",
                                       dc_item->interface.port, dc_item->snmp_community, version);
 	
@@ -375,102 +332,67 @@ static int init_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
     return SUCCEED;
 }
 
-int snmp_worker_send_request(poller_item_t *poller_item, const char *request) {
 
-    static int last_worker_pid = 0;
-    
-    DEBUG_ITEM(poller_item_get_id(poller_item), "Sending item poll request to the worker: '%s'", request);
 
-    if (SUCCEED != glb_worker_send_request(conf.snmp_worker, request) ) {
-        LOG_INF("Couldn't send request %s", request);
-        DEBUG_ITEM(poller_item_get_id(poller_item), "Couldn't send request for snmp: %s",request);
-        finish_snmp_poll(poller_item, CONFIG_ERROR ,"Couldn't start or pass request to glb_snmp_worker");
-        return FAIL;
-    }
-//    LOG_INF("Worker's pid is %d", last_worker_pid);
-
-    if (last_worker_pid != glb_worker_get_pid(conf.snmp_worker)) {
-        LOG_INF("glb_snmp_worker worker's PID (%d) is changed, subscibing the new FD (%d)", last_worker_pid, glb_worker_get_pid(conf.snmp_worker));
-        last_worker_pid = glb_worker_get_pid(conf.snmp_worker);
-        subscribe_worker_fd(worker_get_fd_from_worker(conf.snmp_worker));
-    }
-    poller_inc_requests();
-    return SUCCEED;
-}
-
-void snmp_worker_start_get_request(poller_item_t *poller_item, const char *ipaddr) {
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
-
-    char request[MAX_STRING_LEN];
-
-    zbx_snprintf(request, MAX_STRING_LEN, "{\"id\":%lld, \"ip\":\"%s\", \"oid\":\"%s\", \"type\":\"get\", %s}", 
-                poller_item_get_id(poller_item),
-                ipaddr, snmp_item->request_data.get_data.oid, snmp_item->iface_json_info );
-    
-    //LOG_INF("Will do request: '%s'", request);
-
-    snmp_worker_send_request(poller_item, request);
-}
 
 static void start_snmp_poll(poller_item_t *poller_item, const char *resolved_address) {
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    
+    DEBUG_ITEM(poller_item_get_id(poller_item), "Starting to poll item, type %d to ip %s",snmp_item->request_type, resolved_address);
     
     switch (snmp_item->request_type) {
         case SNMP_REQUEST_GET:
-            snmp_worker_start_get_request( poller_item, resolved_address);
-            return;
-            //break;
-     //   case SNMP_DISCOVERY_WALK:
-     //       snmp_worker_start_discovery_walk(resolved_address, snmp_item);
-     //       break;
-     //   case SNMP_WALK:
-     //       snmp_worker_start_walk(resolved_address, snmp_item);
-     //       break;
+            snmp_worker_start_get_request(poller_item, resolved_address);
+            break;
+        case SNMP_REQUEST_DISCOVERY:
+            snmp_worker_start_discovery_next_walk(poller_item, resolved_address);
+            break;
+        case SNMP_REQUEST_WALK:
+            snmp_worker_start_walk_request(poller_item, resolved_address);
+            break;
         default:
+            LOG_INF("Unknown snmp item request type %d", snmp_item->request_type);
             THIS_SHOULD_NEVER_HAPPEN;
             exit(-1);
     }
-    
-    HALT_HERE("Need to implement starting and processing of the get, walk, and discovery walk");
-    HALT_HERE("Also, parsing and translating of the walk and discovery items needs to be implemented either");
-    HALT_HERE("OMG ! we are polling now item %lld", poller_item_get_id(poller_item));    
-
 }
 
 static void resolved_callback(poller_item_t *poller_item, const char *resolved_address) {
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
-   // LOG_INF("Name %s resolved to %s", snmp_item->address, resolved_address);
     start_snmp_poll(poller_item, resolved_address);
 }
 
 static void resolve_fail_callback(poller_item_t *poller_item) {
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
-    finish_snmp_poll(poller_item, CONFIG_ERROR, "Failed to resolve host name");
+    snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+    poller_preprocess_error(poller_item, "Failed to resolve item's hostname");
+    snmp_worker_finish_poll(poller_item);
 }
 
-static void   start_poll(poller_item_t *poller_item) {
-    snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
-        
+static void  start_poll(poller_item_t *poller_item) {
+    snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+  
     if (snmp_item->need_resolve) {
+        DEBUG_ITEM(poller_item_get_id(poller_item), "Start resolving polling item");    
         poller_async_resolve(poller_item, snmp_item->address);
+        return;
     }
+    
     start_snmp_poll(poller_item, snmp_item->address);
 }
 
 static void handle_async_io(void)
 { 
-//TODO: make it possible to ommit handle_async_io func at all
     RUN_ONCE_IN(30);
     if (FAIL == glb_worker_is_alive(conf.snmp_worker))
         glb_worker_restart(conf.snmp_worker, "Restarted due to fail in periodic check");
     subscribe_worker_fd();
+
 }
 
 static int forks_count(void) {
 	return CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER];
 }
 
-void snmp_worker_shutdown(void) {
+static void snmp_worker_shutdown(void) {
 	
 }
 
@@ -501,13 +423,12 @@ void glb_snmp_worker_init(void) {
     conf.snmp_worker = glb_worker_init(CONFIG_SNMP_WORKER_LOCATION, args, 30, 0, 0, 0);
     
     if (NULL == conf.snmp_worker) {
-        LOG_INF("Cannot create SNMP woker, check the coniguration: path '%s', args %s", CONFIG_SNMP_WORKER_LOCATION, args);
-         exit(-1);
+        LOG_INF("Cannot create SNMP worker, check the coniguration: path '%s', args %s", CONFIG_SNMP_WORKER_LOCATION, args);
+        exit(-1);
     }
 
     worker_set_mode_to_worker(conf.snmp_worker, GLB_WORKER_MODE_NEWLINE);
     worker_set_mode_from_worker(conf.snmp_worker, GLB_WORKER_MODE_NEWLINE);
 
- 
     LOG_DBG("In %s: Ended", __func__);
 }

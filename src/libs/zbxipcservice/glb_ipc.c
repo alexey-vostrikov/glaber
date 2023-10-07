@@ -73,6 +73,9 @@ struct  ipc_conf_t {
 	unsigned int bulk_count;
 	int total_slots;
 	int reserved_slots; //number of slots reserved to high priority senders
+	int elem_size;
+
+	zbx_shmem_info_t *mem_info;
 };
 
 #define MOVE_ALL_ELEMENTS 0
@@ -330,23 +333,22 @@ int glb_ipc_force_flush(ipc_conf_t *ipc) {
 }
 
 int glb_ipc_flush(ipc_conf_t *ipc) {
-	int i = 0, bulk_time_flush = 0;
+	int i = 0, total_count = 0;
 	unsigned int now = time(NULL);
 
-	if (IPC_HIGH_VOLUME == ipc->mode && now > IPC_BULK_TIMEOUT + *ipc->lastflush) {
-		bulk_time_flush = 1;
-		*ipc->lastflush = now;	
+	for (i = 0 ; i < ipc->consumers; i++ )  
+		 total_count += ipc->local_queues->send_queues[i].count ;
+
+	if (0 == total_count)
+		return SUCCEED;
+
+	if ( IPC_LOW_LATENCY == ipc->mode || 
+		now > IPC_BULK_TIMEOUT + *ipc->lastflush ||
+		total_count >= ipc->bulk_count ) 
+	{
+		 glb_ipc_force_flush(ipc);
 	} 
 
-	for (i = 0 ; i < ipc->consumers; i++ )  {
-		
-		if ( IPC_LOW_LATENCY == ipc->mode || 
-	   	 ipc->local_queues->send_queues[i].count > IPC_BULK_COUNT || 
-			 bulk_time_flush)
-		{	
-			move_all_elements(&ipc->local_queues->send_queues[i], &ipc->queues[i], IPC_LOCK_TRY_ONLY);
-		}
-	}
 }
 
 static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, unsigned char lock_mode, int reserve_free) {
@@ -356,7 +358,31 @@ static int get_free_queue_items(ipc_conf_t *ipc, ipc_queue_t *local_free_queue, 
 	if (local_free_queue->count > 0 ) 
 		return SUCCEED;
 
-	return move_n_elements(&ipc->free_queue, local_free_queue, ipc->bulk_count, "ipc_free -> local free", lock_mode, reserve_free);
+	while (FAIL == move_n_elements(&ipc->free_queue, local_free_queue, ipc->bulk_count, "ipc_free -> local free", lock_mode, reserve_free)) {
+		
+		if ((ipc->mem_info->free_size*100)/ipc->mem_info->total_size > 25) {
+		//	LOG_INF("There are free memory, %d %, allocating new slots, total slots %d",(ipc->mem_info->free_size*100)/ipc->mem_info->total_size, ipc->total_slots);
+			void *first, *last;
+
+			if (FAIL == glb_ipc_allocate_slots(ipc, ipc->bulk_count, &first, &last))  {
+				HALT_HERE("Couldn't allocate additional slots in the ipc");
+				return FAIL;
+			}
+			
+			local_free_queue->count = ipc->bulk_count;
+			local_free_queue->first = first;
+			local_free_queue->last = last;
+		
+			return SUCCEED;
+		} 
+		
+		LOG_INF("No free IPC slots available, check processing speed or increase IPC slots / mem size count, waiting 1 sec");
+		//glb_ipc_dump_sender_queues(ipc,"sender ipc dump");
+
+		glb_ipc_flush(ipc);
+		sleep(1);
+
+	}
 }
 
 int glb_ipc_send(ipc_conf_t *ipc, int queue_num, void* send_data, unsigned char lock_wait, ipc_send_priority_t priority ) {
@@ -433,29 +459,61 @@ int  glb_ipc_process(ipc_conf_t *ipc, int consumerid, ipc_data_process_cb_t cb_f
 
 
 ipc_conf_t* glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode) {
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, zbx_shmem_info_t *mem_info) {
 
-	return glb_ipc_init_ext(elems_count, elem_size, consumers, memf,create_cb, free_cb, mode, "", 0);
+	return glb_ipc_init_ext(elems_count, elem_size, consumers, memf,create_cb, free_cb, mode, "", 0, mem_info);
 }
+
+int glb_ipc_allocate_slots(ipc_conf_t *ipc_conf, int elems_count, void **start, void **last) {
+	ipc_element_t *elements;
+	int i;
+	
+	size_t full_elem_size = ipc_conf->elem_size + sizeof (ipc_element_t);
+
+	if (NULL == (elements = ipc_conf->memf.malloc_func(NULL, full_elem_size * elems_count) ) )  {
+		LOG_WRN("Couldn't allocate %ld bytes for elements", full_elem_size * elems_count);
+		return FAIL;
+	}
+
+	void * ptr = elements;
+	ipc_element_t *elem;
+
+	for (i = 0; i < elems_count-1; i++) {
+	 	elem = ptr;
+		elem->next = ptr + full_elem_size;
+		ptr = ptr + full_elem_size;
+	}
+
+	elem = (void *) elements + full_elem_size * (elems_count-1);
+	elem->next = NULL;
+	
+	*start = elements;
+	*last = elem;
+	
+	ipc_conf->total_slots += elems_count;
+
+	return SUCCEED;
+}
+
 ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name, int reserved_slots) {
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name, int reserved_slots, zbx_shmem_info_t *mem_info) {
     
 	ipc_conf_t *ipc;
 	int i;
     char *error = NULL;
-	ipc_element_t *elements;
+	
 	
 	if (NULL == (ipc = memf->malloc_func(NULL, sizeof(ipc_conf_t)))) {	
 		LOG_WRN("Cannot allocate IPC structures for IPC, exiting");
 		return NULL;
 	}
 
-
 	memset((void *)ipc, 0, sizeof(ipc_conf_t));
 	zbx_strlcpy(ipc->name, name, strlen(name));
 
 	ipc->consumers = consumers;
 	ipc->memf = *memf;
+	ipc->mem_info = mem_info;
 
 	if (NULL == (ipc->queues = memf->malloc_func(NULL, sizeof(ipc_queue_t) * consumers))) {
 		LOG_WRN("Couldn't allocate %ld bytes for queues ", sizeof(ipc_queue_t) * consumers);
@@ -470,26 +528,15 @@ ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers
 	
 	glb_lock_init(&ipc->free_queue.lock);
 
-	size_t full_elem_size = elem_size + sizeof (ipc_element_t);
-
-	if (NULL == (elements = memf->malloc_func(NULL, full_elem_size * elems_count) ) )  {
-		LOG_WRN("Couldn't allocate %ld bytes for elements", full_elem_size * elems_count);
-		return NULL;
-	}
-
-	void * ptr = elements;
-	ipc_element_t *elem;
-	for (i = 0; i < elems_count-1; i++) {
-	 	elem = ptr;
-		elem->next = ptr + full_elem_size;
-		ptr = ptr + full_elem_size;
-	}
-
-	elem = (void *) elements + full_elem_size * (elems_count-1);
-	elem->next = NULL;
+	void *first, *last;
 	
-	ipc->free_queue.first = elements;
-	ipc->free_queue.last =  elem;
+	ipc->elem_size = elem_size;
+	
+	if (FAIL == glb_ipc_allocate_slots(ipc, elems_count, &first, &last)) 
+		HALT_HERE("Cannot allocate %d slots of size %d", elems_count, elem_size);
+			
+	ipc->free_queue.first = first;
+	ipc->free_queue.last =  last;
 	ipc->free_queue.count = elems_count;
 	ipc->total_slots = elems_count;
 	ipc->reserved_slots = reserved_slots;
@@ -520,8 +567,7 @@ void glb_ipc_destroy(ipc_conf_t *ipc) {
 	zbx_free(ipc->local_queues);
 }
 
-//this might be not realy precise without locks
-u_int64_t glb_ipc_get_queue(ipc_conf_t *ipc) {
+u_int64_t glb_ipc_get_queue_size(ipc_conf_t *ipc) {
 	int i;
 	u_int64_t global_count = 0;
 	
@@ -604,10 +650,10 @@ IPC_PROCESS_CB(ipc_vector_uint64_process_cb) {
 		memf->free_func(ipc_arr->data);
 }
 
-ipc_conf_t *ipc_vector_uint64_init(int elems_count, int consumers, int mode, mem_funcs_t *memf) {
+ipc_conf_t *ipc_vector_uint64_init(int elems_count, int consumers, int mode, mem_funcs_t *memf, zbx_shmem_info_t *mem_info) {
 
 	return  glb_ipc_init(elems_count, sizeof(ipc_vector_t), consumers, memf, 
-						ipc_vector_uint64_create_cb, NULL, mode);
+						ipc_vector_uint64_create_cb, NULL, mode, mem_info);
 }
 
 int ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint64_t * vector, int max_count) {

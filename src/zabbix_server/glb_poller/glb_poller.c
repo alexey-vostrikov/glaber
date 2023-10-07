@@ -47,7 +47,7 @@
 #include "poller_ipc.h"
 #include "poller_sessions.h"
 #include "poller_contention.h"
-#include "../../libs/apm/apm.h"
+//#include "../../libs/apm/apm.h"
 #include "zbxsysinfo.h"
 #include "glb_preproc.h"
 
@@ -448,8 +448,8 @@ static void update_proc_title_cb(poller_item_t *garbage, void *data)
 	conf.requests = 0;
 	conf.responces = 0;
 
-	apm_update_heap_usage();
-	apm_flush();
+//	apm_update_heap_usage();
+//	apm_flush();
 
 	last_call = now;
 
@@ -506,11 +506,11 @@ static int poller_init(zbx_thread_args_t *args)
 	poller_async_set_resolve_cb(conf.poller.resolve_callback);
 	poller_async_set_resolve_fail_cb(conf.poller.resolve_fail_callback);
 
-	apm_track_counter(&conf.total_requests, "requests", NULL);
-	apm_add_proc_labels(&conf.total_requests);
-	apm_track_counter(&conf.total_responces, "responces", NULL);
-	apm_add_proc_labels(&conf.total_responces);
-	apm_add_heap_usage();
+	//apm_track_counter(&conf.total_requests, "requests", NULL);
+//	apm_add_proc_labels(&conf.total_requests);
+//	apm_track_counter(&conf.total_responces, "responces", NULL);
+//	apm_add_proc_labels(&conf.total_responces);
+//	apm_add_heap_usage();
 
 	return SUCCEED;
 }

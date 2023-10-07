@@ -28,7 +28,7 @@
 #include "zbx_rtc_constants.h"
 #include "../glb_poller/glb_poller.h"
 #include "../../libs/glb_state/glb_state_items.h"
-#include "../../libs/apm/apm.h"
+//#include "../../libs/apm/apm.h"
 
 
 extern int		CONFIG_CONFSYNCER_FREQUENCY;
@@ -118,8 +118,8 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 		sec = zbx_time();
 		zbx_update_env(get_process_type_string(process_type), sec);
 
-		apm_update_heap_usage();
-		apm_flush();
+	//	apm_update_heap_usage();
+	//	apm_flush();
 
 		if (0 == secrets_reload)
 		{

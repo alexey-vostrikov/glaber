@@ -1,3 +1,5 @@
+2023-10-07 ver  3.3.28 (master)
+    - fix: pollers stuck in IPC slots waiting when using huge (>1000) number of pollers
 2023-09-26 ver  3.3.27 (master)
     - fix: LastData fail on non numeric history values
 2023-09-26 ver  3.3.26 (master)

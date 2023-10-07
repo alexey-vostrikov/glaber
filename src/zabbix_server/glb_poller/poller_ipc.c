@@ -38,7 +38,7 @@ static ipc_conf_t* ipc_poller_notify[ITEM_TYPE_MAX];
 static int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
 	if (0 < forks) {
 	//	LOG_INF("doing IPC init of type %d forks %d", type, forks);
-		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, &ipc_memf);
+		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, memf, poller_ipc_notify);
 	}
 }
 

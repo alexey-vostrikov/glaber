@@ -20,7 +20,39 @@
 #ifndef GLB_POLLER_SNMP_WORKER_H
 #define GLB_POLLER_SNMP_WORKER_H
 #include "glb_poller.h"
+#include "poller_async_io.h"
+
+typedef struct snmp_worker_discovery_t snmp_worker_discovery_t;
+typedef enum {
+    SNMP_REQUEST_GET = 1,
+    SNMP_REQUEST_WALK,
+    SNMP_REQUEST_DISCOVERY,
+    SNMP_REQUEST_MAX
+} snmp_request_type_t;
+
+typedef struct {
+    const char *oid;
+} snmp_worker_one_oid_t;
+
+typedef union 
+{
+    const char *get_oid;
+    const char *walk_oid;
+    snmp_worker_discovery_t *discovery_data;
+} snmp_worker_request_data_t;
+
+typedef struct {
+    snmp_worker_request_data_t request_data;
+    const char *iface_json_info; 
+    const char *address;
+    unsigned char need_resolve;
+    snmp_request_type_t request_type;
+    poller_event_t *timeout_event;
+} snmp_worker_item_t;
 
 void glb_snmp_worker_init();
 
+//might be feasible to move to a util file
+const char*   snmp_worker_parse_oid(const char *in_oid);
+int     snmp_worker_send_request(poller_item_t *poller_item, const char *request);
 #endif

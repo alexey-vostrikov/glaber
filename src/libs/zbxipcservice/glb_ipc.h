@@ -52,6 +52,8 @@
 #ifndef GLB_IPC_H
 #define GLB_IPC_H
 
+#include "zbxshmem.h"
+
 #define IPC_BULK_COUNT 512
 #define IPC_LOW_LATENCY_COUNT 4
 
@@ -82,10 +84,11 @@ typedef struct glb_ipc_buffer_t glb_ipc_buffer_t;
 typedef struct ipc_conf_t ipc_conf_t;
 
 ipc_conf_t* glb_ipc_init_ext(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name, int reserved_slots);
-			
+			ipc_data_create_cb_t create_cb, ipc_data_free_cb_t free_cb, ipc_mode_t mode, char *name, int reserved_slots,
+			zbx_shmem_info_t *mem_info);
+
 ipc_conf_t	*glb_ipc_init(size_t elems_count, size_t elem_size, int consumers, mem_funcs_t *memf,
-			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode);
+			ipc_data_create_cb_t create_func, ipc_data_free_cb_t free_func, ipc_mode_t mode, zbx_shmem_info_t *mem_info);
 void		glb_ipc_destroy(ipc_conf_t* ipc);
 
 
@@ -99,22 +102,21 @@ void 	glb_ipc_dump_reciever_queues(ipc_conf_t *ipc_data, char *name, int queue_n
 void 	glb_ipc_dump_sender_queues(ipc_conf_t *ipc_data, char *name);
 
 
-u_int64_t glb_ipc_get_sent(ipc_conf_t *ipc);
-double glb_ipc_get_free_pcnt(ipc_conf_t *ipc);
-u_int64_t glb_ipc_get_queue(ipc_conf_t *ipc);
+u_int64_t 	glb_ipc_get_sent(ipc_conf_t *ipc);
+double 		glb_ipc_get_free_pcnt(ipc_conf_t *ipc);
+u_int64_t	glb_ipc_get_queue_size(ipc_conf_t *ipc);
 
+int glb_ipc_allocate_slots(ipc_conf_t *ipc_conf, int elems_count, void **start, void **last);
 
 /* vector specific ipc functions to pass zbx_vector_uint64_t arrays */
 typedef void (*ipc_data_vector_uint64_cb_t)(mem_funcs_t *memf, int i, zbx_vector_uint64_t *vector, void *data);
 
-ipc_conf_t*	ipc_vector_uint64_init(int elems_count, int consumers, int mode, mem_funcs_t *memf);
+ipc_conf_t*	ipc_vector_uint64_init(int elems_count, int consumers, int mode, mem_funcs_t *memf, zbx_shmem_info_t *mem_info);
 
 int 	ipc_vector_uint64_recieve(ipc_conf_t *ipc, int consumerid, zbx_vector_uint64_t * vector, int max_count);
 int 	ipc_vector_uint64_send(ipc_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock);
+void 	ipc_vector_uint64_destroy(ipc_conf_t *ipc);
 
-void 		ipc_vector_uint64_destroy(ipc_conf_t *ipc);
-
-void	ipc_set_redirect_queue(int queue_num);
 
 
 #endif

@@ -170,14 +170,12 @@ void proctitle_update(poller_item_t *poller_item, void *data) {
 
 void process_incoming_metrics(poller_item_t *poller_item, void *data) {
     glb_preproc_worker_conf_t *conf = data;
-    int next_run = 0, i;
+    int cnt;
     
-    if (0 == (i = preproc_receive_metrics(conf->process_num, metrics_proc_cb, NULL, BATCH_PROCESS_METRICS))) 
-        next_run = 1; //sleeping 1msec if no items
+    while (0 != (cnt = preproc_receive_metrics(conf->process_num, metrics_proc_cb, NULL, BATCH_PROCESS_METRICS))) 
+        conf->total_proc += cnt;
     
-    conf->total_proc += i;
-    poller_run_timer_event(conf->processing, next_run);
-
+    poller_run_timer_event(conf->processing, 1);
 }
 
 void ipc_flush(poller_item_t *poller_item, void *data) {
