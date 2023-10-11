@@ -27,6 +27,7 @@
 #include "poller_async_io.h"
 #include "snmp_util.h"
 #include "zbx_item_constants.h"
+#include "../../libs/glb_state/glb_state_items.h"
 
 #define MAX_ITEM_SNMP_GET_FREQUENCY	15
 

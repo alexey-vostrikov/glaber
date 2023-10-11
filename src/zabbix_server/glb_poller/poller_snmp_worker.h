@@ -49,6 +49,7 @@ typedef struct {
     snmp_request_type_t request_type;
     poller_event_t *timeout_event;
 } snmp_worker_item_t;
+#define SNMP_MAX_CONTENTION 4
 
 void glb_snmp_worker_init();
 

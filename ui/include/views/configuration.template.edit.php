@@ -29,8 +29,12 @@ $html_page = (new CHtmlPage())
 	->setTitle(_('Templates'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_TEMPLATES_EDIT));
 
+// if ($data['form'] !== 'clone' && $data['form'] !== 'full_clone') {
+// 	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['templateid']))); 
+// 	$html_page->setNavigation(
+// }
 if ($data['form'] !== 'clone' && $data['form'] !== 'full_clone') {
-	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['templateid']))); 
+	$html_page->setNavigation(getHostNavigation('', $data['templateid']));
 }
 
 $tabs = new CTabView();

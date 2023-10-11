@@ -87,7 +87,7 @@ static void prepare_dc_item(DC_ITEM *dc_item, poller_item_t *poller_item) {
        dc_item->host.hostid = calc_item->hostid;
 }
 
-void poll_item(poller_item_t *poller_item) {
+static int poll_item(poller_item_t *poller_item) {
     DC_ITEM dc_item = {0};
 
     AGENT_RESULT result;
@@ -105,9 +105,10 @@ void poll_item(poller_item_t *poller_item) {
         poller_preprocess_agent_result_value(poller_item, NULL, &result);
     
     poller_inc_responses();
-    poller_return_item_to_queue(poller_item);   
-    
+    poller_return_item_to_queue(poller_item); 
     zbx_free_agent_result(&result);
+    
+    return POLL_STARTED_OK;
 }
 
 int forks_count(void) {

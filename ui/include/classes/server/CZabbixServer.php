@@ -208,19 +208,22 @@ class CZabbixServer {
 		global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
 		$result = [];
-		foreach (array_chunk($itemids, 81) as $items_chunk) {
-			$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
+
+		$zabbix_server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT,
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::CONNECT_TIMEOUT)),
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 			);
-		
+			
+		foreach (array_chunk($itemids, 16484) as $items_chunk) {
+				
 			$newdata = $zabbix_server->request([
 				'request' => 'itemsstate.get',
 				'itemids' => $items_chunk
 			]);
 			
 			if (is_array($newdata))
-				$result = $result + $newdata;
+				$result = array_merge($result ,$newdata);
+				
 		}
 
 		return $result;
@@ -322,7 +325,7 @@ class CZabbixServer {
 				timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::SOCKET_TIMEOUT)), 0
 		);
 
-		foreach (array_chunk($itemids, 16) as $items_chunk) {
+		foreach (array_chunk($itemids, 16384) as $items_chunk) {
 			
 			$newdata = $zabbix_server->request([
 				'request' => 'lastvalues.get',

@@ -36,6 +36,7 @@
 #include "snmp_walk.h"
 #include "poller_sessions.h"
 #include "snmp_util.h"
+#include "../../libs/glb_state/glb_state_items.h"
 
 extern int CONFIG_GLB_SNMP_CONTENTION;
 extern int CONFIG_GLB_SNMP_FORKS;
@@ -237,7 +238,7 @@ static void resolve_ready_cb(poller_item_t *poller_item,  const char *addr) {
 	snmp_send_request(poller_item);
 }
 
-static void   start_poll_item(poller_item_t *poller_item) {
+static int start_poll_item(poller_item_t *poller_item) {
 	snmp_item_t *snmp_item = poller_item_get_specific_data(poller_item);
     u_int64_t itemid = poller_item_get_id(poller_item);
 	
@@ -247,14 +248,17 @@ static void   start_poll_item(poller_item_t *poller_item) {
 			DEBUG_ITEM(poller_item_get_id(poller_item), "Cannot resolve item's interface addr: '%s'", snmp_item->interface_addr);
 			poller_preprocess_error(poller_item, "Cannot resolve item's interface hostname");
 			poller_return_item_to_queue(poller_item);
+			return POLL_STARTED_FAIL;
 		}
-		return;
+		return POLL_STARTED_OK;
 	}
 	
 	snmp_item->ipaddr = snmp_item->interface_addr;
 	
 	snmp_send_request(poller_item);
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+
+	return POLL_STARTED_OK;
 }
 
 void responce_arrived_cb(poller_item_t *null_item, void *null_data) {

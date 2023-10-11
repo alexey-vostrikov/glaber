@@ -48,6 +48,7 @@
 #include "zbx_rtc_constants.h"
 #include "zbx_item_constants.h"
 #include "../../libs/glb_state/glb_state_hosts.h"
+#include "../../libs/glb_state/glb_state_items.h"
 #include "glb_preproc.h"
 
 static const char	*item_type_agent_string(zbx_item_type_t item_type)
@@ -709,7 +710,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 		DCrequeue_items(&items[i].itemid, &timespec.sec, &errcodes[i], 1);
 		DEBUG_ITEM(items[i].itemid,"Poller %d: Returned item to the zbx queue", poller_type);
 	
-		nextcheck = time(NULL);
+		*nextcheck = time(NULL);
 
 	}
 

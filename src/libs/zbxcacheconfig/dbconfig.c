@@ -173,8 +173,8 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			snmp_iface = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp, &zbx_dc_item->interfaceid);
 							//avoiding dynamic and discovery items from being processed by async glb pollers
 			
-			if ( NULL == snmp_iface || (
-					snmp_iface->version == ZBX_IF_SNMP_VERSION_3) ||
+			if ( NULL == snmp_iface || 
+					//( snmp_iface->version == ZBX_IF_SNMP_VERSION_3) ||
 			   		(snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC) ) {
 				
 				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be SNMP async polled, unsupported by async snmp version");

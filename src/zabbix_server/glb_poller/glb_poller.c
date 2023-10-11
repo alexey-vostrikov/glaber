@@ -58,7 +58,7 @@ extern int  CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 #define NEW_ITEMS_CHECK_INTERVAL 2 * 1000
 #define PROCTITLE_UPDATE_INTERVAL 5 * 1000
 #define ASYNC_RUN_INTERVAL 1
-#define ITEMS_REINIT_INTERVAL 300 * 1000 // after this time in poller item will be repolled whatever it's state is
+#define ITEMS_REINIT_INTERVAL 300  // after this time in poller item will be repolled whatever it's state is
 
 typedef struct
 {
@@ -78,7 +78,7 @@ struct poller_item_t
 	const char *delay;
 	unsigned char item_type;
 	unsigned char flags;
-	u_int64_t lastpolltime;
+	int lastpolltime;
 	void *itemdata; // item type specific data
 	poller_event_t *poll_event;
 	u_int64_t interfaceid;
@@ -154,8 +154,8 @@ static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
 
 static int poller_update_item_nextcheck(poller_item_t *poller_item, int base_time) {
 	
-	int simple_interval, disabled_till;
-	zbx_custom_interval_t *custom_intervals;
+	int simple_interval, disabled_till, now = time(NULL);
+	zbx_custom_interval_t *custom_intervals = NULL;
 	const char *delay;
 	char *error = NULL;
 	int nextcheck;
@@ -172,8 +172,13 @@ static int poller_update_item_nextcheck(poller_item_t *poller_item, int base_tim
 		return FAIL;
 	}
 
+//	if (FAIL == custom_intervals_is_set(custom_intervals) && 
+//		(base_time - poller_item->lastpolltime) < (simple_interval / 2) )
+
+//TODO: consider fixing situation when lastpoll is too close to the nextcheck comparable to delay
 	nextcheck = zbx_calculate_item_nextcheck(poller_item->itemid, poller_item->item_type, simple_interval,
 												 custom_intervals, base_time + 1);
+
 	zbx_custom_interval_free(custom_intervals);
 
 	glb_state_item_update_nextcheck(poller_item->itemid, nextcheck);
@@ -183,13 +188,10 @@ static int poller_update_item_nextcheck(poller_item_t *poller_item, int base_tim
 
 void item_poll_cb(poller_item_t *poller_item, void *data) {
 
-	u_int64_t now_ms = glb_ms_time();
-	int disabled_till, nextcheck, now = time(NULL);
+	int disabled_till, nextcheck, poll_ret = POLL_STARTED_OK, now = time(NULL);
 
 	DEBUG_ITEM(poller_item->itemid, "Item poll event");
-	
-	poller_item->lastpolltime = now_ms;
-	
+
 	if ( poller_sessions_count() > POLLER_MAX_SESSIONS || 
 	     poller_contention_sessions_count() > POLLER_MAX_SESSIONS) 
 	{
@@ -221,11 +223,17 @@ void item_poll_cb(poller_item_t *poller_item, void *data) {
 	}
 
 	poller_item->poll_state = POLL_POLLING;
-
+	poller_item->lastpolltime = now;
+	
 	DEBUG_ITEM(poller_item->itemid, "Starting poller item poll");
 	
-	if (NULL != conf.poller.start_poll)
-		conf.poller.start_poll(poller_item);
+	if (NULL != conf.poller.start_poll) 
+		poll_ret = conf.poller.start_poll(poller_item);
+	
+	if (POLL_NEED_DELAY == poll_ret) {
+		poller_return_delayed_item_to_queue(poller_item);
+		return;
+	}
 
 	if (FAIL == (nextcheck = poller_update_item_nextcheck(poller_item, now))) {
 		LOG_INF("Cannot calc of nextcheck for item %ld, it will not be polled anymore", poller_item->itemid);
@@ -405,7 +413,7 @@ void new_items_check_cb(poller_item_t *garbage, void *data)
 
 static void lost_items_check_cb(poller_item_t *garbage, void *data)
 {
-	u_int64_t mstime = glb_ms_time();
+	int now = time(NULL);
 
 	poller_item_t *poller_item;
 	zbx_hashset_iter_t iter;
@@ -413,7 +421,8 @@ static void lost_items_check_cb(poller_item_t *garbage, void *data)
 
 	while (NULL != (poller_item = zbx_hashset_iter_next(&iter)))
 	{
-		if (poller_item->lastpolltime + ITEMS_REINIT_INTERVAL < mstime && POLL_POLLING == poller_item->poll_state)
+		if (poller_item->lastpolltime + ITEMS_REINIT_INTERVAL < now && 
+			POLL_POLLING == poller_item->poll_state)
 		{
 			DEBUG_ITEM(poller_item->itemid, "Item has timed out in the poller, resetting the sate")
 			poller_item->poll_state = POLL_QUEUED;
@@ -548,7 +557,7 @@ poller_item_t *poller_get_poller_item(u_int64_t itemid)
 void poller_return_item_to_queue(poller_item_t *item)
 {
 	DEBUG_ITEM(item->itemid, "Item returned to the poller's queue");
-	item->lastpolltime = glb_ms_time();
+	item->lastpolltime = time(NULL);
 	item->poll_state = POLL_QUEUED;
 }
 
@@ -561,7 +570,7 @@ void poller_return_delayed_item_to_queue(poller_item_t *item)
 	DEBUG_ITEM(item->itemid,"Item returned to the poller's queue, will repoll in %d sec", nextcheck);
 	
 	glb_state_item_update_nextcheck(item->itemid, time(NULL) + nextcheck * 1000 );
-	item->lastpolltime = glb_ms_time();
+	item->lastpolltime = time(NULL);
 	item->poll_state = POLL_QUEUED;
 
 	poller_disable_event(item->poll_event);

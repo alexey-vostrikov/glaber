@@ -36,12 +36,19 @@
 //#define POLLER_MAX_DNS_REQUESTS	2 * ZBX_KIBIBYTE /*maximum simultanious DNS requests */
 #define POLLER_NEW_ITEM_DELAY_TIME 10
 
+typedef enum {
+	POLL_STARTED_OK = 1,
+	POLL_STARTED_FAIL = 2,
+	POLL_NEED_DELAY	= 3
+} poll_ret_code_t;
+
+
 typedef struct poller_item_t poller_item_t;
 
 typedef int (*init_item_cb)(DC_ITEM *dc_item, poller_item_t *glb_poller_item);
 typedef void (*delete_item_cb)(poller_item_t *glb_item);
 typedef void (*handle_async_io_cb)(void);
-typedef void (*start_poll_cb)(poller_item_t *glb_item);
+typedef int (*start_poll_cb)(poller_item_t *glb_item);
 typedef void (*shutdown_cb)(void);
 typedef int (*forks_count_cb)(void);
 typedef void (*poller_resolve_cb)(poller_item_t *glb_item, const char* ipaddr);

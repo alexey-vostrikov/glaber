@@ -35,6 +35,7 @@
 	return;
 }
 
+
 if (1 == $data['filter']['group_by_discovery'] && $data['entities']) {
     ShowGroupedItems($div, $data);
 } else {
@@ -45,7 +46,6 @@ echo $div;
 return;
 
 function ShowGroupedItems(&$div, array &$data) {
-  //  $all_div = new CDiv();
     $items = &$data['items'];
     
     $discovery_out = (new CDiv());
@@ -55,13 +55,9 @@ function ShowGroupedItems(&$div, array &$data) {
             $discovery_out->addItem((new CDiv())->addItem(' '));
     }
     
-    $div
-	//	->addItem((new CTag("h4", true, "Host-specific items"))
-     //   ->addStyle("font-weight: bold;"))
-        ->addItem( ShowItemsPlainTable($data));
+    $div->addItem( ShowItemsPlainTable($data));
     $div->addItem($discovery_out);
 
-    //return $all_div->toString();
 }
 
 

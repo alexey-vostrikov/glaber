@@ -101,11 +101,16 @@ static void snmp_worker_discovery_submit_result(poller_item_t *poller_item) {
 	
 	zbx_json_close(&js);
     DEBUG_ITEM(poller_item_get_id(poller_item),"Finished walk for the item, result is %s", js.buffer);
-    LOG_INF("Finished walk for the item %lld, result is %s", poller_item_get_id(poller_item), js.buffer);
-
+    
+ //   LOG_INF("Finished walk");
+ //  LOG_INF("Finished walk for the item %lld, oid is %s result is %s", poller_item_get_id(poller_item),
+ //       snmp_item->request_data.discovery_data->buffer + snmp_item->request_data.discovery_data->oids[snmp_item->request_data.discovery_data->current_oid],
+ //       js.buffer);
+ // LOG_INF("Finished walk1");
 	poller_preprocess_str(poller_item, NULL, js.buffer);
+  //    LOG_INF("Finished walk2");
     zbx_json_free(&js);
-
+ // LOG_INF("Finished walk3");
 //	poller_iface_register_succeed(poller_item);
 //  zbx_hashset_iter_reset(&snmp_item->request_data.discovery_data->results, &iter);
 
@@ -285,26 +290,34 @@ void snmp_worker_start_discovery_next_walk(poller_item_t *poller_item, const cha
     snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
     snmp_worker_discovery_t *ddata = snmp_item->request_data.discovery_data;
     
-    DEBUG_ITEM(poller_item_get_id(poller_item),"About to start new discovery, count is %d", ddata->count);
     
-    if (ddata->current_oid == -1) {
+    if ( -1 == ddata->current_oid && NULL == addr ) //not in polling state and not the firtst call
+        return;
+
+    DEBUG_ITEM(poller_item_get_id(poller_item),"About to start new discovery, prev oid idx %d count is %d", ddata->current_oid, ddata->count);
+   // LOG_INF("Stage wegwe1");
+
+    if (ddata->current_oid == -1 && NULL != addr) {
         if (NULL != ddata->address) {
-            if (0 != strcmp(ddata->address, addr)) {
+             if (0 != strcmp(ddata->address, addr)) {
                 poller_strpool_free(ddata->address);
                 ddata->address = poller_strpool_add(addr);
             }
         } else 
             ddata->address = poller_strpool_add(addr);
     }
-
     ddata->current_oid++;
-
+ 
     if (ddata->current_oid >= ddata->count) {
-        snmp_worker_discovery_submit_result(poller_item);
+     //   snmp_worker_discovery_submit_result(poller_item);
+    //    LOG_INF("Stage wegwe31");
         snmp_worker_clean_discovery_request(snmp_item);
+    //    LOG_INF("Stage wegwe32");
+        poller_return_item_to_queue(poller_item);
+    //    LOG_INF("Stage wegwe33");
         return;
     }
-        
+ //   LOG_INF("Stage wegwe4");
     char request[MAX_STRING_LEN];
 
     zbx_snprintf(request, MAX_STRING_LEN, "{\"id\":%lld, \"ip\":\"%s\", \"oid\":\"%s\", \"type\":\"walk\", %s}", 
@@ -335,6 +348,7 @@ void snmp_worker_clean_discovery_request(snmp_worker_item_t *snmp_item) {
 		zbx_free(obj->values);
 	}
 	zbx_hashset_clear(&ddata->results);
+    snmp_item->request_data.discovery_data->current_oid = -1;
 }
 
 void snmp_worker_free_discovery_item(poller_item_t *poller_item) {

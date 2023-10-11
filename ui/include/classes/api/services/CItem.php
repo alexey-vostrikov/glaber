@@ -447,7 +447,7 @@ class CItem extends CItemGeneral {
 				$result = $item['rowscount'];
 			}
 		}
-
+		
 		if ($options['countOutput']) {
 			return $result;
 		}
@@ -457,13 +457,12 @@ class CItem extends CItemGeneral {
 			if (!$options['countOutput'] && ($this->outputIsRequested('state', $options['output']))) {
 
 				$items_state = CZabbixServer::getItemsState(array_keys($result)); 
-				
 				if ( !empty($items_state) && (is_array($items_state) || is_object($items_state))) {
 					foreach ($items_state as $state) {
 						 $result[$state['itemid']] += $state;
 					}
 				}
-
+				
 				foreach ($result as $key=>$value) {
 					if (!isset($result[$key]['state'])) 
 						$result[$key]['state'] = "2";//  ITEM_STATE_UNKNOWN;
@@ -471,6 +470,7 @@ class CItem extends CItemGeneral {
 						$result[$key]['error'] = "";
 				} 
 			}
+
 			if (self::dbDistinct($sqlParts)) {
 				$result = $this->addNclobFieldValues($options, $result);
 			}

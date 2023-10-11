@@ -535,7 +535,7 @@ static void resolve_fail_callback(poller_item_t *poller_item) {
 /******************************************************************************
  * start pinging an item             										  * 
  * ***************************************************************************/
-static void start_ping(poller_item_t *poller_item)
+static int start_ping(poller_item_t *poller_item)
 {
     int i;
     u_int64_t mstime = glb_ms_time();
@@ -546,22 +546,20 @@ static void start_ping(poller_item_t *poller_item)
     
     if (POLL_POLLING == pinger_item->state) {
         DEBUG_ITEM(poller_item_get_id(poller_item), "Pinging is not possible right now: already pinging, skipping");
-        return;
+        return POLL_NEED_DELAY;
     }
 
     if (SUCCEED == needs_resolve(pinger_item)) {
      
         DEBUG_ITEM(poller_item_get_id(poller_item), "Sending item's hostname to async resolve");
         DEBUG_ITEM(poller_item_get_id(poller_item), "Sending item's hostname %s to async resolve", pinger_item->addr);
-
         poller_async_resolve(poller_item, pinger_item->addr);
-        return;
     } else { 
         DEBUG_ITEM(poller_item_get_id(poller_item), "Item doesn't need resolving");
         schedule_item_poll(poller_item);
     }
-    return;
 
+    return POLL_STARTED_OK;
 }
 
 static void handle_async_io(void)

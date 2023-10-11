@@ -685,7 +685,7 @@ ZBX_TABLE	tables[] = {
 		{
 		{"triggerid",	NULL,	NULL,	NULL,	0,	ZBX_TYPE_ID,	ZBX_NOTNULL,	0},
 		{"expression",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
-		{"description",	"",	NULL,	NULL,	255,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
+		{"description",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"url",	"",	NULL,	NULL,	2048,	ZBX_TYPE_CHAR,	ZBX_NOTNULL,	0},
 		{"status",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
 		{"value",	"0",	NULL,	NULL,	0,	ZBX_TYPE_INT,	ZBX_NOTNULL,	0},
@@ -2593,24 +2593,24 @@ ZBX_TABLE	tables[] = {
 };
 
 const zbx_db_table_changelog_t	changelog_tables[] = {
-	{"drules", 9},
-	{"triggers", 5},
-	{"hosts", 1},
-	{"trigger_tag", 6},
-	{"httptestitem", 13},
 	{"host_tag", 2},
-	{"httpstep_field", 15},
-	{"item_tag", 4},
-	{"httpstep", 14},
 	{"httptest_field", 12},
-	{"item_preproc", 8},
-	{"functions", 7},
+	{"triggers", 5},
+	{"items", 3},
+	{"httptest", 11},
+	{"trigger_tag", 6},
+	{"connector", 17},
+	{"hosts", 1},
+	{"item_tag", 4},
+	{"httptestitem", 13},
+	{"httpstep_field", 15},
 	{"httpstepitem", 16},
 	{"connector_tag", 18},
-	{"httptest", 11},
+	{"httpstep", 14},
+	{"functions", 7},
+	{"drules", 9},
 	{"dchecks", 10},
-	{"connector", 17},
-	{"items", 3},
+	{"item_preproc", 8},
 	{0}
 };
 #if defined(HAVE_SQLITE3)
@@ -3230,7 +3230,7 @@ CREATE INDEX config_4 ON config (disabled_usrgrpid);\n\
 CREATE TABLE triggers (\n\
 triggerid bigint  NOT NULL,\n\
 expression varchar(2048) DEFAULT '' NOT NULL,\n\
-description varchar(255) DEFAULT '' NOT NULL,\n\
+description varchar(2048) DEFAULT '' NOT NULL,\n\
 url varchar(2048) DEFAULT '' NOT NULL,\n\
 status integer DEFAULT '0' NOT NULL,\n\
 value integer DEFAULT '0' NOT NULL,\n\

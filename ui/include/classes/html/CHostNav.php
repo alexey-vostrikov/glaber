@@ -36,7 +36,7 @@ class CHostNav extends CList {
             parent::__construct([]);
             return;
         }
-
+       
         if ($data['is_template']) {
             $template = new CSpan(
                 new CLink($data['name'], 'templates.php?form=update&templateid=' . $data['templateid'])

@@ -193,7 +193,7 @@ static worker_t * worker_create_worker(worker_item_t *worker_item) {
 /******************************************************************
  * Sends the actual packet (request to worker to send a packet
  * ****************************************************************/
-static void send_request(poller_item_t *poller_item) {
+static int send_request(poller_item_t *poller_item) {
     u_int64_t mstime = glb_ms_time();
 
     char request[MAX_STRING_LEN];
@@ -219,14 +219,15 @@ static void send_request(poller_item_t *poller_item) {
         
         poller_preprocess_error(poller_item, "Couldn't send request to the script");
         
-        return;
+        return POLL_STARTED_FAIL;
     }
 
     zabbix_log(LOG_LEVEL_DEBUG, "Request finished");
     
     worker_item->lastrequest = mstime;
-
     zabbix_log(LOG_LEVEL_DEBUG, "In %s: Ended", __func__);
+
+    return POLL_STARTED_OK;
 }
 /******************************************************************************
  * item deinit - freeing all interned string								  * 

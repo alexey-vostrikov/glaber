@@ -361,7 +361,7 @@ static int ip_str_version(const char *src) {
 /******************************************************************************
  * starts a connection for the session 										  *
  * ***************************************************************************/
-static void tcp_start_connection(poller_item_t *poller_item)
+static int tcp_start_connection(poller_item_t *poller_item)
 {
 	DEBUG_ITEM(poller_item_get_id(poller_item),
 			   "starting tcp connection for the item");
@@ -372,14 +372,13 @@ static void tcp_start_connection(poller_item_t *poller_item)
 	if (DEFAULT_TCP_HOST_CONTENTION <= (n = poller_contention_get_sessions(tcp_item->ipaddr)))
 	{
 	 	DEBUG_ITEM(poller_item_get_id(poller_item), "There are already %d connections for the %s host, delaying poll", n, tcp_item->interface_addr);
-	 	poller_return_delayed_item_to_queue(poller_item);
-	 	return;
+	 	return POLL_NEED_DELAY;
 	}
 	DEBUG_ITEM(poller_item_get_id(poller_item), "There are already %d connections for the %s host, doing poll", n, tcp_item->interface_addr);
 
 	if (1 == tcp_item->useip) {
 		tcp_send_request(poller_item);
-		return;
+		return POLL_STARTED_OK;
 	}
 
 	if ( tcp_item->next_resolve < time(NULL))
@@ -391,11 +390,13 @@ static void tcp_start_connection(poller_item_t *poller_item)
 			DEBUG_ITEM(poller_item_get_id(poller_item), "Cannot resolve item's interface addr: '%s'", tcp_item->interface_addr);
 			poller_preprocess_error(poller_item, "Cannot resolve item's interface hostname");
 			poller_return_item_to_queue(poller_item);
+			return POLL_STARTED_FAIL;
 		}
-		return;
+		
 	}
 	//LOG_INF("This is dns name %s item, but still cached addres %s",tcp_item->interface_addr, tcp_item->ipaddr);
 	tcp_send_request(poller_item);
+	return POLL_STARTED_OK;
 }
 
 static void tcp_free_item(poller_item_t *poller_item)

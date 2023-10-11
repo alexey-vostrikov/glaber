@@ -27,7 +27,8 @@
 $html_page = (new CHtmlPage())
 	->setTitle(_('Discovery rules'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_HOST_DISCOVERY_EDIT))
-	->setNavigation(new CHostNav(CHostNav::getData($data['hostid'], array_key_exists('itemid', $data) ? $data['itemid'] : 0)));
+	->setNavigation(getHostNavigation('discoveries', $data['hostid'],
+		array_key_exists('itemid', $data) ? $data['itemid'] : 0));
 
 $url = (new CUrl('host_discovery.php'))
 	->setArgument('context', $data['context'])
@@ -982,7 +983,12 @@ $tab = (new CTabView())
 	)
 	->addTab('lldMacroTab', _('LLD macros'), $lld_macro_tab, TAB_INDICATOR_LLD_MACROS)
 	->addTab('macroTab', _('Filters'), $condition_tab, TAB_INDICATOR_FILTERS)
-	->addTab('overridesTab', _('Overrides'), $overrides_tab, TAB_INDICATOR_OVERRIDES);
+	->addTab('overridesTab', _('Overrides'), $overrides_tab, TAB_INDICATOR_OVERRIDES)
+	->addTab('itemInfo',_('Operational state'),
+		(new CFormGrid())
+			->setId('item_state_information')
+			->addItem((new CLatestValue($data['item'], NULL, NULL))->makeStateInfo())
+		);
 
 if ($data['form_refresh'] == 0) {
 	$tab->setSelected(0);

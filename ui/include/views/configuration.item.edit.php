@@ -999,8 +999,10 @@ $item_tabs = (new CTabView())
 				))->addClass('js-item-preprocessing-type')
 			]),
 		TAB_INDICATOR_PREPROCESSING
-	)
-	->addTab('itemInfo',_('Operational state'),
+		);
+
+if (isset($data['item']))
+	$item_tabs->addTab('itemInfo',_('Operational state'),
 	(new CFormGrid())
 			->setId('item_state_information')
 			->addItem((new CLatestValue($data['item'], NULL, $data['triggers']))->makeStateInfo())

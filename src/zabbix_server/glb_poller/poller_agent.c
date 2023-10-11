@@ -424,14 +424,14 @@ void agent_send_request(poller_item_t *poller_item, const char *addr) {
 	agent_start_timeout_watch(poller_item);
 }
 
-static void agent_start_connection(poller_item_t *poller_item) {
+static int agent_start_connection(poller_item_t *poller_item) {
 	agent_item_t *agent_item = poller_item_get_specific_data(poller_item);
 	int n;
 
 	if ( ZBX_TCP_SEC_UNENCRYPTED == agent_item->tls_connect) {
 		DEBUG_ITEM(poller_item_get_id(poller_item), "Item has no TLS set, skipping for test purposes");
 		poller_return_delayed_item_to_queue(poller_item);
-		return;
+		return POLL_STARTED_OK;
 	}
 
 	DEBUG_ITEM(poller_item_get_id(poller_item), "starting agent connection for the item");
@@ -439,16 +439,15 @@ static void agent_start_connection(poller_item_t *poller_item) {
 	if (AGENT_MAX_HOST_CONTENTION <= (n = poller_contention_get_sessions(agent_item->addr))) {
 		DEBUG_ITEM(poller_item_get_id(poller_item), 
 			"There are already %d connections to the host already, delaying the item", n);
-		poller_return_delayed_item_to_queue(poller_item);
-		return;
+		return POLL_NEED_DELAY;
 	}
 
-	if (AGENT_POLLER_MAX_CONNECTIONS <= (n =  poller_contention_sessions_count() )) {
-		DEBUG_ITEM(poller_item_get_id(poller_item), 
-			"There are already %d total connections, delaying the item", n);
-		poller_return_delayed_item_to_queue(poller_item);
-		return;
-	}
+	// if (AGENT_POLLER_MAX_CONNECTIONS <= (n =  poller_contention_sessions_count() )) {
+	// 	DEBUG_ITEM(poller_item_get_id(poller_item), 
+	// 		"There are already %d total connections, delaying the item", n);
+	// 	poller_return_delayed_item_to_queue(poller_item);
+	// 	return POLL_ME;
+	// }
 	
 	LOG_INF("Starting a new connection to `%s`, total connections %d", 
 			agent_item->addr, poller_contention_sessions_count());
@@ -458,11 +457,13 @@ static void agent_start_connection(poller_item_t *poller_item) {
 	if (0 == agent_item->useip) {
 		DEBUG_ITEM(poller_item_get_id(poller_item), "Doing async item resolve of addr '%s'", agent_item->addr);
 		poller_async_resolve(poller_item, agent_item->addr);
-		return;
+		return POLL_STARTED_OK;
 	}
 	
 	DEBUG_ITEM(poller_item_get_id(poller_item), "Item doesn't need resolving");
 	agent_send_request(poller_item, agent_item->addr);
+	
+	return POLL_STARTED_OK;
 }
  static void agent_resolve_fail_cb(poller_item_t *poller_item) {
 	DEBUG_ITEM(poller_item_get_id(poller_item),"Failed to reolve item's DNS address");
