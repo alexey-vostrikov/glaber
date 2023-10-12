@@ -90,15 +90,12 @@ class WidgetView extends CControllerDashboardWidgetView {
 			else {
 				$out_values=[];
 				$history = Manager::History()->getLastValues($items, $this->fields_values['show_lines']);
-			//	error_log("Requested ".$this->fields_values['show_lines']." got ". count($histories). " :".json_encode($histories) ."\n");
+
 				if ($history) {
-					//$histories = array_merge(...$histories);
 
 					foreach ($history as $itemid => &$history_vals) {
-					//	error_log("Processing $itemid hist:". count($history_vals));
 
 						foreach ($history_vals as $val) {
-							error_log("Processing $itemid val:". \json_encode($val));
 							$val['itemid'] = $itemid;
 							$val['value'] = formatHistoryValue($val['value'], $items[$itemid], false);
 							$val['value'] = $this->fields_values['show_as_html']
