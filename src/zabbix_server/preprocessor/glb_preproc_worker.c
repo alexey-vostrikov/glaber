@@ -195,6 +195,10 @@ void preprocessing_worker_init(zbx_thread_args_t *args, glb_preproc_worker_conf_
 			(zbx_clean_func_t)pp_item_clear,
 			ZBX_DEFAULT_MEM_MALLOC_FUNC, ZBX_DEFAULT_MEM_REALLOC_FUNC, ZBX_DEFAULT_MEM_FREE_FUNC);
   
+    
+	LOG_INF("%s #%d started [%s #%d]", get_program_type_string(args->info.program_type),
+			args->info.server_num, get_process_type_string(args->info.process_type), args->info.process_num);
+    
     preprocessing_sync_conf(NULL, conf);
 	
 #ifdef HAVE_LIBXML2

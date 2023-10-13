@@ -928,7 +928,7 @@ class CTrigger extends CTriggerGeneral {
 				$triggers[$triggerid]['value'] = TRIGGER_VALUE_UNKNOWN;
 				$triggers[$triggerid]['lastchange'] = 0;
 				$triggers[$triggerid]['lastvaluechange'] = 0;
-				$triggers[$triggerid]['error'] = "Server not return result";
+				$triggers[$triggerid]['error'] = "Server did not return result";
 			}
 
 			$triggerValues = $this->getTriggerValues(array_column($triggers, 'triggerid'));

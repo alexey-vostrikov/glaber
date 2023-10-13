@@ -215,8 +215,8 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 	{
 		diff = (zbx_trigger_diff_t *)trigger_diff->values[i];
         
-        if (ZBX_FLAGS_TRIGGER_DIFF_UNSET == diff->flags)
-            continue;
+     //   if (ZBX_FLAGS_TRIGGER_DIFF_UNSET == diff->flags)
+     //       continue;
         
         bzero(&info, sizeof(info));
 		
@@ -224,8 +224,8 @@ void glb_state_triggers_apply_diffs(zbx_vector_ptr_t *trigger_diff)
 		info.value = diff->value;
 		info.lastcalc = diff->lastchange;   
 
-        DEBUG_TRIGGER(diff->triggerid,"Saving trigger state to state cache: value %d, lastcalc: %d",
-            info.value, info.lastcalc);
+        DEBUG_TRIGGER(diff->triggerid,"Saving trigger state to state cache: value %d, lastcalc: %d, error: %d",
+            info.value, info.lastcalc, info.error);
 
 		if (0 != (diff->flags & ZBX_FLAGS_TRIGGER_DIFF_UPDATE_ERROR))
 			info.error = diff->error;		

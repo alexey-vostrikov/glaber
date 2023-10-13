@@ -9907,7 +9907,7 @@ void DCconfig_get_preprocessable_items(zbx_hashset_t *items, zbx_uint64_t *revis
 		if (HOST_STATUS_MONITORED != dc_host->status)
 			continue;
 		//only the process config fetching
-		if (manager_num >= 0  && dc_host->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR] != manager_num - 1)
+		if (manager_num >= 0  && (dc_host->hostid % CONFIG_FORKS[GLB_PROCESS_TYPE_PREPROCESSOR]) != (manager_num - 1))
 			continue;
 		
 		//iterating on all hosts items
