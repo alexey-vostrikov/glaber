@@ -35,6 +35,16 @@ stages:
   - pkg-build
   - docker-build
 
+.add_ssh_key: &add_ssh_key
+  - eval $(ssh-agent -s)
+  - echo "${SSH_PRIVATE_KEY_GLABERIO_BASE64}" | base64 -d | ssh-add -
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo 'Host *' > ~/.ssh/config
+  - echo '  StrictHostKeyChecking no' >> ~/.ssh/config
+  - echo '  UserKnownHostsFile /dev/null' >> ~/.ssh/config
+  - chmod 400 ~/.ssh/config
+
 .build_docker: &build_docker
   # github api have some api rate limits for non auth users, so,
   # we need to create PACKER_GITHUB_API_TOKEN secret in gitlab
@@ -63,11 +73,7 @@ stages:
   - export GLABER_VERSION=$(cat include/version.h | grep GLABER_VERSION | tr -dc 0-9.)
   - echo $GLABER_VERSION
 
-.clean_old_dists: &clean_old_dists
-  - rm $FULL_PROJECT_PATH/../glaber*.deb || true
-
 .prepare_sources: &prepare_sources
-  - *clean_old_dists
   - *set_glb_version
   - ./bootstrap.sh
   - ./configure
@@ -84,24 +90,24 @@ stages:
   - make dbschema gettext
   - *upload_mysql_schema
   - autoreconf -fvi
-  - cd ..
-  - cp -r glaber glaber-$GLABER_VERSION
-  - tar -czvf glaber-$GLABER_VERSION.tar.gz glaber-$GLABER_VERSION
-  - cd ${CI_PROJECT_DIR}
+  - cp -r ../glaber ../glaber-$GLABER_VERSION
+  - tar -czvf ../glaber-$GLABER_VERSION.tar.gz ../glaber-$GLABER_VERSION
   - cp -r build/${OS}/${OS_VER}/* build/centos
   - mv ../glaber-$GLABER_VERSION.tar.gz build/centos/SOURCES/glaber-$GLABER_VERSION.tar.gz
   - sed -i "2 s/Version:.*/Version:\t$GLABER_VERSION/g" build/centos/SPECS/zabbix.spec
 
 .upload_packages: &upload_packages
-  - pwd && ls -al
-  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r ../glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --waitforlock 120 --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
+  - echo "Will upload to '$REPO_DIR' repo"
+  - *add_ssh_key
+  - scp -r debbuild/glaber*.deb ${SCP_USER}@glaber.io:~/$REPO_DIR/${OS}/${OS_VER}
+  - ssh -T ${SCP_USER}@glaber.io  "reprepro --confdir /etc/reprepro/conf --waitforlock 120 --dbdir /var/reprepro/$REPO_DIR --outdir /var/www/glaber.io/$REPO_DIR/${OS}/ includedeb ${OS_VER}  ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
+  - ssh -T ${SCP_USER}@glaber.io  "rm ~/$REPO_DIR/${OS}/${OS_VER}/*.deb"
 
 .upload_rpms: &upload_rpms
   - echo "Will upload to '$REPO_DIR' repo"
-  - sshpass -p ${SCP_PASS} scp -o StrictHostKeyChecking=no -r /root/rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
-  - sshpass -p ${SCP_PASS} ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
+  - *add_ssh_key
+  - scp -r rpmbuild/RPMS/* ${SCP_USER}@glaber.io:/var/www/glaber.io/$REPO_DIR/rhel/${OS_VER}/RPMS/
+  - ssh -T ${SCP_USER}@glaber.io  "cd /var/www/glaber.io/$REPO_DIR/rhel/${OS_VER} && createrepo ."
 
 # template for the pre-build stage with docker build
 .base-pre-builder:
@@ -131,14 +137,15 @@ stages:
       - /cache/.ccache/${CI_JOB_NAME}/
   before_script:
     - ccache -z # Clear the statistics
+    - mkdir debbuild
   after_script:
     - ccache -s # Show ccache statistics
   stage: pkg-build
   image: "${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${PRE_BUILDER_VERSION}"
   script:
-    - export FULL_PROJECT_PATH=$PWD
     - *prepare_sources
     - dpkg-buildpackage -b --no-sign
+    - mv ../glaber*.deb debbuild/
     - *upload_packages
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
@@ -154,17 +161,17 @@ stages:
       - /cache/.ccache/${CI_JOB_NAME}/
   before_script:
     - ccache -z # Clear the statistics
+    - mkdir rpmbuild
   after_script:
     - ccache -s # Show ccache statistics
   stage: pkg-build
   image: "${CI_REGISTRY_IMAGE}/${OS}-${OS_VER}-builder:${PRE_BUILDER_VERSION}"
   script:
-    - rm -rf /root/rpmbuild/BUILD/*
-    - export FULL_PROJECT_PATH=$PWD
     - *prepare_rpm_sources
     - cd build/centos
     - yum-builddep -y SPECS/zabbix.spec
-    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION"
+    - rpmbuild -bb SPECS/zabbix.spec --define "_sourcedir $PWD/SOURCES" --define "glaber_version $GLABER_VERSION" --define "_topdir $CI_PROJECT_DIR/rpmbuild"
+    - cd $CI_PROJECT_DIR
     - *upload_rpms
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
@@ -179,9 +186,12 @@ astra:
   hooks: 
     pre_get_sources_script: 
       - update-ca-certificates
+  before_script:
+    - mkdir debbuild
   script:
     - *prepare_sources
     - dpkg-buildpackage -b --no-sign
+    - mv ../glaber*.deb debbuild/
     - *upload_packages
   rules:
     - if: $CI_COMMIT_MESSAGE !~ /pre-build/
@@ -192,18 +202,14 @@ centos-8:
     OS: almalinux
     OS_VER: 8
     PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
-  hooks: 
-    pre_get_sources_script: 
-    #   - rm -rf /builds/mikler/*
-      - rm -rf $CI_BUILDS_DIR/glaber*
 
 # after spec folder created build/almalinux/9
-# centos-9:
-#   extends: .base-centos-builder
-#   variables:
-#     OS: almalinux
-#     OS_VER: 9
-#     PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
+centos-9:
+  extends: .base-centos-builder
+  variables:
+    OS: almalinux
+    OS_VER: 9
+    PRE_BUILDER_VERSION: ${CENTOS_BUILDER_VERSION}
 
 debian-buster:
   extends: .base-debian-builder
@@ -219,12 +225,12 @@ debian-bullseye:
     OS_VER: bullseye
     PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
-# debian-bookworm:
-#   extends: .base-debian-builder
-#   variables:
-#     OS: debian
-#     OS_VER: bookworm
-#     PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
+debian-bookworm:
+  extends: .base-debian-builder
+  variables:
+    OS: debian
+    OS_VER: bookworm
+    PRE_BUILDER_VERSION: ${DEBIAN_BUILDER_VERSION}
 
 ubuntu-focal:
   extends: .base-debian-builder
@@ -240,12 +246,12 @@ ubuntu-bionic:
     OS_VER: bionic
     PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
-# ubuntu-jammy:
-#   extends: .base-debian-builder
-#   variables:
-#     OS: ubuntu
-#     OS_VER: jammy
-#     PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
+ubuntu-jammy:
+  extends: .base-debian-builder
+  variables:
+    OS: ubuntu
+    OS_VER: jammy
+    PRE_BUILDER_VERSION: ${UBUNTU_BUILDER_VERSION}
 
 # build for the docker packages
 docker-debian-bullseye:
