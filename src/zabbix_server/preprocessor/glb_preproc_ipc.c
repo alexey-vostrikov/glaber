@@ -64,9 +64,9 @@ INTERNAL_METRIC_CALLBACK(preprocessing_stat_cb) {
     size_t alloc = 0, offset = 0;
     
      zbx_snprintf_alloc(result, &alloc, &offset, 
-             "{\"queue_size\":\"%d\","
+             "{\"queue_size\":\"%d\", \"sent\":\"%d\","
              "\"mem_total\":\"%ld\", \"mem_used\":\"%ld\",\"mem_free_pcnt\":\"%0.2f\"}",
-             ipc2_get_queue_size(conf->preproc_ipc),
+             ipc2_get_queue_size(conf->preproc_ipc), ipc2_get_sent_items(conf->preproc_ipc),
              preproc_ipc_mem->total_size,  preproc_ipc_mem->used_size,  
              ((double)preproc_ipc_mem->free_size * 100.0)/((double)preproc_ipc_mem->total_size));
 
@@ -77,9 +77,9 @@ INTERNAL_METRIC_CALLBACK(processing_stat_cb) {
     size_t alloc = 0, offset = 0;
     
      zbx_snprintf_alloc(result, &alloc, &offset, 
-         "{\"queue_size\":\"%d\", \"sent\":\"?\","
+         "{\"queue_size\":\"%d\", \"sent\":\"%d\","
          "\"mem_total\":\"%ld\", \"mem_used\":\"%ld\",\"mem_free_pcnt\":\"%0.2f\"}",
-        ipc2_get_queue_size(conf->preproc_ipc),
+        ipc2_get_queue_size(conf->preproc_ipc), ipc2_get_sent_items(conf->preproc_ipc),
         proc_ipc_mem->total_size,  proc_ipc_mem->used_size,  ((double)proc_ipc_mem->free_size * 100.0)/((double)proc_ipc_mem->total_size));
         
     return SUCCEED;
