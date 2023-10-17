@@ -919,7 +919,7 @@ static int	pp_execute_snmp_to_json(zbx_variant_t *value, const char *params)
  *               FAIL    - otherwise. The error message is stored in value.   *
  *                                                                            *
  ******************************************************************************/
-int	pp_execute_step(zbx_pp_context_t *ctx, metric_t *metric_in, zbx_pp_cache_t *cache, unsigned char value_type,
+int	pp_execute_step(zbx_pp_context_t *ctx, const metric_t *metric_in, zbx_pp_cache_t *cache, unsigned char value_type,
 		zbx_variant_t *value, zbx_pp_step_t *step, zbx_variant_t *history_value,
 		zbx_timespec_t *history_ts)
 {
@@ -1049,7 +1049,7 @@ out:
  *                                                                            *
  ******************************************************************************/
 void	pp_execute(zbx_pp_context_t *ctx, zbx_pp_item_preproc_t *preproc, zbx_pp_cache_t *cache,
-		metric_t *metric_in, zbx_variant_t *value_out, zbx_pp_result_t **results_out,
+		const metric_t *metric_in, zbx_variant_t *value_out, zbx_pp_result_t **results_out,
 		int *results_num_out)
 {
 	zbx_pp_result_t		*results;

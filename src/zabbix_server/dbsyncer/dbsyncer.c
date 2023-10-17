@@ -27,7 +27,7 @@
 #include "zbxexport.h"
 #include "zbxprof.h"
 #include "trends.h"
-#include "../../libs/apm/apm.h"
+
 
 extern int				CONFIG_HISTSYNCER_FREQUENCY;
 static sigset_t				orig_mask;
@@ -137,8 +137,7 @@ ZBX_THREAD_ENTRY(dbsyncer_thread, args)
 	if (SUCCEED == zbx_is_export_enabled(ZBX_FLAG_EXPTYPE_EVENTS))
 		problems_export = zbx_problems_export_init(get_problems_export, "history-syncer", process_num);
 
-	apm_add_heap_usage();
-	
+
 	for (;;)
 	{
 		sec = zbx_time();

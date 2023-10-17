@@ -1,3 +1,5 @@
+2023-12-07 ver  3.3.32 (master)
+    - fix: metric IPC refactored to avoid memory leaking
 2023-12-07 ver  3.3.31 (master)
     - fix: set trigger state whatever the set flags to update trigger error
 2023-12-07 ver  3.3.30 (master)

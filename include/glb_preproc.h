@@ -23,23 +23,24 @@
 
 #include "zbxcommon.h"
 #include "metric.h"
+typedef void (*metric_preprocess_func_t)(const metric_t *metric);
+typedef void (*metric_process_func_t)(const metric_t *metric, int i, void *ctx_data);
 
-int preproc_ipc_init();
+int metrics_ipc_init();
 
 int preprocess_send_metric(const metric_t *metric);
+int preprocess_send_metric_hi_priority(const metric_t *metric);
 int preprocess_send_metric_ext(const metric_t *metric, int send_mode, int priority);
 int preprocessing_flush();
 
 int preprocessing_force_flush();
 int processing_force_flush();
-void preprocessing_dump_sender_queues();
 
-typedef void (*ipc_data_create_cb_t)(mem_funcs_t *memf, void *ipc_data, void *buffer);
-typedef void (*ipc_data_free_cb_t)(mem_funcs_t *memf, void *ipc_data);
-typedef void (*ipc_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data);
 
-int preproc_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
-int process_receive_metrics(int process_num, ipc_data_process_cb_t proc_func, void *cb_data, int max_count);
+typedef void (*ipc2_data_process_cb_t)(mem_funcs_t *memf, int i, void *ipc_data, void *cb_data);
+
+int preproc_receive_metrics(int process_num, metric_preprocess_func_t proc_func, void *cb_data, int max_count);
+int process_receive_metrics(int process_num, metric_process_func_t proc_func, void *cb_data, int max_count);
 
 #define IPC_CREATE_CB(name) \
 		static void name(mem_funcs_t *memf, void *ipc_data, void *local_data)

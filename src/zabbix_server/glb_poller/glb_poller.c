@@ -36,7 +36,6 @@
 #include "poller_tcp.h"
 #include "calculated.h"
 #include "poller_snmp_worker.h"
-//#include "poller_agent.h"
 
 #include "snmp.h"
 #include "../../libs/glb_state/glb_state_items.h"
@@ -47,7 +46,7 @@
 #include "poller_ipc.h"
 #include "poller_sessions.h"
 #include "poller_contention.h"
-//#include "../../libs/apm/apm.h"
+
 #include "zbxsysinfo.h"
 #include "glb_preproc.h"
 

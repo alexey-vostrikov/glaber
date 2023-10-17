@@ -25,6 +25,7 @@
 
 
 #include "../../libs/glb_state/tests/glb_state_tests.h"
+#include "../../libs/zbxipcservice/tests/glb_ipc2_serial_tests.h"
 #include "../../libs/zbxalgo/tests/algo_tests.h"
 
 #include "../preprocessor/tests/preproc_tests.h"
@@ -34,9 +35,14 @@
 
 #include "log.h"
 void tests_server_run(void) {
+    
+    
     LOG_INF("Running server tests");    
     sleep(1);
     
+    LOG_INF("Running server IPC2 tests");    
+    glb_ipc2_run_serial_tests();
+
     LOG_INF("Running state tests");
     glb_state_run_tests();
     

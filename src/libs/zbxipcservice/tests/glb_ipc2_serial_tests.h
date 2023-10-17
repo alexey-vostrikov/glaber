@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2023 Glaber
+** Copyright Glaber 2018-2023
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -15,13 +15,6 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
-#ifndef GLB_COMMON_H
-#define GLB_COMMON_H
+#include "glb_common.h"
 
-
-#define GLB_ICMP 20
-#define ZBX_ICMP 21
-
-//#define HAVE_GLB_TESTS 1
-
-#endif
+void glb_ipc2_run_serial_tests();

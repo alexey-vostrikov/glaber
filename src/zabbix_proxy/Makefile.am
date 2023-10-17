@@ -26,7 +26,6 @@ zabbix_proxy_SOURCES = proxy.c
 
 zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
-	$(top_builddir)/src/libs/apm/libglbapm.a \
 	diag/libzbxdiag_proxy.a \
 	$(top_builddir)/src/zabbix_server/dbsyncer/libzbxdbsyncer.a \
 	$(top_builddir)/src/zabbix_server/discoverer/libzbxdiscoverer.a \

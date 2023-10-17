@@ -19,5 +19,5 @@
 
 #include "zbxcommon.h"
 #include "zbxtime.h"
-int pp_execute_dispatch(metric_t *orig_metric, zbx_variant_t *value,  const char *params_in);
-int pp_execute_dispatch_by_ip(metric_t *orig_metric, zbx_variant_t *value, const char *params);
+int pp_execute_dispatch(const metric_t *orig_metric, zbx_variant_t *value,  const char *params_in);
+int pp_execute_dispatch_by_ip(const metric_t *orig_metric, zbx_variant_t *value, const char *params);

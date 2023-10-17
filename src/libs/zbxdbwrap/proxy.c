@@ -1215,8 +1215,7 @@ int	zbx_process_history_data(zbx_history_recv_item_t *items, zbx_agent_value_t *
 	if (0 < processed_num)
 		zbx_dc_items_update_nextcheck(items, values, errcodes, values_num);
 
-	
-	
+
 	processing_force_flush();
 	preprocessing_force_flush();
 

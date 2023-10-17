@@ -58,9 +58,12 @@ static void async_tcp_destroy_session(poller_item_t *poller_item)
 {
 	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
 
-	bufferevent_free(tcp_item->bev);
+	if (NULL != tcp_item && NULL != tcp_item->bev) {
+		bufferevent_free(tcp_item->bev);
+		tcp_item->bev = NULL;
+	}
+
 	poller_return_item_to_queue(poller_item);
-	tcp_item->bev = NULL;
 
 }
 
@@ -73,6 +76,9 @@ static void response_cb(struct bufferevent *bev, void *ctx_ptr)
 
 	poller_item_t *poller_item = ctx_ptr;
 	tcp_item_t *tcp_item = poller_item_get_specific_data(poller_item);
+
+	if (NULL == tcp_item->bev)  
+		return;
 
 	struct evbuffer *input = bufferevent_get_input(tcp_item->bev);
 
@@ -140,7 +146,10 @@ static void events_cb(struct bufferevent *bev, short events, void *ptr)
 	}
 
 	if (events & BEV_EVENT_EOF) // this might happen when other side sent all data and closed connection
-	{
+	{	
+		if (NULL == tcp_item->bev) 
+			return;
+
 		struct evbuffer *input = bufferevent_get_input(tcp_item->bev);
 		int n = evbuffer_get_length(input);
 

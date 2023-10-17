@@ -90,10 +90,9 @@
 
 
 #include "../libs/zbxexec/worker.h"
-#include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
 #include "../libs/glb_state/glb_state_items.h"
-#include "../libs/apm/apm.h"
+
 
 #ifdef HAVE_GLB_TESTS
 #include "./tests/server_tests.h"
@@ -1663,19 +1662,13 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == apm_init())
-	{
-		zbx_error("Cannot initialize internal monitoring IPC");
-		exit(EXIT_FAILURE);
-	}
-	
 	if (FAIL == poller_notify_ipc_init(256 * ZBX_MEBIBYTE))
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
 
-	if (FAIL == preproc_ipc_init())
+	if (FAIL == metrics_ipc_init())
 	{
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);

@@ -1618,14 +1618,12 @@ static void proxy_prepare_history(ZBX_DC_HISTORY *history, int history_num)
 	zbx_vector_uint64_destroy(&itemids);
 }
 
-IPC_PROCESS_CB(metrics_proc_cb) {
+static void metrics_proc_cb(const metric_t * metric, int i, void *cb_data) {
+	
 	ZBX_DC_HISTORY *history = cb_data;
-
 	ZBX_DC_HISTORY *h = &history[i];
 	bzero(h, sizeof(ZBX_DC_HISTORY));
 
-	metric_t *metric = ipc_data;
-	
 	history->state = ITEM_STATE_NORMAL;
 	
 	switch (metric->value.type)
@@ -1675,7 +1673,7 @@ static void sync_proxy_history(int *total_num, int proc_num)
 	do
 	{
 		history_num = process_receive_metrics(proc_num, metrics_proc_cb, history, ZBX_HC_SYNC_MAX );
-
+		LOG_INF("Finished process reveive metrics %d", history_num);
 		if (0 == history_num)
 			break;
 

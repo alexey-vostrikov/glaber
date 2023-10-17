@@ -153,7 +153,6 @@ zabbix_server_LDADD = \
 	$(top_builddir)/src/libs/glb_state/libglbstate.a \
 	$(top_builddir)/src/libs/glb_conf/libglbconfig.a \
 	$(top_builddir)/src/libs/zbxalgo/libzbxalgo.a \
-	$(top_builddir)/src/libs/apm/libglbapm.a \
 	$(top_builddir)/src/libs/zbxconnector/libzbxconnector.a \
 	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
 	$(top_builddir)/src/libs/zbxservice/libzbxservice.a \

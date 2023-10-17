@@ -67,11 +67,9 @@
 #include "preproc.h"
 #include "../zabbix_server/ipmi/ipmi_manager.h"
 
-#include "../libs/zbxipcservice/glb_ipc.h"
 #include "../libs/glb_state/glb_state.h"
 #include "../libs/glb_state/glb_state_items.h"
 #include "glb_preproc.h"
-#include "../libs/apm/apm.h"
 #include "../zabbix_server/glb_poller/poller_ipc.h"
 #include "../zabbix_server/preprocessor/glb_preproc_worker.h"
 #include "../zabbix_server/glb_poller/internal.h"
@@ -1584,18 +1582,13 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	}
 	
 	
-	if (FAIL == preproc_ipc_init()) {
+	if (FAIL == metrics_ipc_init()) {
 		zbx_error("Cannot initialize Processing notify IPC");
 		exit(EXIT_FAILURE);
 	}
 		
 	if (FAIL == poller_notify_ipc_init(64 * ZBX_MEBIBYTE)) {
 		zbx_error("Cannot initialize Processing notify IPC");
-		exit(EXIT_FAILURE);
-	}
-
-	if (FAIL == apm_init()) {
-		zbx_error("Cannot initialize internal monitoring IPC");
 		exit(EXIT_FAILURE);
 	}
 

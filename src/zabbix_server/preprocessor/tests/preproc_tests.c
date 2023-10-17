@@ -29,7 +29,7 @@
 #include "../../glb_poller/internal.h"
 #include "../../../libs/glb_state/glb_state.h"
 
-IPC_PROCESS_CB(processing_cb) {
+void processing_cb(const metric_t *metric){
 }
 
 
@@ -42,7 +42,7 @@ static int test_no_leaks_run() {
     glb_state_init();
 
     LOG_INF("Running leak check testing");
-    assert(SUCCEED == preproc_ipc_init() && "Make sure succeeded init run" );
+    assert(SUCCEED == metrics_ipc_init() && "Make sure succeeded init run" );
     
     LOG_INF("Saving statistics data");
     

@@ -239,3 +239,4 @@ ui/modules/*
 src/glapi/glb_hist_victoria
 src/glapi/glb_syslog_worker
 src/glapi/glb_ripe_subscriber
+src/zabbix_server/tests/test_utils.c

@@ -21,7 +21,7 @@ libglbpoller_a_SOURCES = \
 	snmp_util.c \
 	tcp_agent_proto.c \
 	tcp_simple_http_proto.c \
-	internal.c \ 
+	internal.c \
 	poller_snmp_worker.c \
 	poller_snmp_worker_discovery.c \
 	poller_snmp_worker_get.c \

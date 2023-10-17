@@ -36,14 +36,22 @@ static mem_funcs_t test_memf = {.free_func = __shmtest_shmem_free_func,
         .malloc_func= __shmtest_shmem_malloc_func,
         .realloc_func = __shmtest_shmem_realloc_func};
 
-mem_funcs_t * tests_mem_allocate_shmem(u_int64_t size) {
+int tests_mem_allocate_shmem(u_int64_t size, mem_funcs_t **memf,  zbx_shmem_info_t **shm_mem) {
     char *error = NULL;
-    if (SUCCEED != zbx_shmem_create(&shmtest_mem, size, "State cache size", "TestMemSize", 0, &error)) {
+    if (SUCCEED != zbx_shmem_create(&shmtest_mem, size, "State cache size", "TestMemSize", 1, &error)) {
         zabbix_log(LOG_LEVEL_CRIT,"Shared memory create failed: %s", error);
-    	exit(EXIT_FAILURE);
+    	return FAIL;
     }
+
     allocated_size = shmtest_mem->free_size;
-    return &test_memf;
+
+    if (NULL != shm_mem)
+        *shm_mem = shmtest_mem;
+
+    if ( NULL != memf)
+        *memf = &test_memf;
+
+    return SUCCEED;
 }
     
 int test_mem_release_shmem() {

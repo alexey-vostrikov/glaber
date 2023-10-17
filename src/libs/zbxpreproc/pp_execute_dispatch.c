@@ -27,7 +27,7 @@
 #include "glb_preproc.h"
 #include "../../zabbix_server/preprocessor/glb_preproc_ipc.h"
 
-#include "../zbxipcservice/glb_ipc.h"
+//#include "../zbxipcservice/glb_ipc.h"
 extern int		CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
 typedef struct
@@ -64,7 +64,7 @@ static preproc_params_t *item_preproc_parse_params(char *params_str)
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
  * *************************************************************************/
-int pp_execute_dispatch(metric_t *orig_metric, zbx_variant_t *value,  const char *params_in)
+int pp_execute_dispatch(const metric_t *orig_metric, zbx_variant_t *value,  const char *params_in)
 {
 	zbx_uint64_pair_t host_item_ids;
 	char *hostname = NULL, *error = NULL, params_copy[MAX_STRING_LEN];
@@ -102,7 +102,8 @@ int pp_execute_dispatch(metric_t *orig_metric, zbx_variant_t *value,  const char
 		metric.ts = orig_metric->ts;
 		metric.value = *value;
 		
-		preprocess_send_metric_ext(&metric, IPC_LOCK_BLOCK, IPC_SEND_HIGH_PRIORITY);
+		preprocess_send_metric_hi_priority(&metric);
+		//IPC_LOCK_BLOCK, IPC_SEND_HIGH_PRIORITY);
 
 		zbx_variant_clear(value);
 		zbx_variant_set_none(value);
@@ -119,7 +120,7 @@ int pp_execute_dispatch(metric_t *orig_metric, zbx_variant_t *value,  const char
 /***************************************************************************
  * dispatches or routes the item to another host/item stated in the cfg    *
  * *************************************************************************/
-int pp_execute_dispatch_by_ip(metric_t *orig_metric, zbx_variant_t *value, const char *params_in)
+int pp_execute_dispatch_by_ip(const metric_t *orig_metric, zbx_variant_t *value, const char *params_in)
 {
 	u_int64_t hostid, new_itemid;
 	char *ip_str = NULL, *key = NULL, params_copy[MAX_STRING_LEN], *error = NULL;
@@ -175,7 +176,7 @@ int pp_execute_dispatch_by_ip(metric_t *orig_metric, zbx_variant_t *value, const
 		metric.value = *value;
 		metric.ts = orig_metric->ts;
 
-		preprocess_send_metric_ext(&metric, IPC_LOCK_BLOCK, IPC_SEND_HIGH_PRIORITY);
+		preprocess_send_metric_hi_priority(&metric);
 
 		zbx_variant_clear(value);
 		zbx_variant_set_none(value);

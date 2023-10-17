@@ -20,7 +20,7 @@
 #include "zbxcommon.h"
 #include "zbxalgo.h"
 #include "zbxshmem.h"
-#include "../../libs/zbxipcservice/glb_ipc.h"
+#include "../../libs/zbxipcservice/glb_ipc2.h"
 
 extern int	CONFIG_FORKS[ZBX_PROCESS_TYPE_COUNT];
 
@@ -32,13 +32,15 @@ static mem_funcs_t ipc_memf = {
 		.malloc_func = __poller_ipc_notify_shmem_malloc_func, 
 		.realloc_func = __poller_ipc_notify_shmem_realloc_func};
 
-static ipc_conf_t* ipc_poller_notify[ITEM_TYPE_MAX];
+static ipc2_conf_t* ipc_poller_notify[ITEM_TYPE_MAX];
 
+static int poller_init_ipc_type(ipc2_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
+	char buffer[64];
 
-static int poller_init_ipc_type(ipc_conf_t* ipc_poll[], int type, int forks, mem_funcs_t *memf) {
+	zbx_snprintf(buffer, 64,  "poller notify type %d", type);
+	
 	if (0 < forks) {
-	//	LOG_INF("doing IPC init of type %d forks %d", type, forks);
-		ipc_poll[type] = ipc_vector_uint64_init(forks *2 *IPC_BULK_COUNT, forks, IPC_LOW_LATENCY, memf, poller_ipc_notify);
+		ipc_poll[type] = ipc2_init(forks, memf, buffer, poller_ipc_notify)  ;
 	}
 }
 
@@ -48,7 +50,7 @@ int poller_notify_ipc_init(size_t mem_size) {
 	if (SUCCEED != zbx_shmem_create(&poller_ipc_notify, mem_size, "Poller IPC notify queue", "Poller IPC notify queue", 1, &error))
 		return FAIL;
 
-	bzero(ipc_poller_notify, sizeof(ipc_conf_t*) * ZBX_PROCESS_TYPE_COUNT);
+	bzero(ipc_poller_notify, sizeof(ipc2_conf_t*) * ZBX_PROCESS_TYPE_COUNT);
 	
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SERVER, CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_AGENT, CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT], &ipc_memf);
@@ -62,7 +64,6 @@ int poller_notify_ipc_init(size_t mem_size) {
 }
 
 static int process_by_item_type[ITEM_TYPE_MAX] = {0};
-
 
 static zbx_vector_uint64_pair_t *notify_buffer[ITEM_TYPE_MAX];
 
@@ -114,6 +115,34 @@ int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t
 	return SUCCEED;
 }
 
+void send_uint64_vector_cb(void *mem, void *ctx_data) {
+	zbx_vector_uint64_t *vect = ctx_data;
+	
+	*(int *)mem = vect->values_num;
+	memcpy(mem + sizeof(int), vect->values, vect->values_num * sizeof(u_int64_t));
+}
+
+int vector_uint64_send(ipc2_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock ) {
+	
+	zbx_vector_uint64_t *snd = zbx_calloc(NULL, 0, sizeof(zbx_vector_uint64_t)*ipc2_get_consumers(ipc));
+	int i;
+
+	for (i = 0; i < ipc2_get_consumers(ipc); i++)
+		zbx_vector_uint64_create(&snd[i]);
+	
+	for (i = 0; i < vector->values_num; i++) {
+		zbx_vector_uint64_append(&snd[vector->values[i].first % ipc2_get_consumers(ipc)], vector->values[i].second);
+	}
+	
+	for(i = 0; i < ipc2_get_consumers(ipc); i++) {
+		ipc2_send_by_cb_fill(ipc, i, snd[i].values_num, sizeof(int) + sizeof(u_int64_t) * snd[i].values_num, 
+				send_uint64_vector_cb, &snd[i], ALLOC_PRIORITY_NORMAL);
+
+		zbx_vector_uint64_destroy(&snd[i]);
+	}
+	zbx_free(snd);
+}
+
 void poller_item_notify_flush(void) {
 	int type, i;
 	for (type = 0; type < ZBX_PROCESS_TYPE_COUNT; type++) {
@@ -123,15 +152,21 @@ void poller_item_notify_flush(void) {
 			if (NULL ==  ipc_poller_notify[type]) {
 				LOG_WRN("Got async-synced items of type %d with no async poller initilized, this is a programming bug", type);
 				THIS_SHOULD_NEVER_HAPPEN;
-				//exit(-1);
 			}
-			//LOG_INF("IPC: flushing %d items for type %d", notify_buffer[type]->values_num, type);
-			ipc_vector_uint64_send(ipc_poller_notify[type], notify_buffer[type], 1);
+
+			vector_uint64_send(ipc_poller_notify[type], notify_buffer[type], 1);
 			zbx_vector_uint64_pair_destroy(notify_buffer[type]);
 		}
 	}
 };
 
- int poller_ipc_notify_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items) {
-	ipc_vector_uint64_recieve(ipc_poller_notify[value_type], consumer, changed_items, IPC_PROCESS_ALL);
+void rcv_uint64_vector_cb(void *rcv_data, void *ctx_data) {
+	zbx_vector_uint64_t* v = ctx_data;
+	int count = *(int*)rcv_data;
+
+	zbx_vector_uint64_append_array(v, rcv_data + sizeof(int), count);
+}
+
+int poller_ipc_notify_rcv(int value_type, int consumer, zbx_vector_uint64_t* changed_items) {
+	ipc2_receive_one_chunk(ipc_poller_notify[value_type], NULL, consumer, rcv_uint64_vector_cb, changed_items);
 }

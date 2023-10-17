@@ -4,8 +4,8 @@ noinst_LIBRARIES = libzbxipcservice.a
 
 libzbxipcservice_a_SOURCES = \
 	ipcservice.c \
-	glb_ipc.c	\
-	glb_ipc.h
+	glb_ipc2.c \
+	glb_serial_buffer.c
 
 libzbxipcservice_a_CFLAGS = \
 	$(LIBEVENT_CFLAGS)

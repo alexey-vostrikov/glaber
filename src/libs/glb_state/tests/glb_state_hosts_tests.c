@@ -24,14 +24,13 @@
 #include "../../../zabbix_server/tests/test_utils.h"
 
 
-
 #define TEST_MEM_SIZE 16 * ZBX_MEBIBYTE
 extern int CONFIG_UNREACHABLE_DELAY;
 
 static void test_hosts_heartbeat_process(void){
     mem_funcs_t *test_memf;
 
-    test_memf = tests_mem_allocate_shmem(TEST_MEM_SIZE);
+    tests_mem_allocate_shmem(TEST_MEM_SIZE, &test_memf, NULL);
     glb_state_hosts_init(test_memf);
 
     //should just survive
@@ -64,7 +63,7 @@ static void test_hosts_heartbeat_process(void){
 void test_hosts_interface_process() {
     LOG_INF("%s started", __func__);
     mem_funcs_t *test_memf;
-    test_memf = tests_mem_allocate_shmem(TEST_MEM_SIZE);
+    tests_mem_allocate_shmem(TEST_MEM_SIZE, &test_memf, NULL);
 
     glb_state_hosts_init(test_memf);
     LOG_INF("Calling set avail by name");

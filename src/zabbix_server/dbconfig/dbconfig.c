@@ -28,8 +28,6 @@
 #include "zbx_rtc_constants.h"
 #include "../glb_poller/glb_poller.h"
 #include "../../libs/glb_state/glb_state_items.h"
-//#include "../../libs/apm/apm.h"
-
 
 extern int		CONFIG_CONFSYNCER_FREQUENCY;
 

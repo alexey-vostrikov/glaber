@@ -27,7 +27,6 @@
 #include "zbxpreproc.h"
 #include "zbxcacheconfig.h"
 #include "../../libs/zbxpreproc/pp_history.h"
-#include "../../libs/zbxipcservice/glb_ipc.h"
 #include "../../libs/zbxpreproc/pp_execute.h"
 #include "../../libs/zbxpreproc/preproc_snmp.h"
 #include "../glb_poller/poller_async_io.h"
@@ -90,7 +89,7 @@ static void send_preprocessed_metric(const metric_t *metric, const zbx_pp_item_t
     processing_send_metric(metric);
 }
 
-static void preprocess_metric_execute_steps(metric_t *metric, zbx_pp_cache_t *cache, int dep_level) {
+static void preprocess_metric_execute_steps(const metric_t *metric, zbx_pp_cache_t *cache, int dep_level) {
 
 	zbx_variant_t	value_out;
 	int			i, steps_num, results_num, ret;
@@ -149,8 +148,9 @@ static void process_dependent_metrics(metric_t * metric, zbx_pp_item_preproc_t *
     pp_cache_release(cache);
 }
 
-IPC_PROCESS_CB(metrics_proc_cb) {
-    preprocess_metric_execute_steps((metric_t*)ipc_data, NULL, MAX_DEPENDENCY_LEVEL);
+
+void metrics_proc_cb(const metric_t *metric) {
+    preprocess_metric_execute_steps(metric, NULL, MAX_DEPENDENCY_LEVEL);
 }
 
 void preprocessing_sync_conf(poller_item_t *poller_item, void *data) {

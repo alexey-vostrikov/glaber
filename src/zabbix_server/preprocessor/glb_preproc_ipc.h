@@ -17,13 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "../../libs/zbxipcservice/glb_ipc.h"
 #include "metric.h"
 
 int processing_send_metric(const metric_t *metric);
 int processing_flush();
 
-int preproc_ipc_init();
+int metrics_ipc_init();
 void preproc_ipc_destroy();
 
 

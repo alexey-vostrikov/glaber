@@ -20,5 +20,5 @@
 #include "zbxshmem.h"
 #include "zbxalgo.h"
 
-mem_funcs_t * tests_mem_allocate_shmem(u_int64_t size);
+int tests_mem_allocate_shmem(u_int64_t size, mem_funcs_t **memf,  zbx_shmem_info_t **shm_mem);
 int test_mem_release_shmem();

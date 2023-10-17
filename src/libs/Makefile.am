@@ -114,7 +114,6 @@ SERVER_SUBDIRS = \
 	zbxvault \
 	zbxversion \
 	zbxxml \
-	apm \
 	zbxeval \
 	zbxalgo/tests 
 else
@@ -160,7 +159,6 @@ PROXY_SUBDIRS = \
 	zbxversion \
 	glb_state \
 	glb_conf \
-	apm \
 	zbxxml
 endif
 endif
