@@ -176,7 +176,17 @@ static void process_result(const char *response)
 
         case SNMP_REQUEST_WALK:
             snmp_worker_process_walk_response(poller_item, &jp_resp);
+            
+            if (SUCCEED == snmp_worker_walk_need_more_data(snmp_item))
+            {
+                DEBUG_ITEM(poller_item_get_id(poller_item), "Item poll isn't finished, continue next oid");
+                snmp_worker_start_walk_next_walk(poller_item, NULL);
+                return;
+            }
+
+            snmp_worker_clean_walk_request(snmp_item);
             break;
+
         }
         DEBUG_ITEM(poller_item_get_id(poller_item), "Item poll is finished");
         snmp_worker_finish_poll(poller_item);
@@ -455,7 +465,7 @@ static void start_snmp_poll(poller_item_t *poller_item, const char *resolved_add
         snmp_worker_start_discovery_next_walk(poller_item, resolved_address);
         break;
     case SNMP_REQUEST_WALK:
-        snmp_worker_start_walk_request(poller_item, resolved_address);
+        snmp_worker_start_walk_next_walk(poller_item, resolved_address);
         break;
     default:
         LOG_INF("Unknown snmp item request type %d", snmp_item->request_type);

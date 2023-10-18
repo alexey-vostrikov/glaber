@@ -23,6 +23,7 @@
 #include "poller_async_io.h"
 
 typedef struct snmp_worker_discovery_t snmp_worker_discovery_t;
+typedef struct snmp_worker_walk_t snmp_worker_walk_t;
 typedef enum {
     SNMP_REQUEST_GET = 1,
     SNMP_REQUEST_WALK,
@@ -37,7 +38,7 @@ typedef struct {
 typedef union 
 {
     const char *get_oid;
-    const char *walk_oid;
+    snmp_worker_walk_t *walk_data;
     snmp_worker_discovery_t *discovery_data;
 } snmp_worker_request_data_t;
 

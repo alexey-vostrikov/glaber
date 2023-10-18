@@ -28,6 +28,8 @@ void snmp_worker_process_walk_response(poller_item_t *poller_item,  struct zbx_j
 void snmp_worker_clean_walk_request(snmp_worker_item_t *snmp_item);
 void snmp_worker_free_walk_item(poller_item_t *poller_item);
 int  snmp_worker_init_walk_item(poller_item_t *poller_item, const char *key);
-void snmp_worker_start_walk_request(poller_item_t *poller_item, const char *resolved_address);
+
+int snmp_worker_walk_need_more_data(snmp_worker_item_t *snmp_item);
+void snmp_worker_start_walk_next_walk(poller_item_t *poller_item, const char*addr);
 
 #endif

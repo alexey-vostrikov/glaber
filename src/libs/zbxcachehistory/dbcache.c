@@ -1673,7 +1673,7 @@ static void sync_proxy_history(int *total_num, int proc_num)
 	do
 	{
 		history_num = process_receive_metrics(proc_num, metrics_proc_cb, history, ZBX_HC_SYNC_MAX );
-		LOG_INF("Finished process reveive metrics %d", history_num);
+
 		if (0 == history_num)
 			break;
 

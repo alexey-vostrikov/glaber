@@ -70,7 +70,6 @@ void	snmp_walk_save_result_value(snmp_worker_discovery_t *ddata, const char *ind
 }
 
 static void snmp_worker_discovery_submit_result(poller_item_t *poller_item) {
-//    HALT_HERE("Result submission isn't implemented");
     zbx_hashset_iter_t iter;
     snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
     snmp_worker_discovery_t *ddata = snmp_item->request_data.discovery_data;
@@ -102,18 +101,8 @@ static void snmp_worker_discovery_submit_result(poller_item_t *poller_item) {
 	zbx_json_close(&js);
     DEBUG_ITEM(poller_item_get_id(poller_item),"Finished walk for the item, result is %s", js.buffer);
     
- //   LOG_INF("Finished walk");
- //  LOG_INF("Finished walk for the item %lld, oid is %s result is %s", poller_item_get_id(poller_item),
- //       snmp_item->request_data.discovery_data->buffer + snmp_item->request_data.discovery_data->oids[snmp_item->request_data.discovery_data->current_oid],
- //       js.buffer);
- // LOG_INF("Finished walk1");
 	poller_preprocess_str(poller_item, NULL, js.buffer);
-  //    LOG_INF("Finished walk2");
     zbx_json_free(&js);
- // LOG_INF("Finished walk3");
-//	poller_iface_register_succeed(poller_item);
-//  zbx_hashset_iter_reset(&snmp_item->request_data.discovery_data->results, &iter);
-
 }
 
 int  snmp_worker_process_discovery_response(poller_item_t *poller_item, struct zbx_json_parse *jp) {
