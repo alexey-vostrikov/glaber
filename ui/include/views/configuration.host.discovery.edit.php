@@ -983,12 +983,15 @@ $tab = (new CTabView())
 	)
 	->addTab('lldMacroTab', _('LLD macros'), $lld_macro_tab, TAB_INDICATOR_LLD_MACROS)
 	->addTab('macroTab', _('Filters'), $condition_tab, TAB_INDICATOR_FILTERS)
-	->addTab('overridesTab', _('Overrides'), $overrides_tab, TAB_INDICATOR_OVERRIDES)
-	->addTab('itemInfo',_('Operational state'),
+	->addTab('overridesTab', _('Overrides'), $overrides_tab, TAB_INDICATOR_OVERRIDES);
+	
+	if (isset($data['item']))  
+		$tab->addTab('itemInfo',_('Operational state'),
 		(new CFormGrid())
 			->setId('item_state_information')
-			->addItem((new CLatestValue($data['item'], NULL, NULL))->makeStateInfo())
-		);
+			->addItem((new CLatestValue($data['item'], NULL, NULL))->makeStateInfo()
+		));
+
 
 if ($data['form_refresh'] == 0) {
 	$tab->setSelected(0);
