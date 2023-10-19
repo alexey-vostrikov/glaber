@@ -340,14 +340,7 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		}
 
 		$host = new CSpan(
-			(new CLink($db_host['name'],
-				(new CUrl('zabbix.php'))
-					->setArgument('action', 'host.edit')
-					->setArgument('hostid', $db_host['hostid'])
-				)
-			)
-			->setAttribute('data-hostid', $db_host['hostid'])
-			->onClick('view.editHost(event, this.dataset.hostid);')
+			(new CHostLink($db_host['name'],$db_host['hostid']))
 		);
 
 		if ($current_element === '') {

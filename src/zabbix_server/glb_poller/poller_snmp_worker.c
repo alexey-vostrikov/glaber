@@ -154,6 +154,8 @@ static void process_result(const char *response)
     if (200 == code)
     {
         snmp_worker_item_t *snmp_item = poller_item_get_specific_data(poller_item);
+        
+        poller_iface_register_succeed(poller_item);
 
         switch (snmp_item->request_type)
         {

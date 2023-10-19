@@ -119,8 +119,9 @@ static int cmp_key_id(const char *key_1, const char *key_2)
 extern int CONFIG_DISABLE_SNMPV1_ASYNC;
 extern int CONFIG_ICMP_METHOD;
 extern char *CONFIG_WORKERS_DIR;
-
-static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host ) {
+//setting snmp version to avoid double lookup and to do a internal/worker dispath of items
+//should be removed when all snmp traffic is handled by the same method
+static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_DC_HOST *zbx_dc_host , int *snmp_version) {
 	extern unsigned char program_type;
 
 	DEBUG_ITEM(zbx_dc_item->itemid, "Item being checked if can be  async polled");
@@ -164,18 +165,24 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 		case ITEM_TYPE_SNMP: {
 			ZBX_DC_SNMPINTERFACE *snmp_iface;
 #ifdef HAVE_NETSNMP				
-			if ( CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP]== 0 ) {
+			if ( CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] == 0 &&  CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER] == 0) {
 				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
+				LOG_INF("SNMP check finished");
 				return FAIL;
 			}
 
 
-			snmp_iface = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp, &zbx_dc_item->interfaceid);
+			if (NULL == (snmp_iface = (ZBX_DC_SNMPINTERFACE *)zbx_hashset_search(&config->interfaces_snmp, &zbx_dc_item->interfaceid)))
+				return FAIL;
 							//avoiding dynamic and discovery items from being processed by async glb pollers
 			
-			if ( NULL == snmp_iface || 
-					//( snmp_iface->version == ZBX_IF_SNMP_VERSION_3) ||
-			   		(snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC) ) {
+			*snmp_version = snmp_iface->version;
+
+			//async snmpv3 id done in snmp worker only
+			if ( ZBX_IF_SNMP_VERSION_3 == snmp_iface->version && 0 == CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER] )
+				return FAIL;
+
+			if (snmp_iface->version == ZBX_IF_SNMP_VERSION_1 && CONFIG_DISABLE_SNMPV1_ASYNC ) {
 				
 				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be SNMP async polled, unsupported by async snmp version");
 				return FAIL;
@@ -183,12 +190,11 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 			
 			ZBX_DC_SNMPITEM *snmpitem = zbx_hashset_search(&config->snmpitems, &zbx_dc_item->itemid);
 			
-			if (NULL != strstr(snmpitem->snmp_oid,"[index,")) {
+			if ( NULL != snmpitem && NULL != snmpitem->snmp_oid &&  NULL != strstr(snmpitem->snmp_oid,"[\"index\",")) {
 				DEBUG_ITEM(zbx_dc_item->itemid, "This is an index OID, it might be only sync polled : %s", snmpitem->snmp_oid );
-				//LOG_INF("This is an index OID, it might be only sync polled : %s", snmpitem->snmp_oid);
 				return FAIL;
 			}
-
+			
 			DEBUG_ITEM(zbx_dc_item->itemid, "Item can be SNMP async polled");
 			
 			return SUCCEED;
@@ -847,6 +853,7 @@ void DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type)
 {
 	zbx_binary_heap_elem_t elem;
 	ZBX_DC_HOST *zbx_dc_host;
+	int snmp_version;
 
 	if (ZBX_LOC_POLLER == item->location)
 		return;
@@ -867,7 +874,7 @@ void DCupdate_item_queue(ZBX_DC_ITEM *item, unsigned char old_poller_type)
 	// do not put to queue items that might be processed in a glaber specifig pollers
 	zbx_dc_host = (ZBX_DC_HOST *)zbx_hashset_search(&config->hosts, &item->hostid);
 
-	if (NULL != zbx_dc_host && SUCCEED == glb_might_be_async_polled(item, zbx_dc_host))
+	if (NULL != zbx_dc_host && SUCCEED == glb_might_be_async_polled(item, zbx_dc_host, &snmp_version))
 	{
 		DEBUG_ITEM(item->itemid, "Not putting item to the queue, it might be async pooled");
 		item->poller_type = ZBX_NO_POLLER;
@@ -3383,10 +3390,11 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 		}
 
 		/* items that do not support notify-updates are passed to old queuing */
+		int snmp_version;
 
 		DEBUG_ITEM(item->itemid, "About to be checked how to poll");
-		if (FAIL == glb_might_be_async_polled(item, host) ||
-			FAIL == poller_item_add_notify(type, item->key, itemid, hostid))
+		if (FAIL == glb_might_be_async_polled(item, host, &snmp_version) ||
+			FAIL == poller_item_add_notify(type, item->key, itemid, hostid, snmp_version))
 		{
 
 			DEBUG_ITEM(item->itemid, "Cannot be async polled, adding to zbx queue %s", __func__);
@@ -3444,11 +3452,13 @@ static void DCsync_items(zbx_dbsync_t *sync, zbx_uint64_t revision, int flags, z
 			{
 				zbx_vector_dc_item_ptr_remove(&host->items, i);
 			}
-		
-			if (SUCCEED == glb_might_be_async_polled(item, host))
+			
+			int snmp_version;
+
+			if (SUCCEED == glb_might_be_async_polled(item, host, &snmp_version))
 			{
 				DEBUG_ITEM(item->itemid, "Sending poller notify about item removal");
-				poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
+				poller_item_add_notify(item->type, item->key, item->itemid, item->hostid, snmp_version);
 			}
 		}
 
@@ -11180,7 +11190,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 		DC_ITEM dc_item;
 
-		int errcode = SUCCEED;
+		int errcode = SUCCEED, snmp_version;
 		AGENT_RESULT result;
 		DEBUG_ITEM(itemids->values[i], "Regenerating config");
 
@@ -11190,7 +11200,7 @@ static int process_collected_items(void *poll_data, zbx_vector_uint64_t *itemids
 
 			DEBUG_ITEM(itemids->values[i], "Found item and host data");
 
-			if (FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host))
+			if (FAIL == glb_might_be_async_polled(zbx_dc_item, zbx_dc_host, &snmp_version))
 			{
 
 				DEBUG_ITEM(itemids->values[i], "Item shouldn't be processed anymore, removing from async polling (if it's there)");
@@ -14032,8 +14042,10 @@ void zbx_dc_reschedule_items(const zbx_vector_uint64_t *itemids, int nextcheck, 
 		else if (0 == (proxy_hostid = dc_host->proxy_hostid) ||
 				 SUCCEED == is_item_processed_by_server(dc_item->type, dc_item->key))
 		{
-			if (SUCCEED == glb_might_be_async_polled(dc_item, dc_host) ) {
-				poller_item_add_notify(dc_item->type, dc_item->key, dc_item->itemid, dc_host->hostid);
+			int snmp_version;
+
+			if (SUCCEED == glb_might_be_async_polled(dc_item, dc_host, &snmp_version) ) {
+				poller_item_add_notify(dc_item->type, dc_item->key, dc_item->itemid, dc_host->hostid, snmp_version);
 				
 				//LOG_INF("Added poll now notify for async item %ld", dc_item->itemid);
 
@@ -15674,7 +15686,7 @@ void DCget_host_items(u_int64_t hostid, zbx_vector_uint64_t *items)
 
 void DC_notify_changed_items(zbx_vector_uint64_t *items)
 {
-	int i;
+	int i, snmp_version;
 
 	RDLOCK_CACHE;
 
@@ -15694,10 +15706,10 @@ void DC_notify_changed_items(zbx_vector_uint64_t *items)
 			DEBUG_ITEM(items->values[i], "Couldn't host in find in items om notify change");
 			continue;
 		}
-		if (SUCCEED == glb_might_be_async_polled(item, host))
+		if (SUCCEED == glb_might_be_async_polled(item, host, &snmp_version))
 		{
 			DEBUG_ITEM(item->itemid, "Doing iface poller_item_add_notify");
-			poller_item_add_notify(item->type, item->key, item->itemid, item->hostid);
+			poller_item_add_notify(item->type, item->key, item->itemid, item->hostid, snmp_version);
 		}
 	}
 

@@ -55,6 +55,7 @@ int poller_notify_ipc_init(size_t mem_size) {
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SERVER, CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_AGENT, CONFIG_FORKS[GLB_PROCESS_TYPE_AGENT], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP, CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP], &ipc_memf);
+	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP_WORKER, CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_PINGER, CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_WORKER, CONFIG_FORKS[GLB_PROCESS_TYPE_WORKER], &ipc_memf);
 	poller_init_ipc_type(ipc_poller_notify, GLB_PROCESS_TYPE_SNMP_WORKER, CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER], &ipc_memf);
@@ -70,11 +71,10 @@ static zbx_vector_uint64_pair_t *notify_buffer[ITEM_TYPE_MAX];
 int poller_item_notify_init() {
 	int i;
 	
-	if (0 < CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER])
-		process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP_WORKER;
-	else 
-		process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP;
-
+//	if (0 < CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER])
+//		process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP_WORKER;
+//	else 
+	process_by_item_type[ITEM_TYPE_SNMP] = GLB_PROCESS_TYPE_SNMP;
 	process_by_item_type[ITEM_TYPE_AGENT] = GLB_PROCESS_TYPE_AGENT;
 	process_by_item_type[ITEM_TYPE_SIMPLE] = GLB_PROCESS_TYPE_PINGER;
 	process_by_item_type[ITEM_TYPE_CALCULATED] = ZBX_PROCESS_TYPE_HISTORYPOLLER;
@@ -87,7 +87,7 @@ int poller_item_notify_init() {
 	}
 }
 
-int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t hostid) {
+int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t hostid, int snmp_version) {
 	zbx_uint64_pair_t pair = {.first = hostid, .second = itemid};
 
 	DEBUG_ITEM(itemid,"Adding item to async polling notify for item type %d", item_type);
@@ -106,6 +106,13 @@ int poller_item_add_notify(int item_type, char *key, u_int64_t itemid, u_int64_t
 		return FAIL;
 	}
 
+	//here need to switch traffic to built-in poller or an external one
+	if (GLB_PROCESS_TYPE_SNMP == process_type &&
+	    (ZBX_IF_SNMP_VERSION_3 == snmp_version || 0 == CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP])) {
+	
+		process_type = GLB_PROCESS_TYPE_SNMP_WORKER;
+	}
+
 	if (NULL == ipc_poller_notify[process_type])
 		return FAIL;
 	
@@ -122,7 +129,7 @@ void send_uint64_vector_cb(void *mem, void *ctx_data) {
 	memcpy(mem + sizeof(int), vect->values, vect->values_num * sizeof(u_int64_t));
 }
 
-int vector_uint64_send(ipc2_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock ) {
+static int vector_uint64_send(ipc2_conf_t *ipc, zbx_vector_uint64_pair_t *vector, unsigned char lock ) {
 	
 	zbx_vector_uint64_t *snd = zbx_calloc(NULL, 0, sizeof(zbx_vector_uint64_t)*ipc2_get_consumers(ipc));
 	int i;
