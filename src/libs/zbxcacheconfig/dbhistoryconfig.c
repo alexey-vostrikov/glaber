@@ -346,7 +346,7 @@ void	zbx_dc_config_history_sync_get_triggers_by_itemids(zbx_hashset_t *trigger_i
 				DCget_trigger(trigger, dc_trigger, ZBX_TRIGGER_GET_ALL);
 				zbx_vector_ptr_append(trigger_order, trigger);
 			}
-
+			DEBUG_TRIGGER(trigger->triggerid, "Fetched trigger for calculation");
 			/* copy latest change timestamp */
 
 			if (trigger->timespec.sec < timespecs[i].sec ||
