@@ -373,7 +373,9 @@ int preprocess_agent_result(u_int64_t hostid, u_int64_t itemid, u_int64_t flags,
     if (ar->type & AR_DOUBLE)
         return preprocess_dbl(hostid, itemid, flags, ts, ar->dbl);
     
-    
+    if (ar->type & AR_LOG) 
+        return preprocess_str(hostid, itemid, flags, ts, ar->log->value);
+
     return FAIL;
 }
 

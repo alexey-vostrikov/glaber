@@ -1067,7 +1067,7 @@ static void	process_item_value(const zbx_history_recv_item_t *item, AGENT_RESULT
  ******************************************************************************/
 static int	process_history_data_value(zbx_history_recv_item_t *item, zbx_agent_value_t *value, int *h_num)
 {
-	DEBUG_ITEM(item->itemid,"Processing incoming metric for the item");
+	DEBUG_ITEM(item->itemid,"Processing incoming metric for the item type %d value '%s'", item->value_type, value->value);
 	
 	if (ITEM_STATUS_ACTIVE != item->status)
 		return FAIL;
@@ -1139,12 +1139,14 @@ static int	process_history_data_value(zbx_history_recv_item_t *item, zbx_agent_v
 				zbx_set_agent_result_type(&result, ITEM_VALUE_TYPE_TEXT, value->value);
 		}
 
-		if (0 != value->meta)
+		if (0 != value->meta) {
 			zbx_set_agent_result_meta(&result, value->lastlogsize, value->mtime);
+		}
 
 		if (0 != ZBX_ISSET_VALUE(&result) || 0 != ZBX_ISSET_META(&result))
 		{
 			item->state = ITEM_STATE_NORMAL;
+			DEBUG_ITEM(item->itemid, "Processing item value");
 			process_item_value(item, &result, &value->ts, h_num, NULL);
 		}
 
@@ -1957,7 +1959,7 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
  *                FAIL - an error occurred                                    *
  *                                                                            *
  ******************************************************************************/
-static int	process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_timespec_t *ts,
+static int		process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_timespec_t *ts,
 		zbx_client_item_validator_t validator_func, void *validator_args, char **info)
 {
 	int			ret;

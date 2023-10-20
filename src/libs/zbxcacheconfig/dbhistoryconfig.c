@@ -676,6 +676,7 @@ void	zbx_dc_config_history_recv_get_items_by_keys(zbx_history_recv_item_t *items
 			continue;
 		}
 
+		DEBUG_ITEM(dc_item->itemid, "Item is fetched during host and key lookup");
 		dc_get_history_recv_host(&items[i].host, dc_host, ZBX_ITEM_GET_DEFAULT);
 		dc_get_history_recv_item(&items[i], dc_item, ZBX_ITEM_GET_DEFAULT);
 	}
