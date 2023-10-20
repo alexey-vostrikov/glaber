@@ -167,7 +167,6 @@ static int glb_might_be_async_polled( const ZBX_DC_ITEM *zbx_dc_item,const ZBX_D
 #ifdef HAVE_NETSNMP				
 			if ( CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] == 0 &&  CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP_WORKER] == 0) {
 				DEBUG_ITEM(zbx_dc_item->itemid, "Item can not be async polled");
-				LOG_INF("SNMP check finished");
 				return FAIL;
 			}
 
