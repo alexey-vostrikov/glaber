@@ -1,3 +1,5 @@
+2023-10-20 ver  3.3.39 (master)
+    - fix: proxy memory leak 
 2023-10-20 ver  3.3.38 (master)
     - fix: removed excessive logging
 2023-10-20 ver  3.3.37 (master)

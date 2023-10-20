@@ -1271,8 +1271,7 @@ else {
 	foreach ($data['items'] as $item) {
 		$itemTriggerIds = array_merge($itemTriggerIds, zbx_objectValues($item['triggers'], 'triggerid'));
 	}
-	error_log("Calculating triggers\n\n");
-
+	
 	$data['itemTriggers'] = API::Trigger()->get([
 		'triggerids' => $itemTriggerIds,
 		'output' => ['triggerid', 'description', 'expression', 'recovery_mode', 'recovery_expression', 'priority',

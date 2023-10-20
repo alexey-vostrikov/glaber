@@ -1683,7 +1683,9 @@ static void sync_proxy_history(int *total_num, int proc_num)
 		} while (ZBX_DB_DOWN == (txn_rc = zbx_db_commit()));
 
 		*total_num += history_num;
-		
+
+		hc_free_item_values(history, history_num);
+
 	} while (history_num > 0 && ZBX_HC_SYNC_TIME_MAX >= time(NULL) - sync_start);
 }
 
