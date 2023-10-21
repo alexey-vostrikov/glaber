@@ -643,7 +643,7 @@ class CLineGraphDraw extends CGraphDraw {
 				$history = Manager::History()->getLastValues($items);
 
 				if ($history) {
-					return end($history[$item['itemid']])['value'];
+					return end($history[$this->ymax_itemid])['value'];
 				}
 			}
 			else {
