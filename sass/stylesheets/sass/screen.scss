@@ -227,6 +227,7 @@ $browser-sprite-path: '../img/browser-sprite.png?20221026';
 	z-index: 3;
 	max-width: calc(100% - 200px);
 	min-height: 24px;
+	width: 100%;
 
 	& > ul {
 		display: flex;

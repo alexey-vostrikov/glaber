@@ -241,6 +241,9 @@ $itemForm->addItem([
 	)
 ]);
 
+$html_page->addItem((new CDiv)->addClass('header-navigation')->addItem(
+		getHostNavigation('items', $data['hostid'], $data['parent_discoveryid'])));
+	
 $html_page
 	->addItem($itemForm)
 	->show();

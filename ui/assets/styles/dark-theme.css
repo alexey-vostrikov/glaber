@@ -3332,7 +3332,8 @@ pre, pre a, pre td, pre span {
   margin: 0 0 5px;
   z-index: 3;
   max-width: calc(100% - 200px);
-  min-height: 24px; }
+  min-height: 24px;
+  width: 100%; }
   .header-navigation > ul {
     display: flex;
     flex-wrap: wrap;

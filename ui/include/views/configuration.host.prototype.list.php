@@ -44,7 +44,9 @@ $html_page = (new CHtmlPage())
 				)
 		))->setAttribute('aria-label', _('Content controls'))
 	)
-	->setNavigation(new CHostNav(CHostNav::getData($this->data['discovery_rule']['hostid']))); 
+	->setNavigation(new CHostNav(CHostNav::getData($this->data['discovery_rule']['hostid'])))
+	->addItem((new CDiv)->addClass('header-navigation')->addItem(
+		getHostNavigation('hosts', $data['discovery_rule']['hostid'], $data['parent_discoveryid'])));
 
 	$url = (new CUrl('host_prototypes.php'))
 	->setArgument('parent_discoveryid', $data['parent_discoveryid'])

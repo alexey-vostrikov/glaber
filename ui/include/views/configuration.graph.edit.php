@@ -35,7 +35,10 @@ else {
 	$html_page
 		->setTitle(_('Graph prototypes'))
 		->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_PROTOTYPE_GRAPH_EDIT))
-		->setNavigation(new CHostNav(CHostNav::getData($data['hostid'], $data['parent_discoveryid'])));
+		->setNavigation(new CHostNav(CHostNav::getData($data['hostid'], $data['parent_discoveryid'])))
+		->addItem((new CDiv)->addClass('header-navigation')->addItem(
+			getHostNavigation('graphs', $data['hostid'], $data['parent_discoveryid'])));
+
 }
 
 $url = (new CUrl('graphs.php'))

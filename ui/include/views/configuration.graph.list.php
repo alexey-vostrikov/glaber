@@ -46,7 +46,9 @@ if (!empty($this->data['parent_discoveryid'])) {
 					)
 			))->setAttribute('aria-label', _('Content controls'))
 		)
-		->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'], $this->data['parent_discoveryid'])));
+		->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'], $this->data['parent_discoveryid'])))
+		->addItem((new CDiv)->addClass('header-navigation')->addItem(
+			getHostNavigation('graphs', $data['hostid'], $data['parent_discoveryid'])));
 }
 else {
 	$html_page = (new CHtmlPage())

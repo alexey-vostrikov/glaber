@@ -28,7 +28,9 @@ require_once dirname(__FILE__).'/js/configuration.triggers.edit.js.php';
 $html_page = (new CHtmlPage())
 	->setTitle(_('Trigger prototypes'))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_TRIGGER_PROTOTYPE_EDIT))
-	->setNavigation(new CHostNav(CHostNav::getData($data['hostid']))); 
+	->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])))
+	->addItem((new CDiv)->addClass('header-navigation')->addItem(
+		getHostNavigation('triggers', $data['hostid'], $data['parent_discoveryid'])));
 
 $url = (new CUrl('trigger_prototypes.php'))
 	->setArgument('parent_discoveryid', $data['parent_discoveryid'])

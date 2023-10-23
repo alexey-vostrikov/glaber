@@ -322,22 +322,6 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		$db_host['hostid'] = $db_host['templateid'];
 	}
 	else {
-		switch ($db_host['status']) {
-			case HOST_STATUS_MONITORED:
-				if ($db_host['maintenance_status'] == HOST_MAINTENANCE_STATUS_ON) {
-					$status = (new CSpan(_('In maintenance')))->addClass(ZBX_STYLE_ORANGE);
-				}
-				else {
-					$status = (new CSpan(_('Enabled')))->addClass(ZBX_STYLE_GREEN);
-				}
-				break;
-			case HOST_STATUS_NOT_MONITORED:
-				$status = (new CSpan(_('Disabled')))->addClass(ZBX_STYLE_RED);
-				break;
-			default:
-				$status = (new CSpan(_('Unknown')))->addClass(ZBX_STYLE_GREY);
-				break;
-		}
 
 		$host = new CSpan(
 			(new CHostLink($db_host['name'],$db_host['hostid']))
@@ -347,12 +331,6 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 			$host->addClass(ZBX_STYLE_SELECTED);
 		}
 
-		$list
-			->addItem(new CBreadcrumbs([new CSpan(new CLink(_('All hosts'),
-				(new CUrl('zabbix.php'))->setArgument('action', 'host.list'))), $host
-			]))
-			->addItem($status)
-			->addItem(getHostAvailabilityTable($db_host['interfaces']));
 
 		if ($db_host['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $db_host['hostDiscovery']['ts_delete'] != 0) {
 			$info_icons = [getHostLifetimeIndicator(time(), $db_host['hostDiscovery']['ts_delete'])];
@@ -362,7 +340,8 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 
 	$content_menu = (new CList())
 		->setAttribute('role', 'navigation')
-		->setAttribute('aria-label', _('Content menu'));
+		->setAttribute('aria-label', _('Content menu'))
+		->addClass('breadcrumbs');
 
 	$context = $is_template ? 'template' : 'host';
 
@@ -475,13 +454,13 @@ function getHostNavigation($current_element, $hostid, $lld_ruleid = 0) {
 		}
 
 		$list->addItem(new CBreadcrumbs([
-			(new CSpan())->addItem(new CLink(_('Discovery list'),
-				(new CUrl('host_discovery.php'))
-					->setArgument('filter_set', '1')
-					->setArgument('filter_hostids', [$db_host['hostid']])
-					->setArgument('context', $context)
-			)),
-			$discovery_rule
+			// (new CSpan())->addItem(new CLink(_('Discovery list'),
+			// 	(new CUrl('host_discovery.php'))
+			// 		->setArgument('filter_set', '1')
+			// 		->setArgument('filter_hostids', [$db_host['hostid']])
+			// 		->setArgument('context', $context)
+			// )),
+			 $discovery_rule
 		]));
 
 		// item prototypes
