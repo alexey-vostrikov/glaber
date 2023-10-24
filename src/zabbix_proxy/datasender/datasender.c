@@ -113,7 +113,7 @@ static int	proxy_data_sender(int *more, int now, int *hist_upload_state, const z
 			ZBX_PROXY_UPLOAD_DISABLED != *hist_upload_state)
 	{
 		zbx_json_addarray(&j, ZBX_PROTO_TAG_INTERFACE_AVAILABILITY);
-		glb_state_hosts_get_changed_ifaces_json(avail_exported_ts, &j);
+		glb_state_hosts_get_changed_ifaces_json(last_avail_export_ts, &j);
 		zbx_json_close(&j);
 		
 		history_records = zbx_proxy_get_hist_data(&j, &history_lastid, &more_history);

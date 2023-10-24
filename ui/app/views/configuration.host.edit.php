@@ -73,6 +73,8 @@ if ($data['warnings']) {
 (new CHtmlPage())
 	->setTitle(($data['hostid'] == 0) ? _('New host') : _('Host'))
 	->setNavigation(isset($data['hostid'])? (new CHostNav(CHostNav::getData($data['hostid']))) : null)
+	->addItem((new CDiv)->addClass('header-navigation')->addItem(
+		getHostNavigation('host', $data['hostid'])))
 	->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_HOST_EDIT))
 	->addItem(new CPartial('configuration.host.edit.html', $data))
 	->show();

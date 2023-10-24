@@ -1918,9 +1918,14 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 
 			if (NULL != session)
 				session->last_id = values[i].id;
-		}
 
+			//glb_state_host_process_heartbeat(items[i].host.hostid, 120);
+		}
+		
+		glb_state_host_iface_register_passive_arrive(items[0].host.hostid, "A_AGENT");
+		
 		processed_num += zbx_process_history_data(items, values, errcodes, values_num, NULL);
+
 		total_num += read_num;
 
 		zbx_agent_values_clean(values, values_num);
@@ -1960,7 +1965,7 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
  *                                                                            *
  ******************************************************************************/
 static int		process_client_history_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_timespec_t *ts,
-		zbx_client_item_validator_t validator_func, void *validator_args, char **info)
+		zbx_client_item_validator_t validator_func, void *validator_args, char **info, const char *ifname)
 {
 	int			ret;
 	char			*token = NULL;
@@ -2010,6 +2015,8 @@ static int		process_client_history_data(zbx_socket_t *sock, struct zbx_json_pars
 			goto out;
 		}
 
+		glb_state_host_iface_register_passive_arrive(hostid, ifname);
+				
 		if (NULL == token)
 			session = NULL;
 		else
@@ -2045,11 +2052,10 @@ out:
  *                FAIL - an error occurred                                    *
  *                                                                            *
  ******************************************************************************/
-int	zbx_process_agent_history_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_timespec_t *ts, char **info)
+int	zbx_process_active_agent_metrics_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_timespec_t *ts, char **info)
 {
 	zbx_host_rights_t	rights = {0};
-
-	return process_client_history_data(sock, jp, ts, agent_item_validator, &rights, info);
+	return process_client_history_data(sock, jp, ts, agent_item_validator, &rights, info, "A_AGENT");
 }
 
 /******************************************************************************
@@ -2074,7 +2080,7 @@ int	zbx_process_sender_history_data(zbx_socket_t *sock, struct zbx_json_parse *j
 
 	um_handle = zbx_dc_open_user_macros();
 
-	ret = process_client_history_data(sock, jp, ts, sender_item_validator, &rights, info);
+	ret = process_client_history_data(sock, jp, ts, sender_item_validator, &rights, info, "TRAPPER");
 
 	zbx_dc_close_user_macros(um_handle);
 

@@ -78,7 +78,9 @@ else {
 		);
 
 	if (!empty($this->data['hostid'])) {
-		$html_page->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'])));
+		$html_page->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'])))
+				  ->addItem((new CDiv)->addClass('header-navigation')
+					 		->addItem(getHostNavigation('graphs', $data['hostid'])));
 	}
 
 	// Add filter tab.

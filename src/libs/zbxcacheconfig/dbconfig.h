@@ -1003,6 +1003,8 @@ typedef struct
 
 	u_int64_t debug_trigger;
 	u_int64_t debug_item;
+	u_int64_t debug_host;
+	
 	int server_time;
 	
 	int last_speed_recalc;

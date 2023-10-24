@@ -74,7 +74,9 @@ ELEMS_CREATE(host_create_cb) {
     
     host_state_t* host_state = elem->data;
     bzero(host_state, sizeof(host_state_t));
+    DEBUG_HOST(elem->id, "Host is created in the state");
     glb_vector_host_ifaces_create(&host_state->interfaces, &conf->memf);
+
 }
 
 void interface_clear_cb(void *iface_in, mem_funcs_t *memf){
@@ -90,6 +92,7 @@ ELEMS_FREE(host_free_cb) {
    
     memf->free_func(host_state);
     elem->data = NULL;
+    DEBUG_HOST(elem->id,"Host state has been deleted");
 }
 
 ELEMS_CREATE(ip_to_host_create_cb) {
@@ -99,10 +102,6 @@ ELEMS_CREATE(ip_to_host_create_cb) {
 ELEMS_FREE(ip_to_host_free_cb) {
     strpool_free(&conf->strpool, (char *)elem->id);
 }
-
-
-
-
 
 int glb_state_hosts_init(mem_funcs_t *memf)
 {
@@ -116,10 +115,6 @@ int glb_state_hosts_init(mem_funcs_t *memf)
     conf->memf = *memf;
     strpool_init(&conf->strpool,memf);
     
-    //glb_housekeeper_register_periodic_task
-    //glb_housekeeper_register_periodic_task(update_hosts_avail_state_cb, NULL, 10);
-    // glb_register_internal_metric_handler("host", get_host_availability_cb);
-
     return SUCCEED;
 }
 
@@ -135,7 +130,14 @@ ELEMS_CALLBACK(process_heartbeat_cb) {
     
     host->last_heartbeat = time(NULL);
     host->heartbeat_frequency = *(int*)data;
-
+    DEBUG_HOST(elem->id, "Processed host heartbeat, frequency is %d", host->heartbeat_frequency);
+    
+    if (0 != host->heartbeat_frequency &&  HOST_AVAIL_STATE_DOWN == host->host_avail_state) {
+        host->last_avail_state_change = time(NULL);
+        host->host_avail_state = HOST_AVAIL_STATE_ALIVE;
+        DEBUG_HOST(elem->id, "Arrived heartbeat, setting host avail state to ALIVE");
+    }
+    
     return SUCCEED;
 }
 
@@ -155,17 +157,17 @@ ELEMS_CALLBACK(reset_host_cb) {
     host->heartbeat_frequency = 0;
     host->host_avail_state = HOST_AVAIL_STATE_UNKNOWN;
     host->last_avail_state_change = time(NULL);
-
-    //resetting all the interfaces
+       
     glb_vector_host_ifaces_iterate(&host->interfaces, reset_iface_cb, NULL);
+    DEBUG_HOST(elem->id, "Reset host interfaces, total %d ifaces", host->interfaces.values_num);
 }
 
-void glb_state_hosts_process_heartbeat(u_int64_t hostid, int freq) {
+void glb_state_host_process_heartbeat(u_int64_t hostid, int freq) {
     elems_hash_process(conf->hosts, hostid, process_heartbeat_cb, &freq, 0);
 }
 
-void glb_state_hosts_reset_heartbeat(u_int64_t hostid) {
-    glb_state_hosts_process_heartbeat(hostid, 0);
+void glb_state_host_reset_heartbeat(u_int64_t hostid) {
+    glb_state_host_process_heartbeat(hostid, 0);
 }
 
 void glb_state_hosts_reset(u_int64_t hostid) {
@@ -175,7 +177,7 @@ void glb_state_hosts_reset(u_int64_t hostid) {
 
 ELEMS_CALLBACK(get_avail_state_cb) {
     host_state_t *host = elem->data;
-
+    DEBUG_HOST(elem->id, "Requested host avail_state, state is %d", host->host_avail_state);
     return host->host_avail_state;
 }
 
@@ -221,6 +223,7 @@ ELEMS_CALLBACK(set_interface_cb) {
     int idx, new = 0;
     int now = time(NULL);
 
+    DEBUG_HOST(elem->id, "Updating host's inteface");
     if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *set_iface, interface_compare_func ))) {
      
         if (host->interfaces.values_alloc == host->interfaces.values_num)
@@ -228,6 +231,7 @@ ELEMS_CALLBACK(set_interface_cb) {
  
         idx = glb_vector_host_ifaces_append(&host->interfaces, *set_iface, &conf->memf);
         new = 1;
+        DEBUG_HOST(elem->id, "Added interface id %lld, name %s", set_iface->iface.id, set_iface->name);
     }
     
     interface = glb_vector_host_ifaces_get_element(&host->interfaces, idx);
@@ -249,7 +253,8 @@ ELEMS_CALLBACK(set_interface_cb) {
         interface->lastchange = set_iface->lastchange;
 
     if (set_iface->avail_state != interface->avail_state) {
-        
+        DEBUG_HOST(elem->id, "Interface changed state %d -> %d", interface->avail_state, set_iface->avail_state );
+
         if ( INTERFACE_AVAILABLE_FALSE == set_iface->avail_state) {
 
             if (0 == interface->first_fail)
@@ -270,21 +275,51 @@ ELEMS_CALLBACK(set_interface_cb) {
         interface->first_fail = 0;
         interface->disabled_till = 0;
         interface->avail_state = set_iface->avail_state;
-        interface->lastchange = time(NULL);
+        interface->lastchange = now;
+
+        DEBUG_HOST(elem->id, "Interface  state is %d, lastchange is %d", interface->avail_state, interface->lastchange );
     }
 
     return SUCCEED;
 }
+     
 
-void glb_state_host_set_name_interface_avail(u_int64_t hostid, char *ifname, int avail_state, const char *error) {
-    host_iface_t if_info = {.avail_state = avail_state, .error = error, .fail_count = 0, .type = IFACE_TYPE_NAME,
-        .lastchange = 0, .lastupdate = time(NULL)};
-    
-    if (NULL == ifname || 0 == ifname[0] )
-        return;
+static void set_iface_state(u_int64_t hostid,u_int64_t ifaceid, const char *ifname, int state, const char *error) {
+    host_iface_t if_info = {.avail_state = state, .error = error, .fail_count = 0,
+                            .lastchange = 0, .lastupdate = time(NULL) };
+    if (0 == ifaceid) {
+        if_info.type = IFACE_TYPE_NAME;
    
-    zbx_strlcpy(if_info.name, ifname, MIN(strlen(ifname), 15) + 1);
+        if (NULL == ifname || 0 == ifname[0] )
+        return;
+        
+        zbx_strlcpy(if_info.name, ifname, MIN(strlen(ifname), 15) + 1);
+    } else {
+        if_info.type = IFACE_TYPE_ID;
+        if_info.iface.id = ifaceid;
+    }
+
     elems_hash_process(conf->hosts, hostid, set_interface_cb, &if_info, 0);
+}
+
+void glb_state_host_iface_register_response_arrive(u_int64_t hostid,u_int64_t ifaceid, const char *ifname) {
+    DEBUG_HOST(hostid, "Set host interface AVAIL due to response arrive ,id %lld,  ifname %s", ifaceid, ifname);
+    set_iface_state(hostid, ifaceid, ifname, INTERFACE_AVAILABLE_TRUE, NULL);
+}
+
+void glb_state_host_iface_register_timeout(u_int64_t hostid,u_int64_t ifaceid, const char *ifname, const char *error) {
+    DEBUG_HOST(hostid, "Register interface timeout, id %lld,  ifname %s", ifaceid, ifname);
+    set_iface_state(hostid, ifaceid, ifname, INTERFACE_AVAILABLE_FALSE, error);
+}
+
+void glb_state_host_iface_create(u_int64_t hostid,u_int64_t ifaceid, const char *ifname) {
+    DEBUG_HOST(hostid, "Created interface, id %lld,  ifname %s", ifaceid, ifname);
+    set_iface_state(hostid, ifaceid, ifname, INTERFACE_AVAILABLE_UNKNOWN, NULL);
+}
+
+void glb_state_host_iface_register_passive_arrive(u_int64_t hostid, const char *ifname) {
+    DEBUG_HOST(hostid, "Registering data arrive on passive iface %s", ifname);
+    set_iface_state(hostid, 0, ifname, INTERFACE_AVAILABLE_TRUE, NULL);
 }
 
 
@@ -299,17 +334,12 @@ ELEMS_CALLBACK(update_host_avail_state_cb) {
         return SUCCEED;
     }
     
-    if (host->heartbeat_frequency + host->last_heartbeat < now)
+    if ((host->heartbeat_frequency + host->last_heartbeat < now) && 
+                    HOST_AVAIL_STATE_DOWN != host->host_avail_state ) {
+        DEBUG_HOST(elem->id, "Heartbeat timer expired, setting host avail to DONW");
         host->host_avail_state = HOST_AVAIL_STATE_DOWN;
-    else 
-        host->host_avail_state = HOST_AVAIL_STATE_ALIVE;
-
-    if (old_state != host->host_avail_state) 
         host->last_avail_state_change = now;
-    
-    if  ( 0 == host->last_avail_state_change )
-        host->last_avail_state_change = now;
-
+    }
 }
 
 void update_hosts_avail_state_cb(void) {
@@ -319,16 +349,7 @@ void update_hosts_avail_state_cb(void) {
 
 }
 
-void glb_state_host_set_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid,  int avail_state, const char *error) {
-    host_iface_t if_info = {.avail_state = avail_state, .error = error, .fail_count = 0, .type = IFACE_TYPE_ID, .iface.id = interfaceid,
-                .lastchange = 0, .lastupdate = time(NULL)};
-    
-    elems_hash_process(conf->hosts, hostid, set_interface_cb, &if_info, 0);
-    //TODO: impelement housekeeper timer events with registration
-    //to run periodic tasks on the state/conf, etc
-    RUN_ONCE_IN(60);
-    update_hosts_avail_state_cb();
-}
+
 
 ELEMS_CALLBACK(is_interface_pollable_cb) {
     host_state_t *host = elem->data;
@@ -337,19 +358,28 @@ ELEMS_CALLBACK(is_interface_pollable_cb) {
 
     if (FAIL == (idx = glb_vector_host_ifaces_search(&host->interfaces, *set_iface, interface_compare_func)))
         return SUCCEED;
-
+  
     interface = glb_vector_host_ifaces_get_element(&host->interfaces, idx);
 
-    if (INTERFACE_AVAILABLE_FALSE != interface->avail_state)
+    if (INTERFACE_AVAILABLE_FALSE != interface->avail_state) {
+        DEBUG_HOST(elem->id, "Requested host iface id %lld, name %s avail status, status is AVAILABLE", 
+                        set_iface->iface.id, set_iface->name);
         return SUCCEED;
+    }
     
     if ( interface->disabled_till > time(NULL)) {
         set_iface->disabled_till = interface->disabled_till;
+        DEBUG_HOST(elem->id, "Requested host iface avail status iface id %lld, name %s, status is UNAVAILABLE, disabled for %d more seconds", 
+                                    set_iface->iface.id, set_iface->name, set_iface->disabled_till - time(NULL));
         return FAIL;
     }
 
     //interface is AVAIL_FALSE, but disable time expired, allow to poll once and set disable till again
+    DEBUG_HOST(elem->id, "Requested host iface id %lld, name %s, avail status, status is UNAVAILABLE, allowing single poll and marking disabled for %d more seconds", 
+                                   set_iface->iface.id, set_iface->name, CONFIG_UNREACHABLE_DELAY);
+
     interface->disabled_till = time(NULL) + CONFIG_UNREACHABLE_DELAY;
+    
     return SUCCEED;
 }
 
@@ -369,21 +399,22 @@ static int  is_interface_pollable(u_int64_t hostid, host_iface_t *if_info, int *
 
 }
 
-int glb_state_host_is_name_interface_pollable(u_int64_t hostid, char *ifname, int *disabled_till) {
-    host_iface_t if_info = {.type = IFACE_TYPE_NAME };
+int glb_state_host_is_interface_pollable(u_int64_t hostid, u_int64_t ifaceid, const char *ifname, int *disabled_till) {
+    host_iface_t if_info = {0};
 
-    zbx_strlcpy(if_info.name, ifname, strlen(ifname) + 1);
+    if (0 == ifaceid) {
+        if ( NULL == ifname) //this is possible for templated items, it's ok to skip them
+            return INTERFACE_AVAILABLE_UNKNOWN;
+
+        if_info.type = IFACE_TYPE_NAME;
+        zbx_strlcpy(if_info.name, ifname, strlen(ifname) + 1);
+    } else {
+        if_info.type = IFACE_TYPE_ID;
+        if_info.iface.id = ifaceid;
+    }
 
     return is_interface_pollable(hostid, &if_info, disabled_till);
 }
-
-int glb_state_host_is_id_interface_pollable(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till) {
-
-    host_iface_t if_info = {.type = IFACE_TYPE_ID, .iface.id = interfaceid };
-
-    return is_interface_pollable(hostid, &if_info, disabled_till);
-}
-
 
 ELEMS_CALLBACK(get_interface_avail_cb) {
     host_state_t *host = elem->data;
@@ -437,8 +468,12 @@ void generate_iface_state_json_cb(void *if_info, void *data) {
     json_gen_t *req = data;
     struct zbx_json *j = req->j;
 
-    if (req->change_timestamp > 0 && req->change_timestamp > iface->lastchange)
+    DEBUG_HOST(req->hostid, "Processing iface %s %lld ", iface->name, iface->iface.id);
+    if (req->change_timestamp > 0 && req->change_timestamp > iface->lastchange) {
+        DEBUG_HOST(req->hostid, "Iface %s %lld is not changed ( req ts: %d, if lastchange %d), not adding to state data", 
+            iface->name, iface->iface.id, req->change_timestamp, iface->lastchange);
         return;
+    }
     
     zbx_json_addobject(j, NULL);
     zbx_json_adduint64(j,"hostid", req->hostid);
@@ -451,9 +486,11 @@ void generate_iface_state_json_cb(void *if_info, void *data) {
 	zbx_json_adduint64(j, ZBX_PROTO_TAG_AVAILABLE, iface->avail_state);
     zbx_json_adduint64(j, "lastchange", iface->lastchange);
     zbx_json_adduint64(j, "lastupdate", iface->lastupdate);
-	zbx_json_addstring(j, ZBX_PROTO_TAG_ERROR, iface->error, ZBX_JSON_TYPE_STRING);
+ 	zbx_json_addstring(j, ZBX_PROTO_TAG_ERROR, iface->error, ZBX_JSON_TYPE_STRING);
 
 	zbx_json_close(j);
+
+
 }
 
 ELEMS_CALLBACK(get_ifaces_avail_state_json_cb) {
@@ -463,7 +500,7 @@ ELEMS_CALLBACK(get_ifaces_avail_state_json_cb) {
     req->hostid = elem->id;
 
     glb_vector_host_ifaces_iterate(&host->interfaces, generate_iface_state_json_cb, req);
-    return SUCCEED;
+     return SUCCEED;
 }
 
 int glb_state_host_get_interfaces_avail_json(u_int64_t hostid, struct zbx_json *j) {
@@ -477,7 +514,6 @@ int glb_state_hosts_get_interfaces_avail_json(zbx_vector_uint64_t *hostids, stru
      
         int res = glb_state_host_get_interfaces_avail_json(hostids->values[i], j);
     }
-
 }
 
 int glb_state_hosts_get_changed_ifaces_json(int timestamp, struct zbx_json *j) {
@@ -519,12 +555,12 @@ int parse_interface_record(const char *p) {
     
     glb_json_get_int_value_by_name(&jp, "lastupdate", &iface.lastupdate);
     glb_json_get_int_value_by_name(&jp, "lastchange", &iface.lastchange);
-    
+
     if (SUCCEED == zbx_json_value_by_name(&jp, "error", buffer, MAX_STRING_LEN, &type))
         iface.error = buffer;
     
     iface.fail_count = MAX_IFACE_TIMEOUT_COUNT + 1;
-
+    DEBUG_HOST(hostid, "Arrived host info via json, setting interface: %s", jp.start);
     return elems_hash_process(conf->hosts, hostid, set_interface_cb, &iface, 0);
 }
 
@@ -711,4 +747,4 @@ int glb_state_hosts_set_avail_states_from_json(struct zbx_json_parse *jp) {
         parse_host_avail_record(p);
 
     return SUCCEED;
-}
+}   

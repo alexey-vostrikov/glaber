@@ -29,7 +29,10 @@ $html_page = (new CHtmlPage())
 
 // append host summary to widget header
 if (!empty($this->data['hostid'])) {
-	$html_page->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'])));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($this->data['hostid'])))
+							->addItem((new CDiv)->addClass('header-navigation')
+							->addItem(getHostNavigation('web', $data['hostid'])));
+
 }
 
 $url = (new CUrl('httpconf.php'))

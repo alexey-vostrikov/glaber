@@ -145,9 +145,9 @@ static int item_interface_is_pollable(poller_item_t *item, int *disabled_till) {
 		return SUCCEED;
 
 	if (1 == conf.poller.is_named_iface )  
-		return glb_state_host_is_name_interface_pollable(item->hostid, conf.poller.proto_name, disabled_till);
+		return glb_state_host_is_interface_pollable(item->hostid, 0, conf.poller.proto_name, disabled_till);
 
-	return glb_state_host_is_id_interface_pollable(item->hostid, item->interfaceid, disabled_till);
+	return glb_state_host_is_interface_pollable(item->hostid, item->interfaceid, NULL,  disabled_till);
 
 }
 
@@ -612,11 +612,11 @@ void poller_iface_register_timeout(poller_item_t *item)
 
 	if (1 == conf.poller.is_named_iface) { 
 		DEBUG_ITEM(item->itemid, "Registering interface timeout by iface name %s", conf.poller.proto_name);
-		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_FALSE, "Request timeout");
+		glb_state_host_iface_register_timeout(item->hostid, 0, conf.poller.proto_name, "Request timeout");
 	}
 	else  {
 		DEBUG_ITEM(item->itemid, "Registering interface timeout by iface id %lld", item->interfaceid);
-		glb_state_host_set_id_interface_avail(item->hostid, item->interfaceid, INTERFACE_AVAILABLE_FALSE, "Request timeout");
+		glb_state_host_iface_register_timeout(item->hostid, item->interfaceid, NULL,  "Request timeout");
 	}
 }
 
@@ -627,11 +627,14 @@ void poller_iface_register_succeed(poller_item_t *item)
 			return;
 	}
 	
+	//TODO: some caching might be impelemented here, we can register responses once a second
+	//that will save cpus and locks on the iface state data
+
 	if (1 == conf.poller.is_named_iface) {
-		glb_state_host_set_name_interface_avail(item->hostid, conf.poller.proto_name, INTERFACE_AVAILABLE_TRUE, "Got a repsonse");
+		glb_state_host_iface_register_response_arrive(item->hostid, 0, conf.poller.proto_name);
 	}
 	else 
-		glb_state_host_set_id_interface_avail(item->hostid, item->interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a repsonse");	
+		glb_state_host_iface_register_response_arrive(item->hostid, item->interfaceid, NULL);	
 }
 
 void poller_set_poller_callbacks(init_item_cb init_item, delete_item_cb delete_item,

@@ -100,6 +100,7 @@
 
 u_int64_t CONFIG_DEBUG_ITEM = 0;
 u_int64_t CONFIG_DEBUG_TRIGGER = 0;
+u_int64_t CONFIG_DEBUG_HOST = 0;
 
 int CONFIG_ICMP_METHOD = GLB_ICMP;
 char *CONFIG_VCDUMP_LOCATION = NULL;
@@ -220,8 +221,9 @@ static struct zbx_option longopts[] =
 		{"version", 0, NULL, 'V'},
 		{NULL}};
 
-void DC_set_debug_item(u_int64_t);
-void DC_set_debug_trigger(u_int64_t);
+void DC_set_debug_item(u_int64_t id);
+void DC_set_debug_trigger(u_int64_t id);
+void DC_set_debug_host(u_int64_t id);
 
 /* short options */
 static char shortopts[] = "c:hVR:f";
@@ -978,6 +980,8 @@ static void zbx_load_config(ZBX_TASK_EX *task)
 			 PARM_OPT, 0, 0},
 			{"DebugTrigger", &CONFIG_DEBUG_TRIGGER, TYPE_INT,
 			 PARM_OPT, 0, 0},
+			{"DebugHost", &CONFIG_DEBUG_HOST, TYPE_INT,
+			 PARM_OPT, 0, 0},
 			{"StartWorkerServers", &CONFIG_FORKS[GLB_PROCESS_TYPE_SERVER], TYPE_INT,
 			 PARM_OPT, 0, 8},
 			{"StartGlbSNMPPollers", &CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP], TYPE_INT,
@@ -1650,6 +1654,7 @@ static int server_startup(zbx_socket_t *listen_sock, zbx_socket_t *api_listen_so
 
 	DC_set_debug_item(CONFIG_DEBUG_ITEM);
 	DC_set_debug_trigger(CONFIG_DEBUG_TRIGGER);
+	DC_set_debug_host(CONFIG_DEBUG_HOST);
 
 	if (FAIL == glb_internal_metrics_init()) {
 		zbx_error("Cannot initialize internal metrics register API");

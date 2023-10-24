@@ -170,7 +170,9 @@ $html_page = (new CHtmlPage())
 	);
 
 if ($data['single_selected_hostid'] != 0) {
-	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['single_selected_hostid'])));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['single_selected_hostid'])))
+			  ->addItem((new CDiv)->addClass('header-navigation')
+			  					  ->addItem(getHostNavigation('triggers', $data['single_selected_hostid'])));
 }
 
 $html_page->addItem($filter);

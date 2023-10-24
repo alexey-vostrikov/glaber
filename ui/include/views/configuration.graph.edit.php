@@ -29,7 +29,9 @@ if ($data['parent_discoveryid'] === null) {
 	$html_page
 		->setTitle(_('Graphs'))
 		->setDocUrl(CDocHelper::getUrl(CDocHelper::DATA_COLLECTION_GRAPH_EDIT))
-		->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])));
+		->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])))
+		->addItem((new CDiv)->addClass('header-navigation')
+							->addItem(getHostNavigation('graphs', $data['hostid'])));
 }
 else {
 	$html_page

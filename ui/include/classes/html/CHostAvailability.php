@@ -105,9 +105,9 @@ class CHostAvailability extends CTag {
 	public function toString($destroy = true) {
 		foreach ($this->type_interfaces as $type => $interfaces) {
 			// Add active checks to agent interfaces.
-			if ($type == INTERFACE_TYPE_AGENT) {
-				$interfaces = array_merge($interfaces, $this->type_interfaces[INTERFACE_TYPE_AGENT_ACTIVE]);
-			}
+			//if ($type == INTERFACE_TYPE_AGENT) {
+			//	$interfaces = array_merge($interfaces, $this->type_interfaces[INTERFACE_TYPE_AGENT_ACTIVE]);
+			//}
 
 			if (!$interfaces ||  INTERFACE_TYPE_AGENT_ACTIVE == $type ) {
 								//} || !array_key_exists($type, static::LABELS)) {

@@ -31,7 +31,10 @@ $html_page = (new CHtmlPage())
 $host = $data['host'];
 
 if (!empty($data['hostid'])) {
-	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])));
+	$html_page->setNavigation(new CHostNav(CHostNav::getData($data['hostid'])))
+			  ->addItem((new CDiv)->addClass('header-navigation')->addItem(
+									getHostNavigation('items', $data['hostid'])));
+	
 }
 
 $url = (new CUrl('items.php'))

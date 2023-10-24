@@ -158,7 +158,8 @@ const char	*help_message[] = {
 	NULL	/* end of text */
 };
 
-void DC_set_debug_item(uint64_t CONFIG_DEBUG_ITEM);
+void DC_set_debug_item(uint64_t id);
+void DC_set_debug_host(uint64_t id);
 /* COMMAND LINE OPTIONS */
 
 /* long options */
@@ -191,6 +192,8 @@ static unsigned char	get_program_type(void)
 }
 
 u_int64_t CONFIG_DEBUG_ITEM 	= 0;
+u_int64_t CONFIG_DEBUG_HOST 	= 0;
+
 int CONFIG_ICMP_METHOD			= GLB_ICMP;
 char *CONFIG_GLBMAP_LOCATION	= NULL;
 char *CONFIG_SNMP_WORKER_LOCATION = NULL;
@@ -857,6 +860,8 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	1,			100},
 		{"DebugItem",			&CONFIG_DEBUG_ITEM,			TYPE_INT,
 			PARM_OPT,	0,			0},
+		{"DebugHost", &CONFIG_DEBUG_HOST, TYPE_INT,
+			 PARM_OPT, 0, 0},
 		{"StartGlbSNMPPollers",		&CONFIG_FORKS[GLB_PROCESS_TYPE_SNMP] ,			TYPE_INT,
 			PARM_OPT,	0,			10},	
 		{"StartGlbPingers",		&CONFIG_FORKS[GLB_PROCESS_TYPE_PINGER] ,			TYPE_INT,
@@ -1563,6 +1568,7 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 	}
 
 	DC_set_debug_item(CONFIG_DEBUG_ITEM);
+	DC_set_debug_host(CONFIG_DEBUG_HOST);
 
 	if (SUCCEED != zbx_init_selfmon_collector(get_config_forks, &error))
 	{

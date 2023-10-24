@@ -52,8 +52,11 @@
 
 void DC_set_debug_trigger(uint64_t id);
 void DC_set_debug_item(uint64_t id);
+void DC_set_debug_host(uint64_t id);
 u_int64_t DC_get_debug_trigger();
 uint64_t DC_get_debug_item();
+uint64_t DC_get_debug_host();
+
 int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type) ;
  
 
@@ -163,6 +166,7 @@ static void glb_trapper_get_debug(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	zbx_json_addobject(&json, "data");
 	zbx_json_adduint64(&json, "itemid", DC_get_debug_item());
 	zbx_json_adduint64(&json, "triggerid", DC_get_debug_trigger());
+	zbx_json_adduint64(&json, "hostid", DC_get_debug_host());
 	zbx_json_close(&json);
 
 	LOG_DBG("%s: Response is %s",__func__, json.buffer);
@@ -189,6 +193,11 @@ static void glb_trapper_set_debug(zbx_socket_t *sock, struct zbx_json_parse *jp)
 	if (SUCCEED == zbx_json_value_by_name(jp, "itemid", tmp_str, MAX_ID_LEN, &type) ) {
 			id = strtol(tmp_str, NULL, 10);
 			DC_set_debug_item(id);
+	}
+
+	if (SUCCEED == zbx_json_value_by_name(jp, "hostid", tmp_str, MAX_ID_LEN, &type) ) {
+			id = strtol(tmp_str, NULL, 10);
+			DC_set_debug_host(id);
 	}
 
 	(void)zbx_tcp_send(sock, json.buffer);
@@ -424,7 +433,7 @@ static void	recv_agenthistory(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	if (SUCCEED != (ret = zbx_process_agent_history_data(sock, jp, ts, &info)))
+	if (SUCCEED != (ret = zbx_process_active_agent_metrics_data(sock, jp, ts, &info)))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "received invalid agent history data from \"%s\": %s", sock->peer, info);
 	}
@@ -1276,7 +1285,6 @@ static int	process_active_check_heartbeat(struct zbx_json_parse *jp)
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HEARTBEAT_FREQ, hbfreq, sizeof(hbfreq), NULL))
 		return FAIL;
 
-	glb_state_hosts_process_heartbeat(hostid, atoi(hbfreq));
 	return SUCCEED;
 }
 

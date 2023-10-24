@@ -643,14 +643,16 @@ static int	get_values(unsigned char poller_type, int *nextcheck, const zbx_confi
 			case AGENT_ERROR:
 				if (ITEM_TYPE_AGENT == items[i].type ||	ITEM_TYPE_SNMP == items[i].type ||
 					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type)
-					glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_TRUE, "Got a response");
+					glb_state_host_iface_register_response_arrive(items[i].host.hostid,
+									 				items[i].interface.interfaceid, NULL);
 				break;
 			case NETWORK_ERROR:
 			case GATEWAY_ERROR:
 			case TIMEOUT_ERROR:
 				if (ITEM_TYPE_AGENT == items[i].type ||	ITEM_TYPE_SNMP == items[i].type ||
 					ITEM_TYPE_JMX == items[i].type || ITEM_TYPE_IPMI == items[i].type) 
-				glb_state_host_set_id_interface_avail(items[i].host.hostid, items[i].interface.interfaceid, INTERFACE_AVAILABLE_FALSE, "There was a timeout/configuration/network error");
+					glb_state_host_iface_register_timeout(items[i].host.hostid, items[i].interface.interfaceid, 
+									NULL, "There was a timeout/configuration/network error");
 				break;		
 			case FAIL:
 			case CONFIG_ERROR:

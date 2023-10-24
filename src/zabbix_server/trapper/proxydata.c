@@ -170,6 +170,7 @@ void	zbx_recv_proxy_data(zbx_socket_t *sock, struct zbx_json_parse *jp, zbx_time
 			goto out;
 	}
 
+	glb_state_host_iface_register_passive_arrive(proxy.hostid, "PROXY_A");
 
 	if (!ZBX_IS_RUNNING())
 	{

@@ -21,6 +21,8 @@
 #include "glb_state.h"
 #include "zbxjson.h"
 
+#define IFACE_SPEED_ACCOUNT_TIMEOUT 60
+
 typedef enum {
     HOST_AVAIL_STATE_UNKNOWN = 0,
     HOST_AVAIL_STATE_ALIVE, 
@@ -28,7 +30,7 @@ typedef enum {
 } glb_host_heartbeat_status_t;
 
 
-typedef enum {
+typedef enum { //should be php-synced if changed
     INTERFACE_AVAILABLE_UNKNOWN = 0,
     INTERFACE_AVAILABLE_TRUE = 1,
     INTERFACE_AVAILABLE_FALSE = 2
@@ -39,12 +41,15 @@ int glb_state_hosts_destroy();
 
 void glb_state_host_delete(u_int64_t hostid);
 
-void glb_state_host_set_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid, int avail_state, const char *error);
-void glb_state_host_set_name_interface_avail(u_int64_t hostid, char *ifname, int avail_state, const char *error);
+//for accounting outgoing traffic
+void glb_state_host_iface_register_response_arrive(u_int64_t hostid, u_int64_t interfaceid, const char* ifname);
+//timeout handling
+void glb_state_host_iface_register_timeout(u_int64_t hostid, u_int64_t interfaceid, const char* ifname, const char *error);
+//accounting passive data (agent, trapper, proxy, log, etc)
+void glb_state_host_iface_register_passive_arrive(u_int64_t hostid, const char* ifname);
+//to create iface on item creation 
+void glb_state_host_iface_create(u_int64_t hostid,  u_int64_t interfaceid, const char* ifname);
 
-void glb_state_host_process_heartbeat(u_int64_t hostid, int freq);
-void glb_state_host_reset_heartbeat(u_int64_t hostid);
-int  glb_state_host_get_heartbeat_alive_status(u_int64_t hostid); 
 void glb_state_host_reset(u_int64_t hostid);
 
 int glb_state_host_get_interfaces_avail_json(u_int64_t hostid, struct zbx_json *j);
@@ -55,15 +60,10 @@ void glb_state_hosts_get_changed_avail_states_json(int timestamp, struct zbx_jso
 int glb_state_hosts_set_avail_states_from_json(struct zbx_json_parse *jp);
 
 int glb_state_host_get_interface_avail_by_type(u_int64_t hostid, int iface_type, const char *if_name);
+int glb_state_host_is_interface_pollable(u_int64_t hostid, u_int64_t interfaceid, const char *ifname, int *disabled_till);
 
-
-int glb_state_host_is_name_interface_pollable(u_int64_t hostid, char *ifname, int *disabled_till);
-int glb_state_host_is_id_interface_pollable(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till);
-
-int glb_state_host_get_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till);
-
+int glb_state_host_get_interface_avail(u_int64_t hostid, u_int64_t interfaceid, const char *ifname, int *disabled_till);
 int glb_state_host_set_interfaces_from_json(struct zbx_json_parse *jp);
-void glb_state_hosts_process_heartbeat(u_int64_t hostid, int freq);
 
 int     glb_state_host_register_ip(const char *addr, u_int64_t hostid);
 void    glb_state_hosts_release_ip(const char *addr);

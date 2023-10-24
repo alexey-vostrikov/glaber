@@ -32,6 +32,7 @@ class CControllerDebugList extends CController {
 		$fields = [
 			'triggerid' =>			'string',
 			'itemid'	=>	'string',
+			'hostid'	=>	'string',
 			'apply_new' => 'string'
 		];
 
@@ -51,6 +52,7 @@ class CControllerDebugList extends CController {
 	protected function doAction() {
 		$itemid = $this->getInput('itemid', 0 );
 		$triggerid = $this->getInput('triggerid', 0);
+		$hostid = $this->getInput('hostid', 0);
 		$apply_new = $this->getInput('apply_new', 0);
 		
 		if ( $apply_new > 0 ) {
@@ -63,12 +65,16 @@ class CControllerDebugList extends CController {
 			
 			if (isset($response['triggerid'])) 
 				$triggerid = $response['triggerid'];
+			
+			if (isset($response['hostid'])) 
+				$hostid = $response['hostid'];
 
 		}
 
 		$data = [
 			'triggerid' => $triggerid,
-			'itemid' => $itemid
+			'itemid' => $itemid,
+			'hostid' => $hostid
 		];
 		
 		$response = new \CControllerResponseData($data);

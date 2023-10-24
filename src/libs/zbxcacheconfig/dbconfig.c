@@ -1659,7 +1659,7 @@ static void DCsync_hosts(zbx_dbsync_t *sync, zbx_uint64_t revision, zbx_vector_u
 				{
 					interface = (ZBX_DC_INTERFACE *)host->interfaces_v.values[i];
 					//THIS IS OK to run during sync
-					glb_state_host_set_id_interface_avail(host->hostid, interface->interfaceid, INTERFACE_AVAILABLE_FALSE, NULL );
+					glb_state_host_iface_create(host->hostid, interface->interfaceid, NULL);
 				}
 			}
 
@@ -11081,7 +11081,7 @@ int DCconfig_get_poller_items(unsigned char poller_type, int config_timeout, DC_
 	
 		UNLOCK_CACHE;
 		/*need to unlock to avoid deadlocks while doing another lock*/
-		iface_avail = glb_state_host_is_id_interface_pollable(hostid, ifaceid, &disabled_until);
+		iface_avail = glb_state_host_is_interface_pollable(hostid, ifaceid, NULL, &disabled_until);
 		/*we also updated nextcheck of the last requeued item*/
 		if (last_requeued_item) {
 			glb_state_item_update_nextcheck(last_requeued_item, nextcheck);
@@ -11354,7 +11354,7 @@ int DCconfig_get_ipmi_poller_items(int now, int items_num, int config_timeout, D
 
 		UNLOCK_CACHE;
 
-		iface_avail = glb_state_host_is_id_interface_pollable(hostid, ifaceid, &disable_until);
+		iface_avail = glb_state_host_is_interface_pollable(hostid, ifaceid, NULL, &disable_until);
 
 		if (last_requeued_item) {
 			glb_state_item_update_nextcheck(last_requeued_item, item_nextcheck);
@@ -15628,6 +15628,11 @@ u_int64_t DC_get_debug_trigger()
 	return config->debug_trigger;
 }
 
+u_int64_t DC_get_debug_host()
+{
+	return config->debug_host;
+}
+
 void DC_set_debug_item(uint64_t id)
 {
 	WRLOCK_CACHE;
@@ -15642,6 +15647,15 @@ void DC_set_debug_trigger(uint64_t id)
 	config->debug_trigger = id;
 	UNLOCK_CACHE;
 	DEBUG_TRIGGER(id, "STARTED DEBUG");
+}
+
+void DC_set_debug_host(uint64_t id)
+{
+	WRLOCK_CACHE;
+	config->debug_host = id;
+	UNLOCK_CACHE;
+	LOG_INF("Set host debug to %d",id);
+	DEBUG_HOST(id, "STARTED DEBUG");
 }
 
 int zbx_dc_get_item_type(zbx_uint64_t itemid, int *value_type)
