@@ -1,4 +1,4 @@
-2023-10-24 ver  3.3.42 (master)
+2023-10-24 ver  3.3.42 3.3.43 (master)
     - feat: host state debugg
     - fix: interface states passed from proxy
     - fix: config nabigation restored for hosts

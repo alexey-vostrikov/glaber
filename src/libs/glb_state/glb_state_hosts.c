@@ -349,8 +349,6 @@ void update_hosts_avail_state_cb(void) {
 
 }
 
-
-
 ELEMS_CALLBACK(is_interface_pollable_cb) {
     host_state_t *host = elem->data;
     host_iface_t  *set_iface = data, *interface = NULL;
@@ -393,7 +391,8 @@ static int  is_interface_pollable(u_int64_t hostid, host_iface_t *if_info, int *
     if (-1 == if_info->disabled_till) 
         return SUCCEED;
 
-    *disabled_till = if_info->disabled_till;
+    if (NULL != disabled_till)
+        *disabled_till = if_info->disabled_till;
 
     return FAIL;
 
@@ -443,18 +442,30 @@ static int  get_interface_avail(u_int64_t hostid, host_iface_t *if_info, int *di
     
     if (-1 == if_info->disabled_till) 
         return SUCCEED;
-
-    *disabled_till = if_info->disabled_till;
+    
+    if (NULL != disabled_till)
+        *disabled_till = if_info->disabled_till;
 
     return FAIL;
 }
-int glb_state_host_get_id_interface_avail(u_int64_t hostid, u_int64_t interfaceid, int *disabled_till) {
 
-    host_iface_t if_info = {.type = IFACE_TYPE_ID, .iface.id = interfaceid };
+int glb_state_host_iface_get_avail(u_int64_t hostid, u_int64_t interfaceid, const char *ifname, int *disabled_till) {
+    
+    host_iface_t if_info;
+
+    if ( 0 == interfaceid ) {
+      if ( NULL == ifname) //this is possible for templated items, it's ok to skip them
+            return INTERFACE_AVAILABLE_UNKNOWN;
+
+        if_info.type = IFACE_TYPE_NAME;
+        zbx_strlcpy(if_info.name, ifname, strlen(ifname) + 1);
+    } else {
+        if_info.type = IFACE_TYPE_ID;
+        if_info.iface.id = interfaceid;
+    }
 
     return get_interface_avail(hostid, &if_info, disabled_till);
 }
-
 
 typedef struct {
     struct zbx_json *j;
@@ -479,7 +490,7 @@ void generate_iface_state_json_cb(void *if_info, void *data) {
     zbx_json_adduint64(j,"hostid", req->hostid);
 
     if (IFACE_TYPE_ID == iface->type )
- 		zbx_json_adduint64(j, ZBX_PROTO_TAG_INTERFACE_ID, iface->iface.id);
+    zbx_json_adduint64(j, ZBX_PROTO_TAG_INTERFACE_ID, iface->iface.id);
     
     zbx_json_addstring(j, "interface_name", iface->name, ZBX_JSON_TYPE_STRING);
 

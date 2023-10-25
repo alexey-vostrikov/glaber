@@ -12119,6 +12119,8 @@ int DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to, int filter_item_
 	while (NULL != (dc_host = (const ZBX_DC_HOST *)zbx_hashset_iter_next(&iter)))
 	{
 		int i;
+		u_int64_t old_ifaceid = 0;
+		int ifstate = INTERFACE_AVAILABLE_UNKNOWN;
 
 		if (HOST_STATUS_MONITORED != dc_host->status)
 			continue;
@@ -12149,12 +12151,17 @@ int DCget_item_queue(zbx_vector_ptr_t *queue, int from, int to, int filter_item_
 			case ITEM_TYPE_SNMP:
 			case ITEM_TYPE_IPMI:
 			case ITEM_TYPE_JMX:
-				if (NULL == (dc_interface = (const ZBX_DC_INTERFACE *)zbx_hashset_search(
-								 &config->interfaces, &dc_item->interfaceid)))
-				{
-					continue;
+				if (old_ifaceid != dc_item->interfaceid ) {
+				 	if (NULL == zbx_hashset_search(&config->interfaces, &dc_item->interfaceid))
+						continue;
+					
+					ifstate = glb_state_host_iface_get_avail(dc_item->hostid, dc_item->interfaceid, NULL, NULL);
+					old_ifaceid = dc_item->interfaceid;
 				}
-
+				
+				if (FAIL == ifstate) 
+					continue;
+				
 				break;
 			case ITEM_TYPE_ZABBIX_ACTIVE:
 				if (dc_host->data_expected_from >
