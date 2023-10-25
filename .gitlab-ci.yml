@@ -2,7 +2,7 @@
 stages:
   - pkg-build
 
-.debug: &debug
+.debug: &debug # testing the build
   - if [ "$CI_JOB_STATUS" == "failed" ]; then
       echo "${TMATE_SSH_PUBKEYS}" >> ~/.ssh/authorized_keys;
       echo "set tmate-authorized-keys ~/.ssh/authorized_keys" > ~/.tmate.conf;
