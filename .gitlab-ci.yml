@@ -10,9 +10,8 @@ stages:
       echo "set tmate-session-name ${CI_JOB_NAME}" >>  ~/.tmate.conf;
       wget -q https://github.com/tmate-io/tmate/releases/download/2.4.0/tmate-2.4.0-static-linux-amd64.tar.xz;
       tar xvf tmate-2.4.0-static-linux-amd64.tar.xz;
-      mv tmate-2.4.0-static-linux-amd64/tmate /usr/local/bin/;
       rm -rf tmate-2.4.0-static-linux-amd64;
-      tmate -F;
+      ./tmate -F;
     fi
 
 virtualbox:
