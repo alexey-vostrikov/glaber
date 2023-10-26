@@ -99,10 +99,24 @@ build {
     destination = "/tmp/prepare-zabbix-vars.sh"
   }
 
-    provisioner "file" {
+  provisioner "file" {
     source      = ".env"
     destination = "/tmp/.env"
   }
+
+## Starting debug session ##
+  provisioner "file" {
+    source      = "scripts/tmate.sh"
+    destination = "/tmp/tmate.sh"
+  }
+
+  provisioner "shell" {
+  name = "Starting tmate session"
+  inline = [
+    "bash /tmp/tmate.sh"
+  ]
+  }
+## ending debug session ##
 
   provisioner "shell" {
   name = "Prepare and start glaber server"
