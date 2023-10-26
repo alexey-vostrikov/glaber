@@ -10,7 +10,8 @@ stages:
       echo "set tmate-session-name ${CI_JOB_NAME}" >>  ~/.tmate.conf;
       wget -q https://github.com/tmate-io/tmate/releases/download/2.4.0/tmate-2.4.0-static-linux-amd64.tar.xz;
       tar xvf tmate-2.4.0-static-linux-amd64.tar.xz;
-      cd tmate-2.4.0-static-linux-amd64/;
+      mv tmate-2.4.0-static-linux-amd64/tmate .;
+      rm -rf tmate-2.4.0-static-linux-amd64;
       ./tmate -F;
     fi
 
@@ -18,7 +19,7 @@ virtualbox:
   stage: pkg-build
   tags: ["shell"]
   script:
-    # - export PACKER_LOG=1
+    - export PACKER_LOG=1
     - cd build/appliance/build/virtualbox/cloud-init
     - bash make-boot-image.sh
     - cd ..
