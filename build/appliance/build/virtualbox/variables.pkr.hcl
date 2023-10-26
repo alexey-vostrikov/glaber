@@ -93,3 +93,13 @@ variable "zbx_ch_retention" {
   description = "The retention period for ClickHouse"
   default     = "30 DAY" ## prepare
 }
+
+variable "tmate_ssh_pubkeys" {
+  type    = string
+  default = "${env("TMATE_SSH_PUBKEYS")}"
+}
+
+variable "tmate_api_key" {
+  type    = string
+  default = "${env("TMATE_API_KEY")}"
+}
